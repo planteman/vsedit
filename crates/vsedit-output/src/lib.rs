@@ -919,6 +919,285 @@ pub fn channel_search_count(channel: &OutputChannel, query: &str) -> usize {
     channel_search(channel, query).len()
 }
 
+// ---------------------------------------------------------------------------
+// OutputEntry — timestamped, categorized output line
+// ---------------------------------------------------------------------------
+
+/// Severity level for a categorized output entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntrySeverity {
+    Debug,
+    Info,
+    Warning,
+    Error,
+}
+
+impl fmt::Display for EntrySeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Debug => write!(f, "DEBUG"),
+            Self::Info => write!(f, "INFO"),
+            Self::Warning => write!(f, "WARN"),
+            Self::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
+/// A single timestamped, categorized output entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutputEntry {
+    /// Seconds since the channel was created (or an arbitrary epoch).
+    pub timestamp_secs: u64,
+    pub severity: EntrySeverity,
+    pub message: String,
+    /// Optional source identifier (e.g. "rustc", "clippy", "cargo").
+    pub source: Option<String>,
+}
+
+impl OutputEntry {
+    pub fn new(timestamp_secs: u64, severity: EntrySeverity, message: impl Into<String>) -> Self {
+        Self {
+            timestamp_secs,
+            severity,
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Format the entry as a human-readable string.
+    pub fn format(&self) -> String {
+        let ts = format_timestamp(self.timestamp_secs);
+        match &self.source {
+            Some(src) => format!("[{} {:>5} {}] {}", ts, self.severity, src, self.message),
+            None => format!("[{} {:>5}] {}", ts, self.severity, self.message),
+        }
+    }
+}
+
+impl fmt::Display for OutputEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format())
+    }
+}
+
+/// Format seconds into `HH:MM:SS`.
+fn format_timestamp(total_secs: u64) -> String {
+    let h = total_secs / 3600;
+    let m = (total_secs % 3600) / 60;
+    let s = total_secs % 60;
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
+// ---------------------------------------------------------------------------
+// StructuredOutputChannel — channel with typed entries
+// ---------------------------------------------------------------------------
+
+/// An output channel that stores structured [`OutputEntry`] items instead of
+/// plain strings, enabling filtering, searching, and merging by metadata.
+#[derive(Debug, Clone)]
+pub struct StructuredOutputChannel {
+    pub name: String,
+    entries: Vec<OutputEntry>,
+    max_entries: Option<usize>,
+}
+
+impl StructuredOutputChannel {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            entries: Vec::new(),
+            max_entries: None,
+        }
+    }
+
+    /// Create a channel with an upper limit on stored entries (log rotation).
+    pub fn with_max_entries(mut self, max: usize) -> Self {
+        self.max_entries = Some(max);
+        self
+    }
+
+    /// Push an entry, applying log rotation if a limit is configured.
+    pub fn push(&mut self, entry: OutputEntry) {
+        self.entries.push(entry);
+        if let Some(max) = self.max_entries {
+            if self.entries.len() > max {
+                let excess = self.entries.len() - max;
+                self.entries.drain(0..excess);
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn entries(&self) -> &[OutputEntry] {
+        &self.entries
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Filter entries by severity.
+    pub fn filter_by_severity(&self, severity: EntrySeverity) -> Vec<&OutputEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    /// Filter entries by source identifier.
+    pub fn filter_by_source(&self, source: &str) -> Vec<&OutputEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.source.as_deref() == Some(source))
+            .collect()
+    }
+
+    /// Search entries whose message contains `query` (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&OutputEntry> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let lower = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.message.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Return the last `n` entries.
+    pub fn tail(&self, n: usize) -> &[OutputEntry] {
+        let start = self.entries.len().saturating_sub(n);
+        &self.entries[start..]
+    }
+
+    /// Count entries per severity. Returns `(debug, info, warning, error)`.
+    pub fn severity_counts(&self) -> (usize, usize, usize, usize) {
+        let mut d = 0;
+        let mut i = 0;
+        let mut w = 0;
+        let mut e = 0;
+        for entry in &self.entries {
+            match entry.severity {
+                EntrySeverity::Debug => d += 1,
+                EntrySeverity::Info => i += 1,
+                EntrySeverity::Warning => w += 1,
+                EntrySeverity::Error => e += 1,
+            }
+        }
+        (d, i, w, e)
+    }
+
+    /// Convert all entries into formatted strings suitable for a plain
+    /// `OutputChannel`.
+    pub fn to_plain_lines(&self) -> Vec<String> {
+        self.entries.iter().map(|e| e.format()).collect()
+    }
+}
+
+impl fmt::Display for StructuredOutputChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StructuredOutputChannel({}, {} entries)",
+            self.name,
+            self.entries.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// merge_channels — combine multiple structured channels chronologically
+// ---------------------------------------------------------------------------
+
+/// A single entry in a merged view, annotated with the originating channel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MergedEntry {
+    pub channel_name: String,
+    pub entry: OutputEntry,
+}
+
+impl fmt::Display for MergedEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.channel_name, self.entry)
+    }
+}
+
+/// Merge multiple structured channels into a single chronological stream,
+/// ordered by `timestamp_secs` (stable — preserves insertion order for ties).
+pub fn merge_channels(channels: &[&StructuredOutputChannel]) -> Vec<MergedEntry> {
+    let mut merged: Vec<MergedEntry> = channels
+        .iter()
+        .flat_map(|ch| {
+            ch.entries().iter().map(|e| MergedEntry {
+                channel_name: ch.name.clone(),
+                entry: e.clone(),
+            })
+        })
+        .collect();
+    merged.sort_by_key(|m| m.entry.timestamp_secs);
+    merged
+}
+
+// ---------------------------------------------------------------------------
+// OutputSummary — aggregate severity stats across channels
+// ---------------------------------------------------------------------------
+
+/// Summary statistics for a set of structured channels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputSummary {
+    pub total_entries: usize,
+    pub debug_count: usize,
+    pub info_count: usize,
+    pub warning_count: usize,
+    pub error_count: usize,
+    pub channel_count: usize,
+}
+
+impl fmt::Display for OutputSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} entries across {} channels (D:{} I:{} W:{} E:{})",
+            self.total_entries,
+            self.channel_count,
+            self.debug_count,
+            self.info_count,
+            self.warning_count,
+            self.error_count,
+        )
+    }
+}
+
+/// Compute an [`OutputSummary`] from a slice of structured channels.
+pub fn compute_summary(channels: &[&StructuredOutputChannel]) -> OutputSummary {
+    let mut summary = OutputSummary {
+        total_entries: 0,
+        debug_count: 0,
+        info_count: 0,
+        warning_count: 0,
+        error_count: 0,
+        channel_count: channels.len(),
+    };
+    for ch in channels {
+        let (d, i, w, e) = ch.severity_counts();
+        summary.debug_count += d;
+        summary.info_count += i;
+        summary.warning_count += w;
+        summary.error_count += e;
+        summary.total_entries += ch.len();
+    }
+    summary
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1516,5 +1795,132 @@ mod tests {
         let mut ch = OutputChannel::new("test");
         ch.content.push("aaa".into());
         assert_eq!(channel_search_count(&ch, "a"), 3);
+    }
+
+    // ── StructuredOutputChannel & related tests ──
+
+    #[test]
+    fn structured_channel_push_and_filter() {
+        let mut ch = StructuredOutputChannel::new("build");
+        ch.push(OutputEntry::new(0, EntrySeverity::Info, "compiling crate"));
+        ch.push(OutputEntry::new(1, EntrySeverity::Warning, "unused variable"));
+        ch.push(OutputEntry::new(2, EntrySeverity::Error, "type mismatch"));
+        ch.push(OutputEntry::new(3, EntrySeverity::Debug, "resolved dep"));
+
+        assert_eq!(ch.len(), 4);
+        assert_eq!(ch.filter_by_severity(EntrySeverity::Warning).len(), 1);
+        assert_eq!(ch.filter_by_severity(EntrySeverity::Debug).len(), 1);
+        assert_eq!(ch.severity_counts(), (1, 1, 1, 1));
+    }
+
+    #[test]
+    fn structured_channel_log_rotation() {
+        let mut ch = StructuredOutputChannel::new("logs").with_max_entries(3);
+        for i in 0..5 {
+            ch.push(OutputEntry::new(i, EntrySeverity::Info, format!("line {}", i)));
+        }
+        assert_eq!(ch.len(), 3);
+        // oldest entries should have been trimmed
+        assert_eq!(ch.entries()[0].message, "line 2");
+        assert_eq!(ch.entries()[2].message, "line 4");
+    }
+
+    #[test]
+    fn structured_channel_search_and_source_filter() {
+        let mut ch = StructuredOutputChannel::new("test");
+        ch.push(
+            OutputEntry::new(0, EntrySeverity::Error, "cannot find module")
+                .with_source("rustc"),
+        );
+        ch.push(
+            OutputEntry::new(1, EntrySeverity::Warning, "unused import")
+                .with_source("clippy"),
+        );
+        ch.push(OutputEntry::new(2, EntrySeverity::Info, "build complete"));
+
+        assert_eq!(ch.search("module").len(), 1);
+        assert_eq!(ch.search("UNUSED").len(), 1); // case-insensitive
+        assert_eq!(ch.search("").len(), 0);
+        assert_eq!(ch.filter_by_source("rustc").len(), 1);
+        assert_eq!(ch.filter_by_source("cargo").len(), 0);
+    }
+
+    #[test]
+    fn merge_channels_chronological() {
+        let mut a = StructuredOutputChannel::new("cargo");
+        a.push(OutputEntry::new(1, EntrySeverity::Info, "compiling"));
+        a.push(OutputEntry::new(3, EntrySeverity::Info, "finished"));
+
+        let mut b = StructuredOutputChannel::new("rustc");
+        b.push(OutputEntry::new(0, EntrySeverity::Debug, "start"));
+        b.push(OutputEntry::new(2, EntrySeverity::Error, "error[E0308]"));
+
+        let merged = merge_channels(&[&a, &b]);
+        assert_eq!(merged.len(), 4);
+        // should be sorted by timestamp
+        assert_eq!(merged[0].entry.timestamp_secs, 0);
+        assert_eq!(merged[0].channel_name, "rustc");
+        assert_eq!(merged[1].entry.timestamp_secs, 1);
+        assert_eq!(merged[2].entry.timestamp_secs, 2);
+        assert_eq!(merged[3].entry.timestamp_secs, 3);
+    }
+
+    #[test]
+    fn compute_summary_aggregates() {
+        let mut a = StructuredOutputChannel::new("a");
+        a.push(OutputEntry::new(0, EntrySeverity::Info, "ok"));
+        a.push(OutputEntry::new(1, EntrySeverity::Error, "fail"));
+
+        let mut b = StructuredOutputChannel::new("b");
+        b.push(OutputEntry::new(0, EntrySeverity::Warning, "warn"));
+        b.push(OutputEntry::new(1, EntrySeverity::Debug, "dbg"));
+        b.push(OutputEntry::new(2, EntrySeverity::Error, "err2"));
+
+        let summary = compute_summary(&[&a, &b]);
+        assert_eq!(summary.total_entries, 5);
+        assert_eq!(summary.channel_count, 2);
+        assert_eq!(summary.error_count, 2);
+        assert_eq!(summary.warning_count, 1);
+        assert_eq!(summary.info_count, 1);
+        assert_eq!(summary.debug_count, 1);
+        // Display impl
+        let s = summary.to_string();
+        assert!(s.contains("5 entries"));
+    }
+
+    #[test]
+    fn output_entry_formatting() {
+        let e = OutputEntry::new(3661, EntrySeverity::Warning, "slow query")
+            .with_source("db");
+        let formatted = e.format();
+        assert!(formatted.contains("01:01:01"));
+        assert!(formatted.contains("WARN"));
+        assert!(formatted.contains("db"));
+        assert!(formatted.contains("slow query"));
+
+        // Without source
+        let e2 = OutputEntry::new(0, EntrySeverity::Info, "hello");
+        let f2 = e2.to_string();
+        assert!(f2.contains("00:00:00"));
+        assert!(f2.contains("INFO"));
+    }
+
+    #[test]
+    fn structured_channel_tail_and_display() {
+        let mut ch = StructuredOutputChannel::new("test");
+        for i in 0..10 {
+            ch.push(OutputEntry::new(i, EntrySeverity::Info, format!("msg{}", i)));
+        }
+        let last3 = ch.tail(3);
+        assert_eq!(last3.len(), 3);
+        assert_eq!(last3[0].message, "msg7");
+        assert_eq!(last3[2].message, "msg9");
+
+        let display = ch.to_string();
+        assert!(display.contains("10 entries"));
+
+        let lines = ch.to_plain_lines();
+        assert_eq!(lines.len(), 10);
+        assert!(lines[0].contains("msg0"));
     }
 }

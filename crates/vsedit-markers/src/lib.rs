@@ -665,6 +665,359 @@ pub fn markers_stats(service: &MarkerService) -> WorkspaceMarkerStats {
 }
 
 // ---------------------------------------------------------------------------
+// QuickFix association tracking
+// ---------------------------------------------------------------------------
+
+/// A quick-fix action that can be applied to resolve a diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickFix {
+    pub title: String,
+    pub replacement_text: Option<String>,
+    pub is_preferred: bool,
+}
+
+impl QuickFix {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            replacement_text: None,
+            is_preferred: false,
+        }
+    }
+
+    pub fn with_replacement(mut self, text: impl Into<String>) -> Self {
+        self.replacement_text = Some(text.into());
+        self
+    }
+
+    pub fn preferred(mut self) -> Self {
+        self.is_preferred = true;
+        self
+    }
+}
+
+/// Registry that associates quick-fix actions with markers by (uri, line, message) key.
+pub struct QuickFixRegistry {
+    /// Key: (uri, start_line, message) → list of quick-fixes.
+    fixes: HashMap<(VsUri, u32, String), Vec<QuickFix>>,
+}
+
+impl QuickFixRegistry {
+    pub fn new() -> Self {
+        Self {
+            fixes: HashMap::new(),
+        }
+    }
+
+    /// Register quick-fixes for a specific marker identified by URI, line, and message.
+    pub fn register(&mut self, uri: &VsUri, marker: &MarkerData, fixes: Vec<QuickFix>) {
+        let key = (uri.clone(), marker.start_line, marker.message.clone());
+        self.fixes.entry(key).or_default().extend(fixes);
+    }
+
+    /// Look up quick-fixes for a marker.
+    pub fn get_fixes(&self, uri: &VsUri, marker: &MarkerData) -> Option<&[QuickFix]> {
+        let key = (uri.clone(), marker.start_line, marker.message.clone());
+        self.fixes.get(&key).map(|v| v.as_slice())
+    }
+
+    /// Return only the preferred quick-fix for a marker, if any.
+    pub fn preferred_fix(&self, uri: &VsUri, marker: &MarkerData) -> Option<&QuickFix> {
+        self.get_fixes(uri, marker)
+            .and_then(|fixes| fixes.iter().find(|f| f.is_preferred))
+    }
+
+    /// Remove all quick-fixes for a given URI.
+    pub fn clear_uri(&mut self, uri: &VsUri) {
+        self.fixes.retain(|(u, _, _), _| u != uri);
+    }
+
+    /// Remove all registered quick-fixes.
+    pub fn clear(&mut self) {
+        self.fixes.clear();
+    }
+
+    /// Total number of marker-to-fix associations.
+    pub fn total_associations(&self) -> usize {
+        self.fixes.len()
+    }
+
+    /// Total number of individual quick-fix actions.
+    pub fn total_fixes(&self) -> usize {
+        self.fixes.values().map(|v| v.len()).sum()
+    }
+}
+
+impl Default for QuickFixRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Marker staleness detection
+// ---------------------------------------------------------------------------
+
+/// Tracks file versions and marks diagnostics as stale when the file changes.
+pub struct StalenessTracker {
+    /// Maps URI → version at which diagnostics were last set.
+    diagnostic_versions: HashMap<VsUri, u64>,
+    /// Maps URI → current file version.
+    file_versions: HashMap<VsUri, u64>,
+}
+
+impl StalenessTracker {
+    pub fn new() -> Self {
+        Self {
+            diagnostic_versions: HashMap::new(),
+            file_versions: HashMap::new(),
+        }
+    }
+
+    /// Record that a file has been modified, bumping its version.
+    pub fn notify_file_changed(&mut self, uri: &VsUri) {
+        let v = self.file_versions.entry(uri.clone()).or_insert(0);
+        *v += 1;
+    }
+
+    /// Set the file version explicitly (e.g. from editor save events).
+    pub fn set_file_version(&mut self, uri: &VsUri, version: u64) {
+        self.file_versions.insert(uri.clone(), version);
+    }
+
+    /// Record that diagnostics were produced for a file at its current version.
+    pub fn mark_diagnostics_fresh(&mut self, uri: &VsUri) {
+        let current = self.file_versions.get(uri).copied().unwrap_or(0);
+        self.diagnostic_versions.insert(uri.clone(), current);
+    }
+
+    /// Returns `true` if the file has changed since diagnostics were last set.
+    pub fn is_stale(&self, uri: &VsUri) -> bool {
+        let file_v = self.file_versions.get(uri).copied().unwrap_or(0);
+        let diag_v = self.diagnostic_versions.get(uri).copied();
+        match diag_v {
+            Some(dv) => dv < file_v,
+            None => file_v > 0,
+        }
+    }
+
+    /// Return all URIs whose diagnostics are currently stale.
+    pub fn stale_uris(&self) -> Vec<VsUri> {
+        self.file_versions
+            .keys()
+            .filter(|uri| self.is_stale(uri))
+            .cloned()
+            .collect()
+    }
+
+    /// Remove tracking data for a URI (e.g. when a file is closed).
+    pub fn remove(&mut self, uri: &VsUri) {
+        self.file_versions.remove(uri);
+        self.diagnostic_versions.remove(uri);
+    }
+}
+
+impl Default for StalenessTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Marker diff between diagnostic runs
+// ---------------------------------------------------------------------------
+
+/// The result of comparing two sets of markers for the same URI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerDiff {
+    pub added: Vec<MarkerData>,
+    pub removed: Vec<MarkerData>,
+    pub unchanged: Vec<MarkerData>,
+}
+
+impl MarkerDiff {
+    /// Compute the diff between an old and new set of markers.
+    ///
+    /// Uses equality on `MarkerData` to determine added/removed/unchanged.
+    pub fn compute(old: &[MarkerData], new: &[MarkerData]) -> Self {
+        let mut removed = Vec::new();
+        let mut unchanged = Vec::new();
+        let mut new_remaining: Vec<&MarkerData> = new.iter().collect();
+
+        for old_m in old {
+            if let Some(pos) = new_remaining.iter().position(|n| *n == old_m) {
+                unchanged.push(old_m.clone());
+                new_remaining.remove(pos);
+            } else {
+                removed.push(old_m.clone());
+            }
+        }
+
+        let added: Vec<MarkerData> = new_remaining.into_iter().cloned().collect();
+
+        Self {
+            added,
+            removed,
+            unchanged,
+        }
+    }
+
+    /// Returns `true` if there are no changes between old and new.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty()
+    }
+
+    /// Number of markers that changed (added + removed).
+    pub fn change_count(&self) -> usize {
+        self.added.len() + self.removed.len()
+    }
+
+    /// Summary string for the diff.
+    pub fn summary(&self) -> String {
+        format!(
+            "+{} -{} ={} markers",
+            self.added.len(),
+            self.removed.len(),
+            self.unchanged.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Marker grouping by file (sorted output)
+// ---------------------------------------------------------------------------
+
+/// A file's markers sorted by line number, with severity counts.
+#[derive(Debug, Clone)]
+pub struct FileMarkerGroup {
+    pub uri: VsUri,
+    pub markers: Vec<MarkerData>,
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub info_count: usize,
+    pub hint_count: usize,
+}
+
+/// Group markers by file URI and sort each group by (severity desc, line asc).
+///
+/// Files are sorted by URI for deterministic output. Within each file, markers
+/// are sorted with errors first, then warnings, info, and hints.
+pub fn group_markers_by_file(pairs: &[(VsUri, MarkerData)]) -> Vec<FileMarkerGroup> {
+    let mut by_uri: HashMap<VsUri, Vec<MarkerData>> = HashMap::new();
+    for (uri, marker) in pairs {
+        by_uri.entry(uri.clone()).or_default().push(marker.clone());
+    }
+
+    let severity_order = |s: &MarkerSeverity| -> u8 {
+        match s {
+            MarkerSeverity::Error => 0,
+            MarkerSeverity::Warning => 1,
+            MarkerSeverity::Info => 2,
+            MarkerSeverity::Hint => 3,
+        }
+    };
+
+    let mut groups: Vec<FileMarkerGroup> = by_uri
+        .into_iter()
+        .map(|(uri, mut markers)| {
+            markers.sort_by(|a, b| {
+                severity_order(&a.severity)
+                    .cmp(&severity_order(&b.severity))
+                    .then_with(|| a.start_line.cmp(&b.start_line))
+            });
+            let error_count = markers.iter().filter(|m| m.severity == MarkerSeverity::Error).count();
+            let warning_count = markers.iter().filter(|m| m.severity == MarkerSeverity::Warning).count();
+            let info_count = markers.iter().filter(|m| m.severity == MarkerSeverity::Info).count();
+            let hint_count = markers.iter().filter(|m| m.severity == MarkerSeverity::Hint).count();
+            FileMarkerGroup {
+                uri,
+                markers,
+                error_count,
+                warning_count,
+                info_count,
+                hint_count,
+            }
+        })
+        .collect();
+
+    groups.sort_by(|a, b| a.uri.cmp(&b.uri));
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// Per-URI severity statistics
+// ---------------------------------------------------------------------------
+
+/// Severity counts for a single URI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UriMarkerStats {
+    pub uri: VsUri,
+    pub errors: usize,
+    pub warnings: usize,
+    pub infos: usize,
+    pub hints: usize,
+}
+
+impl UriMarkerStats {
+    pub fn total(&self) -> usize {
+        self.errors + self.warnings + self.infos + self.hints
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.errors > 0
+    }
+
+    /// The highest (most severe) severity present, if any markers exist.
+    pub fn worst_severity(&self) -> Option<MarkerSeverity> {
+        if self.errors > 0 {
+            Some(MarkerSeverity::Error)
+        } else if self.warnings > 0 {
+            Some(MarkerSeverity::Warning)
+        } else if self.infos > 0 {
+            Some(MarkerSeverity::Info)
+        } else if self.hints > 0 {
+            Some(MarkerSeverity::Hint)
+        } else {
+            None
+        }
+    }
+}
+
+impl MarkerService {
+    /// Compute per-URI severity statistics across all owners.
+    pub fn per_uri_stats(&self) -> Vec<UriMarkerStats> {
+        let map = self.markers.lock().unwrap();
+        let mut per_uri: HashMap<VsUri, (usize, usize, usize, usize)> = HashMap::new();
+
+        for ((_, uri), data) in map.iter() {
+            let entry = per_uri.entry(uri.clone()).or_insert((0, 0, 0, 0));
+            for m in data {
+                match m.severity {
+                    MarkerSeverity::Error => entry.0 += 1,
+                    MarkerSeverity::Warning => entry.1 += 1,
+                    MarkerSeverity::Info => entry.2 += 1,
+                    MarkerSeverity::Hint => entry.3 += 1,
+                }
+            }
+        }
+
+        let mut stats: Vec<UriMarkerStats> = per_uri
+            .into_iter()
+            .map(|(uri, (e, w, i, h))| UriMarkerStats {
+                uri,
+                errors: e,
+                warnings: w,
+                infos: i,
+                hints: h,
+            })
+            .collect();
+
+        stats.sort_by(|a, b| a.uri.cmp(&b.uri));
+        stats
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1537,5 +1890,213 @@ mod tests {
         assert_eq!(stats.hints, 3);
         assert_eq!(stats.total_markers, 3);
         assert_eq!(stats.files_with_errors, 0);
+    }
+
+    // -- QuickFixRegistry tests --
+
+    #[test]
+    fn quickfix_register_and_lookup() {
+        let mut reg = QuickFixRegistry::new();
+        let uri = VsUri::file("/fix.rs");
+        let marker = error_marker("unused import", 5);
+
+        let fix = QuickFix::new("Remove import").with_replacement("").preferred();
+        reg.register(&uri, &marker, vec![fix]);
+
+        let fixes = reg.get_fixes(&uri, &marker).unwrap();
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].title, "Remove import");
+        assert!(fixes[0].is_preferred);
+        assert_eq!(fixes[0].replacement_text.as_deref(), Some(""));
+
+        let pref = reg.preferred_fix(&uri, &marker).unwrap();
+        assert_eq!(pref.title, "Remove import");
+
+        // No fixes for a different marker
+        let other = warning_marker("something else", 10);
+        assert!(reg.get_fixes(&uri, &other).is_none());
+        assert!(reg.preferred_fix(&uri, &other).is_none());
+
+        assert_eq!(reg.total_associations(), 1);
+        assert_eq!(reg.total_fixes(), 1);
+    }
+
+    #[test]
+    fn quickfix_clear_uri() {
+        let mut reg = QuickFixRegistry::new();
+        let u1 = VsUri::file("/a.rs");
+        let u2 = VsUri::file("/b.rs");
+        let m1 = error_marker("e1", 1);
+        let m2 = error_marker("e2", 1);
+
+        reg.register(&u1, &m1, vec![QuickFix::new("fix a")]);
+        reg.register(&u2, &m2, vec![QuickFix::new("fix b")]);
+        assert_eq!(reg.total_associations(), 2);
+
+        reg.clear_uri(&u1);
+        assert!(reg.get_fixes(&u1, &m1).is_none());
+        assert!(reg.get_fixes(&u2, &m2).is_some());
+        assert_eq!(reg.total_associations(), 1);
+    }
+
+    // -- StalenessTracker tests --
+
+    #[test]
+    fn staleness_fresh_then_stale() {
+        let mut tracker = StalenessTracker::new();
+        let uri = VsUri::file("/src/main.rs");
+
+        // No file version yet — not stale
+        assert!(!tracker.is_stale(&uri));
+
+        // File changes → stale (no diagnostics recorded yet)
+        tracker.notify_file_changed(&uri);
+        assert!(tracker.is_stale(&uri));
+
+        // Diagnostics are published → fresh
+        tracker.mark_diagnostics_fresh(&uri);
+        assert!(!tracker.is_stale(&uri));
+
+        // File changes again → stale
+        tracker.notify_file_changed(&uri);
+        assert!(tracker.is_stale(&uri));
+
+        // Explicit version set
+        tracker.set_file_version(&uri, 10);
+        assert!(tracker.is_stale(&uri));
+
+        tracker.mark_diagnostics_fresh(&uri);
+        assert!(!tracker.is_stale(&uri));
+    }
+
+    #[test]
+    fn staleness_stale_uris() {
+        let mut tracker = StalenessTracker::new();
+        let u1 = VsUri::file("/a.rs");
+        let u2 = VsUri::file("/b.rs");
+        let u3 = VsUri::file("/c.rs");
+
+        tracker.notify_file_changed(&u1);
+        tracker.notify_file_changed(&u2);
+        tracker.notify_file_changed(&u3);
+
+        tracker.mark_diagnostics_fresh(&u2);
+
+        let mut stale = tracker.stale_uris();
+        stale.sort();
+        assert_eq!(stale.len(), 2);
+        assert!(stale.contains(&u1));
+        assert!(stale.contains(&u3));
+
+        tracker.remove(&u1);
+        let stale2 = tracker.stale_uris();
+        assert_eq!(stale2.len(), 1);
+        assert!(stale2.contains(&u3));
+    }
+
+    // -- MarkerDiff tests --
+
+    #[test]
+    fn marker_diff_added_removed_unchanged() {
+        let old = vec![
+            error_marker("e1", 1),
+            warning_marker("w1", 2),
+            error_marker("e2", 3),
+        ];
+        let new = vec![
+            error_marker("e1", 1),   // unchanged
+            error_marker("e3", 4),   // added
+            info_marker("i1", 5),    // added
+        ];
+
+        let diff = MarkerDiff::compute(&old, &new);
+
+        assert_eq!(diff.unchanged.len(), 1);
+        assert_eq!(diff.unchanged[0].message, "e1");
+
+        assert_eq!(diff.removed.len(), 2);
+        assert!(diff.removed.iter().any(|m| m.message == "w1"));
+        assert!(diff.removed.iter().any(|m| m.message == "e2"));
+
+        assert_eq!(diff.added.len(), 2);
+        assert!(diff.added.iter().any(|m| m.message == "e3"));
+        assert!(diff.added.iter().any(|m| m.message == "i1"));
+
+        assert!(!diff.is_empty());
+        assert_eq!(diff.change_count(), 4);
+        assert_eq!(diff.summary(), "+2 -2 =1 markers");
+    }
+
+    #[test]
+    fn marker_diff_no_changes() {
+        let markers = vec![error_marker("e1", 1), warning_marker("w1", 2)];
+        let diff = MarkerDiff::compute(&markers, &markers);
+
+        assert!(diff.is_empty());
+        assert_eq!(diff.change_count(), 0);
+        assert_eq!(diff.unchanged.len(), 2);
+    }
+
+    // -- group_markers_by_file tests --
+
+    #[test]
+    fn group_markers_sorts_by_severity_then_line() {
+        let u1 = VsUri::file("/alpha.rs");
+        let u2 = VsUri::file("/beta.rs");
+
+        let pairs = vec![
+            (u1.clone(), warning_marker("w1", 10)),
+            (u1.clone(), error_marker("e1", 20)),
+            (u1.clone(), hint_marker("h1", 5)),
+            (u2.clone(), info_marker("i1", 1)),
+        ];
+
+        let groups = group_markers_by_file(&pairs);
+        assert_eq!(groups.len(), 2);
+
+        // Files sorted by URI
+        assert_eq!(groups[0].uri, u1);
+        assert_eq!(groups[1].uri, u2);
+
+        // First file: errors first, then warnings, then hints
+        let g = &groups[0];
+        assert_eq!(g.markers.len(), 3);
+        assert_eq!(g.markers[0].severity, MarkerSeverity::Error);
+        assert_eq!(g.markers[1].severity, MarkerSeverity::Warning);
+        assert_eq!(g.markers[2].severity, MarkerSeverity::Hint);
+
+        assert_eq!(g.error_count, 1);
+        assert_eq!(g.warning_count, 1);
+        assert_eq!(g.hint_count, 1);
+        assert_eq!(g.info_count, 0);
+    }
+
+    // -- Per-URI stats tests --
+
+    #[test]
+    fn per_uri_stats_multiple_files() {
+        let svc = MarkerService::new();
+        let u1 = VsUri::file("/a.rs");
+        let u2 = VsUri::file("/b.rs");
+
+        svc.change_one("rustc", &u1, vec![error_marker("e1", 1), warning_marker("w1", 2)]);
+        svc.change_one("clippy", &u1, vec![warning_marker("w2", 3)]);
+        svc.change_one("rustc", &u2, vec![info_marker("i1", 1)]);
+
+        let stats = svc.per_uri_stats();
+        assert_eq!(stats.len(), 2);
+
+        let s1 = stats.iter().find(|s| s.uri == u1).unwrap();
+        assert_eq!(s1.errors, 1);
+        assert_eq!(s1.warnings, 2);
+        assert_eq!(s1.total(), 3);
+        assert!(s1.has_errors());
+        assert_eq!(s1.worst_severity(), Some(MarkerSeverity::Error));
+
+        let s2 = stats.iter().find(|s| s.uri == u2).unwrap();
+        assert_eq!(s2.infos, 1);
+        assert_eq!(s2.total(), 1);
+        assert!(!s2.has_errors());
+        assert_eq!(s2.worst_severity(), Some(MarkerSeverity::Info));
     }
 }

@@ -933,6 +933,216 @@ impl fmt::Display for TypeTree {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Shortest path between two types (BFS on undirected edges)
+// ---------------------------------------------------------------------------
+
+/// Find the shortest path between two types in the hierarchy, treating
+/// supertype and subtype edges as undirected. Returns `None` if no path
+/// exists. The returned vector includes both endpoints.
+pub fn shortest_path(tree: &TypeTree, from: usize, to: usize) -> Option<Vec<usize>> {
+    if from == to {
+        return Some(vec![from]);
+    }
+    let n = tree.type_count();
+    if from >= n || to >= n {
+        return None;
+    }
+    let mut visited = HashSet::new();
+    let mut parent: HashMap<usize, usize> = HashMap::new();
+    let mut queue = std::collections::VecDeque::new();
+    visited.insert(from);
+    queue.push_back(from);
+
+    while let Some(cur) = queue.pop_front() {
+        let mut neighbors = HashSet::new();
+        if let Some(sups) = tree.supertype_edges.get(&cur) {
+            neighbors.extend(sups);
+        }
+        if let Some(subs) = tree.subtype_edges.get(&cur) {
+            neighbors.extend(subs);
+        }
+        for &nb in &neighbors {
+            if visited.insert(nb) {
+                parent.insert(nb, cur);
+                if nb == to {
+                    // reconstruct path
+                    let mut path = vec![to];
+                    let mut c = to;
+                    while let Some(&p) = parent.get(&c) {
+                        path.push(p);
+                        c = p;
+                    }
+                    path.reverse();
+                    return Some(path);
+                }
+                queue.push_back(nb);
+            }
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Diamond inheritance detection
+// ---------------------------------------------------------------------------
+
+impl TypeTree {
+    /// Detect diamond inheritance: a type that has two or more supertypes
+    /// sharing a common ancestor. Returns indices of types involved in
+    /// diamond patterns.
+    pub fn detect_diamonds(&self) -> Vec<usize> {
+        let mut diamonds = Vec::new();
+        for idx in 0..self.items.len() {
+            let direct_supers: Vec<usize> = self
+                .supertype_edges
+                .get(&idx)
+                .map(|s| s.iter().copied().collect())
+                .unwrap_or_default();
+            if direct_supers.len() < 2 {
+                continue;
+            }
+            // Collect transitive ancestors for each direct supertype
+            let ancestor_sets: Vec<HashSet<usize>> = direct_supers
+                .iter()
+                .map(|&s| {
+                    let mut anc = HashSet::new();
+                    let mut stack = vec![s];
+                    while let Some(c) = stack.pop() {
+                        if let Some(parents) = self.supertype_edges.get(&c) {
+                            for &p in parents {
+                                if anc.insert(p) {
+                                    stack.push(p);
+                                }
+                            }
+                        }
+                    }
+                    anc.insert(s);
+                    anc
+                })
+                .collect();
+            // Check if any two ancestor sets share a common type
+            'outer: for i in 0..ancestor_sets.len() {
+                for j in (i + 1)..ancestor_sets.len() {
+                    if !ancestor_sets[i].is_disjoint(&ancestor_sets[j]) {
+                        diamonds.push(idx);
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        diamonds
+    }
+
+    /// Count how many concrete types (classes/structs) implement each
+    /// interface in the tree. Returns a map from interface index to count.
+    pub fn interface_implementor_counts(&self) -> HashMap<usize, usize> {
+        let mut counts = HashMap::new();
+        for (idx, item) in self.items.iter().enumerate() {
+            if item.kind != SymbolKind::Interface {
+                continue;
+            }
+            let descendants = self.all_descendants(idx);
+            let impl_count = descendants
+                .iter()
+                .filter(|d| d.kind != SymbolKind::Interface)
+                .count();
+            counts.insert(idx, impl_count);
+        }
+        counts
+    }
+
+    /// Compute breadth and depth statistics for the tree.
+    /// Returns `(max_depth, max_breadth, avg_breadth)` where breadth is
+    /// measured as the number of direct subtypes per node.
+    pub fn depth_breadth_stats(&self) -> (usize, usize, f64) {
+        let root_indices = self.root_indices();
+        let mut max_depth: usize = 0;
+        for &r in &root_indices {
+            let d = self.depth(r);
+            if d > max_depth {
+                max_depth = d;
+            }
+        }
+
+        let mut max_breadth: usize = 0;
+        let mut total_breadth: usize = 0;
+        let mut nodes_with_children: usize = 0;
+        for idx in 0..self.items.len() {
+            let b = self
+                .subtype_edges
+                .get(&idx)
+                .map_or(0, |s| s.len());
+            if b > 0 {
+                nodes_with_children += 1;
+                total_breadth += b;
+                if b > max_breadth {
+                    max_breadth = b;
+                }
+            }
+        }
+        let avg_breadth = if nodes_with_children > 0 {
+            total_breadth as f64 / nodes_with_children as f64
+        } else {
+            0.0
+        };
+        (max_depth, max_breadth, avg_breadth)
+    }
+
+    /// Flatten the hierarchy into a topologically sorted list (supertypes
+    /// before subtypes). Uses Kahn's algorithm. Returns `None` if the
+    /// graph contains a cycle.
+    pub fn topological_sort(&self) -> Option<Vec<usize>> {
+        let n = self.items.len();
+        let mut in_degree = vec![0usize; n];
+        for (_, subs) in &self.subtype_edges {
+            for &s in subs {
+                if s < n {
+                    in_degree[s] += 1;
+                }
+            }
+        }
+        let mut queue: std::collections::VecDeque<usize> =
+            (0..n).filter(|&i| in_degree[i] == 0).collect();
+        let mut sorted = Vec::with_capacity(n);
+        while let Some(cur) = queue.pop_front() {
+            sorted.push(cur);
+            if let Some(subs) = self.subtype_edges.get(&cur) {
+                for &s in subs {
+                    if s < n {
+                        in_degree[s] -= 1;
+                        if in_degree[s] == 0 {
+                            queue.push_back(s);
+                        }
+                    }
+                }
+            }
+        }
+        if sorted.len() == n {
+            Some(sorted)
+        } else {
+            None // cycle detected
+        }
+    }
+
+    /// Return all types that are isolated (no supertype or subtype edges).
+    pub fn isolated_types(&self) -> Vec<usize> {
+        (0..self.items.len())
+            .filter(|i| {
+                let no_sup = self
+                    .supertype_edges
+                    .get(i)
+                    .map_or(true, |s| s.is_empty());
+                let no_sub = self
+                    .subtype_edges
+                    .get(i)
+                    .map_or(true, |s| s.is_empty());
+                no_sup && no_sub
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1552,5 +1762,153 @@ mod tests {
         assert!(summary.contains("2 ops"));
         assert!(summary.contains("1 ok"));
         assert!(summary.contains("1 err"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Shortest path, diamond detection, stats, topo sort, isolated types
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn shortest_path_direct_edge() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("A", SymbolKind::Class));
+        let b = tree.add_type(make_item("B", SymbolKind::Class));
+        let c = tree.add_type(make_item("C", SymbolKind::Class));
+        tree.add_supertype_edge(b, a);
+        tree.add_supertype_edge(c, b);
+
+        // A-B direct
+        let path = shortest_path(&tree, a, b).unwrap();
+        assert_eq!(path, vec![a, b]);
+
+        // A-C through B
+        let path2 = shortest_path(&tree, a, c).unwrap();
+        assert_eq!(path2, vec![a, b, c]);
+
+        // same node
+        let path3 = shortest_path(&tree, a, a).unwrap();
+        assert_eq!(path3, vec![a]);
+
+        // unreachable
+        let d = tree.add_type(make_item("D", SymbolKind::Class));
+        assert!(shortest_path(&tree, a, d).is_none());
+
+        // out of bounds
+        assert!(shortest_path(&tree, 999, 0).is_none());
+    }
+
+    #[test]
+    fn detect_diamond_inheritance() {
+        //     Base
+        //    /    \
+        //  Left  Right
+        //    \    /
+        //    Bottom
+        let mut tree = TypeTree::new();
+        let base = tree.add_type(make_item("Base", SymbolKind::Class));
+        let left = tree.add_type(make_item("Left", SymbolKind::Class));
+        let right = tree.add_type(make_item("Right", SymbolKind::Class));
+        let bottom = tree.add_type(make_item("Bottom", SymbolKind::Class));
+
+        tree.add_supertype_edge(left, base);
+        tree.add_supertype_edge(right, base);
+        tree.add_supertype_edge(bottom, left);
+        tree.add_supertype_edge(bottom, right);
+
+        let diamonds = tree.detect_diamonds();
+        assert!(diamonds.contains(&bottom));
+        // Base, Left, Right have <2 supertypes so they are not diamond nodes
+        assert!(!diamonds.contains(&base));
+    }
+
+    #[test]
+    fn interface_implementor_counts() {
+        let mut tree = TypeTree::new();
+        let iface = tree.add_type(make_item("Drawable", SymbolKind::Interface));
+        let cls1 = tree.add_type(make_item("Circle", SymbolKind::Class));
+        let cls2 = tree.add_type(make_item("Square", SymbolKind::Class));
+        let cls3 = tree.add_type(make_item("Triangle", SymbolKind::Class));
+
+        tree.add_subtype_edge(iface, cls1);
+        tree.add_subtype_edge(iface, cls2);
+        tree.add_subtype_edge(iface, cls3);
+
+        let counts = tree.interface_implementor_counts();
+        assert_eq!(counts[&iface], 3);
+
+        // A class should not appear in the counts map
+        assert!(!counts.contains_key(&cls1));
+    }
+
+    #[test]
+    fn depth_breadth_statistics() {
+        //  Root -> Mid -> Leaf1
+        //              -> Leaf2
+        //              -> Leaf3
+        let mut tree = TypeTree::new();
+        let root = tree.add_type(make_item("Root", SymbolKind::Class));
+        let mid = tree.add_type(make_item("Mid", SymbolKind::Class));
+        let l1 = tree.add_type(make_item("L1", SymbolKind::Class));
+        let l2 = tree.add_type(make_item("L2", SymbolKind::Class));
+        let l3 = tree.add_type(make_item("L3", SymbolKind::Class));
+        tree.add_subtype_edge(root, mid);
+        tree.add_subtype_edge(mid, l1);
+        tree.add_subtype_edge(mid, l2);
+        tree.add_subtype_edge(mid, l3);
+
+        let (max_depth, max_breadth, avg_breadth) = tree.depth_breadth_stats();
+        assert_eq!(max_depth, 2);
+        assert_eq!(max_breadth, 3); // Mid has 3 children
+        // Root has 1 child, Mid has 3 → avg = (1+3)/2 = 2.0
+        assert!((avg_breadth - 2.0).abs() < f64::EPSILON);
+
+        // empty tree
+        let empty = TypeTree::new();
+        let (d, b, a) = empty.depth_breadth_stats();
+        assert_eq!(d, 0);
+        assert_eq!(b, 0);
+        assert!((a - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn topological_sort_acyclic() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("A", SymbolKind::Class));
+        let b = tree.add_type(make_item("B", SymbolKind::Class));
+        let c = tree.add_type(make_item("C", SymbolKind::Class));
+        tree.add_subtype_edge(a, b);
+        tree.add_subtype_edge(b, c);
+
+        let sorted = tree.topological_sort().unwrap();
+        assert_eq!(sorted.len(), 3);
+        // A must come before B, B before C
+        let pos_a = sorted.iter().position(|&x| x == a).unwrap();
+        let pos_b = sorted.iter().position(|&x| x == b).unwrap();
+        let pos_c = sorted.iter().position(|&x| x == c).unwrap();
+        assert!(pos_a < pos_b);
+        assert!(pos_b < pos_c);
+    }
+
+    #[test]
+    fn topological_sort_detects_cycle() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("A", SymbolKind::Class));
+        let b = tree.add_type(make_item("B", SymbolKind::Class));
+        tree.add_subtype_edge(a, b);
+        tree.add_subtype_edge(b, a);
+
+        assert!(tree.topological_sort().is_none());
+    }
+
+    #[test]
+    fn isolated_types_detection() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("Connected1", SymbolKind::Class));
+        let b = tree.add_type(make_item("Connected2", SymbolKind::Class));
+        let c = tree.add_type(make_item("Isolated", SymbolKind::Struct));
+        tree.add_subtype_edge(a, b);
+
+        let isolated = tree.isolated_types();
+        assert_eq!(isolated, vec![c]);
     }
 }

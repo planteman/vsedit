@@ -856,6 +856,207 @@ impl fmt::Display for StatusBarVisibility {
 }
 
 // ---------------------------------------------------------------------------
+// Animation states for status bar items
+// ---------------------------------------------------------------------------
+
+/// Animation state for a status bar entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationState {
+    /// No animation, entry is static.
+    Idle,
+    /// Entry is fading in (e.g., just appeared).
+    FadingIn,
+    /// Entry is fading out (e.g., about to be removed).
+    FadingOut,
+    /// Entry is pulsing to draw attention (e.g., new notification).
+    Pulsing,
+    /// Entry content is spinning (e.g., a progress indicator).
+    Spinning,
+}
+
+impl fmt::Display for AnimationState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnimationState::Idle => write!(f, "Idle"),
+            AnimationState::FadingIn => write!(f, "FadingIn"),
+            AnimationState::FadingOut => write!(f, "FadingOut"),
+            AnimationState::Pulsing => write!(f, "Pulsing"),
+            AnimationState::Spinning => write!(f, "Spinning"),
+        }
+    }
+}
+
+impl AnimationState {
+    /// Returns true if the entry is currently animating.
+    pub fn is_animating(&self) -> bool {
+        !matches!(self, AnimationState::Idle)
+    }
+
+    /// Returns true if the animation represents a transition (fade in/out).
+    pub fn is_transition(&self) -> bool {
+        matches!(self, AnimationState::FadingIn | AnimationState::FadingOut)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Click action routing
+// ---------------------------------------------------------------------------
+
+/// Describes what happens when a status bar entry is clicked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClickAction {
+    /// Execute a named command.
+    RunCommand(String),
+    /// Open a URL in the browser.
+    OpenUrl(String),
+    /// Show a quick-pick menu with the given options.
+    ShowMenu(Vec<String>),
+    /// No action configured.
+    None,
+}
+
+impl ClickAction {
+    /// Returns true if a click action is configured.
+    pub fn is_actionable(&self) -> bool {
+        !matches!(self, ClickAction::None)
+    }
+
+    /// Returns the command name if this is a `RunCommand` action.
+    pub fn command_name(&self) -> Option<&str> {
+        match self {
+            ClickAction::RunCommand(cmd) => Some(cmd),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ClickAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClickAction::RunCommand(cmd) => write!(f, "command:{cmd}"),
+            ClickAction::OpenUrl(url) => write!(f, "url:{url}"),
+            ClickAction::ShowMenu(items) => write!(f, "menu[{}]", items.len()),
+            ClickAction::None => write!(f, "none"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Space allocation algorithm
+// ---------------------------------------------------------------------------
+
+/// Result of allocating available width across status bar entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpaceAllocation {
+    /// Entry IDs that fit within the available width, in display order.
+    pub displayed: Vec<String>,
+    /// Entry IDs that were truncated or hidden due to insufficient space.
+    pub overflowed: Vec<String>,
+    /// Total character width consumed by displayed entries (including separators).
+    pub consumed_width: usize,
+    /// Remaining width after allocation.
+    pub remaining_width: usize,
+}
+
+impl StatusBar {
+    /// Allocate entries into available width for a given alignment.
+    ///
+    /// Entries are considered in priority order (ascending). Each entry consumes
+    /// `entry.text.len() + separator_width` characters (the last entry doesn't
+    /// add separator). Entries that don't fit go into the overflow list.
+    pub fn allocate_space(
+        &self,
+        alignment: StatusBarAlignment,
+        available_width: usize,
+        separator_width: usize,
+    ) -> SpaceAllocation {
+        let mut entries: Vec<&StatusBarEntry> = self
+            .entries
+            .iter()
+            .filter(|e| e.visible && e.alignment == alignment)
+            .collect();
+        entries.sort_by_key(|e| e.priority);
+
+        let mut displayed = Vec::new();
+        let mut overflowed = Vec::new();
+        let mut consumed: usize = 0;
+
+        for (i, entry) in entries.iter().enumerate() {
+            let sep = if i > 0 && !displayed.is_empty() {
+                separator_width
+            } else {
+                0
+            };
+            let needed = entry.text.len() + sep;
+            if consumed + needed <= available_width {
+                consumed += needed;
+                displayed.push(entry.id.clone());
+            } else {
+                overflowed.push(entry.id.clone());
+            }
+        }
+
+        SpaceAllocation {
+            displayed,
+            overflowed,
+            consumed_width: consumed,
+            remaining_width: available_width.saturating_sub(consumed),
+        }
+    }
+
+    /// Route a click event to the appropriate action for the given entry.
+    ///
+    /// If the entry has a `command` field set, returns `ClickAction::RunCommand`.
+    /// Otherwise returns `ClickAction::None`.
+    pub fn route_click(&self, entry_id: &str) -> ClickAction {
+        match self.entries.iter().find(|e| e.id == entry_id) {
+            Some(entry) => match &entry.command {
+                Some(cmd) => ClickAction::RunCommand(cmd.clone()),
+                None => ClickAction::None,
+            },
+            None => ClickAction::None,
+        }
+    }
+
+    /// Generate a rich tooltip for an entry, combining its tooltip text with
+    /// contextual information (command binding, alignment, priority tier).
+    pub fn generate_tooltip(&self, entry_id: &str) -> Option<StatusBarTooltip> {
+        let entry = self.entries.iter().find(|e| e.id == entry_id)?;
+        let title = entry
+            .tooltip
+            .clone()
+            .unwrap_or_else(|| entry.text.clone());
+        let tier = if entry.priority < 0 {
+            StatusBarPriorityTier::Essential
+        } else if entry.priority <= 50 {
+            StatusBarPriorityTier::Standard
+        } else {
+            StatusBarPriorityTier::Optional
+        };
+        let description = format!(
+            "Alignment: {} | Priority: {} ({})",
+            entry.alignment, entry.priority, tier
+        );
+        let mut tip = StatusBarTooltip::new(entry_id, title).with_description(description);
+        if let Some(ref cmd) = entry.command {
+            tip = tip.with_shortcut(cmd.clone());
+        }
+        Some(tip)
+    }
+
+    /// Return IDs of entries that are currently overflowing the given width
+    /// (considering both left and right sides, each getting half the width).
+    pub fn overflow_entries(&self, total_width: usize, separator_width: usize) -> Vec<String> {
+        let half = total_width / 2;
+        let left = self.allocate_space(StatusBarAlignment::Left, half, separator_width);
+        let right = self.allocate_space(StatusBarAlignment::Right, half, separator_width);
+        let mut overflow = left.overflowed;
+        overflow.extend(right.overflowed);
+        overflow
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Statistical summary
 // ---------------------------------------------------------------------------
 
@@ -1582,5 +1783,124 @@ mod tests {
         let display = format!("{s}");
         assert!(display.contains("total=2"));
         assert!(display.contains("commands=1"));
+    }
+
+    // --- Animation, click routing, space allocation, overflow tests ---
+
+    #[test]
+    fn animation_state_properties() {
+        assert!(!AnimationState::Idle.is_animating());
+        assert!(AnimationState::FadingIn.is_animating());
+        assert!(AnimationState::FadingOut.is_animating());
+        assert!(AnimationState::Pulsing.is_animating());
+        assert!(AnimationState::Spinning.is_animating());
+        assert!(AnimationState::FadingIn.is_transition());
+        assert!(AnimationState::FadingOut.is_transition());
+        assert!(!AnimationState::Pulsing.is_transition());
+        assert!(!AnimationState::Idle.is_transition());
+        assert_eq!(format!("{}", AnimationState::Spinning), "Spinning");
+    }
+
+    #[test]
+    fn click_action_routing() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(
+            StatusBarEntry::builder("git", "main", StatusBarAlignment::Left)
+                .command("git.checkout")
+                .build(),
+        );
+        bar.add_entry(make_entry("info", StatusBarAlignment::Left, 0));
+        assert_eq!(
+            bar.route_click("git"),
+            ClickAction::RunCommand("git.checkout".to_string())
+        );
+        assert_eq!(bar.route_click("info"), ClickAction::None);
+        assert_eq!(bar.route_click("missing"), ClickAction::None);
+    }
+
+    #[test]
+    fn click_action_helpers_and_display() {
+        let cmd = ClickAction::RunCommand("editor.save".to_string());
+        assert!(cmd.is_actionable());
+        assert_eq!(cmd.command_name(), Some("editor.save"));
+        assert_eq!(format!("{cmd}"), "command:editor.save");
+
+        let url = ClickAction::OpenUrl("https://example.com".to_string());
+        assert!(url.is_actionable());
+        assert!(url.command_name().is_none());
+        assert_eq!(format!("{url}"), "url:https://example.com");
+
+        let menu = ClickAction::ShowMenu(vec!["a".into(), "b".into()]);
+        assert!(menu.is_actionable());
+        assert_eq!(format!("{menu}"), "menu[2]");
+
+        let none = ClickAction::None;
+        assert!(!none.is_actionable());
+        assert_eq!(format!("{none}"), "none");
+    }
+
+    #[test]
+    fn space_allocation_fits_all() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 2));
+        bar.update_text("a", "Hi");
+        bar.update_text("b", "Lo");
+        // "Hi" (2) + sep (1) + "Lo" (2) = 5
+        let alloc = bar.allocate_space(StatusBarAlignment::Left, 10, 1);
+        assert_eq!(alloc.displayed, vec!["a", "b"]);
+        assert!(alloc.overflowed.is_empty());
+        assert_eq!(alloc.consumed_width, 5);
+        assert_eq!(alloc.remaining_width, 5);
+    }
+
+    #[test]
+    fn space_allocation_overflow() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("high", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("low", StatusBarAlignment::Left, 10));
+        bar.update_text("high", "AAAA");
+        bar.update_text("low", "BBBB");
+        // "AAAA"(4) + sep(1) + "BBBB"(4) = 9, only 6 available
+        let alloc = bar.allocate_space(StatusBarAlignment::Left, 6, 1);
+        assert_eq!(alloc.displayed, vec!["high"]);
+        assert_eq!(alloc.overflowed, vec!["low"]);
+        assert_eq!(alloc.consumed_width, 4);
+        assert_eq!(alloc.remaining_width, 2);
+    }
+
+    #[test]
+    fn generate_tooltip_with_command() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(
+            StatusBarEntry::builder("git", "main", StatusBarAlignment::Left)
+                .tooltip("Current branch")
+                .command("git.checkout")
+                .priority(-5)
+                .build(),
+        );
+        let tip = bar.generate_tooltip("git").unwrap();
+        assert_eq!(tip.entry_id, "git");
+        assert_eq!(tip.title, "Current branch");
+        assert!(tip.description.as_ref().unwrap().contains("Essential"));
+        assert_eq!(tip.shortcut.as_deref(), Some("git.checkout"));
+        // Missing entry returns None
+        assert!(bar.generate_tooltip("missing").is_none());
+    }
+
+    #[test]
+    fn overflow_entries_across_sides() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("l1", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("l2", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("r1", StatusBarAlignment::Right, 0));
+        bar.update_text("l1", "AAAA");
+        bar.update_text("l2", "BBBB");
+        bar.update_text("r1", "CC");
+        // total_width=10 => half=5 for each side
+        // Left: "AAAA"(4) fits, "BBBB" needs 4+1=5 more (total 9 > 5) => overflow
+        // Right: "CC"(2) fits
+        let overflow = bar.overflow_entries(10, 1);
+        assert_eq!(overflow, vec!["l2"]);
     }
 }

@@ -921,6 +921,302 @@ impl ActionsStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Action audit log
+// ---------------------------------------------------------------------------
+
+/// Records an action execution for auditing purposes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AuditEntry {
+    /// The action ID that was executed.
+    pub action_id: String,
+    /// Whether the execution succeeded.
+    pub success: bool,
+    /// Monotonic sequence number assigned at recording time.
+    pub seq: u64,
+    /// Optional description of the outcome.
+    pub detail: Option<String>,
+}
+
+/// An append-only audit log tracking action executions.
+#[derive(Debug)]
+pub struct ActionAuditLog {
+    entries: Mutex<Vec<AuditEntry>>,
+    next_seq: Mutex<u64>,
+}
+
+impl ActionAuditLog {
+    pub fn new() -> Self {
+        Self {
+            entries: Mutex::new(Vec::new()),
+            next_seq: Mutex::new(1),
+        }
+    }
+
+    /// Record a successful action execution.
+    pub fn record_success(&self, action_id: impl Into<String>) {
+        self.push(action_id.into(), true, None);
+    }
+
+    /// Record a failed action execution with a detail message.
+    pub fn record_failure(&self, action_id: impl Into<String>, detail: impl Into<String>) {
+        self.push(action_id.into(), false, Some(detail.into()));
+    }
+
+    fn push(&self, action_id: String, success: bool, detail: Option<String>) {
+        let mut seq = self.next_seq.lock().unwrap();
+        let entry = AuditEntry {
+            action_id,
+            success,
+            seq: *seq,
+            detail,
+        };
+        *seq += 1;
+        self.entries.lock().unwrap().push(entry);
+    }
+
+    /// Return a snapshot of all entries.
+    pub fn entries(&self) -> Vec<AuditEntry> {
+        self.entries.lock().unwrap().clone()
+    }
+
+    /// Return only the entries for a given action ID.
+    pub fn entries_for(&self, action_id: &str) -> Vec<AuditEntry> {
+        self.entries
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.action_id == action_id)
+            .cloned()
+            .collect()
+    }
+
+    /// Return the total number of recorded entries.
+    pub fn len(&self) -> usize {
+        self.entries.lock().unwrap().len()
+    }
+
+    /// Check if the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.lock().unwrap().is_empty()
+    }
+
+    /// Clear all entries and reset the sequence counter.
+    pub fn clear(&self) {
+        self.entries.lock().unwrap().clear();
+        *self.next_seq.lock().unwrap() = 1;
+    }
+}
+
+impl Default for ActionAuditLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Action frequency tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks how often each action is executed to surface the most-used actions.
+#[derive(Debug)]
+pub struct ActionFrequencyTracker {
+    counts: Mutex<HashMap<String, u64>>,
+}
+
+impl ActionFrequencyTracker {
+    pub fn new() -> Self {
+        Self {
+            counts: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Increment the execution count for the given action.
+    pub fn record(&self, action_id: impl Into<String>) {
+        let mut counts = self.counts.lock().unwrap();
+        *counts.entry(action_id.into()).or_insert(0) += 1;
+    }
+
+    /// Return the execution count for a specific action.
+    pub fn count(&self, action_id: &str) -> u64 {
+        self.counts.lock().unwrap().get(action_id).copied().unwrap_or(0)
+    }
+
+    /// Return the top-N most frequently executed actions, sorted descending.
+    pub fn top_n(&self, n: usize) -> Vec<(String, u64)> {
+        let counts = self.counts.lock().unwrap();
+        let mut pairs: Vec<(String, u64)> = counts.iter().map(|(k, &v)| (k.clone(), v)).collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        pairs.truncate(n);
+        pairs
+    }
+
+    /// Return all tracked action IDs.
+    pub fn tracked_actions(&self) -> Vec<String> {
+        self.counts.lock().unwrap().keys().cloned().collect()
+    }
+
+    /// Reset all counts.
+    pub fn reset(&self) {
+        self.counts.lock().unwrap().clear();
+    }
+}
+
+impl Default for ActionFrequencyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Action conflict detection
+// ---------------------------------------------------------------------------
+
+/// Detects conflicts between actions that share the same resources or keybindings.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActionConflict {
+    /// The first action involved in the conflict.
+    pub action_a: String,
+    /// The second action involved in the conflict.
+    pub action_b: String,
+    /// A human-readable description of the conflict.
+    pub reason: String,
+}
+
+impl fmt::Display for ActionConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "conflict between '{}' and '{}': {}",
+            self.action_a, self.action_b, self.reason
+        )
+    }
+}
+
+/// Checks a set of (action_id, keybinding) pairs for duplicate keybindings.
+pub fn detect_keybinding_conflicts(bindings: &[(String, String)]) -> Vec<ActionConflict> {
+    let mut by_key: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (action_id, key) in bindings {
+        by_key.entry(key.as_str()).or_default().push(action_id.as_str());
+    }
+    let mut conflicts = Vec::new();
+    for (key, actions) in &by_key {
+        if actions.len() > 1 {
+            for i in 0..actions.len() {
+                for j in (i + 1)..actions.len() {
+                    conflicts.push(ActionConflict {
+                        action_a: actions[i].to_string(),
+                        action_b: actions[j].to_string(),
+                        reason: format!("duplicate keybinding '{key}'"),
+                    });
+                }
+            }
+        }
+    }
+    conflicts.sort_by(|a, b| a.action_a.cmp(&b.action_a).then(a.action_b.cmp(&b.action_b)));
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Undo group
+// ---------------------------------------------------------------------------
+
+/// Groups multiple action IDs into a single undo unit so that undoing reverts
+/// all of them atomically.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UndoGroup {
+    /// Human-readable label for the undo group.
+    pub label: String,
+    /// Ordered list of action IDs that form this group.
+    pub action_ids: Vec<String>,
+}
+
+impl UndoGroup {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            action_ids: Vec::new(),
+        }
+    }
+
+    /// Append an action to the undo group.
+    pub fn push(&mut self, action_id: impl Into<String>) {
+        self.action_ids.push(action_id.into());
+    }
+
+    /// Return the number of actions in this group.
+    pub fn len(&self) -> usize {
+        self.action_ids.len()
+    }
+
+    /// Check if the group is empty.
+    pub fn is_empty(&self) -> bool {
+        self.action_ids.is_empty()
+    }
+
+    /// Check whether an action is part of this group.
+    pub fn contains(&self, action_id: &str) -> bool {
+        self.action_ids.iter().any(|id| id == action_id)
+    }
+}
+
+impl fmt::Display for UndoGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UndoGroup '{}' ({} actions)", self.label, self.action_ids.len())
+    }
+}
+
+/// Manages a stack of undo groups.
+#[derive(Debug)]
+pub struct UndoGroupStack {
+    groups: Mutex<Vec<UndoGroup>>,
+    max_depth: usize,
+}
+
+impl UndoGroupStack {
+    /// Create a stack with a maximum depth. Once exceeded, the oldest group is dropped.
+    pub fn new(max_depth: usize) -> Self {
+        Self {
+            groups: Mutex::new(Vec::new()),
+            max_depth,
+        }
+    }
+
+    /// Push a completed undo group onto the stack.
+    pub fn push(&self, group: UndoGroup) {
+        let mut groups = self.groups.lock().unwrap();
+        if groups.len() >= self.max_depth {
+            groups.remove(0);
+        }
+        groups.push(group);
+    }
+
+    /// Pop the most recent undo group, if any.
+    pub fn pop(&self) -> Option<UndoGroup> {
+        self.groups.lock().unwrap().pop()
+    }
+
+    /// Peek at the most recent undo group without removing it.
+    pub fn peek(&self) -> Option<UndoGroup> {
+        self.groups.lock().unwrap().last().cloned()
+    }
+
+    /// Return the current number of undo groups on the stack.
+    pub fn len(&self) -> usize {
+        self.groups.lock().unwrap().len()
+    }
+
+    /// Check if the stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.groups.lock().unwrap().is_empty()
+    }
+
+    /// Clear all undo groups.
+    pub fn clear(&self) {
+        self.groups.lock().unwrap().clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1575,5 +1871,132 @@ mod tests {
         let summary = stats.summary();
         assert!(summary.contains("2 ops"));
         assert!(summary.contains("50.0%"));
+    }
+
+    // -- AuditLog tests --
+
+    #[test]
+    fn audit_log_record_and_query() {
+        let log = ActionAuditLog::new();
+        assert!(log.is_empty());
+        assert_eq!(log.len(), 0);
+
+        log.record_success("file.save");
+        log.record_success("file.save");
+        log.record_failure("file.open", "permission denied");
+
+        assert_eq!(log.len(), 3);
+        assert!(!log.is_empty());
+
+        let all = log.entries();
+        assert_eq!(all[0].seq, 1);
+        assert_eq!(all[1].seq, 2);
+        assert_eq!(all[2].seq, 3);
+        assert!(all[0].success);
+        assert!(!all[2].success);
+        assert_eq!(all[2].detail.as_deref(), Some("permission denied"));
+
+        let saves = log.entries_for("file.save");
+        assert_eq!(saves.len(), 2);
+
+        log.clear();
+        assert!(log.is_empty());
+    }
+
+    // -- FrequencyTracker tests --
+
+    #[test]
+    fn frequency_tracker_top_n() {
+        let tracker = ActionFrequencyTracker::new();
+        for _ in 0..5 {
+            tracker.record("file.save");
+        }
+        for _ in 0..3 {
+            tracker.record("file.open");
+        }
+        tracker.record("edit.undo");
+
+        assert_eq!(tracker.count("file.save"), 5);
+        assert_eq!(tracker.count("file.open"), 3);
+        assert_eq!(tracker.count("edit.undo"), 1);
+        assert_eq!(tracker.count("nonexistent"), 0);
+
+        let top = tracker.top_n(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0], ("file.save".to_string(), 5));
+        assert_eq!(top[1], ("file.open".to_string(), 3));
+
+        tracker.reset();
+        assert_eq!(tracker.count("file.save"), 0);
+        assert!(tracker.tracked_actions().is_empty());
+    }
+
+    // -- Keybinding conflict detection --
+
+    #[test]
+    fn detect_keybinding_conflicts_finds_duplicates() {
+        let bindings = vec![
+            ("file.save".to_string(), "Ctrl+S".to_string()),
+            ("custom.save".to_string(), "Ctrl+S".to_string()),
+            ("file.open".to_string(), "Ctrl+O".to_string()),
+        ];
+        let conflicts = detect_keybinding_conflicts(&bindings);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].action_a, "file.save");
+        assert_eq!(conflicts[0].action_b, "custom.save");
+        assert!(conflicts[0].reason.contains("Ctrl+S"));
+    }
+
+    #[test]
+    fn detect_keybinding_conflicts_no_duplicates() {
+        let bindings = vec![
+            ("a".to_string(), "Ctrl+A".to_string()),
+            ("b".to_string(), "Ctrl+B".to_string()),
+        ];
+        assert!(detect_keybinding_conflicts(&bindings).is_empty());
+    }
+
+    // -- UndoGroup and UndoGroupStack tests --
+
+    #[test]
+    fn undo_group_and_stack() {
+        let mut group = UndoGroup::new("Refactor rename");
+        assert!(group.is_empty());
+        group.push("editor.rename");
+        group.push("editor.formatDocument");
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("editor.rename"));
+        assert!(!group.contains("editor.save"));
+        assert_eq!(
+            format!("{group}"),
+            "UndoGroup 'Refactor rename' (2 actions)"
+        );
+
+        let stack = UndoGroupStack::new(3);
+        assert!(stack.is_empty());
+
+        stack.push(group.clone());
+        assert_eq!(stack.len(), 1);
+
+        let peeked = stack.peek().unwrap();
+        assert_eq!(peeked.label, "Refactor rename");
+        assert_eq!(stack.len(), 1); // peek doesn't remove
+
+        let popped = stack.pop().unwrap();
+        assert_eq!(popped.label, "Refactor rename");
+        assert!(stack.is_empty());
+
+        // Verify max_depth eviction
+        for i in 0..5 {
+            let mut g = UndoGroup::new(format!("group-{i}"));
+            g.push(format!("action-{i}"));
+            stack.push(g);
+        }
+        assert_eq!(stack.len(), 3); // max_depth = 3, oldest are evicted
+        let top = stack.peek().unwrap();
+        assert_eq!(top.label, "group-4");
+
+        stack.clear();
+        assert!(stack.is_empty());
     }
 }

@@ -879,6 +879,183 @@ pub fn buffer_join_lines(lines: &[VsBuffer]) -> VsBuffer {
     buffer_concat(lines, Some(b"\n"))
 }
 
+// ---------------------------------------------------------------------------
+// ChunkIterator
+// ---------------------------------------------------------------------------
+
+/// Iterator that yields fixed-size chunks of a [`VsBuffer`].
+///
+/// The last chunk may be shorter than `chunk_size` if the buffer length is not
+/// evenly divisible.
+pub struct ChunkIterator {
+    buffer: VsBuffer,
+    chunk_size: usize,
+    offset: usize,
+}
+
+impl ChunkIterator {
+    fn new(buffer: VsBuffer, chunk_size: usize) -> Self {
+        assert!(chunk_size > 0, "chunk_size must be > 0");
+        Self {
+            buffer,
+            chunk_size,
+            offset: 0,
+        }
+    }
+}
+
+impl Iterator for ChunkIterator {
+    type Item = VsBuffer;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset >= self.buffer.len() {
+            return None;
+        }
+        let end = (self.offset + self.chunk_size).min(self.buffer.len());
+        let chunk = self.buffer.slice(self.offset..end);
+        self.offset = end;
+        Some(chunk)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.buffer.len().saturating_sub(self.offset);
+        let n = (remaining + self.chunk_size - 1) / self.chunk_size;
+        (n, Some(n))
+    }
+}
+
+impl ExactSizeIterator for ChunkIterator {}
+
+// ---------------------------------------------------------------------------
+// WindowIterator
+// ---------------------------------------------------------------------------
+
+/// Iterator that yields overlapping windows of a [`VsBuffer`].
+pub struct WindowIterator {
+    buffer: VsBuffer,
+    window_size: usize,
+    offset: usize,
+}
+
+impl WindowIterator {
+    fn new(buffer: VsBuffer, window_size: usize) -> Self {
+        assert!(window_size > 0, "window_size must be > 0");
+        Self {
+            buffer,
+            window_size,
+            offset: 0,
+        }
+    }
+}
+
+impl Iterator for WindowIterator {
+    type Item = VsBuffer;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset + self.window_size > self.buffer.len() {
+            return None;
+        }
+        let window = self.buffer.slice(self.offset..self.offset + self.window_size);
+        self.offset += 1;
+        Some(window)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self
+            .buffer
+            .len()
+            .saturating_sub(self.offset)
+            .saturating_sub(self.window_size - 1);
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for WindowIterator {}
+
+// ---------------------------------------------------------------------------
+// Additional VsBuffer methods: chunks, windows, xor, pad, find_byte,
+// contains_pattern, reverse, repeat
+// ---------------------------------------------------------------------------
+
+impl VsBuffer {
+    /// Return an iterator over fixed-size chunks of the buffer.
+    pub fn chunks(&self, chunk_size: usize) -> ChunkIterator {
+        ChunkIterator::new(self.clone(), chunk_size)
+    }
+
+    /// Return an iterator over overlapping windows of the buffer.
+    pub fn windows(&self, window_size: usize) -> WindowIterator {
+        WindowIterator::new(self.clone(), window_size)
+    }
+
+    /// Find the index of the first occurrence of a single byte.
+    pub fn find_byte(&self, needle: u8) -> Option<usize> {
+        self.inner.iter().position(|&b| b == needle)
+    }
+
+    /// Returns `true` if the buffer contains the given byte pattern.
+    pub fn contains_pattern(&self, pattern: &[u8]) -> bool {
+        self.find(pattern).is_some()
+    }
+
+    /// XOR every byte in this buffer with the corresponding byte in `other`.
+    ///
+    /// The result has the length of the shorter buffer.
+    pub fn xor(&self, other: &VsBuffer) -> Self {
+        let len = self.inner.len().min(other.inner.len());
+        let mut out = BytesMut::with_capacity(len);
+        for i in 0..len {
+            out.extend_from_slice(&[self.inner[i] ^ other.inner[i]]);
+        }
+        Self {
+            inner: out.freeze(),
+        }
+    }
+
+    /// Pad the buffer to `target_len` by appending `pad_byte`.
+    ///
+    /// If the buffer is already at least `target_len`, returns a clone.
+    pub fn pad(&self, target_len: usize, pad_byte: u8) -> Self {
+        if self.inner.len() >= target_len {
+            return self.clone();
+        }
+        let mut out = BytesMut::with_capacity(target_len);
+        out.extend_from_slice(&self.inner);
+        out.resize(target_len, pad_byte);
+        Self {
+            inner: out.freeze(),
+        }
+    }
+
+    /// Return a new buffer with bytes in reverse order.
+    pub fn reverse(&self) -> Self {
+        let mut v: Vec<u8> = self.inner.to_vec();
+        v.reverse();
+        Self::new(v)
+    }
+
+    /// Repeat the buffer `n` times.
+    pub fn repeat(&self, n: usize) -> Self {
+        if n == 0 || self.is_empty() {
+            return Self::empty();
+        }
+        let mut out = BytesMut::with_capacity(self.inner.len() * n);
+        for _ in 0..n {
+            out.extend_from_slice(&self.inner);
+        }
+        Self {
+            inner: out.freeze(),
+        }
+    }
+
+    /// Replace all occurrences of a single byte with another byte (in-place
+    /// copy).
+    pub fn replace_byte(&self, from: u8, to: u8) -> Self {
+        let v: Vec<u8> = self.inner.iter().map(|&b| if b == from { to } else { b }).collect();
+        Self::new(v)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1561,5 +1738,139 @@ mod tests {
         ];
         let result = super::buffer_concat(&bufs, Some(b"<=>"));
         assert_eq!(result.to_string_lossy(), "a<=>b");
+    }
+
+    // -----------------------------------------------------------------------
+    // ChunkIterator / WindowIterator / new VsBuffer method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chunks_even_split() {
+        let buf = VsBuffer::from_string("abcdef");
+        let chunks: Vec<_> = buf.chunks(2).collect();
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].to_string_lossy(), "ab");
+        assert_eq!(chunks[1].to_string_lossy(), "cd");
+        assert_eq!(chunks[2].to_string_lossy(), "ef");
+    }
+
+    #[test]
+    fn chunks_uneven_split() {
+        let buf = VsBuffer::from_string("abcde");
+        let chunks: Vec<_> = buf.chunks(2).collect();
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[2].to_string_lossy(), "e");
+    }
+
+    #[test]
+    fn chunks_exact_size_hint() {
+        let buf = VsBuffer::from_string("abcdef");
+        let iter = buf.chunks(2);
+        assert_eq!(iter.len(), 3);
+    }
+
+    #[test]
+    fn windows_basic() {
+        let buf = VsBuffer::from_string("abcd");
+        let wins: Vec<_> = buf.windows(2).collect();
+        assert_eq!(wins.len(), 3);
+        assert_eq!(wins[0].to_string_lossy(), "ab");
+        assert_eq!(wins[1].to_string_lossy(), "bc");
+        assert_eq!(wins[2].to_string_lossy(), "cd");
+    }
+
+    #[test]
+    fn windows_too_large() {
+        let buf = VsBuffer::from_string("ab");
+        let wins: Vec<_> = buf.windows(5).collect();
+        assert!(wins.is_empty());
+    }
+
+    #[test]
+    fn find_byte_found() {
+        let buf = VsBuffer::from_string("hello");
+        assert_eq!(buf.find_byte(b'l'), Some(2));
+    }
+
+    #[test]
+    fn find_byte_not_found() {
+        let buf = VsBuffer::from_string("hello");
+        assert_eq!(buf.find_byte(b'z'), None);
+    }
+
+    #[test]
+    fn contains_pattern_true() {
+        let buf = VsBuffer::from_string("the quick brown fox");
+        assert!(buf.contains_pattern(b"brown"));
+    }
+
+    #[test]
+    fn contains_pattern_false() {
+        let buf = VsBuffer::from_string("the quick brown fox");
+        assert!(!buf.contains_pattern(b"lazy"));
+    }
+
+    #[test]
+    fn xor_same_length() {
+        let a = VsBuffer::new(vec![0xAA, 0xBB, 0xCC]);
+        let b = VsBuffer::new(vec![0xFF, 0x00, 0xCC]);
+        let result = a.xor(&b);
+        assert_eq!(result.as_bytes(), &[0x55, 0xBB, 0x00]);
+    }
+
+    #[test]
+    fn xor_different_lengths() {
+        let a = VsBuffer::new(vec![0xFF, 0x00]);
+        let b = VsBuffer::new(vec![0x0F]);
+        let result = a.xor(&b);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.as_bytes(), &[0xF0]);
+    }
+
+    #[test]
+    fn pad_extends() {
+        let buf = VsBuffer::from_string("hi");
+        let padded = buf.pad(5, b'.');
+        assert_eq!(padded.len(), 5);
+        assert_eq!(padded.to_string_lossy(), "hi...");
+    }
+
+    #[test]
+    fn pad_already_sufficient() {
+        let buf = VsBuffer::from_string("hello");
+        let padded = buf.pad(3, b'.');
+        assert_eq!(padded.to_string_lossy(), "hello");
+    }
+
+    #[test]
+    fn reverse_buffer() {
+        let buf = VsBuffer::from_string("abcd");
+        assert_eq!(buf.reverse().to_string_lossy(), "dcba");
+    }
+
+    #[test]
+    fn reverse_empty() {
+        let buf = VsBuffer::empty();
+        assert!(buf.reverse().is_empty());
+    }
+
+    #[test]
+    fn repeat_buffer() {
+        let buf = VsBuffer::from_string("ab");
+        let repeated = buf.repeat(3);
+        assert_eq!(repeated.to_string_lossy(), "ababab");
+    }
+
+    #[test]
+    fn repeat_zero() {
+        let buf = VsBuffer::from_string("ab");
+        assert!(buf.repeat(0).is_empty());
+    }
+
+    #[test]
+    fn replace_byte_basic() {
+        let buf = VsBuffer::from_string("hello");
+        let result = buf.replace_byte(b'l', b'r');
+        assert_eq!(result.to_string_lossy(), "herro");
     }
 }

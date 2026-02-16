@@ -842,6 +842,255 @@ impl fmt::Display for GarbageCollectionResult {
     }
 }
 
+// ---------------------------------------------------------------------------
+// History export/import
+// ---------------------------------------------------------------------------
+
+/// A serializable representation of a history entry for export/import.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportedEntry {
+    pub uri: String,
+    pub timestamp: u64,
+    pub content_hash: String,
+    pub label: Option<String>,
+    pub source: String,
+    pub content: Option<String>,
+    pub size_bytes: u64,
+}
+
+impl From<&HistoryEntry> for ExportedEntry {
+    fn from(e: &HistoryEntry) -> Self {
+        Self {
+            uri: e.uri.clone(),
+            timestamp: e.timestamp,
+            content_hash: e.content_hash.clone(),
+            label: e.label.clone(),
+            source: format!("{}", e.source),
+            content: e.content.clone(),
+            size_bytes: e.size_bytes,
+        }
+    }
+}
+
+impl ExportedEntry {
+    /// Parse the source string back into a `HistorySource`.
+    pub fn parse_source(&self) -> Result<HistorySource, String> {
+        match self.source.as_str() {
+            "auto" => Ok(HistorySource::Auto),
+            "manual" => Ok(HistorySource::Manual),
+            "undo" => Ok(HistorySource::Undo),
+            other => Err(format!("unknown source: {other}")),
+        }
+    }
+
+    /// Convert back into a `HistoryEntry`.
+    pub fn into_entry(self) -> Result<HistoryEntry, String> {
+        let source = self.parse_source()?;
+        Ok(HistoryEntry {
+            uri: self.uri,
+            timestamp: self.timestamp,
+            content_hash: self.content_hash,
+            label: self.label,
+            source,
+            content: self.content,
+            size_bytes: self.size_bytes,
+        })
+    }
+}
+
+impl LocalHistoryService {
+    /// Export all entries as `ExportedEntry` values.
+    pub fn export_entries(&self) -> Vec<ExportedEntry> {
+        self.entries.iter().map(ExportedEntry::from).collect()
+    }
+
+    /// Import entries from exported representations, skipping duplicates
+    /// (same URI + timestamp already present).
+    pub fn import_entries(&mut self, exported: Vec<ExportedEntry>) -> Result<usize, String> {
+        let mut imported = 0usize;
+        for ex in exported {
+            let already_exists = self
+                .entries
+                .iter()
+                .any(|e| e.uri == ex.uri && e.timestamp == ex.timestamp);
+            if already_exists {
+                continue;
+            }
+            let entry = ex.into_entry()?;
+            self.entries.push(entry);
+            imported += 1;
+        }
+        Ok(imported)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot scheduling logic
+// ---------------------------------------------------------------------------
+
+/// Configuration for automatic snapshot scheduling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotSchedule {
+    /// Minimum interval between automatic snapshots in seconds.
+    pub min_interval_secs: u64,
+    /// Only snapshot if content hash changed since last snapshot.
+    pub only_on_change: bool,
+}
+
+impl Default for SnapshotSchedule {
+    fn default() -> Self {
+        Self {
+            min_interval_secs: 60,
+            only_on_change: true,
+        }
+    }
+}
+
+impl SnapshotSchedule {
+    /// Determine whether a new snapshot should be taken for the given URI.
+    pub fn should_snapshot(
+        &self,
+        service: &LocalHistoryService,
+        uri: &str,
+        current_time: u64,
+        current_hash: &str,
+    ) -> bool {
+        let latest = service.get_latest_entry(uri);
+        match latest {
+            None => true,
+            Some(entry) => {
+                let elapsed = current_time.saturating_sub(entry.timestamp);
+                if elapsed < self.min_interval_secs {
+                    return false;
+                }
+                if self.only_on_change && entry.content_hash == current_hash {
+                    return false;
+                }
+                true
+            }
+        }
+    }
+
+    /// Compute the number of seconds until the next snapshot is allowed.
+    /// Returns 0 if a snapshot can be taken now.
+    pub fn time_until_next(
+        &self,
+        service: &LocalHistoryService,
+        uri: &str,
+        current_time: u64,
+    ) -> u64 {
+        match service.get_latest_entry(uri) {
+            None => 0,
+            Some(entry) => {
+                let elapsed = current_time.saturating_sub(entry.timestamp);
+                self.min_interval_secs.saturating_sub(elapsed)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-file statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics for a single file's history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileHistoryStats {
+    pub uri: String,
+    pub entry_count: usize,
+    pub total_size: u64,
+    pub oldest_timestamp: u64,
+    pub newest_timestamp: u64,
+    pub unique_hashes: usize,
+}
+
+impl LocalHistoryService {
+    /// Compute per-file statistics for a given URI.
+    pub fn file_stats(&self, uri: &str) -> Option<FileHistoryStats> {
+        let file_entries: Vec<&HistoryEntry> =
+            self.entries.iter().filter(|e| e.uri == uri).collect();
+        if file_entries.is_empty() {
+            return None;
+        }
+        let total_size: u64 = file_entries.iter().map(|e| e.size_bytes).sum();
+        let oldest = file_entries.iter().map(|e| e.timestamp).min().unwrap();
+        let newest = file_entries.iter().map(|e| e.timestamp).max().unwrap();
+        let unique_hashes: std::collections::HashSet<&str> = file_entries
+            .iter()
+            .map(|e| e.content_hash.as_str())
+            .collect();
+        Some(FileHistoryStats {
+            uri: uri.to_string(),
+            entry_count: file_entries.len(),
+            total_size,
+            oldest_timestamp: oldest,
+            newest_timestamp: newest,
+            unique_hashes: unique_hashes.len(),
+        })
+    }
+
+    /// Compute per-file statistics for all tracked files.
+    pub fn all_file_stats(&self) -> Vec<FileHistoryStats> {
+        let uris = self.get_unique_uris();
+        uris.iter()
+            .filter_map(|uri| self.file_stats(uri))
+            .collect()
+    }
+
+    /// Search entries whose URI contains the given substring (case-insensitive).
+    pub fn search_by_filename(&self, needle: &str) -> Vec<&HistoryEntry> {
+        let needle_lower = needle.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.uri.to_lowercase().contains(&needle_lower))
+            .collect()
+    }
+
+    /// Deduplicate entries: for each URI, remove entries with the same
+    /// content hash, keeping only the one with the latest timestamp.
+    /// Returns the number of entries removed.
+    pub fn deduplicate(&mut self) -> usize {
+        let before = self.entries.len();
+        self.compact();
+        before - self.entries.len()
+    }
+
+    /// Compare two entries by URI and timestamps, returning a detailed comparison.
+    pub fn compare_entries(
+        &self,
+        uri: &str,
+        ts_a: u64,
+        ts_b: u64,
+    ) -> Option<EntryComparison> {
+        let a = self.get_entry(uri, ts_a)?;
+        let b = self.get_entry(uri, ts_b)?;
+        let diff = compute_diff(a, b);
+        let content_diff = match (&a.content, &b.content) {
+            (Some(old), Some(new)) => Some(compute_diff_summary(old, new)),
+            _ => None,
+        };
+        Some(EntryComparison {
+            uri: uri.to_string(),
+            from_timestamp: ts_a,
+            to_timestamp: ts_b,
+            hash_changed: diff.hash_changed,
+            size_delta: diff.size_delta,
+            content_diff,
+        })
+    }
+}
+
+/// Detailed comparison of two history entries.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntryComparison {
+    pub uri: String,
+    pub from_timestamp: u64,
+    pub to_timestamp: u64,
+    pub hash_changed: bool,
+    pub size_delta: i64,
+    pub content_diff: Option<DiffSummary>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1577,5 +1826,203 @@ mod tests {
         assert_eq!(recent.len(), 1);
         let recent_all = svc.recent_entries(4, 10);
         assert_eq!(recent_all.len(), 3);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for export/import, scheduling, file stats, dedup, compare
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn export_and_import_round_trip() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Manual);
+        svc.add_entry("file:///b.rs", "h3", HistorySource::Undo);
+        let exported = svc.export_entries();
+        assert_eq!(exported.len(), 3);
+        assert_eq!(exported[0].source, "auto");
+        assert_eq!(exported[1].source, "manual");
+        assert_eq!(exported[2].source, "undo");
+
+        // Import into a fresh service
+        let mut svc2 = LocalHistoryService::new(10);
+        let count = svc2.import_entries(exported).unwrap();
+        assert_eq!(count, 3);
+        assert_eq!(svc2.entry_count(), 3);
+
+        // Re-importing the same entries yields 0 new imports (dedup by uri+ts)
+        let exported2 = svc.export_entries();
+        let count2 = svc2.import_entries(exported2).unwrap();
+        assert_eq!(count2, 0);
+    }
+
+    #[test]
+    fn exported_entry_parse_source_invalid() {
+        let bad = ExportedEntry {
+            uri: "file:///x.rs".to_string(),
+            timestamp: 1,
+            content_hash: "h".to_string(),
+            label: None,
+            source: "bogus".to_string(),
+            content: None,
+            size_bytes: 0,
+        };
+        assert!(bad.parse_source().is_err());
+        assert!(bad.into_entry().is_err());
+    }
+
+    #[test]
+    fn snapshot_schedule_should_snapshot() {
+        let svc = LocalHistoryService::new(10);
+        let schedule = SnapshotSchedule {
+            min_interval_secs: 60,
+            only_on_change: true,
+        };
+
+        // No entries yet — always snapshot
+        assert!(schedule.should_snapshot(&svc, "file:///a.rs", 100, "hash1"));
+        assert_eq!(schedule.time_until_next(&svc, "file:///a.rs", 100), 0);
+    }
+
+    #[test]
+    fn snapshot_schedule_respects_interval_and_change() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "hash1", HistorySource::Auto);
+
+        let schedule = SnapshotSchedule {
+            min_interval_secs: 60,
+            only_on_change: true,
+        };
+
+        // Entry has timestamp=1. At current_time=30, elapsed=29 < 60
+        assert!(!schedule.should_snapshot(&svc, "file:///a.rs", 30, "hash2"));
+        assert_eq!(schedule.time_until_next(&svc, "file:///a.rs", 30), 31);
+
+        // Enough time but same hash — no snapshot (only_on_change=true)
+        assert!(!schedule.should_snapshot(&svc, "file:///a.rs", 100, "hash1"));
+
+        // Enough time and different hash — snapshot
+        assert!(schedule.should_snapshot(&svc, "file:///a.rs", 100, "hash2"));
+
+        // only_on_change=false: same hash but enough time — snapshot
+        let schedule2 = SnapshotSchedule {
+            min_interval_secs: 60,
+            only_on_change: false,
+        };
+        assert!(schedule2.should_snapshot(&svc, "file:///a.rs", 100, "hash1"));
+    }
+
+    #[test]
+    fn file_stats_and_all_file_stats() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.entries.push(HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 10,
+            content_hash: "h1".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 100,
+        });
+        svc.entries.push(HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 20,
+            content_hash: "h2".to_string(),
+            label: None,
+            source: HistorySource::Manual,
+            content: None,
+            size_bytes: 200,
+        });
+        svc.entries.push(HistoryEntry {
+            uri: "file:///b.rs".to_string(),
+            timestamp: 15,
+            content_hash: "h1".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 50,
+        });
+
+        let stats_a = svc.file_stats("file:///a.rs").unwrap();
+        assert_eq!(stats_a.entry_count, 2);
+        assert_eq!(stats_a.total_size, 300);
+        assert_eq!(stats_a.oldest_timestamp, 10);
+        assert_eq!(stats_a.newest_timestamp, 20);
+        assert_eq!(stats_a.unique_hashes, 2);
+
+        assert!(svc.file_stats("file:///nope.rs").is_none());
+
+        let all = svc.all_file_stats();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn search_by_filename_case_insensitive() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///SRC/Main.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///src/util.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///lib/other.py", "h3", HistorySource::Auto);
+
+        let results = svc.search_by_filename("src");
+        assert_eq!(results.len(), 2);
+        let results2 = svc.search_by_filename("MAIN");
+        assert_eq!(results2.len(), 1);
+        let results3 = svc.search_by_filename("nope");
+        assert!(results3.is_empty());
+    }
+
+    #[test]
+    fn deduplicate_removes_duplicate_hashes() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "same_hash", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "same_hash", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "different", HistorySource::Auto);
+        assert_eq!(svc.entry_count(), 3);
+
+        let removed = svc.deduplicate();
+        assert_eq!(removed, 1);
+        assert_eq!(svc.entry_count(), 2);
+
+        // The kept entry for "same_hash" should be the one with the higher timestamp
+        let kept = svc
+            .entries
+            .iter()
+            .find(|e| e.content_hash == "same_hash")
+            .unwrap();
+        assert_eq!(kept.timestamp, 2);
+    }
+
+    #[test]
+    fn compare_entries_with_content() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.entries.push(HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 1,
+            content_hash: "h1".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: Some("line1\nline2".to_string()),
+            size_bytes: 10,
+        });
+        svc.entries.push(HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 2,
+            content_hash: "h2".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: Some("line1\nchanged".to_string()),
+            size_bytes: 12,
+        });
+
+        let cmp = svc.compare_entries("file:///a.rs", 1, 2).unwrap();
+        assert!(cmp.hash_changed);
+        assert_eq!(cmp.size_delta, 2);
+        let diff = cmp.content_diff.unwrap();
+        assert_eq!(diff.modifications, 1);
+        assert_eq!(diff.additions, 0);
+        assert_eq!(diff.deletions, 0);
+
+        // Missing entry returns None
+        assert!(svc.compare_entries("file:///a.rs", 1, 99).is_none());
     }
 }

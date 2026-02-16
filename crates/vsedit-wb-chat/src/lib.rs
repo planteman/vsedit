@@ -875,6 +875,380 @@ pub fn extract_role_content(messages: &[ChatMessage], role: MessageRole) -> Vec<
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Threaded messages (reply chains)
+// ---------------------------------------------------------------------------
+
+/// A message that supports threading via reply chains.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThreadedMessage {
+    pub id: u64,
+    pub parent_id: Option<u64>,
+    pub role: MessageRole,
+    pub content: String,
+    pub timestamp: u64,
+}
+
+/// A conversation that supports threaded reply chains.
+pub struct ThreadedConversation {
+    messages: Vec<ThreadedMessage>,
+    next_id: u64,
+}
+
+impl ThreadedConversation {
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Post a new top-level message. Returns its assigned ID.
+    pub fn post(&mut self, role: MessageRole, content: impl Into<String>, timestamp: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.messages.push(ThreadedMessage {
+            id,
+            parent_id: None,
+            role,
+            content: content.into(),
+            timestamp,
+        });
+        id
+    }
+
+    /// Reply to an existing message. Returns the new message ID, or
+    /// `ChatError::ValidationError` if `parent_id` does not exist.
+    pub fn reply(
+        &mut self,
+        parent_id: u64,
+        role: MessageRole,
+        content: impl Into<String>,
+        timestamp: u64,
+    ) -> Result<u64, ChatError> {
+        if !self.messages.iter().any(|m| m.id == parent_id) {
+            return Err(ChatError::ValidationError(format!(
+                "parent message {parent_id} not found"
+            )));
+        }
+        let id = self.next_id;
+        self.next_id += 1;
+        self.messages.push(ThreadedMessage {
+            id,
+            parent_id: Some(parent_id),
+            role,
+            content: content.into(),
+            timestamp,
+        });
+        Ok(id)
+    }
+
+    /// Return all direct replies to the given message ID.
+    pub fn replies_to(&self, parent_id: u64) -> Vec<&ThreadedMessage> {
+        self.messages
+            .iter()
+            .filter(|m| m.parent_id == Some(parent_id))
+            .collect()
+    }
+
+    /// Return the full thread starting from `root_id` (depth-first).
+    pub fn thread_from(&self, root_id: u64) -> Vec<&ThreadedMessage> {
+        let mut result = Vec::new();
+        self.collect_thread(root_id, &mut result);
+        result
+    }
+
+    fn collect_thread<'a>(&'a self, id: u64, out: &mut Vec<&'a ThreadedMessage>) {
+        if let Some(msg) = self.messages.iter().find(|m| m.id == id) {
+            out.push(msg);
+            for child in self.replies_to(id) {
+                self.collect_thread(child.id, out);
+            }
+        }
+    }
+
+    /// Return all top-level messages (those with no parent).
+    pub fn top_level(&self) -> Vec<&ThreadedMessage> {
+        self.messages
+            .iter()
+            .filter(|m| m.parent_id.is_none())
+            .collect()
+    }
+
+    /// Return the thread depth of a message (0 for top-level).
+    pub fn depth(&self, id: u64) -> usize {
+        let mut d = 0;
+        let mut current = id;
+        while let Some(msg) = self.messages.iter().find(|m| m.id == current) {
+            match msg.parent_id {
+                Some(pid) => {
+                    d += 1;
+                    current = pid;
+                }
+                None => break,
+            }
+        }
+        d
+    }
+
+    /// Total number of messages.
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Returns `true` when no messages exist.
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+}
+
+impl Default for ThreadedConversation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unread message tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks which messages have been read by each participant.
+pub struct UnreadTracker {
+    /// Maps participant ID → set of read message indices.
+    read_set: HashMap<String, std::collections::HashSet<usize>>,
+    total_messages: usize,
+}
+
+impl UnreadTracker {
+    pub fn new() -> Self {
+        Self {
+            read_set: HashMap::new(),
+            total_messages: 0,
+        }
+    }
+
+    /// Record that a new message was appended to the conversation.
+    pub fn on_message_added(&mut self) {
+        self.total_messages += 1;
+    }
+
+    /// Mark a specific message index as read for a participant.
+    pub fn mark_read(&mut self, participant_id: &str, message_index: usize) {
+        self.read_set
+            .entry(participant_id.to_string())
+            .or_default()
+            .insert(message_index);
+    }
+
+    /// Mark all current messages as read for a participant.
+    pub fn mark_all_read(&mut self, participant_id: &str) {
+        let set = self
+            .read_set
+            .entry(participant_id.to_string())
+            .or_default();
+        for i in 0..self.total_messages {
+            set.insert(i);
+        }
+    }
+
+    /// Return the number of unread messages for a participant.
+    pub fn unread_count(&self, participant_id: &str) -> usize {
+        let read = self
+            .read_set
+            .get(participant_id)
+            .map_or(0, |s| s.len().min(self.total_messages));
+        self.total_messages.saturating_sub(read)
+    }
+
+    /// Return the indices of unread messages for a participant.
+    pub fn unread_indices(&self, participant_id: &str) -> Vec<usize> {
+        let read = self.read_set.get(participant_id);
+        (0..self.total_messages)
+            .filter(|i| !read.map_or(false, |s| s.contains(i)))
+            .collect()
+    }
+
+    /// Returns `true` if the participant has unread messages.
+    pub fn has_unread(&self, participant_id: &str) -> bool {
+        self.unread_count(participant_id) > 0
+    }
+}
+
+impl Default for UnreadTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Participant presence tracking
+// ---------------------------------------------------------------------------
+
+/// Online status of a chat participant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PresenceStatus {
+    Online,
+    Away,
+    DoNotDisturb,
+    Offline,
+}
+
+impl fmt::Display for PresenceStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PresenceStatus::Online => write!(f, "online"),
+            PresenceStatus::Away => write!(f, "away"),
+            PresenceStatus::DoNotDisturb => write!(f, "do not disturb"),
+            PresenceStatus::Offline => write!(f, "offline"),
+        }
+    }
+}
+
+/// Entry for one participant's presence information.
+#[derive(Debug, Clone)]
+pub struct PresenceEntry {
+    pub participant_id: String,
+    pub status: PresenceStatus,
+    /// Timestamp when the status was last updated.
+    pub last_updated: u64,
+}
+
+/// Tracks presence/status for all chat participants.
+pub struct PresenceTracker {
+    entries: HashMap<String, PresenceEntry>,
+}
+
+impl PresenceTracker {
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Update the presence status for a participant.
+    pub fn set_status(&mut self, participant_id: &str, status: PresenceStatus, timestamp: u64) {
+        self.entries.insert(
+            participant_id.to_string(),
+            PresenceEntry {
+                participant_id: participant_id.to_string(),
+                status,
+                last_updated: timestamp,
+            },
+        );
+    }
+
+    /// Get the current status of a participant (defaults to `Offline`).
+    pub fn get_status(&self, participant_id: &str) -> PresenceStatus {
+        self.entries
+            .get(participant_id)
+            .map_or(PresenceStatus::Offline, |e| e.status)
+    }
+
+    /// Return all participants currently online.
+    pub fn online_participants(&self) -> Vec<&str> {
+        self.entries
+            .values()
+            .filter(|e| e.status == PresenceStatus::Online)
+            .map(|e| e.participant_id.as_str())
+            .collect()
+    }
+
+    /// Return all participants with the given status.
+    pub fn participants_with_status(&self, status: PresenceStatus) -> Vec<&str> {
+        self.entries
+            .values()
+            .filter(|e| e.status == status)
+            .map(|e| e.participant_id.as_str())
+            .collect()
+    }
+
+    /// Number of tracked participants.
+    pub fn tracked_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Mark all participants whose `last_updated` is older than `threshold` as
+    /// `Offline`.
+    pub fn expire_stale(&mut self, threshold: u64) {
+        for entry in self.entries.values_mut() {
+            if entry.last_updated < threshold && entry.status != PresenceStatus::Offline {
+                entry.status = PresenceStatus::Offline;
+            }
+        }
+    }
+}
+
+impl Default for PresenceTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Chat session export to Markdown with metadata
+// ---------------------------------------------------------------------------
+
+/// Extended exporter that includes participant and session metadata.
+pub struct ChatSessionExporter<'a> {
+    title: &'a str,
+    messages: &'a [ChatMessage],
+    participants: &'a [ChatParticipant],
+}
+
+impl<'a> ChatSessionExporter<'a> {
+    pub fn new(
+        title: &'a str,
+        messages: &'a [ChatMessage],
+        participants: &'a [ChatParticipant],
+    ) -> Self {
+        Self {
+            title,
+            messages,
+            participants,
+        }
+    }
+
+    /// Export to Markdown with a header, participant list, and messages.
+    pub fn to_markdown(&self) -> String {
+        let mut buf = format!("# {}\n\n", self.title);
+
+        if !self.participants.is_empty() {
+            buf.push_str("## Participants\n\n");
+            for p in self.participants {
+                let desc = p.description.as_deref().unwrap_or("(no description)");
+                buf.push_str(&format!("- **{}** (`{}`): {}\n", p.name, p.id, desc));
+            }
+            buf.push('\n');
+        }
+
+        buf.push_str("## Messages\n\n");
+        for (i, msg) in self.messages.iter().enumerate() {
+            buf.push_str(&format!(
+                "{}. **{}** _(t={})_: {}\n",
+                i + 1,
+                msg.role,
+                msg.timestamp,
+                msg.content
+            ));
+        }
+        buf
+    }
+
+    /// Export to JSON-like structured text (no serde dependency).
+    pub fn to_json_lines(&self) -> String {
+        let mut buf = String::new();
+        for msg in self.messages {
+            buf.push_str(&format!(
+                "{{\"role\":\"{}\",\"content\":\"{}\",\"timestamp\":{}}}\n",
+                msg.role,
+                msg.content.replace('\\', "\\\\").replace('"', "\\\""),
+                msg.timestamp,
+            ));
+        }
+        buf
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1500,5 +1874,125 @@ mod tests {
         ];
         let user_content = extract_role_content(&messages, MessageRole::User);
         assert_eq!(user_content, vec!["Q1", "Q2"]);
+    }
+
+    // ── ThreadedConversation tests ──
+
+    #[test]
+    fn threaded_post_and_reply() {
+        let mut tc = ThreadedConversation::new();
+        let root = tc.post(MessageRole::User, "Hello", 100);
+        assert_eq!(root, 1);
+        let reply_id = tc.reply(root, MessageRole::Assistant, "Hi back", 101).unwrap();
+        assert_eq!(reply_id, 2);
+        assert_eq!(tc.len(), 2);
+
+        let replies = tc.replies_to(root);
+        assert_eq!(replies.len(), 1);
+        assert_eq!(replies[0].content, "Hi back");
+    }
+
+    #[test]
+    fn threaded_reply_to_nonexistent_fails() {
+        let mut tc = ThreadedConversation::new();
+        let err = tc.reply(999, MessageRole::User, "orphan", 0).unwrap_err();
+        assert!(matches!(err, ChatError::ValidationError(_)));
+    }
+
+    #[test]
+    fn threaded_depth_and_thread_from() {
+        let mut tc = ThreadedConversation::new();
+        let a = tc.post(MessageRole::User, "root", 1);
+        let b = tc.reply(a, MessageRole::Assistant, "depth-1", 2).unwrap();
+        let c = tc.reply(b, MessageRole::User, "depth-2", 3).unwrap();
+        assert_eq!(tc.depth(a), 0);
+        assert_eq!(tc.depth(b), 1);
+        assert_eq!(tc.depth(c), 2);
+
+        let thread = tc.thread_from(a);
+        assert_eq!(thread.len(), 3);
+        assert_eq!(thread[0].id, a);
+        assert_eq!(thread[2].id, c);
+
+        assert_eq!(tc.top_level().len(), 1);
+    }
+
+    // ── UnreadTracker tests ──
+
+    #[test]
+    fn unread_tracker_basic() {
+        let mut tracker = UnreadTracker::new();
+        tracker.on_message_added();
+        tracker.on_message_added();
+        tracker.on_message_added();
+
+        assert_eq!(tracker.unread_count("alice"), 3);
+        assert!(tracker.has_unread("alice"));
+
+        tracker.mark_read("alice", 0);
+        tracker.mark_read("alice", 1);
+        assert_eq!(tracker.unread_count("alice"), 1);
+        assert_eq!(tracker.unread_indices("alice"), vec![2]);
+
+        tracker.mark_all_read("alice");
+        assert_eq!(tracker.unread_count("alice"), 0);
+        assert!(!tracker.has_unread("alice"));
+    }
+
+    // ── PresenceTracker tests ──
+
+    #[test]
+    fn presence_tracker_set_and_query() {
+        let mut pt = PresenceTracker::new();
+        assert_eq!(pt.get_status("copilot"), PresenceStatus::Offline);
+
+        pt.set_status("copilot", PresenceStatus::Online, 100);
+        pt.set_status("user1", PresenceStatus::Away, 100);
+        pt.set_status("user2", PresenceStatus::Online, 100);
+        assert_eq!(pt.get_status("copilot"), PresenceStatus::Online);
+        assert_eq!(pt.tracked_count(), 3);
+
+        let mut online = pt.online_participants();
+        online.sort();
+        assert_eq!(online, vec!["copilot", "user2"]);
+
+        assert_eq!(pt.participants_with_status(PresenceStatus::Away), vec!["user1"]);
+    }
+
+    #[test]
+    fn presence_tracker_expire_stale() {
+        let mut pt = PresenceTracker::new();
+        pt.set_status("a", PresenceStatus::Online, 50);
+        pt.set_status("b", PresenceStatus::Online, 200);
+        pt.expire_stale(100);
+        assert_eq!(pt.get_status("a"), PresenceStatus::Offline);
+        assert_eq!(pt.get_status("b"), PresenceStatus::Online);
+    }
+
+    // ── ChatSessionExporter tests ──
+
+    #[test]
+    fn session_exporter_markdown() {
+        let participants = vec![make_participant("copilot", true)];
+        let messages = vec![
+            ChatMessage { role: MessageRole::User, content: "Hi".into(), timestamp: 1 },
+            ChatMessage { role: MessageRole::Assistant, content: "Hello!".into(), timestamp: 2 },
+        ];
+        let md = ChatSessionExporter::new("Test Chat", &messages, &participants).to_markdown();
+        assert!(md.starts_with("# Test Chat"));
+        assert!(md.contains("## Participants"));
+        assert!(md.contains("`copilot`"));
+        assert!(md.contains("## Messages"));
+        assert!(md.contains("1. **user**"));
+    }
+
+    #[test]
+    fn session_exporter_json_lines() {
+        let messages = vec![
+            ChatMessage { role: MessageRole::User, content: "Say \"hi\"".into(), timestamp: 5 },
+        ];
+        let jl = ChatSessionExporter::new("t", &messages, &[]).to_json_lines();
+        assert!(jl.contains(r#"\"hi\""#));
+        assert!(jl.contains("\"timestamp\":5"));
     }
 }

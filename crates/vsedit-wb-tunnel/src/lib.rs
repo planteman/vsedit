@@ -863,6 +863,262 @@ impl TunnelDiagnostics {
     }
 }
 
+/// Access control list for tunnel connections.
+///
+/// Manages allow/deny rules evaluated in order. The first matching rule wins;
+/// if no rule matches the default policy applies.
+#[derive(Debug, Clone)]
+pub struct TunnelAcl {
+    rules: Vec<AclRule>,
+    default_allow: bool,
+}
+
+/// A single ACL rule matching on CIDR-style prefix and optional port range.
+#[derive(Debug, Clone)]
+pub struct AclRule {
+    /// Host pattern to match (exact or wildcard prefix with `*`).
+    pub host_pattern: String,
+    /// Optional port range (inclusive). `None` means any port.
+    pub port_range: Option<(u16, u16)>,
+    /// Whether matching connections are allowed.
+    pub allow: bool,
+}
+
+impl AclRule {
+    pub fn new(host_pattern: &str, port_range: Option<(u16, u16)>, allow: bool) -> Self {
+        Self {
+            host_pattern: host_pattern.to_string(),
+            port_range,
+            allow,
+        }
+    }
+
+    /// Check whether `host` and `port` match this rule.
+    pub fn matches(&self, host: &str, port: u16) -> bool {
+        let host_ok = if self.host_pattern == "*" {
+            true
+        } else if let Some(prefix) = self.host_pattern.strip_suffix('*') {
+            host.starts_with(prefix)
+        } else {
+            host == self.host_pattern
+        };
+        if !host_ok {
+            return false;
+        }
+        match self.port_range {
+            Some((lo, hi)) => port >= lo && port <= hi,
+            None => true,
+        }
+    }
+}
+
+impl TunnelAcl {
+    /// Create an ACL with the given default policy.
+    pub fn new(default_allow: bool) -> Self {
+        Self {
+            rules: Vec::new(),
+            default_allow,
+        }
+    }
+
+    pub fn add_rule(&mut self, rule: AclRule) {
+        self.rules.push(rule);
+    }
+
+    /// Evaluate the ACL for a given host and port.
+    pub fn is_allowed(&self, host: &str, port: u16) -> bool {
+        for rule in &self.rules {
+            if rule.matches(host, port) {
+                return rule.allow;
+            }
+        }
+        self.default_allow
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.rules.clear();
+    }
+}
+
+/// Manages a pool of tunnel connections with capacity limits and eviction.
+#[derive(Debug)]
+pub struct TunnelConnectionPool {
+    connections: Vec<TunnelConnection>,
+    max_size: usize,
+    total_evicted: usize,
+}
+
+impl TunnelConnectionPool {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            connections: Vec::new(),
+            max_size,
+            total_evicted: 0,
+        }
+    }
+
+    /// Add a connection, evicting the oldest if at capacity.
+    /// Returns the evicted connection if one was removed.
+    pub fn add(&mut self, conn: TunnelConnection) -> Option<TunnelConnection> {
+        let evicted = if self.connections.len() >= self.max_size {
+            self.total_evicted += 1;
+            Some(self.connections.remove(0))
+        } else {
+            None
+        };
+        self.connections.push(conn);
+        evicted
+    }
+
+    /// Remove a connection by tunnel_id. Returns it if found.
+    pub fn remove(&mut self, tunnel_id: u64) -> Option<TunnelConnection> {
+        if let Some(pos) = self.connections.iter().position(|c| c.tunnel_id == tunnel_id) {
+            Some(self.connections.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, tunnel_id: u64) -> Option<&TunnelConnection> {
+        self.connections.iter().find(|c| c.tunnel_id == tunnel_id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.connections.is_empty()
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.connections.len() >= self.max_size
+    }
+
+    pub fn total_evicted(&self) -> usize {
+        self.total_evicted
+    }
+
+    /// Total bytes across all pooled connections.
+    pub fn total_bytes(&self) -> u64 {
+        self.connections.iter().map(|c| c.total_bytes()).sum()
+    }
+
+    /// Drain all connections, returning them.
+    pub fn drain_all(&mut self) -> Vec<TunnelConnection> {
+        self.connections.drain(..).collect()
+    }
+}
+
+/// Negotiates the protocol to use for a tunnel based on capabilities.
+#[derive(Debug, Clone)]
+pub struct ProtocolNegotiator {
+    supported: Vec<TunnelProtocol>,
+    preferred: TunnelProtocol,
+}
+
+impl ProtocolNegotiator {
+    pub fn new(preferred: TunnelProtocol) -> Self {
+        Self {
+            supported: vec![TunnelProtocol::Http, TunnelProtocol::Https, TunnelProtocol::Tcp],
+            preferred,
+        }
+    }
+
+    /// Restrict the set of supported protocols.
+    pub fn set_supported(&mut self, protocols: Vec<TunnelProtocol>) {
+        self.supported = protocols;
+    }
+
+    /// Negotiate with a remote's advertised capabilities.
+    /// Returns the best mutually-supported protocol, preferring `self.preferred`.
+    pub fn negotiate(&self, remote_capabilities: &[TunnelProtocol]) -> Option<TunnelProtocol> {
+        // Prefer our preferred protocol if both sides support it.
+        if self.supported.contains(&self.preferred) && remote_capabilities.contains(&self.preferred) {
+            return Some(self.preferred);
+        }
+        // Otherwise pick the first protocol we support that the remote also supports.
+        for proto in &self.supported {
+            if remote_capabilities.contains(proto) {
+                return Some(*proto);
+            }
+        }
+        None
+    }
+
+    pub fn is_supported(&self, protocol: TunnelProtocol) -> bool {
+        self.supported.contains(&protocol)
+    }
+}
+
+/// Per-tunnel bandwidth tracker with windowed rate calculation.
+#[derive(Debug, Clone)]
+pub struct BandwidthTracker {
+    samples: Vec<BandwidthSample>,
+    window_size: usize,
+}
+
+#[derive(Debug, Clone)]
+struct BandwidthSample {
+    timestamp: u64,
+    bytes: u64,
+}
+
+impl BandwidthTracker {
+    pub fn new(window_size: usize) -> Self {
+        Self {
+            samples: Vec::new(),
+            window_size: window_size.max(1),
+        }
+    }
+
+    /// Record a transfer of `bytes` at `timestamp`.
+    pub fn record(&mut self, timestamp: u64, bytes: u64) {
+        self.samples.push(BandwidthSample { timestamp, bytes });
+        // Keep only the last `window_size` samples.
+        if self.samples.len() > self.window_size {
+            self.samples.remove(0);
+        }
+    }
+
+    /// Total bytes in the current window.
+    pub fn window_bytes(&self) -> u64 {
+        self.samples.iter().map(|s| s.bytes).sum()
+    }
+
+    /// Duration spanned by the current window (last - first timestamp).
+    /// Returns `None` if fewer than 2 samples.
+    pub fn window_duration(&self) -> Option<u64> {
+        if self.samples.len() < 2 {
+            return None;
+        }
+        let first = self.samples.first().unwrap().timestamp;
+        let last = self.samples.last().unwrap().timestamp;
+        Some(last.saturating_sub(first))
+    }
+
+    /// Bytes per time-unit in the current window, or `None` if duration is zero.
+    pub fn rate(&self) -> Option<f64> {
+        let dur = self.window_duration()?;
+        if dur == 0 {
+            return None;
+        }
+        Some(self.window_bytes() as f64 / dur as f64)
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.samples.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1558,5 +1814,145 @@ mod tests {
         let display = format!("{diag}");
         assert!(display.contains("tunnel=7"));
         assert!(display.contains("150µs"));
+    }
+
+    #[test]
+    fn acl_default_allow_no_rules() {
+        let acl = TunnelAcl::new(true);
+        assert!(acl.is_allowed("example.com", 80));
+        let acl_deny = TunnelAcl::new(false);
+        assert!(!acl_deny.is_allowed("example.com", 80));
+    }
+
+    #[test]
+    fn acl_exact_and_wildcard_rules() {
+        let mut acl = TunnelAcl::new(false);
+        acl.add_rule(AclRule::new("trusted.host", None, true));
+        acl.add_rule(AclRule::new("evil.*", None, false));
+        acl.add_rule(AclRule::new("*", Some((8000, 8100)), true));
+
+        assert!(acl.is_allowed("trusted.host", 443));
+        assert!(!acl.is_allowed("evil.corp", 80));
+        assert!(acl.is_allowed("random.host", 8050));
+        assert!(!acl.is_allowed("random.host", 9999));
+        assert_eq!(acl.rule_count(), 3);
+    }
+
+    #[test]
+    fn acl_port_range_matching() {
+        let rule = AclRule::new("*", Some((3000, 3010)), true);
+        assert!(rule.matches("any", 3000));
+        assert!(rule.matches("any", 3010));
+        assert!(!rule.matches("any", 3011));
+        assert!(!rule.matches("any", 2999));
+    }
+
+    #[test]
+    fn connection_pool_add_and_evict() {
+        let mut pool = TunnelConnectionPool::new(2);
+        assert!(pool.is_empty());
+
+        pool.add(TunnelConnection::new(1, 3000, "h1", 80, TunnelProtocol::Http));
+        pool.add(TunnelConnection::new(2, 3001, "h2", 80, TunnelProtocol::Http));
+        assert!(pool.is_full());
+        assert_eq!(pool.len(), 2);
+
+        // Adding a third should evict tunnel_id=1
+        let evicted = pool.add(TunnelConnection::new(3, 3002, "h3", 80, TunnelProtocol::Http));
+        assert!(evicted.is_some());
+        assert_eq!(evicted.unwrap().tunnel_id, 1);
+        assert_eq!(pool.total_evicted(), 1);
+        assert!(pool.get(1).is_none());
+        assert!(pool.get(3).is_some());
+    }
+
+    #[test]
+    fn connection_pool_remove_and_drain() {
+        let mut pool = TunnelConnectionPool::new(10);
+        pool.add(TunnelConnection::new(1, 3000, "h", 80, TunnelProtocol::Tcp));
+        pool.add(TunnelConnection::new(2, 3001, "h", 80, TunnelProtocol::Tcp));
+
+        let removed = pool.remove(1);
+        assert!(removed.is_some());
+        assert_eq!(pool.len(), 1);
+
+        let all = pool.drain_all();
+        assert_eq!(all.len(), 1);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn protocol_negotiator_prefers_preferred() {
+        let neg = ProtocolNegotiator::new(TunnelProtocol::Https);
+        let remote = vec![TunnelProtocol::Http, TunnelProtocol::Https];
+        assert_eq!(neg.negotiate(&remote), Some(TunnelProtocol::Https));
+    }
+
+    #[test]
+    fn protocol_negotiator_fallback() {
+        let neg = ProtocolNegotiator::new(TunnelProtocol::Https);
+        let remote = vec![TunnelProtocol::Tcp];
+        assert_eq!(neg.negotiate(&remote), Some(TunnelProtocol::Tcp));
+    }
+
+    #[test]
+    fn protocol_negotiator_no_overlap() {
+        let mut neg = ProtocolNegotiator::new(TunnelProtocol::Http);
+        neg.set_supported(vec![TunnelProtocol::Http]);
+        let remote = vec![TunnelProtocol::Tcp];
+        assert_eq!(neg.negotiate(&remote), None);
+    }
+
+    #[test]
+    fn bandwidth_tracker_rate() {
+        let mut bw = BandwidthTracker::new(5);
+        bw.record(0, 100);
+        bw.record(10, 200);
+        bw.record(20, 300);
+
+        assert_eq!(bw.sample_count(), 3);
+        assert_eq!(bw.window_bytes(), 600);
+        assert_eq!(bw.window_duration(), Some(20));
+        assert!((bw.rate().unwrap() - 30.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn bandwidth_tracker_window_eviction() {
+        let mut bw = BandwidthTracker::new(2);
+        bw.record(0, 100);
+        bw.record(10, 200);
+        bw.record(20, 400);
+
+        // Window should only contain the last 2 samples
+        assert_eq!(bw.sample_count(), 2);
+        assert_eq!(bw.window_bytes(), 600); // 200 + 400
+        assert_eq!(bw.window_duration(), Some(10)); // 20 - 10
+    }
+
+    #[test]
+    fn bandwidth_tracker_edge_cases() {
+        let mut bw = BandwidthTracker::new(5);
+        assert_eq!(bw.rate(), None);
+        assert_eq!(bw.window_duration(), None);
+
+        bw.record(5, 100);
+        assert_eq!(bw.window_duration(), None); // only 1 sample
+        assert_eq!(bw.window_bytes(), 100);
+
+        bw.clear();
+        assert_eq!(bw.sample_count(), 0);
+    }
+
+    #[test]
+    fn connection_pool_total_bytes() {
+        let mut pool = TunnelConnectionPool::new(10);
+        let mut c1 = TunnelConnection::new(1, 3000, "h", 80, TunnelProtocol::Http);
+        c1.record_inbound(500);
+        c1.record_outbound(300);
+        let mut c2 = TunnelConnection::new(2, 3001, "h", 80, TunnelProtocol::Http);
+        c2.record_inbound(200);
+        pool.add(c1);
+        pool.add(c2);
+        assert_eq!(pool.total_bytes(), 1000);
     }
 }

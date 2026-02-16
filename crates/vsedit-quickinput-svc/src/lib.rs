@@ -901,6 +901,342 @@ pub fn apply_transforms(input: &str, transforms: &[InputTransform]) -> String {
     s
 }
 
+// ---------------------------------------------------------------------------
+// Multi-step quick pick wizard
+// ---------------------------------------------------------------------------
+
+/// Tracks the state of a multi-step quick pick wizard.
+///
+/// Each step has a title and a set of items. The wizard records the user's
+/// selection at each step and allows navigating back to previous steps.
+#[derive(Debug, Clone)]
+pub struct QuickPickWizard {
+    steps: Vec<WizardStep>,
+    current_step: usize,
+    selections: Vec<Option<usize>>,
+}
+
+/// A single step in a [`QuickPickWizard`].
+#[derive(Debug, Clone)]
+pub struct WizardStep {
+    pub title: String,
+    pub items: Vec<QuickPickItem>,
+}
+
+impl WizardStep {
+    pub fn new(title: impl Into<String>, items: Vec<QuickPickItem>) -> Self {
+        Self {
+            title: title.into(),
+            items,
+        }
+    }
+}
+
+impl QuickPickWizard {
+    /// Create a wizard from a list of steps.
+    pub fn new(steps: Vec<WizardStep>) -> Self {
+        let len = steps.len();
+        Self {
+            steps,
+            current_step: 0,
+            selections: vec![None; len],
+        }
+    }
+
+    /// Returns the current step, or `None` if the wizard is finished.
+    pub fn current(&self) -> Option<&WizardStep> {
+        self.steps.get(self.current_step)
+    }
+
+    /// The zero-based index of the current step.
+    pub fn current_index(&self) -> usize {
+        self.current_step
+    }
+
+    /// Total number of steps.
+    pub fn total_steps(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Whether the wizard has been completed (past the last step).
+    pub fn is_finished(&self) -> bool {
+        self.current_step >= self.steps.len()
+    }
+
+    /// Record a selection for the current step and advance.
+    ///
+    /// Returns `false` if the wizard is already finished or the index is out
+    /// of bounds for the current step's items.
+    pub fn select(&mut self, item_index: usize) -> bool {
+        if self.is_finished() {
+            return false;
+        }
+        if item_index >= self.steps[self.current_step].items.len() {
+            return false;
+        }
+        self.selections[self.current_step] = Some(item_index);
+        self.current_step += 1;
+        true
+    }
+
+    /// Go back one step. Returns `false` if already at the first step.
+    pub fn back(&mut self) -> bool {
+        if self.current_step == 0 {
+            return false;
+        }
+        self.current_step -= 1;
+        self.selections[self.current_step] = None;
+        true
+    }
+
+    /// Returns the selected item for a given step, if any.
+    pub fn selection_at(&self, step: usize) -> Option<&QuickPickItem> {
+        let idx = *self.selections.get(step)?.as_ref()?;
+        self.steps.get(step)?.items.get(idx)
+    }
+
+    /// Collect all selected items across completed steps.
+    pub fn all_selections(&self) -> Vec<&QuickPickItem> {
+        self.selections
+            .iter()
+            .enumerate()
+            .filter_map(|(step, sel)| {
+                let idx = (*sel)?;
+                self.steps.get(step)?.items.get(idx)
+            })
+            .collect()
+    }
+
+    /// A human-readable progress string like "Step 2 of 4".
+    pub fn progress_label(&self) -> String {
+        format!(
+            "Step {} of {}",
+            (self.current_step + 1).min(self.steps.len()),
+            self.steps.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input validation with debounce state
+// ---------------------------------------------------------------------------
+
+/// Tracks debounced validation state for an input box.
+///
+/// In a real UI the debounce timer would be driven by the event loop; this
+/// struct captures the *model* side: when the last change happened, the
+/// configured delay, and the most recent validation result.
+#[derive(Debug, Clone)]
+pub struct DebouncedInputValidator {
+    delay_ms: u64,
+    last_change_ms: u64,
+    last_validated_value: Option<String>,
+    last_result: Option<InputBoxValidation>,
+}
+
+impl DebouncedInputValidator {
+    /// Create a validator with the given debounce delay in milliseconds.
+    pub fn new(delay_ms: u64) -> Self {
+        Self {
+            delay_ms,
+            last_change_ms: 0,
+            last_validated_value: None,
+            last_result: None,
+        }
+    }
+
+    /// Notify the validator that the input changed at `now_ms`.
+    pub fn on_change(&mut self, now_ms: u64) {
+        self.last_change_ms = now_ms;
+    }
+
+    /// Returns `true` if enough time has elapsed since the last change to
+    /// trigger validation.
+    pub fn should_validate(&self, now_ms: u64) -> bool {
+        now_ms.saturating_sub(self.last_change_ms) >= self.delay_ms
+    }
+
+    /// Record the result of running validation against `value`.
+    pub fn set_result(&mut self, value: impl Into<String>, result: InputBoxValidation) {
+        self.last_validated_value = Some(value.into());
+        self.last_result = Some(result);
+    }
+
+    /// The most recent validation result, if any.
+    pub fn last_result(&self) -> Option<&InputBoxValidation> {
+        self.last_result.as_ref()
+    }
+
+    /// Whether the value has changed since the last validation.
+    pub fn is_stale(&self, current_value: &str) -> bool {
+        match &self.last_validated_value {
+            Some(v) => v != current_value,
+            None => true,
+        }
+    }
+
+    /// The configured debounce delay.
+    pub fn delay_ms(&self) -> u64 {
+        self.delay_ms
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Recent selections history
+// ---------------------------------------------------------------------------
+
+/// Manages a bounded most-recently-used list of selected quick pick labels.
+///
+/// This is used to boost recently chosen items to the top of the list.
+#[derive(Debug, Clone)]
+pub struct RecentSelections {
+    labels: Vec<String>,
+    capacity: usize,
+}
+
+impl RecentSelections {
+    /// Create a new history with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            labels: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Record that `label` was selected. If it already exists it is moved to
+    /// the front (most recent). The oldest entry is evicted when at capacity.
+    pub fn record(&mut self, label: impl Into<String>) {
+        let label = label.into();
+        if let Some(pos) = self.labels.iter().position(|l| *l == label) {
+            self.labels.remove(pos);
+        }
+        if self.labels.len() >= self.capacity {
+            self.labels.pop();
+        }
+        self.labels.insert(0, label);
+    }
+
+    /// Returns the position (0 = most recent) of `label`, or `None`.
+    pub fn position(&self, label: &str) -> Option<usize> {
+        self.labels.iter().position(|l| l == label)
+    }
+
+    /// Sort a slice of items so that recently selected items appear first,
+    /// preserving the relative order among non-recent items.
+    pub fn boost_items(&self, items: &[QuickPickItem]) -> Vec<QuickPickItem> {
+        let mut boosted: Vec<(usize, &QuickPickItem)> = items
+            .iter()
+            .map(|item| {
+                let priority = self
+                    .position(&item.label)
+                    .map(|p| p + 1)
+                    .unwrap_or(self.capacity + 1);
+                (priority, item)
+            })
+            .collect();
+        boosted.sort_by_key(|(p, _)| *p);
+        boosted.into_iter().map(|(_, item)| item.clone()).collect()
+    }
+
+    /// The labels in most-recent-first order.
+    pub fn labels(&self) -> &[String] {
+        &self.labels
+    }
+
+    /// Number of recorded labels.
+    pub fn len(&self) -> usize {
+        self.labels.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.labels.is_empty()
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.labels.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Quick pick item badge
+// ---------------------------------------------------------------------------
+
+/// A small badge displayed alongside a quick pick item (e.g. a shortcut key
+/// or status indicator).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickPickBadge {
+    pub text: String,
+    pub tooltip: Option<String>,
+}
+
+impl QuickPickBadge {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            tooltip: None,
+        }
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+}
+
+impl fmt::Display for QuickPickBadge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.text)
+    }
+}
+
+/// Extended quick pick item that includes optional badges and a detail
+/// rendering hint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RichQuickPickItem {
+    pub item: QuickPickItem,
+    pub badges: Vec<QuickPickBadge>,
+    pub icon_id: Option<String>,
+}
+
+impl RichQuickPickItem {
+    pub fn new(item: QuickPickItem) -> Self {
+        Self {
+            item,
+            badges: Vec::new(),
+            icon_id: None,
+        }
+    }
+
+    pub fn with_badge(mut self, badge: QuickPickBadge) -> Self {
+        self.badges.push(badge);
+        self
+    }
+
+    pub fn with_icon(mut self, icon_id: impl Into<String>) -> Self {
+        self.icon_id = Some(icon_id.into());
+        self
+    }
+
+    /// Render a single-line text representation suitable for a terminal UI.
+    pub fn render_line(&self) -> String {
+        let mut line = String::new();
+        if let Some(ref icon) = self.icon_id {
+            line.push_str(&format!("$({}) ", icon));
+        }
+        line.push_str(&self.item.label);
+        for badge in &self.badges {
+            line.push(' ');
+            line.push_str(&badge.to_string());
+        }
+        if let Some(ref desc) = self.item.description {
+            line.push_str(&format!("  {}", desc));
+        }
+        line
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1539,5 +1875,138 @@ mod tests {
     fn apply_transforms_uppercase() {
         let transforms = vec![InputTransform::Uppercase];
         assert_eq!(apply_transforms("hello", &transforms), "HELLO");
+    }
+
+    // -- QuickPickWizard tests --
+
+    #[test]
+    fn wizard_step_through_and_back() {
+        let steps = vec![
+            WizardStep::new("Language", vec![item("Rust"), item("Go")]),
+            WizardStep::new("Framework", vec![item("Actix"), item("Axum")]),
+            WizardStep::new("DB", vec![item("Postgres"), item("SQLite")]),
+        ];
+        let mut wiz = QuickPickWizard::new(steps);
+
+        assert_eq!(wiz.total_steps(), 3);
+        assert_eq!(wiz.current_index(), 0);
+        assert_eq!(wiz.progress_label(), "Step 1 of 3");
+        assert!(!wiz.is_finished());
+
+        assert!(wiz.select(0)); // pick "Rust"
+        assert_eq!(wiz.current_index(), 1);
+        assert!(wiz.select(1)); // pick "Axum"
+        assert_eq!(wiz.current_index(), 2);
+
+        // go back
+        assert!(wiz.back());
+        assert_eq!(wiz.current_index(), 1);
+        assert!(wiz.selection_at(1).is_none()); // cleared
+
+        // re-select and finish
+        assert!(wiz.select(0)); // pick "Actix"
+        assert!(wiz.select(1)); // pick "SQLite"
+        assert!(wiz.is_finished());
+        assert!(!wiz.select(0)); // already finished
+
+        let sels = wiz.all_selections();
+        assert_eq!(sels.len(), 3);
+        assert_eq!(sels[0].label, "Rust");
+        assert_eq!(sels[1].label, "Actix");
+        assert_eq!(sels[2].label, "SQLite");
+    }
+
+    #[test]
+    fn wizard_rejects_out_of_bounds() {
+        let steps = vec![WizardStep::new("Pick", vec![item("Only")])];
+        let mut wiz = QuickPickWizard::new(steps);
+        assert!(!wiz.select(5)); // out of bounds
+        assert!(!wiz.back()); // already at step 0
+    }
+
+    // -- DebouncedInputValidator tests --
+
+    #[test]
+    fn debounced_validator_timing() {
+        let mut dv = DebouncedInputValidator::new(300);
+        assert_eq!(dv.delay_ms(), 300);
+
+        dv.on_change(1000);
+        assert!(!dv.should_validate(1100)); // only 100ms elapsed
+        assert!(dv.should_validate(1300)); // 300ms elapsed
+
+        assert!(dv.is_stale("anything")); // never validated
+        dv.set_result("hello", InputBoxValidation::Ok);
+        assert!(!dv.is_stale("hello"));
+        assert!(dv.is_stale("world"));
+        assert_eq!(dv.last_result(), Some(&InputBoxValidation::Ok));
+    }
+
+    // -- RecentSelections tests --
+
+    #[test]
+    fn recent_selections_record_and_boost() {
+        let mut recent = RecentSelections::new(3);
+        recent.record("C");
+        recent.record("B");
+        recent.record("A");
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent.labels(), &["A", "B", "C"]);
+
+        // Recording an existing label moves it to front
+        recent.record("C");
+        assert_eq!(recent.labels(), &["C", "A", "B"]);
+
+        // Eviction at capacity
+        recent.record("D");
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent.labels(), &["D", "C", "A"]);
+        assert_eq!(recent.position("B"), None); // evicted
+
+        // boost_items reorders
+        let items = vec![item("X"), item("A"), item("D"), item("Y")];
+        let boosted = recent.boost_items(&items);
+        assert_eq!(boosted[0].label, "D");
+        assert_eq!(boosted[1].label, "A");
+    }
+
+    #[test]
+    fn recent_selections_clear() {
+        let mut recent = RecentSelections::new(5);
+        recent.record("a");
+        recent.record("b");
+        assert!(!recent.is_empty());
+        recent.clear();
+        assert!(recent.is_empty());
+        assert_eq!(recent.len(), 0);
+    }
+
+    // -- RichQuickPickItem / badge tests --
+
+    #[test]
+    fn rich_item_render_line() {
+        let rich = RichQuickPickItem::new(
+            QuickPickItemBuilder::new("Open File")
+                .description("recent")
+                .build(),
+        )
+        .with_icon("file")
+        .with_badge(QuickPickBadge::new("⌘O").with_tooltip("Shortcut"));
+
+        let line = rich.render_line();
+        assert!(line.contains("$(file)"));
+        assert!(line.contains("Open File"));
+        assert!(line.contains("[⌘O]"));
+        assert!(line.contains("recent"));
+    }
+
+    #[test]
+    fn badge_display() {
+        let b = QuickPickBadge::new("Ctrl+P");
+        assert_eq!(b.to_string(), "[Ctrl+P]");
+        assert_eq!(b.tooltip, None);
+
+        let b2 = QuickPickBadge::new("!").with_tooltip("Warning");
+        assert_eq!(b2.tooltip.as_deref(), Some("Warning"));
     }
 }

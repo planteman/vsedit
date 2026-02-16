@@ -1009,6 +1009,174 @@ impl CommentWrapper {
     }
 }
 
+// ── TODO/FIXME/HACK scanner ───────────────────────────────────────────
+
+/// The kind of annotation marker found in a comment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AnnotationKind {
+    Todo,
+    Fixme,
+    Hack,
+    Note,
+    Xxx,
+}
+
+impl AnnotationKind {
+    /// The canonical uppercase tag for this annotation.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Self::Todo => "TODO",
+            Self::Fixme => "FIXME",
+            Self::Hack => "HACK",
+            Self::Note => "NOTE",
+            Self::Xxx => "XXX",
+        }
+    }
+}
+
+impl std::fmt::Display for AnnotationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.tag())
+    }
+}
+
+/// A single annotation found inside a comment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommentAnnotation {
+    /// Zero-based line number where the annotation was found.
+    pub line_number: usize,
+    /// Kind of annotation.
+    pub kind: AnnotationKind,
+    /// The text following the annotation tag on the same line.
+    pub message: String,
+}
+
+/// Scans source text for well-known annotation markers inside comments.
+pub struct AnnotationScanner;
+
+impl AnnotationScanner {
+    const TAGS: &[(&str, AnnotationKind)] = &[
+        ("TODO", AnnotationKind::Todo),
+        ("FIXME", AnnotationKind::Fixme),
+        ("HACK", AnnotationKind::Hack),
+        ("NOTE", AnnotationKind::Note),
+        ("XXX", AnnotationKind::Xxx),
+    ];
+
+    /// Scan `text` and return every annotation found, in document order.
+    pub fn scan(text: &str) -> Vec<CommentAnnotation> {
+        let mut results = Vec::new();
+        for (line_no, line) in text.lines().enumerate() {
+            let upper = line.to_uppercase();
+            for &(tag, kind) in Self::TAGS {
+                if let Some(idx) = upper.find(tag) {
+                    let after = &line[idx + tag.len()..];
+                    // Accept optional colon or paren after the tag.
+                    let stripped = after
+                        .strip_prefix(':')
+                        .or_else(|| after.strip_prefix('('))
+                        .unwrap_or(after)
+                        .trim();
+                    let msg = stripped
+                        .strip_suffix(')')
+                        .unwrap_or(stripped)
+                        .trim()
+                        .to_string();
+                    results.push(CommentAnnotation {
+                        line_number: line_no,
+                        kind,
+                        message: msg,
+                    });
+                    break; // one annotation per line
+                }
+            }
+        }
+        results
+    }
+
+    /// Return only annotations of a specific `kind`.
+    pub fn scan_kind(text: &str, kind: AnnotationKind) -> Vec<CommentAnnotation> {
+        Self::scan(text)
+            .into_iter()
+            .filter(|a| a.kind == kind)
+            .collect()
+    }
+
+    /// Count annotations grouped by kind.
+    pub fn count_by_kind(text: &str) -> Vec<(AnnotationKind, usize)> {
+        let annotations = Self::scan(text);
+        let mut counts = std::collections::HashMap::<AnnotationKind, usize>::new();
+        for a in &annotations {
+            *counts.entry(a.kind).or_insert(0) += 1;
+        }
+        let mut result: Vec<_> = counts.into_iter().collect();
+        result.sort_by(|a, b| b.1.cmp(&a.1));
+        result
+    }
+}
+
+// ── doc-comment generation ────────────────────────────────────────────
+
+/// Generates stub doc-comments from simple function signatures.
+pub struct DocCommentGenerator;
+
+impl DocCommentGenerator {
+    /// Generate a Rust-style `///` doc-comment stub for a function
+    /// signature line.
+    ///
+    /// Parses parameter names from the signature and produces a skeleton
+    /// with `# Arguments` and `# Returns` sections.
+    pub fn generate_rust(sig: &str) -> Vec<String> {
+        let mut lines = Vec::new();
+        let trimmed = sig.trim();
+
+        // Extract function name.
+        let fn_name = trimmed
+            .strip_prefix("pub ")
+            .or_else(|| trimmed.strip_prefix("pub(crate) "))
+            .unwrap_or(trimmed)
+            .strip_prefix("fn ")
+            .and_then(|rest| rest.split('(').next())
+            .unwrap_or("unknown")
+            .trim();
+
+        lines.push(format!("/// TODO: describe `{fn_name}`."));
+        lines.push("///".to_string());
+
+        // Extract parameter list.
+        if let Some(open) = trimmed.find('(') {
+            let close = trimmed.rfind(')').unwrap_or(trimmed.len());
+            let params_str = &trimmed[open + 1..close];
+            let params: Vec<&str> = params_str
+                .split(',')
+                .map(str::trim)
+                .filter(|p| !p.is_empty() && *p != "&self" && *p != "&mut self" && *p != "self")
+                .collect();
+            if !params.is_empty() {
+                lines.push("/// # Arguments".to_string());
+                lines.push("///".to_string());
+                for param in &params {
+                    let name = param.split(':').next().unwrap_or(param).trim();
+                    lines.push(format!("/// * `{name}` - TODO"));
+                }
+                lines.push("///".to_string());
+            }
+        }
+
+        // Check for a return type.
+        let has_return = trimmed.contains("->")
+            && !trimmed.contains("-> ()")
+            && !trimmed.ends_with("-> ()");
+        if has_return {
+            lines.push("/// # Returns".to_string());
+            lines.push("///".to_string());
+            lines.push("/// TODO: describe return value.".to_string());
+        }
+
+        lines
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1577,5 +1745,87 @@ mod tests {
     fn count_trailing_comments() {
         let lines = vec!["a // x", "b", "c // y"];
         assert_eq!(CommentAligner::count_trailing_comments(&lines, "//"), 2);
+    }
+
+    // ── AnnotationScanner tests ───────────────────────────────────────
+
+    #[test]
+    fn annotation_scanner_finds_todos() {
+        let src = "// TODO: fix this\nlet x = 1;\n// FIXME: broken\n";
+        let annots = AnnotationScanner::scan(src);
+        assert_eq!(annots.len(), 2);
+        assert_eq!(annots[0].kind, AnnotationKind::Todo);
+        assert_eq!(annots[0].message, "fix this");
+        assert_eq!(annots[0].line_number, 0);
+        assert_eq!(annots[1].kind, AnnotationKind::Fixme);
+        assert_eq!(annots[1].message, "broken");
+        assert_eq!(annots[1].line_number, 2);
+    }
+
+    #[test]
+    fn annotation_scanner_case_insensitive() {
+        let src = "// todo: lower\n// Hack: mixed\n";
+        let annots = AnnotationScanner::scan(src);
+        assert_eq!(annots.len(), 2);
+        assert_eq!(annots[0].kind, AnnotationKind::Todo);
+        assert_eq!(annots[1].kind, AnnotationKind::Hack);
+    }
+
+    #[test]
+    fn annotation_scanner_scan_kind_filters() {
+        let src = "// TODO a\n// FIXME b\n// TODO c\n";
+        let todos = AnnotationScanner::scan_kind(src, AnnotationKind::Todo);
+        assert_eq!(todos.len(), 2);
+        assert!(todos.iter().all(|a| a.kind == AnnotationKind::Todo));
+    }
+
+    #[test]
+    fn annotation_scanner_count_by_kind() {
+        let src = "// TODO a\n// TODO b\n// FIXME c\n// HACK d\n";
+        let counts = AnnotationScanner::count_by_kind(src);
+        let todo_count = counts.iter().find(|(k, _)| *k == AnnotationKind::Todo).map(|(_, c)| *c);
+        assert_eq!(todo_count, Some(2));
+        let fixme_count = counts.iter().find(|(k, _)| *k == AnnotationKind::Fixme).map(|(_, c)| *c);
+        assert_eq!(fixme_count, Some(1));
+    }
+
+    #[test]
+    fn annotation_kind_display() {
+        assert_eq!(AnnotationKind::Todo.to_string(), "TODO");
+        assert_eq!(AnnotationKind::Fixme.tag(), "FIXME");
+        assert_eq!(AnnotationKind::Note.tag(), "NOTE");
+        assert_eq!(AnnotationKind::Xxx.tag(), "XXX");
+    }
+
+    // ── DocCommentGenerator tests ─────────────────────────────────────
+
+    #[test]
+    fn doc_comment_generator_basic_fn() {
+        let sig = "pub fn compute(x: i32, y: i32) -> f64 {";
+        let doc = DocCommentGenerator::generate_rust(sig);
+        assert!(doc[0].contains("compute"));
+        assert!(doc.iter().any(|l| l.contains("# Arguments")));
+        assert!(doc.iter().any(|l| l.contains("`x`")));
+        assert!(doc.iter().any(|l| l.contains("`y`")));
+        assert!(doc.iter().any(|l| l.contains("# Returns")));
+    }
+
+    #[test]
+    fn doc_comment_generator_no_params_no_return() {
+        let sig = "fn do_stuff() {";
+        let doc = DocCommentGenerator::generate_rust(sig);
+        assert!(doc[0].contains("do_stuff"));
+        assert!(!doc.iter().any(|l| l.contains("# Arguments")));
+        assert!(!doc.iter().any(|l| l.contains("# Returns")));
+    }
+
+    #[test]
+    fn doc_comment_generator_self_method() {
+        let sig = "pub fn name(&self, label: &str) -> String {";
+        let doc = DocCommentGenerator::generate_rust(sig);
+        // &self should be excluded from arguments
+        assert!(doc.iter().any(|l| l.contains("`label`")));
+        assert!(!doc.iter().any(|l| l.contains("`self`") || l.contains("`&self`")));
+        assert!(doc.iter().any(|l| l.contains("# Returns")));
     }
 }

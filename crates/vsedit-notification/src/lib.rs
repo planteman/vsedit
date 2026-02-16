@@ -939,6 +939,212 @@ impl IntoIterator for NotificationBatch {
 }
 
 // ---------------------------------------------------------------------------
+// NotificationHistory — bounded history of dismissed notifications
+// ---------------------------------------------------------------------------
+
+/// A bounded history buffer that records dismissed notifications.
+///
+/// When the history reaches `capacity`, the oldest entry is evicted to make
+/// room for the new one (ring-buffer semantics).
+pub struct NotificationHistory {
+    entries: Vec<Notification>,
+    capacity: usize,
+}
+
+impl NotificationHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "capacity must be > 0");
+        Self {
+            entries: Vec::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Record a notification in the history, evicting the oldest if full.
+    pub fn record(&mut self, notification: Notification) {
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(notification);
+    }
+
+    /// Return all entries oldest-first.
+    pub fn entries(&self) -> &[Notification] {
+        &self.entries
+    }
+
+    /// Number of recorded entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Maximum capacity.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Clear all history entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Search history entries whose message contains `needle` (case-insensitive).
+    pub fn search(&self, needle: &str) -> Vec<&Notification> {
+        let lower = needle.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|n| n.message.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Return entries filtered by severity.
+    pub fn by_severity(&self, severity: NotificationSeverity) -> Vec<&Notification> {
+        self.entries
+            .iter()
+            .filter(|n| n.severity == severity)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DoNotDisturb — suppress non-critical notifications
+// ---------------------------------------------------------------------------
+
+/// Do-not-disturb mode that suppresses notifications below a severity
+/// threshold.
+///
+/// When enabled, only notifications at or above `min_severity` are allowed
+/// through. The suppressed count is tracked so the UI can show a badge.
+pub struct DoNotDisturb {
+    enabled: bool,
+    min_severity: NotificationSeverity,
+    suppressed_count: usize,
+}
+
+impl DoNotDisturb {
+    /// Create a new DND controller (initially disabled).
+    pub fn new() -> Self {
+        Self {
+            enabled: false,
+            min_severity: NotificationSeverity::Error,
+            suppressed_count: 0,
+        }
+    }
+
+    /// Enable do-not-disturb. Only notifications with severity >= `min_severity`
+    /// will be allowed through.
+    pub fn enable(&mut self, min_severity: NotificationSeverity) {
+        self.enabled = true;
+        self.min_severity = min_severity;
+        self.suppressed_count = 0;
+    }
+
+    /// Disable do-not-disturb mode.
+    pub fn disable(&mut self) {
+        self.enabled = false;
+        self.suppressed_count = 0;
+    }
+
+    /// Whether DND is currently active.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Number of notifications suppressed since DND was enabled.
+    pub fn suppressed_count(&self) -> usize {
+        self.suppressed_count
+    }
+
+    /// Returns `true` if the notification should be shown (passes DND filter).
+    pub fn should_show(&mut self, notification: &Notification) -> bool {
+        if !self.enabled {
+            return true;
+        }
+        let dominated = match self.min_severity {
+            NotificationSeverity::Info => true, // everything passes
+            NotificationSeverity::Warning => matches!(
+                notification.severity,
+                NotificationSeverity::Warning | NotificationSeverity::Error
+            ),
+            NotificationSeverity::Error => {
+                notification.severity == NotificationSeverity::Error
+            }
+        };
+        if !dominated {
+            self.suppressed_count += 1;
+        }
+        dominated
+    }
+}
+
+impl Default for DoNotDisturb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationDeduplicator — collapse identical messages
+// ---------------------------------------------------------------------------
+
+/// Deduplicates notifications by message text.
+///
+/// When a duplicate is detected, instead of showing a new toast the
+/// deduplicator increments an occurrence counter and updates the timestamp.
+pub struct NotificationDeduplicator {
+    /// Maps message → (first notification id, occurrence count).
+    seen: std::collections::HashMap<String, (u64, usize)>,
+}
+
+impl NotificationDeduplicator {
+    pub fn new() -> Self {
+        Self {
+            seen: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Check whether `notification` is a duplicate. Returns `None` if it is
+    /// new, or `Some((original_id, new_count))` if it has been seen before.
+    pub fn check(&mut self, notification: &Notification) -> Option<(u64, usize)> {
+        if let Some(entry) = self.seen.get_mut(&notification.message) {
+            entry.1 += 1;
+            Some((entry.0, entry.1))
+        } else {
+            self.seen
+                .insert(notification.message.clone(), (notification.id, 1));
+            None
+        }
+    }
+
+    /// Number of unique messages tracked.
+    pub fn unique_count(&self) -> usize {
+        self.seen.len()
+    }
+
+    /// Total occurrences across all tracked messages.
+    pub fn total_occurrences(&self) -> usize {
+        self.seen.values().map(|(_, c)| c).sum()
+    }
+
+    /// Reset all tracking state.
+    pub fn reset(&mut self) {
+        self.seen.clear();
+    }
+}
+
+impl Default for NotificationDeduplicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1565,5 +1771,111 @@ mod tests {
         batch.add(Notification::info("y"));
         let messages: Vec<String> = batch.into_iter().map(|n| n.message).collect();
         assert_eq!(messages, vec!["x", "y"]);
+    }
+
+    // -- NotificationHistory tests --
+
+    #[test]
+    fn history_records_and_evicts() {
+        let mut history = NotificationHistory::new(3);
+        assert!(history.is_empty());
+        assert_eq!(history.capacity(), 3);
+
+        history.record(Notification::info("first"));
+        history.record(Notification::warning("second"));
+        history.record(Notification::error("third"));
+        assert_eq!(history.len(), 3);
+
+        // Adding a 4th should evict "first"
+        history.record(Notification::info("fourth"));
+        assert_eq!(history.len(), 3);
+        assert_eq!(history.entries()[0].message, "second");
+        assert_eq!(history.entries()[2].message, "fourth");
+    }
+
+    #[test]
+    fn history_search_and_by_severity() {
+        let mut history = NotificationHistory::new(10);
+        history.record(Notification::info("Build succeeded"));
+        history.record(Notification::error("Build FAILED"));
+        history.record(Notification::warning("Unused import"));
+
+        let results = history.search("build");
+        assert_eq!(results.len(), 2);
+
+        let errors = history.by_severity(NotificationSeverity::Error);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].message, "Build FAILED");
+
+        history.clear();
+        assert!(history.is_empty());
+    }
+
+    // -- DoNotDisturb tests --
+
+    #[test]
+    fn dnd_suppresses_below_threshold() {
+        let mut dnd = DoNotDisturb::new();
+        assert!(!dnd.is_enabled());
+
+        // Enable DND at Error level — only errors pass
+        dnd.enable(NotificationSeverity::Error);
+        assert!(dnd.is_enabled());
+
+        let info = Notification::info("hello");
+        let warn = Notification::warning("careful");
+        let err = Notification::error("boom");
+
+        assert!(!dnd.should_show(&info));
+        assert!(!dnd.should_show(&warn));
+        assert!(dnd.should_show(&err));
+        assert_eq!(dnd.suppressed_count(), 2);
+
+        dnd.disable();
+        assert!(!dnd.is_enabled());
+        assert!(dnd.should_show(&info));
+    }
+
+    #[test]
+    fn dnd_warning_threshold_passes_warn_and_error() {
+        let mut dnd = DoNotDisturb::new();
+        dnd.enable(NotificationSeverity::Warning);
+
+        assert!(!dnd.should_show(&Notification::info("low")));
+        assert!(dnd.should_show(&Notification::warning("mid")));
+        assert!(dnd.should_show(&Notification::error("high")));
+        assert_eq!(dnd.suppressed_count(), 1);
+    }
+
+    // -- NotificationDeduplicator tests --
+
+    #[test]
+    fn deduplicator_detects_duplicates() {
+        let mut dedup = NotificationDeduplicator::new();
+
+        let n1 = Notification::info("file saved");
+        assert!(dedup.check(&n1).is_none()); // first time → not a dup
+
+        let n2 = Notification::info("file saved");
+        let result = dedup.check(&n2);
+        assert!(result.is_some());
+        let (original_id, count) = result.unwrap();
+        assert_eq!(original_id, n1.id);
+        assert_eq!(count, 2);
+
+        assert_eq!(dedup.unique_count(), 1);
+        assert_eq!(dedup.total_occurrences(), 2);
+    }
+
+    #[test]
+    fn deduplicator_different_messages_not_duplicates() {
+        let mut dedup = NotificationDeduplicator::new();
+        assert!(dedup.check(&Notification::info("aaa")).is_none());
+        assert!(dedup.check(&Notification::info("bbb")).is_none());
+        assert_eq!(dedup.unique_count(), 2);
+        assert_eq!(dedup.total_occurrences(), 2);
+
+        dedup.reset();
+        assert_eq!(dedup.unique_count(), 0);
     }
 }

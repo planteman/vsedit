@@ -831,6 +831,269 @@ pub fn deduplicate_items(items: &[QuickAccessItem]) -> Vec<&QuickAccessItem> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Search history
+// ---------------------------------------------------------------------------
+
+/// Maintains an ordered history of search queries with deduplication.
+pub struct SearchHistory {
+    entries: Vec<String>,
+    max_entries: usize,
+}
+
+impl SearchHistory {
+    /// Create a new search history with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record a query. If it already exists it is moved to the front.
+    /// Empty queries are ignored.
+    pub fn record(&mut self, query: &str) {
+        let query = query.trim();
+        if query.is_empty() {
+            return;
+        }
+        self.entries.retain(|e| e != query);
+        self.entries.insert(0, query.to_string());
+        if self.entries.len() > self.max_entries {
+            self.entries.truncate(self.max_entries);
+        }
+    }
+
+    /// Return the most recent queries (newest first).
+    pub fn recent(&self) -> &[String] {
+        &self.entries
+    }
+
+    /// Number of stored queries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear the entire history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return entries that fuzzy-match `prefix`.
+    pub fn search(&self, prefix: &str) -> Vec<&str> {
+        self.entries
+            .iter()
+            .filter(|e| fuzzy_match_score(prefix, e).is_some())
+            .map(|e| e.as_str())
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Result pinning / favoriting
+// ---------------------------------------------------------------------------
+
+/// Tracks pinned (favorited) item IDs so they always appear at the top.
+pub struct PinnedItems {
+    ids: Vec<String>,
+}
+
+impl PinnedItems {
+    pub fn new() -> Self {
+        Self { ids: Vec::new() }
+    }
+
+    /// Pin an item. No-op if already pinned.
+    pub fn pin(&mut self, item_id: &str) {
+        if !self.ids.iter().any(|id| id == item_id) {
+            self.ids.push(item_id.to_string());
+        }
+    }
+
+    /// Unpin an item.
+    pub fn unpin(&mut self, item_id: &str) {
+        self.ids.retain(|id| id != item_id);
+    }
+
+    /// Toggle the pinned state; returns `true` if the item is now pinned.
+    pub fn toggle(&mut self, item_id: &str) -> bool {
+        if self.is_pinned(item_id) {
+            self.unpin(item_id);
+            false
+        } else {
+            self.pin(item_id);
+            true
+        }
+    }
+
+    /// Check whether an item is pinned.
+    pub fn is_pinned(&self, item_id: &str) -> bool {
+        self.ids.iter().any(|id| id == item_id)
+    }
+
+    /// Return the list of pinned IDs in insertion order.
+    pub fn pinned_ids(&self) -> &[String] {
+        &self.ids
+    }
+
+    /// Number of pinned items.
+    pub fn len(&self) -> usize {
+        self.ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ids.is_empty()
+    }
+}
+
+impl Default for PinnedItems {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sort results so that pinned items always come first, preserving relative
+/// order within each group (pinned vs unpinned).
+pub fn sort_with_pinned(
+    results: &mut [(usize, i32)],
+    items: &[QuickAccessItem],
+    pinned: &PinnedItems,
+) {
+    results.sort_by(|a, b| {
+        let a_pinned = pinned.is_pinned(&items[a.0].id);
+        let b_pinned = pinned.is_pinned(&items[b.0].id);
+        match (a_pinned, b_pinned) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => b.1.cmp(&a.1),
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcut hints
+// ---------------------------------------------------------------------------
+
+/// Associates keyboard shortcuts with quick-access item IDs.
+pub struct ShortcutRegistry {
+    shortcuts: HashMap<String, String>,
+}
+
+impl ShortcutRegistry {
+    pub fn new() -> Self {
+        Self {
+            shortcuts: HashMap::new(),
+        }
+    }
+
+    /// Bind a shortcut string (e.g. `"Ctrl+Shift+P"`) to an item ID.
+    pub fn bind(&mut self, item_id: impl Into<String>, shortcut: impl Into<String>) {
+        self.shortcuts.insert(item_id.into(), shortcut.into());
+    }
+
+    /// Remove a binding.
+    pub fn unbind(&mut self, item_id: &str) {
+        self.shortcuts.remove(item_id);
+    }
+
+    /// Look up the shortcut for an item, if any.
+    pub fn get(&self, item_id: &str) -> Option<&str> {
+        self.shortcuts.get(item_id).map(|s| s.as_str())
+    }
+
+    /// Format a quick-access item label with its shortcut hint appended.
+    pub fn label_with_hint(&self, item: &QuickAccessItem) -> String {
+        match self.get(&item.id) {
+            Some(shortcut) => format!("{} ({})", item.label, shortcut),
+            None => item.label.clone(),
+        }
+    }
+}
+
+impl Default for ShortcutRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Result preview generation
+// ---------------------------------------------------------------------------
+
+/// A preview snippet shown alongside a quick-access result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResultPreview {
+    pub kind: PreviewKind,
+    pub content: String,
+}
+
+/// The kind of preview content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreviewKind {
+    PlainText,
+    FilePath,
+    CodeSnippet { language: String },
+}
+
+impl ResultPreview {
+    /// Create a plain-text preview, truncated to `max_len` characters.
+    pub fn plain(text: &str, max_len: usize) -> Self {
+        let content = if text.chars().count() > max_len {
+            let truncated: String = text.chars().take(max_len.saturating_sub(1)).collect();
+            format!("{truncated}…")
+        } else {
+            text.to_string()
+        };
+        Self {
+            kind: PreviewKind::PlainText,
+            content,
+        }
+    }
+
+    /// Create a file-path preview.
+    pub fn file_path(path: &str) -> Self {
+        Self {
+            kind: PreviewKind::FilePath,
+            content: path.to_string(),
+        }
+    }
+
+    /// Create a code-snippet preview.
+    pub fn code(snippet: &str, language: &str) -> Self {
+        Self {
+            kind: PreviewKind::CodeSnippet {
+                language: language.to_string(),
+            },
+            content: snippet.to_string(),
+        }
+    }
+
+    /// True if the preview has no content.
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+}
+
+/// Generate a preview for a quick-access item based on its metadata.
+pub fn generate_preview(item: &QuickAccessItem) -> ResultPreview {
+    if let Some(ref detail) = item.detail {
+        if detail.starts_with('/') || detail.starts_with('.') || detail.contains(":\\") {
+            return ResultPreview::file_path(detail);
+        }
+    }
+    let text = item
+        .description
+        .as_deref()
+        .or(item.detail.as_deref())
+        .unwrap_or(&item.label);
+    ResultPreview::plain(text, 120)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1578,5 +1841,136 @@ mod tests {
     fn action_category_display() {
         assert_eq!(format!("{}", ActionCategory::File), "Files");
         assert_eq!(format!("{}", ActionCategory::Custom("Git".into())), "Git");
+    }
+
+    // ── Search history ────────────────────────────────────────────
+
+    #[test]
+    fn search_history_record_and_recent() {
+        let mut h = SearchHistory::new(5);
+        h.record("open file");
+        h.record("format document");
+        h.record("open file"); // duplicate moves to front
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.recent()[0], "open file");
+        assert_eq!(h.recent()[1], "format document");
+    }
+
+    #[test]
+    fn search_history_capacity() {
+        let mut h = SearchHistory::new(3);
+        h.record("a");
+        h.record("b");
+        h.record("c");
+        h.record("d");
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.recent()[0], "d");
+        // "a" should have been evicted
+        assert!(!h.recent().contains(&"a".to_string()));
+    }
+
+    #[test]
+    fn search_history_ignores_empty() {
+        let mut h = SearchHistory::new(5);
+        h.record("");
+        h.record("   ");
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn search_history_fuzzy_search() {
+        let mut h = SearchHistory::new(10);
+        h.record("format document");
+        h.record("open file");
+        h.record("find references");
+        let results = h.search("fmt");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], "format document");
+    }
+
+    // ── Pinned items ──────────────────────────────────────────────
+
+    #[test]
+    fn pinned_items_pin_unpin_toggle() {
+        let mut p = PinnedItems::new();
+        assert!(!p.is_pinned("cmd1"));
+        p.pin("cmd1");
+        assert!(p.is_pinned("cmd1"));
+        p.pin("cmd1"); // duplicate no-op
+        assert_eq!(p.len(), 1);
+        assert!(p.toggle("cmd1") == false); // unpin
+        assert!(!p.is_pinned("cmd1"));
+        assert!(p.toggle("cmd1") == true); // re-pin
+        assert!(p.is_pinned("cmd1"));
+    }
+
+    #[test]
+    fn sort_with_pinned_puts_pinned_first() {
+        let items = vec![
+            make_item("a", "Alpha"),
+            make_item("b", "Beta"),
+            make_item("c", "Charlie"),
+        ];
+        let mut results: Vec<(usize, i32)> = vec![(0, 10), (1, 20), (2, 5)];
+        let mut pinned = PinnedItems::new();
+        pinned.pin("c");
+        sort_with_pinned(&mut results, &items, &pinned);
+        // Pinned item "c" (index 2) should be first
+        assert_eq!(results[0].0, 2);
+    }
+
+    // ── Shortcut registry ─────────────────────────────────────────
+
+    #[test]
+    fn shortcut_registry_bind_and_hint() {
+        let mut reg = ShortcutRegistry::new();
+        reg.bind("format", "Ctrl+Shift+F");
+        let item = make_item("format", "Format Document");
+        assert_eq!(reg.label_with_hint(&item), "Format Document (Ctrl+Shift+F)");
+        let item2 = make_item("other", "Other Command");
+        assert_eq!(reg.label_with_hint(&item2), "Other Command");
+        reg.unbind("format");
+        assert!(reg.get("format").is_none());
+    }
+
+    // ── Result preview ────────────────────────────────────────────
+
+    #[test]
+    fn result_preview_plain_truncation() {
+        let long = "a".repeat(200);
+        let preview = ResultPreview::plain(&long, 50);
+        assert_eq!(preview.content.chars().count(), 50);
+        assert!(preview.content.ends_with('…'));
+        assert_eq!(preview.kind, PreviewKind::PlainText);
+    }
+
+    #[test]
+    fn generate_preview_file_path() {
+        let item = QuickAccessItem {
+            id: "f".into(),
+            label: "config".into(),
+            description: None,
+            detail: Some("/etc/config.toml".into()),
+            icon: None,
+            group: None,
+        };
+        let preview = generate_preview(&item);
+        assert_eq!(preview.kind, PreviewKind::FilePath);
+        assert_eq!(preview.content, "/etc/config.toml");
+    }
+
+    #[test]
+    fn generate_preview_falls_back_to_description() {
+        let item = QuickAccessItem {
+            id: "x".into(),
+            label: "Something".into(),
+            description: Some("A useful command".into()),
+            detail: None,
+            icon: None,
+            group: None,
+        };
+        let preview = generate_preview(&item);
+        assert_eq!(preview.kind, PreviewKind::PlainText);
+        assert_eq!(preview.content, "A useful command");
     }
 }

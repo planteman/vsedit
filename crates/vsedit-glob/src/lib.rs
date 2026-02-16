@@ -923,6 +923,202 @@ impl GlobStats {
     }
 }
 
+/// Result of analyzing a glob pattern's structural properties.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlobPatternAnalysis {
+    /// The original pattern string.
+    pub pattern: String,
+    /// Whether the pattern contains `**` (recursive matching).
+    pub is_recursive: bool,
+    /// Whether the pattern contains any wildcard characters (`*`, `?`).
+    pub has_wildcards: bool,
+    /// Whether the pattern contains character classes (`[...]`).
+    pub has_char_class: bool,
+    /// Whether the pattern contains brace alternatives (`{a,b}`).
+    pub has_braces: bool,
+    /// The longest literal directory prefix before any glob metacharacter.
+    pub base_path: String,
+    /// The estimated directory depth of the pattern (number of `/` separators).
+    pub depth: usize,
+}
+
+impl GlobPatternAnalysis {
+    /// Analyze a glob pattern string and return its structural properties.
+    pub fn analyze(pattern: &str) -> Self {
+        let (base, _) = split_glob_pattern(pattern);
+        Self {
+            pattern: pattern.to_string(),
+            is_recursive: pattern.contains("**"),
+            has_wildcards: pattern.contains('*') || pattern.contains('?'),
+            has_char_class: pattern.contains('['),
+            has_braces: pattern.contains('{'),
+            base_path: base.to_string(),
+            depth: pattern.chars().filter(|&c| c == '/').count(),
+        }
+    }
+
+    /// Return `true` if the pattern is a plain literal (no metacharacters).
+    pub fn is_literal(&self) -> bool {
+        !self.has_wildcards && !self.has_char_class && !self.has_braces
+    }
+}
+
+/// Fully normalize a glob pattern for consistent matching.
+///
+/// Performs the following transformations:
+/// - Convert backslashes to forward slashes.
+/// - Strip a leading `./` prefix.
+/// - Collapse consecutive slashes into a single slash.
+/// - Remove a trailing slash (unless the pattern is `/`).
+pub fn normalize_pattern(pattern: &str) -> String {
+    let mut s = pattern.replace('\\', "/");
+
+    // Strip leading "./"
+    while s.starts_with("./") {
+        s = s[2..].to_string();
+    }
+
+    // Collapse consecutive slashes.
+    while s.contains("//") {
+        s = s.replace("//", "/");
+    }
+
+    // Remove trailing slash unless the entire string is "/".
+    if s.len() > 1 && s.ends_with('/') {
+        s.pop();
+    }
+
+    s
+}
+
+/// Match a single compiled [`GlobPattern`] against many paths at once.
+///
+/// Returns the subset of paths that match the pattern, preserving order.
+pub fn batch_match<'a>(pattern: &GlobPattern, paths: &[&'a str]) -> Vec<&'a str> {
+    paths
+        .iter()
+        .copied()
+        .filter(|p| pattern.matches(p))
+        .collect()
+}
+
+/// Match a single compiled [`GlobPattern`] against many paths, returning
+/// a parallel `Vec<bool>` indicating which paths matched.
+pub fn batch_match_flags(pattern: &GlobPattern, paths: &[&str]) -> Vec<bool> {
+    paths.iter().map(|p| pattern.matches(p)).collect()
+}
+
+/// A rule in a [`GlobFilterChain`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterAction {
+    /// Include paths matching this rule.
+    Include,
+    /// Exclude paths matching this rule.
+    Exclude,
+}
+
+/// An ordered chain of include/exclude glob rules evaluated top-to-bottom.
+///
+/// Rules are evaluated in insertion order. The *last* matching rule wins.
+/// If no rule matches, the path is accepted by default.
+pub struct GlobFilterChain {
+    rules: Vec<(FilterAction, GlobMatcher, String)>,
+}
+
+impl fmt::Debug for GlobFilterChain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries: Vec<_> = self
+            .rules
+            .iter()
+            .map(|(action, _, pat)| (*action, pat.as_str()))
+            .collect();
+        f.debug_struct("GlobFilterChain")
+            .field("rules", &entries)
+            .finish()
+    }
+}
+
+impl GlobFilterChain {
+    /// Create a new empty filter chain.
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Append a rule to the chain.
+    pub fn add_rule(
+        &mut self,
+        action: FilterAction,
+        pattern: &str,
+    ) -> Result<(), globset::Error> {
+        let glob = Glob::new(pattern)?;
+        self.rules
+            .push((action, glob.compile_matcher(), pattern.to_string()));
+        Ok(())
+    }
+
+    /// Evaluate the chain for a given path.
+    ///
+    /// Returns `true` (accepted) if the last matching rule is [`FilterAction::Include`]
+    /// or if no rule matched at all. Returns `false` if the last matching rule
+    /// is [`FilterAction::Exclude`].
+    pub fn accepts(&self, path: &str) -> bool {
+        let mut result = true;
+        for (action, matcher, _) in &self.rules {
+            if matcher.is_match(path) {
+                result = *action == FilterAction::Include;
+            }
+        }
+        result
+    }
+
+    /// Filter an iterator of paths through the chain.
+    pub fn filter_paths<'a>(&self, paths: &[&'a str]) -> Vec<&'a str> {
+        paths.iter().copied().filter(|p| self.accepts(p)).collect()
+    }
+
+    /// Return the number of rules in the chain.
+    pub fn len(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// Return `true` if the chain contains no rules.
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+}
+
+impl Default for GlobFilterChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GlobPatternSet {
+    /// Return a new set containing only patterns from `self` that also appear
+    /// in `other` (by pattern string equality).
+    pub fn intersection(&self, other: &GlobPatternSet) -> Result<GlobPatternSet, globset::Error> {
+        let common: Vec<&str> = self
+            .patterns
+            .iter()
+            .filter(|p| other.patterns.iter().any(|o| o == *p))
+            .map(|s| s.as_str())
+            .collect();
+        GlobPatternSet::new(&common)
+    }
+
+    /// Return a new set containing patterns from `self` that do **not** appear
+    /// in `other` (by pattern string equality).
+    pub fn difference(&self, other: &GlobPatternSet) -> Result<GlobPatternSet, globset::Error> {
+        let diff: Vec<&str> = self
+            .patterns
+            .iter()
+            .filter(|p| !other.patterns.iter().any(|o| o == *p))
+            .map(|s| s.as_str())
+            .collect();
+        GlobPatternSet::new(&diff)
+    }
+}
+
 /// Check whether a pattern contains only valid glob syntax characters.
 pub fn is_valid_glob_syntax(pattern: &str) -> bool {
     if pattern.is_empty() {
@@ -1500,5 +1696,84 @@ mod tests {
         assert!(!is_valid_glob_syntax("*.{rs"));
         assert!(!is_valid_glob_syntax("foo}bar"));
         assert!(!is_valid_glob_syntax("]bad"));
+    }
+
+    #[test]
+    fn pattern_analysis_recursive() {
+        let a = GlobPatternAnalysis::analyze("src/**/*.rs");
+        assert!(a.is_recursive);
+        assert!(a.has_wildcards);
+        assert!(!a.has_char_class);
+        assert!(!a.has_braces);
+        assert_eq!(a.base_path, "src/");
+        assert_eq!(a.depth, 2);
+        assert!(!a.is_literal());
+    }
+
+    #[test]
+    fn pattern_analysis_literal() {
+        let a = GlobPatternAnalysis::analyze("Makefile");
+        assert!(!a.is_recursive);
+        assert!(!a.has_wildcards);
+        assert!(a.is_literal());
+        assert_eq!(a.base_path, "Makefile");
+        assert_eq!(a.depth, 0);
+    }
+
+    #[test]
+    fn normalize_pattern_full() {
+        assert_eq!(normalize_pattern("src\\\\lib.rs"), "src/lib.rs");
+        assert_eq!(normalize_pattern("./src/lib.rs"), "src/lib.rs");
+        assert_eq!(normalize_pattern("src//lib.rs"), "src/lib.rs");
+        assert_eq!(normalize_pattern("src/lib/"), "src/lib");
+        assert_eq!(normalize_pattern("././foo"), "foo");
+        assert_eq!(normalize_pattern("/"), "/");
+    }
+
+    #[test]
+    fn batch_match_paths() {
+        let pat = GlobPattern::new("*.rs").unwrap();
+        let paths = &["main.rs", "lib.rs", "Cargo.toml", "README.md"];
+        let matched = batch_match(&pat, paths);
+        assert_eq!(matched, vec!["main.rs", "lib.rs"]);
+
+        let flags = batch_match_flags(&pat, paths);
+        assert_eq!(flags, vec![true, true, false, false]);
+    }
+
+    #[test]
+    fn filter_chain_last_rule_wins() {
+        let mut chain = GlobFilterChain::new();
+        chain.add_rule(FilterAction::Exclude, "*.rs").unwrap();
+        chain.add_rule(FilterAction::Include, "main.rs").unwrap();
+        // main.rs matches both rules; last wins (Include)
+        assert!(chain.accepts("main.rs"));
+        // lib.rs matches only the Exclude rule
+        assert!(!chain.accepts("lib.rs"));
+        // readme.md matches nothing, default is accept
+        assert!(chain.accepts("readme.md"));
+        assert_eq!(chain.len(), 2);
+        assert!(!chain.is_empty());
+
+        let paths = &["main.rs", "lib.rs", "readme.md"];
+        let kept = chain.filter_paths(paths);
+        assert_eq!(kept, vec!["main.rs", "readme.md"]);
+    }
+
+    #[test]
+    fn pattern_set_intersection_and_difference() {
+        let a = GlobPatternSet::new(&["*.rs", "*.toml", "*.lock"]).unwrap();
+        let b = GlobPatternSet::new(&["*.toml", "*.lock", "*.md"]).unwrap();
+
+        let inter = a.intersection(&b).unwrap();
+        assert_eq!(inter.pattern_count(), 2);
+        assert!(inter.contains_pattern("*.toml"));
+        assert!(inter.contains_pattern("*.lock"));
+        assert!(!inter.contains_pattern("*.rs"));
+
+        let diff = a.difference(&b).unwrap();
+        assert_eq!(diff.pattern_count(), 1);
+        assert!(diff.contains_pattern("*.rs"));
+        assert!(!diff.contains_pattern("*.toml"));
     }
 }

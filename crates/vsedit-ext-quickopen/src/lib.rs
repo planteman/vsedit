@@ -907,6 +907,314 @@ impl Default for QuickOpenFilter {
     }
 }
 
+// ── Quick Open Prefix Commands ──
+
+/// Recognized prefix command extracted from a quick-open query string.
+///
+/// Many editors treat certain leading characters as mode switches:
+/// - `@` – go-to-symbol in the current file
+/// - `#` – go-to-symbol across the workspace
+/// - `>` – run an editor command
+/// - `:` – go-to-line number
+#[derive(Debug, Clone, PartialEq)]
+pub enum QuickOpenPrefix {
+    /// `@` – symbol search in the current file.
+    FileSymbol(String),
+    /// `#` – workspace-wide symbol search.
+    WorkspaceSymbol(String),
+    /// `>` – command palette.
+    Command(String),
+    /// `:` followed by a number – go-to-line.
+    GotoLine(usize),
+    /// No special prefix – plain file search.
+    File(String),
+}
+
+/// Parse a raw query typed into the quick-open box and return the
+/// corresponding [`QuickOpenPrefix`] variant.
+pub fn parse_quick_open_prefix(raw: &str) -> QuickOpenPrefix {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return QuickOpenPrefix::File(String::new());
+    }
+    match trimmed.as_bytes()[0] {
+        b'@' => QuickOpenPrefix::FileSymbol(trimmed[1..].trim().to_string()),
+        b'#' => QuickOpenPrefix::WorkspaceSymbol(trimmed[1..].trim().to_string()),
+        b'>' => QuickOpenPrefix::Command(trimmed[1..].trim().to_string()),
+        b':' => {
+            let rest = trimmed[1..].trim();
+            if let Ok(n) = rest.parse::<usize>() {
+                QuickOpenPrefix::GotoLine(n)
+            } else {
+                QuickOpenPrefix::File(trimmed.to_string())
+            }
+        }
+        _ => QuickOpenPrefix::File(trimmed.to_string()),
+    }
+}
+
+// ── File Icon Resolution ──
+
+/// Icon label for a file based on its extension or well-known filename.
+///
+/// Returns a short icon identifier string (e.g. `"rust"`, `"python"`,
+/// `"markdown"`) suitable for mapping to an icon font glyph on the UI side.
+pub fn resolve_file_icon(filename: &str) -> &'static str {
+    let lower = filename.to_lowercase();
+
+    // Well-known filenames first
+    match lower.as_str() {
+        "cargo.toml" | "cargo.lock" => return "rust",
+        "dockerfile" => return "docker",
+        "makefile" | "gnumakefile" => return "makefile",
+        ".gitignore" | ".gitattributes" | ".gitmodules" => return "git",
+        "license" | "licence" => return "license",
+        "readme" | "readme.md" | "readme.txt" => return "readme",
+        "package.json" | "package-lock.json" => return "npm",
+        "tsconfig.json" => return "typescript",
+        _ => {}
+    }
+
+    // Extension-based lookup
+    if let Some(ext) = lower.rsplit_once('.').map(|(_, e)| e) {
+        match ext {
+            "rs" => "rust",
+            "py" | "pyi" => "python",
+            "js" | "mjs" | "cjs" => "javascript",
+            "ts" | "mts" | "cts" => "typescript",
+            "tsx" | "jsx" => "react",
+            "html" | "htm" => "html",
+            "css" | "scss" | "sass" | "less" => "css",
+            "json" | "jsonc" | "json5" => "json",
+            "toml" => "toml",
+            "yaml" | "yml" => "yaml",
+            "xml" | "xsd" | "xsl" => "xml",
+            "md" | "mdx" => "markdown",
+            "sh" | "bash" | "zsh" | "fish" => "shell",
+            "c" | "h" => "c",
+            "cpp" | "cxx" | "cc" | "hpp" | "hxx" => "cpp",
+            "go" => "go",
+            "java" => "java",
+            "rb" => "ruby",
+            "php" => "php",
+            "swift" => "swift",
+            "kt" | "kts" => "kotlin",
+            "sql" => "sql",
+            "graphql" | "gql" => "graphql",
+            "svg" => "svg",
+            "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "ico" => "image",
+            "wasm" => "wasm",
+            "lock" => "lock",
+            "txt" | "text" => "text",
+            "log" => "log",
+            _ => "file",
+        }
+    } else {
+        "file"
+    }
+}
+
+// ── File Path Scoring ──
+
+/// Score a file path against a query using path-aware heuristics.
+///
+/// In addition to the base fuzzy score, this awards bonuses for:
+/// - Matching the filename (basename) rather than directory components.
+/// - Shorter overall paths (less nesting noise).
+/// - Exact basename match.
+pub fn score_file_path(query: &str, path: &str, scorer: &QuickOpenScoring) -> f64 {
+    if query.is_empty() {
+        return 0.0;
+    }
+
+    let basename = path.rsplit('/').next().unwrap_or(path);
+
+    // Score against full path
+    let full_score = scorer.score_match(query, path);
+    // Score against basename only
+    let base_score = scorer.score_match(query, basename);
+
+    // Prefer basename matches: weight basename more heavily
+    let combined = full_score + base_score * 2.0;
+
+    // Bonus for shorter paths (fewer directory components)
+    let depth = path.matches('/').count();
+    let depth_penalty = depth as f64 * 0.3;
+
+    (combined - depth_penalty).max(0.0)
+}
+
+/// Rank a set of file paths against a query, returning them sorted by
+/// descending score. Paths with zero score are excluded.
+pub fn rank_file_paths(
+    query: &str,
+    paths: &[&str],
+    scorer: &QuickOpenScoring,
+) -> Vec<(String, f64)> {
+    let mut results: Vec<(String, f64)> = paths
+        .iter()
+        .filter_map(|&p| {
+            let s = score_file_path(query, p, scorer);
+            if s > 0.0 {
+                Some((p.to_string(), s))
+            } else {
+                None
+            }
+        })
+        .collect();
+    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    results
+}
+
+// ── MRU File List ──
+
+/// Most-recently-used file list with configurable capacity.
+///
+/// Unlike [`QuickOpenHistory`] which stores arbitrary labels, this is
+/// purpose-built for file paths and provides path-normalisation and
+/// workspace-relative conversion helpers.
+pub struct MruFileList {
+    paths: Vec<String>,
+    capacity: usize,
+}
+
+impl MruFileList {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            paths: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Record a file path as the most recently used.
+    /// Duplicates are moved to the front.
+    pub fn touch(&mut self, path: &str) {
+        self.paths.retain(|p| p != path);
+        self.paths.insert(0, path.to_string());
+        self.paths.truncate(self.capacity);
+    }
+
+    /// Remove a path (e.g. when a file is deleted).
+    pub fn remove(&mut self, path: &str) {
+        self.paths.retain(|p| p != path);
+    }
+
+    /// Return the ordered MRU list.
+    pub fn list(&self) -> &[String] {
+        &self.paths
+    }
+
+    /// Return the number of entries.
+    pub fn len(&self) -> usize {
+        self.paths.len()
+    }
+
+    /// Return `true` if empty.
+    pub fn is_empty(&self) -> bool {
+        self.paths.is_empty()
+    }
+
+    /// Convert the MRU list into [`QuickPickItem`]s, optionally filtering
+    /// by a query string.
+    pub fn to_quick_pick_items(&self, query: Option<&str>) -> Vec<QuickPickItem> {
+        let q = query.map(|s| s.to_lowercase());
+        self.paths
+            .iter()
+            .filter(|p| match &q {
+                Some(q) => p.to_lowercase().contains(q),
+                None => true,
+            })
+            .map(|p| {
+                let basename = p.rsplit('/').next().unwrap_or(p);
+                let dir = p.rsplit_once('/').map(|(d, _)| d.to_string());
+                QuickPickItem {
+                    label: basename.to_string(),
+                    description: dir,
+                    detail: None,
+                    picked: false,
+                    always_show: false,
+                }
+            })
+            .collect()
+    }
+}
+
+// ── Quick Open Result Cache ──
+
+/// A simple cache for quick-open results keyed by query string.
+///
+/// Each entry is tagged with a generation number. When the file list changes,
+/// the generation is bumped and stale entries are ignored on lookup.
+pub struct QuickOpenCache {
+    generation: u64,
+    entries: Vec<CacheEntry>,
+    max_entries: usize,
+}
+
+struct CacheEntry {
+    query: String,
+    generation: u64,
+    results: Vec<String>,
+}
+
+impl QuickOpenCache {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            generation: 0,
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Bump the generation, invalidating all existing entries.
+    pub fn invalidate(&mut self) {
+        self.generation += 1;
+    }
+
+    /// Current generation number.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Store results for a query at the current generation.
+    pub fn put(&mut self, query: &str, results: Vec<String>) {
+        // Remove existing entry for same query
+        self.entries.retain(|e| e.query != query);
+        self.entries.push(CacheEntry {
+            query: query.to_string(),
+            generation: self.generation,
+            results,
+        });
+        // Evict oldest entries if over capacity
+        while self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+    }
+
+    /// Look up cached results. Returns `None` if missing or stale.
+    pub fn get(&self, query: &str) -> Option<&[String]> {
+        self.entries
+            .iter()
+            .find(|e| e.query == query && e.generation == self.generation)
+            .map(|e| e.results.as_slice())
+    }
+
+    /// Number of entries (including stale).
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 /// Filters and scores `items` against `query`, returning only those with a
 /// positive score, sorted in descending order by score.
 pub fn quick_open_filter(
@@ -1547,5 +1855,155 @@ mod tests {
         let items = vec![test_item("a"), test_item("b")];
         let filter = QuickOpenFilter::default();
         assert_eq!(filter.apply(&items).len(), 2);
+    }
+
+    // ── Prefix command parsing ──
+
+    #[test]
+    fn parse_prefix_file_symbol() {
+        assert_eq!(
+            parse_quick_open_prefix("@main"),
+            QuickOpenPrefix::FileSymbol("main".into())
+        );
+        assert_eq!(
+            parse_quick_open_prefix("@ foo bar"),
+            QuickOpenPrefix::FileSymbol("foo bar".into())
+        );
+    }
+
+    #[test]
+    fn parse_prefix_workspace_symbol_and_command() {
+        assert_eq!(
+            parse_quick_open_prefix("#Widget"),
+            QuickOpenPrefix::WorkspaceSymbol("Widget".into())
+        );
+        assert_eq!(
+            parse_quick_open_prefix(">format document"),
+            QuickOpenPrefix::Command("format document".into())
+        );
+    }
+
+    #[test]
+    fn parse_prefix_goto_line() {
+        assert_eq!(parse_quick_open_prefix(":42"), QuickOpenPrefix::GotoLine(42));
+        // Non-numeric after colon falls back to File
+        assert_eq!(
+            parse_quick_open_prefix(":abc"),
+            QuickOpenPrefix::File(":abc".into())
+        );
+    }
+
+    #[test]
+    fn parse_prefix_plain_file() {
+        assert_eq!(
+            parse_quick_open_prefix("main.rs"),
+            QuickOpenPrefix::File("main.rs".into())
+        );
+        assert_eq!(
+            parse_quick_open_prefix(""),
+            QuickOpenPrefix::File(String::new())
+        );
+    }
+
+    // ── File icon resolution ──
+
+    #[test]
+    fn resolve_icon_known_extensions_and_filenames() {
+        assert_eq!(resolve_file_icon("main.rs"), "rust");
+        assert_eq!(resolve_file_icon("app.tsx"), "react");
+        assert_eq!(resolve_file_icon("style.css"), "css");
+        assert_eq!(resolve_file_icon("data.json"), "json");
+        assert_eq!(resolve_file_icon("script.py"), "python");
+        assert_eq!(resolve_file_icon("Cargo.toml"), "rust");
+        assert_eq!(resolve_file_icon("Dockerfile"), "docker");
+        assert_eq!(resolve_file_icon(".gitignore"), "git");
+        assert_eq!(resolve_file_icon("photo.png"), "image");
+        assert_eq!(resolve_file_icon("unknown.xyz"), "file");
+        assert_eq!(resolve_file_icon("noext"), "file");
+    }
+
+    // ── File path scoring & ranking ──
+
+    #[test]
+    fn score_file_path_prefers_basename_match() {
+        let scorer = QuickOpenScoring::new();
+        let deep = score_file_path("lib", "a/b/c/d/lib.rs", &scorer);
+        let shallow = score_file_path("lib", "src/lib.rs", &scorer);
+        // Shallower path with same basename should score higher
+        assert!(shallow > deep, "shallow={shallow} should beat deep={deep}");
+    }
+
+    #[test]
+    fn rank_file_paths_orders_correctly() {
+        let scorer = QuickOpenScoring::new();
+        let paths = vec![
+            "src/utils/helpers.rs",
+            "src/main.rs",
+            "tests/main_test.rs",
+            "docs/readme.md",
+        ];
+        let ranked = rank_file_paths("main", &paths, &scorer);
+        assert!(!ranked.is_empty());
+        assert_eq!(ranked[0].0, "src/main.rs");
+        // readme.md shouldn't match "main"
+        assert!(ranked.iter().all(|(p, _)| p != "docs/readme.md"));
+    }
+
+    // ── MRU file list ──
+
+    #[test]
+    fn mru_touch_and_ordering() {
+        let mut mru = MruFileList::new(3);
+        mru.touch("a.rs");
+        mru.touch("b.rs");
+        mru.touch("c.rs");
+        assert_eq!(mru.list(), &["c.rs", "b.rs", "a.rs"]);
+        // Re-touching moves to front
+        mru.touch("a.rs");
+        assert_eq!(mru.list(), &["a.rs", "c.rs", "b.rs"]);
+        // Capacity enforced
+        mru.touch("d.rs");
+        assert_eq!(mru.len(), 3);
+        assert_eq!(mru.list()[0], "d.rs");
+    }
+
+    #[test]
+    fn mru_to_quick_pick_items_with_filter() {
+        let mut mru = MruFileList::new(10);
+        mru.touch("src/main.rs");
+        mru.touch("src/lib.rs");
+        mru.touch("tests/it.rs");
+        let items = mru.to_quick_pick_items(Some("lib"));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "lib.rs");
+        assert_eq!(items[0].description.as_deref(), Some("src"));
+    }
+
+    // ── Quick open result cache ──
+
+    #[test]
+    fn cache_put_get_and_invalidate() {
+        let mut cache = QuickOpenCache::new(10);
+        cache.put("main", vec!["main.rs".into(), "main.go".into()]);
+        assert_eq!(cache.get("main").unwrap().len(), 2);
+        assert!(cache.get("other").is_none());
+        // Invalidate makes previous entries stale
+        cache.invalidate();
+        assert!(cache.get("main").is_none());
+        // New entry at new generation is visible
+        cache.put("main", vec!["main.rs".into()]);
+        assert_eq!(cache.get("main").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn cache_eviction() {
+        let mut cache = QuickOpenCache::new(2);
+        cache.put("a", vec!["a".into()]);
+        cache.put("b", vec!["b".into()]);
+        cache.put("c", vec!["c".into()]);
+        assert_eq!(cache.len(), 2);
+        // Oldest entry "a" should have been evicted
+        assert!(cache.get("a").is_none());
+        assert!(cache.get("c").is_some());
     }
 }

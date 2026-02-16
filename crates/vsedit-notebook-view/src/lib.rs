@@ -1,6 +1,6 @@
 //! Notebook editor.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
 /// Errors that can occur when manipulating a notebook.
@@ -925,6 +925,373 @@ impl fmt::Display for ExportFormat {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Execution order tracking
+// ---------------------------------------------------------------------------
+
+/// Records the order in which cells were executed, supporting re-execution
+/// and providing the ability to replay or inspect execution history.
+#[derive(Debug, Clone)]
+pub struct ExecutionOrderLog {
+    entries: Vec<ExecutionLogEntry>,
+}
+
+/// A single entry in the execution order log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionLogEntry {
+    pub cell_index: usize,
+    pub execution_number: u32,
+    pub source_snapshot: String,
+}
+
+impl ExecutionOrderLog {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Record that a cell was executed with the given source at that moment.
+    pub fn record(&mut self, cell_index: usize, source: &str) -> u32 {
+        let execution_number = self.entries.len() as u32 + 1;
+        self.entries.push(ExecutionLogEntry {
+            cell_index,
+            execution_number,
+            source_snapshot: source.to_string(),
+        });
+        execution_number
+    }
+
+    /// Return entries in execution order.
+    pub fn entries(&self) -> &[ExecutionLogEntry] {
+        &self.entries
+    }
+
+    /// Return only the entries for a specific cell, in execution order.
+    pub fn entries_for_cell(&self, cell_index: usize) -> Vec<&ExecutionLogEntry> {
+        self.entries.iter().filter(|e| e.cell_index == cell_index).collect()
+    }
+
+    /// Return the last execution number for a cell, if any.
+    pub fn last_execution(&self, cell_index: usize) -> Option<u32> {
+        self.entries.iter().rev()
+            .find(|e| e.cell_index == cell_index)
+            .map(|e| e.execution_number)
+    }
+
+    /// Detect cells that were re-executed with different source (stale runs).
+    /// Returns cell indices whose most recent execution source differs from
+    /// the current source in the document.
+    pub fn stale_cells(&self, doc: &NotebookDocument) -> Vec<usize> {
+        let mut seen: HashMap<usize, &str> = HashMap::new();
+        for entry in &self.entries {
+            seen.insert(entry.cell_index, &entry.source_snapshot);
+        }
+        let mut stale = Vec::new();
+        for (idx, last_source) in &seen {
+            if let Some(cell) = doc.cells.get(*idx) {
+                if cell.source != **last_source {
+                    stale.push(*idx);
+                }
+            }
+        }
+        stale.sort();
+        stale
+    }
+
+    /// Return the total number of executions recorded.
+    pub fn total_executions(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return unique cell indices in the order they were first executed.
+    pub fn execution_order(&self) -> Vec<usize> {
+        let mut seen = HashSet::new();
+        let mut order = Vec::new();
+        for entry in &self.entries {
+            if seen.insert(entry.cell_index) {
+                order.push(entry.cell_index);
+            }
+        }
+        order
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Notebook metadata management
+// ---------------------------------------------------------------------------
+
+/// Structured kernel and language metadata for a notebook.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotebookKernelInfo {
+    pub name: String,
+    pub language: String,
+    pub version: Option<String>,
+}
+
+impl NotebookKernelInfo {
+    pub fn new(name: impl Into<String>, language: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            language: language.into(),
+            version: None,
+        }
+    }
+
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.version = Some(version.into());
+        self
+    }
+
+    /// Format as a display string suitable for status bars.
+    pub fn display_name(&self) -> String {
+        match &self.version {
+            Some(v) => format!("{} ({} {})", self.name, self.language, v),
+            None => format!("{} ({})", self.name, self.language),
+        }
+    }
+}
+
+impl fmt::Display for NotebookKernelInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_name())
+    }
+}
+
+/// Manages notebook-level metadata beyond the simple key-value HashMap,
+/// including kernel info, trust state, and format version.
+#[derive(Debug, Clone)]
+pub struct NotebookMetadataManager {
+    pub kernel: Option<NotebookKernelInfo>,
+    pub trusted: bool,
+    pub format_version: (u8, u8),
+    custom: HashMap<String, String>,
+}
+
+impl NotebookMetadataManager {
+    pub fn new() -> Self {
+        Self {
+            kernel: None,
+            trusted: false,
+            format_version: (4, 5),
+            custom: HashMap::new(),
+        }
+    }
+
+    pub fn set_kernel(&mut self, kernel: NotebookKernelInfo) {
+        self.kernel = Some(kernel);
+    }
+
+    pub fn set_trusted(&mut self, trusted: bool) {
+        self.trusted = trusted;
+    }
+
+    pub fn set_custom(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.custom.insert(key.into(), value.into());
+    }
+
+    pub fn get_custom(&self, key: &str) -> Option<&str> {
+        self.custom.get(key).map(|s| s.as_str())
+    }
+
+    /// Merge metadata from the document's HashMap into this manager,
+    /// extracting known keys into structured fields.
+    pub fn import_from_document(&mut self, doc: &NotebookDocument) {
+        if let Some(kernel_name) = doc.metadata.get("kernel") {
+            let language = doc.metadata.get("language")
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            let mut info = NotebookKernelInfo::new(kernel_name.clone(), language);
+            if let Some(ver) = doc.metadata.get("kernel_version") {
+                info = info.with_version(ver.clone());
+            }
+            self.kernel = Some(info);
+        }
+        for (k, v) in &doc.metadata {
+            if !matches!(k.as_str(), "kernel" | "language" | "kernel_version") {
+                self.custom.insert(k.clone(), v.clone());
+            }
+        }
+    }
+
+    /// Export structured metadata back into a flat HashMap.
+    pub fn export_to_map(&self) -> HashMap<String, String> {
+        let mut map = self.custom.clone();
+        if let Some(ref kernel) = self.kernel {
+            map.insert("kernel".into(), kernel.name.clone());
+            map.insert("language".into(), kernel.language.clone());
+            if let Some(ref v) = kernel.version {
+                map.insert("kernel_version".into(), v.clone());
+            }
+        }
+        map.insert("trusted".into(), self.trusted.to_string());
+        map.insert("format_version".into(),
+                    format!("{}.{}", self.format_version.0, self.format_version.1));
+        map
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cell output diffing
+// ---------------------------------------------------------------------------
+
+/// Describes a difference between two sets of cell outputs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutputDiff {
+    /// An output was added at the given index.
+    Added { index: usize, output: NotebookCellOutput },
+    /// An output was removed from the given index.
+    Removed { index: usize, output: NotebookCellOutput },
+    /// An output changed at the given index.
+    Changed {
+        index: usize,
+        old: NotebookCellOutput,
+        new: NotebookCellOutput,
+    },
+}
+
+impl Eq for NotebookCellOutput {}
+
+/// Compute the differences between two output lists.
+/// Uses a simple positional comparison (not LCS) which is appropriate for
+/// cell outputs that are typically short lists.
+pub fn diff_cell_outputs(
+    old: &[NotebookCellOutput],
+    new: &[NotebookCellOutput],
+) -> Vec<OutputDiff> {
+    let mut diffs = Vec::new();
+    let max_len = old.len().max(new.len());
+    for i in 0..max_len {
+        match (old.get(i), new.get(i)) {
+            (Some(o), Some(n)) if o != n => {
+                diffs.push(OutputDiff::Changed {
+                    index: i,
+                    old: o.clone(),
+                    new: n.clone(),
+                });
+            }
+            (Some(_), Some(_)) => {} // identical
+            (None, Some(n)) => {
+                diffs.push(OutputDiff::Added {
+                    index: i,
+                    output: n.clone(),
+                });
+            }
+            (Some(o), None) => {
+                diffs.push(OutputDiff::Removed {
+                    index: i,
+                    output: o.clone(),
+                });
+            }
+            (None, None) => unreachable!(),
+        }
+    }
+    diffs
+}
+
+// ---------------------------------------------------------------------------
+// Cell dependency graph with topological sort
+// ---------------------------------------------------------------------------
+
+/// A directed acyclic graph of cell dependencies with topological ordering.
+pub struct CellDependencyGraph {
+    /// Adjacency list: cell_index -> set of cells it depends on.
+    edges: HashMap<usize, HashSet<usize>>,
+    cell_count: usize,
+}
+
+impl CellDependencyGraph {
+    /// Build a dependency graph from analyzed dependencies.
+    pub fn from_dependencies(deps: &[CellDependency], cell_count: usize) -> Self {
+        let mut edges: HashMap<usize, HashSet<usize>> = HashMap::new();
+        for dep in deps {
+            edges.entry(dep.cell_index).or_default().insert(dep.depends_on);
+        }
+        Self { edges, cell_count }
+    }
+
+    /// Return the direct dependencies of a cell.
+    pub fn dependencies_of(&self, cell_index: usize) -> Vec<usize> {
+        let mut deps: Vec<usize> = self.edges.get(&cell_index)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        deps.sort();
+        deps
+    }
+
+    /// Return cells that depend on the given cell (reverse lookup).
+    pub fn dependents_of(&self, cell_index: usize) -> Vec<usize> {
+        let mut result: Vec<usize> = self.edges.iter()
+            .filter(|(_, deps)| deps.contains(&cell_index))
+            .map(|(idx, _)| *idx)
+            .collect();
+        result.sort();
+        result
+    }
+
+    /// Compute a topological ordering of cells. Returns `None` if a cycle is
+    /// detected (which shouldn't happen in a well-formed notebook).
+    pub fn topological_order(&self) -> Option<Vec<usize>> {
+        let mut adj: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut in_deg: HashMap<usize, usize> = HashMap::new();
+        for i in 0..self.cell_count {
+            in_deg.insert(i, 0);
+        }
+        // Execution edge: depends_on -> cell_index
+        for (&cell_idx, deps) in &self.edges {
+            for &dep in deps {
+                adj.entry(dep).or_default().push(cell_idx);
+                *in_deg.entry(cell_idx).or_insert(0) += 1;
+            }
+        }
+        let mut queue: VecDeque<usize> = in_deg.iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(idx, _)| *idx)
+            .collect();
+        // Sort the initial queue for deterministic output
+        let mut sorted_start: Vec<usize> = queue.drain(..).collect();
+        sorted_start.sort();
+        queue.extend(sorted_start);
+
+        let mut order = Vec::new();
+        while let Some(node) = queue.pop_front() {
+            order.push(node);
+            if let Some(neighbors) = adj.get(&node) {
+                let mut sorted_neighbors = neighbors.clone();
+                sorted_neighbors.sort();
+                for &next in &sorted_neighbors {
+                    let deg = in_deg.get_mut(&next).unwrap();
+                    *deg -= 1;
+                    if *deg == 0 {
+                        queue.push_back(next);
+                    }
+                }
+            }
+        }
+        if order.len() == self.cell_count {
+            Some(order)
+        } else {
+            None // cycle detected
+        }
+    }
+
+    /// Return all cells transitively required to run the given cell.
+    pub fn transitive_dependencies(&self, cell_index: usize) -> Vec<usize> {
+        let mut visited = HashSet::new();
+        let mut stack = vec![cell_index];
+        while let Some(idx) = stack.pop() {
+            if let Some(deps) = self.edges.get(&idx) {
+                for &dep in deps {
+                    if visited.insert(dep) {
+                        stack.push(dep);
+                    }
+                }
+            }
+        }
+        let mut result: Vec<usize> = visited.into_iter().collect();
+        result.sort();
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1501,5 +1868,124 @@ mod tests {
         assert_eq!(ExportFormat::from_name("python"), Some(ExportFormat::Python));
         assert_eq!(ExportFormat::from_name("bogus"), None);
         assert_eq!(format!("{}", ExportFormat::Markdown), "Markdown");
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn execution_order_log_records_and_queries() {
+        let mut log = ExecutionOrderLog::new();
+        let n1 = log.record(0, "x = 1");
+        let n2 = log.record(1, "y = 2");
+        let n3 = log.record(0, "x = 10");
+        assert_eq!(n1, 1);
+        assert_eq!(n2, 2);
+        assert_eq!(n3, 3);
+        assert_eq!(log.total_executions(), 3);
+        assert_eq!(log.entries_for_cell(0).len(), 2);
+        assert_eq!(log.last_execution(0), Some(3));
+        assert_eq!(log.last_execution(1), Some(2));
+        assert_eq!(log.last_execution(99), None);
+        assert_eq!(log.execution_order(), vec![0, 1]);
+    }
+
+    #[test]
+    fn execution_order_log_stale_cells() {
+        let mut log = ExecutionOrderLog::new();
+        let mut doc = NotebookDocument::new("nb.ipynb");
+        doc.add_cell(NotebookCell::code("x = 1", "python"));
+        doc.add_cell(NotebookCell::code("y = 2", "python"));
+        log.record(0, "x = 1");
+        log.record(1, "y = 2");
+        // Modify cell 0 source after execution
+        doc.cells[0].source = "x = 100".to_string();
+        let stale = log.stale_cells(&doc);
+        assert_eq!(stale, vec![0]);
+    }
+
+    #[test]
+    fn notebook_kernel_info_display() {
+        let k = NotebookKernelInfo::new("python3", "Python")
+            .with_version("3.11");
+        assert_eq!(k.display_name(), "python3 (Python 3.11)");
+        assert_eq!(k.to_string(), "python3 (Python 3.11)");
+
+        let k2 = NotebookKernelInfo::new("irkernel", "R");
+        assert_eq!(k2.display_name(), "irkernel (R)");
+    }
+
+    #[test]
+    fn metadata_manager_import_export_roundtrip() {
+        let mut doc = NotebookDocument::new("nb.ipynb");
+        doc.metadata.insert("kernel".into(), "python3".into());
+        doc.metadata.insert("language".into(), "python".into());
+        doc.metadata.insert("kernel_version".into(), "3.11".into());
+        doc.metadata.insert("author".into(), "test".into());
+
+        let mut mgr = NotebookMetadataManager::new();
+        mgr.import_from_document(&doc);
+        assert_eq!(mgr.kernel.as_ref().unwrap().name, "python3");
+        assert_eq!(mgr.kernel.as_ref().unwrap().language, "python");
+        assert_eq!(mgr.kernel.as_ref().unwrap().version.as_deref(), Some("3.11"));
+        assert_eq!(mgr.get_custom("author"), Some("test"));
+
+        mgr.set_trusted(true);
+        let map = mgr.export_to_map();
+        assert_eq!(map.get("kernel").unwrap(), "python3");
+        assert_eq!(map.get("trusted").unwrap(), "true");
+        assert_eq!(map.get("format_version").unwrap(), "4.5");
+        assert_eq!(map.get("author").unwrap(), "test");
+    }
+
+    #[test]
+    fn diff_cell_outputs_detects_changes() {
+        let old = vec![
+            NotebookCellOutput { mime_type: "text/plain".into(), data: "1".into() },
+            NotebookCellOutput { mime_type: "text/plain".into(), data: "2".into() },
+        ];
+        let new = vec![
+            NotebookCellOutput { mime_type: "text/plain".into(), data: "1".into() },
+            NotebookCellOutput { mime_type: "text/plain".into(), data: "changed".into() },
+            NotebookCellOutput { mime_type: "text/html".into(), data: "<b>new</b>".into() },
+        ];
+        let diffs = diff_cell_outputs(&old, &new);
+        assert_eq!(diffs.len(), 2);
+        assert!(matches!(&diffs[0], OutputDiff::Changed { index: 1, .. }));
+        assert!(matches!(&diffs[1], OutputDiff::Added { index: 2, .. }));
+
+        // Test removal
+        let diffs2 = diff_cell_outputs(&new, &old);
+        assert_eq!(diffs2.len(), 2);
+        assert!(matches!(&diffs2[1], OutputDiff::Removed { index: 2, .. }));
+
+        // Identical outputs produce no diffs
+        assert!(diff_cell_outputs(&old, &old).is_empty());
+    }
+
+    #[test]
+    fn dependency_graph_topological_order() {
+        // cell 0: data = load()
+        // cell 1: result = process(data)
+        // cell 2: # markdown (no deps)
+        // cell 3: print(result)
+        let deps = vec![
+            CellDependency { cell_index: 1, depends_on: 0, symbol: "data".into() },
+            CellDependency { cell_index: 3, depends_on: 1, symbol: "result".into() },
+        ];
+        let graph = CellDependencyGraph::from_dependencies(&deps, 4);
+        assert_eq!(graph.dependencies_of(1), vec![0]);
+        assert_eq!(graph.dependents_of(0), vec![1]);
+        assert_eq!(graph.dependents_of(1), vec![3]);
+
+        let order = graph.topological_order().unwrap();
+        // cell 0 must come before 1, cell 1 before 3
+        let pos = |idx: usize| order.iter().position(|&x| x == idx).unwrap();
+        assert!(pos(0) < pos(1));
+        assert!(pos(1) < pos(3));
+
+        // Transitive dependencies of cell 3 = {0, 1}
+        assert_eq!(graph.transitive_dependencies(3), vec![0, 1]);
+        assert_eq!(graph.transitive_dependencies(1), vec![0]);
+        assert!(graph.transitive_dependencies(0).is_empty());
     }
 }

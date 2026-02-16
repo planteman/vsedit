@@ -873,6 +873,372 @@ pub fn timeline_statistics(items: &[TimelineItem]) -> TimelineStatistics {
     }
 }
 
+// ── Timeline Entry Types ──
+
+/// Classification of timeline entries by their source action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EntryKind {
+    /// A git commit.
+    GitCommit,
+    /// A manual file save in the editor.
+    FileSave,
+    /// A debug session event (breakpoint hit, step, etc.).
+    DebugEvent,
+    /// An automated build or CI event.
+    BuildEvent,
+    /// A code review comment or approval.
+    ReviewEvent,
+}
+
+impl fmt::Display for EntryKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::GitCommit => write!(f, "git-commit"),
+            Self::FileSave => write!(f, "file-save"),
+            Self::DebugEvent => write!(f, "debug-event"),
+            Self::BuildEvent => write!(f, "build-event"),
+            Self::ReviewEvent => write!(f, "review-event"),
+        }
+    }
+}
+
+/// A timeline entry enriched with a kind classification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypedTimelineEntry {
+    pub kind: EntryKind,
+    pub item: TimelineItem,
+}
+
+impl TypedTimelineEntry {
+    pub fn new(kind: EntryKind, item: TimelineItem) -> Self {
+        Self { kind, item }
+    }
+}
+
+/// Classify a `TimelineItem` into an `EntryKind` by inspecting the message
+/// and author fields with simple heuristics.
+pub fn classify_entry(item: &TimelineItem) -> EntryKind {
+    let msg = item.message.to_lowercase();
+    let author = item.author.to_lowercase();
+    if msg.contains("[debug]") || msg.contains("breakpoint") || msg.contains("step into") {
+        EntryKind::DebugEvent
+    } else if msg.contains("[build]") || msg.contains("[ci]") || author.contains("ci-bot") {
+        EntryKind::BuildEvent
+    } else if msg.contains("[review]") || msg.contains("lgtm") || msg.contains("approved") {
+        EntryKind::ReviewEvent
+    } else if msg.contains("[save]") || author == "editor" || author == "autosave" {
+        EntryKind::FileSave
+    } else {
+        EntryKind::GitCommit
+    }
+}
+
+/// Filter a slice of typed entries, keeping only those of the specified kinds.
+pub fn filter_by_kind(entries: &[TypedTimelineEntry], kinds: &[EntryKind]) -> Vec<TypedTimelineEntry> {
+    entries
+        .iter()
+        .filter(|e| kinds.contains(&e.kind))
+        .cloned()
+        .collect()
+}
+
+/// Group typed entries by their kind, returning a map from kind to entries.
+pub fn group_by_kind(entries: &[TypedTimelineEntry]) -> HashMap<EntryKind, Vec<TypedTimelineEntry>> {
+    let mut map: HashMap<EntryKind, Vec<TypedTimelineEntry>> = HashMap::new();
+    for entry in entries {
+        map.entry(entry.kind).or_default().push(entry.clone());
+    }
+    map
+}
+
+// ── Cursor-based Pagination ──
+
+/// A page of timeline items produced by cursor-based pagination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelinePage {
+    /// The items on this page.
+    pub items: Vec<TimelineItem>,
+    /// Cursor pointing to the next page, or `None` if this is the last page.
+    pub next_cursor: Option<String>,
+    /// Cursor pointing to the previous page, or `None` if this is the first page.
+    pub prev_cursor: Option<String>,
+    /// Total number of items across all pages.
+    pub total: usize,
+}
+
+/// A cursor-based paginator over a pre-sorted list of timeline items.
+///
+/// Items must be sorted by timestamp descending (newest first) before
+/// constructing the paginator.
+#[derive(Debug, Clone)]
+pub struct TimelinePaginator {
+    items: Vec<TimelineItem>,
+    page_size: usize,
+}
+
+impl TimelinePaginator {
+    /// Create a paginator.  `items` should already be sorted newest-first.
+    /// `page_size` must be >= 1.
+    pub fn new(items: Vec<TimelineItem>, page_size: usize) -> Self {
+        assert!(page_size >= 1, "page_size must be >= 1");
+        Self { items, page_size }
+    }
+
+    /// Total number of items.
+    pub fn total(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Total number of pages.
+    pub fn page_count(&self) -> usize {
+        if self.items.is_empty() {
+            0
+        } else {
+            (self.items.len() + self.page_size - 1) / self.page_size
+        }
+    }
+
+    /// Fetch the first page.
+    pub fn first_page(&self) -> TimelinePage {
+        self.page_at_offset(0)
+    }
+
+    /// Fetch a page using a cursor string previously returned from a `TimelinePage`.
+    ///
+    /// The cursor encodes the byte offset into the item list as a decimal string.
+    pub fn page_for_cursor(&self, cursor: &str) -> Option<TimelinePage> {
+        let offset: usize = cursor.parse().ok()?;
+        if offset > self.items.len() {
+            return None;
+        }
+        Some(self.page_at_offset(offset))
+    }
+
+    fn page_at_offset(&self, offset: usize) -> TimelinePage {
+        let end = (offset + self.page_size).min(self.items.len());
+        let page_items = self.items[offset..end].to_vec();
+
+        let next_cursor = if end < self.items.len() {
+            Some(end.to_string())
+        } else {
+            None
+        };
+        let prev_cursor = if offset > 0 {
+            Some(offset.saturating_sub(self.page_size).to_string())
+        } else {
+            None
+        };
+
+        TimelinePage {
+            items: page_items,
+            next_cursor,
+            prev_cursor,
+            total: self.items.len(),
+        }
+    }
+}
+
+// ── Expand/Collapse Tracking ──
+
+/// Tracks which timeline entries are expanded (showing full detail) vs collapsed.
+#[derive(Debug, Clone)]
+pub struct ExpansionState {
+    expanded: HashMap<String, bool>,
+}
+
+impl ExpansionState {
+    /// Create a new state with all entries collapsed.
+    pub fn new() -> Self {
+        Self {
+            expanded: HashMap::new(),
+        }
+    }
+
+    /// Returns `true` if the entry identified by `sha` is expanded.
+    pub fn is_expanded(&self, sha: &str) -> bool {
+        self.expanded.get(sha).copied().unwrap_or(false)
+    }
+
+    /// Expand an entry.
+    pub fn expand(&mut self, sha: &str) {
+        self.expanded.insert(sha.to_string(), true);
+    }
+
+    /// Collapse an entry.
+    pub fn collapse(&mut self, sha: &str) {
+        self.expanded.insert(sha.to_string(), false);
+    }
+
+    /// Toggle the expanded state for an entry, returning the new state.
+    pub fn toggle(&mut self, sha: &str) -> bool {
+        let new_state = !self.is_expanded(sha);
+        self.expanded.insert(sha.to_string(), new_state);
+        new_state
+    }
+
+    /// Return the number of currently expanded entries.
+    pub fn expanded_count(&self) -> usize {
+        self.expanded.values().filter(|&&v| v).count()
+    }
+
+    /// Collapse all entries.
+    pub fn collapse_all(&mut self) {
+        for v in self.expanded.values_mut() {
+            *v = false;
+        }
+    }
+
+    /// Expand all entries whose SHA appears in the given list.
+    pub fn expand_all(&mut self, shas: &[&str]) {
+        for sha in shas {
+            self.expand(sha);
+        }
+    }
+}
+
+impl Default for ExpansionState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Time-range Comparison ──
+
+/// Result of comparing timeline activity across two time ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RangeComparison {
+    /// Items that fall in range A only.
+    pub only_a: Vec<TimelineItem>,
+    /// Items that fall in range B only.
+    pub only_b: Vec<TimelineItem>,
+    /// Items that fall in both ranges (overlapping region).
+    pub overlap: Vec<TimelineItem>,
+    /// Commit count in range A.
+    pub count_a: usize,
+    /// Commit count in range B.
+    pub count_b: usize,
+    /// Unique authors across both ranges.
+    pub unique_authors: usize,
+}
+
+/// Compare timeline activity between two `TimelineRange`s over a common item set.
+///
+/// Each item is placed into `only_a`, `only_b`, or `overlap` depending on which
+/// range(s) contain its timestamp.
+pub fn compare_ranges(
+    items: &[TimelineItem],
+    range_a: &TimelineRange,
+    range_b: &TimelineRange,
+) -> RangeComparison {
+    let mut only_a = Vec::new();
+    let mut only_b = Vec::new();
+    let mut overlap = Vec::new();
+    let mut authors: Vec<String> = Vec::new();
+
+    for item in items {
+        let in_a = range_a.contains(item.timestamp);
+        let in_b = range_b.contains(item.timestamp);
+        match (in_a, in_b) {
+            (true, true) => overlap.push(item.clone()),
+            (true, false) => only_a.push(item.clone()),
+            (false, true) => only_b.push(item.clone()),
+            (false, false) => {}
+        }
+        if (in_a || in_b) && !authors.iter().any(|a| a.eq_ignore_ascii_case(&item.author)) {
+            authors.push(item.author.clone());
+        }
+    }
+
+    let count_a = only_a.len() + overlap.len();
+    let count_b = only_b.len() + overlap.len();
+
+    RangeComparison {
+        only_a,
+        only_b,
+        overlap,
+        count_a,
+        count_b,
+        unique_authors: authors.len(),
+    }
+}
+
+// ── Relative Date Grouping ──
+
+/// Human-friendly date bucket relative to a reference "now" timestamp.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RelativeDateBucket {
+    Today,
+    Yesterday,
+    ThisWeek,
+    LastWeek,
+    ThisMonth,
+    Older,
+}
+
+impl fmt::Display for RelativeDateBucket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Today => write!(f, "Today"),
+            Self::Yesterday => write!(f, "Yesterday"),
+            Self::ThisWeek => write!(f, "This Week"),
+            Self::LastWeek => write!(f, "Last Week"),
+            Self::ThisMonth => write!(f, "This Month"),
+            Self::Older => write!(f, "Older"),
+        }
+    }
+}
+
+/// Assign a `RelativeDateBucket` to a timestamp given a reference `now`.
+pub fn relative_bucket(timestamp: u64, now: u64) -> RelativeDateBucket {
+    if now < timestamp {
+        return RelativeDateBucket::Today;
+    }
+    let diff_secs = now - timestamp;
+    let diff_days = diff_secs / 86400;
+    match diff_days {
+        0 => RelativeDateBucket::Today,
+        1 => RelativeDateBucket::Yesterday,
+        2..=6 => RelativeDateBucket::ThisWeek,
+        7..=13 => RelativeDateBucket::LastWeek,
+        14..=29 => RelativeDateBucket::ThisMonth,
+        _ => RelativeDateBucket::Older,
+    }
+}
+
+/// Group timeline items into relative-date buckets.
+///
+/// Returns groups in display order: Today → Yesterday → This Week → … → Older.
+/// Within each group items are sorted newest-first.
+pub fn group_by_relative_date(
+    items: &[TimelineItem],
+    now: u64,
+) -> Vec<(RelativeDateBucket, Vec<TimelineItem>)> {
+    let bucket_order = [
+        RelativeDateBucket::Today,
+        RelativeDateBucket::Yesterday,
+        RelativeDateBucket::ThisWeek,
+        RelativeDateBucket::LastWeek,
+        RelativeDateBucket::ThisMonth,
+        RelativeDateBucket::Older,
+    ];
+
+    let mut map: HashMap<RelativeDateBucket, Vec<TimelineItem>> = HashMap::new();
+    for item in items {
+        let bucket = relative_bucket(item.timestamp, now);
+        map.entry(bucket).or_default().push(item.clone());
+    }
+
+    // Sort items within each bucket newest-first
+    for group in map.values_mut() {
+        group.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    }
+
+    bucket_order
+        .iter()
+        .filter_map(|b| map.remove(b).map(|items| (*b, items)))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1526,5 +1892,221 @@ mod tests {
         let stats = timeline_statistics(&[]);
         assert_eq!(stats.total_items, 0);
         assert!(stats.most_active_author.is_none());
+    }
+
+    // ── EntryKind & classification tests ──
+
+    #[test]
+    fn classify_git_commit() {
+        let item = TimelineItem { timestamp: 1, message: "Fix parser".into(), author: "Alice".into(), sha: "a1".into() };
+        assert_eq!(classify_entry(&item), EntryKind::GitCommit);
+    }
+
+    #[test]
+    fn classify_debug_event() {
+        let item = TimelineItem { timestamp: 1, message: "[debug] breakpoint hit".into(), author: "Alice".into(), sha: "d1".into() };
+        assert_eq!(classify_entry(&item), EntryKind::DebugEvent);
+    }
+
+    #[test]
+    fn classify_build_event() {
+        let item = TimelineItem { timestamp: 1, message: "[CI] pipeline passed".into(), author: "ci-bot".into(), sha: "b1".into() };
+        assert_eq!(classify_entry(&item), EntryKind::BuildEvent);
+    }
+
+    #[test]
+    fn classify_review_event() {
+        let item = TimelineItem { timestamp: 1, message: "LGTM, looks good".into(), author: "Bob".into(), sha: "r1".into() };
+        assert_eq!(classify_entry(&item), EntryKind::ReviewEvent);
+    }
+
+    #[test]
+    fn classify_file_save() {
+        let item = TimelineItem { timestamp: 1, message: "[save] buffer written".into(), author: "editor".into(), sha: "s1".into() };
+        assert_eq!(classify_entry(&item), EntryKind::FileSave);
+    }
+
+    #[test]
+    fn filter_by_kind_filters_correctly() {
+        let entries = vec![
+            TypedTimelineEntry::new(EntryKind::GitCommit, sample_items()[0].clone()),
+            TypedTimelineEntry::new(EntryKind::DebugEvent, sample_items()[1].clone()),
+            TypedTimelineEntry::new(EntryKind::GitCommit, sample_items()[2].clone()),
+            TypedTimelineEntry::new(EntryKind::FileSave, sample_items()[3].clone()),
+        ];
+        let commits = filter_by_kind(&entries, &[EntryKind::GitCommit]);
+        assert_eq!(commits.len(), 2);
+        let debug_and_save = filter_by_kind(&entries, &[EntryKind::DebugEvent, EntryKind::FileSave]);
+        assert_eq!(debug_and_save.len(), 2);
+    }
+
+    #[test]
+    fn group_by_kind_groups_correctly() {
+        let entries = vec![
+            TypedTimelineEntry::new(EntryKind::GitCommit, sample_items()[0].clone()),
+            TypedTimelineEntry::new(EntryKind::GitCommit, sample_items()[1].clone()),
+            TypedTimelineEntry::new(EntryKind::DebugEvent, sample_items()[2].clone()),
+        ];
+        let groups = group_by_kind(&entries);
+        assert_eq!(groups.get(&EntryKind::GitCommit).unwrap().len(), 2);
+        assert_eq!(groups.get(&EntryKind::DebugEvent).unwrap().len(), 1);
+        assert!(groups.get(&EntryKind::FileSave).is_none());
+    }
+
+    #[test]
+    fn entry_kind_display() {
+        assert_eq!(format!("{}", EntryKind::GitCommit), "git-commit");
+        assert_eq!(format!("{}", EntryKind::FileSave), "file-save");
+        assert_eq!(format!("{}", EntryKind::DebugEvent), "debug-event");
+    }
+
+    // ── Pagination tests ──
+
+    #[test]
+    fn paginator_first_page() {
+        let items = sample_items();
+        let paginator = TimelinePaginator::new(items.clone(), 2);
+        let page = paginator.first_page();
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.total, 5);
+        assert!(page.prev_cursor.is_none());
+        assert!(page.next_cursor.is_some());
+    }
+
+    #[test]
+    fn paginator_walk_all_pages() {
+        let items = sample_items();
+        let paginator = TimelinePaginator::new(items.clone(), 2);
+        assert_eq!(paginator.page_count(), 3);
+
+        let mut collected = Vec::new();
+        let mut page = paginator.first_page();
+        collected.extend(page.items.clone());
+        while let Some(cursor) = page.next_cursor {
+            page = paginator.page_for_cursor(&cursor).unwrap();
+            collected.extend(page.items.clone());
+        }
+        assert_eq!(collected.len(), 5);
+        assert_eq!(collected, items);
+    }
+
+    #[test]
+    fn paginator_empty() {
+        let paginator = TimelinePaginator::new(vec![], 10);
+        assert_eq!(paginator.page_count(), 0);
+        let page = paginator.first_page();
+        assert!(page.items.is_empty());
+        assert!(page.next_cursor.is_none());
+        assert!(page.prev_cursor.is_none());
+    }
+
+    #[test]
+    fn paginator_invalid_cursor_returns_none() {
+        let paginator = TimelinePaginator::new(sample_items(), 2);
+        assert!(paginator.page_for_cursor("not_a_number").is_none());
+        assert!(paginator.page_for_cursor("999").is_none());
+    }
+
+    #[test]
+    fn paginator_prev_cursor() {
+        let paginator = TimelinePaginator::new(sample_items(), 2);
+        let page1 = paginator.first_page();
+        let page2 = paginator.page_for_cursor(page1.next_cursor.as_ref().unwrap()).unwrap();
+        assert!(page2.prev_cursor.is_some());
+        let back = paginator.page_for_cursor(page2.prev_cursor.as_ref().unwrap()).unwrap();
+        assert_eq!(back.items, page1.items);
+    }
+
+    // ── Expansion state tests ──
+
+    #[test]
+    fn expansion_state_toggle() {
+        let mut state = ExpansionState::new();
+        assert!(!state.is_expanded("abc"));
+        assert!(state.toggle("abc"));
+        assert!(state.is_expanded("abc"));
+        assert!(!state.toggle("abc"));
+        assert!(!state.is_expanded("abc"));
+    }
+
+    #[test]
+    fn expansion_state_expand_collapse_all() {
+        let mut state = ExpansionState::new();
+        state.expand_all(&["a", "b", "c"]);
+        assert_eq!(state.expanded_count(), 3);
+        state.collapse_all();
+        assert_eq!(state.expanded_count(), 0);
+    }
+
+    // ── Range comparison tests ──
+
+    #[test]
+    fn compare_ranges_non_overlapping() {
+        let items = sample_items();
+        let range_a = TimelineRange::new(1700000000, 1700150000);
+        let range_b = TimelineRange::new(1700300000, 1700500000);
+        let cmp = compare_ranges(&items, &range_a, &range_b);
+        assert_eq!(cmp.only_a.len(), 2); // timestamps 1700000000, 1700100000
+        assert_eq!(cmp.only_b.len(), 2); // timestamps 1700300000, 1700400000
+        assert!(cmp.overlap.is_empty());
+        assert_eq!(cmp.count_a, 2);
+        assert_eq!(cmp.count_b, 2);
+    }
+
+    #[test]
+    fn compare_ranges_with_overlap() {
+        let items = sample_items();
+        let range_a = TimelineRange::new(1700000000, 1700250000);
+        let range_b = TimelineRange::new(1700100000, 1700350000);
+        let cmp = compare_ranges(&items, &range_a, &range_b);
+        // overlap: 1700100000, 1700200000
+        assert_eq!(cmp.overlap.len(), 2);
+        assert_eq!(cmp.only_a.len(), 1); // 1700000000
+        assert_eq!(cmp.only_b.len(), 1); // 1700300000
+        assert_eq!(cmp.count_a, 3);
+        assert_eq!(cmp.count_b, 3);
+    }
+
+    #[test]
+    fn compare_ranges_unique_authors() {
+        let items = sample_items();
+        let range_a = TimelineRange::new(1700000000, 1700500000);
+        let range_b = TimelineRange::new(1700000000, 1700500000);
+        let cmp = compare_ranges(&items, &range_a, &range_b);
+        assert_eq!(cmp.unique_authors, 3); // Alice, Bob, Charlie
+    }
+
+    // ── Relative date grouping tests ──
+
+    #[test]
+    fn relative_bucket_assignment() {
+        let now = 1_700_000_000u64;
+        assert_eq!(relative_bucket(now - 100, now), RelativeDateBucket::Today);
+        assert_eq!(relative_bucket(now - 86400, now), RelativeDateBucket::Yesterday);
+        assert_eq!(relative_bucket(now - 86400 * 4, now), RelativeDateBucket::ThisWeek);
+        assert_eq!(relative_bucket(now - 86400 * 10, now), RelativeDateBucket::LastWeek);
+        assert_eq!(relative_bucket(now - 86400 * 20, now), RelativeDateBucket::ThisMonth);
+        assert_eq!(relative_bucket(now - 86400 * 60, now), RelativeDateBucket::Older);
+    }
+
+    #[test]
+    fn group_by_relative_date_ordering() {
+        let now = 1_700_000_000u64;
+        let items = vec![
+            TimelineItem { timestamp: now - 100, message: "today".into(), author: "A".into(), sha: "t1".into() },
+            TimelineItem { timestamp: now - 86400 * 2, message: "this week".into(), author: "A".into(), sha: "t2".into() },
+            TimelineItem { timestamp: now - 86400 * 50, message: "older".into(), author: "A".into(), sha: "t3".into() },
+        ];
+        let groups = group_by_relative_date(&items, now);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].0, RelativeDateBucket::Today);
+        assert_eq!(groups[1].0, RelativeDateBucket::ThisWeek);
+        assert_eq!(groups[2].0, RelativeDateBucket::Older);
+    }
+
+    #[test]
+    fn relative_date_bucket_display() {
+        assert_eq!(format!("{}", RelativeDateBucket::Today), "Today");
+        assert_eq!(format!("{}", RelativeDateBucket::Older), "Older");
     }
 }

@@ -980,6 +980,271 @@ pub fn flatten_all_to_entries(items: &[ListItem]) -> Vec<FlatListEntry> {
     out
 }
 
+// ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+/// Paginated view over a list of items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListPagination {
+    total_items: usize,
+    page_size: usize,
+    current_page: usize,
+}
+
+impl ListPagination {
+    /// Create a new pagination state. `page_size` is clamped to at least 1.
+    pub fn new(total_items: usize, page_size: usize) -> Self {
+        Self {
+            total_items,
+            page_size: page_size.max(1),
+            current_page: 0,
+        }
+    }
+
+    /// Total number of pages (always >= 1 when page_size > 0).
+    pub fn total_pages(&self) -> usize {
+        if self.total_items == 0 {
+            return 1;
+        }
+        (self.total_items + self.page_size - 1) / self.page_size
+    }
+
+    /// Current zero-based page index.
+    pub fn current_page(&self) -> usize {
+        self.current_page
+    }
+
+    /// Move to the next page if possible. Returns `true` if the page changed.
+    pub fn next_page(&mut self) -> bool {
+        if self.current_page + 1 < self.total_pages() {
+            self.current_page += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move to the previous page if possible. Returns `true` if the page changed.
+    pub fn prev_page(&mut self) -> bool {
+        if self.current_page > 0 {
+            self.current_page -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Jump to a specific page, clamping to valid range.
+    pub fn go_to_page(&mut self, page: usize) {
+        self.current_page = page.min(self.total_pages().saturating_sub(1));
+    }
+
+    /// Return the start..end index range for the current page.
+    pub fn page_range(&self) -> std::ops::Range<usize> {
+        let start = self.current_page * self.page_size;
+        let end = (start + self.page_size).min(self.total_items);
+        start..end
+    }
+
+    /// Return items from `slice` that belong to the current page.
+    pub fn page_items<'a, T>(&self, slice: &'a [T]) -> &'a [T] {
+        let range = self.page_range();
+        let start = range.start.min(slice.len());
+        let end = range.end.min(slice.len());
+        &slice[start..end]
+    }
+
+    /// Update the total item count, clamping the current page if needed.
+    pub fn set_total(&mut self, total: usize) {
+        self.total_items = total;
+        let max_page = self.total_pages().saturating_sub(1);
+        if self.current_page > max_page {
+            self.current_page = max_page;
+        }
+    }
+
+    /// Whether the current page is the first page.
+    pub fn is_first_page(&self) -> bool {
+        self.current_page == 0
+    }
+
+    /// Whether the current page is the last page.
+    pub fn is_last_page(&self) -> bool {
+        self.current_page + 1 >= self.total_pages()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Drag reorder
+// ---------------------------------------------------------------------------
+
+/// Result of a drag-reorder operation on a `Vec`.
+/// Returns `Ok(())` on success, or an error description.
+pub fn drag_reorder<T>(items: &mut Vec<T>, from: usize, to: usize) -> Result<(), String> {
+    if from >= items.len() {
+        return Err(format!("source index {} out of range (len={})", from, items.len()));
+    }
+    if to >= items.len() {
+        return Err(format!("target index {} out of range (len={})", to, items.len()));
+    }
+    if from == to {
+        return Ok(());
+    }
+    let item = items.remove(from);
+    items.insert(to, item);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Virtual scrolling calculations
+// ---------------------------------------------------------------------------
+
+/// Parameters and calculations for a virtual-scrolling viewport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VirtualScrollCalc {
+    pub total_items: usize,
+    pub item_height: usize,
+    pub viewport_height: usize,
+    pub buffer_items: usize,
+}
+
+impl VirtualScrollCalc {
+    pub fn new(total_items: usize, item_height: usize, viewport_height: usize) -> Self {
+        Self {
+            total_items,
+            item_height: item_height.max(1),
+            viewport_height,
+            buffer_items: 5,
+        }
+    }
+
+    /// Set the number of extra items rendered above and below the viewport.
+    pub fn with_buffer(mut self, buffer: usize) -> Self {
+        self.buffer_items = buffer;
+        self
+    }
+
+    /// Number of items that fit inside the viewport (without buffer).
+    pub fn visible_count(&self) -> usize {
+        if self.item_height == 0 {
+            return 0;
+        }
+        (self.viewport_height + self.item_height - 1) / self.item_height
+    }
+
+    /// Total scrollable content height in pixels.
+    pub fn total_height(&self) -> usize {
+        self.total_items * self.item_height
+    }
+
+    /// Given a scroll offset in pixels, return the range of item indices that
+    /// should be rendered (including the buffer zone).
+    pub fn render_range(&self, scroll_offset: usize) -> std::ops::Range<usize> {
+        let first_visible = scroll_offset / self.item_height;
+        let start = first_visible.saturating_sub(self.buffer_items);
+        let end = (first_visible + self.visible_count() + self.buffer_items).min(self.total_items);
+        start..end
+    }
+
+    /// Pixel offset for the top of item at `index`.
+    pub fn item_offset(&self, index: usize) -> usize {
+        index * self.item_height
+    }
+
+    /// Scroll offset needed to make `index` the first visible item.
+    pub fn scroll_to_item(&self, index: usize) -> usize {
+        self.item_offset(index.min(self.total_items.saturating_sub(1)))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// List diff
+// ---------------------------------------------------------------------------
+
+/// Describes a single change between two list snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ListDiffEntry {
+    /// Item was added (id, label).
+    Added(String, String),
+    /// Item was removed (id, label).
+    Removed(String, String),
+    /// Item label changed (id, old_label, new_label).
+    Changed(String, String, String),
+}
+
+/// Compute the diff between two flat slices of `ListItem`s (compared by `id`).
+/// Items are matched by id; label changes are detected for matching ids.
+pub fn list_diff(old: &[ListItem], new: &[ListItem]) -> Vec<ListDiffEntry> {
+    use std::collections::HashMap;
+    let old_map: HashMap<&str, &ListItem> = old.iter().map(|i| (i.id.as_str(), i)).collect();
+    let new_map: HashMap<&str, &ListItem> = new.iter().map(|i| (i.id.as_str(), i)).collect();
+
+    let mut changes = Vec::new();
+
+    // Removed or changed
+    for item in old {
+        match new_map.get(item.id.as_str()) {
+            None => changes.push(ListDiffEntry::Removed(item.id.clone(), item.label.clone())),
+            Some(new_item) if new_item.label != item.label => {
+                changes.push(ListDiffEntry::Changed(
+                    item.id.clone(),
+                    item.label.clone(),
+                    new_item.label.clone(),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    // Added
+    for item in new {
+        if !old_map.contains_key(item.id.as_str()) {
+            changes.push(ListDiffEntry::Added(item.id.clone(), item.label.clone()));
+        }
+    }
+
+    changes
+}
+
+// ---------------------------------------------------------------------------
+// List grouping / sectioning
+// ---------------------------------------------------------------------------
+
+/// A group of list items sharing a common section key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListGroup {
+    pub key: String,
+    pub items: Vec<ListItem>,
+}
+
+/// Group a flat slice of `ListItem`s by a key function. Groups preserve the
+/// order of the first occurrence of each key.
+pub fn group_items_by<F>(items: &[ListItem], key_fn: F) -> Vec<ListGroup>
+where
+    F: Fn(&ListItem) -> String,
+{
+    use std::collections::HashMap;
+    let mut order: Vec<String> = Vec::new();
+    let mut map: HashMap<String, Vec<ListItem>> = HashMap::new();
+
+    for item in items {
+        let k = key_fn(item);
+        if !map.contains_key(&k) {
+            order.push(k.clone());
+        }
+        map.entry(k).or_default().push(item.clone());
+    }
+
+    order
+        .into_iter()
+        .map(|k| {
+            let items = map.remove(&k).unwrap_or_default();
+            ListGroup { key: k, items }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1563,5 +1828,162 @@ mod tests {
         ];
         let result = filter_items_by_label(&items, "");
         assert_eq!(result.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Pagination tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn pagination_page_navigation() {
+        let mut pg = ListPagination::new(25, 10);
+        assert_eq!(pg.total_pages(), 3);
+        assert_eq!(pg.current_page(), 0);
+        assert!(pg.is_first_page());
+        assert!(!pg.is_last_page());
+
+        assert!(pg.next_page());
+        assert_eq!(pg.current_page(), 1);
+        assert!(pg.next_page());
+        assert_eq!(pg.current_page(), 2);
+        assert!(pg.is_last_page());
+        assert!(!pg.next_page()); // already at last
+
+        assert!(pg.prev_page());
+        assert_eq!(pg.current_page(), 1);
+        pg.go_to_page(0);
+        assert_eq!(pg.current_page(), 0);
+        pg.go_to_page(100); // clamped
+        assert_eq!(pg.current_page(), 2);
+    }
+
+    #[test]
+    fn pagination_page_range_and_items() {
+        let pg = ListPagination::new(7, 3);
+        assert_eq!(pg.page_range(), 0..3);
+
+        let data: Vec<i32> = (0..7).collect();
+        assert_eq!(pg.page_items(&data), &[0, 1, 2]);
+
+        let mut pg2 = ListPagination::new(7, 3);
+        pg2.go_to_page(2); // last page
+        assert_eq!(pg2.page_range(), 6..7);
+        assert_eq!(pg2.page_items(&data), &[6]);
+    }
+
+    #[test]
+    fn pagination_set_total_clamps() {
+        let mut pg = ListPagination::new(30, 10);
+        pg.go_to_page(2); // page index 2
+        pg.set_total(15); // now only 2 pages (0..1)
+        assert_eq!(pg.current_page(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Drag reorder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn drag_reorder_moves_item() {
+        let mut v = vec!["a", "b", "c", "d"];
+        assert!(drag_reorder(&mut v, 0, 2).is_ok());
+        assert_eq!(v, vec!["b", "c", "a", "d"]);
+
+        assert!(drag_reorder(&mut v, 3, 0).is_ok());
+        assert_eq!(v, vec!["d", "b", "c", "a"]);
+
+        // no-op
+        assert!(drag_reorder(&mut v, 1, 1).is_ok());
+        assert_eq!(v, vec!["d", "b", "c", "a"]);
+    }
+
+    #[test]
+    fn drag_reorder_out_of_bounds() {
+        let mut v = vec![1, 2, 3];
+        assert!(drag_reorder(&mut v, 5, 0).is_err());
+        assert!(drag_reorder(&mut v, 0, 10).is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Virtual scroll calc tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn virtual_scroll_calc_render_range() {
+        let vs = VirtualScrollCalc::new(100, 20, 200).with_buffer(3);
+        // 200/20 = 10 visible items
+        assert_eq!(vs.visible_count(), 10);
+        assert_eq!(vs.total_height(), 2000);
+
+        // At scroll offset 0, first visible = 0
+        let range = vs.render_range(0);
+        assert_eq!(range.start, 0);
+        assert_eq!(range.end, 13); // 0 + 10 + 3 buffer
+
+        // At scroll offset 400 (item 20), with buffer 3
+        let range2 = vs.render_range(400);
+        assert_eq!(range2.start, 17); // 20 - 3
+        assert_eq!(range2.end, 33); // 20 + 10 + 3
+
+        assert_eq!(vs.item_offset(5), 100);
+        assert_eq!(vs.scroll_to_item(10), 200);
+    }
+
+    // -----------------------------------------------------------------------
+    // List diff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn list_diff_detects_changes() {
+        let old = vec![
+            ListItem::new("a", "Alpha"),
+            ListItem::new("b", "Beta"),
+            ListItem::new("c", "Gamma"),
+        ];
+        let new = vec![
+            ListItem::new("a", "Alpha"),
+            ListItem::new("b", "Beta Renamed"),
+            ListItem::new("d", "Delta"),
+        ];
+        let diff = list_diff(&old, &new);
+        assert_eq!(diff.len(), 3);
+        assert!(diff.contains(&ListDiffEntry::Removed("c".into(), "Gamma".into())));
+        assert!(diff.contains(&ListDiffEntry::Changed(
+            "b".into(),
+            "Beta".into(),
+            "Beta Renamed".into()
+        )));
+        assert!(diff.contains(&ListDiffEntry::Added("d".into(), "Delta".into())));
+    }
+
+    #[test]
+    fn list_diff_identical_is_empty() {
+        let items = vec![ListItem::new("x", "X")];
+        assert!(list_diff(&items, &items).is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Group items tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn group_items_by_first_char() {
+        let items = vec![
+            ListItem::new("a1", "Apple"),
+            ListItem::new("a2", "Avocado"),
+            ListItem::new("b1", "Banana"),
+            ListItem::new("c1", "Cherry"),
+            ListItem::new("b2", "Blueberry"),
+        ];
+        let groups = group_items_by(&items, |i| {
+            i.label.chars().next().unwrap_or('?').to_string()
+        });
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].key, "A");
+        assert_eq!(groups[0].items.len(), 2);
+        assert_eq!(groups[1].key, "B");
+        assert_eq!(groups[1].items.len(), 2);
+        assert_eq!(groups[2].key, "C");
+        assert_eq!(groups[2].items.len(), 1);
     }
 }

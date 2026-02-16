@@ -1061,6 +1061,468 @@ impl<T: Send + 'static> fmt::Debug for AsyncBatcher<T> {
 }
 
 // ---------------------------------------------------------------------------
+// CircuitBreaker – circuit breaker pattern state machine
+// ---------------------------------------------------------------------------
+
+/// States of a circuit breaker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CircuitState {
+    /// Normal operation – requests flow through.
+    Closed,
+    /// Too many failures – requests are rejected immediately.
+    Open,
+    /// Tentatively allowing a single probe request.
+    HalfOpen,
+}
+
+impl fmt::Display for CircuitState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CircuitState::Closed => f.write_str("closed"),
+            CircuitState::Open => f.write_str("open"),
+            CircuitState::HalfOpen => f.write_str("half-open"),
+        }
+    }
+}
+
+/// A circuit breaker that tracks consecutive failures and transitions between
+/// [`CircuitState`] variants.
+#[derive(Debug, Clone)]
+pub struct CircuitBreaker {
+    state: CircuitState,
+    failure_count: u32,
+    success_count: u32,
+    failure_threshold: u32,
+    success_threshold: u32,
+    total_trips: u64,
+}
+
+impl CircuitBreaker {
+    /// Create a new circuit breaker.
+    ///
+    /// * `failure_threshold` – consecutive failures before opening.
+    /// * `success_threshold` – consecutive successes in half-open before closing.
+    pub fn new(failure_threshold: u32, success_threshold: u32) -> Self {
+        Self {
+            state: CircuitState::Closed,
+            failure_count: 0,
+            success_count: 0,
+            failure_threshold: failure_threshold.max(1),
+            success_threshold: success_threshold.max(1),
+            total_trips: 0,
+        }
+    }
+
+    /// Current state.
+    pub fn state(&self) -> CircuitState {
+        self.state
+    }
+
+    /// Whether the breaker currently allows requests.
+    pub fn is_call_permitted(&self) -> bool {
+        match self.state {
+            CircuitState::Closed | CircuitState::HalfOpen => true,
+            CircuitState::Open => false,
+        }
+    }
+
+    /// Record a successful call.
+    pub fn record_success(&mut self) {
+        self.failure_count = 0;
+        match self.state {
+            CircuitState::HalfOpen => {
+                self.success_count += 1;
+                if self.success_count >= self.success_threshold {
+                    self.state = CircuitState::Closed;
+                    self.success_count = 0;
+                }
+            }
+            CircuitState::Closed => {}
+            CircuitState::Open => {}
+        }
+    }
+
+    /// Record a failed call.
+    pub fn record_failure(&mut self) {
+        self.success_count = 0;
+        self.failure_count += 1;
+        match self.state {
+            CircuitState::Closed => {
+                if self.failure_count >= self.failure_threshold {
+                    self.state = CircuitState::Open;
+                    self.total_trips += 1;
+                    self.failure_count = 0;
+                }
+            }
+            CircuitState::HalfOpen => {
+                self.state = CircuitState::Open;
+                self.total_trips += 1;
+                self.failure_count = 0;
+            }
+            CircuitState::Open => {}
+        }
+    }
+
+    /// Manually transition from [`CircuitState::Open`] to
+    /// [`CircuitState::HalfOpen`] (e.g. after a cooldown timer).
+    pub fn attempt_reset(&mut self) {
+        if self.state == CircuitState::Open {
+            self.state = CircuitState::HalfOpen;
+            self.failure_count = 0;
+            self.success_count = 0;
+        }
+    }
+
+    /// Manually force the breaker closed.
+    pub fn force_close(&mut self) {
+        self.state = CircuitState::Closed;
+        self.failure_count = 0;
+        self.success_count = 0;
+    }
+
+    /// Number of times the breaker has tripped open.
+    pub fn total_trips(&self) -> u64 {
+        self.total_trips
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskDependencyGraph – directed acyclic dependency tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks dependencies between named tasks and determines which tasks are
+/// ready to execute (all dependencies satisfied).
+#[derive(Debug, Clone)]
+pub struct TaskDependencyGraph {
+    /// Map from task id to its set of dependency ids.
+    deps: std::collections::HashMap<String, Vec<String>>,
+    /// Set of completed task ids.
+    completed: std::collections::HashSet<String>,
+}
+
+impl TaskDependencyGraph {
+    /// Create an empty graph.
+    pub fn new() -> Self {
+        Self {
+            deps: std::collections::HashMap::new(),
+            completed: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Register a task with no dependencies.
+    pub fn add_task(&mut self, id: impl Into<String>) {
+        let id = id.into();
+        self.deps.entry(id).or_default();
+    }
+
+    /// Register that `task` depends on `dependency`.
+    pub fn add_dependency(&mut self, task: impl Into<String>, dependency: impl Into<String>) {
+        let task = task.into();
+        let dep = dependency.into();
+        self.deps.entry(dep.clone()).or_default();
+        self.deps.entry(task.clone()).or_default().push(dep);
+    }
+
+    /// Mark a task as completed.
+    pub fn complete(&mut self, id: &str) {
+        self.completed.insert(id.to_string());
+    }
+
+    /// Return `true` if the given task has all its dependencies satisfied.
+    pub fn is_ready(&self, id: &str) -> bool {
+        if self.completed.contains(id) {
+            return false; // already done
+        }
+        match self.deps.get(id) {
+            Some(deps) => deps.iter().all(|d| self.completed.contains(d)),
+            None => false, // unknown task
+        }
+    }
+
+    /// Return all task ids that are ready to execute (dependencies met, not
+    /// yet completed).
+    pub fn ready_tasks(&self) -> Vec<String> {
+        self.deps
+            .keys()
+            .filter(|id| self.is_ready(id))
+            .cloned()
+            .collect()
+    }
+
+    /// Return true if every registered task is completed.
+    pub fn all_complete(&self) -> bool {
+        self.deps.keys().all(|id| self.completed.contains(id))
+    }
+
+    /// Number of registered tasks.
+    pub fn task_count(&self) -> usize {
+        self.deps.len()
+    }
+
+    /// Number of completed tasks.
+    pub fn completed_count(&self) -> usize {
+        self.completed.len()
+    }
+
+    /// Detect whether adding `dependency` as a requirement of `task` would
+    /// create a cycle. Uses a simple DFS.
+    pub fn would_cycle(&self, task: &str, dependency: &str) -> bool {
+        // A cycle exists if `task` is reachable from `dependency`.
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = vec![dependency.to_string()];
+        while let Some(current) = stack.pop() {
+            if current == task {
+                return true;
+            }
+            if visited.insert(current.clone()) {
+                if let Some(deps) = self.deps.get(&current) {
+                    stack.extend(deps.iter().cloned());
+                }
+            }
+        }
+        false
+    }
+}
+
+impl Default for TaskDependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskProgress – progress tracking for long-running tasks
+// ---------------------------------------------------------------------------
+
+/// Tracks progress of a long-running task.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskProgress {
+    current: u64,
+    total: u64,
+    message: String,
+}
+
+impl TaskProgress {
+    /// Create a new progress tracker with the given total work units.
+    pub fn new(total: u64) -> Self {
+        Self {
+            current: 0,
+            total: total.max(1),
+            message: String::new(),
+        }
+    }
+
+    /// Increment progress by `amount`.
+    pub fn advance(&mut self, amount: u64) {
+        self.current = self.current.saturating_add(amount).min(self.total);
+    }
+
+    /// Set progress to an absolute value.
+    pub fn set(&mut self, value: u64) {
+        self.current = value.min(self.total);
+    }
+
+    /// Update the human-readable status message.
+    pub fn set_message(&mut self, msg: impl Into<String>) {
+        self.message = msg.into();
+    }
+
+    /// Percentage complete as a value in `[0.0, 100.0]`.
+    pub fn percentage(&self) -> f64 {
+        (self.current as f64 / self.total as f64) * 100.0
+    }
+
+    /// Whether the task is finished (`current >= total`).
+    pub fn is_complete(&self) -> bool {
+        self.current >= self.total
+    }
+
+    /// Current work units completed.
+    pub fn current(&self) -> u64 {
+        self.current
+    }
+
+    /// Total work units.
+    pub fn total(&self) -> u64 {
+        self.total
+    }
+
+    /// Current status message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Remaining work units.
+    pub fn remaining(&self) -> u64 {
+        self.total.saturating_sub(self.current)
+    }
+}
+
+impl fmt::Display for TaskProgress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}/{}] {:.1}%{}",
+            self.current,
+            self.total,
+            self.percentage(),
+            if self.message.is_empty() {
+                String::new()
+            } else {
+                format!(" – {}", self.message)
+            }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AdaptiveTimeout – compute timeouts based on observed latencies
+// ---------------------------------------------------------------------------
+
+/// Computes adaptive timeouts based on a sliding window of observed durations.
+#[derive(Debug, Clone)]
+pub struct AdaptiveTimeout {
+    samples: Vec<u64>,
+    max_samples: usize,
+    multiplier: f64,
+    floor: Duration,
+    ceiling: Duration,
+}
+
+impl AdaptiveTimeout {
+    /// Create a new adaptive timeout calculator.
+    ///
+    /// * `max_samples` – how many recent observations to keep.
+    /// * `multiplier`  – scale factor applied to the mean (e.g. 2.0 = 2× mean).
+    /// * `floor`       – minimum timeout.
+    /// * `ceiling`     – maximum timeout.
+    pub fn new(max_samples: usize, multiplier: f64, floor: Duration, ceiling: Duration) -> Self {
+        Self {
+            samples: Vec::with_capacity(max_samples),
+            max_samples: max_samples.max(1),
+            multiplier: multiplier.max(1.0),
+            floor,
+            ceiling,
+        }
+    }
+
+    /// Record an observed duration in milliseconds.
+    pub fn record(&mut self, duration_ms: u64) {
+        if self.samples.len() >= self.max_samples {
+            self.samples.remove(0);
+        }
+        self.samples.push(duration_ms);
+    }
+
+    /// Compute the recommended timeout.  Returns `floor` if no samples exist.
+    pub fn timeout(&self) -> Duration {
+        if self.samples.is_empty() {
+            return self.floor;
+        }
+        let sum: u64 = self.samples.iter().sum();
+        let mean = sum as f64 / self.samples.len() as f64;
+        let computed = Duration::from_millis((mean * self.multiplier) as u64);
+        computed.max(self.floor).min(self.ceiling)
+    }
+
+    /// Number of observations recorded.
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// The p95 estimate from the current samples (simple: sort and pick 95th
+    /// percentile index).  Returns `None` if fewer than 2 samples.
+    pub fn p95(&self) -> Option<Duration> {
+        if self.samples.len() < 2 {
+            return None;
+        }
+        let mut sorted = self.samples.clone();
+        sorted.sort_unstable();
+        let idx = ((sorted.len() as f64) * 0.95).ceil() as usize - 1;
+        Some(Duration::from_millis(sorted[idx.min(sorted.len() - 1)]))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskResultCache – simple bounded cache keyed by string
+// ---------------------------------------------------------------------------
+
+/// A bounded cache for task results, evicting the oldest entry when full.
+#[derive(Debug, Clone)]
+pub struct TaskResultCache<V> {
+    capacity: usize,
+    /// Insertion-ordered entries.
+    entries: Vec<(String, V)>,
+}
+
+impl<V: Clone> TaskResultCache<V> {
+    /// Create a cache with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Insert a key-value pair, evicting the oldest entry if at capacity.
+    pub fn insert(&mut self, key: impl Into<String>, value: V) {
+        let key = key.into();
+        // Update existing entry if present.
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries[pos].1 = value;
+            return;
+        }
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((key, value));
+    }
+
+    /// Look up a cached value.
+    pub fn get(&self, key: &str) -> Option<&V> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v)
+    }
+
+    /// Remove a cached entry.
+    pub fn remove(&mut self, key: &str) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else {
+            None
+        }
+    }
+
+    /// Number of entries currently in the cache.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// The configured capacity.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Return all currently cached keys.
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // race – return the first successful result from multiple futures
 // ---------------------------------------------------------------------------
 
@@ -1581,5 +2043,245 @@ mod tests {
         )
         .await;
         assert_eq!(result, 42);
+    }
+
+    // ---- CircuitBreaker tests ----
+
+    #[test]
+    fn circuit_breaker_starts_closed() {
+        let cb = CircuitBreaker::new(3, 1);
+        assert_eq!(cb.state(), CircuitState::Closed);
+        assert!(cb.is_call_permitted());
+        assert_eq!(cb.total_trips(), 0);
+    }
+
+    #[test]
+    fn circuit_breaker_opens_after_threshold() {
+        let mut cb = CircuitBreaker::new(2, 1);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Closed);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Open);
+        assert!(!cb.is_call_permitted());
+        assert_eq!(cb.total_trips(), 1);
+    }
+
+    #[test]
+    fn circuit_breaker_half_open_and_recovery() {
+        let mut cb = CircuitBreaker::new(1, 2);
+        cb.record_failure(); // opens
+        assert_eq!(cb.state(), CircuitState::Open);
+        cb.attempt_reset();
+        assert_eq!(cb.state(), CircuitState::HalfOpen);
+        assert!(cb.is_call_permitted());
+        cb.record_success();
+        assert_eq!(cb.state(), CircuitState::HalfOpen); // need 2 successes
+        cb.record_success();
+        assert_eq!(cb.state(), CircuitState::Closed);
+    }
+
+    #[test]
+    fn circuit_breaker_half_open_failure_reopens() {
+        let mut cb = CircuitBreaker::new(1, 3);
+        cb.record_failure();
+        cb.attempt_reset();
+        assert_eq!(cb.state(), CircuitState::HalfOpen);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Open);
+        assert_eq!(cb.total_trips(), 2);
+    }
+
+    #[test]
+    fn circuit_breaker_force_close() {
+        let mut cb = CircuitBreaker::new(1, 1);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Open);
+        cb.force_close();
+        assert_eq!(cb.state(), CircuitState::Closed);
+        assert!(cb.is_call_permitted());
+    }
+
+    #[test]
+    fn circuit_state_display() {
+        assert_eq!(CircuitState::Closed.to_string(), "closed");
+        assert_eq!(CircuitState::Open.to_string(), "open");
+        assert_eq!(CircuitState::HalfOpen.to_string(), "half-open");
+    }
+
+    // ---- TaskDependencyGraph tests ----
+
+    #[test]
+    fn dep_graph_ready_tasks() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("a");
+        g.add_task("b");
+        g.add_dependency("c", "a");
+        g.add_dependency("c", "b");
+
+        let ready = g.ready_tasks();
+        assert!(ready.contains(&"a".to_string()));
+        assert!(ready.contains(&"b".to_string()));
+        assert!(!ready.contains(&"c".to_string()));
+
+        g.complete("a");
+        g.complete("b");
+        assert!(g.is_ready("c"));
+        assert!(!g.all_complete());
+        g.complete("c");
+        assert!(g.all_complete());
+    }
+
+    #[test]
+    fn dep_graph_would_cycle() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("b", "a");
+        g.add_dependency("c", "b");
+        // Adding a -> c would create a cycle a -> ... -> c -> a
+        assert!(g.would_cycle("a", "c"));
+        assert!(!g.would_cycle("d", "c"));
+    }
+
+    #[test]
+    fn dep_graph_counts() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("x");
+        g.add_task("y");
+        assert_eq!(g.task_count(), 2);
+        assert_eq!(g.completed_count(), 0);
+        g.complete("x");
+        assert_eq!(g.completed_count(), 1);
+    }
+
+    // ---- TaskProgress tests ----
+
+    #[test]
+    fn task_progress_percentage() {
+        let mut p = TaskProgress::new(200);
+        assert!((p.percentage() - 0.0).abs() < f64::EPSILON);
+        assert!(!p.is_complete());
+        p.advance(100);
+        assert!((p.percentage() - 50.0).abs() < f64::EPSILON);
+        assert_eq!(p.remaining(), 100);
+        p.set(200);
+        assert!(p.is_complete());
+        assert!((p.percentage() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn task_progress_display() {
+        let mut p = TaskProgress::new(10);
+        p.advance(3);
+        p.set_message("loading");
+        let s = format!("{p}");
+        assert!(s.contains("3/10"));
+        assert!(s.contains("loading"));
+    }
+
+    #[test]
+    fn task_progress_clamps() {
+        let mut p = TaskProgress::new(5);
+        p.advance(100);
+        assert_eq!(p.current(), 5);
+        p.set(0);
+        p.advance(3);
+        p.advance(u64::MAX);
+        assert_eq!(p.current(), 5);
+    }
+
+    // ---- AdaptiveTimeout tests ----
+
+    #[test]
+    fn adaptive_timeout_no_samples() {
+        let at = AdaptiveTimeout::new(10, 2.0, Duration::from_millis(50), Duration::from_secs(5));
+        assert_eq!(at.timeout(), Duration::from_millis(50));
+        assert_eq!(at.sample_count(), 0);
+        assert_eq!(at.p95(), None);
+    }
+
+    #[test]
+    fn adaptive_timeout_computes_correctly() {
+        let mut at =
+            AdaptiveTimeout::new(10, 2.0, Duration::from_millis(10), Duration::from_secs(10));
+        at.record(100);
+        at.record(200);
+        // mean = 150, * 2.0 = 300 ms
+        assert_eq!(at.timeout(), Duration::from_millis(300));
+        assert_eq!(at.sample_count(), 2);
+    }
+
+    #[test]
+    fn adaptive_timeout_respects_ceiling() {
+        let mut at =
+            AdaptiveTimeout::new(5, 10.0, Duration::from_millis(10), Duration::from_millis(500));
+        at.record(1000);
+        // mean=1000, *10 = 10000 ms, capped to 500 ms
+        assert_eq!(at.timeout(), Duration::from_millis(500));
+    }
+
+    #[test]
+    fn adaptive_timeout_p95() {
+        let mut at =
+            AdaptiveTimeout::new(100, 2.0, Duration::from_millis(10), Duration::from_secs(60));
+        for i in 1..=100 {
+            at.record(i);
+        }
+        let p95 = at.p95().unwrap();
+        assert_eq!(p95, Duration::from_millis(95));
+    }
+
+    // ---- TaskResultCache tests ----
+
+    #[test]
+    fn cache_insert_and_get() {
+        let mut c = TaskResultCache::new(3);
+        assert!(c.is_empty());
+        c.insert("a", 1);
+        c.insert("b", 2);
+        assert_eq!(c.get("a"), Some(&1));
+        assert_eq!(c.get("b"), Some(&2));
+        assert_eq!(c.get("z"), None);
+        assert_eq!(c.len(), 2);
+    }
+
+    #[test]
+    fn cache_evicts_oldest() {
+        let mut c = TaskResultCache::new(2);
+        c.insert("a", 1);
+        c.insert("b", 2);
+        c.insert("c", 3); // evicts "a"
+        assert_eq!(c.get("a"), None);
+        assert_eq!(c.get("b"), Some(&2));
+        assert_eq!(c.get("c"), Some(&3));
+    }
+
+    #[test]
+    fn cache_update_existing() {
+        let mut c = TaskResultCache::new(3);
+        c.insert("a", 1);
+        c.insert("a", 99);
+        assert_eq!(c.get("a"), Some(&99));
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn cache_remove_and_clear() {
+        let mut c = TaskResultCache::new(5);
+        c.insert("x", 10);
+        c.insert("y", 20);
+        assert_eq!(c.remove("x"), Some(10));
+        assert_eq!(c.len(), 1);
+        c.clear();
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn cache_keys() {
+        let mut c = TaskResultCache::new(5);
+        c.insert("a", 1);
+        c.insert("b", 2);
+        let keys = c.keys();
+        assert!(keys.contains(&"a"));
+        assert!(keys.contains(&"b"));
+        assert_eq!(c.capacity(), 5);
     }
 }

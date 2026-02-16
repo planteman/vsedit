@@ -815,6 +815,339 @@ pub fn decorations_at_line(service: &DecorationService, line: u32) -> Vec<(&Deco
     results
 }
 
+// ---------------------------------------------------------------------------
+// Decoration style merging
+// ---------------------------------------------------------------------------
+
+/// Resolved style properties for rendering a decoration, produced by merging
+/// multiple `DecorationRenderOptions` in priority order.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ResolvedStyle {
+    pub background_color: Option<String>,
+    pub border_color: Option<String>,
+    pub border_width: Option<String>,
+    pub border_style: Option<String>,
+    pub font_weight: Option<String>,
+    pub font_style: Option<String>,
+    pub opacity: Option<f32>,
+}
+
+impl ResolvedStyle {
+    /// Merge `other` into `self`. Fields in `other` override only if they are
+    /// `Some` and the corresponding field in `self` is `None`.
+    pub fn merge_base(&mut self, other: &DecorationRenderOptions) {
+        if self.background_color.is_none() {
+            self.background_color.clone_from(&other.background_color);
+        }
+        if self.border_color.is_none() {
+            self.border_color.clone_from(&other.border_color);
+        }
+        if self.border_width.is_none() {
+            self.border_width.clone_from(&other.border_width);
+        }
+        if self.border_style.is_none() {
+            self.border_style.clone_from(&other.border_style);
+        }
+        if self.font_weight.is_none() {
+            self.font_weight.clone_from(&other.font_weight);
+        }
+        if self.font_style.is_none() {
+            self.font_style.clone_from(&other.font_style);
+        }
+        if self.opacity.is_none() {
+            self.opacity = other.opacity;
+        }
+    }
+
+    /// Force-merge `other` into `self`; `Some` fields in `other` always win.
+    pub fn merge_override(&mut self, other: &DecorationRenderOptions) {
+        if other.background_color.is_some() {
+            self.background_color.clone_from(&other.background_color);
+        }
+        if other.border_color.is_some() {
+            self.border_color.clone_from(&other.border_color);
+        }
+        if other.border_width.is_some() {
+            self.border_width.clone_from(&other.border_width);
+        }
+        if other.border_style.is_some() {
+            self.border_style.clone_from(&other.border_style);
+        }
+        if other.font_weight.is_some() {
+            self.font_weight.clone_from(&other.font_weight);
+        }
+        if other.font_style.is_some() {
+            self.font_style.clone_from(&other.font_style);
+        }
+        if other.opacity.is_some() {
+            self.opacity = other.opacity;
+        }
+    }
+}
+
+/// Merge a list of render options in order (first = lowest priority).
+/// Later entries override earlier ones.
+pub fn merge_render_options(options: &[DecorationRenderOptions]) -> ResolvedStyle {
+    let mut resolved = ResolvedStyle::default();
+    for opt in options {
+        resolved.merge_override(opt);
+    }
+    resolved
+}
+
+// ---------------------------------------------------------------------------
+// Decoration inheritance (child inherits parent unless overridden)
+// ---------------------------------------------------------------------------
+
+/// A node in a decoration inheritance tree.  Children inherit the parent's
+/// `DecorationRenderOptions` but may override individual fields.
+#[derive(Debug, Clone)]
+pub struct DecorationNode {
+    pub id: String,
+    pub options: DecorationRenderOptions,
+    pub children: Vec<DecorationNode>,
+}
+
+impl DecorationNode {
+    pub fn new(id: impl Into<String>, options: DecorationRenderOptions) -> Self {
+        Self {
+            id: id.into(),
+            options,
+            children: Vec::new(),
+        }
+    }
+
+    pub fn add_child(&mut self, child: DecorationNode) {
+        self.children.push(child);
+    }
+
+    /// Resolve the effective style for this node by merging a parent style (as
+    /// base) with this node's own options (as overrides).
+    pub fn resolve(&self, parent_style: &ResolvedStyle) -> ResolvedStyle {
+        let mut style = parent_style.clone();
+        style.merge_override(&self.options);
+        style
+    }
+
+    /// Collect `(id, ResolvedStyle)` pairs for this node and all descendants.
+    pub fn resolve_tree(&self, parent_style: &ResolvedStyle) -> Vec<(String, ResolvedStyle)> {
+        let my_style = self.resolve(parent_style);
+        let mut out = vec![(self.id.clone(), my_style.clone())];
+        for child in &self.children {
+            out.extend(child.resolve_tree(&my_style));
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch decoration updates with change detection
+// ---------------------------------------------------------------------------
+
+/// Represents a pending change to a decoration set.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DecorationChange {
+    /// A decoration set was added or replaced.
+    Set {
+        type_id: String,
+        uri: String,
+        ranges: Vec<DecorationRange>,
+    },
+    /// A decoration set was removed.
+    Remove { type_id: String, uri: String },
+    /// All decorations for a URI were removed.
+    RemoveUri { uri: String },
+}
+
+/// Accumulates decoration mutations and applies them as a batch, returning
+/// only the changes that actually modified state.
+pub struct BatchDecorationUpdate {
+    changes: Vec<DecorationChange>,
+}
+
+impl BatchDecorationUpdate {
+    pub fn new() -> Self {
+        Self {
+            changes: Vec::new(),
+        }
+    }
+
+    pub fn set(
+        &mut self,
+        type_id: impl Into<String>,
+        uri: impl Into<String>,
+        ranges: Vec<DecorationRange>,
+    ) {
+        self.changes.push(DecorationChange::Set {
+            type_id: type_id.into(),
+            uri: uri.into(),
+            ranges,
+        });
+    }
+
+    pub fn remove(&mut self, type_id: impl Into<String>, uri: impl Into<String>) {
+        self.changes.push(DecorationChange::Remove {
+            type_id: type_id.into(),
+            uri: uri.into(),
+        });
+    }
+
+    pub fn remove_uri(&mut self, uri: impl Into<String>) {
+        self.changes.push(DecorationChange::RemoveUri {
+            uri: uri.into(),
+        });
+    }
+
+    /// Apply all accumulated changes to `service`. Returns the changes that
+    /// actually modified state (i.e. were not no-ops).
+    pub fn apply(self, service: &mut DecorationService) -> Vec<DecorationChange> {
+        let mut effective: Vec<DecorationChange> = Vec::new();
+        for change in self.changes {
+            match &change {
+                DecorationChange::Set {
+                    type_id,
+                    uri,
+                    ranges,
+                } => {
+                    let existing: Vec<DecorationRange> = service
+                        .get_decorations(uri)
+                        .iter()
+                        .filter(|s| s.type_id == *type_id)
+                        .flat_map(|s| s.ranges.clone())
+                        .collect();
+                    if existing != *ranges {
+                        service.set_decorations(
+                            type_id.clone(),
+                            uri.clone(),
+                            ranges.clone(),
+                        );
+                        effective.push(change);
+                    }
+                }
+                DecorationChange::Remove { type_id, uri } => {
+                    if service
+                        .sets
+                        .iter()
+                        .any(|s| s.type_id == *type_id && s.uri == *uri)
+                    {
+                        service.remove_decorations(type_id, uri);
+                        effective.push(change);
+                    }
+                }
+                DecorationChange::RemoveUri { uri } => {
+                    if service.has_decorations(uri) {
+                        service.remove_all_for_uri(uri);
+                        effective.push(change);
+                    }
+                }
+            }
+        }
+        effective
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+}
+
+impl Default for BatchDecorationUpdate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Decoration filtering by type / source
+// ---------------------------------------------------------------------------
+
+/// Source annotation for a decoration, allowing filtering by originator.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DecorationSource {
+    /// Built-in editor decoration (e.g. search highlight).
+    BuiltIn,
+    /// Decoration from an extension, identified by extension id.
+    Extension(String),
+    /// Decoration from a language server.
+    LanguageServer,
+    /// Decoration from a debugger.
+    Debugger,
+}
+
+impl fmt::Display for DecorationSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BuiltIn => write!(f, "built-in"),
+            Self::Extension(id) => write!(f, "extension:{id}"),
+            Self::LanguageServer => write!(f, "language-server"),
+            Self::Debugger => write!(f, "debugger"),
+        }
+    }
+}
+
+/// A decoration set annotated with its source and priority, enabling
+/// filtering and ordering in multi-provider scenarios.
+#[derive(Debug, Clone)]
+pub struct SourcedDecorationSet {
+    pub set: DecorationSet,
+    pub source: DecorationSource,
+    pub priority: DecorationPriority,
+}
+
+/// Filter and query a collection of `SourcedDecorationSet` values.
+pub struct DecorationFilter;
+
+impl DecorationFilter {
+    /// Keep only sets from the given source.
+    pub fn by_source<'a>(
+        sets: &'a [SourcedDecorationSet],
+        source: &DecorationSource,
+    ) -> Vec<&'a SourcedDecorationSet> {
+        sets.iter().filter(|s| &s.source == source).collect()
+    }
+
+    /// Keep only sets with priority >= `min`.
+    pub fn by_min_priority(
+        sets: &[SourcedDecorationSet],
+        min: DecorationPriority,
+    ) -> Vec<&SourcedDecorationSet> {
+        sets.iter().filter(|s| s.priority >= min).collect()
+    }
+
+    /// Keep only sets targeting the given URI.
+    pub fn by_uri<'a>(
+        sets: &'a [SourcedDecorationSet],
+        uri: &str,
+    ) -> Vec<&'a SourcedDecorationSet> {
+        sets.iter().filter(|s| s.set.uri == uri).collect()
+    }
+
+    /// Keep only sets whose type_id matches.
+    pub fn by_type_id<'a>(
+        sets: &'a [SourcedDecorationSet],
+        type_id: &str,
+    ) -> Vec<&'a SourcedDecorationSet> {
+        sets.iter().filter(|s| s.set.type_id == type_id).collect()
+    }
+
+    /// Combine multiple filters: source + minimum priority + URI.
+    pub fn query<'a>(
+        sets: &'a [SourcedDecorationSet],
+        source: Option<&DecorationSource>,
+        min_priority: Option<DecorationPriority>,
+        uri: Option<&str>,
+    ) -> Vec<&'a SourcedDecorationSet> {
+        sets.iter()
+            .filter(|s| source.map_or(true, |src| &s.source == src))
+            .filter(|s| min_priority.map_or(true, |mp| s.priority >= mp))
+            .filter(|s| uri.map_or(true, |u| s.set.uri == u))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1500,5 +1833,239 @@ mod tests {
         };
         assert_eq!(decorations_at_line(&svc, 5).len(), 1);
         assert_eq!(decorations_at_line(&svc, 6).len(), 0);
+    }
+
+    // -- style merging tests ------------------------------------------------
+
+    #[test]
+    fn test_resolved_style_merge_base_does_not_override() {
+        let mut style = ResolvedStyle {
+            background_color: Some("red".into()),
+            ..Default::default()
+        };
+        let opts = DecorationRenderOptions {
+            background_color: Some("blue".into()),
+            font_weight: Some("bold".into()),
+            ..Default::default()
+        };
+        style.merge_base(&opts);
+        // background_color already set, should keep "red"
+        assert_eq!(style.background_color.as_deref(), Some("red"));
+        // font_weight was None, should be filled
+        assert_eq!(style.font_weight.as_deref(), Some("bold"));
+    }
+
+    #[test]
+    fn test_resolved_style_merge_override_wins() {
+        let mut style = ResolvedStyle {
+            background_color: Some("red".into()),
+            ..Default::default()
+        };
+        let opts = DecorationRenderOptions {
+            background_color: Some("blue".into()),
+            opacity: Some(0.5),
+            ..Default::default()
+        };
+        style.merge_override(&opts);
+        assert_eq!(style.background_color.as_deref(), Some("blue"));
+        assert_eq!(style.opacity, Some(0.5));
+    }
+
+    #[test]
+    fn test_merge_render_options_layered() {
+        let base = DecorationRenderOptions {
+            background_color: Some("white".into()),
+            border_color: Some("gray".into()),
+            ..Default::default()
+        };
+        let overlay = DecorationRenderOptions {
+            background_color: Some("yellow".into()),
+            font_style: Some("italic".into()),
+            ..Default::default()
+        };
+        let resolved = merge_render_options(&[base, overlay]);
+        assert_eq!(resolved.background_color.as_deref(), Some("yellow"));
+        assert_eq!(resolved.border_color.as_deref(), Some("gray"));
+        assert_eq!(resolved.font_style.as_deref(), Some("italic"));
+    }
+
+    // -- inheritance tests --------------------------------------------------
+
+    #[test]
+    fn test_decoration_node_inherits_parent_style() {
+        let parent = DecorationNode::new(
+            "parent",
+            DecorationRenderOptions {
+                background_color: Some("red".into()),
+                font_weight: Some("bold".into()),
+                ..Default::default()
+            },
+        );
+        let child = DecorationNode::new(
+            "child",
+            DecorationRenderOptions {
+                background_color: Some("blue".into()),
+                ..Default::default()
+            },
+        );
+        let root_style = ResolvedStyle::default();
+        let parent_resolved = parent.resolve(&root_style);
+        let child_resolved = child.resolve(&parent_resolved);
+        // child overrides background
+        assert_eq!(child_resolved.background_color.as_deref(), Some("blue"));
+        // child inherits font_weight from parent
+        assert_eq!(child_resolved.font_weight.as_deref(), Some("bold"));
+    }
+
+    #[test]
+    fn test_decoration_node_resolve_tree() {
+        let mut root = DecorationNode::new(
+            "root",
+            DecorationRenderOptions {
+                background_color: Some("white".into()),
+                font_weight: Some("normal".into()),
+                ..Default::default()
+            },
+        );
+        let mut mid = DecorationNode::new(
+            "mid",
+            DecorationRenderOptions {
+                font_weight: Some("bold".into()),
+                ..Default::default()
+            },
+        );
+        let leaf = DecorationNode::new(
+            "leaf",
+            DecorationRenderOptions {
+                background_color: Some("green".into()),
+                ..Default::default()
+            },
+        );
+        mid.add_child(leaf);
+        root.add_child(mid);
+
+        let styles = root.resolve_tree(&ResolvedStyle::default());
+        assert_eq!(styles.len(), 3);
+        // root
+        assert_eq!(styles[0].0, "root");
+        assert_eq!(styles[0].1.background_color.as_deref(), Some("white"));
+        // mid inherits background from root, overrides font_weight
+        assert_eq!(styles[1].0, "mid");
+        assert_eq!(styles[1].1.background_color.as_deref(), Some("white"));
+        assert_eq!(styles[1].1.font_weight.as_deref(), Some("bold"));
+        // leaf overrides background, inherits font_weight from mid
+        assert_eq!(styles[2].0, "leaf");
+        assert_eq!(styles[2].1.background_color.as_deref(), Some("green"));
+        assert_eq!(styles[2].1.font_weight.as_deref(), Some("bold"));
+    }
+
+    // -- batch update tests -------------------------------------------------
+
+    #[test]
+    fn test_batch_update_detects_no_op() {
+        let mut svc = DecorationService::new();
+        svc.set_decorations("t".into(), "f.rs".into(), vec![sample_range(1)]);
+
+        let mut batch = BatchDecorationUpdate::new();
+        // Same data – should be a no-op
+        batch.set("t", "f.rs", vec![sample_range(1)]);
+        let effective = batch.apply(&mut svc);
+        assert!(effective.is_empty());
+    }
+
+    #[test]
+    fn test_batch_update_applies_real_changes() {
+        let mut svc = DecorationService::new();
+        let mut batch = BatchDecorationUpdate::new();
+        batch.set("err", "a.rs", vec![sample_range(1)]);
+        batch.set("warn", "a.rs", vec![sample_range(2)]);
+        assert_eq!(batch.len(), 2);
+
+        let effective = batch.apply(&mut svc);
+        assert_eq!(effective.len(), 2);
+        assert_eq!(svc.decoration_count(), 2);
+    }
+
+    #[test]
+    fn test_batch_update_remove_noop_and_real() {
+        let mut svc = DecorationService::new();
+        svc.set_decorations("t".into(), "f.rs".into(), vec![sample_range(5)]);
+
+        let mut batch = BatchDecorationUpdate::new();
+        batch.remove("nonexistent", "f.rs");
+        batch.remove("t", "f.rs");
+        let effective = batch.apply(&mut svc);
+        assert_eq!(effective.len(), 1);
+        assert!(svc.get_decorations("f.rs").is_empty());
+    }
+
+    // -- source filtering tests ---------------------------------------------
+
+    fn make_sourced(
+        type_id: &str,
+        uri: &str,
+        source: DecorationSource,
+        priority: DecorationPriority,
+    ) -> SourcedDecorationSet {
+        SourcedDecorationSet {
+            set: DecorationSet {
+                type_id: type_id.into(),
+                uri: uri.into(),
+                ranges: vec![sample_range(1)],
+            },
+            source,
+            priority,
+        }
+    }
+
+    #[test]
+    fn test_filter_by_source() {
+        let sets = vec![
+            make_sourced("a", "f.rs", DecorationSource::BuiltIn, DecorationPriority::Normal),
+            make_sourced("b", "f.rs", DecorationSource::Debugger, DecorationPriority::High),
+            make_sourced("c", "g.rs", DecorationSource::BuiltIn, DecorationPriority::Low),
+        ];
+        let filtered = DecorationFilter::by_source(&sets, &DecorationSource::BuiltIn);
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_by_min_priority() {
+        let sets = vec![
+            make_sourced("a", "f.rs", DecorationSource::BuiltIn, DecorationPriority::Low),
+            make_sourced("b", "f.rs", DecorationSource::Debugger, DecorationPriority::High),
+            make_sourced("c", "g.rs", DecorationSource::BuiltIn, DecorationPriority::Critical),
+        ];
+        let filtered = DecorationFilter::by_min_priority(&sets, DecorationPriority::High);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|s| s.priority >= DecorationPriority::High));
+    }
+
+    #[test]
+    fn test_filter_query_combined() {
+        let sets = vec![
+            make_sourced("a", "f.rs", DecorationSource::BuiltIn, DecorationPriority::Normal),
+            make_sourced("b", "f.rs", DecorationSource::Debugger, DecorationPriority::High),
+            make_sourced("c", "g.rs", DecorationSource::BuiltIn, DecorationPriority::High),
+        ];
+        let filtered = DecorationFilter::query(
+            &sets,
+            Some(&DecorationSource::BuiltIn),
+            Some(DecorationPriority::High),
+            None,
+        );
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].set.uri, "g.rs");
+    }
+
+    #[test]
+    fn test_decoration_source_display() {
+        assert_eq!(DecorationSource::BuiltIn.to_string(), "built-in");
+        assert_eq!(
+            DecorationSource::Extension("rust-analyzer".into()).to_string(),
+            "extension:rust-analyzer"
+        );
+        assert_eq!(DecorationSource::LanguageServer.to_string(), "language-server");
+        assert_eq!(DecorationSource::Debugger.to_string(), "debugger");
     }
 }

@@ -703,6 +703,217 @@ impl fmt::Display for JsonPath {
 }
 
 // ---------------------------------------------------------------------------
+// JSON minification
+// ---------------------------------------------------------------------------
+
+/// Minify a JSON value into a compact single-line string with no extra
+/// whitespace. This is the tightest possible JSON representation.
+pub fn minify(value: &Value) -> String {
+    serde_json::to_string(value).expect("Value serialization cannot fail")
+}
+
+/// Minify a JSONC source string: strip comments, trailing commas, parse,
+/// then emit compact JSON. Returns an error if the input is not valid JSONC.
+pub fn minify_jsonc(input: &str) -> Result<String, ParseError> {
+    let value = parse_jsonc(input)?;
+    Ok(minify(&value))
+}
+
+// ---------------------------------------------------------------------------
+// JSON pretty-printing with configurable indentation
+// ---------------------------------------------------------------------------
+
+/// Pretty-print a JSON value with the specified indentation string.
+///
+/// ```
+/// use serde_json::json;
+/// use vsedit_json::pretty_print;
+///
+/// let v = json!({"a": 1});
+/// let out = pretty_print(&v, "  ");
+/// assert!(out.contains("  \"a\": 1"));
+/// ```
+pub fn pretty_print(value: &Value, indent: &str) -> String {
+    let mut buf = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes());
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    serde::Serialize::serialize(value, &mut ser).expect("Value serialization cannot fail");
+    String::from_utf8(buf).expect("serde_json always produces valid UTF-8")
+}
+
+// ---------------------------------------------------------------------------
+// JSON value diffing
+// ---------------------------------------------------------------------------
+
+/// Describes a single difference between two JSON value trees.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiffEntry {
+    /// A key/index exists only in the left tree.
+    Removed { path: String, value: Value },
+    /// A key/index exists only in the right tree.
+    Added { path: String, value: Value },
+    /// Both trees have a value at this path but they differ.
+    Changed {
+        path: String,
+        left: Value,
+        right: Value,
+    },
+}
+
+/// Compute the structural diff between two JSON values.
+///
+/// Returns a list of [`DiffEntry`] items describing every leaf-level
+/// difference. Objects are compared recursively; arrays and scalars are
+/// compared by equality.
+pub fn diff(left: &Value, right: &Value) -> Vec<DiffEntry> {
+    let mut entries = Vec::new();
+    diff_recursive(left, right, String::new(), &mut entries);
+    entries
+}
+
+fn diff_recursive(left: &Value, right: &Value, path: String, out: &mut Vec<DiffEntry>) {
+    if left == right {
+        return;
+    }
+    match (left, right) {
+        (Value::Object(lm), Value::Object(rm)) => {
+            for (key, lv) in lm {
+                let child_path = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{}.{}", path, key)
+                };
+                match rm.get(key) {
+                    Some(rv) => diff_recursive(lv, rv, child_path, out),
+                    None => out.push(DiffEntry::Removed {
+                        path: child_path,
+                        value: lv.clone(),
+                    }),
+                }
+            }
+            for (key, rv) in rm {
+                if !lm.contains_key(key) {
+                    let child_path = if path.is_empty() {
+                        key.clone()
+                    } else {
+                        format!("{}.{}", path, key)
+                    };
+                    out.push(DiffEntry::Added {
+                        path: child_path,
+                        value: rv.clone(),
+                    });
+                }
+            }
+        }
+        _ => {
+            let p = if path.is_empty() {
+                "$".to_string()
+            } else {
+                path
+            };
+            out.push(DiffEntry::Changed {
+                path: p,
+                left: left.clone(),
+                right: right.clone(),
+            });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JSON value flattening / unflattening
+// ---------------------------------------------------------------------------
+
+/// Flatten a nested JSON object into a single-level map with dot-separated
+/// keys. Non-object values (arrays, scalars) become leaves.
+///
+/// ```
+/// use serde_json::json;
+/// use vsedit_json::json_flatten;
+///
+/// let v = json!({"a": {"b": 1, "c": 2}});
+/// let flat = json_flatten(&v);
+/// assert_eq!(flat, json!({"a.b": 1, "a.c": 2}));
+/// ```
+pub fn json_flatten(value: &Value) -> Value {
+    let mut map = serde_json::Map::new();
+    flatten_recursive(value, String::new(), &mut map);
+    Value::Object(map)
+}
+
+fn flatten_recursive(value: &Value, prefix: String, out: &mut serde_json::Map<String, Value>) {
+    match value {
+        Value::Object(m) => {
+            for (key, val) in m {
+                let new_prefix = if prefix.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{}.{}", prefix, key)
+                };
+                flatten_recursive(val, new_prefix, out);
+            }
+        }
+        other => {
+            out.insert(prefix, other.clone());
+        }
+    }
+}
+
+/// Unflatten a single-level JSON object with dot-separated keys back into a
+/// nested structure.
+///
+/// ```
+/// use serde_json::json;
+/// use vsedit_json::json_unflatten;
+///
+/// let flat = json!({"a.b": 1, "a.c": 2});
+/// let nested = json_unflatten(&flat);
+/// assert_eq!(nested, json!({"a": {"b": 1, "c": 2}}));
+/// ```
+pub fn json_unflatten(value: &Value) -> Value {
+    let map = match value.as_object() {
+        Some(m) => m,
+        None => return value.clone(),
+    };
+    let mut root = Value::Object(serde_json::Map::new());
+    for (dotted_key, val) in map {
+        let segments: Vec<&str> = dotted_key.split('.').collect();
+        let path = JsonPath {
+            segments: segments.iter().map(|s| s.to_string()).collect(),
+        };
+        path.set(&mut root, val.clone());
+    }
+    root
+}
+
+// ---------------------------------------------------------------------------
+// JSON key collection
+// ---------------------------------------------------------------------------
+
+/// Collect all unique dot-separated key paths from a JSON value.
+/// Useful for editor autocomplete and schema inference.
+pub fn collect_keys(value: &Value) -> Vec<String> {
+    let mut keys = Vec::new();
+    collect_keys_recursive(value, String::new(), &mut keys);
+    keys.sort();
+    keys
+}
+
+fn collect_keys_recursive(value: &Value, prefix: String, out: &mut Vec<String>) {
+    if let Value::Object(map) = value {
+        for (key, val) in map {
+            let full = if prefix.is_empty() {
+                key.clone()
+            } else {
+                format!("{}.{}", prefix, key)
+            };
+            out.push(full.clone());
+            collect_keys_recursive(val, full, out);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // JSON Patch (simplified RFC 6902)
 // ---------------------------------------------------------------------------
 
@@ -1509,5 +1720,114 @@ mod tests {
         let patch = json!({});
         let result = json_merge(&base, &patch);
         assert_eq!(result, json!({"a": 1}));
+    }
+
+    // -- minify / pretty_print ----------------------------------------------
+
+    #[test]
+    fn minify_removes_whitespace() {
+        let v = json!({"editor": {"fontSize": 14, "tabSize": 4}});
+        let compact = minify(&v);
+        assert!(!compact.contains(' '));
+        assert!(!compact.contains('\n'));
+        assert!(compact.contains("\"editor\""));
+        // Round-trip: parse the compact string back
+        let parsed: Value = serde_json::from_str(&compact).unwrap();
+        assert_eq!(parsed, v);
+    }
+
+    #[test]
+    fn minify_jsonc_strips_comments_and_compacts() {
+        let input = r#"{
+            // editor settings
+            "a": 1,
+            "b": 2,
+        }"#;
+        let compact = minify_jsonc(input).unwrap();
+        assert_eq!(compact, r#"{"a":1,"b":2}"#);
+    }
+
+    #[test]
+    fn pretty_print_custom_indent() {
+        let v = json!({"x": [1, 2]});
+        let two_space = pretty_print(&v, "  ");
+        let tab = pretty_print(&v, "\t");
+        assert!(two_space.contains("  \"x\""));
+        assert!(tab.contains("\t\"x\""));
+        // Both should parse back to the same value
+        let p1: Value = serde_json::from_str(&two_space).unwrap();
+        let p2: Value = serde_json::from_str(&tab).unwrap();
+        assert_eq!(p1, p2);
+    }
+
+    // -- diff ---------------------------------------------------------------
+
+    #[test]
+    fn diff_identical_values_yields_empty() {
+        let v = json!({"a": {"b": 1}});
+        assert!(diff(&v, &v).is_empty());
+    }
+
+    #[test]
+    fn diff_detects_added_removed_changed() {
+        let left = json!({"a": 1, "b": 2, "c": {"d": 3}});
+        let right = json!({"a": 1, "b": 20, "e": 5, "c": {"d": 30}});
+        let entries = diff(&left, &right);
+
+        // "b" changed
+        assert!(entries.iter().any(|e| matches!(e,
+            DiffEntry::Changed { path, .. } if path == "b"
+        )));
+        // "e" added
+        assert!(entries.iter().any(|e| matches!(e,
+            DiffEntry::Added { path, .. } if path == "e"
+        )));
+        // "c.d" changed
+        assert!(entries.iter().any(|e| matches!(e,
+            DiffEntry::Changed { path, .. } if path == "c.d"
+        )));
+    }
+
+    // -- flatten / unflatten ------------------------------------------------
+
+    #[test]
+    fn flatten_and_unflatten_roundtrip() {
+        let nested = json!({
+            "editor": {
+                "fontSize": 14,
+                "tabSize": 4
+            },
+            "terminal": {
+                "integrated": {
+                    "fontSize": 12
+                }
+            }
+        });
+        let flat = json_flatten(&nested);
+        assert_eq!(flat["editor.fontSize"], json!(14));
+        assert_eq!(flat["terminal.integrated.fontSize"], json!(12));
+
+        let restored = json_unflatten(&flat);
+        assert_eq!(restored, nested);
+    }
+
+    // -- collect_keys -------------------------------------------------------
+
+    #[test]
+    fn collect_keys_returns_all_paths() {
+        let v = json!({
+            "a": {
+                "b": 1,
+                "c": {"d": 2}
+            },
+            "e": 3
+        });
+        let keys = collect_keys(&v);
+        assert!(keys.contains(&"a".to_string()));
+        assert!(keys.contains(&"a.b".to_string()));
+        assert!(keys.contains(&"a.c".to_string()));
+        assert!(keys.contains(&"a.c.d".to_string()));
+        assert!(keys.contains(&"e".to_string()));
+        assert_eq!(keys.len(), 5);
     }
 }

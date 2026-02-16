@@ -971,6 +971,315 @@ impl Default for SearchView {
 }
 
 // ---------------------------------------------------------------------------
+// SearchStatistics
+// ---------------------------------------------------------------------------
+
+/// Computed statistics for a set of search results.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchStatistics {
+    pub files_matched: usize,
+    pub total_matches: usize,
+    pub lines_with_matches: usize,
+}
+
+impl SearchStatistics {
+    /// Compute statistics from [`SearchResults`].
+    pub fn from_results(results: &SearchResults) -> Self {
+        let files_matched = results.total_files();
+        let total_matches = results.total_matches();
+        let lines_with_matches: usize = results
+            .files()
+            .iter()
+            .map(|fm| {
+                let mut lines: Vec<u32> = fm.matches.iter().map(|m| m.line_number).collect();
+                lines.sort_unstable();
+                lines.dedup();
+                lines.len()
+            })
+            .sum();
+        Self {
+            files_matched,
+            total_matches,
+            lines_with_matches,
+        }
+    }
+
+    /// Format a human-readable summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} match{} across {} file{}, {} line{}",
+            self.total_matches,
+            if self.total_matches == 1 { "" } else { "es" },
+            self.files_matched,
+            if self.files_matched == 1 { "" } else { "s" },
+            self.lines_with_matches,
+            if self.lines_with_matches == 1 { "" } else { "s" },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchQueryHistory
+// ---------------------------------------------------------------------------
+
+/// Maintains a deduplicated, bounded history of search queries.
+#[derive(Debug, Clone)]
+pub struct SearchQueryHistory {
+    entries: Vec<String>,
+    capacity: usize,
+    cursor: Option<usize>,
+}
+
+impl SearchQueryHistory {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity: capacity.max(1),
+            cursor: None,
+        }
+    }
+
+    /// Push a query to the front. If it already exists, move it to front.
+    /// Empty strings are ignored.
+    pub fn push(&mut self, query: &str) {
+        if query.is_empty() {
+            return;
+        }
+        // Remove duplicate if present
+        self.entries.retain(|e| e != query);
+        self.entries.insert(0, query.to_string());
+        if self.entries.len() > self.capacity {
+            self.entries.truncate(self.capacity);
+        }
+        self.cursor = None;
+    }
+
+    /// Navigate to the previous (older) entry. Returns `None` if empty or at the end.
+    pub fn previous(&mut self) -> Option<&str> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let next = match self.cursor {
+            None => 0,
+            Some(i) if i + 1 < self.entries.len() => i + 1,
+            Some(_) => return None,
+        };
+        self.cursor = Some(next);
+        Some(&self.entries[next])
+    }
+
+    /// Navigate to the next (newer) entry. Returns `None` if at the newest.
+    pub fn next(&mut self) -> Option<&str> {
+        match self.cursor {
+            None | Some(0) => {
+                self.cursor = None;
+                None
+            }
+            Some(i) => {
+                self.cursor = Some(i - 1);
+                Some(&self.entries[i - 1])
+            }
+        }
+    }
+
+    /// Reset cursor to the most-recent position (no selection).
+    pub fn reset_cursor(&mut self) {
+        self.cursor = None;
+    }
+
+    pub fn entries(&self) -> &[String] {
+        &self.entries
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchResults — collapse / expand helpers
+// ---------------------------------------------------------------------------
+
+impl SearchResults {
+    /// Collapse all file groups.
+    pub fn collapse_all(&mut self) {
+        for fm in &mut self.file_matches {
+            fm.is_expanded = false;
+        }
+    }
+
+    /// Expand all file groups.
+    pub fn expand_all(&mut self) {
+        for fm in &mut self.file_matches {
+            fm.is_expanded = true;
+        }
+    }
+
+    /// Return computed [`SearchStatistics`].
+    pub fn statistics(&self) -> SearchStatistics {
+        SearchStatistics::from_results(self)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchView — match navigation helpers
+// ---------------------------------------------------------------------------
+
+/// Location of the currently selected match (file index + match index within file).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MatchLocation {
+    pub file_index: usize,
+    pub match_index: usize,
+}
+
+impl SearchView {
+    /// Collect a flat list of all (file_idx, match_idx) pairs across results.
+    fn all_match_locations(&self) -> Vec<MatchLocation> {
+        let mut locs = Vec::new();
+        for (fi, fm) in self.results.files().iter().enumerate() {
+            for mi in 0..fm.matches.len() {
+                locs.push(MatchLocation {
+                    file_index: fi,
+                    match_index: mi,
+                });
+            }
+        }
+        locs
+    }
+
+    /// Navigate to the next match (skipping file headers), wrapping around.
+    /// Returns the [`MatchLocation`] if one exists.
+    pub fn next_match(&mut self) -> Option<MatchLocation> {
+        let locs = self.all_match_locations();
+        if locs.is_empty() {
+            return None;
+        }
+
+        // Find current match location from the selected visible entry
+        let current_loc = self.selected_result.and_then(|e| self.get_match_at_entry(e)).map(|m| {
+            let file_idx = self.results.files().iter().position(|fm| fm.file_path == m.file_path).unwrap_or(0);
+            let match_idx = self.results.files()[file_idx]
+                .matches
+                .iter()
+                .position(|mm| std::ptr::eq(mm, m))
+                .unwrap_or(0);
+            MatchLocation { file_index: file_idx, match_index: match_idx }
+        });
+
+        let next = match current_loc {
+            Some(cur) => {
+                let pos = locs.iter().position(|l| *l == cur).unwrap_or(0);
+                locs[(pos + 1) % locs.len()]
+            }
+            None => locs[0],
+        };
+
+        // Ensure the target file is expanded and set visible entry index
+        self.results.files_mut()[next.file_index].is_expanded = true;
+        self.selected_result = Some(self.entry_index_for_match(next));
+        Some(next)
+    }
+
+    /// Navigate to the previous match (skipping file headers), wrapping around.
+    pub fn previous_match(&mut self) -> Option<MatchLocation> {
+        let locs = self.all_match_locations();
+        if locs.is_empty() {
+            return None;
+        }
+
+        let current_loc = self.selected_result.and_then(|e| self.get_match_at_entry(e)).map(|m| {
+            let file_idx = self.results.files().iter().position(|fm| fm.file_path == m.file_path).unwrap_or(0);
+            let match_idx = self.results.files()[file_idx]
+                .matches
+                .iter()
+                .position(|mm| std::ptr::eq(mm, m))
+                .unwrap_or(0);
+            MatchLocation { file_index: file_idx, match_index: match_idx }
+        });
+
+        let prev = match current_loc {
+            Some(cur) => {
+                let pos = locs.iter().position(|l| *l == cur).unwrap_or(0);
+                if pos == 0 { locs[locs.len() - 1] } else { locs[pos - 1] }
+            }
+            None => locs[locs.len() - 1],
+        };
+
+        self.results.files_mut()[prev.file_index].is_expanded = true;
+        self.selected_result = Some(self.entry_index_for_match(prev));
+        Some(prev)
+    }
+
+    /// Compute the visible entry index for a given [`MatchLocation`].
+    fn entry_index_for_match(&self, loc: MatchLocation) -> usize {
+        let mut idx = 0;
+        for (fi, fm) in self.results.files().iter().enumerate() {
+            idx += 1; // file header
+            if fi == loc.file_index {
+                return idx + loc.match_index;
+            }
+            if fm.is_expanded {
+                idx += fm.matches.len();
+            }
+        }
+        0
+    }
+
+    /// Preview replacements for all matches in a file group.
+    /// Returns pairs of (original_line, replaced_line) for each unique line.
+    pub fn preview_replace_for_file(&self, file_idx: usize) -> Vec<(String, String)> {
+        let fm = match self.results.files().get(file_idx) {
+            Some(fm) => fm,
+            None => return Vec::new(),
+        };
+
+        let mut seen_lines = std::collections::HashSet::new();
+        let mut previews = Vec::new();
+
+        for m in &fm.matches {
+            if !seen_lines.insert(m.line_number) {
+                continue;
+            }
+
+            // Collect all matches on this line
+            let line_matches: Vec<&SearchMatch> = fm
+                .matches
+                .iter()
+                .filter(|mm| mm.line_number == m.line_number)
+                .collect();
+
+            // Apply replacements in reverse column order
+            let mut replaced = m.line_content.clone();
+            let mut sorted: Vec<&&SearchMatch> = line_matches.iter().collect();
+            sorted.sort_by(|a, b| b.match_range.start.cmp(&a.match_range.start));
+            for sm in sorted {
+                if sm.match_range.end <= replaced.len() {
+                    replaced = format!(
+                        "{}{}{}",
+                        &replaced[..sm.match_range.start],
+                        self.replace_text,
+                        &replaced[sm.match_range.end..],
+                    );
+                }
+            }
+
+            previews.push((m.line_content.clone(), replaced));
+        }
+
+        previews
+    }
+
+    /// Get statistics for the current results.
+    pub fn statistics(&self) -> SearchStatistics {
+        self.results.statistics()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1555,5 +1864,294 @@ mod tests {
             },
             "y",
         );
+    }
+
+    // -- SearchStatistics tests --
+
+    #[test]
+    fn statistics_from_results() {
+        // Two files: file a has 3 matches on 2 lines, file b has 1 match on 1 line
+        let results = SearchResults::new(vec![
+            FileMatches::new(
+                PathBuf::from("a.rs"),
+                vec![
+                    SearchMatch {
+                        file_path: PathBuf::from("a.rs"),
+                        line_number: 1,
+                        column: 1,
+                        line_content: "xx".into(),
+                        match_range: 0..1,
+                        preview: "xx".into(),
+                    },
+                    SearchMatch {
+                        file_path: PathBuf::from("a.rs"),
+                        line_number: 1,
+                        column: 2,
+                        line_content: "xx".into(),
+                        match_range: 1..2,
+                        preview: "xx".into(),
+                    },
+                    SearchMatch {
+                        file_path: PathBuf::from("a.rs"),
+                        line_number: 5,
+                        column: 1,
+                        line_content: "x".into(),
+                        match_range: 0..1,
+                        preview: "x".into(),
+                    },
+                ],
+            ),
+            FileMatches::new(
+                PathBuf::from("b.rs"),
+                vec![SearchMatch {
+                    file_path: PathBuf::from("b.rs"),
+                    line_number: 10,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                }],
+            ),
+        ]);
+        let stats = results.statistics();
+        assert_eq!(stats.files_matched, 2);
+        assert_eq!(stats.total_matches, 4);
+        assert_eq!(stats.lines_with_matches, 3); // lines 1,5 in a.rs + line 10 in b.rs
+        assert_eq!(stats.summary(), "4 matches across 2 files, 3 lines");
+    }
+
+    #[test]
+    fn statistics_summary_singular() {
+        let stats = SearchStatistics {
+            files_matched: 1,
+            total_matches: 1,
+            lines_with_matches: 1,
+        };
+        assert_eq!(stats.summary(), "1 match across 1 file, 1 line");
+    }
+
+    // -- SearchQueryHistory tests --
+
+    #[test]
+    fn query_history_deduplication_and_ordering() {
+        let mut h = SearchQueryHistory::new(5);
+        h.push("alpha");
+        h.push("beta");
+        h.push("alpha"); // duplicate, should move to front
+        assert_eq!(h.entries(), &["alpha", "beta"]);
+        assert_eq!(h.len(), 2);
+    }
+
+    #[test]
+    fn query_history_capacity_and_navigation() {
+        let mut h = SearchQueryHistory::new(3);
+        h.push("one");
+        h.push("two");
+        h.push("three");
+        h.push("four"); // "one" should be evicted
+        assert_eq!(h.entries(), &["four", "three", "two"]);
+
+        // Navigate backwards through history
+        assert_eq!(h.previous(), Some("four"));
+        assert_eq!(h.previous(), Some("three"));
+        assert_eq!(h.previous(), Some("two"));
+        assert_eq!(h.previous(), None); // at the end
+
+        // Navigate forwards
+        assert_eq!(h.next(), Some("three"));
+        assert_eq!(h.next(), Some("four"));
+        assert_eq!(h.next(), None); // at the newest
+
+        // Reset cursor
+        h.reset_cursor();
+        assert_eq!(h.previous(), Some("four"));
+    }
+
+    #[test]
+    fn query_history_ignores_empty() {
+        let mut h = SearchQueryHistory::new(5);
+        h.push("");
+        assert!(h.is_empty());
+    }
+
+    // -- collapse/expand all tests --
+
+    #[test]
+    fn collapse_and_expand_all() {
+        let mut results = SearchResults::new(vec![
+            FileMatches::new(
+                PathBuf::from("a.rs"),
+                vec![SearchMatch {
+                    file_path: PathBuf::from("a.rs"),
+                    line_number: 1,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                }],
+            ),
+            FileMatches::new(
+                PathBuf::from("b.rs"),
+                vec![SearchMatch {
+                    file_path: PathBuf::from("b.rs"),
+                    line_number: 1,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                }],
+            ),
+        ]);
+
+        // All start expanded
+        assert!(results.files().iter().all(|f| f.is_expanded));
+
+        results.collapse_all();
+        assert!(results.files().iter().all(|f| !f.is_expanded));
+
+        results.expand_all();
+        assert!(results.files().iter().all(|f| f.is_expanded));
+    }
+
+    // -- next_match / previous_match navigation tests --
+
+    #[test]
+    fn next_and_previous_match_navigation() {
+        let mut v = SearchView::new();
+        v.results = SearchResults::new(vec![
+            FileMatches::new(
+                PathBuf::from("a.txt"),
+                vec![
+                    SearchMatch {
+                        file_path: PathBuf::from("a.txt"),
+                        line_number: 1,
+                        column: 1,
+                        line_content: "aaa".into(),
+                        match_range: 0..1,
+                        preview: "aaa".into(),
+                    },
+                    SearchMatch {
+                        file_path: PathBuf::from("a.txt"),
+                        line_number: 2,
+                        column: 1,
+                        line_content: "aaa".into(),
+                        match_range: 0..1,
+                        preview: "aaa".into(),
+                    },
+                ],
+            ),
+            FileMatches::new(
+                PathBuf::from("b.txt"),
+                vec![SearchMatch {
+                    file_path: PathBuf::from("b.txt"),
+                    line_number: 1,
+                    column: 1,
+                    line_content: "bbb".into(),
+                    match_range: 0..1,
+                    preview: "bbb".into(),
+                }],
+            ),
+        ]);
+        v.selected_result = None;
+
+        // First next_match goes to a.txt match 0
+        let loc = v.next_match().unwrap();
+        assert_eq!(loc, MatchLocation { file_index: 0, match_index: 0 });
+
+        // Second goes to a.txt match 1
+        let loc = v.next_match().unwrap();
+        assert_eq!(loc, MatchLocation { file_index: 0, match_index: 1 });
+
+        // Third goes to b.txt match 0
+        let loc = v.next_match().unwrap();
+        assert_eq!(loc, MatchLocation { file_index: 1, match_index: 0 });
+
+        // Fourth wraps back to a.txt match 0
+        let loc = v.next_match().unwrap();
+        assert_eq!(loc, MatchLocation { file_index: 0, match_index: 0 });
+
+        // Previous goes back to b.txt match 0
+        let loc = v.previous_match().unwrap();
+        assert_eq!(loc, MatchLocation { file_index: 1, match_index: 0 });
+    }
+
+    // -- preview_replace_for_file tests --
+
+    #[test]
+    fn preview_replace_for_file_multiple_matches() {
+        let mut v = SearchView::new();
+        v.replace_text = "YY".into();
+        v.results = SearchResults::new(vec![FileMatches::new(
+            PathBuf::from("f.rs"),
+            vec![
+                SearchMatch {
+                    file_path: PathBuf::from("f.rs"),
+                    line_number: 1,
+                    column: 1,
+                    line_content: "aa bb aa".into(),
+                    match_range: 0..2,
+                    preview: "aa bb aa".into(),
+                },
+                SearchMatch {
+                    file_path: PathBuf::from("f.rs"),
+                    line_number: 1,
+                    column: 7,
+                    line_content: "aa bb aa".into(),
+                    match_range: 6..8,
+                    preview: "aa bb aa".into(),
+                },
+                SearchMatch {
+                    file_path: PathBuf::from("f.rs"),
+                    line_number: 3,
+                    column: 1,
+                    line_content: "aa only".into(),
+                    match_range: 0..2,
+                    preview: "aa only".into(),
+                },
+            ],
+        )]);
+
+        let previews = v.preview_replace_for_file(0);
+        assert_eq!(previews.len(), 2); // two unique lines
+        assert_eq!(previews[0].0, "aa bb aa");
+        assert_eq!(previews[0].1, "YY bb YY"); // both matches replaced
+        assert_eq!(previews[1].0, "aa only");
+        assert_eq!(previews[1].1, "YY only");
+    }
+
+    #[test]
+    fn preview_replace_for_file_invalid_index() {
+        let v = SearchView::new();
+        assert!(v.preview_replace_for_file(99).is_empty());
+    }
+
+    #[test]
+    fn view_statistics_method() {
+        let mut v = SearchView::new();
+        v.results = SearchResults::new(vec![FileMatches::new(
+            PathBuf::from("z.rs"),
+            vec![
+                SearchMatch {
+                    file_path: PathBuf::from("z.rs"),
+                    line_number: 1,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                },
+                SearchMatch {
+                    file_path: PathBuf::from("z.rs"),
+                    line_number: 2,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                },
+            ],
+        )]);
+        let stats = v.statistics();
+        assert_eq!(stats.files_matched, 1);
+        assert_eq!(stats.total_matches, 2);
+        assert_eq!(stats.lines_with_matches, 2);
     }
 }

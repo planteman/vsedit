@@ -905,6 +905,321 @@ impl fmt::Display for Hover {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HoverContentFormatter – render hover cards with separators and structure
+// ---------------------------------------------------------------------------
+
+/// Formats multiple hover content sections into a single rendered markdown
+/// string with configurable separators and optional headers.
+#[derive(Debug, Clone)]
+pub struct HoverContentFormatter {
+    separator: String,
+    show_provider_headers: bool,
+    max_line_width: Option<usize>,
+}
+
+impl HoverContentFormatter {
+    pub fn new() -> Self {
+        Self {
+            separator: "\n---\n".to_string(),
+            show_provider_headers: false,
+            max_line_width: None,
+        }
+    }
+
+    /// Set the separator placed between content sections.
+    pub fn separator(mut self, sep: impl Into<String>) -> Self {
+        self.separator = sep.into();
+        self
+    }
+
+    /// When enabled, each section is prefixed with the provider id as a header.
+    pub fn show_headers(mut self, show: bool) -> Self {
+        self.show_provider_headers = show;
+        self
+    }
+
+    /// Set maximum line width; lines longer than this are soft-wrapped.
+    pub fn max_line_width(mut self, width: usize) -> Self {
+        self.max_line_width = Some(width);
+        self
+    }
+
+    /// Format a single `Hover` into a rendered markdown string.
+    pub fn format_hover(&self, hover: &Hover) -> String {
+        let sections: Vec<&str> = hover.contents.iter().map(|c| c.value.as_str()).collect();
+        let joined = sections.join(&self.separator);
+        self.apply_line_width(&joined)
+    }
+
+    /// Format a list of `PrioritizedHover` entries into a single string,
+    /// sorted by priority (highest first).
+    pub fn format_prioritized(&self, hovers: &[PrioritizedHover]) -> String {
+        let mut sorted: Vec<&PrioritizedHover> = hovers.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+
+        let sections: Vec<String> = sorted
+            .iter()
+            .flat_map(|ph| {
+                ph.hover.contents.iter().map(move |c| {
+                    if self.show_provider_headers {
+                        format!("**{}**\n\n{}", ph.provider_id, c.value)
+                    } else {
+                        c.value.clone()
+                    }
+                })
+            })
+            .collect();
+
+        let joined = sections.join(&self.separator);
+        self.apply_line_width(&joined)
+    }
+
+    fn apply_line_width(&self, text: &str) -> String {
+        let Some(width) = self.max_line_width else {
+            return text.to_string();
+        };
+        text.lines()
+            .map(|line| Self::soft_wrap(line, width))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn soft_wrap(line: &str, width: usize) -> String {
+        if line.len() <= width {
+            return line.to_string();
+        }
+        let mut result = String::with_capacity(line.len() + line.len() / width);
+        let mut col = 0;
+        for word in line.split_inclusive(' ') {
+            if col > 0 && col + word.len() > width {
+                result.push('\n');
+                col = 0;
+            }
+            result.push_str(word);
+            col += word.len();
+        }
+        result
+    }
+}
+
+impl Default for HoverContentFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverRangeCalculator – compute ranges from text content
+// ---------------------------------------------------------------------------
+
+/// Utility for computing [`HoverRange`] values from source text and offsets.
+pub struct HoverRangeCalculator;
+
+impl HoverRangeCalculator {
+    /// Convert a byte offset in `text` to a `(line, col)` pair (both 0-based).
+    /// Returns `None` if the offset is out of bounds.
+    pub fn offset_to_position(text: &str, offset: usize) -> Option<(u32, u32)> {
+        if offset > text.len() {
+            return None;
+        }
+        let mut line: u32 = 0;
+        let mut col: u32 = 0;
+        for (i, ch) in text.char_indices() {
+            if i == offset {
+                return Some((line, col));
+            }
+            if ch == '\n' {
+                line += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+        }
+        // offset == text.len() (end of string)
+        if offset == text.len() {
+            Some((line, col))
+        } else {
+            None
+        }
+    }
+
+    /// Build a `HoverRange` from a byte-offset span in `text`.
+    pub fn range_from_offsets(text: &str, start: usize, end: usize) -> Option<HoverRange> {
+        let (sl, sc) = Self::offset_to_position(text, start)?;
+        let (el, ec) = Self::offset_to_position(text, end)?;
+        Some(HoverRange {
+            start_line: sl,
+            start_col: sc,
+            end_line: el,
+            end_col: ec,
+        })
+    }
+
+    /// Find the word boundaries around `offset` (treating `[a-zA-Z0-9_]` as
+    /// word characters) and return the corresponding `HoverRange`.
+    pub fn word_range_at(text: &str, offset: usize) -> Option<HoverRange> {
+        let bytes = text.as_bytes();
+        if offset >= bytes.len() {
+            return None;
+        }
+        let is_word = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+        if !is_word(bytes[offset]) {
+            return None;
+        }
+        let mut start = offset;
+        while start > 0 && is_word(bytes[start - 1]) {
+            start -= 1;
+        }
+        let mut end = offset;
+        while end < bytes.len() && is_word(bytes[end]) {
+            end += 1;
+        }
+        Self::range_from_offsets(text, start, end.saturating_sub(1))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverContentTruncator – limit hover size
+// ---------------------------------------------------------------------------
+
+/// Truncates hover content so it fits within configurable limits.
+#[derive(Debug, Clone)]
+pub struct HoverContentTruncator {
+    /// Maximum number of content sections to keep.
+    pub max_sections: usize,
+    /// Maximum character length per section.
+    pub max_section_chars: usize,
+    /// Maximum total character length across all sections.
+    pub max_total_chars: usize,
+}
+
+impl HoverContentTruncator {
+    pub fn new() -> Self {
+        Self {
+            max_sections: 10,
+            max_section_chars: 5000,
+            max_total_chars: 20_000,
+        }
+    }
+
+    pub fn max_sections(mut self, n: usize) -> Self {
+        self.max_sections = n;
+        self
+    }
+
+    pub fn max_section_chars(mut self, n: usize) -> Self {
+        self.max_section_chars = n;
+        self
+    }
+
+    pub fn max_total_chars(mut self, n: usize) -> Self {
+        self.max_total_chars = n;
+        self
+    }
+
+    /// Truncate a `Hover` in place, returning the modified hover.
+    pub fn truncate(&self, mut hover: Hover) -> Hover {
+        // Limit section count.
+        if hover.contents.len() > self.max_sections {
+            hover.contents.truncate(self.max_sections);
+        }
+
+        // Truncate individual sections.
+        for section in &mut hover.contents {
+            if section.value.chars().count() > self.max_section_chars {
+                *section = section.truncate(self.max_section_chars);
+            }
+        }
+
+        // Enforce total limit by dropping trailing sections.
+        let mut total = 0usize;
+        let mut keep = hover.contents.len();
+        for (i, section) in hover.contents.iter().enumerate() {
+            total += section.value.chars().count();
+            if total > self.max_total_chars {
+                keep = i;
+                break;
+            }
+        }
+        hover.contents.truncate(keep);
+
+        hover
+    }
+}
+
+impl Default for HoverContentTruncator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverProviderChain – chain providers with fallback semantics
+// ---------------------------------------------------------------------------
+
+/// Chains multiple hover providers, querying them in priority order and
+/// optionally short-circuiting when the first result is found.
+pub struct HoverProviderChain {
+    providers: Vec<(Box<dyn HoverProvider>, HoverPriority)>,
+    short_circuit: bool,
+}
+
+impl HoverProviderChain {
+    /// Create a new chain. When `short_circuit` is `true`, iteration stops
+    /// after the first provider that returns a hover.
+    pub fn new(short_circuit: bool) -> Self {
+        Self {
+            providers: Vec::new(),
+            short_circuit,
+        }
+    }
+
+    /// Add a provider with the given priority.
+    pub fn add(&mut self, provider: Box<dyn HoverProvider>, priority: HoverPriority) {
+        self.providers.push((provider, priority));
+        // Keep sorted highest priority first.
+        self.providers.sort_by(|a, b| b.1.cmp(&a.1));
+    }
+
+    /// Query all providers (respecting short-circuit) and return collected
+    /// prioritized hovers.
+    pub fn query(&self, uri: &str, line: u32, col: u32) -> Vec<PrioritizedHover> {
+        let mut results = Vec::new();
+        for (i, (provider, priority)) in self.providers.iter().enumerate() {
+            if let Some(hover) = provider.provide_hover(uri, line, col) {
+                results.push(PrioritizedHover::new(
+                    hover,
+                    *priority,
+                    format!("chain-{i}"),
+                ));
+                if self.short_circuit {
+                    break;
+                }
+            }
+        }
+        results
+    }
+
+    /// Query and merge into a single hover, or `None` if nothing matched.
+    pub fn hover_at(&self, uri: &str, line: u32, col: u32) -> Option<Hover> {
+        let results = self.query(uri, line, col);
+        if results.is_empty() {
+            None
+        } else {
+            Some(merge_prioritized(results))
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.providers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1554,5 +1869,130 @@ mod tests {
         reg.clear();
         assert_eq!(reg.provider_count(), 0);
         assert!(reg.is_empty());
+    }
+
+    // -- HoverContentFormatter tests --
+
+    #[test]
+    fn content_formatter_basic() {
+        let hover = Hover::new(vec![
+            MarkdownString::new("Section A"),
+            MarkdownString::new("Section B"),
+        ]);
+        let fmt = HoverContentFormatter::new().separator("\n\n");
+        let result = fmt.format_hover(&hover);
+        assert!(result.contains("Section A"));
+        assert!(result.contains("Section B"));
+        assert!(!result.contains("---"));
+    }
+
+    #[test]
+    fn content_formatter_with_headers() {
+        let hovers = vec![
+            PrioritizedHover::new(
+                Hover::new(vec![MarkdownString::new("type info")]),
+                HoverPriority::LanguageService,
+                "typescript",
+            ),
+            PrioritizedHover::new(
+                Hover::new(vec![MarkdownString::new("doc")]),
+                HoverPriority::Fallback,
+                "docs-ext",
+            ),
+        ];
+        let fmt = HoverContentFormatter::new().show_headers(true);
+        let result = fmt.format_prioritized(&hovers);
+        assert!(result.contains("**typescript**"));
+        assert!(result.contains("**docs-ext**"));
+        // Highest priority first
+        let ts_pos = result.find("**typescript**").unwrap();
+        let doc_pos = result.find("**docs-ext**").unwrap();
+        assert!(ts_pos < doc_pos);
+    }
+
+    #[test]
+    fn content_formatter_line_width_wraps() {
+        let hover = Hover::new(vec![MarkdownString::new(
+            "this is a fairly long line that should be wrapped at a reasonable width",
+        )]);
+        let fmt = HoverContentFormatter::new().max_line_width(20);
+        let result = fmt.format_hover(&hover);
+        assert!(result.contains('\n'));
+        for line in result.lines() {
+            // Soft-wrap can sometimes exceed width by one word, but should be
+            // close.
+            assert!(line.len() < 80, "line too long: {line}");
+        }
+    }
+
+    // -- HoverRangeCalculator tests --
+
+    #[test]
+    fn range_calculator_offset_to_position() {
+        let text = "hello\nworld\nfoo";
+        assert_eq!(HoverRangeCalculator::offset_to_position(text, 0), Some((0, 0)));
+        assert_eq!(HoverRangeCalculator::offset_to_position(text, 4), Some((0, 4)));
+        // offset 5 is the '\n'
+        assert_eq!(HoverRangeCalculator::offset_to_position(text, 6), Some((1, 0)));
+        assert_eq!(HoverRangeCalculator::offset_to_position(text, text.len()), Some((2, 3)));
+        assert_eq!(HoverRangeCalculator::offset_to_position(text, text.len() + 1), None);
+    }
+
+    #[test]
+    fn range_calculator_word_range_at() {
+        let text = "let foo_bar = 42;";
+        //          0123456789...
+        let r = HoverRangeCalculator::word_range_at(text, 5).unwrap();
+        // "foo_bar" starts at col 4, ends at col 10
+        assert_eq!(r.start_line, 0);
+        assert_eq!(r.start_col, 4);
+        assert_eq!(r.end_col, 10);
+        // Space is not a word char
+        assert!(HoverRangeCalculator::word_range_at(text, 3).is_none());
+    }
+
+    // -- HoverContentTruncator tests --
+
+    #[test]
+    fn content_truncator_limits_sections_and_chars() {
+        let hover = Hover::new(vec![
+            MarkdownString::new("aaa"),
+            MarkdownString::new("bbb"),
+            MarkdownString::new("ccc"),
+            MarkdownString::new("ddd"),
+        ]);
+        let truncator = HoverContentTruncator::new()
+            .max_sections(2)
+            .max_section_chars(100)
+            .max_total_chars(10_000);
+        let result = truncator.truncate(hover);
+        assert_eq!(result.contents.len(), 2);
+        assert_eq!(result.contents[0].value, "aaa");
+        assert_eq!(result.contents[1].value, "bbb");
+    }
+
+    // -- HoverProviderChain tests --
+
+    #[test]
+    fn provider_chain_short_circuit() {
+        struct AlwaysHover(&'static str);
+        impl HoverProvider for AlwaysHover {
+            fn provide_hover(&self, _: &str, _: u32, _: u32) -> Option<Hover> {
+                Some(Hover::new(vec![MarkdownString::new(self.0)]))
+            }
+        }
+
+        let mut chain = HoverProviderChain::new(true);
+        chain.add(Box::new(AlwaysHover("high")), HoverPriority::Builtin);
+        chain.add(Box::new(AlwaysHover("low")), HoverPriority::Fallback);
+        assert_eq!(chain.len(), 2);
+
+        let results = chain.query("file:///x.rs", 0, 0);
+        // Short-circuit: only one result from the highest-priority provider.
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].hover.contents[0].value, "high");
+
+        let merged = chain.hover_at("file:///x.rs", 0, 0).unwrap();
+        assert_eq!(merged.contents.len(), 1);
     }
 }

@@ -806,6 +806,198 @@ impl WbKeybindingStats {
     }
 }
 
+/// Parse a modifier name (case-insensitive) into a `KeyMod`.
+pub fn parse_modifier(s: &str) -> Option<KeyMod> {
+    match s.trim().to_lowercase().as_str() {
+        "ctrl" | "ctrlcmd" => Some(KeyMod::CtrlCmd),
+        "shift" => Some(KeyMod::Shift),
+        "alt" => Some(KeyMod::Alt),
+        "win" | "meta" | "super" => Some(KeyMod::WinCtrl),
+        _ => None,
+    }
+}
+
+/// Parse a single key chord string like "Ctrl+Shift+S" into (key, modifiers).
+/// Returns `None` if the string is empty or contains no key part.
+pub fn parse_key_chord(s: &str) -> Option<(String, Vec<KeyMod>)> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let parts: Vec<&str> = s.split('+').collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let mut modifiers = Vec::new();
+    let mut key = None;
+    for (i, part) in parts.iter().enumerate() {
+        let trimmed = part.trim();
+        if i < parts.len() - 1 {
+            if let Some(m) = parse_modifier(trimmed) {
+                modifiers.push(m);
+            } else {
+                // Unknown modifier treated as key if last unrecognized
+                return None;
+            }
+        } else {
+            key = Some(trimmed.to_string());
+        }
+    }
+    key.map(|k| (k, modifiers))
+}
+
+/// Parse a full chord sequence string like "Ctrl+K Ctrl+C" (space-separated chords).
+pub fn parse_chord_sequence(s: &str) -> Option<ChordSequence> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let mut chords = Vec::new();
+    for part in s.split_whitespace() {
+        let (key, mods) = parse_key_chord(part)?;
+        chords.push((key, mods));
+    }
+    if chords.is_empty() {
+        return None;
+    }
+    Some(ChordSequence { chords })
+}
+
+/// Format a chord sequence back into its canonical string representation.
+pub fn format_chord_sequence(seq: &ChordSequence) -> String {
+    seq.to_string()
+}
+
+/// Tracks per-command usage counts for keybinding analytics.
+#[derive(Debug, Clone, Default)]
+pub struct KeybindingUsageTracker {
+    hits: std::collections::HashMap<String, u64>,
+}
+
+impl KeybindingUsageTracker {
+    pub fn new() -> Self {
+        Self {
+            hits: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Record a single use of a command.
+    pub fn record(&mut self, command: &str) {
+        *self.hits.entry(command.to_string()).or_insert(0) += 1;
+    }
+
+    /// Get the usage count for a specific command.
+    pub fn count(&self, command: &str) -> u64 {
+        self.hits.get(command).copied().unwrap_or(0)
+    }
+
+    /// Return the total number of keybinding invocations across all commands.
+    pub fn total_invocations(&self) -> u64 {
+        self.hits.values().sum()
+    }
+
+    /// Return the top N most-used commands, sorted descending by count.
+    pub fn top_commands(&self, n: usize) -> Vec<(&str, u64)> {
+        let mut entries: Vec<(&str, u64)> = self
+            .hits
+            .iter()
+            .map(|(k, &v)| (k.as_str(), v))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
+    }
+
+    /// Return the number of distinct commands that have been invoked.
+    pub fn distinct_commands(&self) -> usize {
+        self.hits.len()
+    }
+
+    /// Reset all usage data.
+    pub fn reset(&mut self) {
+        self.hits.clear();
+    }
+
+    /// Merge another tracker's data into this one.
+    pub fn merge(&mut self, other: &KeybindingUsageTracker) {
+        for (cmd, &count) in &other.hits {
+            *self.hits.entry(cmd.clone()).or_insert(0) += count;
+        }
+    }
+}
+
+impl fmt::Display for KeybindingUsageTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UsageTracker({} commands, {} invocations)",
+            self.distinct_commands(),
+            self.total_invocations()
+        )
+    }
+}
+
+/// Detect keybinding conflicts across multiple independent keymaps.
+///
+/// Each keymap is a slice of `ResolvedKeybinding`. Returns a list of
+/// (formatted_key, Vec<(keymap_index, command)>) for every key chord
+/// that is bound in more than one keymap.
+pub fn detect_cross_keymap_conflicts(
+    keymaps: &[&[ResolvedKeybinding]],
+) -> Vec<(String, Vec<(usize, String)>)> {
+    let mut key_to_sources: std::collections::HashMap<String, Vec<(usize, String)>> =
+        std::collections::HashMap::new();
+    for (map_idx, keymap) in keymaps.iter().enumerate() {
+        for binding in *keymap {
+            let formatted = KeybindingService::format_binding(binding);
+            key_to_sources
+                .entry(formatted)
+                .or_default()
+                .push((map_idx, binding.command.clone()));
+        }
+    }
+    key_to_sources
+        .into_iter()
+        .filter(|(_, sources)| {
+            // Only a conflict if bound in more than one distinct keymap
+            let mut seen = std::collections::HashSet::new();
+            for (idx, _) in sources {
+                seen.insert(*idx);
+            }
+            seen.len() > 1
+        })
+        .collect()
+}
+
+/// Resolve a key press against the service, filtering by when-clause context.
+/// Returns the highest-priority matching binding (User > Extension > Default).
+pub fn resolve_with_context<'a>(
+    service: &'a KeybindingService,
+    key: &str,
+    modifiers: &[KeyMod],
+    context: &KeybindingWhenContext,
+) -> Option<&'a ResolvedKeybinding> {
+    let candidates = service.resolve(key, modifiers);
+    let active: Vec<&ResolvedKeybinding> = candidates
+        .into_iter()
+        .filter(|b| context.binding_active(b))
+        .collect();
+    if active.is_empty() {
+        return None;
+    }
+    // Priority: User > Extension > Default
+    fn priority(source: &KeybindingSource) -> u8 {
+        match source {
+            KeybindingSource::User => 2,
+            KeybindingSource::Extension => 1,
+            KeybindingSource::Default => 0,
+        }
+    }
+    active
+        .into_iter()
+        .max_by_key(|b| priority(&b.source))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1501,5 +1693,154 @@ mod tests {
         assert!(s.contains("2 ops"));
         assert!(s.contains("1 ok"));
         assert!(s.contains("1 err"));
+    }
+
+    #[test]
+    fn parse_key_chord_single_key() {
+        let result = parse_key_chord("F5");
+        assert_eq!(result, Some(("F5".to_string(), vec![])));
+    }
+
+    #[test]
+    fn parse_key_chord_with_modifiers() {
+        let result = parse_key_chord("Ctrl+Shift+S");
+        assert_eq!(
+            result,
+            Some(("S".to_string(), vec![KeyMod::CtrlCmd, KeyMod::Shift]))
+        );
+
+        let result2 = parse_key_chord("Alt+x");
+        assert_eq!(result2, Some(("x".to_string(), vec![KeyMod::Alt])));
+
+        assert_eq!(parse_key_chord(""), None);
+    }
+
+    #[test]
+    fn parse_chord_sequence_multi() {
+        let seq = parse_chord_sequence("Ctrl+K Ctrl+C").unwrap();
+        assert_eq!(seq.len(), 2);
+        assert_eq!(seq.chords[0], ("K".to_string(), vec![KeyMod::CtrlCmd]));
+        assert_eq!(seq.chords[1], ("C".to_string(), vec![KeyMod::CtrlCmd]));
+
+        let single = parse_chord_sequence("Shift+Tab").unwrap();
+        assert_eq!(single.len(), 1);
+        assert_eq!(
+            single.chords[0],
+            ("Tab".to_string(), vec![KeyMod::Shift])
+        );
+
+        assert!(parse_chord_sequence("").is_none());
+    }
+
+    #[test]
+    fn usage_tracker_records_and_ranks() {
+        let mut tracker = KeybindingUsageTracker::new();
+        tracker.record("save");
+        tracker.record("save");
+        tracker.record("save");
+        tracker.record("copy");
+        tracker.record("paste");
+        tracker.record("paste");
+
+        assert_eq!(tracker.count("save"), 3);
+        assert_eq!(tracker.count("copy"), 1);
+        assert_eq!(tracker.count("paste"), 2);
+        assert_eq!(tracker.count("nonexistent"), 0);
+        assert_eq!(tracker.total_invocations(), 6);
+        assert_eq!(tracker.distinct_commands(), 3);
+
+        let top = tracker.top_commands(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].0, "save");
+        assert_eq!(top[0].1, 3);
+        assert_eq!(top[1].0, "paste");
+        assert_eq!(top[1].1, 2);
+
+        let display = format!("{tracker}");
+        assert!(display.contains("3 commands"));
+        assert!(display.contains("6 invocations"));
+
+        let mut other = KeybindingUsageTracker::new();
+        other.record("save");
+        other.record("undo");
+        tracker.merge(&other);
+        assert_eq!(tracker.count("save"), 4);
+        assert_eq!(tracker.count("undo"), 1);
+
+        tracker.reset();
+        assert_eq!(tracker.total_invocations(), 0);
+        assert_eq!(tracker.distinct_commands(), 0);
+    }
+
+    #[test]
+    fn cross_keymap_conflict_detection() {
+        let map1 = vec![
+            sample_binding("S", "save", vec![KeyMod::CtrlCmd]),
+            sample_binding("C", "copy", vec![KeyMod::CtrlCmd]),
+        ];
+        let map2 = vec![
+            sample_binding("S", "search", vec![KeyMod::CtrlCmd]),
+            sample_binding("N", "new", vec![KeyMod::CtrlCmd]),
+        ];
+        let conflicts = detect_cross_keymap_conflicts(&[&map1, &map2]);
+        // Ctrl+S is bound in both maps
+        assert_eq!(conflicts.len(), 1);
+        let (key, sources) = &conflicts[0];
+        assert_eq!(key, "Ctrl+S");
+        assert_eq!(sources.len(), 2);
+        assert_eq!(sources[0].0, 0); // from map1
+        assert_eq!(sources[1].0, 1); // from map2
+
+        // No conflicts when keymaps don't overlap
+        let map3 = vec![sample_binding("Z", "undo", vec![KeyMod::CtrlCmd])];
+        let no_conflicts = detect_cross_keymap_conflicts(&[&map1, &map3]);
+        assert!(no_conflicts.is_empty());
+    }
+
+    #[test]
+    fn resolve_with_context_priority() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding_src(
+            "S", "default.save", vec![KeyMod::CtrlCmd], KeybindingSource::Default,
+        ));
+        svc.register(sample_binding_src(
+            "S", "user.save", vec![KeyMod::CtrlCmd], KeybindingSource::User,
+        ));
+        svc.register(sample_binding_src(
+            "S", "ext.save", vec![KeyMod::CtrlCmd], KeybindingSource::Extension,
+        ));
+
+        let ctx = KeybindingWhenContext::new();
+        let result = resolve_with_context(&svc, "S", &[KeyMod::CtrlCmd], &ctx);
+        assert!(result.is_some());
+        // User source has highest priority
+        assert_eq!(result.unwrap().command, "user.save");
+
+        // No match for unregistered key
+        let none = resolve_with_context(&svc, "X", &[KeyMod::CtrlCmd], &ctx);
+        assert!(none.is_none());
+    }
+
+    #[test]
+    fn resolve_with_context_when_filter() {
+        let mut svc = KeybindingService::new();
+        let b = KeybindingBuilder::new()
+            .key("S")
+            .modifier(KeyMod::CtrlCmd)
+            .command("save")
+            .when("editorFocus")
+            .source(KeybindingSource::Default)
+            .build();
+        svc.register(b);
+
+        // Without the context key set, binding is inactive
+        let empty_ctx = KeybindingWhenContext::new();
+        assert!(resolve_with_context(&svc, "S", &[KeyMod::CtrlCmd], &empty_ctx).is_none());
+
+        // With the context key set, binding is active
+        let mut ctx = KeybindingWhenContext::new();
+        ctx.set("editorFocus", true);
+        let result = resolve_with_context(&svc, "S", &[KeyMod::CtrlCmd], &ctx);
+        assert_eq!(result.unwrap().command, "save");
     }
 }

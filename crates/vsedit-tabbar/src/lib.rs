@@ -46,6 +46,7 @@ impl TabKind {
     }
 }
 
+#[derive(Debug)]
 pub struct TabGroup {
     tabs: Vec<Tab>,
     active_tab: Option<usize>,
@@ -910,6 +911,279 @@ pub fn sort_pinned_first(group: &mut TabGroup) -> usize {
     moved
 }
 
+// ---------------------------------------------------------------------------
+// Tab history — recently closed tabs for reopen support
+// ---------------------------------------------------------------------------
+
+/// Tracks recently closed tabs so they can be reopened.
+#[derive(Debug, Clone)]
+pub struct TabHistory {
+    /// Closed tabs stored in LIFO order (most recent last).
+    closed: Vec<Tab>,
+    /// Maximum number of closed tabs to remember.
+    capacity: usize,
+}
+
+impl TabHistory {
+    /// Create a new history with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            closed: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Record a tab that was just closed.
+    pub fn push(&mut self, tab: Tab) {
+        if self.closed.len() >= self.capacity {
+            self.closed.remove(0);
+        }
+        self.closed.push(tab);
+    }
+
+    /// Pop the most recently closed tab for reopening, or `None` if empty.
+    pub fn pop(&mut self) -> Option<Tab> {
+        self.closed.pop()
+    }
+
+    /// Peek at the most recently closed tab without removing it.
+    pub fn peek(&self) -> Option<&Tab> {
+        self.closed.last()
+    }
+
+    /// Number of closed tabs in history.
+    pub fn len(&self) -> usize {
+        self.closed.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.closed.is_empty()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.closed.clear();
+    }
+
+    /// Return an iterator over the closed tabs (oldest first).
+    pub fn iter(&self) -> impl Iterator<Item = &Tab> {
+        self.closed.iter()
+    }
+
+    /// Find a closed tab by URI.
+    pub fn find_by_uri(&self, uri: &str) -> Option<&Tab> {
+        self.closed.iter().find(|t| t.uri.as_deref() == Some(uri))
+    }
+
+    /// Remove and return a specific closed tab by id, if present.
+    pub fn remove_by_id(&mut self, id: &str) -> Option<Tab> {
+        if let Some(pos) = self.closed.iter().position(|t| t.id == id) {
+            Some(self.closed.remove(pos))
+        } else {
+            None
+        }
+    }
+}
+
+impl Default for TabHistory {
+    fn default() -> Self {
+        Self::new(20)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tab search / filter
+// ---------------------------------------------------------------------------
+
+/// Result of matching a tab against a search query.
+#[derive(Debug, Clone)]
+pub struct TabSearchResult<'a> {
+    pub tab: &'a Tab,
+    pub score: u32,
+}
+
+/// Search tabs by label using a simple substring + prefix-bonus scoring.
+pub fn search_tabs<'a>(tabs: &'a [Tab], query: &str) -> Vec<TabSearchResult<'a>> {
+    if query.is_empty() {
+        return tabs
+            .iter()
+            .map(|tab| TabSearchResult { tab, score: 0 })
+            .collect();
+    }
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+    for tab in tabs {
+        let label_lower = tab.label.to_lowercase();
+        if let Some(pos) = label_lower.find(&query_lower) {
+            let mut score: u32 = 100u32.saturating_sub(pos as u32);
+            // Exact match bonus
+            if label_lower == query_lower {
+                score += 50;
+            }
+            // Prefix match bonus
+            if pos == 0 {
+                score += 25;
+            }
+            results.push(TabSearchResult { tab, score });
+        }
+    }
+    results.sort_by(|a, b| b.score.cmp(&a.score));
+    results
+}
+
+/// Filter tabs whose label contains the query (case-insensitive).
+pub fn filter_tabs<'a>(tabs: &'a [Tab], query: &str) -> Vec<&'a Tab> {
+    let query_lower = query.to_lowercase();
+    tabs.iter()
+        .filter(|t| t.label.to_lowercase().contains(&query_lower))
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Tab sizing calculations
+// ---------------------------------------------------------------------------
+
+/// Calculate individual tab widths given labels and constraints.
+pub fn calculate_tab_widths(
+    labels: &[&str],
+    available_width: usize,
+    min_width: usize,
+    max_width: usize,
+    padding: usize,
+) -> Vec<usize> {
+    if labels.is_empty() {
+        return Vec::new();
+    }
+    let ideal_widths: Vec<usize> = labels
+        .iter()
+        .map(|l| (l.len() + padding).clamp(min_width, max_width))
+        .collect();
+    let total_ideal: usize = ideal_widths.iter().sum();
+    if total_ideal <= available_width {
+        return ideal_widths;
+    }
+    // Proportionally shrink, respecting min_width
+    let scale = available_width as f64 / total_ideal as f64;
+    ideal_widths
+        .iter()
+        .map(|&w| ((w as f64 * scale) as usize).max(min_width))
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Split view management
+// ---------------------------------------------------------------------------
+
+/// Represents a split editor pane, each containing its own tab group.
+#[derive(Debug)]
+pub struct SplitView {
+    panes: Vec<TabGroup>,
+    active_pane: usize,
+}
+
+impl SplitView {
+    /// Create a split view with a single empty pane.
+    pub fn new() -> Self {
+        Self {
+            panes: vec![TabGroup::new()],
+            active_pane: 0,
+        }
+    }
+
+    /// Number of panes.
+    pub fn pane_count(&self) -> usize {
+        self.panes.len()
+    }
+
+    /// Get the active pane index.
+    pub fn active_pane_index(&self) -> usize {
+        self.active_pane
+    }
+
+    /// Get a reference to the active pane's tab group.
+    pub fn active_pane(&self) -> &TabGroup {
+        &self.panes[self.active_pane]
+    }
+
+    /// Get a mutable reference to the active pane's tab group.
+    pub fn active_pane_mut(&mut self) -> &mut TabGroup {
+        &mut self.panes[self.active_pane]
+    }
+
+    /// Add a new split pane. Returns the index of the new pane.
+    pub fn split(&mut self) -> usize {
+        self.panes.push(TabGroup::new());
+        self.panes.len() - 1
+    }
+
+    /// Focus a specific pane by index. Returns false if out of range.
+    pub fn focus_pane(&mut self, index: usize) -> bool {
+        if index < self.panes.len() {
+            self.active_pane = index;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Close a pane by index, moving its tabs nowhere (they are lost).
+    /// Cannot close the last remaining pane.
+    /// Returns the closed pane's tabs, or `None` if it can't be closed.
+    pub fn close_pane(&mut self, index: usize) -> Option<Vec<Tab>> {
+        if self.panes.len() <= 1 || index >= self.panes.len() {
+            return None;
+        }
+        let mut removed = self.panes.remove(index);
+        let tabs = removed.close_all();
+        if self.active_pane >= self.panes.len() {
+            self.active_pane = self.panes.len() - 1;
+        }
+        Some(tabs)
+    }
+
+    /// Move a tab from one pane to another.
+    /// Returns `true` on success.
+    pub fn move_tab_to_pane(
+        &mut self,
+        tab_id: &str,
+        from_pane: usize,
+        to_pane: usize,
+    ) -> bool {
+        if from_pane >= self.panes.len() || to_pane >= self.panes.len() || from_pane == to_pane {
+            return false;
+        }
+        // Find and remove the tab from source pane
+        let tab = {
+            let src = &self.panes[from_pane];
+            src.get_tab(tab_id).cloned()
+        };
+        if let Some(tab) = tab {
+            self.panes[from_pane].close_tab(tab_id);
+            self.panes[to_pane].add_tab(tab);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get a reference to a pane by index.
+    pub fn get_pane(&self, index: usize) -> Option<&TabGroup> {
+        self.panes.get(index)
+    }
+
+    /// Total number of tabs across all panes.
+    pub fn total_tab_count(&self) -> usize {
+        self.panes.iter().map(|p| p.tab_count()).sum()
+    }
+}
+
+impl Default for SplitView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1581,5 +1855,158 @@ mod tests {
         let moved = sort_pinned_first(&mut group);
         assert!(moved > 0);
         assert_eq!(group.get_tab_index("b"), Some(0));
+    }
+
+    // -- TabHistory tests ----------------------------------------------------
+
+    #[test]
+    fn tab_history_push_pop() {
+        let mut history = TabHistory::new(5);
+        assert!(history.is_empty());
+        history.push(make_tab("a"));
+        history.push(make_tab("b"));
+        assert_eq!(history.len(), 2);
+        let reopened = history.pop().unwrap();
+        assert_eq!(reopened.id, "b");
+        let reopened = history.pop().unwrap();
+        assert_eq!(reopened.id, "a");
+        assert!(history.pop().is_none());
+    }
+
+    #[test]
+    fn tab_history_capacity_eviction() {
+        let mut history = TabHistory::new(2);
+        history.push(make_tab("a"));
+        history.push(make_tab("b"));
+        history.push(make_tab("c"));
+        assert_eq!(history.len(), 2);
+        // "a" should have been evicted
+        assert!(history.find_by_uri("a").is_none());
+        let t = history.pop().unwrap();
+        assert_eq!(t.id, "c");
+    }
+
+    #[test]
+    fn tab_history_find_by_uri_and_remove() {
+        let mut history = TabHistory::new(10);
+        history.push(make_tab_with_uri("t1", "file:///foo.rs"));
+        history.push(make_tab("t2"));
+        assert!(history.find_by_uri("file:///foo.rs").is_some());
+        assert!(history.find_by_uri("file:///bar.rs").is_none());
+        let removed = history.remove_by_id("t1").unwrap();
+        assert_eq!(removed.id, "t1");
+        assert_eq!(history.len(), 1);
+        assert!(history.remove_by_id("missing").is_none());
+    }
+
+    // -- search_tabs / filter_tabs tests -------------------------------------
+
+    #[test]
+    fn search_tabs_scores_and_order() {
+        let tabs = vec![
+            make_tab("readme"),
+            make_tab("lib"),
+            make_tab("main"),
+        ];
+        // Change labels to something meaningful
+        let mut tabs = tabs;
+        tabs[0].label = "README.md".to_string();
+        tabs[1].label = "lib.rs".to_string();
+        tabs[2].label = "main.rs".to_string();
+
+        let results = search_tabs(&tabs, "main");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].tab.id, "main");
+
+        // Empty query returns all
+        let all = search_tabs(&tabs, "");
+        assert_eq!(all.len(), 3);
+    }
+
+    #[test]
+    fn filter_tabs_case_insensitive() {
+        let mut tabs = vec![make_tab("a"), make_tab("b"), make_tab("c")];
+        tabs[0].label = "Cargo.toml".to_string();
+        tabs[1].label = "cargo.lock".to_string();
+        tabs[2].label = "README.md".to_string();
+
+        let filtered = filter_tabs(&tabs, "cargo");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    // -- calculate_tab_widths tests ------------------------------------------
+
+    #[test]
+    fn tab_widths_fit_within_available() {
+        let labels = vec!["ab", "cdef", "g"];
+        let widths = calculate_tab_widths(&labels, 200, 5, 40, 4);
+        // All should fit: "ab"+4=6, "cdef"+4=8, "g"+4=5 → total=19 ≤ 200
+        assert_eq!(widths, vec![6, 8, 5]);
+    }
+
+    #[test]
+    fn tab_widths_shrink_proportionally() {
+        let labels = vec!["abcdefghij"; 10]; // 10 + 4 = 14 each, total 140
+        let widths = calculate_tab_widths(&labels, 50, 3, 40, 4);
+        // Must shrink. Each should be >= min_width
+        for &w in &widths {
+            assert!(w >= 3);
+        }
+        assert_eq!(widths.len(), 10);
+    }
+
+    // -- SplitView tests -----------------------------------------------------
+
+    #[test]
+    fn split_view_basic_operations() {
+        let mut sv = SplitView::new();
+        assert_eq!(sv.pane_count(), 1);
+        assert_eq!(sv.active_pane_index(), 0);
+
+        sv.active_pane_mut().add_tab(make_tab("a"));
+        assert_eq!(sv.total_tab_count(), 1);
+
+        let idx = sv.split();
+        assert_eq!(idx, 1);
+        assert_eq!(sv.pane_count(), 2);
+
+        assert!(sv.focus_pane(1));
+        assert_eq!(sv.active_pane_index(), 1);
+        assert!(!sv.focus_pane(99));
+    }
+
+    #[test]
+    fn split_view_move_tab_between_panes() {
+        let mut sv = SplitView::new();
+        sv.active_pane_mut().add_tab(make_tab("t1"));
+        sv.active_pane_mut().add_tab(make_tab("t2"));
+        let pane1 = sv.split();
+
+        assert!(sv.move_tab_to_pane("t1", 0, pane1));
+        assert_eq!(sv.get_pane(0).unwrap().tab_count(), 1);
+        assert_eq!(sv.get_pane(pane1).unwrap().tab_count(), 1);
+        assert_eq!(sv.total_tab_count(), 2);
+
+        // Can't move to same pane or invalid pane
+        assert!(!sv.move_tab_to_pane("t2", 0, 0));
+        assert!(!sv.move_tab_to_pane("t2", 0, 99));
+    }
+
+    #[test]
+    fn split_view_close_pane() {
+        let mut sv = SplitView::new();
+        sv.active_pane_mut().add_tab(make_tab("a"));
+        let p1 = sv.split();
+        sv.focus_pane(p1);
+        sv.active_pane_mut().add_tab(make_tab("b"));
+
+        // Can't close the last pane
+        let tabs = sv.close_pane(p1);
+        assert!(tabs.is_some());
+        assert_eq!(tabs.unwrap().len(), 1);
+        assert_eq!(sv.pane_count(), 1);
+
+        // Now only one pane left — can't close it
+        assert!(sv.close_pane(0).is_none());
     }
 }

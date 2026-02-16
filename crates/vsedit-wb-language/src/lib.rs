@@ -785,6 +785,296 @@ impl LanguageFeatureSupport {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Syntax token classification
+// ---------------------------------------------------------------------------
+
+/// Classification of syntax tokens for semantic highlighting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SyntaxTokenKind {
+    Keyword,
+    Identifier,
+    StringLiteral,
+    NumericLiteral,
+    Comment,
+    Operator,
+    Punctuation,
+    TypeName,
+    FunctionName,
+    Variable,
+    Whitespace,
+    Unknown,
+}
+
+impl SyntaxTokenKind {
+    /// Returns `true` if the token carries semantic meaning.
+    pub fn is_semantic(&self) -> bool {
+        !matches!(self, Self::Whitespace | Self::Unknown | Self::Punctuation)
+    }
+
+    /// Returns a human-readable label for this token kind.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Keyword => "keyword",
+            Self::Identifier => "identifier",
+            Self::StringLiteral => "string",
+            Self::NumericLiteral => "number",
+            Self::Comment => "comment",
+            Self::Operator => "operator",
+            Self::Punctuation => "punctuation",
+            Self::TypeName => "type",
+            Self::FunctionName => "function",
+            Self::Variable => "variable",
+            Self::Whitespace => "whitespace",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl fmt::Display for SyntaxTokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language configuration with merging
+// ---------------------------------------------------------------------------
+
+/// Language-specific editor settings that can be layered and merged.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageConfiguration {
+    pub language_id: String,
+    pub tab_size: Option<u8>,
+    pub insert_spaces: Option<bool>,
+    pub word_wrap: Option<bool>,
+    pub rulers: Vec<usize>,
+    pub comment_line: Option<String>,
+    pub comment_block_start: Option<String>,
+    pub comment_block_end: Option<String>,
+}
+
+impl LanguageConfiguration {
+    pub fn new(language_id: impl Into<String>) -> Self {
+        Self {
+            language_id: language_id.into(),
+            tab_size: None,
+            insert_spaces: None,
+            word_wrap: None,
+            rulers: Vec::new(),
+            comment_line: None,
+            comment_block_start: None,
+            comment_block_end: None,
+        }
+    }
+
+    /// Merges `other` into `self`, where `other` values take precedence when present.
+    pub fn merge_from(&mut self, other: &LanguageConfiguration) {
+        if other.tab_size.is_some() {
+            self.tab_size = other.tab_size;
+        }
+        if other.insert_spaces.is_some() {
+            self.insert_spaces = other.insert_spaces;
+        }
+        if other.word_wrap.is_some() {
+            self.word_wrap = other.word_wrap;
+        }
+        if !other.rulers.is_empty() {
+            self.rulers = other.rulers.clone();
+        }
+        if other.comment_line.is_some() {
+            self.comment_line = other.comment_line.clone();
+        }
+        if other.comment_block_start.is_some() {
+            self.comment_block_start = other.comment_block_start.clone();
+        }
+        if other.comment_block_end.is_some() {
+            self.comment_block_end = other.comment_block_end.clone();
+        }
+    }
+
+    /// Returns `true` if the configuration has block comment delimiters.
+    pub fn has_block_comments(&self) -> bool {
+        self.comment_block_start.is_some() && self.comment_block_end.is_some()
+    }
+
+    /// Returns the effective tab size, falling back to a default of 4.
+    pub fn effective_tab_size(&self) -> u8 {
+        self.tab_size.unwrap_or(4)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Embedded / multi-language document support
+// ---------------------------------------------------------------------------
+
+/// A region within a document that uses a different language.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EmbeddedLanguageRegion {
+    pub language_id: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+impl EmbeddedLanguageRegion {
+    pub fn new(language_id: impl Into<String>, start_line: usize, end_line: usize) -> Self {
+        Self {
+            language_id: language_id.into(),
+            start_line,
+            end_line,
+        }
+    }
+
+    /// Number of lines spanned by this region.
+    pub fn line_count(&self) -> usize {
+        if self.end_line >= self.start_line {
+            self.end_line - self.start_line + 1
+        } else {
+            0
+        }
+    }
+
+    /// Returns `true` if the given line falls within this region.
+    pub fn contains_line(&self, line: usize) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+}
+
+/// A document that tracks its primary language and any embedded language regions.
+#[derive(Debug, Clone)]
+pub struct MultiLanguageDocument {
+    pub primary_language_id: String,
+    pub regions: Vec<EmbeddedLanguageRegion>,
+}
+
+impl MultiLanguageDocument {
+    pub fn new(primary_language_id: impl Into<String>) -> Self {
+        Self {
+            primary_language_id: primary_language_id.into(),
+            regions: Vec::new(),
+        }
+    }
+
+    pub fn add_region(&mut self, region: EmbeddedLanguageRegion) {
+        self.regions.push(region);
+    }
+
+    /// Returns the language id for a given line number.
+    pub fn language_at_line(&self, line: usize) -> &str {
+        for region in &self.regions {
+            if region.contains_line(line) {
+                return &region.language_id;
+            }
+        }
+        &self.primary_language_id
+    }
+
+    /// Returns all unique language ids present in the document.
+    pub fn all_languages(&self) -> Vec<&str> {
+        let mut langs: Vec<&str> = vec![&self.primary_language_id];
+        for region in &self.regions {
+            if !langs.contains(&region.language_id.as_str()) {
+                langs.push(&region.language_id);
+            }
+        }
+        langs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// File association scoring
+// ---------------------------------------------------------------------------
+
+/// Scores how well a file matches a language, considering multiple signals.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileAssociationScore {
+    pub language_id: String,
+    pub extension_match: bool,
+    pub filename_match: bool,
+    pub first_line_match: bool,
+    pub mime_match: bool,
+}
+
+impl FileAssociationScore {
+    /// Computes a numeric score: each signal contributes a weight.
+    pub fn score(&self) -> u32 {
+        let mut s = 0u32;
+        if self.extension_match {
+            s += 10;
+        }
+        if self.filename_match {
+            s += 5;
+        }
+        if self.first_line_match {
+            s += 20;
+        }
+        if self.mime_match {
+            s += 8;
+        }
+        s
+    }
+}
+
+/// Scores all languages in a registry against a filename and optional first line.
+pub fn score_languages(
+    registry: &LanguageRegistry,
+    filename: &str,
+    first_line: Option<&str>,
+) -> Vec<FileAssociationScore> {
+    let mut scores: Vec<FileAssociationScore> = registry
+        .languages
+        .iter()
+        .map(|lang| {
+            let extension_match = lang.matches_filename(filename);
+            let filename_match = lang.extensions.iter().any(|ext| {
+                filename
+                    .rsplit('/')
+                    .next()
+                    .map_or(false, |base| base == ext.trim_start_matches('.'))
+            });
+            let first_line_match = first_line.map_or(false, |fl| {
+                lang.first_line_pattern
+                    .as_ref()
+                    .map_or(false, |pat| fl.contains(pat.as_str()))
+            });
+            FileAssociationScore {
+                language_id: lang.id.clone(),
+                extension_match,
+                filename_match,
+                first_line_match,
+                mime_match: false,
+            }
+        })
+        .filter(|s| s.score() > 0)
+        .collect();
+    scores.sort_by(|a, b| b.score().cmp(&a.score()));
+    scores
+}
+
+// ---------------------------------------------------------------------------
+// Shebang parser
+// ---------------------------------------------------------------------------
+
+/// Extracts the interpreter name from a shebang line (e.g. `#!/usr/bin/env python3` → `"python3"`).
+pub fn parse_shebang(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("#!") {
+        return None;
+    }
+    let after_hash = trimmed.trim_start_matches("#!").trim();
+    // Handle `env` wrapper: `#!/usr/bin/env python3`
+    let parts: Vec<&str> = after_hash.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let first = parts[0].rsplit('/').next().unwrap_or(parts[0]);
+    if first == "env" {
+        parts.get(1).map(|s| s.rsplit('/').next().unwrap_or(s))
+    } else {
+        Some(first)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1579,5 +1869,121 @@ mod tests {
             partial.missing_features(),
             vec!["hover", "diagnostics", "references", "code_actions"]
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: syntax token classification
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn syntax_token_kind_semantic_and_label() {
+        assert!(SyntaxTokenKind::Keyword.is_semantic());
+        assert!(SyntaxTokenKind::FunctionName.is_semantic());
+        assert!(!SyntaxTokenKind::Whitespace.is_semantic());
+        assert!(!SyntaxTokenKind::Unknown.is_semantic());
+        assert!(!SyntaxTokenKind::Punctuation.is_semantic());
+
+        assert_eq!(SyntaxTokenKind::Comment.label(), "comment");
+        assert_eq!(SyntaxTokenKind::Operator.label(), "operator");
+        assert_eq!(format!("{}", SyntaxTokenKind::TypeName), "type");
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: language configuration merging
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn language_configuration_merge_and_defaults() {
+        let mut base = LanguageConfiguration::new("rust");
+        base.tab_size = Some(4);
+        base.insert_spaces = Some(true);
+        base.comment_line = Some("//".into());
+
+        let mut overlay = LanguageConfiguration::new("rust");
+        overlay.tab_size = Some(2);
+        overlay.rulers = vec![80, 120];
+        overlay.comment_block_start = Some("/*".into());
+        overlay.comment_block_end = Some("*/".into());
+
+        base.merge_from(&overlay);
+
+        assert_eq!(base.tab_size, Some(2)); // overridden
+        assert_eq!(base.insert_spaces, Some(true)); // kept
+        assert_eq!(base.rulers, vec![80, 120]); // replaced
+        assert_eq!(base.comment_line.as_deref(), Some("//")); // kept
+        assert!(base.has_block_comments());
+        assert_eq!(base.effective_tab_size(), 2);
+
+        let empty = LanguageConfiguration::new("go");
+        assert_eq!(empty.effective_tab_size(), 4); // default
+        assert!(!empty.has_block_comments());
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: multi-language document
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn multi_language_document_regions() {
+        let mut doc = MultiLanguageDocument::new("html");
+        doc.add_region(EmbeddedLanguageRegion::new("css", 5, 15));
+        doc.add_region(EmbeddedLanguageRegion::new("javascript", 20, 30));
+
+        assert_eq!(doc.language_at_line(0), "html");
+        assert_eq!(doc.language_at_line(5), "css");
+        assert_eq!(doc.language_at_line(10), "css");
+        assert_eq!(doc.language_at_line(18), "html");
+        assert_eq!(doc.language_at_line(25), "javascript");
+
+        let langs = doc.all_languages();
+        assert_eq!(langs, vec!["html", "css", "javascript"]);
+
+        let region = &doc.regions[0];
+        assert_eq!(region.line_count(), 11);
+        assert!(region.contains_line(5));
+        assert!(region.contains_line(15));
+        assert!(!region.contains_line(16));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: file association scoring
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn score_languages_ranks_by_signals() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+
+        let scores = score_languages(&reg, "main.rs", None);
+        assert!(!scores.is_empty());
+        assert_eq!(scores[0].language_id, "rust");
+        assert!(scores[0].extension_match);
+        assert_eq!(scores[0].score(), 10);
+
+        // With first-line match for python
+        let scores2 = score_languages(
+            &reg,
+            "script",
+            Some("^#!.*\\bpython something"),
+        );
+        assert_eq!(scores2[0].language_id, "python");
+        assert!(scores2[0].first_line_match);
+        assert!(scores2[0].score() >= 20);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: shebang parsing
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_shebang_extracts_interpreter() {
+        assert_eq!(parse_shebang("#!/usr/bin/env python3"), Some("python3"));
+        assert_eq!(parse_shebang("#!/bin/bash"), Some("bash"));
+        assert_eq!(parse_shebang("#!/usr/bin/env node"), Some("node"));
+        assert_eq!(parse_shebang("#!/usr/local/bin/ruby"), Some("ruby"));
+        assert_eq!(parse_shebang("  #!/usr/bin/env perl  "), Some("perl"));
+        assert_eq!(parse_shebang("no shebang here"), None);
+        assert_eq!(parse_shebang(""), None);
     }
 }

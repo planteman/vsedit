@@ -947,6 +947,164 @@ impl<T: Clone + Send + Sync + 'static> EventPipeline<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EventStatistics — count events by tag
+// ---------------------------------------------------------------------------
+
+/// Tracks event statistics: total count, per-tag counts, and timestamps.
+pub struct EventStatistics {
+    total: usize,
+    by_tag: std::collections::HashMap<String, usize>,
+    first_event_time: Option<u64>,
+    last_event_time: Option<u64>,
+}
+
+impl EventStatistics {
+    /// Create a new empty statistics tracker.
+    pub fn new() -> Self {
+        Self {
+            total: 0,
+            by_tag: std::collections::HashMap::new(),
+            first_event_time: None,
+            last_event_time: None,
+        }
+    }
+
+    /// Record an event with the given tag.
+    pub fn record(&mut self, tag: &str) {
+        let now = current_time_ms();
+        self.total += 1;
+        *self.by_tag.entry(tag.to_string()).or_insert(0) += 1;
+        if self.first_event_time.is_none() {
+            self.first_event_time = Some(now);
+        }
+        self.last_event_time = Some(now);
+    }
+
+    /// Total number of events recorded.
+    pub fn total(&self) -> usize {
+        self.total
+    }
+
+    /// Count for a specific tag. Returns 0 if the tag has never been recorded.
+    pub fn count_for(&self, tag: &str) -> usize {
+        self.by_tag.get(tag).copied().unwrap_or(0)
+    }
+
+    /// Return all recorded tags and their counts.
+    pub fn all_counts(&self) -> &std::collections::HashMap<String, usize> {
+        &self.by_tag
+    }
+
+    /// Number of distinct tags recorded.
+    pub fn distinct_tags(&self) -> usize {
+        self.by_tag.len()
+    }
+
+    /// Return the tag with the highest count, or `None` if empty.
+    pub fn most_frequent(&self) -> Option<(&str, usize)> {
+        self.by_tag
+            .iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(tag, count)| (tag.as_str(), *count))
+    }
+
+    /// Reset all statistics.
+    pub fn reset(&mut self) {
+        self.total = 0;
+        self.by_tag.clear();
+        self.first_event_time = None;
+        self.last_event_time = None;
+    }
+
+    /// Milliseconds between the first and last recorded event, or 0 if fewer
+    /// than two events have been recorded.
+    pub fn duration_ms(&self) -> u64 {
+        match (self.first_event_time, self.last_event_time) {
+            (Some(first), Some(last)) => last.saturating_sub(first),
+            _ => 0,
+        }
+    }
+}
+
+impl Default for EventStatistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Debug for EventStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventStatistics")
+            .field("total", &self.total)
+            .field("distinct_tags", &self.distinct_tags())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventAggregator — batch events and flush
+// ---------------------------------------------------------------------------
+
+/// Collects events into a batch and fires them as a single `Vec<T>` when
+/// the batch reaches a configured size or when manually flushed.
+pub struct EventAggregator<T: Clone + Send + Sync + 'static> {
+    batch: Mutex<Vec<T>>,
+    batch_size: usize,
+    emitter: Emitter<Vec<T>>,
+}
+
+impl<T: Clone + Send + Sync + 'static> EventAggregator<T> {
+    /// Create a new aggregator that flushes every `batch_size` events.
+    pub fn new(batch_size: usize) -> Self {
+        assert!(batch_size > 0, "batch_size must be > 0");
+        Self {
+            batch: Mutex::new(Vec::with_capacity(batch_size)),
+            batch_size,
+            emitter: Emitter::new(),
+        }
+    }
+
+    /// Add a value to the current batch. If the batch reaches `batch_size`,
+    /// it is automatically flushed.
+    pub fn push(&self, value: T) {
+        let mut batch = self.batch.lock().unwrap();
+        batch.push(value);
+        if batch.len() >= self.batch_size {
+            let items: Vec<T> = batch.drain(..).collect();
+            drop(batch);
+            self.emitter.fire(&items);
+        }
+    }
+
+    /// Flush any pending events in the current batch regardless of size.
+    /// No-op if the batch is empty.
+    pub fn flush(&self) {
+        let mut batch = self.batch.lock().unwrap();
+        if batch.is_empty() {
+            return;
+        }
+        let items: Vec<T> = batch.drain(..).collect();
+        drop(batch);
+        self.emitter.fire(&items);
+    }
+
+    /// Returns the subscribable event that fires batches.
+    pub fn event(&self) -> Event<Vec<T>> {
+        self.emitter.event()
+    }
+
+    /// Number of events waiting in the current batch.
+    pub fn pending(&self) -> usize {
+        self.batch.lock().unwrap().len()
+    }
+
+    /// The configured batch size.
+    pub fn batch_size(&self) -> usize {
+        self.batch_size
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1570,5 +1728,97 @@ mod tests {
         });
         pipeline.process("hello".to_string());
         assert_eq!(received.lock().unwrap()[0], "hello");
+    }
+
+    // -- EventStatistics tests -----------------------------------------------
+
+    #[test]
+    fn event_statistics_record_and_count() {
+        let mut stats = EventStatistics::new();
+        stats.record("click");
+        stats.record("click");
+        stats.record("scroll");
+        assert_eq!(stats.total(), 3);
+        assert_eq!(stats.count_for("click"), 2);
+        assert_eq!(stats.count_for("scroll"), 1);
+        assert_eq!(stats.count_for("keypress"), 0);
+        assert_eq!(stats.distinct_tags(), 2);
+    }
+
+    #[test]
+    fn event_statistics_most_frequent() {
+        let mut stats = EventStatistics::new();
+        assert!(stats.most_frequent().is_none());
+        stats.record("a");
+        stats.record("b");
+        stats.record("b");
+        stats.record("b");
+        stats.record("a");
+        let (tag, count) = stats.most_frequent().unwrap();
+        assert_eq!(tag, "b");
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn event_statistics_reset() {
+        let mut stats = EventStatistics::new();
+        stats.record("x");
+        stats.record("y");
+        assert_eq!(stats.total(), 2);
+        stats.reset();
+        assert_eq!(stats.total(), 0);
+        assert_eq!(stats.distinct_tags(), 0);
+        assert_eq!(stats.duration_ms(), 0);
+    }
+
+    // -- EventAggregator tests -----------------------------------------------
+
+    #[test]
+    fn aggregator_auto_flushes_at_batch_size() {
+        let agg = EventAggregator::<i32>::new(3);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = agg.event().on(move |batch: &Vec<i32>| {
+            r.lock().unwrap().push(batch.clone());
+        });
+        agg.push(1);
+        agg.push(2);
+        assert_eq!(agg.pending(), 2);
+        assert!(received.lock().unwrap().is_empty());
+        agg.push(3); // triggers auto-flush
+        assert_eq!(agg.pending(), 0);
+        let batches = received.lock().unwrap();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0], vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn aggregator_manual_flush() {
+        let agg = EventAggregator::<String>::new(100);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = agg.event().on(move |batch: &Vec<String>| {
+            r.lock().unwrap().push(batch.clone());
+        });
+        agg.push("a".into());
+        agg.push("b".into());
+        assert_eq!(agg.pending(), 2);
+        agg.flush();
+        assert_eq!(agg.pending(), 0);
+        let batches = received.lock().unwrap();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0], vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn aggregator_flush_empty_is_noop() {
+        let agg = EventAggregator::<i32>::new(5);
+        let received = Arc::new(Mutex::new(Vec::<Vec<i32>>::new()));
+        let r = received.clone();
+        let _h = agg.event().on(move |batch: &Vec<i32>| {
+            r.lock().unwrap().push(batch.clone());
+        });
+        agg.flush(); // no-op
+        assert!(received.lock().unwrap().is_empty());
     }
 }

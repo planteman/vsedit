@@ -885,6 +885,222 @@ pub fn image_fit_dimensions(src_w: u32, src_h: u32, max_w: u32, max_h: u32) -> (
     (new_w.max(1), new_h.max(1))
 }
 
+// ---------------------------------------------------------------------------
+// Color – hex / RGB / HSL conversion helpers
+// ---------------------------------------------------------------------------
+
+/// An RGB color with 8-bit components.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rgb {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+/// An HSL color with components in the ranges H:[0,360), S:[0,1], L:[0,1].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Hsl {
+    pub h: f64,
+    pub s: f64,
+    pub l: f64,
+}
+
+impl Rgb {
+    pub fn new(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b }
+    }
+
+    /// Parse a CSS-style hex color string (`#RRGGBB` or `RRGGBB`).
+    pub fn from_hex(hex: &str) -> Result<Self, String> {
+        let hex = hex.trim_start_matches('#');
+        if hex.len() != 6 {
+            return Err(format!("expected 6 hex digits, got {}", hex.len()));
+        }
+        let r = u8::from_str_radix(&hex[0..2], 16).map_err(|e| e.to_string())?;
+        let g = u8::from_str_radix(&hex[2..4], 16).map_err(|e| e.to_string())?;
+        let b = u8::from_str_radix(&hex[4..6], 16).map_err(|e| e.to_string())?;
+        Ok(Self { r, g, b })
+    }
+
+    /// Render as `#rrggbb` lowercase hex.
+    pub fn to_hex(self) -> String {
+        format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
+    }
+
+    /// Convert to HSL.
+    pub fn to_hsl(self) -> Hsl {
+        let r = self.r as f64 / 255.0;
+        let g = self.g as f64 / 255.0;
+        let b = self.b as f64 / 255.0;
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let l = (max + min) / 2.0;
+        if (max - min).abs() < f64::EPSILON {
+            return Hsl { h: 0.0, s: 0.0, l };
+        }
+        let d = max - min;
+        let s = if l > 0.5 {
+            d / (2.0 - max - min)
+        } else {
+            d / (max + min)
+        };
+        let h = if (max - r).abs() < f64::EPSILON {
+            ((g - b) / d) % 6.0
+        } else if (max - g).abs() < f64::EPSILON {
+            (b - r) / d + 2.0
+        } else {
+            (r - g) / d + 4.0
+        };
+        let h = ((h * 60.0) + 360.0) % 360.0;
+        Hsl { h, s, l }
+    }
+
+    /// Relative luminance per ITU-R BT.601.
+    pub fn luminance(self) -> f64 {
+        0.299 * (self.r as f64) + 0.587 * (self.g as f64) + 0.114 * (self.b as f64)
+    }
+}
+
+impl fmt::Display for Rgb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "rgb({}, {}, {})", self.r, self.g, self.b)
+    }
+}
+
+impl fmt::Display for Hsl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "hsl({:.0}, {:.1}%, {:.1}%)", self.h, self.s * 100.0, self.l * 100.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SVG dimension parsing
+// ---------------------------------------------------------------------------
+
+/// Parsed dimensions from an SVG root element.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SvgDimensions {
+    pub width: f64,
+    pub height: f64,
+}
+
+/// Extract `width` and `height` attributes from a minimal SVG header string.
+///
+/// Looks for patterns like `width="300"` / `height="200"` (with or without a
+/// unit suffix such as `px`).  Returns `None` if either attribute is missing
+/// or cannot be parsed.
+pub fn parse_svg_dimensions(svg: &str) -> Option<SvgDimensions> {
+    fn extract_attr(s: &str, attr: &str) -> Option<f64> {
+        let needle = format!("{}=\"", attr);
+        let start = s.find(&needle)? + needle.len();
+        let rest = &s[start..];
+        let end = rest.find('"')?;
+        let val = &rest[..end];
+        // strip optional unit suffix (px, em, pt, etc.)
+        let numeric: String = val.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+        numeric.parse::<f64>().ok()
+    }
+
+    let header = if svg.len() > 512 { &svg[..512] } else { svg };
+    let w = extract_attr(header, "width")?;
+    let h = extract_attr(header, "height")?;
+    Some(SvgDimensions { width: w, height: h })
+}
+
+// ---------------------------------------------------------------------------
+// ImageCacheEntry / LRU eviction helper
+// ---------------------------------------------------------------------------
+
+/// A single entry in an image cache.
+#[derive(Debug, Clone)]
+pub struct ImageCacheEntry {
+    pub uri: String,
+    pub size_bytes: u64,
+    pub access_counter: u64,
+}
+
+/// A simple LRU-style image cache tracker.
+///
+/// This does **not** store actual pixel data – it only tracks which URIs are
+/// cached and their sizes so that eviction decisions can be made.
+#[derive(Debug, Clone)]
+pub struct ImageCacheTracker {
+    entries: Vec<ImageCacheEntry>,
+    max_total_bytes: u64,
+    total_bytes: u64,
+    counter: u64,
+}
+
+impl ImageCacheTracker {
+    pub fn new(max_total_bytes: u64) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_total_bytes,
+            total_bytes: 0,
+            counter: 0,
+        }
+    }
+
+    /// Record a cache access, inserting the entry if absent.
+    /// Returns URIs that were evicted to make room.
+    pub fn touch(&mut self, uri: &str, size_bytes: u64) -> Vec<String> {
+        self.counter += 1;
+        // If already present, just bump the counter.
+        if let Some(e) = self.entries.iter_mut().find(|e| e.uri == uri) {
+            e.access_counter = self.counter;
+            return Vec::new();
+        }
+        // Evict LRU entries until there is room.
+        let mut evicted = Vec::new();
+        while self.total_bytes + size_bytes > self.max_total_bytes && !self.entries.is_empty() {
+            // Find the entry with the smallest access_counter.
+            let min_idx = self
+                .entries
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, e)| e.access_counter)
+                .map(|(i, _)| i)
+                .unwrap();
+            let removed = self.entries.swap_remove(min_idx);
+            self.total_bytes -= removed.size_bytes;
+            evicted.push(removed.uri);
+        }
+        self.entries.push(ImageCacheEntry {
+            uri: uri.to_string(),
+            size_bytes,
+            access_counter: self.counter,
+        });
+        self.total_bytes += size_bytes;
+        evicted
+    }
+
+    /// Number of entries currently tracked.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Total bytes currently tracked.
+    pub fn total_bytes(&self) -> u64 {
+        self.total_bytes
+    }
+
+    /// Check whether a URI is in the cache.
+    pub fn contains(&self, uri: &str) -> bool {
+        self.entries.iter().any(|e| e.uri == uri)
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.total_bytes = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1564,5 +1780,106 @@ mod tests {
         let b = vec![0u8; 4];
         let r = image_compare(&a, &b, 3, 3);
         assert!(r.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Color conversion tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rgb_from_hex_and_roundtrip() {
+        let c = Rgb::from_hex("#ff8800").unwrap();
+        assert_eq!(c, Rgb::new(255, 136, 0));
+        assert_eq!(c.to_hex(), "#ff8800");
+
+        // Without leading '#'
+        let c2 = Rgb::from_hex("00ff00").unwrap();
+        assert_eq!(c2, Rgb::new(0, 255, 0));
+
+        // Invalid length
+        assert!(Rgb::from_hex("#fff").is_err());
+    }
+
+    #[test]
+    fn rgb_to_hsl_pure_red() {
+        let hsl = Rgb::new(255, 0, 0).to_hsl();
+        assert!((hsl.h - 0.0).abs() < 1.0);
+        assert!((hsl.s - 1.0).abs() < 1e-6);
+        assert!((hsl.l - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn rgb_luminance() {
+        // Pure white should have luminance 255 * (0.299 + 0.587 + 0.114) = 255
+        let lum = Rgb::new(255, 255, 255).luminance();
+        assert!((lum - 255.0).abs() < 1e-6);
+
+        // Pure black
+        assert!((Rgb::new(0, 0, 0).luminance() - 0.0).abs() < f64::EPSILON);
+    }
+
+    // -----------------------------------------------------------------------
+    // SVG dimension parsing tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_svg_dimensions_basic() {
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">"#;
+        let dims = parse_svg_dimensions(svg).unwrap();
+        assert!((dims.width - 300.0).abs() < f64::EPSILON);
+        assert!((dims.height - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_svg_dimensions_with_px_unit() {
+        let svg = r#"<svg width="100px" height="50px">"#;
+        let dims = parse_svg_dimensions(svg).unwrap();
+        assert!((dims.width - 100.0).abs() < f64::EPSILON);
+        assert!((dims.height - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_svg_dimensions_missing() {
+        assert!(parse_svg_dimensions("<svg>").is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Image cache tracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cache_tracker_basic_insert_and_contains() {
+        let mut cache = ImageCacheTracker::new(1000);
+        assert!(cache.is_empty());
+        let evicted = cache.touch("a.png", 400);
+        assert!(evicted.is_empty());
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains("a.png"));
+        assert_eq!(cache.total_bytes(), 400);
+    }
+
+    #[test]
+    fn cache_tracker_lru_eviction() {
+        let mut cache = ImageCacheTracker::new(500);
+        cache.touch("a.png", 300);
+        cache.touch("b.png", 100);
+        // Re-touch a.png to make it more recent
+        cache.touch("a.png", 300);
+        // Insert c.png (200 bytes) – total would be 600 > 500, must evict b.png (LRU)
+        let evicted = cache.touch("c.png", 200);
+        assert_eq!(evicted, vec!["b.png"]);
+        assert!(!cache.contains("b.png"));
+        assert!(cache.contains("a.png"));
+        assert!(cache.contains("c.png"));
+    }
+
+    #[test]
+    fn cache_tracker_clear() {
+        let mut cache = ImageCacheTracker::new(1000);
+        cache.touch("a.png", 100);
+        cache.touch("b.png", 200);
+        cache.clear();
+        assert!(cache.is_empty());
+        assert_eq!(cache.total_bytes(), 0);
     }
 }

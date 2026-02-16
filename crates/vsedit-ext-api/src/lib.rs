@@ -1026,6 +1026,231 @@ pub fn validate_extension_metadata(meta: &ExtensionMetadata) -> Vec<ExtensionMet
     errors
 }
 
+// ---------------------------------------------------------------------------
+// API permission model
+// ---------------------------------------------------------------------------
+
+/// Permissions that can be granted to an extension for API access.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ApiPermission {
+    /// Read-only access to workspace files.
+    FileSystemRead,
+    /// Write access to workspace files.
+    FileSystemWrite,
+    /// Execute commands in the editor.
+    CommandExecution,
+    /// Access to terminal APIs.
+    TerminalAccess,
+    /// Access to debug APIs.
+    DebugAccess,
+    /// Network requests (outbound HTTP, WebSocket).
+    NetworkAccess,
+    /// Access to clipboard read/write.
+    ClipboardAccess,
+    /// Access to environment variables and shell.
+    EnvironmentAccess,
+    /// Access to authentication providers.
+    AuthenticationAccess,
+    /// Access to language model / AI APIs.
+    LanguageModelAccess,
+}
+
+/// A set of permissions granted to a specific extension.
+#[derive(Debug, Clone)]
+pub struct ExtensionPermissions {
+    extension_id: String,
+    granted: std::collections::HashSet<ApiPermission>,
+    denied_log: Vec<(ApiPermission, String)>,
+}
+
+impl ExtensionPermissions {
+    /// Create a new permission set for an extension with no permissions granted.
+    pub fn new(extension_id: impl Into<String>) -> Self {
+        Self {
+            extension_id: extension_id.into(),
+            granted: std::collections::HashSet::new(),
+            denied_log: Vec::new(),
+        }
+    }
+
+    /// Grant a permission.
+    pub fn grant(&mut self, perm: ApiPermission) {
+        self.granted.insert(perm);
+    }
+
+    /// Revoke a previously granted permission.
+    pub fn revoke(&mut self, perm: ApiPermission) {
+        self.granted.remove(&perm);
+    }
+
+    /// Check whether a permission is currently granted.
+    pub fn has(&self, perm: ApiPermission) -> bool {
+        self.granted.contains(&perm)
+    }
+
+    /// Attempt to use a permission. Returns `Ok(())` if granted, or `Err` with
+    /// a description and records the denial.
+    pub fn check(&mut self, perm: ApiPermission, context: &str) -> Result<(), String> {
+        if self.granted.contains(&perm) {
+            Ok(())
+        } else {
+            let msg = format!(
+                "extension '{}' denied {:?} (context: {})",
+                self.extension_id, perm, context
+            );
+            self.denied_log.push((perm, msg.clone()));
+            Err(msg)
+        }
+    }
+
+    /// Return all recorded permission denials.
+    pub fn denial_log(&self) -> &[(ApiPermission, String)] {
+        &self.denied_log
+    }
+
+    /// Return the extension id.
+    pub fn extension_id(&self) -> &str {
+        &self.extension_id
+    }
+
+    /// Return the number of granted permissions.
+    pub fn granted_count(&self) -> usize {
+        self.granted.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// API rate limiting per extension
+// ---------------------------------------------------------------------------
+
+/// Simple sliding-window rate limiter for API calls per extension.
+#[derive(Debug, Clone)]
+pub struct RateLimiter {
+    extension_id: String,
+    /// Maximum number of calls allowed within the window.
+    max_calls: u64,
+    /// Window duration in milliseconds.
+    window_ms: u64,
+    /// Timestamps (in ms since an arbitrary epoch) of recent calls.
+    timestamps: Vec<u64>,
+}
+
+impl RateLimiter {
+    /// Create a new rate limiter.
+    pub fn new(extension_id: impl Into<String>, max_calls: u64, window_ms: u64) -> Self {
+        Self {
+            extension_id: extension_id.into(),
+            max_calls,
+            window_ms,
+            timestamps: Vec::new(),
+        }
+    }
+
+    /// Attempt to record a call at the given timestamp (ms).
+    /// Returns `Ok(remaining)` with the number of remaining calls in the window,
+    /// or `Err` if the rate limit is exceeded.
+    pub fn try_acquire(&mut self, now_ms: u64) -> Result<u64, String> {
+        self.prune(now_ms);
+        if self.timestamps.len() as u64 >= self.max_calls {
+            return Err(format!(
+                "rate limit exceeded for '{}': {} calls in {}ms window",
+                self.extension_id, self.max_calls, self.window_ms
+            ));
+        }
+        self.timestamps.push(now_ms);
+        Ok(self.max_calls - self.timestamps.len() as u64)
+    }
+
+    /// Remove timestamps outside the current window.
+    fn prune(&mut self, now_ms: u64) {
+        let cutoff = now_ms.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&ts| ts > cutoff);
+    }
+
+    /// Return how many calls have been made in the current window.
+    pub fn current_count(&self, now_ms: u64) -> u64 {
+        let cutoff = now_ms.saturating_sub(self.window_ms);
+        self.timestamps.iter().filter(|&&ts| ts > cutoff).count() as u64
+    }
+
+    /// Reset the limiter, clearing all recorded timestamps.
+    pub fn reset(&mut self) {
+        self.timestamps.clear();
+    }
+
+    /// Return the extension id this limiter is associated with.
+    pub fn extension_id(&self) -> &str {
+        &self.extension_id
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extension capability declaration
+// ---------------------------------------------------------------------------
+
+/// Capabilities that an extension declares it requires from the host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionCapabilityDeclaration {
+    pub extension_id: String,
+    pub required_namespaces: Vec<String>,
+    pub required_permissions: Vec<ApiPermission>,
+    pub min_api_version: Option<String>,
+}
+
+impl ExtensionCapabilityDeclaration {
+    /// Create a new capability declaration for an extension.
+    pub fn new(extension_id: impl Into<String>) -> Self {
+        Self {
+            extension_id: extension_id.into(),
+            required_namespaces: Vec::new(),
+            required_permissions: Vec::new(),
+            min_api_version: None,
+        }
+    }
+
+    /// Declare that a namespace is required.
+    pub fn require_namespace(mut self, ns: impl Into<String>) -> Self {
+        self.required_namespaces.push(ns.into());
+        self
+    }
+
+    /// Declare that a permission is required.
+    pub fn require_permission(mut self, perm: ApiPermission) -> Self {
+        self.required_permissions.push(perm);
+        self
+    }
+
+    /// Declare the minimum API version required.
+    pub fn require_api_version(mut self, version: impl Into<String>) -> Self {
+        self.min_api_version = Some(version.into());
+        self
+    }
+
+    /// Validate the declaration against the current registry and API version.
+    /// Returns a list of unsatisfied requirements as human-readable strings.
+    pub fn validate_against(&self, registry: &ApiRegistry) -> Vec<String> {
+        let mut issues = Vec::new();
+
+        for ns in &self.required_namespaces {
+            if !registry.has_namespace(ns) {
+                issues.push(format!("required namespace '{}' is not registered", ns));
+            }
+        }
+
+        if let Some(ref min_ver) = self.min_api_version {
+            let check = ApiVersionCheck::new(API_VERSION);
+            if !check.is_compatible(min_ver) {
+                issues.push(format!(
+                    "requires API version {} but host provides {}",
+                    min_ver, API_VERSION
+                ));
+            }
+        }
+
+        issues
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1580,5 +1805,88 @@ mod tests {
         };
         let errors = validate_extension_metadata(&meta);
         assert!(errors.iter().any(|e| matches!(e, ExtensionMetadataError::EmptyDisplayName)));
+    }
+
+    // -- permission model tests ---------------------------------------------
+
+    #[test]
+    fn permission_grant_and_check() {
+        let mut perms = ExtensionPermissions::new("pub.my-ext");
+        assert!(!perms.has(ApiPermission::FileSystemRead));
+        perms.grant(ApiPermission::FileSystemRead);
+        assert!(perms.has(ApiPermission::FileSystemRead));
+        assert_eq!(perms.granted_count(), 1);
+
+        assert!(perms.check(ApiPermission::FileSystemRead, "read file").is_ok());
+        assert!(perms.check(ApiPermission::NetworkAccess, "fetch url").is_err());
+        assert_eq!(perms.denial_log().len(), 1);
+        assert_eq!(perms.extension_id(), "pub.my-ext");
+    }
+
+    #[test]
+    fn permission_revoke() {
+        let mut perms = ExtensionPermissions::new("pub.ext");
+        perms.grant(ApiPermission::TerminalAccess);
+        assert!(perms.has(ApiPermission::TerminalAccess));
+        perms.revoke(ApiPermission::TerminalAccess);
+        assert!(!perms.has(ApiPermission::TerminalAccess));
+        assert_eq!(perms.granted_count(), 0);
+    }
+
+    // -- rate limiter tests -------------------------------------------------
+
+    #[test]
+    fn rate_limiter_allows_within_limit() {
+        let mut rl = RateLimiter::new("pub.ext", 3, 1000);
+        assert_eq!(rl.try_acquire(100), Ok(2));
+        assert_eq!(rl.try_acquire(200), Ok(1));
+        assert_eq!(rl.try_acquire(300), Ok(0));
+        assert!(rl.try_acquire(400).is_err());
+        assert_eq!(rl.current_count(400), 3);
+        assert_eq!(rl.extension_id(), "pub.ext");
+    }
+
+    #[test]
+    fn rate_limiter_window_expiry() {
+        let mut rl = RateLimiter::new("pub.ext", 2, 1000);
+        assert!(rl.try_acquire(100).is_ok());
+        assert!(rl.try_acquire(200).is_ok());
+        assert!(rl.try_acquire(300).is_err()); // limit hit
+        // After the window expires, calls are allowed again
+        assert!(rl.try_acquire(1200).is_ok());
+        assert_eq!(rl.current_count(1200), 1);
+    }
+
+    #[test]
+    fn rate_limiter_reset() {
+        let mut rl = RateLimiter::new("pub.ext", 1, 1000);
+        assert!(rl.try_acquire(100).is_ok());
+        assert!(rl.try_acquire(200).is_err());
+        rl.reset();
+        assert!(rl.try_acquire(300).is_ok());
+    }
+
+    // -- capability declaration tests ---------------------------------------
+
+    #[test]
+    fn capability_declaration_validates_against_registry() {
+        let reg = ApiRegistry::with_defaults();
+        let decl = ExtensionCapabilityDeclaration::new("pub.ext")
+            .require_namespace("commands")
+            .require_namespace("window")
+            .require_api_version("1.70.0");
+        let issues = decl.validate_against(&reg);
+        assert!(issues.is_empty(), "expected no issues, got: {:?}", issues);
+    }
+
+    #[test]
+    fn capability_declaration_detects_missing_namespace() {
+        let reg = ApiRegistry::new(); // empty registry
+        let decl = ExtensionCapabilityDeclaration::new("pub.ext")
+            .require_namespace("commands")
+            .require_permission(ApiPermission::FileSystemRead);
+        let issues = decl.validate_against(&reg);
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("commands"));
     }
 }

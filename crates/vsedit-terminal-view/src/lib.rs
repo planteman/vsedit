@@ -972,6 +972,310 @@ impl Default for TerminalService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Scrollback history manager
+// ---------------------------------------------------------------------------
+
+/// Manages a bounded scrollback history buffer with configurable capacity.
+///
+/// When the capacity is exceeded, the oldest lines are discarded. This
+/// prevents unbounded memory growth for long-running terminal sessions.
+#[derive(Debug, Clone)]
+pub struct ScrollbackManager {
+    lines: Vec<Vec<TerminalCell>>,
+    capacity: usize,
+}
+
+impl ScrollbackManager {
+    /// Create a new scrollback manager with the given maximum line capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            lines: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Push a line into the scrollback buffer, evicting the oldest if full.
+    pub fn push_line(&mut self, line: Vec<TerminalCell>) {
+        if self.lines.len() >= self.capacity && self.capacity > 0 {
+            self.lines.remove(0);
+        }
+        if self.capacity > 0 {
+            self.lines.push(line);
+        }
+    }
+
+    /// Return the total number of lines currently stored.
+    pub fn len(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Return true if no lines are stored.
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    /// Get a specific line by index, if it exists.
+    pub fn get_line(&self, index: usize) -> Option<&Vec<TerminalCell>> {
+        self.lines.get(index)
+    }
+
+    /// Clear all stored scrollback lines.
+    pub fn clear(&mut self) {
+        self.lines.clear();
+    }
+
+    /// Return the maximum capacity.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Extract the plain text content of a scrollback line.
+    pub fn line_text(&self, index: usize) -> Option<String> {
+        self.lines.get(index).map(|row| {
+            row.iter().map(|c| c.ch).collect::<String>().trim_end().to_string()
+        })
+    }
+
+    /// Search scrollback lines for a substring, returning matching indices.
+    pub fn search(&self, needle: &str) -> Vec<usize> {
+        self.lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, row)| {
+                let text: String = row.iter().map(|c| c.ch).collect();
+                if text.contains(needle) {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ANSI escape code helpers
+// ---------------------------------------------------------------------------
+
+/// Parsed representation of a CSI (Control Sequence Introducer) escape sequence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CsiSequence {
+    /// Numeric parameters separated by `;` in the original sequence.
+    pub params: Vec<u16>,
+    /// The final byte that identifies the command (e.g. `m`, `H`, `J`).
+    pub final_byte: u8,
+}
+
+/// Strip all ANSI escape sequences from a byte slice, returning plain text.
+pub fn strip_ansi(input: &[u8]) -> String {
+    let mut out = String::new();
+    let mut i = 0;
+    while i < input.len() {
+        if input[i] == 0x1b {
+            i += 1;
+            if i < input.len() && input[i] == b'[' {
+                // CSI sequence: skip until final byte (0x40-0x7E).
+                i += 1;
+                while i < input.len() && !(0x40..=0x7E).contains(&input[i]) {
+                    i += 1;
+                }
+                if i < input.len() {
+                    i += 1; // skip final byte
+                }
+            } else if i < input.len() && input[i] == b']' {
+                // OSC: skip until BEL or ST.
+                i += 1;
+                while i < input.len() && input[i] != 0x07 && input[i] != 0x9c {
+                    i += 1;
+                }
+                if i < input.len() {
+                    i += 1;
+                }
+            }
+            // else: unknown ESC, already skipped the ESC byte
+        } else if input[i] >= 0x20 {
+            out.push(input[i] as char);
+            i += 1;
+        } else {
+            // Control chars like \r, \n
+            match input[i] {
+                b'\n' => out.push('\n'),
+                b'\t' => out.push('\t'),
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Parse a raw CSI sequence from its interior bytes (everything between `ESC[`
+/// and the final byte inclusive). Returns `None` if the slice is empty.
+pub fn parse_csi(interior: &[u8]) -> Option<CsiSequence> {
+    if interior.is_empty() {
+        return None;
+    }
+    let final_byte = *interior.last()?;
+    if !(0x40..=0x7E).contains(&final_byte) {
+        return None;
+    }
+    let param_bytes = &interior[..interior.len() - 1];
+    let params: Vec<u16> = if param_bytes.is_empty() {
+        Vec::new()
+    } else {
+        std::str::from_utf8(param_bytes)
+            .ok()?
+            .split(';')
+            .map(|s| s.parse::<u16>().unwrap_or(0))
+            .collect()
+    };
+    Some(CsiSequence { params, final_byte })
+}
+
+// ---------------------------------------------------------------------------
+// Terminal dimensions / resize tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks terminal dimensions and fires logical resize events.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerminalDimensions {
+    pub cols: u16,
+    pub rows: u16,
+}
+
+impl TerminalDimensions {
+    pub fn new(cols: u16, rows: u16) -> Self {
+        Self { cols, rows }
+    }
+
+    /// Apply a resize and return `true` if the dimensions actually changed.
+    pub fn resize(&mut self, new_cols: u16, new_rows: u16) -> bool {
+        if new_cols == 0 || new_rows == 0 {
+            return false;
+        }
+        if self.cols == new_cols && self.rows == new_rows {
+            return false;
+        }
+        self.cols = new_cols;
+        self.rows = new_rows;
+        true
+    }
+
+    /// Return the total number of cells in the grid.
+    pub fn cell_count(&self) -> u32 {
+        self.cols as u32 * self.rows as u32
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal session state machine
+// ---------------------------------------------------------------------------
+
+/// High-level states for a terminal session lifecycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionState {
+    /// The terminal has been created but the shell has not started.
+    Created,
+    /// The shell is starting (PTY allocated, waiting for first output).
+    Starting,
+    /// The shell is running and accepting input.
+    Running,
+    /// The shell has exited but the terminal tab is still open.
+    Exited(i32),
+    /// The terminal has been fully closed and cleaned up.
+    Closed,
+}
+
+/// State machine that tracks a terminal session through its lifecycle.
+#[derive(Debug, Clone)]
+pub struct SessionStateMachine {
+    state: SessionState,
+    /// Number of bytes received from the PTY so far.
+    bytes_received: u64,
+    /// Number of bytes sent to the PTY so far.
+    bytes_sent: u64,
+}
+
+impl SessionStateMachine {
+    pub fn new() -> Self {
+        Self {
+            state: SessionState::Created,
+            bytes_received: 0,
+            bytes_sent: 0,
+        }
+    }
+
+    pub fn state(&self) -> SessionState {
+        self.state
+    }
+
+    pub fn bytes_received(&self) -> u64 {
+        self.bytes_received
+    }
+
+    pub fn bytes_sent(&self) -> u64 {
+        self.bytes_sent
+    }
+
+    /// Transition to `Starting`. Only valid from `Created`.
+    pub fn start(&mut self) -> bool {
+        if self.state == SessionState::Created {
+            self.state = SessionState::Starting;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Record received PTY output bytes. Automatically transitions from
+    /// `Starting` to `Running` on the first output.
+    pub fn record_output(&mut self, len: usize) {
+        self.bytes_received += len as u64;
+        if self.state == SessionState::Starting {
+            self.state = SessionState::Running;
+        }
+    }
+
+    /// Record bytes sent to the PTY.
+    pub fn record_input(&mut self, len: usize) {
+        self.bytes_sent += len as u64;
+    }
+
+    /// Transition to `Exited`. Valid from `Running` or `Starting`.
+    pub fn exit(&mut self, code: i32) -> bool {
+        match self.state {
+            SessionState::Running | SessionState::Starting => {
+                self.state = SessionState::Exited(code);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Transition to `Closed`. Valid from `Exited` or `Created`.
+    pub fn close(&mut self) -> bool {
+        match self.state {
+            SessionState::Exited(_) | SessionState::Created => {
+                self.state = SessionState::Closed;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Return `true` if the session is in a state that can accept user input.
+    pub fn is_interactive(&self) -> bool {
+        self.state == SessionState::Running
+    }
+}
+
+impl Default for SessionStateMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1497,5 +1801,186 @@ mod tests {
         // ESC[42m = green background
         buf.process_output(b"\x1b[42mX");
         assert_eq!(buf.cells[0][0].bg, Color::Green);
+    }
+
+    // -- ScrollbackManager tests --------------------------------------------
+
+    #[test]
+    fn scrollback_manager_push_and_len() {
+        let mut sm = ScrollbackManager::new(100);
+        assert!(sm.is_empty());
+        let line: Vec<TerminalCell> = "hello"
+            .chars()
+            .map(|ch| TerminalCell { ch, ..Default::default() })
+            .collect();
+        sm.push_line(line);
+        assert_eq!(sm.len(), 1);
+        assert!(!sm.is_empty());
+    }
+
+    #[test]
+    fn scrollback_manager_evicts_oldest() {
+        let mut sm = ScrollbackManager::new(3);
+        for i in 0..5u8 {
+            let line = vec![TerminalCell {
+                ch: (b'A' + i) as char,
+                ..Default::default()
+            }];
+            sm.push_line(line);
+        }
+        // Capacity 3, pushed 5: should have C, D, E.
+        assert_eq!(sm.len(), 3);
+        assert_eq!(sm.get_line(0).unwrap()[0].ch, 'C');
+        assert_eq!(sm.get_line(2).unwrap()[0].ch, 'E');
+    }
+
+    #[test]
+    fn scrollback_manager_search() {
+        let mut sm = ScrollbackManager::new(100);
+        let make_line = |s: &str| -> Vec<TerminalCell> {
+            s.chars()
+                .map(|ch| TerminalCell { ch, ..Default::default() })
+                .collect()
+        };
+        sm.push_line(make_line("error: file not found"));
+        sm.push_line(make_line("warning: unused variable"));
+        sm.push_line(make_line("error: type mismatch"));
+        let hits = sm.search("error");
+        assert_eq!(hits, vec![0, 2]);
+        assert!(sm.search("success").is_empty());
+    }
+
+    #[test]
+    fn scrollback_manager_line_text() {
+        let mut sm = ScrollbackManager::new(10);
+        let mut line: Vec<TerminalCell> = "hi  "
+            .chars()
+            .map(|ch| TerminalCell { ch, ..Default::default() })
+            .collect();
+        // Pad with trailing spaces (as a real terminal row would be).
+        line.push(TerminalCell::default());
+        sm.push_line(line);
+        assert_eq!(sm.line_text(0).unwrap(), "hi");
+    }
+
+    #[test]
+    fn scrollback_manager_clear() {
+        let mut sm = ScrollbackManager::new(10);
+        sm.push_line(vec![TerminalCell::default()]);
+        sm.push_line(vec![TerminalCell::default()]);
+        sm.clear();
+        assert!(sm.is_empty());
+        assert_eq!(sm.capacity(), 10);
+    }
+
+    // -- ANSI helpers tests -------------------------------------------------
+
+    #[test]
+    fn strip_ansi_removes_sequences() {
+        let input = b"\x1b[31mHello\x1b[0m World\x1b[1;32m!\x1b[0m";
+        let plain = strip_ansi(input);
+        assert_eq!(plain, "Hello World!");
+    }
+
+    #[test]
+    fn strip_ansi_preserves_newlines() {
+        let input = b"line1\nline2\x1b[33m!\x1b[0m\n";
+        let plain = strip_ansi(input);
+        assert_eq!(plain, "line1\nline2!\n");
+    }
+
+    #[test]
+    fn parse_csi_sgr() {
+        let seq = parse_csi(b"1;31m").unwrap();
+        assert_eq!(seq.params, vec![1, 31]);
+        assert_eq!(seq.final_byte, b'm');
+    }
+
+    #[test]
+    fn parse_csi_cursor_position() {
+        let seq = parse_csi(b"5;10H").unwrap();
+        assert_eq!(seq.params, vec![5, 10]);
+        assert_eq!(seq.final_byte, b'H');
+    }
+
+    #[test]
+    fn parse_csi_empty_returns_none() {
+        assert!(parse_csi(b"").is_none());
+    }
+
+    // -- TerminalDimensions tests -------------------------------------------
+
+    #[test]
+    fn dimensions_resize_returns_changed() {
+        let mut dims = TerminalDimensions::new(80, 24);
+        assert!(dims.resize(120, 40));
+        assert_eq!(dims.cols, 120);
+        assert_eq!(dims.rows, 40);
+        // Same dimensions should return false.
+        assert!(!dims.resize(120, 40));
+    }
+
+    #[test]
+    fn dimensions_rejects_zero() {
+        let mut dims = TerminalDimensions::new(80, 24);
+        assert!(!dims.resize(0, 24));
+        assert!(!dims.resize(80, 0));
+        assert_eq!(dims.cols, 80);
+    }
+
+    #[test]
+    fn dimensions_cell_count() {
+        let dims = TerminalDimensions::new(80, 24);
+        assert_eq!(dims.cell_count(), 1920);
+    }
+
+    // -- SessionStateMachine tests ------------------------------------------
+
+    #[test]
+    fn session_lifecycle_happy_path() {
+        let mut sm = SessionStateMachine::new();
+        assert_eq!(sm.state(), SessionState::Created);
+        assert!(!sm.is_interactive());
+
+        assert!(sm.start());
+        assert_eq!(sm.state(), SessionState::Starting);
+
+        sm.record_output(128);
+        assert_eq!(sm.state(), SessionState::Running);
+        assert!(sm.is_interactive());
+        assert_eq!(sm.bytes_received(), 128);
+
+        sm.record_input(10);
+        assert_eq!(sm.bytes_sent(), 10);
+
+        assert!(sm.exit(0));
+        assert_eq!(sm.state(), SessionState::Exited(0));
+        assert!(!sm.is_interactive());
+
+        assert!(sm.close());
+        assert_eq!(sm.state(), SessionState::Closed);
+    }
+
+    #[test]
+    fn session_invalid_transitions() {
+        let mut sm = SessionStateMachine::new();
+        // Can't exit from Created.
+        assert!(!sm.exit(1));
+        // Can't start twice.
+        assert!(sm.start());
+        assert!(!sm.start());
+        // Can close from Created after a fresh machine.
+        let mut sm2 = SessionStateMachine::new();
+        assert!(sm2.close());
+        assert_eq!(sm2.state(), SessionState::Closed);
+    }
+
+    #[test]
+    fn session_exit_from_starting() {
+        let mut sm = SessionStateMachine::new();
+        sm.start();
+        // Shell can exit before producing output (e.g. bad command).
+        assert!(sm.exit(127));
+        assert_eq!(sm.state(), SessionState::Exited(127));
     }
 }

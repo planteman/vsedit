@@ -716,6 +716,197 @@ pub fn threads_with_recent_activity(threads: &[CommentThread], since: u64) -> Ve
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Comment threading / nesting with depth tracking
+// ---------------------------------------------------------------------------
+
+/// A comment that supports nesting via `parent_id` and tracks its depth.
+#[derive(Debug, Clone)]
+pub struct NestedComment {
+    pub id: u64,
+    pub parent_id: Option<u64>,
+    pub author: String,
+    pub body: String,
+    pub timestamp: u64,
+    pub depth: u32,
+}
+
+/// Builds a tree of nested comments from a flat list, computing depth for each.
+pub fn compute_comment_depths(comments: &mut [NestedComment]) {
+    // Index parent depths.
+    let depth_map: HashMap<u64, u32> = comments
+        .iter()
+        .filter(|c| c.parent_id.is_none())
+        .map(|c| (c.id, 0))
+        .collect();
+
+    // Multi-pass: propagate depths until stable.
+    let mut depth_map = depth_map;
+    let max_iter = comments.len();
+    for _ in 0..max_iter {
+        let mut changed = false;
+        for c in comments.iter() {
+            if depth_map.contains_key(&c.id) {
+                continue;
+            }
+            if let Some(pid) = c.parent_id {
+                if let Some(&parent_depth) = depth_map.get(&pid) {
+                    depth_map.insert(c.id, parent_depth + 1);
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    for c in comments.iter_mut() {
+        c.depth = depth_map.get(&c.id).copied().unwrap_or(0);
+    }
+}
+
+/// Returns the direct children of a given comment id from a flat list.
+pub fn children_of(comments: &[NestedComment], parent_id: u64) -> Vec<&NestedComment> {
+    comments
+        .iter()
+        .filter(|c| c.parent_id == Some(parent_id))
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Comment date-range filtering
+// ---------------------------------------------------------------------------
+
+/// Filter threads to those that have at least one comment within `[start, end]`.
+pub fn threads_in_date_range<'a>(
+    threads: &'a [CommentThread],
+    start: u64,
+    end: u64,
+) -> Vec<&'a CommentThread> {
+    threads
+        .iter()
+        .filter(|t| {
+            t.comments
+                .iter()
+                .any(|c| c.timestamp >= start && c.timestamp <= end)
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Batch operations
+// ---------------------------------------------------------------------------
+
+impl CommentsService {
+    /// Resolve every thread whose first comment was authored by `author`.
+    pub fn resolve_all_by_author(&mut self, author: &str) -> usize {
+        let mut count = 0;
+        for thread in &mut self.threads {
+            if !thread.resolved
+                && thread
+                    .comments
+                    .first()
+                    .map_or(false, |c| c.author == author)
+            {
+                thread.resolved = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Remove all threads whose first comment was authored by `author`.
+    pub fn remove_threads_by_author(&mut self, author: &str) -> usize {
+        let before = self.threads.len();
+        self.threads.retain(|t| {
+            t.comments
+                .first()
+                .map_or(true, |c| c.author != author)
+        });
+        before - self.threads.len()
+    }
+
+    /// Delete all comments by a specific author across every thread, returning
+    /// the number of comments removed.
+    pub fn delete_comments_by_author(&mut self, author: &str) -> usize {
+        let mut removed = 0;
+        for thread in &mut self.threads {
+            let before = thread.comments.len();
+            thread.comments.retain(|c| c.author != author);
+            removed += before - thread.comments.len();
+        }
+        removed
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Comment diff tracking
+// ---------------------------------------------------------------------------
+
+/// Represents a range of changed lines in a diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
+/// Identifies which threads sit on lines that were changed in a diff.
+pub fn threads_on_changed_lines<'a>(
+    threads: &'a [CommentThread],
+    uri: &str,
+    hunks: &[DiffHunk],
+) -> Vec<&'a CommentThread> {
+    threads
+        .iter()
+        .filter(|t| {
+            t.uri == uri
+                && hunks
+                    .iter()
+                    .any(|h| t.line >= h.start_line && t.line <= h.end_line)
+        })
+        .collect()
+}
+
+/// Returns threads that are *not* on any changed line (potentially outdated).
+pub fn threads_outside_changed_lines<'a>(
+    threads: &'a [CommentThread],
+    uri: &str,
+    hunks: &[DiffHunk],
+) -> Vec<&'a CommentThread> {
+    threads
+        .iter()
+        .filter(|t| {
+            t.uri == uri
+                && !hunks
+                    .iter()
+                    .any(|h| t.line >= h.start_line && t.line <= h.end_line)
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Multi-thread markdown export
+// ---------------------------------------------------------------------------
+
+impl CommentFormatter {
+    /// Export multiple threads to a single markdown document.
+    pub fn export_threads_as_markdown(threads: &[CommentThread]) -> String {
+        let mut out = String::from("# Code Review Comments\n\n");
+        out.push_str(&format!(
+            "**Total threads:** {} | **Resolved:** {} | **Unresolved:** {}\n\n---\n\n",
+            threads.len(),
+            threads.iter().filter(|t| t.resolved).count(),
+            threads.iter().filter(|t| !t.resolved).count(),
+        ));
+        for thread in threads {
+            out.push_str(&Self::format_as_markdown(thread));
+            out.push_str("---\n\n");
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1562,5 +1753,104 @@ mod tests {
     fn comment_age_display() {
         assert_eq!(format!("{}", CommentAge::Recent), "Recent");
         assert_eq!(format!("{}", CommentAge::Older), "Older");
+    }
+
+    // ── Nested comments depth tracking ────────────────────────────
+
+    #[test]
+    fn compute_comment_depths_builds_tree() {
+        let mut comments = vec![
+            NestedComment { id: 1, parent_id: None, author: "a".into(), body: "root".into(), timestamp: 1, depth: 0 },
+            NestedComment { id: 2, parent_id: Some(1), author: "b".into(), body: "reply".into(), timestamp: 2, depth: 0 },
+            NestedComment { id: 3, parent_id: Some(2), author: "c".into(), body: "deep".into(), timestamp: 3, depth: 0 },
+            NestedComment { id: 4, parent_id: Some(1), author: "d".into(), body: "reply2".into(), timestamp: 4, depth: 0 },
+        ];
+        compute_comment_depths(&mut comments);
+        assert_eq!(comments[0].depth, 0);
+        assert_eq!(comments[1].depth, 1);
+        assert_eq!(comments[2].depth, 2);
+        assert_eq!(comments[3].depth, 1);
+
+        let kids = children_of(&comments, 1);
+        assert_eq!(kids.len(), 2);
+    }
+
+    // ── Date-range filtering ──────────────────────────────────────
+
+    #[test]
+    fn threads_in_date_range_filters_correctly() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "x", "early", 100));
+        let mut t2 = make_thread("t2", "a.rs", 2);
+        t2.comments.push(make_comment(2, "y", "mid", 500));
+        let mut t3 = make_thread("t3", "a.rs", 3);
+        t3.comments.push(make_comment(3, "z", "late", 900));
+
+        let threads = [t1, t2, t3];
+        let result = threads_in_date_range(&threads, 200, 600);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t2");
+    }
+
+    // ── Batch operations ──────────────────────────────────────────
+
+    #[test]
+    fn batch_resolve_and_delete_by_author() {
+        let mut svc = CommentsService::new();
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "fix", 10));
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(2, "bob", "bug", 20));
+        let mut t3 = make_thread("t3", "c.rs", 3);
+        t3.comments.push(make_comment(3, "alice", "nit", 30));
+        svc.add_thread(t1);
+        svc.add_thread(t2);
+        svc.add_thread(t3);
+
+        assert_eq!(svc.resolve_all_by_author("alice"), 2);
+        assert_eq!(svc.resolved_count(), 2);
+
+        assert_eq!(svc.delete_comments_by_author("bob"), 1);
+        assert_eq!(svc.total_comment_count(), 2);
+
+        assert_eq!(svc.remove_threads_by_author("alice"), 2);
+        assert_eq!(svc.thread_count(), 1);
+    }
+
+    // ── Diff tracking ─────────────────────────────────────────────
+
+    #[test]
+    fn threads_on_and_outside_changed_lines() {
+        let t1 = CommentThread { id: "t1".into(), uri: "src/main.rs".into(), line: 5, comments: vec![], resolved: false, collapsed: false };
+        let t2 = CommentThread { id: "t2".into(), uri: "src/main.rs".into(), line: 15, comments: vec![], resolved: false, collapsed: false };
+        let t3 = CommentThread { id: "t3".into(), uri: "src/main.rs".into(), line: 25, comments: vec![], resolved: false, collapsed: false };
+        let threads = [t1, t2, t3];
+        let hunks = vec![DiffHunk { start_line: 10, end_line: 20 }];
+
+        let on = threads_on_changed_lines(&threads, "src/main.rs", &hunks);
+        assert_eq!(on.len(), 1);
+        assert_eq!(on[0].id, "t2");
+
+        let off = threads_outside_changed_lines(&threads, "src/main.rs", &hunks);
+        assert_eq!(off.len(), 2);
+    }
+
+    // ── Multi-thread markdown export ──────────────────────────────
+
+    #[test]
+    fn export_threads_as_markdown_includes_header() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "looks good", 100));
+        t1.resolved = true;
+        let mut t2 = make_thread("t2", "b.rs", 5);
+        t2.comments.push(make_comment(2, "bob", "needs work", 200));
+
+        let md = CommentFormatter::export_threads_as_markdown(&[t1, t2]);
+        assert!(md.starts_with("# Code Review Comments"));
+        assert!(md.contains("**Total threads:** 2"));
+        assert!(md.contains("**Resolved:** 1"));
+        assert!(md.contains("**Unresolved:** 1"));
+        assert!(md.contains("alice"));
+        assert!(md.contains("needs work"));
     }
 }

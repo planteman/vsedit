@@ -843,6 +843,348 @@ impl Default for RpcCorrelator {
     }
 }
 
+// ── RPC error code classification ──
+
+/// Standard error codes for RPC failures, modelled after JSON-RPC and
+/// language-server conventions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum RpcErrorCode {
+    ParseError = -32700,
+    InvalidRequest = -32600,
+    MethodNotFound = -32601,
+    InvalidParams = -32602,
+    InternalError = -32603,
+    ServerNotInitialized = -32002,
+    RequestCancelled = -32800,
+    ContentModified = -32801,
+}
+
+impl RpcErrorCode {
+    /// Map a numeric code to the corresponding variant.
+    pub fn from_code(code: i32) -> Option<Self> {
+        match code {
+            -32700 => Some(Self::ParseError),
+            -32600 => Some(Self::InvalidRequest),
+            -32601 => Some(Self::MethodNotFound),
+            -32602 => Some(Self::InvalidParams),
+            -32603 => Some(Self::InternalError),
+            -32002 => Some(Self::ServerNotInitialized),
+            -32800 => Some(Self::RequestCancelled),
+            -32801 => Some(Self::ContentModified),
+            _ => None,
+        }
+    }
+
+    /// Whether this error is retryable.
+    pub fn is_retryable(self) -> bool {
+        matches!(self, Self::InternalError | Self::ContentModified)
+    }
+
+    /// Human-readable label for the error code.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::ParseError => "Parse error",
+            Self::InvalidRequest => "Invalid request",
+            Self::MethodNotFound => "Method not found",
+            Self::InvalidParams => "Invalid params",
+            Self::InternalError => "Internal error",
+            Self::ServerNotInitialized => "Server not initialized",
+            Self::RequestCancelled => "Request cancelled",
+            Self::ContentModified => "Content modified",
+        }
+    }
+
+    /// Numeric code value.
+    pub fn code(self) -> i32 {
+        self as i32
+    }
+}
+
+impl fmt::Display for RpcErrorCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.label(), self.code())
+    }
+}
+
+// ── RPC protocol version negotiation ──
+
+/// Represents a protocol version as `major.minor`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RpcVersion {
+    pub major: u16,
+    pub minor: u16,
+}
+
+impl RpcVersion {
+    pub fn new(major: u16, minor: u16) -> Self {
+        Self { major, minor }
+    }
+
+    /// Check whether two versions are compatible (same major version).
+    pub fn is_compatible_with(&self, other: &RpcVersion) -> bool {
+        self.major == other.major
+    }
+}
+
+impl fmt::Display for RpcVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
+    }
+}
+
+/// Negotiates protocol version between two peers.
+pub struct RpcVersionNegotiator {
+    supported: Vec<RpcVersion>,
+}
+
+impl RpcVersionNegotiator {
+    /// Create a negotiator that supports the given versions.  Versions are
+    /// stored sorted from highest to lowest so negotiation prefers the newest
+    /// compatible version.
+    pub fn new(mut supported: Vec<RpcVersion>) -> Self {
+        supported.sort();
+        supported.reverse();
+        Self { supported }
+    }
+
+    /// Find the best (highest) version supported by both peers.
+    pub fn negotiate(&self, remote_versions: &[RpcVersion]) -> Option<RpcVersion> {
+        for v in &self.supported {
+            if remote_versions.contains(v) {
+                return Some(*v);
+            }
+        }
+        // Fall back to highest compatible version even if minor differs.
+        for local in &self.supported {
+            for remote in remote_versions {
+                if local.is_compatible_with(remote) {
+                    return Some(std::cmp::min(*local, *remote));
+                }
+            }
+        }
+        None
+    }
+
+    /// List all supported versions (highest first).
+    pub fn supported_versions(&self) -> &[RpcVersion] {
+        &self.supported
+    }
+}
+
+// ── RPC serialization size tracking ──
+
+/// Tracks serialized message sizes flowing through the RPC layer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RpcSerializationStats {
+    pub messages_in: u64,
+    pub messages_out: u64,
+    pub bytes_in: u64,
+    pub bytes_out: u64,
+    pub largest_in: u64,
+    pub largest_out: u64,
+}
+
+impl RpcSerializationStats {
+    pub fn new() -> Self {
+        Self {
+            messages_in: 0,
+            messages_out: 0,
+            bytes_in: 0,
+            bytes_out: 0,
+            largest_in: 0,
+            largest_out: 0,
+        }
+    }
+
+    /// Record an inbound message of `size` bytes.
+    pub fn record_inbound(&mut self, size: u64) {
+        self.messages_in += 1;
+        self.bytes_in = self.bytes_in.saturating_add(size);
+        if size > self.largest_in {
+            self.largest_in = size;
+        }
+    }
+
+    /// Record an outbound message of `size` bytes.
+    pub fn record_outbound(&mut self, size: u64) {
+        self.messages_out += 1;
+        self.bytes_out = self.bytes_out.saturating_add(size);
+        if size > self.largest_out {
+            self.largest_out = size;
+        }
+    }
+
+    /// Average inbound message size, or 0 if no messages recorded.
+    pub fn avg_inbound_size(&self) -> u64 {
+        if self.messages_in == 0 { 0 } else { self.bytes_in / self.messages_in }
+    }
+
+    /// Average outbound message size, or 0 if no messages recorded.
+    pub fn avg_outbound_size(&self) -> u64 {
+        if self.messages_out == 0 { 0 } else { self.bytes_out / self.messages_out }
+    }
+
+    /// Total bytes transferred (in + out).
+    pub fn total_bytes(&self) -> u64 {
+        self.bytes_in.saturating_add(self.bytes_out)
+    }
+
+    /// Reset all counters.
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+}
+
+impl Default for RpcSerializationStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Rate limiting ──
+
+/// A simple token-bucket rate limiter for RPC calls.
+///
+/// Each call to [`try_acquire`] checks whether enough time has passed to
+/// replenish tokens.  The bucket is capped at `capacity` tokens.
+#[derive(Debug, Clone)]
+pub struct RpcRateLimiter {
+    capacity: u64,
+    tokens: u64,
+    refill_rate_per_sec: u64,
+    last_refill_ms: u64,
+}
+
+impl RpcRateLimiter {
+    /// Create a new rate limiter.
+    ///
+    /// * `capacity` – maximum burst size (tokens).
+    /// * `refill_rate_per_sec` – tokens added per second.
+    /// * `now_ms` – current wall-clock time in milliseconds used to
+    ///   initialise the refill timestamp.
+    pub fn new(capacity: u64, refill_rate_per_sec: u64, now_ms: u64) -> Self {
+        Self {
+            capacity,
+            tokens: capacity,
+            refill_rate_per_sec,
+            last_refill_ms: now_ms,
+        }
+    }
+
+    /// Try to consume one token at time `now_ms`.
+    /// Returns `true` if permitted, `false` if rate-limited.
+    pub fn try_acquire(&mut self, now_ms: u64) -> bool {
+        self.refill(now_ms);
+        if self.tokens > 0 {
+            self.tokens -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the number of tokens currently available (after refilling).
+    pub fn available(&mut self, now_ms: u64) -> u64 {
+        self.refill(now_ms);
+        self.tokens
+    }
+
+    fn refill(&mut self, now_ms: u64) {
+        if now_ms <= self.last_refill_ms {
+            return;
+        }
+        let elapsed_ms = now_ms - self.last_refill_ms;
+        let new_tokens = (elapsed_ms * self.refill_rate_per_sec) / 1000;
+        if new_tokens > 0 {
+            self.tokens = (self.tokens + new_tokens).min(self.capacity);
+            self.last_refill_ms = now_ms;
+        }
+    }
+}
+
+// ── Connection health monitoring ──
+
+/// Tracks heartbeat round-trips to determine connection health.
+#[derive(Debug, Clone)]
+pub struct RpcHealthMonitor {
+    /// Interval (ms) at which heartbeats are expected.
+    heartbeat_interval_ms: u64,
+    /// Maximum number of missed heartbeats before declaring unhealthy.
+    max_missed: u32,
+    /// Timestamp (ms) of the last received heartbeat.
+    last_heartbeat_ms: Option<u64>,
+    /// Running count of consecutive missed heartbeats.
+    consecutive_missed: u32,
+    /// Total heartbeats received over the lifetime of this monitor.
+    total_received: u64,
+    /// Cumulative latency of all heartbeats (for averaging).
+    total_latency_ms: u64,
+}
+
+impl RpcHealthMonitor {
+    /// Create a new health monitor.
+    ///
+    /// * `heartbeat_interval_ms` – expected time between heartbeats.
+    /// * `max_missed` – how many consecutive misses mark the connection unhealthy.
+    pub fn new(heartbeat_interval_ms: u64, max_missed: u32) -> Self {
+        Self {
+            heartbeat_interval_ms,
+            max_missed,
+            last_heartbeat_ms: None,
+            consecutive_missed: 0,
+            total_received: 0,
+            total_latency_ms: 0,
+        }
+    }
+
+    /// Record that a heartbeat was received at `received_ms` with round-trip
+    /// latency `latency_ms`.
+    pub fn record_heartbeat(&mut self, received_ms: u64, latency_ms: u64) {
+        self.last_heartbeat_ms = Some(received_ms);
+        self.consecutive_missed = 0;
+        self.total_received += 1;
+        self.total_latency_ms = self.total_latency_ms.saturating_add(latency_ms);
+    }
+
+    /// Record a missed heartbeat.
+    pub fn record_miss(&mut self) {
+        self.consecutive_missed += 1;
+    }
+
+    /// Whether the connection is considered healthy.
+    pub fn is_healthy(&self) -> bool {
+        self.consecutive_missed < self.max_missed
+    }
+
+    /// Check whether a heartbeat is overdue at `now_ms`.
+    pub fn is_overdue(&self, now_ms: u64) -> bool {
+        match self.last_heartbeat_ms {
+            Some(last) => now_ms.saturating_sub(last) > self.heartbeat_interval_ms,
+            None => true,
+        }
+    }
+
+    /// Average heartbeat latency, or `None` if no heartbeats received.
+    pub fn avg_latency_ms(&self) -> Option<u64> {
+        if self.total_received == 0 {
+            None
+        } else {
+            Some(self.total_latency_ms / self.total_received)
+        }
+    }
+
+    /// Total heartbeats received.
+    pub fn total_received(&self) -> u64 {
+        self.total_received
+    }
+
+    /// Number of consecutive missed heartbeats.
+    pub fn consecutive_missed(&self) -> u32 {
+        self.consecutive_missed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1569,5 +1911,180 @@ mod tests {
         let mut corr = RpcCorrelator::new();
         let resp = RpcResponse { id: 999, result: Ok(json!(null)) };
         assert!(corr.correlate(&resp).is_none());
+    }
+
+    // ── RpcErrorCode tests ──
+
+    #[test]
+    fn error_code_from_code_roundtrip() {
+        let code = RpcErrorCode::MethodNotFound;
+        assert_eq!(code.code(), -32601);
+        assert_eq!(RpcErrorCode::from_code(-32601), Some(RpcErrorCode::MethodNotFound));
+        assert_eq!(RpcErrorCode::from_code(9999), None);
+    }
+
+    #[test]
+    fn error_code_retryable() {
+        assert!(RpcErrorCode::InternalError.is_retryable());
+        assert!(RpcErrorCode::ContentModified.is_retryable());
+        assert!(!RpcErrorCode::ParseError.is_retryable());
+        assert!(!RpcErrorCode::MethodNotFound.is_retryable());
+        assert!(!RpcErrorCode::RequestCancelled.is_retryable());
+    }
+
+    #[test]
+    fn error_code_display() {
+        let s = format!("{}", RpcErrorCode::InvalidParams);
+        assert!(s.contains("Invalid params"));
+        assert!(s.contains("-32602"));
+    }
+
+    // ── RpcVersion / negotiation tests ──
+
+    #[test]
+    fn version_compatibility() {
+        let v1 = RpcVersion::new(1, 0);
+        let v1_1 = RpcVersion::new(1, 1);
+        let v2 = RpcVersion::new(2, 0);
+        assert!(v1.is_compatible_with(&v1_1));
+        assert!(!v1.is_compatible_with(&v2));
+    }
+
+    #[test]
+    fn version_negotiation_exact_match() {
+        let neg = RpcVersionNegotiator::new(vec![
+            RpcVersion::new(1, 0),
+            RpcVersion::new(2, 0),
+        ]);
+        let remote = vec![RpcVersion::new(2, 0), RpcVersion::new(3, 0)];
+        assert_eq!(neg.negotiate(&remote), Some(RpcVersion::new(2, 0)));
+    }
+
+    #[test]
+    fn version_negotiation_compatible_fallback() {
+        let neg = RpcVersionNegotiator::new(vec![RpcVersion::new(2, 3)]);
+        let remote = vec![RpcVersion::new(2, 1)];
+        // Same major, picks min of (2.3, 2.1) = 2.1
+        assert_eq!(neg.negotiate(&remote), Some(RpcVersion::new(2, 1)));
+    }
+
+    #[test]
+    fn version_negotiation_no_match() {
+        let neg = RpcVersionNegotiator::new(vec![RpcVersion::new(1, 0)]);
+        let remote = vec![RpcVersion::new(3, 0)];
+        assert_eq!(neg.negotiate(&remote), None);
+    }
+
+    #[test]
+    fn version_display() {
+        assert_eq!(format!("{}", RpcVersion::new(2, 5)), "2.5");
+    }
+
+    // ── RpcSerializationStats tests ──
+
+    #[test]
+    fn serialization_stats_inbound_outbound() {
+        let mut stats = RpcSerializationStats::new();
+        stats.record_inbound(100);
+        stats.record_inbound(200);
+        stats.record_outbound(50);
+        assert_eq!(stats.messages_in, 2);
+        assert_eq!(stats.messages_out, 1);
+        assert_eq!(stats.bytes_in, 300);
+        assert_eq!(stats.bytes_out, 50);
+        assert_eq!(stats.avg_inbound_size(), 150);
+        assert_eq!(stats.avg_outbound_size(), 50);
+        assert_eq!(stats.total_bytes(), 350);
+        assert_eq!(stats.largest_in, 200);
+        assert_eq!(stats.largest_out, 50);
+    }
+
+    #[test]
+    fn serialization_stats_reset() {
+        let mut stats = RpcSerializationStats::new();
+        stats.record_inbound(500);
+        stats.record_outbound(300);
+        stats.reset();
+        assert_eq!(stats.messages_in, 0);
+        assert_eq!(stats.bytes_in, 0);
+        assert_eq!(stats.total_bytes(), 0);
+    }
+
+    // ── RpcRateLimiter tests ──
+
+    #[test]
+    fn rate_limiter_basic() {
+        let mut rl = RpcRateLimiter::new(3, 1, 0);
+        // Consume all 3 tokens at time 0
+        assert!(rl.try_acquire(0));
+        assert!(rl.try_acquire(0));
+        assert!(rl.try_acquire(0));
+        // 4th should be blocked
+        assert!(!rl.try_acquire(0));
+    }
+
+    #[test]
+    fn rate_limiter_refill() {
+        let mut rl = RpcRateLimiter::new(2, 1, 0);
+        assert!(rl.try_acquire(0));
+        assert!(rl.try_acquire(0));
+        assert!(!rl.try_acquire(0));
+        // After 1 second, 1 token should be refilled
+        assert!(rl.try_acquire(1000));
+        assert!(!rl.try_acquire(1000));
+    }
+
+    #[test]
+    fn rate_limiter_available() {
+        let mut rl = RpcRateLimiter::new(5, 10, 0);
+        assert_eq!(rl.available(0), 5);
+        rl.try_acquire(0);
+        rl.try_acquire(0);
+        assert_eq!(rl.available(0), 3);
+    }
+
+    // ── RpcHealthMonitor tests ──
+
+    #[test]
+    fn health_monitor_healthy_after_heartbeats() {
+        let mut hm = RpcHealthMonitor::new(1000, 3);
+        assert!(hm.is_healthy());
+        assert!(hm.is_overdue(0)); // no heartbeat yet
+        hm.record_heartbeat(100, 5);
+        assert!(hm.is_healthy());
+        assert!(!hm.is_overdue(500));
+        assert_eq!(hm.total_received(), 1);
+        assert_eq!(hm.avg_latency_ms(), Some(5));
+    }
+
+    #[test]
+    fn health_monitor_becomes_unhealthy() {
+        let mut hm = RpcHealthMonitor::new(1000, 2);
+        hm.record_heartbeat(100, 10);
+        hm.record_miss();
+        assert!(hm.is_healthy()); // 1 miss < 2
+        hm.record_miss();
+        assert!(!hm.is_healthy()); // 2 misses == max_missed
+    }
+
+    #[test]
+    fn health_monitor_recovery() {
+        let mut hm = RpcHealthMonitor::new(1000, 2);
+        hm.record_miss();
+        hm.record_miss();
+        assert!(!hm.is_healthy());
+        hm.record_heartbeat(5000, 3);
+        assert!(hm.is_healthy());
+        assert_eq!(hm.consecutive_missed(), 0);
+    }
+
+    #[test]
+    fn health_monitor_avg_latency() {
+        let mut hm = RpcHealthMonitor::new(1000, 3);
+        assert_eq!(hm.avg_latency_ms(), None);
+        hm.record_heartbeat(100, 10);
+        hm.record_heartbeat(200, 20);
+        hm.record_heartbeat(300, 30);
+        assert_eq!(hm.avg_latency_ms(), Some(20));
     }
 }

@@ -882,6 +882,289 @@ pub fn parse_chord(input: &str) -> Option<ChordKeybinding> {
     })
 }
 
+// ---------------------------------------------------------------------------
+// Conflict resolution suggestions
+// ---------------------------------------------------------------------------
+
+/// A suggestion for resolving a keybinding conflict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolutionSuggestion {
+    /// Rebind one of the conflicting commands to a suggested key combo.
+    Rebind { command: String, suggested_key: String },
+    /// Add a when-clause to disambiguate.
+    AddWhenClause { command: String, suggested_clause: String },
+    /// Remove the lower-priority binding entirely.
+    RemoveLowerPriority { command: String, source: KeybindingSource },
+}
+
+/// Produce resolution suggestions for a given `KeybindingConflict`.
+pub fn suggest_resolutions(conflict: &KeybindingConflict) -> Vec<ResolutionSuggestion> {
+    let mut suggestions = Vec::new();
+    if conflict.bindings.len() < 2 {
+        return suggestions;
+    }
+
+    // Sort by priority (User > Extension > Default) so highest-priority is first.
+    let mut sorted = conflict.bindings.clone();
+    sorted.sort_by_key(|b| match b.source {
+        KeybindingSource::User => 0,
+        KeybindingSource::Extension => 1,
+        KeybindingSource::Default => 2,
+    });
+
+    // Suggest removing every binding except the highest-priority one.
+    for b in sorted.iter().skip(1) {
+        suggestions.push(ResolutionSuggestion::RemoveLowerPriority {
+            command: b.command.clone(),
+            source: b.source.clone(),
+        });
+    }
+
+    // Suggest adding when-clauses for bindings that lack one.
+    for b in &sorted {
+        if b.when_clause.is_none() {
+            suggestions.push(ResolutionSuggestion::AddWhenClause {
+                command: b.command.clone(),
+                suggested_clause: format!("editorTextFocus && resourceScheme == 'file'"),
+            });
+        }
+    }
+
+    suggestions
+}
+
+// ---------------------------------------------------------------------------
+// Platform-specific key label conversion
+// ---------------------------------------------------------------------------
+
+/// Target platform for key label display.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Platform {
+    Windows,
+    MacOs,
+    Linux,
+}
+
+/// Convert a key combo into a platform-appropriate display string.
+pub fn platform_key_label(key: &KeyCode, modifiers: &Modifiers, platform: Platform) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+
+    match platform {
+        Platform::MacOs => {
+            if modifiers.ctrl { parts.push("⌃"); }
+            if modifiers.alt { parts.push("⌥"); }
+            if modifiers.shift { parts.push("⇧"); }
+            if modifiers.meta { parts.push("⌘"); }
+        }
+        Platform::Windows | Platform::Linux => {
+            if modifiers.ctrl { parts.push("Ctrl"); }
+            if modifiers.alt { parts.push("Alt"); }
+            if modifiers.shift { parts.push("Shift"); }
+            if modifiers.meta {
+                parts.push(if platform == Platform::Windows { "Win" } else { "Super" });
+            }
+        }
+    }
+
+    let key_str = match key {
+        KeyCode::Enter => "Enter".to_string(),
+        KeyCode::Escape => "Esc".to_string(),
+        KeyCode::Tab => "Tab".to_string(),
+        KeyCode::Backspace => if platform == Platform::MacOs { "⌫".to_string() } else { "Backspace".to_string() },
+        KeyCode::Space => "Space".to_string(),
+        KeyCode::ArrowUp => "↑".to_string(),
+        KeyCode::ArrowDown => "↓".to_string(),
+        KeyCode::ArrowLeft => "←".to_string(),
+        KeyCode::ArrowRight => "→".to_string(),
+        KeyCode::Char(c) => c.to_uppercase().to_string(),
+        KeyCode::F(n) => format!("F{n}"),
+        KeyCode::Delete => if platform == Platform::MacOs { "⌦".to_string() } else { "Delete".to_string() },
+        KeyCode::Home => "Home".to_string(),
+        KeyCode::End => "End".to_string(),
+        KeyCode::PageUp => "PgUp".to_string(),
+        KeyCode::PageDown => "PgDn".to_string(),
+    };
+
+    if parts.is_empty() {
+        return key_str;
+    }
+    match platform {
+        Platform::MacOs => {
+            // macOS uses concatenation without separator
+            let prefix: String = parts.into_iter().collect();
+            format!("{prefix}{key_str}")
+        }
+        _ => {
+            parts.push(&key_str);
+            parts.join("+")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keybinding category grouping
+// ---------------------------------------------------------------------------
+
+/// A named group of keybindings.
+#[derive(Debug, Clone)]
+pub struct KeybindingCategory {
+    pub name: String,
+    pub prefix: String,
+}
+
+/// Group bindings from a registry by command prefix (e.g. "editor.", "workbench.").
+pub fn group_by_category(
+    registry: &KeybindingRegistry,
+    categories: &[KeybindingCategory],
+) -> Vec<(String, Vec<Keybinding>)> {
+    let mut groups: Vec<(String, Vec<Keybinding>)> = categories
+        .iter()
+        .map(|c| (c.name.clone(), Vec::new()))
+        .collect();
+    let mut uncategorised: Vec<Keybinding> = Vec::new();
+
+    for b in registry.get_all_bindings() {
+        let mut matched = false;
+        for (i, cat) in categories.iter().enumerate() {
+            if b.command.starts_with(&cat.prefix) {
+                groups[i].1.push(b.clone());
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            uncategorised.push(b.clone());
+        }
+    }
+    if !uncategorised.is_empty() {
+        groups.push(("Other".to_string(), uncategorised));
+    }
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// Keymap diff – compare two registries
+// ---------------------------------------------------------------------------
+
+/// A single difference between two keymaps.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeymapDiffEntry {
+    /// Binding exists only in the first keymap.
+    OnlyInFirst { command: String, key_label: String },
+    /// Binding exists only in the second keymap.
+    OnlyInSecond { command: String, key_label: String },
+    /// Same command is bound to different keys.
+    Changed { command: String, first_key: String, second_key: String },
+}
+
+/// Diff two registries, returning the list of differences.
+pub fn diff_keymaps(first: &KeybindingRegistry, second: &KeybindingRegistry) -> Vec<KeymapDiffEntry> {
+    use std::collections::HashMap;
+
+    let build_map = |reg: &KeybindingRegistry| -> HashMap<String, String> {
+        let mut m = HashMap::new();
+        for b in reg.get_all_bindings() {
+            m.entry(b.command.clone())
+                .or_insert_with(|| format_key_combo(&b.key, &b.modifiers));
+        }
+        m
+    };
+
+    let map1 = build_map(first);
+    let map2 = build_map(second);
+
+    let mut diffs = Vec::new();
+
+    for (cmd, key1) in &map1 {
+        match map2.get(cmd) {
+            None => diffs.push(KeymapDiffEntry::OnlyInFirst {
+                command: cmd.clone(),
+                key_label: key1.clone(),
+            }),
+            Some(key2) if key1 != key2 => diffs.push(KeymapDiffEntry::Changed {
+                command: cmd.clone(),
+                first_key: key1.clone(),
+                second_key: key2.clone(),
+            }),
+            _ => {}
+        }
+    }
+    for (cmd, key2) in &map2 {
+        if !map1.contains_key(cmd) {
+            diffs.push(KeymapDiffEntry::OnlyInSecond {
+                command: cmd.clone(),
+                key_label: key2.clone(),
+            });
+        }
+    }
+
+    diffs.sort_by(|a, b| {
+        let cmd_a = match a {
+            KeymapDiffEntry::OnlyInFirst { command, .. }
+            | KeymapDiffEntry::OnlyInSecond { command, .. }
+            | KeymapDiffEntry::Changed { command, .. } => command,
+        };
+        let cmd_b = match b {
+            KeymapDiffEntry::OnlyInFirst { command, .. }
+            | KeymapDiffEntry::OnlyInSecond { command, .. }
+            | KeymapDiffEntry::Changed { command, .. } => command,
+        };
+        cmd_a.cmp(cmd_b)
+    });
+    diffs
+}
+
+// ---------------------------------------------------------------------------
+// Default vs custom tracking
+// ---------------------------------------------------------------------------
+
+/// Summary of how many bindings are default vs customised.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CustomisationSummary {
+    pub total: usize,
+    pub default_count: usize,
+    pub user_count: usize,
+    pub extension_count: usize,
+    pub overridden_defaults: Vec<String>,
+}
+
+/// Analyse a registry and report customisation statistics.
+pub fn customisation_summary(registry: &KeybindingRegistry) -> CustomisationSummary {
+    let bindings = registry.get_all_bindings();
+    let total = bindings.len();
+    let mut default_count = 0usize;
+    let mut user_count = 0usize;
+    let mut extension_count = 0usize;
+
+    use std::collections::HashMap;
+    let mut by_key: HashMap<(KeyCode, Modifiers), Vec<&Keybinding>> = HashMap::new();
+    for b in bindings {
+        match b.source {
+            KeybindingSource::Default => default_count += 1,
+            KeybindingSource::User => user_count += 1,
+            KeybindingSource::Extension => extension_count += 1,
+        }
+        by_key.entry((b.key.clone(), b.modifiers.clone())).or_default().push(b);
+    }
+
+    // A default is "overridden" if a User or Extension binding shares the same key+modifiers.
+    let mut overridden_defaults = Vec::new();
+    for group in by_key.values() {
+        let has_default = group.iter().any(|b| b.source == KeybindingSource::Default);
+        let has_override = group.iter().any(|b| b.source != KeybindingSource::Default);
+        if has_default && has_override {
+            for b in group {
+                if b.source == KeybindingSource::Default {
+                    overridden_defaults.push(b.command.clone());
+                }
+            }
+        }
+    }
+    overridden_defaults.sort();
+
+    CustomisationSummary { total, default_count, user_count, extension_count, overridden_defaults }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1584,5 +1867,123 @@ mod tests {
     #[test]
     fn parse_chord_three_parts_fails() {
         assert!(parse_chord("Ctrl+K Ctrl+C Ctrl+X").is_none());
+    }
+
+    // --- Tests for new functionality ---
+
+    #[test]
+    fn conflict_resolution_suggests_remove_lower_priority() {
+        let conflict = KeybindingConflict {
+            bindings: vec![
+                kb_with_source(KeyCode::Char('s'), true, "user_save", KeybindingSource::User),
+                kb_with_source(KeyCode::Char('s'), true, "default_save", KeybindingSource::Default),
+            ],
+        };
+        let suggestions = suggest_resolutions(&conflict);
+        let has_remove = suggestions.iter().any(|s| matches!(
+            s,
+            ResolutionSuggestion::RemoveLowerPriority { command, .. } if command == "default_save"
+        ));
+        assert!(has_remove, "should suggest removing the default binding");
+    }
+
+    #[test]
+    fn conflict_resolution_suggests_when_clause() {
+        let conflict = KeybindingConflict {
+            bindings: vec![
+                kb(KeyCode::Char('p'), true, "palette"),
+                kb(KeyCode::Char('p'), true, "print"),
+            ],
+        };
+        let suggestions = suggest_resolutions(&conflict);
+        let when_count = suggestions.iter().filter(|s| matches!(s, ResolutionSuggestion::AddWhenClause { .. })).count();
+        assert!(when_count >= 2, "should suggest when-clauses for both bindings without one");
+    }
+
+    #[test]
+    fn platform_label_macos_uses_symbols() {
+        let mods = Modifiers { ctrl: false, shift: false, alt: false, meta: true };
+        let label = platform_key_label(&KeyCode::Char('c'), &mods, Platform::MacOs);
+        assert!(label.contains('⌘'), "macOS should use ⌘ for meta: {}", label);
+        assert!(label.contains('C'));
+    }
+
+    #[test]
+    fn platform_label_windows_uses_win_for_meta() {
+        let mods = Modifiers { ctrl: true, shift: false, alt: false, meta: true };
+        let label = platform_key_label(&KeyCode::Char('l'), &mods, Platform::Windows);
+        assert!(label.contains("Win"), "Windows should use Win for meta: {}", label);
+        assert!(label.contains("Ctrl"));
+    }
+
+    #[test]
+    fn platform_label_linux_uses_super() {
+        let mods = Modifiers { ctrl: false, shift: false, alt: false, meta: true };
+        let label = platform_key_label(&KeyCode::Char('t'), &mods, Platform::Linux);
+        assert!(label.contains("Super"), "Linux should use Super for meta: {}", label);
+    }
+
+    #[test]
+    fn group_by_category_assigns_correctly() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::Char('s'), true, "editor.save"));
+        reg.add(kb(KeyCode::Char('o'), true, "workbench.open"));
+        reg.add(kb(KeyCode::Char('t'), true, "misc.toggle"));
+
+        let categories = vec![
+            KeybindingCategory { name: "Editor".into(), prefix: "editor.".into() },
+            KeybindingCategory { name: "Workbench".into(), prefix: "workbench.".into() },
+        ];
+        let groups = group_by_category(&reg, &categories);
+        assert_eq!(groups.len(), 3); // Editor, Workbench, Other
+        assert_eq!(groups[0].0, "Editor");
+        assert_eq!(groups[0].1.len(), 1);
+        assert_eq!(groups[1].0, "Workbench");
+        assert_eq!(groups[1].1.len(), 1);
+        assert_eq!(groups[2].0, "Other");
+        assert_eq!(groups[2].1.len(), 1);
+    }
+
+    #[test]
+    fn diff_keymaps_detects_added_removed_changed() {
+        let mut first = KeybindingRegistry::new();
+        first.add(kb(KeyCode::Char('s'), true, "save"));
+        first.add(kb(KeyCode::Char('o'), true, "open"));
+
+        let mut second = KeybindingRegistry::new();
+        second.add(kb(KeyCode::Char('s'), false, "save")); // changed key
+        second.add(kb(KeyCode::Char('n'), true, "new"));   // added
+
+        let diffs = diff_keymaps(&first, &second);
+        let has_only_first = diffs.iter().any(|d| matches!(d, KeymapDiffEntry::OnlyInFirst { command, .. } if command == "open"));
+        let has_only_second = diffs.iter().any(|d| matches!(d, KeymapDiffEntry::OnlyInSecond { command, .. } if command == "new"));
+        let has_changed = diffs.iter().any(|d| matches!(d, KeymapDiffEntry::Changed { command, .. } if command == "save"));
+        assert!(has_only_first, "should detect 'open' only in first");
+        assert!(has_only_second, "should detect 'new' only in second");
+        assert!(has_changed, "should detect 'save' changed key");
+    }
+
+    #[test]
+    fn customisation_summary_counts_sources() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb_with_source(KeyCode::Char('s'), true, "save", KeybindingSource::Default));
+        reg.add(kb_with_source(KeyCode::Char('s'), true, "save_user", KeybindingSource::User));
+        reg.add(kb_with_source(KeyCode::Char('o'), true, "open", KeybindingSource::Extension));
+
+        let summary = customisation_summary(&reg);
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.default_count, 1);
+        assert_eq!(summary.user_count, 1);
+        assert_eq!(summary.extension_count, 1);
+        assert!(summary.overridden_defaults.contains(&"save".to_string()));
+    }
+
+    #[test]
+    fn diff_keymaps_identical_returns_empty() {
+        let mut a = KeybindingRegistry::new();
+        a.add(kb(KeyCode::Char('s'), true, "save"));
+        let mut b = KeybindingRegistry::new();
+        b.add(kb(KeyCode::Char('s'), true, "save"));
+        assert!(diff_keymaps(&a, &b).is_empty());
     }
 }

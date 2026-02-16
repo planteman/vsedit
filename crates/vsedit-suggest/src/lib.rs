@@ -799,6 +799,251 @@ pub fn rank_completions(items: &[CompletionItem], query: &str, limit: usize) -> 
     scored
 }
 
+// ---------------------------------------------------------------------------
+// Trigger character configuration and detection
+// ---------------------------------------------------------------------------
+
+/// Configuration for trigger characters that initiate auto-completion.
+#[derive(Debug, Clone)]
+pub struct TriggerConfig {
+    /// Characters that trigger completion (e.g., '.', ':', '<').
+    pub trigger_chars: Vec<char>,
+    /// Characters that commit/accept the current completion (e.g., Tab, Enter).
+    pub commit_chars: Vec<char>,
+    /// Minimum word length before auto-triggering without a trigger character.
+    pub min_word_length: usize,
+}
+
+impl Default for TriggerConfig {
+    fn default() -> Self {
+        Self {
+            trigger_chars: vec!['.', ':', '<'],
+            commit_chars: vec!['\t', '\n'],
+            min_word_length: 3,
+        }
+    }
+}
+
+impl TriggerConfig {
+    /// Create a config with the given trigger characters.
+    pub fn with_triggers(chars: &[char]) -> Self {
+        Self {
+            trigger_chars: chars.to_vec(),
+            ..Default::default()
+        }
+    }
+
+    /// Returns `true` if `ch` is a trigger character.
+    pub fn is_trigger(&self, ch: char) -> bool {
+        self.trigger_chars.contains(&ch)
+    }
+
+    /// Returns `true` if `ch` is a commit character.
+    pub fn is_commit(&self, ch: char) -> bool {
+        self.commit_chars.contains(&ch)
+    }
+
+    /// Determine whether completion should be triggered for the given line
+    /// content up to (but not including) the cursor column.
+    ///
+    /// Returns `true` if the character immediately before the cursor is a
+    /// trigger character, or if the current word being typed has reached
+    /// `min_word_length`.
+    pub fn should_trigger(&self, line: &str, cursor_col: usize) -> bool {
+        let text = &line[..cursor_col.min(line.len())];
+        if let Some(last) = text.chars().last() {
+            if self.is_trigger(last) {
+                return true;
+            }
+        }
+        // Check word length: count contiguous identifier chars at end of text.
+        let word_len = text
+            .chars()
+            .rev()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .count();
+        word_len >= self.min_word_length
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet variable expansion
+// ---------------------------------------------------------------------------
+
+/// Expand simple snippet tab-stop and variable placeholders in `body`.
+///
+/// Supported syntax:
+///   - `$0`                 → empty (final cursor position marker, removed)
+///   - `${N:default}`       → `default`
+///   - `$N`                 → empty string (bare tab-stop without default)
+///   - `${TM_FILENAME}`     → looked up in `vars`; empty if absent
+///   - `${VAR:fallback}`    → value from `vars`, or `fallback` if absent
+pub fn expand_snippet(body: &str, vars: &HashMap<String, String>) -> String {
+    let mut result = String::with_capacity(body.len());
+    let chars: Vec<char> = body.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        if chars[i] == '$' && i + 1 < len {
+            if chars[i + 1] == '{' {
+                // Find matching '}'
+                if let Some(close) = chars[i + 2..].iter().position(|&c| c == '}') {
+                    let inner: String = chars[i + 2..i + 2 + close].iter().collect();
+                    let expanded = expand_snippet_placeholder(&inner, vars);
+                    result.push_str(&expanded);
+                    i = i + 2 + close + 1;
+                    continue;
+                }
+            } else if chars[i + 1].is_ascii_digit() {
+                // Bare $N — skip the tab-stop number
+                i += 1;
+                while i < len && chars[i].is_ascii_digit() {
+                    i += 1;
+                }
+                continue;
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
+/// Expand a single `${...}` placeholder interior (the text between braces).
+fn expand_snippet_placeholder(inner: &str, vars: &HashMap<String, String>) -> String {
+    if let Some(colon_pos) = inner.find(':') {
+        let key = &inner[..colon_pos];
+        let fallback = &inner[colon_pos + 1..];
+        // If key is purely numeric it's a tab-stop with default text.
+        if key.chars().all(|c| c.is_ascii_digit()) {
+            return fallback.to_string();
+        }
+        // Otherwise it's a variable with fallback.
+        vars.get(key).cloned().unwrap_or_else(|| fallback.to_string())
+    } else {
+        // No colon — could be a bare number or a variable name.
+        if inner.chars().all(|c| c.is_ascii_digit()) {
+            String::new()
+        } else {
+            vars.get(inner).cloned().unwrap_or_default()
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion item sorting by relevance + recency
+// ---------------------------------------------------------------------------
+
+/// Tracks recently-selected completion labels so they can be boosted in future
+/// ranking.
+#[derive(Debug, Clone)]
+pub struct RecencyTracker {
+    /// Most-recently-used labels, newest first.
+    history: Vec<String>,
+    /// Maximum number of entries to retain.
+    capacity: usize,
+}
+
+impl RecencyTracker {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            history: Vec::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Record that `label` was selected by the user.
+    pub fn record(&mut self, label: &str) {
+        // Remove existing entry if present so it moves to front.
+        self.history.retain(|l| l != label);
+        self.history.insert(0, label.to_string());
+        self.history.truncate(self.capacity);
+    }
+
+    /// Return a recency boost for `label`.  Items used most recently get the
+    /// highest boost (capacity points for position 0, capacity-1 for position
+    /// 1, etc.).  Returns 0 if the label has no history.
+    pub fn boost(&self, label: &str) -> i64 {
+        self.history
+            .iter()
+            .position(|l| l == label)
+            .map(|pos| (self.capacity - pos) as i64)
+            .unwrap_or(0)
+    }
+
+    /// The number of labels currently tracked.
+    pub fn len(&self) -> usize {
+        self.history.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.history.is_empty()
+    }
+}
+
+/// Rank completions considering both fuzzy score and recency.
+pub fn rank_with_recency(
+    items: &[CompletionItem],
+    query: &str,
+    recency: &RecencyTracker,
+    limit: usize,
+) -> Vec<ScoredCompletion> {
+    let mut scored: Vec<ScoredCompletion> = items
+        .iter()
+        .filter_map(|item| {
+            let text = item.get_filter_text();
+            fuzzy_score(query, text).map(|mut s| {
+                if item.preselect {
+                    s += 1000;
+                }
+                if item.deprecated {
+                    s -= 500;
+                }
+                s += recency.boost(&item.label) * 50;
+                ScoredCompletion::new(item.clone(), s)
+            })
+        })
+        .collect();
+    scored.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.item.label.cmp(&b.item.label)));
+    scored.truncate(limit);
+    scored
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion pre-filtering by multiple kinds
+// ---------------------------------------------------------------------------
+
+impl CompletionList {
+    /// Return only items whose kind is in the given set.
+    pub fn filter_by_kinds(&self, kinds: &[CompletionItemKind]) -> CompletionList {
+        let items = self
+            .items
+            .iter()
+            .filter(|item| kinds.contains(&item.kind))
+            .cloned()
+            .collect();
+        CompletionList {
+            items,
+            is_incomplete: self.is_incomplete,
+        }
+    }
+
+    /// Exclude items whose kind is in the given set.
+    pub fn exclude_kinds(&self, kinds: &[CompletionItemKind]) -> CompletionList {
+        let items = self
+            .items
+            .iter()
+            .filter(|item| !kinds.contains(&item.kind))
+            .cloned()
+            .collect();
+        CompletionList {
+            items,
+            is_incomplete: self.is_incomplete,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1511,5 +1756,125 @@ mod tests {
         ];
         let ranked = rank_completions(&items, "a", 2);
         assert_eq!(ranked.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Trigger character configuration tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn trigger_config_default_triggers() {
+        let cfg = TriggerConfig::default();
+        assert!(cfg.is_trigger('.'));
+        assert!(cfg.is_trigger(':'));
+        assert!(!cfg.is_trigger(' '));
+        assert!(cfg.is_commit('\t'));
+        assert!(!cfg.is_commit('.'));
+    }
+
+    #[test]
+    fn trigger_config_should_trigger_on_dot() {
+        let cfg = TriggerConfig::default();
+        assert!(cfg.should_trigger("foo.", 4));
+        assert!(!cfg.should_trigger("fo", 2)); // only 2 chars, min is 3
+        assert!(cfg.should_trigger("foo", 3)); // 3 chars == min_word_length
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet variable expansion tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn expand_snippet_tab_stops_and_defaults() {
+        let vars = HashMap::new();
+        let body = "for ${1:i} in ${2:collection} { $0 }";
+        let expanded = expand_snippet(body, &vars);
+        assert_eq!(expanded, "for i in collection {  }");
+    }
+
+    #[test]
+    fn expand_snippet_variables() {
+        let mut vars = HashMap::new();
+        vars.insert("TM_FILENAME".to_string(), "main.rs".to_string());
+        let body = "// File: ${TM_FILENAME}\n// Author: ${AUTHOR:unknown}";
+        let expanded = expand_snippet(body, &vars);
+        assert_eq!(expanded, "// File: main.rs\n// Author: unknown");
+    }
+
+    // -----------------------------------------------------------------------
+    // Recency tracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn recency_tracker_boost_ordering() {
+        let mut tracker = RecencyTracker::new(5);
+        tracker.record("alpha");
+        tracker.record("beta");
+        tracker.record("gamma");
+        // gamma is most recent (position 0), alpha is oldest (position 2)
+        assert!(tracker.boost("gamma") > tracker.boost("beta"));
+        assert!(tracker.boost("beta") > tracker.boost("alpha"));
+        assert_eq!(tracker.boost("unknown"), 0);
+        assert_eq!(tracker.len(), 3);
+    }
+
+    #[test]
+    fn recency_tracker_capacity_eviction() {
+        let mut tracker = RecencyTracker::new(2);
+        tracker.record("a");
+        tracker.record("b");
+        tracker.record("c");
+        assert_eq!(tracker.len(), 2);
+        assert_eq!(tracker.boost("a"), 0); // evicted
+        assert!(tracker.boost("c") > 0);
+    }
+
+    #[test]
+    fn rank_with_recency_boosts_recent() {
+        let items = vec![
+            CompletionItem::new("apple", CompletionItemKind::Variable),
+            CompletionItem::new("apply", CompletionItemKind::Function),
+        ];
+        let mut tracker = RecencyTracker::new(10);
+        tracker.record("apple");
+        let ranked = rank_with_recency(&items, "app", &tracker, 10);
+        assert_eq!(ranked[0].item.label, "apple");
+    }
+
+    // -----------------------------------------------------------------------
+    // Multi-kind filtering tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn filter_by_kinds_multiple() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("foo", CompletionItemKind::Function),
+            CompletionItem::new("bar", CompletionItemKind::Variable),
+            CompletionItem::new("baz", CompletionItemKind::Keyword),
+            CompletionItem::new("qux", CompletionItemKind::Class),
+        ]);
+        let filtered = list.filter_by_kinds(&[
+            CompletionItemKind::Function,
+            CompletionItemKind::Variable,
+        ]);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.items.iter().all(|i| {
+            i.kind == CompletionItemKind::Function || i.kind == CompletionItemKind::Variable
+        }));
+    }
+
+    #[test]
+    fn exclude_kinds_removes_snippets_and_keywords() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("fn", CompletionItemKind::Keyword),
+            CompletionItem::new("for_loop", CompletionItemKind::Snippet),
+            CompletionItem::new("process", CompletionItemKind::Function),
+        ]);
+        let filtered = list.exclude_kinds(&[
+            CompletionItemKind::Keyword,
+            CompletionItemKind::Snippet,
+        ]);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered.items[0].label, "process");
     }
 }

@@ -815,6 +815,291 @@ impl Default for GettingStartedChecklist {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SectionPriority / SectionOrdering
+// ---------------------------------------------------------------------------
+
+/// Priority level for a welcome page section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SectionPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
+}
+
+/// A section with an associated priority for ordering.
+#[derive(Debug, Clone)]
+pub struct PrioritizedSection {
+    pub section: WelcomeSection,
+    pub priority: SectionPriority,
+    pub visible: bool,
+}
+
+/// Manages ordered, prioritized welcome sections.
+pub struct SectionOrdering {
+    sections: Vec<PrioritizedSection>,
+}
+
+impl SectionOrdering {
+    pub fn new() -> Self {
+        Self {
+            sections: Vec::new(),
+        }
+    }
+
+    /// Add a section with the given priority.
+    pub fn add(&mut self, section: WelcomeSection, priority: SectionPriority) {
+        self.sections.push(PrioritizedSection {
+            section,
+            priority,
+            visible: true,
+        });
+        self.sections.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    /// Return sections in priority order, filtered to visible only.
+    pub fn visible_sections(&self) -> Vec<&WelcomeSection> {
+        self.sections
+            .iter()
+            .filter(|ps| ps.visible)
+            .map(|ps| &ps.section)
+            .collect()
+    }
+
+    /// Hide a section by title.
+    pub fn hide(&mut self, title: &str) {
+        if let Some(ps) = self.sections.iter_mut().find(|ps| ps.section.title == title) {
+            ps.visible = false;
+        }
+    }
+
+    /// Show a previously hidden section by title.
+    pub fn show(&mut self, title: &str) {
+        if let Some(ps) = self.sections.iter_mut().find(|ps| ps.section.title == title) {
+            ps.visible = true;
+        }
+    }
+
+    /// Change the priority of a section by title. Returns `true` if found.
+    pub fn set_priority(&mut self, title: &str, priority: SectionPriority) -> bool {
+        if let Some(ps) = self.sections.iter_mut().find(|ps| ps.section.title == title) {
+            ps.priority = priority;
+            self.sections.sort_by(|a, b| b.priority.cmp(&a.priority));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Total number of sections (including hidden).
+    pub fn len(&self) -> usize {
+        self.sections.len()
+    }
+
+    /// Whether there are no sections.
+    pub fn is_empty(&self) -> bool {
+        self.sections.is_empty()
+    }
+}
+
+impl Default for SectionOrdering {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RecentProjectManager – filtering and sorting recent projects
+// ---------------------------------------------------------------------------
+
+/// Sort criteria for recent projects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectSortOrder {
+    /// Most recently opened first.
+    LastOpened,
+    /// Alphabetical by name.
+    Name,
+    /// Alphabetical by path.
+    Path,
+}
+
+/// A project entry in the recent-projects list.
+#[derive(Debug, Clone)]
+pub struct RecentProject {
+    pub name: String,
+    pub path: String,
+    pub last_opened: u64,
+    pub tags: Vec<String>,
+}
+
+/// Manages recent projects with sorting, filtering, and deduplication.
+pub struct RecentProjectManager {
+    projects: Vec<RecentProject>,
+    max_projects: usize,
+}
+
+impl RecentProjectManager {
+    pub fn new(max_projects: usize) -> Self {
+        Self {
+            projects: Vec::new(),
+            max_projects,
+        }
+    }
+
+    /// Record a project as recently opened. Deduplicates by path.
+    pub fn record_open(&mut self, project: RecentProject) {
+        self.projects.retain(|p| p.path != project.path);
+        self.projects.insert(0, project);
+        self.projects.truncate(self.max_projects);
+    }
+
+    /// Return projects sorted by the given order.
+    pub fn sorted(&self, order: ProjectSortOrder) -> Vec<&RecentProject> {
+        let mut refs: Vec<&RecentProject> = self.projects.iter().collect();
+        match order {
+            ProjectSortOrder::LastOpened => refs.sort_by(|a, b| b.last_opened.cmp(&a.last_opened)),
+            ProjectSortOrder::Name => refs.sort_by(|a, b| a.name.cmp(&b.name)),
+            ProjectSortOrder::Path => refs.sort_by(|a, b| a.path.cmp(&b.path)),
+        }
+        refs
+    }
+
+    /// Filter projects whose name or path contains the query (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&RecentProject> {
+        let q = query.to_lowercase();
+        self.projects
+            .iter()
+            .filter(|p| p.name.to_lowercase().contains(&q) || p.path.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    /// Filter projects that have at least one of the given tags.
+    pub fn filter_by_tags(&self, tags: &[&str]) -> Vec<&RecentProject> {
+        self.projects
+            .iter()
+            .filter(|p| p.tags.iter().any(|t| tags.contains(&t.as_str())))
+            .collect()
+    }
+
+    /// Remove a project by path. Returns `true` if found.
+    pub fn remove(&mut self, path: &str) -> bool {
+        let before = self.projects.len();
+        self.projects.retain(|p| p.path != path);
+        self.projects.len() < before
+    }
+
+    pub fn count(&self) -> usize {
+        self.projects.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.projects.is_empty()
+    }
+
+    /// Collect all unique tags across all projects, sorted alphabetically.
+    pub fn all_tags(&self) -> Vec<String> {
+        let mut tags: Vec<String> = self
+            .projects
+            .iter()
+            .flat_map(|p| p.tags.iter().cloned())
+            .collect();
+        tags.sort();
+        tags.dedup();
+        tags
+    }
+}
+
+impl Default for RecentProjectManager {
+    fn default() -> Self {
+        Self::new(25)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WelcomeLayout – layout computation for the welcome page
+// ---------------------------------------------------------------------------
+
+/// Rectangle describing a region on the welcome page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Rect {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self { x, y, width, height }
+    }
+
+    pub fn area(&self) -> u32 {
+        self.width * self.height
+    }
+
+    pub fn contains_point(&self, px: u32, py: u32) -> bool {
+        px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
+    }
+
+    pub fn intersects(&self, other: &Rect) -> bool {
+        self.x < other.x + other.width
+            && self.x + self.width > other.x
+            && self.y < other.y + other.height
+            && self.y + self.height > other.y
+    }
+}
+
+/// Computes layout rectangles for welcome page regions.
+pub struct WelcomeLayout {
+    viewport_width: u32,
+    viewport_height: u32,
+    padding: u32,
+}
+
+impl WelcomeLayout {
+    pub fn new(viewport_width: u32, viewport_height: u32, padding: u32) -> Self {
+        Self {
+            viewport_width,
+            viewport_height,
+            padding,
+        }
+    }
+
+    /// Compute a vertically stacked layout where each section gets an equal
+    /// share of the available height.
+    pub fn compute_stacked(&self, section_count: usize) -> Vec<Rect> {
+        if section_count == 0 {
+            return Vec::new();
+        }
+        let usable_w = self.viewport_width.saturating_sub(self.padding * 2);
+        let total_gap = self.padding * section_count.saturating_sub(1) as u32;
+        let usable_h = self.viewport_height.saturating_sub(self.padding * 2 + total_gap);
+        let section_h = usable_h / section_count as u32;
+        (0..section_count)
+            .map(|i| {
+                let y = self.padding + (section_h + self.padding) * i as u32;
+                Rect::new(self.padding, y, usable_w, section_h)
+            })
+            .collect()
+    }
+
+    /// Compute a two-column layout: left column takes `left_frac` of the width.
+    pub fn compute_two_column(&self, left_frac: f32) -> (Rect, Rect) {
+        let usable_w = self.viewport_width.saturating_sub(self.padding * 3);
+        let usable_h = self.viewport_height.saturating_sub(self.padding * 2);
+        let left_w = (usable_w as f32 * left_frac.clamp(0.0, 1.0)) as u32;
+        let right_w = usable_w - left_w;
+        let left = Rect::new(self.padding, self.padding, left_w, usable_h);
+        let right = Rect::new(self.padding * 2 + left_w, self.padding, right_w, usable_h);
+        (left, right)
+    }
+
+    pub fn viewport_area(&self) -> u32 {
+        self.viewport_width * self.viewport_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1570,5 +1855,174 @@ mod tests {
         assert!(lines[0].contains("1/2"));
         assert!(lines[1].contains("✓"));
         assert!(lines[2].contains("○"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SectionOrdering tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn section_ordering_priority_sort() {
+        let mut ordering = SectionOrdering::new();
+        ordering.add(
+            WelcomeSection { title: "Low".into(), items: vec![] },
+            SectionPriority::Low,
+        );
+        ordering.add(
+            WelcomeSection { title: "High".into(), items: vec![] },
+            SectionPriority::High,
+        );
+        ordering.add(
+            WelcomeSection { title: "Normal".into(), items: vec![] },
+            SectionPriority::Normal,
+        );
+        let visible = ordering.visible_sections();
+        assert_eq!(visible.len(), 3);
+        assert_eq!(visible[0].title, "High");
+        assert_eq!(visible[1].title, "Normal");
+        assert_eq!(visible[2].title, "Low");
+    }
+
+    #[test]
+    fn section_ordering_hide_and_show() {
+        let mut ordering = SectionOrdering::new();
+        ordering.add(
+            WelcomeSection { title: "A".into(), items: vec![] },
+            SectionPriority::Normal,
+        );
+        ordering.add(
+            WelcomeSection { title: "B".into(), items: vec![] },
+            SectionPriority::Normal,
+        );
+        assert_eq!(ordering.visible_sections().len(), 2);
+        ordering.hide("A");
+        let visible = ordering.visible_sections();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].title, "B");
+        ordering.show("A");
+        assert_eq!(ordering.visible_sections().len(), 2);
+    }
+
+    #[test]
+    fn section_ordering_set_priority_reorders() {
+        let mut ordering = SectionOrdering::new();
+        ordering.add(
+            WelcomeSection { title: "First".into(), items: vec![] },
+            SectionPriority::High,
+        );
+        ordering.add(
+            WelcomeSection { title: "Second".into(), items: vec![] },
+            SectionPriority::Low,
+        );
+        assert_eq!(ordering.visible_sections()[0].title, "First");
+        assert!(ordering.set_priority("Second", SectionPriority::Critical));
+        assert_eq!(ordering.visible_sections()[0].title, "Second");
+        assert!(!ordering.set_priority("Missing", SectionPriority::Low));
+    }
+
+    // -----------------------------------------------------------------------
+    // RecentProjectManager tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn project_manager_dedup_and_sort() {
+        let mut mgr = RecentProjectManager::new(10);
+        mgr.record_open(RecentProject {
+            name: "alpha".into(),
+            path: "/a".into(),
+            last_opened: 100,
+            tags: vec!["rust".into()],
+        });
+        mgr.record_open(RecentProject {
+            name: "beta".into(),
+            path: "/b".into(),
+            last_opened: 200,
+            tags: vec!["python".into()],
+        });
+        // Re-open alpha with newer timestamp
+        mgr.record_open(RecentProject {
+            name: "alpha".into(),
+            path: "/a".into(),
+            last_opened: 300,
+            tags: vec!["rust".into()],
+        });
+        assert_eq!(mgr.count(), 2);
+        let by_time = mgr.sorted(ProjectSortOrder::LastOpened);
+        assert_eq!(by_time[0].name, "alpha");
+        let by_name = mgr.sorted(ProjectSortOrder::Name);
+        assert_eq!(by_name[0].name, "alpha");
+        assert_eq!(by_name[1].name, "beta");
+    }
+
+    #[test]
+    fn project_manager_search_and_tags() {
+        let mut mgr = RecentProjectManager::new(10);
+        mgr.record_open(RecentProject {
+            name: "my-web-app".into(),
+            path: "/projects/web".into(),
+            last_opened: 1,
+            tags: vec!["web".into(), "js".into()],
+        });
+        mgr.record_open(RecentProject {
+            name: "cli-tool".into(),
+            path: "/projects/cli".into(),
+            last_opened: 2,
+            tags: vec!["rust".into()],
+        });
+        assert_eq!(mgr.search("web").len(), 1);
+        assert_eq!(mgr.search("CLI").len(), 1);
+        assert_eq!(mgr.filter_by_tags(&["rust"]).len(), 1);
+        assert_eq!(mgr.filter_by_tags(&["web", "rust"]).len(), 2);
+        let tags = mgr.all_tags();
+        assert_eq!(tags, vec!["js", "rust", "web"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // WelcomeLayout / Rect tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rect_area_and_contains() {
+        let r = Rect::new(10, 20, 100, 50);
+        assert_eq!(r.area(), 5000);
+        assert!(r.contains_point(10, 20));
+        assert!(r.contains_point(50, 40));
+        assert!(!r.contains_point(110, 20));
+        assert!(!r.contains_point(10, 70));
+    }
+
+    #[test]
+    fn rect_intersects() {
+        let a = Rect::new(0, 0, 100, 100);
+        let b = Rect::new(50, 50, 100, 100);
+        let c = Rect::new(200, 200, 10, 10);
+        assert!(a.intersects(&b));
+        assert!(b.intersects(&a));
+        assert!(!a.intersects(&c));
+    }
+
+    #[test]
+    fn layout_stacked_sections() {
+        let layout = WelcomeLayout::new(800, 600, 10);
+        let rects = layout.compute_stacked(3);
+        assert_eq!(rects.len(), 3);
+        // All rects should have the same width and height
+        assert!(rects.iter().all(|r| r.width == rects[0].width));
+        assert!(rects.iter().all(|r| r.height == rects[0].height));
+        // Each subsequent rect has a larger y
+        assert!(rects[1].y > rects[0].y);
+        assert!(rects[2].y > rects[1].y);
+        // Empty case
+        assert!(layout.compute_stacked(0).is_empty());
+    }
+
+    #[test]
+    fn layout_two_column() {
+        let layout = WelcomeLayout::new(1000, 600, 10);
+        let (left, right) = layout.compute_two_column(0.3);
+        assert!(left.width < right.width);
+        assert_eq!(left.height, right.height);
+        assert!(right.x > left.x);
+        assert_eq!(layout.viewport_area(), 600_000);
     }
 }

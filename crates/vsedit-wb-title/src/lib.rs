@@ -852,6 +852,253 @@ impl Default for TitleBarDirtyIndicator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TitleHistory – tracks previous window titles
+// ---------------------------------------------------------------------------
+
+/// Tracks a bounded history of rendered window titles.
+#[derive(Debug, Clone)]
+pub struct TitleHistory {
+    entries: Vec<TitleHistoryEntry>,
+    capacity: usize,
+}
+
+/// A single entry in the title history.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TitleHistoryEntry {
+    pub title: String,
+    pub timestamp_ms: u64,
+}
+
+impl TitleHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Push a new title onto the history. If the capacity is exceeded the
+    /// oldest entry is removed.
+    pub fn push(&mut self, title: String, timestamp_ms: u64) {
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(TitleHistoryEntry {
+            title,
+            timestamp_ms,
+        });
+    }
+
+    /// Returns the most recent title, if any.
+    pub fn latest(&self) -> Option<&TitleHistoryEntry> {
+        self.entries.last()
+    }
+
+    /// Returns all entries from oldest to newest.
+    pub fn entries(&self) -> &[TitleHistoryEntry] {
+        &self.entries
+    }
+
+    /// Returns the number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` when the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all history entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Returns `true` if the given title differs from the most recent entry.
+    pub fn is_changed(&self, title: &str) -> bool {
+        match self.latest() {
+            Some(entry) => entry.title != title,
+            None => true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Platform – platform-specific title formatting
+// ---------------------------------------------------------------------------
+
+/// Target platform for title bar formatting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Platform {
+    Windows,
+    MacOs,
+    Linux,
+}
+
+impl Platform {
+    /// Detects the current compilation target platform.
+    pub fn current() -> Self {
+        if cfg!(target_os = "windows") {
+            Platform::Windows
+        } else if cfg!(target_os = "macos") {
+            Platform::MacOs
+        } else {
+            Platform::Linux
+        }
+    }
+}
+
+impl fmt::Display for Platform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Platform::Windows => write!(f, "windows"),
+            Platform::MacOs => write!(f, "macos"),
+            Platform::Linux => write!(f, "linux"),
+        }
+    }
+}
+
+/// Formats a window title according to platform conventions.
+///
+/// - **macOS**: shows the filename only (no path prefix) when a file is active,
+///   since macOS uses a proxy icon for the full path.
+/// - **Windows**: uses backslash separators in paths.
+/// - **Linux**: uses the full forward-slash path.
+pub fn format_title_for_platform(
+    platform: Platform,
+    context: &TitleBarContext,
+) -> String {
+    let file_part = match (&context.active_file, platform) {
+        (Some(path), Platform::MacOs) => {
+            // macOS convention: display only the filename.
+            path.rsplit('/').next().unwrap_or(path).to_string()
+        }
+        (Some(path), Platform::Windows) => {
+            path.replace('/', "\\")
+        }
+        (Some(path), Platform::Linux) => path.clone(),
+        (None, _) => String::new(),
+    };
+
+    let dirty = if context.is_dirty { "● " } else { "" };
+
+    if file_part.is_empty() {
+        format!("{dirty}{}", context.app_name)
+    } else {
+        format!("{dirty}{file_part} — {}", context.app_name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleBarTheme – title bar color / theme customization tracking
+// ---------------------------------------------------------------------------
+
+/// RGBA colour represented as four `u8` components.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rgba {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl Rgba {
+    pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self { r, g, b, a }
+    }
+
+    /// Parse a `#RRGGBB` or `#RRGGBBAA` hex colour string.
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        let hex = hex.strip_prefix('#').unwrap_or(hex);
+        match hex.len() {
+            6 => {
+                let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+                let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+                let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+                Some(Self { r, g, b, a: 255 })
+            }
+            8 => {
+                let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+                let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+                let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+                let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+                Some(Self { r, g, b, a })
+            }
+            _ => None,
+        }
+    }
+
+    /// Render as a `#RRGGBB` hex string (alpha is omitted when fully opaque).
+    pub fn to_hex(&self) -> String {
+        if self.a == 255 {
+            format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
+        } else {
+            format!("#{:02x}{:02x}{:02x}{:02x}", self.r, self.g, self.b, self.a)
+        }
+    }
+}
+
+impl fmt::Display for Rgba {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+/// Title bar visual theme configuration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TitleBarTheme {
+    pub background: Rgba,
+    pub foreground: Rgba,
+    pub active_background: Rgba,
+    pub active_foreground: Rgba,
+    pub border: Option<Rgba>,
+}
+
+impl TitleBarTheme {
+    /// A sensible dark theme default.
+    pub fn dark() -> Self {
+        Self {
+            background: Rgba::new(30, 30, 30, 255),
+            foreground: Rgba::new(204, 204, 204, 255),
+            active_background: Rgba::new(30, 30, 30, 255),
+            active_foreground: Rgba::new(255, 255, 255, 255),
+            border: None,
+        }
+    }
+
+    /// A sensible light theme default.
+    pub fn light() -> Self {
+        Self {
+            background: Rgba::new(221, 221, 221, 255),
+            foreground: Rgba::new(51, 51, 51, 255),
+            active_background: Rgba::new(221, 221, 221, 255),
+            active_foreground: Rgba::new(0, 0, 0, 255),
+            border: None,
+        }
+    }
+
+    /// Returns `true` if the background colour is considered "dark"
+    /// (perceived luminance < 128).
+    pub fn is_dark(&self) -> bool {
+        perceived_luminance(self.background) < 128
+    }
+
+    /// Set a border colour.
+    pub fn with_border(mut self, color: Rgba) -> Self {
+        self.border = Some(color);
+        self
+    }
+}
+
+/// Compute perceived luminance using the standard rec. 601 formula,
+/// returning a value in 0..=255.
+fn perceived_luminance(c: Rgba) -> u8 {
+    let lum = 0.299 * c.r as f64 + 0.587 * c.g as f64 + 0.114 * c.b as f64;
+    lum.round() as u8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1520,5 +1767,157 @@ mod tests {
     fn dirty_indicator_default_trait() {
         let d = TitleBarDirtyIndicator::default();
         assert_eq!(d, TitleBarDirtyIndicator::new());
+    }
+
+    // -----------------------------------------------------------------------
+    // TitleHistory tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn history_push_and_latest() {
+        let mut h = TitleHistory::new(5);
+        assert!(h.is_empty());
+        h.push("title1".into(), 100);
+        h.push("title2".into(), 200);
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.latest().unwrap().title, "title2");
+        assert_eq!(h.latest().unwrap().timestamp_ms, 200);
+    }
+
+    #[test]
+    fn history_evicts_oldest_on_overflow() {
+        let mut h = TitleHistory::new(2);
+        h.push("a".into(), 1);
+        h.push("b".into(), 2);
+        h.push("c".into(), 3);
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.entries()[0].title, "b");
+        assert_eq!(h.entries()[1].title, "c");
+    }
+
+    #[test]
+    fn history_is_changed() {
+        let mut h = TitleHistory::new(5);
+        assert!(h.is_changed("anything"));
+        h.push("first".into(), 1);
+        assert!(!h.is_changed("first"));
+        assert!(h.is_changed("second"));
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut h = TitleHistory::new(5);
+        h.push("a".into(), 1);
+        h.push("b".into(), 2);
+        h.clear();
+        assert!(h.is_empty());
+        assert_eq!(h.len(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Platform formatting tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn platform_display() {
+        assert_eq!(Platform::Windows.to_string(), "windows");
+        assert_eq!(Platform::MacOs.to_string(), "macos");
+        assert_eq!(Platform::Linux.to_string(), "linux");
+    }
+
+    #[test]
+    fn format_title_macos_shows_filename_only() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("src/main.rs");
+        let title = format_title_for_platform(Platform::MacOs, &ctx);
+        assert_eq!(title, "main.rs — VSEdit");
+    }
+
+    #[test]
+    fn format_title_windows_uses_backslash() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("src/lib/mod.rs");
+        let title = format_title_for_platform(Platform::Windows, &ctx);
+        assert_eq!(title, "src\\lib\\mod.rs — VSEdit");
+    }
+
+    #[test]
+    fn format_title_linux_full_path() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("/home/user/project/main.rs");
+        let title = format_title_for_platform(Platform::Linux, &ctx);
+        assert_eq!(title, "/home/user/project/main.rs — VSEdit");
+    }
+
+    #[test]
+    fn format_title_no_file() {
+        let ctx = TitleBarContext::new("VSEdit");
+        let title = format_title_for_platform(Platform::Linux, &ctx);
+        assert_eq!(title, "VSEdit");
+    }
+
+    #[test]
+    fn format_title_dirty_indicator() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("f.rs")
+            .with_dirty(true);
+        let title = format_title_for_platform(Platform::Linux, &ctx);
+        assert!(title.starts_with("● "));
+    }
+
+    // -----------------------------------------------------------------------
+    // Rgba / TitleBarTheme tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rgba_from_hex_6() {
+        let c = Rgba::from_hex("#1e1e1e").unwrap();
+        assert_eq!(c, Rgba::new(30, 30, 30, 255));
+    }
+
+    #[test]
+    fn rgba_from_hex_8() {
+        let c = Rgba::from_hex("#1e1e1e80").unwrap();
+        assert_eq!(c, Rgba::new(30, 30, 30, 128));
+    }
+
+    #[test]
+    fn rgba_from_hex_invalid() {
+        assert!(Rgba::from_hex("nope").is_none());
+        assert!(Rgba::from_hex("#zzzzzz").is_none());
+    }
+
+    #[test]
+    fn rgba_to_hex_opaque() {
+        let c = Rgba::new(255, 0, 128, 255);
+        assert_eq!(c.to_hex(), "#ff0080");
+    }
+
+    #[test]
+    fn rgba_to_hex_transparent() {
+        let c = Rgba::new(255, 0, 128, 100);
+        assert_eq!(c.to_hex(), "#ff008064");
+    }
+
+    #[test]
+    fn rgba_display() {
+        let c = Rgba::new(0, 0, 0, 255);
+        assert_eq!(format!("{c}"), "#000000");
+    }
+
+    #[test]
+    fn theme_dark_is_dark() {
+        assert!(TitleBarTheme::dark().is_dark());
+    }
+
+    #[test]
+    fn theme_light_is_not_dark() {
+        assert!(!TitleBarTheme::light().is_dark());
+    }
+
+    #[test]
+    fn theme_with_border() {
+        let t = TitleBarTheme::dark().with_border(Rgba::new(100, 100, 100, 255));
+        assert_eq!(t.border, Some(Rgba::new(100, 100, 100, 255)));
     }
 }

@@ -902,6 +902,320 @@ pub fn uuid_version(uuid_str: &str) -> Option<u8> {
     Some(parsed.get_version_num() as u8)
 }
 
+// ---------------------------------------------------------------------------
+// HMAC-SHA256 (RFC 2104)
+// ---------------------------------------------------------------------------
+
+/// HMAC block size for SHA-256.
+const HMAC_BLOCK_SIZE: usize = 64;
+
+/// Compute HMAC-SHA256 per RFC 2104.
+///
+/// Returns the hex-encoded MAC. Unlike [`keyed_hash`], this follows the
+/// standard two-pass HMAC construction and is safe against length-extension
+/// attacks.
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> String {
+    // If key is longer than block size, hash it first.
+    let key_block = if key.len() > HMAC_BLOCK_SIZE {
+        let h = sha256_bytes(key);
+        let mut kb = [0u8; HMAC_BLOCK_SIZE];
+        kb[..32].copy_from_slice(&h);
+        kb
+    } else {
+        let mut kb = [0u8; HMAC_BLOCK_SIZE];
+        kb[..key.len()].copy_from_slice(key);
+        kb
+    };
+
+    // inner pad (0x36) and outer pad (0x5c)
+    let mut i_key_pad = [0x36u8; HMAC_BLOCK_SIZE];
+    let mut o_key_pad = [0x5cu8; HMAC_BLOCK_SIZE];
+    for i in 0..HMAC_BLOCK_SIZE {
+        i_key_pad[i] ^= key_block[i];
+        o_key_pad[i] ^= key_block[i];
+    }
+
+    // inner hash: SHA256(i_key_pad || message)
+    let mut inner = Sha256::new();
+    inner.update(i_key_pad);
+    inner.update(message);
+    let inner_hash = inner.finalize();
+
+    // outer hash: SHA256(o_key_pad || inner_hash)
+    let mut outer = Sha256::new();
+    outer.update(o_key_pad);
+    outer.update(inner_hash);
+    hex_encode(&outer.finalize())
+}
+
+/// Convenience wrapper: HMAC-SHA256 with string key and message.
+pub fn hmac_sha256_str(key: &str, message: &str) -> String {
+    hmac_sha256(key.as_bytes(), message.as_bytes())
+}
+
+// ---------------------------------------------------------------------------
+// Merkle tree
+// ---------------------------------------------------------------------------
+
+/// A Merkle tree built from a list of leaf items.
+///
+/// Each leaf is the SHA-256 hash of the item. Internal nodes are the SHA-256
+/// hash of the concatenation of their two children. If a level has an odd
+/// number of nodes the last node is duplicated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MerkleTree {
+    /// All levels, from leaves (index 0) to root (last).
+    levels: Vec<Vec<String>>,
+}
+
+impl MerkleTree {
+    /// Build a Merkle tree from leaf data slices.
+    pub fn from_items(items: &[&[u8]]) -> Self {
+        if items.is_empty() {
+            return Self {
+                levels: vec![vec![sha256_hex(b"")]],
+            };
+        }
+
+        let leaves: Vec<String> = items.iter().map(|item| sha256_hex(item)).collect();
+        let mut levels = vec![leaves];
+
+        while levels.last().unwrap().len() > 1 {
+            let prev = levels.last().unwrap();
+            let mut next = Vec::with_capacity((prev.len() + 1) / 2);
+            let mut i = 0;
+            while i < prev.len() {
+                let left = &prev[i];
+                let right = if i + 1 < prev.len() {
+                    &prev[i + 1]
+                } else {
+                    left // duplicate last node
+                };
+                let combined = format!("{left}{right}");
+                next.push(sha256_string(&combined));
+                i += 2;
+            }
+            levels.push(next);
+        }
+
+        Self { levels }
+    }
+
+    /// Build a Merkle tree from string slices (convenience).
+    pub fn from_strings(items: &[&str]) -> Self {
+        let byte_items: Vec<&[u8]> = items.iter().map(|s| s.as_bytes()).collect();
+        Self::from_items(&byte_items)
+    }
+
+    /// Return the root hash.
+    pub fn root(&self) -> &str {
+        &self.levels.last().unwrap()[0]
+    }
+
+    /// Return the number of levels (including leaves).
+    pub fn depth(&self) -> usize {
+        self.levels.len()
+    }
+
+    /// Return the leaf hashes.
+    pub fn leaves(&self) -> &[String] {
+        &self.levels[0]
+    }
+
+    /// Verify that a given leaf value is consistent with the root.
+    ///
+    /// Rebuilds the tree and checks if the root matches.
+    pub fn verify_leaf(&self, index: usize, data: &[u8]) -> bool {
+        if index >= self.levels[0].len() {
+            return false;
+        }
+        sha256_hex(data) == self.levels[0][index]
+    }
+}
+
+impl fmt::Display for MerkleTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MerkleTree(root={}, leaves={})", self.root(), self.levels[0].len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rolling hash (Rabin-Karp)
+// ---------------------------------------------------------------------------
+
+/// A rolling hash using a polynomial (Rabin-Karp style) for efficient
+/// substring matching over a sliding window.
+pub struct RollingHash {
+    hash: u64,
+    base: u64,
+    modulus: u64,
+    /// `base^window_size mod modulus`, precomputed for removal.
+    base_pow: u64,
+    window_size: usize,
+    buffer: Vec<u8>,
+}
+
+impl RollingHash {
+    /// Create a rolling hash with the given window size.
+    pub fn new(window_size: usize) -> Self {
+        let base: u64 = 257;
+        let modulus: u64 = 1_000_000_007;
+        let base_pow = mod_pow(base, window_size as u64, modulus);
+        Self {
+            hash: 0,
+            base,
+            modulus,
+            base_pow,
+            window_size,
+            buffer: Vec::new(),
+        }
+    }
+
+    /// Push a byte into the window. If the window is full the oldest byte is
+    /// removed and the hash is updated accordingly.
+    pub fn push(&mut self, byte: u8) {
+        self.buffer.push(byte);
+        if self.buffer.len() <= self.window_size {
+            self.hash = (self.hash.wrapping_mul(self.base) + u64::from(byte)) % self.modulus;
+        } else {
+            let old = self.buffer[self.buffer.len() - self.window_size - 1];
+            self.hash = (self.hash.wrapping_mul(self.base)
+                + u64::from(byte)
+                + self.modulus
+                - (u64::from(old) * self.base_pow) % self.modulus)
+                % self.modulus;
+        }
+    }
+
+    /// Current hash value.
+    pub fn value(&self) -> u64 {
+        self.hash
+    }
+
+    /// Number of bytes pushed so far.
+    pub fn bytes_pushed(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Returns `true` once at least `window_size` bytes have been pushed.
+    pub fn is_full(&self) -> bool {
+        self.buffer.len() >= self.window_size
+    }
+}
+
+/// Modular exponentiation: `base^exp mod modulus`.
+fn mod_pow(mut base: u64, mut exp: u64, modulus: u64) -> u64 {
+    let mut result: u64 = 1;
+    base %= modulus;
+    while exp > 0 {
+        if exp & 1 == 1 {
+            result = result.wrapping_mul(base) % modulus;
+        }
+        exp >>= 1;
+        base = base.wrapping_mul(base) % modulus;
+    }
+    result
+}
+
+/// Find all starting positions where `pattern` occurs in `text` using a
+/// rolling-hash (Rabin-Karp) search.
+pub fn rabin_karp_search(text: &[u8], pattern: &[u8]) -> Vec<usize> {
+    if pattern.is_empty() || pattern.len() > text.len() {
+        return Vec::new();
+    }
+
+    let pat_len = pattern.len();
+    let base: u64 = 257;
+    let modulus: u64 = 1_000_000_007;
+    let base_pow = mod_pow(base, pat_len as u64, modulus);
+
+    // Hash the pattern.
+    let mut pat_hash: u64 = 0;
+    for &b in pattern {
+        pat_hash = (pat_hash.wrapping_mul(base) + u64::from(b)) % modulus;
+    }
+
+    // Hash the first window.
+    let mut win_hash: u64 = 0;
+    for &b in &text[..pat_len] {
+        win_hash = (win_hash.wrapping_mul(base) + u64::from(b)) % modulus;
+    }
+
+    let mut positions = Vec::new();
+    if win_hash == pat_hash && text[..pat_len] == *pattern {
+        positions.push(0);
+    }
+
+    for i in 1..=(text.len() - pat_len) {
+        let old = u64::from(text[i - 1]);
+        let new = u64::from(text[i + pat_len - 1]);
+        win_hash = (win_hash.wrapping_mul(base) + new + modulus - (old * base_pow) % modulus)
+            % modulus;
+        if win_hash == pat_hash && text[i..i + pat_len] == *pattern {
+            positions.push(i);
+        }
+    }
+    positions
+}
+
+// ---------------------------------------------------------------------------
+// Content-addressable storage key
+// ---------------------------------------------------------------------------
+
+/// Generate a content-addressable storage (CAS) key from arbitrary data.
+///
+/// The key encodes the hash algorithm, the hex digest, and the data length,
+/// separated by colons: `sha256:<hex>:<len>`.
+pub fn cas_key(data: &[u8]) -> String {
+    let digest = sha256_hex(data);
+    format!("sha256:{digest}:{}", data.len())
+}
+
+/// Parse a CAS key back into its components: `(algorithm, digest, length)`.
+pub fn cas_key_parse(key: &str) -> Result<(&str, &str, usize), HashError> {
+    let mut parts = key.splitn(3, ':');
+    let algo = parts
+        .next()
+        .ok_or_else(|| HashError::InvalidContentAddress("missing algorithm".into()))?;
+    let digest = parts
+        .next()
+        .ok_or_else(|| HashError::InvalidContentAddress("missing digest".into()))?;
+    let len_str = parts
+        .next()
+        .ok_or_else(|| HashError::InvalidContentAddress("missing length".into()))?;
+    let length: usize = len_str
+        .parse()
+        .map_err(|_| HashError::InvalidContentAddress(format!("invalid length: {len_str}")))?;
+    Ok((algo, digest, length))
+}
+
+/// Verify that `data` matches a previously generated CAS key.
+pub fn cas_key_verify(data: &[u8], key: &str) -> Result<bool, HashError> {
+    let (_, digest, length) = cas_key_parse(key)?;
+    Ok(data.len() == length && sha256_hex(data) == digest)
+}
+
+// ---------------------------------------------------------------------------
+// Hex similarity scoring
+// ---------------------------------------------------------------------------
+
+/// Compute a similarity score between two hex digest strings.
+///
+/// Returns a value in `[0.0, 1.0]` representing the fraction of nibble
+/// positions that match. Returns `0.0` if the strings have different lengths
+/// or are empty.
+pub fn hex_similarity(a: &str, b: &str) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+    let matching = a
+        .bytes()
+        .zip(b.bytes())
+        .filter(|(x, y)| x.to_ascii_lowercase() == y.to_ascii_lowercase())
+        .count();
+    matching as f64 / a.len() as f64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1576,5 +1890,209 @@ mod tests {
     #[test]
     fn uuid_version_invalid() {
         assert_eq!(uuid_version("not-a-uuid"), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // HMAC-SHA256 tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn hmac_sha256_deterministic() {
+        let mac1 = hmac_sha256(b"secret", b"hello");
+        let mac2 = hmac_sha256(b"secret", b"hello");
+        assert_eq!(mac1, mac2);
+        assert_eq!(mac1.len(), 64);
+    }
+
+    #[test]
+    fn hmac_sha256_differs_with_different_key() {
+        let mac1 = hmac_sha256(b"key1", b"message");
+        let mac2 = hmac_sha256(b"key2", b"message");
+        assert_ne!(mac1, mac2);
+    }
+
+    #[test]
+    fn hmac_sha256_differs_with_different_message() {
+        let mac1 = hmac_sha256(b"key", b"msg1");
+        let mac2 = hmac_sha256(b"key", b"msg2");
+        assert_ne!(mac1, mac2);
+    }
+
+    #[test]
+    fn hmac_sha256_long_key_handled() {
+        // Key longer than block size should be hashed first.
+        let long_key = vec![0xABu8; 128];
+        let mac = hmac_sha256(&long_key, b"data");
+        assert_eq!(mac.len(), 64);
+        // Deterministic with same long key
+        assert_eq!(mac, hmac_sha256(&long_key, b"data"));
+    }
+
+    #[test]
+    fn hmac_sha256_str_wrapper() {
+        let mac = hmac_sha256_str("key", "message");
+        assert_eq!(mac, hmac_sha256(b"key", b"message"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Merkle tree tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn merkle_tree_single_item() {
+        let tree = MerkleTree::from_strings(&["hello"]);
+        assert_eq!(tree.depth(), 1);
+        assert_eq!(tree.leaves().len(), 1);
+        assert_eq!(tree.root(), sha256_hex(b"hello"));
+    }
+
+    #[test]
+    fn merkle_tree_two_items() {
+        let tree = MerkleTree::from_strings(&["a", "b"]);
+        assert_eq!(tree.depth(), 2);
+        assert_eq!(tree.leaves().len(), 2);
+        // Root should be hash of concatenated leaf hashes
+        let expected_root = sha256_string(&format!(
+            "{}{}",
+            sha256_hex(b"a"),
+            sha256_hex(b"b")
+        ));
+        assert_eq!(tree.root(), expected_root);
+    }
+
+    #[test]
+    fn merkle_tree_odd_items_duplicates_last() {
+        let tree = MerkleTree::from_strings(&["a", "b", "c"]);
+        assert_eq!(tree.leaves().len(), 3);
+        assert!(tree.depth() >= 2);
+        assert_eq!(tree.root().len(), 64);
+    }
+
+    #[test]
+    fn merkle_tree_empty() {
+        let tree = MerkleTree::from_items(&[]);
+        assert_eq!(tree.depth(), 1);
+        assert_eq!(tree.root(), sha256_hex(b""));
+    }
+
+    #[test]
+    fn merkle_tree_verify_leaf() {
+        let tree = MerkleTree::from_strings(&["alpha", "beta", "gamma"]);
+        assert!(tree.verify_leaf(0, b"alpha"));
+        assert!(tree.verify_leaf(1, b"beta"));
+        assert!(!tree.verify_leaf(0, b"wrong"));
+        assert!(!tree.verify_leaf(99, b"alpha")); // out of bounds
+    }
+
+    #[test]
+    fn merkle_tree_display() {
+        let tree = MerkleTree::from_strings(&["x", "y"]);
+        let s = format!("{tree}");
+        assert!(s.contains("MerkleTree"));
+        assert!(s.contains("leaves=2"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Rolling hash / Rabin-Karp tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rolling_hash_basic() {
+        let mut rh = RollingHash::new(3);
+        assert!(!rh.is_full());
+        rh.push(b'a');
+        rh.push(b'b');
+        rh.push(b'c');
+        assert!(rh.is_full());
+        assert_eq!(rh.bytes_pushed(), 3);
+        let v1 = rh.value();
+        // Pushing another byte should change the hash.
+        rh.push(b'd');
+        assert_ne!(rh.value(), v1);
+    }
+
+    #[test]
+    fn rabin_karp_finds_pattern() {
+        let text = b"hello world hello";
+        let positions = rabin_karp_search(text, b"hello");
+        assert_eq!(positions, vec![0, 12]);
+    }
+
+    #[test]
+    fn rabin_karp_no_match() {
+        let positions = rabin_karp_search(b"abcdef", b"xyz");
+        assert!(positions.is_empty());
+    }
+
+    #[test]
+    fn rabin_karp_empty_pattern() {
+        let positions = rabin_karp_search(b"abc", b"");
+        assert!(positions.is_empty());
+    }
+
+    #[test]
+    fn rabin_karp_pattern_longer_than_text() {
+        let positions = rabin_karp_search(b"hi", b"hello");
+        assert!(positions.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // CAS key tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cas_key_roundtrip() {
+        let data = b"some file content";
+        let key = cas_key(data);
+        assert!(key.starts_with("sha256:"));
+        let (algo, digest, length) = cas_key_parse(&key).unwrap();
+        assert_eq!(algo, "sha256");
+        assert_eq!(digest, sha256_hex(data));
+        assert_eq!(length, data.len());
+    }
+
+    #[test]
+    fn cas_key_verify_valid() {
+        let data = b"test data";
+        let key = cas_key(data);
+        assert!(cas_key_verify(data, &key).unwrap());
+        assert!(!cas_key_verify(b"wrong", &key).unwrap());
+    }
+
+    #[test]
+    fn cas_key_parse_invalid() {
+        assert!(cas_key_parse("nodelimiter").is_err());
+        assert!(cas_key_parse("sha256:abc").is_err());
+        assert!(cas_key_parse("sha256:abc:notnum").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Hex similarity tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn hex_similarity_identical() {
+        let h = sha256_string("test");
+        assert!((hex_similarity(&h, &h) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn hex_similarity_completely_different_length() {
+        assert_eq!(hex_similarity("aabb", "aabbcc"), 0.0);
+    }
+
+    #[test]
+    fn hex_similarity_empty() {
+        assert_eq!(hex_similarity("", ""), 0.0);
+    }
+
+    #[test]
+    fn hex_similarity_partial_match() {
+        // Same prefix, different suffix
+        let score = hex_similarity("aabb", "aacc");
+        assert!(score > 0.0);
+        assert!(score < 1.0);
+        // 2 of 4 nibbles match
+        assert!((score - 0.5).abs() < f64::EPSILON);
     }
 }

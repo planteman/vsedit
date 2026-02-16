@@ -860,6 +860,316 @@ impl EditorRenderer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Line token layout computation
+// ---------------------------------------------------------------------------
+
+/// A positioned token ready for rendering, with pre-computed column offsets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutToken {
+    /// Start column (0-based, in display cells).
+    pub start_col: u32,
+    /// End column (exclusive, in display cells).
+    pub end_col: u32,
+    /// The text content of this token.
+    pub text: String,
+}
+
+/// Default tab stop interval.
+const DEFAULT_TAB_WIDTH: u32 = 4;
+
+/// Compute the display width of a single character at a given column,
+/// expanding tabs to the next tab stop.
+pub fn char_display_width(ch: char, current_col: u32, tab_width: u32) -> u32 {
+    match ch {
+        '\t' => {
+            let tw = tab_width.max(1);
+            tw - (current_col % tw)
+        }
+        _ => 1,
+    }
+}
+
+/// Compute the laid-out token positions for a line, honoring tab stops.
+/// Each token is a contiguous run of non-tab characters or a single tab.
+pub fn layout_line_tokens(line: &str, tab_width: u32) -> Vec<LayoutToken> {
+    let mut tokens = Vec::new();
+    let mut col: u32 = 0;
+    let mut current_text = String::new();
+    let mut token_start = col;
+
+    for ch in line.chars() {
+        if ch == '\t' {
+            // Flush any accumulated text token.
+            if !current_text.is_empty() {
+                tokens.push(LayoutToken {
+                    start_col: token_start,
+                    end_col: col,
+                    text: current_text.clone(),
+                });
+                current_text.clear();
+            }
+            let width = char_display_width('\t', col, tab_width);
+            tokens.push(LayoutToken {
+                start_col: col,
+                end_col: col + width,
+                text: "\t".to_string(),
+            });
+            col += width;
+            token_start = col;
+        } else {
+            if current_text.is_empty() {
+                token_start = col;
+            }
+            current_text.push(ch);
+            col += 1;
+        }
+    }
+    if !current_text.is_empty() {
+        tokens.push(LayoutToken {
+            start_col: token_start,
+            end_col: col,
+            text: current_text,
+        });
+    }
+    tokens
+}
+
+/// Compute the total display width of a line (expanding tabs).
+pub fn line_display_width(line: &str, tab_width: u32) -> u32 {
+    let mut col: u32 = 0;
+    for ch in line.chars() {
+        col += char_display_width(ch, col, tab_width);
+    }
+    col
+}
+
+// ---------------------------------------------------------------------------
+// Viewport dirty region tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks which lines within the viewport need re-rendering.
+#[derive(Debug, Clone)]
+pub struct DirtyRegionTracker {
+    /// Bitmap of dirty line offsets relative to viewport start.
+    dirty_lines: Vec<bool>,
+    /// Total viewport height this tracker covers.
+    height: usize,
+}
+
+impl DirtyRegionTracker {
+    /// Create a new tracker for the given viewport height, initially all clean.
+    pub fn new(height: usize) -> Self {
+        Self {
+            dirty_lines: vec![false; height],
+            height,
+        }
+    }
+
+    /// Mark all lines dirty (e.g. after a scroll).
+    pub fn mark_all_dirty(&mut self) {
+        self.dirty_lines.iter_mut().for_each(|d| *d = true);
+    }
+
+    /// Mark all lines clean after a full re-render.
+    pub fn clear(&mut self) {
+        self.dirty_lines.iter_mut().for_each(|d| *d = false);
+    }
+
+    /// Mark a single viewport-relative line offset as dirty.
+    pub fn mark_dirty(&mut self, offset: usize) {
+        if offset < self.height {
+            self.dirty_lines[offset] = true;
+        }
+    }
+
+    /// Mark a range of viewport-relative line offsets as dirty.
+    pub fn mark_range_dirty(&mut self, start: usize, end: usize) {
+        let clamped_end = end.min(self.height);
+        for i in start..clamped_end {
+            self.dirty_lines[i] = true;
+        }
+    }
+
+    /// Whether the given viewport-relative offset needs re-rendering.
+    pub fn is_dirty(&self, offset: usize) -> bool {
+        offset < self.height && self.dirty_lines[offset]
+    }
+
+    /// Returns the offsets of all dirty lines.
+    pub fn dirty_offsets(&self) -> Vec<usize> {
+        self.dirty_lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &d)| if d { Some(i) } else { None })
+            .collect()
+    }
+
+    /// Number of dirty lines.
+    pub fn dirty_count(&self) -> usize {
+        self.dirty_lines.iter().filter(|&&d| d).count()
+    }
+
+    /// Whether there are any dirty lines at all.
+    pub fn has_dirty(&self) -> bool {
+        self.dirty_lines.iter().any(|&d| d)
+    }
+
+    /// Resize the tracker for a new viewport height, marking new lines dirty.
+    pub fn resize(&mut self, new_height: usize) {
+        if new_height > self.height {
+            self.dirty_lines.resize(new_height, true);
+        } else {
+            self.dirty_lines.truncate(new_height);
+        }
+        self.height = new_height;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Inline decoration placement
+// ---------------------------------------------------------------------------
+
+/// A positioned inline decoration with resolved column offsets after tab
+/// expansion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedDecoration {
+    /// Display column start (0-based).
+    pub display_start: u32,
+    /// Display column end (exclusive).
+    pub display_end: u32,
+    /// The decoration kind.
+    pub kind: DecorationKind,
+}
+
+/// Map a byte/char-offset–based decoration to display columns, expanding tabs.
+pub fn resolve_decoration_columns(
+    line: &str,
+    decoration: &LineDecoration,
+    tab_width: u32,
+) -> ResolvedDecoration {
+    let mut col: u32 = 0;
+    let mut char_idx: u32 = 0;
+    let mut display_start = 0u32;
+    let mut display_end = 0u32;
+    let mut found_start = false;
+
+    for ch in line.chars() {
+        if char_idx == decoration.start_col {
+            display_start = col;
+            found_start = true;
+        }
+        if char_idx == decoration.end_col {
+            display_end = col;
+            return ResolvedDecoration {
+                display_start,
+                display_end,
+                kind: decoration.kind,
+            };
+        }
+        col += char_display_width(ch, col, tab_width);
+        char_idx += 1;
+    }
+    // Decoration extends to or past end of line.
+    if !found_start {
+        display_start = col;
+    }
+    display_end = col;
+    ResolvedDecoration {
+        display_start,
+        display_end,
+        kind: decoration.kind,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cursor blink phase state machine
+// ---------------------------------------------------------------------------
+
+/// Cursor blink phase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlinkPhase {
+    /// Cursor is visible.
+    Visible,
+    /// Cursor is hidden (between blinks).
+    Hidden,
+    /// Blinking is paused (e.g. user just typed).
+    Paused,
+}
+
+/// State machine that drives cursor blink timing.
+#[derive(Debug, Clone)]
+pub struct CursorBlinkState {
+    /// Current phase.
+    pub phase: BlinkPhase,
+    /// Milliseconds elapsed in the current phase.
+    pub elapsed_ms: u64,
+    /// Duration of the visible phase in milliseconds.
+    pub visible_ms: u64,
+    /// Duration of the hidden phase in milliseconds.
+    pub hidden_ms: u64,
+    /// Duration of the pause phase in milliseconds (after a keystroke).
+    pub pause_ms: u64,
+    /// Whether blinking is enabled at all.
+    pub enabled: bool,
+}
+
+impl CursorBlinkState {
+    /// Create with default blink timings (530ms visible, 530ms hidden, 800ms pause).
+    pub fn new() -> Self {
+        Self {
+            phase: BlinkPhase::Visible,
+            elapsed_ms: 0,
+            visible_ms: 530,
+            hidden_ms: 530,
+            pause_ms: 800,
+            enabled: true,
+        }
+    }
+
+    /// Advance the state machine by `delta_ms` milliseconds.
+    /// Returns `true` if the phase changed.
+    pub fn tick(&mut self, delta_ms: u64) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        self.elapsed_ms += delta_ms;
+        let threshold = match self.phase {
+            BlinkPhase::Visible => self.visible_ms,
+            BlinkPhase::Hidden => self.hidden_ms,
+            BlinkPhase::Paused => self.pause_ms,
+        };
+        if self.elapsed_ms >= threshold {
+            self.elapsed_ms = 0;
+            self.phase = match self.phase {
+                BlinkPhase::Visible => BlinkPhase::Hidden,
+                BlinkPhase::Hidden => BlinkPhase::Visible,
+                BlinkPhase::Paused => BlinkPhase::Visible,
+            };
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Reset to paused-visible (call after user input).
+    pub fn reset_on_input(&mut self) {
+        self.phase = BlinkPhase::Paused;
+        self.elapsed_ms = 0;
+    }
+
+    /// Whether the cursor should currently be drawn.
+    pub fn should_draw(&self) -> bool {
+        !self.enabled || self.phase != BlinkPhase::Hidden
+    }
+}
+
+impl Default for CursorBlinkState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1541,5 +1851,185 @@ mod tests {
 
         r.viewport.update(95, 100);
         assert_eq!(r.total_rendered_lines(), 6);
+    }
+
+    // -- line token layout tests --------------------------------------------
+
+    #[test]
+    fn char_display_width_regular_and_tab() {
+        assert_eq!(char_display_width('a', 0, 4), 1);
+        assert_eq!(char_display_width('\t', 0, 4), 4);
+        assert_eq!(char_display_width('\t', 1, 4), 3);
+        assert_eq!(char_display_width('\t', 3, 4), 1);
+        assert_eq!(char_display_width('\t', 4, 4), 4);
+        // Tab width of 8
+        assert_eq!(char_display_width('\t', 5, 8), 3);
+    }
+
+    #[test]
+    fn layout_line_tokens_plain_text() {
+        let tokens = layout_line_tokens("hello", 4);
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].start_col, 0);
+        assert_eq!(tokens[0].end_col, 5);
+        assert_eq!(tokens[0].text, "hello");
+    }
+
+    #[test]
+    fn layout_line_tokens_with_tabs() {
+        let tokens = layout_line_tokens("\thi\tthere", 4);
+        // \t(0->4) "hi"(4->6) \t(6->8) "there"(8->13)
+        assert_eq!(tokens.len(), 4);
+        assert_eq!(tokens[0].text, "\t");
+        assert_eq!(tokens[0].start_col, 0);
+        assert_eq!(tokens[0].end_col, 4);
+        assert_eq!(tokens[1].text, "hi");
+        assert_eq!(tokens[1].start_col, 4);
+        assert_eq!(tokens[1].end_col, 6);
+        assert_eq!(tokens[2].text, "\t");
+        assert_eq!(tokens[2].start_col, 6);
+        assert_eq!(tokens[2].end_col, 8);
+        assert_eq!(tokens[3].text, "there");
+        assert_eq!(tokens[3].start_col, 8);
+        assert_eq!(tokens[3].end_col, 13);
+    }
+
+    #[test]
+    fn line_display_width_with_tabs() {
+        assert_eq!(line_display_width("hello", 4), 5);
+        assert_eq!(line_display_width("\t", 4), 4);
+        assert_eq!(line_display_width("ab\tcd", 4), 6); // a(0) b(1) \t(2->4) c(4) d(5) = 6
+        assert_eq!(line_display_width("", 4), 0);
+    }
+
+    // -- dirty region tracker tests -----------------------------------------
+
+    #[test]
+    fn dirty_tracker_initial_state() {
+        let tracker = DirtyRegionTracker::new(10);
+        assert!(!tracker.has_dirty());
+        assert_eq!(tracker.dirty_count(), 0);
+        assert!(tracker.dirty_offsets().is_empty());
+    }
+
+    #[test]
+    fn dirty_tracker_mark_and_clear() {
+        let mut tracker = DirtyRegionTracker::new(5);
+        tracker.mark_dirty(2);
+        tracker.mark_dirty(4);
+        assert!(tracker.is_dirty(2));
+        assert!(tracker.is_dirty(4));
+        assert!(!tracker.is_dirty(0));
+        assert_eq!(tracker.dirty_count(), 2);
+        assert_eq!(tracker.dirty_offsets(), vec![2, 4]);
+
+        tracker.clear();
+        assert!(!tracker.has_dirty());
+        assert_eq!(tracker.dirty_count(), 0);
+    }
+
+    #[test]
+    fn dirty_tracker_mark_all_and_range() {
+        let mut tracker = DirtyRegionTracker::new(5);
+        tracker.mark_all_dirty();
+        assert_eq!(tracker.dirty_count(), 5);
+
+        tracker.clear();
+        tracker.mark_range_dirty(1, 3);
+        assert!(!tracker.is_dirty(0));
+        assert!(tracker.is_dirty(1));
+        assert!(tracker.is_dirty(2));
+        assert!(!tracker.is_dirty(3));
+        assert_eq!(tracker.dirty_count(), 2);
+    }
+
+    #[test]
+    fn dirty_tracker_resize() {
+        let mut tracker = DirtyRegionTracker::new(3);
+        tracker.mark_dirty(0);
+        // Grow: new lines should be dirty
+        tracker.resize(5);
+        assert!(tracker.is_dirty(0));
+        assert!(tracker.is_dirty(3));
+        assert!(tracker.is_dirty(4));
+        assert_eq!(tracker.dirty_count(), 3);
+
+        // Shrink
+        tracker.resize(2);
+        assert_eq!(tracker.dirty_count(), 1);
+        assert!(!tracker.is_dirty(2)); // out of bounds => false
+    }
+
+    // -- inline decoration placement tests ----------------------------------
+
+    #[test]
+    fn resolve_decoration_columns_plain() {
+        let dec = LineDecoration::new(2, 5, DecorationKind::Error);
+        let resolved = resolve_decoration_columns("hello world", &dec, 4);
+        assert_eq!(resolved.display_start, 2);
+        assert_eq!(resolved.display_end, 5);
+        assert_eq!(resolved.kind, DecorationKind::Error);
+    }
+
+    #[test]
+    fn resolve_decoration_columns_with_tab() {
+        // Line: \thello   (tab_width=4 => \t occupies cols 0-3, 'h' at col 4)
+        // Decoration on char indices 1..4 => "hel" => display cols 4..7
+        let dec = LineDecoration::new(1, 4, DecorationKind::SearchMatch);
+        let resolved = resolve_decoration_columns("\thello", &dec, 4);
+        assert_eq!(resolved.display_start, 4);
+        assert_eq!(resolved.display_end, 7);
+    }
+
+    // -- cursor blink state machine tests -----------------------------------
+
+    #[test]
+    fn cursor_blink_initial_state() {
+        let blink = CursorBlinkState::new();
+        assert_eq!(blink.phase, BlinkPhase::Visible);
+        assert!(blink.should_draw());
+        assert_eq!(blink.elapsed_ms, 0);
+    }
+
+    #[test]
+    fn cursor_blink_tick_transitions() {
+        let mut blink = CursorBlinkState::new();
+        // Tick less than threshold: no change
+        assert!(!blink.tick(100));
+        assert_eq!(blink.phase, BlinkPhase::Visible);
+
+        // Tick past visible threshold
+        assert!(blink.tick(500)); // total 600 >= 530
+        assert_eq!(blink.phase, BlinkPhase::Hidden);
+        assert!(!blink.should_draw());
+
+        // Tick past hidden threshold
+        assert!(blink.tick(530));
+        assert_eq!(blink.phase, BlinkPhase::Visible);
+        assert!(blink.should_draw());
+    }
+
+    #[test]
+    fn cursor_blink_reset_on_input() {
+        let mut blink = CursorBlinkState::new();
+        blink.tick(600); // => Hidden
+        assert_eq!(blink.phase, BlinkPhase::Hidden);
+
+        blink.reset_on_input();
+        assert_eq!(blink.phase, BlinkPhase::Paused);
+        assert!(blink.should_draw()); // Paused is still drawable
+
+        // After pause_ms, transitions to Visible
+        assert!(blink.tick(800));
+        assert_eq!(blink.phase, BlinkPhase::Visible);
+    }
+
+    #[test]
+    fn cursor_blink_disabled() {
+        let mut blink = CursorBlinkState::new();
+        blink.enabled = false;
+        assert!(blink.should_draw()); // always drawn when disabled
+        assert!(!blink.tick(10000)); // tick never changes phase
+        assert_eq!(blink.phase, BlinkPhase::Visible);
     }
 }

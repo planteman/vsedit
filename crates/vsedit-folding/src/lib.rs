@@ -830,6 +830,172 @@ impl Default for FoldingHistory {
     fn default() -> Self { Self::new() }
 }
 
+// ---------------------------------------------------------------------------
+// Fold region merging – coalesce adjacent single-line folds
+// ---------------------------------------------------------------------------
+
+impl FoldingModel {
+    /// Merge adjacent single-line fold ranges into larger contiguous ranges.
+    ///
+    /// Two ranges are merged when the first range's `end_line` is immediately
+    /// followed by the next range's `start_line` (i.e. `end_line + 1 ==
+    /// start_line`) and both span exactly one line. The merged range inherits
+    /// the kind of the first range and is expanded.
+    pub fn merge_adjacent_single_line_folds(&mut self) {
+        if self.ranges.len() < 2 {
+            return;
+        }
+        self.ranges.sort_by_key(|r| r.start_line);
+        let mut merged: Vec<FoldingRange> = Vec::new();
+        let mut i = 0;
+        while i < self.ranges.len() {
+            let mut current = self.ranges[i].clone();
+            if current.line_span() == 1 {
+                // Absorb consecutive single-line ranges.
+                while i + 1 < self.ranges.len()
+                    && self.ranges[i + 1].line_span() == 1
+                    && self.ranges[i + 1].start_line == current.end_line + 1
+                {
+                    current.end_line = self.ranges[i + 1].end_line;
+                    i += 1;
+                }
+            }
+            merged.push(current);
+            i += 1;
+        }
+        self.ranges = merged;
+    }
+
+    /// Fold all ranges at exactly nesting depth `level` and unfold the rest.
+    ///
+    /// This is the selective "fold to level N" operation editors expose via
+    /// keyboard shortcuts (e.g. Ctrl+K Ctrl+1 folds to level 1).
+    pub fn fold_to_level(&mut self, level: u32) {
+        let snapshot: Vec<FoldingRange> = self.ranges.clone();
+        for range in &mut self.ranges {
+            let depth = range.nesting_depth_in(&snapshot);
+            range.is_collapsed = depth >= level;
+        }
+    }
+
+    /// Return the maximum nesting depth across all ranges.
+    pub fn max_fold_depth(&self) -> u32 {
+        self.ranges
+            .iter()
+            .map(|r| r.nesting_depth_in(&self.ranges))
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Return the set of lines that are fold-start lines (fold gutter icons).
+    pub fn fold_start_lines(&self) -> Vec<u32> {
+        self.ranges.iter().map(|r| r.start_line).collect()
+    }
+
+    /// Compute a mapping from each document line to its fold level.
+    ///
+    /// `total_lines` is the 1-based count of lines in the document. Lines that
+    /// are not inside any fold range get level 0.
+    pub fn line_fold_levels(&self, total_lines: u32) -> Vec<u32> {
+        let mut levels = vec![0u32; total_lines as usize + 1];
+        for line in 1..=total_lines {
+            levels[line as usize] = self.get_nesting_depth(line);
+        }
+        levels
+    }
+
+    /// Collect all ranges that overlap a given line range `[from, to]`
+    /// (inclusive).
+    pub fn ranges_overlapping(&self, from: u32, to: u32) -> Vec<&FoldingRange> {
+        self.ranges
+            .iter()
+            .filter(|r| r.start_line <= to && r.end_line >= from)
+            .collect()
+    }
+
+    /// Toggle all ranges whose kind matches `kind`.
+    pub fn toggle_by_kind(&mut self, kind: FoldingRangeKind) {
+        for range in &mut self.ranges {
+            if range.kind == kind {
+                range.is_collapsed = !range.is_collapsed;
+            }
+        }
+    }
+
+    /// Unfold every range whose kind matches `kind`.
+    pub fn unfold_by_kind(&mut self, kind: FoldingRangeKind) {
+        for range in &mut self.ranges {
+            if range.kind == kind {
+                range.is_collapsed = false;
+            }
+        }
+    }
+
+    /// Return visible line numbers (not hidden by any collapsed fold).
+    pub fn visible_lines(&self, total_lines: u32) -> Vec<u32> {
+        (1..=total_lines)
+            .filter(|&line| !self.is_line_hidden(line))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fold state persistence – serialize to / deserialize from a compact string
+// ---------------------------------------------------------------------------
+
+impl FoldingModel {
+    /// Serialize the collapsed state to a compact string representation.
+    ///
+    /// Format: `"start:end:c;start:end:c;..."` where `c` is `1` (collapsed)
+    /// or `0` (expanded). This is suitable for storing in editor settings or
+    /// workspace files.
+    pub fn serialize_to_string(&self) -> String {
+        self.ranges
+            .iter()
+            .map(|r| {
+                format!(
+                    "{}:{}:{}",
+                    r.start_line,
+                    r.end_line,
+                    u8::from(r.is_collapsed)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+
+    /// Restore collapsed state from a string produced by
+    /// [`serialize_to_string`](Self::serialize_to_string).
+    ///
+    /// Only ranges whose `(start_line, end_line)` pair appears in the
+    /// serialized data are updated; other ranges keep their current state.
+    pub fn restore_from_string(&mut self, data: &str) {
+        if data.is_empty() {
+            return;
+        }
+        for entry in data.split(';') {
+            let parts: Vec<&str> = entry.split(':').collect();
+            if parts.len() != 3 {
+                continue;
+            }
+            let start: u32 = match parts[0].parse() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let end: u32 = match parts[1].parse() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let collapsed: bool = parts[2] == "1";
+            for range in &mut self.ranges {
+                if range.start_line == start && range.end_line == end {
+                    range.is_collapsed = collapsed;
+                }
+            }
+        }
+    }
+}
+
 /// Unfold the range starting at `start_line`. When `recursive` is true, also
 /// unfold all nested ranges within the target.
 pub fn unfold_region(model: &mut FoldingModel, start_line: u32, recursive: bool) {
@@ -1519,5 +1685,111 @@ mod tests {
         let last = history.pop().unwrap();
         assert_eq!(last.start_line, 10);
         assert_eq!(history.len(), 2);
+    }
+
+    // -- Merge adjacent single-line folds ------------------------------------
+
+    #[test]
+    fn merge_adjacent_single_line_folds_combines_consecutive() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 2, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            FoldingRange { start_line: 3, end_line: 4, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 6, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            // Gap here – line 7-8 is separate
+            FoldingRange { start_line: 10, end_line: 11, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        model.merge_adjacent_single_line_folds();
+        // First three should merge into 1-6; line 10-11 stays separate
+        assert_eq!(model.get_ranges().len(), 2);
+        assert_eq!(model.get_ranges()[0].start_line, 1);
+        assert_eq!(model.get_ranges()[0].end_line, 6);
+        assert_eq!(model.get_ranges()[1].start_line, 10);
+    }
+
+    // -- Fold to level -------------------------------------------------------
+
+    #[test]
+    fn fold_to_level_collapses_deeper_and_expands_shallower() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 30, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 3, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        // fold_to_level(1) -> depth 0 stays expanded, depths >= 1 collapse
+        model.fold_to_level(1);
+        assert!(!model.get_range_at(1).unwrap().is_collapsed);  // depth 0
+        assert!(model.get_range_at(3).unwrap().is_collapsed);   // depth 1
+        assert!(model.get_range_at(5).unwrap().is_collapsed);   // depth 2
+    }
+
+    // -- String-based fold state persistence ---------------------------------
+
+    #[test]
+    fn serialize_and_restore_fold_state_via_string() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 15, end_line: 25, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let serialized = model.serialize_to_string();
+        assert_eq!(serialized, "1:10:1;15:25:0");
+
+        // Change state, then restore
+        model.unfold_all();
+        assert!(!model.get_range_at(1).unwrap().is_collapsed);
+        model.restore_from_string(&serialized);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert!(!model.get_range_at(15).unwrap().is_collapsed);
+    }
+
+    // -- Line fold levels ----------------------------------------------------
+
+    #[test]
+    fn line_fold_levels_reflect_nesting() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 3, end_line: 8, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let levels = model.line_fold_levels(10);
+        assert_eq!(levels[1], 1);  // inside outer only
+        assert_eq!(levels[5], 2);  // inside both
+        assert_eq!(levels[9], 1);  // inside outer only
+        assert_eq!(levels[0], 0);  // line 0 unused sentinel
+    }
+
+    // -- Ranges overlapping a viewport ---------------------------------------
+
+    #[test]
+    fn ranges_overlapping_returns_partial_and_full_overlaps() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 8, end_line: 12, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 20, end_line: 30, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        // Viewport covers lines 4-10: overlaps first two ranges but not third
+        let overlapping = model.ranges_overlapping(4, 10);
+        assert_eq!(overlapping.len(), 2);
+        assert_eq!(overlapping[0].start_line, 1);
+        assert_eq!(overlapping[1].start_line, 8);
+    }
+
+    // -- Toggle by kind ------------------------------------------------------
+
+    #[test]
+    fn toggle_by_kind_flips_matching_ranges() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 3, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 12, end_line: 14, kind: FoldingRangeKind::Comment, is_collapsed: true },
+        ]);
+        model.toggle_by_kind(FoldingRangeKind::Comment);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);   // was false -> true
+        assert!(!model.get_range_at(5).unwrap().is_collapsed);   // Region untouched
+        assert!(!model.get_range_at(12).unwrap().is_collapsed);  // was true -> false
     }
 }

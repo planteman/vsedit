@@ -807,6 +807,314 @@ impl ServiceScope {
 }
 
 // ---------------------------------------------------------------------------
+// ServiceDescriptor — singleton vs transient metadata
+// ---------------------------------------------------------------------------
+
+/// Describes how a service should be instantiated and managed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ServiceKind {
+    /// A single shared instance is created on first resolve and reused.
+    Singleton,
+    /// A new instance is created on every resolve.
+    Transient,
+}
+
+impl fmt::Display for ServiceKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Singleton => write!(f, "Singleton"),
+            Self::Transient => write!(f, "Transient"),
+        }
+    }
+}
+
+/// Metadata describing a registered service: its name, kind, lifecycle, and
+/// declared dependencies.
+#[derive(Debug, Clone)]
+pub struct ServiceDescriptor {
+    /// Human-readable service name.
+    pub name: String,
+    /// Whether the service is singleton or transient.
+    pub kind: ServiceKind,
+    /// Current lifecycle phase.
+    pub lifecycle: ServiceLifecycle,
+    /// Names of services this service depends on.
+    pub dependencies: Vec<String>,
+}
+
+impl ServiceDescriptor {
+    /// Create a new descriptor.
+    pub fn new(name: impl Into<String>, kind: ServiceKind) -> Self {
+        Self {
+            name: name.into(),
+            kind,
+            lifecycle: ServiceLifecycle::Registered,
+            dependencies: Vec::new(),
+        }
+    }
+
+    /// Builder: add a dependency.
+    pub fn depends_on(mut self, dep: impl Into<String>) -> Self {
+        self.dependencies.push(dep.into());
+        self
+    }
+
+    /// Transition to the [`Active`](ServiceLifecycle::Active) state.
+    pub fn activate(&mut self) {
+        self.lifecycle = ServiceLifecycle::Active;
+    }
+
+    /// Transition to the [`Disposed`](ServiceLifecycle::Disposed) state.
+    pub fn mark_disposed(&mut self) {
+        self.lifecycle = ServiceLifecycle::Disposed;
+    }
+
+    /// Returns `true` when this is a singleton service.
+    pub fn is_singleton(&self) -> bool {
+        self.kind == ServiceKind::Singleton
+    }
+
+    /// Returns `true` when this is a transient service.
+    pub fn is_transient(&self) -> bool {
+        self.kind == ServiceKind::Transient
+    }
+}
+
+impl fmt::Display for ServiceDescriptor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}] ({})", self.name, self.kind, self.lifecycle)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServiceDescriptorRegistry — tracks descriptors for all services
+// ---------------------------------------------------------------------------
+
+/// A registry mapping service names to their [`ServiceDescriptor`]s.
+///
+/// This sits alongside [`ServiceCollection`] and provides metadata that the
+/// collection itself does not track (kind, declared dependencies, etc.).
+pub struct ServiceDescriptorRegistry {
+    descriptors: HashMap<String, ServiceDescriptor>,
+}
+
+impl ServiceDescriptorRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self {
+            descriptors: HashMap::new(),
+        }
+    }
+
+    /// Register a descriptor. Replaces any previous descriptor with the same
+    /// name.
+    pub fn register(&mut self, descriptor: ServiceDescriptor) {
+        self.descriptors.insert(descriptor.name.clone(), descriptor);
+    }
+
+    /// Look up a descriptor by service name.
+    pub fn get(&self, name: &str) -> Option<&ServiceDescriptor> {
+        self.descriptors.get(name)
+    }
+
+    /// Mutably look up a descriptor by service name.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut ServiceDescriptor> {
+        self.descriptors.get_mut(name)
+    }
+
+    /// Build the dependency graph from all registered descriptors.
+    pub fn dependency_graph(&self) -> HashMap<String, Vec<String>> {
+        self.descriptors
+            .iter()
+            .map(|(name, desc)| (name.clone(), desc.dependencies.clone()))
+            .collect()
+    }
+
+    /// Validate that all declared dependencies reference services that are also
+    /// registered, and that no circular dependencies exist.
+    ///
+    /// Returns a list of error messages (empty when valid).
+    pub fn validate(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        // Check for missing dependencies.
+        for (name, desc) in &self.descriptors {
+            for dep in &desc.dependencies {
+                if !self.descriptors.contains_key(dep) {
+                    errors.push(format!(
+                        "Service '{}' depends on '{}' which is not registered",
+                        name, dep
+                    ));
+                }
+            }
+        }
+
+        // Check for circular dependencies.
+        let graph = self.dependency_graph();
+        if let Some(cycle) = detect_circular_dependency(&graph) {
+            errors.push(format!("Circular dependency detected: {}", cycle.join(" -> ")));
+        }
+
+        errors
+    }
+
+    /// Number of descriptors registered.
+    pub fn len(&self) -> usize {
+        self.descriptors.len()
+    }
+
+    /// Returns `true` if no descriptors are registered.
+    pub fn is_empty(&self) -> bool {
+        self.descriptors.is_empty()
+    }
+
+    /// Iterate over all descriptors.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &ServiceDescriptor)> {
+        self.descriptors.iter().map(|(k, v)| (k.as_str(), v))
+    }
+
+    /// Return only singleton descriptors.
+    pub fn singletons(&self) -> Vec<&ServiceDescriptor> {
+        self.descriptors.values().filter(|d| d.is_singleton()).collect()
+    }
+
+    /// Return only transient descriptors.
+    pub fn transients(&self) -> Vec<&ServiceDescriptor> {
+        self.descriptors.values().filter(|d| d.is_transient()).collect()
+    }
+}
+
+impl Default for ServiceDescriptorRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ResolutionEvent / ResolutionTrace — resolution tracing/logging
+// ---------------------------------------------------------------------------
+
+/// A single resolution event recorded by [`ResolutionTrace`].
+#[derive(Debug, Clone)]
+pub struct ResolutionEvent {
+    /// The service that was resolved.
+    pub service_name: String,
+    /// Whether the resolution was successful.
+    pub success: bool,
+    /// Sequential event number (zero-based).
+    pub sequence: usize,
+}
+
+/// Records an ordered sequence of service resolution events for diagnostics.
+///
+/// Attach a `ResolutionTrace` to your container and call [`record`](Self::record)
+/// each time a service is resolved to build a complete audit trail.
+pub struct ResolutionTrace {
+    events: Vec<ResolutionEvent>,
+}
+
+impl ResolutionTrace {
+    /// Create a new, empty trace.
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    /// Record a successful resolution.
+    pub fn record_success(&mut self, service_name: impl Into<String>) {
+        let seq = self.events.len();
+        self.events.push(ResolutionEvent {
+            service_name: service_name.into(),
+            success: true,
+            sequence: seq,
+        });
+    }
+
+    /// Record a failed resolution.
+    pub fn record_failure(&mut self, service_name: impl Into<String>) {
+        let seq = self.events.len();
+        self.events.push(ResolutionEvent {
+            service_name: service_name.into(),
+            success: false,
+            sequence: seq,
+        });
+    }
+
+    /// All events in order.
+    pub fn events(&self) -> &[ResolutionEvent] {
+        &self.events
+    }
+
+    /// Number of events recorded.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Returns `true` if no events have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Count of successful resolutions.
+    pub fn success_count(&self) -> usize {
+        self.events.iter().filter(|e| e.success).count()
+    }
+
+    /// Count of failed resolutions.
+    pub fn failure_count(&self) -> usize {
+        self.events.iter().filter(|e| !e.success).count()
+    }
+
+    /// Return the names of all services that failed to resolve (deduplicated).
+    pub fn failed_services(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self
+            .events
+            .iter()
+            .filter(|e| !e.success)
+            .map(|e| e.service_name.as_str())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Format the trace as a human-readable multi-line log.
+    pub fn format_log(&self) -> String {
+        let mut out = String::new();
+        for evt in &self.events {
+            let status = if evt.success { "OK" } else { "FAIL" };
+            out.push_str(&format!(
+                "[{}] #{}: {}\n",
+                status, evt.sequence, evt.service_name
+            ));
+        }
+        out
+    }
+
+    /// Clear all recorded events.
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
+}
+
+impl Default for ResolutionTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ResolutionTrace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "trace: {} event(s), {} ok, {} failed",
+            self.len(),
+            self.success_count(),
+            self.failure_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Dependency graph helpers
 // ---------------------------------------------------------------------------
 
@@ -1534,5 +1842,138 @@ mod tests {
         let child = ServiceScope::child(&accessor);
         assert!(child.has_parent());
         assert!(child.is_empty());
+    }
+
+    // -- ServiceDescriptor / ServiceDescriptorRegistry ----------------------
+
+    #[test]
+    fn descriptor_builder_and_lifecycle_transitions() {
+        let mut desc = ServiceDescriptor::new("ILogService", ServiceKind::Singleton)
+            .depends_on("IConfigService")
+            .depends_on("IFileService");
+
+        assert_eq!(desc.name, "ILogService");
+        assert!(desc.is_singleton());
+        assert!(!desc.is_transient());
+        assert_eq!(desc.dependencies.len(), 2);
+        assert_eq!(desc.lifecycle, ServiceLifecycle::Registered);
+        assert_eq!(desc.to_string(), "ILogService [Singleton] (Registered)");
+
+        desc.activate();
+        assert_eq!(desc.lifecycle, ServiceLifecycle::Active);
+
+        desc.mark_disposed();
+        assert_eq!(desc.lifecycle, ServiceLifecycle::Disposed);
+    }
+
+    #[test]
+    fn descriptor_registry_validate_detects_missing_and_cycles() {
+        let mut registry = ServiceDescriptorRegistry::new();
+        registry.register(
+            ServiceDescriptor::new("A", ServiceKind::Singleton).depends_on("B"),
+        );
+        registry.register(
+            ServiceDescriptor::new("B", ServiceKind::Transient).depends_on("C"),
+        );
+        // "C" is not registered — should produce a missing-dependency error.
+        let errors = registry.validate();
+        assert!(
+            errors.iter().any(|e| e.contains("depends on 'C'")),
+            "expected missing dep error, got: {:?}",
+            errors,
+        );
+
+        // Now register C with a cycle back to A.
+        registry.register(
+            ServiceDescriptor::new("C", ServiceKind::Singleton).depends_on("A"),
+        );
+        let errors = registry.validate();
+        assert!(
+            errors.iter().any(|e| e.contains("Circular dependency")),
+            "expected cycle error, got: {:?}",
+            errors,
+        );
+    }
+
+    #[test]
+    fn descriptor_registry_singletons_and_transients() {
+        let mut registry = ServiceDescriptorRegistry::new();
+        registry.register(ServiceDescriptor::new("S1", ServiceKind::Singleton));
+        registry.register(ServiceDescriptor::new("S2", ServiceKind::Singleton));
+        registry.register(ServiceDescriptor::new("T1", ServiceKind::Transient));
+
+        assert_eq!(registry.len(), 3);
+        assert_eq!(registry.singletons().len(), 2);
+        assert_eq!(registry.transients().len(), 1);
+        assert!(!registry.is_empty());
+
+        // Dependency graph should have three nodes.
+        let graph = registry.dependency_graph();
+        assert_eq!(graph.len(), 3);
+
+        // All deps are empty so validation should pass.
+        assert!(registry.validate().is_empty());
+    }
+
+    // -- ResolutionTrace ----------------------------------------------------
+
+    #[test]
+    fn resolution_trace_records_and_reports() {
+        let mut trace = ResolutionTrace::new();
+        assert!(trace.is_empty());
+
+        trace.record_success("IConfigService");
+        trace.record_success("ILogService");
+        trace.record_failure("IMissingService");
+        trace.record_success("IEditorService");
+
+        assert_eq!(trace.len(), 4);
+        assert_eq!(trace.success_count(), 3);
+        assert_eq!(trace.failure_count(), 1);
+        assert_eq!(trace.failed_services(), vec!["IMissingService"]);
+
+        let log = trace.format_log();
+        assert!(log.contains("[OK] #0: IConfigService"));
+        assert!(log.contains("[FAIL] #2: IMissingService"));
+
+        let display = trace.to_string();
+        assert!(display.contains("4 event(s)"));
+        assert!(display.contains("3 ok"));
+        assert!(display.contains("1 failed"));
+
+        trace.clear();
+        assert!(trace.is_empty());
+    }
+
+    #[test]
+    fn resolution_trace_deduplicates_failed_services() {
+        let mut trace = ResolutionTrace::new();
+        trace.record_failure("X");
+        trace.record_failure("Y");
+        trace.record_failure("X"); // duplicate
+        let failed = trace.failed_services();
+        assert_eq!(failed, vec!["X", "Y"]);
+    }
+
+    #[test]
+    fn descriptor_registry_get_mut_activates() {
+        let mut registry = ServiceDescriptorRegistry::new();
+        registry.register(ServiceDescriptor::new("Svc", ServiceKind::Singleton));
+
+        assert_eq!(
+            registry.get("Svc").unwrap().lifecycle,
+            ServiceLifecycle::Registered
+        );
+        registry.get_mut("Svc").unwrap().activate();
+        assert_eq!(
+            registry.get("Svc").unwrap().lifecycle,
+            ServiceLifecycle::Active
+        );
+    }
+
+    #[test]
+    fn service_kind_display() {
+        assert_eq!(ServiceKind::Singleton.to_string(), "Singleton");
+        assert_eq!(ServiceKind::Transient.to_string(), "Transient");
     }
 }

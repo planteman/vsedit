@@ -938,6 +938,188 @@ pub fn diff_apply(original: &str, hunks: &[DiffHunk]) -> Result<String, String> 
     Ok(result)
 }
 
+// ---------------------------------------------------------------------------
+// Word-level diff within changed lines
+// ---------------------------------------------------------------------------
+
+/// A word-level change within a line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WordChange {
+    /// The word or token that changed.
+    pub value: String,
+    /// Whether this word was added, removed, or unchanged.
+    pub kind: WordChangeKind,
+}
+
+/// Kind of word-level change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WordChangeKind {
+    /// Word is the same in both versions.
+    Equal,
+    /// Word was inserted in the modified version.
+    Insert,
+    /// Word was deleted from the original version.
+    Delete,
+}
+
+/// Compute a word-level diff between two single lines.
+///
+/// Words are split on whitespace boundaries. The result is a sequence of
+/// [`WordChange`] values describing equal, inserted, and deleted tokens.
+pub fn compute_word_diff(original: &str, modified: &str) -> Vec<WordChange> {
+    let orig_words: Vec<&str> = original.split_whitespace().collect();
+    let mod_words: Vec<&str> = modified.split_whitespace().collect();
+
+    let diff = TextDiff::from_slices(&orig_words, &mod_words);
+    diff.iter_all_changes()
+        .map(|c| {
+            let kind = match c.tag() {
+                ChangeTag::Equal => WordChangeKind::Equal,
+                ChangeTag::Insert => WordChangeKind::Insert,
+                ChangeTag::Delete => WordChangeKind::Delete,
+            };
+            WordChange {
+                value: c.value().to_string(),
+                kind,
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Diff navigation — next/previous change from a cursor position
+// ---------------------------------------------------------------------------
+
+/// Navigator for stepping through diff changes by line number.
+pub struct DiffNavigator<'a> {
+    changes: &'a [DiffChange],
+}
+
+impl<'a> DiffNavigator<'a> {
+    /// Create a navigator over the given changes.
+    pub fn new(changes: &'a [DiffChange]) -> Self {
+        Self { changes }
+    }
+
+    /// Return the index of the next change whose `original_start` is strictly
+    /// after `current_line`, or `None` if there is no such change.
+    pub fn next_change(&self, current_line: u32) -> Option<usize> {
+        self.changes
+            .iter()
+            .position(|c| c.original_start > current_line)
+    }
+
+    /// Return the index of the previous change whose `original_start` is
+    /// strictly before `current_line`, or `None` if there is no such change.
+    pub fn prev_change(&self, current_line: u32) -> Option<usize> {
+        self.changes
+            .iter()
+            .rposition(|c| c.original_start < current_line)
+    }
+
+    /// Return the index of the change that contains `current_line` (i.e. the
+    /// line falls within `[original_start, original_start + original_length)`),
+    /// or `None` if no change spans that line.
+    pub fn change_at(&self, current_line: u32) -> Option<usize> {
+        self.changes.iter().position(|c| {
+            current_line >= c.original_start
+                && current_line < c.original_start + c.original_length.max(1)
+        })
+    }
+
+    /// Total number of changes.
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Whether there are no changes.
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Three-way merge conflict detection
+// ---------------------------------------------------------------------------
+
+/// A detected conflict region in a three-way merge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeConflict {
+    /// 1-based line in the base where the conflict starts.
+    pub base_start: u32,
+    /// Number of base lines involved.
+    pub base_length: u32,
+    /// Lines from the "ours" side.
+    pub ours_lines: Vec<String>,
+    /// Lines from the "theirs" side.
+    pub theirs_lines: Vec<String>,
+}
+
+/// Detect three-way merge conflicts between `ours` and `theirs` relative to
+/// a common `base` text.
+///
+/// A conflict exists when both sides modify the same region of the base. This
+/// is a simplified heuristic: any overlapping original ranges in the two diffs
+/// are reported as conflicts.
+pub fn detect_merge_conflicts(base: &str, ours: &str, theirs: &str) -> Vec<MergeConflict> {
+    let diff_ours = compute_line_diff(base, ours);
+    let diff_theirs = compute_line_diff(base, theirs);
+
+    let mut conflicts = Vec::new();
+
+    for co in &diff_ours.changes {
+        for ct in &diff_theirs.changes {
+            let o_end = co.original_start + co.original_length;
+            let t_end = ct.original_start + ct.original_length;
+
+            // Check overlap in the base (original) dimension.
+            let overlap = co.original_start < t_end && ct.original_start < o_end;
+            if !overlap {
+                continue;
+            }
+
+            // Both sides touch the same base region — conflict.
+            let base_start = co.original_start.min(ct.original_start);
+            let base_end = o_end.max(t_end);
+
+            // Collect the affected lines from each side.
+            let ours_lines: Vec<String> = ours
+                .lines()
+                .skip((co.modified_start as usize).saturating_sub(1))
+                .take(co.modified_length as usize)
+                .map(|l| l.to_string())
+                .collect();
+            let theirs_lines: Vec<String> = theirs
+                .lines()
+                .skip((ct.modified_start as usize).saturating_sub(1))
+                .take(ct.modified_length as usize)
+                .map(|l| l.to_string())
+                .collect();
+
+            conflicts.push(MergeConflict {
+                base_start,
+                base_length: base_end - base_start,
+                ours_lines,
+                theirs_lines,
+            });
+        }
+    }
+
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Similarity ratio between two texts
+// ---------------------------------------------------------------------------
+
+/// Compute a similarity ratio in `[0.0, 1.0]` between two texts.
+///
+/// Uses the number of unchanged lines over the total lines in both documents.
+pub fn similarity_ratio(original: &str, modified: &str) -> f64 {
+    let diff = TextDiff::from_lines(original, modified);
+    diff.ratio() as f64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1595,5 +1777,99 @@ mod tests {
             DiffChange { kind: DiffChangeKind::Insert, original_start: 5, original_length: 0, modified_start: 2, modified_length: 2 },
         ];
         assert_eq!(total_affected_lines(&changes), 5);
+    }
+
+    // ---- Word-level diff tests ----
+
+    #[test]
+    fn word_diff_single_word_change() {
+        let result = compute_word_diff("the quick brown fox", "the slow brown fox");
+        // "quick" should be deleted, "slow" inserted, rest equal
+        let deleted: Vec<_> = result.iter().filter(|w| w.kind == WordChangeKind::Delete).collect();
+        let inserted: Vec<_> = result.iter().filter(|w| w.kind == WordChangeKind::Insert).collect();
+        assert_eq!(deleted.len(), 1);
+        assert!(deleted[0].value.contains("quick"));
+        assert_eq!(inserted.len(), 1);
+        assert!(inserted[0].value.contains("slow"));
+    }
+
+    #[test]
+    fn word_diff_identical_lines() {
+        let result = compute_word_diff("hello world", "hello world");
+        assert!(result.iter().all(|w| w.kind == WordChangeKind::Equal));
+    }
+
+    // ---- Diff navigator tests ----
+
+    #[test]
+    fn navigator_next_and_prev() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Delete, original_start: 5, original_length: 2, modified_start: 5, modified_length: 0 },
+            DiffChange { kind: DiffChangeKind::Insert, original_start: 15, original_length: 0, modified_start: 13, modified_length: 3 },
+            DiffChange { kind: DiffChangeKind::Change, original_start: 30, original_length: 1, modified_start: 29, modified_length: 1 },
+        ];
+        let nav = DiffNavigator::new(&changes);
+        assert_eq!(nav.len(), 3);
+
+        // Next change after line 1 → index 0 (line 5)
+        assert_eq!(nav.next_change(1), Some(0));
+        // Next change after line 10 → index 1 (line 15)
+        assert_eq!(nav.next_change(10), Some(1));
+        // No next change after line 30
+        assert_eq!(nav.next_change(30), None);
+
+        // Prev change before line 20 → index 1 (line 15)
+        assert_eq!(nav.prev_change(20), Some(1));
+        // No prev change before line 5
+        assert_eq!(nav.prev_change(5), None);
+    }
+
+    #[test]
+    fn navigator_change_at_line() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Change, original_start: 10, original_length: 3, modified_start: 10, modified_length: 2 },
+        ];
+        let nav = DiffNavigator::new(&changes);
+        assert_eq!(nav.change_at(10), Some(0));
+        assert_eq!(nav.change_at(12), Some(0));
+        assert_eq!(nav.change_at(13), None);
+        assert_eq!(nav.change_at(9), None);
+    }
+
+    // ---- Three-way merge conflict detection test ----
+
+    #[test]
+    fn detect_conflict_on_same_region() {
+        let base = "line1\nline2\nline3\nline4\n";
+        let ours = "line1\nours2\nline3\nline4\n";
+        let theirs = "line1\ntheirs2\nline3\nline4\n";
+        let conflicts = detect_merge_conflicts(base, ours, theirs);
+        assert!(!conflicts.is_empty(), "should detect at least one conflict");
+        let c = &conflicts[0];
+        assert!(!c.ours_lines.is_empty());
+        assert!(!c.theirs_lines.is_empty());
+    }
+
+    #[test]
+    fn no_conflict_when_different_regions() {
+        let base = "line1\nline2\nline3\nline4\n";
+        let ours = "changed1\nline2\nline3\nline4\n";
+        let theirs = "line1\nline2\nline3\nchanged4\n";
+        let conflicts = detect_merge_conflicts(base, ours, theirs);
+        assert!(conflicts.is_empty(), "non-overlapping edits should not conflict");
+    }
+
+    // ---- Similarity ratio test ----
+
+    #[test]
+    fn similarity_identical_texts() {
+        let r = similarity_ratio("aaa\nbbb\n", "aaa\nbbb\n");
+        assert!((r - 1.0).abs() < f64::EPSILON, "identical texts should have ratio 1.0");
+    }
+
+    #[test]
+    fn similarity_completely_different() {
+        let r = similarity_ratio("aaa\n", "zzz\n");
+        assert!(r < 0.5, "completely different texts should have low ratio");
     }
 }

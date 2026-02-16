@@ -907,6 +907,293 @@ pub fn deduplicate_selections(selections: &[Selection]) -> Vec<Selection> {
     normalized
 }
 
+// ---------------------------------------------------------------------------
+// Text transformation for multi-cursor edits
+// ---------------------------------------------------------------------------
+
+/// Kinds of text transformation that can be applied at each cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextTransform {
+    Uppercase,
+    Lowercase,
+    /// Convert `snake_case` or space-separated words to `camelCase`.
+    CamelCase,
+    /// Convert `camelCase` or space-separated words to `snake_case`.
+    SnakeCase,
+    /// Reverse the characters in the string.
+    Reverse,
+}
+
+impl TextTransform {
+    /// Apply this transformation to the given text.
+    pub fn apply(&self, text: &str) -> String {
+        match self {
+            Self::Uppercase => text.to_uppercase(),
+            Self::Lowercase => text.to_lowercase(),
+            Self::CamelCase => to_camel_case(text),
+            Self::SnakeCase => to_snake_case(text),
+            Self::Reverse => text.chars().rev().collect(),
+        }
+    }
+}
+
+/// Split text on underscores or spaces and join as camelCase.
+fn to_camel_case(text: &str) -> String {
+    let words: Vec<&str> = text.split(|c: char| c == '_' || c == ' ')
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.is_empty() {
+        return String::new();
+    }
+    let mut result = words[0].to_lowercase();
+    for word in &words[1..] {
+        let mut chars = word.chars();
+        if let Some(first) = chars.next() {
+            result.push(first.to_uppercase().next().unwrap_or(first));
+            result.extend(chars.flat_map(|c| c.to_lowercase()));
+        }
+    }
+    result
+}
+
+/// Split camelCase boundaries, underscores, or spaces and join with underscores.
+fn to_snake_case(text: &str) -> String {
+    let mut result = String::with_capacity(text.len() + 4);
+    let mut prev_was_upper = false;
+    for (i, ch) in text.chars().enumerate() {
+        if ch == '_' || ch == ' ' {
+            if !result.ends_with('_') {
+                result.push('_');
+            }
+            prev_was_upper = false;
+            continue;
+        }
+        if ch.is_uppercase() && i > 0 && !prev_was_upper && !result.ends_with('_') {
+            result.push('_');
+        }
+        result.extend(ch.to_lowercase());
+        prev_was_upper = ch.is_uppercase();
+    }
+    result
+}
+
+/// Result of applying a multi-cursor text transformation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransformResult {
+    pub original: String,
+    pub transformed: String,
+    pub cursor: CursorPosition,
+}
+
+/// Apply a [`TextTransform`] to a list of `(cursor, selected_text)` pairs.
+pub fn apply_transform_at_cursors(
+    pairs: &[(CursorPosition, &str)],
+    transform: TextTransform,
+) -> Vec<TransformResult> {
+    pairs.iter().map(|(pos, text)| TransformResult {
+        original: (*text).to_string(),
+        transformed: transform.apply(text),
+        cursor: *pos,
+    }).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Cursor grouping by column alignment
+// ---------------------------------------------------------------------------
+
+/// Group cursors that share the same column value.
+///
+/// Returns a map from column number to the list of cursor positions at that
+/// column, sorted by line within each group.
+pub fn group_cursors_by_column(
+    cursors: &[CursorPosition],
+) -> std::collections::BTreeMap<u32, Vec<CursorPosition>> {
+    let mut groups: std::collections::BTreeMap<u32, Vec<CursorPosition>> =
+        std::collections::BTreeMap::new();
+    for c in cursors {
+        groups.entry(c.column).or_default().push(*c);
+    }
+    for positions in groups.values_mut() {
+        positions.sort_by_key(|p| p.line);
+    }
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// Rectangular / block selection
+// ---------------------------------------------------------------------------
+
+/// A rectangular (block) selection defined by two corner positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockSelection {
+    pub top_left: CursorPosition,
+    pub bottom_right: CursorPosition,
+}
+
+impl BlockSelection {
+    /// Create a block selection from any two corner positions.
+    pub fn from_corners(a: CursorPosition, b: CursorPosition) -> Self {
+        let top = a.line.min(b.line);
+        let bottom = a.line.max(b.line);
+        let left = a.column.min(b.column);
+        let right = a.column.max(b.column);
+        Self {
+            top_left: CursorPosition::new(top, left),
+            bottom_right: CursorPosition::new(bottom, right),
+        }
+    }
+
+    /// Number of lines in this block.
+    pub fn height(&self) -> u32 {
+        self.bottom_right.line - self.top_left.line + 1
+    }
+
+    /// Width of this block in columns.
+    pub fn width(&self) -> u32 {
+        self.bottom_right.column - self.top_left.column + 1
+    }
+
+    /// Returns `true` if the given position is inside the block (inclusive).
+    pub fn contains(&self, pos: &CursorPosition) -> bool {
+        pos.line >= self.top_left.line
+            && pos.line <= self.bottom_right.line
+            && pos.column >= self.top_left.column
+            && pos.column <= self.bottom_right.column
+    }
+
+    /// Expand the per-line selections from this block, clamping each line's
+    /// right edge to `max_column_fn(line)`.
+    pub fn to_line_selections(
+        &self,
+        max_column_fn: impl Fn(u32) -> u32,
+    ) -> Vec<Selection> {
+        (self.top_left.line..=self.bottom_right.line)
+            .map(|line| {
+                let max_col = max_column_fn(line);
+                let left = self.top_left.column.min(max_col);
+                let right = self.bottom_right.column.min(max_col);
+                Selection::new(
+                    CursorPosition::new(line, left),
+                    CursorPosition::new(line, right),
+                )
+            })
+            .collect()
+    }
+
+    /// Generate one cursor per line at the right edge of the block, clamped.
+    pub fn right_edge_cursors(
+        &self,
+        max_column_fn: impl Fn(u32) -> u32,
+    ) -> Vec<CursorPosition> {
+        (self.top_left.line..=self.bottom_right.line)
+            .map(|line| {
+                let col = self.bottom_right.column.min(max_column_fn(line));
+                CursorPosition::new(line, col)
+            })
+            .collect()
+    }
+}
+
+impl fmt::Display for BlockSelection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Block[{},{} -> {},{}]",
+            self.top_left.line, self.top_left.column,
+            self.bottom_right.line, self.bottom_right.column,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-cursor undo / redo history
+// ---------------------------------------------------------------------------
+
+/// A snapshot of cursor and selection state for undo/redo.
+#[derive(Debug, Clone, PartialEq)]
+struct CursorSnapshot {
+    cursors: Vec<CursorPosition>,
+    selections: Vec<Selection>,
+}
+
+/// Tracks undo/redo history for a [`MultiCursorSession`].
+#[derive(Debug, Clone)]
+pub struct CursorHistory {
+    undo_stack: Vec<CursorSnapshot>,
+    redo_stack: Vec<CursorSnapshot>,
+    max_entries: usize,
+}
+
+impl CursorHistory {
+    /// Create a new history tracker with the given maximum number of undo entries.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Save the current session state before a mutation.
+    pub fn save(&mut self, session: &MultiCursorSession) {
+        if self.undo_stack.len() >= self.max_entries {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(CursorSnapshot {
+            cursors: session.cursors.clone(),
+            selections: session.selections.clone(),
+        });
+        self.redo_stack.clear();
+    }
+
+    /// Undo the last change, restoring `session` to its previous state.
+    /// Returns `true` if an undo was performed.
+    pub fn undo(&mut self, session: &mut MultiCursorSession) -> bool {
+        if let Some(snapshot) = self.undo_stack.pop() {
+            self.redo_stack.push(CursorSnapshot {
+                cursors: session.cursors.clone(),
+                selections: session.selections.clone(),
+            });
+            session.cursors = snapshot.cursors;
+            session.selections = snapshot.selections;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Redo the last undone change. Returns `true` if a redo was performed.
+    pub fn redo(&mut self, session: &mut MultiCursorSession) -> bool {
+        if let Some(snapshot) = self.redo_stack.pop() {
+            self.undo_stack.push(CursorSnapshot {
+                cursors: session.cursors.clone(),
+                selections: session.selections.clone(),
+            });
+            session.cursors = snapshot.cursors;
+            session.selections = snapshot.selections;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Number of undo entries available.
+    pub fn undo_len(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Number of redo entries available.
+    pub fn redo_len(&self) -> usize {
+        self.redo_stack.len()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1511,5 +1798,136 @@ mod tests {
 
         let deduped = deduplicate_selections(&sels);
         assert_eq!(deduped.len(), 2);
+    }
+
+    // -- text transform tests --
+
+    #[test]
+    fn text_transform_uppercase_lowercase() {
+        assert_eq!(TextTransform::Uppercase.apply("hello"), "HELLO");
+        assert_eq!(TextTransform::Lowercase.apply("HELLO"), "hello");
+        assert_eq!(TextTransform::Reverse.apply("abc"), "cba");
+    }
+
+    #[test]
+    fn text_transform_camel_and_snake() {
+        assert_eq!(TextTransform::CamelCase.apply("my_variable_name"), "myVariableName");
+        assert_eq!(TextTransform::CamelCase.apply("get data"), "getData");
+        assert_eq!(TextTransform::SnakeCase.apply("myVariableName"), "my_variable_name");
+        assert_eq!(TextTransform::SnakeCase.apply("getData"), "get_data");
+    }
+
+    #[test]
+    fn apply_transform_at_cursors_batch() {
+        let pairs = vec![
+            (CursorPosition::new(1, 1), "hello_world"),
+            (CursorPosition::new(3, 5), "foo_bar"),
+        ];
+        let results = apply_transform_at_cursors(&pairs, TextTransform::CamelCase);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].transformed, "helloWorld");
+        assert_eq!(results[0].original, "hello_world");
+        assert_eq!(results[1].transformed, "fooBar");
+        assert_eq!(results[1].cursor, CursorPosition::new(3, 5));
+    }
+
+    // -- cursor grouping tests --
+
+    #[test]
+    fn group_cursors_by_column_groups_correctly() {
+        let cursors = vec![
+            CursorPosition::new(1, 5),
+            CursorPosition::new(3, 10),
+            CursorPosition::new(2, 5),
+            CursorPosition::new(4, 10),
+            CursorPosition::new(6, 1),
+        ];
+        let groups = group_cursors_by_column(&cursors);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[&5].len(), 2);
+        assert_eq!(groups[&5][0].line, 1);
+        assert_eq!(groups[&5][1].line, 2);
+        assert_eq!(groups[&10].len(), 2);
+        assert_eq!(groups[&1].len(), 1);
+    }
+
+    // -- block selection tests --
+
+    #[test]
+    fn block_selection_from_any_corners() {
+        let block = BlockSelection::from_corners(
+            CursorPosition::new(5, 10),
+            CursorPosition::new(2, 3),
+        );
+        assert_eq!(block.top_left, CursorPosition::new(2, 3));
+        assert_eq!(block.bottom_right, CursorPosition::new(5, 10));
+        assert_eq!(block.height(), 4);
+        assert_eq!(block.width(), 8);
+        assert!(block.contains(&CursorPosition::new(3, 5)));
+        assert!(!block.contains(&CursorPosition::new(1, 5)));
+        assert!(!block.contains(&CursorPosition::new(3, 11)));
+
+        let sels = block.to_line_selections(|_| 20);
+        assert_eq!(sels.len(), 4);
+        assert_eq!(sels[0].start, CursorPosition::new(2, 3));
+        assert_eq!(sels[0].end, CursorPosition::new(2, 10));
+
+        // Clamped line
+        let sels_clamped = block.to_line_selections(|line| if line == 3 { 6 } else { 20 });
+        assert_eq!(sels_clamped[1].end.column, 6);
+
+        let edge = block.right_edge_cursors(|_| 20);
+        assert_eq!(edge.len(), 4);
+        assert_eq!(edge[0], CursorPosition::new(2, 10));
+
+        assert!(format!("{block}").contains("Block["));
+    }
+
+    // -- cursor history undo/redo tests --
+
+    #[test]
+    fn cursor_history_undo_redo() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        let mut history = CursorHistory::new(10);
+
+        // Save state, then mutate
+        history.save(&session);
+        session.add_cursor(CursorPosition::new(2, 2));
+        assert_eq!(session.cursor_count(), 2);
+        assert_eq!(history.undo_len(), 1);
+        assert_eq!(history.redo_len(), 0);
+
+        // Undo restores to 1 cursor
+        assert!(history.undo(&mut session));
+        assert_eq!(session.cursor_count(), 1);
+        assert_eq!(session.cursors[0], CursorPosition::new(1, 1));
+        assert_eq!(history.undo_len(), 0);
+        assert_eq!(history.redo_len(), 1);
+
+        // Redo restores to 2 cursors
+        assert!(history.redo(&mut session));
+        assert_eq!(session.cursor_count(), 2);
+        assert_eq!(history.redo_len(), 0);
+
+        // Undo with empty stack returns false
+        history.clear();
+        assert!(!history.undo(&mut session));
+        assert!(!history.redo(&mut session));
+    }
+
+    #[test]
+    fn cursor_history_max_entries_evicts() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        let mut history = CursorHistory::new(3);
+
+        for i in 0..5u32 {
+            history.save(&session);
+            session.move_all(1, 0);
+            // After 4th save the stack should be capped at 3
+            assert!(history.undo_len() <= 3, "iteration {i}");
+        }
+        assert_eq!(history.undo_len(), 3);
     }
 }

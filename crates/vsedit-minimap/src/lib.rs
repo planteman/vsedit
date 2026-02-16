@@ -851,6 +851,305 @@ impl MinimapColorScheme {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Minimap scale factor and line density
+// ---------------------------------------------------------------------------
+
+/// Computes how many document lines map to a single pixel row in the minimap.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapScaleFactor {
+    /// Total document lines.
+    pub document_lines: u32,
+    /// Available minimap height in pixels.
+    pub minimap_height_px: u32,
+}
+
+impl MinimapScaleFactor {
+    pub fn new(document_lines: u32, minimap_height_px: u32) -> Self {
+        Self {
+            document_lines,
+            minimap_height_px,
+        }
+    }
+
+    /// Lines per pixel. Values > 1 mean multiple lines share a pixel row.
+    pub fn lines_per_pixel(&self) -> f64 {
+        if self.minimap_height_px == 0 {
+            return 0.0;
+        }
+        self.document_lines as f64 / self.minimap_height_px as f64
+    }
+
+    /// Pixels per line. Values < 1 mean a single pixel represents several lines.
+    pub fn pixels_per_line(&self) -> f64 {
+        if self.document_lines == 0 {
+            return 0.0;
+        }
+        self.minimap_height_px as f64 / self.document_lines as f64
+    }
+
+    /// Whether the minimap must down-sample (more lines than pixels).
+    pub fn is_downsampled(&self) -> bool {
+        self.document_lines > self.minimap_height_px
+    }
+
+    /// Map a document line number to its pixel-row in the minimap.
+    pub fn line_to_pixel(&self, line: u32) -> u32 {
+        if self.document_lines == 0 {
+            return 0;
+        }
+        let ratio = self.minimap_height_px as f64 / self.document_lines as f64;
+        let px = (line as f64 * ratio) as u32;
+        px.min(self.minimap_height_px.saturating_sub(1))
+    }
+
+    /// Map a pixel-row back to the nearest document line.
+    pub fn pixel_to_line(&self, pixel: u32) -> u32 {
+        if self.minimap_height_px == 0 {
+            return 0;
+        }
+        let ratio = self.document_lines as f64 / self.minimap_height_px as f64;
+        let line = (pixel as f64 * ratio) as u32;
+        line.min(self.document_lines.saturating_sub(1))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Minimap viewport mapping
+// ---------------------------------------------------------------------------
+
+/// Maps an editor viewport (visible range) onto the minimap coordinate space.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewportMapping {
+    /// First visible line in the editor.
+    pub editor_start: u32,
+    /// One-past-last visible line in the editor.
+    pub editor_end: u32,
+    /// Total document lines.
+    pub document_lines: u32,
+    /// Total minimap height in pixels.
+    pub minimap_height_px: u32,
+}
+
+impl ViewportMapping {
+    pub fn new(
+        editor_start: u32,
+        editor_end: u32,
+        document_lines: u32,
+        minimap_height_px: u32,
+    ) -> Self {
+        Self {
+            editor_start,
+            editor_end: editor_end.min(document_lines),
+            document_lines,
+            minimap_height_px,
+        }
+    }
+
+    /// The pixel range of the slider overlay on the minimap.
+    pub fn slider_pixel_range(&self) -> (u32, u32) {
+        let scale = MinimapScaleFactor::new(self.document_lines, self.minimap_height_px);
+        let top = scale.line_to_pixel(self.editor_start);
+        let bottom = if self.editor_end >= self.document_lines {
+            self.minimap_height_px
+        } else {
+            scale.line_to_pixel(self.editor_end)
+        };
+        (top, bottom.max(top + 1))
+    }
+
+    /// Height of the slider in pixels (clamped to at least 1).
+    pub fn slider_height_px(&self) -> u32 {
+        let (top, bottom) = self.slider_pixel_range();
+        bottom - top
+    }
+
+    /// Given a click on the minimap at `pixel_y`, return the document line the
+    /// editor should centre on.
+    pub fn click_to_center_line(&self, pixel_y: u32) -> u32 {
+        let scale = MinimapScaleFactor::new(self.document_lines, self.minimap_height_px);
+        scale.pixel_to_line(pixel_y)
+    }
+
+    /// Fraction of the document currently visible (0.0–1.0).
+    pub fn visible_fraction(&self) -> f64 {
+        if self.document_lines == 0 {
+            return 0.0;
+        }
+        let visible = self.editor_end.saturating_sub(self.editor_start);
+        (visible as f64 / self.document_lines as f64).min(1.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Line-density sampler for colour bands
+// ---------------------------------------------------------------------------
+
+/// Produces per-pixel-row colour samples by averaging token colours across the
+/// document lines that map to each pixel row.
+pub struct LineDensitySampler;
+
+impl LineDensitySampler {
+    /// Sample the dominant `color_id` for each pixel row of the minimap.
+    ///
+    /// Returns a `Vec` of length `minimap_height_px`, where each element is
+    /// the most-frequent `color_id` among the tokens in the lines that map to
+    /// that pixel row, or `None` for blank rows.
+    pub fn sample(
+        lines: &[MinimapLine],
+        minimap_height_px: u32,
+    ) -> Vec<Option<u8>> {
+        if lines.is_empty() || minimap_height_px == 0 {
+            return vec![None; minimap_height_px as usize];
+        }
+
+        let scale = MinimapScaleFactor::new(lines.len() as u32, minimap_height_px);
+        let mut result = Vec::with_capacity(minimap_height_px as usize);
+
+        for px in 0..minimap_height_px {
+            let first_line = scale.pixel_to_line(px) as usize;
+            let next_px_line = if px + 1 < minimap_height_px {
+                scale.pixel_to_line(px + 1) as usize
+            } else {
+                lines.len()
+            };
+            let last_line = next_px_line.max(first_line + 1).min(lines.len());
+
+            // Count occurrences of each color_id in this pixel band.
+            let mut counts: Vec<(u8, u32)> = Vec::new();
+            for line in &lines[first_line..last_line] {
+                for tok in &line.tokens {
+                    if let Some(entry) = counts.iter_mut().find(|(id, _)| *id == tok.color_id) {
+                        entry.1 += tok.length;
+                    } else {
+                        counts.push((tok.color_id, tok.length));
+                    }
+                }
+            }
+
+            let dominant = counts.iter().max_by_key(|(_, c)| *c).map(|(id, _)| *id);
+            result.push(dominant);
+        }
+
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Search highlight overlay
+// ---------------------------------------------------------------------------
+
+/// Pre-computed search highlight positions projected onto minimap pixel rows.
+#[derive(Debug, Clone)]
+pub struct SearchHighlightOverlay {
+    /// Pixel rows that contain at least one search match.
+    highlighted_pixels: Vec<u32>,
+}
+
+impl SearchHighlightOverlay {
+    /// Build an overlay from a set of matched line numbers and a scale factor.
+    pub fn from_matches(matched_lines: &[u32], scale: &MinimapScaleFactor) -> Self {
+        let mut pixels: Vec<u32> = matched_lines
+            .iter()
+            .map(|&line| scale.line_to_pixel(line))
+            .collect();
+        pixels.sort_unstable();
+        pixels.dedup();
+        Self {
+            highlighted_pixels: pixels,
+        }
+    }
+
+    /// Whether a given pixel row is highlighted.
+    pub fn is_highlighted(&self, pixel_row: u32) -> bool {
+        self.highlighted_pixels.binary_search(&pixel_row).is_ok()
+    }
+
+    /// Total number of distinct highlighted pixel rows.
+    pub fn highlight_count(&self) -> usize {
+        self.highlighted_pixels.len()
+    }
+
+    /// Iterator over highlighted pixel rows.
+    pub fn iter(&self) -> impl Iterator<Item = &u32> {
+        self.highlighted_pixels.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Git-change gutter marks
+// ---------------------------------------------------------------------------
+
+/// The kind of git change for a line range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitChangeKind {
+    Added,
+    Modified,
+    Deleted,
+}
+
+/// A contiguous range of lines with a git change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitChange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: GitChangeKind,
+}
+
+/// Manages git-change decorations and projects them onto the minimap.
+#[derive(Debug, Clone)]
+pub struct GitChangeLayer {
+    changes: Vec<GitChange>,
+}
+
+impl GitChangeLayer {
+    pub fn new() -> Self {
+        Self {
+            changes: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, change: GitChange) {
+        self.changes.push(change);
+    }
+
+    pub fn clear(&mut self) {
+        self.changes.clear();
+    }
+
+    /// Return changes that overlap a line range.
+    pub fn changes_in_range(&self, start: u32, end: u32) -> Vec<&GitChange> {
+        self.changes
+            .iter()
+            .filter(|c| c.start_line < end && c.end_line > start)
+            .collect()
+    }
+
+    /// Project all changes onto minimap pixel rows. Returns a `Vec` of
+    /// `(pixel_row, kind)` pairs, deduplicated and sorted.
+    pub fn project_onto_minimap(
+        &self,
+        scale: &MinimapScaleFactor,
+    ) -> Vec<(u32, GitChangeKind)> {
+        let mut result: Vec<(u32, GitChangeKind)> = Vec::new();
+        for change in &self.changes {
+            let px_start = scale.line_to_pixel(change.start_line);
+            let px_end = scale.line_to_pixel(change.end_line.saturating_sub(1));
+            for px in px_start..=px_end {
+                if !result.iter().any(|(p, _)| *p == px) {
+                    result.push((px, change.kind));
+                }
+            }
+        }
+        result.sort_by_key(|(px, _)| *px);
+        result
+    }
+
+    pub fn count(&self) -> usize {
+        self.changes.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1521,5 +1820,146 @@ mod tests {
         let light = MinimapColorScheme::new("light");
         assert!(light.is_light());
         assert!(!light.is_dark());
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for scale factor, viewport mapping, density sampler,
+    // search overlay, and git change layer
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scale_factor_lines_per_pixel_and_round_trip() {
+        let scale = MinimapScaleFactor::new(1000, 500);
+        assert!((scale.lines_per_pixel() - 2.0).abs() < f64::EPSILON);
+        assert!((scale.pixels_per_line() - 0.5).abs() < f64::EPSILON);
+        assert!(scale.is_downsampled());
+
+        // Round-trip: line → pixel → line should be close to original
+        let px = scale.line_to_pixel(400);
+        let back = scale.pixel_to_line(px);
+        assert!((back as i64 - 400).unsigned_abs() <= 1);
+
+        // Edge: zero height
+        let zero = MinimapScaleFactor::new(100, 0);
+        assert!((zero.lines_per_pixel() - 0.0).abs() < f64::EPSILON);
+        assert_eq!(zero.line_to_pixel(50), 0);
+    }
+
+    #[test]
+    fn scale_factor_not_downsampled() {
+        let scale = MinimapScaleFactor::new(200, 800);
+        assert!(!scale.is_downsampled());
+        assert!(scale.pixels_per_line() > 1.0);
+    }
+
+    #[test]
+    fn viewport_mapping_slider_and_click() {
+        let vm = ViewportMapping::new(100, 150, 1000, 500);
+        let (top, bottom) = vm.slider_pixel_range();
+        assert!(top < bottom);
+        assert!(vm.slider_height_px() >= 1);
+
+        // Clicking at pixel 250 (mid-minimap) should map to ~line 500
+        let center = vm.click_to_center_line(250);
+        assert!((center as i64 - 500).unsigned_abs() <= 1);
+
+        assert!((vm.visible_fraction() - 0.05).abs() < 0.01);
+    }
+
+    #[test]
+    fn viewport_mapping_full_document() {
+        let vm = ViewportMapping::new(0, 100, 100, 400);
+        assert!((vm.visible_fraction() - 1.0).abs() < f64::EPSILON);
+        let (top, bottom) = vm.slider_pixel_range();
+        assert_eq!(top, 0);
+        assert_eq!(bottom, 400);
+    }
+
+    #[test]
+    fn line_density_sampler_basic() {
+        let lines: Vec<MinimapLine> = (0..100)
+            .map(|i| MinimapLine {
+                line_number: i,
+                tokens: vec![MinimapToken {
+                    start_col: 0,
+                    length: 10,
+                    color_id: if i < 50 { 1 } else { 2 },
+                }],
+            })
+            .collect();
+        let samples = LineDensitySampler::sample(&lines, 10);
+        assert_eq!(samples.len(), 10);
+        // First half should be dominated by color_id 1
+        assert_eq!(samples[0], Some(1));
+        // Last entry should be dominated by color_id 2
+        assert_eq!(samples[9], Some(2));
+    }
+
+    #[test]
+    fn line_density_sampler_blank_lines() {
+        let lines: Vec<MinimapLine> = (0..10)
+            .map(|i| MinimapLine {
+                line_number: i,
+                tokens: vec![],
+            })
+            .collect();
+        let samples = LineDensitySampler::sample(&lines, 5);
+        assert!(samples.iter().all(|s| s.is_none()));
+    }
+
+    #[test]
+    fn search_highlight_overlay_basic() {
+        let scale = MinimapScaleFactor::new(1000, 200);
+        let matched = vec![0, 100, 500, 999];
+        let overlay = SearchHighlightOverlay::from_matches(&matched, &scale);
+        assert!(overlay.highlight_count() <= matched.len());
+        assert!(overlay.is_highlighted(scale.line_to_pixel(0)));
+        assert!(overlay.is_highlighted(scale.line_to_pixel(500)));
+        // An arbitrary non-matched pixel should not be highlighted
+        let unmapped = scale.line_to_pixel(300);
+        // May or may not be highlighted depending on density – just ensure no panic
+        let _ = overlay.is_highlighted(unmapped);
+    }
+
+    #[test]
+    fn git_change_layer_project() {
+        let mut layer = GitChangeLayer::new();
+        layer.add(GitChange {
+            start_line: 10,
+            end_line: 20,
+            kind: GitChangeKind::Added,
+        });
+        layer.add(GitChange {
+            start_line: 50,
+            end_line: 55,
+            kind: GitChangeKind::Modified,
+        });
+        assert_eq!(layer.count(), 2);
+
+        let scale = MinimapScaleFactor::new(100, 100);
+        let projected = layer.project_onto_minimap(&scale);
+        assert!(!projected.is_empty());
+        // All projected rows for the first change should be Added
+        let added: Vec<_> = projected.iter().filter(|(_, k)| *k == GitChangeKind::Added).collect();
+        assert!(!added.is_empty());
+
+        // Range query
+        let in_range = layer.changes_in_range(15, 25);
+        assert_eq!(in_range.len(), 1);
+        assert_eq!(in_range[0].kind, GitChangeKind::Added);
+    }
+
+    #[test]
+    fn git_change_layer_clear_and_empty() {
+        let mut layer = GitChangeLayer::new();
+        layer.add(GitChange {
+            start_line: 0,
+            end_line: 5,
+            kind: GitChangeKind::Deleted,
+        });
+        assert_eq!(layer.count(), 1);
+        layer.clear();
+        assert_eq!(layer.count(), 0);
+        assert!(layer.changes_in_range(0, 100).is_empty());
     }
 }

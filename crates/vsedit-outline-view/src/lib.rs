@@ -22,7 +22,7 @@ impl fmt::Display for OutlineError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OutlineKind {
     File,
     Module,
@@ -834,6 +834,196 @@ impl OutlineElement {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Outline diff – detect structural changes between two outline snapshots
+// ---------------------------------------------------------------------------
+
+/// Describes a difference between two outline snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutlineDiff {
+    /// A symbol was added (label, kind).
+    Added(String, OutlineKind),
+    /// A symbol was removed (label, kind).
+    Removed(String, OutlineKind),
+    /// A symbol's line range changed (label, old_start, old_end, new_start, new_end).
+    Moved(String, u32, u32, u32, u32),
+}
+
+impl fmt::Display for OutlineDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutlineDiff::Added(label, kind) => write!(f, "+ {label} ({kind})"),
+            OutlineDiff::Removed(label, kind) => write!(f, "- {label} ({kind})"),
+            OutlineDiff::Moved(label, os, oe, ns, ne) => {
+                write!(f, "~ {label} [{os}-{oe}] -> [{ns}-{ne}]")
+            }
+        }
+    }
+}
+
+/// Compute a flat diff between two outline models.
+///
+/// Compares elements by (label, kind) identity. Reports additions, removals,
+/// and range changes.
+pub fn outline_diff(old: &OutlineModel, new: &OutlineModel) -> Vec<OutlineDiff> {
+    let old_flat = old.flatten();
+    let new_flat = new.flatten();
+
+    let old_map: std::collections::HashMap<(&str, OutlineKind), (u32, u32)> = old_flat
+        .iter()
+        .map(|e| ((e.label.as_str(), e.kind), (e.range_start_line, e.range_end_line)))
+        .collect();
+    let new_map: std::collections::HashMap<(&str, OutlineKind), (u32, u32)> = new_flat
+        .iter()
+        .map(|e| ((e.label.as_str(), e.kind), (e.range_start_line, e.range_end_line)))
+        .collect();
+
+    let mut diffs = Vec::new();
+
+    for (&(label, kind), &(os, oe)) in &old_map {
+        match new_map.get(&(label, kind)) {
+            None => diffs.push(OutlineDiff::Removed(label.to_string(), kind)),
+            Some(&(ns, ne)) if (os, oe) != (ns, ne) => {
+                diffs.push(OutlineDiff::Moved(label.to_string(), os, oe, ns, ne));
+            }
+            _ => {}
+        }
+    }
+    for (&(label, kind), _) in &new_map {
+        if !old_map.contains_key(&(label, kind)) {
+            diffs.push(OutlineDiff::Added(label.to_string(), kind));
+        }
+    }
+
+    diffs.sort_by(|a, b| {
+        let key = |d: &OutlineDiff| match d {
+            OutlineDiff::Removed(l, _) => (0, l.clone()),
+            OutlineDiff::Moved(l, _, _, _, _) => (1, l.clone()),
+            OutlineDiff::Added(l, _) => (2, l.clone()),
+        };
+        key(a).cmp(&key(b))
+    });
+
+    diffs
+}
+
+// ---------------------------------------------------------------------------
+// Outline symbol range validation
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Detect sibling elements at any level whose ranges overlap.
+    ///
+    /// Returns pairs of labels that overlap within the same parent scope.
+    pub fn find_overlapping_siblings(&self) -> Vec<(String, String)> {
+        let mut result = Vec::new();
+        fn check(elems: &[OutlineElement], out: &mut Vec<(String, String)>) {
+            for i in 0..elems.len() {
+                for j in (i + 1)..elems.len() {
+                    if elems[i].overlaps(&elems[j]) {
+                        out.push((elems[i].label.clone(), elems[j].label.clone()));
+                    }
+                }
+                check(&elems[i].children, out);
+            }
+        }
+        check(&self.elements, &mut result);
+        result
+    }
+
+    /// Validate that every child element's range is fully contained within
+    /// its parent's range. Returns labels of violating children.
+    pub fn find_range_violations(&self) -> Vec<String> {
+        let mut violations = Vec::new();
+        fn check(elems: &[OutlineElement], parent: Option<&OutlineElement>, out: &mut Vec<String>) {
+            for e in elems {
+                if let Some(p) = parent {
+                    if e.range_start_line < p.range_start_line
+                        || e.range_end_line > p.range_end_line
+                    {
+                        out.push(e.label.clone());
+                    }
+                }
+                check(&e.children, Some(e), out);
+            }
+        }
+        check(&self.elements, None, &mut violations);
+        violations
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outline navigation – next/previous sibling at cursor
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Find the element immediately after the one containing `line` at the
+    /// same nesting level.  Returns `None` if the cursor is in the last
+    /// sibling or outside any element.
+    pub fn next_sibling_at_line(&self, line: u32) -> Option<&OutlineElement> {
+        fn search<'a>(elems: &'a [OutlineElement], line: u32) -> Option<&'a OutlineElement> {
+            for (i, e) in elems.iter().enumerate() {
+                if line >= e.range_start_line && line <= e.range_end_line {
+                    // Try deeper first
+                    if let Some(found) = search(&e.children, line) {
+                        return Some(found);
+                    }
+                    // Return next sibling at this level
+                    return elems.get(i + 1);
+                }
+            }
+            None
+        }
+        search(&self.elements, line)
+    }
+
+    /// Find the element immediately before the one containing `line` at the
+    /// same nesting level.
+    pub fn prev_sibling_at_line(&self, line: u32) -> Option<&OutlineElement> {
+        fn search<'a>(elems: &'a [OutlineElement], line: u32) -> Option<&'a OutlineElement> {
+            for (i, e) in elems.iter().enumerate() {
+                if line >= e.range_start_line && line <= e.range_end_line {
+                    if let Some(found) = search(&e.children, line) {
+                        return Some(found);
+                    }
+                    return if i > 0 { Some(&elems[i - 1]) } else { None };
+                }
+            }
+            None
+        }
+        search(&self.elements, line)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outline statistics summary
+// ---------------------------------------------------------------------------
+
+/// Per-kind count entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindCount {
+    pub kind: OutlineKind,
+    pub count: usize,
+}
+
+impl OutlineModel {
+    /// Return a breakdown of element counts grouped by kind, sorted
+    /// descending by count.
+    pub fn kind_histogram(&self) -> Vec<KindCount> {
+        let mut map: std::collections::HashMap<OutlineKind, usize> =
+            std::collections::HashMap::new();
+        for e in self.flatten() {
+            *map.entry(e.kind).or_insert(0) += 1;
+        }
+        let mut counts: Vec<KindCount> = map
+            .into_iter()
+            .map(|(kind, count)| KindCount { kind, count })
+            .collect();
+        counts.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| format!("{:?}", a.kind).cmp(&format!("{:?}", b.kind))));
+        counts
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1554,5 +1744,105 @@ mod tests {
         assert_eq!(e.line_span(), 1);
         let e2 = elem("y", OutlineKind::Function, 1, 10);
         assert_eq!(e2.line_span(), 10);
+    }
+
+    #[test]
+    fn outline_diff_detects_added_and_removed() {
+        let mut old = OutlineModel::new("file.rs");
+        old.add_element(elem("foo", OutlineKind::Function, 1, 10));
+        old.add_element(elem("bar", OutlineKind::Struct, 12, 20));
+
+        let mut new = OutlineModel::new("file.rs");
+        new.add_element(elem("foo", OutlineKind::Function, 1, 10));
+        new.add_element(elem("baz", OutlineKind::Enum, 12, 25));
+
+        let diffs = outline_diff(&old, &new);
+        assert!(diffs.iter().any(|d| matches!(d, OutlineDiff::Removed(l, _) if l == "bar")));
+        assert!(diffs.iter().any(|d| matches!(d, OutlineDiff::Added(l, _) if l == "baz")));
+        // foo is unchanged, so no diff entry for it
+        assert!(!diffs.iter().any(|d| match d {
+            OutlineDiff::Added(l, _) | OutlineDiff::Removed(l, _) => l == "foo",
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn outline_diff_detects_moved() {
+        let mut old = OutlineModel::new("file.rs");
+        old.add_element(elem("main", OutlineKind::Function, 1, 10));
+
+        let mut new = OutlineModel::new("file.rs");
+        new.add_element(elem("main", OutlineKind::Function, 5, 15));
+
+        let diffs = outline_diff(&old, &new);
+        assert_eq!(diffs.len(), 1);
+        assert!(matches!(&diffs[0], OutlineDiff::Moved(l, 1, 10, 5, 15) if l == "main"));
+    }
+
+    #[test]
+    fn outline_diff_display() {
+        let d = OutlineDiff::Added("foo".into(), OutlineKind::Function);
+        assert_eq!(d.to_string(), "+ foo (Function)");
+        let d = OutlineDiff::Removed("bar".into(), OutlineKind::Struct);
+        assert_eq!(d.to_string(), "- bar (Struct)");
+        let d = OutlineDiff::Moved("baz".into(), 1, 10, 5, 15);
+        assert_eq!(d.to_string(), "~ baz [1-10] -> [5-15]");
+    }
+
+    #[test]
+    fn find_overlapping_siblings_detects_overlap() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("a", OutlineKind::Function, 1, 15));
+        model.add_element(elem("b", OutlineKind::Function, 10, 25));
+        model.add_element(elem("c", OutlineKind::Function, 30, 40));
+        let overlaps = model.find_overlapping_siblings();
+        assert_eq!(overlaps.len(), 1);
+        assert_eq!(overlaps[0], ("a".to_string(), "b".to_string()));
+    }
+
+    #[test]
+    fn find_range_violations_detects_child_outside_parent() {
+        let mut model = OutlineModel::new("file.rs");
+        let mut parent = elem("Parent", OutlineKind::Class, 10, 30);
+        parent.children.push(elem("ok_child", OutlineKind::Method, 12, 25));
+        parent.children.push(elem("bad_child", OutlineKind::Method, 5, 15));
+        model.add_element(parent);
+        let violations = model.find_range_violations();
+        assert_eq!(violations, vec!["bad_child"]);
+    }
+
+    #[test]
+    fn next_prev_sibling_navigation() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("first", OutlineKind::Function, 1, 10));
+        model.add_element(elem("second", OutlineKind::Function, 12, 20));
+        model.add_element(elem("third", OutlineKind::Function, 22, 30));
+
+        let next = model.next_sibling_at_line(5).unwrap();
+        assert_eq!(next.label, "second");
+
+        let next = model.next_sibling_at_line(15).unwrap();
+        assert_eq!(next.label, "third");
+
+        assert!(model.next_sibling_at_line(25).is_none());
+
+        let prev = model.prev_sibling_at_line(15).unwrap();
+        assert_eq!(prev.label, "first");
+
+        assert!(model.prev_sibling_at_line(5).is_none());
+    }
+
+    #[test]
+    fn kind_histogram_counts_and_sorts() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("a", OutlineKind::Function, 1, 5));
+        model.add_element(elem("b", OutlineKind::Function, 6, 10));
+        model.add_element(elem("c", OutlineKind::Function, 11, 15));
+        model.add_element(elem("D", OutlineKind::Struct, 16, 25));
+        model.add_element(elem("E", OutlineKind::Constant, 26, 26));
+        let hist = model.kind_histogram();
+        assert_eq!(hist[0].kind, OutlineKind::Function);
+        assert_eq!(hist[0].count, 3);
+        assert_eq!(hist.len(), 3);
     }
 }

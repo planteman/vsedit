@@ -894,6 +894,317 @@ pub fn disable_extension(
     save_enable_state(state_path, &state)
 }
 
+// ── Semantic Version Parsing & Comparison ──
+
+/// A parsed semantic version (major.minor.patch).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemVer {
+    pub major: u64,
+    pub minor: u64,
+    pub patch: u64,
+}
+
+impl SemVer {
+    /// Parse a version string like "1.2.3". Returns `None` on invalid input.
+    pub fn parse(s: &str) -> Option<Self> {
+        let parts: Vec<&str> = s.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        Some(Self {
+            major: parts[0].parse().ok()?,
+            minor: parts[1].parse().ok()?,
+            patch: parts[2].parse().ok()?,
+        })
+    }
+
+    /// True when `self` is strictly newer than `other`.
+    pub fn is_newer_than(&self, other: &SemVer) -> bool {
+        (self.major, self.minor, self.patch) > (other.major, other.minor, other.patch)
+    }
+}
+
+impl std::fmt::Display for SemVer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+impl PartialOrd for SemVer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SemVer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.major, self.minor, self.patch).cmp(&(other.major, other.minor, other.patch))
+    }
+}
+
+// ── Version Range Matching ──
+
+/// Check whether `version` satisfies `range`.
+///
+/// Supported range prefixes:
+///   `^1.2.3` – compatible (same major, >= minor.patch)
+///   `~1.2.3` – patch-level (same major.minor, >= patch)
+///   `>=1.2.3` / `>1.2.3` / `<=1.2.3` / `<1.2.3` / `=1.2.3`
+///   `*`       – any version
+///   bare `1.2.3` is treated as `=1.2.3`
+pub fn version_satisfies(version: &str, range: &str) -> bool {
+    let range = range.trim();
+    if range == "*" {
+        return true;
+    }
+    if let Some(rest) = range.strip_prefix('^') {
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(rest) else { return false };
+        ver.major == req.major && ver >= req
+    } else if let Some(rest) = range.strip_prefix('~') {
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(rest) else { return false };
+        ver.major == req.major && ver.minor == req.minor && ver.patch >= req.patch
+    } else if let Some(rest) = range.strip_prefix(">=") {
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(rest) else { return false };
+        ver >= req
+    } else if let Some(rest) = range.strip_prefix('>') {
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(rest) else { return false };
+        ver > req
+    } else if let Some(rest) = range.strip_prefix("<=") {
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(rest) else { return false };
+        ver <= req
+    } else if let Some(rest) = range.strip_prefix('<') {
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(rest) else { return false };
+        ver < req
+    } else {
+        let bare = range.strip_prefix('=').unwrap_or(range);
+        let Some(ver) = SemVer::parse(version) else { return false };
+        let Some(req) = SemVer::parse(bare) else { return false };
+        ver == req
+    }
+}
+
+// ── Dependency Resolution ──
+
+/// Errors that can occur during dependency resolution.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DependencyError {
+    /// A required dependency is not installed.
+    Missing { extension_id: String, missing_dep: String },
+    /// An installed dependency's version doesn't satisfy the required range.
+    Incompatible {
+        extension_id: String,
+        dep_id: String,
+        required_range: String,
+        installed_version: String,
+    },
+    /// A dependency cycle was detected.
+    Cycle(Vec<String>),
+}
+
+impl std::fmt::Display for DependencyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Missing { extension_id, missing_dep } => {
+                write!(f, "{extension_id}: missing dependency {missing_dep}")
+            }
+            Self::Incompatible { extension_id, dep_id, required_range, installed_version } => {
+                write!(
+                    f,
+                    "{extension_id}: {dep_id} {installed_version} does not satisfy {required_range}"
+                )
+            }
+            Self::Cycle(ids) => write!(f, "dependency cycle: {}", ids.join(" -> ")),
+        }
+    }
+}
+
+impl MgmtBridge {
+    /// Validate that every dependency of every installed extension is present
+    /// and satisfies its version range.
+    pub fn check_dependencies(&self) -> Vec<DependencyError> {
+        let mut errors = Vec::new();
+        let index: HashMap<&str, &ExtensionInfo> =
+            self.extensions.iter().map(|e| (e.id.as_str(), e)).collect();
+
+        for ext in &self.extensions {
+            for dep in &ext.dependencies {
+                match index.get(dep.id.as_str()) {
+                    None => errors.push(DependencyError::Missing {
+                        extension_id: ext.id.clone(),
+                        missing_dep: dep.id.clone(),
+                    }),
+                    Some(installed) => {
+                        if !version_satisfies(&installed.version, &dep.version_range) {
+                            errors.push(DependencyError::Incompatible {
+                                extension_id: ext.id.clone(),
+                                dep_id: dep.id.clone(),
+                                required_range: dep.version_range.clone(),
+                                installed_version: installed.version.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        errors
+    }
+
+    /// Return a topological ordering of extensions respecting dependencies.
+    /// Extensions with no dependencies come first.
+    /// Returns `Err` with a cycle path if a cycle is detected.
+    pub fn resolve_load_order(&self) -> Result<Vec<&ExtensionInfo>, DependencyError> {
+        let index: HashMap<&str, &ExtensionInfo> =
+            self.extensions.iter().map(|e| (e.id.as_str(), e)).collect();
+
+        let mut order: Vec<&str> = Vec::new();
+        let mut visited: HashMap<&str, bool> = HashMap::new(); // false = in-progress
+
+        for ext in &self.extensions {
+            if !visited.contains_key(ext.id.as_str()) {
+                Self::topo_visit(ext.id.as_str(), &index, &mut visited, &mut order)?;
+            }
+        }
+
+        Ok(order.iter().filter_map(|id| index.get(id).copied()).collect())
+    }
+
+    fn topo_visit<'a>(
+        id: &'a str,
+        index: &HashMap<&'a str, &'a ExtensionInfo>,
+        visited: &mut HashMap<&'a str, bool>,
+        order: &mut Vec<&'a str>,
+    ) -> Result<(), DependencyError> {
+        if let Some(&done) = visited.get(id) {
+            if !done {
+                return Err(DependencyError::Cycle(vec![id.to_string()]));
+            }
+            return Ok(());
+        }
+        visited.insert(id, false);
+        if let Some(ext) = index.get(id) {
+            for dep in &ext.dependencies {
+                if let Err(DependencyError::Cycle(mut path)) =
+                    Self::topo_visit(dep.id.as_str(), index, visited, order)
+                {
+                    path.insert(0, id.to_string());
+                    return Err(DependencyError::Cycle(path));
+                }
+            }
+        }
+        visited.insert(id, true);
+        order.push(id);
+        Ok(())
+    }
+
+    /// Disable an extension and cascade-disable all extensions that depend on it.
+    /// Returns the list of extension ids that were disabled.
+    pub fn disable_cascade(&mut self, id: &str) -> Vec<String> {
+        let mut disabled = Vec::new();
+        self.disable_cascade_inner(id, &mut disabled);
+        disabled
+    }
+
+    fn disable_cascade_inner(&mut self, id: &str, disabled: &mut Vec<String>) {
+        if let Some(ext) = self.extensions.iter_mut().find(|e| e.id == id) {
+            if !ext.is_enabled {
+                return;
+            }
+            ext.is_enabled = false;
+            disabled.push(id.to_string());
+        }
+        let dependents: Vec<String> = self
+            .extensions
+            .iter()
+            .filter(|e| e.is_enabled && e.dependencies.iter().any(|d| d.id == id))
+            .map(|e| e.id.clone())
+            .collect();
+        for dep_id in dependents {
+            self.disable_cascade_inner(&dep_id, disabled);
+        }
+    }
+
+    /// Check which installed extensions have a newer version available.
+    /// `available` maps extension id → latest version string.
+    pub fn check_updates(&self, available: &HashMap<String, String>) -> Vec<UpdateInfo> {
+        let mut updates = Vec::new();
+        for ext in &self.extensions {
+            if let Some(latest_str) = available.get(&ext.id) {
+                if let (Some(current), Some(latest)) =
+                    (SemVer::parse(&ext.version), SemVer::parse(latest_str))
+                {
+                    if latest.is_newer_than(&current) {
+                        updates.push(UpdateInfo {
+                            extension_id: ext.id.clone(),
+                            current_version: ext.version.clone(),
+                            latest_version: latest_str.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        updates
+    }
+}
+
+/// Describes an available update for an installed extension.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UpdateInfo {
+    pub extension_id: String,
+    pub current_version: String,
+    pub latest_version: String,
+}
+
+// ── Search Result Ranking ──
+
+/// Rank marketplace search results by a weighted score.
+///
+/// Score = `query_relevance * 10  +  ln(1 + downloads) * 2  +  rating`.
+/// Results are returned in descending score order.
+pub fn rank_search_results(results: &[GalleryExtension], query: &str) -> Vec<RankedResult> {
+    let q = query.to_lowercase();
+    let mut ranked: Vec<RankedResult> = results
+        .iter()
+        .map(|ext| {
+            let name_lower = ext.display_name.to_lowercase();
+            let id_lower = ext.id.to_lowercase();
+            let relevance: f64 = if id_lower == q || name_lower == q {
+                10.0
+            } else if id_lower.starts_with(&q) || name_lower.starts_with(&q) {
+                7.0
+            } else if id_lower.contains(&q) || name_lower.contains(&q) {
+                4.0
+            } else if ext.description.to_lowercase().contains(&q) {
+                2.0
+            } else {
+                0.0
+            };
+            let download_score = (1.0 + ext.download_count as f64).ln() * 2.0;
+            let score = relevance * 10.0 + download_score + ext.rating;
+            RankedResult {
+                id: ext.id.clone(),
+                display_name: ext.display_name.clone(),
+                score,
+            }
+        })
+        .collect();
+    ranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    ranked
+}
+
+/// A search result annotated with a computed relevance score.
+#[derive(Debug, Clone)]
+pub struct RankedResult {
+    pub id: String,
+    pub display_name: String,
+    pub score: f64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1538,5 +1849,190 @@ mod tests {
         let dir_str = dir.to_string_lossy();
         assert!(dir_str.contains("vsedit"));
         assert!(dir_str.contains("extensions"));
+    }
+
+    // ── SemVer & Version Range Tests ──
+
+    #[test]
+    fn semver_parse_and_compare() {
+        let v1 = SemVer::parse("1.2.3").unwrap();
+        let v2 = SemVer::parse("1.3.0").unwrap();
+        let v3 = SemVer::parse("2.0.0").unwrap();
+        assert!(!v1.is_newer_than(&v2));
+        assert!(v2.is_newer_than(&v1));
+        assert!(v3.is_newer_than(&v2));
+        assert_eq!(SemVer::parse("bad"), None);
+        assert_eq!(v1.to_string(), "1.2.3");
+    }
+
+    #[test]
+    fn version_range_matching() {
+        // caret: same major, >= specified
+        assert!(version_satisfies("1.5.0", "^1.2.0"));
+        assert!(version_satisfies("1.2.0", "^1.2.0"));
+        assert!(!version_satisfies("2.0.0", "^1.2.0"));
+        assert!(!version_satisfies("1.1.9", "^1.2.0"));
+
+        // tilde: same major.minor, >= patch
+        assert!(version_satisfies("1.2.5", "~1.2.3"));
+        assert!(!version_satisfies("1.3.0", "~1.2.3"));
+
+        // comparison operators
+        assert!(version_satisfies("2.0.0", ">=1.0.0"));
+        assert!(version_satisfies("1.0.0", ">=1.0.0"));
+        assert!(!version_satisfies("0.9.0", ">=1.0.0"));
+        assert!(version_satisfies("2.0.0", ">1.0.0"));
+        assert!(!version_satisfies("1.0.0", ">1.0.0"));
+        assert!(version_satisfies("0.9.0", "<1.0.0"));
+        assert!(version_satisfies("1.0.0", "<=1.0.0"));
+
+        // exact & wildcard
+        assert!(version_satisfies("1.0.0", "=1.0.0"));
+        assert!(version_satisfies("1.0.0", "1.0.0"));
+        assert!(!version_satisfies("1.0.1", "1.0.0"));
+        assert!(version_satisfies("9.9.9", "*"));
+    }
+
+    // ── Dependency Resolution Tests ──
+
+    #[test]
+    fn check_dependencies_reports_missing_and_incompatible() {
+        let mut bridge = MgmtBridge::new();
+        bridge.install(test_ext_with_deps("app", vec![("lib-a", "^1.0.0"), ("lib-b", "^2.0.0")]));
+        // lib-a installed at correct version
+        bridge.install(ExtensionInfo {
+            id: "lib-a".into(),
+            display_name: "Lib A".into(),
+            version: "1.5.0".into(),
+            publisher: "acme".into(),
+            kind: ExtensionKind::Workspace,
+            is_enabled: true,
+            extension_path: None,
+            dependencies: vec![],
+        });
+        // lib-b installed but too old
+        bridge.install(ExtensionInfo {
+            id: "lib-b".into(),
+            display_name: "Lib B".into(),
+            version: "1.9.0".into(),
+            publisher: "acme".into(),
+            kind: ExtensionKind::Workspace,
+            is_enabled: true,
+            extension_path: None,
+            dependencies: vec![],
+        });
+
+        let errors = bridge.check_dependencies();
+        assert_eq!(errors.len(), 1);
+        match &errors[0] {
+            DependencyError::Incompatible { dep_id, .. } => assert_eq!(dep_id, "lib-b"),
+            other => panic!("expected Incompatible, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn resolve_load_order_topological() {
+        let mut bridge = MgmtBridge::new();
+        bridge.install(test_ext_with_deps("app", vec![("lib", "^1.0.0")]));
+        bridge.install(test_ext_with_deps("lib", vec![("core", "^1.0.0")]));
+        bridge.install(test_ext_with_deps("core", vec![]));
+
+        let order = bridge.resolve_load_order().unwrap();
+        let ids: Vec<&str> = order.iter().map(|e| e.id.as_str()).collect();
+        // core before lib before app
+        let core_pos = ids.iter().position(|&id| id == "core").unwrap();
+        let lib_pos = ids.iter().position(|&id| id == "lib").unwrap();
+        let app_pos = ids.iter().position(|&id| id == "app").unwrap();
+        assert!(core_pos < lib_pos);
+        assert!(lib_pos < app_pos);
+    }
+
+    // ── Cascade Disable Test ──
+
+    #[test]
+    fn disable_cascade_disables_dependents() {
+        let mut bridge = MgmtBridge::new();
+        bridge.install(test_ext_with_deps("core", vec![]));
+        bridge.install(test_ext_with_deps("mid", vec![("core", "^1.0.0")]));
+        bridge.install(test_ext_with_deps("leaf", vec![("mid", "^1.0.0")]));
+
+        let disabled = bridge.disable_cascade("core");
+        assert_eq!(disabled.len(), 3);
+        assert!(disabled.contains(&"core".to_string()));
+        assert!(disabled.contains(&"mid".to_string()));
+        assert!(disabled.contains(&"leaf".to_string()));
+        // All should now be disabled
+        assert!(bridge.get_enabled_extensions().is_empty());
+    }
+
+    // ── Update Checking Test ──
+
+    #[test]
+    fn check_updates_finds_newer_versions() {
+        let mut bridge = MgmtBridge::new();
+        bridge.install(ExtensionInfo {
+            id: "a.ext".into(),
+            display_name: "A".into(),
+            version: "1.0.0".into(),
+            publisher: "a".into(),
+            kind: ExtensionKind::Workspace,
+            is_enabled: true,
+            extension_path: None,
+            dependencies: vec![],
+        });
+        bridge.install(ExtensionInfo {
+            id: "b.ext".into(),
+            display_name: "B".into(),
+            version: "2.0.0".into(),
+            publisher: "b".into(),
+            kind: ExtensionKind::Workspace,
+            is_enabled: true,
+            extension_path: None,
+            dependencies: vec![],
+        });
+
+        let mut available = HashMap::new();
+        available.insert("a.ext".to_string(), "1.2.0".to_string());
+        available.insert("b.ext".to_string(), "2.0.0".to_string()); // same, no update
+
+        let updates = bridge.check_updates(&available);
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].extension_id, "a.ext");
+        assert_eq!(updates[0].latest_version, "1.2.0");
+    }
+
+    // ── Search Ranking Test ──
+
+    #[test]
+    fn rank_search_results_orders_by_score() {
+        let results = vec![
+            GalleryExtension {
+                id: "other.tool".into(),
+                display_name: "Other Tool".into(),
+                publisher: "other".into(),
+                version: "1.0.0".into(),
+                description: "Has rust in description".into(),
+                download_count: 100,
+                rating: 3.0,
+                install_count: 100,
+                download_url: None,
+            },
+            GalleryExtension {
+                id: "rust-lang.rust".into(),
+                display_name: "Rust".into(),
+                publisher: "rust-lang".into(),
+                version: "2.0.0".into(),
+                description: "Official Rust support".into(),
+                download_count: 500_000,
+                rating: 4.9,
+                install_count: 500_000,
+                download_url: None,
+            },
+        ];
+        let ranked = rank_search_results(&results, "rust");
+        assert_eq!(ranked.len(), 2);
+        // Exact name match + huge downloads should rank first
+        assert_eq!(ranked[0].id, "rust-lang.rust");
+        assert!(ranked[0].score > ranked[1].score);
     }
 }

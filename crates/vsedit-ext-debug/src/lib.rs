@@ -861,6 +861,266 @@ pub fn debug_evaluate(
     })
 }
 
+// ── Breakpoint Hit Count Evaluation ──
+
+/// Specifies when a breakpoint should trigger based on its hit count.
+#[derive(Debug, Clone, PartialEq)]
+pub enum HitCondition {
+    /// Break when hit count equals the value.
+    Equal(u64),
+    /// Break when hit count is greater than or equal to the value.
+    GreaterOrEqual(u64),
+    /// Break every N-th hit (modulo).
+    Multiple(u64),
+}
+
+impl HitCondition {
+    /// Parse a hit condition string such as `"= 5"`, `">= 10"`, or `"% 3"`.
+    pub fn parse(s: &str) -> Result<Self, String> {
+        let s = s.trim();
+        if let Some(rest) = s.strip_prefix(">=") {
+            let n: u64 = rest.trim().parse().map_err(|_| format!("invalid number in hit condition: '{}'", rest.trim()))?;
+            Ok(HitCondition::GreaterOrEqual(n))
+        } else if let Some(rest) = s.strip_prefix('%') {
+            let n: u64 = rest.trim().parse().map_err(|_| format!("invalid number in hit condition: '{}'", rest.trim()))?;
+            if n == 0 {
+                return Err("modulo hit condition must be non-zero".to_string());
+            }
+            Ok(HitCondition::Multiple(n))
+        } else if let Some(rest) = s.strip_prefix('=') {
+            let n: u64 = rest.trim().parse().map_err(|_| format!("invalid number in hit condition: '{}'", rest.trim()))?;
+            Ok(HitCondition::Equal(n))
+        } else {
+            // Try parsing as a bare number (treated as equal).
+            let n: u64 = s.parse().map_err(|_| format!("unrecognised hit condition: '{s}'"))?;
+            Ok(HitCondition::Equal(n))
+        }
+    }
+
+    /// Returns `true` if the breakpoint should fire at the given hit count.
+    pub fn should_break(&self, hit_count: u64) -> bool {
+        match self {
+            HitCondition::Equal(n) => hit_count == *n,
+            HitCondition::GreaterOrEqual(n) => hit_count >= *n,
+            HitCondition::Multiple(n) => hit_count > 0 && hit_count % *n == 0,
+        }
+    }
+}
+
+// ── Call Stack Frame Formatting ──
+
+/// Represents a single frame in the debug call stack.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StackFrame {
+    pub id: u64,
+    pub name: String,
+    pub source_path: Option<String>,
+    pub line: u32,
+    pub column: u32,
+    pub module_name: Option<String>,
+}
+
+impl StackFrame {
+    pub fn new(id: u64, name: impl Into<String>, line: u32, column: u32) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            source_path: None,
+            line,
+            column,
+            module_name: None,
+        }
+    }
+
+    pub fn with_source(mut self, path: impl Into<String>) -> Self {
+        self.source_path = Some(path.into());
+        self
+    }
+
+    pub fn with_module(mut self, module: impl Into<String>) -> Self {
+        self.module_name = Some(module.into());
+        self
+    }
+
+    /// Format the frame as a human-readable one-line summary.
+    pub fn format_summary(&self) -> String {
+        let location = match &self.source_path {
+            Some(p) => format!("{}:{}:{}", p, self.line, self.column),
+            None => format!("<unknown>:{}:{}", self.line, self.column),
+        };
+        match &self.module_name {
+            Some(m) => format!("#{} {} [{}] at {}", self.id, self.name, m, location),
+            None => format!("#{} {} at {}", self.id, self.name, location),
+        }
+    }
+}
+
+impl fmt::Display for StackFrame {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format_summary())
+    }
+}
+
+/// Format an entire call stack into a multi-line string.
+pub fn format_call_stack(frames: &[StackFrame]) -> String {
+    frames
+        .iter()
+        .map(|f| f.format_summary())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+// ── Debug Console Command Parsing ──
+
+/// Commands that can be entered in the debug console REPL.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DebugConsoleCommand {
+    /// Evaluate an expression and print the result.
+    Evaluate(String),
+    /// Set a variable to a new value.
+    SetVariable { name: String, value: String },
+    /// Step into the next statement.
+    StepIn,
+    /// Step over the next statement.
+    StepOver,
+    /// Step out of the current function.
+    StepOut,
+    /// Continue execution.
+    Continue,
+    /// Show the call stack.
+    Backtrace,
+    /// Unknown / unparseable command.
+    Unknown(String),
+}
+
+impl DebugConsoleCommand {
+    /// Parse a raw console input line into a command.
+    pub fn parse(input: &str) -> Self {
+        let input = input.trim();
+        if input.is_empty() {
+            return DebugConsoleCommand::Unknown(String::new());
+        }
+
+        // Check for built-in commands (case-insensitive prefix).
+        let lower = input.to_ascii_lowercase();
+        if lower == "stepin" || lower == "si" {
+            return DebugConsoleCommand::StepIn;
+        }
+        if lower == "stepover" || lower == "so" || lower == "next" {
+            return DebugConsoleCommand::StepOver;
+        }
+        if lower == "stepout" {
+            return DebugConsoleCommand::StepOut;
+        }
+        if lower == "continue" || lower == "c" {
+            return DebugConsoleCommand::Continue;
+        }
+        if lower == "bt" || lower == "backtrace" {
+            return DebugConsoleCommand::Backtrace;
+        }
+
+        // `set <name> = <value>`
+        if let Some(rest) = lower.strip_prefix("set ") {
+            let original_rest = &input[4..];
+            if let Some(eq_pos) = original_rest.find('=') {
+                let name = original_rest[..eq_pos].trim().to_string();
+                let value = original_rest[eq_pos + 1..].trim().to_string();
+                if !name.is_empty() && !value.is_empty() {
+                    return DebugConsoleCommand::SetVariable { name, value };
+                }
+            }
+            // Malformed set – treat the whole thing as unknown.
+            return DebugConsoleCommand::Unknown(input.to_string());
+        }
+
+        // Everything else is an expression evaluation.
+        DebugConsoleCommand::Evaluate(input.to_string())
+    }
+}
+
+// ── Debug Output Filtering ──
+
+/// Categories for debug output messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DebugOutputCategory {
+    Console,
+    Stdout,
+    Stderr,
+    Telemetry,
+}
+
+/// A single debug output entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DebugOutputEntry {
+    pub category: DebugOutputCategory,
+    pub text: String,
+    pub source: Option<String>,
+}
+
+/// Collects debug output and provides filtering by category.
+pub struct DebugOutputLog {
+    entries: Vec<DebugOutputEntry>,
+    max_entries: usize,
+}
+
+impl DebugOutputLog {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    pub fn append(&mut self, category: DebugOutputCategory, text: impl Into<String>) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(DebugOutputEntry {
+            category,
+            text: text.into(),
+            source: None,
+        });
+    }
+
+    pub fn append_with_source(
+        &mut self,
+        category: DebugOutputCategory,
+        text: impl Into<String>,
+        source: impl Into<String>,
+    ) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(DebugOutputEntry {
+            category,
+            text: text.into(),
+            source: Some(source.into()),
+        });
+    }
+
+    /// Return all entries matching the given category.
+    pub fn filter_by_category(&self, category: DebugOutputCategory) -> Vec<&DebugOutputEntry> {
+        self.entries.iter().filter(|e| e.category == category).collect()
+    }
+
+    /// Return all entries whose text contains the given substring.
+    pub fn search(&self, needle: &str) -> Vec<&DebugOutputEntry> {
+        self.entries.iter().filter(|e| e.text.contains(needle)).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1591,5 +1851,183 @@ mod tests {
         let containers = make_test_containers();
         let result = debug_evaluate(&containers, "x.field");
         assert!(result.is_err());
+    }
+
+    // ── HitCondition tests ──
+
+    #[test]
+    fn hit_condition_parse_equal() {
+        let hc = HitCondition::parse("= 5").unwrap();
+        assert_eq!(hc, HitCondition::Equal(5));
+        assert!(!hc.should_break(4));
+        assert!(hc.should_break(5));
+        assert!(!hc.should_break(6));
+    }
+
+    #[test]
+    fn hit_condition_parse_bare_number() {
+        let hc = HitCondition::parse("10").unwrap();
+        assert_eq!(hc, HitCondition::Equal(10));
+    }
+
+    #[test]
+    fn hit_condition_parse_greater_or_equal() {
+        let hc = HitCondition::parse(">= 3").unwrap();
+        assert_eq!(hc, HitCondition::GreaterOrEqual(3));
+        assert!(!hc.should_break(2));
+        assert!(hc.should_break(3));
+        assert!(hc.should_break(100));
+    }
+
+    #[test]
+    fn hit_condition_parse_multiple() {
+        let hc = HitCondition::parse("% 4").unwrap();
+        assert_eq!(hc, HitCondition::Multiple(4));
+        assert!(!hc.should_break(0));
+        assert!(!hc.should_break(1));
+        assert!(hc.should_break(4));
+        assert!(hc.should_break(8));
+        assert!(!hc.should_break(5));
+    }
+
+    #[test]
+    fn hit_condition_parse_modulo_zero_rejected() {
+        assert!(HitCondition::parse("% 0").is_err());
+    }
+
+    #[test]
+    fn hit_condition_parse_invalid() {
+        assert!(HitCondition::parse("abc").is_err());
+        assert!(HitCondition::parse(">= abc").is_err());
+    }
+
+    // ── StackFrame / call stack tests ──
+
+    #[test]
+    fn stack_frame_format_summary_minimal() {
+        let frame = StackFrame::new(0, "main", 1, 0);
+        assert_eq!(frame.format_summary(), "#0 main at <unknown>:1:0");
+    }
+
+    #[test]
+    fn stack_frame_format_summary_full() {
+        let frame = StackFrame::new(1, "foo", 42, 5)
+            .with_source("src/main.rs")
+            .with_module("myapp");
+        assert_eq!(
+            frame.format_summary(),
+            "#1 foo [myapp] at src/main.rs:42:5"
+        );
+    }
+
+    #[test]
+    fn format_call_stack_multiple_frames() {
+        let frames = vec![
+            StackFrame::new(0, "main", 10, 0).with_source("main.rs"),
+            StackFrame::new(1, "run", 20, 4).with_source("lib.rs"),
+        ];
+        let output = format_call_stack(&frames);
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("main"));
+        assert!(lines[1].contains("run"));
+    }
+
+    // ── DebugConsoleCommand tests ──
+
+    #[test]
+    fn console_command_parse_stepin() {
+        assert_eq!(DebugConsoleCommand::parse("si"), DebugConsoleCommand::StepIn);
+        assert_eq!(DebugConsoleCommand::parse("stepin"), DebugConsoleCommand::StepIn);
+    }
+
+    #[test]
+    fn console_command_parse_continue() {
+        assert_eq!(DebugConsoleCommand::parse("c"), DebugConsoleCommand::Continue);
+        assert_eq!(DebugConsoleCommand::parse("continue"), DebugConsoleCommand::Continue);
+    }
+
+    #[test]
+    fn console_command_parse_backtrace() {
+        assert_eq!(DebugConsoleCommand::parse("bt"), DebugConsoleCommand::Backtrace);
+    }
+
+    #[test]
+    fn console_command_parse_set_variable() {
+        match DebugConsoleCommand::parse("set x = 42") {
+            DebugConsoleCommand::SetVariable { name, value } => {
+                assert_eq!(name, "x");
+                assert_eq!(value, "42");
+            }
+            other => panic!("expected SetVariable, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn console_command_parse_expression() {
+        match DebugConsoleCommand::parse("x + y * 2") {
+            DebugConsoleCommand::Evaluate(expr) => assert_eq!(expr, "x + y * 2"),
+            other => panic!("expected Evaluate, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn console_command_empty_is_unknown() {
+        assert_eq!(
+            DebugConsoleCommand::parse(""),
+            DebugConsoleCommand::Unknown(String::new())
+        );
+    }
+
+    // ── DebugOutputLog tests ──
+
+    #[test]
+    fn output_log_filter_by_category() {
+        let mut log = DebugOutputLog::new(100);
+        log.append(DebugOutputCategory::Stdout, "hello");
+        log.append(DebugOutputCategory::Stderr, "error!");
+        log.append(DebugOutputCategory::Stdout, "world");
+        assert_eq!(log.filter_by_category(DebugOutputCategory::Stdout).len(), 2);
+        assert_eq!(log.filter_by_category(DebugOutputCategory::Stderr).len(), 1);
+        assert_eq!(log.filter_by_category(DebugOutputCategory::Telemetry).len(), 0);
+    }
+
+    #[test]
+    fn output_log_search() {
+        let mut log = DebugOutputLog::new(100);
+        log.append(DebugOutputCategory::Console, "Loading module foo");
+        log.append(DebugOutputCategory::Console, "Ready");
+        log.append(DebugOutputCategory::Stdout, "foo output");
+        let results = log.search("foo");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn output_log_max_entries_evicts_oldest() {
+        let mut log = DebugOutputLog::new(3);
+        log.append(DebugOutputCategory::Stdout, "a");
+        log.append(DebugOutputCategory::Stdout, "b");
+        log.append(DebugOutputCategory::Stdout, "c");
+        log.append(DebugOutputCategory::Stdout, "d");
+        assert_eq!(log.len(), 3);
+        // "a" should have been evicted
+        assert!(log.search("a").is_empty());
+        assert_eq!(log.search("d").len(), 1);
+    }
+
+    #[test]
+    fn output_log_clear() {
+        let mut log = DebugOutputLog::new(100);
+        log.append(DebugOutputCategory::Stdout, "x");
+        log.clear();
+        assert!(log.is_empty());
+    }
+
+    #[test]
+    fn output_log_with_source() {
+        let mut log = DebugOutputLog::new(100);
+        log.append_with_source(DebugOutputCategory::Console, "msg", "adapter.js");
+        let entries = log.filter_by_category(DebugOutputCategory::Console);
+        assert_eq!(entries[0].source.as_deref(), Some("adapter.js"));
     }
 }

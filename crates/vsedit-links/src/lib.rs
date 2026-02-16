@@ -885,6 +885,317 @@ pub fn count_links_by_type(links: &[ClassifiedLink]) -> (usize, usize, usize) {
     (urls, files, emails)
 }
 
+// ---------------------------------------------------------------------------
+// Markdown link extraction
+// ---------------------------------------------------------------------------
+
+/// A link extracted from Markdown `[text](url)` syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkdownLink {
+    /// Display text between the brackets.
+    pub text: String,
+    /// Target URL/path between the parentheses.
+    pub target: String,
+    /// Byte start of the full `[text](url)` span.
+    pub byte_start: usize,
+    /// Byte end (exclusive) of the full span.
+    pub byte_end: usize,
+}
+
+/// Extract `[text](url)` style links from Markdown content.
+pub fn extract_markdown_links(content: &str) -> Vec<MarkdownLink> {
+    let mut results = Vec::new();
+    let bytes = content.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'[' {
+            // Look for closing bracket
+            let text_start = i + 1;
+            let mut j = text_start;
+            let mut depth = 1u32;
+            while j < len && depth > 0 {
+                match bytes[j] {
+                    b'[' => depth += 1,
+                    b']' => depth -= 1,
+                    _ => {}
+                }
+                if depth > 0 {
+                    j += 1;
+                }
+            }
+            if depth == 0 && j + 1 < len && bytes[j + 1] == b'(' {
+                let link_text = &content[text_start..j];
+                let url_start = j + 2;
+                if let Some(close_paren) = content[url_start..].find(')') {
+                    let url_end = url_start + close_paren;
+                    let target = content[url_start..url_end].trim().to_string();
+                    if !target.is_empty() {
+                        results.push(MarkdownLink {
+                            text: link_text.to_string(),
+                            target,
+                            byte_start: i,
+                            byte_end: url_end + 1,
+                        });
+                    }
+                    i = url_end + 1;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    results
+}
+
+// ---------------------------------------------------------------------------
+// Link display truncation
+// ---------------------------------------------------------------------------
+
+/// Truncate a URL for display purposes, preserving the domain and showing an
+/// ellipsis in the middle when the URL exceeds `max_len` characters.
+///
+/// If the URL is shorter than or equal to `max_len`, it is returned unchanged.
+pub fn truncate_url_for_display(url: &str, max_len: usize) -> String {
+    if url.chars().count() <= max_len || max_len < 10 {
+        return url.to_string();
+    }
+    let scheme_end = url.find("://").map(|i| i + 3).unwrap_or(0);
+    let after_scheme = &url[scheme_end..];
+    let host_end = after_scheme.find('/').unwrap_or(after_scheme.len());
+    let prefix_len = scheme_end + host_end;
+
+    // If the domain alone is already too long, just hard-truncate.
+    if prefix_len >= max_len.saturating_sub(3) {
+        let truncated: String = url.chars().take(max_len.saturating_sub(1)).collect();
+        return format!("{truncated}…");
+    }
+
+    let suffix_budget = max_len.saturating_sub(prefix_len).saturating_sub(1); // 1 for '…'
+    let path = &url[prefix_len..];
+    let path_chars: Vec<char> = path.chars().collect();
+    if path_chars.len() <= suffix_budget {
+        return url.to_string();
+    }
+    let tail: String = path_chars[path_chars.len() - suffix_budget..].iter().collect();
+    format!("{}…{}", &url[..prefix_len], tail)
+}
+
+// ---------------------------------------------------------------------------
+// Deep link generation (editor:// protocol)
+// ---------------------------------------------------------------------------
+
+/// Generate an `editor://` deep link that can open a specific file and
+/// position in the editor.
+pub fn generate_deep_link(file_path: &str, line: Option<u32>, col: Option<u32>) -> String {
+    let mut link = format!("editor://file/{file_path}");
+    match (line, col) {
+        (Some(l), Some(c)) => {
+            link.push_str(&format!(":{l}:{c}"));
+        }
+        (Some(l), None) => {
+            link.push_str(&format!(":{l}"));
+        }
+        _ => {}
+    }
+    link
+}
+
+/// Parse an `editor://` deep link back into its components.
+///
+/// Returns `(file_path, optional_line, optional_col)` or `None` if the link
+/// does not use the `editor://file/` scheme.
+pub fn parse_deep_link(link: &str) -> Option<(String, Option<u32>, Option<u32>)> {
+    let rest = link.strip_prefix("editor://file/")?;
+    if rest.is_empty() {
+        return None;
+    }
+    // Split from the right to handle paths that contain ':'
+    let parts: Vec<&str> = rest.rsplitn(3, ':').collect();
+    match parts.len() {
+        3 => {
+            let col = parts[0].parse::<u32>().ok();
+            let line = parts[1].parse::<u32>().ok();
+            if line.is_some() && col.is_some() {
+                Some((parts[2].to_string(), line, col))
+            } else {
+                Some((rest.to_string(), None, None))
+            }
+        }
+        2 => {
+            let line = parts[0].parse::<u32>().ok();
+            if line.is_some() {
+                Some((parts[1].to_string(), line, None))
+            } else {
+                Some((rest.to_string(), None, None))
+            }
+        }
+        _ => Some((rest.to_string(), None, None)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Relative path resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve a relative path against a base directory, normalizing `.` and `..`
+/// segments without filesystem access.
+pub fn resolve_relative_path(base_dir: &str, relative: &str) -> String {
+    if relative.starts_with('/') {
+        return normalize_path_segments(relative);
+    }
+    let combined = if base_dir.ends_with('/') {
+        format!("{base_dir}{relative}")
+    } else {
+        format!("{base_dir}/{relative}")
+    };
+    normalize_path_segments(&combined)
+}
+
+/// Normalize a path by resolving `.` and `..` segments.
+fn normalize_path_segments(path: &str) -> String {
+    let mut stack: Vec<&str> = Vec::new();
+    for seg in path.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                stack.pop();
+            }
+            other => stack.push(other),
+        }
+    }
+    let joined = stack.join("/");
+    if path.starts_with('/') {
+        format!("/{joined}")
+    } else {
+        joined
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Link history tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks which links a user has visited within an editing session.
+#[derive(Debug, Clone)]
+pub struct LinkHistory {
+    entries: Vec<LinkHistoryEntry>,
+    max_entries: usize,
+}
+
+/// A single entry in the link history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkHistoryEntry {
+    pub target: String,
+    pub visit_count: u32,
+}
+
+impl LinkHistory {
+    /// Create a new history with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record a link visit. If the link was already visited, increments its
+    /// count; otherwise adds a new entry (evicting the oldest if at capacity).
+    pub fn record_visit(&mut self, target: &str) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.target == target) {
+            entry.visit_count += 1;
+            return;
+        }
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(LinkHistoryEntry {
+            target: target.to_string(),
+            visit_count: 1,
+        });
+    }
+
+    /// Return how many times a link has been visited, or 0 if never.
+    pub fn visit_count(&self, target: &str) -> u32 {
+        self.entries
+            .iter()
+            .find(|e| e.target == target)
+            .map_or(0, |e| e.visit_count)
+    }
+
+    /// Return all entries ordered by most-visited first.
+    pub fn most_visited(&self) -> Vec<&LinkHistoryEntry> {
+        let mut sorted: Vec<&LinkHistoryEntry> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.visit_count.cmp(&a.visit_count));
+        sorted
+    }
+
+    /// Return the total number of distinct links tracked.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if no links have been tracked.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all history entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URL sub-categorization
+// ---------------------------------------------------------------------------
+
+/// Finer-grained categorization of HTTP(S) URLs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UrlCategory {
+    /// Documentation site (docs.*, readthedocs, wiki, etc.)
+    Documentation,
+    /// API endpoint (contains `/api/` or `api.` subdomain)
+    Api,
+    /// Source-code hosting (github, gitlab, bitbucket, etc.)
+    SourceRepo,
+    /// Media / image link (common image extensions)
+    Media,
+    /// General web link
+    Web,
+}
+
+/// Categorize an HTTP(S) URL into a finer-grained [`UrlCategory`].
+pub fn categorize_url(url: &str) -> UrlCategory {
+    let lower = url.to_lowercase();
+    let domain = extract_domain(&lower).unwrap_or("");
+
+    if domain.starts_with("docs.")
+        || domain.contains("readthedocs")
+        || domain.contains("wiki")
+        || lower.contains("/wiki/")
+        || lower.contains("/docs/")
+    {
+        return UrlCategory::Documentation;
+    }
+    if domain.starts_with("api.") || lower.contains("/api/") {
+        return UrlCategory::Api;
+    }
+    if domain.contains("github.com")
+        || domain.contains("gitlab.com")
+        || domain.contains("bitbucket.org")
+        || domain.contains("sr.ht")
+    {
+        return UrlCategory::SourceRepo;
+    }
+    let media_exts = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".mp4"];
+    if media_exts.iter().any(|ext| lower.ends_with(ext)) {
+        return UrlCategory::Media;
+    }
+    UrlCategory::Web
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1578,5 +1889,183 @@ mod tests {
         assert_eq!(links[0].start, 10);
         assert_eq!(links[1].start, 30);
         assert_eq!(links[2].start, 50);
+    }
+
+    // -- markdown link extraction tests --
+
+    #[test]
+    fn extract_markdown_links_basic() {
+        let md = "Click [here](https://example.com) for info.";
+        let links = extract_markdown_links(md);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].text, "here");
+        assert_eq!(links[0].target, "https://example.com");
+    }
+
+    #[test]
+    fn extract_markdown_links_multiple() {
+        let md = "[a](https://a.com) text [b](./local.md)";
+        let links = extract_markdown_links(md);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].target, "https://a.com");
+        assert_eq!(links[1].target, "./local.md");
+        assert_eq!(links[1].text, "b");
+    }
+
+    #[test]
+    fn extract_markdown_links_none() {
+        let md = "No links here, just [brackets] and (parens).";
+        let links = extract_markdown_links(md);
+        assert!(links.is_empty());
+    }
+
+    // -- URL display truncation tests --
+
+    #[test]
+    fn truncate_url_short_unchanged() {
+        let url = "https://example.com";
+        assert_eq!(truncate_url_for_display(url, 50), url);
+    }
+
+    #[test]
+    fn truncate_url_long_is_shortened() {
+        let url = "https://example.com/very/long/path/to/some/resource/file.html";
+        let result = truncate_url_for_display(url, 35);
+        assert!(result.chars().count() <= 35);
+        assert!(result.contains("example.com"));
+        assert!(result.contains('…'));
+    }
+
+    // -- deep link tests --
+
+    #[test]
+    fn generate_deep_link_full() {
+        let link = generate_deep_link("src/main.rs", Some(42), Some(10));
+        assert_eq!(link, "editor://file/src/main.rs:42:10");
+    }
+
+    #[test]
+    fn generate_deep_link_line_only() {
+        let link = generate_deep_link("src/lib.rs", Some(7), None);
+        assert_eq!(link, "editor://file/src/lib.rs:7");
+    }
+
+    #[test]
+    fn parse_deep_link_roundtrip() {
+        let link = generate_deep_link("src/main.rs", Some(42), Some(10));
+        let parsed = parse_deep_link(&link);
+        assert_eq!(parsed, Some(("src/main.rs".to_string(), Some(42), Some(10))));
+    }
+
+    #[test]
+    fn parse_deep_link_no_position() {
+        let parsed = parse_deep_link("editor://file/README.md");
+        assert_eq!(parsed, Some(("README.md".to_string(), None, None)));
+    }
+
+    #[test]
+    fn parse_deep_link_invalid_scheme() {
+        assert!(parse_deep_link("http://file/foo.rs").is_none());
+    }
+
+    // -- relative path resolution tests --
+
+    #[test]
+    fn resolve_relative_path_basic() {
+        let result = resolve_relative_path("/home/user/project", "../other/file.rs");
+        assert_eq!(result, "/home/user/other/file.rs");
+    }
+
+    #[test]
+    fn resolve_relative_path_dot_segments() {
+        let result = resolve_relative_path("/a/b/c", "./d/../e/f");
+        assert_eq!(result, "/a/b/c/e/f");
+    }
+
+    #[test]
+    fn resolve_absolute_ignores_base() {
+        let result = resolve_relative_path("/home/user", "/etc/hosts");
+        assert_eq!(result, "/etc/hosts");
+    }
+
+    // -- link history tests --
+
+    #[test]
+    fn link_history_basic_tracking() {
+        let mut hist = LinkHistory::new(10);
+        assert!(hist.is_empty());
+        hist.record_visit("https://a.com");
+        hist.record_visit("https://b.com");
+        hist.record_visit("https://a.com");
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist.visit_count("https://a.com"), 2);
+        assert_eq!(hist.visit_count("https://b.com"), 1);
+        assert_eq!(hist.visit_count("https://c.com"), 0);
+    }
+
+    #[test]
+    fn link_history_eviction() {
+        let mut hist = LinkHistory::new(2);
+        hist.record_visit("a");
+        hist.record_visit("b");
+        hist.record_visit("c"); // evicts "a"
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist.visit_count("a"), 0);
+        assert_eq!(hist.visit_count("b"), 1);
+        assert_eq!(hist.visit_count("c"), 1);
+    }
+
+    #[test]
+    fn link_history_most_visited_order() {
+        let mut hist = LinkHistory::new(10);
+        hist.record_visit("x");
+        hist.record_visit("y");
+        hist.record_visit("y");
+        hist.record_visit("z");
+        hist.record_visit("z");
+        hist.record_visit("z");
+        let top = hist.most_visited();
+        assert_eq!(top[0].target, "z");
+        assert_eq!(top[1].target, "y");
+        assert_eq!(top[2].target, "x");
+    }
+
+    #[test]
+    fn link_history_clear() {
+        let mut hist = LinkHistory::new(10);
+        hist.record_visit("a");
+        hist.clear();
+        assert!(hist.is_empty());
+    }
+
+    // -- URL categorization tests --
+
+    #[test]
+    fn categorize_url_source_repo() {
+        assert_eq!(categorize_url("https://github.com/user/repo"), UrlCategory::SourceRepo);
+        assert_eq!(categorize_url("https://gitlab.com/proj"), UrlCategory::SourceRepo);
+    }
+
+    #[test]
+    fn categorize_url_docs() {
+        assert_eq!(categorize_url("https://docs.rs/serde/latest"), UrlCategory::Documentation);
+        assert_eq!(categorize_url("https://example.com/wiki/page"), UrlCategory::Documentation);
+    }
+
+    #[test]
+    fn categorize_url_api() {
+        assert_eq!(categorize_url("https://api.example.com/v1/data"), UrlCategory::Api);
+        assert_eq!(categorize_url("https://example.com/api/users"), UrlCategory::Api);
+    }
+
+    #[test]
+    fn categorize_url_media() {
+        assert_eq!(categorize_url("https://example.com/image.png"), UrlCategory::Media);
+        assert_eq!(categorize_url("https://cdn.example.com/video.mp4"), UrlCategory::Media);
+    }
+
+    #[test]
+    fn categorize_url_generic_web() {
+        assert_eq!(categorize_url("https://example.com/page"), UrlCategory::Web);
     }
 }

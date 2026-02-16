@@ -1014,6 +1014,261 @@ impl ColorPalette {
 }
 
 // ---------------------------------------------------------------------------
+// Color operations
+// ---------------------------------------------------------------------------
+
+impl Color {
+    /// Returns the complementary color (hue rotated 180°).
+    pub fn complementary(&self) -> Self {
+        Self::rgb(255 - self.r, 255 - self.g, 255 - self.b)
+    }
+
+    /// Lighten the color by a percentage (0.0–1.0).
+    pub fn lighten(&self, amount: f64) -> Self {
+        let amount = amount.clamp(0.0, 1.0);
+        Self::rgba(
+            (self.r as f64 + (255.0 - self.r as f64) * amount).round() as u8,
+            (self.g as f64 + (255.0 - self.g as f64) * amount).round() as u8,
+            (self.b as f64 + (255.0 - self.b as f64) * amount).round() as u8,
+            self.a,
+        )
+    }
+
+    /// Darken the color by a percentage (0.0–1.0).
+    pub fn darken(&self, amount: f64) -> Self {
+        let amount = amount.clamp(0.0, 1.0);
+        Self::rgba(
+            (self.r as f64 * (1.0 - amount)).round() as u8,
+            (self.g as f64 * (1.0 - amount)).round() as u8,
+            (self.b as f64 * (1.0 - amount)).round() as u8,
+            self.a,
+        )
+    }
+
+    /// Convert to greyscale using luminance weighting.
+    pub fn to_greyscale(&self) -> Self {
+        let lum = (0.2126 * self.r as f64 + 0.7152 * self.g as f64 + 0.0722 * self.b as f64).round() as u8;
+        Self::rgba(lum, lum, lum, self.a)
+    }
+
+    /// Returns true if this color is considered "dark" (luminance < 0.5).
+    pub fn is_dark(&self) -> bool {
+        relative_luminance(self) < 0.5
+    }
+
+    /// Convert to HSL representation: (hue 0–360, saturation 0–1, lightness 0–1).
+    pub fn to_hsl(&self) -> (f64, f64, f64) {
+        let r = self.r as f64 / 255.0;
+        let g = self.g as f64 / 255.0;
+        let b = self.b as f64 / 255.0;
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let l = (max + min) / 2.0;
+        if (max - min).abs() < f64::EPSILON {
+            return (0.0, 0.0, l);
+        }
+        let d = max - min;
+        let s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
+        let h = if (max - r).abs() < f64::EPSILON {
+            let mut h = (g - b) / d;
+            if g < b { h += 6.0; }
+            h
+        } else if (max - g).abs() < f64::EPSILON {
+            (b - r) / d + 2.0
+        } else {
+            (r - g) / d + 4.0
+        };
+        (h * 60.0, s, l)
+    }
+
+    /// Create a color from HSL values (hue 0–360, saturation 0–1, lightness 0–1).
+    pub fn from_hsl(h: f64, s: f64, l: f64) -> Self {
+        let s = s.clamp(0.0, 1.0);
+        let l = l.clamp(0.0, 1.0);
+        if s.abs() < f64::EPSILON {
+            let v = (l * 255.0).round() as u8;
+            return Self::rgb(v, v, v);
+        }
+        let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+        let p = 2.0 * l - q;
+        let h = h / 360.0;
+        let hue_to_rgb = |t: f64| -> f64 {
+            let t = ((t % 1.0) + 1.0) % 1.0;
+            if t < 1.0 / 6.0 {
+                p + (q - p) * 6.0 * t
+            } else if t < 0.5 {
+                q
+            } else if t < 2.0 / 3.0 {
+                p + (q - p) * (2.0 / 3.0 - t) * 6.0
+            } else {
+                p
+            }
+        };
+        Self::rgb(
+            (hue_to_rgb(h + 1.0 / 3.0) * 255.0).round() as u8,
+            (hue_to_rgb(h) * 255.0).round() as u8,
+            (hue_to_rgb(h - 1.0 / 3.0) * 255.0).round() as u8,
+        )
+    }
+}
+
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Theme diff
+// ---------------------------------------------------------------------------
+
+/// A single color change between two themes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorChange {
+    pub key: String,
+    pub old: Option<Color>,
+    pub new: Option<Color>,
+}
+
+/// Computes the difference between two themes' workbench colors.
+///
+/// Returns a list of keys that were added, removed, or changed.
+pub fn theme_diff(old: &ColorTheme, new: &ColorTheme) -> Vec<ColorChange> {
+    let mut changes = Vec::new();
+    // Changed or removed in new
+    for (key, old_color) in &old.colors {
+        match new.colors.get(key) {
+            Some(new_color) if new_color != old_color => {
+                changes.push(ColorChange { key: key.clone(), old: Some(*old_color), new: Some(*new_color) });
+            }
+            None => {
+                changes.push(ColorChange { key: key.clone(), old: Some(*old_color), new: None });
+            }
+            _ => {}
+        }
+    }
+    // Added in new
+    for (key, new_color) in &new.colors {
+        if !old.colors.contains_key(key) {
+            changes.push(ColorChange { key: key.clone(), old: None, new: Some(*new_color) });
+        }
+    }
+    changes.sort_by(|a, b| a.key.cmp(&b.key));
+    changes
+}
+
+// ---------------------------------------------------------------------------
+// Theme validation
+// ---------------------------------------------------------------------------
+
+/// Core workbench color keys that a well-formed theme should define.
+pub const REQUIRED_COLOR_KEYS: &[&str] = &[
+    "editor.background",
+    "editor.foreground",
+    "editorCursor.foreground",
+    "editorLineNumber.foreground",
+    "editor.selectionBackground",
+    "editor.lineHighlightBackground",
+    "statusBar.background",
+    "statusBar.foreground",
+    "sideBar.background",
+    "sideBar.foreground",
+    "activityBar.background",
+    "activityBar.foreground",
+    "tab.activeBackground",
+    "tab.activeForeground",
+    "tab.inactiveBackground",
+    "tab.inactiveForeground",
+    "titleBar.activeBackground",
+    "titleBar.activeForeground",
+];
+
+/// A validation issue found in a theme.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThemeValidationIssue {
+    pub key: String,
+    pub kind: ValidationIssueKind,
+}
+
+/// Kind of theme validation issue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationIssueKind {
+    /// A required color key is missing.
+    MissingRequired,
+    /// Foreground/background contrast is too low for accessibility.
+    LowContrast { ratio: u32 },
+}
+
+/// Validate a theme, checking for missing required colors and low-contrast pairs.
+pub fn validate_theme(theme: &ColorTheme) -> Vec<ThemeValidationIssue> {
+    let mut issues = Vec::new();
+
+    for &key in REQUIRED_COLOR_KEYS {
+        if !theme.colors.contains_key(key) {
+            issues.push(ThemeValidationIssue {
+                key: key.to_string(),
+                kind: ValidationIssueKind::MissingRequired,
+            });
+        }
+    }
+
+    // Check editor foreground/background contrast
+    if let (Some(fg), Some(bg)) = (
+        theme.colors.get("editor.foreground"),
+        theme.colors.get("editor.background"),
+    ) {
+        let ratio = contrast_ratio(fg, bg);
+        if ratio < 3.0 {
+            issues.push(ThemeValidationIssue {
+                key: "editor.foreground/editor.background".to_string(),
+                kind: ValidationIssueKind::LowContrast { ratio: (ratio * 100.0) as u32 },
+            });
+        }
+    }
+
+    issues
+}
+
+// ---------------------------------------------------------------------------
+// Theme inheritance
+// ---------------------------------------------------------------------------
+
+impl ColorTheme {
+    /// Create a child theme that inherits from this (parent) theme.
+    ///
+    /// The child's colors override the parent's; token colors from the child
+    /// take priority (appended after parent rules, so they match first by
+    /// the longest-prefix algorithm only when scopes overlap).
+    pub fn with_overrides(&self, overrides: &ColorTheme) -> Self {
+        let mut colors = self.colors.clone();
+        colors.extend(overrides.colors.iter().map(|(k, v)| (k.clone(), *v)));
+
+        let mut token_colors = self.token_colors.clone();
+        token_colors.extend(overrides.token_colors.iter().cloned());
+
+        Self {
+            id: overrides.id.clone(),
+            label: overrides.label.clone(),
+            theme_type: overrides.theme_type,
+            colors,
+            token_colors,
+        }
+    }
+
+    /// Returns all workbench color keys defined in this theme, sorted.
+    pub fn color_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.colors.keys().map(|s| s.as_str()).collect();
+        keys.sort();
+        keys
+    }
+
+    /// Count of token color rules.
+    pub fn token_color_count(&self) -> usize {
+        self.token_colors.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1569,5 +1824,139 @@ mod tests {
         assert_eq!(palette.lightest().unwrap().r, 240);
         let avg = palette.average().unwrap();
         assert_eq!(avg.r, 125);
+    }
+
+    // -- Color operations ----------------------------------------------------
+
+    #[test]
+    fn color_complementary() {
+        let c = Color::rgb(255, 0, 128);
+        let comp = c.complementary();
+        assert_eq!(comp, Color::rgb(0, 255, 127));
+    }
+
+    #[test]
+    fn color_lighten_darken() {
+        let c = Color::rgb(100, 100, 100);
+        let lighter = c.lighten(0.5);
+        assert!(lighter.r > c.r);
+        assert!(lighter.g > c.g);
+        let darker = c.darken(0.5);
+        assert!(darker.r < c.r);
+        assert!(darker.g < c.g);
+        // Lighten/darken by 0 should be identity
+        assert_eq!(c.lighten(0.0), c);
+        assert_eq!(c.darken(0.0), c);
+    }
+
+    #[test]
+    fn color_greyscale_and_is_dark() {
+        let red = Color::rgb(255, 0, 0);
+        let grey = red.to_greyscale();
+        assert_eq!(grey.r, grey.g);
+        assert_eq!(grey.g, grey.b);
+        // Pure black is dark, pure white is not
+        assert!(Color::rgb(0, 0, 0).is_dark());
+        assert!(!Color::rgb(255, 255, 255).is_dark());
+    }
+
+    #[test]
+    fn color_hsl_roundtrip() {
+        let original = Color::rgb(200, 100, 50);
+        let (h, s, l) = original.to_hsl();
+        let restored = Color::from_hsl(h, s, l);
+        // Allow ±1 rounding tolerance
+        assert!((original.r as i16 - restored.r as i16).abs() <= 1);
+        assert!((original.g as i16 - restored.g as i16).abs() <= 1);
+        assert!((original.b as i16 - restored.b as i16).abs() <= 1);
+    }
+
+    #[test]
+    fn color_display_trait() {
+        let c = Color::rgb(0xAB, 0xCD, 0xEF);
+        assert_eq!(format!("{c}"), "#ABCDEF");
+    }
+
+    // -- Theme diff ----------------------------------------------------------
+
+    #[test]
+    fn theme_diff_detects_changes() {
+        let dark = dark_plus();
+        let light = light_plus();
+        let diff = theme_diff(&dark, &light);
+        // Both have editor.background but with different values
+        assert!(diff.iter().any(|c| c.key == "editor.background"
+            && c.old == Some(Color::from_hex("#1E1E1E").unwrap())
+            && c.new == Some(Color::from_hex("#FFFFFF").unwrap())));
+    }
+
+    #[test]
+    fn theme_diff_empty_for_identical() {
+        let t = dark_plus();
+        let diff = theme_diff(&t, &t);
+        assert!(diff.is_empty());
+    }
+
+    // -- Theme validation ----------------------------------------------------
+
+    #[test]
+    fn validate_builtin_themes_pass() {
+        // All built-in themes should have all required keys
+        for theme in builtin_themes() {
+            let issues: Vec<_> = validate_theme(&theme).into_iter()
+                .filter(|i| matches!(i.kind, ValidationIssueKind::MissingRequired))
+                .collect();
+            assert!(issues.is_empty(), "theme '{}' missing keys: {:?}", theme.id, issues);
+        }
+    }
+
+    #[test]
+    fn validate_incomplete_theme_reports_missing() {
+        let theme = ColorTheme {
+            id: "empty".into(),
+            label: "Empty".into(),
+            theme_type: ThemeType::Dark,
+            colors: HashMap::new(),
+            token_colors: Vec::new(),
+        };
+        let issues = validate_theme(&theme);
+        let missing: Vec<_> = issues.iter()
+            .filter(|i| matches!(i.kind, ValidationIssueKind::MissingRequired))
+            .collect();
+        assert_eq!(missing.len(), REQUIRED_COLOR_KEYS.len());
+    }
+
+    // -- Theme inheritance ---------------------------------------------------
+
+    #[test]
+    fn theme_with_overrides() {
+        let parent = dark_plus();
+        let mut child_colors = HashMap::new();
+        child_colors.insert("editor.background".into(), Color::rgb(0, 0, 0));
+        child_colors.insert("custom.color".into(), Color::rgb(1, 2, 3));
+        let child = ColorTheme {
+            id: "child".into(),
+            label: "Child".into(),
+            theme_type: ThemeType::Dark,
+            colors: child_colors,
+            token_colors: Vec::new(),
+        };
+        let merged = parent.with_overrides(&child);
+        // Overridden
+        assert_eq!(merged.get_color("editor.background"), Some(&Color::rgb(0, 0, 0)));
+        // Inherited from parent
+        assert_eq!(merged.get_color("editor.foreground"), parent.get_color("editor.foreground"));
+        // Added by child
+        assert_eq!(merged.get_color("custom.color"), Some(&Color::rgb(1, 2, 3)));
+        assert_eq!(merged.id, "child");
+    }
+
+    #[test]
+    fn color_keys_sorted() {
+        let theme = dark_plus();
+        let keys = theme.color_keys();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted);
     }
 }

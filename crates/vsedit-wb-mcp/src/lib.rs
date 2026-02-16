@@ -840,6 +840,301 @@ impl fmt::Display for McpConnectionConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MCP prompt templates
+// ---------------------------------------------------------------------------
+
+/// A prompt template exposed by an MCP server.
+#[derive(Debug, Clone, PartialEq)]
+pub struct McpPromptTemplate {
+    pub name: String,
+    pub description: String,
+    pub template: String,
+    pub parameters: Vec<String>,
+}
+
+impl McpPromptTemplate {
+    /// Create a new prompt template.
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        template: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            template: template.into(),
+            parameters: Vec::new(),
+        }
+    }
+
+    /// Add a parameter name that the template accepts.
+    pub fn with_parameter(mut self, param: impl Into<String>) -> Self {
+        self.parameters.push(param.into());
+        self
+    }
+
+    /// Render the template by replacing `{{param}}` placeholders with values.
+    pub fn render(&self, values: &std::collections::HashMap<String, String>) -> Result<String, String> {
+        let mut result = self.template.clone();
+        for param in &self.parameters {
+            let placeholder = format!("{{{{{}}}}}", param);
+            match values.get(param) {
+                Some(val) => result = result.replace(&placeholder, val),
+                None => return Err(format!("missing parameter: {}", param)),
+            }
+        }
+        Ok(result)
+    }
+
+    /// Return the set of parameter names found as `{{name}}` in the template string.
+    pub fn extract_placeholders(&self) -> Vec<String> {
+        let mut placeholders = Vec::new();
+        let bytes = self.template.as_bytes();
+        let mut i = 0;
+        while i + 4 < bytes.len() {
+            if bytes[i] == b'{' && bytes[i + 1] == b'{' {
+                if let Some(end) = self.template[i + 2..].find("}}") {
+                    let name = &self.template[i + 2..i + 2 + end];
+                    if !name.is_empty() && !placeholders.contains(&name.to_string()) {
+                        placeholders.push(name.to_string());
+                    }
+                    i += end + 4;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        placeholders
+    }
+}
+
+impl fmt::Display for McpPromptTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({})", self.name, self.parameters.join(", "))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MCP message types & validation
+// ---------------------------------------------------------------------------
+
+/// Supported JSON-RPC method kinds in the MCP protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum McpMethodKind {
+    Initialize,
+    ToolsList,
+    ToolsCall,
+    ResourcesList,
+    ResourcesRead,
+    PromptsList,
+    PromptsGet,
+    Ping,
+}
+
+impl McpMethodKind {
+    /// Parse a method string into its kind.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "initialize" => Some(Self::Initialize),
+            "tools/list" => Some(Self::ToolsList),
+            "tools/call" => Some(Self::ToolsCall),
+            "resources/list" => Some(Self::ResourcesList),
+            "resources/read" => Some(Self::ResourcesRead),
+            "prompts/list" => Some(Self::PromptsList),
+            "prompts/get" => Some(Self::PromptsGet),
+            "ping" => Some(Self::Ping),
+            _ => None,
+        }
+    }
+
+    /// Return the canonical method string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Initialize => "initialize",
+            Self::ToolsList => "tools/list",
+            Self::ToolsCall => "tools/call",
+            Self::ResourcesList => "resources/list",
+            Self::ResourcesRead => "resources/read",
+            Self::PromptsList => "prompts/list",
+            Self::PromptsGet => "prompts/get",
+            Self::Ping => "ping",
+        }
+    }
+}
+
+/// An MCP JSON-RPC message envelope for validation purposes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct McpMessage {
+    pub id: Option<u64>,
+    pub method: String,
+    pub params_json: Option<String>,
+}
+
+impl McpMessage {
+    /// Validate structural correctness of the message.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.method.is_empty() {
+            return Err("method must not be empty".into());
+        }
+        if McpMethodKind::from_str(&self.method).is_none() {
+            return Err(format!("unknown method: {}", self.method));
+        }
+        // Requests must have an id
+        if self.id.is_none() {
+            return Err("request id is required".into());
+        }
+        Ok(())
+    }
+
+    /// Return the parsed method kind, if valid.
+    pub fn method_kind(&self) -> Option<McpMethodKind> {
+        McpMethodKind::from_str(&self.method)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MCP capability negotiation
+// ---------------------------------------------------------------------------
+
+/// Capabilities that a client or server can advertise.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct McpCapabilities {
+    pub tools: bool,
+    pub resources: bool,
+    pub prompts: bool,
+    pub logging: bool,
+}
+
+impl McpCapabilities {
+    /// Create capabilities with everything enabled.
+    pub fn all() -> Self {
+        Self { tools: true, resources: true, prompts: true, logging: true }
+    }
+
+    /// Create capabilities with nothing enabled.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Negotiate the intersection of two capability sets.
+    pub fn negotiate(&self, other: &Self) -> Self {
+        Self {
+            tools: self.tools && other.tools,
+            resources: self.resources && other.resources,
+            prompts: self.prompts && other.prompts,
+            logging: self.logging && other.logging,
+        }
+    }
+
+    /// Return the number of enabled capabilities.
+    pub fn enabled_count(&self) -> usize {
+        [self.tools, self.resources, self.prompts, self.logging]
+            .iter()
+            .filter(|&&v| v)
+            .count()
+    }
+
+    /// Check whether a specific method is allowed under these capabilities.
+    pub fn allows_method(&self, method: McpMethodKind) -> bool {
+        match method {
+            McpMethodKind::ToolsList | McpMethodKind::ToolsCall => self.tools,
+            McpMethodKind::ResourcesList | McpMethodKind::ResourcesRead => self.resources,
+            McpMethodKind::PromptsList | McpMethodKind::PromptsGet => self.prompts,
+            McpMethodKind::Initialize | McpMethodKind::Ping => true,
+        }
+    }
+}
+
+impl fmt::Display for McpCapabilities {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = Vec::new();
+        if self.tools { parts.push("tools"); }
+        if self.resources { parts.push("resources"); }
+        if self.prompts { parts.push("prompts"); }
+        if self.logging { parts.push("logging"); }
+        if parts.is_empty() {
+            write!(f, "(none)")
+        } else {
+            write!(f, "{}", parts.join(", "))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MCP request/response correlation
+// ---------------------------------------------------------------------------
+
+/// Tracks in-flight MCP requests for correlation with responses.
+#[derive(Debug)]
+pub struct McpRequestTracker {
+    pending: std::collections::HashMap<u64, PendingRequest>,
+    next_id: u64,
+}
+
+/// Metadata for a pending request.
+#[derive(Debug, Clone)]
+pub struct PendingRequest {
+    pub id: u64,
+    pub method: String,
+    pub server_id: String,
+    pub issued_at: u64,
+}
+
+impl McpRequestTracker {
+    /// Create a new empty tracker.
+    pub fn new() -> Self {
+        Self {
+            pending: std::collections::HashMap::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Issue a new request, returning the assigned id.
+    pub fn issue(&mut self, method: impl Into<String>, server_id: impl Into<String>, now: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.pending.insert(id, PendingRequest {
+            id,
+            method: method.into(),
+            server_id: server_id.into(),
+            issued_at: now,
+        });
+        id
+    }
+
+    /// Complete a pending request, returning its metadata.
+    pub fn complete(&mut self, id: u64) -> Option<PendingRequest> {
+        self.pending.remove(&id)
+    }
+
+    /// Return the number of pending requests.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Return all requests that have been pending longer than `threshold` relative to `now`.
+    pub fn stale_requests(&self, now: u64, threshold: u64) -> Vec<&PendingRequest> {
+        self.pending
+            .values()
+            .filter(|r| now.saturating_sub(r.issued_at) > threshold)
+            .collect()
+    }
+
+    /// Cancel all pending requests for a given server, returning the cancelled count.
+    pub fn cancel_for_server(&mut self, server_id: &str) -> usize {
+        let before = self.pending.len();
+        self.pending.retain(|_, r| r.server_id != server_id);
+        before - self.pending.len()
+    }
+}
+
+impl Default for McpRequestTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1568,6 +1863,168 @@ mod tests {
         assert!(!cfg.tls);
         assert_eq!(cfg.timeout_ms, 5000);
         assert_eq!(cfg.uri(), "http://example.com:443");
+    }
+
+    // --- prompt template tests ---
+
+    #[test]
+    fn prompt_template_render_success() {
+        let tmpl = McpPromptTemplate::new("greet", "Greet user", "Hello, {{name}}! Welcome to {{place}}.")
+            .with_parameter("name")
+            .with_parameter("place");
+        let mut vals = std::collections::HashMap::new();
+        vals.insert("name".into(), "Alice".into());
+        vals.insert("place".into(), "Wonderland".into());
+        let rendered = tmpl.render(&vals).unwrap();
+        assert_eq!(rendered, "Hello, Alice! Welcome to Wonderland.");
+    }
+
+    #[test]
+    fn prompt_template_render_missing_param() {
+        let tmpl = McpPromptTemplate::new("greet", "Greet", "Hello {{name}}")
+            .with_parameter("name");
+        let vals = std::collections::HashMap::new();
+        assert!(tmpl.render(&vals).is_err());
+    }
+
+    #[test]
+    fn prompt_template_extract_placeholders() {
+        let tmpl = McpPromptTemplate::new("t", "d", "{{a}} and {{b}} and {{a}}");
+        let phs = tmpl.extract_placeholders();
+        assert_eq!(phs, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn prompt_template_display() {
+        let tmpl = McpPromptTemplate::new("summarize", "Summarize", "{{text}}")
+            .with_parameter("text")
+            .with_parameter("length");
+        assert_eq!(format!("{tmpl}"), "summarize(text, length)");
+    }
+
+    // --- MCP message validation tests ---
+
+    #[test]
+    fn mcp_message_validate_valid() {
+        let msg = McpMessage { id: Some(1), method: "tools/list".into(), params_json: None };
+        assert!(msg.validate().is_ok());
+        assert_eq!(msg.method_kind(), Some(McpMethodKind::ToolsList));
+    }
+
+    #[test]
+    fn mcp_message_validate_empty_method() {
+        let msg = McpMessage { id: Some(1), method: "".into(), params_json: None };
+        assert!(msg.validate().unwrap_err().contains("empty"));
+    }
+
+    #[test]
+    fn mcp_message_validate_unknown_method() {
+        let msg = McpMessage { id: Some(1), method: "foo/bar".into(), params_json: None };
+        assert!(msg.validate().unwrap_err().contains("unknown"));
+    }
+
+    #[test]
+    fn mcp_message_validate_missing_id() {
+        let msg = McpMessage { id: None, method: "ping".into(), params_json: None };
+        assert!(msg.validate().unwrap_err().contains("id"));
+    }
+
+    // --- method kind round-trip ---
+
+    #[test]
+    fn mcp_method_kind_round_trip() {
+        let methods = [
+            "initialize", "tools/list", "tools/call",
+            "resources/list", "resources/read",
+            "prompts/list", "prompts/get", "ping",
+        ];
+        for m in methods {
+            let kind = McpMethodKind::from_str(m).unwrap();
+            assert_eq!(kind.as_str(), m);
+        }
+        assert!(McpMethodKind::from_str("unknown").is_none());
+    }
+
+    // --- capability negotiation tests ---
+
+    #[test]
+    fn capabilities_negotiate_intersection() {
+        let client = McpCapabilities { tools: true, resources: true, prompts: false, logging: true };
+        let server = McpCapabilities { tools: true, resources: false, prompts: true, logging: true };
+        let result = client.negotiate(&server);
+        assert!(result.tools);
+        assert!(!result.resources);
+        assert!(!result.prompts);
+        assert!(result.logging);
+        assert_eq!(result.enabled_count(), 2);
+    }
+
+    #[test]
+    fn capabilities_all_and_none() {
+        let all = McpCapabilities::all();
+        assert_eq!(all.enabled_count(), 4);
+        let none = McpCapabilities::none();
+        assert_eq!(none.enabled_count(), 0);
+        let negotiated = all.negotiate(&none);
+        assert_eq!(negotiated.enabled_count(), 0);
+    }
+
+    #[test]
+    fn capabilities_allows_method() {
+        let caps = McpCapabilities { tools: true, resources: false, prompts: false, logging: false };
+        assert!(caps.allows_method(McpMethodKind::ToolsList));
+        assert!(caps.allows_method(McpMethodKind::ToolsCall));
+        assert!(!caps.allows_method(McpMethodKind::ResourcesList));
+        assert!(!caps.allows_method(McpMethodKind::PromptsGet));
+        // Initialize and Ping are always allowed
+        assert!(caps.allows_method(McpMethodKind::Initialize));
+        assert!(caps.allows_method(McpMethodKind::Ping));
+    }
+
+    #[test]
+    fn capabilities_display() {
+        let caps = McpCapabilities { tools: true, resources: false, prompts: true, logging: false };
+        assert_eq!(format!("{caps}"), "tools, prompts");
+        let none = McpCapabilities::none();
+        assert_eq!(format!("{none}"), "(none)");
+    }
+
+    // --- request tracker tests ---
+
+    #[test]
+    fn request_tracker_issue_and_complete() {
+        let mut tracker = McpRequestTracker::new();
+        let id1 = tracker.issue("tools/list", "srv1", 100);
+        let id2 = tracker.issue("ping", "srv1", 101);
+        assert_eq!(tracker.pending_count(), 2);
+        assert_ne!(id1, id2);
+
+        let req = tracker.complete(id1).unwrap();
+        assert_eq!(req.method, "tools/list");
+        assert_eq!(req.server_id, "srv1");
+        assert_eq!(tracker.pending_count(), 1);
+
+        assert!(tracker.complete(id1).is_none()); // already completed
+    }
+
+    #[test]
+    fn request_tracker_stale_requests() {
+        let mut tracker = McpRequestTracker::new();
+        tracker.issue("tools/list", "srv1", 100);
+        tracker.issue("ping", "srv2", 200);
+        let stale = tracker.stale_requests(250, 100);
+        assert_eq!(stale.len(), 1);
+        assert_eq!(stale[0].server_id, "srv1");
+    }
+
+    #[test]
+    fn request_tracker_cancel_for_server() {
+        let mut tracker = McpRequestTracker::new();
+        tracker.issue("tools/list", "srv1", 100);
+        tracker.issue("ping", "srv1", 101);
+        tracker.issue("resources/list", "srv2", 102);
+        assert_eq!(tracker.cancel_for_server("srv1"), 2);
+        assert_eq!(tracker.pending_count(), 1);
     }
 
 }

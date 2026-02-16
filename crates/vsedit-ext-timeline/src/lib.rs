@@ -886,6 +886,228 @@ impl fmt::Display for TimelineSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Provider priority registry
+// ---------------------------------------------------------------------------
+
+/// Registry that tracks providers with explicit priority ordering.
+/// Lower priority values are higher priority (evaluated first).
+pub struct ProviderPriorityRegistry {
+    entries: Vec<ProviderPriorityEntry>,
+}
+
+#[derive(Debug, Clone)]
+struct ProviderPriorityEntry {
+    provider: TimelineProvider,
+    priority: i32,
+}
+
+impl ProviderPriorityRegistry {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Register a provider with a given priority. Lower values = higher priority.
+    /// If a provider with the same ID already exists, its priority is updated.
+    pub fn register(&mut self, provider: TimelineProvider, priority: i32) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.provider.id == provider.id) {
+            entry.priority = priority;
+            entry.provider = provider;
+        } else {
+            self.entries.push(ProviderPriorityEntry { provider, priority });
+        }
+        self.entries.sort_by_key(|e| e.priority);
+    }
+
+    /// Unregister a provider by ID.
+    pub fn unregister(&mut self, id: &str) {
+        self.entries.retain(|e| e.provider.id != id);
+    }
+
+    /// Return providers sorted by priority (lowest value first).
+    pub fn providers_by_priority(&self) -> Vec<&TimelineProvider> {
+        self.entries.iter().map(|e| &e.provider).collect()
+    }
+
+    /// Return the priority assigned to a provider, if registered.
+    pub fn get_priority(&self, id: &str) -> Option<i32> {
+        self.entries.iter().find(|e| e.provider.id == id).map(|e| e.priority)
+    }
+
+    /// Return providers matching a scheme, still sorted by priority.
+    pub fn providers_for_scheme(&self, scheme: &str) -> Vec<&TimelineProvider> {
+        self.entries
+            .iter()
+            .filter(|e| e.provider.scheme == scheme)
+            .map(|e| &e.provider)
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for ProviderPriorityRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cross-provider deduplication
+// ---------------------------------------------------------------------------
+
+/// Deduplicate timeline items across multiple providers.
+/// Items with the same `id` are collapsed: the item with the latest timestamp wins.
+pub fn deduplicate_items(items: &[TimelineItem]) -> Vec<TimelineItem> {
+    let mut seen: HashMap<String, TimelineItem> = HashMap::new();
+    for item in items {
+        match seen.get(&item.id) {
+            Some(existing) if existing.timestamp >= item.timestamp => {}
+            _ => {
+                seen.insert(item.id.clone(), item.clone());
+            }
+        }
+    }
+    let mut result: Vec<TimelineItem> = seen.into_values().collect();
+    result.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    result
+}
+
+/// Collect items from a store across all providers, deduplicate, and return sorted.
+pub fn deduplicate_store(store: &TimelineItemStore) -> Vec<TimelineItem> {
+    let mut all = Vec::new();
+    for pid in store.all_provider_ids() {
+        all.extend(store.get_items(pid));
+    }
+    deduplicate_items(&all)
+}
+
+// ---------------------------------------------------------------------------
+// Timeline item action / command association
+// ---------------------------------------------------------------------------
+
+/// Maps timeline item IDs to a command identifier and optional arguments.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TimelineAction {
+    pub command_id: String,
+    pub title: String,
+    pub args: Vec<String>,
+}
+
+/// Registry that associates timeline items with actions.
+pub struct TimelineActionRegistry {
+    actions: HashMap<String, Vec<TimelineAction>>,
+}
+
+impl TimelineActionRegistry {
+    pub fn new() -> Self {
+        Self {
+            actions: HashMap::new(),
+        }
+    }
+
+    /// Bind an action to a timeline item ID.
+    pub fn bind(&mut self, item_id: &str, action: TimelineAction) {
+        self.actions
+            .entry(item_id.to_string())
+            .or_default()
+            .push(action);
+    }
+
+    /// Remove all actions for a given item ID.
+    pub fn unbind(&mut self, item_id: &str) {
+        self.actions.remove(item_id);
+    }
+
+    /// Get the actions associated with an item.
+    pub fn get_actions(&self, item_id: &str) -> &[TimelineAction] {
+        self.actions.get(item_id).map_or(&[], |v| v.as_slice())
+    }
+
+    /// Return true if the item has at least one associated action.
+    pub fn has_actions(&self, item_id: &str) -> bool {
+        self.actions.get(item_id).map_or(false, |v| !v.is_empty())
+    }
+
+    /// Total number of item-action bindings.
+    pub fn total_bindings(&self) -> usize {
+        self.actions.values().map(|v| v.len()).sum()
+    }
+}
+
+impl Default for TimelineActionRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Icon / color theme resolution
+// ---------------------------------------------------------------------------
+
+/// Resolved visual style for a timeline item.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedItemStyle {
+    pub icon: String,
+    pub color: String,
+}
+
+/// Mapping from icon IDs to themed visual properties.
+pub struct TimelineThemeResolver {
+    icon_map: HashMap<String, ResolvedItemStyle>,
+    default_style: ResolvedItemStyle,
+}
+
+impl TimelineThemeResolver {
+    pub fn new(default_icon: &str, default_color: &str) -> Self {
+        Self {
+            icon_map: HashMap::new(),
+            default_style: ResolvedItemStyle {
+                icon: default_icon.to_string(),
+                color: default_color.to_string(),
+            },
+        }
+    }
+
+    /// Register a mapping from an icon_id to a resolved icon path and color.
+    pub fn register_icon(&mut self, icon_id: &str, icon: &str, color: &str) {
+        self.icon_map.insert(
+            icon_id.to_string(),
+            ResolvedItemStyle {
+                icon: icon.to_string(),
+                color: color.to_string(),
+            },
+        );
+    }
+
+    /// Resolve the style for a timeline item. Falls back to default when the
+    /// item has no icon_id or the icon_id is not in the map.
+    pub fn resolve(&self, item: &TimelineItem) -> ResolvedItemStyle {
+        item.icon_id
+            .as_deref()
+            .and_then(|id| self.icon_map.get(id))
+            .cloned()
+            .unwrap_or_else(|| self.default_style.clone())
+    }
+
+    /// Resolve styles for a batch of items.
+    pub fn resolve_batch(&self, items: &[TimelineItem]) -> Vec<ResolvedItemStyle> {
+        items.iter().map(|item| self.resolve(item)).collect()
+    }
+
+    pub fn registered_icon_count(&self) -> usize {
+        self.icon_map.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1557,5 +1779,171 @@ mod tests {
         assert_eq!(pag.current_page_one_indexed(), 2);
         pag.next_page();
         assert!(pag.is_last_page());
+    }
+
+    // ── New tests for added functionality ──
+
+    #[test]
+    fn provider_priority_ordering() {
+        let mut reg = ProviderPriorityRegistry::new();
+        reg.register(
+            TimelineProvider { id: "low".into(), label: "Low".into(), scheme: "file".into() },
+            100,
+        );
+        reg.register(
+            TimelineProvider { id: "high".into(), label: "High".into(), scheme: "file".into() },
+            10,
+        );
+        reg.register(
+            TimelineProvider { id: "mid".into(), label: "Mid".into(), scheme: "file".into() },
+            50,
+        );
+        let ordered: Vec<&str> = reg.providers_by_priority().iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ordered, vec!["high", "mid", "low"]);
+        assert_eq!(reg.get_priority("high"), Some(10));
+        assert_eq!(reg.get_priority("missing"), None);
+        assert_eq!(reg.len(), 3);
+    }
+
+    #[test]
+    fn provider_priority_update_and_unregister() {
+        let mut reg = ProviderPriorityRegistry::new();
+        reg.register(
+            TimelineProvider { id: "a".into(), label: "A".into(), scheme: "file".into() },
+            50,
+        );
+        reg.register(
+            TimelineProvider { id: "b".into(), label: "B".into(), scheme: "file".into() },
+            10,
+        );
+        // Update priority of "a" to be higher than "b"
+        reg.register(
+            TimelineProvider { id: "a".into(), label: "A-updated".into(), scheme: "file".into() },
+            5,
+        );
+        let ordered: Vec<&str> = reg.providers_by_priority().iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ordered, vec!["a", "b"]);
+        assert_eq!(reg.providers_by_priority()[0].label, "A-updated");
+
+        reg.unregister("a");
+        assert_eq!(reg.len(), 1);
+        assert!(reg.get_priority("a").is_none());
+    }
+
+    #[test]
+    fn deduplicate_items_across_providers() {
+        let mut store = TimelineItemStore::new();
+        // Same item ID "shared" appears in two providers with different timestamps
+        store.add_items("git", vec![
+            TimelineItem { id: "shared".into(), label: "Old".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "git-only".into(), label: "Git".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        store.add_items("local", vec![
+            TimelineItem { id: "shared".into(), label: "New".into(), description: None, timestamp: 300, icon_id: None, command: None },
+            TimelineItem { id: "local-only".into(), label: "Local".into(), description: None, timestamp: 50, icon_id: None, command: None },
+        ]);
+        let deduped = deduplicate_store(&store);
+        assert_eq!(deduped.len(), 3);
+        // "shared" should keep the newer version (timestamp 300)
+        let shared = deduped.iter().find(|i| i.id == "shared").unwrap();
+        assert_eq!(shared.label, "New");
+        assert_eq!(shared.timestamp, 300);
+        // Results are sorted descending by timestamp
+        assert!(deduped[0].timestamp >= deduped[1].timestamp);
+        assert!(deduped[1].timestamp >= deduped[2].timestamp);
+    }
+
+    #[test]
+    fn action_registry_bind_and_query() {
+        let mut reg = TimelineActionRegistry::new();
+        assert!(!reg.has_actions("c1"));
+        reg.bind("c1", TimelineAction {
+            command_id: "git.showCommit".into(),
+            title: "Show Commit".into(),
+            args: vec!["abc123".into()],
+        });
+        reg.bind("c1", TimelineAction {
+            command_id: "git.diffCommit".into(),
+            title: "Diff".into(),
+            args: vec![],
+        });
+        reg.bind("c2", TimelineAction {
+            command_id: "editor.open".into(),
+            title: "Open".into(),
+            args: vec!["file.rs".into()],
+        });
+        assert!(reg.has_actions("c1"));
+        assert_eq!(reg.get_actions("c1").len(), 2);
+        assert_eq!(reg.get_actions("c1")[0].command_id, "git.showCommit");
+        assert_eq!(reg.total_bindings(), 3);
+
+        reg.unbind("c1");
+        assert!(!reg.has_actions("c1"));
+        assert_eq!(reg.get_actions("c1").len(), 0);
+        assert_eq!(reg.total_bindings(), 1);
+    }
+
+    #[test]
+    fn theme_resolver_with_fallback() {
+        let mut resolver = TimelineThemeResolver::new("$(circle)", "#888888");
+        resolver.register_icon("git-commit", "$(git-commit)", "#4ec9b0");
+        resolver.register_icon("save", "$(save)", "#dcdcaa");
+        assert_eq!(resolver.registered_icon_count(), 2);
+
+        // Item with a known icon_id
+        let git_item = TimelineItem {
+            id: "c1".into(), label: "Commit".into(), description: None,
+            timestamp: 100, icon_id: Some("git-commit".into()), command: None,
+        };
+        let style = resolver.resolve(&git_item);
+        assert_eq!(style.icon, "$(git-commit)");
+        assert_eq!(style.color, "#4ec9b0");
+
+        // Item with an unknown icon_id falls back to default
+        let unknown_item = TimelineItem {
+            id: "c2".into(), label: "Other".into(), description: None,
+            timestamp: 200, icon_id: Some("unknown-icon".into()), command: None,
+        };
+        let fallback = resolver.resolve(&unknown_item);
+        assert_eq!(fallback.icon, "$(circle)");
+        assert_eq!(fallback.color, "#888888");
+
+        // Item with no icon_id also falls back
+        let no_icon = TimelineItem {
+            id: "c3".into(), label: "None".into(), description: None,
+            timestamp: 300, icon_id: None, command: None,
+        };
+        assert_eq!(resolver.resolve(&no_icon), fallback);
+
+        // Batch resolve
+        let styles = resolver.resolve_batch(&[git_item, unknown_item, no_icon]);
+        assert_eq!(styles.len(), 3);
+        assert_eq!(styles[0].icon, "$(git-commit)");
+        assert_eq!(styles[1].icon, "$(circle)");
+    }
+
+    #[test]
+    fn provider_priority_scheme_filter() {
+        let mut reg = ProviderPriorityRegistry::new();
+        reg.register(
+            TimelineProvider { id: "git".into(), label: "Git".into(), scheme: "file".into() },
+            10,
+        );
+        reg.register(
+            TimelineProvider { id: "remote".into(), label: "Remote".into(), scheme: "vscode-remote".into() },
+            20,
+        );
+        reg.register(
+            TimelineProvider { id: "local".into(), label: "Local".into(), scheme: "file".into() },
+            30,
+        );
+        let file_providers = reg.providers_for_scheme("file");
+        assert_eq!(file_providers.len(), 2);
+        // Should still be sorted by priority
+        assert_eq!(file_providers[0].id, "git");
+        assert_eq!(file_providers[1].id, "local");
+        assert_eq!(reg.providers_for_scheme("vscode-remote").len(), 1);
+        assert!(reg.providers_for_scheme("unknown").is_empty());
+        assert!(!reg.is_empty());
     }
 }

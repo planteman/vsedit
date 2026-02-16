@@ -885,6 +885,367 @@ impl fmt::Display for SignatureStats {
     }
 }
 
+// ─── Signature chain of trust ─────────────────────────────────────
+
+/// A certificate in a chain of trust, linking a subject to an issuer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SigningCertificate {
+    /// Unique identifier for this certificate.
+    pub subject: String,
+    /// The issuer that signed this certificate (None for self-signed roots).
+    pub issuer: Option<String>,
+    /// Algorithm used to sign this certificate.
+    pub algorithm: SignatureAlgorithm,
+    /// Validity window: not-valid-before (seconds since epoch).
+    pub not_before: u64,
+    /// Validity window: not-valid-after (seconds since epoch).
+    pub not_after: u64,
+    /// The raw signature bytes binding this certificate.
+    pub signature: Vec<u8>,
+}
+
+impl SigningCertificate {
+    /// Create a new self-signed root certificate.
+    pub fn new_root(
+        subject: impl Into<String>,
+        algorithm: SignatureAlgorithm,
+        not_before: u64,
+        not_after: u64,
+        key: &[u8],
+    ) -> Self {
+        let subject = subject.into();
+        let sig = xor_fold(subject.as_bytes(), key);
+        Self {
+            subject,
+            issuer: None,
+            algorithm,
+            not_before,
+            not_after,
+            signature: sig,
+        }
+    }
+
+    /// Create a certificate issued by another entity.
+    pub fn new_issued(
+        subject: impl Into<String>,
+        issuer: impl Into<String>,
+        algorithm: SignatureAlgorithm,
+        not_before: u64,
+        not_after: u64,
+        key: &[u8],
+    ) -> Self {
+        let subject = subject.into();
+        let issuer = issuer.into();
+        let payload: Vec<u8> = subject
+            .as_bytes()
+            .iter()
+            .chain(issuer.as_bytes())
+            .copied()
+            .collect();
+        let sig = xor_fold(&payload, key);
+        Self {
+            subject,
+            issuer: Some(issuer),
+            algorithm,
+            not_before,
+            not_after,
+            signature: sig,
+        }
+    }
+
+    /// Whether this is a self-signed root certificate.
+    pub fn is_root(&self) -> bool {
+        self.issuer.is_none()
+    }
+
+    /// Check if the certificate is valid at a given timestamp (seconds since epoch).
+    pub fn is_valid_at(&self, now: u64) -> bool {
+        now >= self.not_before && now <= self.not_after
+    }
+
+    /// Check if the certificate has expired relative to a given timestamp.
+    pub fn is_expired_at(&self, now: u64) -> bool {
+        now > self.not_after
+    }
+
+    /// Remaining validity in seconds, or 0 if expired.
+    pub fn remaining_validity(&self, now: u64) -> u64 {
+        self.not_after.saturating_sub(now)
+    }
+}
+
+impl fmt::Display for SigningCertificate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.issuer {
+            Some(issuer) => write!(
+                f,
+                "Cert(subject={}, issuer={}, valid={}..{})",
+                self.subject, issuer, self.not_before, self.not_after
+            ),
+            None => write!(
+                f,
+                "Cert(subject={} [root], valid={}..{})",
+                self.subject, self.not_before, self.not_after
+            ),
+        }
+    }
+}
+
+/// Errors from certificate chain validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChainError {
+    /// The chain is empty.
+    EmptyChain,
+    /// The chain's root is not self-signed.
+    UntrustedRoot { subject: String },
+    /// A link in the chain has a broken issuer reference.
+    BrokenLink { child: String, expected_issuer: String },
+    /// A certificate in the chain has expired.
+    Expired { subject: String, expired_at: u64 },
+}
+
+impl fmt::Display for ChainError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChainError::EmptyChain => write!(f, "certificate chain is empty"),
+            ChainError::UntrustedRoot { subject } => {
+                write!(f, "root certificate '{}' is not self-signed", subject)
+            }
+            ChainError::BrokenLink {
+                child,
+                expected_issuer,
+            } => write!(
+                f,
+                "broken chain link: '{}' expects issuer '{}' but it is not the next cert",
+                child, expected_issuer
+            ),
+            ChainError::Expired { subject, expired_at } => {
+                write!(f, "certificate '{}' expired at {}", subject, expired_at)
+            }
+        }
+    }
+}
+
+/// Validate a certificate chain at a given point in time.
+///
+/// The chain must be ordered from leaf to root. The root must be self-signed,
+/// each intermediate's issuer must match the subject of the next certificate,
+/// and every certificate must be valid at `now`.
+pub fn validate_certificate_chain(
+    chain: &[SigningCertificate],
+    now: u64,
+) -> Result<(), ChainError> {
+    if chain.is_empty() {
+        return Err(ChainError::EmptyChain);
+    }
+
+    // Check each certificate is valid at `now`.
+    for cert in chain {
+        if cert.is_expired_at(now) || !cert.is_valid_at(now) {
+            return Err(ChainError::Expired {
+                subject: cert.subject.clone(),
+                expired_at: cert.not_after,
+            });
+        }
+    }
+
+    // The last certificate in the chain must be a self-signed root.
+    let root = &chain[chain.len() - 1];
+    if !root.is_root() {
+        return Err(ChainError::UntrustedRoot {
+            subject: root.subject.clone(),
+        });
+    }
+
+    // Walk from leaf toward root, ensuring each issuer matches the next subject.
+    for window in chain.windows(2) {
+        let child = &window[0];
+        let parent = &window[1];
+        if let Some(ref issuer) = child.issuer {
+            if issuer != &parent.subject {
+                return Err(ChainError::BrokenLink {
+                    child: child.subject.clone(),
+                    expected_issuer: issuer.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ─── Digest computation helpers ───────────────────────────────────
+
+/// Supported digest algorithms for content hashing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DigestAlgorithm {
+    /// XOR-fold to a single byte (fast, not cryptographic).
+    Xor,
+    /// DJB2 hash folded into 8 bytes.
+    Djb2,
+    /// FNV-1a 64-bit hash.
+    Fnv1a64,
+}
+
+/// A computed content digest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentDigest {
+    pub algorithm: DigestAlgorithm,
+    pub value: Vec<u8>,
+}
+
+impl ContentDigest {
+    /// Return the digest as a hex string.
+    pub fn to_hex(&self) -> String {
+        self.value.iter().map(|b| format!("{b:02x}")).collect()
+    }
+}
+
+impl fmt::Display for ContentDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Digest({:?}, {})", self.algorithm, self.to_hex())
+    }
+}
+
+/// Compute a content digest using the specified algorithm.
+pub fn compute_digest(content: &[u8], algorithm: DigestAlgorithm) -> ContentDigest {
+    let value = match algorithm {
+        DigestAlgorithm::Xor => {
+            vec![content.iter().fold(0u8, |acc, &b| acc ^ b)]
+        }
+        DigestAlgorithm::Djb2 => {
+            let mut hash: u64 = 5381;
+            for &b in content {
+                hash = hash.wrapping_mul(33).wrapping_add(b as u64);
+            }
+            hash.to_be_bytes().to_vec()
+        }
+        DigestAlgorithm::Fnv1a64 => {
+            let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+            for &b in content {
+                hash ^= b as u64;
+                hash = hash.wrapping_mul(0x0100_0000_01b3);
+            }
+            hash.to_be_bytes().to_vec()
+        }
+    };
+    ContentDigest { algorithm, value }
+}
+
+/// Verify that a digest matches the content.
+pub fn verify_digest(content: &[u8], digest: &ContentDigest) -> bool {
+    let recomputed = compute_digest(content, digest.algorithm);
+    recomputed.value == digest.value
+}
+
+// ─── Batch signature verification ─────────────────────────────────
+
+/// Result of verifying a single entry in a batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchVerifyResult {
+    /// Index into the original batch.
+    pub index: usize,
+    /// Label for this entry (e.g. file name).
+    pub label: String,
+    /// Whether verification succeeded.
+    pub valid: bool,
+    /// Optional reason on failure.
+    pub reason: Option<String>,
+}
+
+/// An entry to be verified in a batch operation.
+pub struct BatchEntry<'a> {
+    pub label: String,
+    pub content: &'a [u8],
+    pub signature: &'a Signature,
+}
+
+/// Verify a batch of labelled entries against a key, collecting detailed results.
+pub fn verify_batch_detailed<'a>(
+    entries: &[BatchEntry<'a>],
+    key: &[u8],
+    expected_algorithm: SignatureAlgorithm,
+) -> Vec<BatchVerifyResult> {
+    entries
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| {
+            if entry.signature.algorithm != expected_algorithm {
+                return BatchVerifyResult {
+                    index: i,
+                    label: entry.label.clone(),
+                    valid: false,
+                    reason: Some(format!(
+                        "algorithm mismatch: expected {:?}, found {:?}",
+                        expected_algorithm, entry.signature.algorithm
+                    )),
+                };
+            }
+            let ok = verify_signature(entry.content, key, entry.signature);
+            BatchVerifyResult {
+                index: i,
+                label: entry.label.clone(),
+                valid: ok,
+                reason: if ok {
+                    None
+                } else {
+                    Some("signature does not match content".to_string())
+                },
+            }
+        })
+        .collect()
+}
+
+/// Count the number of valid results in a batch verification.
+pub fn batch_valid_count(results: &[BatchVerifyResult]) -> usize {
+    results.iter().filter(|r| r.valid).count()
+}
+
+/// Check if all results in a batch are valid.
+pub fn batch_all_valid(results: &[BatchVerifyResult]) -> bool {
+    results.iter().all(|r| r.valid)
+}
+
+// ─── Signature metadata ──────────────────────────────────────────
+
+/// Extracted metadata about a signature for display or auditing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureMetadata {
+    pub algorithm: SignatureAlgorithm,
+    pub algorithm_label: String,
+    pub is_asymmetric: bool,
+    pub key_size_bits: usize,
+    pub signature_hex: String,
+    pub signature_length: usize,
+    pub signer: Option<String>,
+}
+
+/// Extract display-ready metadata from a [`Signature`].
+pub fn extract_metadata(signature: &Signature) -> SignatureMetadata {
+    SignatureMetadata {
+        algorithm: signature.algorithm,
+        algorithm_label: signature.algorithm.label().to_string(),
+        is_asymmetric: signature.algorithm.is_asymmetric(),
+        key_size_bits: signature.algorithm.key_size_bits(),
+        signature_hex: signature.to_hex(),
+        signature_length: signature.len(),
+        signer: signature.signer.clone(),
+    }
+}
+
+impl fmt::Display for SignatureMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SignatureMetadata(algo={}, key={}bit, len={}, signer={})",
+            self.algorithm_label,
+            self.key_size_bits,
+            self.signature_length,
+            self.signer.as_deref().unwrap_or("none"),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1513,5 +1874,168 @@ mod tests {
         assert!(!optional_with_all.is_required());
         assert!(optional_with_all.has_documentation());
         assert!(optional_with_all.has_default());
+    }
+
+    // ─── Certificate chain tests ────────────────────────────────
+
+    #[test]
+    fn certificate_chain_valid() {
+        let root = SigningCertificate::new_root(
+            "RootCA", SignatureAlgorithm::Ed25519Stub, 1000, 9999, b"rootkey",
+        );
+        let intermediate = SigningCertificate::new_issued(
+            "IntermediateCA", "RootCA", SignatureAlgorithm::Ed25519Stub, 1000, 9999, b"intkey",
+        );
+        let leaf = SigningCertificate::new_issued(
+            "LeafCert", "IntermediateCA", SignatureAlgorithm::HmacSha256Stub, 1000, 9999, b"leafkey",
+        );
+        assert!(validate_certificate_chain(&[leaf, intermediate, root], 5000).is_ok());
+    }
+
+    #[test]
+    fn certificate_chain_expired() {
+        let root = SigningCertificate::new_root(
+            "RootCA", SignatureAlgorithm::Ed25519Stub, 1000, 2000, b"key",
+        );
+        let leaf = SigningCertificate::new_issued(
+            "Leaf", "RootCA", SignatureAlgorithm::HmacSha256Stub, 1000, 2000, b"key2",
+        );
+        let result = validate_certificate_chain(&[leaf, root], 3000);
+        assert!(matches!(result, Err(ChainError::Expired { .. })));
+    }
+
+    #[test]
+    fn certificate_chain_broken_link() {
+        let root = SigningCertificate::new_root(
+            "RootCA", SignatureAlgorithm::Ed25519Stub, 0, 99999, b"k",
+        );
+        let leaf = SigningCertificate::new_issued(
+            "Leaf", "WrongIssuer", SignatureAlgorithm::HmacSha256Stub, 0, 99999, b"k2",
+        );
+        let result = validate_certificate_chain(&[leaf, root], 500);
+        assert!(matches!(result, Err(ChainError::BrokenLink { .. })));
+    }
+
+    #[test]
+    fn certificate_chain_untrusted_root() {
+        let not_root = SigningCertificate::new_issued(
+            "NotRoot", "SomeIssuer", SignatureAlgorithm::Ed25519Stub, 0, 99999, b"k",
+        );
+        let result = validate_certificate_chain(&[not_root], 500);
+        assert!(matches!(result, Err(ChainError::UntrustedRoot { .. })));
+    }
+
+    #[test]
+    fn certificate_chain_empty() {
+        assert_eq!(validate_certificate_chain(&[], 0), Err(ChainError::EmptyChain));
+    }
+
+    #[test]
+    fn certificate_validity_helpers() {
+        let cert = SigningCertificate::new_root(
+            "Test", SignatureAlgorithm::Ed25519Stub, 100, 200, b"k",
+        );
+        assert!(cert.is_root());
+        assert!(cert.is_valid_at(150));
+        assert!(!cert.is_valid_at(50));
+        assert!(!cert.is_valid_at(250));
+        assert!(cert.is_expired_at(201));
+        assert!(!cert.is_expired_at(200));
+        assert_eq!(cert.remaining_validity(150), 50);
+        assert_eq!(cert.remaining_validity(300), 0);
+        let display = format!("{cert}");
+        assert!(display.contains("root"));
+    }
+
+    // ─── Digest computation tests ───────────────────────────────
+
+    #[test]
+    fn digest_xor_matches_checksum() {
+        let data = b"hello";
+        let digest = compute_digest(data, DigestAlgorithm::Xor);
+        assert_eq!(digest.value.len(), 1);
+        assert_eq!(digest.value[0], content_checksum(data));
+        assert!(verify_digest(data, &digest));
+    }
+
+    #[test]
+    fn digest_djb2_deterministic() {
+        let d1 = compute_digest(b"test data", DigestAlgorithm::Djb2);
+        let d2 = compute_digest(b"test data", DigestAlgorithm::Djb2);
+        assert_eq!(d1, d2);
+        assert_eq!(d1.value.len(), 8);
+        assert!(verify_digest(b"test data", &d1));
+        assert!(!verify_digest(b"other data", &d1));
+    }
+
+    #[test]
+    fn digest_fnv1a_deterministic_and_different_from_djb2() {
+        let fnv = compute_digest(b"sample", DigestAlgorithm::Fnv1a64);
+        let djb = compute_digest(b"sample", DigestAlgorithm::Djb2);
+        assert_eq!(fnv.value.len(), 8);
+        assert_ne!(fnv.value, djb.value);
+        assert!(verify_digest(b"sample", &fnv));
+        let display = format!("{fnv}");
+        assert!(display.contains("Fnv1a64"));
+    }
+
+    // ─── Batch verification tests ───────────────────────────────
+
+    #[test]
+    fn batch_verify_detailed_all_valid() {
+        let key = b"batchkey";
+        let algo = SignatureAlgorithm::HmacSha256Stub;
+        let s1 = sign_content(b"file1", key, algo);
+        let s2 = sign_content(b"file2", key, algo);
+        let entries = vec![
+            BatchEntry { label: "file1.txt".into(), content: b"file1", signature: &s1 },
+            BatchEntry { label: "file2.txt".into(), content: b"file2", signature: &s2 },
+        ];
+        let results = verify_batch_detailed(&entries, key, algo);
+        assert_eq!(results.len(), 2);
+        assert!(batch_all_valid(&results));
+        assert_eq!(batch_valid_count(&results), 2);
+        assert_eq!(results[0].label, "file1.txt");
+    }
+
+    #[test]
+    fn batch_verify_detailed_with_failures() {
+        let key = b"k";
+        let algo = SignatureAlgorithm::HmacSha256Stub;
+        let good_sig = sign_content(b"good", key, algo);
+        let bad_sig = sign_content(b"original", key, algo);
+        let wrong_algo_sig = sign_content(b"data", key, SignatureAlgorithm::Ed25519Stub);
+        let entries = vec![
+            BatchEntry { label: "good.rs".into(), content: b"good", signature: &good_sig },
+            BatchEntry { label: "tampered.rs".into(), content: b"tampered", signature: &bad_sig },
+            BatchEntry { label: "wrong_algo.rs".into(), content: b"data", signature: &wrong_algo_sig },
+        ];
+        let results = verify_batch_detailed(&entries, key, algo);
+        assert!(results[0].valid);
+        assert!(!results[1].valid);
+        assert!(results[1].reason.as_ref().unwrap().contains("does not match"));
+        assert!(!results[2].valid);
+        assert!(results[2].reason.as_ref().unwrap().contains("algorithm mismatch"));
+        assert!(!batch_all_valid(&results));
+        assert_eq!(batch_valid_count(&results), 1);
+    }
+
+    // ─── Metadata extraction tests ──────────────────────────────
+
+    #[test]
+    fn extract_metadata_fields() {
+        let sig = sign_content(b"hello", b"key", SignatureAlgorithm::Ed25519Stub)
+            .with_signer("bob");
+        let meta = extract_metadata(&sig);
+        assert_eq!(meta.algorithm, SignatureAlgorithm::Ed25519Stub);
+        assert!(meta.is_asymmetric);
+        assert_eq!(meta.key_size_bits, 256);
+        assert_eq!(meta.signature_length, 5);
+        assert_eq!(meta.signer, Some("bob".to_string()));
+        assert_eq!(meta.algorithm_label, "Ed25519 (stub)");
+        assert_eq!(meta.signature_hex.len(), 10); // 5 bytes * 2 hex chars
+        let display = format!("{meta}");
+        assert!(display.contains("Ed25519"));
+        assert!(display.contains("bob"));
     }
 }

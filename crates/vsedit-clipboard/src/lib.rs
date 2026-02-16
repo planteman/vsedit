@@ -1027,6 +1027,231 @@ pub fn apply_paste_strategy(text: &str, strategy: PasteStrategy) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Clipboard transformation pipeline
+// ---------------------------------------------------------------------------
+
+/// A single transformation step that can be applied to clipboard text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardTransform {
+    /// Trim leading and trailing whitespace.
+    Trim,
+    /// Convert to lowercase.
+    Lowercase,
+    /// Convert to uppercase.
+    Uppercase,
+    /// Collapse consecutive blank lines into one.
+    CollapseBlankLines,
+    /// Remove all blank lines.
+    RemoveBlankLines,
+    /// Add line numbers (1-based).
+    AddLineNumbers,
+    /// Sort lines alphabetically.
+    SortLines,
+    /// Reverse the order of lines.
+    ReverseLines,
+    /// Remove trailing whitespace from each line.
+    StripTrailingWhitespace,
+}
+
+/// Apply a sequence of transformations to clipboard text.
+pub fn apply_transform_pipeline(text: &str, transforms: &[ClipboardTransform]) -> String {
+    let mut result = text.to_string();
+    for &t in transforms {
+        result = apply_single_transform(&result, t);
+    }
+    result
+}
+
+fn apply_single_transform(text: &str, transform: ClipboardTransform) -> String {
+    match transform {
+        ClipboardTransform::Trim => text.trim().to_string(),
+        ClipboardTransform::Lowercase => text.to_lowercase(),
+        ClipboardTransform::Uppercase => text.to_uppercase(),
+        ClipboardTransform::CollapseBlankLines => {
+            let mut result = Vec::new();
+            let mut prev_blank = false;
+            for line in text.lines() {
+                let blank = line.trim().is_empty();
+                if blank && prev_blank {
+                    continue;
+                }
+                result.push(line);
+                prev_blank = blank;
+            }
+            result.join("\n")
+        }
+        ClipboardTransform::RemoveBlankLines => {
+            text.lines()
+                .filter(|l| !l.trim().is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+        ClipboardTransform::AddLineNumbers => {
+            text.lines()
+                .enumerate()
+                .map(|(i, l)| format!("{:>4} {l}", i + 1))
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+        ClipboardTransform::SortLines => {
+            let mut lines: Vec<&str> = text.lines().collect();
+            lines.sort();
+            lines.join("\n")
+        }
+        ClipboardTransform::ReverseLines => {
+            let mut lines: Vec<&str> = text.lines().collect();
+            lines.reverse();
+            lines.join("\n")
+        }
+        ClipboardTransform::StripTrailingWhitespace => {
+            text.lines()
+                .map(|l| l.trim_end())
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard size-limited history
+// ---------------------------------------------------------------------------
+
+/// A clipboard history that enforces a maximum total byte size across all
+/// entries, in addition to an entry count limit.
+#[derive(Debug)]
+pub struct SizeLimitedHistory {
+    entries: Vec<ClipboardItem>,
+    max_entries: usize,
+    max_bytes: usize,
+    current_bytes: usize,
+}
+
+impl SizeLimitedHistory {
+    /// Create a history with limits on both entry count and total byte size.
+    pub fn new(max_entries: usize, max_bytes: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+            max_bytes,
+            current_bytes: 0,
+        }
+    }
+
+    /// Push an item, evicting oldest entries as needed to stay within limits.
+    pub fn push(&mut self, item: ClipboardItem) {
+        let item_bytes = item.text.len();
+        // Evict until we have room for the new item
+        while self.entries.len() >= self.max_entries
+            || (self.current_bytes + item_bytes > self.max_bytes && !self.entries.is_empty())
+        {
+            let removed = self.entries.remove(0);
+            self.current_bytes -= removed.text.len();
+        }
+        self.current_bytes += item_bytes;
+        self.entries.push(item);
+    }
+
+    /// Current total bytes across all entries.
+    pub fn current_bytes(&self) -> usize {
+        self.current_bytes
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get the most recent entry.
+    pub fn most_recent(&self) -> Option<&ClipboardItem> {
+        self.entries.last()
+    }
+
+    /// Return a slice of all entries.
+    pub fn entries(&self) -> &[ClipboardItem] {
+        &self.entries
+    }
+
+    /// Remaining byte capacity.
+    pub fn remaining_bytes(&self) -> usize {
+        self.max_bytes.saturating_sub(self.current_bytes)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-cursor paste distribution
+// ---------------------------------------------------------------------------
+
+/// Distribute clipboard text across multiple cursors.
+///
+/// If the clipboard contains the same number of lines as there are cursors,
+/// each cursor gets its own line. Otherwise every cursor gets the full text.
+pub fn distribute_paste(text: &str, cursor_count: usize) -> Vec<String> {
+    if cursor_count == 0 {
+        return Vec::new();
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() == cursor_count {
+        lines.iter().map(|l| l.to_string()).collect()
+    } else {
+        vec![text.to_string(); cursor_count]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Case-insensitive history search
+// ---------------------------------------------------------------------------
+
+impl ClipboardHistory {
+    /// Search for items whose text contains the query (case-insensitive).
+    pub fn search_case_insensitive(&self, query: &str) -> Vec<&ClipboardItem> {
+        let q = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|item| item.text.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    /// Return aggregate statistics about the history.
+    pub fn statistics(&self) -> ClipboardHistoryStats {
+        let total_bytes: usize = self.entries.iter().map(|e| e.text.len()).sum();
+        let total_lines: usize = self.entries.iter().map(|e| e.text.lines().count()).sum();
+        let avg_bytes = if self.entries.is_empty() {
+            0
+        } else {
+            total_bytes / self.entries.len()
+        };
+        let multiline_count = self.entries.iter().filter(|e| e.text.contains('\n')).count();
+        ClipboardHistoryStats {
+            entry_count: self.entries.len(),
+            total_bytes,
+            average_bytes: avg_bytes,
+            total_lines,
+            multiline_entries: multiline_count,
+        }
+    }
+}
+
+/// Aggregate statistics about clipboard history entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardHistoryStats {
+    /// Total number of entries.
+    pub entry_count: usize,
+    /// Total bytes across all entries.
+    pub total_bytes: usize,
+    /// Average bytes per entry.
+    pub average_bytes: usize,
+    /// Total number of lines across all entries.
+    pub total_lines: usize,
+    /// Number of entries that span multiple lines.
+    pub multiline_entries: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1592,5 +1817,136 @@ mod tests {
         assert_eq!(ClipboardContentType::Url.to_string(), "URL");
         assert_eq!(ClipboardContentType::Code.to_string(), "Code");
         assert_eq!(ClipboardContentType::PlainText.to_string(), "Plain Text");
+    }
+
+    // --- transform pipeline tests ---
+
+    #[test]
+    fn transform_pipeline_single_trim() {
+        let result = apply_transform_pipeline("  hello  ", &[ClipboardTransform::Trim]);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn transform_pipeline_chained() {
+        let result = apply_transform_pipeline(
+            "  Hello World  ",
+            &[ClipboardTransform::Trim, ClipboardTransform::Lowercase],
+        );
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn transform_collapse_blank_lines() {
+        let input = "a\n\n\n\nb\n\nc";
+        let result = apply_transform_pipeline(input, &[ClipboardTransform::CollapseBlankLines]);
+        assert_eq!(result, "a\n\nb\n\nc");
+    }
+
+    #[test]
+    fn transform_remove_blank_lines() {
+        let input = "a\n\nb\n\nc";
+        let result = apply_transform_pipeline(input, &[ClipboardTransform::RemoveBlankLines]);
+        assert_eq!(result, "a\nb\nc");
+    }
+
+    #[test]
+    fn transform_add_line_numbers() {
+        let input = "alpha\nbeta\ngamma";
+        let result = apply_transform_pipeline(input, &[ClipboardTransform::AddLineNumbers]);
+        assert!(result.starts_with("   1 alpha"));
+        assert!(result.contains("   2 beta"));
+        assert!(result.contains("   3 gamma"));
+    }
+
+    #[test]
+    fn transform_sort_and_reverse() {
+        let input = "banana\napple\ncherry";
+        let sorted = apply_transform_pipeline(input, &[ClipboardTransform::SortLines]);
+        assert_eq!(sorted, "apple\nbanana\ncherry");
+        let reversed = apply_transform_pipeline(input, &[ClipboardTransform::ReverseLines]);
+        assert_eq!(reversed, "cherry\napple\nbanana");
+    }
+
+    #[test]
+    fn transform_strip_trailing_whitespace() {
+        let input = "hello   \nworld  \n  ok  ";
+        let result =
+            apply_transform_pipeline(input, &[ClipboardTransform::StripTrailingWhitespace]);
+        assert_eq!(result, "hello\nworld\n  ok");
+    }
+
+    // --- size-limited history tests ---
+
+    #[test]
+    fn size_limited_history_byte_limit() {
+        let mut h = SizeLimitedHistory::new(100, 10);
+        h.push(ClipboardItem::new("abcde", 1, None)); // 5 bytes
+        h.push(ClipboardItem::new("fghij", 2, None)); // 5 bytes, total = 10
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.current_bytes(), 10);
+        // Pushing 3 more bytes forces eviction of first entry
+        h.push(ClipboardItem::new("xyz", 3, None));
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.current_bytes(), 8); // 5 + 3
+        assert_eq!(h.most_recent().unwrap().text, "xyz");
+    }
+
+    #[test]
+    fn size_limited_history_remaining_bytes() {
+        let mut h = SizeLimitedHistory::new(10, 20);
+        h.push(ClipboardItem::new("hello", 1, None));
+        assert_eq!(h.remaining_bytes(), 15);
+    }
+
+    // --- multi-cursor paste tests ---
+
+    #[test]
+    fn distribute_paste_matching_lines() {
+        let text = "line1\nline2\nline3";
+        let result = distribute_paste(text, 3);
+        assert_eq!(result, vec!["line1", "line2", "line3"]);
+    }
+
+    #[test]
+    fn distribute_paste_mismatch_broadcasts() {
+        let text = "line1\nline2";
+        let result = distribute_paste(text, 3);
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().all(|s| s == "line1\nline2"));
+    }
+
+    #[test]
+    fn distribute_paste_zero_cursors() {
+        assert!(distribute_paste("anything", 0).is_empty());
+    }
+
+    // --- case-insensitive search test ---
+
+    #[test]
+    fn history_search_case_insensitive() {
+        let mut h = ClipboardHistory::new(10);
+        h.push(ClipboardItem::new("Hello World", 1, None));
+        h.push(ClipboardItem::new("goodbye WORLD", 2, None));
+        h.push(ClipboardItem::new("no match", 3, None));
+        let results = h.search_case_insensitive("world");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].text, "Hello World");
+        assert_eq!(results[1].text, "goodbye WORLD");
+    }
+
+    // --- history statistics test ---
+
+    #[test]
+    fn history_statistics() {
+        let mut h = ClipboardHistory::new(10);
+        h.push(ClipboardItem::new("hello", 1, None));
+        h.push(ClipboardItem::new("line1\nline2", 2, None));
+        let stats = h.statistics();
+        assert_eq!(stats.entry_count, 2);
+        assert_eq!(stats.total_bytes, 16); // 5 + 11
+        assert_eq!(stats.average_bytes, 8);
+        assert_eq!(stats.total_lines, 3); // 1 + 2
+        assert_eq!(stats.multiline_entries, 1);
     }
 }

@@ -874,6 +874,311 @@ pub fn generate_highlight_decorations(
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Context extraction with surrounding lines
+// ---------------------------------------------------------------------------
+
+/// A match with surrounding lines of context (like grep -C).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchLineContext {
+    pub find_match: FindMatch,
+    /// Lines before the match line (may be fewer than requested at start of file).
+    pub lines_before: Vec<String>,
+    /// The full line containing the match.
+    pub match_line: String,
+    /// Lines after the match line (may be fewer than requested at end of file).
+    pub lines_after: Vec<String>,
+}
+
+/// Find all matches and return each with `context_lines` surrounding lines.
+pub fn find_with_line_context(
+    text: &str,
+    options: &FindOptions,
+    context_lines: usize,
+) -> Vec<MatchLineContext> {
+    let all_lines: Vec<&str> = text.lines().collect();
+    let matches = find_matches(text, options);
+
+    matches
+        .into_iter()
+        .map(|m| {
+            let line_idx = (m.line - 1) as usize;
+            let start = line_idx.saturating_sub(context_lines);
+            let end = (line_idx + context_lines + 1).min(all_lines.len());
+
+            let lines_before = all_lines[start..line_idx]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            let match_line = all_lines
+                .get(line_idx)
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+            let lines_after = if line_idx + 1 < all_lines.len() {
+                all_lines[(line_idx + 1)..end]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+            MatchLineContext {
+                find_match: m,
+                lines_before,
+                match_line,
+                lines_after,
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Replace preview generation
+// ---------------------------------------------------------------------------
+
+/// A before/after pair showing what a single replacement would look like.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplacePreview {
+    pub line: u32,
+    pub before: String,
+    pub after: String,
+}
+
+/// Generate a preview for every match showing the original and replaced line.
+pub fn generate_replace_previews(
+    text: &str,
+    options: &FindOptions,
+    replacement: &str,
+) -> Vec<ReplacePreview> {
+    let re = match options.compile_pattern() {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+    let lines: Vec<&str> = text.lines().collect();
+    let matches = find_matches(text, options);
+
+    matches
+        .iter()
+        .map(|m| {
+            let line_idx = (m.line - 1) as usize;
+            let original = lines.get(line_idx).copied().unwrap_or("");
+            // Replace only the specific occurrence within this line by position.
+            let start = (m.start_col - 1) as usize;
+            let end = (m.end_col - 1) as usize;
+            let after = format!("{}{}{}", &original[..start], replacement, &original[end..]);
+            ReplacePreview {
+                line: m.line,
+                before: original.to_string(),
+                after,
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Case-preserving replace
+// ---------------------------------------------------------------------------
+
+/// Apply the case pattern of `original` to `replacement`.
+///
+/// Rules:
+/// - If `original` is all uppercase, return `replacement` uppercased.
+/// - If `original` is all lowercase, return `replacement` lowercased.
+/// - If `original` starts with an uppercase letter and the rest is lowercase
+///   (title case), return `replacement` title-cased.
+/// - Otherwise return `replacement` unchanged.
+fn apply_case_pattern(original: &str, replacement: &str) -> String {
+    if original.is_empty() || replacement.is_empty() {
+        return replacement.to_string();
+    }
+    let all_upper = original.chars().all(|c| !c.is_alphabetic() || c.is_uppercase());
+    let all_lower = original.chars().all(|c| !c.is_alphabetic() || c.is_lowercase());
+
+    if all_upper && original.chars().any(|c| c.is_alphabetic()) {
+        return replacement.to_uppercase();
+    }
+    if all_lower {
+        return replacement.to_lowercase();
+    }
+
+    // Title case: first char uppercase, rest lowercase.
+    let mut chars = original.chars();
+    let first_upper = chars.next().map_or(false, |c| c.is_uppercase());
+    let rest_lower = chars.all(|c| !c.is_alphabetic() || c.is_lowercase());
+    if first_upper && rest_lower {
+        let mut result = String::with_capacity(replacement.len());
+        for (i, ch) in replacement.chars().enumerate() {
+            if i == 0 {
+                for u in ch.to_uppercase() {
+                    result.push(u);
+                }
+            } else {
+                for l in ch.to_lowercase() {
+                    result.push(l);
+                }
+            }
+        }
+        return result;
+    }
+
+    replacement.to_string()
+}
+
+/// Replace all matches using case-preserving logic: the replacement adopts the
+/// case pattern of each individual match.
+pub fn replace_all_preserve_case(
+    text: &str,
+    options: &FindOptions,
+    replacement: &str,
+) -> String {
+    let re = match options.compile_pattern() {
+        Ok(r) => r,
+        Err(_) => return text.to_string(),
+    };
+
+    let mut result = String::with_capacity(text.len());
+    let mut last_end = 0;
+    for m in re.find_iter(text) {
+        result.push_str(&text[last_end..m.start()]);
+        result.push_str(&apply_case_pattern(m.as_str(), replacement));
+        last_end = m.end();
+    }
+    result.push_str(&text[last_end..]);
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Multi-file find result aggregation
+// ---------------------------------------------------------------------------
+
+/// A single match within a named file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileMatch {
+    pub file: String,
+    pub find_match: FindMatch,
+}
+
+/// Results from searching across multiple files, grouped by file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiFileResults {
+    pub file_matches: Vec<FileMatch>,
+}
+
+impl MultiFileResults {
+    /// Build multi-file results by searching each `(filename, content)` pair.
+    pub fn search(files: &[(&str, &str)], options: &FindOptions) -> Self {
+        let mut file_matches = Vec::new();
+        for &(name, content) in files {
+            for m in find_matches(content, options) {
+                file_matches.push(FileMatch {
+                    file: name.to_string(),
+                    find_match: m,
+                });
+            }
+        }
+        Self { file_matches }
+    }
+
+    /// Total number of matches across all files.
+    pub fn total_matches(&self) -> usize {
+        self.file_matches.len()
+    }
+
+    /// Number of files that contain at least one match.
+    pub fn file_count(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for fm in &self.file_matches {
+            seen.insert(&fm.file);
+        }
+        seen.len()
+    }
+
+    /// Return matches grouped by file, preserving encounter order.
+    pub fn grouped_by_file(&self) -> Vec<(&str, Vec<&FindMatch>)> {
+        let mut groups: Vec<(&str, Vec<&FindMatch>)> = Vec::new();
+        for fm in &self.file_matches {
+            if let Some(group) = groups.iter_mut().find(|(f, _)| *f == fm.file.as_str()) {
+                group.1.push(&fm.find_match);
+            } else {
+                groups.push((fm.file.as_str(), vec![&fm.find_match]));
+            }
+        }
+        groups
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Find history
+// ---------------------------------------------------------------------------
+
+/// A bounded, deduplicated search history.
+#[derive(Debug, Clone)]
+pub struct FindHistory {
+    entries: Vec<String>,
+    capacity: usize,
+}
+
+impl FindHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Push a search term. If already present it is moved to the front.
+    /// Empty strings are ignored.
+    pub fn push(&mut self, term: impl Into<String>) {
+        let term = term.into();
+        if term.is_empty() {
+            return;
+        }
+        // Remove existing duplicate.
+        self.entries.retain(|e| *e != term);
+        self.entries.insert(0, term);
+        if self.entries.len() > self.capacity {
+            self.entries.truncate(self.capacity);
+        }
+    }
+
+    /// Most recent entry.
+    pub fn most_recent(&self) -> Option<&str> {
+        self.entries.first().map(|s| s.as_str())
+    }
+
+    /// Return entries that contain `substring` (case-insensitive).
+    pub fn search(&self, substring: &str) -> Vec<&str> {
+        let lower = substring.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.to_lowercase().contains(&lower))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// All entries from most recent to oldest.
+    pub fn entries(&self) -> &[String] {
+        &self.entries
+    }
+
+    /// Number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1530,5 +1835,148 @@ mod tests {
         assert!(!decorations[0].is_current);
         assert!(decorations[1].is_current);
         assert!(!decorations[2].is_current);
+    }
+
+    // -----------------------------------------------------------------------
+    // find_with_line_context tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn find_with_line_context_basic() {
+        let text = "line1\nline2 match\nline3\nline4";
+        let opts = FindOptions::new("match");
+        let results = find_with_line_context(text, &opts, 1);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].lines_before, vec!["line1"]);
+        assert_eq!(results[0].match_line, "line2 match");
+        assert_eq!(results[0].lines_after, vec!["line3"]);
+    }
+
+    #[test]
+    fn find_with_line_context_at_start() {
+        let text = "match here\nline2\nline3";
+        let opts = FindOptions::new("match");
+        let results = find_with_line_context(text, &opts, 2);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].lines_before.is_empty());
+        assert_eq!(results[0].lines_after, vec!["line2", "line3"]);
+    }
+
+    #[test]
+    fn find_with_line_context_at_end() {
+        let text = "line1\nline2\nmatch here";
+        let opts = FindOptions::new("match");
+        let results = find_with_line_context(text, &opts, 2);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].lines_before, vec!["line1", "line2"]);
+        assert!(results[0].lines_after.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // replace preview tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn replace_preview_basic() {
+        let text = "hello world\ngoodbye world";
+        let opts = FindOptions::new("world");
+        let previews = generate_replace_previews(text, &opts, "rust");
+        assert_eq!(previews.len(), 2);
+        assert_eq!(previews[0].before, "hello world");
+        assert_eq!(previews[0].after, "hello rust");
+        assert_eq!(previews[1].before, "goodbye world");
+        assert_eq!(previews[1].after, "goodbye rust");
+    }
+
+    // -----------------------------------------------------------------------
+    // case-preserving replace tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn case_preserve_all_upper() {
+        let opts = FindOptions::new("HELLO").with_case_sensitive(false);
+        let result = replace_all_preserve_case("say HELLO there", &opts, "goodbye");
+        assert_eq!(result, "say GOODBYE there");
+    }
+
+    #[test]
+    fn case_preserve_title_case() {
+        let opts = FindOptions::new("Hello").with_case_sensitive(false);
+        let result = replace_all_preserve_case("Hello hello HELLO", &opts, "goodbye");
+        assert_eq!(result, "Goodbye goodbye GOODBYE");
+    }
+
+    #[test]
+    fn case_preserve_all_lower() {
+        let opts = FindOptions::new("hello").with_case_sensitive(false);
+        let result = replace_all_preserve_case("hello", &opts, "GOODBYE");
+        assert_eq!(result, "goodbye");
+    }
+
+    // -----------------------------------------------------------------------
+    // multi-file find tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn multi_file_search_basic() {
+        let files = vec![
+            ("a.rs", "fn hello() {}"),
+            ("b.rs", "let x = hello();"),
+            ("c.rs", "no match here"),
+        ];
+        let opts = FindOptions::new("hello");
+        let results = MultiFileResults::search(&files, &opts);
+        assert_eq!(results.total_matches(), 2);
+        assert_eq!(results.file_count(), 2);
+
+        let groups = results.grouped_by_file();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].0, "a.rs");
+        assert_eq!(groups[1].0, "b.rs");
+    }
+
+    // -----------------------------------------------------------------------
+    // find history tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn find_history_push_and_dedup() {
+        let mut h = FindHistory::new(5);
+        h.push("alpha");
+        h.push("beta");
+        h.push("alpha"); // duplicate moves to front
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.most_recent(), Some("alpha"));
+        assert_eq!(h.entries(), &["alpha", "beta"]);
+    }
+
+    #[test]
+    fn find_history_capacity() {
+        let mut h = FindHistory::new(3);
+        h.push("a");
+        h.push("b");
+        h.push("c");
+        h.push("d"); // evicts oldest ("a")
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.entries(), &["d", "c", "b"]);
+    }
+
+    #[test]
+    fn find_history_search() {
+        let mut h = FindHistory::new(10);
+        h.push("findOptions");
+        h.push("replace_all");
+        h.push("find_matches");
+        let results = h.search("find");
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&"find_matches"));
+        assert!(results.contains(&"findOptions"));
+    }
+
+    #[test]
+    fn find_history_empty_ignored() {
+        let mut h = FindHistory::new(5);
+        h.push("");
+        assert!(h.is_empty());
     }
 }

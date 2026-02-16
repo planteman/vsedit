@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for window.
 
+use std::collections::VecDeque;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -967,6 +968,388 @@ impl fmt::Display for QuickPickOptions {
     }
 }
 
+// ── Split layout management ──
+
+/// Direction of a window split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SplitDirection {
+    Horizontal,
+    Vertical,
+}
+
+impl fmt::Display for SplitDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Horizontal => write!(f, "horizontal"),
+            Self::Vertical => write!(f, "vertical"),
+        }
+    }
+}
+
+/// Dimension constraints for a window pane.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneConstraints {
+    pub min_width: f64,
+    pub max_width: f64,
+    pub min_height: f64,
+    pub max_height: f64,
+}
+
+impl PaneConstraints {
+    pub fn new(min_width: f64, max_width: f64, min_height: f64, max_height: f64) -> Self {
+        Self { min_width, max_width, min_height, max_height }
+    }
+
+    /// Clamp a proposed width to the constraint bounds.
+    pub fn clamp_width(&self, width: f64) -> f64 {
+        width.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a proposed height to the constraint bounds.
+    pub fn clamp_height(&self, height: f64) -> f64 {
+        height.clamp(self.min_height, self.max_height)
+    }
+
+    /// Check if a proposed size satisfies both constraints.
+    pub fn satisfies(&self, width: f64, height: f64) -> bool {
+        width >= self.min_width
+            && width <= self.max_width
+            && height >= self.min_height
+            && height <= self.max_height
+    }
+}
+
+impl Default for PaneConstraints {
+    fn default() -> Self {
+        Self { min_width: 80.0, max_width: f64::MAX, min_height: 40.0, max_height: f64::MAX }
+    }
+}
+
+/// A single pane in a split layout tree.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pane {
+    pub id: String,
+    /// Proportional size weight relative to siblings (0.0–1.0).
+    pub weight: f64,
+    pub constraints: PaneConstraints,
+}
+
+impl Pane {
+    pub fn new(id: impl Into<String>, weight: f64) -> Self {
+        Self { id: id.into(), weight, constraints: PaneConstraints::default() }
+    }
+
+    pub fn with_constraints(mut self, constraints: PaneConstraints) -> Self {
+        self.constraints = constraints;
+        self
+    }
+}
+
+/// A node in the split layout tree: either a leaf pane or a split container.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum LayoutNode {
+    Leaf { pane: Pane },
+    Split { direction: SplitDirection, children: Vec<LayoutNode> },
+}
+
+impl LayoutNode {
+    /// Collect all pane IDs in depth-first order.
+    pub fn pane_ids(&self) -> Vec<&str> {
+        match self {
+            Self::Leaf { pane } => vec![pane.id.as_str()],
+            Self::Split { children, .. } => {
+                children.iter().flat_map(|c| c.pane_ids()).collect()
+            }
+        }
+    }
+
+    /// Count the total number of leaf panes.
+    pub fn pane_count(&self) -> usize {
+        match self {
+            Self::Leaf { .. } => 1,
+            Self::Split { children, .. } => children.iter().map(|c| c.pane_count()).sum(),
+        }
+    }
+
+    /// Find a pane by ID.
+    pub fn find_pane(&self, id: &str) -> Option<&Pane> {
+        match self {
+            Self::Leaf { pane } if pane.id == id => Some(pane),
+            Self::Split { children, .. } => {
+                children.iter().find_map(|c| c.find_pane(id))
+            }
+            _ => None,
+        }
+    }
+
+    /// Split a leaf pane into two panes. Returns `false` if the pane was not found.
+    pub fn split_pane(
+        &mut self,
+        target_id: &str,
+        direction: SplitDirection,
+        new_pane: Pane,
+    ) -> bool {
+        match self {
+            Self::Leaf { pane } if pane.id == target_id => {
+                let existing = pane.clone();
+                // Each child gets half the weight.
+                let mut left = Pane::new(&existing.id, 0.5);
+                left.constraints = existing.constraints;
+                let mut right = new_pane;
+                right.weight = 0.5;
+                *self = Self::Split {
+                    direction,
+                    children: vec![
+                        Self::Leaf { pane: left },
+                        Self::Leaf { pane: right },
+                    ],
+                };
+                true
+            }
+            Self::Split { children, .. } => {
+                children.iter_mut().any(|c| c.split_pane(target_id, direction, new_pane.clone()))
+            }
+            _ => false,
+        }
+    }
+
+    /// Remove a pane by ID. Returns `true` if removed.
+    /// When a split has only one child left, it collapses to that child.
+    pub fn remove_pane(&mut self, target_id: &str) -> bool {
+        match self {
+            Self::Leaf { pane } if pane.id == target_id => {
+                // Caller must handle root removal
+                return false;
+            }
+            Self::Split { children, .. } => {
+                // Remove direct leaf children matching the ID.
+                let before = children.len();
+                children.retain(|c| {
+                    !matches!(c, Self::Leaf { pane } if pane.id == target_id)
+                });
+                let removed = children.len() < before;
+
+                if !removed {
+                    // Recurse into child splits.
+                    for child in children.iter_mut() {
+                        if child.remove_pane(target_id) {
+                            break;
+                        }
+                    }
+                }
+
+                // Collapse single-child splits.
+                if children.len() == 1 {
+                    let only = children.remove(0);
+                    *self = only;
+                }
+                removed || self.find_pane(target_id).is_none()
+            }
+            _ => false,
+        }
+    }
+
+    /// Normalize child weights so they sum to 1.0.
+    pub fn normalize_weights(&mut self) {
+        if let Self::Split { children, .. } = self {
+            let total: f64 = children.iter().map(|c| match c {
+                Self::Leaf { pane } => pane.weight,
+                _ => 1.0,
+            }).sum();
+            if total > 0.0 {
+                for child in children.iter_mut() {
+                    if let Self::Leaf { pane } = child {
+                        pane.weight /= total;
+                    }
+                }
+            }
+            for child in children.iter_mut() {
+                child.normalize_weights();
+            }
+        }
+    }
+}
+
+// ── Tab group management ──
+
+/// A tab group contains an ordered list of tab IDs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TabGroup {
+    pub id: String,
+    pub tabs: Vec<String>,
+    pub active_index: usize,
+}
+
+impl TabGroup {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self { id: id.into(), tabs: Vec::new(), active_index: 0 }
+    }
+
+    /// Add a tab at the end and make it active.
+    pub fn add_tab(&mut self, tab_id: impl Into<String>) {
+        self.tabs.push(tab_id.into());
+        self.active_index = self.tabs.len() - 1;
+    }
+
+    /// Remove a tab by ID, adjusting the active index. Returns `true` if removed.
+    pub fn remove_tab(&mut self, tab_id: &str) -> bool {
+        if let Some(pos) = self.tabs.iter().position(|t| t == tab_id) {
+            self.tabs.remove(pos);
+            if self.tabs.is_empty() {
+                self.active_index = 0;
+            } else if self.active_index >= self.tabs.len() {
+                self.active_index = self.tabs.len() - 1;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move a tab from one position to another.
+    pub fn move_tab(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.tabs.len() || to >= self.tabs.len() {
+            return false;
+        }
+        let tab = self.tabs.remove(from);
+        self.tabs.insert(to, tab);
+        self.active_index = to;
+        true
+    }
+
+    /// Return the currently active tab ID, if any.
+    pub fn active_tab(&self) -> Option<&str> {
+        self.tabs.get(self.active_index).map(|s| s.as_str())
+    }
+
+    /// Select the next tab (wrapping around).
+    pub fn next_tab(&mut self) {
+        if !self.tabs.is_empty() {
+            self.active_index = (self.active_index + 1) % self.tabs.len();
+        }
+    }
+
+    /// Select the previous tab (wrapping around).
+    pub fn prev_tab(&mut self) {
+        if !self.tabs.is_empty() {
+            self.active_index = if self.active_index == 0 {
+                self.tabs.len() - 1
+            } else {
+                self.active_index - 1
+            };
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.tabs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tabs.is_empty()
+    }
+}
+
+impl fmt::Display for TabGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TabGroup({}, {} tabs)", self.id, self.tabs.len())
+    }
+}
+
+// ── Focus history ──
+
+/// Tracks the most-recently-focused pane IDs in a bounded ring buffer.
+#[derive(Debug, Clone)]
+pub struct FocusHistory {
+    entries: VecDeque<String>,
+    capacity: usize,
+}
+
+impl FocusHistory {
+    pub fn new(capacity: usize) -> Self {
+        Self { entries: VecDeque::with_capacity(capacity), capacity }
+    }
+
+    /// Record that a pane received focus. Duplicates are moved to the front.
+    pub fn record_focus(&mut self, pane_id: impl Into<String>) {
+        let id = pane_id.into();
+        // Remove existing entry so the ID appears only once, at the front.
+        self.entries.retain(|e| e != &id);
+        if self.entries.len() >= self.capacity {
+            self.entries.pop_back();
+        }
+        self.entries.push_front(id);
+    }
+
+    /// The most recently focused pane ID.
+    pub fn current(&self) -> Option<&str> {
+        self.entries.front().map(|s| s.as_str())
+    }
+
+    /// The previously focused pane ID (second in the stack).
+    pub fn previous(&self) -> Option<&str> {
+        self.entries.get(1).map(|s| s.as_str())
+    }
+
+    /// Return the full history from most-recent to least-recent.
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|s| s.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove a pane from the history (e.g. when the pane is closed).
+    pub fn remove(&mut self, pane_id: &str) {
+        self.entries.retain(|e| e != pane_id);
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ── Workspace layout snapshot for serialization / restore ──
+
+/// Serialisable snapshot of the entire window workspace.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSnapshot {
+    pub layout: LayoutNode,
+    pub tab_groups: Vec<TabGroup>,
+    pub window_state: WindowState,
+}
+
+impl WorkspaceSnapshot {
+    pub fn new(layout: LayoutNode, tab_groups: Vec<TabGroup>, window_state: WindowState) -> Self {
+        Self { layout, tab_groups, window_state }
+    }
+
+    /// Serialize the snapshot to a JSON string.
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Deserialize a snapshot from a JSON string.
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Return all pane IDs referenced in the layout.
+    pub fn pane_ids(&self) -> Vec<&str> {
+        self.layout.pane_ids()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1556,5 +1939,144 @@ mod tests {
 
         let qp_multi = QuickPickOptions { placeholder: None, can_pick_many: true };
         assert_eq!(qp_multi.to_string(), "QuickPick(multi)");
+    }
+
+    // ── Split layout tests ──
+
+    #[test]
+    fn layout_split_pane_and_count() {
+        let mut root = LayoutNode::Leaf {
+            pane: Pane::new("editor1", 1.0),
+        };
+        assert_eq!(root.pane_count(), 1);
+
+        let ok = root.split_pane("editor1", SplitDirection::Vertical, Pane::new("editor2", 0.5));
+        assert!(ok);
+        assert_eq!(root.pane_count(), 2);
+        assert!(root.find_pane("editor1").is_some());
+        assert!(root.find_pane("editor2").is_some());
+        assert_eq!(root.pane_ids(), vec!["editor1", "editor2"]);
+    }
+
+    #[test]
+    fn layout_remove_pane_collapses_split() {
+        let mut root = LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            children: vec![
+                LayoutNode::Leaf { pane: Pane::new("a", 0.5) },
+                LayoutNode::Leaf { pane: Pane::new("b", 0.5) },
+            ],
+        };
+        assert!(root.remove_pane("b"));
+        assert_eq!(root.pane_count(), 1);
+        // After collapse, root should be a leaf.
+        assert!(matches!(root, LayoutNode::Leaf { .. }));
+    }
+
+    #[test]
+    fn tab_group_add_remove_move() {
+        let mut tg = TabGroup::new("group1");
+        assert!(tg.is_empty());
+        tg.add_tab("file1.rs");
+        tg.add_tab("file2.rs");
+        tg.add_tab("file3.rs");
+        assert_eq!(tg.len(), 3);
+        assert_eq!(tg.active_tab(), Some("file3.rs"));
+
+        // Move last tab to front.
+        assert!(tg.move_tab(2, 0));
+        assert_eq!(tg.tabs, vec!["file3.rs", "file1.rs", "file2.rs"]);
+        assert_eq!(tg.active_tab(), Some("file3.rs"));
+
+        // Remove active tab.
+        tg.remove_tab("file3.rs");
+        assert_eq!(tg.len(), 2);
+        assert_eq!(tg.active_tab(), Some("file1.rs"));
+
+        // next/prev cycling.
+        tg.next_tab();
+        assert_eq!(tg.active_tab(), Some("file2.rs"));
+        tg.prev_tab();
+        assert_eq!(tg.active_tab(), Some("file1.rs"));
+        tg.prev_tab(); // wrap
+        assert_eq!(tg.active_tab(), Some("file2.rs"));
+    }
+
+    #[test]
+    fn focus_history_tracks_order_and_deduplicates() {
+        let mut fh = FocusHistory::new(4);
+        assert!(fh.is_empty());
+        fh.record_focus("pane-a");
+        fh.record_focus("pane-b");
+        fh.record_focus("pane-c");
+        assert_eq!(fh.current(), Some("pane-c"));
+        assert_eq!(fh.previous(), Some("pane-b"));
+        assert_eq!(fh.len(), 3);
+
+        // Re-focusing an existing pane moves it to front.
+        fh.record_focus("pane-a");
+        assert_eq!(fh.current(), Some("pane-a"));
+        assert_eq!(fh.previous(), Some("pane-c"));
+        assert_eq!(fh.len(), 3); // no duplicates
+
+        // Removing an entry.
+        fh.remove("pane-b");
+        assert_eq!(fh.len(), 2);
+        let ids: Vec<&str> = fh.iter().collect();
+        assert_eq!(ids, vec!["pane-a", "pane-c"]);
+
+        // Capacity enforcement.
+        fh.record_focus("d1");
+        fh.record_focus("d2");
+        fh.record_focus("d3"); // exceeds capacity of 4
+        assert!(fh.len() <= 4);
+    }
+
+    #[test]
+    fn workspace_snapshot_serde_roundtrip() {
+        let layout = LayoutNode::Split {
+            direction: SplitDirection::Vertical,
+            children: vec![
+                LayoutNode::Leaf { pane: Pane::new("left", 0.4) },
+                LayoutNode::Leaf { pane: Pane::new("right", 0.6) },
+            ],
+        };
+        let mut tg = TabGroup::new("main");
+        tg.add_tab("file1.rs");
+        tg.add_tab("file2.rs");
+        let snapshot = WorkspaceSnapshot::new(layout, vec![tg], WindowState::active());
+
+        let json = snapshot.to_json().unwrap();
+        let restored = WorkspaceSnapshot::from_json(&json).unwrap();
+        assert_eq!(snapshot, restored);
+        assert_eq!(restored.pane_ids(), vec!["left", "right"]);
+    }
+
+    #[test]
+    fn pane_constraints_clamp_and_satisfies() {
+        let c = PaneConstraints::new(100.0, 800.0, 50.0, 600.0);
+        assert_eq!(c.clamp_width(50.0), 100.0);
+        assert_eq!(c.clamp_width(1000.0), 800.0);
+        assert_eq!(c.clamp_width(400.0), 400.0);
+        assert_eq!(c.clamp_height(10.0), 50.0);
+        assert!(c.satisfies(400.0, 300.0));
+        assert!(!c.satisfies(50.0, 300.0));
+        assert!(!c.satisfies(400.0, 700.0));
+    }
+
+    #[test]
+    fn layout_normalize_weights() {
+        let mut root = LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            children: vec![
+                LayoutNode::Leaf { pane: Pane::new("a", 3.0) },
+                LayoutNode::Leaf { pane: Pane::new("b", 1.0) },
+            ],
+        };
+        root.normalize_weights();
+        let a = root.find_pane("a").unwrap();
+        let b = root.find_pane("b").unwrap();
+        assert!((a.weight - 0.75).abs() < 1e-9);
+        assert!((b.weight - 0.25).abs() < 1e-9);
     }
 }

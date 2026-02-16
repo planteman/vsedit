@@ -937,6 +937,242 @@ pub fn suggest_auto_close(
         .collect()
 }
 
+// ── Bracket folding ranges ──
+
+/// A foldable range derived from a matched bracket pair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketFoldRange {
+    /// 1-based line of the opening bracket.
+    pub start_line: u32,
+    /// 1-based column of the opening bracket.
+    pub start_col: u32,
+    /// 1-based line of the closing bracket.
+    pub end_line: u32,
+    /// 1-based column of the closing bracket.
+    pub end_col: u32,
+    /// Nesting depth of this range (0 = outermost).
+    pub depth: u32,
+}
+
+/// Compute foldable ranges from bracket pairs. Only pairs that span more than
+/// one line are included because single-line pairs provide no useful fold.
+pub fn folding_ranges(lines: &[&str], pairs: &[BracketPair]) -> Vec<BracketFoldRange> {
+    let matches = find_all_brackets(lines, pairs);
+    matches
+        .into_iter()
+        .filter(|m| m.close_line > m.open_line)
+        .map(|m| BracketFoldRange {
+            start_line: m.open_line,
+            start_col: m.open_col,
+            end_line: m.close_line,
+            end_col: m.close_col,
+            depth: m.depth,
+        })
+        .collect()
+}
+
+// ── Indentation guides from bracket structure ──
+
+/// An indentation guide derived from bracket nesting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentGuide {
+    /// 1-based line number.
+    pub line: u32,
+    /// Nesting depth at the start of this line.
+    pub depth: u32,
+    /// Whether the line contains an opening bracket that increases depth.
+    pub opens: bool,
+    /// Whether the line contains a closing bracket that decreases depth.
+    pub closes: bool,
+}
+
+/// Compute indentation guides for every line based on bracket nesting.
+pub fn indentation_guides(lines: &[&str], pairs: &[BracketPair]) -> Vec<IndentGuide> {
+    let mut guides = Vec::with_capacity(lines.len());
+    let mut depth: u32 = 0;
+
+    for (li, line) in lines.iter().enumerate() {
+        let start_depth = depth;
+        let mut has_open = false;
+        let mut has_close = false;
+
+        for ch in line.chars() {
+            if pairs.iter().any(|p| p.open == ch) {
+                depth += 1;
+                has_open = true;
+            } else if pairs.iter().any(|p| p.close == ch) {
+                if depth > 0 {
+                    depth -= 1;
+                }
+                has_close = true;
+            }
+        }
+
+        guides.push(IndentGuide {
+            line: (li + 1) as u32,
+            depth: start_depth,
+            opens: has_open,
+            closes: has_close,
+        });
+    }
+    guides
+}
+
+// ── Bracket scope text extraction ──
+
+/// Extract the text content between a matched bracket pair (exclusive of the
+/// brackets themselves). Returns `None` if the match spans positions that are
+/// out of bounds.
+pub fn extract_bracket_scope<'a>(
+    lines: &[&'a str],
+    m: &BracketMatch,
+) -> Option<String> {
+    if m.open_line == 0 || m.close_line == 0 {
+        return None;
+    }
+    let open_li = (m.open_line - 1) as usize;
+    let close_li = (m.close_line - 1) as usize;
+    if open_li >= lines.len() || close_li >= lines.len() {
+        return None;
+    }
+
+    if m.open_line == m.close_line {
+        let line = lines[open_li];
+        let start = m.open_col as usize; // char after opening bracket
+        let end = (m.close_col - 1) as usize;
+        if start > end || end > line.len() {
+            return Some(String::new());
+        }
+        return Some(line[start..end].to_string());
+    }
+
+    let mut result = String::new();
+    // Remainder of the opening line after the bracket.
+    let first = lines[open_li];
+    let start = m.open_col as usize;
+    if start <= first.len() {
+        result.push_str(&first[start..]);
+    }
+    // Full intermediate lines.
+    for li in (open_li + 1)..close_li {
+        result.push('\n');
+        result.push_str(lines[li]);
+    }
+    // Portion of the closing line before the bracket.
+    if close_li > open_li {
+        result.push('\n');
+        let last = lines[close_li];
+        let end = (m.close_col - 1) as usize;
+        if end <= last.len() {
+            result.push_str(&last[..end]);
+        }
+    }
+    Some(result)
+}
+
+// ── Bracket insertion edits ──
+
+/// A text edit representing a bracket insertion or replacement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketEdit {
+    /// 1-based line.
+    pub line: u32,
+    /// 1-based column where the edit starts.
+    pub col: u32,
+    /// Number of characters to delete before inserting.
+    pub delete_len: u32,
+    /// Text to insert.
+    pub insert_text: String,
+}
+
+/// Produce edits to fix all detected bracket errors in a document.
+///
+/// For `UnmatchedOpen` errors, an edit inserts the matching close bracket at
+/// the end of the document. For `UnmatchedClose` errors, an edit deletes the
+/// stray closing bracket. For `Mismatch` errors, an edit replaces the wrong
+/// closing bracket with the expected one.
+pub fn bracket_fix_edits(lines: &[&str], pairs: &[BracketPair]) -> Vec<BracketEdit> {
+    let errors = bracket_errors(lines, pairs);
+    let last_line = lines.len() as u32;
+    let last_col = lines.last().map(|l| l.len() as u32 + 1).unwrap_or(1);
+
+    errors
+        .iter()
+        .map(|err| match &err.error_kind {
+            BracketErrorKind::UnmatchedOpen => {
+                let close = pairs
+                    .iter()
+                    .find(|p| p.open == err.bracket)
+                    .map(|p| p.close)
+                    .unwrap_or(err.bracket);
+                BracketEdit {
+                    line: last_line,
+                    col: last_col,
+                    delete_len: 0,
+                    insert_text: close.to_string(),
+                }
+            }
+            BracketErrorKind::UnmatchedClose => BracketEdit {
+                line: err.line,
+                col: err.col,
+                delete_len: 1,
+                insert_text: String::new(),
+            },
+            BracketErrorKind::Mismatch { expected, found: _ } => BracketEdit {
+                line: err.line,
+                col: err.col,
+                delete_len: 1,
+                insert_text: expected.to_string(),
+            },
+        })
+        .collect()
+}
+
+// ── Per-line bracket balance ──
+
+/// Balance information for a single line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineBracketBalance {
+    /// 1-based line number.
+    pub line: u32,
+    /// Net balance change on this line (opens minus closes).
+    pub net: i32,
+    /// Number of opening brackets on this line.
+    pub opens: u32,
+    /// Number of closing brackets on this line.
+    pub closes: u32,
+    /// Running cumulative depth at the end of this line.
+    pub cumulative_depth: i32,
+}
+
+/// Compute bracket balance for every line in the document.
+pub fn line_bracket_balances(lines: &[&str], pairs: &[BracketPair]) -> Vec<LineBracketBalance> {
+    let mut results = Vec::with_capacity(lines.len());
+    let mut cumulative: i32 = 0;
+
+    for (li, line) in lines.iter().enumerate() {
+        let mut opens: u32 = 0;
+        let mut closes: u32 = 0;
+        for ch in line.chars() {
+            if pairs.iter().any(|p| p.open == ch) {
+                opens += 1;
+            } else if pairs.iter().any(|p| p.close == ch) {
+                closes += 1;
+            }
+        }
+        let net = opens as i32 - closes as i32;
+        cumulative += net;
+        results.push(LineBracketBalance {
+            line: (li + 1) as u32,
+            net,
+            opens,
+            closes,
+            cumulative_depth: cumulative,
+        });
+    }
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1572,5 +1808,121 @@ mod tests {
         let pairs = default_bracket_pairs();
         let suggestions = suggest_auto_close(&lines, &pairs);
         assert!(suggestions.is_empty());
+    }
+
+    // ── Folding range tests ──
+
+    #[test]
+    fn folding_ranges_multiline() {
+        let lines = vec!["fn f() {", "  x", "}"];
+        let pairs = default_bracket_pairs();
+        let folds = folding_ranges(&lines, &pairs);
+        // Only the braces span multiple lines; parens are single-line.
+        assert_eq!(folds.len(), 1);
+        assert_eq!(folds[0].start_line, 1);
+        assert_eq!(folds[0].end_line, 3);
+    }
+
+    #[test]
+    fn folding_ranges_excludes_single_line() {
+        let lines = vec!["let x = (1 + 2);"];
+        let pairs = default_bracket_pairs();
+        let folds = folding_ranges(&lines, &pairs);
+        assert!(folds.is_empty());
+    }
+
+    // ── Indentation guide tests ──
+
+    #[test]
+    fn indentation_guides_basic() {
+        let lines = vec!["{", "  x", "}"];
+        let pairs = default_bracket_pairs();
+        let guides = indentation_guides(&lines, &pairs);
+        assert_eq!(guides.len(), 3);
+        assert_eq!(guides[0].depth, 0);
+        assert!(guides[0].opens);
+        assert_eq!(guides[1].depth, 1);
+        assert!(!guides[1].opens);
+        assert!(!guides[1].closes);
+        assert_eq!(guides[2].depth, 1);
+        assert!(guides[2].closes);
+    }
+
+    // ── Bracket scope extraction tests ──
+
+    #[test]
+    fn extract_scope_single_line() {
+        let lines = vec!["(hello)"];
+        let pairs = default_bracket_pairs();
+        let matches = find_all_brackets(&lines, &pairs);
+        assert_eq!(matches.len(), 1);
+        let scope = extract_bracket_scope(&lines, &matches[0]).unwrap();
+        assert_eq!(scope, "hello");
+    }
+
+    #[test]
+    fn extract_scope_multiline() {
+        let lines = vec!["{", "  body", "}"];
+        let pairs = default_bracket_pairs();
+        let matches = find_all_brackets(&lines, &pairs);
+        let brace_match = matches.iter().find(|m| m.open_col == 1 && m.open_line == 1).unwrap();
+        let scope = extract_bracket_scope(&lines, brace_match).unwrap();
+        assert!(scope.contains("body"));
+    }
+
+    // ── Bracket fix edit tests ──
+
+    #[test]
+    fn fix_edits_unmatched_open() {
+        let lines = vec!["(hello"];
+        let pairs = default_bracket_pairs();
+        let edits = bracket_fix_edits(&lines, &pairs);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].insert_text, ")");
+        assert_eq!(edits[0].delete_len, 0);
+    }
+
+    #[test]
+    fn fix_edits_unmatched_close() {
+        let lines = vec!["hello)"];
+        let pairs = default_bracket_pairs();
+        let edits = bracket_fix_edits(&lines, &pairs);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].delete_len, 1);
+        assert!(edits[0].insert_text.is_empty());
+    }
+
+    #[test]
+    fn fix_edits_mismatch() {
+        let lines = vec!["(hello]"];
+        let pairs = default_bracket_pairs();
+        let edits = bracket_fix_edits(&lines, &pairs);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].insert_text, ")");
+        assert_eq!(edits[0].delete_len, 1);
+    }
+
+    // ── Line bracket balance tests ──
+
+    #[test]
+    fn line_balance_simple() {
+        let lines = vec!["{", "  (x)", "}"];
+        let pairs = default_bracket_pairs();
+        let balances = line_bracket_balances(&lines, &pairs);
+        assert_eq!(balances.len(), 3);
+        assert_eq!(balances[0].net, 1);
+        assert_eq!(balances[0].cumulative_depth, 1);
+        assert_eq!(balances[1].net, 0); // ( and ) cancel
+        assert_eq!(balances[1].cumulative_depth, 1);
+        assert_eq!(balances[2].net, -1);
+        assert_eq!(balances[2].cumulative_depth, 0);
+    }
+
+    #[test]
+    fn line_balance_empty_doc() {
+        let lines: Vec<&str> = vec![];
+        let pairs = default_bracket_pairs();
+        let balances = line_bracket_balances(&lines, &pairs);
+        assert!(balances.is_empty());
     }
 }

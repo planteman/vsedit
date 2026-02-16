@@ -906,6 +906,208 @@ pub fn assess_health(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Remote file path mapping (local <-> remote)
+// ---------------------------------------------------------------------------
+
+/// Maps local file paths to remote file paths and vice versa.
+#[derive(Debug, Clone)]
+pub struct PathMapping {
+    local_root: String,
+    remote_root: String,
+}
+
+impl PathMapping {
+    pub fn new(local_root: impl Into<String>, remote_root: impl Into<String>) -> Self {
+        Self {
+            local_root: local_root.into(),
+            remote_root: remote_root.into(),
+        }
+    }
+
+    /// Convert a local path to its remote equivalent.
+    /// Returns `None` if the path does not start with the local root.
+    pub fn to_remote(&self, local_path: &str) -> Option<String> {
+        local_path
+            .strip_prefix(&self.local_root)
+            .map(|suffix| format!("{}{}", self.remote_root, suffix))
+    }
+
+    /// Convert a remote path to its local equivalent.
+    /// Returns `None` if the path does not start with the remote root.
+    pub fn to_local(&self, remote_path: &str) -> Option<String> {
+        remote_path
+            .strip_prefix(&self.remote_root)
+            .map(|suffix| format!("{}{}", self.local_root, suffix))
+    }
+
+    pub fn local_root(&self) -> &str {
+        &self.local_root
+    }
+
+    pub fn remote_root(&self) -> &str {
+        &self.remote_root
+    }
+}
+
+/// A registry of multiple path mappings used to translate paths between
+/// local and remote file systems.
+#[derive(Debug, Clone, Default)]
+pub struct PathMappingRegistry {
+    mappings: Vec<PathMapping>,
+}
+
+impl PathMappingRegistry {
+    pub fn new() -> Self {
+        Self { mappings: Vec::new() }
+    }
+
+    pub fn add(&mut self, mapping: PathMapping) {
+        self.mappings.push(mapping);
+    }
+
+    /// Translate a local path using the first matching mapping.
+    pub fn to_remote(&self, local_path: &str) -> Option<String> {
+        self.mappings.iter().find_map(|m| m.to_remote(local_path))
+    }
+
+    /// Translate a remote path using the first matching mapping.
+    pub fn to_local(&self, remote_path: &str) -> Option<String> {
+        self.mappings.iter().find_map(|m| m.to_local(remote_path))
+    }
+
+    pub fn len(&self) -> usize {
+        self.mappings.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.mappings.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Heartbeat tracker for remote sessions
+// ---------------------------------------------------------------------------
+
+/// Tracks heartbeat timestamps for a remote session and determines liveness.
+#[derive(Debug, Clone)]
+pub struct HeartbeatTracker {
+    /// Epoch seconds of each received heartbeat.
+    timestamps: Vec<u64>,
+    /// Maximum interval (seconds) before the session is considered stale.
+    timeout_secs: u64,
+}
+
+impl HeartbeatTracker {
+    pub fn new(timeout_secs: u64) -> Self {
+        Self {
+            timestamps: Vec::new(),
+            timeout_secs,
+        }
+    }
+
+    /// Record a heartbeat at the given epoch time.
+    pub fn beat(&mut self, now_secs: u64) {
+        self.timestamps.push(now_secs);
+    }
+
+    /// Returns `true` if the session is alive (last heartbeat within timeout).
+    pub fn is_alive(&self, now_secs: u64) -> bool {
+        self.timestamps
+            .last()
+            .map_or(false, |&last| now_secs.saturating_sub(last) <= self.timeout_secs)
+    }
+
+    /// Seconds since the last heartbeat, or `None` if no beats recorded.
+    pub fn seconds_since_last(&self, now_secs: u64) -> Option<u64> {
+        self.timestamps.last().map(|&last| now_secs.saturating_sub(last))
+    }
+
+    /// Number of heartbeats received.
+    pub fn count(&self) -> usize {
+        self.timestamps.len()
+    }
+
+    /// Average interval between consecutive heartbeats in seconds, or `None`.
+    pub fn average_interval(&self) -> Option<u64> {
+        if self.timestamps.len() < 2 {
+            return None;
+        }
+        let total: u64 = self
+            .timestamps
+            .windows(2)
+            .map(|w| w[1].saturating_sub(w[0]))
+            .sum();
+        Some(total / (self.timestamps.len() as u64 - 1))
+    }
+
+    pub fn reset(&mut self) {
+        self.timestamps.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Port forwarding rule manager
+// ---------------------------------------------------------------------------
+
+/// Manages a collection of port forwarding rules, ensuring no local port
+/// conflicts and providing lookup helpers.
+#[derive(Debug, Clone, Default)]
+pub struct PortForwardingManager {
+    rules: Vec<PortForwardingConfig>,
+}
+
+impl PortForwardingManager {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Add a rule. Returns `Err` if the local port is already forwarded.
+    pub fn add_rule(&mut self, rule: PortForwardingConfig) -> Result<(), RemoteError> {
+        if self.rules.iter().any(|r| r.local_port == rule.local_port) {
+            return Err(RemoteError::ConnectionFailed(format!(
+                "local port {} already forwarded",
+                rule.local_port
+            )));
+        }
+        self.rules.push(rule);
+        Ok(())
+    }
+
+    /// Remove the rule forwarding the given local port. Returns `true` if found.
+    pub fn remove_by_local_port(&mut self, local_port: u16) -> bool {
+        let before = self.rules.len();
+        self.rules.retain(|r| r.local_port != local_port);
+        self.rules.len() < before
+    }
+
+    /// Find the rule for a given local port.
+    pub fn find_by_local_port(&self, local_port: u16) -> Option<&PortForwardingConfig> {
+        self.rules.iter().find(|r| r.local_port == local_port)
+    }
+
+    /// All rules targeting a specific remote host.
+    pub fn rules_for_host(&self, host: &str) -> Vec<&PortForwardingConfig> {
+        self.rules.iter().filter(|r| r.remote_host == host).collect()
+    }
+
+    pub fn rules(&self) -> &[PortForwardingConfig] {
+        &self.rules
+    }
+
+    pub fn len(&self) -> usize {
+        self.rules.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.rules.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1553,5 +1755,117 @@ mod tests {
         history.record("h", true, "ok");
         // 33% success rate < 50%
         assert_eq!(assess_health(&latency, &history, 100, 500), HealthStatus::Unhealthy);
+    }
+
+    // ---------------------------------------------------------------
+    // Path mapping tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn path_mapping_local_to_remote_and_back() {
+        let m = PathMapping::new("/home/user/project", "/workspace/project");
+        assert_eq!(
+            m.to_remote("/home/user/project/src/main.rs"),
+            Some("/workspace/project/src/main.rs".into())
+        );
+        assert_eq!(
+            m.to_local("/workspace/project/src/main.rs"),
+            Some("/home/user/project/src/main.rs".into())
+        );
+        // Non-matching prefix returns None.
+        assert_eq!(m.to_remote("/other/path"), None);
+        assert_eq!(m.to_local("/other/path"), None);
+    }
+
+    #[test]
+    fn path_mapping_registry_multiple_mappings() {
+        let mut reg = PathMappingRegistry::new();
+        assert!(reg.is_empty());
+        reg.add(PathMapping::new("/home/a", "/remote/a"));
+        reg.add(PathMapping::new("/home/b", "/remote/b"));
+        assert_eq!(reg.len(), 2);
+        assert_eq!(
+            reg.to_remote("/home/b/file.txt"),
+            Some("/remote/b/file.txt".into())
+        );
+        assert_eq!(
+            reg.to_local("/remote/a/lib.rs"),
+            Some("/home/a/lib.rs".into())
+        );
+        assert_eq!(reg.to_remote("/nomatch"), None);
+    }
+
+    // ---------------------------------------------------------------
+    // Heartbeat tracker tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn heartbeat_tracker_liveness() {
+        let mut hb = HeartbeatTracker::new(30);
+        // No beats yet – not alive.
+        assert!(!hb.is_alive(100));
+        assert_eq!(hb.seconds_since_last(100), None);
+
+        hb.beat(100);
+        assert!(hb.is_alive(120)); // 20s < 30s timeout
+        assert!(!hb.is_alive(200)); // 100s > 30s timeout
+        assert_eq!(hb.seconds_since_last(110), Some(10));
+        assert_eq!(hb.count(), 1);
+    }
+
+    #[test]
+    fn heartbeat_average_interval() {
+        let mut hb = HeartbeatTracker::new(60);
+        hb.beat(100);
+        assert_eq!(hb.average_interval(), None); // need >=2 samples
+        hb.beat(110);
+        hb.beat(130);
+        // intervals: 10, 20 → avg = 15
+        assert_eq!(hb.average_interval(), Some(15));
+        hb.reset();
+        assert_eq!(hb.count(), 0);
+    }
+
+    // ---------------------------------------------------------------
+    // Port forwarding manager tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn port_forwarding_manager_add_find_remove() {
+        let mut mgr = PortForwardingManager::new();
+        assert!(mgr.is_empty());
+
+        let r1 = PortForwardingConfig::new(3000, 80, "server.io").unwrap();
+        let r2 = PortForwardingConfig::new(3001, 443, "server.io").unwrap();
+        mgr.add_rule(r1).unwrap();
+        mgr.add_rule(r2).unwrap();
+        assert_eq!(mgr.len(), 2);
+
+        // Duplicate local port rejected.
+        let dup = PortForwardingConfig::new(3000, 8080, "other.io").unwrap();
+        assert!(mgr.add_rule(dup).is_err());
+
+        // Lookup by local port.
+        let found = mgr.find_by_local_port(3000).unwrap();
+        assert_eq!(found.remote_port, 80);
+
+        // Lookup by host.
+        assert_eq!(mgr.rules_for_host("server.io").len(), 2);
+        assert_eq!(mgr.rules_for_host("unknown").len(), 0);
+
+        // Remove.
+        assert!(mgr.remove_by_local_port(3000));
+        assert_eq!(mgr.len(), 1);
+        assert!(!mgr.remove_by_local_port(9999));
+
+        mgr.clear();
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn path_mapping_roots_accessors() {
+        let m = PathMapping::new("/local", "/remote");
+        assert_eq!(m.local_root(), "/local");
+        assert_eq!(m.remote_root(), "/remote");
     }
 }

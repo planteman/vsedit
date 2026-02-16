@@ -1,6 +1,6 @@
 //! Accessibility features detection.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
 /// Whether the platform has a screen reader active.
@@ -877,6 +877,333 @@ pub fn a11y_status_announcement(event: &A11yEvent) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ARIA role/label management
+// ---------------------------------------------------------------------------
+
+/// Standard ARIA roles for UI components.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AriaRole {
+    Button,
+    Dialog,
+    Menu,
+    MenuItem,
+    Tab,
+    TabPanel,
+    TabList,
+    TreeItem,
+    Tree,
+    Toolbar,
+    Status,
+    Alert,
+    Region,
+    Navigation,
+    Complementary,
+    Main,
+}
+
+impl fmt::Display for AriaRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Button => "button",
+            Self::Dialog => "dialog",
+            Self::Menu => "menu",
+            Self::MenuItem => "menuitem",
+            Self::Tab => "tab",
+            Self::TabPanel => "tabpanel",
+            Self::TabList => "tablist",
+            Self::TreeItem => "treeitem",
+            Self::Tree => "tree",
+            Self::Toolbar => "toolbar",
+            Self::Status => "status",
+            Self::Alert => "alert",
+            Self::Region => "region",
+            Self::Navigation => "navigation",
+            Self::Complementary => "complementary",
+            Self::Main => "main",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// ARIA attributes attached to a UI component.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AriaAttributes {
+    pub role: AriaRole,
+    pub label: String,
+    pub described_by: Option<String>,
+    pub live: Option<AnnouncementPriority>,
+    pub expanded: Option<bool>,
+    pub hidden: bool,
+}
+
+impl AriaAttributes {
+    pub fn new(role: AriaRole, label: impl Into<String>) -> Self {
+        Self {
+            role,
+            label: label.into(),
+            described_by: None,
+            live: None,
+            expanded: None,
+            hidden: false,
+        }
+    }
+
+    pub fn with_described_by(mut self, desc: impl Into<String>) -> Self {
+        self.described_by = Some(desc.into());
+        self
+    }
+
+    pub fn with_live(mut self, priority: AnnouncementPriority) -> Self {
+        self.live = Some(priority);
+        self
+    }
+
+    pub fn with_expanded(mut self, expanded: bool) -> Self {
+        self.expanded = Some(expanded);
+        self
+    }
+}
+
+/// Registry mapping component IDs to their ARIA attributes.
+#[derive(Debug, Clone, Default)]
+pub struct AriaRegistry {
+    components: HashMap<String, AriaAttributes>,
+}
+
+impl AriaRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, id: impl Into<String>, attrs: AriaAttributes) {
+        self.components.insert(id.into(), attrs);
+    }
+
+    pub fn unregister(&mut self, id: &str) -> Option<AriaAttributes> {
+        self.components.remove(id)
+    }
+
+    pub fn get(&self, id: &str) -> Option<&AriaAttributes> {
+        self.components.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut AriaAttributes> {
+        self.components.get_mut(id)
+    }
+
+    /// Find all components with a specific role.
+    pub fn find_by_role(&self, role: AriaRole) -> Vec<(&str, &AriaAttributes)> {
+        self.components
+            .iter()
+            .filter(|(_, attrs)| attrs.role == role)
+            .map(|(id, attrs)| (id.as_str(), attrs))
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.components.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.components.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Focus trap management for modal dialogs
+// ---------------------------------------------------------------------------
+
+/// Represents a focusable element within a focus trap.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FocusableElement {
+    pub id: String,
+    pub label: String,
+    pub enabled: bool,
+}
+
+/// Manages focus trapping within a modal dialog or panel so that keyboard
+/// navigation (Tab / Shift+Tab) cycles only within the trapped elements.
+#[derive(Debug, Clone)]
+pub struct FocusTrap {
+    elements: Vec<FocusableElement>,
+    active_index: Option<usize>,
+    trap_active: bool,
+}
+
+impl FocusTrap {
+    pub fn new() -> Self {
+        Self {
+            elements: Vec::new(),
+            active_index: None,
+            trap_active: false,
+        }
+    }
+
+    pub fn activate(&mut self) {
+        self.trap_active = true;
+        if !self.focusable_indices().is_empty() && self.active_index.is_none() {
+            self.active_index = self.focusable_indices().into_iter().next();
+        }
+    }
+
+    pub fn deactivate(&mut self) {
+        self.trap_active = false;
+        self.active_index = None;
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.trap_active
+    }
+
+    pub fn add_element(&mut self, id: impl Into<String>, label: impl Into<String>) {
+        self.elements.push(FocusableElement {
+            id: id.into(),
+            label: label.into(),
+            enabled: true,
+        });
+    }
+
+    pub fn set_enabled(&mut self, id: &str, enabled: bool) {
+        if let Some(el) = self.elements.iter_mut().find(|e| e.id == id) {
+            el.enabled = enabled;
+        }
+    }
+
+    fn focusable_indices(&self) -> Vec<usize> {
+        self.elements
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.enabled)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Move focus to the next enabled element, wrapping around.
+    pub fn focus_next(&mut self) -> Option<&FocusableElement> {
+        if !self.trap_active {
+            return None;
+        }
+        let indices = self.focusable_indices();
+        if indices.is_empty() {
+            return None;
+        }
+        let next = match self.active_index {
+            Some(cur) => {
+                let pos = indices.iter().position(|&i| i == cur).unwrap_or(0);
+                indices[(pos + 1) % indices.len()]
+            }
+            None => indices[0],
+        };
+        self.active_index = Some(next);
+        Some(&self.elements[next])
+    }
+
+    /// Move focus to the previous enabled element, wrapping around.
+    pub fn focus_prev(&mut self) -> Option<&FocusableElement> {
+        if !self.trap_active {
+            return None;
+        }
+        let indices = self.focusable_indices();
+        if indices.is_empty() {
+            return None;
+        }
+        let prev = match self.active_index {
+            Some(cur) => {
+                let pos = indices.iter().position(|&i| i == cur).unwrap_or(0);
+                indices[(pos + indices.len() - 1) % indices.len()]
+            }
+            None => *indices.last().unwrap(),
+        };
+        self.active_index = Some(prev);
+        Some(&self.elements[prev])
+    }
+
+    /// Return the currently focused element, if any.
+    pub fn focused(&self) -> Option<&FocusableElement> {
+        self.active_index
+            .and_then(|i| self.elements.get(i))
+            .filter(|_| self.trap_active)
+    }
+
+    pub fn element_count(&self) -> usize {
+        self.elements.len()
+    }
+}
+
+impl Default for FocusTrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation path tracking
+// ---------------------------------------------------------------------------
+
+/// Records the sequence of UI regions the user has navigated through via
+/// keyboard shortcuts, enabling breadcrumb-style announcements and
+/// back-navigation.
+#[derive(Debug, Clone)]
+pub struct NavigationPath {
+    path: Vec<String>,
+    max_depth: usize,
+}
+
+impl NavigationPath {
+    pub fn new(max_depth: usize) -> Self {
+        Self {
+            path: Vec::new(),
+            max_depth,
+        }
+    }
+
+    /// Push a new region onto the navigation stack. If the stack exceeds
+    /// `max_depth`, the oldest entry is removed.
+    pub fn push(&mut self, region: impl Into<String>) {
+        if self.path.len() >= self.max_depth {
+            self.path.remove(0);
+        }
+        self.path.push(region.into());
+    }
+
+    /// Pop the most recent region, returning it.
+    pub fn pop(&mut self) -> Option<String> {
+        self.path.pop()
+    }
+
+    /// Return the current (most recently pushed) region.
+    pub fn current(&self) -> Option<&str> {
+        self.path.last().map(|s| s.as_str())
+    }
+
+    /// Generate a breadcrumb string like "Editor > File Tree > Search".
+    pub fn breadcrumb(&self) -> String {
+        self.path.join(" > ")
+    }
+
+    pub fn depth(&self) -> usize {
+        self.path.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.path.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.path.clear();
+    }
+
+    /// Return a screen-reader-friendly announcement describing the current
+    /// navigation position.
+    pub fn announce(&self) -> String {
+        match self.current() {
+            Some(region) => format!("Navigated to {region}. Path: {}", self.breadcrumb()),
+            None => "No navigation history".to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1526,5 +1853,150 @@ mod tests {
     fn a11y_event_selection_changed() {
         let event = A11yEvent::SelectionChanged { lines: 3, chars: 120 };
         assert_eq!(a11y_status_announcement(&event), "Selected 3 lines, 120 characters");
+    }
+
+    // -----------------------------------------------------------------------
+    // ARIA registry tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn aria_registry_register_and_find_by_role() {
+        let mut reg = AriaRegistry::new();
+        reg.register("btn-save", AriaAttributes::new(AriaRole::Button, "Save"));
+        reg.register("btn-cancel", AriaAttributes::new(AriaRole::Button, "Cancel"));
+        reg.register("main-content", AriaAttributes::new(AriaRole::Main, "Editor"));
+
+        assert_eq!(reg.len(), 3);
+
+        let buttons = reg.find_by_role(AriaRole::Button);
+        assert_eq!(buttons.len(), 2);
+
+        let mains = reg.find_by_role(AriaRole::Main);
+        assert_eq!(mains.len(), 1);
+        assert_eq!(mains[0].1.label, "Editor");
+
+        assert!(reg.find_by_role(AriaRole::Dialog).is_empty());
+    }
+
+    #[test]
+    fn aria_attributes_builder_methods() {
+        let attrs = AriaAttributes::new(AriaRole::Dialog, "Settings")
+            .with_described_by("settings-desc")
+            .with_live(AnnouncementPriority::Polite)
+            .with_expanded(true);
+
+        assert_eq!(attrs.role, AriaRole::Dialog);
+        assert_eq!(attrs.label, "Settings");
+        assert_eq!(attrs.described_by.as_deref(), Some("settings-desc"));
+        assert_eq!(attrs.live, Some(AnnouncementPriority::Polite));
+        assert_eq!(attrs.expanded, Some(true));
+        assert!(!attrs.hidden);
+    }
+
+    // -----------------------------------------------------------------------
+    // Focus trap tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn focus_trap_cycles_through_elements() {
+        let mut trap = FocusTrap::new();
+        trap.add_element("ok", "OK");
+        trap.add_element("cancel", "Cancel");
+        trap.add_element("help", "Help");
+        trap.activate();
+
+        // First focus_next should land on element 0 (we started there via activate)
+        // then advance to 1
+        let el = trap.focus_next().unwrap();
+        assert_eq!(el.id, "cancel");
+
+        let el = trap.focus_next().unwrap();
+        assert_eq!(el.id, "help");
+
+        // Wrap around
+        let el = trap.focus_next().unwrap();
+        assert_eq!(el.id, "ok");
+    }
+
+    #[test]
+    fn focus_trap_skips_disabled_elements() {
+        let mut trap = FocusTrap::new();
+        trap.add_element("a", "A");
+        trap.add_element("b", "B");
+        trap.add_element("c", "C");
+        trap.set_enabled("b", false);
+        trap.activate();
+
+        // Starts on "a" (index 0), next skips "b" → "c"
+        let el = trap.focus_next().unwrap();
+        assert_eq!(el.id, "c");
+
+        // Wraps back to "a"
+        let el = trap.focus_next().unwrap();
+        assert_eq!(el.id, "a");
+    }
+
+    #[test]
+    fn focus_trap_prev_wraps() {
+        let mut trap = FocusTrap::new();
+        trap.add_element("x", "X");
+        trap.add_element("y", "Y");
+        trap.add_element("z", "Z");
+        trap.activate();
+
+        // Currently at index 0, prev wraps to last
+        let el = trap.focus_prev().unwrap();
+        assert_eq!(el.id, "z");
+
+        let el = trap.focus_prev().unwrap();
+        assert_eq!(el.id, "y");
+    }
+
+    #[test]
+    fn focus_trap_inactive_returns_none() {
+        let mut trap = FocusTrap::new();
+        trap.add_element("a", "A");
+        assert!(!trap.is_active());
+        assert!(trap.focus_next().is_none());
+        assert!(trap.focused().is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Navigation path tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn navigation_path_breadcrumb_and_depth() {
+        let mut nav = NavigationPath::new(10);
+        assert!(nav.is_empty());
+        assert_eq!(nav.announce(), "No navigation history");
+
+        nav.push("Editor");
+        nav.push("File Tree");
+        nav.push("Search");
+
+        assert_eq!(nav.depth(), 3);
+        assert_eq!(nav.current(), Some("Search"));
+        assert_eq!(nav.breadcrumb(), "Editor > File Tree > Search");
+        assert_eq!(
+            nav.announce(),
+            "Navigated to Search. Path: Editor > File Tree > Search"
+        );
+
+        let popped = nav.pop();
+        assert_eq!(popped.as_deref(), Some("Search"));
+        assert_eq!(nav.current(), Some("File Tree"));
+    }
+
+    #[test]
+    fn navigation_path_respects_max_depth() {
+        let mut nav = NavigationPath::new(3);
+        nav.push("A");
+        nav.push("B");
+        nav.push("C");
+        nav.push("D"); // should evict "A"
+
+        assert_eq!(nav.depth(), 3);
+        assert_eq!(nav.breadcrumb(), "B > C > D");
     }
 }

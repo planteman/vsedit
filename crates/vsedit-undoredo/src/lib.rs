@@ -904,6 +904,230 @@ impl<T: Clone + fmt::Display> UndoRedoStack<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EditKind — categorise edits for selective undo
+// ---------------------------------------------------------------------------
+
+/// Categorises an edit operation for selective undo filtering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EditKind {
+    /// A character or text insertion.
+    Insert,
+    /// A deletion (backspace, delete, cut).
+    Delete,
+    /// A replacement (select-then-type, find-and-replace).
+    Replace,
+    /// Formatting-only change (indent, whitespace normalisation).
+    Format,
+    /// Any other edit that does not fit the above categories.
+    Other,
+}
+
+impl fmt::Display for EditKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Insert => write!(f, "insert"),
+            Self::Delete => write!(f, "delete"),
+            Self::Replace => write!(f, "replace"),
+            Self::Format => write!(f, "format"),
+            Self::Other => write!(f, "other"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaggedEdit — an edit value paired with its kind
+// ---------------------------------------------------------------------------
+
+/// Wraps an edit value together with an [`EditKind`] tag so that the undo
+/// system can reason about edit categories without knowing `T`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaggedEdit<T> {
+    pub kind: EditKind,
+    pub value: T,
+    /// Optional human-readable description of this edit.
+    pub description: Option<String>,
+}
+
+impl<T> TaggedEdit<T> {
+    pub fn new(kind: EditKind, value: T) -> Self {
+        Self {
+            kind,
+            value,
+            description: None,
+        }
+    }
+
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for TaggedEdit<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.description {
+            Some(d) => write!(f, "[{}] {} ({})", self.kind, self.value, d),
+            None => write!(f, "[{}] {}", self.kind, self.value),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Selective undo — filter undo history by EditKind
+// ---------------------------------------------------------------------------
+
+impl<T: Clone> UndoRedoStack<TaggedEdit<T>> {
+    /// Remove and return the most recent undo entry whose kind matches `kind`,
+    /// shifting later entries to preserve order. Returns `None` if no matching
+    /// entry exists.
+    pub fn selective_undo(&mut self, kind: EditKind) -> Option<TaggedEdit<T>> {
+        let pos = self.past.iter().rposition(|e| e.kind == kind)?;
+        let entry = self.past.remove(pos);
+        Some(entry)
+    }
+
+    /// Count how many undo entries match the given `kind`.
+    pub fn count_by_kind(&self, kind: EditKind) -> usize {
+        self.past.iter().filter(|e| e.kind == kind).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MemoryBudget — track estimated memory consumption of the undo stack
+// ---------------------------------------------------------------------------
+
+/// Trait for types that can estimate their in-memory size in bytes.
+pub trait EstimateSize {
+    fn estimated_size(&self) -> usize;
+}
+
+impl EstimateSize for String {
+    fn estimated_size(&self) -> usize {
+        std::mem::size_of::<String>() + self.capacity()
+    }
+}
+
+impl EstimateSize for Vec<u8> {
+    fn estimated_size(&self) -> usize {
+        std::mem::size_of::<Vec<u8>>() + self.capacity()
+    }
+}
+
+/// Tracks the memory budget consumed by an undo stack.
+#[derive(Debug, Clone)]
+pub struct MemoryBudget {
+    /// Maximum allowed bytes.
+    pub limit: usize,
+    /// Currently consumed bytes.
+    pub used: usize,
+}
+
+impl MemoryBudget {
+    pub fn new(limit: usize) -> Self {
+        Self { limit, used: 0 }
+    }
+
+    /// Record that `bytes` have been added to the budget.
+    pub fn add(&mut self, bytes: usize) {
+        self.used = self.used.saturating_add(bytes);
+    }
+
+    /// Record that `bytes` have been freed from the budget.
+    pub fn free(&mut self, bytes: usize) {
+        self.used = self.used.saturating_sub(bytes);
+    }
+
+    /// Returns `true` if `additional` bytes would exceed the budget.
+    pub fn would_exceed(&self, additional: usize) -> bool {
+        self.used.saturating_add(additional) > self.limit
+    }
+
+    /// Remaining bytes before the budget is exhausted.
+    pub fn remaining(&self) -> usize {
+        self.limit.saturating_sub(self.used)
+    }
+
+    /// Fraction of the budget consumed, in the range `0.0..=1.0`.
+    pub fn utilisation(&self) -> f64 {
+        if self.limit == 0 {
+            return 1.0;
+        }
+        self.used as f64 / self.limit as f64
+    }
+}
+
+impl fmt::Display for MemoryBudget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MemoryBudget({}/{} bytes, {:.1}%)",
+            self.used,
+            self.limit,
+            self.utilisation() * 100.0,
+        )
+    }
+}
+
+impl<T: Clone + EstimateSize> UndoRedoStack<T> {
+    /// Push an item while respecting a memory budget, evicting oldest entries
+    /// as needed. Returns the number of entries evicted.
+    pub fn push_budgeted(&mut self, item: T, budget: &mut MemoryBudget) -> usize {
+        let item_size = item.estimated_size();
+        let mut evicted = 0;
+        while budget.would_exceed(item_size) && !self.past.is_empty() {
+            let old = self.past.remove(0);
+            budget.free(old.estimated_size());
+            evicted += 1;
+        }
+        budget.add(item_size);
+        self.past.push(item);
+        self.future.clear();
+        evicted
+    }
+
+    /// Compute the total estimated memory used by all undo entries.
+    pub fn estimated_memory(&self) -> usize {
+        self.past.iter().map(|e| e.estimated_size()).sum::<usize>()
+            + self.future.iter().map(|e| e.estimated_size()).sum::<usize>()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UndoStats — summary statistics about the undo stack
+// ---------------------------------------------------------------------------
+
+/// Snapshot of undo/redo stack statistics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UndoStats {
+    pub undo_depth: usize,
+    pub redo_depth: usize,
+    pub total_entries: usize,
+    pub has_capacity_limit: bool,
+}
+
+impl<T: Clone> UndoRedoStack<T> {
+    /// Gather a snapshot of the current stack statistics.
+    pub fn stats(&self) -> UndoStats {
+        UndoStats {
+            undo_depth: self.past.len(),
+            redo_depth: self.future.len(),
+            total_entries: self.past.len() + self.future.len(),
+            has_capacity_limit: self.capacity.is_some(),
+        }
+    }
+}
+
+impl fmt::Display for UndoStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UndoStats(undo={}, redo={}, total={}, capped={})",
+            self.undo_depth, self.redo_depth, self.total_entries, self.has_capacity_limit,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1584,5 +1808,121 @@ mod tests {
         let display = format!("{}", tl[0]);
         assert!(display.contains("←"));
         assert!(display.contains("alpha"));
+    }
+
+    // -- EditKind & TaggedEdit tests -----------------------------------------
+
+    #[test]
+    fn edit_kind_display() {
+        assert_eq!(EditKind::Insert.to_string(), "insert");
+        assert_eq!(EditKind::Delete.to_string(), "delete");
+        assert_eq!(EditKind::Replace.to_string(), "replace");
+        assert_eq!(EditKind::Format.to_string(), "format");
+        assert_eq!(EditKind::Other.to_string(), "other");
+    }
+
+    #[test]
+    fn tagged_edit_with_description() {
+        let edit = TaggedEdit::new(EditKind::Insert, "hello")
+            .with_description("typed greeting");
+        assert_eq!(edit.kind, EditKind::Insert);
+        assert_eq!(edit.value, "hello");
+        assert_eq!(edit.description.as_deref(), Some("typed greeting"));
+        let display = format!("{edit}");
+        assert!(display.contains("[insert]"));
+        assert!(display.contains("hello"));
+        assert!(display.contains("typed greeting"));
+    }
+
+    // -- Selective undo tests ------------------------------------------------
+
+    #[test]
+    fn selective_undo_removes_matching_kind() {
+        let mut stack: UndoRedoStack<TaggedEdit<&str>> = UndoRedoStack::new();
+        stack.push(TaggedEdit::new(EditKind::Insert, "a"));
+        stack.push(TaggedEdit::new(EditKind::Delete, "b"));
+        stack.push(TaggedEdit::new(EditKind::Insert, "c"));
+
+        assert_eq!(stack.count_by_kind(EditKind::Insert), 2);
+        let removed = stack.selective_undo(EditKind::Insert).unwrap();
+        assert_eq!(removed.value, "c");
+        assert_eq!(stack.count_by_kind(EditKind::Insert), 1);
+        assert_eq!(stack.undo_count(), 2);
+    }
+
+    #[test]
+    fn selective_undo_returns_none_when_no_match() {
+        let mut stack: UndoRedoStack<TaggedEdit<i32>> = UndoRedoStack::new();
+        stack.push(TaggedEdit::new(EditKind::Insert, 1));
+        assert!(stack.selective_undo(EditKind::Format).is_none());
+        assert_eq!(stack.undo_count(), 1);
+    }
+
+    // -- MemoryBudget tests --------------------------------------------------
+
+    #[test]
+    fn memory_budget_tracking() {
+        let mut budget = MemoryBudget::new(1000);
+        assert_eq!(budget.remaining(), 1000);
+        assert!(!budget.would_exceed(500));
+
+        budget.add(600);
+        assert_eq!(budget.used, 600);
+        assert_eq!(budget.remaining(), 400);
+        assert!(budget.would_exceed(500));
+        assert!(!budget.would_exceed(400));
+
+        budget.free(200);
+        assert_eq!(budget.used, 400);
+
+        let display = format!("{budget}");
+        assert!(display.contains("400/1000 bytes"));
+    }
+
+    #[test]
+    fn push_budgeted_evicts_oldest() {
+        let mut stack: UndoRedoStack<String> = UndoRedoStack::new();
+        // Each String has overhead (~24 bytes on 64-bit) plus content capacity.
+        // Use a small budget to force evictions.
+        let mut budget = MemoryBudget::new(200);
+
+        // Push strings that will eventually exceed the budget.
+        let s1 = "a".repeat(60);
+        let s2 = "b".repeat(60);
+        let s3 = "c".repeat(60);
+        let evicted1 = stack.push_budgeted(s1, &mut budget);
+        assert_eq!(evicted1, 0);
+        let evicted2 = stack.push_budgeted(s2, &mut budget);
+        assert_eq!(evicted2, 0);
+        // Third push should evict at least one entry to stay within budget.
+        let evicted3 = stack.push_budgeted(s3, &mut budget);
+        assert!(evicted3 >= 1);
+        // Stack should still have entries and budget should be within limit.
+        assert!(stack.undo_count() >= 1);
+        assert!(budget.used <= budget.limit);
+    }
+
+    // -- UndoStats tests -----------------------------------------------------
+
+    #[test]
+    fn stats_snapshot() {
+        let mut stack = UndoRedoStack::new();
+        stack.push(1);
+        stack.push(2);
+        stack.push(3);
+        stack.undo();
+
+        let s = stack.stats();
+        assert_eq!(s.undo_depth, 2);
+        assert_eq!(s.redo_depth, 1);
+        assert_eq!(s.total_entries, 3);
+        assert!(!s.has_capacity_limit);
+
+        let display = format!("{s}");
+        assert!(display.contains("undo=2"));
+        assert!(display.contains("redo=1"));
+
+        let capped: UndoRedoStack<i32> = UndoRedoStack::with_capacity(5);
+        assert!(capped.stats().has_capacity_limit);
     }
 }

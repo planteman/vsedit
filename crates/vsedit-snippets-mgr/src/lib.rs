@@ -917,6 +917,208 @@ pub fn reindent_snippet_body(body: &[String], base_indent: &str) -> Vec<String> 
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Snippet categorization / tagging
+// ---------------------------------------------------------------------------
+
+/// A snippet with associated tags for categorization.
+#[derive(Debug, Clone)]
+pub struct TaggedSnippet {
+    pub snippet: Snippet,
+    pub tags: Vec<String>,
+    pub enabled: bool,
+}
+
+/// Manages snippets organized by tags/categories.
+pub struct SnippetCatalog {
+    entries: Vec<TaggedSnippet>,
+}
+
+impl SnippetCatalog {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add a snippet with tags.
+    pub fn add(&mut self, snippet: Snippet, tags: Vec<String>) {
+        self.entries.push(TaggedSnippet {
+            snippet,
+            tags,
+            enabled: true,
+        });
+    }
+
+    /// Find all snippets that have the given tag.
+    pub fn find_by_tag(&self, tag: &str) -> Vec<&TaggedSnippet> {
+        self.entries
+            .iter()
+            .filter(|e| e.tags.iter().any(|t| t == tag))
+            .collect()
+    }
+
+    /// Return all unique tags sorted alphabetically.
+    pub fn all_tags(&self) -> Vec<String> {
+        let mut tags: Vec<String> = self
+            .entries
+            .iter()
+            .flat_map(|e| e.tags.iter().cloned())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        tags.sort();
+        tags
+    }
+
+    /// Disable all snippets that have the given tag.
+    pub fn disable_by_tag(&mut self, tag: &str) -> usize {
+        let mut count = 0;
+        for entry in &mut self.entries {
+            if entry.enabled && entry.tags.iter().any(|t| t == tag) {
+                entry.enabled = false;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Enable all snippets that have the given tag.
+    pub fn enable_by_tag(&mut self, tag: &str) -> usize {
+        let mut count = 0;
+        for entry in &mut self.entries {
+            if !entry.enabled && entry.tags.iter().any(|t| t == tag) {
+                entry.enabled = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Return only enabled snippets.
+    pub fn enabled_snippets(&self) -> Vec<&Snippet> {
+        self.entries
+            .iter()
+            .filter(|e| e.enabled)
+            .map(|e| &e.snippet)
+            .collect()
+    }
+
+    /// Return only disabled snippets.
+    pub fn disabled_snippets(&self) -> Vec<&Snippet> {
+        self.entries
+            .iter()
+            .filter(|e| !e.enabled)
+            .map(|e| &e.snippet)
+            .collect()
+    }
+
+    /// Total number of catalog entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the catalog is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for SnippetCatalog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet sorting by usage frequency
+// ---------------------------------------------------------------------------
+
+/// Sort snippets by their usage frequency (most-used first).
+/// Snippets not present in `usage` are treated as having zero uses.
+pub fn sort_snippets_by_usage(snippets: &mut [Snippet], usage: &SnippetUsageTracker) {
+    snippets.sort_by(|a, b| {
+        let ua = usage.usage_count(&a.name);
+        let ub = usage.usage_count(&b.name);
+        ub.cmp(&ua)
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Snippet body complexity analysis
+// ---------------------------------------------------------------------------
+
+/// Metrics describing the complexity of a snippet body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnippetComplexity {
+    pub line_count: usize,
+    pub tabstop_count: usize,
+    pub has_choices: bool,
+    pub has_variables: bool,
+    pub nested_placeholders: bool,
+}
+
+/// Analyse a snippet body and return complexity metrics.
+pub fn analyse_snippet_complexity(body: &[String]) -> SnippetComplexity {
+    let joined = body.join("\n");
+    let tabstop_count = count_tabstops(&joined);
+
+    // Check for choice syntax: ${1|one,two,three|}
+    let has_choices = body.iter().any(|line| {
+        let chars: Vec<char> = line.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+        while i + 2 < len {
+            if chars[i] == '$' && chars[i + 1] == '{' {
+                // Skip the digit(s)
+                let mut j = i + 2;
+                while j < len && chars[j].is_ascii_digit() {
+                    j += 1;
+                }
+                if j < len && chars[j] == '|' {
+                    return true;
+                }
+            }
+            i += 1;
+        }
+        false
+    });
+
+    let has_variables = SnippetVariable::all()
+        .iter()
+        .any(|v| joined.contains(v.token()));
+
+    // Nested placeholders: ${1:${2:inner}}
+    let nested_placeholders = body.iter().any(|line| {
+        let mut depth = 0i32;
+        let chars: Vec<char> = line.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i] == '$' && i + 1 < chars.len() && chars[i + 1] == '{' {
+                depth += 1;
+                if depth > 1 {
+                    return true;
+                }
+                i += 2;
+                continue;
+            }
+            if chars[i] == '}' && depth > 0 {
+                depth -= 1;
+            }
+            i += 1;
+        }
+        false
+    });
+
+    SnippetComplexity {
+        line_count: body.len(),
+        tabstop_count,
+        has_choices,
+        has_variables,
+        nested_placeholders,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1569,5 +1771,135 @@ mod tests {
         assert_eq!(result[0], "if cond {");
         assert_eq!(result[1], "            do_thing();");
         assert_eq!(result[2], "        }");
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet catalog / tagging tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn catalog_add_and_find_by_tag() {
+        let mut catalog = SnippetCatalog::new();
+        catalog.add(
+            sample_snippet("for-loop", "for", Some("rust")),
+            vec!["loops".into(), "control-flow".into()],
+        );
+        catalog.add(
+            sample_snippet("if-else", "if", Some("rust")),
+            vec!["conditionals".into(), "control-flow".into()],
+        );
+        catalog.add(
+            sample_snippet("println", "pl", Some("rust")),
+            vec!["io".into()],
+        );
+
+        let cf = catalog.find_by_tag("control-flow");
+        assert_eq!(cf.len(), 2);
+
+        let io = catalog.find_by_tag("io");
+        assert_eq!(io.len(), 1);
+        assert_eq!(io[0].snippet.name, "println");
+
+        assert_eq!(catalog.find_by_tag("nonexistent").len(), 0);
+    }
+
+    #[test]
+    fn catalog_all_tags_sorted() {
+        let mut catalog = SnippetCatalog::new();
+        catalog.add(
+            sample_snippet("a", "a", None),
+            vec!["zebra".into(), "alpha".into()],
+        );
+        catalog.add(
+            sample_snippet("b", "b", None),
+            vec!["beta".into(), "alpha".into()],
+        );
+        let tags = catalog.all_tags();
+        assert_eq!(tags, vec!["alpha", "beta", "zebra"]);
+    }
+
+    #[test]
+    fn catalog_bulk_enable_disable_by_tag() {
+        let mut catalog = SnippetCatalog::new();
+        catalog.add(
+            sample_snippet("for", "for", None),
+            vec!["loops".into()],
+        );
+        catalog.add(
+            sample_snippet("while", "while", None),
+            vec!["loops".into()],
+        );
+        catalog.add(
+            sample_snippet("if", "if", None),
+            vec!["conditionals".into()],
+        );
+
+        assert_eq!(catalog.enabled_snippets().len(), 3);
+
+        let disabled = catalog.disable_by_tag("loops");
+        assert_eq!(disabled, 2);
+        assert_eq!(catalog.enabled_snippets().len(), 1);
+        assert_eq!(catalog.disabled_snippets().len(), 2);
+        assert_eq!(catalog.enabled_snippets()[0].name, "if");
+
+        // Disabling again should change nothing.
+        assert_eq!(catalog.disable_by_tag("loops"), 0);
+
+        let enabled = catalog.enable_by_tag("loops");
+        assert_eq!(enabled, 2);
+        assert_eq!(catalog.enabled_snippets().len(), 3);
+    }
+
+    #[test]
+    fn sort_snippets_by_usage_orders_most_used_first() {
+        let mut tracker = SnippetUsageTracker::new();
+        tracker.record_use("c");
+        tracker.record_use("a");
+        tracker.record_use("a");
+        tracker.record_use("a");
+        tracker.record_use("b");
+        tracker.record_use("b");
+
+        let mut snippets = vec![
+            sample_snippet("b", "b", None),
+            sample_snippet("c", "c", None),
+            sample_snippet("a", "a", None),
+        ];
+        sort_snippets_by_usage(&mut snippets, &tracker);
+        assert_eq!(snippets[0].name, "a"); // 3 uses
+        assert_eq!(snippets[1].name, "b"); // 2 uses
+        assert_eq!(snippets[2].name, "c"); // 1 use
+    }
+
+    #[test]
+    fn analyse_complexity_simple_body() {
+        let body = vec!["let ${1:name} = $2;".into()];
+        let c = analyse_snippet_complexity(&body);
+        assert_eq!(c.line_count, 1);
+        assert_eq!(c.tabstop_count, 2);
+        assert!(!c.has_choices);
+        assert!(!c.has_variables);
+        assert!(!c.nested_placeholders);
+    }
+
+    #[test]
+    fn analyse_complexity_with_choices_and_variables() {
+        let body = vec![
+            "// $TM_FILENAME".into(),
+            "${1|pub,pub(crate),pub(super)|} fn ${2:name}() {".into(),
+            "    $0".into(),
+            "}".into(),
+        ];
+        let c = analyse_snippet_complexity(&body);
+        assert_eq!(c.line_count, 4);
+        assert!(c.has_choices);
+        assert!(c.has_variables);
+    }
+
+    #[test]
+    fn analyse_complexity_nested_placeholders() {
+        let body = vec!["${1:outer ${2:inner}}".into()];
+        let c = analyse_snippet_complexity(&body);
+        assert!(c.nested_placeholders);
     }
 }

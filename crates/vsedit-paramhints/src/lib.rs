@@ -802,6 +802,316 @@ impl SignatureHelpWidget {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Active parameter tracking via cursor position & comma counting
+// ---------------------------------------------------------------------------
+
+/// Determine which parameter is active based on the cursor position within
+/// a call expression.  The function counts top-level commas (respecting
+/// nested parentheses, brackets, braces, and string literals) to the left
+/// of `cursor_offset` within `text`.
+///
+/// Returns `None` if the cursor is not inside a parenthesised argument list.
+pub fn active_parameter_from_cursor(text: &str, cursor_offset: usize) -> Option<u32> {
+    let bytes = text.as_bytes();
+    let len = bytes.len().min(cursor_offset);
+
+    // Walk backwards to find the matching open-paren for the innermost call.
+    let mut depth: i32 = 0;
+    let mut open_paren_pos: Option<usize> = None;
+    for i in (0..len).rev() {
+        match bytes[i] {
+            b')' | b']' | b'}' => depth += 1,
+            b'(' | b'[' | b'{' => {
+                if depth == 0 {
+                    open_paren_pos = Some(i);
+                    break;
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    let start = open_paren_pos? + 1;
+
+    // Count top-level commas between open_paren_pos+1 and cursor_offset.
+    let mut commas: u32 = 0;
+    let mut nest: i32 = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    for &b in &bytes[start..len] {
+        if escape {
+            escape = false;
+            continue;
+        }
+        if b == b'\\' && in_string {
+            escape = true;
+            continue;
+        }
+        if b == b'"' {
+            in_string = !in_string;
+            continue;
+        }
+        if in_string {
+            continue;
+        }
+        match b {
+            b'(' | b'[' | b'{' => nest += 1,
+            b')' | b']' | b'}' => nest -= 1,
+            b',' if nest == 0 => commas += 1,
+            _ => {}
+        }
+    }
+    Some(commas)
+}
+
+// ---------------------------------------------------------------------------
+// Markdown documentation → plain-text stripping
+// ---------------------------------------------------------------------------
+
+/// Strip common markdown formatting from documentation text, producing a
+/// plain-text approximation suitable for a minimal terminal overlay.
+///
+/// Handles: bold/italic markers, inline code backticks, code fences,
+/// heading `#` prefixes, link syntax `[text](url)`, and HTML `<tags>`.
+pub fn strip_markdown(md: &str) -> String {
+    let mut out = String::with_capacity(md.len());
+    let mut in_fence = false;
+
+    for line in md.lines() {
+        let trimmed = line.trim();
+
+        // Toggle fenced code blocks.
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+
+        if in_fence {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+
+        // Strip heading markers.
+        let stripped = trimmed.trim_start_matches('#').trim_start();
+        // Strip bold/italic markers.
+        let stripped = stripped.replace("**", "").replace("__", "");
+        let stripped = stripped.replace('*', "").replace('_', " ");
+        // Strip inline backticks.
+        let stripped = stripped.replace('`', "");
+        // Strip link syntax [text](url) → text
+        let stripped = strip_markdown_links(&stripped);
+        // Strip simple HTML tags.
+        let stripped = strip_html_tags(&stripped);
+
+        if !stripped.is_empty() {
+            out.push_str(&stripped);
+            out.push('\n');
+        }
+    }
+
+    // Trim trailing newline.
+    if out.ends_with('\n') {
+        out.pop();
+    }
+    out
+}
+
+/// Replace `[text](url)` with just `text`.
+fn strip_markdown_links(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '[' {
+            let mut link_text = String::new();
+            let mut found_close = false;
+            for c in chars.by_ref() {
+                if c == ']' {
+                    found_close = true;
+                    break;
+                }
+                link_text.push(c);
+            }
+            if found_close && chars.peek() == Some(&'(') {
+                chars.next(); // skip '('
+                for c in chars.by_ref() {
+                    if c == ')' {
+                        break;
+                    }
+                }
+                result.push_str(&link_text);
+            } else {
+                result.push('[');
+                result.push_str(&link_text);
+                if found_close {
+                    result.push(']');
+                }
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+/// Remove HTML tags like `<br>`, `<code>`, etc.
+fn strip_html_tags(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for ch in s.chars() {
+        if ch == '<' {
+            in_tag = true;
+        } else if ch == '>' && in_tag {
+            in_tag = false;
+        } else if !in_tag {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Signature context extraction for nested calls
+// ---------------------------------------------------------------------------
+
+/// Information about the call site surrounding the cursor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallContext {
+    /// Name of the function being called (text immediately before the `(`).
+    pub function_name: String,
+    /// Byte offset of the opening parenthesis in the source text.
+    pub open_paren_offset: usize,
+    /// The active parameter index (0-based) at the cursor.
+    pub active_parameter: u32,
+}
+
+/// Extract the innermost [`CallContext`] at `cursor_offset` within `text`.
+///
+/// This is useful for nested calls like `foo(bar(1, |), 3)` where the cursor
+/// `|` is inside the inner `bar(…)` call.
+pub fn extract_call_context(text: &str, cursor_offset: usize) -> Option<CallContext> {
+    let bytes = text.as_bytes();
+    let len = bytes.len().min(cursor_offset);
+
+    // Walk backwards to find the innermost unmatched open-paren.
+    let mut depth: i32 = 0;
+    let mut open_pos: Option<usize> = None;
+    for i in (0..len).rev() {
+        match bytes[i] {
+            b')' | b']' | b'}' => depth += 1,
+            b'(' => {
+                if depth == 0 {
+                    open_pos = Some(i);
+                    break;
+                }
+                depth -= 1;
+            }
+            b'[' | b'{' => {
+                if depth == 0 {
+                    // Not a function call paren.
+                    return None;
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    let paren_pos = open_pos?;
+
+    // Extract the function name: scan backwards from paren_pos skipping
+    // whitespace, then collect identifier characters.
+    let mut name_end = paren_pos;
+    while name_end > 0 && bytes[name_end - 1] == b' ' {
+        name_end -= 1;
+    }
+    let mut name_start = name_end;
+    while name_start > 0
+        && (bytes[name_start - 1].is_ascii_alphanumeric()
+            || bytes[name_start - 1] == b'_'
+            || bytes[name_start - 1] == b'.'
+            || bytes[name_start - 1] == b':'
+            || bytes[name_start - 1] == b'!')
+    {
+        name_start -= 1;
+    }
+
+    let function_name = text[name_start..name_end].to_string();
+    if function_name.is_empty() {
+        return None;
+    }
+
+    let active_parameter = active_parameter_from_cursor(text, cursor_offset)?;
+
+    Some(CallContext {
+        function_name,
+        open_paren_offset: paren_pos,
+        active_parameter,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Parameter type annotation display formatting
+// ---------------------------------------------------------------------------
+
+/// Format a list of parameter labels into a compact type signature string.
+///
+/// Example: `["x: i32", "y: &str"]` → `"(i32, &str)"`.
+/// Parameters without type annotations are rendered as `_`.
+pub fn format_type_signature(params: &[ParameterInformation]) -> String {
+    let mut out = String::from("(");
+    for (i, p) in params.iter().enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        match extract_parameter_type(&p.label) {
+            Some(ty) => out.push_str(ty),
+            None => out.push('_'),
+        }
+    }
+    out.push(')');
+    out
+}
+
+/// Build a one-line summary of a signature: `name(type1, type2) -> …`
+/// The return type is extracted from the label if it contains `->`.
+pub fn format_signature_summary(sig: &SignatureInformation) -> String {
+    let types = format_type_signature(&sig.parameters);
+    let ret = sig
+        .label
+        .find("->")
+        .map(|pos| sig.label[pos..].trim())
+        .unwrap_or("");
+    let name = sig
+        .label
+        .split('(')
+        .next()
+        .unwrap_or(&sig.label)
+        .trim_start_matches("fn ")
+        .trim();
+    if ret.is_empty() {
+        format!("{name}{types}")
+    } else {
+        format!("{name}{types} {ret}")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Best-overload selection
+// ---------------------------------------------------------------------------
+
+/// Select the best overload index for the given number of arguments so far.
+/// Updates `help.active_signature` in place and returns the chosen index.
+pub fn select_best_overload(help: &mut SignatureHelp, arg_count: usize) -> Option<usize> {
+    if help.signatures.is_empty() {
+        return None;
+    }
+    let ranked = rank_overloads(&help.signatures, arg_count);
+    let best = *ranked.first()?;
+    help.active_signature = best as u32;
+    Some(best)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1540,5 +1850,157 @@ mod tests {
         let zero = SignatureHelpWidget { x: 0, y: 0, width: 0, height: 5 };
         assert!(!zero.is_visible());
         assert_eq!(zero.area(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Active parameter from cursor tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn active_param_from_cursor_simple() {
+        // foo(a, b, c)  — cursor after 'a' → param 0
+        let text = "foo(a, b, c)";
+        assert_eq!(active_parameter_from_cursor(text, 5), Some(0)); // after 'a'
+        assert_eq!(active_parameter_from_cursor(text, 7), Some(1)); // after first comma+space
+        assert_eq!(active_parameter_from_cursor(text, 10), Some(2)); // after second comma+space
+    }
+
+    #[test]
+    fn active_param_from_cursor_nested() {
+        // foo(bar(1, 2), c)  — cursor inside bar → param 1 of bar
+        let text = "foo(bar(1, 2), c)";
+        assert_eq!(active_parameter_from_cursor(text, 10), Some(1)); // inside bar, after comma
+        // cursor in outer call after the inner call closes
+        assert_eq!(active_parameter_from_cursor(text, 16), Some(1)); // at 'c' in outer foo
+    }
+
+    #[test]
+    fn active_param_from_cursor_strings() {
+        // Commas inside string literals should be ignored.
+        let text = r#"foo("a,b", c)"#;
+        assert_eq!(active_parameter_from_cursor(text, 11), Some(1)); // at 'c'
+        assert_eq!(active_parameter_from_cursor(text, 6), Some(0)); // inside string
+    }
+
+    #[test]
+    fn active_param_from_cursor_no_paren() {
+        // No open paren → None
+        assert_eq!(active_parameter_from_cursor("hello world", 5), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // Markdown stripping tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn strip_markdown_basic() {
+        let md = "## Hello\n\nThis is **bold** and `code`.";
+        let plain = strip_markdown(md);
+        assert!(plain.contains("Hello"));
+        assert!(plain.contains("bold"));
+        assert!(plain.contains("code"));
+        assert!(!plain.contains("**"));
+        assert!(!plain.contains('`'));
+        assert!(!plain.contains("##"));
+    }
+
+    #[test]
+    fn strip_markdown_links_and_fences() {
+        let md = "See [docs](https://example.com) for info.\n```\ncode block\n```";
+        let plain = strip_markdown(md);
+        assert!(plain.contains("See docs for info."));
+        assert!(plain.contains("code block"));
+        assert!(!plain.contains("https://"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Call context extraction tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn extract_call_context_simple() {
+        let text = "println!(hello, world)";
+        let ctx = extract_call_context(text, 20).unwrap();
+        assert_eq!(ctx.function_name, "println!");
+        assert_eq!(ctx.active_parameter, 1);
+    }
+
+    #[test]
+    fn extract_call_context_nested_inner() {
+        let text = "foo(bar(x, y), z)";
+        // cursor inside bar(…) at position 12 (after "bar(x, y")
+        let ctx = extract_call_context(text, 12).unwrap();
+        assert_eq!(ctx.function_name, "bar");
+        assert_eq!(ctx.active_parameter, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Type annotation formatting tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn format_type_signature_basic() {
+        let params = vec![
+            ParameterInformation { label: "x: i32".into(), documentation: None },
+            ParameterInformation { label: "y: &str".into(), documentation: None },
+        ];
+        assert_eq!(format_type_signature(&params), "(i32, &str)");
+    }
+
+    #[test]
+    fn format_type_signature_no_types() {
+        let params = vec![
+            ParameterInformation { label: "x".into(), documentation: None },
+        ];
+        assert_eq!(format_type_signature(&params), "(_)");
+    }
+
+    #[test]
+    fn format_signature_summary_with_return() {
+        let sig = SignatureInformation {
+            label: "fn add(a: i32, b: i32) -> i32".into(),
+            documentation: None,
+            parameters: vec![
+                ParameterInformation { label: "a: i32".into(), documentation: None },
+                ParameterInformation { label: "b: i32".into(), documentation: None },
+            ],
+            active_parameter: None,
+        };
+        assert_eq!(format_signature_summary(&sig), "add(i32, i32) -> i32");
+    }
+
+    // -----------------------------------------------------------------------
+    // Best-overload selection test
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn select_best_overload_picks_exact_match() {
+        let mut help = SignatureHelp {
+            signatures: vec![
+                SignatureInformation {
+                    label: "fn f(a: i32)".into(),
+                    documentation: None,
+                    parameters: vec![
+                        ParameterInformation { label: "a: i32".into(), documentation: None },
+                    ],
+                    active_parameter: None,
+                },
+                SignatureInformation {
+                    label: "fn f(a: i32, b: i32)".into(),
+                    documentation: None,
+                    parameters: vec![
+                        ParameterInformation { label: "a: i32".into(), documentation: None },
+                        ParameterInformation { label: "b: i32".into(), documentation: None },
+                    ],
+                    active_parameter: None,
+                },
+            ],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        // With 2 args the second overload should be selected.
+        let best = select_best_overload(&mut help, 2).unwrap();
+        assert_eq!(best, 1);
+        assert_eq!(help.active_signature, 1);
     }
 }

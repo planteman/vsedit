@@ -1076,6 +1076,295 @@ pub fn apply_case_transforms(input: &str, transforms: &[CaseTransform]) -> Strin
     result
 }
 
+// ---------------------------------------------------------------------------
+// Snippet complexity analysis
+// ---------------------------------------------------------------------------
+
+/// Summary statistics about a snippet's structure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnippetComplexity {
+    /// Number of plain text segments.
+    pub text_count: usize,
+    /// Number of tabstops (bare `$N`).
+    pub tabstop_count: usize,
+    /// Number of placeholders (`${N:default}`).
+    pub placeholder_count: usize,
+    /// Number of choice elements (`${N|a,b|}`).
+    pub choice_count: usize,
+    /// Total number of individual choice options across all choices.
+    pub total_choice_options: usize,
+    /// Number of variable references.
+    pub variable_count: usize,
+    /// Maximum nesting depth of placeholders.
+    pub max_depth: usize,
+}
+
+/// Analyse a snippet and return complexity metrics.
+pub fn snippet_complexity(snippet: &Snippet) -> SnippetComplexity {
+    let mut cx = SnippetComplexity {
+        text_count: 0,
+        tabstop_count: 0,
+        placeholder_count: 0,
+        choice_count: 0,
+        total_choice_options: 0,
+        variable_count: 0,
+        max_depth: 0,
+    };
+    for elem in &snippet.elements {
+        complexity_elem(elem, 1, &mut cx);
+    }
+    cx
+}
+
+fn complexity_elem(elem: &SnippetElement, depth: usize, cx: &mut SnippetComplexity) {
+    if depth > cx.max_depth {
+        cx.max_depth = depth;
+    }
+    match elem {
+        SnippetElement::Text(_) => cx.text_count += 1,
+        SnippetElement::Tabstop(_) => cx.tabstop_count += 1,
+        SnippetElement::Placeholder { default, .. } => {
+            cx.placeholder_count += 1;
+            for d in default {
+                complexity_elem(d, depth + 1, cx);
+            }
+        }
+        SnippetElement::Choice { choices, .. } => {
+            cx.choice_count += 1;
+            cx.total_choice_options += choices.len();
+        }
+        SnippetElement::Variable { default, .. } => {
+            cx.variable_count += 1;
+            if let Some(defaults) = default {
+                for d in defaults {
+                    complexity_elem(d, depth + 1, cx);
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet placeholder validation
+// ---------------------------------------------------------------------------
+
+/// A validation issue found in a snippet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SnippetIssue {
+    /// Two placeholders share the same index but have different default text.
+    ConflictingDefaults { index: u32, defaults: Vec<String> },
+    /// A tabstop index is referenced but never given a placeholder default.
+    BareTabstop { index: u32 },
+    /// No final tabstop (`$0`) found.
+    MissingFinalTabstop,
+}
+
+/// Validate a snippet and return any issues found.
+pub fn validate_snippet(snippet: &Snippet) -> Vec<SnippetIssue> {
+    let mut issues = Vec::new();
+    let mut defaults_map: HashMap<u32, Vec<String>> = HashMap::new();
+    let mut has_placeholder: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    let mut all_indices: std::collections::HashSet<u32> = std::collections::HashSet::new();
+
+    collect_validation_info(&snippet.elements, &mut defaults_map, &mut has_placeholder, &mut all_indices);
+
+    // Check for conflicting defaults
+    for (index, defs) in &defaults_map {
+        let mut unique: Vec<String> = defs.clone();
+        unique.sort();
+        unique.dedup();
+        if unique.len() > 1 {
+            issues.push(SnippetIssue::ConflictingDefaults {
+                index: *index,
+                defaults: unique,
+            });
+        }
+    }
+
+    // Check for bare tabstops (indices with no placeholder default)
+    for idx in &all_indices {
+        if *idx != 0 && !has_placeholder.contains(idx) {
+            issues.push(SnippetIssue::BareTabstop { index: *idx });
+        }
+    }
+
+    // Check for missing $0
+    if !all_indices.contains(&0) {
+        issues.push(SnippetIssue::MissingFinalTabstop);
+    }
+
+    issues.sort_by_key(|i| match i {
+        SnippetIssue::ConflictingDefaults { index, .. } => (0, *index),
+        SnippetIssue::BareTabstop { index } => (1, *index),
+        SnippetIssue::MissingFinalTabstop => (2, 0),
+    });
+    issues
+}
+
+fn collect_validation_info(
+    elements: &[SnippetElement],
+    defaults_map: &mut HashMap<u32, Vec<String>>,
+    has_placeholder: &mut std::collections::HashSet<u32>,
+    all_indices: &mut std::collections::HashSet<u32>,
+) {
+    for elem in elements {
+        match elem {
+            SnippetElement::Tabstop(idx) => {
+                all_indices.insert(*idx);
+            }
+            SnippetElement::Placeholder { index, default } => {
+                all_indices.insert(*index);
+                has_placeholder.insert(*index);
+                let text = default
+                    .iter()
+                    .filter_map(|e| if let SnippetElement::Text(t) = e { Some(t.as_str()) } else { None })
+                    .collect::<Vec<_>>()
+                    .join("");
+                defaults_map.entry(*index).or_default().push(text);
+                collect_validation_info(default, defaults_map, has_placeholder, all_indices);
+            }
+            SnippetElement::Choice { index, .. } => {
+                all_indices.insert(*index);
+                has_placeholder.insert(*index);
+            }
+            SnippetElement::Variable { default: Some(d), .. } => {
+                collect_validation_info(d, defaults_map, has_placeholder, all_indices);
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet normalization — reindex placeholders sequentially
+// ---------------------------------------------------------------------------
+
+/// Reindex all tabstop/placeholder/choice indices so they are sequential
+/// starting from 1, preserving `$0` as the final tabstop.
+pub fn normalize_indices(snippet: &Snippet) -> Snippet {
+    let existing = collect_tabstops(snippet);
+    // Build mapping: old index -> new index, keeping 0 as 0
+    let mut mapping: HashMap<u32, u32> = HashMap::new();
+    let mut next = 1u32;
+    for idx in &existing {
+        if *idx == 0 {
+            mapping.insert(0, 0);
+        } else {
+            mapping.insert(*idx, next);
+            next += 1;
+        }
+    }
+    let new_elements = remap_elements(&snippet.elements, &mapping);
+    Snippet { elements: new_elements }
+}
+
+fn remap_elements(elements: &[SnippetElement], mapping: &HashMap<u32, u32>) -> Vec<SnippetElement> {
+    elements
+        .iter()
+        .map(|elem| match elem {
+            SnippetElement::Text(t) => SnippetElement::Text(t.clone()),
+            SnippetElement::Tabstop(idx) => {
+                SnippetElement::Tabstop(*mapping.get(idx).unwrap_or(idx))
+            }
+            SnippetElement::Placeholder { index, default } => SnippetElement::Placeholder {
+                index: *mapping.get(index).unwrap_or(index),
+                default: remap_elements(default, mapping),
+            },
+            SnippetElement::Choice { index, choices } => SnippetElement::Choice {
+                index: *mapping.get(index).unwrap_or(index),
+                choices: choices.clone(),
+            },
+            SnippetElement::Variable { name, default } => SnippetElement::Variable {
+                name: name.clone(),
+                default: default.as_ref().map(|d| remap_elements(d, mapping)),
+            },
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Snippet merging — combine two snippets into one
+// ---------------------------------------------------------------------------
+
+/// Merge two snippets end-to-end, shifting the second snippet's tabstop
+/// indices so they don't collide with the first. The final tabstop (`$0`)
+/// is taken from the second snippet only.
+pub fn merge_snippets(a: &Snippet, b: &Snippet) -> Snippet {
+    let a_tabs = collect_tabstops(a);
+    let max_a = a_tabs.iter().filter(|&&i| i != 0).max().copied().unwrap_or(0);
+
+    // Shift b's indices by max_a (except 0 stays 0)
+    let mut mapping: HashMap<u32, u32> = HashMap::new();
+    let b_tabs = collect_tabstops(b);
+    for idx in &b_tabs {
+        if *idx == 0 {
+            mapping.insert(0, 0);
+        } else {
+            mapping.insert(*idx, idx + max_a);
+        }
+    }
+
+    // Remove $0 from a's elements (strip bare tabstop-0)
+    let a_elements: Vec<SnippetElement> = a
+        .elements
+        .iter()
+        .filter(|e| !matches!(e, SnippetElement::Tabstop(0)))
+        .cloned()
+        .collect();
+
+    let b_elements = remap_elements(&b.elements, &mapping);
+
+    let mut elements = a_elements;
+    elements.extend(b_elements);
+    Snippet { elements }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet template rendering with named context
+// ---------------------------------------------------------------------------
+
+/// Render a snippet body string by resolving variables from a simple
+/// key-value context map and expanding all placeholders to their defaults.
+pub fn render_template(body: &str, context: &HashMap<String, String>) -> String {
+    let mut vars = SnippetVariables::new();
+    for (k, v) in context {
+        vars.set(k, v);
+    }
+    let snippet = parse_snippet(body);
+    expand_snippet(&snippet, &vars)
+}
+
+// ---------------------------------------------------------------------------
+// Choice navigation helper
+// ---------------------------------------------------------------------------
+
+/// Given a list of choices and a current selection, return the next choice
+/// (wrapping around to the beginning).
+pub fn next_choice(choices: &[String], current: &str) -> Option<String> {
+    if choices.is_empty() {
+        return None;
+    }
+    let pos = choices.iter().position(|c| c == current);
+    match pos {
+        Some(i) => Some(choices[(i + 1) % choices.len()].clone()),
+        None => Some(choices[0].clone()),
+    }
+}
+
+/// Given a list of choices and a current selection, return the previous
+/// choice (wrapping around to the end).
+pub fn prev_choice(choices: &[String], current: &str) -> Option<String> {
+    if choices.is_empty() {
+        return None;
+    }
+    let pos = choices.iter().position(|c| c == current);
+    match pos {
+        Some(0) => Some(choices[choices.len() - 1].clone()),
+        Some(i) => Some(choices[i - 1].clone()),
+        None => Some(choices[choices.len() - 1].clone()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1570,5 +1859,129 @@ mod tests {
         let mut vars = SnippetVariables::new();
         vars.set("MY_VAR", "custom_value");
         assert_eq!(resolve_variable("MY_VAR", &vars), Some("custom_value".into()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet complexity analysis tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn complexity_counts_all_element_types() {
+        let s = parse_snippet("hello ${1:name} $2 ${3|a,b,c|} $TM_FILENAME end");
+        let cx = snippet_complexity(&s);
+        assert_eq!(cx.text_count, 6); // "hello ", "name", " ", " ", " ", " end"
+        assert_eq!(cx.placeholder_count, 1);
+        assert_eq!(cx.tabstop_count, 1);
+        assert_eq!(cx.choice_count, 1);
+        assert_eq!(cx.total_choice_options, 3);
+        assert_eq!(cx.variable_count, 1);
+    }
+
+    #[test]
+    fn complexity_nested_depth() {
+        // ${1:default} has depth 2 (placeholder at 1, text child at 2)
+        let s = parse_snippet("${1:inner}");
+        let cx = snippet_complexity(&s);
+        assert_eq!(cx.max_depth, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet validation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn validate_detects_missing_final_tabstop() {
+        let s = parse_snippet("${1:name} ${2:value}");
+        let issues = validate_snippet(&s);
+        assert!(issues.iter().any(|i| matches!(i, SnippetIssue::MissingFinalTabstop)));
+    }
+
+    #[test]
+    fn validate_detects_bare_tabstop() {
+        let s = parse_snippet("$1 ${2:has_default} $0");
+        let issues = validate_snippet(&s);
+        assert!(issues.iter().any(|i| matches!(i, SnippetIssue::BareTabstop { index: 1 })));
+    }
+
+    #[test]
+    fn validate_clean_snippet_has_no_bare_or_missing() {
+        let s = parse_snippet("${1:name} $0");
+        let issues = validate_snippet(&s);
+        assert!(!issues.iter().any(|i| matches!(i, SnippetIssue::MissingFinalTabstop)));
+        assert!(!issues.iter().any(|i| matches!(i, SnippetIssue::BareTabstop { .. })));
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet normalization tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn normalize_reindexes_gaps() {
+        let s = parse_snippet("${3:first} ${7:second} $0");
+        let norm = normalize_indices(&s);
+        let tabs = collect_tabstops(&norm);
+        assert_eq!(tabs, vec![0, 1, 2]);
+        // Verify placeholder defaults are preserved
+        if let SnippetElement::Placeholder { index, .. } = &norm.elements[0] {
+            assert_eq!(*index, 1);
+        } else {
+            panic!("expected placeholder");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet merging tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn merge_shifts_second_snippet_indices() {
+        let a = parse_snippet("${1:first} $0");
+        let b = parse_snippet("${1:second} $0");
+        let merged = merge_snippets(&a, &b);
+        let tabs = collect_tabstops(&merged);
+        // a had $1, b's $1 becomes $2, and b's $0 stays $0
+        assert!(tabs.contains(&1));
+        assert!(tabs.contains(&2));
+        assert!(tabs.contains(&0));
+    }
+
+    // -----------------------------------------------------------------------
+    // Render template tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn render_template_resolves_variables() {
+        let mut ctx = HashMap::new();
+        ctx.insert("USER".to_string(), "alice".to_string());
+        ctx.insert("PROJECT".to_string(), "vsedit".to_string());
+        let result = render_template("Author: $USER, Project: $PROJECT", &ctx);
+        assert_eq!(result, "Author: alice, Project: vsedit");
+    }
+
+    // -----------------------------------------------------------------------
+    // Choice navigation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn choice_navigation_next_and_prev() {
+        let choices: Vec<String> = vec!["public".into(), "private".into(), "protected".into()];
+        assert_eq!(next_choice(&choices, "public"), Some("private".into()));
+        assert_eq!(next_choice(&choices, "protected"), Some("public".into())); // wraps
+        assert_eq!(prev_choice(&choices, "public"), Some("protected".into())); // wraps
+        assert_eq!(prev_choice(&choices, "private"), Some("public".into()));
+    }
+
+    #[test]
+    fn choice_navigation_unknown_current() {
+        let choices: Vec<String> = vec!["a".into(), "b".into()];
+        assert_eq!(next_choice(&choices, "unknown"), Some("a".into()));
+        assert_eq!(prev_choice(&choices, "unknown"), Some("b".into()));
+    }
+
+    #[test]
+    fn choice_navigation_empty() {
+        let choices: Vec<String> = vec![];
+        assert_eq!(next_choice(&choices, "x"), None);
+        assert_eq!(prev_choice(&choices, "x"), None);
     }
 }

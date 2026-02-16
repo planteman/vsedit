@@ -695,6 +695,271 @@ impl fmt::Display for SchemaDiff {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Schema composition (allOf / anyOf / oneOf)
+// ---------------------------------------------------------------------------
+
+/// Describes how multiple sub-schemas should be composed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompositionKind {
+    /// All sub-schemas must be satisfied (intersection of properties).
+    AllOf,
+    /// At least one sub-schema must be satisfied.
+    AnyOf,
+    /// Exactly one sub-schema must be satisfied.
+    OneOf,
+}
+
+impl fmt::Display for CompositionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CompositionKind::AllOf => write!(f, "allOf"),
+            CompositionKind::AnyOf => write!(f, "anyOf"),
+            CompositionKind::OneOf => write!(f, "oneOf"),
+        }
+    }
+}
+
+/// A composite schema that combines several sub-schemas.
+#[derive(Debug, Clone)]
+pub struct CompositeSchema {
+    pub kind: CompositionKind,
+    pub schemas: Vec<JsonSchema>,
+}
+
+impl CompositeSchema {
+    pub fn new(kind: CompositionKind) -> Self {
+        Self {
+            kind,
+            schemas: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, schema: JsonSchema) {
+        self.schemas.push(schema);
+    }
+
+    /// Merge all sub-schemas into a single `JsonSchema` using allOf semantics:
+    /// properties from all sub-schemas are collected; if a property appears more
+    /// than once the first occurrence wins (same behaviour as `merge_with`).
+    /// The resulting schema is always of type `Object`.
+    pub fn merge_all(&self) -> JsonSchema {
+        let mut merged = JsonSchema {
+            id: None,
+            title: None,
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: Vec::new(),
+            file_match: Vec::new(),
+        };
+        for sub in &self.schemas {
+            merged.merge_with(sub);
+            // Also merge file_match patterns.
+            for pat in &sub.file_match {
+                if !merged.file_match.contains(pat) {
+                    merged.file_match.push(pat.clone());
+                }
+            }
+        }
+        merged
+    }
+
+    /// Validate a `JsonValue` according to the composition kind.
+    ///
+    /// * `AllOf` – the value must pass validation against **every** sub-schema.
+    /// * `AnyOf` – the value must pass validation against **at least one**.
+    /// * `OneOf` – the value must pass validation against **exactly one**.
+    pub fn validate(&self, value: &JsonValue) -> Vec<ValidationError> {
+        let results: Vec<Vec<ValidationError>> = self
+            .schemas
+            .iter()
+            .map(|s| SchemaValidator::validate(s, value))
+            .collect();
+
+        match self.kind {
+            CompositionKind::AllOf => results.into_iter().flatten().collect(),
+            CompositionKind::AnyOf => {
+                if results.iter().any(|r| r.is_empty()) {
+                    Vec::new()
+                } else {
+                    vec![ValidationError {
+                        path: String::new(),
+                        message: "value does not satisfy any of the anyOf sub-schemas".into(),
+                        expected_type: None,
+                    }]
+                }
+            }
+            CompositionKind::OneOf => {
+                let passing = results.iter().filter(|r| r.is_empty()).count();
+                if passing == 1 {
+                    Vec::new()
+                } else {
+                    vec![ValidationError {
+                        path: String::new(),
+                        message: format!(
+                            "value must satisfy exactly one oneOf sub-schema, but {} matched",
+                            passing
+                        ),
+                        expected_type: None,
+                    }]
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// $ref resolution helpers
+// ---------------------------------------------------------------------------
+
+/// A simple definition store: maps definition names to schemas so that
+/// internal `$ref` pointers (e.g. `#/definitions/Address`) can be resolved.
+#[derive(Debug, Clone, Default)]
+pub struct SchemaDefinitions {
+    defs: Vec<(String, JsonSchema)>,
+}
+
+impl SchemaDefinitions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, name: impl Into<String>, schema: JsonSchema) {
+        self.defs.push((name.into(), schema));
+    }
+
+    pub fn get(&self, name: &str) -> Option<&JsonSchema> {
+        self.defs.iter().find(|(n, _)| n == name).map(|(_, s)| s)
+    }
+
+    pub fn len(&self) -> usize {
+        self.defs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.defs.is_empty()
+    }
+
+    /// Resolve a `SchemaRef` against this definition store.
+    /// Internal refs of the form `#/definitions/<name>` are looked up; all
+    /// other refs return `None`.
+    pub fn resolve(&self, reference: &SchemaRef) -> Option<&JsonSchema> {
+        match reference {
+            SchemaRef::Internal(path) => {
+                let name = path
+                    .strip_prefix("#/definitions/")
+                    .or_else(|| path.strip_prefix("#/$defs/"))?;
+                self.get(name)
+            }
+            SchemaRef::External(_) => None,
+        }
+    }
+
+    /// Return all definition names.
+    pub fn names(&self) -> Vec<&str> {
+        self.defs.iter().map(|(n, _)| n.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Default value extraction
+// ---------------------------------------------------------------------------
+
+/// Extract all default values from a schema, returning `(property_name, default)` pairs.
+pub fn extract_defaults(schema: &JsonSchema) -> Vec<(&str, &str)> {
+    schema
+        .properties
+        .iter()
+        .filter_map(|p| p.default_value.as_deref().map(|d| (p.name.as_str(), d)))
+        .collect()
+}
+
+/// Build a skeleton object (as `JsonValue`) by filling every property that has
+/// a default value. Properties without defaults are omitted.
+pub fn build_default_object(schema: &JsonSchema) -> JsonValue {
+    let fields: Vec<(String, JsonValue)> = schema
+        .properties
+        .iter()
+        .filter_map(|p| {
+            p.default_value
+                .as_deref()
+                .map(|d| (p.name.clone(), default_str_to_value(d, p.schema_type)))
+        })
+        .collect();
+    JsonValue::Object(fields)
+}
+
+/// Best-effort conversion of a default-value string into a `JsonValue`.
+fn default_str_to_value(s: &str, ty: SchemaType) -> JsonValue {
+    match ty {
+        SchemaType::Boolean => match s {
+            "true" => JsonValue::Bool(true),
+            "false" => JsonValue::Bool(false),
+            _ => JsonValue::Str(s.to_string()),
+        },
+        SchemaType::Number | SchemaType::Integer => s
+            .parse::<f64>()
+            .map(JsonValue::Number)
+            .unwrap_or_else(|_| JsonValue::Str(s.to_string())),
+        SchemaType::Null => JsonValue::Null,
+        _ => JsonValue::Str(s.to_string()),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Code-completion hint generation
+// ---------------------------------------------------------------------------
+
+/// A hint for a code editor's auto-completion list.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompletionHint {
+    /// The text to insert.
+    pub label: String,
+    /// A short description shown alongside the label.
+    pub detail: Option<String>,
+    /// The expected JSON type of the value.
+    pub value_type: SchemaType,
+    /// Whether this property is required.
+    pub required: bool,
+    /// An optional snippet with a placeholder, e.g. `"key": "$1"`.
+    pub insert_text: Option<String>,
+}
+
+/// Generate completion hints for the top-level properties of a schema.
+/// Hints that correspond to keys already present in `existing_keys` are excluded.
+pub fn completion_hints(schema: &JsonSchema, existing_keys: &[&str]) -> Vec<CompletionHint> {
+    schema
+        .properties
+        .iter()
+        .filter(|p| !existing_keys.contains(&p.name.as_str()))
+        .map(|p| {
+            let placeholder = p
+                .default_value
+                .as_deref()
+                .unwrap_or_else(|| type_placeholder(p.schema_type));
+            CompletionHint {
+                label: p.name.clone(),
+                detail: p.description.clone(),
+                value_type: p.schema_type,
+                required: p.required,
+                insert_text: Some(format!("\"{}\": {}", p.name, placeholder)),
+            }
+        })
+        .collect()
+}
+
+/// A reasonable placeholder value for each schema type (used in snippets).
+fn type_placeholder(ty: SchemaType) -> &'static str {
+    match ty {
+        SchemaType::String => "\"\"",
+        SchemaType::Number | SchemaType::Integer => "0",
+        SchemaType::Boolean => "false",
+        SchemaType::Array => "[]",
+        SchemaType::Object => "{}",
+        SchemaType::Null => "null",
+    }
+}
+
 /// Compare two schemas and return differences.
 pub fn compare_schemas(old: &JsonSchema, new: &JsonSchema) -> Vec<SchemaDiff> {
     let mut diffs = Vec::new();
@@ -1502,5 +1767,196 @@ mod tests {
     fn test_schema_diff_display() {
         let d = SchemaDiff::PropertyAdded("foo".into());
         assert_eq!(format!("{d}"), "+ foo");
+    }
+
+    // ── Composition tests ──────────────────────────────────────────────
+
+    #[test]
+    fn composite_allof_merge_and_validate() {
+        let s1 = JsonSchema {
+            id: None,
+            title: None,
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+            ],
+            file_match: vec!["a.json".into()],
+        };
+        let s2 = JsonSchema {
+            id: None,
+            title: None,
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("age", SchemaType::Number, "Age"),
+            ],
+            file_match: vec!["b.json".into()],
+        };
+        let mut comp = CompositeSchema::new(CompositionKind::AllOf);
+        comp.add(s1);
+        comp.add(s2);
+
+        // merge_all collects all properties
+        let merged = comp.merge_all();
+        assert_eq!(merged.property_count(), 2);
+        assert!(merged.file_match.contains(&"a.json".to_string()));
+        assert!(merged.file_match.contains(&"b.json".to_string()));
+
+        // AllOf validation: both sub-schemas must pass
+        let good = JsonValue::Object(vec![
+            ("name".into(), JsonValue::Str("Alice".into())),
+            ("age".into(), JsonValue::Number(30.0)),
+        ]);
+        assert!(comp.validate(&good).is_empty());
+
+        let bad = JsonValue::Object(vec![
+            ("name".into(), JsonValue::Str("Bob".into())),
+        ]);
+        assert!(!comp.validate(&bad).is_empty());
+    }
+
+    #[test]
+    fn composite_anyof_validation() {
+        let str_schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::String,
+            properties: vec![], file_match: vec![],
+        };
+        let num_schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Number,
+            properties: vec![], file_match: vec![],
+        };
+        let mut comp = CompositeSchema::new(CompositionKind::AnyOf);
+        comp.add(str_schema);
+        comp.add(num_schema);
+
+        assert!(comp.validate(&JsonValue::Str("hi".into())).is_empty());
+        assert!(comp.validate(&JsonValue::Number(42.0)).is_empty());
+        assert!(!comp.validate(&JsonValue::Bool(true)).is_empty());
+    }
+
+    #[test]
+    fn composite_oneof_validation() {
+        let str_schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::String,
+            properties: vec![], file_match: vec![],
+        };
+        let also_str = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::String,
+            properties: vec![], file_match: vec![],
+        };
+        let mut comp = CompositeSchema::new(CompositionKind::OneOf);
+        comp.add(str_schema);
+        comp.add(also_str);
+
+        // A string matches both -> oneOf fails (needs exactly 1)
+        let errs = comp.validate(&JsonValue::Str("x".into()));
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("exactly one"));
+
+        // A number matches none -> also fails
+        assert!(!comp.validate(&JsonValue::Number(1.0)).is_empty());
+    }
+
+    // ── $ref resolution tests ──────────────────────────────────────────
+
+    #[test]
+    fn schema_definitions_resolve_internal_ref() {
+        let mut defs = SchemaDefinitions::new();
+        defs.insert("Address", JsonSchema {
+            id: None, title: Some("Address".into()), description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("street", SchemaType::String, "Street"),
+            ],
+            file_match: vec![],
+        });
+        assert_eq!(defs.len(), 1);
+        assert!(!defs.is_empty());
+        assert_eq!(defs.names(), vec!["Address"]);
+
+        let r = SchemaRef::parse("#/definitions/Address");
+        let resolved = defs.resolve(&r);
+        assert!(resolved.is_some());
+        assert_eq!(resolved.unwrap().title.as_deref(), Some("Address"));
+
+        // $defs variant
+        let r2 = SchemaRef::parse("#/$defs/Address");
+        assert!(defs.resolve(&r2).is_some());
+
+        // External ref returns None
+        let ext = SchemaRef::parse("https://example.com/schema.json");
+        assert!(defs.resolve(&ext).is_none());
+
+        // Unknown definition returns None
+        let unknown = SchemaRef::parse("#/definitions/Missing");
+        assert!(defs.resolve(&unknown).is_none());
+    }
+
+    // ── Default extraction tests ───────────────────────────────────────
+
+    #[test]
+    fn extract_defaults_and_build_default_object() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+                SchemaProperty::optional_prop("count", SchemaType::Integer, "10"),
+                SchemaProperty::optional_prop("verbose", SchemaType::Boolean, "true"),
+            ],
+            file_match: vec![],
+        };
+
+        let defaults = extract_defaults(&schema);
+        // "name" has no default so only 2 entries
+        assert_eq!(defaults.len(), 2);
+        assert!(defaults.iter().any(|(k, v)| *k == "count" && *v == "10"));
+        assert!(defaults.iter().any(|(k, v)| *k == "verbose" && *v == "true"));
+
+        let obj = build_default_object(&schema);
+        if let JsonValue::Object(fields) = &obj {
+            assert_eq!(fields.len(), 2);
+            assert!(fields.iter().any(|(k, v)| k == "count" && *v == JsonValue::Number(10.0)));
+            assert!(fields.iter().any(|(k, v)| k == "verbose" && *v == JsonValue::Bool(true)));
+        } else {
+            panic!("expected Object");
+        }
+    }
+
+    // ── Completion hint tests ──────────────────────────────────────────
+
+    #[test]
+    fn completion_hints_filters_existing_keys() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+                SchemaProperty::optional_prop("debug", SchemaType::Boolean, "false"),
+                SchemaProperty::optional_prop("port", SchemaType::Integer, "8080"),
+            ],
+            file_match: vec![],
+        };
+
+        let hints = completion_hints(&schema, &["name"]);
+        assert_eq!(hints.len(), 2);
+        assert!(hints.iter().all(|h| h.label != "name"));
+
+        let debug_hint = hints.iter().find(|h| h.label == "debug").unwrap();
+        assert_eq!(debug_hint.value_type, SchemaType::Boolean);
+        assert!(!debug_hint.required);
+        assert!(debug_hint.insert_text.as_ref().unwrap().contains("false"));
+
+        let port_hint = hints.iter().find(|h| h.label == "port").unwrap();
+        assert!(port_hint.insert_text.as_ref().unwrap().contains("8080"));
+
+        // With no existing keys all properties are returned
+        let all = completion_hints(&schema, &[]);
+        assert_eq!(all.len(), 3);
     }
 }

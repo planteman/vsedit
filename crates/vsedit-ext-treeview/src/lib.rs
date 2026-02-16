@@ -854,6 +854,196 @@ impl Default for TreeViewSelection {
     }
 }
 
+// ── Tree Statistics ──
+
+/// Structural statistics about a tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeStats {
+    /// Total number of nodes.
+    pub total_nodes: usize,
+    /// Number of leaf nodes (no children).
+    pub leaf_count: usize,
+    /// Number of internal (non-leaf) nodes.
+    pub internal_count: usize,
+    /// Maximum depth (root children are depth 1).
+    pub max_depth: usize,
+    /// Maximum breadth (largest number of siblings at any level).
+    pub max_breadth: usize,
+}
+
+impl TreeStats {
+    /// Compute statistics for the given tree items.
+    pub fn compute(items: &[TreeItem]) -> Self {
+        let total_nodes = count_items(items);
+        let mut leaf_count = 0;
+        let mut max_depth: usize = 0;
+        let mut max_breadth = items.len();
+
+        fn walk(items: &[TreeItem], depth: usize, leaf_count: &mut usize, max_depth: &mut usize, max_breadth: &mut usize) {
+            if depth > *max_depth {
+                *max_depth = depth;
+            }
+            for item in items {
+                if item.children.is_empty() {
+                    *leaf_count += 1;
+                } else {
+                    if item.children.len() > *max_breadth {
+                        *max_breadth = item.children.len();
+                    }
+                    walk(&item.children, depth + 1, leaf_count, max_depth, max_breadth);
+                }
+            }
+        }
+
+        if !items.is_empty() {
+            walk(items, 1, &mut leaf_count, &mut max_depth, &mut max_breadth);
+        }
+
+        let internal_count = total_nodes - leaf_count;
+        Self { total_nodes, leaf_count, internal_count, max_depth, max_breadth }
+    }
+}
+
+// ── Tree Diff ──
+
+/// Describes a single change between two tree snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TreeDiffKind {
+    Added,
+    Removed,
+    LabelChanged { old: String, new: String },
+}
+
+/// A diff entry identifying a changed node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeDiffEntry {
+    pub node_id: String,
+    pub kind: TreeDiffKind,
+}
+
+/// Compare two tree snapshots and produce a list of differences.
+/// Both trees are flattened to id→label maps and compared by id.
+pub fn tree_diff(old: &[TreeItem], new: &[TreeItem]) -> Vec<TreeDiffEntry> {
+    fn collect_map(items: &[TreeItem], map: &mut HashMap<String, String>) {
+        for item in items {
+            map.insert(item.id.clone(), item.label.clone());
+            collect_map(&item.children, map);
+        }
+    }
+
+    let mut old_map = HashMap::new();
+    let mut new_map = HashMap::new();
+    collect_map(old, &mut old_map);
+    collect_map(new, &mut new_map);
+
+    let mut diffs = Vec::new();
+
+    // Detect removed and label-changed nodes.
+    let mut old_keys: Vec<&String> = old_map.keys().collect();
+    old_keys.sort();
+    for id in old_keys {
+        match new_map.get(id) {
+            None => diffs.push(TreeDiffEntry { node_id: id.clone(), kind: TreeDiffKind::Removed }),
+            Some(new_label) if new_label != old_map.get(id).unwrap() => {
+                diffs.push(TreeDiffEntry {
+                    node_id: id.clone(),
+                    kind: TreeDiffKind::LabelChanged {
+                        old: old_map[id].clone(),
+                        new: new_label.clone(),
+                    },
+                });
+            }
+            _ => {}
+        }
+    }
+
+    // Detect added nodes.
+    let mut new_keys: Vec<&String> = new_map.keys().collect();
+    new_keys.sort();
+    for id in new_keys {
+        if !old_map.contains_key(id) {
+            diffs.push(TreeDiffEntry { node_id: id.clone(), kind: TreeDiffKind::Added });
+        }
+    }
+
+    diffs
+}
+
+// ── Flatten with Depth ──
+
+/// A reference to a tree item together with its depth in the tree.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FlatTreeEntry<'a> {
+    pub item: &'a TreeItem,
+    pub depth: usize,
+}
+
+/// Flatten a tree into a depth-first ordered list, annotating each entry with its depth.
+/// Useful for virtual-list rendering where indentation level is needed.
+pub fn flatten_tree_with_depth<'a>(items: &'a [TreeItem], base_depth: usize) -> Vec<FlatTreeEntry<'a>> {
+    let mut result = Vec::new();
+    for item in items {
+        result.push(FlatTreeEntry { item, depth: base_depth });
+        result.extend(flatten_tree_with_depth(&item.children, base_depth + 1));
+    }
+    result
+}
+
+// ── Lazy Loading Tracker ──
+
+/// Tracks which tree nodes have been loaded vs pending lazy-load.
+#[derive(Debug, Clone)]
+pub struct LazyLoadTracker {
+    loaded: HashMap<String, bool>,
+}
+
+impl LazyLoadTracker {
+    pub fn new() -> Self {
+        Self { loaded: HashMap::new() }
+    }
+
+    /// Mark a node as loaded.
+    pub fn mark_loaded(&mut self, node_id: &str) {
+        self.loaded.insert(node_id.to_string(), true);
+    }
+
+    /// Mark a node as pending (not yet loaded).
+    pub fn mark_pending(&mut self, node_id: &str) {
+        self.loaded.insert(node_id.to_string(), false);
+    }
+
+    /// Check whether a node has been loaded.
+    pub fn is_loaded(&self, node_id: &str) -> bool {
+        self.loaded.get(node_id).copied().unwrap_or(false)
+    }
+
+    /// Return the set of node IDs that are still pending.
+    pub fn pending_nodes(&self) -> Vec<String> {
+        let mut out: Vec<String> = self.loaded.iter()
+            .filter(|(_, loaded)| !**loaded)
+            .map(|(id, _)| id.clone())
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// Return the total number of tracked nodes.
+    pub fn tracked_count(&self) -> usize {
+        self.loaded.len()
+    }
+
+    /// Return the number of loaded nodes.
+    pub fn loaded_count(&self) -> usize {
+        self.loaded.values().filter(|&&v| v).count()
+    }
+}
+
+impl Default for LazyLoadTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1590,5 +1780,100 @@ mod tests {
         let sel = TreeViewSelection::default();
         assert_eq!(sel.count(), 0);
         assert!(sel.selected_items().is_empty());
+    }
+
+    // ── Tree Statistics Tests ──
+
+    #[test]
+    fn tree_stats_sample_tree() {
+        let tree = sample_tree();
+        let stats = TreeStats::compute(&tree);
+        assert_eq!(stats.total_nodes, 5);
+        assert_eq!(stats.leaf_count, 3); // main, nested, readme
+        assert_eq!(stats.internal_count, 2); // src, lib
+        assert_eq!(stats.max_depth, 3); // src -> lib -> nested
+        assert_eq!(stats.max_breadth, 2); // src has 2 children, root has 2
+    }
+
+    #[test]
+    fn tree_stats_empty() {
+        let stats = TreeStats::compute(&[]);
+        assert_eq!(stats.total_nodes, 0);
+        assert_eq!(stats.leaf_count, 0);
+        assert_eq!(stats.max_depth, 0);
+        assert_eq!(stats.max_breadth, 0);
+    }
+
+    // ── Tree Diff Tests ──
+
+    #[test]
+    fn tree_diff_added_and_removed() {
+        let old = vec![make_item("a", "A", vec![])];
+        let new = vec![make_item("b", "B", vec![])];
+        let diffs = tree_diff(&old, &new);
+        assert!(diffs.iter().any(|d| d.node_id == "a" && d.kind == TreeDiffKind::Removed));
+        assert!(diffs.iter().any(|d| d.node_id == "b" && d.kind == TreeDiffKind::Added));
+    }
+
+    #[test]
+    fn tree_diff_label_changed() {
+        let old = vec![make_item("x", "OldLabel", vec![])];
+        let new = vec![make_item("x", "NewLabel", vec![])];
+        let diffs = tree_diff(&old, &new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(
+            diffs[0].kind,
+            TreeDiffKind::LabelChanged { old: "OldLabel".into(), new: "NewLabel".into() }
+        );
+    }
+
+    #[test]
+    fn tree_diff_identical_trees() {
+        let tree = sample_tree();
+        let diffs = tree_diff(&tree, &tree);
+        assert!(diffs.is_empty());
+    }
+
+    // ── Flatten with Depth Tests ──
+
+    #[test]
+    fn flatten_with_depth_values() {
+        let tree = sample_tree();
+        let flat = flatten_tree_with_depth(&tree, 0);
+        assert_eq!(flat.len(), 5);
+        assert_eq!(flat[0].item.id, "src");
+        assert_eq!(flat[0].depth, 0);
+        assert_eq!(flat[1].item.id, "main");
+        assert_eq!(flat[1].depth, 1);
+        assert_eq!(flat[3].item.id, "nested");
+        assert_eq!(flat[3].depth, 2);
+        assert_eq!(flat[4].item.id, "readme");
+        assert_eq!(flat[4].depth, 0);
+    }
+
+    // ── Lazy Load Tracker Tests ──
+
+    #[test]
+    fn lazy_load_tracker_workflow() {
+        let mut tracker = LazyLoadTracker::new();
+        tracker.mark_pending("node_a");
+        tracker.mark_pending("node_b");
+        assert!(!tracker.is_loaded("node_a"));
+        assert_eq!(tracker.pending_nodes(), vec!["node_a", "node_b"]);
+        assert_eq!(tracker.loaded_count(), 0);
+
+        tracker.mark_loaded("node_a");
+        assert!(tracker.is_loaded("node_a"));
+        assert!(!tracker.is_loaded("node_b"));
+        assert_eq!(tracker.pending_nodes(), vec!["node_b"]);
+        assert_eq!(tracker.loaded_count(), 1);
+        assert_eq!(tracker.tracked_count(), 2);
+    }
+
+    #[test]
+    fn lazy_load_tracker_unknown_node_not_loaded() {
+        let tracker = LazyLoadTracker::new();
+        assert!(!tracker.is_loaded("unknown"));
+        assert_eq!(tracker.tracked_count(), 0);
     }
 }

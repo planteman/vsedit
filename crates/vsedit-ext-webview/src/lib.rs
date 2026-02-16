@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for webview panels.
 
+use std::collections::HashMap;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -948,6 +949,190 @@ impl WebviewResourceLoader {
     }
 }
 
+// ── Content Security Policy Builder ──
+
+/// Fluent builder for constructing Content-Security-Policy header values.
+///
+/// Each directive is accumulated independently, then serialised into a single
+/// semicolon-separated header string via [`CspBuilder::build`].
+#[derive(Debug, Clone, Default)]
+pub struct CspBuilder {
+    directives: HashMap<String, Vec<String>>,
+}
+
+impl CspBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add one or more source expressions to a directive (e.g. `"script-src"`, `"'self'"`).
+    pub fn add(mut self, directive: &str, source: &str) -> Self {
+        self.directives
+            .entry(directive.to_string())
+            .or_default()
+            .push(source.to_string());
+        self
+    }
+
+    /// Shorthand: set `default-src` to `'none'` (strictest baseline).
+    pub fn default_none(self) -> Self {
+        self.add("default-src", "'none'")
+    }
+
+    /// Shorthand: set `default-src` to `'self'`.
+    pub fn default_self(self) -> Self {
+        self.add("default-src", "'self'")
+    }
+
+    /// Allow inline scripts guarded by a nonce.
+    pub fn script_nonce(self, nonce: &str) -> Self {
+        self.add("script-src", &format!("'nonce-{nonce}'"))
+    }
+
+    /// Allow styles from `'self'` plus an optional nonce.
+    pub fn style_self_with_nonce(self, nonce: Option<&str>) -> Self {
+        let s = match nonce {
+            Some(n) => self.add("style-src", "'self'").add("style-src", &format!("'nonce-{n}'")),
+            None => self.add("style-src", "'self'"),
+        };
+        s
+    }
+
+    /// Allow images from `https:` and `data:` schemes (common for webview panels).
+    pub fn img_https_data(self) -> Self {
+        self.add("img-src", "https:").add("img-src", "data:")
+    }
+
+    /// Serialize the accumulated directives into a CSP header value.
+    ///
+    /// Directives are sorted alphabetically for deterministic output.
+    pub fn build(&self) -> String {
+        let mut keys: Vec<&String> = self.directives.keys().collect();
+        keys.sort();
+        keys.iter()
+            .map(|k| {
+                let sources = self.directives[*k].join(" ");
+                format!("{k} {sources}")
+            })
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+}
+
+// ── Webview Panel Layout Tracking ──
+
+/// Describes the editor column a webview panel occupies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ViewColumn {
+    One,
+    Two,
+    Three,
+    /// Panel is in the side-bar area rather than an editor column.
+    Sidebar,
+}
+
+/// Tracks the layout state of a single webview panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PanelLayoutEntry {
+    pub handle: u64,
+    pub title: String,
+    pub column: ViewColumn,
+    pub active: bool,
+    pub visible: bool,
+}
+
+/// Registry that tracks the layout positions and visibility of all webview panels.
+#[derive(Debug, Clone, Default)]
+pub struct PanelLayoutTracker {
+    panels: Vec<PanelLayoutEntry>,
+}
+
+impl PanelLayoutTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a new panel in the given column.
+    pub fn add_panel(&mut self, handle: u64, title: impl Into<String>, column: ViewColumn) {
+        if self.panels.iter().any(|p| p.handle == handle) {
+            return;
+        }
+        self.panels.push(PanelLayoutEntry {
+            handle,
+            title: title.into(),
+            column,
+            active: false,
+            visible: true,
+        });
+    }
+
+    /// Remove a panel by handle. Returns `true` if it existed.
+    pub fn remove_panel(&mut self, handle: u64) -> bool {
+        let before = self.panels.len();
+        self.panels.retain(|p| p.handle != handle);
+        self.panels.len() < before
+    }
+
+    /// Move a panel to a different column.
+    pub fn move_panel(&mut self, handle: u64, column: ViewColumn) -> bool {
+        if let Some(p) = self.panels.iter_mut().find(|p| p.handle == handle) {
+            p.column = column;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Set exactly one panel as active within its column, deactivating others
+    /// in the same column.
+    pub fn set_active(&mut self, handle: u64) -> bool {
+        let col = match self.panels.iter().find(|p| p.handle == handle) {
+            Some(p) => p.column,
+            None => return false,
+        };
+        for p in &mut self.panels {
+            if p.column == col {
+                p.active = p.handle == handle;
+            }
+        }
+        true
+    }
+
+    /// Return the currently active panel in the given column, if any.
+    pub fn active_in_column(&self, column: ViewColumn) -> Option<&PanelLayoutEntry> {
+        self.panels.iter().find(|p| p.column == column && p.active)
+    }
+
+    /// List all panels in a given column, ordered by insertion.
+    pub fn panels_in_column(&self, column: ViewColumn) -> Vec<&PanelLayoutEntry> {
+        self.panels.iter().filter(|p| p.column == column).collect()
+    }
+
+    /// Toggle the visibility of a panel.
+    pub fn set_visible(&mut self, handle: u64, visible: bool) -> bool {
+        if let Some(p) = self.panels.iter_mut().find(|p| p.handle == handle) {
+            p.visible = visible;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return all visible panels across every column.
+    pub fn visible_panels(&self) -> Vec<&PanelLayoutEntry> {
+        self.panels.iter().filter(|p| p.visible).collect()
+    }
+
+    pub fn panel_count(&self) -> usize {
+        self.panels.len()
+    }
+
+    pub fn get_panel(&self, handle: u64) -> Option<&PanelLayoutEntry> {
+        self.panels.iter().find(|p| p.handle == handle)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1542,5 +1727,125 @@ mod tests {
         let tags = loader.to_html_tags();
         assert!(tags.contains("<link rel=\"stylesheet\" href=\"https://cdn.example.com/app.css\">"));
         assert!(tags.contains("<script src=\"https://cdn.example.com/main.js\"></script>"));
+    }
+
+    // ── CspBuilder tests ──
+
+    #[test]
+    fn csp_builder_default_none() {
+        let csp = CspBuilder::new().default_none().build();
+        assert_eq!(csp, "default-src 'none'");
+    }
+
+    #[test]
+    fn csp_builder_complex_policy() {
+        let csp = CspBuilder::new()
+            .default_self()
+            .script_nonce("abc123")
+            .style_self_with_nonce(Some("xyz"))
+            .img_https_data()
+            .add("font-src", "https:")
+            .build();
+        assert!(csp.contains("default-src 'self'"));
+        assert!(csp.contains("script-src 'nonce-abc123'"));
+        assert!(csp.contains("style-src 'self' 'nonce-xyz'"));
+        assert!(csp.contains("img-src https: data:"));
+        assert!(csp.contains("font-src https:"));
+    }
+
+    #[test]
+    fn csp_builder_deterministic_order() {
+        let csp1 = CspBuilder::new()
+            .add("script-src", "'self'")
+            .add("default-src", "'none'")
+            .build();
+        let csp2 = CspBuilder::new()
+            .add("default-src", "'none'")
+            .add("script-src", "'self'")
+            .build();
+        assert_eq!(csp1, csp2);
+        // default-src should come before script-src alphabetically
+        let idx_default = csp1.find("default-src").unwrap();
+        let idx_script = csp1.find("script-src").unwrap();
+        assert!(idx_default < idx_script);
+    }
+
+    // ── PanelLayoutTracker tests ──
+
+    #[test]
+    fn panel_layout_add_and_query() {
+        let mut tracker = PanelLayoutTracker::new();
+        tracker.add_panel(1, "Preview", ViewColumn::One);
+        tracker.add_panel(2, "Terminal", ViewColumn::Two);
+        assert_eq!(tracker.panel_count(), 2);
+
+        let panels = tracker.panels_in_column(ViewColumn::One);
+        assert_eq!(panels.len(), 1);
+        assert_eq!(panels[0].title, "Preview");
+        assert_eq!(panels[0].column, ViewColumn::One);
+    }
+
+    #[test]
+    fn panel_layout_set_active_deactivates_siblings() {
+        let mut tracker = PanelLayoutTracker::new();
+        tracker.add_panel(1, "A", ViewColumn::One);
+        tracker.add_panel(2, "B", ViewColumn::One);
+        tracker.add_panel(3, "C", ViewColumn::Two);
+
+        assert!(tracker.set_active(1));
+        assert!(tracker.get_panel(1).unwrap().active);
+        assert!(!tracker.get_panel(2).unwrap().active);
+
+        // Activating panel 2 in the same column deactivates panel 1
+        assert!(tracker.set_active(2));
+        assert!(!tracker.get_panel(1).unwrap().active);
+        assert!(tracker.get_panel(2).unwrap().active);
+
+        // Panel 3 in column Two is unaffected
+        assert!(!tracker.get_panel(3).unwrap().active);
+        assert_eq!(tracker.active_in_column(ViewColumn::Two), None);
+    }
+
+    #[test]
+    fn panel_layout_move_and_visibility() {
+        let mut tracker = PanelLayoutTracker::new();
+        tracker.add_panel(1, "Panel", ViewColumn::One);
+
+        assert!(tracker.move_panel(1, ViewColumn::Sidebar));
+        assert_eq!(tracker.get_panel(1).unwrap().column, ViewColumn::Sidebar);
+        assert!(tracker.panels_in_column(ViewColumn::One).is_empty());
+
+        assert!(tracker.set_visible(1, false));
+        assert!(tracker.visible_panels().is_empty());
+
+        assert!(tracker.set_visible(1, true));
+        assert_eq!(tracker.visible_panels().len(), 1);
+    }
+
+    #[test]
+    fn panel_layout_remove() {
+        let mut tracker = PanelLayoutTracker::new();
+        tracker.add_panel(1, "X", ViewColumn::One);
+        assert!(tracker.remove_panel(1));
+        assert!(!tracker.remove_panel(1));
+        assert_eq!(tracker.panel_count(), 0);
+    }
+
+    #[test]
+    fn panel_layout_duplicate_add_ignored() {
+        let mut tracker = PanelLayoutTracker::new();
+        tracker.add_panel(1, "First", ViewColumn::One);
+        tracker.add_panel(1, "Second", ViewColumn::Two);
+        assert_eq!(tracker.panel_count(), 1);
+        assert_eq!(tracker.get_panel(1).unwrap().title, "First");
+    }
+
+    #[test]
+    fn view_column_serde_roundtrip() {
+        let col = ViewColumn::Sidebar;
+        let json = serde_json::to_string(&col).unwrap();
+        assert_eq!(json, "\"sidebar\"");
+        let back: ViewColumn = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ViewColumn::Sidebar);
     }
 }

@@ -987,6 +987,218 @@ pub fn uri_matches_glob(uri: &str, pattern: &str) -> bool {
     uri == pattern
 }
 
+// ---------------------------------------------------------------------------
+// Workspace folder prioritization
+// ---------------------------------------------------------------------------
+
+/// Priority level for workspace folders.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum FolderPriority {
+    /// Low priority – auxiliary or reference folders.
+    Low = 0,
+    /// Normal priority – standard workspace folders.
+    Normal = 1,
+    /// High priority – primary working folders.
+    High = 2,
+}
+
+impl Default for FolderPriority {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+/// A workspace folder with an associated priority.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrioritizedFolder {
+    pub uri: String,
+    pub priority: FolderPriority,
+}
+
+/// Manages workspace folders with priority ordering.
+#[derive(Debug, Clone, Default)]
+pub struct FolderPriorityManager {
+    folders: Vec<PrioritizedFolder>,
+}
+
+impl FolderPriorityManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a folder with the given priority.
+    pub fn add(&mut self, uri: impl Into<String>, priority: FolderPriority) {
+        let uri = uri.into();
+        if !self.folders.iter().any(|f| f.uri == uri) {
+            self.folders.push(PrioritizedFolder { uri, priority });
+        }
+    }
+
+    /// Update the priority of an existing folder. Returns `false` if not found.
+    pub fn set_priority(&mut self, uri: &str, priority: FolderPriority) -> bool {
+        if let Some(f) = self.folders.iter_mut().find(|f| f.uri == uri) {
+            f.priority = priority;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return folders sorted by descending priority (highest first).
+    pub fn sorted(&self) -> Vec<&PrioritizedFolder> {
+        let mut sorted: Vec<&PrioritizedFolder> = self.folders.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    /// Return only folders matching the given priority.
+    pub fn by_priority(&self, priority: FolderPriority) -> Vec<&PrioritizedFolder> {
+        self.folders.iter().filter(|f| f.priority == priority).collect()
+    }
+
+    /// Remove a folder by URI. Returns `true` if removed.
+    pub fn remove(&mut self, uri: &str) -> bool {
+        let before = self.folders.len();
+        self.folders.retain(|f| f.uri != uri);
+        self.folders.len() < before
+    }
+
+    pub fn len(&self) -> usize {
+        self.folders.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.folders.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace trust management
+// ---------------------------------------------------------------------------
+
+/// Trust level assigned to a workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrustLevel {
+    Untrusted,
+    Restricted,
+    Trusted,
+}
+
+/// Manages per-folder trust decisions.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceTrustManager {
+    trust: HashMap<String, TrustLevel>,
+}
+
+impl WorkspaceTrustManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the trust level for a workspace folder URI.
+    pub fn set_trust(&mut self, uri: impl Into<String>, level: TrustLevel) {
+        self.trust.insert(uri.into(), level);
+    }
+
+    /// Get the trust level for a folder. Returns `Untrusted` if unknown.
+    pub fn trust_level(&self, uri: &str) -> TrustLevel {
+        self.trust.get(uri).copied().unwrap_or(TrustLevel::Untrusted)
+    }
+
+    /// Returns `true` if the folder is fully trusted.
+    pub fn is_trusted(&self, uri: &str) -> bool {
+        self.trust_level(uri) == TrustLevel::Trusted
+    }
+
+    /// Returns `true` if any workspace folder is untrusted.
+    pub fn has_untrusted(&self) -> bool {
+        self.trust.values().any(|t| *t == TrustLevel::Untrusted)
+    }
+
+    /// Return the count of folders at each trust level.
+    pub fn summary(&self) -> (usize, usize, usize) {
+        let mut untrusted = 0;
+        let mut restricted = 0;
+        let mut trusted = 0;
+        for t in self.trust.values() {
+            match t {
+                TrustLevel::Untrusted => untrusted += 1,
+                TrustLevel::Restricted => restricted += 1,
+                TrustLevel::Trusted => trusted += 1,
+            }
+        }
+        (untrusted, restricted, trusted)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace event coalescing
+// ---------------------------------------------------------------------------
+
+/// Kind of file-system event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FsEventKind {
+    Created,
+    Changed,
+    Deleted,
+}
+
+/// A coalesced file-system event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CoalescedEvent {
+    pub uri: String,
+    pub kind: FsEventKind,
+}
+
+/// Accumulates raw file-system events and coalesces them so that redundant
+/// notifications are collapsed (e.g. Created+Changed → Created, Changed+Deleted → Deleted).
+#[derive(Debug, Clone, Default)]
+pub struct EventCoalescer {
+    events: HashMap<String, FsEventKind>,
+}
+
+impl EventCoalescer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Push a raw event into the coalescer.
+    pub fn push(&mut self, uri: impl Into<String>, kind: FsEventKind) {
+        let uri = uri.into();
+        let merged = match (self.events.get(&uri), kind) {
+            // A create followed by a change is still just a create.
+            (Some(FsEventKind::Created), FsEventKind::Changed) => FsEventKind::Created,
+            // A create followed by a delete cancels out.
+            (Some(FsEventKind::Created), FsEventKind::Deleted) => {
+                self.events.remove(&uri);
+                return;
+            }
+            // A change followed by a delete is just a delete.
+            (Some(FsEventKind::Changed), FsEventKind::Deleted) => FsEventKind::Deleted,
+            // Otherwise the latest event wins.
+            (_, k) => k,
+        };
+        self.events.insert(uri, merged);
+    }
+
+    /// Drain the coalesced events and return them.
+    pub fn drain(&mut self) -> Vec<CoalescedEvent> {
+        let mut out: Vec<CoalescedEvent> = self
+            .events
+            .drain()
+            .map(|(uri, kind)| CoalescedEvent { uri, kind })
+            .collect();
+        out.sort_by(|a, b| a.uri.cmp(&b.uri));
+        out
+    }
+
+    /// Number of distinct URIs with pending events.
+    pub fn pending_count(&self) -> usize {
+        self.events.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1591,5 +1803,91 @@ mod tests {
     fn uri_matches_glob_prefix() {
         assert!(uri_matches_glob("file:///src/lib.rs", "file:///src/*"));
         assert!(!uri_matches_glob("file:///other/lib.rs", "file:///src/*"));
+    }
+
+    // -- folder prioritization tests --
+
+    #[test]
+    fn folder_priority_manager_sorted_order() {
+        let mut mgr = FolderPriorityManager::new();
+        mgr.add("file:///low", FolderPriority::Low);
+        mgr.add("file:///high", FolderPriority::High);
+        mgr.add("file:///normal", FolderPriority::Normal);
+        let sorted = mgr.sorted();
+        assert_eq!(sorted[0].uri, "file:///high");
+        assert_eq!(sorted[1].uri, "file:///normal");
+        assert_eq!(sorted[2].uri, "file:///low");
+    }
+
+    #[test]
+    fn folder_priority_manager_set_priority_and_filter() {
+        let mut mgr = FolderPriorityManager::new();
+        mgr.add("file:///a", FolderPriority::Normal);
+        assert!(mgr.set_priority("file:///a", FolderPriority::High));
+        assert!(!mgr.set_priority("file:///missing", FolderPriority::Low));
+        assert_eq!(mgr.by_priority(FolderPriority::High).len(), 1);
+        assert_eq!(mgr.by_priority(FolderPriority::Normal).len(), 0);
+    }
+
+    #[test]
+    fn folder_priority_manager_no_duplicates() {
+        let mut mgr = FolderPriorityManager::new();
+        mgr.add("file:///a", FolderPriority::Normal);
+        mgr.add("file:///a", FolderPriority::High);
+        assert_eq!(mgr.len(), 1);
+        // Priority should remain Normal (first add wins).
+        assert_eq!(mgr.sorted()[0].priority, FolderPriority::Normal);
+    }
+
+    // -- trust management tests --
+
+    #[test]
+    fn trust_manager_defaults_to_untrusted() {
+        let mgr = WorkspaceTrustManager::new();
+        assert_eq!(mgr.trust_level("file:///unknown"), TrustLevel::Untrusted);
+        assert!(!mgr.is_trusted("file:///unknown"));
+    }
+
+    #[test]
+    fn trust_manager_set_and_query() {
+        let mut mgr = WorkspaceTrustManager::new();
+        mgr.set_trust("file:///proj", TrustLevel::Trusted);
+        mgr.set_trust("file:///vendor", TrustLevel::Restricted);
+        assert!(mgr.is_trusted("file:///proj"));
+        assert!(!mgr.is_trusted("file:///vendor"));
+        assert!(!mgr.has_untrusted());
+        let (u, r, t) = mgr.summary();
+        assert_eq!((u, r, t), (0, 1, 1));
+    }
+
+    // -- event coalescing tests --
+
+    #[test]
+    fn event_coalescer_create_then_change_stays_created() {
+        let mut c = EventCoalescer::new();
+        c.push("file:///a.rs", FsEventKind::Created);
+        c.push("file:///a.rs", FsEventKind::Changed);
+        let events = c.drain();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].kind, FsEventKind::Created);
+    }
+
+    #[test]
+    fn event_coalescer_create_then_delete_cancels() {
+        let mut c = EventCoalescer::new();
+        c.push("file:///tmp.rs", FsEventKind::Created);
+        c.push("file:///tmp.rs", FsEventKind::Deleted);
+        assert_eq!(c.pending_count(), 0);
+        assert!(c.drain().is_empty());
+    }
+
+    #[test]
+    fn event_coalescer_change_then_delete_becomes_deleted() {
+        let mut c = EventCoalescer::new();
+        c.push("file:///x.rs", FsEventKind::Changed);
+        c.push("file:///x.rs", FsEventKind::Deleted);
+        let events = c.drain();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].kind, FsEventKind::Deleted);
     }
 }

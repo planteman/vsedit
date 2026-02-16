@@ -1,6 +1,7 @@
 //! Network utilities.
 
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap};
+use std::cmp::Ordering;
 use std::fmt;
 // ---------------------------------------------------------------------------
 // HTTP method
@@ -978,6 +979,385 @@ impl ConnectionTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HTTP Header Builder
+// ---------------------------------------------------------------------------
+
+/// Fluent builder for constructing common HTTP headers.
+#[derive(Debug, Clone, Default)]
+pub struct HeaderBuilder {
+    headers: Vec<(String, String)>,
+}
+
+impl HeaderBuilder {
+    /// Create a new empty header builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add an arbitrary header.
+    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((name.into(), value.into()));
+        self
+    }
+
+    /// Set the `Content-Type` header.
+    pub fn content_type(self, mime: impl Into<String>) -> Self {
+        self.header("Content-Type", mime)
+    }
+
+    /// Set `Content-Type: application/json`.
+    pub fn json(self) -> Self {
+        self.content_type("application/json")
+    }
+
+    /// Set the `Authorization` header with a Bearer token.
+    pub fn bearer_token(self, token: impl Into<String>) -> Self {
+        self.header("Authorization", format!("Bearer {}", token.into()))
+    }
+
+    /// Set the `Accept` header.
+    pub fn accept(self, mime: impl Into<String>) -> Self {
+        self.header("Accept", mime)
+    }
+
+    /// Set the `User-Agent` header.
+    pub fn user_agent(self, ua: impl Into<String>) -> Self {
+        self.header("User-Agent", ua)
+    }
+
+    /// Apply common defaults for a JSON API request (Accept + Content-Type).
+    pub fn json_api_defaults(self) -> Self {
+        self.json().accept("application/json")
+    }
+
+    /// Consume the builder and return the header list.
+    pub fn build(self) -> Vec<(String, String)> {
+        self.headers
+    }
+
+    /// Return how many headers have been added.
+    pub fn len(&self) -> usize {
+        self.headers.len()
+    }
+
+    /// Return `true` if no headers have been added.
+    pub fn is_empty(&self) -> bool {
+        self.headers.is_empty()
+    }
+
+    /// Look up a header value by name (case-insensitive).
+    pub fn get(&self, name: &str) -> Option<&str> {
+        let lower = name.to_ascii_lowercase();
+        self.headers
+            .iter()
+            .find(|(k, _)| k.to_ascii_lowercase() == lower)
+            .map(|(_, v)| v.as_str())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Request Priority Queue
+// ---------------------------------------------------------------------------
+
+/// Priority level for queued network requests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RequestPriority {
+    /// Background tasks (telemetry, prefetch).
+    Low = 0,
+    /// Normal user-initiated requests.
+    Normal = 1,
+    /// Interactive requests (autocomplete, hover info).
+    High = 2,
+    /// Requests that block the UI.
+    Critical = 3,
+}
+
+impl RequestPriority {
+    /// Return the numeric priority value (higher = more urgent).
+    pub fn value(self) -> u8 {
+        self as u8
+    }
+}
+
+/// A network request wrapped with a priority and insertion order.
+#[derive(Debug, Clone)]
+pub struct PrioritizedRequest {
+    pub request: HttpRequest,
+    pub priority: RequestPriority,
+    sequence: u64,
+}
+
+impl PartialEq for PrioritizedRequest {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority == other.priority && self.sequence == other.sequence
+    }
+}
+impl Eq for PrioritizedRequest {}
+
+impl PartialOrd for PrioritizedRequest {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PrioritizedRequest {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Higher priority first; within same priority, lower sequence (FIFO).
+        (self.priority.value(), other.sequence).cmp(&(other.priority.value(), self.sequence))
+    }
+}
+
+/// A priority queue for outgoing network requests.
+///
+/// Higher-priority requests are dequeued first. Within the same priority,
+/// requests are served in FIFO order.
+#[derive(Debug)]
+pub struct RequestQueue {
+    heap: BinaryHeap<PrioritizedRequest>,
+    next_seq: u64,
+}
+
+impl RequestQueue {
+    pub fn new() -> Self {
+        Self {
+            heap: BinaryHeap::new(),
+            next_seq: 0,
+        }
+    }
+
+    /// Enqueue a request with the given priority.
+    pub fn push(&mut self, request: HttpRequest, priority: RequestPriority) {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        self.heap.push(PrioritizedRequest {
+            request,
+            priority,
+            sequence: seq,
+        });
+    }
+
+    /// Dequeue the highest-priority request.
+    pub fn pop(&mut self) -> Option<PrioritizedRequest> {
+        self.heap.pop()
+    }
+
+    /// Peek at the highest-priority request without removing it.
+    pub fn peek(&self) -> Option<&PrioritizedRequest> {
+        self.heap.peek()
+    }
+
+    /// Return the number of queued requests.
+    pub fn len(&self) -> usize {
+        self.heap.len()
+    }
+
+    /// Return `true` if the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.heap.is_empty()
+    }
+
+    /// Drain all requests in priority order.
+    pub fn drain(&mut self) -> Vec<PrioritizedRequest> {
+        let mut out = Vec::with_capacity(self.heap.len());
+        while let Some(req) = self.heap.pop() {
+            out.push(req);
+        }
+        out
+    }
+}
+
+impl Default for RequestQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URL query string utilities
+// ---------------------------------------------------------------------------
+
+/// Parse a query string (without leading `?`) into key-value pairs.
+///
+/// Duplicate keys produce multiple entries in the returned vector.
+pub fn parse_query_string(query: &str) -> Vec<(String, String)> {
+    if query.is_empty() {
+        return Vec::new();
+    }
+    query
+        .split('&')
+        .filter(|s| !s.is_empty())
+        .map(|pair| {
+            if let Some((k, v)) = pair.split_once('=') {
+                (k.to_string(), v.to_string())
+            } else {
+                (pair.to_string(), String::new())
+            }
+        })
+        .collect()
+}
+
+/// Build a query string from key-value pairs (without leading `?`).
+pub fn build_query_string(params: &[(impl AsRef<str>, impl AsRef<str>)]) -> String {
+    params
+        .iter()
+        .map(|(k, v)| {
+            let k = k.as_ref();
+            let v = v.as_ref();
+            if v.is_empty() {
+                k.to_string()
+            } else {
+                format!("{k}={v}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("&")
+}
+
+/// Extract the query string portion from a full URL, if present.
+pub fn extract_query(url: &str) -> Option<&str> {
+    let without_fragment = url.split('#').next().unwrap_or(url);
+    without_fragment.split_once('?').map(|(_, q)| q)
+}
+
+/// Return the URL without its query string and fragment.
+pub fn strip_query(url: &str) -> &str {
+    let without_fragment = url.split('#').next().unwrap_or(url);
+    without_fragment.split('?').next().unwrap_or(without_fragment)
+}
+
+// ---------------------------------------------------------------------------
+// Proxy bypass list
+// ---------------------------------------------------------------------------
+
+/// Extended proxy configuration with a bypass (no-proxy) list.
+#[derive(Debug, Clone)]
+pub struct ProxyManager {
+    config: Option<ProxyConfig>,
+    bypass_hosts: Vec<String>,
+}
+
+impl ProxyManager {
+    /// Create a new proxy manager with no proxy configured.
+    pub fn new() -> Self {
+        Self {
+            config: None,
+            bypass_hosts: Vec::new(),
+        }
+    }
+
+    /// Set the proxy configuration.
+    pub fn set_proxy(&mut self, config: ProxyConfig) {
+        self.config = Some(config);
+    }
+
+    /// Clear the proxy configuration.
+    pub fn clear_proxy(&mut self) {
+        self.config = None;
+    }
+
+    /// Add a host pattern to the bypass list (e.g. `"localhost"`, `".internal.corp"`).
+    pub fn add_bypass(&mut self, host: impl Into<String>) {
+        self.bypass_hosts.push(host.into());
+    }
+
+    /// Return `true` if the given host should bypass the proxy.
+    pub fn should_bypass(&self, host: &str) -> bool {
+        let lower = host.to_ascii_lowercase();
+        self.bypass_hosts.iter().any(|pattern| {
+            let pat = pattern.to_ascii_lowercase();
+            if pat.starts_with('.') {
+                lower.ends_with(&pat) || lower == pat[1..]
+            } else {
+                lower == pat
+            }
+        })
+    }
+
+    /// Return the proxy URL to use for the given host, or `None` if bypassed
+    /// or no proxy is configured.
+    pub fn proxy_for(&self, host: &str) -> Option<String> {
+        if self.config.is_none() || self.should_bypass(host) {
+            return None;
+        }
+        self.config.as_ref().map(|c| c.proxy_url())
+    }
+
+    /// Return a reference to the current proxy config.
+    pub fn config(&self) -> Option<&ProxyConfig> {
+        self.config.as_ref()
+    }
+
+    /// Return the bypass list.
+    pub fn bypass_list(&self) -> &[String] {
+        &self.bypass_hosts
+    }
+}
+
+impl Default for ProxyManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Request timeout configuration
+// ---------------------------------------------------------------------------
+
+/// Configurable timeout policy for network requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeoutConfig {
+    /// Connection timeout in milliseconds.
+    pub connect_ms: u64,
+    /// Read/write timeout in milliseconds.
+    pub read_ms: u64,
+    /// Total request timeout in milliseconds (0 = no limit).
+    pub total_ms: u64,
+}
+
+impl TimeoutConfig {
+    /// Create a timeout config with the given connect and read timeouts.
+    pub fn new(connect_ms: u64, read_ms: u64) -> Self {
+        Self {
+            connect_ms,
+            read_ms,
+            total_ms: 0,
+        }
+    }
+
+    /// Set a total request timeout.
+    pub fn with_total(mut self, total_ms: u64) -> Self {
+        self.total_ms = total_ms;
+        self
+    }
+
+    /// Return a fast timeout preset (1s connect, 5s read).
+    pub fn fast() -> Self {
+        Self::new(1_000, 5_000)
+    }
+
+    /// Return a default timeout preset (5s connect, 30s read).
+    pub fn standard() -> Self {
+        Self::new(5_000, 30_000)
+    }
+
+    /// Return a patient timeout preset (10s connect, 120s read).
+    pub fn patient() -> Self {
+        Self::new(10_000, 120_000)
+    }
+
+    /// Return `true` if a total timeout is configured.
+    pub fn has_total_timeout(&self) -> bool {
+        self.total_ms > 0
+    }
+}
+
+impl Default for TimeoutConfig {
+    fn default() -> Self {
+        Self::standard()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1553,5 +1933,198 @@ mod tests {
         assert_eq!(tracker.current(), NetworkStatus::Limited);
         assert_eq!(tracker.transition_count(), 2);
         assert_eq!(tracker.transitions()[0], (NetworkStatus::Online, NetworkStatus::Offline));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: HeaderBuilder, RequestQueue, query string, ProxyManager,
+    // TimeoutConfig
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn header_builder_json_api_defaults() {
+        let headers = HeaderBuilder::new()
+            .json_api_defaults()
+            .user_agent("vsedit/1.0")
+            .bearer_token("tok_abc")
+            .build();
+        assert_eq!(headers.len(), 4);
+
+        let builder = HeaderBuilder::new().json_api_defaults().user_agent("vsedit/1.0");
+        assert_eq!(builder.get("content-type"), Some("application/json"));
+        assert_eq!(builder.get("Accept"), Some("application/json"));
+        assert_eq!(builder.get("user-agent"), Some("vsedit/1.0"));
+        assert!(builder.get("X-Missing").is_none());
+    }
+
+    #[test]
+    fn header_builder_empty() {
+        let builder = HeaderBuilder::new();
+        assert!(builder.is_empty());
+        assert_eq!(builder.len(), 0);
+        let headers = builder.build();
+        assert!(headers.is_empty());
+    }
+
+    #[test]
+    fn request_queue_priority_ordering() {
+        let mut queue = RequestQueue::new();
+        let make_req = |url: &str| HttpRequest {
+            method: HttpMethod::Get,
+            url: url.to_string(),
+            headers: vec![],
+            body: None,
+        };
+
+        queue.push(make_req("low"), RequestPriority::Low);
+        queue.push(make_req("normal"), RequestPriority::Normal);
+        queue.push(make_req("critical"), RequestPriority::Critical);
+        queue.push(make_req("high"), RequestPriority::High);
+
+        assert_eq!(queue.len(), 4);
+        assert!(!queue.is_empty());
+
+        let first = queue.pop().unwrap();
+        assert_eq!(first.request.url, "critical");
+        assert_eq!(first.priority, RequestPriority::Critical);
+
+        let second = queue.pop().unwrap();
+        assert_eq!(second.request.url, "high");
+
+        let third = queue.pop().unwrap();
+        assert_eq!(third.request.url, "normal");
+
+        let fourth = queue.pop().unwrap();
+        assert_eq!(fourth.request.url, "low");
+
+        assert!(queue.pop().is_none());
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn request_queue_fifo_within_same_priority() {
+        let mut queue = RequestQueue::new();
+        let make_req = |url: &str| HttpRequest {
+            method: HttpMethod::Get,
+            url: url.to_string(),
+            headers: vec![],
+            body: None,
+        };
+
+        queue.push(make_req("first"), RequestPriority::Normal);
+        queue.push(make_req("second"), RequestPriority::Normal);
+        queue.push(make_req("third"), RequestPriority::Normal);
+
+        assert_eq!(queue.pop().unwrap().request.url, "first");
+        assert_eq!(queue.pop().unwrap().request.url, "second");
+        assert_eq!(queue.pop().unwrap().request.url, "third");
+    }
+
+    #[test]
+    fn request_queue_drain() {
+        let mut queue = RequestQueue::new();
+        let make_req = |url: &str| HttpRequest {
+            method: HttpMethod::Get,
+            url: url.to_string(),
+            headers: vec![],
+            body: None,
+        };
+        queue.push(make_req("a"), RequestPriority::Low);
+        queue.push(make_req("b"), RequestPriority::High);
+        let drained = queue.drain();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(drained[0].request.url, "b");
+        assert_eq!(drained[1].request.url, "a");
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn parse_and_build_query_string() {
+        let pairs = parse_query_string("foo=bar&baz=42&flag");
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(pairs[0], ("foo".to_string(), "bar".to_string()));
+        assert_eq!(pairs[1], ("baz".to_string(), "42".to_string()));
+        assert_eq!(pairs[2], ("flag".to_string(), String::new()));
+
+        let rebuilt = build_query_string(&[("foo", "bar"), ("baz", "42"), ("flag", "")]);
+        assert_eq!(rebuilt, "foo=bar&baz=42&flag");
+
+        assert!(parse_query_string("").is_empty());
+    }
+
+    #[test]
+    fn extract_and_strip_query() {
+        assert_eq!(
+            extract_query("https://example.com/path?foo=1&bar=2#frag"),
+            Some("foo=1&bar=2")
+        );
+        assert_eq!(extract_query("https://example.com/path"), None);
+        assert_eq!(
+            strip_query("https://example.com/path?foo=1&bar=2#frag"),
+            "https://example.com/path"
+        );
+        assert_eq!(
+            strip_query("https://example.com/path"),
+            "https://example.com/path"
+        );
+    }
+
+    #[test]
+    fn proxy_manager_bypass_and_selection() {
+        let mut mgr = ProxyManager::new();
+        assert!(mgr.config().is_none());
+        assert!(mgr.proxy_for("example.com").is_none());
+
+        mgr.set_proxy(ProxyConfig {
+            host: "proxy.corp".into(),
+            port: 3128,
+            username: None,
+            password: None,
+        });
+        mgr.add_bypass("localhost");
+        mgr.add_bypass(".internal.corp");
+
+        // Bypassed hosts
+        assert!(mgr.should_bypass("localhost"));
+        assert!(mgr.should_bypass("LOCALHOST"));
+        assert!(mgr.should_bypass("app.internal.corp"));
+        assert!(mgr.should_bypass("internal.corp"));
+        assert!(mgr.proxy_for("localhost").is_none());
+
+        // Non-bypassed host
+        assert!(!mgr.should_bypass("example.com"));
+        assert_eq!(
+            mgr.proxy_for("example.com"),
+            Some("http://proxy.corp:3128".to_string())
+        );
+
+        assert_eq!(mgr.bypass_list().len(), 2);
+
+        mgr.clear_proxy();
+        assert!(mgr.proxy_for("example.com").is_none());
+    }
+
+    #[test]
+    fn timeout_config_presets() {
+        let fast = TimeoutConfig::fast();
+        assert_eq!(fast.connect_ms, 1_000);
+        assert_eq!(fast.read_ms, 5_000);
+        assert!(!fast.has_total_timeout());
+
+        let standard = TimeoutConfig::default();
+        assert_eq!(standard.connect_ms, 5_000);
+        assert_eq!(standard.read_ms, 30_000);
+
+        let patient = TimeoutConfig::patient().with_total(300_000);
+        assert_eq!(patient.connect_ms, 10_000);
+        assert_eq!(patient.read_ms, 120_000);
+        assert!(patient.has_total_timeout());
+        assert_eq!(patient.total_ms, 300_000);
+    }
+
+    #[test]
+    fn request_priority_values() {
+        assert!(RequestPriority::Critical.value() > RequestPriority::High.value());
+        assert!(RequestPriority::High.value() > RequestPriority::Normal.value());
+        assert!(RequestPriority::Normal.value() > RequestPriority::Low.value());
     }
 }

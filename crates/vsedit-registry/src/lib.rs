@@ -766,6 +766,301 @@ pub fn registry_diff(old_snap: &RegistrySnapshot, new_snap: &RegistrySnapshot) -
     }
 }
 
+// ---------------------------------------------------------------------------
+// RegistryEventLog
+// ---------------------------------------------------------------------------
+
+/// The kind of event recorded in a [`RegistryEventLog`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryEventKind {
+    /// An extension point was registered.
+    Registered,
+    /// An extension point was unregistered.
+    Unregistered,
+}
+
+impl fmt::Display for RegistryEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RegistryEventKind::Registered => f.write_str("registered"),
+            RegistryEventKind::Unregistered => f.write_str("unregistered"),
+        }
+    }
+}
+
+/// A single timestamped event in the registry event log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryEvent {
+    pub kind: RegistryEventKind,
+    pub point_id: String,
+    pub timestamp_ns: u64,
+}
+
+impl fmt::Display for RegistryEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}ns] {} '{}'",
+            self.timestamp_ns, self.kind, self.point_id
+        )
+    }
+}
+
+/// An append-only log of registry mutation events.
+///
+/// Useful for auditing which extension points were registered or unregistered
+/// and in what order. Each event carries a caller-supplied timestamp so the log
+/// can be correlated with external clocks.
+#[derive(Debug, Clone, Default)]
+pub struct RegistryEventLog {
+    events: Vec<RegistryEvent>,
+}
+
+impl RegistryEventLog {
+    /// Create an empty event log.
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    /// Record a registration event.
+    pub fn record_register(&mut self, point_id: &str, timestamp_ns: u64) {
+        self.events.push(RegistryEvent {
+            kind: RegistryEventKind::Registered,
+            point_id: point_id.to_string(),
+            timestamp_ns,
+        });
+    }
+
+    /// Record an unregistration event.
+    pub fn record_unregister(&mut self, point_id: &str, timestamp_ns: u64) {
+        self.events.push(RegistryEvent {
+            kind: RegistryEventKind::Unregistered,
+            point_id: point_id.to_string(),
+            timestamp_ns,
+        });
+    }
+
+    /// Returns all recorded events in chronological order.
+    pub fn events(&self) -> &[RegistryEvent] {
+        &self.events
+    }
+
+    /// Returns the number of recorded events.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Returns `true` if no events have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Returns only events that match the given kind.
+    pub fn filter_by_kind(&self, kind: &RegistryEventKind) -> Vec<&RegistryEvent> {
+        self.events.iter().filter(|e| e.kind == *kind).collect()
+    }
+
+    /// Returns only events for the given extension point ID.
+    pub fn filter_by_point(&self, point_id: &str) -> Vec<&RegistryEvent> {
+        self.events
+            .iter()
+            .filter(|e| e.point_id == point_id)
+            .collect()
+    }
+
+    /// Returns events within the given timestamp range (inclusive).
+    pub fn filter_by_time_range(&self, start_ns: u64, end_ns: u64) -> Vec<&RegistryEvent> {
+        self.events
+            .iter()
+            .filter(|e| e.timestamp_ns >= start_ns && e.timestamp_ns <= end_ns)
+            .collect()
+    }
+
+    /// Clear all recorded events.
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DependencyTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks directed dependencies between extension points.
+///
+/// An edge `(A, B)` means extension point `A` depends on extension point `B`.
+/// The tracker can detect missing dependencies and cycles.
+#[derive(Debug, Clone, Default)]
+pub struct DependencyTracker {
+    /// Maps each extension point to the set of points it depends on.
+    deps: HashMap<String, HashSet<String>>,
+}
+
+impl DependencyTracker {
+    /// Create an empty dependency tracker.
+    pub fn new() -> Self {
+        Self {
+            deps: HashMap::new(),
+        }
+    }
+
+    /// Declare that `point` depends on `dependency`.
+    pub fn add_dependency(&mut self, point: &str, dependency: &str) {
+        self.deps
+            .entry(point.to_string())
+            .or_default()
+            .insert(dependency.to_string());
+    }
+
+    /// Remove a dependency edge.
+    pub fn remove_dependency(&mut self, point: &str, dependency: &str) -> bool {
+        if let Some(set) = self.deps.get_mut(point) {
+            return set.remove(dependency);
+        }
+        false
+    }
+
+    /// Returns the direct dependencies of `point`.
+    pub fn direct_dependencies(&self, point: &str) -> Vec<&str> {
+        let mut result: Vec<&str> = self
+            .deps
+            .get(point)
+            .map(|s| s.iter().map(String::as_str).collect())
+            .unwrap_or_default();
+        result.sort();
+        result
+    }
+
+    /// Returns all extension points that directly depend on `target`.
+    pub fn dependents_of(&self, target: &str) -> Vec<&str> {
+        let mut result: Vec<&str> = self
+            .deps
+            .iter()
+            .filter(|(_, deps)| deps.contains(target))
+            .map(|(point, _)| point.as_str())
+            .collect();
+        result.sort();
+        result
+    }
+
+    /// Check for dependencies that reference points not present in `registry`.
+    pub fn find_missing(
+        &self,
+        registry: &ExtensionPointRegistry,
+    ) -> Vec<(String, String)> {
+        let mut missing = Vec::new();
+        for (point, deps) in &self.deps {
+            for dep in deps {
+                if !registry.has_point(dep) {
+                    missing.push((point.clone(), dep.clone()));
+                }
+            }
+        }
+        missing.sort();
+        missing
+    }
+
+    /// Detect whether adding or having a dependency from `point` to `dependency`
+    /// would create a cycle. Uses iterative DFS.
+    pub fn has_cycle_through(&self, point: &str, dependency: &str) -> bool {
+        // Check if `dependency` can reach `point` through existing edges.
+        let mut visited = HashSet::new();
+        let mut stack = vec![dependency.to_string()];
+        while let Some(current) = stack.pop() {
+            if current == point {
+                return true;
+            }
+            if visited.insert(current.clone()) {
+                if let Some(next) = self.deps.get(&current) {
+                    for n in next {
+                        stack.push(n.clone());
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Returns the total number of dependency edges.
+    pub fn edge_count(&self) -> usize {
+        self.deps.values().map(|s| s.len()).sum()
+    }
+
+    /// Returns the number of extension points that have at least one dependency.
+    pub fn point_count(&self) -> usize {
+        self.deps.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch validation
+// ---------------------------------------------------------------------------
+
+/// Result of validating a single contribution in a batch.
+#[derive(Debug, Clone)]
+pub struct BatchValidationResult {
+    pub index: usize,
+    pub errors: Vec<String>,
+}
+
+impl BatchValidationResult {
+    /// Returns `true` if the contribution passed validation.
+    pub fn is_valid(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+/// Validate multiple contributions against a schema in one call.
+///
+/// Returns a [`BatchValidationResult`] for each contribution, preserving the
+/// input ordering. Only entries with errors are included in the returned vec
+/// when `errors_only` is `true`.
+pub fn batch_validate(
+    validator: &ExtensionPointValidator,
+    contributions: &[HashMap<String, ContributionValue>],
+    errors_only: bool,
+) -> Vec<BatchValidationResult> {
+    contributions
+        .iter()
+        .enumerate()
+        .filter_map(|(i, contrib)| {
+            let errors = validator.validate_contribution(contrib);
+            if errors_only && errors.is_empty() {
+                None
+            } else {
+                Some(BatchValidationResult { index: i, errors })
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Registry merge
+// ---------------------------------------------------------------------------
+
+/// Merge the contents of `source` into `target`.
+///
+/// Extension points already present in `target` are skipped (no error).
+/// Metadata from `source` is copied for newly added points.
+/// Returns the number of new extension points added.
+pub fn merge_registries(
+    target: &mut ExtensionPointRegistry,
+    source: &ExtensionPointRegistry,
+) -> usize {
+    let mut added = 0;
+    for id in source.iter() {
+        if !target.has_point(id) {
+            if let Some(meta) = source.get_metadata(id) {
+                target.register_point_with_metadata(id, meta.clone());
+            } else {
+                target.register_point(id);
+            }
+            added += 1;
+        }
+    }
+    added
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1496,5 +1791,171 @@ mod tests {
     fn registry_is_ascii_printable() {
         assert!(RegistryValidator::is_ascii_printable("Hello World 123"));
         assert!(!RegistryValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // RegistryEventLog tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn event_log_records_and_filters() {
+        let mut log = RegistryEventLog::new();
+        assert!(log.is_empty());
+
+        log.record_register("vsedit.commands", 100);
+        log.record_register("vsedit.themes", 200);
+        log.record_unregister("vsedit.commands", 300);
+
+        assert_eq!(log.len(), 3);
+        assert!(!log.is_empty());
+
+        let registrations = log.filter_by_kind(&RegistryEventKind::Registered);
+        assert_eq!(registrations.len(), 2);
+
+        let unregistrations = log.filter_by_kind(&RegistryEventKind::Unregistered);
+        assert_eq!(unregistrations.len(), 1);
+        assert_eq!(unregistrations[0].point_id, "vsedit.commands");
+
+        let cmd_events = log.filter_by_point("vsedit.commands");
+        assert_eq!(cmd_events.len(), 2);
+
+        let range = log.filter_by_time_range(150, 250);
+        assert_eq!(range.len(), 1);
+        assert_eq!(range[0].point_id, "vsedit.themes");
+
+        // Display impls
+        assert_eq!(format!("{}", log.events()[0]), "[100ns] registered 'vsedit.commands'");
+    }
+
+    // -----------------------------------------------------------------------
+    // DependencyTracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn dependency_tracker_basic_operations() {
+        let mut tracker = DependencyTracker::new();
+        tracker.add_dependency("vsedit.editor", "vsedit.config");
+        tracker.add_dependency("vsedit.editor", "vsedit.themes");
+        tracker.add_dependency("vsedit.debugger", "vsedit.editor");
+
+        assert_eq!(tracker.edge_count(), 3);
+        assert_eq!(tracker.point_count(), 2);
+
+        let deps = tracker.direct_dependencies("vsedit.editor");
+        assert_eq!(deps, vec!["vsedit.config", "vsedit.themes"]);
+
+        let dependents = tracker.dependents_of("vsedit.editor");
+        assert_eq!(dependents, vec!["vsedit.debugger"]);
+
+        assert!(tracker.remove_dependency("vsedit.editor", "vsedit.themes"));
+        assert!(!tracker.remove_dependency("vsedit.editor", "vsedit.themes"));
+        assert_eq!(tracker.edge_count(), 2);
+    }
+
+    #[test]
+    fn dependency_tracker_cycle_detection() {
+        let mut tracker = DependencyTracker::new();
+        tracker.add_dependency("a", "b");
+        tracker.add_dependency("b", "c");
+
+        // c -> a would form a cycle a -> b -> c -> a
+        assert!(tracker.has_cycle_through("c", "a"));
+        // d -> a would NOT form a cycle
+        assert!(!tracker.has_cycle_through("d", "a"));
+    }
+
+    #[test]
+    fn dependency_tracker_find_missing() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("vsedit.editor");
+        // vsedit.config is NOT registered
+
+        let mut tracker = DependencyTracker::new();
+        tracker.add_dependency("vsedit.editor", "vsedit.config");
+
+        let missing = tracker.find_missing(&reg);
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0], ("vsedit.editor".to_string(), "vsedit.config".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch validation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn batch_validate_mixed_results() {
+        let mut v = ExtensionPointValidator::new();
+        v.add_field("name", SchemaFieldType::StringType);
+        v.add_field("count", SchemaFieldType::NumberType);
+
+        let good = {
+            let mut m = HashMap::new();
+            m.insert("name".into(), ContributionValue::Str("ok".into()));
+            m.insert("count".into(), ContributionValue::Number(1.0));
+            m
+        };
+        let bad_type = {
+            let mut m = HashMap::new();
+            m.insert("name".into(), ContributionValue::Str("ok".into()));
+            m.insert("count".into(), ContributionValue::Bool(true));
+            m
+        };
+        let missing_field: HashMap<String, ContributionValue> = {
+            let mut m = HashMap::new();
+            m.insert("name".into(), ContributionValue::Str("ok".into()));
+            m
+        };
+
+        // errors_only = false: returns all
+        let all = batch_validate(&v, &[good.clone(), bad_type.clone(), missing_field.clone()], false);
+        assert_eq!(all.len(), 3);
+        assert!(all[0].is_valid());
+        assert!(!all[1].is_valid());
+        assert!(!all[2].is_valid());
+
+        // errors_only = true: skips valid
+        let errs = batch_validate(&v, &[good, bad_type, missing_field], true);
+        assert_eq!(errs.len(), 2);
+        assert_eq!(errs[0].index, 1);
+        assert_eq!(errs[1].index, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // merge_registries tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn merge_registries_combines_points() {
+        let mut target = ExtensionPointRegistry::new();
+        target.register_point("vsedit.commands");
+        target.register_point_with_metadata(
+            "vsedit.themes",
+            ExtensionPointMetadata {
+                description: "Themes".into(),
+                ..Default::default()
+            },
+        );
+
+        let mut source = ExtensionPointRegistry::new();
+        source.register_point("vsedit.commands"); // duplicate, should be skipped
+        source.register_point_with_metadata(
+            "vsedit.keybindings",
+            ExtensionPointMetadata {
+                description: "Key bindings".into(),
+                version: Some("2.0".into()),
+                ..Default::default()
+            },
+        );
+        source.register_point("vsedit.snippets");
+
+        let added = merge_registries(&mut target, &source);
+        assert_eq!(added, 2);
+        assert_eq!(target.len(), 4);
+        assert!(target.has_point("vsedit.keybindings"));
+        assert!(target.has_point("vsedit.snippets"));
+        // metadata carried over for keybindings
+        let meta = target.get_metadata("vsedit.keybindings").unwrap();
+        assert_eq!(meta.description, "Key bindings");
+        assert_eq!(meta.version.as_deref(), Some("2.0"));
     }
 }

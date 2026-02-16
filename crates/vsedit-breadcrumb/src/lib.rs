@@ -900,6 +900,206 @@ fn tag_to_kind(tag: &str) -> Option<BreadcrumbKind> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Breadcrumb navigation history (back/forward)
+// ---------------------------------------------------------------------------
+
+/// Navigation history supporting back/forward movement through breadcrumb paths.
+#[derive(Debug, Clone)]
+pub struct BreadcrumbHistory {
+    entries: Vec<BreadcrumbPath>,
+    cursor: usize,
+    max_entries: usize,
+}
+
+impl BreadcrumbHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: 0,
+            max_entries: max_entries.max(1),
+        }
+    }
+
+    /// Push a new path, discarding any forward history.
+    pub fn push(&mut self, path: BreadcrumbPath) {
+        if self.cursor < self.entries.len() {
+            self.entries.truncate(self.cursor);
+        }
+        self.entries.push(path);
+        if self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+        self.cursor = self.entries.len();
+    }
+
+    /// Navigate back, returning the previous path if available.
+    pub fn back(&mut self) -> Option<&BreadcrumbPath> {
+        if self.cursor > 1 {
+            self.cursor -= 1;
+            self.entries.get(self.cursor - 1)
+        } else {
+            None
+        }
+    }
+
+    /// Navigate forward, returning the next path if available.
+    pub fn forward(&mut self) -> Option<&BreadcrumbPath> {
+        if self.cursor < self.entries.len() {
+            self.cursor += 1;
+            self.entries.get(self.cursor - 1)
+        } else {
+            None
+        }
+    }
+
+    /// Return the current path without moving.
+    pub fn current(&self) -> Option<&BreadcrumbPath> {
+        if self.cursor == 0 {
+            None
+        } else {
+            self.entries.get(self.cursor - 1)
+        }
+    }
+
+    /// Whether back navigation is possible.
+    pub fn can_go_back(&self) -> bool {
+        self.cursor > 1
+    }
+
+    /// Whether forward navigation is possible.
+    pub fn can_go_forward(&self) -> bool {
+        self.cursor < self.entries.len()
+    }
+
+    /// Number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb path collapsing
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbPath {
+    /// Collapse the path to show only "important" segments: the first folder,
+    /// the file, and any symbol-like elements. Intermediate folders are replaced
+    /// with a single `…` placeholder element.
+    pub fn collapsed(&self) -> BreadcrumbPath {
+        if self.len() <= 3 {
+            return self.clone();
+        }
+        let mut result = BreadcrumbPath::new();
+        let mut skipped_folders = false;
+        for (i, elem) in self.elements.iter().enumerate() {
+            let is_first = i == 0;
+            let is_last = i == self.len() - 1;
+            let is_important = elem.kind.is_symbol()
+                || elem.kind == BreadcrumbKind::File
+                || is_first
+                || is_last;
+            if is_important {
+                if skipped_folders {
+                    result.push(BreadcrumbElement {
+                        label: "…".to_string(),
+                        kind: BreadcrumbKind::Folder,
+                        uri: None,
+                        range_start_line: None,
+                    });
+                    skipped_folders = false;
+                }
+                result.push(elem.clone());
+            } else {
+                skipped_folders = true;
+            }
+        }
+        result
+    }
+
+    /// Find the divergence index between two paths — the first index where
+    /// the elements differ, or the length of the shorter path.
+    pub fn divergence_index(&self, other: &BreadcrumbPath) -> usize {
+        let mut idx = 0;
+        for (a, b) in self.elements.iter().zip(other.elements.iter()) {
+            if a.label != b.label || a.kind != b.kind {
+                break;
+            }
+            idx += 1;
+        }
+        idx
+    }
+
+    /// Search within the path for elements whose label contains the query
+    /// (case-insensitive), returning their indices.
+    pub fn search(&self, query: &str) -> Vec<usize> {
+        let query_lower = query.to_lowercase();
+        self.elements
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.label.to_lowercase().contains(&query_lower))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Return a new path containing only the first `max_depth` elements.
+    pub fn depth_limited(&self, max_depth: usize) -> BreadcrumbPath {
+        BreadcrumbPath {
+            elements: self.elements.iter().take(max_depth).cloned().collect(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Symbol breadcrumb generation from an outline
+// ---------------------------------------------------------------------------
+
+/// A symbol outline entry used to generate breadcrumbs.
+#[derive(Debug, Clone)]
+pub struct OutlineEntry {
+    pub name: String,
+    pub kind: BreadcrumbKind,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub children: Vec<OutlineEntry>,
+}
+
+/// Build a `BreadcrumbPath` from a document outline for a given cursor line.
+/// Walks the outline tree and collects the chain of symbols that contain the
+/// cursor position.
+pub fn breadcrumbs_from_outline(outline: &[OutlineEntry], cursor_line: u32) -> BreadcrumbPath {
+    let mut path = BreadcrumbPath::new();
+    collect_outline_chain(outline, cursor_line, &mut path);
+    path
+}
+
+fn collect_outline_chain(entries: &[OutlineEntry], line: u32, path: &mut BreadcrumbPath) {
+    for entry in entries {
+        if line >= entry.start_line && line <= entry.end_line {
+            path.push(BreadcrumbElement {
+                label: entry.name.clone(),
+                kind: entry.kind.clone(),
+                uri: None,
+                range_start_line: Some(entry.start_line),
+            });
+            collect_outline_chain(&entry.children, line, path);
+            return;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1580,5 +1780,163 @@ mod tests {
     fn breadcrumb_deserialize_invalid_returns_none() {
         assert!(BreadcrumbPath::deserialize("no_colon").is_none());
         assert!(BreadcrumbPath::deserialize("badtag:label").is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for new functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn history_back_and_forward() {
+        let mut history = BreadcrumbHistory::new(10);
+        assert!(!history.can_go_back());
+        assert!(!history.can_go_forward());
+
+        let mut p1 = BreadcrumbPath::new();
+        p1.push(sample_element("src", BreadcrumbKind::Folder));
+        let mut p2 = BreadcrumbPath::new();
+        p2.push(sample_element("lib.rs", BreadcrumbKind::File));
+
+        history.push(p1);
+        history.push(p2);
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.current().unwrap().to_path_string(), "lib.rs");
+
+        // Go back
+        assert!(history.can_go_back());
+        let back = history.back().unwrap();
+        assert_eq!(back.to_path_string(), "src");
+
+        // Go forward
+        assert!(history.can_go_forward());
+        let fwd = history.forward().unwrap();
+        assert_eq!(fwd.to_path_string(), "lib.rs");
+        assert!(!history.can_go_forward());
+    }
+
+    #[test]
+    fn history_push_truncates_forward() {
+        let mut history = BreadcrumbHistory::new(10);
+        let mut p1 = BreadcrumbPath::new();
+        p1.push(sample_element("a", BreadcrumbKind::Folder));
+        let mut p2 = BreadcrumbPath::new();
+        p2.push(sample_element("b", BreadcrumbKind::Folder));
+        let mut p3 = BreadcrumbPath::new();
+        p3.push(sample_element("c", BreadcrumbKind::Folder));
+
+        history.push(p1);
+        history.push(p2);
+        history.back(); // cursor at "a"
+        // Pushing now should discard "b"
+        history.push(p3);
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.current().unwrap().to_path_string(), "c");
+        assert!(!history.can_go_forward());
+    }
+
+    #[test]
+    fn path_collapsed_short_path_unchanged() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("main.rs", BreadcrumbKind::File));
+        let collapsed = path.collapsed();
+        assert_eq!(collapsed.len(), 2);
+        assert_eq!(collapsed.to_path_string(), "src > main.rs");
+    }
+
+    #[test]
+    fn path_collapsed_replaces_middle_folders() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("project", BreadcrumbKind::Folder));
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("utils", BreadcrumbKind::Folder));
+        path.push(sample_element("helpers", BreadcrumbKind::Folder));
+        path.push(sample_element("lib.rs", BreadcrumbKind::File));
+        path.push(sample_element("run", BreadcrumbKind::Function));
+
+        let collapsed = path.collapsed();
+        let labels: Vec<&str> = collapsed.labels();
+        // first folder kept, middle folders collapsed to "…", file and symbol kept
+        assert!(labels.contains(&"project"));
+        assert!(labels.contains(&"…"));
+        assert!(labels.contains(&"lib.rs"));
+        assert!(labels.contains(&"run"));
+        assert!(collapsed.len() < path.len());
+    }
+
+    #[test]
+    fn divergence_index_finds_split() {
+        let mut a = BreadcrumbPath::new();
+        a.push(sample_element("src", BreadcrumbKind::Folder));
+        a.push(sample_element("lib.rs", BreadcrumbKind::File));
+        a.push(sample_element("foo", BreadcrumbKind::Function));
+
+        let mut b = BreadcrumbPath::new();
+        b.push(sample_element("src", BreadcrumbKind::Folder));
+        b.push(sample_element("lib.rs", BreadcrumbKind::File));
+        b.push(sample_element("bar", BreadcrumbKind::Function));
+
+        assert_eq!(a.divergence_index(&b), 2);
+
+        // Identical paths diverge at length
+        assert_eq!(a.divergence_index(&a), 3);
+    }
+
+    #[test]
+    fn search_finds_matching_elements() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("MyStruct", BreadcrumbKind::Class));
+        path.push(sample_element("my_method", BreadcrumbKind::Method));
+
+        let results = path.search("my");
+        assert_eq!(results, vec![1, 2]);
+
+        let empty = path.search("zzz");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn depth_limited_returns_prefix() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("a", BreadcrumbKind::Folder));
+        path.push(sample_element("b", BreadcrumbKind::Folder));
+        path.push(sample_element("c", BreadcrumbKind::File));
+        path.push(sample_element("d", BreadcrumbKind::Function));
+
+        let limited = path.depth_limited(2);
+        assert_eq!(limited.len(), 2);
+        assert_eq!(limited.to_path_string(), "a > b");
+    }
+
+    #[test]
+    fn breadcrumbs_from_outline_nested() {
+        let outline = vec![OutlineEntry {
+            name: "MyModule".into(),
+            kind: BreadcrumbKind::Module,
+            start_line: 0,
+            end_line: 100,
+            children: vec![OutlineEntry {
+                name: "MyStruct".into(),
+                kind: BreadcrumbKind::Class,
+                start_line: 10,
+                end_line: 50,
+                children: vec![OutlineEntry {
+                    name: "new".into(),
+                    kind: BreadcrumbKind::Function,
+                    start_line: 15,
+                    end_line: 25,
+                    children: vec![],
+                }],
+            }],
+        }];
+
+        let path = breadcrumbs_from_outline(&outline, 20);
+        assert_eq!(path.len(), 3);
+        assert_eq!(path.labels(), vec!["MyModule", "MyStruct", "new"]);
+
+        // Cursor outside any symbol
+        let empty = breadcrumbs_from_outline(&outline, 200);
+        assert!(empty.is_empty());
     }
 }

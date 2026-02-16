@@ -985,6 +985,351 @@ impl StatusBar {
 }
 
 // ---------------------------------------------------------------------------
+// Text wrapping
+// ---------------------------------------------------------------------------
+
+/// Word-wrap a string to fit within `width` columns.
+///
+/// Splits on whitespace boundaries when possible, falling back to hard breaks
+/// for tokens longer than `width`.
+pub fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![];
+    }
+    let mut lines = Vec::new();
+    for raw_line in text.split('\n') {
+        let words: Vec<&str> = raw_line.split_whitespace().collect();
+        if words.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+        let mut current = String::new();
+        for word in &words {
+            if word.len() > width {
+                // Flush current line first.
+                if !current.is_empty() {
+                    lines.push(current);
+                    current = String::new();
+                }
+                // Hard-break the long word.
+                let mut remaining = *word;
+                while remaining.len() > width {
+                    lines.push(remaining[..width].to_string());
+                    remaining = &remaining[width..];
+                }
+                current = remaining.to_string();
+            } else if current.is_empty() {
+                current = word.to_string();
+            } else if current.len() + 1 + word.len() <= width {
+                current.push(' ');
+                current.push_str(word);
+            } else {
+                lines.push(current);
+                current = word.to_string();
+            }
+        }
+        lines.push(current);
+    }
+    lines
+}
+
+// ---------------------------------------------------------------------------
+// ANSI escape code stripping
+// ---------------------------------------------------------------------------
+
+/// Strip ANSI escape sequences (CSI, OSC, simple escapes) from a string.
+pub fn strip_ansi(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            match chars.peek() {
+                Some('[') => {
+                    chars.next(); // consume '['
+                    // Consume until a letter in '@'..='~' terminates the CSI.
+                    while let Some(&c) = chars.peek() {
+                        chars.next();
+                        if c.is_ascii_alphabetic() || c == '~' || c == '@' {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    chars.next(); // consume ']'
+                    // OSC — terminated by ST (\x1b\\) or BEL (\x07).
+                    while let Some(&c) = chars.peek() {
+                        chars.next();
+                        if c == '\x07' {
+                            break;
+                        }
+                        if c == '\x1b' {
+                            if chars.peek() == Some(&'\\') {
+                                chars.next();
+                            }
+                            break;
+                        }
+                    }
+                }
+                _ => {
+                    // Simple two-byte escape — skip next char.
+                    chars.next();
+                }
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// Return the visible (non-ANSI) length of a string.
+pub fn visible_len(s: &str) -> usize {
+    strip_ansi(s).len()
+}
+
+// ---------------------------------------------------------------------------
+// Text alignment
+// ---------------------------------------------------------------------------
+
+/// Horizontal text alignment within a fixed-width area.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+/// Align `text` within `width` columns, padding with spaces.
+///
+/// If the text is longer than `width` it is truncated from the right.
+pub fn align_text(text: &str, width: usize, alignment: TextAlignment) -> String {
+    let text_len = text.len();
+    if text_len >= width {
+        return text[..width].to_string();
+    }
+    let padding = width - text_len;
+    match alignment {
+        TextAlignment::Left => format!("{}{}", text, " ".repeat(padding)),
+        TextAlignment::Right => format!("{}{}", " ".repeat(padding), text),
+        TextAlignment::Center => {
+            let left_pad = padding / 2;
+            let right_pad = padding - left_pad;
+            format!("{}{}{}", " ".repeat(left_pad), text, " ".repeat(right_pad))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Border drawing characters
+// ---------------------------------------------------------------------------
+
+/// Box-drawing character sets for border rendering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BorderStyle {
+    /// Single-line borders: ┌─┐│└┘
+    Single,
+    /// Double-line borders: ╔═╗║╚╝
+    Double,
+    /// Rounded corners: ╭─╮│╰╯
+    Rounded,
+    /// ASCII-only borders: +-+|+-+
+    Ascii,
+}
+
+/// The six characters needed to draw a rectangular border.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BorderChars {
+    pub top_left: char,
+    pub top_right: char,
+    pub bottom_left: char,
+    pub bottom_right: char,
+    pub horizontal: char,
+    pub vertical: char,
+}
+
+impl BorderStyle {
+    /// Return the [`BorderChars`] for this style.
+    pub fn chars(self) -> BorderChars {
+        match self {
+            BorderStyle::Single => BorderChars {
+                top_left: '┌',
+                top_right: '┐',
+                bottom_left: '└',
+                bottom_right: '┘',
+                horizontal: '─',
+                vertical: '│',
+            },
+            BorderStyle::Double => BorderChars {
+                top_left: '╔',
+                top_right: '╗',
+                bottom_left: '╚',
+                bottom_right: '╝',
+                horizontal: '═',
+                vertical: '║',
+            },
+            BorderStyle::Rounded => BorderChars {
+                top_left: '╭',
+                top_right: '╮',
+                bottom_left: '╰',
+                bottom_right: '╯',
+                horizontal: '─',
+                vertical: '│',
+            },
+            BorderStyle::Ascii => BorderChars {
+                top_left: '+',
+                top_right: '+',
+                bottom_left: '+',
+                bottom_right: '+',
+                horizontal: '-',
+                vertical: '|',
+            },
+        }
+    }
+
+    /// Render a complete top border line of `width` characters.
+    pub fn top_line(self, width: usize) -> String {
+        let c = self.chars();
+        if width < 2 {
+            return String::new();
+        }
+        let inner: String = std::iter::repeat(c.horizontal).take(width - 2).collect();
+        format!("{}{}{}", c.top_left, inner, c.top_right)
+    }
+
+    /// Render a complete bottom border line of `width` characters.
+    pub fn bottom_line(self, width: usize) -> String {
+        let c = self.chars();
+        if width < 2 {
+            return String::new();
+        }
+        let inner: String = std::iter::repeat(c.horizontal).take(width - 2).collect();
+        format!("{}{}{}", c.bottom_left, inner, c.bottom_right)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scrollbar position calculation
+// ---------------------------------------------------------------------------
+
+/// Compute the scrollbar thumb position and size for a scrollable region.
+///
+/// Returns `(thumb_offset, thumb_size)` within `track_height` rows.
+/// If the content fits entirely in the viewport the thumb spans the full
+/// track.
+pub fn scrollbar_metrics(
+    content_height: usize,
+    viewport_height: usize,
+    scroll_offset: usize,
+    track_height: usize,
+) -> (usize, usize) {
+    if content_height == 0 || viewport_height == 0 || track_height == 0 {
+        return (0, track_height);
+    }
+    if content_height <= viewport_height {
+        return (0, track_height);
+    }
+    // Thumb size proportional to visible fraction, at least 1 row.
+    let thumb = (track_height * viewport_height / content_height).max(1).min(track_height);
+    let max_offset = content_height - viewport_height;
+    let scroll_frac = scroll_offset.min(max_offset) as f64 / max_offset as f64;
+    let pos = ((track_height - thumb) as f64 * scroll_frac) as usize;
+    (pos, thumb)
+}
+
+// ---------------------------------------------------------------------------
+// CellGrid — 2-D character grid operations
+// ---------------------------------------------------------------------------
+
+/// A simple 2-D grid of characters for compositing terminal output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellGrid {
+    pub width: usize,
+    pub height: usize,
+    cells: Vec<char>,
+}
+
+impl CellGrid {
+    /// Create a grid filled with spaces.
+    pub fn new(width: usize, height: usize) -> Self {
+        Self {
+            width,
+            height,
+            cells: vec![' '; width * height],
+        }
+    }
+
+    /// Get the character at `(x, y)`.
+    pub fn get(&self, x: usize, y: usize) -> Option<char> {
+        if x < self.width && y < self.height {
+            Some(self.cells[y * self.width + x])
+        } else {
+            None
+        }
+    }
+
+    /// Set the character at `(x, y)`.
+    pub fn set(&mut self, x: usize, y: usize, ch: char) {
+        if x < self.width && y < self.height {
+            self.cells[y * self.width + x] = ch;
+        }
+    }
+
+    /// Fill the entire grid with `ch`.
+    pub fn fill(&mut self, ch: char) {
+        self.cells.fill(ch);
+    }
+
+    /// Fill a rectangular sub-region with `ch`.
+    pub fn fill_region(&mut self, x: usize, y: usize, w: usize, h: usize, ch: char) {
+        for row in y..((y + h).min(self.height)) {
+            for col in x..((x + w).min(self.width)) {
+                self.cells[row * self.width + col] = ch;
+            }
+        }
+    }
+
+    /// Write a string starting at `(x, y)`, clipping at the grid edge.
+    pub fn put_str(&mut self, x: usize, y: usize, s: &str) {
+        if y >= self.height {
+            return;
+        }
+        for (i, ch) in s.chars().enumerate() {
+            let col = x + i;
+            if col >= self.width {
+                break;
+            }
+            self.cells[y * self.width + col] = ch;
+        }
+    }
+
+    /// Return a row as a [`String`].
+    pub fn row_str(&self, y: usize) -> Option<String> {
+        if y >= self.height {
+            return None;
+        }
+        let start = y * self.width;
+        Some(self.cells[start..start + self.width].iter().collect())
+    }
+
+    /// Copy a rectangular region from `src` into this grid at `(dest_x, dest_y)`.
+    pub fn blit(&mut self, src: &CellGrid, dest_x: usize, dest_y: usize) {
+        for sy in 0..src.height {
+            let dy = dest_y + sy;
+            if dy >= self.height {
+                break;
+            }
+            for sx in 0..src.width {
+                let dx = dest_x + sx;
+                if dx >= self.width {
+                    break;
+                }
+                self.cells[dy * self.width + dx] = src.cells[sy * src.width + sx];
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1573,5 +1918,152 @@ mod tests {
             supports_bracketed_paste: true,
         };
         assert_eq!(all.enabled_count(), 5);
+    }
+
+    // -- wrap_text --
+
+    #[test]
+    fn wrap_text_basic() {
+        let lines = wrap_text("hello world foo bar", 11);
+        assert_eq!(lines, vec!["hello world", "foo bar"]);
+    }
+
+    #[test]
+    fn wrap_text_long_word_hard_break() {
+        let lines = wrap_text("abcdefghij", 4);
+        assert_eq!(lines, vec!["abcd", "efgh", "ij"]);
+    }
+
+    #[test]
+    fn wrap_text_preserves_newlines() {
+        let lines = wrap_text("a\nb\nc", 80);
+        assert_eq!(lines, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn wrap_text_zero_width() {
+        assert!(wrap_text("hello", 0).is_empty());
+    }
+
+    // -- strip_ansi / visible_len --
+
+    #[test]
+    fn strip_ansi_removes_csi() {
+        let input = "\x1b[31mred\x1b[0m plain";
+        assert_eq!(strip_ansi(input), "red plain");
+    }
+
+    #[test]
+    fn strip_ansi_no_escapes() {
+        assert_eq!(strip_ansi("hello"), "hello");
+    }
+
+    #[test]
+    fn visible_len_ansi() {
+        assert_eq!(visible_len("\x1b[1mbold\x1b[0m"), 4);
+    }
+
+    // -- align_text --
+
+    #[test]
+    fn align_text_left() {
+        assert_eq!(align_text("hi", 6, TextAlignment::Left), "hi    ");
+    }
+
+    #[test]
+    fn align_text_right() {
+        assert_eq!(align_text("hi", 6, TextAlignment::Right), "    hi");
+    }
+
+    #[test]
+    fn align_text_center() {
+        assert_eq!(align_text("hi", 6, TextAlignment::Center), "  hi  ");
+    }
+
+    #[test]
+    fn align_text_truncate() {
+        assert_eq!(align_text("longtext", 4, TextAlignment::Left), "long");
+    }
+
+    // -- BorderStyle --
+
+    #[test]
+    fn border_single_chars() {
+        let c = BorderStyle::Single.chars();
+        assert_eq!(c.top_left, '┌');
+        assert_eq!(c.horizontal, '─');
+    }
+
+    #[test]
+    fn border_top_line() {
+        assert_eq!(BorderStyle::Ascii.top_line(5), "+---+");
+        assert_eq!(BorderStyle::Ascii.bottom_line(5), "+---+");
+    }
+
+    #[test]
+    fn border_top_line_too_narrow() {
+        assert_eq!(BorderStyle::Single.top_line(1), "");
+    }
+
+    // -- scrollbar_metrics --
+
+    #[test]
+    fn scrollbar_fits_in_viewport() {
+        let (pos, size) = scrollbar_metrics(10, 20, 0, 10);
+        assert_eq!(pos, 0);
+        assert_eq!(size, 10);
+    }
+
+    #[test]
+    fn scrollbar_half_scrolled() {
+        let (pos, size) = scrollbar_metrics(100, 10, 45, 20);
+        assert!(size >= 1);
+        assert!(pos + size <= 20);
+    }
+
+    // -- CellGrid --
+
+    #[test]
+    fn cell_grid_new_filled_with_spaces() {
+        let g = CellGrid::new(4, 3);
+        assert_eq!(g.get(0, 0), Some(' '));
+        assert_eq!(g.row_str(0), Some("    ".to_string()));
+    }
+
+    #[test]
+    fn cell_grid_set_get() {
+        let mut g = CellGrid::new(5, 5);
+        g.set(2, 3, 'X');
+        assert_eq!(g.get(2, 3), Some('X'));
+        assert_eq!(g.get(99, 0), None);
+    }
+
+    #[test]
+    fn cell_grid_fill_region() {
+        let mut g = CellGrid::new(6, 4);
+        g.fill_region(1, 1, 3, 2, '#');
+        assert_eq!(g.get(0, 0), Some(' '));
+        assert_eq!(g.get(1, 1), Some('#'));
+        assert_eq!(g.get(3, 2), Some('#'));
+        assert_eq!(g.get(4, 1), Some(' '));
+    }
+
+    #[test]
+    fn cell_grid_put_str_and_row() {
+        let mut g = CellGrid::new(10, 2);
+        g.put_str(2, 0, "hello");
+        assert_eq!(g.row_str(0), Some("  hello   ".to_string()));
+    }
+
+    #[test]
+    fn cell_grid_blit() {
+        let mut dst = CellGrid::new(6, 4);
+        let mut src = CellGrid::new(2, 2);
+        src.fill('A');
+        dst.blit(&src, 1, 1);
+        assert_eq!(dst.get(0, 0), Some(' '));
+        assert_eq!(dst.get(1, 1), Some('A'));
+        assert_eq!(dst.get(2, 2), Some('A'));
+        assert_eq!(dst.get(3, 1), Some(' '));
     }
 }

@@ -911,6 +911,236 @@ impl DragAndDropService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Rect – axis-aligned bounding box for hit testing
+// ---------------------------------------------------------------------------
+
+/// An axis-aligned rectangle used for drop-zone hit testing.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Rect {
+    pub fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
+        Self { x, y, width, height }
+    }
+
+    /// Returns `true` if the point `(px, py)` lies inside this rectangle
+    /// (inclusive on all edges).
+    pub fn contains(&self, px: f64, py: f64) -> bool {
+        px >= self.x
+            && px <= self.x + self.width
+            && py >= self.y
+            && py <= self.y + self.height
+    }
+
+    /// Returns `true` if `self` and `other` overlap.
+    pub fn intersects(&self, other: &Rect) -> bool {
+        self.x < other.x + other.width
+            && self.x + self.width > other.x
+            && self.y < other.y + other.height
+            && self.y + self.height > other.y
+    }
+
+    /// The center point of the rectangle.
+    pub fn center(&self) -> (f64, f64) {
+        (self.x + self.width / 2.0, self.y + self.height / 2.0)
+    }
+}
+
+impl fmt::Display for Rect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Rect({}, {}, {}×{})", self.x, self.y, self.width, self.height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragFeedbackState – visual feedback state machine
+// ---------------------------------------------------------------------------
+
+/// Visual feedback states during a drag operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DragFeedbackState {
+    /// Mouse pressed but drag threshold not yet exceeded.
+    Pending,
+    /// Threshold exceeded – drag is visually active.
+    Dragging,
+    /// Cursor is over a valid drop zone.
+    OverValidTarget,
+    /// Cursor is over an invalid (disabled / wrong mime) drop zone.
+    OverInvalidTarget,
+    /// Drop completed successfully.
+    Dropped,
+    /// Drag was cancelled (e.g. Escape key).
+    Cancelled,
+}
+
+impl DragFeedbackState {
+    /// Returns `true` for terminal states (`Dropped` or `Cancelled`).
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Dropped | Self::Cancelled)
+    }
+
+    /// Returns `true` when a drag ghost / preview should be rendered.
+    pub fn should_show_preview(&self) -> bool {
+        matches!(self, Self::Dragging | Self::OverValidTarget | Self::OverInvalidTarget)
+    }
+}
+
+impl fmt::Display for DragFeedbackState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Pending => "pending",
+            Self::Dragging => "dragging",
+            Self::OverValidTarget => "over-valid",
+            Self::OverInvalidTarget => "over-invalid",
+            Self::Dropped => "dropped",
+            Self::Cancelled => "cancelled",
+        };
+        f.write_str(label)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiDragTracker – track multiple selected items during a drag
+// ---------------------------------------------------------------------------
+
+/// Tracks a set of items that are being dragged together.
+#[derive(Debug, Clone)]
+pub struct MultiDragTracker {
+    items: Vec<DragPayload>,
+}
+
+impl MultiDragTracker {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn add(&mut self, payload: DragPayload) {
+        self.items.push(payload);
+    }
+
+    pub fn remove_by_index(&mut self, index: usize) -> Option<DragPayload> {
+        if index < self.items.len() {
+            Some(self.items.remove(index))
+        } else {
+            None
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn items(&self) -> &[DragPayload] {
+        &self.items
+    }
+
+    /// Returns all items that match a specific payload type name.
+    pub fn items_of_type(&self, type_name: &str) -> Vec<&DragPayload> {
+        self.items.iter().filter(|p| p.payload_type() == type_name).collect()
+    }
+
+    /// Drain all items, returning them as a `Vec`.
+    pub fn take_all(&mut self) -> Vec<DragPayload> {
+        std::mem::take(&mut self.items)
+    }
+}
+
+impl Default for MultiDragTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DropEffectResolver – decide copy / move / link based on modifiers
+// ---------------------------------------------------------------------------
+
+/// Keyboard modifier state used to decide the drop effect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ModifierKeys {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+}
+
+/// Resolves the [`DragEffect`] from the current modifier-key state and the
+/// set of effects the source allows.
+pub fn resolve_drop_effect(
+    modifiers: &ModifierKeys,
+    allowed: &[DragEffect],
+) -> DragEffect {
+    let preferred = if modifiers.ctrl && modifiers.shift {
+        DragEffect::Link
+    } else if modifiers.ctrl {
+        DragEffect::Copy
+    } else if modifiers.shift {
+        DragEffect::Move
+    } else if allowed.contains(&DragEffect::Move) {
+        DragEffect::Move
+    } else if allowed.contains(&DragEffect::Copy) {
+        DragEffect::Copy
+    } else {
+        DragEffect::None
+    };
+
+    if allowed.contains(&preferred) {
+        preferred
+    } else {
+        DragEffect::None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AutoScrollRegion – detect when cursor is near viewport edges
+// ---------------------------------------------------------------------------
+
+/// Describes which edge of the viewport the cursor is near.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrollEdge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Check whether a cursor position is within `margin` pixels of any edge of
+/// the given viewport rectangle.  Returns the set of edges that are "hot".
+pub fn detect_auto_scroll_edges(
+    cursor_x: f64,
+    cursor_y: f64,
+    viewport: &Rect,
+    margin: f64,
+) -> Vec<ScrollEdge> {
+    let mut edges = Vec::new();
+    if cursor_y >= viewport.y && cursor_y <= viewport.y + margin {
+        edges.push(ScrollEdge::Top);
+    }
+    if cursor_y >= viewport.y + viewport.height - margin
+        && cursor_y <= viewport.y + viewport.height
+    {
+        edges.push(ScrollEdge::Bottom);
+    }
+    if cursor_x >= viewport.x && cursor_x <= viewport.x + margin {
+        edges.push(ScrollEdge::Left);
+    }
+    if cursor_x >= viewport.x + viewport.width - margin
+        && cursor_x <= viewport.x + viewport.width
+    {
+        edges.push(ScrollEdge::Right);
+    }
+    edges
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1586,5 +1816,136 @@ mod tests {
         svc.try_drop_on(&target).unwrap();
         assert_eq!(svc.history_count(), 1);
         assert!(svc.active_source().is_none());
+    }
+
+    // --- Rect hit-testing tests ---
+
+    #[test]
+    fn rect_contains_and_edges() {
+        let r = Rect::new(10.0, 20.0, 100.0, 50.0);
+        // inside
+        assert!(r.contains(50.0, 40.0));
+        // on top-left corner (inclusive)
+        assert!(r.contains(10.0, 20.0));
+        // on bottom-right corner (inclusive)
+        assert!(r.contains(110.0, 70.0));
+        // outside
+        assert!(!r.contains(9.9, 20.0));
+        assert!(!r.contains(50.0, 70.1));
+    }
+
+    #[test]
+    fn rect_intersects() {
+        let a = Rect::new(0.0, 0.0, 50.0, 50.0);
+        let b = Rect::new(25.0, 25.0, 50.0, 50.0);
+        assert!(a.intersects(&b));
+        assert!(b.intersects(&a));
+
+        let c = Rect::new(100.0, 100.0, 10.0, 10.0);
+        assert!(!a.intersects(&c));
+    }
+
+    #[test]
+    fn rect_center_and_display() {
+        let r = Rect::new(0.0, 0.0, 100.0, 200.0);
+        assert_eq!(r.center(), (50.0, 100.0));
+        let s = format!("{r}");
+        assert!(s.contains("Rect("));
+    }
+
+    // --- DragFeedbackState tests ---
+
+    #[test]
+    fn drag_feedback_state_transitions() {
+        assert!(!DragFeedbackState::Pending.is_terminal());
+        assert!(!DragFeedbackState::Dragging.is_terminal());
+        assert!(DragFeedbackState::Dropped.is_terminal());
+        assert!(DragFeedbackState::Cancelled.is_terminal());
+
+        assert!(!DragFeedbackState::Pending.should_show_preview());
+        assert!(DragFeedbackState::Dragging.should_show_preview());
+        assert!(DragFeedbackState::OverValidTarget.should_show_preview());
+        assert!(DragFeedbackState::OverInvalidTarget.should_show_preview());
+        assert!(!DragFeedbackState::Dropped.should_show_preview());
+
+        assert_eq!(format!("{}", DragFeedbackState::Dragging), "dragging");
+    }
+
+    // --- MultiDragTracker tests ---
+
+    #[test]
+    fn multi_drag_tracker_operations() {
+        let mut tracker = MultiDragTracker::new();
+        assert!(tracker.is_empty());
+
+        tracker.add(DragPayload::Tab { tab_id: "t1".into(), group_id: 0 });
+        tracker.add(DragPayload::Tab { tab_id: "t2".into(), group_id: 0 });
+        tracker.add(DragPayload::File { uri: "file:///a.rs".into(), mime_type: "text/plain".into() });
+        assert_eq!(tracker.count(), 3);
+
+        let tabs = tracker.items_of_type("tab");
+        assert_eq!(tabs.len(), 2);
+
+        let removed = tracker.remove_by_index(0);
+        assert!(removed.is_some());
+        assert_eq!(tracker.count(), 2);
+        assert!(tracker.remove_by_index(99).is_none());
+
+        let all = tracker.take_all();
+        assert_eq!(all.len(), 2);
+        assert!(tracker.is_empty());
+    }
+
+    // --- resolve_drop_effect tests ---
+
+    #[test]
+    fn resolve_drop_effect_from_modifiers() {
+        let all = vec![DragEffect::Copy, DragEffect::Move, DragEffect::Link];
+
+        // no modifiers → default Move
+        let mods = ModifierKeys::default();
+        assert_eq!(resolve_drop_effect(&mods, &all), DragEffect::Move);
+
+        // ctrl → Copy
+        let mods = ModifierKeys { ctrl: true, ..Default::default() };
+        assert_eq!(resolve_drop_effect(&mods, &all), DragEffect::Copy);
+
+        // shift → Move
+        let mods = ModifierKeys { shift: true, ..Default::default() };
+        assert_eq!(resolve_drop_effect(&mods, &all), DragEffect::Move);
+
+        // ctrl+shift → Link
+        let mods = ModifierKeys { ctrl: true, shift: true, ..Default::default() };
+        assert_eq!(resolve_drop_effect(&mods, &all), DragEffect::Link);
+
+        // ctrl but Copy not allowed → None
+        let mods = ModifierKeys { ctrl: true, ..Default::default() };
+        assert_eq!(resolve_drop_effect(&mods, &[DragEffect::Move]), DragEffect::None);
+    }
+
+    // --- detect_auto_scroll_edges tests ---
+
+    #[test]
+    fn auto_scroll_edge_detection() {
+        let viewport = Rect::new(0.0, 0.0, 800.0, 600.0);
+        let margin = 20.0;
+
+        // center → no edges
+        let edges = detect_auto_scroll_edges(400.0, 300.0, &viewport, margin);
+        assert!(edges.is_empty());
+
+        // top-left corner → Top + Left
+        let edges = detect_auto_scroll_edges(5.0, 5.0, &viewport, margin);
+        assert!(edges.contains(&ScrollEdge::Top));
+        assert!(edges.contains(&ScrollEdge::Left));
+
+        // bottom edge
+        let edges = detect_auto_scroll_edges(400.0, 595.0, &viewport, margin);
+        assert!(edges.contains(&ScrollEdge::Bottom));
+        assert!(!edges.contains(&ScrollEdge::Top));
+
+        // right edge
+        let edges = detect_auto_scroll_edges(790.0, 300.0, &viewport, margin);
+        assert!(edges.contains(&ScrollEdge::Right));
     }
 }

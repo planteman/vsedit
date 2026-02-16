@@ -893,6 +893,200 @@ impl ProgressTimer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ThroughputTracker — items-per-second calculation
+// ---------------------------------------------------------------------------
+
+/// Tracks throughput (items processed per unit time) for progress reporting.
+#[derive(Debug, Clone)]
+pub struct ThroughputTracker {
+    items_processed: u64,
+    start: std::time::Instant,
+    window: Vec<(std::time::Instant, u64)>,
+    window_duration: std::time::Duration,
+}
+
+impl ThroughputTracker {
+    /// Create a new tracker with a sliding window duration for rate calculation.
+    pub fn new(window_duration: std::time::Duration) -> Self {
+        Self {
+            items_processed: 0,
+            start: std::time::Instant::now(),
+            window: Vec::new(),
+            window_duration,
+        }
+    }
+
+    /// Record that `count` items were processed at this instant.
+    pub fn record(&mut self, count: u64) {
+        let now = std::time::Instant::now();
+        self.items_processed += count;
+        self.window.push((now, count));
+        self.prune(now);
+    }
+
+    /// Total items processed since creation.
+    pub fn total_items(&self) -> u64 {
+        self.items_processed
+    }
+
+    /// Overall throughput (items/second) since creation.
+    pub fn overall_rate(&self) -> f64 {
+        let elapsed = self.start.elapsed().as_secs_f64();
+        if elapsed <= 0.0 {
+            return 0.0;
+        }
+        self.items_processed as f64 / elapsed
+    }
+
+    /// Windowed throughput (items/second) over the configured window.
+    pub fn windowed_rate(&mut self) -> f64 {
+        let now = std::time::Instant::now();
+        self.prune(now);
+        let window_items: u64 = self.window.iter().map(|(_, c)| c).sum();
+        let secs = self.window_duration.as_secs_f64();
+        if secs <= 0.0 {
+            return 0.0;
+        }
+        window_items as f64 / secs
+    }
+
+    fn prune(&mut self, now: std::time::Instant) {
+        let cutoff = now - self.window_duration;
+        self.window.retain(|(t, _)| *t >= cutoff);
+    }
+
+    /// Estimate time remaining given `remaining_items` based on overall rate.
+    pub fn estimate_remaining(&self, remaining_items: u64) -> Option<std::time::Duration> {
+        let rate = self.overall_rate();
+        if rate <= 0.0 {
+            return None;
+        }
+        Some(std::time::Duration::from_secs_f64(
+            remaining_items as f64 / rate,
+        ))
+    }
+}
+
+impl fmt::Display for ThroughputTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} items ({:.1} items/s)",
+            self.items_processed,
+            self.overall_rate()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WeightedStepProgress — multi-step progress with per-step weights
+// ---------------------------------------------------------------------------
+
+/// A single step in a weighted multi-step progress tracker.
+#[derive(Debug, Clone)]
+pub struct WeightedStep {
+    pub label: String,
+    pub weight: f64,
+    pub progress: f64,
+}
+
+/// Tracks progress across multiple weighted steps, producing a single
+/// aggregate percentage.
+#[derive(Debug, Clone)]
+pub struct WeightedStepProgress {
+    steps: Vec<WeightedStep>,
+}
+
+impl WeightedStepProgress {
+    pub fn new() -> Self {
+        Self { steps: Vec::new() }
+    }
+
+    /// Add a step with the given label and relative weight.
+    pub fn add_step(&mut self, label: impl Into<String>, weight: f64) -> usize {
+        let idx = self.steps.len();
+        self.steps.push(WeightedStep {
+            label: label.into(),
+            weight,
+            progress: 0.0,
+        });
+        idx
+    }
+
+    /// Update progress (0.0–100.0) for a step by index.
+    pub fn set_step_progress(&mut self, index: usize, progress: f64) {
+        if let Some(step) = self.steps.get_mut(index) {
+            step.progress = progress.clamp(0.0, 100.0);
+        }
+    }
+
+    /// Overall weighted percentage (0.0–100.0).
+    pub fn overall_progress(&self) -> f64 {
+        let total_weight: f64 = self.steps.iter().map(|s| s.weight).sum();
+        if total_weight <= 0.0 {
+            return 0.0;
+        }
+        let weighted_sum: f64 = self
+            .steps
+            .iter()
+            .map(|s| s.progress * s.weight)
+            .sum();
+        (weighted_sum / total_weight).clamp(0.0, 100.0)
+    }
+
+    /// Number of steps.
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Get a step by index.
+    pub fn get_step(&self, index: usize) -> Option<&WeightedStep> {
+        self.steps.get(index)
+    }
+
+    /// Returns true when every step is at 100%.
+    pub fn is_complete(&self) -> bool {
+        !self.steps.is_empty() && self.steps.iter().all(|s| (s.progress - 100.0).abs() < f64::EPSILON)
+    }
+
+    /// Returns the index of the current (first non-100%) step, if any.
+    pub fn current_step_index(&self) -> Option<usize> {
+        self.steps.iter().position(|s| s.progress < 100.0)
+    }
+
+    /// Human-readable summary: "Step 2/3: Linking (45%)"
+    pub fn summary(&self) -> String {
+        let total = self.steps.len();
+        match self.current_step_index() {
+            Some(idx) => {
+                let step = &self.steps[idx];
+                format!(
+                    "Step {}/{}: {} ({:.0}%)",
+                    idx + 1,
+                    total,
+                    step.label,
+                    step.progress
+                )
+            }
+            None if total > 0 => "All steps complete".to_string(),
+            None => "No steps".to_string(),
+        }
+    }
+}
+
+impl Default for WeightedStepProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for WeightedStepProgress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.0}% — {}", self.overall_progress(), self.summary())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1576,5 +1770,104 @@ mod tests {
         timer.restart();
         assert!(timer.is_running());
         assert!(timer.elapsed_secs() < 1.0);
+    }
+
+    // -- ThroughputTracker tests --
+
+    #[test]
+    fn throughput_tracker_basic() {
+        let mut tracker = ThroughputTracker::new(std::time::Duration::from_secs(60));
+        assert_eq!(tracker.total_items(), 0);
+        tracker.record(10);
+        tracker.record(5);
+        assert_eq!(tracker.total_items(), 15);
+    }
+
+    #[test]
+    fn throughput_tracker_estimate_remaining() {
+        let mut tracker = ThroughputTracker::new(std::time::Duration::from_secs(60));
+        // With zero items, rate is 0 so estimate should be None
+        assert!(tracker.estimate_remaining(100).is_none());
+        tracker.record(50);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        // Now we have some rate, so estimate should be Some
+        let est = tracker.estimate_remaining(50);
+        assert!(est.is_some());
+    }
+
+    #[test]
+    fn throughput_tracker_display() {
+        let mut tracker = ThroughputTracker::new(std::time::Duration::from_secs(60));
+        tracker.record(42);
+        let s = format!("{tracker}");
+        assert!(s.contains("42 items"));
+        assert!(s.contains("items/s"));
+    }
+
+    // -- WeightedStepProgress tests --
+
+    #[test]
+    fn weighted_step_progress_overall() {
+        let mut wsp = WeightedStepProgress::new();
+        let compile = wsp.add_step("Compile", 3.0);
+        let link = wsp.add_step("Link", 1.0);
+        assert_eq!(wsp.step_count(), 2);
+        assert!(!wsp.is_complete());
+
+        // Compile 100%, Link 0% => overall = (100*3 + 0*1)/4 = 75%
+        wsp.set_step_progress(compile, 100.0);
+        assert!((wsp.overall_progress() - 75.0).abs() < f64::EPSILON);
+
+        wsp.set_step_progress(link, 100.0);
+        assert!(wsp.is_complete());
+        assert!((wsp.overall_progress() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn weighted_step_progress_summary() {
+        let mut wsp = WeightedStepProgress::new();
+        wsp.add_step("Parse", 1.0);
+        wsp.add_step("Codegen", 2.0);
+        let s = wsp.summary();
+        assert!(s.contains("Step 1/2"));
+        assert!(s.contains("Parse"));
+
+        wsp.set_step_progress(0, 100.0);
+        let s2 = wsp.summary();
+        assert!(s2.contains("Step 2/2"));
+        assert!(s2.contains("Codegen"));
+
+        wsp.set_step_progress(1, 100.0);
+        assert_eq!(wsp.summary(), "All steps complete");
+    }
+
+    #[test]
+    fn weighted_step_progress_empty() {
+        let wsp = WeightedStepProgress::new();
+        assert_eq!(wsp.overall_progress(), 0.0);
+        assert_eq!(wsp.summary(), "No steps");
+        assert!(!wsp.is_complete());
+        assert!(wsp.current_step_index().is_none());
+    }
+
+    #[test]
+    fn weighted_step_progress_clamping() {
+        let mut wsp = WeightedStepProgress::new();
+        let idx = wsp.add_step("Test", 1.0);
+        wsp.set_step_progress(idx, 200.0);
+        assert!((wsp.get_step(idx).unwrap().progress - 100.0).abs() < f64::EPSILON);
+        wsp.set_step_progress(idx, -50.0);
+        assert!((wsp.get_step(idx).unwrap().progress - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn weighted_step_progress_display() {
+        let mut wsp = WeightedStepProgress::new();
+        wsp.add_step("A", 1.0);
+        wsp.add_step("B", 1.0);
+        wsp.set_step_progress(0, 50.0);
+        let s = format!("{wsp}");
+        assert!(s.contains("25%"));
+        assert!(s.contains("Step 1/2"));
     }
 }

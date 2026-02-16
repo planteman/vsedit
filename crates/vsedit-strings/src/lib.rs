@@ -1053,6 +1053,230 @@ pub fn to_kebab_case(s: &str) -> String {
     snake.replace('_', "-")
 }
 
+// ---------------------------------------------------------------------------
+// Slug generation, word wrapping, sentence case, center padding,
+// line/column ↔ offset, indentation detection, Hamming distance,
+// run-length encoding, string rotation check
+// ---------------------------------------------------------------------------
+
+/// Generate a URL-safe slug from a string.
+///
+/// Lowercases, replaces non-alphanumeric runs with a single hyphen,
+/// and trims leading/trailing hyphens.
+pub fn slugify(s: &str) -> String {
+    let mut slug = String::with_capacity(s.len());
+    let mut prev_dash = true; // suppress leading dash
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() {
+            slug.push(c.to_ascii_lowercase());
+            prev_dash = false;
+        } else if !prev_dash {
+            slug.push('-');
+            prev_dash = true;
+        }
+    }
+    // trim trailing dash
+    if slug.ends_with('-') {
+        slug.pop();
+    }
+    slug
+}
+
+/// Wrap text to a given column width, breaking on word boundaries.
+///
+/// Existing newlines are preserved. Words longer than `width` are kept
+/// intact on their own line.
+pub fn word_wrap(text: &str, width: usize) -> String {
+    if width == 0 {
+        return text.to_string();
+    }
+    let mut result = String::with_capacity(text.len() + text.len() / width);
+    for line in text.split('\n') {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        let mut col = 0usize;
+        for (i, word) in line.split_whitespace().enumerate() {
+            let wlen = word.len();
+            if i == 0 {
+                result.push_str(word);
+                col = wlen;
+            } else if col + 1 + wlen > width {
+                result.push('\n');
+                result.push_str(word);
+                col = wlen;
+            } else {
+                result.push(' ');
+                result.push_str(word);
+                col += 1 + wlen;
+            }
+        }
+    }
+    result
+}
+
+/// Convert a string to sentence case (first letter uppercase, rest lowercase).
+pub fn to_sentence_case(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => {
+            let mut out = first.to_uppercase().to_string();
+            for c in chars {
+                out.extend(c.to_lowercase());
+            }
+            out
+        }
+    }
+}
+
+/// Center-pad a string to the given width using `pad_char`.
+///
+/// If the string is already at least `width` characters, it is returned
+/// unchanged. When the padding is odd, the extra character goes on the right.
+pub fn pad_center(s: &str, width: usize, pad_char: char) -> String {
+    let len = s.chars().count();
+    if len >= width {
+        return s.to_string();
+    }
+    let total_pad = width - len;
+    let left = total_pad / 2;
+    let right = total_pad - left;
+    let mut out = String::with_capacity(width);
+    for _ in 0..left {
+        out.push(pad_char);
+    }
+    out.push_str(s);
+    for _ in 0..right {
+        out.push(pad_char);
+    }
+    out
+}
+
+/// Convert a (0-based line, 0-based column) position to a byte offset.
+///
+/// Returns `None` if the line or column is out of bounds.
+pub fn line_col_to_offset(text: &str, line: usize, col: usize) -> Option<usize> {
+    let mut current_line = 0usize;
+    let mut line_start = 0usize;
+    for (i, c) in text.char_indices() {
+        if current_line == line {
+            let pos_in_line = i - line_start;
+            if pos_in_line == col {
+                return Some(i);
+            }
+        }
+        if c == '\n' {
+            if current_line == line {
+                // col was beyond this line
+                return None;
+            }
+            current_line += 1;
+            line_start = i + 1;
+        }
+    }
+    // handle position at end of last line
+    if current_line == line {
+        let pos_in_line = text.len() - line_start;
+        if col == pos_in_line {
+            return Some(text.len());
+        }
+    }
+    None
+}
+
+/// Convert a byte offset to a (0-based line, 0-based column) position.
+///
+/// Returns `None` if `offset` is out of bounds or not on a char boundary.
+pub fn offset_to_line_col(text: &str, offset: usize) -> Option<(usize, usize)> {
+    if offset > text.len() || !text.is_char_boundary(offset) {
+        return None;
+    }
+    let mut line = 0usize;
+    let mut line_start = 0usize;
+    for (i, c) in text.char_indices() {
+        if i == offset {
+            return Some((line, i - line_start));
+        }
+        if c == '\n' {
+            line += 1;
+            line_start = i + 1;
+        }
+    }
+    // offset == text.len()
+    Some((line, text.len() - line_start))
+}
+
+/// Detect the indentation (leading whitespace) of the first non-empty line.
+///
+/// Returns the indentation string, or an empty string if no indented line is found.
+pub fn detect_indentation(text: &str) -> &str {
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let stripped = line.trim_start();
+        let indent_len = line.len() - stripped.len();
+        if indent_len > 0 {
+            return &line[..indent_len];
+        }
+    }
+    ""
+}
+
+/// Compute the Hamming distance between two strings of equal length.
+///
+/// Returns `None` if the strings differ in character count.
+pub fn hamming_distance(a: &str, b: &str) -> Option<usize> {
+    let ac: Vec<char> = a.chars().collect();
+    let bc: Vec<char> = b.chars().collect();
+    if ac.len() != bc.len() {
+        return None;
+    }
+    Some(ac.iter().zip(bc.iter()).filter(|(x, y)| x != y).count())
+}
+
+/// Simple run-length encoding of a string.
+///
+/// `"aaabbc"` → `"3a2b1c"`
+pub fn run_length_encode(s: &str) -> String {
+    if s.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut chars = s.chars();
+    let mut current = chars.next().unwrap();
+    let mut count = 1usize;
+    for c in chars {
+        if c == current {
+            count += 1;
+        } else {
+            out.push_str(&count.to_string());
+            out.push(current);
+            current = c;
+            count = 1;
+        }
+    }
+    out.push_str(&count.to_string());
+    out.push(current);
+    out
+}
+
+/// Check whether `a` is a rotation of `b`.
+///
+/// Two strings are rotations of each other if one can be obtained by moving
+/// some prefix of the other to the end (e.g. "abcde" and "cdeab").
+pub fn is_rotation(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    if a.is_empty() {
+        return true;
+    }
+    let doubled = format!("{a}{a}");
+    doubled.contains(b)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1570,5 +1794,84 @@ mod tests {
         assert_eq!(to_kebab_case("camelCase"), "camel-case");
         assert_eq!(to_kebab_case("PascalCase"), "pascal-case");
         assert_eq!(to_kebab_case("already_snake"), "already-snake");
+    }
+
+    #[test]
+    fn test_slugify() {
+        assert_eq!(slugify("Hello, World!"), "hello-world");
+        assert_eq!(slugify("  foo   bar  "), "foo-bar");
+        assert_eq!(slugify("Rust 2024 — Release"), "rust-2024-release");
+        assert_eq!(slugify("already-slug"), "already-slug");
+        assert_eq!(slugify(""), "");
+    }
+
+    #[test]
+    fn test_word_wrap() {
+        assert_eq!(word_wrap("hello world foo", 11), "hello world\nfoo");
+        assert_eq!(word_wrap("short", 80), "short");
+        assert_eq!(
+            word_wrap("one two three four", 9),
+            "one two\nthree\nfour"
+        );
+        // preserves existing newlines
+        assert_eq!(word_wrap("a\nb", 80), "a\nb");
+    }
+
+    #[test]
+    fn test_to_sentence_case() {
+        assert_eq!(to_sentence_case("hELLO WORLD"), "Hello world");
+        assert_eq!(to_sentence_case(""), "");
+        assert_eq!(to_sentence_case("a"), "A");
+    }
+
+    #[test]
+    fn test_pad_center() {
+        assert_eq!(pad_center("hi", 6, '-'), "--hi--");
+        assert_eq!(pad_center("hi", 7, '-'), "--hi---");
+        assert_eq!(pad_center("long enough", 5, '-'), "long enough");
+    }
+
+    #[test]
+    fn test_line_col_to_offset_and_back() {
+        let text = "hello\nworld\nfoo";
+        assert_eq!(line_col_to_offset(text, 0, 0), Some(0));
+        assert_eq!(line_col_to_offset(text, 1, 0), Some(6));
+        assert_eq!(line_col_to_offset(text, 2, 3), Some(15));
+        assert_eq!(line_col_to_offset(text, 5, 0), None);
+
+        assert_eq!(offset_to_line_col(text, 0), Some((0, 0)));
+        assert_eq!(offset_to_line_col(text, 6), Some((1, 0)));
+        assert_eq!(offset_to_line_col(text, 15), Some((2, 3)));
+    }
+
+    #[test]
+    fn test_detect_indentation() {
+        assert_eq!(detect_indentation("    hello\n    world"), "    ");
+        assert_eq!(detect_indentation("\thello"), "\t");
+        assert_eq!(detect_indentation("no indent"), "");
+        assert_eq!(detect_indentation("\n  indented"), "  ");
+    }
+
+    #[test]
+    fn test_hamming_distance() {
+        assert_eq!(hamming_distance("karolin", "kathrin"), Some(3));
+        assert_eq!(hamming_distance("abc", "abc"), Some(0));
+        assert_eq!(hamming_distance("ab", "abc"), None);
+    }
+
+    #[test]
+    fn test_run_length_encode() {
+        assert_eq!(run_length_encode("aaabbc"), "3a2b1c");
+        assert_eq!(run_length_encode("a"), "1a");
+        assert_eq!(run_length_encode(""), "");
+    }
+
+    #[test]
+    fn test_is_rotation() {
+        assert!(is_rotation("abcde", "cdeab"));
+        assert!(is_rotation("", ""));
+        assert!(!is_rotation("abc", "cab1"));
+        assert!(!is_rotation("abc", "bca1"));
+        assert!(is_rotation("abc", "bca"));
     }
 }
