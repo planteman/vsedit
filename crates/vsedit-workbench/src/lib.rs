@@ -823,6 +823,10 @@ pub struct Workbench {
     pub show_quick_open: bool,
     /// Known workspace file paths for Quick Open filtering.
     pub workspace_files: Vec<PathBuf>,
+    /// Whether the Go To Line input overlay is visible.
+    pub show_goto_line: bool,
+    /// Current text typed into the Go To Line input.
+    pub goto_line_input: String,
 }
 
 impl Workbench {
@@ -1130,6 +1134,8 @@ impl Workbench {
             quick_open: QuickOpenState::new(),
             show_quick_open: false,
             workspace_files: Vec::new(),
+            show_goto_line: false,
+            goto_line_input: String::new(),
         }
     }
 
@@ -1466,6 +1472,11 @@ impl Workbench {
         if self.show_quick_open {
             self.render_quick_open(frame, area);
         }
+
+        // Go To Line overlay
+        if self.show_goto_line {
+            self.render_goto_line(frame, area);
+        }
     }
 
     /// Render the command palette overlay.
@@ -1631,8 +1642,16 @@ impl Workbench {
             return self.handle_palette_key(key);
         }
 
-        // When quick open is focused, handle keys directly.
+        // When quick open or go-to-line is focused, handle keys directly.
         if self.focused == FocusedPart::QuickInput {
+            if self.show_goto_line {
+                if let Some(line) = self.handle_goto_line_key(key) {
+                    return WorkbenchAction::ExecuteCommand(
+                        format!("__gotoLine:{}", line),
+                    );
+                }
+                return WorkbenchAction::None;
+            }
             return self.handle_quick_open_key(key);
         }
 
@@ -1992,6 +2011,82 @@ impl Workbench {
                 WorkbenchAction::None
             }
         }
+    }
+
+    /// Open the Go To Line input overlay.
+    pub fn open_goto_line(&mut self) {
+        self.saved_focus = self.focused;
+        self.focused = FocusedPart::QuickInput;
+        self.show_goto_line = true;
+        self.goto_line_input.clear();
+    }
+
+    /// Close the Go To Line input overlay and restore focus.
+    pub fn close_goto_line(&mut self) {
+        self.show_goto_line = false;
+        self.goto_line_input.clear();
+        self.focused = self.saved_focus;
+    }
+
+    /// Handle a key press while the Go To Line input is focused.
+    /// Returns `Some(line_number)` when the user confirms, `None` otherwise.
+    pub fn handle_goto_line_key(&mut self, key: KeyInput) -> Option<u32> {
+        use vsedit_keycodes::KeyCode as KC;
+
+        match key.key_code {
+            KC::Escape => {
+                self.close_goto_line();
+                None
+            }
+            KC::Enter => {
+                let line: Option<u32> = self.goto_line_input.trim().parse().ok();
+                self.close_goto_line();
+                line
+            }
+            KC::Backspace => {
+                self.goto_line_input.pop();
+                None
+            }
+            other => {
+                if !key.ctrl && !key.alt && !key.meta {
+                    if let Some(ch) = key_code_to_char(other, key.shift) {
+                        if ch.is_ascii_digit() {
+                            self.goto_line_input.push(ch);
+                        }
+                    }
+                }
+                None
+            }
+        }
+    }
+
+    /// Render the Go To Line input overlay.
+    fn render_goto_line(&self, frame: &mut Frame, area: Rect) {
+        let width = 40u16.min(area.width);
+        let height = 3u16;
+        let x = area.x + (area.width.saturating_sub(width)) / 2;
+        let y = area.y + 1;
+        let popup_area = Rect::new(x, y, width, height);
+
+        frame.render_widget(Clear, popup_area);
+
+        let block = Block::default()
+            .title(" Go to Line ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .style(Style::default().bg(Color::DarkGray));
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        if inner.height == 0 || inner.width == 0 {
+            return;
+        }
+
+        let input_line = Line::from(vec![
+            Span::styled(": ", Style::default().fg(Color::Yellow)),
+            Span::raw(&self.goto_line_input),
+        ]);
+        frame.render_widget(Paragraph::new(input_line), inner);
     }
 
     /// Render the Quick Open overlay.

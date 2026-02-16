@@ -536,6 +536,9 @@ async fn run() -> io::Result<()> {
 
     app.lifecycle.set_phase(LifecyclePhase::Restored);
 
+    // Restore persisted UI state (sidebar/panel visibility, cursor).
+    restore_persisted_ui_state(&mut app);
+
     // Start watching the open file for external changes.
     if let Some(ref file_path) = app.file_path {
         if let Ok(mut watcher) = FileWatcher::new() {
@@ -771,16 +774,80 @@ fn save_persisted_state(path: &Path, state: &StateService) {
 
 fn persist_ui_state(app: &AppState) {
     let pos = app.controller.cursors.get_primary().position();
-    let state = &app.state_service;
-    // We cannot mutate through a shared ref, so we serialise key info into
-    // the state file via the save path.  The state_service requires &mut self
-    // for set(), so we save directly below.
-    let _ = (pos, state);
+    let state = serde_json::json!({
+        "cursor": {
+            "line": pos.line,
+            "column": pos.column,
+        },
+        "file": app.file_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+        "sidebar_visible": app.workbench.layout.is_part_visible(vsedit_wb_layout::Part::Sidebar),
+        "panel_visible": app.workbench.layout.is_part_visible(vsedit_wb_layout::Part::Panel),
+        "active_sidebar": format!("{:?}", app.workbench.active_sidebar),
+    });
+
+    let state_path = app.env_service.paths.user_data.join("ui-state.json");
+    if let Some(parent) = state_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(
+        &state_path,
+        serde_json::to_string_pretty(&state).unwrap_or_default(),
+    ) {
+        tracing::warn!("Could not save UI state: {e}");
+    }
 }
 
 fn restore_ui_state(state: &StateService, workbench: &mut Workbench) {
     if let Some(folder) = state.get("workspace.folder") {
         workbench.workspace_folder = Some(folder.to_string());
+    }
+}
+
+/// Restore persisted UI state (sidebar/panel visibility, cursor position)
+/// from the `ui-state.json` file written at shutdown.
+fn restore_persisted_ui_state(app: &mut AppState) {
+    let state_path = app.env_service.paths.user_data.join("ui-state.json");
+    let content = match std::fs::read_to_string(&state_path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let state: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    if let Some(sidebar) = state.get("sidebar_visible").and_then(|v| v.as_bool()) {
+        let currently_visible = app
+            .workbench
+            .layout
+            .is_part_visible(vsedit_wb_layout::Part::Sidebar);
+        if sidebar != currently_visible {
+            app.workbench.layout.toggle_sidebar();
+        }
+    }
+    if let Some(panel) = state.get("panel_visible").and_then(|v| v.as_bool()) {
+        let currently_visible = app
+            .workbench
+            .layout
+            .is_part_visible(vsedit_wb_layout::Part::Panel);
+        if panel != currently_visible {
+            app.workbench.layout.toggle_panel();
+        }
+    }
+    // Restore cursor position if same file.
+    if let Some(saved_file) = state.get("file").and_then(|v| v.as_str()) {
+        if let Some(ref current_file) = app.file_path {
+            if current_file.to_string_lossy() == saved_file {
+                if let Some(line) = state
+                    .get("cursor")
+                    .and_then(|c| c.get("line"))
+                    .and_then(|l| l.as_u64())
+                {
+                    app.controller
+                        .execute_action(EditorAction::GoToLine(line as u32));
+                }
+            }
+        }
     }
 }
 
@@ -907,6 +974,13 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
 
     // ── Command palette open → route everything through workbench ──────
     if app.workbench.focused == FocusedPart::CommandPalette {
+        let input = from_crossterm_key(key_event);
+        let action = app.workbench.handle_input(InputEvent::Key(input));
+        return handle_workbench_action(&action, app);
+    }
+
+    // ── Quick Input (Quick Open / Go To Line) → route through workbench ──
+    if app.workbench.focused == FocusedPart::QuickInput {
         let input = from_crossterm_key(key_event);
         let action = app.workbench.handle_input(InputEvent::Key(input));
         return handle_workbench_action(&action, app);
@@ -1281,9 +1355,7 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
             load_active_tab_into_controller(app);
         }
         "workbench.action.gotoLine" => {
-            // Stub: go to line 1 — full implementation would show input box.
-            app.controller.execute_action(EditorAction::GoToLine(1));
-            sync_state(app);
+            app.workbench.open_goto_line();
         }
         "workbench.action.splitEditor" => {
             app.workbench.editor_groups.split_editor(vsedit_workbench::SplitDirection::Right);
@@ -1347,6 +1419,17 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
                                             tracing::info!("Starting debug session: type={}, program={}", debug_type, program);
                                             app.workbench.statusbar.update_item("statusbar.debug", "⚡ Debugging");
                                             app.debug_active = true;
+                                            // Fire onDebug activation event.
+                                            tracing::info!("Firing onDebug activation event");
+                                            let exts: Vec<String> = app
+                                                .ext_host
+                                                .should_activate("onDebug")
+                                                .iter()
+                                                .map(|ext| ext.id.clone())
+                                                .collect();
+                                            for ext_id in &exts {
+                                                app.ext_host.mark_activated(ext_id);
+                                            }
                                         }
                                     }
                                 }
@@ -1381,6 +1464,14 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
         "editor.debug.toggleBreakpoint" => {
             toggle_breakpoint(app);
         }
+        _ if cmd.starts_with("__gotoLine:") => {
+            if let Some(line_str) = cmd.strip_prefix("__gotoLine:") {
+                if let Ok(line) = line_str.parse::<u32>() {
+                    app.controller.execute_action(EditorAction::GoToLine(line));
+                    sync_state(app);
+                }
+            }
+        }
         _ => {
             // Try the command registry, then fall back to workbench.
             if app.command_registry.has(cmd) {
@@ -1390,6 +1481,35 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
             }
         }
     }
+
+    // Fire onCommand activation event for extensions.
+    let cmd_event = format!("onCommand:{}", cmd);
+    let extensions_to_activate: Vec<String> = app
+        .ext_host
+        .should_activate(&cmd_event)
+        .iter()
+        .map(|ext| ext.id.clone())
+        .collect();
+    for ext_id in &extensions_to_activate {
+        tracing::debug!("Firing activation event: {} (extension: {})", cmd_event, ext_id);
+        app.ext_host.mark_activated(ext_id);
+    }
+
+    // Fire onView activation event when a sidebar panel changes.
+    if let Some(view_id) = cmd.strip_prefix("workbench.view.") {
+        let view_event = format!("onView:{}", view_id);
+        tracing::debug!("Firing onView:{} activation event", view_id);
+        let exts: Vec<String> = app
+            .ext_host
+            .should_activate(&view_event)
+            .iter()
+            .map(|ext| ext.id.clone())
+            .collect();
+        for ext_id in &exts {
+            app.ext_host.mark_activated(ext_id);
+        }
+    }
+
     false
 }
 
