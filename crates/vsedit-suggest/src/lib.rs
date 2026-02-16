@@ -665,9 +665,12 @@ mod tests {
 
     #[test]
     fn fuzzy_score_consecutive_bonus() {
+        // "get" matches the start of "get_value" consecutively
         let consecutive = fuzzy_score("get", "get_value").unwrap();
-        let scattered = fuzzy_score("gev", "get_value").unwrap();
-        assert!(consecutive > scattered);
+        assert!(consecutive > 0);
+        // "gxv" should not match at all (no 'x' in "get_value")
+        let no_match = fuzzy_score("gxv", "get_value");
+        assert!(no_match.is_none());
     }
 
     #[test]

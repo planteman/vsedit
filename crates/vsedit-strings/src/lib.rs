@@ -848,9 +848,9 @@ mod tests {
     #[test]
     fn test_to_snake_case() {
         assert_eq!(to_snake_case("camelCase"), "camel_case");
-        assert_eq!(to_snake_case("PascalCase"), "_pascal_case");
+        assert_eq!(to_snake_case("PascalCase"), "pascal_case");
         assert_eq!(to_snake_case("already_snake"), "already_snake");
-        assert_eq!(to_snake_case("HTMLParser"), "_h_t_m_l_parser");
+        assert_eq!(to_snake_case("HTMLParser"), "h_t_m_l_parser");
     }
 
     #[test]
