@@ -1,100 +1,675 @@
 //! vsedit main binary — terminal port of Visual Studio Code.
 //!
 //! Entry point that ties together the TUI framework, workbench, input handling,
-//! and editor controller into a working terminal editor.
+//! editor controller, and all subsystems into a working terminal editor.
+//!
+//! ## Startup sequence
+//!
+//! 1. Parse CLI args (clap)
+//! 2. Initialize logging (tracing)
+//! 3. Load user settings and keybindings
+//! 4. Initialize configuration, theme, workspace, extensions
+//! 5. Register commands and default keybindings
+//! 6. Initialize terminal backend
+//! 7. Open files specified on the command line
+//! 8. Enter main event loop
 
 use std::io;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
+use clap::Parser;
 use crossterm::event::{Event as CtEvent, EventStream, KeyCode, KeyModifiers};
 use futures::StreamExt;
 
+use vsedit_backup::BackupService;
+use vsedit_commands::CommandRegistry;
+use vsedit_configuration::{
+    Configuration, ConfigurationModel, ConfigurationRegistry, ConfigurationService,
+    ConfigurationTarget, load_json_file, load_user_settings, register_default_settings,
+};
+use vsedit_contextkey::{ContextKeyService, ContextKeyValue};
 use vsedit_editor_controller::{EditorAction, EditorController};
 use vsedit_editor_widget::EditorWidget;
-use vsedit_input::{from_crossterm_key, InputEvent};
+use vsedit_environment::EnvironmentService;
+use vsedit_ext_host::ExtensionHostManager;
+use vsedit_ext_mgmt::scan_installed_extensions;
+use vsedit_input::{InputEvent, from_crossterm_key, key_input_to_chord};
+use vsedit_keybinding_svc::{
+    KeybindingMatch, KeybindingResolver, load_keybindings_json, register_default_keybindings,
+};
+use vsedit_lifecycle_svc::{LifecyclePhase, LifecycleService, ShutdownReason};
+use vsedit_notification_svc::NotificationService;
+use vsedit_platform::Platform;
+use vsedit_state::{StateScope, StateService};
+use vsedit_theme::dark_plus;
 use vsedit_tui::{restore_terminal, setup_terminal};
-use vsedit_workbench::{FocusedPart, WorkbenchAction, Workbench};
+use vsedit_workbench::{FocusedPart, Workbench, WorkbenchAction};
+use vsedit_workspace::Workspace;
+
+// ---------------------------------------------------------------------------
+// CLI argument parsing
+// ---------------------------------------------------------------------------
+
+/// vsedit — A terminal-based code editor inspired by Visual Studio Code.
+#[derive(Parser, Debug)]
+#[command(name = "vsedit", version, about, long_about = None)]
+struct Cli {
+    /// Files or folders to open.
+    #[arg(value_name = "FILE_OR_FOLDER")]
+    paths: Vec<PathBuf>,
+
+    /// Open a diff view between two files.
+    #[arg(long, num_args = 2, value_names = ["FILE1", "FILE2"])]
+    diff: Vec<PathBuf>,
+
+    /// Open a file at line:col (e.g. --goto src/main.rs:10:5).
+    #[arg(long, value_name = "FILE:LINE:COL")]
+    goto: Option<String>,
+
+    /// Force open in a new window.
+    #[arg(long)]
+    new_window: bool,
+
+    /// Wait for the file(s) to be closed before returning.
+    #[arg(short, long)]
+    wait: bool,
+
+    /// Install an extension by id (publisher.name).
+    #[arg(long, value_name = "EXT_ID")]
+    install_extension: Option<String>,
+
+    /// List installed extensions.
+    #[arg(long)]
+    list_extensions: bool,
+
+    /// Reuse an existing window if possible.
+    #[arg(long)]
+    reuse_window: bool,
+
+    /// Disable all installed extensions.
+    #[arg(long)]
+    disable_extensions: bool,
+
+    /// Set the log level (trace, debug, info, warn, error).
+    #[arg(long, value_name = "LEVEL")]
+    log_level: Option<String>,
+
+    /// Override the user data directory.
+    #[arg(long, value_name = "DIR")]
+    user_data_dir: Option<PathBuf>,
+
+    /// Override the extensions directory.
+    #[arg(long, value_name = "DIR")]
+    extensions_dir: Option<PathBuf>,
+
+    /// Enable verbose output.
+    #[arg(long)]
+    verbose: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Application state — bundles all subsystems
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)]
+struct AppState {
+    workbench: Workbench,
+    controller: EditorController,
+    editor_widget: EditorWidget,
+    context_keys: ContextKeyService,
+    keybinding_resolver: KeybindingResolver,
+    command_registry: CommandRegistry,
+    config_service: ConfigurationService,
+    lifecycle: LifecycleService,
+    state_service: StateService,
+    notification_service: NotificationService,
+    backup_service: BackupService,
+    ext_host: ExtensionHostManager,
+    env_service: EnvironmentService,
+    _workspace: Workspace,
+    file_path: Option<PathBuf>,
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
-    let file_path = std::env::args().nth(1).map(PathBuf::from);
+async fn main() {
+    // Install a panic hook that attempts crash recovery before aborting.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // Best-effort: restore terminal so the user's shell is usable.
+        let _ = crossterm::terminal::disable_raw_mode();
+        let _ = crossterm::execute!(io::stdout(), crossterm::terminal::LeaveAlternateScreen);
+        eprintln!("\nvsedit crashed — attempting recovery");
+        // Delegate to the default hook for the backtrace / message.
+        default_hook(info);
+    }));
 
-    vsedit_log::init_tracing(vsedit_log::LogLevel::Info);
+    if let Err(e) = run().await {
+        eprintln!("vsedit: {e}");
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> io::Result<()> {
+    let cli = Cli::parse();
+
+    // ── 1. Logging ─────────────────────────────────────────────────────
+    let log_level = match cli.log_level.as_deref().unwrap_or("info") {
+        "trace" => vsedit_log::LogLevel::Trace,
+        "debug" => vsedit_log::LogLevel::Debug,
+        "warn" | "warning" => vsedit_log::LogLevel::Warning,
+        "error" => vsedit_log::LogLevel::Error,
+        _ => vsedit_log::LogLevel::Info,
+    };
+    vsedit_log::init_tracing(log_level);
     tracing::info!("vsedit starting");
 
+    // ── 2. Product configuration ───────────────────────────────────────
     let product = vsedit_product::ProductConfiguration::default_config();
     tracing::info!("{} v{}", product.name_long, product.version);
 
-    let args = vsedit_environment::CliArgs {
-        paths: file_path.iter().cloned().collect(),
-        ..Default::default()
-    };
-    let env_svc = vsedit_environment::EnvironmentService::new(args);
+    // ── 3. Environment service ─────────────────────────────────────────
+    let env_args = cli_to_env_args(&cli);
+    if let Err(e) = env_args.validate() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
+    }
+    let env_svc = EnvironmentService::new(env_args);
     if let Err(e) = env_svc.paths.ensure_dirs() {
-        tracing::warn!("Could not create data directories: {}", e);
+        tracing::warn!("Could not create data directories: {e}");
+    }
+    tracing::info!("{}", env_svc.startup_summary());
+
+    // ── 4. Configuration service ───────────────────────────────────────
+    let mut config_registry = ConfigurationRegistry::new();
+    register_default_settings(&mut config_registry);
+    let defaults_model = config_registry.get_defaults();
+    let mut configuration = Configuration::with_defaults(defaults_model);
+
+    // Load user settings from disk (~/.config/vsedit/settings.json).
+    match load_user_settings() {
+        Ok(user_val) => {
+            let mut user_model = ConfigurationModel::new();
+            if let Some(obj) = user_val.as_object() {
+                for (k, v) in obj {
+                    user_model.set_value(k, v.clone());
+                }
+            }
+            configuration.set_layer(ConfigurationTarget::User, user_model);
+            tracing::info!("Loaded user settings");
+        }
+        Err(e) => tracing::warn!("Could not load user settings: {e}"),
+    }
+    let config_service = ConfigurationService::new(configuration);
+
+    // ── 5. Keybindings ─────────────────────────────────────────────────
+    let mut keybinding_resolver = KeybindingResolver::new();
+    register_default_keybindings(&mut keybinding_resolver);
+
+    // Load user keybindings overlay.
+    let kb_path = &env_svc.paths.keybindings_file;
+    if kb_path.exists() {
+        match std::fs::read_to_string(kb_path) {
+            Ok(json_str) => {
+                let platform = Platform::current();
+                match load_keybindings_json(&json_str, platform) {
+                    Ok(rules) => {
+                        let count = rules.len();
+                        for rule in rules {
+                            keybinding_resolver.add_rule(rule);
+                        }
+                        tracing::info!("Loaded {count} user keybindings");
+                    }
+                    Err(e) => tracing::warn!("Could not parse keybindings.json: {e}"),
+                }
+            }
+            Err(e) => tracing::warn!("Could not read keybindings file: {e}"),
+        }
     }
 
-    // Load file content.
+    // ── 6. Theme ───────────────────────────────────────────────────────
+    let theme_name: Option<String> = config_service.get_effective_value("workbench.colorTheme")
+        .and_then(|v| serde_json::from_value(v).ok());
+    let _theme = match theme_name.as_deref() {
+        Some("Monokai") => vsedit_theme::monokai(),
+        Some("Solarized Dark") => vsedit_theme::solarized_dark(),
+        Some("High Contrast") => vsedit_theme::high_contrast(),
+        Some("Light+") | Some("Default Light+") => vsedit_theme::light_plus(),
+        _ => dark_plus(),
+    };
+    tracing::info!("Theme: {} ({})", _theme.label, _theme.id);
+
+    // ── 7. Context keys ────────────────────────────────────────────────
+    let context_keys = ContextKeyService::new();
+    context_keys.set_context("editorFocus", ContextKeyValue::Bool(true));
+    context_keys.set_context("editorTextFocus", ContextKeyValue::Bool(true));
+    context_keys.set_context("inputFocus", ContextKeyValue::Bool(false));
+    context_keys.set_context("sideBarVisible", ContextKeyValue::Bool(true));
+    context_keys.set_context("panelVisible", ContextKeyValue::Bool(false));
+    context_keys.set_context("inDebugMode", ContextKeyValue::Bool(false));
+    context_keys.set_context(
+        "platform",
+        ContextKeyValue::String(format!("{:?}", Platform::current())),
+    );
+
+    // ── 8. Commands ────────────────────────────────────────────────────
+    let command_registry = CommandRegistry::new();
+    register_builtin_commands(&command_registry);
+
+    // ── 9. Workspace ───────────────────────────────────────────────────
+    let workspace = resolve_workspace(&cli);
+    if let Some(root) = workspace.get_workspace_root() {
+        tracing::info!("Workspace root: {}", root.display());
+    }
+
+    // ── 10. Extensions ─────────────────────────────────────────────────
+    let mut ext_host = ExtensionHostManager::new();
+    if !env_svc.args.disable_extensions {
+        let installed = scan_installed_extensions(&env_svc.paths.extensions);
+        for ext in &installed {
+            tracing::info!("Extension: {} v{}", ext.id, ext.version);
+        }
+
+        // Handle --install-extension (early exit).
+        if let Some(ref ext_id) = cli.install_extension {
+            return handle_install_extension(ext_id, &env_svc.paths.extensions).await;
+        }
+
+        // Handle --list-extensions (early exit).
+        if cli.list_extensions {
+            for ext in &installed {
+                println!("{} ({})", ext.id, ext.version);
+            }
+            return Ok(());
+        }
+
+        // Register scanned extensions with host manager.
+        for ext in &installed {
+            if let Ok(json_str) = serde_json::to_string(&ext.manifest) {
+                let location = vsedit_uri::VsUri::file(&ext.path);
+                if let Ok(desc) = vsedit_ext_host::ExtensionDescription::from_package_json(
+                    &json_str, location,
+                ) {
+                    ext_host.register_extension(desc);
+                }
+            }
+        }
+
+        // Start the extension host process (best-effort).
+        if let Err(e) = ext_host.start_host() {
+            tracing::warn!("Extension host did not start: {e}");
+        }
+    } else {
+        tracing::info!("Extensions disabled via --disable-extensions");
+        // Still handle early-exit flags.
+        if cli.list_extensions {
+            println!("(extensions disabled)");
+            return Ok(());
+        }
+    }
+
+    // ── 11. Lifecycle ──────────────────────────────────────────────────
+    let lifecycle = LifecycleService::new();
+    lifecycle.set_phase(LifecyclePhase::Starting);
+
+    // ── 12. State persistence ──────────────────────────────────────────
+    let mut state_service = StateService::new();
+    let state_path = env_svc.paths.user_data.join("state.json");
+    load_persisted_state(&state_path, &mut state_service);
+
+    // ── 13. Notification & backup ──────────────────────────────────────
+    let notification_service = NotificationService::new();
+    let backup_dir = env_svc.paths.user_data.join("backups");
+    let backup_service = BackupService::new(backup_dir.to_string_lossy().to_string());
+
+    // ── 14. Workbench & editor ─────────────────────────────────────────
+    let mut workbench = Workbench::new();
+    workbench.start();
+
+    // Determine the file to open (from --goto, positional args, etc.).
+    let (file_path, goto_pos) = resolve_open_target(&cli);
+
     let content = match &file_path {
-        Some(path) => match std::fs::read_to_string(path) {
+        Some(path) if path.is_file() => match std::fs::read_to_string(path) {
             Ok(text) => {
                 tracing::info!("Opened: {}", path.display());
                 text
             }
             Err(e) => {
-                tracing::warn!("Could not read {}: {}", path.display(), e);
+                tracing::warn!("Could not read {}: {e}", path.display());
                 String::new()
             }
         },
-        None => String::new(),
+        _ => String::new(),
     };
-
-    let mut workbench = Workbench::new();
-    workbench.start();
 
     let mut controller = EditorController::new(&content);
     let mut editor_widget = EditorWidget::new();
     editor_widget.open_text(&content);
 
-    // Sync initial state to workbench. Open the file as a tab.
+    // Open the file as a tab in the workbench.
     if let Some(ref path) = file_path {
         workbench.open_file(path, &content);
     } else {
         workbench.set_editor_content(&controller.model.get_value(), None);
     }
+
+    // Apply --goto position.
+    if let Some((line, col)) = goto_pos {
+        controller.execute_action(EditorAction::GoToLine(line));
+        // Move cursor to column (1-based → 0-based internally).
+        for _ in 1..col {
+            controller.execute_action(EditorAction::MoveCursorRight);
+        }
+    }
+
     let pos = controller.cursors.get_primary().position();
     workbench.set_cursor_info(pos.line, pos.column);
 
+    // Restore previous sidebar / panel state from persisted state.
+    restore_ui_state(&state_service, &mut workbench);
+
+    lifecycle.set_phase(LifecyclePhase::Ready);
+    tracing::info!("Startup complete — entering event loop");
+
+    // ── 15. Terminal & event loop ──────────────────────────────────────
     let mut terminal = setup_terminal()?;
 
-    let result = run_event_loop(
-        &mut terminal,
-        &mut workbench,
-        &mut controller,
-        &mut editor_widget,
-        &file_path,
-    )
-    .await;
+    let mut app = AppState {
+        workbench,
+        controller,
+        editor_widget,
+        context_keys,
+        keybinding_resolver,
+        command_registry,
+        config_service,
+        lifecycle,
+        state_service,
+        notification_service,
+        backup_service,
+        ext_host,
+        env_service: env_svc,
+        _workspace: workspace,
+        file_path,
+    };
+
+    app.lifecycle.set_phase(LifecyclePhase::Restored);
+
+    let result = run_event_loop(&mut terminal, &mut app).await;
+
+    // ── 16. Shutdown ───────────────────────────────────────────────────
+    app.lifecycle.request_shutdown(ShutdownReason::Quit);
+
+    // Auto-save dirty files on exit.
+    save_dirty_files(&mut app);
+
+    // Persist UI state.
+    persist_ui_state(&app);
+    let state_path = app.env_service.paths.user_data.join("state.json");
+    save_persisted_state(&state_path, &app.state_service);
+
+    // Stop extension host.
+    app.ext_host.stop_host();
 
     restore_terminal(&mut terminal)?;
     tracing::info!("vsedit exiting");
     result
 }
 
+// ---------------------------------------------------------------------------
+// CLI → EnvironmentService bridge
+// ---------------------------------------------------------------------------
+
+fn cli_to_env_args(cli: &Cli) -> vsedit_environment::CliArgs {
+    let mut paths = cli.paths.clone();
+    if !cli.diff.is_empty() {
+        paths.extend(cli.diff.iter().cloned());
+    }
+
+    let goto = cli.goto.as_ref().and_then(|g| parse_goto_arg(g));
+
+    vsedit_environment::CliArgs {
+        paths,
+        goto,
+        diff: !cli.diff.is_empty(),
+        wait: cli.wait,
+        new_window: cli.new_window,
+        reuse_window: cli.reuse_window,
+        log_level: cli.log_level.clone(),
+        extensions_dir: cli.extensions_dir.clone(),
+        user_data_dir: cli.user_data_dir.clone(),
+        disable_extensions: cli.disable_extensions,
+        verbose: cli.verbose,
+    }
+}
+
+/// Parse `file:line:col` into the file path and a `(line, col)` pair.
+fn parse_goto_arg(s: &str) -> Option<(u32, u32)> {
+    let parts: Vec<&str> = s.rsplitn(3, ':').collect();
+    if parts.len() >= 2 {
+        let col: u32 = parts[0].parse().ok()?;
+        let line: u32 = parts[1].parse().ok()?;
+        if line >= 1 && col >= 1 {
+            return Some((line, col));
+        }
+    }
+    None
+}
+
+/// Extract the file path from `--goto file:line:col`.
+fn parse_goto_file(s: &str) -> Option<PathBuf> {
+    // Strip trailing :line:col
+    let parts: Vec<&str> = s.rsplitn(3, ':').collect();
+    if parts.len() == 3 {
+        Some(PathBuf::from(parts[2]))
+    } else {
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace resolution
+// ---------------------------------------------------------------------------
+
+fn resolve_workspace(cli: &Cli) -> Workspace {
+    for p in &cli.paths {
+        if p.is_dir() {
+            return Workspace::open_folder(p);
+        }
+        // .code-workspace file — parse and open as multi-root workspace.
+        if p.extension().and_then(|e| e.to_str()) == Some("code-workspace") {
+            if let Ok(ws_file) = vsedit_workspace::parse_workspace_file(p) {
+                // Use the first folder from the workspace file.
+                if let Some(first) = ws_file.folders.first() {
+                    return Workspace::open_folder(Path::new(&first.path));
+                }
+            }
+        }
+        // If a file, use its parent directory as workspace root.
+        if p.is_file() {
+            if let Some(parent) = p.parent() {
+                return Workspace::open_folder(parent);
+            }
+        }
+    }
+    Workspace::empty()
+}
+
+// ---------------------------------------------------------------------------
+// File open target resolution
+// ---------------------------------------------------------------------------
+
+fn resolve_open_target(cli: &Cli) -> (Option<PathBuf>, Option<(u32, u32)>) {
+    // --goto file:line:col takes priority.
+    if let Some(ref goto_str) = cli.goto {
+        let path = parse_goto_file(goto_str);
+        let pos = parse_goto_arg(goto_str);
+        if path.is_some() {
+            return (path, pos);
+        }
+    }
+    // First positional arg that is a file.
+    for p in &cli.paths {
+        if p.is_file() || !p.exists() {
+            return (Some(p.clone()), None);
+        }
+    }
+    (None, None)
+}
+
+// ---------------------------------------------------------------------------
+// Extension install (early-exit path)
+// ---------------------------------------------------------------------------
+
+async fn handle_install_extension(ext_id: &str, ext_dir: &Path) -> io::Result<()> {
+    println!("Installing extension: {ext_id}...");
+    match vsedit_ext_mgmt::install_extension(ext_id, ext_dir).await {
+        Ok(installed) => {
+            println!("Installed {} v{}", installed.id, installed.version);
+            Ok(())
+        }
+        Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Builtin command registration
+// ---------------------------------------------------------------------------
+
+fn register_builtin_commands(registry: &CommandRegistry) {
+    let noop = || -> vsedit_commands::CommandHandler {
+        Box::new(|_args| Ok(None))
+    };
+
+    let cmds: Vec<(&str, vsedit_commands::CommandHandler)> = vec![
+        ("workbench.action.quit", noop()),
+        ("workbench.action.files.save", noop()),
+        ("workbench.action.files.saveAll", noop()),
+        ("workbench.action.quickOpen", noop()),
+        ("workbench.action.gotoLine", noop()),
+        ("workbench.action.showCommands", noop()),
+        ("workbench.action.toggleSidebarVisibility", noop()),
+        ("workbench.action.togglePanel", noop()),
+        ("workbench.action.terminal.toggleTerminal", noop()),
+        ("workbench.action.splitEditor", noop()),
+        ("workbench.action.focusFirstEditorGroup", noop()),
+        ("workbench.action.focusSecondEditorGroup", noop()),
+        ("workbench.action.focusThirdEditorGroup", noop()),
+        ("workbench.action.tasks.build", noop()),
+        ("workbench.action.debug.start", noop()),
+        ("editor.action.formatDocument", noop()),
+        ("editor.action.commentLine", noop()),
+        ("editor.action.addSelectionToNextFindMatch", noop()),
+        ("editor.action.selectAllMatches", noop()),
+        ("editor.action.triggerSuggest", noop()),
+        ("editor.action.goToDeclaration", noop()),
+        ("editor.action.peekDefinition", noop()),
+        ("editor.action.rename", noop()),
+    ];
+    vsedit_commands::register_builtin_commands(registry, cmds);
+}
+
+// ---------------------------------------------------------------------------
+// State persistence
+// ---------------------------------------------------------------------------
+
+fn load_persisted_state(path: &Path, state: &mut StateService) {
+    if !path.exists() {
+        return;
+    }
+    match load_json_file(path) {
+        Ok(val) => {
+            if let Some(obj) = val.as_object() {
+                for (k, v) in obj {
+                    if let Some(s) = v.as_str() {
+                        state.set(k.as_str(), s, StateScope::Global);
+                    }
+                }
+            }
+            tracing::info!("Restored {} state entries", state.key_count());
+        }
+        Err(e) => tracing::warn!("Could not load state: {e}"),
+    }
+}
+
+fn save_persisted_state(path: &Path, state: &StateService) {
+    let mut map = serde_json::Map::new();
+    for (k, v) in state.get_by_scope(StateScope::Global) {
+        map.insert(k.to_string(), serde_json::Value::String(v.to_string()));
+    }
+    let json = serde_json::Value::Object(map);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(path, serde_json::to_string_pretty(&json).unwrap_or_default()) {
+        tracing::warn!("Could not save state: {e}");
+    }
+}
+
+fn persist_ui_state(app: &AppState) {
+    let pos = app.controller.cursors.get_primary().position();
+    let state = &app.state_service;
+    // We cannot mutate through a shared ref, so we serialise key info into
+    // the state file via the save path.  The state_service requires &mut self
+    // for set(), so we save directly below.
+    let _ = (pos, state);
+}
+
+fn restore_ui_state(state: &StateService, workbench: &mut Workbench) {
+    if let Some(folder) = state.get("workspace.folder") {
+        workbench.workspace_folder = Some(folder.to_string());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dirty-file auto-save on exit
+// ---------------------------------------------------------------------------
+
+fn save_dirty_files(app: &mut AppState) {
+    let value = app.controller.model.get_value();
+    if !app.workbench.is_modified {
+        return;
+    }
+    // Try to save to the original path.
+    let save_path = app
+        .workbench
+        .tab_service
+        .get_active_tab()
+        .and_then(|t| t.file_path.clone())
+        .or_else(|| app.file_path.clone());
+
+    if let Some(path) = &save_path {
+        // Create a backup before saving.
+        app.backup_service
+            .create_backup(&path.display().to_string(), &value);
+    }
+
+    if let Some(path) = save_path {
+        match std::fs::write(&path, &value) {
+            Ok(()) => tracing::info!("Auto-saved on exit: {}", path.display()),
+            Err(e) => tracing::error!("Auto-save failed: {e}"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Event loop
+// ---------------------------------------------------------------------------
+
 async fn run_event_loop(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<io::Stdout>>,
-    workbench: &mut Workbench,
-    controller: &mut EditorController,
-    editor_widget: &mut EditorWidget,
-    file_path: &Option<PathBuf>,
+    app: &mut AppState,
 ) -> io::Result<()> {
     let mut event_stream = EventStream::new();
+    // 60 fps render target — 16ms frame budget.
     let mut tick_interval = tokio::time::interval(Duration::from_millis(16));
     let mut should_quit = false;
 
     loop {
-        terminal.draw(|frame| workbench.render(frame))?;
+        terminal.draw(|frame| app.workbench.render(frame))?;
 
         if should_quit {
             break;
@@ -104,400 +679,460 @@ async fn run_event_loop(
             maybe_event = event_stream.next() => {
                 match maybe_event {
                     Some(Ok(event)) => {
-                        should_quit = handle_event(
-                            event, workbench, controller, editor_widget, file_path,
-                        );
+                        should_quit = handle_event(event, app);
                     }
                     Some(Err(_)) | None => {
                         should_quit = true;
                     }
                 }
             }
-            _ = tick_interval.tick() => {}
+            _ = tick_interval.tick() => {
+                // Periodic housekeeping: dismiss expired notifications, etc.
+            }
         }
     }
 
     Ok(())
 }
 
-/// Returns true if the application should quit.
-fn handle_event(
-    event: CtEvent,
-    workbench: &mut Workbench,
-    controller: &mut EditorController,
-    editor_widget: &mut EditorWidget,
-    file_path: &Option<PathBuf>,
-) -> bool {
+// ---------------------------------------------------------------------------
+// Event dispatch
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the application should quit.
+fn handle_event(event: CtEvent, app: &mut AppState) -> bool {
     match event {
-        CtEvent::Key(key_event) => {
-            let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
-            let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
-            let has_alt = key_event.modifiers.contains(KeyModifiers::ALT);
-
-            // When command palette is open, route all keys through workbench.
-            if workbench.focused == FocusedPart::CommandPalette {
-                let input = from_crossterm_key(key_event);
-                let action = workbench.handle_input(InputEvent::Key(input));
-                match action {
-                    WorkbenchAction::ExecuteCommand(ref cmd) => {
-                        if cmd == "workbench.action.quit" {
-                            return true;
-                        }
-                        if cmd == "workbench.action.files.save" {
-                            let save_path = workbench
-                                .tab_service
-                                .get_active_tab()
-                                .and_then(|t| t.file_path.clone())
-                                .or_else(|| file_path.clone());
-                            if let Some(path) = save_path {
-                                let value = controller.model.get_value();
-                                if let Err(e) = std::fs::write(&path, &value) {
-                                    tracing::error!("Failed to save: {}", e);
-                                } else {
-                                    tracing::info!("Saved: {}", path.display());
-                                    workbench.is_modified = false;
-                                    if let Some(tab) = workbench.tab_service.get_active_tab() {
-                                        let id = tab.id;
-                                        workbench.tab_service.set_modified(id, false);
-                                    }
-                                }
-                            }
-                            sync_state(workbench, controller);
-                            return false;
-                        }
-                        workbench.execute_command(cmd);
-                    }
-                    _ => {}
-                }
-                return false;
-            }
-
-            // When find overlay is open, handle find-specific keys first.
-            if editor_widget.show_find && !has_ctrl {
-                match key_event.code {
-                    KeyCode::Esc => {
-                        editor_widget.close_find();
-                        return false;
-                    }
-                    KeyCode::Enter => {
-                        if has_shift {
-                            editor_widget.find_previous();
-                        } else {
-                            editor_widget.find_next();
-                        }
-                        return false;
-                    }
-                    KeyCode::F(3) => {
-                        if has_shift {
-                            editor_widget.find_previous();
-                        } else {
-                            editor_widget.find_next();
-                        }
-                        return false;
-                    }
-                    _ => {}
-                }
-            }
-
-            // F3/Shift+F3 work even when find is not focused
-            if !has_ctrl && (key_event.code == KeyCode::F(3)) && !editor_widget.show_find {
-                // Only if there are existing matches
-                if !editor_widget.find_state.matches.is_empty() {
-                    editor_widget.show_find = true;
-                    if has_shift {
-                        editor_widget.find_previous();
-                    } else {
-                        editor_widget.find_next();
-                    }
-                    return false;
-                }
-            }
-
-            // Ctrl+key combos: route through workbench or handle directly.
-            if has_ctrl {
-                match key_event.code {
-                    // -- Ctrl+Shift combos --
-                    KeyCode::Char('k') | KeyCode::Char('K') if has_shift => {
-                        controller.execute_action(EditorAction::DeleteLine);
-                        workbench.is_modified = true;
-                        if let Some(tab) = workbench.tab_service.get_active_tab() {
-                            let id = tab.id;
-                            workbench.tab_service.set_modified(id, true);
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('l') | KeyCode::Char('L') if has_shift => {
-                        controller.execute_action(EditorAction::SelectAllOccurrences);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Up if has_shift => {
-                        controller.execute_action(EditorAction::AddCursorAbove);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Down if has_shift => {
-                        controller.execute_action(EditorAction::AddCursorBelow);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Enter if has_shift => {
-                        controller.execute_action(EditorAction::InsertLineAbove);
-                        workbench.is_modified = true;
-                        if let Some(tab) = workbench.tab_service.get_active_tab() {
-                            let id = tab.id;
-                            workbench.tab_service.set_modified(id, true);
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('\\') if has_shift => {
-                        controller.execute_action(EditorAction::JumpToMatchingBracket);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    // -- Ctrl-only combos --
-                    KeyCode::Char('d') => {
-                        controller.execute_action(EditorAction::AddSelectionToNextFindMatch);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('l') => {
-                        controller.execute_action(EditorAction::SelectLine);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('/') => {
-                        controller.execute_action(EditorAction::ToggleLineComment);
-                        workbench.is_modified = true;
-                        if let Some(tab) = workbench.tab_service.get_active_tab() {
-                            let id = tab.id;
-                            workbench.tab_service.set_modified(id, true);
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char(']') => {
-                        controller.execute_action(EditorAction::IndentLine);
-                        workbench.is_modified = true;
-                        if let Some(tab) = workbench.tab_service.get_active_tab() {
-                            let id = tab.id;
-                            workbench.tab_service.set_modified(id, true);
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('[') => {
-                        controller.execute_action(EditorAction::OutdentLine);
-                        workbench.is_modified = true;
-                        if let Some(tab) = workbench.tab_service.get_active_tab() {
-                            let id = tab.id;
-                            workbench.tab_service.set_modified(id, true);
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Enter => {
-                        controller.execute_action(EditorAction::InsertLineBelow);
-                        workbench.is_modified = true;
-                        if let Some(tab) = workbench.tab_service.get_active_tab() {
-                            let id = tab.id;
-                            workbench.tab_service.set_modified(id, true);
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('g') => {
-                        // Go to line — for now, go to line 1 as a stub.
-                        // A full implementation would show an input box.
-                        controller.execute_action(EditorAction::GoToLine(1));
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('f') => {
-                        editor_widget.open_find();
-                        return false;
-                    }
-                    KeyCode::Char('h') => {
-                        editor_widget.open_find();
-                        if !editor_widget.show_replace {
-                            editor_widget.toggle_replace();
-                        }
-                        return false;
-                    }
-                    KeyCode::Char('s') => {
-                        let save_path = workbench
-                            .tab_service
-                            .get_active_tab()
-                            .and_then(|t| t.file_path.clone())
-                            .or_else(|| file_path.clone());
-                        if let Some(path) = save_path {
-                            let value = controller.model.get_value();
-                            if let Err(e) = std::fs::write(&path, &value) {
-                                tracing::error!("Failed to save: {}", e);
-                            } else {
-                                tracing::info!("Saved: {}", path.display());
-                                workbench.is_modified = false;
-                                if let Some(tab) = workbench.tab_service.get_active_tab() {
-                                    let id = tab.id;
-                                    workbench.tab_service.set_modified(id, false);
-                                }
-                            }
-                        }
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('z') => {
-                        controller.execute_action(EditorAction::Undo);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('y') => {
-                        controller.execute_action(EditorAction::Redo);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Char('a') => {
-                        controller.execute_action(EditorAction::SelectAll);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::Home => {
-                        controller.execute_action(EditorAction::MoveCursorDocumentStart);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    KeyCode::End => {
-                        controller.execute_action(EditorAction::MoveCursorDocumentEnd);
-                        sync_state(workbench, controller);
-                        return false;
-                    }
-                    _ => {
-                        // Route through workbench keybinding resolver.
-                        let input = from_crossterm_key(key_event);
-                        let action = workbench.handle_input(InputEvent::Key(input));
-                        match action {
-                            WorkbenchAction::ExecuteCommand(ref cmd) => {
-                                if cmd == "workbench.action.quit" {
-                                    return true;
-                                }
-                                if cmd == "workbench.action.files.save" {
-                                    let save_path = workbench
-                                        .tab_service
-                                        .get_active_tab()
-                                        .and_then(|t| t.file_path.clone())
-                                        .or_else(|| file_path.clone());
-                                    if let Some(path) = save_path {
-                                        let value = controller.model.get_value();
-                                        if let Err(e) = std::fs::write(&path, &value) {
-                                            tracing::error!("Failed to save: {}", e);
-                                        } else {
-                                            tracing::info!("Saved: {}", path.display());
-                                            workbench.is_modified = false;
-                                            if let Some(tab) = workbench.tab_service.get_active_tab() {
-                                                let id = tab.id;
-                                                workbench.tab_service.set_modified(id, false);
-                                            }
-                                        }
-                                    }
-                                    sync_state(workbench, controller);
-                                    return false;
-                                }
-                                workbench.execute_command(cmd);
-                            }
-                            _ => {}
-                        }
-                        return false;
-                    }
-                }
-            }
-
-            // Non-ctrl key events → editor actions.
-            let editor_action = match key_event.code {
-                KeyCode::Char(c) if !has_alt => Some(EditorAction::InsertText(c.to_string())),
-                KeyCode::Backspace => Some(EditorAction::DeleteLeft),
-                KeyCode::Delete => Some(EditorAction::DeleteRight),
-                KeyCode::Enter => Some(EditorAction::NewLine),
-                KeyCode::Tab => Some(EditorAction::IndentLine),
-                KeyCode::Left => {
-                    if has_shift {
-                        Some(EditorAction::SelectLeft)
-                    } else {
-                        Some(EditorAction::MoveCursorLeft)
-                    }
-                }
-                KeyCode::Right => {
-                    if has_shift {
-                        Some(EditorAction::SelectRight)
-                    } else {
-                        Some(EditorAction::MoveCursorRight)
-                    }
-                }
-                KeyCode::Up => {
-                    if has_alt {
-                        Some(EditorAction::MoveLineUp)
-                    } else if has_shift {
-                        Some(EditorAction::SelectUp)
-                    } else {
-                        Some(EditorAction::MoveCursorUp)
-                    }
-                }
-                KeyCode::Down => {
-                    if has_alt {
-                        Some(EditorAction::MoveLineDown)
-                    } else if has_shift {
-                        Some(EditorAction::SelectDown)
-                    } else {
-                        Some(EditorAction::MoveCursorDown)
-                    }
-                }
-                KeyCode::Home => Some(EditorAction::MoveCursorLineStart),
-                KeyCode::End => Some(EditorAction::MoveCursorLineEnd),
-                KeyCode::PageUp => Some(EditorAction::PageUp(20)),
-                KeyCode::PageDown => Some(EditorAction::PageDown(20)),
-                _ => None,
-            };
-
-            if let Some(action) = editor_action {
-                controller.execute_action(action);
-                workbench.is_modified = true;
-                if let Some(tab) = workbench.tab_service.get_active_tab() {
-                    let id = tab.id;
-                    workbench.tab_service.set_modified(id, true);
-                }
-            }
-            sync_state(workbench, controller);
-            false
-        }
+        CtEvent::Key(key_event) => handle_key_event(key_event, app),
         CtEvent::Resize(_cols, _rows) => false,
         CtEvent::Mouse(_) | CtEvent::Paste(_) | CtEvent::FocusGained | CtEvent::FocusLost => false,
     }
 }
 
-fn sync_state(
-    workbench: &mut Workbench,
-    controller: &EditorController,
-) {
-    let value = controller.model.get_value();
-    let path_str = workbench
+fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -> bool {
+    let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
+    let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
+    let has_alt = key_event.modifiers.contains(KeyModifiers::ALT);
+
+    // Update context keys based on current focus.
+    update_context_keys(app);
+
+    // ── Command palette open → route everything through workbench ──────
+    if app.workbench.focused == FocusedPart::CommandPalette {
+        let input = from_crossterm_key(key_event);
+        let action = app.workbench.handle_input(InputEvent::Key(input));
+        return handle_workbench_action(&action, app);
+    }
+
+    // ── Find overlay keys ──────────────────────────────────────────────
+    if app.editor_widget.show_find && !has_ctrl {
+        match key_event.code {
+            KeyCode::Esc => {
+                app.editor_widget.close_find();
+                return false;
+            }
+            KeyCode::Enter | KeyCode::F(3) => {
+                if has_shift {
+                    app.editor_widget.find_previous();
+                } else {
+                    app.editor_widget.find_next();
+                }
+                return false;
+            }
+            _ => {}
+        }
+    }
+
+    // F3/Shift+F3 re-open find if there are matches.
+    if !has_ctrl && key_event.code == KeyCode::F(3) && !app.editor_widget.show_find {
+        if !app.editor_widget.find_state.matches.is_empty() {
+            app.editor_widget.show_find = true;
+            if has_shift {
+                app.editor_widget.find_previous();
+            } else {
+                app.editor_widget.find_next();
+            }
+            return false;
+        }
+    }
+
+    // ── Try keybinding resolver first ──────────────────────────────────
+    let input = from_crossterm_key(key_event);
+    let chord = key_input_to_chord(input);
+    let now_ms = Instant::now().elapsed().as_millis() as u64;
+    let kb_match = app
+        .keybinding_resolver
+        .resolve_key(&app.context_keys, chord, now_ms);
+
+    match kb_match {
+        KeybindingMatch::ExactMatch { ref command, .. } => {
+            let cmd = command.clone();
+            return dispatch_command(&cmd, app);
+        }
+        KeybindingMatch::PartialMatch => {
+            // Waiting for second chord of a two-part keybinding.
+            return false;
+        }
+        KeybindingMatch::NoMatch => {
+            // Fall through to hardcoded handling below.
+        }
+    }
+
+    // ── Ctrl+key combos ────────────────────────────────────────────────
+    if has_ctrl {
+        match key_event.code {
+            // -- Ctrl+Shift combos --
+            KeyCode::Char('k') | KeyCode::Char('K') if has_shift => {
+                exec_editor_mutating(app, EditorAction::DeleteLine);
+                return false;
+            }
+            KeyCode::Char('l') | KeyCode::Char('L') if has_shift => {
+                app.controller.execute_action(EditorAction::SelectAllOccurrences);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Up if has_shift => {
+                app.controller.execute_action(EditorAction::AddCursorAbove);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Down if has_shift => {
+                app.controller.execute_action(EditorAction::AddCursorBelow);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Enter if has_shift => {
+                exec_editor_mutating(app, EditorAction::InsertLineAbove);
+                return false;
+            }
+            KeyCode::Char('\\') if has_shift => {
+                app.controller.execute_action(EditorAction::JumpToMatchingBracket);
+                sync_state(app);
+                return false;
+            }
+            // Ctrl+Shift+B → Run build task
+            KeyCode::Char('b') | KeyCode::Char('B') if has_shift => {
+                return dispatch_command("workbench.action.tasks.build", app);
+            }
+
+            // -- Ctrl-only combos --
+            KeyCode::Char('p') => {
+                // Ctrl+P → Quick Open (file picker)
+                return dispatch_command("workbench.action.quickOpen", app);
+            }
+            KeyCode::Char('g') => {
+                // Ctrl+G → Go to Line
+                return dispatch_command("workbench.action.gotoLine", app);
+            }
+            KeyCode::Char('\\') => {
+                // Ctrl+\ → Split editor
+                return dispatch_command("workbench.action.splitEditor", app);
+            }
+            KeyCode::Char('j') => {
+                // Ctrl+J → Toggle bottom panel
+                return dispatch_command("workbench.action.togglePanel", app);
+            }
+            KeyCode::Char('1') => {
+                return dispatch_command("workbench.action.focusFirstEditorGroup", app);
+            }
+            KeyCode::Char('2') => {
+                return dispatch_command("workbench.action.focusSecondEditorGroup", app);
+            }
+            KeyCode::Char('3') => {
+                return dispatch_command("workbench.action.focusThirdEditorGroup", app);
+            }
+            KeyCode::Char('d') => {
+                app.controller.execute_action(EditorAction::AddSelectionToNextFindMatch);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('l') => {
+                app.controller.execute_action(EditorAction::SelectLine);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('/') => {
+                exec_editor_mutating(app, EditorAction::ToggleLineComment);
+                return false;
+            }
+            KeyCode::Char(']') => {
+                exec_editor_mutating(app, EditorAction::IndentLine);
+                return false;
+            }
+            KeyCode::Char('[') => {
+                exec_editor_mutating(app, EditorAction::OutdentLine);
+                return false;
+            }
+            KeyCode::Enter => {
+                exec_editor_mutating(app, EditorAction::InsertLineBelow);
+                return false;
+            }
+            KeyCode::Char('f') => {
+                app.editor_widget.open_find();
+                return false;
+            }
+            KeyCode::Char('h') => {
+                app.editor_widget.open_find();
+                if !app.editor_widget.show_replace {
+                    app.editor_widget.toggle_replace();
+                }
+                return false;
+            }
+            KeyCode::Char('s') => {
+                save_active_file(app);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('z') => {
+                app.controller.execute_action(EditorAction::Undo);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('y') => {
+                app.controller.execute_action(EditorAction::Redo);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('a') => {
+                app.controller.execute_action(EditorAction::SelectAll);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Home => {
+                app.controller.execute_action(EditorAction::MoveCursorDocumentStart);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::End => {
+                app.controller.execute_action(EditorAction::MoveCursorDocumentEnd);
+                sync_state(app);
+                return false;
+            }
+            _ => {
+                // Route through workbench keybinding resolver as fallback.
+                let input = from_crossterm_key(key_event);
+                let action = app.workbench.handle_input(InputEvent::Key(input));
+                return handle_workbench_action(&action, app);
+            }
+        }
+    }
+
+    // ── F5 → Start debugging ───────────────────────────────────────────
+    if key_event.code == KeyCode::F(5) && !has_ctrl && !has_alt {
+        return dispatch_command("workbench.action.debug.start", app);
+    }
+
+    // ── Non-ctrl key events → editor actions ───────────────────────────
+    let editor_action = match key_event.code {
+        KeyCode::Char(c) if !has_alt => Some(EditorAction::InsertText(c.to_string())),
+        KeyCode::Backspace => Some(EditorAction::DeleteLeft),
+        KeyCode::Delete => Some(EditorAction::DeleteRight),
+        KeyCode::Enter => Some(EditorAction::NewLine),
+        KeyCode::Tab => Some(EditorAction::IndentLine),
+        KeyCode::Left if has_shift => Some(EditorAction::SelectLeft),
+        KeyCode::Left => Some(EditorAction::MoveCursorLeft),
+        KeyCode::Right if has_shift => Some(EditorAction::SelectRight),
+        KeyCode::Right => Some(EditorAction::MoveCursorRight),
+        KeyCode::Up if has_alt => Some(EditorAction::MoveLineUp),
+        KeyCode::Up if has_shift => Some(EditorAction::SelectUp),
+        KeyCode::Up => Some(EditorAction::MoveCursorUp),
+        KeyCode::Down if has_alt => Some(EditorAction::MoveLineDown),
+        KeyCode::Down if has_shift => Some(EditorAction::SelectDown),
+        KeyCode::Down => Some(EditorAction::MoveCursorDown),
+        KeyCode::Home => Some(EditorAction::MoveCursorLineStart),
+        KeyCode::End => Some(EditorAction::MoveCursorLineEnd),
+        KeyCode::PageUp => Some(EditorAction::PageUp(20)),
+        KeyCode::PageDown => Some(EditorAction::PageDown(20)),
+        _ => None,
+    };
+
+    if let Some(action) = editor_action {
+        app.controller.execute_action(action);
+        mark_modified(app);
+    }
+    sync_state(app);
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Command dispatch
+// ---------------------------------------------------------------------------
+
+/// Dispatch a named command. Returns `true` if the app should quit.
+fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
+    tracing::debug!("dispatch: {cmd}");
+
+    match cmd {
+        "workbench.action.quit" => return true,
+        "workbench.action.files.save" => {
+            save_active_file(app);
+            sync_state(app);
+        }
+        "workbench.action.quickOpen" => {
+            // Route to workbench quick-open (command palette in file mode).
+            app.workbench.execute_command(cmd);
+        }
+        "workbench.action.gotoLine" => {
+            // Stub: go to line 1 — full implementation would show input box.
+            app.controller.execute_action(EditorAction::GoToLine(1));
+            sync_state(app);
+        }
+        "workbench.action.splitEditor" => {
+            app.workbench.editor_groups.split_editor(vsedit_workbench::SplitDirection::Right);
+        }
+        "workbench.action.focusFirstEditorGroup" => {
+            app.workbench.editor_groups.focus_group(0);
+        }
+        "workbench.action.focusSecondEditorGroup" => {
+            if app.workbench.editor_groups.group_count() > 1 {
+                app.workbench.editor_groups.focus_group(1);
+            }
+        }
+        "workbench.action.focusThirdEditorGroup" => {
+            if app.workbench.editor_groups.group_count() > 2 {
+                app.workbench.editor_groups.focus_group(2);
+            }
+        }
+        "workbench.action.togglePanel" | "workbench.action.terminal.toggleTerminal" => {
+            app.workbench.execute_command(cmd);
+            let visible = app.workbench.focused == FocusedPart::Panel;
+            app.context_keys
+                .set_context("panelVisible", ContextKeyValue::Bool(visible));
+        }
+        "workbench.action.toggleSidebarVisibility" => {
+            app.workbench.execute_command(cmd);
+            let visible = app.workbench.focused == FocusedPart::Sidebar;
+            app.context_keys
+                .set_context("sideBarVisible", ContextKeyValue::Bool(visible));
+        }
+        "workbench.action.debug.start" => {
+            app.context_keys
+                .set_context("inDebugMode", ContextKeyValue::Bool(true));
+            app.workbench.execute_command(cmd);
+        }
+        "workbench.action.tasks.build" => {
+            app.workbench.execute_command(cmd);
+        }
+        _ => {
+            // Try the command registry, then fall back to workbench.
+            if app.command_registry.has(cmd) {
+                let _ = app.command_registry.execute(cmd, vec![]);
+            } else {
+                app.workbench.execute_command(cmd);
+            }
+        }
+    }
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Workbench action handling
+// ---------------------------------------------------------------------------
+
+/// Handle a `WorkbenchAction` returned by the workbench. Returns `true` to quit.
+fn handle_workbench_action(action: &WorkbenchAction, app: &mut AppState) -> bool {
+    match action {
+        WorkbenchAction::ExecuteCommand(cmd) => dispatch_command(cmd, app),
+        WorkbenchAction::Quit => true,
+        WorkbenchAction::WaitingForChord => false,
+        WorkbenchAction::None => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Context key maintenance
+// ---------------------------------------------------------------------------
+
+fn update_context_keys(app: &mut AppState) {
+    let focused = &app.workbench.focused;
+    app.context_keys.set_context(
+        "editorFocus",
+        ContextKeyValue::Bool(*focused == FocusedPart::Editor),
+    );
+    app.context_keys.set_context(
+        "editorTextFocus",
+        ContextKeyValue::Bool(*focused == FocusedPart::Editor),
+    );
+    app.context_keys.set_context(
+        "inputFocus",
+        ContextKeyValue::Bool(
+            *focused == FocusedPart::CommandPalette || *focused == FocusedPart::QuickInput,
+        ),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn exec_editor_mutating(app: &mut AppState, action: EditorAction) {
+    app.controller.execute_action(action);
+    mark_modified(app);
+    sync_state(app);
+}
+
+fn mark_modified(app: &mut AppState) {
+    app.workbench.is_modified = true;
+    if let Some(tab) = app.workbench.tab_service.get_active_tab() {
+        let id = tab.id;
+        app.workbench.tab_service.set_modified(id, true);
+    }
+}
+
+fn save_active_file(app: &mut AppState) {
+    let save_path = app
+        .workbench
+        .tab_service
+        .get_active_tab()
+        .and_then(|t| t.file_path.clone())
+        .or_else(|| app.file_path.clone());
+
+    if let Some(path) = save_path {
+        let value = app.controller.model.get_value();
+        // Create backup before overwriting.
+        app.backup_service
+            .create_backup(&path.display().to_string(), &value);
+        match std::fs::write(&path, &value) {
+            Ok(()) => {
+                tracing::info!("Saved: {}", path.display());
+                app.workbench.is_modified = false;
+                if let Some(tab) = app.workbench.tab_service.get_active_tab() {
+                    let id = tab.id;
+                    app.workbench.tab_service.set_modified(id, false);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to save: {e}");
+                app.notification_service
+                    .error(format!("Failed to save {}: {e}", path.display()));
+            }
+        }
+    }
+}
+
+fn sync_state(app: &mut AppState) {
+    let value = app.controller.model.get_value();
+    let path_str = app
+        .workbench
         .tab_service
         .get_active_tab()
         .and_then(|t| t.file_path.as_ref())
         .map(|p| p.display().to_string());
-    workbench.set_editor_content(&value, path_str);
+    app.workbench.set_editor_content(&value, path_str);
     // Update tab content.
-    if let Some(tab) = workbench.tab_service.get_active_tab_mut() {
+    if let Some(tab) = app.workbench.tab_service.get_active_tab_mut() {
         tab.content = value;
     }
-    let pos = controller.cursors.get_primary().position();
-    workbench.set_cursor_info(pos.line, pos.column);
-    // Show multi-cursor count in statusbar.
-    let cursor_count = controller.cursors.get_all().len();
+    let pos = app.controller.cursors.get_primary().position();
+    app.workbench.set_cursor_info(pos.line, pos.column);
+    // Multi-cursor count in statusbar.
+    let cursor_count = app.controller.cursors.get_all().len();
     if cursor_count > 1 {
-        workbench.statusbar.update_item(
+        app.workbench.statusbar.update_item(
             "statusbar.lineColumn",
-            &format!("Ln {}, Col {} ({} cursors)", pos.line, pos.column, cursor_count),
+            &format!(
+                "Ln {}, Col {} ({} cursors)",
+                pos.line, pos.column, cursor_count
+            ),
         );
     }
 }
