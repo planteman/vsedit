@@ -207,6 +207,154 @@ impl Default for StatusBar {
     }
 }
 
+// --- New features ---
+
+impl StatusBar {
+    /// Return entries whose text contains the given substring.
+    pub fn find_entries(&self, substring: &str) -> Vec<&StatusBarEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.text.contains(substring))
+            .collect()
+    }
+
+    /// Sort all entries in-place by priority (ascending).
+    pub fn sort_by_priority(&mut self) {
+        self.entries.sort_by_key(|e| e.priority);
+    }
+
+    /// Toggle the visibility of an entry. Returns `true` if the entry was found.
+    pub fn toggle_visibility(&mut self, id: &str) -> bool {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            entry.visible = !entry.visible;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Render a formatted string of visible left-aligned entries separated by spaces,
+    /// sorted by priority.
+    pub fn render_left_text(&self) -> String {
+        let mut left: Vec<&StatusBarEntry> = self
+            .entries
+            .iter()
+            .filter(|e| e.visible && e.alignment == StatusBarAlignment::Left)
+            .collect();
+        left.sort_by_key(|e| e.priority);
+        left.iter()
+            .map(|e| e.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Render a formatted string of visible right-aligned entries separated by spaces,
+    /// sorted by priority.
+    pub fn render_right_text(&self) -> String {
+        let mut right: Vec<&StatusBarEntry> = self
+            .entries
+            .iter()
+            .filter(|e| e.visible && e.alignment == StatusBarAlignment::Right)
+            .collect();
+        right.sort_by_key(|e| e.priority);
+        right
+            .iter()
+            .map(|e| e.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Move an entry to a different alignment. Returns `true` if the entry was found.
+    pub fn move_entry(&mut self, id: &str, alignment: StatusBarAlignment) -> bool {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            entry.alignment = alignment;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Bulk-update fields of an entry via a callback closure.
+    /// Returns `true` if the entry was found and the callback was applied.
+    pub fn update_entry<F>(&mut self, id: &str, f: F) -> bool
+    where
+        F: FnOnce(&mut StatusBarEntry),
+    {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            f(entry);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return all entries that have a command set.
+    pub fn entries_with_command(&self) -> Vec<&StatusBarEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.command.is_some())
+            .collect()
+    }
+
+    /// Capture a snapshot of the current status bar state.
+    pub fn snapshot(&self) -> StatusBarSnapshot {
+        StatusBarSnapshot {
+            entries: self.entries.clone(),
+        }
+    }
+
+    /// Restore the status bar from a previously captured snapshot.
+    pub fn restore(&mut self, snapshot: &StatusBarSnapshot) {
+        self.entries = snapshot.entries.clone();
+    }
+
+    /// Merge entries from another `StatusBar`, skipping entries whose id already exists.
+    pub fn merge(&mut self, other: &StatusBar) {
+        for entry in &other.entries {
+            if !self.has_entry(&entry.id) {
+                self.entries.push(entry.clone());
+            }
+        }
+    }
+
+    /// Reorder entries according to the given list of IDs.
+    /// IDs present in the list are placed first (in the given order),
+    /// followed by any remaining entries in their original order.
+    pub fn reorder(&mut self, ids: &[&str]) {
+        let mut ordered: Vec<StatusBarEntry> = Vec::with_capacity(self.entries.len());
+        for &id in ids {
+            if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+                ordered.push(self.entries.remove(pos));
+            }
+        }
+        ordered.append(&mut self.entries);
+        self.entries = ordered;
+    }
+}
+
+/// A snapshot of a `StatusBar`'s entries that can be used to restore state.
+#[derive(Debug, Clone)]
+pub struct StatusBarSnapshot {
+    entries: Vec<StatusBarEntry>,
+}
+
+impl StatusBarSnapshot {
+    /// Number of entries captured in this snapshot.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get a reference to a captured entry by id.
+    pub fn get_entry(&self, id: &str) -> Option<&StatusBarEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    /// Get all captured entries.
+    pub fn entries(&self) -> &[StatusBarEntry] {
+        &self.entries
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,5 +484,233 @@ mod tests {
         assert_eq!(format!("{}", StatusBarAlignment::Right), "Right");
         let entry = StatusBarEntry::builder("id", "hello", StatusBarAlignment::Right).build();
         assert_eq!(format!("{}", entry), "[Right] hello");
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn find_entries_by_substring() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("branch", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("errors", StatusBarAlignment::Left, 1));
+        bar.update_text("branch", "main branch");
+        bar.update_text("errors", "0 errors");
+        let found = bar.find_entries("branch");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "branch");
+    }
+
+    #[test]
+    fn find_entries_no_match() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        assert!(bar.find_entries("zzz").is_empty());
+    }
+
+    #[test]
+    fn sort_by_priority_reorders() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("c", StatusBarAlignment::Left, 30));
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 10));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Right, 20));
+        bar.sort_by_priority();
+        let ids: Vec<&str> = bar.get_all_entries().iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn toggle_visibility_flips() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("x", StatusBarAlignment::Left, 0));
+        assert!(bar.get_entry("x").unwrap().visible);
+        assert!(bar.toggle_visibility("x"));
+        assert!(!bar.get_entry("x").unwrap().visible);
+        assert!(bar.toggle_visibility("x"));
+        assert!(bar.get_entry("x").unwrap().visible);
+    }
+
+    #[test]
+    fn toggle_visibility_missing() {
+        let mut bar = StatusBar::new();
+        assert!(!bar.toggle_visibility("nope"));
+    }
+
+    #[test]
+    fn render_left_text_sorted() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 10));
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("r", StatusBarAlignment::Right, 5));
+        bar.update_text("b", "second");
+        bar.update_text("a", "first");
+        assert_eq!(bar.render_left_text(), "first second");
+    }
+
+    #[test]
+    fn render_right_text_sorted() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("r2", StatusBarAlignment::Right, 20));
+        bar.add_entry(make_entry("r1", StatusBarAlignment::Right, 5));
+        bar.update_text("r1", "alpha");
+        bar.update_text("r2", "beta");
+        assert_eq!(bar.render_right_text(), "alpha beta");
+    }
+
+    #[test]
+    fn render_text_excludes_hidden() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("v", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("h", StatusBarAlignment::Left, 1));
+        bar.set_visibility("h", false);
+        bar.update_text("v", "visible");
+        bar.update_text("h", "hidden");
+        assert_eq!(bar.render_left_text(), "visible");
+    }
+
+    #[test]
+    fn render_text_empty() {
+        let bar = StatusBar::new();
+        assert_eq!(bar.render_left_text(), "");
+        assert_eq!(bar.render_right_text(), "");
+    }
+
+    #[test]
+    fn move_entry_changes_alignment() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("m", StatusBarAlignment::Left, 0));
+        assert!(bar.move_entry("m", StatusBarAlignment::Right));
+        assert_eq!(bar.get_entry("m").unwrap().alignment, StatusBarAlignment::Right);
+        assert!(!bar.move_entry("missing", StatusBarAlignment::Left));
+    }
+
+    #[test]
+    fn update_entry_bulk() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("u", StatusBarAlignment::Left, 0));
+        let found = bar.update_entry("u", |e| {
+            e.text = "new text".to_string();
+            e.priority = 99;
+            e.color = Some("#abc".to_string());
+            e.visible = false;
+        });
+        assert!(found);
+        let e = bar.get_entry("u").unwrap();
+        assert_eq!(e.text, "new text");
+        assert_eq!(e.priority, 99);
+        assert_eq!(e.color.as_deref(), Some("#abc"));
+        assert!(!e.visible);
+    }
+
+    #[test]
+    fn update_entry_missing() {
+        let mut bar = StatusBar::new();
+        assert!(!bar.update_entry("nope", |_| {}));
+    }
+
+    #[test]
+    fn entries_with_command_filters() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(
+            StatusBarEntry::builder("cmd1", "text", StatusBarAlignment::Left)
+                .command("do.thing")
+                .build(),
+        );
+        bar.add_entry(make_entry("no_cmd", StatusBarAlignment::Left, 0));
+        bar.add_entry(
+            StatusBarEntry::builder("cmd2", "text2", StatusBarAlignment::Right)
+                .command("do.other")
+                .build(),
+        );
+        let with_cmd = bar.entries_with_command();
+        assert_eq!(with_cmd.len(), 2);
+        assert!(with_cmd.iter().all(|e| e.command.is_some()));
+    }
+
+    #[test]
+    fn snapshot_and_restore() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Right, 1));
+
+        let snap = bar.snapshot();
+        assert_eq!(snap.entry_count(), 2);
+        assert!(snap.get_entry("a").is_some());
+        assert_eq!(snap.entries().len(), 2);
+
+        bar.clear();
+        assert_eq!(bar.entry_count(), 0);
+
+        bar.restore(&snap);
+        assert_eq!(bar.entry_count(), 2);
+        assert_eq!(bar.get_entry("a").unwrap().text, "a");
+    }
+
+    #[test]
+    fn snapshot_is_independent() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("x", StatusBarAlignment::Left, 0));
+        let snap = bar.snapshot();
+        bar.update_text("x", "changed");
+        assert_eq!(snap.get_entry("x").unwrap().text, "x");
+    }
+
+    #[test]
+    fn merge_skips_duplicates() {
+        let mut bar1 = StatusBar::new();
+        bar1.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar1.add_entry(make_entry("b", StatusBarAlignment::Left, 1));
+
+        let mut bar2 = StatusBar::new();
+        bar2.add_entry(make_entry("b", StatusBarAlignment::Right, 99));
+        bar2.add_entry(make_entry("c", StatusBarAlignment::Right, 2));
+
+        bar1.merge(&bar2);
+        assert_eq!(bar1.entry_count(), 3);
+        // "b" should keep original alignment (Left) since it was a duplicate
+        assert_eq!(bar1.get_entry("b").unwrap().alignment, StatusBarAlignment::Left);
+        assert!(bar1.has_entry("c"));
+    }
+
+    #[test]
+    fn merge_empty_into_empty() {
+        let mut bar1 = StatusBar::new();
+        let bar2 = StatusBar::new();
+        bar1.merge(&bar2);
+        assert_eq!(bar1.entry_count(), 0);
+    }
+
+    #[test]
+    fn reorder_by_ids() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("c", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 2));
+
+        bar.reorder(&["b", "a", "c"]);
+        let ids: Vec<&str> = bar.get_all_entries().iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["b", "a", "c"]);
+    }
+
+    #[test]
+    fn reorder_partial_ids() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("x", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("y", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("z", StatusBarAlignment::Left, 2));
+
+        bar.reorder(&["z"]);
+        let ids: Vec<&str> = bar.get_all_entries().iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["z", "x", "y"]);
+    }
+
+    #[test]
+    fn reorder_with_unknown_ids() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 1));
+
+        bar.reorder(&["missing", "b", "a"]);
+        let ids: Vec<&str> = bar.get_all_entries().iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["b", "a"]);
     }
 }
