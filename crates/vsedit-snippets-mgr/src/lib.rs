@@ -704,6 +704,219 @@ pub fn snippet_resolve_body(body: &[String], ctx: &SnippetVariableContext) -> Ve
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Snippet fuzzy search
+// ---------------------------------------------------------------------------
+
+/// Simple fuzzy matching for snippet search.
+pub struct SnippetSearch;
+
+impl SnippetSearch {
+    /// Returns true if all characters in `pattern` appear in `text` in order
+    /// (case-insensitive).
+    pub fn fuzzy_matches(pattern: &str, text: &str) -> bool {
+        let mut pattern_chars = pattern.chars().flat_map(|c| c.to_lowercase());
+        let mut text_chars = text.chars().flat_map(|c| c.to_lowercase());
+
+        let mut next_p = pattern_chars.next();
+        while let Some(p) = next_p {
+            loop {
+                match text_chars.next() {
+                    Some(t) if t == p => break,
+                    Some(_) => continue,
+                    None => return false,
+                }
+            }
+            next_p = pattern_chars.next();
+        }
+        true
+    }
+
+    /// Compute a simple fuzzy match score (higher = better).
+    /// Returns `None` if there is no match.
+    pub fn fuzzy_score(pattern: &str, text: &str) -> Option<u32> {
+        if !Self::fuzzy_matches(pattern, text) {
+            return None;
+        }
+        let pl = pattern.len() as u32;
+        let tl = text.len() as u32;
+        // Bonus for exact prefix match.
+        let prefix_bonus = if text
+            .to_lowercase()
+            .starts_with(&pattern.to_lowercase())
+        {
+            50
+        } else {
+            0
+        };
+        // Shorter targets are better matches for the same pattern.
+        let length_score = if tl > 0 { (pl * 100) / tl } else { 100 };
+        Some(length_score + prefix_bonus)
+    }
+
+    /// Search snippets by fuzzy-matching the query against name, prefixes, and
+    /// description. Results are sorted by score descending.
+    pub fn search(snippets: &[Snippet], query: &str) -> Vec<SnippetSearchResult> {
+        let mut results: Vec<SnippetSearchResult> = snippets
+            .iter()
+            .filter_map(|s| {
+                // Best score across name, prefix entries and description.
+                let mut best: Option<u32> = Self::fuzzy_score(query, &s.name);
+
+                for p in &s.prefix {
+                    if let Some(sc) = Self::fuzzy_score(query, p) {
+                        best = Some(best.map_or(sc, |b| b.max(sc)));
+                    }
+                }
+                if let Some(ref desc) = s.description {
+                    if let Some(sc) = Self::fuzzy_score(query, desc) {
+                        best = Some(best.map_or(sc, |b| b.max(sc)));
+                    }
+                }
+
+                best.map(|score| SnippetSearchResult {
+                    snippet: s.clone(),
+                    score,
+                })
+            })
+            .collect();
+
+        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results
+    }
+}
+
+/// A search result with its match score.
+#[derive(Debug, Clone)]
+pub struct SnippetSearchResult {
+    pub snippet: Snippet,
+    pub score: u32,
+}
+
+// ---------------------------------------------------------------------------
+// Snippet usage tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks how often and when each snippet is used.
+pub struct SnippetUsageTracker {
+    counts: HashMap<String, u64>,
+}
+
+impl SnippetUsageTracker {
+    pub fn new() -> Self {
+        Self {
+            counts: HashMap::new(),
+        }
+    }
+
+    /// Record one use of the snippet with the given name.
+    pub fn record_use(&mut self, name: &str) {
+        *self.counts.entry(name.to_string()).or_insert(0) += 1;
+    }
+
+    /// Get the usage count for a snippet.
+    pub fn usage_count(&self, name: &str) -> u64 {
+        self.counts.get(name).copied().unwrap_or(0)
+    }
+
+    /// Return snippet names sorted by usage count descending.
+    pub fn most_used(&self) -> Vec<(&str, u64)> {
+        let mut entries: Vec<(&str, u64)> = self
+            .counts
+            .iter()
+            .map(|(k, &v)| (k.as_str(), v))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries
+    }
+
+    /// Return the total number of tracked snippets.
+    pub fn tracked_count(&self) -> usize {
+        self.counts.len()
+    }
+
+    /// Reset all usage data.
+    pub fn reset(&mut self) {
+        self.counts.clear();
+    }
+}
+
+impl Default for SnippetUsageTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet conflict resolver
+// ---------------------------------------------------------------------------
+
+/// Describes a prefix collision between two snippets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SnippetConflict {
+    pub prefix: String,
+    pub snippet_a: String,
+    pub snippet_b: String,
+}
+
+/// Detects and resolves prefix conflicts among snippets.
+pub struct SnippetConflictResolver;
+
+impl SnippetConflictResolver {
+    /// Find all prefix collisions in a set of snippets.
+    pub fn detect_conflicts(snippets: &[Snippet]) -> Vec<SnippetConflict> {
+        let mut prefix_map: HashMap<&str, Vec<&str>> = HashMap::new();
+        for s in snippets {
+            for p in &s.prefix {
+                prefix_map.entry(p.as_str()).or_default().push(&s.name);
+            }
+        }
+
+        let mut conflicts = Vec::new();
+        for (prefix, names) in &prefix_map {
+            if names.len() > 1 {
+                for i in 0..names.len() {
+                    for j in (i + 1)..names.len() {
+                        conflicts.push(SnippetConflict {
+                            prefix: prefix.to_string(),
+                            snippet_a: names[i].to_string(),
+                            snippet_b: names[j].to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        conflicts.sort_by(|a, b| a.prefix.cmp(&b.prefix));
+        conflicts
+    }
+
+    /// Returns `true` if the snippet set has any prefix collisions.
+    pub fn has_conflicts(snippets: &[Snippet]) -> bool {
+        !Self::detect_conflicts(snippets).is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet body indentation helper
+// ---------------------------------------------------------------------------
+
+/// Re-indent a multi-line snippet body to match a given base indentation.
+pub fn reindent_snippet_body(body: &[String], base_indent: &str) -> Vec<String> {
+    body.iter()
+        .enumerate()
+        .map(|(i, line)| {
+            if i == 0 {
+                // First line keeps its content as-is (cursor is already at position).
+                line.clone()
+            } else if line.is_empty() {
+                String::new()
+            } else {
+                format!("{}{}", base_indent, line)
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1256,5 +1469,105 @@ mod tests {
         let tokens: Vec<&str> = SnippetVariable::all().iter().map(|v| v.token()).collect();
         let unique: std::collections::HashSet<&str> = tokens.iter().copied().collect();
         assert_eq!(tokens.len(), unique.len());
+    }
+
+    // -----------------------------------------------------------------------
+    // Fuzzy search tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fuzzy_matches_basic() {
+        assert!(SnippetSearch::fuzzy_matches("fl", "for-loop"));
+        assert!(SnippetSearch::fuzzy_matches("FL", "for-loop")); // case-insensitive
+        assert!(!SnippetSearch::fuzzy_matches("xyz", "for-loop"));
+        assert!(SnippetSearch::fuzzy_matches("", "anything")); // empty pattern matches all
+    }
+
+    #[test]
+    fn fuzzy_score_prefix_bonus() {
+        let exact = SnippetSearch::fuzzy_score("for", "for-loop");
+        let mid = SnippetSearch::fuzzy_score("for", "a-for-loop");
+        assert!(exact.is_some());
+        assert!(mid.is_some());
+        assert!(exact.unwrap() > mid.unwrap());
+    }
+
+    #[test]
+    fn fuzzy_search_ranks_results() {
+        let snippets = vec![
+            sample_snippet("for-loop", "for", Some("rust")),
+            sample_snippet("fn-def", "fn", Some("rust")),
+            sample_snippet("format-string", "fmt", None),
+        ];
+        let results = SnippetSearch::search(&snippets, "fn");
+        assert!(!results.is_empty());
+        // "fn-def" should be the top result (exact prefix match).
+        assert_eq!(results[0].snippet.name, "fn-def");
+    }
+
+    // -----------------------------------------------------------------------
+    // Usage tracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn usage_tracker_records_and_ranks() {
+        let mut tracker = SnippetUsageTracker::new();
+        tracker.record_use("for-loop");
+        tracker.record_use("fn-def");
+        tracker.record_use("for-loop");
+        tracker.record_use("for-loop");
+
+        assert_eq!(tracker.usage_count("for-loop"), 3);
+        assert_eq!(tracker.usage_count("fn-def"), 1);
+        assert_eq!(tracker.usage_count("unknown"), 0);
+        assert_eq!(tracker.tracked_count(), 2);
+
+        let ranked = tracker.most_used();
+        assert_eq!(ranked[0].0, "for-loop");
+        assert_eq!(ranked[0].1, 3);
+
+        tracker.reset();
+        assert_eq!(tracker.tracked_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Conflict resolver tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn conflict_resolver_detects_prefix_collision() {
+        let snippets = vec![
+            sample_snippet("for-loop-a", "for", Some("rust")),
+            sample_snippet("for-loop-b", "for", Some("rust")),
+            sample_snippet("fn-def", "fn", Some("rust")),
+        ];
+        let conflicts = SnippetConflictResolver::detect_conflicts(&snippets);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].prefix, "for");
+        assert!(SnippetConflictResolver::has_conflicts(&snippets));
+
+        // No conflicts when prefixes are unique.
+        let unique = vec![
+            sample_snippet("a", "alpha", None),
+            sample_snippet("b", "beta", None),
+        ];
+        assert!(!SnippetConflictResolver::has_conflicts(&unique));
+    }
+
+    // -----------------------------------------------------------------------
+    // Reindent tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn reindent_snippet_body_applies_base_indent() {
+        let body = vec![
+            "if cond {".into(),
+            "    do_thing();".into(),
+            "}".into(),
+        ];
+        let result = reindent_snippet_body(&body, "        ");
+        assert_eq!(result[0], "if cond {");
+        assert_eq!(result[1], "            do_thing();");
+        assert_eq!(result[2], "        }");
     }
 }

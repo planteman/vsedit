@@ -650,6 +650,219 @@ impl Default for WbTunnelValidator {
     }
 }
 
+/// Result of a single health check probe against a tunnel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded(String),
+    Unhealthy(String),
+}
+
+/// Tracks health check state for a tunnel.
+#[derive(Debug, Clone)]
+pub struct TunnelHealthCheck {
+    pub tunnel_id: u64,
+    pub status: HealthStatus,
+    pub consecutive_failures: u32,
+    pub total_checks: u64,
+    pub total_failures: u64,
+    pub last_check_timestamp: u64,
+    failure_threshold: u32,
+}
+
+impl TunnelHealthCheck {
+    pub fn new(tunnel_id: u64, failure_threshold: u32) -> Self {
+        Self {
+            tunnel_id,
+            status: HealthStatus::Healthy,
+            consecutive_failures: 0,
+            total_checks: 0,
+            total_failures: 0,
+            last_check_timestamp: 0,
+            failure_threshold,
+        }
+    }
+
+    /// Record a successful probe at the given timestamp.
+    pub fn record_success(&mut self, timestamp: u64) {
+        self.total_checks += 1;
+        self.consecutive_failures = 0;
+        self.last_check_timestamp = timestamp;
+        self.status = HealthStatus::Healthy;
+    }
+
+    /// Record a failed probe. Transitions to Degraded or Unhealthy based on threshold.
+    pub fn record_failure(&mut self, timestamp: u64, reason: &str) {
+        self.total_checks += 1;
+        self.total_failures += 1;
+        self.consecutive_failures += 1;
+        self.last_check_timestamp = timestamp;
+        if self.consecutive_failures >= self.failure_threshold {
+            self.status = HealthStatus::Unhealthy(reason.to_string());
+        } else {
+            self.status = HealthStatus::Degraded(reason.to_string());
+        }
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        self.status == HealthStatus::Healthy
+    }
+
+    /// Fraction of checks that succeeded, in [0.0, 1.0].
+    pub fn success_rate(&self) -> f64 {
+        if self.total_checks == 0 {
+            return 1.0;
+        }
+        (self.total_checks - self.total_failures) as f64 / self.total_checks as f64
+    }
+}
+
+/// Bandwidth and latency metrics for a single tunnel.
+#[derive(Debug, Clone)]
+pub struct TunnelMetrics {
+    pub tunnel_id: u64,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    latency_samples: Vec<u64>,
+}
+
+impl TunnelMetrics {
+    pub fn new(tunnel_id: u64) -> Self {
+        Self {
+            tunnel_id,
+            bytes_sent: 0,
+            bytes_received: 0,
+            latency_samples: Vec::new(),
+        }
+    }
+
+    pub fn record_sent(&mut self, bytes: u64) {
+        self.bytes_sent += bytes;
+    }
+
+    pub fn record_received(&mut self, bytes: u64) {
+        self.bytes_received += bytes;
+    }
+
+    pub fn total_bandwidth(&self) -> u64 {
+        self.bytes_sent + self.bytes_received
+    }
+
+    /// Record a latency measurement in microseconds.
+    pub fn record_latency(&mut self, latency_us: u64) {
+        self.latency_samples.push(latency_us);
+    }
+
+    /// Average latency across all samples, or `None` if no samples.
+    pub fn average_latency_us(&self) -> Option<u64> {
+        if self.latency_samples.is_empty() {
+            return None;
+        }
+        Some(self.latency_samples.iter().sum::<u64>() / self.latency_samples.len() as u64)
+    }
+
+    /// Maximum latency recorded, or `None` if no samples.
+    pub fn max_latency_us(&self) -> Option<u64> {
+        self.latency_samples.iter().copied().max()
+    }
+
+    /// Minimum latency recorded, or `None` if no samples.
+    pub fn min_latency_us(&self) -> Option<u64> {
+        self.latency_samples.iter().copied().min()
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.latency_samples.len()
+    }
+}
+
+/// Policy governing automatic reconnection of failed tunnels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelReconnectPolicy {
+    pub max_retries: u32,
+    pub base_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub use_exponential_backoff: bool,
+}
+
+impl TunnelReconnectPolicy {
+    pub fn new(max_retries: u32, base_delay_ms: u64) -> Self {
+        Self {
+            max_retries,
+            base_delay_ms,
+            max_delay_ms: base_delay_ms * 32,
+            use_exponential_backoff: true,
+        }
+    }
+
+    /// Compute the delay before the n-th retry attempt (0-indexed).
+    pub fn delay_for_attempt(&self, attempt: u32) -> u64 {
+        if !self.use_exponential_backoff {
+            return self.base_delay_ms.min(self.max_delay_ms);
+        }
+        let factor = 1u64.checked_shl(attempt).unwrap_or(u64::MAX);
+        let delay = self.base_delay_ms.saturating_mul(factor);
+        delay.min(self.max_delay_ms)
+    }
+
+    /// Returns `true` if the attempt number is still within the retry budget.
+    pub fn should_retry(&self, attempt: u32) -> bool {
+        attempt < self.max_retries
+    }
+}
+
+impl Default for TunnelReconnectPolicy {
+    fn default() -> Self {
+        Self::new(5, 1000)
+    }
+}
+
+/// Diagnostic snapshot for a tunnel, combining health and metrics.
+#[derive(Debug, Clone)]
+pub struct TunnelDiagnostics {
+    pub tunnel_id: u64,
+    pub state: TunnelState,
+    pub health: HealthStatus,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub avg_latency_us: Option<u64>,
+    pub consecutive_failures: u32,
+}
+
+impl fmt::Display for TunnelDiagnostics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let lat = match self.avg_latency_us {
+            Some(us) => format!("{us}µs"),
+            None => "n/a".to_string(),
+        };
+        write!(
+            f,
+            "tunnel={} state={:?} health={:?} sent={} recv={} latency={}",
+            self.tunnel_id, self.state, self.health, self.bytes_sent, self.bytes_received, lat
+        )
+    }
+}
+
+impl TunnelDiagnostics {
+    /// Build a diagnostics snapshot from health check and metrics data.
+    pub fn from_parts(
+        tunnel_id: u64,
+        state: TunnelState,
+        health: &TunnelHealthCheck,
+        metrics: &TunnelMetrics,
+    ) -> Self {
+        Self {
+            tunnel_id,
+            state,
+            health: health.status.clone(),
+            bytes_sent: metrics.bytes_sent,
+            bytes_received: metrics.bytes_received,
+            avg_latency_us: metrics.average_latency_us(),
+            consecutive_failures: health.consecutive_failures,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1256,5 +1469,94 @@ mod tests {
         let s = tunnel_status_summary(&svc);
         assert!(s.contains("1 tunnel(s) active"));
         assert!(s.contains("KB"));
+    }
+
+    #[test]
+    fn health_check_transitions() {
+        let mut hc = TunnelHealthCheck::new(1, 3);
+        assert!(hc.is_healthy());
+
+        hc.record_failure(1, "timeout");
+        assert_eq!(hc.status, HealthStatus::Degraded("timeout".into()));
+        assert_eq!(hc.consecutive_failures, 1);
+
+        hc.record_failure(2, "timeout");
+        hc.record_failure(3, "connection refused");
+        assert_eq!(hc.status, HealthStatus::Unhealthy("connection refused".into()));
+        assert_eq!(hc.consecutive_failures, 3);
+
+        hc.record_success(4);
+        assert!(hc.is_healthy());
+        assert_eq!(hc.consecutive_failures, 0);
+        assert_eq!(hc.total_failures, 3);
+        assert_eq!(hc.total_checks, 4);
+    }
+
+    #[test]
+    fn health_check_success_rate() {
+        let mut hc = TunnelHealthCheck::new(1, 5);
+        assert!((hc.success_rate() - 1.0).abs() < f64::EPSILON);
+
+        hc.record_success(1);
+        hc.record_success(2);
+        hc.record_failure(3, "err");
+        hc.record_success(4);
+        // 3 successes out of 4
+        assert!((hc.success_rate() - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn tunnel_metrics_bandwidth_and_latency() {
+        let mut m = TunnelMetrics::new(42);
+        assert_eq!(m.total_bandwidth(), 0);
+        assert_eq!(m.average_latency_us(), None);
+
+        m.record_sent(1000);
+        m.record_received(500);
+        assert_eq!(m.total_bandwidth(), 1500);
+
+        m.record_latency(100);
+        m.record_latency(200);
+        m.record_latency(300);
+        assert_eq!(m.average_latency_us(), Some(200));
+        assert_eq!(m.min_latency_us(), Some(100));
+        assert_eq!(m.max_latency_us(), Some(300));
+        assert_eq!(m.sample_count(), 3);
+    }
+
+    #[test]
+    fn reconnect_policy_exponential_backoff() {
+        let policy = TunnelReconnectPolicy::new(4, 100);
+        assert!(policy.should_retry(0));
+        assert!(policy.should_retry(3));
+        assert!(!policy.should_retry(4));
+
+        assert_eq!(policy.delay_for_attempt(0), 100);   // 100 * 2^0
+        assert_eq!(policy.delay_for_attempt(1), 200);   // 100 * 2^1
+        assert_eq!(policy.delay_for_attempt(2), 400);   // 100 * 2^2
+        // capped at max_delay_ms = 100 * 32 = 3200
+        assert_eq!(policy.delay_for_attempt(10), 3200);
+    }
+
+    #[test]
+    fn tunnel_diagnostics_from_parts() {
+        let mut hc = TunnelHealthCheck::new(7, 3);
+        hc.record_failure(1, "slow");
+        let mut m = TunnelMetrics::new(7);
+        m.record_sent(512);
+        m.record_received(256);
+        m.record_latency(150);
+
+        let diag = TunnelDiagnostics::from_parts(7, TunnelState::Connected, &hc, &m);
+        assert_eq!(diag.tunnel_id, 7);
+        assert_eq!(diag.health, HealthStatus::Degraded("slow".into()));
+        assert_eq!(diag.bytes_sent, 512);
+        assert_eq!(diag.bytes_received, 256);
+        assert_eq!(diag.avg_latency_us, Some(150));
+        assert_eq!(diag.consecutive_failures, 1);
+
+        let display = format!("{diag}");
+        assert!(display.contains("tunnel=7"));
+        assert!(display.contains("150µs"));
     }
 }

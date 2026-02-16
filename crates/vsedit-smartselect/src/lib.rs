@@ -717,6 +717,243 @@ pub fn syntax_aware_selection(text: &str, line: u32, col: u32) -> SelectionRange
     build_selection_chain(tuples)
 }
 
+// ── SelectionHistory ──
+
+/// A complete history tracker that supports navigating through past selections
+/// with undo and redo semantics.
+#[derive(Debug, Clone)]
+pub struct SelectionHistory {
+    entries: Vec<SelectionHistoryEntry>,
+    cursor: usize,
+    max_size: usize,
+}
+
+impl SelectionHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: 0,
+            max_size,
+        }
+    }
+
+    /// Record a selection change.  If the cursor is not at the end,
+    /// redo history beyond the cursor is discarded.
+    pub fn record(&mut self, range: SelectionRange, expanded: bool) {
+        self.entries.truncate(self.cursor);
+        self.entries.push(SelectionHistoryEntry { range, expanded });
+        if self.entries.len() > self.max_size {
+            let remove = self.entries.len() - self.max_size;
+            self.entries.drain(0..remove);
+        }
+        self.cursor = self.entries.len();
+    }
+
+    /// Navigate to the previous selection.
+    pub fn undo(&mut self) -> Option<&SelectionHistoryEntry> {
+        if self.cursor == 0 {
+            return None;
+        }
+        self.cursor -= 1;
+        self.entries.get(self.cursor)
+    }
+
+    /// Navigate to the next selection.
+    pub fn redo(&mut self) -> Option<&SelectionHistoryEntry> {
+        if self.cursor >= self.entries.len() {
+            return None;
+        }
+        let entry = self.entries.get(self.cursor);
+        self.cursor += 1;
+        entry
+    }
+
+    /// Return the current selection (the one at the cursor position).
+    pub fn current(&self) -> Option<&SelectionHistoryEntry> {
+        if self.cursor == 0 {
+            return None;
+        }
+        self.entries.get(self.cursor - 1)
+    }
+
+    /// Whether undo is available.
+    pub fn can_undo(&self) -> bool {
+        self.cursor > 0
+    }
+
+    /// Whether redo is available.
+    pub fn can_redo(&self) -> bool {
+        self.cursor < self.entries.len()
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return all entries.
+    pub fn entries(&self) -> &[SelectionHistoryEntry] {
+        &self.entries
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+}
+
+// ── Selection expansion heuristics ──
+
+/// Levels of selection expansion from innermost to outermost.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExpansionLevel {
+    Word,
+    Line,
+    Block,
+    Function,
+    File,
+}
+
+impl fmt::Display for ExpansionLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Word => write!(f, "Word"),
+            Self::Line => write!(f, "Line"),
+            Self::Block => write!(f, "Block"),
+            Self::Function => write!(f, "Function"),
+            Self::File => write!(f, "File"),
+        }
+    }
+}
+
+/// Expand a selection to the next level using heuristics.
+///
+/// Returns `(new_range, level)` or `None` if the selection already covers
+/// the entire file.
+pub fn expand_to_next_level(
+    text: &str,
+    current: &SelectionRange,
+) -> Option<(SelectionRange, ExpansionLevel)> {
+    let doc = find_document_range(text);
+
+    // If current covers the whole document, no further expansion
+    if current.start_line == doc.start_line
+        && current.start_col == doc.start_col
+        && current.end_line == doc.end_line
+        && current.end_col == doc.end_col
+    {
+        return None;
+    }
+
+    // If single-line and small, expand to full line
+    if current.is_single_line() {
+        let line_range = find_line_range(text, current.start_line);
+        if line_range != *current {
+            return Some((line_range, ExpansionLevel::Line));
+        }
+    }
+
+    // Try expanding to a block (paragraph)
+    if let Some(block) = find_block_range(text, current.start_line) {
+        if selection_contains(&block, current) && block != *current {
+            return Some((block, ExpansionLevel::Block));
+        }
+    }
+
+    // Fall back to entire document
+    Some((doc, ExpansionLevel::File))
+}
+
+/// Determine the current expansion level of a selection.
+pub fn detect_expansion_level(
+    text: &str,
+    range: &SelectionRange,
+) -> ExpansionLevel {
+    let doc = find_document_range(text);
+    if range.start_line == doc.start_line
+        && range.start_col == doc.start_col
+        && range.end_line == doc.end_line
+        && range.end_col == doc.end_col
+    {
+        return ExpansionLevel::File;
+    }
+
+    if let Some(block) = find_block_range(text, range.start_line) {
+        if range.start_line == block.start_line
+            && range.end_line == block.end_line
+        {
+            return ExpansionLevel::Block;
+        }
+    }
+
+    let line_range = find_line_range(text, range.start_line);
+    if range.start_line == range.end_line
+        && range.start_col == line_range.start_col
+        && range.end_col == line_range.end_col
+    {
+        return ExpansionLevel::Line;
+    }
+
+    ExpansionLevel::Word
+}
+
+// ── Selection comparison and diffing ──
+
+/// The result of comparing two selections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectionDiff {
+    /// Lines added (in new but not old).
+    pub lines_added: i64,
+    /// Columns shifted for start position.
+    pub start_col_delta: i64,
+    /// Columns shifted for end position.
+    pub end_col_delta: i64,
+    /// Whether the selection grew.
+    pub grew: bool,
+    /// Whether the selection moved (different start position).
+    pub moved: bool,
+}
+
+/// Compare two selections and describe the difference.
+pub fn selection_diff(old: &SelectionRange, new: &SelectionRange) -> SelectionDiff {
+    let lines_added = (new.end_line as i64 - new.start_line as i64)
+        - (old.end_line as i64 - old.start_line as i64);
+    let start_col_delta = new.start_col as i64 - old.start_col as i64;
+    let end_col_delta = new.end_col as i64 - old.end_col as i64;
+
+    let old_span = (old.end_line as i64 - old.start_line as i64) * 1000
+        + (old.end_col as i64 - old.start_col as i64);
+    let new_span = (new.end_line as i64 - new.start_line as i64) * 1000
+        + (new.end_col as i64 - new.start_col as i64);
+    let grew = new_span > old_span;
+
+    let moved = old.start_line != new.start_line || old.start_col != new.start_col;
+
+    SelectionDiff {
+        lines_added,
+        start_col_delta,
+        end_col_delta,
+        grew,
+        moved,
+    }
+}
+
+/// Check whether two selections are identical in position (ignoring parent
+/// chains).
+pub fn selections_equal_position(a: &SelectionRange, b: &SelectionRange) -> bool {
+    a.start_line == b.start_line
+        && a.start_col == b.start_col
+        && a.end_line == b.end_line
+        && a.end_col == b.end_col
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1297,5 +1534,92 @@ mod tests {
                 a,
             );
         }
+    }
+
+    // ── SelectionHistory tests ──
+
+    #[test]
+    fn selection_history_undo_redo() {
+        let mut hist = SelectionHistory::new(100);
+        let r1 = SelectionRange::new(1, 1, 1, 5);
+        let r2 = SelectionRange::new(1, 1, 1, 10);
+        hist.record(r1.clone(), true);
+        hist.record(r2.clone(), true);
+        assert_eq!(hist.len(), 2);
+        assert!(hist.can_undo());
+
+        let undone = hist.undo().unwrap();
+        assert_eq!(undone.range, r2);
+        assert!(hist.can_redo());
+
+        let redone = hist.redo().unwrap();
+        assert_eq!(redone.range, r2);
+    }
+
+    #[test]
+    fn selection_history_record_clears_redo() {
+        let mut hist = SelectionHistory::new(100);
+        hist.record(SelectionRange::new(1, 1, 1, 5), true);
+        hist.record(SelectionRange::new(1, 1, 1, 10), true);
+        hist.undo();
+        hist.record(SelectionRange::new(2, 1, 2, 5), false);
+        assert!(!hist.can_redo());
+        assert_eq!(hist.len(), 2);
+    }
+
+    // ── Expansion heuristics tests ──
+
+    #[test]
+    fn expand_to_next_level_from_word() {
+        let text = "fn main() {\n    hello world\n}";
+        let word = SelectionRange::new(2, 5, 2, 10);
+        let result = expand_to_next_level(text, &word);
+        assert!(result.is_some());
+        let (expanded, _level) = result.unwrap();
+        // The expanded range should be different from the original
+        assert!(expanded != word);
+    }
+
+    #[test]
+    fn expand_to_next_level_already_file() {
+        let text = "hello";
+        let doc = find_document_range(text);
+        let result = expand_to_next_level(text, &doc);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn detect_expansion_level_word() {
+        let text = "fn main() {\n    hello world\n}";
+        let word = SelectionRange::new(2, 5, 2, 10);
+        let level = detect_expansion_level(text, &word);
+        assert_eq!(level, ExpansionLevel::Word);
+    }
+
+    // ── Selection diff tests ──
+
+    #[test]
+    fn selection_diff_grew() {
+        let old = SelectionRange::new(1, 1, 1, 5);
+        let new = SelectionRange::new(1, 1, 1, 10);
+        let diff = selection_diff(&old, &new);
+        assert!(diff.grew);
+        assert!(!diff.moved);
+        assert_eq!(diff.end_col_delta, 5);
+    }
+
+    #[test]
+    fn selection_diff_moved() {
+        let old = SelectionRange::new(1, 1, 1, 5);
+        let new = SelectionRange::new(2, 1, 2, 5);
+        let diff = selection_diff(&old, &new);
+        assert!(diff.moved);
+    }
+
+    #[test]
+    fn selections_equal_position_test() {
+        let a = SelectionRange::new(1, 1, 2, 5);
+        let b = SelectionRange::new(1, 1, 2, 5).with_parent(SelectionRange::new(1, 1, 3, 1));
+        assert!(selections_equal_position(&a, &b));
     }
 }

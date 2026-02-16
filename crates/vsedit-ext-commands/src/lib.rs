@@ -738,6 +738,226 @@ impl Default for CommandRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandThrottler
+// ---------------------------------------------------------------------------
+
+/// Throttles command execution by tracking invocation timestamps per command.
+#[derive(Debug, Clone)]
+pub struct CommandThrottler {
+    /// Minimum interval in milliseconds between executions of the same command.
+    interval_ms: u64,
+    /// Last execution timestamp (ms) per command.
+    last_execution: HashMap<String, u64>,
+}
+
+impl CommandThrottler {
+    /// Create a new throttler with the given minimum interval.
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            interval_ms,
+            last_execution: HashMap::new(),
+        }
+    }
+
+    /// Check if a command may execute at the given timestamp.
+    pub fn may_execute(&self, command_id: &str, now_ms: u64) -> bool {
+        match self.last_execution.get(command_id) {
+            Some(&last) => now_ms.saturating_sub(last) >= self.interval_ms,
+            None => true,
+        }
+    }
+
+    /// Record that a command executed at the given timestamp.
+    pub fn record_execution(&mut self, command_id: &str, now_ms: u64) {
+        self.last_execution.insert(command_id.to_string(), now_ms);
+    }
+
+    /// Try to execute: returns `true` if allowed (and records it), `false` if throttled.
+    pub fn try_execute(&mut self, command_id: &str, now_ms: u64) -> bool {
+        if self.may_execute(command_id, now_ms) {
+            self.record_execution(command_id, now_ms);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remaining cooldown in ms for a command, or 0 if ready.
+    pub fn remaining_ms(&self, command_id: &str, now_ms: u64) -> u64 {
+        match self.last_execution.get(command_id) {
+            Some(&last) => {
+                let elapsed = now_ms.saturating_sub(last);
+                self.interval_ms.saturating_sub(elapsed)
+            }
+            None => 0,
+        }
+    }
+
+    /// Reset throttle state for a specific command.
+    pub fn reset(&mut self, command_id: &str) {
+        self.last_execution.remove(command_id);
+    }
+
+    /// Reset all throttle state.
+    pub fn reset_all(&mut self) {
+        self.last_execution.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandPermission
+// ---------------------------------------------------------------------------
+
+/// Permission level for an extension command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PermissionLevel {
+    /// Command is denied.
+    Denied,
+    /// Requires user confirmation before execution.
+    Prompt,
+    /// Allowed without confirmation.
+    Allowed,
+}
+
+impl fmt::Display for PermissionLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PermissionLevel::Denied => write!(f, "denied"),
+            PermissionLevel::Prompt => write!(f, "prompt"),
+            PermissionLevel::Allowed => write!(f, "allowed"),
+        }
+    }
+}
+
+/// Permission model for extension commands.
+#[derive(Debug, Clone)]
+pub struct CommandPermission {
+    default_level: PermissionLevel,
+    overrides: HashMap<String, PermissionLevel>,
+}
+
+impl CommandPermission {
+    pub fn new(default_level: PermissionLevel) -> Self {
+        Self {
+            default_level,
+            overrides: HashMap::new(),
+        }
+    }
+
+    /// Override the permission for a specific command.
+    pub fn set_override(&mut self, command_id: &str, level: PermissionLevel) {
+        self.overrides.insert(command_id.to_string(), level);
+    }
+
+    /// Get the effective permission level for a command.
+    pub fn level_for(&self, command_id: &str) -> PermissionLevel {
+        self.overrides
+            .get(command_id)
+            .copied()
+            .unwrap_or(self.default_level)
+    }
+
+    /// Returns `true` if the command is allowed (without prompt).
+    pub fn is_allowed(&self, command_id: &str) -> bool {
+        self.level_for(command_id) == PermissionLevel::Allowed
+    }
+
+    /// Returns `true` if the command is denied.
+    pub fn is_denied(&self, command_id: &str) -> bool {
+        self.level_for(command_id) == PermissionLevel::Denied
+    }
+
+    /// Remove any override for a command, reverting to default.
+    pub fn remove_override(&mut self, command_id: &str) {
+        self.overrides.remove(command_id);
+    }
+
+    /// Count how many overrides are set.
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandBatchExecutor
+// ---------------------------------------------------------------------------
+
+/// Result of a single command in a batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchCommandResult {
+    pub command_id: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+/// Executes multiple commands in sequence, collecting results.
+#[derive(Debug, Clone)]
+pub struct CommandBatchExecutor {
+    results: Vec<BatchCommandResult>,
+}
+
+impl CommandBatchExecutor {
+    pub fn new() -> Self {
+        Self {
+            results: Vec::new(),
+        }
+    }
+
+    /// Simulate executing a batch of commands against a bridge.
+    /// Returns results for each command.
+    pub fn execute_batch(
+        &mut self,
+        bridge: &mut CommandBridge,
+        command_ids: &[&str],
+    ) -> &[BatchCommandResult] {
+        let start = self.results.len();
+        for &id in command_ids {
+            let msg = CommandMessage::ExecuteCommand {
+                command_id: id.to_string(),
+                args: vec![],
+            };
+            let resp = bridge.handle(msg);
+            let (success, error) = match resp {
+                CommandResponse::ExecuteResult { .. } => (true, None),
+                _ => (false, Some("unexpected response".to_string())),
+            };
+            self.results.push(BatchCommandResult {
+                command_id: id.to_string(),
+                success,
+                error,
+            });
+        }
+        &self.results[start..]
+    }
+
+    /// Return all collected results.
+    pub fn results(&self) -> &[BatchCommandResult] {
+        &self.results
+    }
+
+    /// Count of successful executions.
+    pub fn success_count(&self) -> usize {
+        self.results.iter().filter(|r| r.success).count()
+    }
+
+    /// Count of failed executions.
+    pub fn failure_count(&self) -> usize {
+        self.results.iter().filter(|r| !r.success).count()
+    }
+
+    /// Clear all results.
+    pub fn clear(&mut self) {
+        self.results.clear();
+    }
+}
+
+impl Default for CommandBatchExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1334,5 +1554,91 @@ mod tests {
         assert_eq!(reg.description_count(), 3);
         assert!(reg.get_description("b").is_some());
         assert!(reg.get_description("missing").is_none());
+    }
+
+    // -- CommandThrottler --
+
+    #[test]
+    fn throttler_allows_first_call() {
+        let mut throttler = CommandThrottler::new(100);
+        assert!(throttler.try_execute("cmd.save", 0));
+    }
+
+    #[test]
+    fn throttler_blocks_rapid_calls() {
+        let mut throttler = CommandThrottler::new(100);
+        assert!(throttler.try_execute("cmd.save", 0));
+        assert!(!throttler.try_execute("cmd.save", 50));
+        assert!(throttler.try_execute("cmd.save", 100));
+    }
+
+    #[test]
+    fn throttler_remaining_ms() {
+        let mut throttler = CommandThrottler::new(100);
+        throttler.record_execution("cmd.save", 200);
+        assert_eq!(throttler.remaining_ms("cmd.save", 250), 50);
+        assert_eq!(throttler.remaining_ms("cmd.save", 300), 0);
+        assert_eq!(throttler.remaining_ms("cmd.unknown", 0), 0);
+    }
+
+    #[test]
+    fn throttler_reset() {
+        let mut throttler = CommandThrottler::new(100);
+        throttler.record_execution("cmd.save", 0);
+        assert!(!throttler.may_execute("cmd.save", 50));
+        throttler.reset("cmd.save");
+        assert!(throttler.may_execute("cmd.save", 50));
+    }
+
+    // -- CommandPermission --
+
+    #[test]
+    fn permission_default_and_override() {
+        let mut perm = CommandPermission::new(PermissionLevel::Prompt);
+        assert_eq!(perm.level_for("cmd.open"), PermissionLevel::Prompt);
+        assert!(!perm.is_allowed("cmd.open"));
+
+        perm.set_override("cmd.open", PermissionLevel::Allowed);
+        assert!(perm.is_allowed("cmd.open"));
+        assert_eq!(perm.override_count(), 1);
+
+        perm.remove_override("cmd.open");
+        assert!(!perm.is_allowed("cmd.open"));
+    }
+
+    #[test]
+    fn permission_denied() {
+        let mut perm = CommandPermission::new(PermissionLevel::Allowed);
+        perm.set_override("cmd.dangerous", PermissionLevel::Denied);
+        assert!(perm.is_denied("cmd.dangerous"));
+        assert!(!perm.is_denied("cmd.safe"));
+    }
+
+    #[test]
+    fn permission_level_display() {
+        assert_eq!(format!("{}", PermissionLevel::Denied), "denied");
+        assert_eq!(format!("{}", PermissionLevel::Prompt), "prompt");
+        assert_eq!(format!("{}", PermissionLevel::Allowed), "allowed");
+    }
+
+    // -- CommandBatchExecutor --
+
+    #[test]
+    fn batch_executor_registered_commands() {
+        let mut bridge = make_bridge_with(&["cmd.a", "cmd.b"]);
+        let mut batch = CommandBatchExecutor::new();
+        batch.execute_batch(&mut bridge, &["cmd.a", "cmd.b"]);
+        assert_eq!(batch.success_count(), 2);
+        assert_eq!(batch.failure_count(), 0);
+    }
+
+    #[test]
+    fn batch_executor_clear() {
+        let mut bridge = make_bridge_with(&["cmd.a"]);
+        let mut batch = CommandBatchExecutor::new();
+        batch.execute_batch(&mut bridge, &["cmd.a"]);
+        assert_eq!(batch.results().len(), 1);
+        batch.clear();
+        assert_eq!(batch.results().len(), 0);
     }
 }

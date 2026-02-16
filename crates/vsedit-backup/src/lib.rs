@@ -703,6 +703,248 @@ pub fn simple_hash(data: &[u8]) -> u64 {
     hash
 }
 
+// ---------------------------------------------------------------------------
+// BackupDiff – compare backup content with current content
+// ---------------------------------------------------------------------------
+
+/// Represents a line-level difference between two text snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffLine {
+    /// Line exists only in the old (backup) version.
+    Removed(String),
+    /// Line exists only in the new (current) version.
+    Added(String),
+    /// Line is unchanged between versions.
+    Unchanged(String),
+}
+
+/// Result of diffing a backup against the current file content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackupDiff {
+    pub lines: Vec<DiffLine>,
+}
+
+impl BackupDiff {
+    /// Compute a simple line-level diff between `old` (backup) and `new` (current).
+    ///
+    /// Uses a greedy longest-common-subsequence approach to align matching lines.
+    pub fn compute(old: &str, new: &str) -> Self {
+        let old_lines: Vec<&str> = old.lines().collect();
+        let new_lines: Vec<&str> = new.lines().collect();
+
+        let mut result = Vec::new();
+        let mut oi = 0;
+        let mut ni = 0;
+
+        while oi < old_lines.len() && ni < new_lines.len() {
+            if old_lines[oi] == new_lines[ni] {
+                result.push(DiffLine::Unchanged(old_lines[oi].to_string()));
+                oi += 1;
+                ni += 1;
+            } else {
+                // Look ahead in new for a match to old[oi]
+                let new_match = new_lines[ni..].iter().position(|l| *l == old_lines[oi]);
+                // Look ahead in old for a match to new[ni]
+                let old_match = old_lines[oi..].iter().position(|l| *l == new_lines[ni]);
+
+                match (new_match, old_match) {
+                    (Some(nm), Some(om)) if nm <= om => {
+                        for j in ni..ni + nm {
+                            result.push(DiffLine::Added(new_lines[j].to_string()));
+                        }
+                        ni += nm;
+                    }
+                    (_, Some(om)) => {
+                        for j in oi..oi + om {
+                            result.push(DiffLine::Removed(old_lines[j].to_string()));
+                        }
+                        oi += om;
+                    }
+                    (Some(nm), None) => {
+                        for j in ni..ni + nm {
+                            result.push(DiffLine::Added(new_lines[j].to_string()));
+                        }
+                        ni += nm;
+                    }
+                    (None, None) => {
+                        result.push(DiffLine::Removed(old_lines[oi].to_string()));
+                        result.push(DiffLine::Added(new_lines[ni].to_string()));
+                        oi += 1;
+                        ni += 1;
+                    }
+                }
+            }
+        }
+
+        for line in &old_lines[oi..] {
+            result.push(DiffLine::Removed(line.to_string()));
+        }
+        for line in &new_lines[ni..] {
+            result.push(DiffLine::Added(line.to_string()));
+        }
+
+        Self { lines: result }
+    }
+
+    /// Returns the number of added lines.
+    pub fn additions(&self) -> usize {
+        self.lines.iter().filter(|l| matches!(l, DiffLine::Added(_))).count()
+    }
+
+    /// Returns the number of removed lines.
+    pub fn deletions(&self) -> usize {
+        self.lines.iter().filter(|l| matches!(l, DiffLine::Removed(_))).count()
+    }
+
+    /// Returns `true` if the two snapshots are identical.
+    pub fn is_unchanged(&self) -> bool {
+        self.lines.iter().all(|l| matches!(l, DiffLine::Unchanged(_)))
+    }
+}
+
+impl fmt::Display for BackupDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in &self.lines {
+            match line {
+                DiffLine::Removed(s) => writeln!(f, "- {s}")?,
+                DiffLine::Added(s) => writeln!(f, "+ {s}")?,
+                DiffLine::Unchanged(s) => writeln!(f, "  {s}")?,
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BackupCleaner – bulk cleanup of stale backups
+// ---------------------------------------------------------------------------
+
+/// Bulk cleanup utility that removes backups older than a given age or
+/// exceeding a total size budget.
+pub struct BackupCleaner {
+    /// Maximum age in seconds; backups older than this are considered stale.
+    pub max_age_secs: u64,
+    /// Maximum total size in bytes across all retained backups.
+    pub max_total_bytes: u64,
+}
+
+impl BackupCleaner {
+    pub fn new(max_age_secs: u64, max_total_bytes: u64) -> Self {
+        Self {
+            max_age_secs,
+            max_total_bytes,
+        }
+    }
+
+    /// Remove entries from `entries` that are older than `max_age_secs`
+    /// relative to `now`. Returns the number of entries removed.
+    pub fn remove_stale(&self, entries: &mut Vec<BackupEntry>, now: u64) -> usize {
+        let before = entries.len();
+        entries.retain(|e| now.saturating_sub(e.timestamp) < self.max_age_secs);
+        before - entries.len()
+    }
+
+    /// Remove the oldest entries until the total size is within budget.
+    /// Returns the number of entries removed.
+    pub fn enforce_size_budget(&self, entries: &mut Vec<BackupEntry>) -> usize {
+        entries.sort_by_key(|e| e.timestamp);
+        let mut total: u64 = entries.iter().map(|e| e.size).sum();
+        let mut removed = 0usize;
+        while total > self.max_total_bytes && !entries.is_empty() {
+            total -= entries[0].size;
+            entries.remove(0);
+            removed += 1;
+        }
+        removed
+    }
+
+    /// Convenience method: remove stale entries first, then enforce size budget.
+    /// Returns `(stale_removed, budget_removed)`.
+    pub fn clean(&self, entries: &mut Vec<BackupEntry>, now: u64) -> (usize, usize) {
+        let stale = self.remove_stale(entries, now);
+        let budget = self.enforce_size_budget(entries);
+        (stale, budget)
+    }
+}
+
+impl fmt::Display for BackupCleaner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BackupCleaner(max_age={}s, max_bytes={})",
+            self.max_age_secs, self.max_total_bytes
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BackupVerifier – batch integrity verification
+// ---------------------------------------------------------------------------
+
+/// Batch verifier that checks a set of backup entries against known hashes.
+pub struct BackupVerifier {
+    /// Pairs of (backup_path, expected_hash).
+    expectations: Vec<(String, u64)>,
+}
+
+impl BackupVerifier {
+    pub fn new() -> Self {
+        Self {
+            expectations: Vec::new(),
+        }
+    }
+
+    /// Register an expected hash for a backup path.
+    pub fn expect(&mut self, backup_path: impl Into<String>, hash: u64) {
+        self.expectations.push((backup_path.into(), hash));
+    }
+
+    /// Verify all registered expectations against provided actual hashes.
+    ///
+    /// `actual_hashes` maps backup_path → actual hash. Returns a list of
+    /// `(backup_path, BackupVerifyResult)` for every registered expectation.
+    pub fn verify_all(
+        &self,
+        actual_hashes: &[(String, u64)],
+    ) -> Vec<(String, BackupVerifyResult)> {
+        self.expectations
+            .iter()
+            .map(|(path, expected)| {
+                let actual = actual_hashes
+                    .iter()
+                    .find(|(p, _)| p == path)
+                    .map(|(_, h)| *h);
+                let result = match actual {
+                    Some(h) => backup_verify(*expected, h),
+                    None => BackupVerifyResult::Corrupted {
+                        expected: *expected,
+                        actual: 0,
+                    },
+                };
+                (path.clone(), result)
+            })
+            .collect()
+    }
+
+    /// Returns the number of registered expectations.
+    pub fn expectation_count(&self) -> usize {
+        self.expectations.len()
+    }
+
+    /// Returns `true` if all verifications pass.
+    pub fn all_valid(&self, actual_hashes: &[(String, u64)]) -> bool {
+        self.verify_all(actual_hashes)
+            .iter()
+            .all(|(_, r)| *r == BackupVerifyResult::Valid)
+    }
+}
+
+impl Default for BackupVerifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1283,5 +1525,119 @@ mod tests {
     fn backup_is_ascii_printable() {
         assert!(BackupValidator::is_ascii_printable("Hello World 123"));
         assert!(!BackupValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- BackupDiff tests --
+
+    #[test]
+    fn diff_identical_content() {
+        let text = "line one\nline two\nline three";
+        let diff = BackupDiff::compute(text, text);
+        assert!(diff.is_unchanged());
+        assert_eq!(diff.additions(), 0);
+        assert_eq!(diff.deletions(), 0);
+    }
+
+    #[test]
+    fn diff_detects_additions_and_removals() {
+        let old = "alpha\nbeta\ngamma";
+        let new = "alpha\ndelta\ngamma";
+        let diff = BackupDiff::compute(old, new);
+        assert!(!diff.is_unchanged());
+        assert!(diff.additions() >= 1);
+        assert!(diff.deletions() >= 1);
+        // "alpha" and "gamma" should be unchanged
+        assert!(diff.lines.contains(&DiffLine::Unchanged("alpha".into())));
+        assert!(diff.lines.contains(&DiffLine::Unchanged("gamma".into())));
+    }
+
+    #[test]
+    fn diff_display_format() {
+        let old = "aaa";
+        let new = "bbb";
+        let diff = BackupDiff::compute(old, new);
+        let output = format!("{diff}");
+        assert!(output.contains("- aaa"));
+        assert!(output.contains("+ bbb"));
+    }
+
+    // -- BackupCleaner tests --
+
+    #[test]
+    fn cleaner_removes_stale_entries() {
+        let cleaner = BackupCleaner::new(100, u64::MAX);
+        let mut entries = vec![
+            BackupEntry {
+                original_path: "/a".into(),
+                backup_path: "/b/a".into(),
+                timestamp: 10,
+                size: 5,
+            },
+            BackupEntry {
+                original_path: "/b".into(),
+                backup_path: "/b/b".into(),
+                timestamp: 200,
+                size: 5,
+            },
+        ];
+        let removed = cleaner.remove_stale(&mut entries, 250);
+        assert_eq!(removed, 1);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].timestamp, 200);
+    }
+
+    #[test]
+    fn cleaner_enforces_size_budget() {
+        let cleaner = BackupCleaner::new(u64::MAX, 10);
+        let mut entries = vec![
+            BackupEntry {
+                original_path: "/a".into(),
+                backup_path: "/b/a".into(),
+                timestamp: 1,
+                size: 8,
+            },
+            BackupEntry {
+                original_path: "/b".into(),
+                backup_path: "/b/b".into(),
+                timestamp: 2,
+                size: 8,
+            },
+        ];
+        let removed = cleaner.enforce_size_budget(&mut entries);
+        assert_eq!(removed, 1);
+        assert_eq!(entries.len(), 1);
+        // The newer entry should survive
+        assert_eq!(entries[0].timestamp, 2);
+    }
+
+    // -- BackupVerifier tests --
+
+    #[test]
+    fn verifier_all_valid() {
+        let mut v = BackupVerifier::new();
+        v.expect("/b/a.bak", 100);
+        v.expect("/b/b.bak", 200);
+        let actuals = vec![
+            ("/b/a.bak".to_string(), 100u64),
+            ("/b/b.bak".to_string(), 200u64),
+        ];
+        assert!(v.all_valid(&actuals));
+        assert_eq!(v.expectation_count(), 2);
+    }
+
+    #[test]
+    fn verifier_detects_corruption() {
+        let mut v = BackupVerifier::new();
+        v.expect("/b/a.bak", 100);
+        let actuals = vec![("/b/a.bak".to_string(), 999u64)];
+        assert!(!v.all_valid(&actuals));
+        let results = v.verify_all(&actuals);
+        assert_eq!(
+            results[0].1,
+            BackupVerifyResult::Corrupted {
+                expected: 100,
+                actual: 999
+            }
+        );
     }
 }

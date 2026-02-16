@@ -768,6 +768,185 @@ impl<T> fmt::Debug for EventCounter<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EventBus — named event channels
+// ---------------------------------------------------------------------------
+
+/// A bus that manages named event channels.
+///
+/// Each channel is identified by a string name and broadcasts values of
+/// a single type `T`.
+pub struct EventBus<T: Clone + Send + Sync + 'static> {
+    channels: Mutex<std::collections::HashMap<String, Arc<Emitter<T>>>>,
+}
+
+impl<T: Clone + Send + Sync + 'static> EventBus<T> {
+    /// Create a new empty event bus.
+    pub fn new() -> Self {
+        Self {
+            channels: Mutex::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Get or create a channel by name.
+    fn get_or_create(&self, name: &str) -> Arc<Emitter<T>> {
+        let mut channels = self.channels.lock().unwrap();
+        channels
+            .entry(name.to_string())
+            .or_insert_with(|| Arc::new(Emitter::new()))
+            .clone()
+    }
+
+    /// Subscribe to a named channel.
+    pub fn on<F>(&self, channel: &str, listener: F) -> DisposableHandle
+    where
+        F: Fn(&T) + Send + Sync + 'static,
+    {
+        let emitter = self.get_or_create(channel);
+        emitter.event().on(listener)
+    }
+
+    /// Fire a value on a named channel.
+    pub fn fire(&self, channel: &str, value: &T) {
+        let emitter = self.get_or_create(channel);
+        emitter.fire(value);
+    }
+
+    /// Return the number of registered channels.
+    pub fn channel_count(&self) -> usize {
+        self.channels.lock().unwrap().len()
+    }
+
+    /// Check if a channel exists.
+    pub fn has_channel(&self, name: &str) -> bool {
+        self.channels.lock().unwrap().contains_key(name)
+    }
+
+    /// List all channel names.
+    pub fn channel_names(&self) -> Vec<String> {
+        self.channels.lock().unwrap().keys().cloned().collect()
+    }
+
+    /// Remove a channel (new subscriptions will create a fresh one).
+    pub fn remove_channel(&self, name: &str) {
+        self.channels.lock().unwrap().remove(name);
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> fmt::Debug for EventBus<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventBus")
+            .field("channels", &self.channel_count())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventThrottle — max N fires per time window
+// ---------------------------------------------------------------------------
+
+/// Limits event firing to at most `max_fires` in a rolling time window.
+pub struct EventThrottle<T: Clone + Send + Sync + 'static> {
+    inner: Emitter<T>,
+    max_fires: usize,
+    window_ms: u64,
+    fire_times: Mutex<Vec<u64>>,
+}
+
+impl<T: Clone + Send + Sync + 'static> EventThrottle<T> {
+    /// Create a new throttle allowing `max_fires` in `window_ms` milliseconds.
+    pub fn new(max_fires: usize, window_ms: u64) -> Self {
+        Self {
+            inner: Emitter::new(),
+            max_fires,
+            window_ms,
+            fire_times: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Attempt to fire a value. Returns `true` if the value was emitted,
+    /// `false` if throttled.
+    pub fn fire(&self, value: &T) -> bool {
+        let now = current_time_ms();
+        let mut times = self.fire_times.lock().unwrap();
+        // Remove expired entries
+        let cutoff = now.saturating_sub(self.window_ms);
+        times.retain(|&t| t > cutoff);
+        if times.len() >= self.max_fires {
+            return false;
+        }
+        times.push(now);
+        self.inner.fire(value);
+        true
+    }
+
+    /// Returns the subscribable event.
+    pub fn event(&self) -> Event<T> {
+        self.inner.event()
+    }
+
+    /// Number of fires in the current window.
+    pub fn fires_in_window(&self) -> usize {
+        let now = current_time_ms();
+        let cutoff = now.saturating_sub(self.window_ms);
+        let times = self.fire_times.lock().unwrap();
+        times.iter().filter(|&&t| t > cutoff).count()
+    }
+
+    /// Reset the throttle state.
+    pub fn reset(&self) {
+        self.fire_times.lock().unwrap().clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventPipeline — chain of transforms
+// ---------------------------------------------------------------------------
+
+/// A pipeline that chains transformations on events.
+///
+/// Each stage transforms a value before passing it to the next stage.
+pub struct EventPipeline<T: Clone + Send + Sync + 'static> {
+    stages: Vec<Box<dyn Fn(T) -> T + Send + Sync>>,
+    emitter: Emitter<T>,
+}
+
+impl<T: Clone + Send + Sync + 'static> EventPipeline<T> {
+    /// Create a new empty pipeline.
+    pub fn new() -> Self {
+        Self {
+            stages: Vec::new(),
+            emitter: Emitter::new(),
+        }
+    }
+
+    /// Add a transformation stage.
+    pub fn add_stage<F>(&mut self, f: F)
+    where
+        F: Fn(T) -> T + Send + Sync + 'static,
+    {
+        self.stages.push(Box::new(f));
+    }
+
+    /// Process a value through all stages and fire the result.
+    pub fn process(&self, mut value: T) {
+        for stage in &self.stages {
+            value = stage(value);
+        }
+        self.emitter.fire(&value);
+    }
+
+    /// Returns the subscribable event for the pipeline output.
+    pub fn event(&self) -> Event<T> {
+        self.emitter.event()
+    }
+
+    /// Number of stages in the pipeline.
+    pub fn stage_count(&self) -> usize {
+        self.stages.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1310,5 +1489,86 @@ mod tests {
         assert_eq!(counter.count(), 0);
         counter.increment();
         assert_eq!(counter.count(), 1);
+    }
+
+    // -- EventBus tests ------------------------------------------------------
+
+    #[test]
+    fn event_bus_named_channels() {
+        let bus = EventBus::<i32>::new();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _handle = bus.on("numbers", move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        bus.fire("numbers", &42);
+        bus.fire("other", &99);
+        assert_eq!(*received.lock().unwrap(), vec![42]);
+        assert!(bus.has_channel("numbers"));
+        assert_eq!(bus.channel_count(), 2);
+    }
+
+    #[test]
+    fn event_bus_remove_channel() {
+        let bus = EventBus::<String>::new();
+        let _handle = bus.on("ch1", |_| {});
+        assert!(bus.has_channel("ch1"));
+        bus.remove_channel("ch1");
+        assert!(!bus.has_channel("ch1"));
+    }
+
+    // -- EventThrottle tests -------------------------------------------------
+
+    #[test]
+    fn event_throttle_limits_fires() {
+        let throttle = EventThrottle::<i32>::new(2, 10_000);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _handle = throttle.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        assert!(throttle.fire(&1));
+        assert!(throttle.fire(&2));
+        assert!(!throttle.fire(&3)); // throttled
+        assert_eq!(received.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn event_throttle_reset() {
+        let throttle = EventThrottle::<i32>::new(1, 10_000);
+        assert!(throttle.fire(&1));
+        assert!(!throttle.fire(&2));
+        throttle.reset();
+        assert!(throttle.fire(&3));
+    }
+
+    // -- EventPipeline tests -------------------------------------------------
+
+    #[test]
+    fn event_pipeline_processes_stages() {
+        let mut pipeline = EventPipeline::<i32>::new();
+        pipeline.add_stage(|v| v + 10);
+        pipeline.add_stage(|v| v * 2);
+        assert_eq!(pipeline.stage_count(), 2);
+
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _handle = pipeline.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        pipeline.process(5); // (5 + 10) * 2 = 30
+        assert_eq!(*received.lock().unwrap(), vec![30]);
+    }
+
+    #[test]
+    fn event_pipeline_empty_passes_through() {
+        let pipeline = EventPipeline::<String>::new();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _handle = pipeline.event().on(move |v: &String| {
+            r.lock().unwrap().push(v.clone());
+        });
+        pipeline.process("hello".to_string());
+        assert_eq!(received.lock().unwrap()[0], "hello");
     }
 }

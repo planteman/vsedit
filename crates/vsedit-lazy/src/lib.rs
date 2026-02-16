@@ -734,6 +734,244 @@ pub fn lazy_from_value<T: 'static>(value: T) -> Lazy<T> {
     lazy
 }
 
+// ── LazyPool ──
+
+/// A pool of lazy values keyed by string identifiers.
+///
+/// Each entry stores a lazily-initialized value together with an optional TTL.
+/// Once the TTL has elapsed the value is considered expired and will be
+/// re-initialized on the next access.
+pub struct LazyPool<T> {
+    entries: HashMap<String, LazyPoolEntry<T>>,
+}
+
+struct LazyPoolEntry<T> {
+    value: Option<T>,
+    factory: Box<dyn Fn() -> T>,
+    created_at: Option<Instant>,
+    ttl: Option<Duration>,
+}
+
+impl<T> LazyPool<T> {
+    /// Create an empty pool.
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Register a key with a factory function and an optional TTL.
+    pub fn register(
+        &mut self,
+        key: impl Into<String>,
+        ttl: Option<Duration>,
+        factory: impl Fn() -> T + 'static,
+    ) {
+        self.entries.insert(
+            key.into(),
+            LazyPoolEntry {
+                value: None,
+                factory: Box::new(factory),
+                created_at: None,
+                ttl,
+            },
+        );
+    }
+
+    /// Get a reference to the value for `key`, initializing or refreshing it as
+    /// necessary.  Returns `None` when the key has not been registered.
+    pub fn get(&mut self, key: &str) -> Option<&T> {
+        let entry = self.entries.get_mut(key)?;
+        let expired = match (entry.created_at, entry.ttl) {
+            (Some(created), Some(ttl)) => created.elapsed() >= ttl,
+            _ => false,
+        };
+        if entry.value.is_none() || expired {
+            entry.value = Some((entry.factory)());
+            entry.created_at = Some(Instant::now());
+        }
+        entry.value.as_ref()
+    }
+
+    /// Return `true` if the key exists in the pool (whether initialized or
+    /// not).
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.entries.contains_key(key)
+    }
+
+    /// Return the number of registered keys.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` when no keys have been registered.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Evict the cached value for `key` so it will be re-created on next
+    /// access.
+    pub fn invalidate(&mut self, key: &str) {
+        if let Some(entry) = self.entries.get_mut(key) {
+            entry.value = None;
+            entry.created_at = None;
+        }
+    }
+
+    /// Evict all cached values.
+    pub fn invalidate_all(&mut self) {
+        for entry in self.entries.values_mut() {
+            entry.value = None;
+            entry.created_at = None;
+        }
+    }
+
+    /// Return all keys that currently hold an initialized value.
+    pub fn initialized_keys(&self) -> Vec<&str> {
+        self.entries
+            .iter()
+            .filter_map(|(k, e)| if e.value.is_some() { Some(k.as_str()) } else { None })
+            .collect()
+    }
+
+    /// Check whether the cached value for `key` has expired.  Returns `None`
+    /// when the key is unknown.
+    pub fn is_expired(&self, key: &str) -> Option<bool> {
+        let entry = self.entries.get(key)?;
+        Some(match (entry.created_at, entry.ttl) {
+            (Some(created), Some(ttl)) => created.elapsed() >= ttl,
+            (None, _) => true, // never initialized ⇒ treat as expired
+            _ => false,
+        })
+    }
+}
+
+impl<T> Default for LazyPool<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Batch initialization ──
+
+/// Initialize multiple lazy values at once, returning results keyed by name.
+pub fn lazy_batch_init<T>(
+    items: Vec<(String, Box<dyn FnOnce() -> T>)>,
+) -> HashMap<String, T> {
+    let mut results = HashMap::with_capacity(items.len());
+    for (key, factory) in items {
+        results.insert(key, factory());
+    }
+    results
+}
+
+// ── Lazy chain ──
+
+/// A lazy value whose initializer depends on the result of another lazy value.
+///
+/// `LazyChain` links two deferred computations: the *source* lazy produces a
+/// `T`, and a *transform* converts it into a `U`.  Neither runs until the
+/// chain is resolved.
+pub struct LazyChain<T, U> {
+    source: Option<Box<dyn FnOnce() -> T>>,
+    transform: Option<Box<dyn FnOnce(&T) -> U>>,
+    source_value: Option<T>,
+    result: Option<U>,
+}
+
+impl<T, U> LazyChain<T, U> {
+    /// Create a new lazy chain.
+    pub fn new(
+        source: impl FnOnce() -> T + 'static,
+        transform: impl FnOnce(&T) -> U + 'static,
+    ) -> Self {
+        Self {
+            source: Some(Box::new(source)),
+            transform: Some(Box::new(transform)),
+            source_value: None,
+            result: None,
+        }
+    }
+
+    /// Resolve the chain, returning a reference to the final value.
+    pub fn resolve(&mut self) -> &U {
+        if self.result.is_none() {
+            if self.source_value.is_none() {
+                let src_fn = self.source.take().expect("source already consumed");
+                self.source_value = Some(src_fn());
+            }
+            let tf = self.transform.take().expect("transform already consumed");
+            let source_val = self.source_value.as_ref().unwrap();
+            self.result = Some(tf(source_val));
+        }
+        self.result.as_ref().unwrap()
+    }
+
+    /// Return `true` when the chain has already been resolved.
+    pub fn is_resolved(&self) -> bool {
+        self.result.is_some()
+    }
+
+    /// Access the intermediate source value, if already computed.
+    pub fn source_value(&self) -> Option<&T> {
+        self.source_value.as_ref()
+    }
+}
+
+// ── LazyExpiring ──
+
+/// A single lazy value with built-in expiration.
+pub struct LazyExpiring<T> {
+    value: Option<T>,
+    factory: Box<dyn Fn() -> T>,
+    created_at: Option<Instant>,
+    ttl: Duration,
+}
+
+impl<T> LazyExpiring<T> {
+    /// Create a new expiring lazy value.
+    pub fn new(ttl: Duration, factory: impl Fn() -> T + 'static) -> Self {
+        Self {
+            value: None,
+            factory: Box::new(factory),
+            created_at: None,
+            ttl,
+        }
+    }
+
+    /// Get the value, initializing or refreshing if expired.
+    pub fn get(&mut self) -> &T {
+        let expired = self
+            .created_at
+            .map(|c| c.elapsed() >= self.ttl)
+            .unwrap_or(true);
+        if expired {
+            self.value = Some((self.factory)());
+            self.created_at = Some(Instant::now());
+        }
+        self.value.as_ref().unwrap()
+    }
+
+    /// Return the remaining time-to-live, or `None` if not yet initialized.
+    pub fn remaining_ttl(&self) -> Option<Duration> {
+        self.created_at
+            .map(|c| self.ttl.saturating_sub(c.elapsed()))
+    }
+
+    /// Return `true` when the cached value has expired.
+    pub fn is_expired(&self) -> bool {
+        self.created_at
+            .map(|c| c.elapsed() >= self.ttl)
+            .unwrap_or(true)
+    }
+
+    /// Manually expire the cached value.
+    pub fn expire(&mut self) {
+        self.value = None;
+        self.created_at = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1293,5 +1531,101 @@ mod tests {
         assert_eq!(memo.len(), 2); // no new entry
         memo.clear();
         assert!(memo.is_empty());
+    }
+
+    // ── LazyPool tests ──
+
+    #[test]
+    fn lazy_pool_register_and_get() {
+        let mut pool: LazyPool<i32> = LazyPool::new();
+        pool.register("a", None, || 42);
+        pool.register("b", None, || 99);
+        assert_eq!(pool.len(), 2);
+        assert_eq!(*pool.get("a").unwrap(), 42);
+        assert_eq!(*pool.get("b").unwrap(), 99);
+        assert!(pool.get("c").is_none());
+    }
+
+    #[test]
+    fn lazy_pool_invalidate() {
+        let counter = Rc::new(Cell::new(0));
+        let c2 = counter.clone();
+        let mut pool: LazyPool<i32> = LazyPool::new();
+        pool.register("x", None, move || {
+            c2.set(c2.get() + 1);
+            c2.get()
+        });
+        assert_eq!(*pool.get("x").unwrap(), 1);
+        assert_eq!(*pool.get("x").unwrap(), 1); // cached
+        pool.invalidate("x");
+        assert_eq!(*pool.get("x").unwrap(), 2); // re-initialized
+    }
+
+    #[test]
+    fn lazy_pool_initialized_keys() {
+        let mut pool: LazyPool<i32> = LazyPool::new();
+        pool.register("a", None, || 1);
+        pool.register("b", None, || 2);
+        assert!(pool.initialized_keys().is_empty());
+        pool.get("a");
+        let keys = pool.initialized_keys();
+        assert_eq!(keys.len(), 1);
+        assert!(keys.contains(&"a"));
+    }
+
+    #[test]
+    fn lazy_pool_invalidate_all() {
+        let mut pool: LazyPool<i32> = LazyPool::new();
+        pool.register("a", None, || 1);
+        pool.register("b", None, || 2);
+        pool.get("a");
+        pool.get("b");
+        assert_eq!(pool.initialized_keys().len(), 2);
+        pool.invalidate_all();
+        assert!(pool.initialized_keys().is_empty());
+    }
+
+    // ── LazyChain tests ──
+
+    #[test]
+    fn lazy_chain_resolves() {
+        let mut chain = LazyChain::new(|| vec![1, 2, 3], |v| v.iter().sum::<i32>());
+        assert!(!chain.is_resolved());
+        assert_eq!(*chain.resolve(), 6);
+        assert!(chain.is_resolved());
+        assert_eq!(chain.source_value().unwrap(), &vec![1, 2, 3]);
+    }
+
+    // ── Batch init tests ──
+
+    #[test]
+    fn lazy_batch_init_basic() {
+        let items: Vec<(String, Box<dyn FnOnce() -> i32>)> = vec![
+            ("x".into(), Box::new(|| 10)),
+            ("y".into(), Box::new(|| 20)),
+        ];
+        let results = lazy_batch_init(items);
+        assert_eq!(results.len(), 2);
+        assert_eq!(*results.get("x").unwrap(), 10);
+        assert_eq!(*results.get("y").unwrap(), 20);
+    }
+
+    // ── LazyExpiring tests ──
+
+    #[test]
+    fn lazy_expiring_get_and_expire() {
+        let counter = Rc::new(Cell::new(0));
+        let c2 = counter.clone();
+        let mut lazy = LazyExpiring::new(Duration::from_secs(3600), move || {
+            c2.set(c2.get() + 1);
+            c2.get()
+        });
+        assert!(lazy.is_expired());
+        assert_eq!(*lazy.get(), 1);
+        assert!(!lazy.is_expired());
+        assert!(lazy.remaining_ttl().unwrap() > Duration::ZERO);
+        lazy.expire();
+        assert!(lazy.is_expired());
+        assert_eq!(*lazy.get(), 2);
     }
 }

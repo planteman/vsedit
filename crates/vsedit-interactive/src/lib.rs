@@ -714,6 +714,307 @@ impl InteractiveZone {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Cell dependency graph
+// ---------------------------------------------------------------------------
+
+/// Tracks which cells depend on other cells (e.g. a code cell referencing
+/// a variable defined in an earlier cell).
+#[derive(Debug, Clone)]
+pub struct CellDependencyGraph {
+    /// Map from cell ID to the set of cell IDs it depends on.
+    edges: Vec<(String, String)>,
+}
+
+impl CellDependencyGraph {
+    pub fn new() -> Self {
+        Self { edges: Vec::new() }
+    }
+
+    /// Record that `cell_id` depends on `depends_on_id`.
+    pub fn add_dependency(&mut self, cell_id: impl Into<String>, depends_on_id: impl Into<String>) {
+        let edge = (cell_id.into(), depends_on_id.into());
+        if !self.edges.contains(&edge) {
+            self.edges.push(edge);
+        }
+    }
+
+    /// Remove a specific dependency.
+    pub fn remove_dependency(&mut self, cell_id: &str, depends_on_id: &str) {
+        self.edges.retain(|(c, d)| !(c == cell_id && d == depends_on_id));
+    }
+
+    /// Remove all edges involving a cell (as source or target).
+    pub fn remove_cell(&mut self, cell_id: &str) {
+        self.edges.retain(|(c, d)| c != cell_id && d != cell_id);
+    }
+
+    /// Get the direct dependencies of a cell.
+    pub fn dependencies_of(&self, cell_id: &str) -> Vec<&str> {
+        self.edges
+            .iter()
+            .filter(|(c, _)| c == cell_id)
+            .map(|(_, d)| d.as_str())
+            .collect()
+    }
+
+    /// Get the cells that directly depend on the given cell.
+    pub fn dependents_of(&self, cell_id: &str) -> Vec<&str> {
+        self.edges
+            .iter()
+            .filter(|(_, d)| d == cell_id)
+            .map(|(c, _)| c.as_str())
+            .collect()
+    }
+
+    /// Whether the graph has any edges.
+    pub fn is_empty(&self) -> bool {
+        self.edges.is_empty()
+    }
+
+    /// Total number of dependency edges.
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Return all unique cell IDs referenced in the graph.
+    pub fn all_cell_ids(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self.edges.iter()
+            .flat_map(|(c, d)| [c.as_str(), d.as_str()])
+            .collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+}
+
+impl Default for CellDependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cell execution plan (topological ordering)
+// ---------------------------------------------------------------------------
+
+/// An ordered plan for executing cells respecting dependencies.
+#[derive(Debug, Clone)]
+pub struct CellExecutionPlan {
+    /// Cell IDs in the order they should be executed.
+    pub order: Vec<String>,
+    /// Cell IDs that could not be scheduled (part of a cycle).
+    pub unresolved: Vec<String>,
+}
+
+impl CellExecutionPlan {
+    /// Build an execution plan from a dependency graph and the list of cell IDs
+    /// present in the session. Uses Kahn's algorithm for topological sort.
+    pub fn build(graph: &CellDependencyGraph, cell_ids: &[String]) -> Self {
+        use std::collections::{HashMap, VecDeque};
+
+        // In-degree map (only for cells in the session).
+        let id_set: std::collections::HashSet<&str> = cell_ids.iter().map(|s| s.as_str()).collect();
+        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        for id in &id_set {
+            in_degree.insert(id, 0);
+        }
+        for (c, d) in &graph.edges {
+            if id_set.contains(c.as_str()) && id_set.contains(d.as_str()) {
+                *in_degree.entry(c.as_str()).or_insert(0) += 1;
+            }
+        }
+
+        let mut queue: VecDeque<&str> = VecDeque::new();
+        // Seed with zero in-degree nodes, preserving original order for stability.
+        for id in cell_ids {
+            if in_degree.get(id.as_str()).copied().unwrap_or(0) == 0 {
+                queue.push_back(id.as_str());
+            }
+        }
+
+        let mut order: Vec<String> = Vec::new();
+        while let Some(node) = queue.pop_front() {
+            order.push(node.to_string());
+            for (c, d) in &graph.edges {
+                if d.as_str() == node && id_set.contains(c.as_str()) {
+                    if let Some(deg) = in_degree.get_mut(c.as_str()) {
+                        *deg = deg.saturating_sub(1);
+                        if *deg == 0 {
+                            queue.push_back(c.as_str());
+                        }
+                    }
+                }
+            }
+        }
+
+        let ordered_set: std::collections::HashSet<&str> = order.iter().map(|s| s.as_str()).collect();
+        let unresolved: Vec<String> = cell_ids
+            .iter()
+            .filter(|id| !ordered_set.contains(id.as_str()))
+            .cloned()
+            .collect();
+
+        Self { order, unresolved }
+    }
+
+    /// Whether all cells were successfully scheduled.
+    pub fn is_complete(&self) -> bool {
+        self.unresolved.is_empty()
+    }
+
+    /// Total number of cells in the plan (scheduled + unresolved).
+    pub fn total_cells(&self) -> usize {
+        self.order.len() + self.unresolved.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Session exporter (Markdown)
+// ---------------------------------------------------------------------------
+
+/// Export an `InteractiveSession` to various text formats.
+pub struct SessionExporter;
+
+impl SessionExporter {
+    /// Export the session to a Markdown string.
+    pub fn to_markdown(session: &InteractiveSession) -> String {
+        let mut out = String::new();
+        for cell in session.get_cells() {
+            match cell.kind {
+                CellKind::Markup => {
+                    out.push_str(&cell.source);
+                    out.push_str("\n\n");
+                }
+                CellKind::Code => {
+                    let lang = cell.language.as_deref().unwrap_or("");
+                    out.push_str(&format!("```{lang}\n"));
+                    out.push_str(&cell.source);
+                    out.push_str("\n```\n\n");
+                    for o in &cell.outputs {
+                        out.push_str("**Output:**\n\n");
+                        out.push_str("```\n");
+                        out.push_str(&o.data);
+                        out.push_str("\n```\n\n");
+                    }
+                }
+            }
+        }
+        out.truncate(out.trim_end().len());
+        out.push('\n');
+        out
+    }
+
+    /// Export only the source of code cells, separated by blank lines.
+    pub fn to_script(session: &InteractiveSession) -> String {
+        session
+            .get_cells()
+            .iter()
+            .filter(|c| c.kind == CellKind::Code)
+            .map(|c| c.source.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cell diff (comparing cell versions)
+// ---------------------------------------------------------------------------
+
+/// Represents a single change between two versions of a cell's source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffOp {
+    /// Line present in both versions.
+    Equal(String),
+    /// Line added in the new version.
+    Added(String),
+    /// Line removed from the old version.
+    Removed(String),
+}
+
+/// A diff between two cell source strings.
+#[derive(Debug, Clone)]
+pub struct CellDiff {
+    pub ops: Vec<DiffOp>,
+}
+
+impl CellDiff {
+    /// Compute a simple line-level diff between `old` and `new` source text.
+    /// Uses a basic LCS-based approach.
+    pub fn compute(old: &str, new: &str) -> Self {
+        let old_lines: Vec<&str> = old.lines().collect();
+        let new_lines: Vec<&str> = new.lines().collect();
+
+        let n = old_lines.len();
+        let m = new_lines.len();
+
+        // Build LCS table.
+        let mut table = vec![vec![0u32; m + 1]; n + 1];
+        for i in 1..=n {
+            for j in 1..=m {
+                if old_lines[i - 1] == new_lines[j - 1] {
+                    table[i][j] = table[i - 1][j - 1] + 1;
+                } else {
+                    table[i][j] = table[i - 1][j].max(table[i][j - 1]);
+                }
+            }
+        }
+
+        // Backtrack to produce diff ops.
+        let mut ops = Vec::new();
+        let (mut i, mut j) = (n, m);
+        while i > 0 || j > 0 {
+            if i > 0 && j > 0 && old_lines[i - 1] == new_lines[j - 1] {
+                ops.push(DiffOp::Equal(old_lines[i - 1].to_string()));
+                i -= 1;
+                j -= 1;
+            } else if j > 0 && (i == 0 || table[i][j - 1] >= table[i - 1][j]) {
+                ops.push(DiffOp::Added(new_lines[j - 1].to_string()));
+                j -= 1;
+            } else {
+                ops.push(DiffOp::Removed(old_lines[i - 1].to_string()));
+                i -= 1;
+            }
+        }
+        ops.reverse();
+        Self { ops }
+    }
+
+    /// Number of lines added.
+    pub fn additions(&self) -> usize {
+        self.ops.iter().filter(|o| matches!(o, DiffOp::Added(_))).count()
+    }
+
+    /// Number of lines removed.
+    pub fn deletions(&self) -> usize {
+        self.ops.iter().filter(|o| matches!(o, DiffOp::Removed(_))).count()
+    }
+
+    /// Whether the two sources are identical.
+    pub fn is_unchanged(&self) -> bool {
+        self.ops.iter().all(|o| matches!(o, DiffOp::Equal(_)))
+    }
+
+    /// Render the diff in unified-diff-like format.
+    pub fn to_string_unified(&self) -> String {
+        let mut out = String::new();
+        for op in &self.ops {
+            match op {
+                DiffOp::Equal(l) => {
+                    out.push_str(&format!(" {l}\n"));
+                }
+                DiffOp::Added(l) => {
+                    out.push_str(&format!("+{l}\n"));
+                }
+                DiffOp::Removed(l) => {
+                    out.push_str(&format!("-{l}\n"));
+                }
+            }
+        }
+        out
+    }
+}
+
 /// Manages a collection of interactive zones.
 pub struct ZoneTracker {
     zones: Vec<InteractiveZone>,
@@ -1252,5 +1553,105 @@ mod tests {
         assert_eq!(format!("{}", ZoneAction::OpenUrl("http://x".into())), "open:http://x");
         assert_eq!(format!("{}", ZoneAction::RunCommand("copy".into())), "cmd:copy");
         assert_eq!(format!("{}", ZoneAction::None), "none");
+    }
+
+    // -- CellDependencyGraph --
+
+    #[test]
+    fn dependency_graph_basic_operations() {
+        let mut g = CellDependencyGraph::new();
+        assert!(g.is_empty());
+        g.add_dependency("c2", "c1");
+        g.add_dependency("c3", "c1");
+        g.add_dependency("c3", "c2");
+        assert_eq!(g.edge_count(), 3);
+        assert_eq!(g.dependencies_of("c3"), vec!["c1", "c2"]);
+        assert_eq!(g.dependents_of("c1"), vec!["c2", "c3"]);
+
+        // duplicate edge is ignored
+        g.add_dependency("c2", "c1");
+        assert_eq!(g.edge_count(), 3);
+
+        g.remove_dependency("c3", "c2");
+        assert_eq!(g.edge_count(), 2);
+        assert_eq!(g.dependencies_of("c3"), vec!["c1"]);
+
+        g.remove_cell("c1");
+        assert!(g.is_empty());
+    }
+
+    // -- CellExecutionPlan --
+
+    #[test]
+    fn execution_plan_topological_order() {
+        let mut g = CellDependencyGraph::new();
+        // c2 depends on c1, c3 depends on c2
+        g.add_dependency("c2", "c1");
+        g.add_dependency("c3", "c2");
+        let ids: Vec<String> = vec!["c1".into(), "c2".into(), "c3".into()];
+        let plan = CellExecutionPlan::build(&g, &ids);
+        assert!(plan.is_complete());
+        assert_eq!(plan.order, vec!["c1", "c2", "c3"]);
+    }
+
+    #[test]
+    fn execution_plan_detects_cycle() {
+        let mut g = CellDependencyGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        let ids: Vec<String> = vec!["a".into(), "b".into()];
+        let plan = CellExecutionPlan::build(&g, &ids);
+        assert!(!plan.is_complete());
+        assert_eq!(plan.unresolved.len(), 2);
+        assert_eq!(plan.total_cells(), 2);
+    }
+
+    // -- SessionExporter --
+
+    #[test]
+    fn session_exporter_markdown() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Markup, "# Title", None);
+        let code_id = s.add_cell(CellKind::Code, "print(1)", Some("python".into()));
+        s.add_output(&code_id, CellOutput::plain("1"));
+
+        let md = SessionExporter::to_markdown(&s);
+        assert!(md.contains("# Title"));
+        assert!(md.contains("```python"));
+        assert!(md.contains("print(1)"));
+        assert!(md.contains("**Output:**"));
+        assert!(md.contains("1"));
+    }
+
+    #[test]
+    fn session_exporter_script() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Code, "x = 1", None);
+        s.add_cell(CellKind::Markup, "# ignored", None);
+        s.add_cell(CellKind::Code, "y = 2", None);
+        let script = SessionExporter::to_script(&s);
+        assert_eq!(script, "x = 1\n\ny = 2");
+    }
+
+    // -- CellDiff --
+
+    #[test]
+    fn cell_diff_identical_sources() {
+        let diff = CellDiff::compute("a\nb\nc", "a\nb\nc");
+        assert!(diff.is_unchanged());
+        assert_eq!(diff.additions(), 0);
+        assert_eq!(diff.deletions(), 0);
+    }
+
+    #[test]
+    fn cell_diff_detects_changes() {
+        let diff = CellDiff::compute("line1\nline2\nline3", "line1\nchanged\nline3");
+        assert!(!diff.is_unchanged());
+        assert_eq!(diff.additions(), 1);
+        assert_eq!(diff.deletions(), 1);
+        let unified = diff.to_string_unified();
+        assert!(unified.contains("+changed"));
+        assert!(unified.contains("-line2"));
+        assert!(unified.contains(" line1"));
     }
 }

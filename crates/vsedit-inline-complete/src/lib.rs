@@ -624,6 +624,274 @@ impl Default for InlineCompleteValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Completion ranker – scores and sorts completion items
+// ---------------------------------------------------------------------------
+
+/// Scoring criteria for ranking inline completion items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RankingCriteria {
+    /// Rank by how well the insert text matches a prefix.
+    PrefixMatch,
+    /// Rank by the length of the insert text (shorter is better).
+    Shortest,
+    /// Rank by the length of the insert text (longer is better).
+    Longest,
+}
+
+/// Ranks and sorts inline completion items by a chosen criterion.
+#[derive(Debug, Clone)]
+pub struct CompletionRanker {
+    criteria: RankingCriteria,
+}
+
+impl CompletionRanker {
+    pub fn new(criteria: RankingCriteria) -> Self {
+        Self { criteria }
+    }
+
+    /// Score a single item against the given prefix. Higher is better.
+    pub fn score(&self, item: &InlineCompletionItem, prefix: &str) -> i64 {
+        match self.criteria {
+            RankingCriteria::PrefixMatch => {
+                let text = item.filter_text.as_deref().unwrap_or(&item.insert_text);
+                let common = text
+                    .chars()
+                    .zip(prefix.chars())
+                    .take_while(|(a, b)| a == b)
+                    .count();
+                common as i64
+            }
+            RankingCriteria::Shortest => -(item.insert_text.len() as i64),
+            RankingCriteria::Longest => item.insert_text.len() as i64,
+        }
+    }
+
+    /// Sort items in-place by score (descending). Stable sort preserves
+    /// order among equal-scored items.
+    pub fn rank(&self, items: &mut [InlineCompletionItem], prefix: &str) {
+        items.sort_by(|a, b| self.score(b, prefix).cmp(&self.score(a, prefix)));
+    }
+
+    /// Return a new sorted `Vec` without modifying the original slice.
+    pub fn ranked(&self, items: &[InlineCompletionItem], prefix: &str) -> Vec<InlineCompletionItem> {
+        let mut v = items.to_vec();
+        self.rank(&mut v, prefix);
+        v
+    }
+}
+
+impl Default for CompletionRanker {
+    fn default() -> Self {
+        Self::new(RankingCriteria::PrefixMatch)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion cache – keeps recent completions keyed by (uri, line, col)
+// ---------------------------------------------------------------------------
+
+/// A simple bounded cache for inline completion results.
+#[derive(Debug, Clone)]
+pub struct CompletionCache {
+    entries: Vec<CompletionCacheEntry>,
+    capacity: usize,
+}
+
+#[derive(Debug, Clone)]
+struct CompletionCacheEntry {
+    uri: String,
+    line: u32,
+    col: u32,
+    list: InlineCompletionList,
+}
+
+impl CompletionCache {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Look up a cached completion list for the exact position.
+    pub fn get(&self, uri: &str, line: u32, col: u32) -> Option<&InlineCompletionList> {
+        self.entries
+            .iter()
+            .find(|e| e.uri == uri && e.line == line && e.col == col)
+            .map(|e| &e.list)
+    }
+
+    /// Insert a completion list. Evicts the oldest entry when at capacity.
+    pub fn insert(&mut self, uri: &str, line: u32, col: u32, list: InlineCompletionList) {
+        // Remove existing entry for the same key.
+        self.entries
+            .retain(|e| !(e.uri == uri && e.line == line && e.col == col));
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(CompletionCacheEntry {
+            uri: uri.to_string(),
+            line,
+            col,
+            list,
+        });
+    }
+
+    /// Remove all cached entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Returns the number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for CompletionCache {
+    fn default() -> Self {
+        Self::new(64)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion preview – prepares a textual preview of a completion
+// ---------------------------------------------------------------------------
+
+/// A rendered preview of an inline completion suitable for display in a
+/// tooltip or preview panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionPreview {
+    /// Lines of the preview with line numbers.
+    pub numbered_lines: Vec<String>,
+    /// Total number of lines in the preview.
+    pub total_lines: usize,
+    /// Whether the preview was truncated.
+    pub truncated: bool,
+}
+
+impl CompletionPreview {
+    /// Build a preview from a completion item, limiting to `max_lines`.
+    pub fn from_item(item: &InlineCompletionItem, max_lines: usize) -> Self {
+        let all_lines: Vec<&str> = item.insert_text.split('\n').collect();
+        let truncated = all_lines.len() > max_lines;
+        let visible = if truncated {
+            &all_lines[..max_lines]
+        } else {
+            &all_lines[..]
+        };
+        let start = item.range_start_line as usize;
+        let numbered_lines = visible
+            .iter()
+            .enumerate()
+            .map(|(i, l)| format!("{:>4} | {}", start + i + 1, l))
+            .collect();
+        Self {
+            numbered_lines,
+            total_lines: all_lines.len(),
+            truncated,
+        }
+    }
+
+    /// Format the preview as a single string separated by newlines.
+    pub fn render(&self) -> String {
+        let mut out = self.numbered_lines.join("\n");
+        if self.truncated {
+            out.push_str(&format!("\n  ... ({} more lines)", self.total_lines - self.numbered_lines.len()));
+        }
+        out
+    }
+}
+
+impl fmt::Display for CompletionPreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.render())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion telemetry – lightweight event log
+// ---------------------------------------------------------------------------
+
+/// The kind of telemetry event recorded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionEventKind {
+    Shown,
+    Accepted,
+    Dismissed,
+    Cycled,
+}
+
+/// A single telemetry event.
+#[derive(Debug, Clone)]
+pub struct CompletionEvent {
+    pub kind: CompletionEventKind,
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub insert_text_len: usize,
+}
+
+/// Collects telemetry events for inline completions.
+#[derive(Debug, Clone, Default)]
+pub struct CompletionTelemetry {
+    events: Vec<CompletionEvent>,
+}
+
+impl CompletionTelemetry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record an event.
+    pub fn record(&mut self, kind: CompletionEventKind, uri: &str, line: u32, col: u32, insert_text_len: usize) {
+        self.events.push(CompletionEvent {
+            kind,
+            uri: uri.to_string(),
+            line,
+            col,
+            insert_text_len,
+        });
+    }
+
+    /// Return total number of recorded events.
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Count events of a specific kind.
+    pub fn count_kind(&self, kind: CompletionEventKind) -> usize {
+        self.events.iter().filter(|e| e.kind == kind).count()
+    }
+
+    /// Compute the accept rate (accepted / shown). Returns `None` when no
+    /// `Shown` events have been recorded.
+    pub fn accept_rate(&self) -> Option<f64> {
+        let shown = self.count_kind(CompletionEventKind::Shown);
+        if shown == 0 {
+            return None;
+        }
+        let accepted = self.count_kind(CompletionEventKind::Accepted);
+        Some(accepted as f64 / shown as f64)
+    }
+
+    /// Clear all recorded events.
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
+
+    /// Return a slice of all recorded events.
+    pub fn events(&self) -> &[CompletionEvent] {
+        &self.events
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1264,5 +1532,126 @@ mod tests {
         let list = InlineCompletionList { items: vec![] };
         let session = InlineCompletionSession::new(list);
         assert!(accept_inline_completion(&session, "Hello", 0, 5).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionRanker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ranker_prefix_match_scores() {
+        let ranker = CompletionRanker::new(RankingCriteria::PrefixMatch);
+        let item_ab = make_item("abc");
+        let item_xy = make_item("xyz");
+        assert!(ranker.score(&item_ab, "ab") > ranker.score(&item_xy, "ab"));
+    }
+
+    #[test]
+    fn ranker_shortest_sorts_ascending_length() {
+        let ranker = CompletionRanker::new(RankingCriteria::Shortest);
+        let items = vec![make_item("longer_text"), make_item("ab"), make_item("medium")];
+        let ranked = ranker.ranked(&items, "");
+        assert_eq!(ranked[0].insert_text, "ab");
+        assert_eq!(ranked[1].insert_text, "medium");
+        assert_eq!(ranked[2].insert_text, "longer_text");
+    }
+
+    #[test]
+    fn ranker_longest_sorts_descending_length() {
+        let ranker = CompletionRanker::new(RankingCriteria::Longest);
+        let items = vec![make_item("ab"), make_item("longer_text"), make_item("medium")];
+        let ranked = ranker.ranked(&items, "");
+        assert_eq!(ranked[0].insert_text, "longer_text");
+        assert_eq!(ranked[2].insert_text, "ab");
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionCache tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cache_insert_and_get() {
+        let mut cache = CompletionCache::new(4);
+        assert!(cache.is_empty());
+        let list = make_list(&["foo", "bar"]);
+        cache.insert("file:///a.rs", 1, 5, list);
+        assert_eq!(cache.len(), 1);
+        let hit = cache.get("file:///a.rs", 1, 5).unwrap();
+        assert_eq!(hit.items.len(), 2);
+        assert!(cache.get("file:///a.rs", 1, 6).is_none());
+    }
+
+    #[test]
+    fn cache_evicts_oldest() {
+        let mut cache = CompletionCache::new(2);
+        cache.insert("a", 0, 0, make_list(&["1"]));
+        cache.insert("b", 0, 0, make_list(&["2"]));
+        cache.insert("c", 0, 0, make_list(&["3"]));
+        assert_eq!(cache.len(), 2);
+        assert!(cache.get("a", 0, 0).is_none()); // evicted
+        assert!(cache.get("b", 0, 0).is_some());
+        assert!(cache.get("c", 0, 0).is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionPreview tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn preview_single_line() {
+        let item = make_item("hello");
+        let preview = CompletionPreview::from_item(&item, 10);
+        assert_eq!(preview.total_lines, 1);
+        assert!(!preview.truncated);
+        assert_eq!(preview.numbered_lines.len(), 1);
+        assert!(preview.numbered_lines[0].contains("hello"));
+    }
+
+    #[test]
+    fn preview_truncated() {
+        let item = make_item("a\nb\nc\nd\ne");
+        let preview = CompletionPreview::from_item(&item, 2);
+        assert!(preview.truncated);
+        assert_eq!(preview.numbered_lines.len(), 2);
+        assert_eq!(preview.total_lines, 5);
+        let rendered = preview.render();
+        assert!(rendered.contains("3 more lines"));
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionTelemetry tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn telemetry_record_and_count() {
+        let mut tel = CompletionTelemetry::new();
+        assert_eq!(tel.event_count(), 0);
+        tel.record(CompletionEventKind::Shown, "f.rs", 0, 0, 5);
+        tel.record(CompletionEventKind::Accepted, "f.rs", 0, 0, 5);
+        tel.record(CompletionEventKind::Shown, "f.rs", 1, 0, 3);
+        tel.record(CompletionEventKind::Dismissed, "f.rs", 1, 0, 3);
+        assert_eq!(tel.event_count(), 4);
+        assert_eq!(tel.count_kind(CompletionEventKind::Shown), 2);
+        assert_eq!(tel.count_kind(CompletionEventKind::Accepted), 1);
+    }
+
+    #[test]
+    fn telemetry_accept_rate() {
+        let mut tel = CompletionTelemetry::new();
+        assert!(tel.accept_rate().is_none());
+        tel.record(CompletionEventKind::Shown, "f.rs", 0, 0, 5);
+        tel.record(CompletionEventKind::Shown, "f.rs", 1, 0, 3);
+        tel.record(CompletionEventKind::Accepted, "f.rs", 0, 0, 5);
+        let rate = tel.accept_rate().unwrap();
+        assert!((rate - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn telemetry_clear() {
+        let mut tel = CompletionTelemetry::new();
+        tel.record(CompletionEventKind::Cycled, "f.rs", 0, 0, 10);
+        tel.clear();
+        assert_eq!(tel.event_count(), 0);
+        assert!(tel.accept_rate().is_none());
     }
 }

@@ -636,6 +636,185 @@ impl Default for WelcomeValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TipOfTheDay
+// ---------------------------------------------------------------------------
+
+/// A single tip shown on the welcome page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tip {
+    pub id: String,
+    pub text: String,
+    pub category: String,
+}
+
+/// Rotating tip-of-the-day manager.
+pub struct TipOfTheDay {
+    tips: Vec<Tip>,
+    seen_ids: Vec<String>,
+}
+
+impl TipOfTheDay {
+    pub fn new() -> Self {
+        Self {
+            tips: Vec::new(),
+            seen_ids: Vec::new(),
+        }
+    }
+
+    /// Add a tip to the pool.
+    pub fn add_tip(&mut self, tip: Tip) {
+        if !self.tips.iter().any(|t| t.id == tip.id) {
+            self.tips.push(tip);
+        }
+    }
+
+    /// Total number of tips.
+    pub fn tip_count(&self) -> usize {
+        self.tips.len()
+    }
+
+    /// Get the next unseen tip, cycling back to the beginning when all have
+    /// been seen. Returns `None` only when the pool is empty.
+    pub fn next_tip(&mut self) -> Option<&Tip> {
+        if self.tips.is_empty() {
+            return None;
+        }
+        // Find first unseen tip
+        if let Some(tip) = self.tips.iter().find(|t| !self.seen_ids.contains(&t.id)) {
+            self.seen_ids.push(tip.id.clone());
+            return Some(tip);
+        }
+        // All seen – reset and return the first
+        self.seen_ids.clear();
+        let tip = &self.tips[0];
+        self.seen_ids.push(tip.id.clone());
+        Some(tip)
+    }
+
+    /// Mark all tips as unseen.
+    pub fn reset(&mut self) {
+        self.seen_ids.clear();
+    }
+
+    /// Number of tips that have been seen.
+    pub fn seen_count(&self) -> usize {
+        self.seen_ids.len()
+    }
+
+    /// Filter tips by category, returning references.
+    pub fn tips_in_category(&self, category: &str) -> Vec<&Tip> {
+        self.tips.iter().filter(|t| t.category == category).collect()
+    }
+}
+
+impl Default for TipOfTheDay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GettingStartedChecklist
+// ---------------------------------------------------------------------------
+
+/// A single item on the getting-started checklist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChecklistItem {
+    pub id: String,
+    pub label: String,
+    pub done: bool,
+}
+
+/// A checklist that guides new users through initial setup.
+pub struct GettingStartedChecklist {
+    items: Vec<ChecklistItem>,
+}
+
+impl GettingStartedChecklist {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Append a new unchecked item.
+    pub fn add_item(&mut self, id: impl Into<String>, label: impl Into<String>) {
+        self.items.push(ChecklistItem {
+            id: id.into(),
+            label: label.into(),
+            done: false,
+        });
+    }
+
+    /// Mark an item as done. Returns `true` if the item was found.
+    pub fn check(&mut self, id: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
+            item.done = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Uncheck an item.
+    pub fn uncheck(&mut self, id: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
+            item.done = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether every item is done.
+    pub fn all_done(&self) -> bool {
+        !self.items.is_empty() && self.items.iter().all(|i| i.done)
+    }
+
+    /// Number of completed items.
+    pub fn done_count(&self) -> usize {
+        self.items.iter().filter(|i| i.done).count()
+    }
+
+    /// Total items.
+    pub fn total(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Completion ratio in [0.0, 1.0].
+    pub fn progress(&self) -> f64 {
+        if self.items.is_empty() {
+            return 0.0;
+        }
+        self.done_count() as f64 / self.items.len() as f64
+    }
+
+    /// Get the next unchecked item, if any.
+    pub fn next_pending(&self) -> Option<&ChecklistItem> {
+        self.items.iter().find(|i| !i.done)
+    }
+
+    /// Render the checklist as displayable text lines.
+    pub fn render(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        lines.push(format!(
+            "Getting Started ({}/{})",
+            self.done_count(),
+            self.total()
+        ));
+        for item in &self.items {
+            let mark = if item.done { "✓" } else { "○" };
+            lines.push(format!("  [{mark}] {}", item.label));
+        }
+        lines
+    }
+}
+
+impl Default for GettingStartedChecklist {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1271,5 +1450,125 @@ mod tests {
         for line in &formatted {
             assert!(line.starts_with("  "));
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // TipOfTheDay tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tip_of_the_day_empty_returns_none() {
+        let mut tips = TipOfTheDay::new();
+        assert!(tips.next_tip().is_none());
+        assert_eq!(tips.tip_count(), 0);
+    }
+
+    #[test]
+    fn tip_of_the_day_cycles_through_all() {
+        let mut tips = TipOfTheDay::new();
+        tips.add_tip(Tip { id: "t1".into(), text: "Tip 1".into(), category: "editor".into() });
+        tips.add_tip(Tip { id: "t2".into(), text: "Tip 2".into(), category: "editor".into() });
+        assert_eq!(tips.tip_count(), 2);
+
+        let first = tips.next_tip().unwrap().id.clone();
+        assert_eq!(first, "t1");
+        let second = tips.next_tip().unwrap().id.clone();
+        assert_eq!(second, "t2");
+
+        // Wraps around
+        let third = tips.next_tip().unwrap().id.clone();
+        assert_eq!(third, "t1");
+    }
+
+    #[test]
+    fn tip_of_the_day_no_duplicates() {
+        let mut tips = TipOfTheDay::new();
+        tips.add_tip(Tip { id: "t1".into(), text: "A".into(), category: "x".into() });
+        tips.add_tip(Tip { id: "t1".into(), text: "B".into(), category: "x".into() });
+        assert_eq!(tips.tip_count(), 1);
+    }
+
+    #[test]
+    fn tip_of_the_day_category_filter() {
+        let mut tips = TipOfTheDay::new();
+        tips.add_tip(Tip { id: "t1".into(), text: "A".into(), category: "editor".into() });
+        tips.add_tip(Tip { id: "t2".into(), text: "B".into(), category: "git".into() });
+        tips.add_tip(Tip { id: "t3".into(), text: "C".into(), category: "editor".into() });
+        assert_eq!(tips.tips_in_category("editor").len(), 2);
+        assert_eq!(tips.tips_in_category("git").len(), 1);
+        assert_eq!(tips.tips_in_category("unknown").len(), 0);
+    }
+
+    #[test]
+    fn tip_of_the_day_reset() {
+        let mut tips = TipOfTheDay::new();
+        tips.add_tip(Tip { id: "t1".into(), text: "A".into(), category: "x".into() });
+        let _ = tips.next_tip();
+        assert_eq!(tips.seen_count(), 1);
+        tips.reset();
+        assert_eq!(tips.seen_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // GettingStartedChecklist tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn checklist_progress_empty() {
+        let cl = GettingStartedChecklist::new();
+        assert!(!cl.all_done());
+        assert_eq!(cl.total(), 0);
+        assert!((cl.progress() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn checklist_add_check_uncheck() {
+        let mut cl = GettingStartedChecklist::new();
+        cl.add_item("theme", "Choose a color theme");
+        cl.add_item("keybindings", "Configure keybindings");
+        assert_eq!(cl.total(), 2);
+        assert_eq!(cl.done_count(), 0);
+
+        assert!(cl.check("theme"));
+        assert_eq!(cl.done_count(), 1);
+        assert!(!cl.all_done());
+
+        assert!(cl.check("keybindings"));
+        assert!(cl.all_done());
+
+        assert!(cl.uncheck("theme"));
+        assert!(!cl.all_done());
+        assert_eq!(cl.done_count(), 1);
+    }
+
+    #[test]
+    fn checklist_check_nonexistent() {
+        let mut cl = GettingStartedChecklist::new();
+        assert!(!cl.check("nope"));
+        assert!(!cl.uncheck("nope"));
+    }
+
+    #[test]
+    fn checklist_next_pending() {
+        let mut cl = GettingStartedChecklist::new();
+        cl.add_item("a", "A");
+        cl.add_item("b", "B");
+        assert_eq!(cl.next_pending().unwrap().id, "a");
+        cl.check("a");
+        assert_eq!(cl.next_pending().unwrap().id, "b");
+        cl.check("b");
+        assert!(cl.next_pending().is_none());
+    }
+
+    #[test]
+    fn checklist_render_output() {
+        let mut cl = GettingStartedChecklist::new();
+        cl.add_item("a", "Install extensions");
+        cl.add_item("b", "Open a folder");
+        cl.check("a");
+        let lines = cl.render();
+        assert!(lines[0].contains("1/2"));
+        assert!(lines[1].contains("✓"));
+        assert!(lines[2].contains("○"));
     }
 }

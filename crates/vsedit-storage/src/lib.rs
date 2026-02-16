@@ -821,6 +821,254 @@ pub fn storage_migrate(
     applied
 }
 
+// ---------------------------------------------------------------------------
+// StorageQuota
+// ---------------------------------------------------------------------------
+
+/// Tracks storage usage against a configured quota.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StorageQuota {
+    max_keys: usize,
+    max_total_bytes: usize,
+    current_keys: usize,
+    current_bytes: usize,
+}
+
+impl StorageQuota {
+    /// Create a quota with maximum key count and total byte limit.
+    pub fn new(max_keys: usize, max_total_bytes: usize) -> Self {
+        Self {
+            max_keys,
+            max_total_bytes,
+            current_keys: 0,
+            current_bytes: 0,
+        }
+    }
+
+    /// Update usage counters from a [`StorageDatabase`].
+    pub fn compute_usage(&mut self, db: &StorageDatabase) {
+        self.current_keys = db.len();
+        self.current_bytes = db.export().iter().map(|(k, v)| k.len() + v.len()).sum();
+    }
+
+    /// Returns true if adding `key_bytes` + `value_bytes` would exceed quota.
+    pub fn would_exceed(&self, key_bytes: usize, value_bytes: usize) -> bool {
+        self.current_keys + 1 > self.max_keys
+            || self.current_bytes + key_bytes + value_bytes > self.max_total_bytes
+    }
+
+    /// Percentage of key quota used (0.0–100.0).
+    pub fn key_usage_percent(&self) -> f64 {
+        if self.max_keys == 0 {
+            return 100.0;
+        }
+        (self.current_keys as f64 / self.max_keys as f64) * 100.0
+    }
+
+    /// Percentage of byte quota used (0.0–100.0).
+    pub fn byte_usage_percent(&self) -> f64 {
+        if self.max_total_bytes == 0 {
+            return 100.0;
+        }
+        (self.current_bytes as f64 / self.max_total_bytes as f64) * 100.0
+    }
+
+    /// Remaining key capacity.
+    pub fn remaining_keys(&self) -> usize {
+        self.max_keys.saturating_sub(self.current_keys)
+    }
+
+    /// Remaining byte capacity.
+    pub fn remaining_bytes(&self) -> usize {
+        self.max_total_bytes.saturating_sub(self.current_bytes)
+    }
+
+    pub fn current_keys(&self) -> usize {
+        self.current_keys
+    }
+
+    pub fn current_bytes(&self) -> usize {
+        self.current_bytes
+    }
+}
+
+impl fmt::Display for StorageQuota {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Quota: {}/{} keys, {}/{} bytes",
+            self.current_keys, self.max_keys, self.current_bytes, self.max_total_bytes,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StorageExporter
+// ---------------------------------------------------------------------------
+
+/// Serialize/deserialize a [`StorageDatabase`] to/from a HashMap.
+pub struct StorageExporter;
+
+impl StorageExporter {
+    /// Export the database into a HashMap.
+    pub fn to_map(db: &StorageDatabase) -> HashMap<String, String> {
+        db.export().into_iter().collect()
+    }
+
+    /// Import from a HashMap, replacing all existing data.
+    pub fn from_map(map: &HashMap<String, String>) -> StorageDatabase {
+        let mut db = StorageDatabase::new();
+        for (k, v) in map {
+            db.set(k.clone(), v.clone());
+        }
+        db
+    }
+
+    /// Merge a map into an existing database. Existing keys are overwritten.
+    pub fn merge_map(db: &mut StorageDatabase, map: &HashMap<String, String>) {
+        for (k, v) in map {
+            db.set(k.clone(), v.clone());
+        }
+    }
+
+    /// Export only keys matching a prefix.
+    pub fn export_prefix(db: &StorageDatabase, prefix: &str) -> HashMap<String, String> {
+        db.export()
+            .into_iter()
+            .filter(|(k, _)| k.starts_with(prefix))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StorageChangeLog
+// ---------------------------------------------------------------------------
+
+/// A recorded change in storage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageChange {
+    pub key: String,
+    pub kind: StorageChangeKind,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+    pub sequence: u64,
+}
+
+/// The type of change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageChangeKind {
+    Set,
+    Remove,
+    Clear,
+}
+
+impl fmt::Display for StorageChangeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StorageChangeKind::Set => write!(f, "SET"),
+            StorageChangeKind::Remove => write!(f, "REMOVE"),
+            StorageChangeKind::Clear => write!(f, "CLEAR"),
+        }
+    }
+}
+
+/// Tracks changes made to a storage database.
+pub struct StorageChangeLog {
+    changes: Vec<StorageChange>,
+    next_seq: u64,
+}
+
+impl StorageChangeLog {
+    pub fn new() -> Self {
+        Self {
+            changes: Vec::new(),
+            next_seq: 1,
+        }
+    }
+
+    /// Record a SET operation.
+    pub fn record_set(&mut self, key: &str, old_value: Option<&str>, new_value: &str) {
+        self.changes.push(StorageChange {
+            key: key.to_string(),
+            kind: StorageChangeKind::Set,
+            old_value: old_value.map(|s| s.to_string()),
+            new_value: Some(new_value.to_string()),
+            sequence: self.next_seq,
+        });
+        self.next_seq += 1;
+    }
+
+    /// Record a REMOVE operation.
+    pub fn record_remove(&mut self, key: &str, old_value: Option<&str>) {
+        self.changes.push(StorageChange {
+            key: key.to_string(),
+            kind: StorageChangeKind::Remove,
+            old_value: old_value.map(|s| s.to_string()),
+            new_value: None,
+            sequence: self.next_seq,
+        });
+        self.next_seq += 1;
+    }
+
+    /// Record a CLEAR operation.
+    pub fn record_clear(&mut self, keys: &[String]) {
+        for key in keys {
+            self.changes.push(StorageChange {
+                key: key.clone(),
+                kind: StorageChangeKind::Clear,
+                old_value: None,
+                new_value: None,
+                sequence: self.next_seq,
+            });
+            self.next_seq += 1;
+        }
+    }
+
+    /// All changes since the log was created.
+    pub fn all_changes(&self) -> &[StorageChange] {
+        &self.changes
+    }
+
+    /// Changes for a specific key.
+    pub fn changes_for_key(&self, key: &str) -> Vec<&StorageChange> {
+        self.changes.iter().filter(|c| c.key == key).collect()
+    }
+
+    /// Number of recorded changes.
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Whether no changes have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Clear all recorded changes.
+    pub fn clear(&mut self) {
+        self.changes.clear();
+    }
+
+    /// Get all unique keys that were changed.
+    pub fn changed_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.changes.iter().map(|c| c.key.as_str()).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        keys
+    }
+
+    /// Changes since a given sequence number.
+    pub fn changes_since(&self, seq: u64) -> Vec<&StorageChange> {
+        self.changes.iter().filter(|c| c.sequence > seq).collect()
+    }
+}
+
+impl Default for StorageChangeLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1304,5 +1552,78 @@ mod tests {
         let mut db = StorageDatabase::new();
         let migrations = storage_migrate(&mut db, 1, &[]);
         assert!(migrations.is_empty());
+    }
+
+    // ── StorageQuota / Exporter / ChangeLog tests ──
+
+    #[test]
+    fn storage_quota_usage_tracking() {
+        let mut db = StorageDatabase::new();
+        db.set("key1", "value1");
+        db.set("key2", "value2");
+        let mut quota = StorageQuota::new(10, 1000);
+        quota.compute_usage(&db);
+        assert_eq!(quota.current_keys(), 2);
+        assert!(quota.current_bytes() > 0);
+        assert_eq!(quota.remaining_keys(), 8);
+        assert!(!quota.would_exceed(4, 6));
+    }
+
+    #[test]
+    fn storage_quota_exceed_detection() {
+        let mut quota = StorageQuota::new(2, 50);
+        quota.current_keys = 2;
+        quota.current_bytes = 45;
+        assert!(quota.would_exceed(3, 5));
+        assert!(quota.key_usage_percent() >= 99.0);
+    }
+
+    #[test]
+    fn storage_exporter_roundtrip() {
+        let mut db = StorageDatabase::new();
+        db.set("alpha", "1");
+        db.set("beta", "2");
+        let map = StorageExporter::to_map(&db);
+        let db2 = StorageExporter::from_map(&map);
+        assert_eq!(db2.get("alpha"), Some("1"));
+        assert_eq!(db2.get("beta"), Some("2"));
+        assert_eq!(db2.len(), 2);
+    }
+
+    #[test]
+    fn storage_exporter_export_prefix() {
+        let mut db = StorageDatabase::new();
+        db.set("app.theme", "dark");
+        db.set("app.font", "mono");
+        db.set("user.name", "alice");
+        let map = StorageExporter::export_prefix(&db, "app.");
+        assert_eq!(map.len(), 2);
+        assert!(map.contains_key("app.theme"));
+        assert!(!map.contains_key("user.name"));
+    }
+
+    #[test]
+    fn storage_changelog_records_changes() {
+        let mut log = StorageChangeLog::new();
+        log.record_set("key1", None, "val1");
+        log.record_set("key1", Some("val1"), "val2");
+        log.record_remove("key1", Some("val2"));
+        assert_eq!(log.len(), 3);
+        assert_eq!(log.changed_keys(), vec!["key1"]);
+        let key_changes = log.changes_for_key("key1");
+        assert_eq!(key_changes.len(), 3);
+        assert_eq!(key_changes[0].kind, StorageChangeKind::Set);
+        assert_eq!(key_changes[2].kind, StorageChangeKind::Remove);
+    }
+
+    #[test]
+    fn storage_changelog_changes_since() {
+        let mut log = StorageChangeLog::new();
+        log.record_set("a", None, "1");
+        log.record_set("b", None, "2");
+        log.record_set("c", None, "3");
+        let since = log.changes_since(1);
+        assert_eq!(since.len(), 2);
+        assert_eq!(since[0].key, "b");
     }
 }

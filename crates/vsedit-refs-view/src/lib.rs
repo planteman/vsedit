@@ -753,6 +753,221 @@ pub fn find_references_at(
     service.find_references(symbol_name, uri, line, col, include_declaration)
 }
 
+// ---------------------------------------------------------------------------
+// ReferenceGraph — graph of references between files
+// ---------------------------------------------------------------------------
+
+/// An edge in the reference graph: file A references file B.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferenceEdge {
+    pub from_uri: String,
+    pub to_uri: String,
+    pub count: usize,
+}
+
+/// A directed graph of file-to-file references.
+#[derive(Debug, Clone, Default)]
+pub struct ReferenceGraph {
+    edges: Vec<ReferenceEdge>,
+}
+
+impl ReferenceGraph {
+    pub fn new() -> Self {
+        Self { edges: Vec::new() }
+    }
+
+    /// Build a reference graph from a ReferencesModel.
+    /// The base location's URI is the "from" file; each reference's URI is the "to" file.
+    pub fn from_model(model: &ReferencesModel) -> Self {
+        let from = &model.base_location.uri;
+        let mut edge_map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for r in &model.references {
+            *edge_map.entry(r.location.uri.clone()).or_insert(0) += 1;
+        }
+        let edges = edge_map.into_iter().map(|(to_uri, count)| {
+            ReferenceEdge { from_uri: from.clone(), to_uri, count }
+        }).collect();
+        Self { edges }
+    }
+
+    /// Return all edges in the graph.
+    pub fn edges(&self) -> &[ReferenceEdge] {
+        &self.edges
+    }
+
+    /// Return files that the given URI references (outgoing edges).
+    pub fn outgoing(&self, uri: &str) -> Vec<&ReferenceEdge> {
+        self.edges.iter().filter(|e| e.from_uri == uri).collect()
+    }
+
+    /// Return files that reference the given URI (incoming edges).
+    pub fn incoming(&self, uri: &str) -> Vec<&ReferenceEdge> {
+        self.edges.iter().filter(|e| e.to_uri == uri).collect()
+    }
+
+    /// Return the total number of edges.
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Return all unique file URIs involved in the graph.
+    pub fn all_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.edges.iter()
+            .flat_map(|e| vec![e.from_uri.as_str(), e.to_uri.as_str()])
+            .collect();
+        files.sort_unstable();
+        files.dedup();
+        files
+    }
+
+    /// Add an edge or increment count if one already exists.
+    pub fn add_edge(&mut self, from: &str, to: &str) {
+        if let Some(edge) = self.edges.iter_mut().find(|e| e.from_uri == from && e.to_uri == to) {
+            edge.count += 1;
+        } else {
+            self.edges.push(ReferenceEdge {
+                from_uri: from.to_string(),
+                to_uri: to.to_string(),
+                count: 1,
+            });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferenceCluster — cluster related references
+// ---------------------------------------------------------------------------
+
+/// A cluster of references that are logically related.
+#[derive(Debug, Clone)]
+pub struct ReferenceCluster<'a> {
+    pub uri: String,
+    pub items: Vec<&'a ReferenceItem>,
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
+impl<'a> ReferenceCluster<'a> {
+    /// Number of references in this cluster.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Line span of the cluster.
+    pub fn line_span(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+}
+
+/// Cluster references within a model by proximity within files.
+pub fn cluster_references<'a>(model: &'a ReferencesModel, max_gap: u32) -> Vec<ReferenceCluster<'a>> {
+    let mut clusters = Vec::new();
+    for file_uri in model.unique_files() {
+        let sorted = model.sorted_refs_in_file(file_uri);
+        if sorted.is_empty() {
+            continue;
+        }
+        let mut current_items: Vec<&ReferenceItem> = vec![sorted[0]];
+        let mut start_line = sorted[0].location.start_line;
+        let mut end_line = sorted[0].location.end_line;
+        for r in &sorted[1..] {
+            if r.location.start_line <= end_line + max_gap {
+                current_items.push(r);
+                end_line = end_line.max(r.location.end_line);
+            } else {
+                clusters.push(ReferenceCluster {
+                    uri: file_uri.to_string(),
+                    items: std::mem::take(&mut current_items),
+                    start_line,
+                    end_line,
+                });
+                current_items.push(r);
+                start_line = r.location.start_line;
+                end_line = r.location.end_line;
+            }
+        }
+        if !current_items.is_empty() {
+            clusters.push(ReferenceCluster {
+                uri: file_uri.to_string(),
+                items: current_items,
+                start_line,
+                end_line,
+            });
+        }
+    }
+    clusters
+}
+
+// ---------------------------------------------------------------------------
+// ReferenceExporter — export references in different formats
+// ---------------------------------------------------------------------------
+
+/// Format for exporting references.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    PlainText,
+    Csv,
+    Json,
+}
+
+/// Export a ReferencesModel in the specified format.
+pub fn export_references(model: &ReferencesModel, format: ExportFormat) -> String {
+    match format {
+        ExportFormat::PlainText => {
+            let mut lines = Vec::new();
+            for r in &model.references {
+                lines.push(format!("{}:{}:{}: {}", r.location.uri, r.location.start_line, r.location.start_col, r.context_line));
+            }
+            lines.join("\n")
+        }
+        ExportFormat::Csv => {
+            let mut lines = vec!["uri,line,col,context".to_string()];
+            for r in &model.references {
+                let escaped = r.context_line.replace('"', "\"\"");
+                lines.push(format!("{},{},{},\"{}\"", r.location.uri, r.location.start_line, r.location.start_col, escaped));
+            }
+            lines.join("\n")
+        }
+        ExportFormat::Json => {
+            let entries: Vec<String> = model.references.iter().map(|r| {
+                format!(
+                    "{{\"uri\":\"{}\",\"line\":{},\"col\":{},\"context\":\"{}\"}}",
+                    r.location.uri, r.location.start_line, r.location.start_col,
+                    r.context_line.replace('\\', "\\\\").replace('"', "\\\"")
+                )
+            }).collect();
+            format!("[{}]", entries.join(","))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferencesModel grouping by kind
+// ---------------------------------------------------------------------------
+
+impl ReferencesModel {
+    /// Group kinded reference items by their kind.
+    pub fn group_by_kind(items: &[KindedReferenceItem]) -> Vec<(ReferenceKind, Vec<&ReferenceItem>)> {
+        let kinds = [
+            ReferenceKind::Declaration, ReferenceKind::Definition,
+            ReferenceKind::Read, ReferenceKind::Write,
+            ReferenceKind::Call, ReferenceKind::Import,
+            ReferenceKind::Other,
+        ];
+        kinds.iter().filter_map(|kind| {
+            let refs: Vec<&ReferenceItem> = items.iter()
+                .filter(|k| k.kind == *kind)
+                .map(|k| &k.item)
+                .collect();
+            if refs.is_empty() { None } else { Some((*kind, refs)) }
+        }).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1348,5 +1563,91 @@ mod tests {
         model.add_reference(ref_item("a.rs", 30, 0));
         let s = format!("{model}");
         assert_eq!(s, "3 references in 2 files");
+    }
+
+    // -- ReferenceGraph tests -----------------------------------------------
+
+    #[test]
+    fn graph_from_model() {
+        let mut model = ReferencesModel::new("sym", loc("main.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        model.add_reference(ref_item("a.rs", 20, 0));
+        model.add_reference(ref_item("b.rs", 5, 0));
+
+        let graph = ReferenceGraph::from_model(&model);
+        assert_eq!(graph.edge_count(), 2);
+        let outgoing = graph.outgoing("main.rs");
+        assert_eq!(outgoing.len(), 2);
+        // a.rs should have count 2
+        let a_edge = outgoing.iter().find(|e| e.to_uri == "a.rs").unwrap();
+        assert_eq!(a_edge.count, 2);
+    }
+
+    #[test]
+    fn graph_add_edge_increments() {
+        let mut graph = ReferenceGraph::new();
+        graph.add_edge("x.rs", "y.rs");
+        graph.add_edge("x.rs", "y.rs");
+        assert_eq!(graph.edge_count(), 1);
+        assert_eq!(graph.edges()[0].count, 2);
+    }
+
+    #[test]
+    fn graph_incoming_and_all_files() {
+        let mut graph = ReferenceGraph::new();
+        graph.add_edge("a.rs", "b.rs");
+        graph.add_edge("c.rs", "b.rs");
+        let incoming = graph.incoming("b.rs");
+        assert_eq!(incoming.len(), 2);
+        let files = graph.all_files();
+        assert_eq!(files.len(), 3);
+    }
+
+    // -- ReferenceCluster tests ---------------------------------------------
+
+    #[test]
+    fn cluster_references_groups_nearby() {
+        let mut model = ReferencesModel::new("sym", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        model.add_reference(ref_item("a.rs", 12, 0));
+        model.add_reference(ref_item("a.rs", 50, 0));
+        let clusters = cluster_references(&model, 5);
+        assert_eq!(clusters.len(), 2);
+        assert_eq!(clusters[0].len(), 2);
+        assert_eq!(clusters[1].len(), 1);
+    }
+
+    // -- ReferenceExporter tests --------------------------------------------
+
+    #[test]
+    fn export_plain_text_format() {
+        let mut model = ReferencesModel::new("sym", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 5));
+        let text = export_references(&model, ExportFormat::PlainText);
+        assert!(text.contains("a.rs:10:5:"));
+    }
+
+    #[test]
+    fn export_csv_format() {
+        let mut model = ReferencesModel::new("sym", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("b.rs", 20, 0));
+        let csv = export_references(&model, ExportFormat::Csv);
+        assert!(csv.starts_with("uri,line,col,context"));
+        assert!(csv.contains("b.rs,20,0,"));
+    }
+
+    // -- Group by kind tests ------------------------------------------------
+
+    #[test]
+    fn group_by_kind_partitions_items() {
+        let items = vec![
+            KindedReferenceItem { item: ref_item("a.rs", 1, 0), kind: ReferenceKind::Read },
+            KindedReferenceItem { item: ref_item("a.rs", 5, 0), kind: ReferenceKind::Write },
+            KindedReferenceItem { item: ref_item("b.rs", 10, 0), kind: ReferenceKind::Read },
+        ];
+        let groups = ReferencesModel::group_by_kind(&items);
+        assert_eq!(groups.len(), 2); // Read and Write
+        let read_group = groups.iter().find(|(k, _)| *k == ReferenceKind::Read).unwrap();
+        assert_eq!(read_group.1.len(), 2);
     }
 }

@@ -742,6 +742,166 @@ impl Default for AuthProviderRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AuthAuditLog
+// ---------------------------------------------------------------------------
+
+/// The kind of authentication event recorded in the audit log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthEventKind {
+    /// A new session was created.
+    SessionCreated,
+    /// A session was removed / logged out.
+    SessionRemoved,
+    /// A token was refreshed.
+    TokenRefreshed,
+    /// An authentication attempt was denied.
+    AuthDenied,
+    /// A provider was registered.
+    ProviderRegistered,
+    /// A provider was unregistered.
+    ProviderUnregistered,
+}
+
+impl fmt::Display for AuthEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::SessionCreated => "SessionCreated",
+            Self::SessionRemoved => "SessionRemoved",
+            Self::TokenRefreshed => "TokenRefreshed",
+            Self::AuthDenied => "AuthDenied",
+            Self::ProviderRegistered => "ProviderRegistered",
+            Self::ProviderUnregistered => "ProviderUnregistered",
+        };
+        f.write_str(label)
+    }
+}
+
+/// A single entry in the authentication audit log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthAuditEntry {
+    pub timestamp: u64,
+    pub kind: AuthEventKind,
+    pub provider_id: String,
+    pub session_id: Option<String>,
+    pub detail: Option<String>,
+}
+
+/// Append-only audit log for authentication events.
+#[derive(Debug, Clone, Default)]
+pub struct AuthAuditLog {
+    entries: Vec<AuthAuditEntry>,
+}
+
+impl AuthAuditLog {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Record an event in the audit log.
+    pub fn record(
+        &mut self,
+        timestamp: u64,
+        kind: AuthEventKind,
+        provider_id: impl Into<String>,
+        session_id: Option<String>,
+        detail: Option<String>,
+    ) {
+        self.entries.push(AuthAuditEntry {
+            timestamp,
+            kind,
+            provider_id: provider_id.into(),
+            session_id,
+            detail,
+        });
+    }
+
+    /// Return all entries.
+    pub fn entries(&self) -> &[AuthAuditEntry] {
+        &self.entries
+    }
+
+    /// Return entries filtered by event kind.
+    pub fn entries_by_kind(&self, kind: &AuthEventKind) -> Vec<&AuthAuditEntry> {
+        self.entries.iter().filter(|e| &e.kind == kind).collect()
+    }
+
+    /// Return entries for a specific provider.
+    pub fn entries_for_provider(&self, provider_id: &str) -> Vec<&AuthAuditEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.provider_id == provider_id)
+            .collect()
+    }
+
+    /// Return the total number of recorded events.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PermissionChecker
+// ---------------------------------------------------------------------------
+
+/// A simple permission checker that maps required scopes to actions.
+#[derive(Debug, Clone)]
+pub struct PermissionChecker {
+    rules: Vec<(String, Vec<String>)>,
+}
+
+impl PermissionChecker {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Define the scopes required to perform `action`.
+    pub fn add_rule(&mut self, action: impl Into<String>, required_scopes: Vec<String>) {
+        self.rules.push((action.into(), required_scopes));
+    }
+
+    /// Check whether a session is allowed to perform the given action.
+    pub fn is_allowed(&self, session: &AuthSession, action: &str) -> bool {
+        match self.rules.iter().find(|(a, _)| a == action) {
+            Some((_, required)) => required.iter().all(|s| session.has_scope(s)),
+            // No rule means the action is unrestricted.
+            None => true,
+        }
+    }
+
+    /// Return all actions that the given session is permitted to perform.
+    pub fn allowed_actions(&self, session: &AuthSession) -> Vec<&str> {
+        self.rules
+            .iter()
+            .filter(|(_, required)| required.iter().all(|s| session.has_scope(s)))
+            .map(|(action, _)| action.as_str())
+            .collect()
+    }
+
+    /// Return the number of rules defined.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl Default for PermissionChecker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Attempt to refresh an auth token. Returns a new session with updated token.
 pub fn auth_token_refresh(
     session: &AuthSession,
@@ -1260,5 +1420,75 @@ mod tests {
         assert_eq!(refreshed.access_token, "new_token");
         assert_eq!(refreshed.expires_at, Some(2000));
         assert_eq!(refreshed.session_id, "s1");
+    }
+
+    // -- AuthAuditLog tests ---------------------------------------------------
+
+    #[test]
+    fn audit_log_record_and_query() {
+        let mut log = AuthAuditLog::new();
+        assert!(log.is_empty());
+
+        log.record(100, AuthEventKind::SessionCreated, "github", Some("s1".into()), None);
+        log.record(200, AuthEventKind::TokenRefreshed, "github", Some("s1".into()), None);
+        log.record(300, AuthEventKind::AuthDenied, "azure", None, Some("bad creds".into()));
+
+        assert_eq!(log.len(), 3);
+        assert!(!log.is_empty());
+        assert_eq!(log.entries_by_kind(&AuthEventKind::AuthDenied).len(), 1);
+        assert_eq!(log.entries_for_provider("github").len(), 2);
+        assert_eq!(log.entries_for_provider("azure").len(), 1);
+    }
+
+    #[test]
+    fn audit_log_clear() {
+        let mut log = AuthAuditLog::new();
+        log.record(1, AuthEventKind::ProviderRegistered, "gh", None, None);
+        log.record(2, AuthEventKind::ProviderUnregistered, "gh", None, None);
+        assert_eq!(log.len(), 2);
+        log.clear();
+        assert!(log.is_empty());
+    }
+
+    #[test]
+    fn audit_event_kind_display() {
+        assert_eq!(AuthEventKind::SessionCreated.to_string(), "SessionCreated");
+        assert_eq!(AuthEventKind::AuthDenied.to_string(), "AuthDenied");
+        assert_eq!(AuthEventKind::TokenRefreshed.to_string(), "TokenRefreshed");
+        assert_eq!(AuthEventKind::ProviderRegistered.to_string(), "ProviderRegistered");
+    }
+
+    // -- PermissionChecker tests ----------------------------------------------
+
+    #[test]
+    fn permission_checker_allows_when_scopes_match() {
+        let mut checker = PermissionChecker::new();
+        checker.add_rule("read_repo", vec!["repo".into()]);
+        checker.add_rule("admin", vec!["repo".into(), "admin".into()]);
+
+        let session = AuthSession::new("s1", "gh", "tok")
+            .with_scopes(vec!["repo".into(), "admin".into()]);
+        assert!(checker.is_allowed(&session, "read_repo"));
+        assert!(checker.is_allowed(&session, "admin"));
+        assert_eq!(checker.allowed_actions(&session).len(), 2);
+    }
+
+    #[test]
+    fn permission_checker_denies_missing_scope() {
+        let mut checker = PermissionChecker::new();
+        checker.add_rule("admin", vec!["admin".into()]);
+
+        let session = AuthSession::new("s1", "gh", "tok")
+            .with_scopes(vec!["repo".into()]);
+        assert!(!checker.is_allowed(&session, "admin"));
+        assert!(checker.allowed_actions(&session).is_empty());
+        assert_eq!(checker.rule_count(), 1);
+    }
+
+    #[test]
+    fn permission_checker_unknown_action_is_unrestricted() {
+        let checker = PermissionChecker::new();
+        let session = AuthSession::new("s1", "gh", "tok");
+        assert!(checker.is_allowed(&session, "anything"));
     }
 }

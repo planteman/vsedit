@@ -678,6 +678,232 @@ impl<T: Clone> Default for UndoGroupBuilder<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UndoRedoMetrics — tracks undo/redo usage statistics
+// ---------------------------------------------------------------------------
+
+/// Tracks frequency and usage statistics for undo/redo operations.
+#[derive(Debug, Clone, Default)]
+pub struct UndoRedoMetrics {
+    /// Total number of undo operations performed.
+    pub undo_count: u64,
+    /// Total number of redo operations performed.
+    pub redo_count: u64,
+    /// Total number of push operations performed.
+    pub push_count: u64,
+    /// Total number of clear operations performed.
+    pub clear_count: u64,
+    /// Peak undo depth ever reached.
+    pub peak_undo_depth: usize,
+}
+
+impl UndoRedoMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record an undo operation.
+    pub fn record_undo(&mut self) {
+        self.undo_count += 1;
+    }
+
+    /// Record a redo operation.
+    pub fn record_redo(&mut self) {
+        self.redo_count += 1;
+    }
+
+    /// Record a push operation and update peak depth if needed.
+    pub fn record_push(&mut self, current_depth: usize) {
+        self.push_count += 1;
+        if current_depth > self.peak_undo_depth {
+            self.peak_undo_depth = current_depth;
+        }
+    }
+
+    /// Record a clear operation.
+    pub fn record_clear(&mut self) {
+        self.clear_count += 1;
+    }
+
+    /// Returns the total number of all recorded operations.
+    pub fn total_operations(&self) -> u64 {
+        self.undo_count + self.redo_count + self.push_count + self.clear_count
+    }
+
+    /// Reset all metrics to zero.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
+impl fmt::Display for UndoRedoMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Metrics(push: {}, undo: {}, redo: {}, clear: {}, peak: {})",
+            self.push_count,
+            self.undo_count,
+            self.redo_count,
+            self.clear_count,
+            self.peak_undo_depth,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Checkpoint — named snapshot of undo/redo stack state
+// ---------------------------------------------------------------------------
+
+/// A checkpoint captures the lengths of the undo and redo stacks at a moment
+/// in time, allowing callers to detect whether changes have been made since
+/// the checkpoint was taken.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Checkpoint {
+    /// Label for the checkpoint.
+    pub label: String,
+    /// Length of the undo stack when the checkpoint was taken.
+    pub undo_len: usize,
+    /// Length of the redo stack when the checkpoint was taken.
+    pub redo_len: usize,
+    /// Monotonic sequence number at checkpoint time.
+    pub seq: u64,
+}
+
+impl fmt::Display for Checkpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Checkpoint('{}', undo={}, redo={}, seq={})",
+            self.label, self.undo_len, self.redo_len, self.seq,
+        )
+    }
+}
+
+impl<T: Clone> UndoRedoStack<T> {
+    /// Create a named checkpoint of the current stack state.
+    pub fn checkpoint(&self, label: impl Into<String>, seq: u64) -> Checkpoint {
+        Checkpoint {
+            label: label.into(),
+            undo_len: self.past.len(),
+            redo_len: self.future.len(),
+            seq,
+        }
+    }
+
+    /// Returns `true` if the stack state has changed since the given checkpoint.
+    pub fn changed_since(&self, cp: &Checkpoint) -> bool {
+        self.past.len() != cp.undo_len || self.future.len() != cp.redo_len
+    }
+
+    /// Truncate the undo stack back to the depth recorded in the checkpoint,
+    /// discarding any entries pushed after the checkpoint was taken.
+    /// Returns the number of entries removed.
+    pub fn restore_to_checkpoint(&mut self, cp: &Checkpoint) -> usize {
+        let removed = self.past.len().saturating_sub(cp.undo_len);
+        self.past.truncate(cp.undo_len);
+        self.future.truncate(cp.redo_len);
+        removed
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryCompactor — compact consecutive similar entries
+// ---------------------------------------------------------------------------
+
+/// Compacts an undo history by merging consecutive entries that satisfy a
+/// caller-provided predicate.
+pub struct HistoryCompactor;
+
+impl HistoryCompactor {
+    /// Compact a vector of entries by merging consecutive runs where `should_merge`
+    /// returns `true`. Merged runs are combined using `merge_fn`.
+    pub fn compact<T>(
+        entries: Vec<T>,
+        should_merge: impl Fn(&T, &T) -> bool,
+        merge_fn: impl Fn(Vec<T>) -> T,
+    ) -> Vec<T> {
+        if entries.is_empty() {
+            return Vec::new();
+        }
+        let mut result: Vec<Vec<T>> = Vec::new();
+        let mut current_run: Vec<T> = Vec::new();
+
+        for entry in entries {
+            if current_run.is_empty() {
+                current_run.push(entry);
+            } else if should_merge(current_run.last().unwrap(), &entry) {
+                current_run.push(entry);
+            } else {
+                result.push(std::mem::take(&mut current_run));
+                current_run.push(entry);
+            }
+        }
+        if !current_run.is_empty() {
+            result.push(current_run);
+        }
+
+        result.into_iter().map(merge_fn).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TimelineEntry — helper for visualising undo history
+// ---------------------------------------------------------------------------
+
+/// A single entry in an undo/redo timeline suitable for display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineEntry {
+    /// Index within the combined timeline (0 = oldest).
+    pub index: usize,
+    /// Whether this entry is in the undo (past) or redo (future) portion.
+    pub kind: TimelineKind,
+    /// Human-readable description.
+    pub label: String,
+}
+
+/// Whether a timeline entry is part of the undo or redo stack.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimelineKind {
+    Undo,
+    Redo,
+}
+
+impl fmt::Display for TimelineEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let marker = match self.kind {
+            TimelineKind::Undo => "←",
+            TimelineKind::Redo => "→",
+        };
+        write!(f, "{:>3} {} {}", self.index, marker, self.label)
+    }
+}
+
+impl<T: Clone + fmt::Display> UndoRedoStack<T> {
+    /// Build a timeline of all undo and redo entries for display.
+    ///
+    /// Undo entries come first (oldest to newest), then redo entries (oldest
+    /// to newest — i.e. the next redo first).
+    pub fn timeline(&self) -> Vec<TimelineEntry> {
+        let mut out = Vec::with_capacity(self.past.len() + self.future.len());
+        for (i, item) in self.past.iter().enumerate() {
+            out.push(TimelineEntry {
+                index: i,
+                kind: TimelineKind::Undo,
+                label: item.to_string(),
+            });
+        }
+        // Redo stack is stored newest-first internally; reverse for display.
+        for (i, item) in self.future.iter().rev().enumerate() {
+            out.push(TimelineEntry {
+                index: self.past.len() + i,
+                kind: TimelineKind::Redo,
+                label: item.to_string(),
+            });
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1249,5 +1475,114 @@ mod tests {
         let builder = builder.add_edit(1).add_edit(2);
         assert!(!builder.is_empty());
         assert_eq!(builder.edit_count(), 2);
+    }
+
+    // -- UndoRedoMetrics tests -----------------------------------------------
+
+    #[test]
+    fn metrics_tracks_operations() {
+        let mut m = UndoRedoMetrics::new();
+        assert_eq!(m.total_operations(), 0);
+
+        m.record_push(1);
+        m.record_push(2);
+        m.record_push(3);
+        m.record_undo();
+        m.record_redo();
+        m.record_clear();
+
+        assert_eq!(m.push_count, 3);
+        assert_eq!(m.undo_count, 1);
+        assert_eq!(m.redo_count, 1);
+        assert_eq!(m.clear_count, 1);
+        assert_eq!(m.total_operations(), 6);
+        assert_eq!(m.peak_undo_depth, 3);
+
+        let display = format!("{m}");
+        assert!(display.contains("push: 3"));
+        assert!(display.contains("peak: 3"));
+    }
+
+    #[test]
+    fn metrics_reset() {
+        let mut m = UndoRedoMetrics::new();
+        m.record_push(5);
+        m.record_undo();
+        m.reset();
+        assert_eq!(m.total_operations(), 0);
+        assert_eq!(m.peak_undo_depth, 0);
+    }
+
+    // -- Checkpoint tests ----------------------------------------------------
+
+    #[test]
+    fn checkpoint_detects_changes() {
+        let mut stack = UndoRedoStack::new();
+        stack.push(1);
+        stack.push(2);
+        let cp = stack.checkpoint("save", 1);
+        assert!(!stack.changed_since(&cp));
+
+        stack.push(3);
+        assert!(stack.changed_since(&cp));
+
+        let display = format!("{cp}");
+        assert!(display.contains("save"));
+        assert!(display.contains("seq=1"));
+    }
+
+    #[test]
+    fn checkpoint_restore_truncates() {
+        let mut stack = UndoRedoStack::new();
+        stack.push(10);
+        stack.push(20);
+        let cp = stack.checkpoint("before-batch", 0);
+        stack.push(30);
+        stack.push(40);
+        assert_eq!(stack.undo_count(), 4);
+
+        let removed = stack.restore_to_checkpoint(&cp);
+        assert_eq!(removed, 2);
+        assert_eq!(stack.undo_count(), 2);
+        assert_eq!(stack.peek_undo(), Some(&20));
+    }
+
+    // -- HistoryCompactor tests ----------------------------------------------
+
+    #[test]
+    fn compactor_merges_consecutive_runs() {
+        // Compact consecutive equal values by summing them
+        let entries = vec![1, 1, 1, 2, 2, 3];
+        let compacted = HistoryCompactor::compact(
+            entries,
+            |a, b| a == b,
+            |run| run.iter().sum(),
+        );
+        assert_eq!(compacted, vec![3, 4, 3]);
+    }
+
+    // -- Timeline tests ------------------------------------------------------
+
+    #[test]
+    fn timeline_shows_undo_and_redo() {
+        let mut stack = UndoRedoStack::new();
+        stack.push("alpha".to_string());
+        stack.push("beta".to_string());
+        stack.push("gamma".to_string());
+        stack.undo(); // gamma moves to redo
+
+        let tl = stack.timeline();
+        assert_eq!(tl.len(), 3);
+        assert_eq!(tl[0].kind, TimelineKind::Undo);
+        assert_eq!(tl[0].label, "alpha");
+        assert_eq!(tl[1].kind, TimelineKind::Undo);
+        assert_eq!(tl[1].label, "beta");
+        assert_eq!(tl[2].kind, TimelineKind::Redo);
+        assert_eq!(tl[2].label, "gamma");
+
+        // Display format
+        let display = format!("{}", tl[0]);
+        assert!(display.contains("←"));
+        assert!(display.contains("alpha"));
     }
 }

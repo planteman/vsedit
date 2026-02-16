@@ -765,6 +765,304 @@ pub fn update_check_interval(
     }
 }
 
+// ---------------------------------------------------------------------------
+// UpdateDiffSummary – summarize changes between versions
+// ---------------------------------------------------------------------------
+
+/// Summarizes the differences between two versions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UpdateDiffSummary {
+    pub from_version: String,
+    pub to_version: String,
+    pub features_added: Vec<String>,
+    pub bugs_fixed: Vec<String>,
+    pub breaking_changes: Vec<String>,
+}
+
+impl UpdateDiffSummary {
+    /// Create a new diff summary between two versions.
+    pub fn new(from: impl Into<String>, to: impl Into<String>) -> Self {
+        Self {
+            from_version: from.into(),
+            to_version: to.into(),
+            features_added: Vec::new(),
+            bugs_fixed: Vec::new(),
+            breaking_changes: Vec::new(),
+        }
+    }
+
+    /// Add a new feature to the summary.
+    pub fn add_feature(&mut self, feature: impl Into<String>) -> &mut Self {
+        self.features_added.push(feature.into());
+        self
+    }
+
+    /// Add a bug fix to the summary.
+    pub fn add_fix(&mut self, fix: impl Into<String>) -> &mut Self {
+        self.bugs_fixed.push(fix.into());
+        self
+    }
+
+    /// Add a breaking change to the summary.
+    pub fn add_breaking(&mut self, change: impl Into<String>) -> &mut Self {
+        self.breaking_changes.push(change.into());
+        self
+    }
+
+    /// Total number of changes.
+    pub fn total_changes(&self) -> usize {
+        self.features_added.len() + self.bugs_fixed.len() + self.breaking_changes.len()
+    }
+
+    /// Whether there are any breaking changes.
+    pub fn has_breaking_changes(&self) -> bool {
+        !self.breaking_changes.is_empty()
+    }
+
+    /// Whether the update is a major version bump.
+    pub fn is_major_update(&self) -> bool {
+        let from = VersionParts::parse(&self.from_version);
+        let to = VersionParts::parse(&self.to_version);
+        match (from, to) {
+            (Some(f), Some(t)) => t.major > f.major,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for UpdateDiffSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} → {}: {} features, {} fixes, {} breaking",
+            self.from_version,
+            self.to_version,
+            self.features_added.len(),
+            self.bugs_fixed.len(),
+            self.breaking_changes.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateRollbackPlan – plan rollback to a previous version
+// ---------------------------------------------------------------------------
+
+/// Describes a plan for rolling back to a previous version.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UpdateRollbackPlan {
+    pub current_version: String,
+    pub target_version: String,
+    pub steps: Vec<String>,
+    pub requires_restart: bool,
+    pub data_migration_needed: bool,
+}
+
+impl UpdateRollbackPlan {
+    /// Create a rollback plan from current to target version.
+    pub fn new(current: impl Into<String>, target: impl Into<String>) -> Self {
+        let current = current.into();
+        let target = target.into();
+        let cur_parts = VersionParts::parse(&current);
+        let tgt_parts = VersionParts::parse(&target);
+
+        let requires_restart = true; // rollbacks always require restart
+        let data_migration_needed = match (&cur_parts, &tgt_parts) {
+            (Some(c), Some(t)) => c.major != t.major,
+            _ => false,
+        };
+
+        let mut steps = vec![
+            format!("Backup current configuration (v{})", current),
+            format!("Download version {}", target),
+        ];
+        if data_migration_needed {
+            steps.push("Run data migration (major version change)".into());
+        }
+        steps.push(format!("Install version {}", target));
+        steps.push("Restart application".into());
+
+        Self {
+            current_version: current,
+            target_version: target,
+            steps,
+            requires_restart,
+            data_migration_needed,
+        }
+    }
+
+    /// Number of steps in the plan.
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Whether the rollback crosses a major version boundary.
+    pub fn is_major_rollback(&self) -> bool {
+        self.data_migration_needed
+    }
+
+    /// Validate that the target version is actually older than current.
+    pub fn is_valid(&self) -> bool {
+        let cur = VersionParts::parse(&self.current_version);
+        let tgt = VersionParts::parse(&self.target_version);
+        match (cur, tgt) {
+            (Some(c), Some(t)) => t.is_older_than(&c),
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for UpdateRollbackPlan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Rollback {} → {} ({} steps)",
+            self.current_version,
+            self.target_version,
+            self.steps.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdatePrerequisites – check prerequisites before update
+// ---------------------------------------------------------------------------
+
+/// A single prerequisite check.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Prerequisite {
+    pub name: String,
+    pub description: String,
+    pub satisfied: bool,
+}
+
+/// Checks prerequisites before allowing an update to proceed.
+#[derive(Debug, Clone)]
+pub struct UpdatePrerequisites {
+    checks: Vec<Prerequisite>,
+}
+
+impl UpdatePrerequisites {
+    pub fn new() -> Self {
+        Self {
+            checks: Vec::new(),
+        }
+    }
+
+    /// Add a prerequisite check.
+    pub fn add_check(
+        &mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        satisfied: bool,
+    ) -> &mut Self {
+        self.checks.push(Prerequisite {
+            name: name.into(),
+            description: description.into(),
+            satisfied,
+        });
+        self
+    }
+
+    /// Returns true if all prerequisites are satisfied.
+    pub fn all_satisfied(&self) -> bool {
+        self.checks.iter().all(|c| c.satisfied)
+    }
+
+    /// Return the list of unsatisfied prerequisites.
+    pub fn unsatisfied(&self) -> Vec<&Prerequisite> {
+        self.checks.iter().filter(|c| !c.satisfied).collect()
+    }
+
+    /// Total number of prerequisites.
+    pub fn count(&self) -> usize {
+        self.checks.len()
+    }
+
+    /// Number of satisfied prerequisites.
+    pub fn satisfied_count(&self) -> usize {
+        self.checks.iter().filter(|c| c.satisfied).count()
+    }
+
+    /// Check a minimum version prerequisite.
+    pub fn require_min_version(&mut self, current: &str, minimum: &str) -> &mut Self {
+        let cur = VersionParts::parse(current);
+        let min = VersionParts::parse(minimum);
+        let satisfied = match (cur, min) {
+            (Some(c), Some(m)) => !c.is_older_than(&m),
+            _ => false,
+        };
+        self.add_check(
+            "min_version",
+            format!("Requires at least version {minimum}"),
+            satisfied,
+        )
+    }
+
+    /// Check a disk space prerequisite (in bytes).
+    pub fn require_disk_space(&mut self, available_bytes: u64, required_bytes: u64) -> &mut Self {
+        self.add_check(
+            "disk_space",
+            format!("Requires {required_bytes} bytes free"),
+            available_bytes >= required_bytes,
+        )
+    }
+}
+
+impl Default for UpdatePrerequisites {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VersionParts – comparison and range checking extensions
+// ---------------------------------------------------------------------------
+
+impl VersionParts {
+    /// Check if this version falls within the given range [min, max] inclusive.
+    pub fn in_range(&self, min: &VersionParts, max: &VersionParts) -> bool {
+        !self.is_older_than(min) && (self == max || self.is_older_than(max))
+    }
+
+    /// Return the number of version increments between two versions
+    /// as a simple tuple (major_diff, minor_diff, patch_diff).
+    pub fn increments_from(&self, other: &VersionParts) -> (u32, u32, u32) {
+        (
+            self.major.abs_diff(other.major),
+            self.minor.abs_diff(other.minor),
+            self.patch.abs_diff(other.patch),
+        )
+    }
+
+    /// Return the "severity" of the version difference: Major, Minor, or Patch.
+    pub fn diff_severity(&self, other: &VersionParts) -> &'static str {
+        if self.major != other.major {
+            "major"
+        } else if self.minor != other.minor {
+            "minor"
+        } else if self.patch != other.patch {
+            "patch"
+        } else {
+            "none"
+        }
+    }
+
+    /// Construct from individual components.
+    pub fn from_parts(major: u32, minor: u32, patch: u32) -> Self {
+        Self {
+            major,
+            minor,
+            patch,
+        }
+    }
+
+    /// Return true if this version is newer than the other.
+    pub fn is_newer_than(&self, other: &Self) -> bool {
+        other.is_older_than(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1329,5 +1627,131 @@ mod tests {
         assert_eq!(svc.history()[0], info1);
         let versions: Vec<String> = svc.into_iter().map(|i| i.version).collect();
         assert_eq!(versions, vec!["1.1.0", "1.2.0"]);
+    }
+
+    // -- UpdateDiffSummary tests -------------------------------------------
+
+    #[test]
+    fn diff_summary_basic() {
+        let mut summary = UpdateDiffSummary::new("1.0.0", "1.1.0");
+        summary.add_feature("New editor tabs");
+        summary.add_fix("Fixed crash on startup");
+        assert_eq!(summary.total_changes(), 2);
+        assert!(!summary.has_breaking_changes());
+        assert!(!summary.is_major_update());
+    }
+
+    #[test]
+    fn diff_summary_major_update_with_breaking() {
+        let mut summary = UpdateDiffSummary::new("1.0.0", "2.0.0");
+        summary.add_breaking("API changed");
+        assert!(summary.has_breaking_changes());
+        assert!(summary.is_major_update());
+    }
+
+    #[test]
+    fn diff_summary_display() {
+        let mut s = UpdateDiffSummary::new("1.0.0", "1.1.0");
+        s.add_feature("feat1");
+        s.add_fix("fix1");
+        let display = format!("{s}");
+        assert!(display.contains("1.0.0 → 1.1.0"));
+        assert!(display.contains("1 features"));
+    }
+
+    // -- UpdateRollbackPlan tests ------------------------------------------
+
+    #[test]
+    fn rollback_plan_valid() {
+        let plan = UpdateRollbackPlan::new("2.0.0", "1.5.0");
+        assert!(plan.is_valid());
+        assert!(plan.requires_restart);
+        assert!(plan.step_count() >= 4); // includes migration step for major change
+        assert!(plan.is_major_rollback());
+    }
+
+    #[test]
+    fn rollback_plan_same_major() {
+        let plan = UpdateRollbackPlan::new("1.5.0", "1.3.0");
+        assert!(plan.is_valid());
+        assert!(!plan.is_major_rollback());
+    }
+
+    #[test]
+    fn rollback_plan_invalid_newer_target() {
+        let plan = UpdateRollbackPlan::new("1.0.0", "2.0.0");
+        assert!(!plan.is_valid());
+    }
+
+    #[test]
+    fn rollback_plan_display() {
+        let plan = UpdateRollbackPlan::new("2.0.0", "1.0.0");
+        let s = format!("{plan}");
+        assert!(s.contains("Rollback 2.0.0 → 1.0.0"));
+    }
+
+    // -- UpdatePrerequisites tests -----------------------------------------
+
+    #[test]
+    fn prerequisites_all_satisfied() {
+        let mut prereqs = UpdatePrerequisites::new();
+        prereqs.require_min_version("1.5.0", "1.0.0");
+        prereqs.require_disk_space(1_000_000, 500_000);
+        assert!(prereqs.all_satisfied());
+        assert_eq!(prereqs.satisfied_count(), 2);
+    }
+
+    #[test]
+    fn prerequisites_version_too_old() {
+        let mut prereqs = UpdatePrerequisites::new();
+        prereqs.require_min_version("0.9.0", "1.0.0");
+        assert!(!prereqs.all_satisfied());
+        assert_eq!(prereqs.unsatisfied().len(), 1);
+        assert_eq!(prereqs.unsatisfied()[0].name, "min_version");
+    }
+
+    #[test]
+    fn prerequisites_disk_space_insufficient() {
+        let mut prereqs = UpdatePrerequisites::new();
+        prereqs.require_disk_space(100, 500);
+        assert!(!prereqs.all_satisfied());
+    }
+
+    // -- VersionParts extension tests --------------------------------------
+
+    #[test]
+    fn version_in_range() {
+        let v = VersionParts::from_parts(1, 5, 0);
+        let min = VersionParts::from_parts(1, 0, 0);
+        let max = VersionParts::from_parts(2, 0, 0);
+        assert!(v.in_range(&min, &max));
+        assert!(!VersionParts::from_parts(0, 9, 0).in_range(&min, &max));
+    }
+
+    #[test]
+    fn version_diff_severity() {
+        let v1 = VersionParts::from_parts(1, 0, 0);
+        let v2 = VersionParts::from_parts(2, 0, 0);
+        assert_eq!(v1.diff_severity(&v2), "major");
+        let v3 = VersionParts::from_parts(1, 1, 0);
+        assert_eq!(v1.diff_severity(&v3), "minor");
+        let v4 = VersionParts::from_parts(1, 0, 1);
+        assert_eq!(v1.diff_severity(&v4), "patch");
+        assert_eq!(v1.diff_severity(&v1), "none");
+    }
+
+    #[test]
+    fn version_increments_from() {
+        let v1 = VersionParts::from_parts(1, 2, 3);
+        let v2 = VersionParts::from_parts(3, 0, 1);
+        assert_eq!(v1.increments_from(&v2), (2, 2, 2));
+    }
+
+    #[test]
+    fn version_is_newer_than() {
+        let v1 = VersionParts::from_parts(1, 0, 0);
+        let v2 = VersionParts::from_parts(2, 0, 0);
+        assert!(v2.is_newer_than(&v1));
+        assert!(!v1.is_newer_than(&v2));
     }
 }

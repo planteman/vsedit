@@ -783,6 +783,261 @@ pub fn view_drag_transfer(
     registry.move_view_to_container(&drag_data.view_id, &target)
 }
 
+// ---------------------------------------------------------------------------
+// ViewStack
+// ---------------------------------------------------------------------------
+
+/// A stack-based manager for view layers with push/pop semantics.
+#[derive(Debug, Clone)]
+pub struct ViewStack {
+    layers: Vec<String>,
+    max_depth: usize,
+}
+
+impl ViewStack {
+    /// Create a new view stack with a maximum depth.
+    pub fn new(max_depth: usize) -> Self {
+        Self {
+            layers: Vec::new(),
+            max_depth: max_depth.max(1),
+        }
+    }
+
+    /// Push a view onto the stack. Returns false if the stack is full.
+    pub fn push(&mut self, view_id: impl Into<String>) -> bool {
+        if self.layers.len() >= self.max_depth {
+            return false;
+        }
+        self.layers.push(view_id.into());
+        true
+    }
+
+    /// Pop the top view off the stack.
+    pub fn pop(&mut self) -> Option<String> {
+        self.layers.pop()
+    }
+
+    /// Peek at the top view without removing it.
+    pub fn top(&self) -> Option<&str> {
+        self.layers.last().map(|s| s.as_str())
+    }
+
+    /// Number of views on the stack.
+    pub fn depth(&self) -> usize {
+        self.layers.len()
+    }
+
+    /// Check if the stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.layers.is_empty()
+    }
+
+    /// Check if the stack is full.
+    pub fn is_full(&self) -> bool {
+        self.layers.len() >= self.max_depth
+    }
+
+    /// Check if a view is anywhere in the stack.
+    pub fn contains(&self, view_id: &str) -> bool {
+        self.layers.iter().any(|v| v == view_id)
+    }
+
+    /// Clear all views from the stack.
+    pub fn clear(&mut self) {
+        self.layers.clear();
+    }
+
+    /// Get all views as a slice, bottom to top.
+    pub fn as_slice(&self) -> &[String] {
+        &self.layers
+    }
+
+    /// Bring a specific view to the top, removing it from its current position.
+    pub fn bring_to_top(&mut self, view_id: &str) -> bool {
+        if let Some(pos) = self.layers.iter().position(|v| v == view_id) {
+            let view = self.layers.remove(pos);
+            self.layers.push(view);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for ViewStack {
+    fn default() -> Self {
+        Self::new(64)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewFocusHistory
+// ---------------------------------------------------------------------------
+
+/// Tracks which views have been focused, in order.
+#[derive(Debug, Clone)]
+pub struct ViewFocusHistory {
+    history: Vec<String>,
+    max_entries: usize,
+}
+
+impl ViewFocusHistory {
+    /// Create a new focus history with a maximum number of entries.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            history: Vec::new(),
+            max_entries: max_entries.max(1),
+        }
+    }
+
+    /// Record that a view received focus.
+    /// If already in history, it's moved to the most recent position.
+    pub fn record_focus(&mut self, view_id: impl Into<String>) {
+        let id = view_id.into();
+        self.history.retain(|v| v != &id);
+        self.history.push(id);
+        while self.history.len() > self.max_entries {
+            self.history.remove(0);
+        }
+    }
+
+    /// Get the most recently focused view.
+    pub fn most_recent(&self) -> Option<&str> {
+        self.history.last().map(|s| s.as_str())
+    }
+
+    /// Get the previously focused view (the one before the most recent).
+    pub fn previous(&self) -> Option<&str> {
+        if self.history.len() >= 2 {
+            Some(self.history[self.history.len() - 2].as_str())
+        } else {
+            None
+        }
+    }
+
+    /// Number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Check if the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.history.is_empty()
+    }
+
+    /// Get the full focus history, most recent last.
+    pub fn entries(&self) -> &[String] {
+        &self.history
+    }
+
+    /// Clear the focus history.
+    pub fn clear(&mut self) {
+        self.history.clear();
+    }
+
+    /// Check if a view appears in the history.
+    pub fn contains(&self, view_id: &str) -> bool {
+        self.history.iter().any(|v| v == view_id)
+    }
+}
+
+impl Default for ViewFocusHistory {
+    fn default() -> Self {
+        Self::new(50)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewLayoutConstraint
+// ---------------------------------------------------------------------------
+
+/// Layout constraints for a view with aspect ratio support.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewLayoutConstraint {
+    pub min_width: u16,
+    pub min_height: u16,
+    pub max_width: Option<u16>,
+    pub max_height: Option<u16>,
+    pub aspect_ratio: Option<f64>,
+}
+
+impl ViewLayoutConstraint {
+    /// Create constraints with minimum dimensions.
+    pub fn new(min_width: u16, min_height: u16) -> Self {
+        Self {
+            min_width,
+            min_height,
+            max_width: None,
+            max_height: None,
+            aspect_ratio: None,
+        }
+    }
+
+    /// Set the desired aspect ratio (width / height).
+    pub fn with_aspect_ratio(mut self, ratio: f64) -> Self {
+        self.aspect_ratio = Some(ratio);
+        self
+    }
+
+    /// Set the maximum width.
+    pub fn with_max_width(mut self, w: u16) -> Self {
+        self.max_width = Some(w);
+        self
+    }
+
+    /// Set the maximum height.
+    pub fn with_max_height(mut self, h: u16) -> Self {
+        self.max_height = Some(h);
+        self
+    }
+
+    /// Given a width, compute the constrained height respecting aspect ratio.
+    pub fn compute_height_for_width(&self, width: u16) -> u16 {
+        let h = match self.aspect_ratio {
+            Some(ratio) if ratio > 0.0 => (width as f64 / ratio).round() as u16,
+            _ => self.min_height,
+        };
+        let h = h.max(self.min_height);
+        match self.max_height {
+            Some(max) => h.min(max),
+            None => h,
+        }
+    }
+
+    /// Given a height, compute the constrained width respecting aspect ratio.
+    pub fn compute_width_for_height(&self, height: u16) -> u16 {
+        let w = match self.aspect_ratio {
+            Some(ratio) if ratio > 0.0 => (height as f64 * ratio).round() as u16,
+            _ => self.min_width,
+        };
+        let w = w.max(self.min_width);
+        match self.max_width {
+            Some(max) => w.min(max),
+            None => w,
+        }
+    }
+
+    /// Check if given dimensions satisfy these constraints.
+    pub fn satisfies(&self, width: u16, height: u16) -> bool {
+        if width < self.min_width || height < self.min_height {
+            return false;
+        }
+        if self.max_width.is_some_and(|m| width > m) {
+            return false;
+        }
+        if self.max_height.is_some_and(|m| height > m) {
+            return false;
+        }
+        true
+    }
+}
+
+impl Default for ViewLayoutConstraint {
+    fn default() -> Self {
+        Self::new(1, 1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1304,5 +1559,84 @@ mod tests {
         let views = registry.get_views("panel");
         assert_eq!(views.len(), 1);
         assert_eq!(views[0].id, "files");
+    }
+
+    // ── ViewStack / FocusHistory / LayoutConstraint tests ──
+
+    #[test]
+    fn view_stack_push_pop() {
+        let mut stack = ViewStack::new(3);
+        assert!(stack.push("a"));
+        assert!(stack.push("b"));
+        assert!(stack.push("c"));
+        assert!(!stack.push("d")); // full
+        assert!(stack.is_full());
+        assert_eq!(stack.top(), Some("c"));
+        assert_eq!(stack.pop(), Some("c".to_string()));
+        assert_eq!(stack.depth(), 2);
+    }
+
+    #[test]
+    fn view_stack_bring_to_top() {
+        let mut stack = ViewStack::new(10);
+        stack.push("a");
+        stack.push("b");
+        stack.push("c");
+        assert!(stack.bring_to_top("a"));
+        assert_eq!(stack.top(), Some("a"));
+        assert!(!stack.bring_to_top("nonexistent"));
+    }
+
+    #[test]
+    fn focus_history_tracks_order() {
+        let mut hist = ViewFocusHistory::new(5);
+        hist.record_focus("editor");
+        hist.record_focus("terminal");
+        hist.record_focus("files");
+        assert_eq!(hist.most_recent(), Some("files"));
+        assert_eq!(hist.previous(), Some("terminal"));
+        assert_eq!(hist.len(), 3);
+    }
+
+    #[test]
+    fn focus_history_deduplicates() {
+        let mut hist = ViewFocusHistory::new(10);
+        hist.record_focus("a");
+        hist.record_focus("b");
+        hist.record_focus("a"); // should move "a" to most recent
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist.most_recent(), Some("a"));
+    }
+
+    #[test]
+    fn focus_history_max_entries() {
+        let mut hist = ViewFocusHistory::new(2);
+        hist.record_focus("a");
+        hist.record_focus("b");
+        hist.record_focus("c");
+        assert_eq!(hist.len(), 2);
+        assert!(!hist.contains("a"));
+        assert!(hist.contains("b"));
+        assert!(hist.contains("c"));
+    }
+
+    #[test]
+    fn view_layout_constraint_aspect_ratio() {
+        let c = ViewLayoutConstraint::new(10, 10).with_aspect_ratio(16.0 / 9.0);
+        let h = c.compute_height_for_width(160);
+        assert_eq!(h, 90);
+        let w = c.compute_width_for_height(90);
+        assert_eq!(w, 160);
+    }
+
+    #[test]
+    fn view_layout_constraint_satisfies() {
+        let c = ViewLayoutConstraint::new(10, 10)
+            .with_max_width(200)
+            .with_max_height(150);
+        assert!(c.satisfies(100, 100));
+        assert!(!c.satisfies(5, 100));
+        assert!(!c.satisfies(100, 5));
+        assert!(!c.satisfies(201, 100));
     }
 }

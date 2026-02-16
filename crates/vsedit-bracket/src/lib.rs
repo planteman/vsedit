@@ -731,6 +731,212 @@ pub fn bracket_errors(lines: &[&str], pairs: &[BracketPair]) -> Vec<BracketError
     errors
 }
 
+// ── BracketStatistics ──
+
+/// Per-bracket-type count.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketTypeCount {
+    pub open: char,
+    pub close: char,
+    pub open_count: usize,
+    pub close_count: usize,
+}
+
+/// Detailed bracket statistics including per-type counts and nesting depth
+/// histogram.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketStatistics {
+    /// Counts per bracket type.
+    pub type_counts: Vec<BracketTypeCount>,
+    /// Histogram mapping nesting depth to number of brackets at that depth.
+    pub depth_histogram: Vec<usize>,
+    /// Total number of opening brackets.
+    pub total_opens: usize,
+    /// Total number of closing brackets.
+    pub total_closes: usize,
+    /// Whether all brackets are balanced.
+    pub is_balanced: bool,
+}
+
+impl BracketStatistics {
+    /// Compute detailed statistics for the given document.
+    pub fn compute(lines: &[&str], pairs: &[BracketPair]) -> Self {
+        let mut type_counts: Vec<BracketTypeCount> = pairs
+            .iter()
+            .map(|p| BracketTypeCount {
+                open: p.open,
+                close: p.close,
+                open_count: 0,
+                close_count: 0,
+            })
+            .collect();
+        let mut depth: usize = 0;
+        let mut depth_histogram: Vec<usize> = Vec::new();
+
+        for line in lines {
+            for ch in line.chars() {
+                for (pi, pair) in pairs.iter().enumerate() {
+                    if ch == pair.open {
+                        type_counts[pi].open_count += 1;
+                        // Record this bracket at the current depth
+                        if depth >= depth_histogram.len() {
+                            depth_histogram.resize(depth + 1, 0);
+                        }
+                        depth_histogram[depth] += 1;
+                        depth += 1;
+                    } else if ch == pair.close {
+                        type_counts[pi].close_count += 1;
+                        if depth > 0 {
+                            depth -= 1;
+                        }
+                        if depth >= depth_histogram.len() {
+                            depth_histogram.resize(depth + 1, 0);
+                        }
+                        depth_histogram[depth] += 1;
+                    }
+                }
+            }
+        }
+
+        let total_opens: usize = type_counts.iter().map(|c| c.open_count).sum();
+        let total_closes: usize = type_counts.iter().map(|c| c.close_count).sum();
+        let is_balanced = type_counts.iter().all(|c| c.open_count == c.close_count);
+
+        BracketStatistics {
+            type_counts,
+            depth_histogram,
+            total_opens,
+            total_closes,
+            is_balanced,
+        }
+    }
+
+    /// Return the maximum nesting depth observed.
+    pub fn max_depth(&self) -> usize {
+        if self.depth_histogram.is_empty() {
+            0
+        } else {
+            self.depth_histogram.len() - 1
+        }
+    }
+}
+
+// ── BracketHighlighter ──
+
+/// A range of text that should be highlighted as a bracket.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketHighlightRange {
+    pub line: u32,
+    pub col_start: u32,
+    pub col_end: u32,
+    pub color: String,
+    pub depth: u32,
+    pub is_open: bool,
+}
+
+/// Produces colored highlight ranges for all brackets in a document.
+pub struct BracketHighlighter {
+    colors: Vec<String>,
+}
+
+impl BracketHighlighter {
+    /// Create a highlighter with the given palette.
+    pub fn new(colors: Vec<String>) -> Self {
+        Self { colors }
+    }
+
+    /// Generate highlight ranges for every bracket in the document.
+    pub fn highlight(
+        &self,
+        lines: &[&str],
+        pairs: &[BracketPair],
+    ) -> Vec<BracketHighlightRange> {
+        if self.colors.is_empty() {
+            return Vec::new();
+        }
+        let mut results = Vec::new();
+        let mut depth: u32 = 0;
+        for (li, line) in lines.iter().enumerate() {
+            for (ci, ch) in line.char_indices() {
+                let is_open = pairs.iter().any(|p| p.open == ch);
+                let is_close = pairs.iter().any(|p| p.close == ch);
+                if is_open {
+                    let color_idx = (depth as usize) % self.colors.len();
+                    results.push(BracketHighlightRange {
+                        line: (li + 1) as u32,
+                        col_start: (ci + 1) as u32,
+                        col_end: (ci + 2) as u32,
+                        color: self.colors[color_idx].clone(),
+                        depth,
+                        is_open: true,
+                    });
+                    depth += 1;
+                } else if is_close {
+                    if depth > 0 {
+                        depth -= 1;
+                    }
+                    let color_idx = (depth as usize) % self.colors.len();
+                    results.push(BracketHighlightRange {
+                        line: (li + 1) as u32,
+                        col_start: (ci + 1) as u32,
+                        col_end: (ci + 2) as u32,
+                        color: self.colors[color_idx].clone(),
+                        depth,
+                        is_open: false,
+                    });
+                }
+            }
+        }
+        results
+    }
+}
+
+// ── Bracket auto-close suggestions ──
+
+/// A suggestion to auto-close a bracket.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoCloseSuggestion {
+    pub line: u32,
+    pub col: u32,
+    pub close_char: char,
+    pub open_char: char,
+}
+
+/// Scan the document and suggest where unclosed brackets should be closed.
+pub fn suggest_auto_close(
+    lines: &[&str],
+    pairs: &[BracketPair],
+) -> Vec<AutoCloseSuggestion> {
+    let mut stack: Vec<(char, char, u32, u32)> = Vec::new(); // (open, close, line, col)
+    for (li, line) in lines.iter().enumerate() {
+        for (ci, ch) in line.char_indices() {
+            if let Some(pair) = pairs.iter().find(|p| p.open == ch) {
+                stack.push((pair.open, pair.close, (li + 1) as u32, (ci + 1) as u32));
+            } else if pairs.iter().any(|p| p.close == ch) {
+                // Pop matching open if available
+                if let Some(pos) = stack.iter().rposition(|(_, close, _, _)| *close == ch) {
+                    stack.remove(pos);
+                }
+            }
+        }
+    }
+
+    // Remaining items on the stack need a closing bracket
+    let last_line = lines.len() as u32;
+    let last_col = lines.last().map(|l| l.len() as u32 + 1).unwrap_or(1);
+
+    stack
+        .into_iter()
+        .rev()
+        .map(|(open_char, close_char, _, _)| AutoCloseSuggestion {
+            line: last_line,
+            col: last_col,
+            close_char,
+            open_char,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1297,5 +1503,74 @@ mod tests {
         assert_eq!(errs.len(), 2);
         assert_eq!(errs[0].error_kind, BracketErrorKind::UnmatchedClose);
         assert_eq!(errs[1].error_kind, BracketErrorKind::UnmatchedOpen);
+    }
+
+    // ── BracketStatistics tests ──
+
+    #[test]
+    fn bracket_statistics_balanced() {
+        let lines = vec!["fn f() {", "  let x = [1, 2];", "}"];
+        let pairs = default_bracket_pairs();
+        let stats = BracketStatistics::compute(&lines, &pairs);
+        assert!(stats.is_balanced);
+        assert_eq!(stats.total_opens, stats.total_closes);
+        assert!(stats.max_depth() >= 1);
+    }
+
+    #[test]
+    fn bracket_statistics_unbalanced() {
+        let lines = vec!["(("];
+        let pairs = default_bracket_pairs();
+        let stats = BracketStatistics::compute(&lines, &pairs);
+        assert!(!stats.is_balanced);
+        assert_eq!(stats.total_opens, 2);
+        assert_eq!(stats.total_closes, 0);
+    }
+
+    #[test]
+    fn bracket_statistics_depth_histogram() {
+        let lines = vec!["(())"];
+        let pairs = default_bracket_pairs();
+        let stats = BracketStatistics::compute(&lines, &pairs);
+        // depth 0: outer open + outer close = 2
+        // depth 1: inner open + inner close = 2
+        assert_eq!(stats.depth_histogram.len(), 2);
+        assert_eq!(stats.depth_histogram[0], 2);
+        assert_eq!(stats.depth_histogram[1], 2);
+    }
+
+    // ── BracketHighlighter tests ──
+
+    #[test]
+    fn bracket_highlighter_basic() {
+        let lines = vec!["(a)"];
+        let pairs = default_bracket_pairs();
+        let hl = BracketHighlighter::new(vec!["red".into(), "blue".into()]);
+        let ranges = hl.highlight(&lines, &pairs);
+        assert_eq!(ranges.len(), 2);
+        assert!(ranges[0].is_open);
+        assert!(!ranges[1].is_open);
+        assert_eq!(ranges[0].color, ranges[1].color); // same depth
+    }
+
+    // ── Auto-close suggestion tests ──
+
+    #[test]
+    fn suggest_auto_close_unclosed() {
+        let lines = vec!["fn f() {", "  let x = (1;"];
+        let pairs = default_bracket_pairs();
+        let suggestions = suggest_auto_close(&lines, &pairs);
+        assert_eq!(suggestions.len(), 2); // unclosed { and (
+        let close_chars: Vec<char> = suggestions.iter().map(|s| s.close_char).collect();
+        assert!(close_chars.contains(&')'));
+        assert!(close_chars.contains(&'}'));
+    }
+
+    #[test]
+    fn suggest_auto_close_all_closed() {
+        let lines = vec!["fn f() {}"];
+        let pairs = default_bracket_pairs();
+        let suggestions = suggest_auto_close(&lines, &pairs);
+        assert!(suggestions.is_empty());
     }
 }

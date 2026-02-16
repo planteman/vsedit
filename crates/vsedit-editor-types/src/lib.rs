@@ -571,6 +571,266 @@ impl Default for EditorTypesValidator {
 }
 
 // ---------------------------------------------------------------------------
+// TextEdit — a range + replacement text
+// ---------------------------------------------------------------------------
+
+/// A single text edit: replace `range` with `new_text`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextEdit {
+    pub range: Range,
+    pub new_text: String,
+}
+
+impl TextEdit {
+    /// Create a new text edit.
+    pub fn new(range: Range, new_text: impl Into<String>) -> Self {
+        Self { range, new_text: new_text.into() }
+    }
+
+    /// Create an insertion edit at a position (empty range).
+    pub fn insert(position: Position, text: impl Into<String>) -> Self {
+        Self {
+            range: Range::from_positions(position, position),
+            new_text: text.into(),
+        }
+    }
+
+    /// Create a deletion edit (replacement text is empty).
+    pub fn delete(range: Range) -> Self {
+        Self { range, new_text: String::new() }
+    }
+
+    /// Whether this edit is a pure insertion (empty range).
+    pub fn is_insert(&self) -> bool {
+        self.range.is_empty()
+    }
+
+    /// Whether this edit is a pure deletion (empty new_text, non-empty range).
+    pub fn is_delete(&self) -> bool {
+        !self.range.is_empty() && self.new_text.is_empty()
+    }
+
+    /// Whether this edit is a replacement (non-empty range and non-empty new_text).
+    pub fn is_replace(&self) -> bool {
+        !self.range.is_empty() && !self.new_text.is_empty()
+    }
+
+    /// Classify this edit as an EditOperation.
+    pub fn classify(&self) -> EditOperation {
+        if self.is_insert() {
+            EditOperation::Insert {
+                position: self.range.start,
+                text: self.new_text.clone(),
+            }
+        } else if self.is_delete() {
+            EditOperation::Delete { range: self.range }
+        } else {
+            EditOperation::Replace {
+                range: self.range,
+                text: self.new_text.clone(),
+            }
+        }
+    }
+
+    /// Apply this edit to lines of text (1-based line numbers).
+    /// Returns the modified text as a single string.
+    pub fn apply(&self, text: &str) -> String {
+        let lines: Vec<&str> = text.lines().collect();
+        let mut result = String::new();
+
+        // Convert start/end to 0-based indices
+        let start_line = (self.range.start.line as usize).saturating_sub(1);
+        let start_col = (self.range.start.column as usize).saturating_sub(1);
+        let end_line = (self.range.end.line as usize).saturating_sub(1);
+        let end_col = (self.range.end.column as usize).saturating_sub(1);
+
+        // Add lines before the edit range
+        for (i, line) in lines.iter().enumerate() {
+            if i < start_line {
+                result.push_str(line);
+                result.push('\n');
+            } else if i == start_line {
+                // Partial first line
+                let prefix = &line[..start_col.min(line.len())];
+                result.push_str(prefix);
+                result.push_str(&self.new_text);
+
+                // If start and end are on the same line
+                if start_line == end_line {
+                    let suffix_start = end_col.min(line.len());
+                    result.push_str(&line[suffix_start..]);
+                    result.push('\n');
+                }
+            } else if i > start_line && i < end_line {
+                // Skip lines inside the range
+                continue;
+            } else if i == end_line && start_line != end_line {
+                let suffix_start = end_col.min(line.len());
+                result.push_str(&line[suffix_start..]);
+                result.push('\n');
+            } else if i > end_line {
+                result.push_str(line);
+                result.push('\n');
+            }
+        }
+
+        // Handle case where text has no trailing newline
+        if !text.ends_with('\n') && result.ends_with('\n') {
+            result.pop();
+        }
+        result
+    }
+}
+
+impl fmt::Display for TextEdit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_insert() {
+            write!(f, "Insert({}, {:?})", self.range.start, self.new_text)
+        } else if self.is_delete() {
+            write!(f, "Delete({})", self.range)
+        } else {
+            write!(f, "Replace({}, {:?})", self.range, self.new_text)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditOperation enum
+// ---------------------------------------------------------------------------
+
+/// Classification of an edit operation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EditOperation {
+    Insert { position: Position, text: String },
+    Delete { range: Range },
+    Replace { range: Range, text: String },
+}
+
+impl EditOperation {
+    /// Convert back to a TextEdit.
+    pub fn to_text_edit(&self) -> TextEdit {
+        match self {
+            EditOperation::Insert { position, text } => TextEdit::insert(*position, text.clone()),
+            EditOperation::Delete { range } => TextEdit::delete(*range),
+            EditOperation::Replace { range, text } => TextEdit::new(*range, text.clone()),
+        }
+    }
+
+    /// The affected range of this operation.
+    pub fn affected_range(&self) -> Range {
+        match self {
+            EditOperation::Insert { position, .. } => Range::from_positions(*position, *position),
+            EditOperation::Delete { range } => *range,
+            EditOperation::Replace { range, .. } => *range,
+        }
+    }
+}
+
+impl fmt::Display for EditOperation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EditOperation::Insert { position, text } => {
+                write!(f, "Insert at {} ({} chars)", position, text.len())
+            }
+            EditOperation::Delete { range } => {
+                write!(f, "Delete {}", range)
+            }
+            EditOperation::Replace { range, text } => {
+                write!(f, "Replace {} with {} chars", range, text.len())
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch edit application
+// ---------------------------------------------------------------------------
+
+/// Apply multiple text edits to text. Edits are sorted by range in reverse
+/// order so later edits don't shift earlier positions.
+pub fn apply_edits(text: &str, edits: &[TextEdit]) -> String {
+    if edits.is_empty() {
+        return text.to_string();
+    }
+    let mut sorted_edits: Vec<&TextEdit> = edits.iter().collect();
+    sorted_edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+
+    let mut result = text.to_string();
+    for edit in sorted_edits {
+        result = edit.apply(&result);
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Range splitting / subtraction
+// ---------------------------------------------------------------------------
+
+impl Range {
+    /// Subtract `other` from `self`, returning the remaining pieces.
+    ///
+    /// If `other` does not intersect, returns `[self]`.
+    /// If `other` fully contains `self`, returns empty vec.
+    /// If `other` partially overlaps, returns 1 or 2 remaining fragments.
+    pub fn subtract(&self, other: &Range) -> Vec<Range> {
+        if !self.intersects(other) {
+            return vec![*self];
+        }
+        if other.contains_range(self) {
+            return Vec::new();
+        }
+        let mut result = Vec::new();
+        // Left fragment: self.start..other.start
+        if self.start < other.start {
+            result.push(Range { start: self.start, end: other.start });
+        }
+        // Right fragment: other.end..self.end
+        if other.end < self.end {
+            result.push(Range { start: other.end, end: self.end });
+        }
+        result
+    }
+
+    /// Split this range at a position, returning (left, right).
+    /// If the position is outside the range, one side will be empty.
+    pub fn split_at(&self, pos: Position) -> (Range, Range) {
+        if pos <= self.start {
+            (
+                Range { start: self.start, end: self.start },
+                *self,
+            )
+        } else if pos >= self.end {
+            (
+                *self,
+                Range { start: self.end, end: self.end },
+            )
+        } else {
+            (
+                Range { start: self.start, end: pos },
+                Range { start: pos, end: self.end },
+            )
+        }
+    }
+
+    /// Returns true if this range touches `other` (adjacent or overlapping).
+    pub fn touches(&self, other: &Range) -> bool {
+        self.start <= other.end && other.start <= self.end
+    }
+
+    /// Merge two touching ranges into one, or return None if disjoint.
+    pub fn merge(&self, other: &Range) -> Option<Range> {
+        if self.touches(other) {
+            Some(Range {
+                start: Position::min(self.start, other.start),
+                end: Position::max(self.end, other.end),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Selection direction and position containment
 // ---------------------------------------------------------------------------
 
@@ -1289,5 +1549,94 @@ mod tests {
         let u = a.union(&b);
         assert_eq!(u.start, Position::new(1, 1));
         assert_eq!(u.end, Position::new(6, 1));
+    }
+
+    // ---- TextEdit tests ----
+
+    #[test]
+    fn text_edit_classify_insert() {
+        let edit = TextEdit::insert(Position::new(1, 1), "hello");
+        assert!(edit.is_insert());
+        assert!(!edit.is_delete());
+        assert!(!edit.is_replace());
+        match edit.classify() {
+            EditOperation::Insert { position, text } => {
+                assert_eq!(position, Position::new(1, 1));
+                assert_eq!(text, "hello");
+            }
+            _ => panic!("Expected Insert"),
+        }
+    }
+
+    #[test]
+    fn text_edit_classify_delete() {
+        let edit = TextEdit::delete(Range::new(1, 1, 1, 5));
+        assert!(edit.is_delete());
+        assert!(!edit.is_insert());
+    }
+
+    #[test]
+    fn text_edit_apply_single_line_replace() {
+        let text = "hello world";
+        let edit = TextEdit::new(Range::new(1, 1, 1, 6), "goodbye");
+        let result = edit.apply(text);
+        assert_eq!(result, "goodbye world");
+    }
+
+    #[test]
+    fn edit_operation_roundtrip() {
+        let edit = TextEdit::new(Range::new(1, 1, 2, 3), "replacement");
+        let op = edit.classify();
+        let back = op.to_text_edit();
+        assert_eq!(back.range, edit.range);
+        assert_eq!(back.new_text, edit.new_text);
+    }
+
+    // ---- Range subtraction / splitting tests ----
+
+    #[test]
+    fn range_subtract_no_overlap() {
+        let a = Range::new(1, 1, 2, 1);
+        let b = Range::new(5, 1, 6, 1);
+        let result = a.subtract(&b);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], a);
+    }
+
+    #[test]
+    fn range_subtract_full_cover() {
+        let a = Range::new(2, 1, 3, 1);
+        let b = Range::new(1, 1, 5, 1);
+        let result = a.subtract(&b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn range_split_at_middle() {
+        let r = Range::new(1, 1, 3, 1);
+        let (left, right) = r.split_at(Position::new(2, 1));
+        assert_eq!(left.start, Position::new(1, 1));
+        assert_eq!(left.end, Position::new(2, 1));
+        assert_eq!(right.start, Position::new(2, 1));
+        assert_eq!(right.end, Position::new(3, 1));
+    }
+
+    #[test]
+    fn range_merge_adjacent() {
+        let a = Range::new(1, 1, 2, 1);
+        let b = Range::new(2, 1, 3, 1);
+        let merged = a.merge(&b);
+        assert!(merged.is_some());
+        let m = merged.unwrap();
+        assert_eq!(m.start, Position::new(1, 1));
+        assert_eq!(m.end, Position::new(3, 1));
+    }
+
+    #[test]
+    fn range_touches_disjoint() {
+        let a = Range::new(1, 1, 2, 1);
+        let b = Range::new(3, 1, 4, 1);
+        assert!(!a.touches(&b));
+        assert!(a.merge(&b).is_none());
     }
 }

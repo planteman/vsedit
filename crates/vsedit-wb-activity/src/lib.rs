@@ -697,6 +697,268 @@ pub fn activity_bar_restore(bar: &mut ActivityBar, state: &ActivityBarState) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ActivityBarLayout – overflow handling
+// ---------------------------------------------------------------------------
+
+/// Layout result for rendering the activity bar with a fixed capacity.
+#[derive(Debug, Clone)]
+pub struct ActivityBarLayout {
+    pub visible_items: Vec<String>,
+    pub overflow_items: Vec<String>,
+    pub capacity: usize,
+}
+
+impl ActivityBarLayout {
+    /// Compute layout from a bar given a maximum visible capacity.
+    pub fn compute(bar: &ActivityBar, capacity: usize) -> Self {
+        let visible: Vec<&ActivityBarItem> = bar.get_visible_items();
+        let mut vis_ids = Vec::new();
+        let mut overflow_ids = Vec::new();
+        for (i, item) in visible.iter().enumerate() {
+            if i < capacity {
+                vis_ids.push(item.id.clone());
+            } else {
+                overflow_ids.push(item.id.clone());
+            }
+        }
+        Self {
+            visible_items: vis_ids,
+            overflow_items: overflow_ids,
+            capacity,
+        }
+    }
+
+    pub fn has_overflow(&self) -> bool {
+        !self.overflow_items.is_empty()
+    }
+
+    pub fn overflow_count(&self) -> usize {
+        self.overflow_items.len()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.visible_items.len() + self.overflow_items.len()
+    }
+}
+
+impl fmt::Display for ActivityBarLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Layout({} visible, {} overflow)",
+            self.visible_items.len(),
+            self.overflow_items.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityBadgeCounter – numeric badge tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks numeric badge counters for activity bar items.
+#[derive(Debug, Clone)]
+pub struct ActivityBadgeCounter {
+    counts: std::collections::HashMap<String, u32>,
+}
+
+impl ActivityBadgeCounter {
+    pub fn new() -> Self {
+        Self {
+            counts: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Set the badge count for an item.
+    pub fn set(&mut self, id: impl Into<String>, count: u32) {
+        self.counts.insert(id.into(), count);
+    }
+
+    /// Increment badge count by 1, returning the new value.
+    pub fn increment(&mut self, id: impl Into<String>) -> u32 {
+        let entry = self.counts.entry(id.into()).or_insert(0);
+        *entry += 1;
+        *entry
+    }
+
+    /// Decrement badge count by 1 (saturating), returning the new value.
+    pub fn decrement(&mut self, id: &str) -> u32 {
+        if let Some(entry) = self.counts.get_mut(id) {
+            *entry = entry.saturating_sub(1);
+            *entry
+        } else {
+            0
+        }
+    }
+
+    /// Get count for an item (0 if not set).
+    pub fn get(&self, id: &str) -> u32 {
+        self.counts.get(id).copied().unwrap_or(0)
+    }
+
+    /// Clear count for an item.
+    pub fn clear(&mut self, id: &str) {
+        self.counts.remove(id);
+    }
+
+    /// Clear all counters.
+    pub fn clear_all(&mut self) {
+        self.counts.clear();
+    }
+
+    /// Total across all items.
+    pub fn total(&self) -> u32 {
+        self.counts.values().sum()
+    }
+
+    /// Items with non-zero counts.
+    pub fn active_items(&self) -> Vec<(&str, u32)> {
+        let mut items: Vec<(&str, u32)> = self
+            .counts
+            .iter()
+            .filter(|(_, v)| **v > 0)
+            .map(|(k, v)| (k.as_str(), *v))
+            .collect();
+        items.sort_by_key(|(k, _)| k.to_string());
+        items
+    }
+
+    /// Format count as a badge string (e.g., "99+" for large values).
+    pub fn format_badge(count: u32) -> String {
+        if count == 0 {
+            String::new()
+        } else if count > 99 {
+            "99+".to_string()
+        } else {
+            count.to_string()
+        }
+    }
+}
+
+impl Default for ActivityBadgeCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityItemGroup – grouping with separators
+// ---------------------------------------------------------------------------
+
+/// A group of activity bar items that appear together with optional separators.
+#[derive(Debug, Clone)]
+pub struct ActivityItemGroup {
+    pub label: String,
+    pub item_ids: Vec<String>,
+    pub collapsed: bool,
+}
+
+impl ActivityItemGroup {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            item_ids: Vec::new(),
+            collapsed: false,
+        }
+    }
+
+    pub fn add_item(&mut self, id: impl Into<String>) {
+        self.item_ids.push(id.into());
+    }
+
+    pub fn remove_item(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.item_ids.iter().position(|s| s == id) {
+            self.item_ids.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.item_ids.iter().any(|s| s == id)
+    }
+
+    pub fn toggle_collapse(&mut self) {
+        self.collapsed = !self.collapsed;
+    }
+
+    pub fn len(&self) -> usize {
+        self.item_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.item_ids.is_empty()
+    }
+}
+
+impl fmt::Display for ActivityItemGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let state = if self.collapsed { "collapsed" } else { "expanded" };
+        write!(f, "Group({}, {} items, {})", self.label, self.item_ids.len(), state)
+    }
+}
+
+/// Manages multiple item groups for the activity bar.
+#[derive(Debug, Clone)]
+pub struct ActivityGroupManager {
+    groups: Vec<ActivityItemGroup>,
+}
+
+impl ActivityGroupManager {
+    pub fn new() -> Self {
+        Self {
+            groups: Vec::new(),
+        }
+    }
+
+    pub fn add_group(&mut self, group: ActivityItemGroup) {
+        self.groups.push(group);
+    }
+
+    pub fn find_group(&self, label: &str) -> Option<&ActivityItemGroup> {
+        self.groups.iter().find(|g| g.label == label)
+    }
+
+    pub fn find_group_mut(&mut self, label: &str) -> Option<&mut ActivityItemGroup> {
+        self.groups.iter_mut().find(|g| g.label == label)
+    }
+
+    /// Find which group contains the given item id.
+    pub fn group_for_item(&self, id: &str) -> Option<&ActivityItemGroup> {
+        self.groups.iter().find(|g| g.contains(id))
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Total items across all groups.
+    pub fn total_items(&self) -> usize {
+        self.groups.iter().map(|g| g.len()).sum()
+    }
+
+    /// Flattened order of all item ids (respecting group ordering).
+    pub fn flattened_order(&self) -> Vec<&str> {
+        self.groups
+            .iter()
+            .filter(|g| !g.collapsed)
+            .flat_map(|g| g.item_ids.iter().map(|s| s.as_str()))
+            .collect()
+    }
+
+    pub fn groups(&self) -> &[ActivityItemGroup] {
+        &self.groups
+    }
+}
+
+impl Default for ActivityGroupManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1300,5 +1562,95 @@ mod tests {
         bar.add_item(make_item("b", 1));
         bar.set_position(ActivityBarPosition::Top);
         assert_eq!(format!("{bar}"), "ActivityBar(2 items, position=Top)");
+    }
+
+    // --- New tests for layout, badges, groups ---
+
+    #[test]
+    fn layout_overflow() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        bar.add_item(make_item("c", 2));
+        let layout = ActivityBarLayout::compute(&bar, 2);
+        assert!(layout.has_overflow());
+        assert_eq!(layout.overflow_count(), 1);
+        assert_eq!(layout.visible_items.len(), 2);
+        assert_eq!(layout.total_count(), 3);
+    }
+
+    #[test]
+    fn layout_no_overflow() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        let layout = ActivityBarLayout::compute(&bar, 5);
+        assert!(!layout.has_overflow());
+        assert_eq!(layout.overflow_count(), 0);
+    }
+
+    #[test]
+    fn badge_counter_increment_decrement() {
+        let mut bc = ActivityBadgeCounter::new();
+        assert_eq!(bc.increment("explorer"), 1);
+        assert_eq!(bc.increment("explorer"), 2);
+        assert_eq!(bc.decrement("explorer"), 1);
+        assert_eq!(bc.get("explorer"), 1);
+        assert_eq!(bc.total(), 1);
+    }
+
+    #[test]
+    fn badge_counter_format() {
+        assert_eq!(ActivityBadgeCounter::format_badge(0), "");
+        assert_eq!(ActivityBadgeCounter::format_badge(42), "42");
+        assert_eq!(ActivityBadgeCounter::format_badge(100), "99+");
+    }
+
+    #[test]
+    fn badge_counter_active_items() {
+        let mut bc = ActivityBadgeCounter::new();
+        bc.set("a", 5);
+        bc.set("b", 0);
+        bc.set("c", 3);
+        let active = bc.active_items();
+        assert_eq!(active.len(), 2);
+        assert_eq!(active[0], ("a", 5));
+        assert_eq!(active[1], ("c", 3));
+    }
+
+    #[test]
+    fn item_group_basic() {
+        let mut group = ActivityItemGroup::new("Primary");
+        group.add_item("explorer");
+        group.add_item("search");
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("explorer"));
+        assert!(group.remove_item("explorer"));
+        assert_eq!(group.len(), 1);
+        assert!(!group.contains("explorer"));
+    }
+
+    #[test]
+    fn group_manager_flattened() {
+        let mut mgr = ActivityGroupManager::new();
+        let mut g1 = ActivityItemGroup::new("Primary");
+        g1.add_item("a");
+        g1.add_item("b");
+        let mut g2 = ActivityItemGroup::new("Secondary");
+        g2.add_item("c");
+        mgr.add_group(g1);
+        mgr.add_group(g2);
+        assert_eq!(mgr.total_items(), 3);
+        assert_eq!(mgr.flattened_order(), vec!["a", "b", "c"]);
+        assert_eq!(mgr.group_for_item("c").unwrap().label, "Secondary");
+    }
+
+    #[test]
+    fn group_manager_collapse_hides_items() {
+        let mut mgr = ActivityGroupManager::new();
+        let mut g = ActivityItemGroup::new("G");
+        g.add_item("x");
+        g.collapsed = true;
+        mgr.add_group(g);
+        assert!(mgr.flattened_order().is_empty());
     }
 }

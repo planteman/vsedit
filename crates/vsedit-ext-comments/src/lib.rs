@@ -872,6 +872,355 @@ impl Default for ExtCommentsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ThreadResolutionStatus
+// ---------------------------------------------------------------------------
+
+/// The resolution status of a comment thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ThreadResolutionStatus {
+    Open,
+    Resolved,
+    WontFix,
+    Outdated,
+}
+
+impl ThreadResolutionStatus {
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            ThreadResolutionStatus::Open => "Open",
+            ThreadResolutionStatus::Resolved => "Resolved",
+            ThreadResolutionStatus::WontFix => "Won't Fix",
+            ThreadResolutionStatus::Outdated => "Outdated",
+        }
+    }
+
+    /// Whether the status is considered "closed" (not open).
+    pub fn is_closed(&self) -> bool {
+        !matches!(self, ThreadResolutionStatus::Open)
+    }
+}
+
+impl fmt::Display for ThreadResolutionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThreadResolutionWorkflow
+// ---------------------------------------------------------------------------
+
+/// Manages the resolution workflow for comment threads.
+pub struct ThreadResolutionWorkflow {
+    statuses: std::collections::HashMap<String, ThreadResolutionStatus>,
+    history: Vec<ThreadResolutionChange>,
+}
+
+/// A recorded resolution status change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThreadResolutionChange {
+    pub thread_id: String,
+    pub old_status: ThreadResolutionStatus,
+    pub new_status: ThreadResolutionStatus,
+    pub changed_by: String,
+}
+
+impl ThreadResolutionWorkflow {
+    pub fn new() -> Self {
+        Self {
+            statuses: std::collections::HashMap::new(),
+            history: Vec::new(),
+        }
+    }
+
+    /// Register a thread as open.
+    pub fn register_thread(&mut self, thread_id: impl Into<String>) {
+        self.statuses.insert(thread_id.into(), ThreadResolutionStatus::Open);
+    }
+
+    /// Get the current status of a thread.
+    pub fn status(&self, thread_id: &str) -> Option<ThreadResolutionStatus> {
+        self.statuses.get(thread_id).copied()
+    }
+
+    /// Resolve a thread.
+    pub fn resolve(&mut self, thread_id: &str, by: &str) -> bool {
+        self.transition(thread_id, ThreadResolutionStatus::Resolved, by)
+    }
+
+    /// Reopen a thread.
+    pub fn reopen(&mut self, thread_id: &str, by: &str) -> bool {
+        self.transition(thread_id, ThreadResolutionStatus::Open, by)
+    }
+
+    /// Mark a thread as won't fix.
+    pub fn wont_fix(&mut self, thread_id: &str, by: &str) -> bool {
+        self.transition(thread_id, ThreadResolutionStatus::WontFix, by)
+    }
+
+    /// Mark a thread as outdated.
+    pub fn mark_outdated(&mut self, thread_id: &str, by: &str) -> bool {
+        self.transition(thread_id, ThreadResolutionStatus::Outdated, by)
+    }
+
+    fn transition(&mut self, thread_id: &str, new_status: ThreadResolutionStatus, by: &str) -> bool {
+        if let Some(old_status) = self.statuses.get(thread_id).copied() {
+            if old_status == new_status {
+                return false;
+            }
+            self.statuses.insert(thread_id.to_string(), new_status);
+            self.history.push(ThreadResolutionChange {
+                thread_id: thread_id.to_string(),
+                old_status,
+                new_status,
+                changed_by: by.to_string(),
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get all open threads.
+    pub fn open_threads(&self) -> Vec<&str> {
+        self.statuses
+            .iter()
+            .filter(|(_, s)| **s == ThreadResolutionStatus::Open)
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Get all resolved threads.
+    pub fn resolved_threads(&self) -> Vec<&str> {
+        self.statuses
+            .iter()
+            .filter(|(_, s)| s.is_closed())
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Get the resolution change history.
+    pub fn history(&self) -> &[ThreadResolutionChange] {
+        &self.history
+    }
+
+    /// Number of tracked threads.
+    pub fn thread_count(&self) -> usize {
+        self.statuses.len()
+    }
+}
+
+impl Default for ThreadResolutionWorkflow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReactionKind
+// ---------------------------------------------------------------------------
+
+/// Standard reaction types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ReactionKind {
+    ThumbsUp,
+    ThumbsDown,
+    Laugh,
+    Heart,
+    Confused,
+    Rocket,
+}
+
+impl ReactionKind {
+    /// Emoji representation.
+    pub fn emoji(&self) -> &'static str {
+        match self {
+            ReactionKind::ThumbsUp => "👍",
+            ReactionKind::ThumbsDown => "👎",
+            ReactionKind::Laugh => "😄",
+            ReactionKind::Heart => "❤️",
+            ReactionKind::Confused => "😕",
+            ReactionKind::Rocket => "🚀",
+        }
+    }
+
+    /// All available reaction kinds.
+    pub fn all() -> &'static [ReactionKind] {
+        &[
+            ReactionKind::ThumbsUp,
+            ReactionKind::ThumbsDown,
+            ReactionKind::Laugh,
+            ReactionKind::Heart,
+            ReactionKind::Confused,
+            ReactionKind::Rocket,
+        ]
+    }
+}
+
+impl fmt::Display for ReactionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.emoji())
+    }
+}
+
+/// Manages reactions on a comment.
+#[derive(Debug, Clone)]
+pub struct CommentReactions {
+    reactions: std::collections::HashMap<ReactionKind, Vec<String>>,
+}
+
+impl CommentReactions {
+    pub fn new() -> Self {
+        Self {
+            reactions: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Toggle a reaction for an author. Returns true if added, false if removed.
+    pub fn toggle(&mut self, kind: ReactionKind, author: &str) -> bool {
+        let users = self.reactions.entry(kind).or_default();
+        if let Some(pos) = users.iter().position(|a| a == author) {
+            users.remove(pos);
+            false
+        } else {
+            users.push(author.to_string());
+            true
+        }
+    }
+
+    /// Get the count for a specific reaction kind.
+    pub fn count(&self, kind: ReactionKind) -> usize {
+        self.reactions.get(&kind).map_or(0, |v| v.len())
+    }
+
+    /// Get all reactions with their counts (non-zero only).
+    pub fn summary(&self) -> Vec<(ReactionKind, usize)> {
+        self.reactions
+            .iter()
+            .filter(|(_, users)| !users.is_empty())
+            .map(|(kind, users)| (*kind, users.len()))
+            .collect()
+    }
+
+    /// Total number of reactions across all kinds.
+    pub fn total(&self) -> usize {
+        self.reactions.values().map(|v| v.len()).sum()
+    }
+}
+
+impl Default for CommentReactions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommentSearch
+// ---------------------------------------------------------------------------
+
+/// Search filter criteria for comments.
+#[derive(Debug, Clone)]
+pub struct CommentSearchFilter {
+    pub text: Option<String>,
+    pub author: Option<String>,
+    pub uri: Option<String>,
+    pub include_resolved: bool,
+}
+
+impl CommentSearchFilter {
+    /// Create a filter that matches everything.
+    pub fn all() -> Self {
+        Self {
+            text: None,
+            author: None,
+            uri: None,
+            include_resolved: true,
+        }
+    }
+
+    /// Filter by text content.
+    pub fn with_text(mut self, text: impl Into<String>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    /// Filter by author name.
+    pub fn with_author(mut self, author: impl Into<String>) -> Self {
+        self.author = Some(author.into());
+        self
+    }
+
+    /// Filter by file URI.
+    pub fn with_uri(mut self, uri: impl Into<String>) -> Self {
+        self.uri = Some(uri.into());
+        self
+    }
+
+    /// Exclude resolved threads.
+    pub fn exclude_resolved(mut self) -> Self {
+        self.include_resolved = false;
+        self
+    }
+}
+
+/// Searches comment threads using filters.
+pub struct CommentSearchEngine;
+
+impl CommentSearchEngine {
+    /// Search threads matching the given filter.
+    pub fn search<'a>(
+        threads: &'a [CommentThread],
+        filter: &CommentSearchFilter,
+    ) -> Vec<&'a CommentThread> {
+        threads
+            .iter()
+            .filter(|thread| {
+                if let Some(ref uri) = filter.uri {
+                    if &thread.uri != uri {
+                        return false;
+                    }
+                }
+                if let Some(ref text) = filter.text {
+                    let text_lower = text.to_lowercase();
+                    let has_match = thread.comments.iter().any(|c| {
+                        c.body.to_lowercase().contains(&text_lower)
+                    });
+                    if !has_match {
+                        return false;
+                    }
+                }
+                if let Some(ref author) = filter.author {
+                    let has_author = thread.comments.iter().any(|c| {
+                        c.author.name == *author
+                    });
+                    if !has_author {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+
+    /// Count threads matching a filter.
+    pub fn count(threads: &[CommentThread], filter: &CommentSearchFilter) -> usize {
+        Self::search(threads, filter).len()
+    }
+
+    /// Get unique authors across all matching threads.
+    pub fn unique_authors(threads: &[CommentThread], filter: &CommentSearchFilter) -> Vec<String> {
+        let mut authors: Vec<String> = Self::search(threads, filter)
+            .iter()
+            .flat_map(|t| t.comments.iter().map(|c| c.author.name.clone()))
+            .collect();
+        authors.sort();
+        authors.dedup();
+        authors
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1306,5 +1655,115 @@ mod tests {
         assert!(d.is_empty());
         let d = d.with_body("hello");
         assert!(!d.is_empty());
+    }
+
+    // ── ThreadResolution / Reactions / Search tests ──
+
+    #[test]
+    fn thread_resolution_workflow() {
+        let mut wf = ThreadResolutionWorkflow::new();
+        wf.register_thread("t1");
+        wf.register_thread("t2");
+        assert_eq!(wf.status("t1"), Some(ThreadResolutionStatus::Open));
+        assert!(wf.resolve("t1", "alice"));
+        assert_eq!(wf.status("t1"), Some(ThreadResolutionStatus::Resolved));
+        assert!(!wf.resolve("t1", "bob")); // already resolved
+        assert!(wf.reopen("t1", "bob"));
+        assert_eq!(wf.status("t1"), Some(ThreadResolutionStatus::Open));
+        assert_eq!(wf.history().len(), 2);
+    }
+
+    #[test]
+    fn thread_resolution_open_resolved_lists() {
+        let mut wf = ThreadResolutionWorkflow::new();
+        wf.register_thread("a");
+        wf.register_thread("b");
+        wf.register_thread("c");
+        wf.resolve("b", "alice");
+        wf.wont_fix("c", "bob");
+        let open = wf.open_threads();
+        assert_eq!(open.len(), 1);
+        let resolved = wf.resolved_threads();
+        assert_eq!(resolved.len(), 2);
+    }
+
+    #[test]
+    fn comment_reactions_toggle() {
+        let mut rx = CommentReactions::new();
+        assert!(rx.toggle(ReactionKind::ThumbsUp, "alice")); // added
+        assert!(rx.toggle(ReactionKind::ThumbsUp, "bob"));
+        assert_eq!(rx.count(ReactionKind::ThumbsUp), 2);
+        assert!(!rx.toggle(ReactionKind::ThumbsUp, "alice")); // removed
+        assert_eq!(rx.count(ReactionKind::ThumbsUp), 1);
+        assert_eq!(rx.total(), 1);
+    }
+
+    #[test]
+    fn reaction_kind_emoji() {
+        assert_eq!(ReactionKind::ThumbsUp.emoji(), "👍");
+        assert_eq!(ReactionKind::all().len(), 6);
+    }
+
+    #[test]
+    fn comment_search_by_text() {
+        let threads = vec![
+            CommentThread {
+                id: "t1".into(),
+                uri: "file:///a.rs".into(),
+                range_start_line: 1,
+                range_end_line: 5,
+                comments: vec![Comment::new("c1", "fix the bug", "alice")],
+                is_collapsed: false,
+            },
+            CommentThread {
+                id: "t2".into(),
+                uri: "file:///b.rs".into(),
+                range_start_line: 10,
+                range_end_line: 12,
+                comments: vec![Comment::new("c2", "looks good", "bob")],
+                is_collapsed: false,
+            },
+        ];
+        let filter = CommentSearchFilter::all().with_text("bug");
+        let results = CommentSearchEngine::search(&threads, &filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "t1");
+    }
+
+    #[test]
+    fn comment_search_by_author() {
+        let threads = vec![
+            CommentThread {
+                id: "t1".into(),
+                uri: "file:///a.rs".into(),
+                range_start_line: 1,
+                range_end_line: 5,
+                comments: vec![Comment::new("c1", "hello", "alice")],
+                is_collapsed: false,
+            },
+        ];
+        let filter = CommentSearchFilter::all().with_author("bob");
+        assert_eq!(CommentSearchEngine::count(&threads, &filter), 0);
+        let filter = CommentSearchFilter::all().with_author("alice");
+        assert_eq!(CommentSearchEngine::count(&threads, &filter), 1);
+    }
+
+    #[test]
+    fn comment_search_unique_authors() {
+        let threads = vec![
+            CommentThread {
+                id: "t1".into(),
+                uri: "file:///a.rs".into(),
+                range_start_line: 1,
+                range_end_line: 5,
+                comments: vec![
+                    Comment::new("c1", "hi", "alice"),
+                    Comment::new("c2", "hey", "bob"),
+                ],
+                is_collapsed: false,
+            },
+        ];
+        let authors = CommentSearchEngine::unique_authors(&threads, &CommentSearchFilter::all());
+        assert_eq!(authors, vec!["alice", "bob"]);
     }
 }

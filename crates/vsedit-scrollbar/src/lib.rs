@@ -642,6 +642,295 @@ pub fn scroll_position_from_click(
     (fraction * max_scroll).clamp(0.0, max_scroll)
 }
 
+// ---------------------------------------------------------------------------
+// ScrollbarAnimation – smooth scrolling support
+// ---------------------------------------------------------------------------
+
+/// Easing function used for smooth scroll animations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrollEasing {
+    /// Linear interpolation (constant speed).
+    Linear,
+    /// Quadratic ease-out (decelerating).
+    EaseOut,
+    /// Quadratic ease-in-out (accelerate then decelerate).
+    EaseInOut,
+}
+
+impl ScrollEasing {
+    /// Evaluate the easing function at time `t` where `t` is in `0.0..=1.0`.
+    pub fn evaluate(&self, t: f64) -> f64 {
+        let t = t.clamp(0.0, 1.0);
+        match self {
+            ScrollEasing::Linear => t,
+            ScrollEasing::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
+            ScrollEasing::EaseInOut => {
+                if t < 0.5 {
+                    2.0 * t * t
+                } else {
+                    1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+                }
+            }
+        }
+    }
+}
+
+/// Drives a smooth scroll animation from one position to another.
+#[derive(Debug, Clone)]
+pub struct ScrollbarAnimation {
+    /// Starting scroll offset.
+    pub from: f64,
+    /// Target scroll offset.
+    pub to: f64,
+    /// Duration of the animation in milliseconds.
+    pub duration_ms: u64,
+    /// Elapsed time in milliseconds.
+    pub elapsed_ms: u64,
+    /// Easing function to use.
+    pub easing: ScrollEasing,
+}
+
+impl ScrollbarAnimation {
+    /// Create a new animation.
+    pub fn new(from: f64, to: f64, duration_ms: u64, easing: ScrollEasing) -> Self {
+        Self { from, to, duration_ms, elapsed_ms: 0, easing }
+    }
+
+    /// Returns `true` when the animation has finished.
+    pub fn is_complete(&self) -> bool {
+        self.elapsed_ms >= self.duration_ms
+    }
+
+    /// Advance the animation by `delta_ms` milliseconds and return the current
+    /// interpolated position.
+    pub fn tick(&mut self, delta_ms: u64) -> f64 {
+        self.elapsed_ms = self.elapsed_ms.saturating_add(delta_ms).min(self.duration_ms);
+        self.current_value()
+    }
+
+    /// Return the current interpolated position without advancing time.
+    pub fn current_value(&self) -> f64 {
+        if self.duration_ms == 0 {
+            return self.to;
+        }
+        let t = self.elapsed_ms as f64 / self.duration_ms as f64;
+        let eased = self.easing.evaluate(t);
+        self.from + (self.to - self.from) * eased
+    }
+
+    /// Return the progress of the animation as a value in `0.0..=1.0`.
+    pub fn progress(&self) -> f64 {
+        if self.duration_ms == 0 {
+            return 1.0;
+        }
+        (self.elapsed_ms as f64 / self.duration_ms as f64).clamp(0.0, 1.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MinimapRenderer – computes layout for a document minimap
+// ---------------------------------------------------------------------------
+
+/// A decoration marker displayed in the minimap or overview ruler.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapMarker {
+    /// Line number (0-based) where the marker starts.
+    pub line_start: usize,
+    /// Line number (0-based) where the marker ends (inclusive).
+    pub line_end: usize,
+    /// RGBA colour packed into a u32 (0xRRGGBBAA).
+    pub color: u32,
+}
+
+/// Computes pixel coordinates for minimap rendering.
+#[derive(Debug, Clone)]
+pub struct MinimapRenderer {
+    /// Total number of lines in the document.
+    pub total_lines: usize,
+    /// Height of the minimap viewport in pixels.
+    pub viewport_height: f64,
+    /// Width of the minimap in pixels.
+    pub width: f64,
+}
+
+impl MinimapRenderer {
+    pub fn new(total_lines: usize, viewport_height: f64, width: f64) -> Self {
+        Self { total_lines, viewport_height, width }
+    }
+
+    /// Pixels per line in the minimap.
+    pub fn line_height(&self) -> f64 {
+        if self.total_lines == 0 {
+            return 0.0;
+        }
+        self.viewport_height / self.total_lines as f64
+    }
+
+    /// Convert a line number to a y-pixel coordinate in the minimap.
+    pub fn line_to_y(&self, line: usize) -> f64 {
+        line as f64 * self.line_height()
+    }
+
+    /// Convert a y-pixel coordinate to the nearest line number.
+    pub fn y_to_line(&self, y: f64) -> usize {
+        let lh = self.line_height();
+        if lh <= 0.0 {
+            return 0;
+        }
+        let line = (y / lh).floor() as usize;
+        line.min(self.total_lines.saturating_sub(1))
+    }
+
+    /// Return the y-range `(top, height)` for a marker in minimap pixel space.
+    pub fn marker_rect(&self, marker: &MinimapMarker) -> (f64, f64) {
+        let top = self.line_to_y(marker.line_start);
+        let bottom = self.line_to_y(marker.line_end + 1);
+        let height = (bottom - top).max(1.0);
+        (top, height)
+    }
+
+    /// Return the visible slider rect `(top, height)` given the current scroll
+    /// state and document line count.
+    pub fn visible_slider(&self, state: &ScrollState, line_height_px: f64) -> (f64, f64) {
+        if line_height_px <= 0.0 || self.total_lines == 0 {
+            return (0.0, self.viewport_height);
+        }
+        let first_visible = state.scroll_top / line_height_px;
+        let visible_lines = state.viewport_height / line_height_px;
+        let lh = self.line_height();
+        let top = first_visible * lh;
+        let height = (visible_lines * lh).min(self.viewport_height - top).max(1.0);
+        (top, height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarAccessibility – ARIA / screen-reader metadata
+// ---------------------------------------------------------------------------
+
+/// Accessibility metadata for a scrollbar, suitable for ARIA attributes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScrollbarAccessibility {
+    /// The ARIA role (e.g. `"scrollbar"`).
+    pub role: String,
+    /// Human-readable label.
+    pub label: String,
+    /// Current value as a percentage `0..=100`.
+    pub value_now: u32,
+    /// Minimum value (always 0).
+    pub value_min: u32,
+    /// Maximum value (always 100).
+    pub value_max: u32,
+    /// The orientation string (`"vertical"` or `"horizontal"`).
+    pub orientation_str: String,
+}
+
+impl ScrollbarAccessibility {
+    /// Build accessibility info from a scroll state and orientation.
+    pub fn from_state(state: &ScrollState, orientation: ScrollbarOrientation) -> Self {
+        let pct = match orientation {
+            ScrollbarOrientation::Vertical => state.scroll_percentage_vertical(),
+            ScrollbarOrientation::Horizontal => state.scroll_percentage_horizontal(),
+        };
+        let orientation_str = match orientation {
+            ScrollbarOrientation::Vertical => "vertical",
+            ScrollbarOrientation::Horizontal => "horizontal",
+        };
+        Self {
+            role: "scrollbar".to_string(),
+            label: format!("{} scrollbar", orientation_str),
+            value_now: (pct * 100.0).round() as u32,
+            value_min: 0,
+            value_max: 100,
+            orientation_str: orientation_str.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ScrollbarAccessibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "aria-role={} aria-label=\"{}\" aria-valuenow={} aria-orientation={}",
+            self.role, self.label, self.value_now, self.orientation_str,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarZoom – zoom-level management for scrollbar / minimap
+// ---------------------------------------------------------------------------
+
+/// Manages zoom level for the scrollbar or minimap.
+#[derive(Debug, Clone)]
+pub struct ScrollbarZoom {
+    /// Current zoom factor (1.0 = 100%).
+    level: f64,
+    /// Minimum allowed zoom factor.
+    min_level: f64,
+    /// Maximum allowed zoom factor.
+    max_level: f64,
+    /// Increment used by `zoom_in` / `zoom_out`.
+    step: f64,
+}
+
+impl ScrollbarZoom {
+    /// Create a new zoom controller.
+    pub fn new(min_level: f64, max_level: f64, step: f64) -> Self {
+        Self {
+            level: 1.0,
+            min_level: min_level.max(0.1),
+            max_level: max_level.max(min_level),
+            step: step.abs().max(0.01),
+        }
+    }
+
+    /// Current zoom level.
+    pub fn level(&self) -> f64 {
+        self.level
+    }
+
+    /// Zoom in by one step.
+    pub fn zoom_in(&mut self) -> f64 {
+        self.level = (self.level + self.step).min(self.max_level);
+        self.level
+    }
+
+    /// Zoom out by one step.
+    pub fn zoom_out(&mut self) -> f64 {
+        self.level = (self.level - self.step).max(self.min_level);
+        self.level
+    }
+
+    /// Reset zoom to 1.0.
+    pub fn reset(&mut self) -> f64 {
+        self.level = 1.0_f64.clamp(self.min_level, self.max_level);
+        self.level
+    }
+
+    /// Set zoom to an arbitrary value, clamped to the allowed range.
+    pub fn set_level(&mut self, level: f64) -> f64 {
+        self.level = level.clamp(self.min_level, self.max_level);
+        self.level
+    }
+
+    /// Apply the current zoom factor to a dimension value.
+    pub fn apply(&self, value: f64) -> f64 {
+        value * self.level
+    }
+
+    /// Returns `true` if the zoom is at the default level (1.0).
+    pub fn is_default(&self) -> bool {
+        (self.level - 1.0).abs() < f64::EPSILON
+    }
+}
+
+impl Default for ScrollbarZoom {
+    fn default() -> Self {
+        Self::new(0.25, 4.0, 0.25)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1274,5 +1563,153 @@ mod tests {
     fn scrollbar_is_ascii_printable() {
         assert!(ScrollbarValidator::is_ascii_printable("Hello World 123"));
         assert!(!ScrollbarValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarAnimation tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn animation_linear_interpolation() {
+        let mut anim = ScrollbarAnimation::new(0.0, 100.0, 200, ScrollEasing::Linear);
+        assert!(!anim.is_complete());
+        let val = anim.tick(100);
+        assert!((val - 50.0).abs() < f64::EPSILON);
+        assert!(!anim.is_complete());
+        let val = anim.tick(100);
+        assert!((val - 100.0).abs() < f64::EPSILON);
+        assert!(anim.is_complete());
+    }
+
+    #[test]
+    fn animation_ease_out_reaches_target() {
+        let mut anim = ScrollbarAnimation::new(10.0, 200.0, 500, ScrollEasing::EaseOut);
+        // Run to completion
+        let final_val = anim.tick(500);
+        assert!((final_val - 200.0).abs() < f64::EPSILON);
+        assert!(anim.is_complete());
+        assert!((anim.progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn animation_zero_duration_jumps_to_target() {
+        let anim = ScrollbarAnimation::new(0.0, 42.0, 0, ScrollEasing::EaseInOut);
+        assert!((anim.current_value() - 42.0).abs() < f64::EPSILON);
+        assert!((anim.progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn easing_ease_in_out_midpoint() {
+        // At t=0.5, ease-in-out should return 0.5
+        let val = ScrollEasing::EaseInOut.evaluate(0.5);
+        assert!((val - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn easing_boundaries() {
+        for easing in &[ScrollEasing::Linear, ScrollEasing::EaseOut, ScrollEasing::EaseInOut] {
+            assert!((easing.evaluate(0.0) - 0.0).abs() < f64::EPSILON);
+            assert!((easing.evaluate(1.0) - 1.0).abs() < f64::EPSILON);
+            // Clamps out-of-range
+            assert!((easing.evaluate(-0.5) - 0.0).abs() < f64::EPSILON);
+            assert!((easing.evaluate(1.5) - 1.0).abs() < f64::EPSILON);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // MinimapRenderer tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn minimap_line_height() {
+        let r = MinimapRenderer::new(1000, 500.0, 80.0);
+        assert!((r.line_height() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn minimap_line_to_y_and_back() {
+        let r = MinimapRenderer::new(200, 400.0, 60.0);
+        let y = r.line_to_y(50);
+        let line = r.y_to_line(y);
+        assert_eq!(line, 50);
+    }
+
+    #[test]
+    fn minimap_marker_rect() {
+        let r = MinimapRenderer::new(100, 200.0, 50.0);
+        let marker = MinimapMarker { line_start: 10, line_end: 19, color: 0xFF0000FF };
+        let (top, height) = r.marker_rect(&marker);
+        assert!((top - 20.0).abs() < f64::EPSILON);
+        assert!((height - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn minimap_zero_lines() {
+        let r = MinimapRenderer::new(0, 400.0, 60.0);
+        assert!((r.line_height() - 0.0).abs() < f64::EPSILON);
+        assert_eq!(r.y_to_line(100.0), 0);
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarAccessibility tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn accessibility_vertical_at_top() {
+        let state = make_state(0.0, 100.0, 1000.0);
+        let a11y = ScrollbarAccessibility::from_state(&state, ScrollbarOrientation::Vertical);
+        assert_eq!(a11y.role, "scrollbar");
+        assert_eq!(a11y.value_now, 0);
+        assert_eq!(a11y.orientation_str, "vertical");
+    }
+
+    #[test]
+    fn accessibility_display() {
+        let state = make_state(450.0, 100.0, 1000.0);
+        let a11y = ScrollbarAccessibility::from_state(&state, ScrollbarOrientation::Vertical);
+        let s = format!("{a11y}");
+        assert!(s.contains("aria-valuenow=50"));
+        assert!(s.contains("vertical"));
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarZoom tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn zoom_in_out() {
+        let mut z = ScrollbarZoom::new(0.5, 3.0, 0.5);
+        assert!((z.level() - 1.0).abs() < f64::EPSILON);
+        z.zoom_in();
+        assert!((z.level() - 1.5).abs() < f64::EPSILON);
+        z.zoom_out();
+        assert!((z.level() - 1.0).abs() < f64::EPSILON);
+        assert!(z.is_default());
+    }
+
+    #[test]
+    fn zoom_clamps_to_bounds() {
+        let mut z = ScrollbarZoom::new(0.5, 2.0, 0.5);
+        z.set_level(10.0);
+        assert!((z.level() - 2.0).abs() < f64::EPSILON);
+        z.set_level(0.1);
+        assert!((z.level() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn zoom_apply_scales_value() {
+        let mut z = ScrollbarZoom::default();
+        z.set_level(2.0);
+        assert!((z.apply(100.0) - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn zoom_reset() {
+        let mut z = ScrollbarZoom::default();
+        z.zoom_in();
+        z.zoom_in();
+        assert!(!z.is_default());
+        z.reset();
+        assert!(z.is_default());
     }
 }

@@ -721,6 +721,303 @@ impl Default for ExtensionsPlatValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ExtensionDependencyGraph – dependency tracking & topological sort
+// ---------------------------------------------------------------------------
+
+/// Directed graph tracking dependencies between extensions.
+#[derive(Debug, Clone)]
+pub struct ExtensionDependencyGraph {
+    /// adjacency list: extension id -> set of ids it depends on
+    deps: std::collections::HashMap<String, Vec<String>>,
+}
+
+impl ExtensionDependencyGraph {
+    pub fn new() -> Self {
+        Self {
+            deps: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register an extension (no dependencies yet).
+    pub fn add_extension(&mut self, id: impl Into<String>) {
+        self.deps.entry(id.into()).or_default();
+    }
+
+    /// Declare that `ext` depends on `dependency`.
+    pub fn add_dependency(&mut self, ext: impl Into<String>, dependency: impl Into<String>) {
+        let ext = ext.into();
+        let dep = dependency.into();
+        self.deps.entry(dep.clone()).or_default();
+        self.deps.entry(ext.clone()).or_default().push(dep);
+    }
+
+    /// All direct dependencies for `ext`.
+    pub fn direct_deps(&self, ext: &str) -> Vec<&str> {
+        self.deps
+            .get(ext)
+            .map(|v| v.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Transitive (recursive) dependencies for `ext`.
+    pub fn transitive_deps(&self, ext: &str) -> Vec<String> {
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = vec![ext.to_string()];
+        while let Some(current) = stack.pop() {
+            if let Some(neighbors) = self.deps.get(&current) {
+                for n in neighbors {
+                    if visited.insert(n.clone()) {
+                        stack.push(n.clone());
+                    }
+                }
+            }
+        }
+        let mut result: Vec<String> = visited.into_iter().collect();
+        result.sort();
+        result
+    }
+
+    /// Number of registered extensions.
+    pub fn extension_count(&self) -> usize {
+        self.deps.len()
+    }
+
+    /// Check if adding `dependency` to `ext` would create a cycle.
+    pub fn would_create_cycle(&self, ext: &str, dependency: &str) -> bool {
+        if ext == dependency {
+            return true;
+        }
+        // Does `dependency` transitively depend on `ext`?
+        self.transitive_deps(dependency).contains(&ext.to_string())
+    }
+
+    /// Topological sort (Kahn's algorithm). Returns `Err` with a cycle participant
+    /// if the graph has a cycle.
+    pub fn topological_sort(&self) -> Result<Vec<String>, ExtensionError> {
+        let mut in_degree: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for (node, neighbors) in &self.deps {
+            in_degree.entry(node.as_str()).or_insert(0);
+            for n in neighbors {
+                *in_degree.entry(n.as_str()).or_insert(0) += 1;
+            }
+        }
+
+        // Note: in this graph, edges go FROM dependent TO dependency.
+        // "in_degree" here actually counts how many extensions depend on a node.
+        // For load ordering we want dependencies first, so we reverse the edge direction.
+        let mut in_deg: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for (node, _) in &self.deps {
+            in_deg.entry(node.as_str()).or_insert(0);
+        }
+        for (_, neighbors) in &self.deps {
+            for n in neighbors {
+                // n is a dependency – it has an outgoing reverse-edge to the dependent
+                in_deg.entry(n.as_str()).or_insert(0);
+            }
+        }
+        // Reverse direction: for each ext->dep edge, dep must come first.
+        // So in reverse graph dep->ext and in_degree of ext increases.
+        let mut reverse_in: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        let mut reverse_adj: std::collections::HashMap<&str, Vec<&str>> = std::collections::HashMap::new();
+        for (node, _) in &self.deps {
+            reverse_in.entry(node.as_str()).or_insert(0);
+            reverse_adj.entry(node.as_str()).or_default();
+        }
+        for (ext, neighbors) in &self.deps {
+            for dep in neighbors {
+                reverse_adj.entry(dep.as_str()).or_default().push(ext.as_str());
+                *reverse_in.entry(ext.as_str()).or_insert(0) += 1;
+            }
+        }
+
+        let mut queue: std::collections::VecDeque<&str> = std::collections::VecDeque::new();
+        for (&node, &deg) in &reverse_in {
+            if deg == 0 {
+                queue.push_back(node);
+            }
+        }
+
+        let mut order: Vec<String> = Vec::new();
+        while let Some(node) = queue.pop_front() {
+            order.push(node.to_string());
+            if let Some(neighbors) = reverse_adj.get(node) {
+                for &n in neighbors {
+                    let d = reverse_in.get_mut(n).unwrap();
+                    *d -= 1;
+                    if *d == 0 {
+                        queue.push_back(n);
+                    }
+                }
+            }
+        }
+
+        if order.len() != self.deps.len() {
+            return Err(ExtensionError::DependencyMissing(
+                "cycle detected in extension dependencies".to_string(),
+            ));
+        }
+        Ok(order)
+    }
+
+    /// Check whether all declared dependencies actually exist in the graph.
+    pub fn check_missing(&self) -> Vec<String> {
+        let known: std::collections::HashSet<&str> =
+            self.deps.keys().map(|s| s.as_str()).collect();
+        let mut missing = Vec::new();
+        for neighbors in self.deps.values() {
+            for n in neighbors {
+                if !known.contains(n.as_str()) {
+                    missing.push(n.clone());
+                }
+            }
+        }
+        missing.sort();
+        missing.dedup();
+        missing
+    }
+
+    /// Extensions that nothing else depends on (leaf nodes).
+    pub fn leaf_extensions(&self) -> Vec<&str> {
+        let mut depended_on: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for neighbors in self.deps.values() {
+            for n in neighbors {
+                depended_on.insert(n.as_str());
+            }
+        }
+        let mut leaves: Vec<&str> = self
+            .deps
+            .keys()
+            .map(|s| s.as_str())
+            .filter(|s| !depended_on.contains(s))
+            .collect();
+        leaves.sort();
+        leaves
+    }
+
+    /// Extensions that have no dependencies themselves (root nodes).
+    pub fn root_extensions(&self) -> Vec<&str> {
+        let mut roots: Vec<&str> = self
+            .deps
+            .iter()
+            .filter(|(_, v)| v.is_empty())
+            .map(|(k, _)| k.as_str())
+            .collect();
+        roots.sort();
+        roots
+    }
+}
+
+impl Default for ExtensionDependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ExtensionDependencyGraph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ExtensionDependencyGraph({} extensions)", self.deps.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extension compatibility checking
+// ---------------------------------------------------------------------------
+
+/// Semantic version range for compatibility checking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VersionRange {
+    pub min_major: u32,
+    pub min_minor: u32,
+    pub min_patch: u32,
+    pub max_major: Option<u32>,
+}
+
+impl VersionRange {
+    pub fn at_least(major: u32, minor: u32, patch: u32) -> Self {
+        Self {
+            min_major: major,
+            min_minor: minor,
+            min_patch: patch,
+            max_major: None,
+        }
+    }
+
+    pub fn compatible_major(major: u32) -> Self {
+        Self {
+            min_major: major,
+            min_minor: 0,
+            min_patch: 0,
+            max_major: Some(major),
+        }
+    }
+
+    /// Does the given version string satisfy this range?
+    pub fn satisfies(&self, version: &str) -> Result<bool, ExtensionError> {
+        let (maj, min, pat) = parse_version(version)?;
+        if let Some(max) = self.max_major {
+            if maj != max {
+                return Ok(false);
+            }
+        }
+        if maj < self.min_major {
+            return Ok(false);
+        }
+        if maj == self.min_major && min < self.min_minor {
+            return Ok(false);
+        }
+        if maj == self.min_major && min == self.min_minor && pat < self.min_patch {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+}
+
+impl fmt::Display for VersionRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, ">={}.{}.{}", self.min_major, self.min_minor, self.min_patch)?;
+        if let Some(max) = self.max_major {
+            write!(f, ", <{}", max + 1)?;
+        }
+        Ok(())
+    }
+}
+
+/// Check compatibility between an extension and the host engine.
+#[derive(Debug, Clone)]
+pub struct CompatibilityChecker {
+    engine_version: String,
+}
+
+impl CompatibilityChecker {
+    pub fn new(engine_version: impl Into<String>) -> Self {
+        Self {
+            engine_version: engine_version.into(),
+        }
+    }
+
+    pub fn engine_version(&self) -> &str {
+        &self.engine_version
+    }
+
+    /// Check if a manifest is compatible with the current engine.
+    pub fn is_compatible(&self, manifest: &ExtensionManifest) -> Result<bool, ExtensionError> {
+        manifest.identifier.is_compatible_with(&self.engine_version)
+    }
+
+    /// Filter a list of manifests to only compatible ones.
+    pub fn filter_compatible<'a>(
+        &self,
+        manifests: &[&'a ExtensionManifest],
+    ) -> Vec<&'a ExtensionManifest> {
+        manifests
+            .iter()
+            .filter(|m| self.is_compatible(m).unwrap_or(false))
+            .copied()
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1299,5 +1596,89 @@ mod tests {
     fn extensions_plat_is_ascii_printable() {
         assert!(ExtensionsPlatValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtensionsPlatValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- New tests for dependency graph, compatibility, load ordering ---
+
+    #[test]
+    fn dep_graph_add_and_direct_deps() {
+        let mut g = ExtensionDependencyGraph::new();
+        g.add_extension("a");
+        g.add_dependency("b", "a");
+        g.add_dependency("c", "a");
+        g.add_dependency("c", "b");
+        assert_eq!(g.extension_count(), 3);
+        assert_eq!(g.direct_deps("c"), vec!["a", "b"]);
+        assert!(g.direct_deps("a").is_empty());
+    }
+
+    #[test]
+    fn dep_graph_topological_sort() {
+        let mut g = ExtensionDependencyGraph::new();
+        g.add_dependency("app", "lib");
+        g.add_dependency("lib", "core");
+        let order = g.topological_sort().unwrap();
+        let pos = |id: &str| order.iter().position(|s| s == id).unwrap();
+        assert!(pos("core") < pos("lib"));
+        assert!(pos("lib") < pos("app"));
+    }
+
+    #[test]
+    fn dep_graph_cycle_detection() {
+        let mut g = ExtensionDependencyGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        assert!(g.topological_sort().is_err());
+        assert!(g.would_create_cycle("a", "b"));
+    }
+
+    #[test]
+    fn dep_graph_transitive_deps() {
+        let mut g = ExtensionDependencyGraph::new();
+        g.add_dependency("c", "b");
+        g.add_dependency("b", "a");
+        let trans = g.transitive_deps("c");
+        assert!(trans.contains(&"a".to_string()));
+        assert!(trans.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn dep_graph_roots_and_leaves() {
+        let mut g = ExtensionDependencyGraph::new();
+        g.add_dependency("app", "lib");
+        g.add_dependency("lib", "core");
+        let roots = g.root_extensions();
+        assert!(roots.contains(&"core"));
+        let leaves = g.leaf_extensions();
+        assert!(leaves.contains(&"app"));
+    }
+
+    #[test]
+    fn version_range_satisfies() {
+        let range = VersionRange::at_least(1, 2, 0);
+        assert!(range.satisfies("1.2.0").unwrap());
+        assert!(range.satisfies("2.0.0").unwrap());
+        assert!(!range.satisfies("1.1.9").unwrap());
+
+        let compat = VersionRange::compatible_major(1);
+        assert!(compat.satisfies("1.5.0").unwrap());
+        assert!(!compat.satisfies("2.0.0").unwrap());
+    }
+
+    #[test]
+    fn compatibility_checker_filters() {
+        let checker = CompatibilityChecker::new("1.50.0");
+        let m1 = make_manifest("pub1.ext1");
+        // All test manifests have version "1.0.0" and is_compatible_with checks parse_version
+        // which compares with the engine version
+        assert_eq!(checker.engine_version(), "1.50.0");
+    }
+
+    #[test]
+    fn dep_graph_display() {
+        let mut g = ExtensionDependencyGraph::new();
+        g.add_extension("x");
+        g.add_extension("y");
+        assert_eq!(format!("{g}"), "ExtensionDependencyGraph(2 extensions)");
     }
 }

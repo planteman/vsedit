@@ -830,6 +830,190 @@ pub fn builtin_themes() -> Vec<ColorTheme> {
 }
 
 // ---------------------------------------------------------------------------
+// ThemeMixer — blend two themes
+// ---------------------------------------------------------------------------
+
+/// Blends two colors using linear interpolation.
+/// `t` is the blend factor: 0.0 = entirely `a`, 1.0 = entirely `b`.
+pub fn blend_colors(a: &Color, b: &Color, t: f64) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    let inv = 1.0 - t;
+    Color::rgba(
+        (a.r as f64 * inv + b.r as f64 * t).round() as u8,
+        (a.g as f64 * inv + b.g as f64 * t).round() as u8,
+        (a.b as f64 * inv + b.b as f64 * t).round() as u8,
+        (a.a as f64 * inv + b.a as f64 * t).round() as u8,
+    )
+}
+
+/// Mixes two `ColorTheme`s by blending their workbench colors.
+///
+/// The result uses `base`'s metadata (name, theme_type, token_colors)
+/// and blends workbench colors with `overlay` at the given factor.
+pub struct ThemeMixer;
+
+impl ThemeMixer {
+    /// Blend workbench colors from two themes.
+    /// Returns a new map with all keys from both themes blended at factor `t`.
+    pub fn blend_workbench_colors(
+        base: &HashMap<String, Color>,
+        overlay: &HashMap<String, Color>,
+        t: f64,
+    ) -> HashMap<String, Color> {
+        let mut result = HashMap::new();
+        for (key, base_color) in base {
+            let blended = match overlay.get(key) {
+                Some(overlay_color) => blend_colors(base_color, overlay_color, t),
+                None => *base_color,
+            };
+            result.insert(key.clone(), blended);
+        }
+        // Add keys only in overlay
+        for (key, overlay_color) in overlay {
+            if !base.contains_key(key) {
+                result.insert(key.clone(), *overlay_color);
+            }
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WCAG contrast ratio validation
+// ---------------------------------------------------------------------------
+
+/// Compute the relative luminance of a color (sRGB).
+/// See <https://www.w3.org/TR/WCAG20/#relativeluminancedef>.
+pub fn relative_luminance(c: &Color) -> f64 {
+    fn linearize(channel: u8) -> f64 {
+        let s = channel as f64 / 255.0;
+        if s <= 0.03928 {
+            s / 12.92
+        } else {
+            ((s + 0.055) / 1.055).powf(2.4)
+        }
+    }
+    0.2126 * linearize(c.r) + 0.7152 * linearize(c.g) + 0.0722 * linearize(c.b)
+}
+
+/// Compute the WCAG contrast ratio between two colors.
+/// Result is in [1.0, 21.0].
+pub fn contrast_ratio(a: &Color, b: &Color) -> f64 {
+    let la = relative_luminance(a);
+    let lb = relative_luminance(b);
+    let (lighter, darker) = if la > lb { (la, lb) } else { (lb, la) };
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+/// WCAG conformance level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WcagLevel {
+    /// Contrast ratio < 3.0 — fails all criteria.
+    Fail,
+    /// Contrast ratio >= 3.0 — passes for large text (AA large).
+    AALarge,
+    /// Contrast ratio >= 4.5 — passes AA for normal text.
+    AA,
+    /// Contrast ratio >= 7.0 — passes AAA for normal text.
+    AAA,
+}
+
+impl WcagLevel {
+    /// Determine the WCAG level from a contrast ratio.
+    pub fn from_ratio(ratio: f64) -> Self {
+        if ratio >= 7.0 {
+            Self::AAA
+        } else if ratio >= 4.5 {
+            Self::AA
+        } else if ratio >= 3.0 {
+            Self::AALarge
+        } else {
+            Self::Fail
+        }
+    }
+}
+
+/// Validate that a foreground/background pair meets a minimum WCAG level.
+pub fn validate_contrast(fg: &Color, bg: &Color, minimum: WcagLevel) -> bool {
+    let ratio = contrast_ratio(fg, bg);
+    let actual = WcagLevel::from_ratio(ratio);
+    match minimum {
+        WcagLevel::Fail => true,
+        WcagLevel::AALarge => matches!(actual, WcagLevel::AALarge | WcagLevel::AA | WcagLevel::AAA),
+        WcagLevel::AA => matches!(actual, WcagLevel::AA | WcagLevel::AAA),
+        WcagLevel::AAA => matches!(actual, WcagLevel::AAA),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Theme color palette extraction
+// ---------------------------------------------------------------------------
+
+/// Extracts the unique color palette from a theme's workbench colors.
+#[derive(Debug, Clone)]
+pub struct ColorPalette {
+    colors: Vec<Color>,
+}
+
+impl ColorPalette {
+    /// Extract unique colors from a workbench color map.
+    pub fn from_workbench_colors(colors: &HashMap<String, Color>) -> Self {
+        let mut seen = std::collections::HashSet::new();
+        let mut palette = Vec::new();
+        for color in colors.values() {
+            let key = (color.r, color.g, color.b, color.a);
+            if seen.insert(key) {
+                palette.push(*color);
+            }
+        }
+        palette.sort_by_key(|c| (c.r, c.g, c.b, c.a));
+        Self { colors: palette }
+    }
+
+    /// Number of unique colors.
+    pub fn len(&self) -> usize {
+        self.colors.len()
+    }
+
+    /// Whether the palette is empty.
+    pub fn is_empty(&self) -> bool {
+        self.colors.is_empty()
+    }
+
+    /// Get the palette colors.
+    pub fn colors(&self) -> &[Color] {
+        &self.colors
+    }
+
+    /// Find the darkest color (lowest luminance).
+    pub fn darkest(&self) -> Option<&Color> {
+        self.colors
+            .iter()
+            .min_by(|a, b| relative_luminance(a).partial_cmp(&relative_luminance(b)).unwrap())
+    }
+
+    /// Find the lightest color (highest luminance).
+    pub fn lightest(&self) -> Option<&Color> {
+        self.colors
+            .iter()
+            .max_by(|a, b| relative_luminance(a).partial_cmp(&relative_luminance(b)).unwrap())
+    }
+
+    /// Average color of the palette.
+    pub fn average(&self) -> Option<Color> {
+        if self.colors.is_empty() {
+            return None;
+        }
+        let n = self.colors.len() as f64;
+        let r = self.colors.iter().map(|c| c.r as f64).sum::<f64>() / n;
+        let g = self.colors.iter().map(|c| c.g as f64).sum::<f64>() / n;
+        let b = self.colors.iter().map(|c| c.b as f64).sum::<f64>() / n;
+        let a = self.colors.iter().map(|c| c.a as f64).sum::<f64>() / n;
+        Some(Color::rgba(r.round() as u8, g.round() as u8, b.round() as u8, a.round() as u8))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1309,5 +1493,81 @@ mod tests {
         assert!(scope_matches("string.quoted.double", "string.quoted"));
         assert!(!scope_matches("stringx", "string"));
         assert!(scope_matches("string", "string"));
+    }
+
+    // -- ThemeMixer tests ----------------------------------------------------
+
+    #[test]
+    fn blend_colors_midpoint() {
+        let a = Color::rgb(0, 0, 0);
+        let b = Color::rgb(200, 100, 50);
+        let mid = blend_colors(&a, &b, 0.5);
+        assert_eq!(mid.r, 100);
+        assert_eq!(mid.g, 50);
+        assert_eq!(mid.b, 25);
+    }
+
+    #[test]
+    fn blend_workbench_colors_union() {
+        let mut base = HashMap::new();
+        base.insert("bg".into(), Color::rgb(0, 0, 0));
+        let mut overlay = HashMap::new();
+        overlay.insert("bg".into(), Color::rgb(100, 100, 100));
+        overlay.insert("fg".into(), Color::rgb(200, 200, 200));
+        let result = ThemeMixer::blend_workbench_colors(&base, &overlay, 0.5);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result["bg"].r, 50);
+        assert_eq!(result["fg"], Color::rgb(200, 200, 200));
+    }
+
+    // -- WCAG contrast tests -------------------------------------------------
+
+    #[test]
+    fn contrast_ratio_black_white() {
+        let black = Color::rgb(0, 0, 0);
+        let white = Color::rgb(255, 255, 255);
+        let ratio = contrast_ratio(&black, &white);
+        assert!(ratio > 20.0);
+        assert_eq!(WcagLevel::from_ratio(ratio), WcagLevel::AAA);
+    }
+
+    #[test]
+    fn contrast_ratio_same_color_is_one() {
+        let c = Color::rgb(128, 128, 128);
+        let ratio = contrast_ratio(&c, &c);
+        assert!((ratio - 1.0).abs() < 0.01);
+        assert_eq!(WcagLevel::from_ratio(ratio), WcagLevel::Fail);
+    }
+
+    #[test]
+    fn validate_contrast_checks_level() {
+        let black = Color::rgb(0, 0, 0);
+        let white = Color::rgb(255, 255, 255);
+        assert!(validate_contrast(&black, &white, WcagLevel::AAA));
+        assert!(validate_contrast(&black, &white, WcagLevel::AA));
+    }
+
+    // -- ColorPalette tests --------------------------------------------------
+
+    #[test]
+    fn palette_extracts_unique_colors() {
+        let mut colors = HashMap::new();
+        colors.insert("a".into(), Color::rgb(255, 0, 0));
+        colors.insert("b".into(), Color::rgb(0, 255, 0));
+        colors.insert("c".into(), Color::rgb(255, 0, 0)); // duplicate
+        let palette = ColorPalette::from_workbench_colors(&colors);
+        assert_eq!(palette.len(), 2);
+    }
+
+    #[test]
+    fn palette_darkest_lightest() {
+        let mut colors = HashMap::new();
+        colors.insert("dark".into(), Color::rgb(10, 10, 10));
+        colors.insert("light".into(), Color::rgb(240, 240, 240));
+        let palette = ColorPalette::from_workbench_colors(&colors);
+        assert_eq!(palette.darkest().unwrap().r, 10);
+        assert_eq!(palette.lightest().unwrap().r, 240);
+        let avg = palette.average().unwrap();
+        assert_eq!(avg.r, 125);
     }
 }

@@ -672,6 +672,330 @@ pub fn animation_frame<'a>(elapsed_ms: u64, frames: &[&'a str]) -> &'a str {
 }
 
 // ---------------------------------------------------------------------------
+// StatusBarNotification — temporary notification system
+// ---------------------------------------------------------------------------
+
+/// Priority level for status bar notifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NotificationPriority {
+    Low,
+    Normal,
+    High,
+    Urgent,
+}
+
+/// A temporary notification displayed in the status bar.
+#[derive(Debug, Clone)]
+pub struct StatusBarNotification {
+    pub id: String,
+    pub message: String,
+    pub priority: NotificationPriority,
+    pub duration_ms: u64,
+    pub elapsed_ms: u64,
+    pub icon: Option<String>,
+    pub dismissed: bool,
+}
+
+impl StatusBarNotification {
+    pub fn new(id: impl Into<String>, message: impl Into<String>, duration_ms: u64) -> Self {
+        Self {
+            id: id.into(),
+            message: message.into(),
+            priority: NotificationPriority::Normal,
+            duration_ms,
+            elapsed_ms: 0,
+            icon: None,
+            dismissed: false,
+        }
+    }
+
+    pub fn with_priority(mut self, priority: NotificationPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_icon(mut self, icon: impl Into<String>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+
+    /// Advance the elapsed time. Returns true if the notification has expired.
+    pub fn tick(&mut self, delta_ms: u64) -> bool {
+        self.elapsed_ms = self.elapsed_ms.saturating_add(delta_ms);
+        self.is_expired()
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.elapsed_ms >= self.duration_ms || self.dismissed
+    }
+
+    pub fn dismiss(&mut self) {
+        self.dismissed = true;
+    }
+
+    /// Display text including optional icon prefix.
+    pub fn display_text(&self) -> String {
+        match &self.icon {
+            Some(icon) => format!("{} {}", icon, self.message),
+            None => self.message.clone(),
+        }
+    }
+
+    /// Remaining time in milliseconds.
+    pub fn remaining_ms(&self) -> u64 {
+        self.duration_ms.saturating_sub(self.elapsed_ms)
+    }
+}
+
+/// Manages a queue of status bar notifications.
+#[derive(Debug, Clone, Default)]
+pub struct NotificationQueue {
+    notifications: Vec<StatusBarNotification>,
+}
+
+impl NotificationQueue {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, notification: StatusBarNotification) {
+        self.notifications.push(notification);
+        self.notifications.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    /// Remove expired notifications, returning the count removed.
+    pub fn sweep(&mut self) -> usize {
+        let before = self.notifications.len();
+        self.notifications.retain(|n| !n.is_expired());
+        before - self.notifications.len()
+    }
+
+    /// Tick all notifications and sweep expired ones.
+    pub fn tick(&mut self, delta_ms: u64) -> usize {
+        for n in &mut self.notifications {
+            n.tick(delta_ms);
+        }
+        self.sweep()
+    }
+
+    /// The highest-priority active notification.
+    pub fn current(&self) -> Option<&StatusBarNotification> {
+        self.notifications.first()
+    }
+
+    pub fn len(&self) -> usize {
+        self.notifications.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.notifications.is_empty()
+    }
+
+    pub fn dismiss(&mut self, id: &str) -> bool {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
+            n.dismiss();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.notifications.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarProgressItem — progress indicator
+// ---------------------------------------------------------------------------
+
+/// A progress indicator displayed in the status bar.
+#[derive(Debug, Clone)]
+pub struct StatusBarProgressItem {
+    pub id: String,
+    pub label: String,
+    pub current: u64,
+    pub total: u64,
+    pub completed: bool,
+}
+
+impl StatusBarProgressItem {
+    pub fn new(id: impl Into<String>, label: impl Into<String>, total: u64) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            current: 0,
+            total,
+            completed: false,
+        }
+    }
+
+    /// Advance by `amount`. Marks completed when current >= total.
+    pub fn advance(&mut self, amount: u64) {
+        self.current = self.current.saturating_add(amount).min(self.total);
+        if self.current >= self.total {
+            self.completed = true;
+        }
+    }
+
+    /// Progress ratio in [0.0, 1.0].
+    pub fn ratio(&self) -> f64 {
+        if self.total == 0 {
+            return 1.0;
+        }
+        self.current as f64 / self.total as f64
+    }
+
+    /// Percentage as an integer (0–100).
+    pub fn percentage(&self) -> u8 {
+        (self.ratio() * 100.0).round() as u8
+    }
+
+    /// A display string like "Building: 45%".
+    pub fn display_text(&self) -> String {
+        format!("{}: {}%", self.label, self.percentage())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarContextMenu
+// ---------------------------------------------------------------------------
+
+/// An action within a status bar context menu.
+#[derive(Debug, Clone)]
+pub struct ContextMenuAction {
+    pub label: String,
+    pub command: String,
+    pub enabled: bool,
+}
+
+impl ContextMenuAction {
+    pub fn new(label: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            command: command.into(),
+            enabled: true,
+        }
+    }
+
+    pub fn disabled(mut self) -> Self {
+        self.enabled = false;
+        self
+    }
+}
+
+/// A context menu attached to a status bar item.
+#[derive(Debug, Clone)]
+pub struct StatusBarContextMenu {
+    pub item_id: String,
+    pub actions: Vec<ContextMenuAction>,
+    pub selected: usize,
+    pub visible: bool,
+}
+
+impl StatusBarContextMenu {
+    pub fn new(item_id: impl Into<String>) -> Self {
+        Self {
+            item_id: item_id.into(),
+            actions: Vec::new(),
+            selected: 0,
+            visible: false,
+        }
+    }
+
+    pub fn add_action(&mut self, action: ContextMenuAction) {
+        self.actions.push(action);
+    }
+
+    pub fn show(&mut self) {
+        self.visible = true;
+        self.selected = 0;
+    }
+
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+
+    pub fn select_next(&mut self) {
+        if !self.actions.is_empty() {
+            self.selected = (self.selected + 1) % self.actions.len();
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if !self.actions.is_empty() {
+            self.selected = if self.selected == 0 {
+                self.actions.len() - 1
+            } else {
+                self.selected - 1
+            };
+        }
+    }
+
+    /// Returns the selected action's command if it is enabled.
+    pub fn activate(&self) -> Option<&str> {
+        self.actions.get(self.selected).and_then(|a| {
+            if a.enabled {
+                Some(a.command.as_str())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Number of enabled actions.
+    pub fn enabled_count(&self) -> usize {
+        self.actions.iter().filter(|a| a.enabled).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarLayout — responsive layout calculations
+// ---------------------------------------------------------------------------
+
+impl StatusBarLayout {
+    /// Compute responsive widths for (left, center, right) given a total width.
+    /// Center is clamped to not overlap left/right. Returns (left_w, center_w, right_w).
+    pub fn compute_responsive_widths(&self, total_width: usize, sep: usize) -> (usize, usize, usize) {
+        let left_w = compute_status_bar_width(
+            &self.left.items.iter().filter(|i| i.visible).cloned().collect::<Vec<_>>(),
+            sep,
+        );
+        let right_w = compute_status_bar_width(
+            &self.right.items.iter().filter(|i| i.visible).cloned().collect::<Vec<_>>(),
+            sep,
+        );
+        let center_w = compute_status_bar_width(
+            &self.center.items.iter().filter(|i| i.visible).cloned().collect::<Vec<_>>(),
+            sep,
+        );
+        let available_center = total_width.saturating_sub(left_w + right_w);
+        let clamped_center = center_w.min(available_center);
+        (left_w, clamped_center, right_w)
+    }
+
+    /// Returns true if items overflow the given width.
+    pub fn overflows(&self, total_width: usize, sep: usize) -> bool {
+        let (l, c, r) = self.compute_responsive_widths(total_width, sep);
+        l + c + r > total_width
+    }
+
+    /// Find an item by id across all sections.
+    pub fn find_item(&self, id: &str) -> Option<&StatusBarItem> {
+        self.left.get_item(id)
+            .or_else(|| self.center.get_item(id))
+            .or_else(|| self.right.get_item(id))
+    }
+
+    /// Count of all visible items across sections.
+    pub fn visible_count(&self) -> usize {
+        self.left.items.iter().filter(|i| i.visible).count()
+            + self.center.items.iter().filter(|i| i.visible).count()
+            + self.right.items.iter().filter(|i| i.visible).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1334,5 +1658,123 @@ mod tests {
             .alignment(StatusBarAlignment::Center)
             .build();
         assert_eq!(format!("{}", center_item), "Ready [Center]");
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn notification_lifecycle() {
+        let mut n = StatusBarNotification::new("n1", "Saved!", 3000)
+            .with_priority(NotificationPriority::High)
+            .with_icon("✓");
+        assert!(!n.is_expired());
+        assert_eq!(n.display_text(), "✓ Saved!");
+        assert_eq!(n.remaining_ms(), 3000);
+        n.tick(1500);
+        assert_eq!(n.remaining_ms(), 1500);
+        assert!(!n.is_expired());
+        n.tick(1500);
+        assert!(n.is_expired());
+    }
+
+    #[test]
+    fn notification_queue_priority_and_sweep() {
+        let mut q = NotificationQueue::new();
+        q.push(StatusBarNotification::new("low", "low", 100).with_priority(NotificationPriority::Low));
+        q.push(StatusBarNotification::new("urgent", "urgent", 100).with_priority(NotificationPriority::Urgent));
+        assert_eq!(q.current().unwrap().id, "urgent");
+        assert_eq!(q.len(), 2);
+        let removed = q.tick(200);
+        assert_eq!(removed, 2);
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn notification_dismiss() {
+        let mut q = NotificationQueue::new();
+        q.push(StatusBarNotification::new("d", "dismiss me", 5000));
+        assert!(q.dismiss("d"));
+        assert!(!q.dismiss("nonexistent"));
+        let removed = q.sweep();
+        assert_eq!(removed, 1);
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn progress_item_advance_and_display() {
+        let mut p = StatusBarProgressItem::new("p1", "Building", 200);
+        assert_eq!(p.percentage(), 0);
+        assert!(!p.completed);
+        p.advance(100);
+        assert_eq!(p.percentage(), 50);
+        assert_eq!(p.display_text(), "Building: 50%");
+        p.advance(100);
+        assert!(p.completed);
+        assert_eq!(p.percentage(), 100);
+    }
+
+    #[test]
+    fn progress_item_zero_total() {
+        let p = StatusBarProgressItem::new("z", "Empty", 0);
+        assert_eq!(p.ratio(), 1.0);
+        assert_eq!(p.percentage(), 100);
+    }
+
+    #[test]
+    fn context_menu_navigation_and_activate() {
+        let mut menu = StatusBarContextMenu::new("item1");
+        menu.add_action(ContextMenuAction::new("Copy", "editor.copy"));
+        menu.add_action(ContextMenuAction::new("Paste", "editor.paste").disabled());
+        menu.add_action(ContextMenuAction::new("Cut", "editor.cut"));
+        menu.show();
+        assert!(menu.visible);
+        assert_eq!(menu.activate(), Some("editor.copy"));
+        menu.select_next();
+        assert_eq!(menu.activate(), None); // disabled
+        menu.select_next();
+        assert_eq!(menu.activate(), Some("editor.cut"));
+        assert_eq!(menu.enabled_count(), 2);
+    }
+
+    #[test]
+    fn context_menu_wrap_around() {
+        let mut menu = StatusBarContextMenu::new("wrap");
+        menu.add_action(ContextMenuAction::new("A", "a"));
+        menu.add_action(ContextMenuAction::new("B", "b"));
+        menu.select_prev(); // should wrap to last
+        assert_eq!(menu.selected, 1);
+        menu.select_next(); // wrap back to 0
+        assert_eq!(menu.selected, 0);
+    }
+
+    #[test]
+    fn layout_responsive_widths() {
+        let mut layout = StatusBarLayout::new();
+        layout.add_to_left(make_item("branch", StatusBarAlignment::Left, 10));
+        layout.add_to_right(make_item("utf8", StatusBarAlignment::Right, 10));
+        let (l, c, r) = layout.compute_responsive_widths(80, 1);
+        assert!(l > 0);
+        assert!(r > 0);
+        assert_eq!(c, 0); // no center items
+    }
+
+    #[test]
+    fn layout_find_item_across_sections() {
+        let mut layout = StatusBarLayout::new();
+        layout.add_to_left(make_item("left1", StatusBarAlignment::Left, 1));
+        layout.add_to_right(make_item("right1", StatusBarAlignment::Right, 1));
+        assert!(layout.find_item("left1").is_some());
+        assert!(layout.find_item("right1").is_some());
+        assert!(layout.find_item("nope").is_none());
+    }
+
+    #[test]
+    fn layout_visible_count() {
+        let mut layout = StatusBarLayout::new();
+        layout.add_to_left(make_item("a", StatusBarAlignment::Left, 1));
+        let mut hidden = make_item("b", StatusBarAlignment::Right, 1);
+        hidden.visible = false;
+        layout.add_to_right(hidden);
+        assert_eq!(layout.visible_count(), 1);
     }
 }

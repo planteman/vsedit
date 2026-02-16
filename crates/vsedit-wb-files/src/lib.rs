@@ -754,6 +754,234 @@ pub fn file_sort(entries: &mut [(String, bool)]) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// FileGlobFilter
+// ---------------------------------------------------------------------------
+
+/// Matches filenames against simple glob patterns.
+pub struct FileGlobFilter {
+    patterns: Vec<String>,
+}
+
+impl FileGlobFilter {
+    /// Create a filter with the given glob patterns.
+    /// Supports `*` (any chars) and `?` (single char) wildcards.
+    pub fn new(patterns: &[&str]) -> Self {
+        Self {
+            patterns: patterns.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// Check if a filename matches any of the patterns.
+    pub fn matches(&self, filename: &str) -> bool {
+        self.patterns.iter().any(|p| Self::glob_match(p, filename))
+    }
+
+    /// Filter a list of filenames, returning only those that match.
+    pub fn filter<'a>(&self, names: &[&'a str]) -> Vec<&'a str> {
+        names.iter().copied().filter(|n| self.matches(n)).collect()
+    }
+
+    /// Filter a list of filenames, returning only those that do NOT match (exclusion).
+    pub fn exclude<'a>(&self, names: &[&'a str]) -> Vec<&'a str> {
+        names.iter().copied().filter(|n| !self.matches(n)).collect()
+    }
+
+    fn glob_match(pattern: &str, text: &str) -> bool {
+        let p: Vec<char> = pattern.chars().collect();
+        let t: Vec<char> = text.chars().collect();
+        Self::glob_match_inner(&p, &t, 0, 0)
+    }
+
+    fn glob_match_inner(pattern: &[char], text: &[char], pi: usize, ti: usize) -> bool {
+        if pi == pattern.len() {
+            return ti == text.len();
+        }
+        if pattern[pi] == '*' {
+            // Try matching * with 0..n characters
+            for skip in 0..=(text.len() - ti) {
+                if Self::glob_match_inner(pattern, text, pi + 1, ti + skip) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if ti >= text.len() {
+            return false;
+        }
+        if pattern[pi] == '?' || pattern[pi] == text[ti] {
+            return Self::glob_match_inner(pattern, text, pi + 1, ti + 1);
+        }
+        false
+    }
+
+    /// Get the patterns used by this filter.
+    pub fn patterns(&self) -> &[String] {
+        &self.patterns
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileStatistics
+// ---------------------------------------------------------------------------
+
+/// Tracks file statistics: counts by extension and total size tracking.
+#[derive(Debug, Clone)]
+pub struct FileStatistics {
+    counts_by_ext: std::collections::HashMap<String, usize>,
+    total_size: u64,
+    file_count: usize,
+    dir_count: usize,
+}
+
+impl FileStatistics {
+    pub fn new() -> Self {
+        Self {
+            counts_by_ext: std::collections::HashMap::new(),
+            total_size: 0,
+            file_count: 0,
+            dir_count: 0,
+        }
+    }
+
+    /// Record a file with its extension and size.
+    pub fn record_file(&mut self, filename: &str, size: u64) {
+        self.file_count += 1;
+        self.total_size += size;
+        let ext = filename
+            .rsplit('.')
+            .next()
+            .unwrap_or("")
+            .to_lowercase();
+        if !ext.is_empty() && ext != filename.to_lowercase() {
+            *self.counts_by_ext.entry(ext).or_insert(0) += 1;
+        }
+    }
+
+    /// Record a directory.
+    pub fn record_directory(&mut self) {
+        self.dir_count += 1;
+    }
+
+    /// Get the count for a specific extension.
+    pub fn count_for_ext(&self, ext: &str) -> usize {
+        self.counts_by_ext.get(&ext.to_lowercase()).copied().unwrap_or(0)
+    }
+
+    /// Get all extensions sorted by count (descending).
+    pub fn extensions_by_count(&self) -> Vec<(String, usize)> {
+        let mut exts: Vec<(String, usize)> = self.counts_by_ext.clone().into_iter().collect();
+        exts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        exts
+    }
+
+    /// Total number of files recorded.
+    pub fn total_files(&self) -> usize {
+        self.file_count
+    }
+
+    /// Total number of directories recorded.
+    pub fn total_dirs(&self) -> usize {
+        self.dir_count
+    }
+
+    /// Total size in bytes.
+    pub fn total_size(&self) -> u64 {
+        self.total_size
+    }
+
+    /// Average file size in bytes.
+    pub fn average_file_size(&self) -> f64 {
+        if self.file_count == 0 {
+            return 0.0;
+        }
+        self.total_size as f64 / self.file_count as f64
+    }
+
+    /// Number of distinct extensions.
+    pub fn extension_count(&self) -> usize {
+        self.counts_by_ext.len()
+    }
+
+    /// Merge another statistics into this one.
+    pub fn merge(&mut self, other: &FileStatistics) {
+        self.file_count += other.file_count;
+        self.dir_count += other.dir_count;
+        self.total_size += other.total_size;
+        for (ext, count) in &other.counts_by_ext {
+            *self.counts_by_ext.entry(ext.clone()).or_insert(0) += count;
+        }
+    }
+}
+
+impl Default for FileStatistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for FileStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} files, {} dirs, {} bytes, {} extensions",
+            self.file_count, self.dir_count, self.total_size, self.counts_by_ext.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileTreeNode depth / flatten
+// ---------------------------------------------------------------------------
+
+impl FileTreeNode {
+    /// Maximum depth of the tree (root = 0).
+    pub fn max_depth(&self) -> usize {
+        if self.children.is_empty() {
+            return 0;
+        }
+        1 + self.children.iter().map(|c| c.max_depth()).max().unwrap_or(0)
+    }
+
+    /// Flatten the tree into a list of (path, is_directory) pairs.
+    pub fn flatten(&self, prefix: &str) -> Vec<(String, bool)> {
+        let mut result = Vec::new();
+        let path = if prefix.is_empty() {
+            self.name.clone()
+        } else if self.name.is_empty() {
+            prefix.to_string()
+        } else {
+            format!("{}/{}", prefix, self.name)
+        };
+        if !self.name.is_empty() {
+            result.push((path.clone(), self.is_directory));
+        }
+        for child in &self.children {
+            let child_prefix = if self.name.is_empty() { prefix } else { &path };
+            result.extend(child.flatten(child_prefix));
+        }
+        result
+    }
+
+    /// Add a child node if one with the same name does not already exist.
+    pub fn add_child(&mut self, child: FileTreeNode) -> bool {
+        if self.find(&child.name).is_some() {
+            return false;
+        }
+        self.children.push(child);
+        true
+    }
+
+    /// Remove a child by name, returning the removed node.
+    pub fn remove_child(&mut self, name: &str) -> Option<FileTreeNode> {
+        if let Some(pos) = self.children.iter().position(|c| c.name == name) {
+            Some(self.children.remove(pos))
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1304,5 +1532,84 @@ mod tests {
         assert_eq!(entries[2].0, "alpha.rs");
         assert_eq!(entries[3].0, "Beta.rs");
         assert_eq!(entries[4].0, "Zebra.rs");
+    }
+
+    // ── FileGlobFilter / FileStatistics / TreeNode extension tests ──
+
+    #[test]
+    fn glob_filter_matches_wildcard() {
+        let filter = FileGlobFilter::new(&["*.rs", "*.toml"]);
+        assert!(filter.matches("main.rs"));
+        assert!(filter.matches("Cargo.toml"));
+        assert!(!filter.matches("readme.md"));
+    }
+
+    #[test]
+    fn glob_filter_question_mark() {
+        let filter = FileGlobFilter::new(&["file?.txt"]);
+        assert!(filter.matches("file1.txt"));
+        assert!(filter.matches("fileA.txt"));
+        assert!(!filter.matches("file12.txt"));
+    }
+
+    #[test]
+    fn glob_filter_exclude() {
+        let filter = FileGlobFilter::new(&["*.lock"]);
+        let names = vec!["Cargo.toml", "Cargo.lock", "main.rs"];
+        let excluded = filter.exclude(&names);
+        assert_eq!(excluded, vec!["Cargo.toml", "main.rs"]);
+    }
+
+    #[test]
+    fn file_statistics_tracks_extensions() {
+        let mut stats = FileStatistics::new();
+        stats.record_file("main.rs", 1000);
+        stats.record_file("lib.rs", 2000);
+        stats.record_file("readme.md", 500);
+        stats.record_directory();
+        assert_eq!(stats.count_for_ext("rs"), 2);
+        assert_eq!(stats.count_for_ext("md"), 1);
+        assert_eq!(stats.total_files(), 3);
+        assert_eq!(stats.total_dirs(), 1);
+        assert_eq!(stats.total_size(), 3500);
+        assert!((stats.average_file_size() - 1166.666).abs() < 1.0);
+    }
+
+    #[test]
+    fn file_statistics_merge() {
+        let mut a = FileStatistics::new();
+        a.record_file("a.rs", 100);
+        let mut b = FileStatistics::new();
+        b.record_file("b.rs", 200);
+        b.record_file("c.py", 300);
+        a.merge(&b);
+        assert_eq!(a.total_files(), 3);
+        assert_eq!(a.total_size(), 600);
+        assert_eq!(a.count_for_ext("rs"), 2);
+    }
+
+    #[test]
+    fn file_tree_node_flatten() {
+        let tree = FileTreeBuilder::build(&["src/main.rs", "src/lib.rs", "Cargo.toml"]);
+        let flat = tree.flatten("");
+        assert!(flat.iter().any(|(p, d)| p == "src" && *d));
+        assert!(flat.iter().any(|(p, d)| p == "src/main.rs" && !*d));
+    }
+
+    #[test]
+    fn file_tree_node_max_depth() {
+        let tree = FileTreeBuilder::build(&["a/b/c.txt"]);
+        assert!(tree.max_depth() >= 2);
+    }
+
+    #[test]
+    fn file_tree_node_add_remove_child() {
+        let mut root = FileTreeNode::new_dir("root");
+        assert!(root.add_child(FileTreeNode::new_file("a.txt")));
+        assert!(!root.add_child(FileTreeNode::new_file("a.txt")));
+        assert!(root.find("a.txt").is_some());
+        let removed = root.remove_child("a.txt");
+        assert!(removed.is_some());
+        assert!(root.find("a.txt").is_none());
     }
 }

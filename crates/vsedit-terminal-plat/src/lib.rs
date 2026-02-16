@@ -806,6 +806,191 @@ impl TerminalFontConfig {
 }
 
 // ---------------------------------------------------------------------------
+// TerminalSplitLayout — split terminal layout management
+// ---------------------------------------------------------------------------
+
+/// Orientation of a split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitOrientation {
+    Horizontal,
+    Vertical,
+}
+
+/// A pane within a split layout, identified by terminal ID.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SplitPane {
+    pub terminal_id: u64,
+    pub weight: f32,
+}
+
+/// Manages a split layout of terminal panes.
+#[derive(Debug, Clone)]
+pub struct TerminalSplitLayout {
+    pub orientation: SplitOrientation,
+    pub panes: Vec<SplitPane>,
+}
+
+impl TerminalSplitLayout {
+    pub fn new(orientation: SplitOrientation) -> Self {
+        Self { orientation, panes: Vec::new() }
+    }
+
+    /// Add a pane with equal weight.
+    pub fn add_pane(&mut self, terminal_id: u64) {
+        self.panes.push(SplitPane { terminal_id, weight: 1.0 });
+        self.normalize_weights();
+    }
+
+    /// Remove a pane by terminal ID. Returns true if found.
+    pub fn remove_pane(&mut self, terminal_id: u64) -> bool {
+        let before = self.panes.len();
+        self.panes.retain(|p| p.terminal_id != terminal_id);
+        if self.panes.len() < before {
+            self.normalize_weights();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Normalize weights so they sum to 1.0.
+    fn normalize_weights(&mut self) {
+        if self.panes.is_empty() {
+            return;
+        }
+        let total: f32 = self.panes.iter().map(|p| p.weight).sum();
+        if total > 0.0 {
+            for pane in &mut self.panes {
+                pane.weight /= total;
+            }
+        }
+    }
+
+    /// Compute the pixel size for each pane given a total container size.
+    pub fn compute_sizes(&self, total_pixels: u32) -> Vec<(u64, u32)> {
+        self.panes
+            .iter()
+            .map(|p| (p.terminal_id, (p.weight * total_pixels as f32).round() as u32))
+            .collect()
+    }
+
+    pub fn pane_count(&self) -> usize {
+        self.panes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.panes.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalCommandHistory — command history with frequency tracking
+// ---------------------------------------------------------------------------
+
+/// Entry in the command history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandHistoryEntry {
+    pub command: String,
+    pub run_count: u32,
+    pub last_used_ms: u64,
+}
+
+/// Tracks commands executed in terminals with frequency information.
+#[derive(Debug, Clone, Default)]
+pub struct TerminalCommandHistory {
+    entries: Vec<CommandHistoryEntry>,
+    max_entries: usize,
+}
+
+impl TerminalCommandHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), max_entries }
+    }
+
+    /// Record a command execution.
+    pub fn record(&mut self, command: &str, timestamp_ms: u64) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.command == command) {
+            entry.run_count += 1;
+            entry.last_used_ms = timestamp_ms;
+        } else {
+            if self.entries.len() >= self.max_entries {
+                // Evict least-recently-used
+                if let Some(idx) = self.entries.iter().enumerate()
+                    .min_by_key(|(_, e)| e.last_used_ms)
+                    .map(|(i, _)| i)
+                {
+                    self.entries.remove(idx);
+                }
+            }
+            self.entries.push(CommandHistoryEntry {
+                command: command.to_string(),
+                run_count: 1,
+                last_used_ms: timestamp_ms,
+            });
+        }
+    }
+
+    /// Return entries sorted by frequency (most used first).
+    pub fn most_frequent(&self, limit: usize) -> Vec<&CommandHistoryEntry> {
+        let mut sorted: Vec<&CommandHistoryEntry> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.run_count.cmp(&a.run_count));
+        sorted.truncate(limit);
+        sorted
+    }
+
+    /// Search for commands matching a prefix.
+    pub fn search_prefix(&self, prefix: &str) -> Vec<&CommandHistoryEntry> {
+        self.entries.iter().filter(|e| e.command.starts_with(prefix)).collect()
+    }
+
+    /// Return the total number of unique commands recorded.
+    pub fn unique_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return total executions across all commands.
+    pub fn total_executions(&self) -> u32 {
+        self.entries.iter().map(|e| e.run_count).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalTheme — theme management for terminals
+// ---------------------------------------------------------------------------
+
+/// A named terminal theme combining color scheme and font config.
+#[derive(Debug, Clone)]
+pub struct TerminalTheme {
+    pub name: String,
+    pub colors: TerminalColorScheme,
+    pub font: TerminalFontConfig,
+}
+
+impl TerminalTheme {
+    pub fn new(name: impl Into<String>, colors: TerminalColorScheme, font: TerminalFontConfig) -> Self {
+        Self { name: name.into(), colors, font }
+    }
+
+    pub fn dark_default() -> Self {
+        Self::new("Dark Default", TerminalColorScheme::default_dark(), TerminalFontConfig::new())
+    }
+
+    pub fn light_default() -> Self {
+        Self::new("Light Default", TerminalColorScheme::default_light(), TerminalFontConfig::new())
+    }
+
+    pub fn is_dark(&self) -> bool {
+        self.colors.is_dark()
+    }
+}
+
+impl fmt::Display for TerminalTheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TerminalTheme({})", self.name)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1343,5 +1528,90 @@ mod tests {
     fn test_font_config_cell_height() {
         let fc = TerminalFontConfig::new().with_size(20.0).with_line_height(1.5);
         assert!((fc.cell_height() - 30.0).abs() < f32::EPSILON);
+    }
+
+    // -- TerminalSplitLayout tests ------------------------------------------
+
+    #[test]
+    fn split_layout_add_and_remove_panes() {
+        let mut layout = TerminalSplitLayout::new(SplitOrientation::Horizontal);
+        assert!(layout.is_empty());
+        layout.add_pane(1);
+        layout.add_pane(2);
+        assert_eq!(layout.pane_count(), 2);
+
+        // Weights should sum to ~1.0
+        let total_weight: f32 = layout.panes.iter().map(|p| p.weight).sum();
+        assert!((total_weight - 1.0).abs() < 0.01);
+
+        assert!(layout.remove_pane(1));
+        assert_eq!(layout.pane_count(), 1);
+        assert!(!layout.remove_pane(99));
+    }
+
+    #[test]
+    fn split_layout_compute_sizes() {
+        let mut layout = TerminalSplitLayout::new(SplitOrientation::Vertical);
+        layout.add_pane(10);
+        layout.add_pane(20);
+        let sizes = layout.compute_sizes(1000);
+        assert_eq!(sizes.len(), 2);
+        let total: u32 = sizes.iter().map(|(_, s)| *s).sum();
+        assert!(total >= 999 && total <= 1001); // rounding tolerance
+    }
+
+    // -- TerminalCommandHistory tests ---------------------------------------
+
+    #[test]
+    fn command_history_records_and_counts() {
+        let mut hist = TerminalCommandHistory::new(100);
+        hist.record("ls -la", 1000);
+        hist.record("git status", 2000);
+        hist.record("ls -la", 3000);
+        assert_eq!(hist.unique_count(), 2);
+        assert_eq!(hist.total_executions(), 3);
+
+        let freq = hist.most_frequent(10);
+        assert_eq!(freq[0].command, "ls -la");
+        assert_eq!(freq[0].run_count, 2);
+    }
+
+    #[test]
+    fn command_history_search_prefix() {
+        let mut hist = TerminalCommandHistory::new(100);
+        hist.record("git status", 100);
+        hist.record("git commit", 200);
+        hist.record("ls", 300);
+        let results = hist.search_prefix("git");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn command_history_evicts_lru() {
+        let mut hist = TerminalCommandHistory::new(2);
+        hist.record("cmd1", 100);
+        hist.record("cmd2", 200);
+        hist.record("cmd3", 300); // should evict cmd1 (oldest)
+        assert_eq!(hist.unique_count(), 2);
+        assert!(hist.search_prefix("cmd1").is_empty());
+    }
+
+    // -- TerminalTheme tests ------------------------------------------------
+
+    #[test]
+    fn theme_dark_and_light_defaults() {
+        let dark = TerminalTheme::dark_default();
+        assert!(dark.is_dark());
+        assert_eq!(dark.name, "Dark Default");
+
+        let light = TerminalTheme::light_default();
+        assert!(!light.is_dark());
+        assert_eq!(light.name, "Light Default");
+    }
+
+    #[test]
+    fn theme_display() {
+        let t = TerminalTheme::dark_default();
+        assert_eq!(format!("{t}"), "TerminalTheme(Dark Default)");
     }
 }

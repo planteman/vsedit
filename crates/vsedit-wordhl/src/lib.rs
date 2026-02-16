@@ -746,6 +746,243 @@ impl MultiWordTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HighlightMerger — merge overlapping highlights on the same line
+// ---------------------------------------------------------------------------
+
+/// Merges overlapping or adjacent highlights on the same line.
+///
+/// When multiple highlights overlap, they are combined into one span
+/// covering the full extent.  The resulting kind is chosen by priority:
+/// `Write > Read > Text`.
+#[derive(Debug, Clone)]
+pub struct HighlightMerger {
+    highlights: Vec<DocumentHighlight>,
+}
+
+impl HighlightMerger {
+    /// Create a new empty merger.
+    pub fn new() -> Self {
+        Self {
+            highlights: Vec::new(),
+        }
+    }
+
+    /// Create a merger pre-loaded with highlights.
+    pub fn from_highlights(highlights: Vec<DocumentHighlight>) -> Self {
+        Self { highlights }
+    }
+
+    /// Add a highlight to the pending set.
+    pub fn push(&mut self, hl: DocumentHighlight) {
+        self.highlights.push(hl);
+    }
+
+    /// Merge all overlapping highlights on the same line and return the
+    /// resulting non-overlapping set.
+    pub fn merge(&self) -> Vec<DocumentHighlight> {
+        if self.highlights.is_empty() {
+            return Vec::new();
+        }
+
+        let mut by_line: std::collections::HashMap<u32, Vec<&DocumentHighlight>> =
+            std::collections::HashMap::new();
+        for hl in &self.highlights {
+            by_line.entry(hl.line).or_default().push(hl);
+        }
+
+        let mut result = Vec::new();
+        for (_line, mut hls) in by_line {
+            hls.sort_by_key(|h| (h.start_column, h.end_column));
+            let mut cur_start = hls[0].start_column;
+            let mut cur_end = hls[0].end_column;
+            let mut cur_kind = hls[0].kind;
+            let cur_line = hls[0].line;
+
+            for hl in hls.iter().skip(1) {
+                if hl.start_column <= cur_end {
+                    // overlapping — extend and pick higher-priority kind
+                    cur_end = cur_end.max(hl.end_column);
+                    cur_kind = higher_priority_kind(cur_kind, hl.kind);
+                } else {
+                    result.push(DocumentHighlight::new(cur_line, cur_start, cur_end, cur_kind));
+                    cur_start = hl.start_column;
+                    cur_end = hl.end_column;
+                    cur_kind = hl.kind;
+                }
+            }
+            result.push(DocumentHighlight::new(cur_line, cur_start, cur_end, cur_kind));
+        }
+        result.sort_by_key(|h| (h.line, h.start_column));
+        result
+    }
+}
+
+/// Returns the higher-priority kind (Write > Read > Text).
+fn higher_priority_kind(a: DocumentHighlightKind, b: DocumentHighlightKind) -> DocumentHighlightKind {
+    fn rank(k: DocumentHighlightKind) -> u8 {
+        match k {
+            DocumentHighlightKind::Text => 0,
+            DocumentHighlightKind::Read => 1,
+            DocumentHighlightKind::Write => 2,
+        }
+    }
+    if rank(b) > rank(a) { b } else { a }
+}
+
+// ---------------------------------------------------------------------------
+// Highlight diff — compute added/removed highlights between two sets
+// ---------------------------------------------------------------------------
+
+/// Result of diffing two highlight sets.
+#[derive(Debug, Clone)]
+pub struct HighlightDiff {
+    /// Highlights present in `after` but not in `before`.
+    pub added: Vec<DocumentHighlight>,
+    /// Highlights present in `before` but not in `after`.
+    pub removed: Vec<DocumentHighlight>,
+}
+
+impl HighlightDiff {
+    /// Returns `true` if there are no differences.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty()
+    }
+
+    /// Total number of changes (additions + removals).
+    pub fn change_count(&self) -> usize {
+        self.added.len() + self.removed.len()
+    }
+}
+
+/// Compute the diff between two highlight sets.
+///
+/// Two highlights are considered equal when they have the same line,
+/// start_column, end_column, and kind.
+pub fn diff_highlights(before: &[DocumentHighlight], after: &[DocumentHighlight]) -> HighlightDiff {
+    fn key(h: &DocumentHighlight) -> (u32, u32, u32, DocumentHighlightKind) {
+        (h.line, h.start_column, h.end_column, h.kind)
+    }
+
+    let before_set: std::collections::HashSet<_> = before.iter().map(key).collect();
+    let after_set: std::collections::HashSet<_> = after.iter().map(key).collect();
+
+    let added = after
+        .iter()
+        .filter(|h| !before_set.contains(&key(h)))
+        .cloned()
+        .collect();
+    let removed = before
+        .iter()
+        .filter(|h| !after_set.contains(&key(h)))
+        .cloned()
+        .collect();
+
+    HighlightDiff { added, removed }
+}
+
+// ---------------------------------------------------------------------------
+// WordOccurrenceTracker — count word occurrences with positions
+// ---------------------------------------------------------------------------
+
+/// Tracks a single occurrence of a word.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WordOccurrence {
+    /// Zero-based line index.
+    pub line: u32,
+    /// Zero-based column of the start of the word.
+    pub column: u32,
+    /// Length of the word in columns.
+    pub length: u32,
+}
+
+/// Counts and tracks all occurrences of specific words in a document.
+#[derive(Debug, Clone)]
+pub struct WordOccurrenceTracker {
+    occurrences: std::collections::HashMap<String, Vec<WordOccurrence>>,
+}
+
+impl WordOccurrenceTracker {
+    /// Create a new empty tracker.
+    pub fn new() -> Self {
+        Self {
+            occurrences: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Scan `lines` for all occurrences of `word` (case-sensitive).
+    pub fn track_word(&mut self, lines: &[&str], word: &str) {
+        let mut positions = Vec::new();
+        for (line_idx, line) in lines.iter().enumerate() {
+            let mut start = 0;
+            while let Some(pos) = line[start..].find(word) {
+                let col = start + pos;
+                // only match whole words
+                let before_ok = col == 0
+                    || !line.as_bytes()[col - 1].is_ascii_alphanumeric()
+                        && line.as_bytes()[col - 1] != b'_';
+                let after_pos = col + word.len();
+                let after_ok = after_pos >= line.len()
+                    || !line.as_bytes()[after_pos].is_ascii_alphanumeric()
+                        && line.as_bytes()[after_pos] != b'_';
+
+                if before_ok && after_ok {
+                    positions.push(WordOccurrence {
+                        line: line_idx as u32,
+                        column: col as u32,
+                        length: word.len() as u32,
+                    });
+                }
+                start = col + word.len();
+            }
+        }
+        self.occurrences.insert(word.to_string(), positions);
+    }
+
+    /// Return the number of occurrences of `word`.
+    pub fn count(&self, word: &str) -> usize {
+        self.occurrences.get(word).map_or(0, |v| v.len())
+    }
+
+    /// Return all tracked occurrences of `word`.
+    pub fn get(&self, word: &str) -> &[WordOccurrence] {
+        self.occurrences.get(word).map_or(&[], |v| v.as_slice())
+    }
+
+    /// Return all tracked words.
+    pub fn tracked_words(&self) -> Vec<&str> {
+        self.occurrences.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Remove tracking data for a word.
+    pub fn untrack(&mut self, word: &str) {
+        self.occurrences.remove(word);
+    }
+
+    /// Clear all tracking data.
+    pub fn clear(&mut self) {
+        self.occurrences.clear();
+    }
+
+    /// Return the total number of occurrences across all tracked words.
+    pub fn total_occurrences(&self) -> usize {
+        self.occurrences.values().map(|v| v.len()).sum()
+    }
+
+    /// Return lines that contain at least one occurrence of `word`.
+    pub fn lines_with_word(&self, word: &str) -> Vec<u32> {
+        let mut lines: Vec<u32> = self
+            .get(word)
+            .iter()
+            .map(|o| o.line)
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        lines.sort();
+        lines
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1306,5 +1543,81 @@ mod tests {
             DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
         ]);
         assert_eq!(set.to_string(), "3 highlights on 2 lines");
+    }
+
+    // -- HighlightMerger tests -----------------------------------------------
+
+    #[test]
+    fn merger_combines_overlapping() {
+        let mut merger = HighlightMerger::new();
+        merger.push(DocumentHighlight::new(1, 0, 5, DocumentHighlightKind::Text));
+        merger.push(DocumentHighlight::new(1, 3, 8, DocumentHighlightKind::Read));
+        let merged = merger.merge();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_column, 0);
+        assert_eq!(merged[0].end_column, 8);
+        assert_eq!(merged[0].kind, DocumentHighlightKind::Read);
+    }
+
+    #[test]
+    fn merger_keeps_non_overlapping_separate() {
+        let merger = HighlightMerger::from_highlights(vec![
+            DocumentHighlight::new(1, 0, 3, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 5, 8, DocumentHighlightKind::Text),
+        ]);
+        let merged = merger.merge();
+        assert_eq!(merged.len(), 2);
+    }
+
+    // -- HighlightDiff tests -------------------------------------------------
+
+    #[test]
+    fn diff_detects_added_and_removed() {
+        let before = vec![
+            DocumentHighlight::new(1, 0, 3, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 0, 3, DocumentHighlightKind::Read),
+        ];
+        let after = vec![
+            DocumentHighlight::new(2, 0, 3, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 0, 3, DocumentHighlightKind::Write),
+        ];
+        let diff = diff_highlights(&before, &after);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.removed.len(), 1);
+        assert_eq!(diff.added[0].line, 3);
+        assert_eq!(diff.removed[0].line, 1);
+    }
+
+    #[test]
+    fn diff_empty_when_identical() {
+        let set = vec![DocumentHighlight::new(1, 0, 5, DocumentHighlightKind::Text)];
+        let diff = diff_highlights(&set, &set);
+        assert!(diff.is_empty());
+        assert_eq!(diff.change_count(), 0);
+    }
+
+    // -- WordOccurrenceTracker tests -----------------------------------------
+
+    #[test]
+    fn tracker_counts_word_occurrences() {
+        let lines = vec!["let x = x + 1;", "let y = x;"];
+        let mut tracker = WordOccurrenceTracker::new();
+        tracker.track_word(&lines, "x");
+        assert_eq!(tracker.count("x"), 3);
+        assert_eq!(tracker.total_occurrences(), 3);
+
+        let positions = tracker.get("x");
+        assert_eq!(positions[0], WordOccurrence { line: 0, column: 4, length: 1 });
+        assert_eq!(positions[1], WordOccurrence { line: 0, column: 8, length: 1 });
+        assert_eq!(positions[2], WordOccurrence { line: 1, column: 8, length: 1 });
+    }
+
+    #[test]
+    fn tracker_lines_with_word() {
+        let lines = vec!["hello world", "foo bar", "hello again"];
+        let mut tracker = WordOccurrenceTracker::new();
+        tracker.track_word(&lines, "hello");
+        let word_lines = tracker.lines_with_word("hello");
+        assert_eq!(word_lines, vec![0, 2]);
     }
 }

@@ -859,6 +859,221 @@ pub fn classification_color_name(cls: TokenClassification) -> &'static str {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TokenScope
+// ---------------------------------------------------------------------------
+
+/// Scope-based token classification with dot-delimited scope names.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TokenScope {
+    /// Dot-delimited scope segments, e.g. "comment.line.double-slash".
+    pub scope: String,
+}
+
+impl TokenScope {
+    /// Create a new token scope.
+    pub fn new(scope: impl Into<String>) -> Self {
+        Self {
+            scope: scope.into(),
+        }
+    }
+
+    /// Return the number of scope segments.
+    pub fn depth(&self) -> usize {
+        if self.scope.is_empty() {
+            return 0;
+        }
+        self.scope.split('.').count()
+    }
+
+    /// Return the top-level scope segment (e.g. "comment" from "comment.line.double-slash").
+    pub fn root(&self) -> &str {
+        self.scope.split('.').next().unwrap_or("")
+    }
+
+    /// Return the leaf scope segment.
+    pub fn leaf(&self) -> &str {
+        self.scope.rsplit('.').next().unwrap_or("")
+    }
+
+    /// Check if this scope is a prefix of another.
+    pub fn is_prefix_of(&self, other: &TokenScope) -> bool {
+        other.scope.starts_with(&self.scope)
+            && (other.scope.len() == self.scope.len()
+                || other.scope.as_bytes().get(self.scope.len()) == Some(&b'.'))
+    }
+
+    /// Return the parent scope (one level up), or `None` if already root.
+    pub fn parent(&self) -> Option<TokenScope> {
+        self.scope
+            .rfind('.')
+            .map(|pos| TokenScope::new(&self.scope[..pos]))
+    }
+}
+
+impl fmt::Display for TokenScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.scope)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenDiffEngine
+// ---------------------------------------------------------------------------
+
+/// Describes a change between two token sequences.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenDiffOp {
+    /// Token at old index was kept (identical in both).
+    Keep { index: usize },
+    /// Token was inserted at new index.
+    Insert { new_index: usize },
+    /// Token was removed from old index.
+    Remove { old_index: usize },
+}
+
+/// Diffs two token sequences.
+pub struct TokenDiffEngine;
+
+impl TokenDiffEngine {
+    /// Compute a simple diff between old and new token sequences.
+    pub fn diff(old: &[Token], new: &[Token]) -> Vec<TokenDiffOp> {
+        let mut ops = Vec::new();
+        let mut oi = 0;
+        let mut ni = 0;
+        while oi < old.len() && ni < new.len() {
+            if old[oi] == new[ni] {
+                ops.push(TokenDiffOp::Keep { index: oi });
+                oi += 1;
+                ni += 1;
+            } else if oi + 1 < old.len() && old[oi + 1] == new[ni] {
+                ops.push(TokenDiffOp::Remove { old_index: oi });
+                oi += 1;
+            } else {
+                ops.push(TokenDiffOp::Insert { new_index: ni });
+                ni += 1;
+            }
+        }
+        while oi < old.len() {
+            ops.push(TokenDiffOp::Remove { old_index: oi });
+            oi += 1;
+        }
+        while ni < new.len() {
+            ops.push(TokenDiffOp::Insert { new_index: ni });
+            ni += 1;
+        }
+        ops
+    }
+
+    /// Returns `true` if two token sequences are identical.
+    pub fn is_identical(old: &[Token], new: &[Token]) -> bool {
+        old == new
+    }
+
+    /// Count insertions in a diff.
+    pub fn insertion_count(ops: &[TokenDiffOp]) -> usize {
+        ops.iter()
+            .filter(|op| matches!(op, TokenDiffOp::Insert { .. }))
+            .count()
+    }
+
+    /// Count removals in a diff.
+    pub fn removal_count(ops: &[TokenDiffOp]) -> usize {
+        ops.iter()
+            .filter(|op| matches!(op, TokenDiffOp::Remove { .. }))
+            .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenStreamIterator
+// ---------------------------------------------------------------------------
+
+/// Iterates over tokens providing context (previous and next token).
+pub struct TokenStreamIterator<'a> {
+    tokens: &'a [Token],
+    pos: usize,
+}
+
+impl<'a> TokenStreamIterator<'a> {
+    pub fn new(tokens: &'a [Token]) -> Self {
+        Self { tokens, pos: 0 }
+    }
+
+    /// Peek at the previous token without advancing.
+    pub fn prev(&self) -> Option<&'a Token> {
+        if self.pos > 0 {
+            Some(&self.tokens[self.pos - 1])
+        } else {
+            None
+        }
+    }
+
+    /// Peek at the current token without advancing.
+    pub fn current(&self) -> Option<&'a Token> {
+        self.tokens.get(self.pos)
+    }
+
+    /// Peek at the next token without advancing.
+    pub fn peek_next(&self) -> Option<&'a Token> {
+        self.tokens.get(self.pos + 1)
+    }
+
+    /// Advance and return the current token.
+    pub fn advance(&mut self) -> Option<&'a Token> {
+        let tok = self.tokens.get(self.pos);
+        if tok.is_some() {
+            self.pos += 1;
+        }
+        tok
+    }
+
+    /// Return the remaining number of tokens.
+    pub fn remaining(&self) -> usize {
+        self.tokens.len().saturating_sub(self.pos)
+    }
+
+    /// Reset position to the beginning.
+    pub fn reset(&mut self) {
+        self.pos = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenizationCache – eviction & stats
+// ---------------------------------------------------------------------------
+
+impl TokenizationCache {
+    /// Evict the oldest `n` cached entries (from the start).
+    pub fn evict_oldest(&mut self, n: usize) {
+        let mut evicted = 0;
+        for entry in self.entries.iter_mut() {
+            if evicted >= n {
+                break;
+            }
+            if entry.is_some() {
+                *entry = None;
+                evicted += 1;
+            }
+        }
+    }
+
+    /// Return the hit rate as the ratio of cached lines to total capacity.
+    pub fn hit_rate(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 0.0;
+        }
+        self.cached_line_count() as f64 / self.entries.len() as f64
+    }
+
+    /// Trim the cache to keep only the first `max_lines` entries.
+    pub fn trim_to(&mut self, max_lines: usize) {
+        if self.entries.len() > max_lines {
+            self.entries.truncate(max_lines);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1334,5 +1549,149 @@ mod tests {
         let empty = LineTokens::empty();
         assert_eq!(empty.comment_count(), 0);
         assert_eq!(empty.string_count(), 0);
+    }
+
+    // -- TokenScope --
+
+    #[test]
+    fn token_scope_depth_and_root() {
+        let scope = TokenScope::new("comment.line.double-slash");
+        assert_eq!(scope.depth(), 3);
+        assert_eq!(scope.root(), "comment");
+        assert_eq!(scope.leaf(), "double-slash");
+    }
+
+    #[test]
+    fn token_scope_parent() {
+        let scope = TokenScope::new("comment.line.double-slash");
+        let parent = scope.parent().unwrap();
+        assert_eq!(parent.scope, "comment.line");
+        let grandparent = parent.parent().unwrap();
+        assert_eq!(grandparent.scope, "comment");
+        assert!(grandparent.parent().is_none());
+    }
+
+    #[test]
+    fn token_scope_is_prefix_of() {
+        let comment = TokenScope::new("comment");
+        let comment_line = TokenScope::new("comment.line");
+        assert!(comment.is_prefix_of(&comment_line));
+        assert!(!comment_line.is_prefix_of(&comment));
+        assert!(comment.is_prefix_of(&comment)); // prefix of itself
+    }
+
+    #[test]
+    fn token_scope_empty() {
+        let empty = TokenScope::new("");
+        assert_eq!(empty.depth(), 0);
+        assert_eq!(empty.root(), "");
+    }
+
+    // -- TokenDiffEngine --
+
+    #[test]
+    fn diff_identical_sequences() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let tokens = vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 5, metadata: meta },
+        ];
+        let ops = TokenDiffEngine::diff(&tokens, &tokens);
+        assert_eq!(TokenDiffEngine::insertion_count(&ops), 0);
+        assert_eq!(TokenDiffEngine::removal_count(&ops), 0);
+        assert!(TokenDiffEngine::is_identical(&tokens, &tokens));
+    }
+
+    #[test]
+    fn diff_detects_insertion() {
+        let m1 = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let m2 = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let old = vec![Token { start_offset: 0, metadata: m1 }];
+        let new = vec![
+            Token { start_offset: 0, metadata: m1 },
+            Token { start_offset: 5, metadata: m2 },
+        ];
+        let ops = TokenDiffEngine::diff(&old, &new);
+        assert_eq!(TokenDiffEngine::insertion_count(&ops), 1);
+    }
+
+    #[test]
+    fn diff_detects_removal() {
+        let m1 = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let m2 = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let old = vec![
+            Token { start_offset: 0, metadata: m1 },
+            Token { start_offset: 5, metadata: m2 },
+        ];
+        let new = vec![Token { start_offset: 0, metadata: m1 }];
+        let ops = TokenDiffEngine::diff(&old, &new);
+        assert_eq!(TokenDiffEngine::removal_count(&ops), 1);
+    }
+
+    // -- TokenStreamIterator --
+
+    #[test]
+    fn stream_iterator_navigation() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let tokens = vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 5, metadata: meta },
+            Token { start_offset: 10, metadata: meta },
+        ];
+        let mut iter = TokenStreamIterator::new(&tokens);
+        assert!(iter.prev().is_none());
+        assert_eq!(iter.current().unwrap().start_offset, 0);
+        assert_eq!(iter.peek_next().unwrap().start_offset, 5);
+        assert_eq!(iter.remaining(), 3);
+
+        iter.advance();
+        assert_eq!(iter.prev().unwrap().start_offset, 0);
+        assert_eq!(iter.current().unwrap().start_offset, 5);
+        assert_eq!(iter.remaining(), 2);
+
+        iter.advance();
+        iter.advance();
+        assert!(iter.current().is_none());
+        assert_eq!(iter.remaining(), 0);
+
+        iter.reset();
+        assert_eq!(iter.remaining(), 3);
+    }
+
+    // -- TokenizationCache eviction --
+
+    #[test]
+    fn cache_evict_oldest() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let mut cache = TokenizationCache::new();
+        cache.set(0, LineTokens::new(vec![Token { start_offset: 0, metadata: meta }]), TokenizationState::initial());
+        cache.set(1, LineTokens::new(vec![Token { start_offset: 0, metadata: meta }]), TokenizationState::initial());
+        cache.set(2, LineTokens::new(vec![Token { start_offset: 0, metadata: meta }]), TokenizationState::initial());
+        assert_eq!(cache.cached_line_count(), 3);
+        cache.evict_oldest(2);
+        assert_eq!(cache.cached_line_count(), 1);
+    }
+
+    #[test]
+    fn cache_hit_rate() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let mut cache = TokenizationCache::new();
+        cache.set(0, LineTokens::new(vec![Token { start_offset: 0, metadata: meta }]), TokenizationState::initial());
+        cache.set(2, LineTokens::new(vec![Token { start_offset: 0, metadata: meta }]), TokenizationState::initial());
+        // capacity is 3 (indices 0,1,2), 2 filled
+        let rate = cache.hit_rate();
+        assert!((rate - 2.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn cache_trim_to() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let mut cache = TokenizationCache::new();
+        for i in 0..5 {
+            cache.set(i, LineTokens::new(vec![Token { start_offset: 0, metadata: meta }]), TokenizationState::initial());
+        }
+        assert_eq!(cache.capacity(), 5);
+        cache.trim_to(3);
+        assert_eq!(cache.capacity(), 3);
     }
 }

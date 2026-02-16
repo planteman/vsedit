@@ -1,5 +1,6 @@
 //! Inlay type and parameter annotations for inline editor hints.
 
+use std::collections::HashMap;
 use std::fmt;
 /// The kind of inlay hint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -710,6 +711,211 @@ impl Default for InlayHintStyle {
     }
 }
 
+// ---------------------------------------------------------------------------
+// InlayHintFilter – select hints by kind or line range
+// ---------------------------------------------------------------------------
+
+/// Configurable filter for selecting a subset of inlay hints.
+#[derive(Debug, Clone)]
+pub struct InlayHintFilter {
+    /// If set, only hints of these kinds are kept.
+    pub kinds: Option<Vec<InlayHintKind>>,
+    /// If set, only hints on lines `>= min_line` are kept.
+    pub min_line: Option<u32>,
+    /// If set, only hints on lines `<= max_line` are kept.
+    pub max_line: Option<u32>,
+}
+
+impl InlayHintFilter {
+    /// Create a filter that accepts everything.
+    pub fn accept_all() -> Self {
+        Self {
+            kinds: None,
+            min_line: None,
+            max_line: None,
+        }
+    }
+
+    /// Restrict to the given kinds.
+    pub fn with_kinds(mut self, kinds: Vec<InlayHintKind>) -> Self {
+        self.kinds = Some(kinds);
+        self
+    }
+
+    /// Restrict to a line range (inclusive).
+    pub fn with_line_range(mut self, min: u32, max: u32) -> Self {
+        self.min_line = Some(min);
+        self.max_line = Some(max);
+        self
+    }
+
+    /// Return `true` if `hint` passes the filter.
+    pub fn matches(&self, hint: &InlayHint) -> bool {
+        if let Some(ref kinds) = self.kinds {
+            if !kinds.contains(&hint.kind) {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_line {
+            if hint.position_line < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.max_line {
+            if hint.position_line > max {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Apply the filter to a slice, returning only matching hints.
+    pub fn apply(&self, hints: &[InlayHint]) -> Vec<InlayHint> {
+        hints.iter().filter(|h| self.matches(h)).cloned().collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintCache – per-URI, per-range caching of computed hints
+// ---------------------------------------------------------------------------
+
+/// Key identifying a cached hint region.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct CacheKey {
+    uri: String,
+    start_line: u32,
+    end_line: u32,
+}
+
+/// Simple cache for inlay hints keyed by `(uri, start_line, end_line)`.
+#[derive(Debug)]
+pub struct InlayHintCache {
+    entries: HashMap<(String, u32, u32), Vec<InlayHint>>,
+}
+
+impl InlayHintCache {
+    /// Create an empty cache.
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Look up cached hints for the given region.
+    pub fn get(&self, uri: &str, start_line: u32, end_line: u32) -> Option<&Vec<InlayHint>> {
+        self.entries.get(&(uri.to_string(), start_line, end_line))
+    }
+
+    /// Insert hints for a region, replacing any previous entry.
+    pub fn insert(&mut self, uri: &str, start_line: u32, end_line: u32, hints: Vec<InlayHint>) {
+        self.entries
+            .insert((uri.to_string(), start_line, end_line), hints);
+    }
+
+    /// Invalidate all cached entries for a given URI.
+    pub fn invalidate_uri(&mut self, uri: &str) {
+        self.entries.retain(|(u, _, _), _| u != uri);
+    }
+
+    /// Invalidate entries that overlap with the given line range for a URI.
+    pub fn invalidate_range(&mut self, uri: &str, start_line: u32, end_line: u32) {
+        self.entries.retain(|(u, s, e), _| {
+            if u != uri {
+                return true;
+            }
+            // Keep entries that don't overlap
+            *e < start_line || *s > end_line
+        });
+    }
+
+    /// Clear all cached entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return the number of cached regions.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for InlayHintCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintDiff – compare two hint sets
+// ---------------------------------------------------------------------------
+
+/// Describes differences between two hint sets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlayHintDiff {
+    /// Hints present in the new set but not in the old set.
+    pub added: Vec<InlayHint>,
+    /// Hints present in the old set but not in the new set.
+    pub removed: Vec<InlayHint>,
+    /// Hints present in both sets (unchanged).
+    pub unchanged: Vec<InlayHint>,
+}
+
+impl InlayHintDiff {
+    /// Compute the diff between `old` and `new` hint sets.
+    ///
+    /// Uses structural equality ([`PartialEq`]) to classify each hint.
+    pub fn compute(old: &[InlayHint], new: &[InlayHint]) -> Self {
+        let mut added: Vec<InlayHint> = Vec::new();
+        let mut removed: Vec<InlayHint> = Vec::new();
+        let mut unchanged: Vec<InlayHint> = Vec::new();
+
+        // Track which old hints have been matched
+        let mut old_matched = vec![false; old.len()];
+
+        for new_hint in new {
+            let mut found = false;
+            for (i, old_hint) in old.iter().enumerate() {
+                if !old_matched[i] && new_hint == old_hint {
+                    old_matched[i] = true;
+                    unchanged.push(new_hint.clone());
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                added.push(new_hint.clone());
+            }
+        }
+
+        for (i, old_hint) in old.iter().enumerate() {
+            if !old_matched[i] {
+                removed.push(old_hint.clone());
+            }
+        }
+
+        Self {
+            added,
+            removed,
+            unchanged,
+        }
+    }
+
+    /// Return `true` if there are no differences.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty()
+    }
+
+    /// Total number of changed hints (added + removed).
+    pub fn change_count(&self) -> usize {
+        self.added.len() + self.removed.len()
+    }
+}
+
 /// Render a single editor line with inlay hints spliced in.
 ///
 /// `hints` must contain only hints whose `position_line` matches the line
@@ -1256,5 +1462,155 @@ mod tests {
         let hint = InlayHint::simple(0, 5, "Z", InlayHintKind::Other);
         let result = render_line_with_inlay_hints(line, &[hint], &InlayHintStyle::default());
         assert_eq!(result, "abZ");
+    }
+
+    // -- filter tests -------------------------------------------------------
+
+    #[test]
+    fn filter_accept_all_keeps_everything() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(5, 0, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(10, 0, "note", InlayHintKind::Other),
+        ];
+        let filter = InlayHintFilter::accept_all();
+        let result = filter.apply(&hints);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn filter_by_kind() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(2, 0, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(3, 0, ": bool", InlayHintKind::Type),
+        ];
+        let filter = InlayHintFilter::accept_all().with_kinds(vec![InlayHintKind::Type]);
+        let result = filter.apply(&hints);
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().all(|h| h.kind == InlayHintKind::Type));
+    }
+
+    #[test]
+    fn filter_by_line_range() {
+        let hints: Vec<InlayHint> = (0..20)
+            .map(|i| InlayHint::simple(i, 0, "h", InlayHintKind::Other))
+            .collect();
+        let filter = InlayHintFilter::accept_all().with_line_range(5, 10);
+        let result = filter.apply(&hints);
+        assert_eq!(result.len(), 6); // lines 5..=10
+        assert!(result.iter().all(|h| h.position_line >= 5 && h.position_line <= 10));
+    }
+
+    #[test]
+    fn filter_combined_kind_and_range() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(5, 0, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(8, 0, ": bool", InlayHintKind::Type),
+            InlayHint::simple(12, 0, ": u8", InlayHintKind::Type),
+        ];
+        let filter = InlayHintFilter::accept_all()
+            .with_kinds(vec![InlayHintKind::Type])
+            .with_line_range(3, 10);
+        let result = filter.apply(&hints);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].position_line, 8);
+    }
+
+    // -- cache tests --------------------------------------------------------
+
+    #[test]
+    fn cache_insert_and_get() {
+        let mut cache = InlayHintCache::new();
+        assert!(cache.is_empty());
+        let hints = vec![InlayHint::simple(1, 0, ": i32", InlayHintKind::Type)];
+        cache.insert("file:///a.rs", 0, 10, hints.clone());
+        assert_eq!(cache.len(), 1);
+        let got = cache.get("file:///a.rs", 0, 10).unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].label[0].value, ": i32");
+    }
+
+    #[test]
+    fn cache_invalidate_uri() {
+        let mut cache = InlayHintCache::new();
+        cache.insert("file:///a.rs", 0, 10, vec![]);
+        cache.insert("file:///a.rs", 11, 20, vec![]);
+        cache.insert("file:///b.rs", 0, 5, vec![]);
+        assert_eq!(cache.len(), 3);
+        cache.invalidate_uri("file:///a.rs");
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("file:///b.rs", 0, 5).is_some());
+    }
+
+    #[test]
+    fn cache_invalidate_range() {
+        let mut cache = InlayHintCache::new();
+        cache.insert("file:///a.rs", 0, 10, vec![]);
+        cache.insert("file:///a.rs", 15, 25, vec![]);
+        cache.insert("file:///a.rs", 30, 40, vec![]);
+        // Invalidate lines 8..=20 – overlaps entries [0,10] and [15,25]
+        cache.invalidate_range("file:///a.rs", 8, 20);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("file:///a.rs", 30, 40).is_some());
+    }
+
+    // -- diff tests ---------------------------------------------------------
+
+    #[test]
+    fn diff_identical_sets() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(2, 5, "x:", InlayHintKind::Parameter),
+        ];
+        let diff = InlayHintDiff::compute(&hints, &hints);
+        assert!(diff.is_empty());
+        assert_eq!(diff.unchanged.len(), 2);
+        assert_eq!(diff.change_count(), 0);
+    }
+
+    #[test]
+    fn diff_all_new() {
+        let old: Vec<InlayHint> = vec![];
+        let new = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+        ];
+        let diff = InlayHintDiff::compute(&old, &new);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.removed.len(), 0);
+        assert_eq!(diff.unchanged.len(), 0);
+        assert_eq!(diff.change_count(), 1);
+    }
+
+    #[test]
+    fn diff_all_removed() {
+        let old = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+        ];
+        let new: Vec<InlayHint> = vec![];
+        let diff = InlayHintDiff::compute(&old, &new);
+        assert_eq!(diff.added.len(), 0);
+        assert_eq!(diff.removed.len(), 1);
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn diff_mixed_changes() {
+        let old = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(2, 0, "x:", InlayHintKind::Parameter),
+        ];
+        let new = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type), // unchanged
+            InlayHint::simple(3, 0, ": bool", InlayHintKind::Type), // added
+        ];
+        let diff = InlayHintDiff::compute(&old, &new);
+        assert_eq!(diff.unchanged.len(), 1);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.added[0].label[0].value, ": bool");
+        assert_eq!(diff.removed.len(), 1);
+        assert_eq!(diff.removed[0].label[0].value, "x:");
+        assert_eq!(diff.change_count(), 2);
     }
 }

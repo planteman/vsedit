@@ -692,6 +692,196 @@ impl Default for KeybindingsUiValidator {
     }
 }
 
+/// Search engine for filtering keybindings by command name, key label, or when-clause.
+#[derive(Debug, Clone)]
+pub struct KeybindingSearchEngine {
+    query: String,
+    case_sensitive: bool,
+}
+
+impl KeybindingSearchEngine {
+    pub fn new(query: &str) -> Self {
+        Self {
+            query: query.to_string(),
+            case_sensitive: false,
+        }
+    }
+
+    pub fn case_sensitive(mut self, yes: bool) -> Self {
+        self.case_sensitive = yes;
+        self
+    }
+
+    fn matches_str(&self, haystack: &str) -> bool {
+        if self.case_sensitive {
+            haystack.contains(&self.query)
+        } else {
+            haystack.to_lowercase().contains(&self.query.to_lowercase())
+        }
+    }
+
+    /// Search bindings in a registry, returning indices of matching entries.
+    pub fn search(&self, registry: &KeybindingRegistry) -> Vec<usize> {
+        registry
+            .get_all_bindings()
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| {
+                self.matches_str(&b.command)
+                    || self.matches_str(&format_key_combo(&b.key, &b.modifiers))
+                    || b.when_clause.as_deref().map_or(false, |w| self.matches_str(w))
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Convenience: return matching bindings directly.
+    pub fn search_bindings<'a>(&self, registry: &'a KeybindingRegistry) -> Vec<&'a Keybinding> {
+        let indices = self.search(registry);
+        let all = registry.get_all_bindings();
+        indices.into_iter().map(|i| &all[i]).collect()
+    }
+}
+
+/// Tracks an undo/redo history of keybinding changes.
+#[derive(Debug, Clone)]
+pub enum KeybindingAction {
+    Add(Keybinding),
+    Remove { command: String },
+}
+
+#[derive(Debug, Clone)]
+pub struct KeybindingHistory {
+    undo_stack: Vec<KeybindingAction>,
+    redo_stack: Vec<KeybindingAction>,
+}
+
+impl KeybindingHistory {
+    pub fn new() -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+        }
+    }
+
+    /// Push an action onto the undo stack and clear redo.
+    pub fn push(&mut self, action: KeybindingAction) {
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+    }
+
+    /// Pop the most recent action for undoing. Returns `None` if nothing to undo.
+    pub fn undo(&mut self) -> Option<KeybindingAction> {
+        let action = self.undo_stack.pop()?;
+        self.redo_stack.push(action.clone());
+        Some(action)
+    }
+
+    /// Pop the most recent undone action for redoing. Returns `None` if nothing to redo.
+    pub fn redo(&mut self) -> Option<KeybindingAction> {
+        let action = self.redo_stack.pop()?;
+        self.undo_stack.push(action.clone());
+        Some(action)
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    pub fn undo_len(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    pub fn redo_len(&self) -> usize {
+        self.redo_stack.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+}
+
+impl Default for KeybindingHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Export format for keybindings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    Json,
+    Csv,
+}
+
+/// Exports keybindings from a registry into a textual format.
+pub struct KeybindingExporter;
+
+impl KeybindingExporter {
+    /// Export all bindings as a JSON array string.
+    pub fn export_json(registry: &KeybindingRegistry) -> String {
+        let mut entries = Vec::new();
+        for b in registry.get_all_bindings() {
+            let key_label = format_key_combo(&b.key, &b.modifiers);
+            let when = b.when_clause.as_deref().unwrap_or("");
+            let source = match b.source {
+                KeybindingSource::Default => "default",
+                KeybindingSource::User => "user",
+                KeybindingSource::Extension => "extension",
+            };
+            entries.push(format!(
+                "  {{\"command\":\"{}\",\"key\":\"{}\",\"when\":\"{}\",\"source\":\"{}\"}}",
+                b.command, key_label, when, source,
+            ));
+        }
+        format!("[\n{}\n]", entries.join(",\n"))
+    }
+
+    /// Export all bindings as CSV (header + rows).
+    pub fn export_csv(registry: &KeybindingRegistry) -> String {
+        let mut lines = vec!["command,key,when,source".to_string()];
+        for b in registry.get_all_bindings() {
+            let key_label = format_key_combo(&b.key, &b.modifiers);
+            let when = b.when_clause.as_deref().unwrap_or("");
+            let source = match b.source {
+                KeybindingSource::Default => "default",
+                KeybindingSource::User => "user",
+                KeybindingSource::Extension => "extension",
+            };
+            lines.push(format!("{},{},{},{}", b.command, key_label, when, source));
+        }
+        lines.join("\n")
+    }
+
+    /// Export using the specified format.
+    pub fn export(registry: &KeybindingRegistry, format: ExportFormat) -> String {
+        match format {
+            ExportFormat::Json => Self::export_json(registry),
+            ExportFormat::Csv => Self::export_csv(registry),
+        }
+    }
+}
+
+/// Parse a chord string like `"Ctrl+K Ctrl+C"` into a `ChordKeybinding`.
+pub fn parse_chord(input: &str) -> Option<ChordKeybinding> {
+    let parts: Vec<&str> = input.split_whitespace().collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let first = parse_keybinding(parts[0])?;
+    let second = parse_keybinding(parts[1])?;
+    Some(ChordKeybinding {
+        first: (first.key, first.modifiers),
+        second: (second.key, second.modifiers),
+        command: String::new(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1268,5 +1458,131 @@ mod tests {
         let done = rec.record_key(KeyCode::Char('x'), Modifiers::none());
         assert!(!done);
         assert!(rec.recorded_keys().is_empty());
+    }
+
+    #[test]
+    fn search_engine_matches_command() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::Char('s'), true, "editor.save"));
+        reg.add(kb(KeyCode::Char('o'), true, "editor.open"));
+        reg.add(kb(KeyCode::F(5), false, "debug.run"));
+        let engine = KeybindingSearchEngine::new("save");
+        let results = engine.search_bindings(&reg);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].command, "editor.save");
+    }
+
+    #[test]
+    fn search_engine_case_insensitive_by_default() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::Char('s'), true, "Editor.Save"));
+        let engine = KeybindingSearchEngine::new("editor.save");
+        assert_eq!(engine.search(&reg).len(), 1);
+    }
+
+    #[test]
+    fn search_engine_case_sensitive_mode() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::Char('s'), true, "Editor.Save"));
+        let engine = KeybindingSearchEngine::new("editor.save").case_sensitive(true);
+        assert!(engine.search(&reg).is_empty());
+    }
+
+    #[test]
+    fn search_engine_matches_key_label() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::F(5), false, "debug.run"));
+        let engine = KeybindingSearchEngine::new("F5");
+        assert_eq!(engine.search(&reg).len(), 1);
+    }
+
+    #[test]
+    fn search_engine_matches_when_clause() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(Keybinding {
+            key: KeyCode::Char('c'),
+            modifiers: Modifiers { ctrl: true, shift: false, alt: false, meta: false },
+            command: "copy".into(),
+            when_clause: Some("editorFocus".into()),
+            source: KeybindingSource::Default,
+        });
+        let engine = KeybindingSearchEngine::new("editorFocus");
+        assert_eq!(engine.search(&reg).len(), 1);
+    }
+
+    #[test]
+    fn history_undo_redo() {
+        let mut hist = KeybindingHistory::new();
+        assert!(!hist.can_undo());
+        hist.push(KeybindingAction::Add(kb(KeyCode::Char('a'), false, "test")));
+        assert!(hist.can_undo());
+        assert!(!hist.can_redo());
+        let undone = hist.undo().unwrap();
+        assert!(matches!(undone, KeybindingAction::Add(_)));
+        assert!(hist.can_redo());
+        assert!(!hist.can_undo());
+        let redone = hist.redo().unwrap();
+        assert!(matches!(redone, KeybindingAction::Add(_)));
+        assert!(hist.can_undo());
+    }
+
+    #[test]
+    fn history_push_clears_redo() {
+        let mut hist = KeybindingHistory::new();
+        hist.push(KeybindingAction::Add(kb(KeyCode::Char('a'), false, "a")));
+        hist.push(KeybindingAction::Add(kb(KeyCode::Char('b'), false, "b")));
+        hist.undo();
+        assert_eq!(hist.redo_len(), 1);
+        hist.push(KeybindingAction::Remove { command: "c".into() });
+        assert_eq!(hist.redo_len(), 0);
+    }
+
+    #[test]
+    fn exporter_json_format() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::Char('s'), true, "save"));
+        let json = KeybindingExporter::export_json(&reg);
+        assert!(json.starts_with('['));
+        assert!(json.ends_with(']'));
+        assert!(json.contains("\"command\":\"save\""));
+        assert!(json.contains("\"key\":\"Ctrl+S\""));
+    }
+
+    #[test]
+    fn exporter_csv_format() {
+        let mut reg = KeybindingRegistry::new();
+        reg.add(kb(KeyCode::Char('o'), true, "open"));
+        let csv = KeybindingExporter::export_csv(&reg);
+        let lines: Vec<&str> = csv.lines().collect();
+        assert_eq!(lines[0], "command,key,when,source");
+        assert!(lines[1].starts_with("open,Ctrl+O"));
+    }
+
+    #[test]
+    fn exporter_dispatch() {
+        let reg = KeybindingRegistry::new();
+        let json = KeybindingExporter::export(&reg, ExportFormat::Json);
+        let csv = KeybindingExporter::export(&reg, ExportFormat::Csv);
+        assert!(json.contains('['));
+        assert!(csv.contains("command,key,when,source"));
+    }
+
+    #[test]
+    fn parse_chord_valid() {
+        let chord = parse_chord("Ctrl+K Ctrl+C").unwrap();
+        assert_eq!(chord.first.0, KeyCode::Char('k'));
+        assert!(chord.first.1.ctrl);
+        assert_eq!(chord.second.0, KeyCode::Char('c'));
+        assert!(chord.second.1.ctrl);
+    }
+
+    #[test]
+    fn parse_chord_single_part_fails() {
+        assert!(parse_chord("Ctrl+K").is_none());
+    }
+
+    #[test]
+    fn parse_chord_three_parts_fails() {
+        assert!(parse_chord("Ctrl+K Ctrl+C Ctrl+X").is_none());
     }
 }

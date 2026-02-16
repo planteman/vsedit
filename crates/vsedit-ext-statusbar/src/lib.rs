@@ -791,6 +791,281 @@ pub fn status_bar_layout(items: &[StatusBarItem]) -> StatusBarLayout {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StatusBarGroup — logical grouping of items
+// ---------------------------------------------------------------------------
+
+/// A named group of status bar items for bulk operations.
+#[derive(Debug, Clone)]
+pub struct StatusBarGroup {
+    pub name: String,
+    pub item_ids: Vec<String>,
+    pub visible: bool,
+    pub priority_offset: i32,
+}
+
+impl StatusBarGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            item_ids: Vec::new(),
+            visible: true,
+            priority_offset: 0,
+        }
+    }
+
+    /// Add an item ID to this group.
+    pub fn add_item(&mut self, id: impl Into<String>) {
+        self.item_ids.push(id.into());
+    }
+
+    /// Remove an item ID from this group.
+    pub fn remove_item(&mut self, id: &str) {
+        self.item_ids.retain(|i| i != id);
+    }
+
+    /// Number of items in this group.
+    pub fn item_count(&self) -> usize {
+        self.item_ids.len()
+    }
+
+    /// Returns true if the group contains the given item ID.
+    pub fn contains(&self, id: &str) -> bool {
+        self.item_ids.iter().any(|i| i == id)
+    }
+}
+
+impl fmt::Display for StatusBarGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let vis = if self.visible { "visible" } else { "hidden" };
+        write!(f, "Group({}, {} items, {})", self.name, self.item_ids.len(), vis)
+    }
+}
+
+/// Manages multiple status bar groups and applies bulk visibility operations.
+#[derive(Debug, Clone, Default)]
+pub struct StatusBarGroupManager {
+    pub groups: Vec<StatusBarGroup>,
+}
+
+impl StatusBarGroupManager {
+    pub fn new() -> Self {
+        Self { groups: Vec::new() }
+    }
+
+    /// Add a new group.
+    pub fn add_group(&mut self, group: StatusBarGroup) {
+        self.groups.push(group);
+    }
+
+    /// Find a group by name.
+    pub fn find_group(&self, name: &str) -> Option<&StatusBarGroup> {
+        self.groups.iter().find(|g| g.name == name)
+    }
+
+    /// Find a mutable group by name.
+    pub fn find_group_mut(&mut self, name: &str) -> Option<&mut StatusBarGroup> {
+        self.groups.iter_mut().find(|g| g.name == name)
+    }
+
+    /// Show all items in a group on the bridge.
+    pub fn show_group(&mut self, name: &str, bridge: &mut StatusBarBridge) {
+        if let Some(group) = self.groups.iter_mut().find(|g| g.name == name) {
+            group.visible = true;
+            for id in &group.item_ids {
+                bridge.show_item(id);
+            }
+        }
+    }
+
+    /// Hide all items in a group on the bridge.
+    pub fn hide_group(&mut self, name: &str, bridge: &mut StatusBarBridge) {
+        if let Some(group) = self.groups.iter_mut().find(|g| g.name == name) {
+            group.visible = false;
+            for id in &group.item_ids {
+                bridge.hide_item(id);
+            }
+        }
+    }
+
+    /// Toggle visibility of a group.
+    pub fn toggle_group(&mut self, name: &str, bridge: &mut StatusBarBridge) {
+        let is_visible = self.groups.iter().find(|g| g.name == name).map(|g| g.visible);
+        match is_visible {
+            Some(true) => self.hide_group(name, bridge),
+            Some(false) => self.show_group(name, bridge),
+            None => {}
+        }
+    }
+
+    /// Total number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Find which group an item belongs to, if any.
+    pub fn group_for_item(&self, id: &str) -> Option<&StatusBarGroup> {
+        self.groups.iter().find(|g| g.contains(id))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AnimationState — for animated status bar items
+// ---------------------------------------------------------------------------
+
+/// Animation state for a status bar item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AnimationState {
+    /// No animation.
+    None,
+    /// Spinning / loading indicator.
+    Spinning,
+    /// Pulsing / attention indicator.
+    Pulsing,
+    /// Fading in/out.
+    Fading,
+}
+
+impl Default for AnimationState {
+    fn default() -> Self {
+        AnimationState::None
+    }
+}
+
+impl fmt::Display for AnimationState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnimationState::None => write!(f, "none"),
+            AnimationState::Spinning => write!(f, "spinning"),
+            AnimationState::Pulsing => write!(f, "pulsing"),
+            AnimationState::Fading => write!(f, "fading"),
+        }
+    }
+}
+
+/// Extended status bar item with animation support.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AnimatedStatusBarItem {
+    pub item: StatusBarItem,
+    pub animation: AnimationState,
+    pub progress: Option<f32>,
+}
+
+impl AnimatedStatusBarItem {
+    pub fn new(item: StatusBarItem) -> Self {
+        Self {
+            item,
+            animation: AnimationState::None,
+            progress: None,
+        }
+    }
+
+    /// Set the animation state.
+    pub fn set_animation(&mut self, state: AnimationState) {
+        self.animation = state;
+    }
+
+    /// Set progress (0.0 to 1.0), automatically enabling spinning animation.
+    pub fn set_progress(&mut self, progress: f32) {
+        self.progress = Some(progress.clamp(0.0, 1.0));
+        if self.animation == AnimationState::None {
+            self.animation = AnimationState::Spinning;
+        }
+    }
+
+    /// Clear progress and stop animation.
+    pub fn clear_progress(&mut self) {
+        self.progress = None;
+        self.animation = AnimationState::None;
+    }
+
+    /// Whether this item is currently animating.
+    pub fn is_animating(&self) -> bool {
+        self.animation != AnimationState::None
+    }
+
+    /// Render the item text with animation indicator.
+    pub fn render_text(&self) -> String {
+        let prefix = match self.animation {
+            AnimationState::None => "",
+            AnimationState::Spinning => "$(sync~spin) ",
+            AnimationState::Pulsing => "$(pulse) ",
+            AnimationState::Fading => "$(fade) ",
+        };
+        if let Some(pct) = self.progress {
+            format!("{}{} ({:.0}%)", prefix, self.item.display_text(), pct * 100.0)
+        } else {
+            format!("{}{}", prefix, self.item.display_text())
+        }
+    }
+}
+
+impl fmt::Display for AnimatedStatusBarItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.item, self.animation)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk visibility operations
+// ---------------------------------------------------------------------------
+
+impl StatusBarBridge {
+    /// Show all items matching a predicate.
+    pub fn show_matching(&mut self, predicate: impl Fn(&StatusBarItem) -> bool) -> usize {
+        let mut count = 0;
+        for item in &mut self.items {
+            if predicate(item) && !item.is_visible {
+                item.is_visible = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Hide all items matching a predicate.
+    pub fn hide_matching(&mut self, predicate: impl Fn(&StatusBarItem) -> bool) -> usize {
+        let mut count = 0;
+        for item in &mut self.items {
+            if predicate(item) && item.is_visible {
+                item.is_visible = false;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Show all items.
+    pub fn show_all(&mut self) -> usize {
+        self.show_matching(|_| true)
+    }
+
+    /// Hide all items.
+    pub fn hide_all(&mut self) -> usize {
+        self.hide_matching(|_| true)
+    }
+
+    /// Show all items with a specific alignment.
+    pub fn show_by_alignment(&mut self, alignment: StatusBarAlignment) -> usize {
+        self.show_matching(|item| item.alignment == alignment)
+    }
+
+    /// Hide all items with a specific alignment.
+    pub fn hide_by_alignment(&mut self, alignment: StatusBarAlignment) -> usize {
+        self.hide_matching(|item| item.alignment == alignment)
+    }
+
+    /// Return items sorted by priority within a specific alignment.
+    pub fn priority_sorted_by_alignment(&self, alignment: StatusBarAlignment) -> Vec<&StatusBarItem> {
+        let mut items: Vec<&StatusBarItem> = self.items.iter()
+            .filter(|i| i.alignment == alignment && i.is_visible)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        items
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1289,5 +1564,107 @@ mod tests {
         assert_eq!(with_cmd.len(), 2);
         assert!(with_cmd.iter().any(|i| i.id == "a"));
         assert!(with_cmd.iter().any(|i| i.id == "c"));
+    }
+
+    // ---- StatusBarGroup tests ----
+
+    #[test]
+    fn status_bar_group_add_remove() {
+        let mut group = StatusBarGroup::new("git");
+        group.add_item("git.branch");
+        group.add_item("git.sync");
+        assert_eq!(group.item_count(), 2);
+        assert!(group.contains("git.branch"));
+        group.remove_item("git.branch");
+        assert_eq!(group.item_count(), 1);
+        assert!(!group.contains("git.branch"));
+    }
+
+    #[test]
+    fn group_manager_show_hide() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("git.branch", StatusBarAlignment::Left, 10);
+        bridge.create_item("git.sync", StatusBarAlignment::Left, 5);
+        bridge.create_item("lsp.status", StatusBarAlignment::Right, 8);
+
+        let mut mgr = StatusBarGroupManager::new();
+        let mut git_group = StatusBarGroup::new("git");
+        git_group.add_item("git.branch");
+        git_group.add_item("git.sync");
+        mgr.add_group(git_group);
+
+        mgr.show_group("git", &mut bridge);
+        assert!(bridge.get_item("git.branch").unwrap().is_visible);
+        assert!(bridge.get_item("git.sync").unwrap().is_visible);
+
+        mgr.hide_group("git", &mut bridge);
+        assert!(!bridge.get_item("git.branch").unwrap().is_visible);
+        assert!(!bridge.get_item("git.sync").unwrap().is_visible);
+    }
+
+    #[test]
+    fn animated_item_progress() {
+        let item = StatusBarItemBuilder::new()
+            .id("build")
+            .text("Building...")
+            .build()
+            .unwrap();
+        let mut animated = AnimatedStatusBarItem::new(item);
+        assert!(!animated.is_animating());
+
+        animated.set_progress(0.5);
+        assert!(animated.is_animating());
+        assert_eq!(animated.animation, AnimationState::Spinning);
+        let rendered = animated.render_text();
+        assert!(rendered.contains("50%"));
+
+        animated.clear_progress();
+        assert!(!animated.is_animating());
+    }
+
+    #[test]
+    fn bulk_show_hide_all() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("a", StatusBarAlignment::Left, 1);
+        bridge.create_item("b", StatusBarAlignment::Right, 2);
+        bridge.create_item("c", StatusBarAlignment::Left, 3);
+
+        let shown = bridge.show_all();
+        assert_eq!(shown, 3);
+        assert_eq!(bridge.visible_count(), 3);
+
+        let hidden = bridge.hide_all();
+        assert_eq!(hidden, 3);
+        assert_eq!(bridge.visible_count(), 0);
+    }
+
+    #[test]
+    fn bulk_show_by_alignment() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("a", StatusBarAlignment::Left, 1);
+        bridge.create_item("b", StatusBarAlignment::Right, 2);
+        bridge.create_item("c", StatusBarAlignment::Left, 3);
+
+        bridge.show_by_alignment(StatusBarAlignment::Left);
+        assert!(bridge.get_item("a").unwrap().is_visible);
+        assert!(!bridge.get_item("b").unwrap().is_visible);
+        assert!(bridge.get_item("c").unwrap().is_visible);
+    }
+
+    #[test]
+    fn group_manager_toggle() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("x", StatusBarAlignment::Left, 1);
+
+        let mut mgr = StatusBarGroupManager::new();
+        let mut group = StatusBarGroup::new("test");
+        group.add_item("x");
+        mgr.add_group(group);
+
+        mgr.toggle_group("test", &mut bridge);
+        assert!(!bridge.get_item("x").unwrap().is_visible);
+
+        mgr.toggle_group("test", &mut bridge);
+        assert!(bridge.get_item("x").unwrap().is_visible);
     }
 }

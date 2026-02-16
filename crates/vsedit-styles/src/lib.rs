@@ -753,6 +753,290 @@ impl Default for StylesValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StyleInheritance — style inheritance chain resolution
+// ---------------------------------------------------------------------------
+
+/// Resolves styles through an inheritance chain (child extends parent).
+#[derive(Debug, Clone, Default)]
+pub struct StyleInheritance {
+    /// Maps selector -> parent selector.
+    parent_map: HashMap<String, String>,
+}
+
+impl StyleInheritance {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register that `child` inherits from `parent`.
+    pub fn set_parent(&mut self, child: impl Into<String>, parent: impl Into<String>) {
+        self.parent_map.insert(child.into(), parent.into());
+    }
+
+    /// Get the parent of a selector.
+    pub fn parent_of(&self, selector: &str) -> Option<&str> {
+        self.parent_map.get(selector).map(|s| s.as_str())
+    }
+
+    /// Walk the full inheritance chain, from the selector up to the root.
+    /// Returns an empty vec if the selector has no parent.
+    pub fn chain(&self, selector: &str) -> Vec<&str> {
+        let mut chain = Vec::new();
+        let mut current = selector;
+        while let Some(parent) = self.parent_map.get(current) {
+            // Guard against cycles
+            if chain.contains(&parent.as_str()) {
+                break;
+            }
+            chain.push(parent.as_str());
+            current = parent;
+        }
+        chain
+    }
+
+    /// Resolve all properties for a selector by cascading from root ancestor to child.
+    pub fn resolve(&self, sheet: &StyleSheet, selector: &str) -> HashMap<String, StyleProperty> {
+        let mut chain = self.chain(selector);
+        chain.reverse(); // root first
+        chain.push(selector); // self last
+        let mut merged = HashMap::new();
+        for sel in chain {
+            if let Some(rule) = sheet.find_rule(sel) {
+                for (k, v) in &rule.properties {
+                    merged.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        merged
+    }
+
+    /// Depth of the inheritance chain for a selector (0 = no parent).
+    pub fn depth(&self, selector: &str) -> usize {
+        self.chain(selector).len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContrastChecker — WCAG-like contrast checking for accessibility
+// ---------------------------------------------------------------------------
+
+/// Checks color contrast ratios for accessibility.
+pub struct ContrastChecker;
+
+impl ContrastChecker {
+    /// Relative luminance of an RGB color per WCAG 2.0.
+    pub fn luminance(r: u8, g: u8, b: u8) -> f64 {
+        let rs = Self::srgb_component(r);
+        let gs = Self::srgb_component(g);
+        let bs = Self::srgb_component(b);
+        0.2126 * rs + 0.7152 * gs + 0.0722 * bs
+    }
+
+    fn srgb_component(c: u8) -> f64 {
+        let s = c as f64 / 255.0;
+        if s <= 0.03928 {
+            s / 12.92
+        } else {
+            ((s + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    /// Contrast ratio between two luminance values.
+    pub fn contrast_ratio(l1: f64, l2: f64) -> f64 {
+        let lighter = l1.max(l2);
+        let darker = l1.min(l2);
+        (lighter + 0.05) / (darker + 0.05)
+    }
+
+    /// Contrast ratio between two RGB colors.
+    pub fn color_contrast(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> f64 {
+        let l1 = Self::luminance(r1, g1, b1);
+        let l2 = Self::luminance(r2, g2, b2);
+        Self::contrast_ratio(l1, l2)
+    }
+
+    /// Check if a contrast ratio meets WCAG AA for normal text (>= 4.5).
+    pub fn meets_aa(ratio: f64) -> bool {
+        ratio >= 4.5
+    }
+
+    /// Check if a contrast ratio meets WCAG AAA for normal text (>= 7.0).
+    pub fn meets_aaa(ratio: f64) -> bool {
+        ratio >= 7.0
+    }
+
+    /// Check if a contrast ratio meets WCAG AA for large text (>= 3.0).
+    pub fn meets_aa_large(ratio: f64) -> bool {
+        ratio >= 3.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StyleTransition — interpolation between two styles
+// ---------------------------------------------------------------------------
+
+/// Represents a transition between two color values with a duration.
+#[derive(Debug, Clone)]
+pub struct StyleTransition {
+    pub property: String,
+    pub from: Color,
+    pub to: Color,
+    pub duration_ms: u64,
+    pub elapsed_ms: u64,
+}
+
+impl StyleTransition {
+    pub fn new(property: impl Into<String>, from: Color, to: Color, duration_ms: u64) -> Self {
+        Self {
+            property: property.into(),
+            from,
+            to,
+            duration_ms,
+            elapsed_ms: 0,
+        }
+    }
+
+    /// Advance elapsed time by delta.
+    pub fn tick(&mut self, delta_ms: u64) {
+        self.elapsed_ms = self.elapsed_ms.saturating_add(delta_ms).min(self.duration_ms);
+    }
+
+    /// Progress ratio in [0.0, 1.0].
+    pub fn progress(&self) -> f32 {
+        if self.duration_ms == 0 {
+            return 1.0;
+        }
+        (self.elapsed_ms as f32 / self.duration_ms as f32).min(1.0)
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.elapsed_ms >= self.duration_ms
+    }
+
+    /// Interpolated color at the current progress.
+    pub fn current_color(&self) -> Option<Color> {
+        blend_colors(self.from, self.to, self.progress())
+    }
+}
+
+/// Manages multiple simultaneous style transitions.
+#[derive(Debug, Clone, Default)]
+pub struct TransitionManager {
+    transitions: Vec<StyleTransition>,
+}
+
+impl TransitionManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, transition: StyleTransition) {
+        self.transitions.push(transition);
+    }
+
+    /// Tick all transitions and remove completed ones. Returns count removed.
+    pub fn tick(&mut self, delta_ms: u64) -> usize {
+        for t in &mut self.transitions {
+            t.tick(delta_ms);
+        }
+        let before = self.transitions.len();
+        self.transitions.retain(|t| !t.is_complete());
+        before - self.transitions.len()
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.transitions.len()
+    }
+
+    pub fn is_idle(&self) -> bool {
+        self.transitions.is_empty()
+    }
+
+    /// Get the current interpolated color for a property, if a transition exists.
+    pub fn current_color(&self, property: &str) -> Option<Color> {
+        self.transitions
+            .iter()
+            .find(|t| t.property == property)
+            .and_then(|t| t.current_color())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StyleSheet — conditional (media-query-like) styles
+// ---------------------------------------------------------------------------
+
+/// A condition for applying a style rule.
+#[derive(Debug, Clone, PartialEq)]
+pub enum StyleCondition {
+    MinWidth(u16),
+    MaxWidth(u16),
+    DarkTheme,
+    LightTheme,
+}
+
+impl StyleCondition {
+    /// Evaluate the condition against current context.
+    pub fn matches(&self, width: u16, is_dark: bool) -> bool {
+        match self {
+            StyleCondition::MinWidth(w) => width >= *w,
+            StyleCondition::MaxWidth(w) => width <= *w,
+            StyleCondition::DarkTheme => is_dark,
+            StyleCondition::LightTheme => !is_dark,
+        }
+    }
+}
+
+/// A style rule with an optional condition.
+#[derive(Debug, Clone)]
+pub struct ConditionalStyleRule {
+    pub rule: StyleRule,
+    pub condition: Option<StyleCondition>,
+}
+
+impl ConditionalStyleRule {
+    pub fn new(rule: StyleRule) -> Self {
+        Self { rule, condition: None }
+    }
+
+    pub fn with_condition(mut self, condition: StyleCondition) -> Self {
+        self.condition = Some(condition);
+        self
+    }
+
+    pub fn matches_context(&self, width: u16, is_dark: bool) -> bool {
+        self.condition.as_ref().map_or(true, |c| c.matches(width, is_dark))
+    }
+}
+
+impl StyleSheet {
+    /// Resolve properties for a selector, filtered by conditional rules.
+    pub fn resolve_conditional(
+        &self,
+        selector: &str,
+        conditionals: &[ConditionalStyleRule],
+        width: u16,
+        is_dark: bool,
+    ) -> HashMap<String, StyleProperty> {
+        let mut merged = HashMap::new();
+        // Base rules first
+        if let Some(rule) = self.find_rule(selector) {
+            for (k, v) in &rule.properties {
+                merged.insert(k.clone(), v.clone());
+            }
+        }
+        // Conditional overrides
+        for cond in conditionals {
+            if cond.rule.selector == selector && cond.matches_context(width, is_dark) {
+                for (k, v) in &cond.rule.properties {
+                    merged.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        merged
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1336,5 +1620,137 @@ mod tests {
     fn styles_is_ascii_printable() {
         assert!(StylesValidator::is_ascii_printable("Hello World 123"));
         assert!(!StylesValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn style_inheritance_chain_resolution() {
+        let mut inh = StyleInheritance::new();
+        inh.set_parent("button.primary", "button");
+        inh.set_parent("button", "base");
+
+        assert_eq!(inh.parent_of("button.primary"), Some("button"));
+        assert_eq!(inh.depth("button.primary"), 2);
+        let chain = inh.chain("button.primary");
+        assert_eq!(chain, vec!["button", "base"]);
+    }
+
+    #[test]
+    fn style_inheritance_resolve_cascade() {
+        let mut sheet = StyleSheet::new();
+        let mut base = StyleRule::new("base");
+        base.set("color", StyleProperty::StringValue("white".into()));
+        base.set("size", StyleProperty::NumberValue(12.0));
+        sheet.add_rule(base);
+
+        let mut button = StyleRule::new("button");
+        button.set("color", StyleProperty::StringValue("blue".into()));
+        sheet.add_rule(button);
+
+        let mut inh = StyleInheritance::new();
+        inh.set_parent("button", "base");
+
+        let resolved = inh.resolve(&sheet, "button");
+        assert_eq!(resolved.get("color"), Some(&StyleProperty::StringValue("blue".into())));
+        assert_eq!(resolved.get("size"), Some(&StyleProperty::NumberValue(12.0)));
+    }
+
+    #[test]
+    fn contrast_checker_black_white() {
+        let ratio = ContrastChecker::color_contrast(0, 0, 0, 255, 255, 255);
+        assert!(ratio > 20.0);
+        assert!(ContrastChecker::meets_aa(ratio));
+        assert!(ContrastChecker::meets_aaa(ratio));
+    }
+
+    #[test]
+    fn contrast_checker_similar_colors_fail() {
+        let ratio = ContrastChecker::color_contrast(200, 200, 200, 210, 210, 210);
+        assert!(!ContrastChecker::meets_aa(ratio));
+        assert!(!ContrastChecker::meets_aaa(ratio));
+    }
+
+    #[test]
+    fn contrast_checker_large_text() {
+        let ratio = ContrastChecker::color_contrast(100, 100, 100, 200, 200, 200);
+        assert!(ContrastChecker::meets_aa_large(ratio));
+    }
+
+    #[test]
+    fn style_transition_interpolation() {
+        let mut t = StyleTransition::new(
+            "bg",
+            Color::Rgb(0, 0, 0),
+            Color::Rgb(255, 255, 255),
+            100,
+        );
+        assert_eq!(t.progress(), 0.0);
+        t.tick(50);
+        assert!((t.progress() - 0.5).abs() < 0.01);
+        let mid = t.current_color().unwrap();
+        if let Color::Rgb(r, _, _) = mid {
+            assert!(r > 100 && r < 200);
+        } else {
+            panic!("Expected Rgb");
+        }
+        t.tick(50);
+        assert!(t.is_complete());
+    }
+
+    #[test]
+    fn transition_manager_tick_and_remove() {
+        let mut mgr = TransitionManager::new();
+        mgr.add(StyleTransition::new("a", Color::Rgb(0, 0, 0), Color::Rgb(255, 255, 255), 50));
+        mgr.add(StyleTransition::new("b", Color::Rgb(0, 0, 0), Color::Rgb(255, 255, 255), 100));
+        assert_eq!(mgr.active_count(), 2);
+
+        let removed = mgr.tick(50);
+        assert_eq!(removed, 1);
+        assert_eq!(mgr.active_count(), 1);
+
+        assert!(mgr.current_color("b").is_some());
+        assert!(mgr.current_color("a").is_none()); // already removed
+    }
+
+    #[test]
+    fn conditional_style_rule_matching() {
+        let cond_dark = StyleCondition::DarkTheme;
+        assert!(cond_dark.matches(80, true));
+        assert!(!cond_dark.matches(80, false));
+
+        let cond_min = StyleCondition::MinWidth(100);
+        assert!(cond_min.matches(120, true));
+        assert!(!cond_min.matches(80, true));
+    }
+
+    #[test]
+    fn stylesheet_resolve_conditional() {
+        let mut sheet = StyleSheet::new();
+        let mut rule = StyleRule::new("panel");
+        rule.set("bg", StyleProperty::StringValue("dark".into()));
+        sheet.add_rule(rule);
+
+        let mut light_rule = StyleRule::new("panel");
+        light_rule.set("bg", StyleProperty::StringValue("white".into()));
+        let conditionals = vec![
+            ConditionalStyleRule::new(light_rule).with_condition(StyleCondition::LightTheme),
+        ];
+
+        let dark_result = sheet.resolve_conditional("panel", &conditionals, 80, true);
+        assert_eq!(dark_result.get("bg"), Some(&StyleProperty::StringValue("dark".into())));
+
+        let light_result = sheet.resolve_conditional("panel", &conditionals, 80, false);
+        assert_eq!(light_result.get("bg"), Some(&StyleProperty::StringValue("white".into())));
+    }
+
+    #[test]
+    fn style_inheritance_cycle_guard() {
+        let mut inh = StyleInheritance::new();
+        inh.set_parent("a", "b");
+        inh.set_parent("b", "a");
+        let chain = inh.chain("a");
+        // Should not infinite loop, chain should stop
+        assert!(chain.len() <= 2);
     }
 }

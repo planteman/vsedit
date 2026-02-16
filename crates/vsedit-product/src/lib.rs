@@ -725,6 +725,231 @@ pub fn product_update_channel(config: &ProductConfiguration) -> UpdateChannel {
     }
 }
 
+/// License type for a product.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LicenseType {
+    Mit,
+    Apache2,
+    Gpl3,
+    Proprietary,
+    Custom,
+}
+
+impl LicenseType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LicenseType::Mit => "MIT",
+            LicenseType::Apache2 => "Apache-2.0",
+            LicenseType::Gpl3 => "GPL-3.0",
+            LicenseType::Proprietary => "Proprietary",
+            LicenseType::Custom => "Custom",
+        }
+    }
+
+    /// Returns `true` if this is an open-source license.
+    pub fn is_open_source(&self) -> bool {
+        !matches!(self, LicenseType::Proprietary | LicenseType::Custom)
+    }
+}
+
+impl fmt::Display for LicenseType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Product license information and validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductLicense {
+    pub license_type: LicenseType,
+    pub holder: String,
+    pub year: u16,
+    pub spdx_id: Option<String>,
+}
+
+impl ProductLicense {
+    pub fn new(license_type: LicenseType, holder: impl Into<String>, year: u16) -> Self {
+        let spdx_id = match license_type {
+            LicenseType::Mit => Some("MIT".to_string()),
+            LicenseType::Apache2 => Some("Apache-2.0".to_string()),
+            LicenseType::Gpl3 => Some("GPL-3.0-only".to_string()),
+            _ => None,
+        };
+        Self {
+            license_type,
+            holder: holder.into(),
+            year,
+            spdx_id,
+        }
+    }
+
+    /// Returns a single-line copyright notice.
+    pub fn copyright_notice(&self) -> String {
+        format!(
+            "Copyright (c) {} {} - {}",
+            self.year,
+            self.holder,
+            self.license_type
+        )
+    }
+
+    /// Validate that the license has sensible field values.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.holder.is_empty() {
+            return Err("license holder must not be empty".to_string());
+        }
+        if self.year < 1970 || self.year > 2100 {
+            return Err(format!("license year {} is out of range [1970..2100]", self.year));
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for ProductLicense {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.license_type, self.holder)
+    }
+}
+
+/// A condition that gates whether a feature flag should be active.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FeatureCondition {
+    /// Always evaluate to the given value.
+    Always(bool),
+    /// Active only for the specified update channel.
+    Channel(UpdateChannel),
+    /// Active only when the product version is at least (major, minor, patch).
+    MinVersion(u32, u32, u32),
+    /// Active when ALL sub-conditions are true.
+    AllOf(Vec<FeatureCondition>),
+    /// Active when ANY sub-condition is true.
+    AnyOf(Vec<FeatureCondition>),
+}
+
+/// Evaluates feature flags with conditions against a product configuration.
+#[derive(Debug, Clone)]
+pub struct FeatureFlagEvaluator {
+    rules: Vec<(String, FeatureCondition)>,
+}
+
+impl FeatureFlagEvaluator {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Register a feature with a condition.
+    pub fn add_rule(&mut self, feature: impl Into<String>, condition: FeatureCondition) {
+        self.rules.push((feature.into(), condition));
+    }
+
+    /// Evaluate all registered rules against the given configuration and return
+    /// a [`ProductFeatureFlags`] containing the results.
+    pub fn evaluate(&self, config: &ProductConfiguration) -> ProductFeatureFlags {
+        let mut flags = ProductFeatureFlags::new();
+        for (name, cond) in &self.rules {
+            flags.set(name.clone(), Self::eval_condition(cond, config));
+        }
+        flags
+    }
+
+    fn eval_condition(cond: &FeatureCondition, config: &ProductConfiguration) -> bool {
+        match cond {
+            FeatureCondition::Always(v) => *v,
+            FeatureCondition::Channel(ch) => product_update_channel(config) == *ch,
+            FeatureCondition::MinVersion(maj, min, pat) => {
+                if let Some((a, b, c)) = config.version_tuple() {
+                    (a, b, c) >= (*maj, *min, *pat)
+                } else {
+                    false
+                }
+            }
+            FeatureCondition::AllOf(subs) => {
+                subs.iter().all(|s| Self::eval_condition(s, config))
+            }
+            FeatureCondition::AnyOf(subs) => {
+                subs.iter().any(|s| Self::eval_condition(s, config))
+            }
+        }
+    }
+}
+
+impl Default for FeatureFlagEvaluator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Compatibility check result between two product configurations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompatibilityReport {
+    pub compatible: bool,
+    pub warnings: Vec<String>,
+}
+
+impl CompatibilityReport {
+    /// Returns `true` if there are any warnings.
+    pub fn has_warnings(&self) -> bool {
+        !self.warnings.is_empty()
+    }
+}
+
+impl fmt::Display for CompatibilityReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.compatible {
+            write!(f, "Compatible")?;
+        } else {
+            write!(f, "Incompatible")?;
+        }
+        if !self.warnings.is_empty() {
+            write!(f, " ({} warning(s))", self.warnings.len())?;
+        }
+        Ok(())
+    }
+}
+
+/// Check compatibility between two product configurations.
+pub fn check_compatibility(
+    source: &ProductConfiguration,
+    target: &ProductConfiguration,
+) -> CompatibilityReport {
+    let mut warnings = Vec::new();
+    let mut compatible = true;
+
+    if source.application_name != target.application_name {
+        warnings.push(format!(
+            "application name mismatch: '{}' vs '{}'",
+            source.application_name, target.application_name
+        ));
+        compatible = false;
+    }
+
+    if let (Some(sq), Some(tq)) = (&source.quality, &target.quality) {
+        if sq != tq {
+            warnings.push(format!("quality mismatch: '{}' vs '{}'", sq, tq));
+        }
+    }
+
+    if let (Some(sv), Some(tv)) = (source.version_tuple(), target.version_tuple()) {
+        if sv.0 != tv.0 {
+            warnings.push(format!(
+                "major version mismatch: {} vs {}",
+                sv.0, tv.0
+            ));
+            compatible = false;
+        }
+    }
+
+    if source.extensions_gallery.is_some() != target.extensions_gallery.is_some() {
+        warnings.push("gallery configuration differs".to_string());
+    }
+
+    CompatibilityReport {
+        compatible,
+        warnings,
+    }
+}
+
 /// Telemetry configuration derived from product settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TelemetryConfig {
@@ -1263,5 +1488,114 @@ mod tests {
         let tc = product_telemetry_config(&config);
         assert!(!tc.enabled);
         assert_eq!(tc.level, TelemetryLevel::Off);
+    }
+
+    #[test]
+    fn license_type_open_source() {
+        assert!(LicenseType::Mit.is_open_source());
+        assert!(LicenseType::Apache2.is_open_source());
+        assert!(LicenseType::Gpl3.is_open_source());
+        assert!(!LicenseType::Proprietary.is_open_source());
+        assert!(!LicenseType::Custom.is_open_source());
+    }
+
+    #[test]
+    fn product_license_copyright_notice() {
+        let lic = ProductLicense::new(LicenseType::Mit, "Acme Corp", 2024);
+        let notice = lic.copyright_notice();
+        assert!(notice.contains("2024"));
+        assert!(notice.contains("Acme Corp"));
+        assert!(notice.contains("MIT"));
+        assert_eq!(lic.spdx_id, Some("MIT".to_string()));
+    }
+
+    #[test]
+    fn product_license_validate() {
+        let good = ProductLicense::new(LicenseType::Apache2, "Dev", 2024);
+        assert!(good.validate().is_ok());
+
+        let bad_holder = ProductLicense::new(LicenseType::Mit, "", 2024);
+        assert!(bad_holder.validate().is_err());
+
+        let bad_year = ProductLicense::new(LicenseType::Mit, "Dev", 1900);
+        assert!(bad_year.validate().is_err());
+    }
+
+    #[test]
+    fn feature_flag_evaluator_always() {
+        let config = ProductConfiguration::default_config();
+        let mut eval = FeatureFlagEvaluator::new();
+        eval.add_rule("on", FeatureCondition::Always(true));
+        eval.add_rule("off", FeatureCondition::Always(false));
+        let flags = eval.evaluate(&config);
+        assert!(flags.is_enabled("on"));
+        assert!(!flags.is_enabled("off"));
+    }
+
+    #[test]
+    fn feature_flag_evaluator_channel_and_version() {
+        let mut config = ProductConfiguration::default_config();
+        config.quality = Some("insider".to_string());
+        config.version = "2.5.0".to_string();
+
+        let mut eval = FeatureFlagEvaluator::new();
+        eval.add_rule("insider-only", FeatureCondition::Channel(UpdateChannel::Insiders));
+        eval.add_rule("stable-only", FeatureCondition::Channel(UpdateChannel::Stable));
+        eval.add_rule("v2-plus", FeatureCondition::MinVersion(2, 0, 0));
+        eval.add_rule("v3-plus", FeatureCondition::MinVersion(3, 0, 0));
+
+        let flags = eval.evaluate(&config);
+        assert!(flags.is_enabled("insider-only"));
+        assert!(!flags.is_enabled("stable-only"));
+        assert!(flags.is_enabled("v2-plus"));
+        assert!(!flags.is_enabled("v3-plus"));
+    }
+
+    #[test]
+    fn feature_flag_evaluator_composite() {
+        let mut config = ProductConfiguration::default_config();
+        config.quality = Some("stable".to_string());
+        config.version = "1.5.0".to_string();
+
+        let mut eval = FeatureFlagEvaluator::new();
+        eval.add_rule(
+            "stable-v1",
+            FeatureCondition::AllOf(vec![
+                FeatureCondition::Channel(UpdateChannel::Stable),
+                FeatureCondition::MinVersion(1, 0, 0),
+            ]),
+        );
+        eval.add_rule(
+            "insider-or-v2",
+            FeatureCondition::AnyOf(vec![
+                FeatureCondition::Channel(UpdateChannel::Insiders),
+                FeatureCondition::MinVersion(2, 0, 0),
+            ]),
+        );
+
+        let flags = eval.evaluate(&config);
+        assert!(flags.is_enabled("stable-v1"));
+        assert!(!flags.is_enabled("insider-or-v2"));
+    }
+
+    #[test]
+    fn compatibility_same_product() {
+        let a = ProductConfiguration::default_config();
+        let b = ProductConfiguration::default_config();
+        let report = check_compatibility(&a, &b);
+        assert!(report.compatible);
+        assert!(!report.has_warnings());
+        assert!(report.to_string().contains("Compatible"));
+    }
+
+    #[test]
+    fn compatibility_different_app_name() {
+        let a = ProductConfiguration::default_config();
+        let mut b = ProductConfiguration::default_config();
+        b.application_name = "other-app".to_string();
+        let report = check_compatibility(&a, &b);
+        assert!(!report.compatible);
+        assert!(report.has_warnings());
+        assert!(report.warnings.iter().any(|w| w.contains("application name")));
     }
 }

@@ -4,7 +4,6 @@
 //! comments for any language whose comment syntax is described by a
 //! [`CommentRule`].
 
-use std::fmt;
 /// Whether a comment operation targets lines or blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentMode {
@@ -805,6 +804,211 @@ pub fn wrap_in_block_comment(text: &str, open: &str, close: &str) -> String {
     format!("{open} {text} {close}")
 }
 
+// ---------------------------------------------------------------------------
+// CommentAligner
+// ---------------------------------------------------------------------------
+
+/// Aligns trailing comments in a block of lines to the same column.
+pub struct CommentAligner;
+
+impl CommentAligner {
+    /// Align trailing line comments so they all start at the same column.
+    ///
+    /// Lines without the `prefix` are returned unchanged.
+    pub fn align_trailing(lines: &[&str], prefix: &str) -> Vec<String> {
+        // Find which lines have trailing comments and determine the max code width.
+        let parsed: Vec<(String, Option<String>)> = lines
+            .iter()
+            .map(|line| {
+                if let Some(idx) = line.find(prefix) {
+                    if idx > 0 {
+                        let code = line[..idx].trim_end().to_string();
+                        let comment = line[idx..].to_string();
+                        return (code, Some(comment));
+                    }
+                }
+                (line.to_string(), None)
+            })
+            .collect();
+
+        let max_code_width = parsed
+            .iter()
+            .filter_map(|(code, comment)| comment.as_ref().map(|_| code.len()))
+            .max()
+            .unwrap_or(0);
+
+        parsed
+            .into_iter()
+            .map(|(code, comment)| match comment {
+                Some(c) => {
+                    let padding = max_code_width.saturating_sub(code.len());
+                    format!("{}{} {}", code, " ".repeat(padding), c.trim_start())
+                }
+                None => code,
+            })
+            .collect()
+    }
+
+    /// Count how many lines contain a trailing comment.
+    pub fn count_trailing_comments(lines: &[&str], prefix: &str) -> usize {
+        lines.iter().filter(|line| {
+            if let Some(idx) = line.find(prefix) {
+                idx > 0
+            } else {
+                false
+            }
+        }).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommentExtractor
+// ---------------------------------------------------------------------------
+
+/// Extracted comment with its location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtractedComment {
+    pub line_number: usize,
+    pub text: String,
+    pub is_line_comment: bool,
+}
+
+/// Extracts all comments from source text.
+pub struct CommentExtractor;
+
+impl CommentExtractor {
+    /// Extract all line comments from text using the given prefix.
+    pub fn extract_line_comments(text: &str, prefix: &str) -> Vec<ExtractedComment> {
+        let mut results = Vec::new();
+        for (i, line) in text.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with(prefix) {
+                let content = trimmed[prefix.len()..].trim().to_string();
+                results.push(ExtractedComment {
+                    line_number: i,
+                    text: content,
+                    is_line_comment: true,
+                });
+            } else if let Some(idx) = line.find(prefix) {
+                if idx > 0 {
+                    let content = line[idx + prefix.len()..].trim().to_string();
+                    results.push(ExtractedComment {
+                        line_number: i,
+                        text: content,
+                        is_line_comment: true,
+                    });
+                }
+            }
+        }
+        results
+    }
+
+    /// Extract block comments from text given open/close markers.
+    pub fn extract_block_comments(text: &str, open: &str, close: &str) -> Vec<ExtractedComment> {
+        let mut results = Vec::new();
+        let mut search_from = 0;
+        let lines: Vec<&str> = text.lines().collect();
+        while let Some(start) = text[search_from..].find(open) {
+            let abs_start = search_from + start;
+            let content_start = abs_start + open.len();
+            if let Some(end) = text[content_start..].find(close) {
+                let content = text[content_start..content_start + end].trim().to_string();
+                let line_number = text[..abs_start].lines().count().saturating_sub(1).min(lines.len().saturating_sub(1));
+                results.push(ExtractedComment {
+                    line_number,
+                    text: content,
+                    is_line_comment: false,
+                });
+                search_from = content_start + end + close.len();
+            } else {
+                break;
+            }
+        }
+        results
+    }
+
+    /// Return the total number of comments (line + block).
+    pub fn count_all(text: &str, line_prefix: &str, block_open: &str, block_close: &str) -> usize {
+        Self::extract_line_comments(text, line_prefix).len()
+            + Self::extract_block_comments(text, block_open, block_close).len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommentWrapper
+// ---------------------------------------------------------------------------
+
+/// Wraps long comment lines at a given column width.
+pub struct CommentWrapper;
+
+impl CommentWrapper {
+    /// Wrap a comment string to fit within `max_width` characters per line,
+    /// prefixing continuation lines with `prefix`.
+    pub fn wrap_comment(text: &str, prefix: &str, max_width: usize) -> Vec<String> {
+        if text.is_empty() {
+            return vec![format!("{prefix}")];
+        }
+        let words: Vec<&str> = text.split_whitespace().collect();
+        if words.is_empty() {
+            return vec![format!("{prefix}")];
+        }
+
+        let mut lines = Vec::new();
+        let mut current_line = format!("{prefix} ");
+        for word in &words {
+            if current_line.len() + word.len() + 1 > max_width && current_line.len() > prefix.len() + 1 {
+                lines.push(current_line.trim_end().to_string());
+                current_line = format!("{prefix} ");
+            }
+            current_line.push_str(word);
+            current_line.push(' ');
+        }
+        let trimmed = current_line.trim_end().to_string();
+        if !trimmed.is_empty() {
+            lines.push(trimmed);
+        }
+        lines
+    }
+
+    /// Wrap a multi-line block comment body so each line fits within `max_width`.
+    pub fn wrap_block_comment(
+        body: &str,
+        open: &str,
+        close: &str,
+        continuation: &str,
+        max_width: usize,
+    ) -> Vec<String> {
+        let words: Vec<&str> = body.split_whitespace().collect();
+        if words.is_empty() {
+            return vec![format!("{open} {close}")];
+        }
+        let mut result = Vec::new();
+        result.push(open.to_string());
+        let mut current_line = format!("{continuation} ");
+        for word in &words {
+            if current_line.len() + word.len() + 1 > max_width
+                && current_line.len() > continuation.len() + 1
+            {
+                result.push(current_line.trim_end().to_string());
+                current_line = format!("{continuation} ");
+            }
+            current_line.push_str(word);
+            current_line.push(' ');
+        }
+        let trimmed = current_line.trim_end().to_string();
+        if !trimmed.is_empty() {
+            result.push(trimmed);
+        }
+        result.push(close.to_string());
+        result
+    }
+
+    /// Check whether any line in the comment exceeds `max_width`.
+    pub fn needs_wrapping(lines: &[&str], max_width: usize) -> bool {
+        lines.iter().any(|l| l.len() > max_width)
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1304,5 +1508,74 @@ mod tests {
     fn comment_mode_label() {
         assert_eq!(CommentMode::Line.label(), "line");
         assert_eq!(CommentMode::Block.label(), "block");
+    }
+
+    // ── CommentAligner / Extractor / Wrapper tests ──
+
+    #[test]
+    fn aligner_aligns_trailing_comments() {
+        let lines = vec![
+            "let x = 1; // short",
+            "let long_variable = 42; // longer",
+            "no_comment_here",
+        ];
+        let result = CommentAligner::align_trailing(&lines, "//");
+        assert!(result[0].contains("// short"));
+        assert!(result[1].contains("// longer"));
+        // Both comment columns should be at the same position
+        let col0 = result[0].find("//").unwrap();
+        let col1 = result[1].find("//").unwrap();
+        assert_eq!(col0, col1);
+    }
+
+    #[test]
+    fn extractor_extracts_line_comments() {
+        let text = "let x = 1;\n// a comment\nlet y = 2; // inline\n";
+        let comments = CommentExtractor::extract_line_comments(text, "//");
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].text, "a comment");
+        assert!(comments[0].is_line_comment);
+        assert_eq!(comments[1].text, "inline");
+    }
+
+    #[test]
+    fn extractor_extracts_block_comments() {
+        let text = "code /* block one */ more /* block two */ end";
+        let comments = CommentExtractor::extract_block_comments(text, "/*", "*/");
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].text, "block one");
+        assert_eq!(comments[1].text, "block two");
+        assert!(!comments[0].is_line_comment);
+    }
+
+    #[test]
+    fn wrapper_wraps_long_comment() {
+        let text = "this is a very long comment that should be wrapped across multiple lines";
+        let lines = CommentWrapper::wrap_comment(text, "//", 30);
+        assert!(lines.len() > 1);
+        for line in &lines {
+            assert!(line.starts_with("//"));
+        }
+    }
+
+    #[test]
+    fn wrapper_needs_wrapping_detects_long_lines() {
+        assert!(CommentWrapper::needs_wrapping(&["// short", "// this is a very very long line"], 20));
+        assert!(!CommentWrapper::needs_wrapping(&["// ok", "// fine"], 20));
+    }
+
+    #[test]
+    fn wrapper_block_comment_wrapping() {
+        let body = "short text that fits and some more words to wrap around the limit";
+        let result = CommentWrapper::wrap_block_comment(body, "/*", "*/", " *", 30);
+        assert_eq!(result[0], "/*");
+        assert_eq!(*result.last().unwrap(), "*/");
+        assert!(result.len() >= 3);
+    }
+
+    #[test]
+    fn count_trailing_comments() {
+        let lines = vec!["a // x", "b", "c // y"];
+        assert_eq!(CommentAligner::count_trailing_comments(&lines, "//"), 2);
     }
 }

@@ -841,6 +841,245 @@ pub fn transform_range_lowercase(text: &str, line_index: usize, start_col: usize
     Some(result.join("\n"))
 }
 
+// ── CommandHistory ──
+
+/// An entry in the command history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandHistoryEntry {
+    pub command: CoreEditorCommand,
+    pub timestamp_ms: u64,
+}
+
+/// Tracks executed commands for undo/redo navigation.
+#[derive(Debug, Clone)]
+pub struct CommandHistory {
+    entries: Vec<CommandHistoryEntry>,
+    /// Points to the current position. Entries after this are redo candidates.
+    cursor: usize,
+    max_size: usize,
+}
+
+impl CommandHistory {
+    /// Create a new history with a maximum capacity.
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: 0,
+            max_size,
+        }
+    }
+
+    /// Push a new command, discarding any redo history beyond the cursor.
+    pub fn push(&mut self, command: CoreEditorCommand, timestamp_ms: u64) {
+        // Discard redo history
+        self.entries.truncate(self.cursor);
+        self.entries.push(CommandHistoryEntry {
+            command,
+            timestamp_ms,
+        });
+        // Trim if over capacity
+        if self.entries.len() > self.max_size {
+            let remove = self.entries.len() - self.max_size;
+            self.entries.drain(0..remove);
+        }
+        self.cursor = self.entries.len();
+    }
+
+    /// Undo: move cursor back and return the undone command.
+    pub fn undo(&mut self) -> Option<&CommandHistoryEntry> {
+        if self.cursor == 0 {
+            return None;
+        }
+        self.cursor -= 1;
+        self.entries.get(self.cursor)
+    }
+
+    /// Redo: move cursor forward and return the redone command.
+    pub fn redo(&mut self) -> Option<&CommandHistoryEntry> {
+        if self.cursor >= self.entries.len() {
+            return None;
+        }
+        let entry = self.entries.get(self.cursor);
+        self.cursor += 1;
+        entry
+    }
+
+    /// Return `true` if undo is available.
+    pub fn can_undo(&self) -> bool {
+        self.cursor > 0
+    }
+
+    /// Return `true` if redo is available.
+    pub fn can_redo(&self) -> bool {
+        self.cursor < self.entries.len()
+    }
+
+    /// Number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear the entire history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+
+    /// Return all entries.
+    pub fn entries(&self) -> &[CommandHistoryEntry] {
+        &self.entries
+    }
+}
+
+// ── Command composition ──
+
+/// A composed command that executes two commands in sequence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComposedCommand {
+    pub first: CoreEditorCommand,
+    pub second: CoreEditorCommand,
+    pub label: String,
+}
+
+impl ComposedCommand {
+    /// Create a new composed command.
+    pub fn new(first: CoreEditorCommand, second: CoreEditorCommand) -> Self {
+        let label = format!("{} + {}", first.label(), second.label());
+        Self {
+            first,
+            second,
+            label,
+        }
+    }
+
+    /// Return the IDs of the two commands.
+    pub fn command_ids(&self) -> (&'static str, &'static str) {
+        (self.first.id(), self.second.id())
+    }
+}
+
+/// Compose a sequence of commands into a list of composed pairs.
+pub fn compose_command_sequence(commands: &[CoreEditorCommand]) -> Vec<ComposedCommand> {
+    commands
+        .windows(2)
+        .map(|w| ComposedCommand::new(w[0], w[1]))
+        .collect()
+}
+
+// ── Command macro recording ──
+
+/// A recorded macro: a named sequence of commands that can be replayed.
+#[derive(Debug, Clone)]
+pub struct CommandMacro {
+    pub name: String,
+    steps: Vec<CoreEditorCommand>,
+}
+
+impl CommandMacro {
+    /// Create a new empty macro.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            steps: Vec::new(),
+        }
+    }
+
+    /// Add a command to the macro.
+    pub fn record(&mut self, command: CoreEditorCommand) {
+        self.steps.push(command);
+    }
+
+    /// Return the recorded steps.
+    pub fn steps(&self) -> &[CoreEditorCommand] {
+        &self.steps
+    }
+
+    /// Return the number of steps.
+    pub fn len(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Whether the macro has no steps.
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+}
+
+/// Records commands into a macro while active.
+#[derive(Debug)]
+pub struct MacroRecorder {
+    recording: Option<CommandMacro>,
+    saved_macros: Vec<CommandMacro>,
+}
+
+impl MacroRecorder {
+    /// Create a new recorder with no active recording.
+    pub fn new() -> Self {
+        Self {
+            recording: None,
+            saved_macros: Vec::new(),
+        }
+    }
+
+    /// Start recording a new macro with the given name.  Returns `false` if
+    /// already recording.
+    pub fn start(&mut self, name: impl Into<String>) -> bool {
+        if self.recording.is_some() {
+            return false;
+        }
+        self.recording = Some(CommandMacro::new(name));
+        true
+    }
+
+    /// Record a command into the active macro.  Returns `false` if not
+    /// recording.
+    pub fn record(&mut self, command: CoreEditorCommand) -> bool {
+        match &mut self.recording {
+            Some(m) => {
+                m.record(command);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Stop recording and save the macro.  Returns `None` if not recording.
+    pub fn stop(&mut self) -> Option<&CommandMacro> {
+        if let Some(m) = self.recording.take() {
+            self.saved_macros.push(m);
+            self.saved_macros.last()
+        } else {
+            None
+        }
+    }
+
+    /// Return `true` when actively recording.
+    pub fn is_recording(&self) -> bool {
+        self.recording.is_some()
+    }
+
+    /// Return all saved macros.
+    pub fn macros(&self) -> &[CommandMacro] {
+        &self.saved_macros
+    }
+
+    /// Find a saved macro by name.
+    pub fn find_macro(&self, name: &str) -> Option<&CommandMacro> {
+        self.saved_macros.iter().find(|m| m.name == name)
+    }
+}
+
+impl Default for MacroRecorder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1297,5 +1536,81 @@ mod tests {
     fn transform_range_out_of_bounds() {
         assert!(transform_range_uppercase("hi", 0, 0, 10).is_none());
         assert!(transform_range_uppercase("hi", 5, 0, 1).is_none());
+    }
+
+    // ── CommandHistory tests ──
+
+    #[test]
+    fn command_history_undo_redo() {
+        let mut hist = CommandHistory::new(100);
+        hist.push(CoreEditorCommand::Type, 1);
+        hist.push(CoreEditorCommand::DeleteLeft, 2);
+        assert_eq!(hist.len(), 2);
+        assert!(hist.can_undo());
+
+        let undone = hist.undo().unwrap();
+        assert_eq!(undone.command, CoreEditorCommand::DeleteLeft);
+        assert!(hist.can_redo());
+
+        let redone = hist.redo().unwrap();
+        assert_eq!(redone.command, CoreEditorCommand::DeleteLeft);
+        assert!(!hist.can_redo());
+    }
+
+    #[test]
+    fn command_history_push_clears_redo() {
+        let mut hist = CommandHistory::new(100);
+        hist.push(CoreEditorCommand::Type, 1);
+        hist.push(CoreEditorCommand::DeleteLeft, 2);
+        hist.undo(); // undo DeleteLeft
+        hist.push(CoreEditorCommand::Paste, 3);
+        assert!(!hist.can_redo());
+        assert_eq!(hist.len(), 2); // Type + Paste
+    }
+
+    // ── ComposedCommand tests ──
+
+    #[test]
+    fn composed_command_label() {
+        let comp = ComposedCommand::new(CoreEditorCommand::SelectAll, CoreEditorCommand::Copy);
+        assert!(comp.label.contains(CoreEditorCommand::SelectAll.label()));
+        assert!(comp.label.contains(CoreEditorCommand::Copy.label()));
+        let (id1, id2) = comp.command_ids();
+        assert_eq!(id1, "editor.action.selectAll");
+        assert_eq!(id2, "editor.action.clipboardCopyAction");
+    }
+
+    #[test]
+    fn compose_sequence() {
+        let seq = vec![
+            CoreEditorCommand::SelectAll,
+            CoreEditorCommand::Copy,
+            CoreEditorCommand::Paste,
+        ];
+        let composed = compose_command_sequence(&seq);
+        assert_eq!(composed.len(), 2);
+    }
+
+    // ── MacroRecorder tests ──
+
+    #[test]
+    fn macro_recorder_record_and_playback() {
+        let mut rec = MacroRecorder::new();
+        assert!(rec.start("test_macro"));
+        assert!(rec.is_recording());
+        assert!(!rec.start("another")); // can't start while recording
+        rec.record(CoreEditorCommand::Type);
+        rec.record(CoreEditorCommand::NewLine);
+        let saved = rec.stop().unwrap();
+        assert_eq!(saved.name, "test_macro");
+        assert_eq!(saved.len(), 2);
+        assert!(!rec.is_recording());
+        assert!(rec.find_macro("test_macro").is_some());
+    }
+
+    #[test]
+    fn macro_recorder_find_nonexistent() {
+        let rec = MacroRecorder::new();
+        assert!(rec.find_macro("nope").is_none());
     }
 }

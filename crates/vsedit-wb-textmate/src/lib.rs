@@ -697,6 +697,235 @@ pub fn theme_scope_lookup<'a>(
     best
 }
 
+// ---------------------------------------------------------------------------
+// ScopePath – manipulating dotted TextMate scope names
+// ---------------------------------------------------------------------------
+
+/// A parsed dotted scope name (e.g. `source.rust.macro`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ScopePath {
+    components: Vec<String>,
+}
+
+impl ScopePath {
+    /// Parse a dotted scope string into its components.
+    pub fn parse(scope: &str) -> Self {
+        Self {
+            components: scope.split('.').map(String::from).collect(),
+        }
+    }
+
+    /// Number of dotted components.
+    pub fn depth(&self) -> usize {
+        self.components.len()
+    }
+
+    /// Return the top-level component (e.g. `"source"` for `"source.rust"`).
+    pub fn root(&self) -> Option<&str> {
+        self.components.first().map(|s| s.as_str())
+    }
+
+    /// Return the leaf component (e.g. `"rust"` for `"source.rust"`).
+    pub fn leaf(&self) -> Option<&str> {
+        self.components.last().map(|s| s.as_str())
+    }
+
+    /// Check whether `self` is a prefix of `other`.
+    pub fn is_prefix_of(&self, other: &ScopePath) -> bool {
+        if self.components.len() > other.components.len() {
+            return false;
+        }
+        self.components
+            .iter()
+            .zip(other.components.iter())
+            .all(|(a, b)| a == b)
+    }
+
+    /// Return a new `ScopePath` with an extra component appended.
+    pub fn push(&self, component: &str) -> Self {
+        let mut components = self.components.clone();
+        components.push(component.to_string());
+        Self { components }
+    }
+
+    /// Return a parent path (all but the last component), or `None` if at root.
+    pub fn parent(&self) -> Option<Self> {
+        if self.components.len() <= 1 {
+            return None;
+        }
+        Some(Self {
+            components: self.components[..self.components.len() - 1].to_vec(),
+        })
+    }
+
+    /// Reconstruct the dotted string.
+    pub fn as_dotted(&self) -> String {
+        self.components.join(".")
+    }
+}
+
+impl fmt::Display for ScopePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_dotted())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenLineCache – cache highlighted lines by content hash
+// ---------------------------------------------------------------------------
+
+use std::collections::HashMap;
+
+/// A cache mapping (line content, syntax name) pairs to highlighted output.
+/// Avoids re-highlighting unchanged lines.
+#[derive(Debug, Clone)]
+pub struct TokenLineCache {
+    entries: HashMap<(u64, String), HighlightedLine>,
+    capacity: usize,
+    hits: u64,
+    misses: u64,
+}
+
+impl TokenLineCache {
+    /// Create a new cache with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: HashMap::new(),
+            capacity,
+            hits: 0,
+            misses: 0,
+        }
+    }
+
+    /// Simple hash of a string for cache keying.
+    fn hash_line(line: &str) -> u64 {
+        let mut h: u64 = 5381;
+        for byte in line.bytes() {
+            h = h.wrapping_mul(33).wrapping_add(u64::from(byte));
+        }
+        h
+    }
+
+    /// Look up a cached highlighted line.
+    pub fn get(&mut self, line: &str, syntax_name: &str) -> Option<&HighlightedLine> {
+        let key = (Self::hash_line(line), syntax_name.to_string());
+        if self.entries.contains_key(&key) {
+            self.hits += 1;
+            self.entries.get(&key)
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    /// Insert a highlighted line into the cache. Evicts entries when over capacity.
+    pub fn insert(&mut self, line: &str, syntax_name: &str, highlighted: HighlightedLine) {
+        if self.entries.len() >= self.capacity {
+            // Evict an arbitrary entry to make room.
+            if let Some(key) = self.entries.keys().next().cloned() {
+                self.entries.remove(&key);
+            }
+        }
+        let key = (Self::hash_line(line), syntax_name.to_string());
+        self.entries.insert(key, highlighted);
+    }
+
+    /// Number of entries currently in the cache.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all cached entries and reset counters.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+
+    /// Return cache hit count.
+    pub fn hits(&self) -> u64 {
+        self.hits
+    }
+
+    /// Return cache miss count.
+    pub fn misses(&self) -> u64 {
+        self.misses
+    }
+
+    /// Return the hit rate as a fraction in [0.0, 1.0].
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 {
+            return 0.0;
+        }
+        self.hits as f64 / total as f64
+    }
+}
+
+impl Default for TokenLineCache {
+    fn default() -> Self {
+        Self::new(1024)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GrammarRegistry – track syntax usage statistics
+// ---------------------------------------------------------------------------
+
+/// Tracks which grammars/syntaxes have been used and how often.
+#[derive(Debug, Clone, Default)]
+pub struct GrammarRegistry {
+    usage: HashMap<String, u64>,
+}
+
+impl GrammarRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a use of the given syntax name.
+    pub fn record_use(&mut self, syntax_name: &str) {
+        *self.usage.entry(syntax_name.to_string()).or_insert(0) += 1;
+    }
+
+    /// Return the usage count for a syntax, or 0 if never used.
+    pub fn usage_count(&self, syntax_name: &str) -> u64 {
+        self.usage.get(syntax_name).copied().unwrap_or(0)
+    }
+
+    /// Return all syntax names that have been used, sorted by usage descending.
+    pub fn most_used(&self) -> Vec<(&str, u64)> {
+        let mut entries: Vec<(&str, u64)> = self
+            .usage
+            .iter()
+            .map(|(k, &v)| (k.as_str(), v))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries
+    }
+
+    /// Number of distinct syntaxes recorded.
+    pub fn distinct_count(&self) -> usize {
+        self.usage.len()
+    }
+
+    /// Total number of uses across all syntaxes.
+    pub fn total_uses(&self) -> u64 {
+        self.usage.values().sum()
+    }
+
+    /// Clear all recorded usage.
+    pub fn clear(&mut self) {
+        self.usage.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1256,5 +1485,123 @@ mod tests {
         // keyword.control must come before source.rust in the stack
         assert!(!sel.matches(&["source.rust", "keyword.control"]));
         assert!(sel.matches(&["keyword.control", "source.rust"]));
+    }
+
+    // ---- ScopePath tests ----
+
+    #[test]
+    fn scope_path_parse_and_components() {
+        let p = ScopePath::parse("source.rust.macro");
+        assert_eq!(p.depth(), 3);
+        assert_eq!(p.root(), Some("source"));
+        assert_eq!(p.leaf(), Some("macro"));
+        assert_eq!(p.as_dotted(), "source.rust.macro");
+        assert_eq!(format!("{p}"), "source.rust.macro");
+    }
+
+    #[test]
+    fn scope_path_parent_and_push() {
+        let p = ScopePath::parse("source.rust.macro");
+        let parent = p.parent().unwrap();
+        assert_eq!(parent.as_dotted(), "source.rust");
+        let root = parent.parent().unwrap();
+        assert_eq!(root.as_dotted(), "source");
+        assert!(root.parent().is_none());
+
+        let extended = root.push("python");
+        assert_eq!(extended.as_dotted(), "source.python");
+    }
+
+    #[test]
+    fn scope_path_is_prefix_of() {
+        let short = ScopePath::parse("source.rust");
+        let long = ScopePath::parse("source.rust.macro");
+        assert!(short.is_prefix_of(&long));
+        assert!(!long.is_prefix_of(&short));
+        assert!(short.is_prefix_of(&short));
+    }
+
+    // ---- TokenLineCache tests ----
+
+    #[test]
+    fn token_line_cache_insert_and_get() {
+        let mut cache = TokenLineCache::new(10);
+        assert!(cache.is_empty());
+
+        let line = HighlightedLine::from_syntect_ranges(&[]);
+        cache.insert("fn main() {", "Rust", line.clone());
+        assert_eq!(cache.len(), 1);
+
+        let cached = cache.get("fn main() {", "Rust");
+        assert!(cached.is_some());
+        assert_eq!(cache.hits(), 1);
+        assert_eq!(cache.misses(), 0);
+
+        assert!(cache.get("other line", "Rust").is_none());
+        assert_eq!(cache.misses(), 1);
+    }
+
+    #[test]
+    fn token_line_cache_eviction() {
+        let mut cache = TokenLineCache::new(2);
+        let line = HighlightedLine::from_syntect_ranges(&[]);
+        cache.insert("line1", "Rust", line.clone());
+        cache.insert("line2", "Rust", line.clone());
+        assert_eq!(cache.len(), 2);
+        // Third insert should evict one entry to stay at capacity.
+        cache.insert("line3", "Rust", line);
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn token_line_cache_hit_rate() {
+        let mut cache = TokenLineCache::new(10);
+        let line = HighlightedLine::from_syntect_ranges(&[]);
+        cache.insert("x", "Rust", line);
+        cache.get("x", "Rust"); // hit
+        cache.get("y", "Rust"); // miss
+        assert!((cache.hit_rate() - 0.5).abs() < f64::EPSILON);
+
+        cache.clear();
+        assert!(cache.is_empty());
+        assert_eq!(cache.hits(), 0);
+        assert_eq!(cache.misses(), 0);
+        assert!((cache.hit_rate() - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ---- GrammarRegistry tests ----
+
+    #[test]
+    fn grammar_registry_tracks_usage() {
+        let mut reg = GrammarRegistry::new();
+        assert_eq!(reg.distinct_count(), 0);
+        assert_eq!(reg.total_uses(), 0);
+
+        reg.record_use("Rust");
+        reg.record_use("Rust");
+        reg.record_use("Python");
+        assert_eq!(reg.usage_count("Rust"), 2);
+        assert_eq!(reg.usage_count("Python"), 1);
+        assert_eq!(reg.usage_count("Go"), 0);
+        assert_eq!(reg.distinct_count(), 2);
+        assert_eq!(reg.total_uses(), 3);
+    }
+
+    #[test]
+    fn grammar_registry_most_used_order() {
+        let mut reg = GrammarRegistry::new();
+        reg.record_use("Go");
+        reg.record_use("Rust");
+        reg.record_use("Rust");
+        reg.record_use("Rust");
+        reg.record_use("Python");
+        reg.record_use("Python");
+        let top = reg.most_used();
+        assert_eq!(top[0], ("Rust", 3));
+        assert_eq!(top[1], ("Python", 2));
+        assert_eq!(top[2], ("Go", 1));
+
+        reg.clear();
+        assert_eq!(reg.distinct_count(), 0);
     }
 }

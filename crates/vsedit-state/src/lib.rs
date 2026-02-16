@@ -771,6 +771,246 @@ pub fn migration_needed(current_version: u32, target_version: u32) -> bool {
     current_version < target_version
 }
 
+// ── StateSnapshot ──
+
+/// A complete snapshot of a `StateService` at a point in time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateSnapshot {
+    pub entries: HashMap<String, StoredState>,
+    pub label: String,
+}
+
+impl StateSnapshot {
+    /// Capture a snapshot from the given `StateService`.
+    pub fn capture(svc: &StateService, label: impl Into<String>) -> Self {
+        Self {
+            entries: svc.state.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            label: label.into(),
+        }
+    }
+
+    /// Returns the number of entries in this snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get a value from the snapshot by key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.entries.get(key).map(|s| s.value.as_str())
+    }
+
+    /// Returns all keys in this snapshot.
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.keys().map(|k| k.as_str()).collect()
+    }
+}
+
+impl fmt::Display for StateSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StateSnapshot({}, {} entries)", self.label, self.entries.len())
+    }
+}
+
+// ── StateDiffEngine ──
+
+/// Represents a single difference between two state snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateDiff {
+    /// Key exists in new snapshot but not in old.
+    Added { key: String, value: String },
+    /// Key exists in old snapshot but not in new.
+    Removed { key: String, value: String },
+    /// Key exists in both but with different values.
+    Changed { key: String, old_value: String, new_value: String },
+}
+
+impl fmt::Display for StateDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StateDiff::Added { key, value } => write!(f, "+ {} = {}", key, value),
+            StateDiff::Removed { key, value } => write!(f, "- {} = {}", key, value),
+            StateDiff::Changed { key, old_value, new_value } => {
+                write!(f, "~ {} : {} -> {}", key, old_value, new_value)
+            }
+        }
+    }
+}
+
+/// Computes diffs between two `StateSnapshot`s.
+pub struct StateDiffEngine;
+
+impl StateDiffEngine {
+    /// Compute the list of differences between `old` and `new` snapshots.
+    pub fn diff(old: &StateSnapshot, new: &StateSnapshot) -> Vec<StateDiff> {
+        let mut diffs = Vec::new();
+
+        // Find added and changed
+        for (key, new_entry) in &new.entries {
+            match old.entries.get(key) {
+                Some(old_entry) if old_entry.value != new_entry.value => {
+                    diffs.push(StateDiff::Changed {
+                        key: key.clone(),
+                        old_value: old_entry.value.clone(),
+                        new_value: new_entry.value.clone(),
+                    });
+                }
+                None => {
+                    diffs.push(StateDiff::Added {
+                        key: key.clone(),
+                        value: new_entry.value.clone(),
+                    });
+                }
+                _ => {} // unchanged
+            }
+        }
+
+        // Find removed
+        for (key, old_entry) in &old.entries {
+            if !new.entries.contains_key(key) {
+                diffs.push(StateDiff::Removed {
+                    key: key.clone(),
+                    value: old_entry.value.clone(),
+                });
+            }
+        }
+
+        diffs.sort_by(|a, b| {
+            let key_a = match a {
+                StateDiff::Added { key, .. } | StateDiff::Removed { key, .. } | StateDiff::Changed { key, .. } => key,
+            };
+            let key_b = match b {
+                StateDiff::Added { key, .. } | StateDiff::Removed { key, .. } | StateDiff::Changed { key, .. } => key,
+            };
+            key_a.cmp(key_b)
+        });
+
+        diffs
+    }
+
+    /// Returns true if the two snapshots are identical.
+    pub fn is_equal(old: &StateSnapshot, new: &StateSnapshot) -> bool {
+        Self::diff(old, new).is_empty()
+    }
+
+    /// Returns only the keys that differ between two snapshots.
+    pub fn changed_keys(old: &StateSnapshot, new: &StateSnapshot) -> Vec<String> {
+        Self::diff(old, new)
+            .into_iter()
+            .map(|d| match d {
+                StateDiff::Added { key, .. } | StateDiff::Removed { key, .. } | StateDiff::Changed { key, .. } => key,
+            })
+            .collect()
+    }
+}
+
+// ── StateSubscription ──
+
+/// A subscriber callback identifier.
+pub type SubscriptionId = u64;
+
+/// Manages subscriptions to state changes.
+pub struct StateSubscription {
+    next_id: SubscriptionId,
+    /// Subscriptions stored as (id, key_prefix) pairs.
+    subscriptions: Vec<(SubscriptionId, String)>,
+}
+
+impl StateSubscription {
+    pub fn new() -> Self {
+        Self {
+            next_id: 1,
+            subscriptions: Vec::new(),
+        }
+    }
+
+    /// Subscribe to changes for keys matching the given prefix.
+    /// Returns a subscription ID that can be used to unsubscribe.
+    pub fn subscribe(&mut self, key_prefix: impl Into<String>) -> SubscriptionId {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.subscriptions.push((id, key_prefix.into()));
+        id
+    }
+
+    /// Remove a subscription by ID. Returns true if found.
+    pub fn unsubscribe(&mut self, id: SubscriptionId) -> bool {
+        let len = self.subscriptions.len();
+        self.subscriptions.retain(|(sid, _)| *sid != id);
+        self.subscriptions.len() < len
+    }
+
+    /// Returns the subscription IDs that match the given key.
+    pub fn matching_subscriptions(&self, key: &str) -> Vec<SubscriptionId> {
+        self.subscriptions
+            .iter()
+            .filter(|(_, prefix)| key.starts_with(prefix.as_str()))
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Returns the total number of active subscriptions.
+    pub fn count(&self) -> usize {
+        self.subscriptions.len()
+    }
+
+    /// Returns true if there are no subscriptions.
+    pub fn is_empty(&self) -> bool {
+        self.subscriptions.is_empty()
+    }
+}
+
+impl Default for StateSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Namespace support on StateService ──
+
+impl StateService {
+    /// Set a value under a namespace, using "namespace.key" format.
+    pub fn ns_set(&mut self, namespace: &str, key: &str, value: impl Into<String>, scope: StateScope) {
+        let full_key = format!("{}.{}", namespace, key);
+        self.set(full_key, value, scope);
+    }
+
+    /// Get a value under a namespace.
+    pub fn ns_get(&self, namespace: &str, key: &str) -> Option<&str> {
+        let full_key = format!("{}.{}", namespace, key);
+        self.get(&full_key)
+    }
+
+    /// Returns all keys within a namespace.
+    pub fn ns_keys(&self, namespace: &str) -> Vec<&str> {
+        let prefix = format!("{}.", namespace);
+        self.state
+            .keys()
+            .filter(|k| k.starts_with(&prefix))
+            .map(|k| k.as_str())
+            .collect()
+    }
+
+    /// Remove all keys within a namespace. Returns the number of keys removed.
+    pub fn ns_clear(&mut self, namespace: &str) -> usize {
+        let prefix = format!("{}.", namespace);
+        let keys: Vec<String> = self.state
+            .keys()
+            .filter(|k| k.starts_with(&prefix))
+            .cloned()
+            .collect();
+        let count = keys.len();
+        for k in keys {
+            self.state.remove(&k);
+        }
+        count
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1323,5 +1563,118 @@ mod tests {
         assert!(s.contains("v1"));
         assert!(s.contains("v2"));
         assert!(s.contains("rename theme keys"));
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn state_snapshot_capture() {
+        let mut svc = StateService::new();
+        svc.set("theme", "dark", StateScope::Global);
+        svc.set("font", "mono", StateScope::Workspace);
+        let snap = StateSnapshot::capture(&svc, "test_snap");
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.label, "test_snap");
+        assert_eq!(snap.get("theme"), Some("dark"));
+        assert_eq!(snap.get("font"), Some("mono"));
+        assert_eq!(snap.get("missing"), None);
+    }
+
+    #[test]
+    fn state_diff_added_removed_changed() {
+        let mut svc = StateService::new();
+        svc.set("a", "1", StateScope::Global);
+        svc.set("b", "2", StateScope::Global);
+        let old = StateSnapshot::capture(&svc, "old");
+
+        svc.set("b", "99", StateScope::Global); // changed
+        svc.remove("a");                          // removed
+        svc.set("c", "3", StateScope::Global);   // added
+        let new = StateSnapshot::capture(&svc, "new");
+
+        let diffs = StateDiffEngine::diff(&old, &new);
+        assert_eq!(diffs.len(), 3);
+        assert!(diffs.iter().any(|d| matches!(d, StateDiff::Removed { key, .. } if key == "a")));
+        assert!(diffs.iter().any(|d| matches!(d, StateDiff::Changed { key, old_value, new_value } if key == "b" && old_value == "2" && new_value == "99")));
+        assert!(diffs.iter().any(|d| matches!(d, StateDiff::Added { key, .. } if key == "c")));
+    }
+
+    #[test]
+    fn state_diff_equal_snapshots() {
+        let mut svc = StateService::new();
+        svc.set("x", "1", StateScope::Global);
+        let s1 = StateSnapshot::capture(&svc, "s1");
+        let s2 = StateSnapshot::capture(&svc, "s2");
+        assert!(StateDiffEngine::is_equal(&s1, &s2));
+        assert!(StateDiffEngine::changed_keys(&s1, &s2).is_empty());
+    }
+
+    #[test]
+    fn state_subscription_matching() {
+        let mut sub = StateSubscription::new();
+        let id1 = sub.subscribe("editor.");
+        let id2 = sub.subscribe("theme.");
+        let _id3 = sub.subscribe("editor.font");
+
+        assert_eq!(sub.count(), 3);
+        // "editor.fontSize" matches both "editor." and "editor.font" prefixes
+        let matches = sub.matching_subscriptions("editor.fontSize");
+        assert_eq!(matches.len(), 2);
+        assert!(matches.contains(&id1));
+
+        let matches3 = sub.matching_subscriptions("theme.color");
+        assert_eq!(matches3.len(), 1);
+        assert_eq!(matches3[0], id2);
+    }
+
+    #[test]
+    fn state_subscription_unsubscribe() {
+        let mut sub = StateSubscription::new();
+        let id1 = sub.subscribe("a");
+        let _id2 = sub.subscribe("b");
+        assert_eq!(sub.count(), 2);
+        assert!(sub.unsubscribe(id1));
+        assert_eq!(sub.count(), 1);
+        assert!(!sub.unsubscribe(id1)); // already removed
+    }
+
+    #[test]
+    fn state_namespace_set_get() {
+        let mut svc = StateService::new();
+        svc.ns_set("editor", "fontSize", "14", StateScope::Global);
+        svc.ns_set("editor", "fontFamily", "Mono", StateScope::Global);
+        svc.ns_set("theme", "name", "dark", StateScope::Workspace);
+
+        assert_eq!(svc.ns_get("editor", "fontSize"), Some("14"));
+        assert_eq!(svc.ns_get("editor", "fontFamily"), Some("Mono"));
+        assert_eq!(svc.ns_get("theme", "name"), Some("dark"));
+        assert_eq!(svc.ns_get("theme", "missing"), None);
+    }
+
+    #[test]
+    fn state_namespace_keys_and_clear() {
+        let mut svc = StateService::new();
+        svc.ns_set("editor", "a", "1", StateScope::Global);
+        svc.ns_set("editor", "b", "2", StateScope::Global);
+        svc.ns_set("theme", "c", "3", StateScope::Global);
+
+        let editor_keys = svc.ns_keys("editor");
+        assert_eq!(editor_keys.len(), 2);
+        assert_eq!(svc.key_count(), 3);
+
+        let removed = svc.ns_clear("editor");
+        assert_eq!(removed, 2);
+        assert_eq!(svc.key_count(), 1);
+        assert_eq!(svc.ns_get("theme", "c"), Some("3"));
+    }
+
+    #[test]
+    fn state_diff_display() {
+        let d = StateDiff::Added { key: "k".into(), value: "v".into() };
+        assert_eq!(format!("{}", d), "+ k = v");
+        let d2 = StateDiff::Removed { key: "k".into(), value: "v".into() };
+        assert_eq!(format!("{}", d2), "- k = v");
+        let d3 = StateDiff::Changed { key: "k".into(), old_value: "a".into(), new_value: "b".into() };
+        assert_eq!(format!("{}", d3), "~ k : a -> b");
     }
 }

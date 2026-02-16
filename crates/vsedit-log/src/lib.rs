@@ -810,6 +810,221 @@ impl LogViewer {
     pub fn entry_count(&self) -> usize {
         self.entries.len()
     }
+
+    /// Search entries by message substring (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&LogEntry> {
+        let lower = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.message.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Return entries grouped by log level.
+    pub fn group_by_level(&self) -> HashMap<String, Vec<&LogEntry>> {
+        let mut groups: HashMap<String, Vec<&LogEntry>> = HashMap::new();
+        for entry in &self.entries {
+            groups
+                .entry(entry.level.as_str().to_string())
+                .or_default()
+                .push(entry);
+        }
+        groups
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StructuredLogEntry
+// ---------------------------------------------------------------------------
+
+/// A log entry with structured key-value metadata.
+#[derive(Debug, Clone)]
+pub struct StructuredLogEntry {
+    pub level: LogLevel,
+    pub message: String,
+    pub channel: String,
+    pub timestamp: u64,
+    pub fields: HashMap<String, String>,
+}
+
+impl StructuredLogEntry {
+    pub fn new(level: LogLevel, channel: &str, message: &str) -> Self {
+        Self {
+            level,
+            message: message.to_string(),
+            channel: channel.to_string(),
+            timestamp: now_epoch_ms(),
+            fields: HashMap::new(),
+        }
+    }
+
+    /// Add a key-value field.
+    pub fn with_field(mut self, key: &str, value: &str) -> Self {
+        self.fields.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    /// Get a field value by key.
+    pub fn get_field(&self, key: &str) -> Option<&str> {
+        self.fields.get(key).map(String::as_str)
+    }
+
+    /// Format as a JSON string.
+    pub fn to_json(&self) -> String {
+        let fields_json: Vec<String> = self
+            .fields
+            .iter()
+            .map(|(k, v)| format!(r#""{}":"{}""#, k.replace('"', "\\\""), v.replace('"', "\\\"")))
+            .collect();
+        format!(
+            r#"{{"level":"{}","channel":"{}","message":"{}","fields":{{{}}}}}"#,
+            self.level.as_str(),
+            self.channel.replace('"', "\\\""),
+            self.message.replace('"', "\\\""),
+            fields_json.join(",")
+        )
+    }
+
+    /// Convert to a plain LogEntry (fields stored in data map).
+    pub fn to_log_entry(&self) -> LogEntry {
+        LogEntry {
+            level: self.level,
+            message: self.message.clone(),
+            channel: self.channel.clone(),
+            timestamp: self.timestamp,
+            source: None,
+            data: if self.fields.is_empty() {
+                None
+            } else {
+                Some(self.fields.clone())
+            },
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogExporter
+// ---------------------------------------------------------------------------
+
+/// Export log entries to different string formats.
+pub struct LogExporter;
+
+impl LogExporter {
+    /// Export entries as newline-delimited plain text.
+    pub fn to_text(entries: &[LogEntry]) -> String {
+        entries
+            .iter()
+            .map(|e| e.formatted())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Export entries as a JSON array string.
+    pub fn to_json(entries: &[LogEntry]) -> String {
+        let items: Vec<String> = entries
+            .iter()
+            .map(|e| {
+                format!(
+                    r#"{{"level":"{}","channel":"{}","message":"{}","timestamp":{}}}"#,
+                    e.level.as_str(),
+                    e.channel.replace('"', "\\\""),
+                    e.message.replace('"', "\\\""),
+                    e.timestamp
+                )
+            })
+            .collect();
+        format!("[{}]", items.join(","))
+    }
+
+    /// Export entries as CSV (level,channel,message,timestamp).
+    pub fn to_csv(entries: &[LogEntry]) -> String {
+        let mut lines = vec!["level,channel,message,timestamp".to_string()];
+        for e in entries {
+            lines.push(format!(
+                "{},{},{},{}",
+                e.level.as_str(),
+                e.channel.replace(',', ";"),
+                e.message.replace(',', ";"),
+                e.timestamp,
+            ));
+        }
+        lines.join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogAggregator
+// ---------------------------------------------------------------------------
+
+/// Aggregate log entries by grouping criteria.
+#[derive(Debug, Default)]
+pub struct LogAggregator {
+    groups: HashMap<String, Vec<LogEntry>>,
+}
+
+impl LogAggregator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Group entries by channel.
+    pub fn group_by_channel(entries: &[LogEntry]) -> Self {
+        let mut agg = Self::new();
+        for entry in entries {
+            agg.groups
+                .entry(entry.channel.clone())
+                .or_default()
+                .push(entry.clone());
+        }
+        agg
+    }
+
+    /// Group entries by log level.
+    pub fn group_by_level(entries: &[LogEntry]) -> Self {
+        let mut agg = Self::new();
+        for entry in entries {
+            agg.groups
+                .entry(entry.level.as_str().to_string())
+                .or_default()
+                .push(entry.clone());
+        }
+        agg
+    }
+
+    /// Group entries by a message pattern prefix (first word).
+    pub fn group_by_first_word(entries: &[LogEntry]) -> Self {
+        let mut agg = Self::new();
+        for entry in entries {
+            let key = entry
+                .message
+                .split_whitespace()
+                .next()
+                .unwrap_or("(empty)")
+                .to_string();
+            agg.groups.entry(key).or_default().push(entry.clone());
+        }
+        agg
+    }
+
+    /// Get group names.
+    pub fn group_names(&self) -> Vec<&str> {
+        self.groups.keys().map(String::as_str).collect()
+    }
+
+    /// Get entries in a specific group.
+    pub fn get_group(&self, name: &str) -> Option<&[LogEntry]> {
+        self.groups.get(name).map(Vec::as_slice)
+    }
+
+    /// Number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Total entries across all groups.
+    pub fn total_entries(&self) -> usize {
+        self.groups.values().map(Vec::len).sum()
+    }
 }
 
 #[cfg(test)]
@@ -1317,5 +1532,107 @@ mod tests {
         let results = viewer.filter(None, None, Some(150), Some(250));
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].message, "middle");
+    }
+
+    #[test]
+    fn structured_log_entry_fields() {
+        let entry = StructuredLogEntry::new(LogLevel::Info, "app", "request received")
+            .with_field("method", "GET")
+            .with_field("path", "/api/health");
+
+        assert_eq!(entry.get_field("method"), Some("GET"));
+        assert_eq!(entry.get_field("path"), Some("/api/health"));
+        assert!(entry.get_field("missing").is_none());
+    }
+
+    #[test]
+    fn structured_log_entry_to_json() {
+        let entry = StructuredLogEntry::new(LogLevel::Warning, "db", "slow query")
+            .with_field("duration_ms", "500");
+        let json = entry.to_json();
+        assert!(json.contains(r#""level":"warning""#));
+        assert!(json.contains(r#""message":"slow query""#));
+        assert!(json.contains(r#""duration_ms":"500""#));
+    }
+
+    #[test]
+    fn structured_log_entry_to_log_entry() {
+        let structured = StructuredLogEntry::new(LogLevel::Error, "ch", "fail")
+            .with_field("code", "42");
+        let plain = structured.to_log_entry();
+        assert_eq!(plain.level, LogLevel::Error);
+        assert_eq!(plain.message, "fail");
+        assert!(plain.data.is_some());
+        assert_eq!(plain.data.unwrap().get("code").unwrap(), "42");
+    }
+
+    #[test]
+    fn log_exporter_text() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "app", "started"),
+            LogEntry::new(LogLevel::Error, "app", "crashed"),
+        ];
+        let text = LogExporter::to_text(&entries);
+        assert!(text.contains("[INFO] app: started"));
+        assert!(text.contains("[ERROR] app: crashed"));
+    }
+
+    #[test]
+    fn log_exporter_json() {
+        let entries = vec![LogEntry::new(LogLevel::Debug, "test", "hello")];
+        let json = LogExporter::to_json(&entries);
+        assert!(json.starts_with('['));
+        assert!(json.ends_with(']'));
+        assert!(json.contains(r#""level":"debug""#));
+    }
+
+    #[test]
+    fn log_exporter_csv() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "msg1"),
+            LogEntry::new(LogLevel::Warning, "ch", "msg2"),
+        ];
+        let csv = LogExporter::to_csv(&entries);
+        let lines: Vec<&str> = csv.lines().collect();
+        assert_eq!(lines[0], "level,channel,message,timestamp");
+        assert!(lines[1].starts_with("info,ch,msg1,"));
+        assert!(lines[2].starts_with("warning,ch,msg2,"));
+    }
+
+    #[test]
+    fn log_aggregator_by_channel() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "app", "hello"),
+            LogEntry::new(LogLevel::Info, "db", "query"),
+            LogEntry::new(LogLevel::Error, "app", "fail"),
+        ];
+        let agg = LogAggregator::group_by_channel(&entries);
+        assert_eq!(agg.group_count(), 2);
+        assert_eq!(agg.total_entries(), 3);
+        assert_eq!(agg.get_group("app").unwrap().len(), 2);
+        assert_eq!(agg.get_group("db").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn log_aggregator_by_level() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "a"),
+            LogEntry::new(LogLevel::Info, "ch", "b"),
+            LogEntry::new(LogLevel::Error, "ch", "c"),
+        ];
+        let agg = LogAggregator::group_by_level(&entries);
+        assert_eq!(agg.get_group("info").unwrap().len(), 2);
+        assert_eq!(agg.get_group("error").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn log_viewer_search() {
+        let mut viewer = LogViewer::new("test");
+        viewer.push(LogEntry::new(LogLevel::Info, "ch", "user logged in"));
+        viewer.push(LogEntry::new(LogLevel::Info, "ch", "file saved"));
+        viewer.push(LogEntry::new(LogLevel::Error, "ch", "user not found"));
+
+        let results = viewer.search("user");
+        assert_eq!(results.len(), 2);
     }
 }

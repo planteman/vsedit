@@ -712,6 +712,204 @@ pub fn tab_close_animation(tab_id: &str, duration_ms: u64) -> TabCloseAnimation 
     TabCloseAnimation::new(tab_id, duration_ms)
 }
 
+// ---------------------------------------------------------------------------
+// TabLayout — overflow handling strategies
+// ---------------------------------------------------------------------------
+
+/// Strategy for handling tab overflow when tabs exceed available width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabOverflowStrategy {
+    /// Tabs shrink proportionally to fit.
+    Shrink,
+    /// A horizontal scroll region is used.
+    Scroll,
+    /// Excess tabs are placed in a dropdown menu.
+    Dropdown,
+}
+
+/// Computes tab layout given available width and tab count.
+#[derive(Debug, Clone)]
+pub struct TabLayout {
+    pub strategy: TabOverflowStrategy,
+    /// Minimum width per tab in characters.
+    pub min_tab_width: usize,
+    /// Maximum width per tab in characters.
+    pub max_tab_width: usize,
+    /// Available container width.
+    pub available_width: usize,
+}
+
+impl TabLayout {
+    /// Create a new layout calculator.
+    pub fn new(available_width: usize, strategy: TabOverflowStrategy) -> Self {
+        Self {
+            strategy,
+            min_tab_width: 8,
+            max_tab_width: 40,
+            available_width,
+        }
+    }
+
+    /// Compute the rendered width for each tab given the number of tabs.
+    /// Returns a vector of per-tab widths.
+    pub fn compute_widths(&self, tab_count: usize) -> Vec<usize> {
+        if tab_count == 0 {
+            return Vec::new();
+        }
+        match self.strategy {
+            TabOverflowStrategy::Shrink => {
+                let ideal = self.available_width / tab_count;
+                let clamped = ideal.clamp(self.min_tab_width, self.max_tab_width);
+                vec![clamped; tab_count]
+            }
+            TabOverflowStrategy::Scroll | TabOverflowStrategy::Dropdown => {
+                let ideal = self.available_width / tab_count;
+                let w = ideal.min(self.max_tab_width).max(self.min_tab_width);
+                vec![w; tab_count]
+            }
+        }
+    }
+
+    /// Determine how many tabs are visible (fit within available width).
+    pub fn visible_count(&self, tab_count: usize) -> usize {
+        if tab_count == 0 {
+            return 0;
+        }
+        let widths = self.compute_widths(tab_count);
+        let per_tab = widths[0];
+        let fits = self.available_width / per_tab;
+        fits.min(tab_count)
+    }
+
+    /// Whether overflow is happening.
+    pub fn is_overflowing(&self, tab_count: usize) -> bool {
+        self.visible_count(tab_count) < tab_count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tab drag-and-drop reordering
+// ---------------------------------------------------------------------------
+
+/// Describes a drag-and-drop reorder operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabDragOperation {
+    /// ID of the tab being dragged.
+    pub tab_id: String,
+    /// Original index of the tab.
+    pub from_index: usize,
+    /// Target index for the tab.
+    pub to_index: usize,
+}
+
+impl TabDragOperation {
+    /// Create a new drag operation.
+    pub fn new(tab_id: impl Into<String>, from_index: usize, to_index: usize) -> Self {
+        Self {
+            tab_id: tab_id.into(),
+            from_index,
+            to_index,
+        }
+    }
+
+    /// Whether the drag actually moves the tab.
+    pub fn is_move(&self) -> bool {
+        self.from_index != self.to_index
+    }
+
+    /// Distance of the drag in tab positions.
+    pub fn distance(&self) -> usize {
+        if self.from_index > self.to_index {
+            self.from_index - self.to_index
+        } else {
+            self.to_index - self.from_index
+        }
+    }
+}
+
+/// Apply a drag-and-drop reorder operation to a `TabGroup`.
+/// Returns `true` if the operation was applied successfully.
+pub fn apply_drag_reorder(group: &mut TabGroup, op: &TabDragOperation) -> bool {
+    if !op.is_move() {
+        return false;
+    }
+    group.move_tab(&op.tab_id, op.to_index)
+}
+
+// ---------------------------------------------------------------------------
+// Tab pinning with pin-area separation
+// ---------------------------------------------------------------------------
+
+/// Splits a `TabGroup`'s tabs into pinned and unpinned regions.
+#[derive(Debug)]
+pub struct PinnedAreaSplit<'a> {
+    pub pinned: Vec<&'a Tab>,
+    pub unpinned: Vec<&'a Tab>,
+}
+
+impl<'a> PinnedAreaSplit<'a> {
+    /// Compute the split from a tab group.
+    pub fn from_group(group: &'a TabGroup) -> Self {
+        let mut pinned = Vec::new();
+        let mut unpinned = Vec::new();
+        for tab in group.get_tabs() {
+            if tab.pinned {
+                pinned.push(tab);
+            } else {
+                unpinned.push(tab);
+            }
+        }
+        Self { pinned, unpinned }
+    }
+
+    /// Total number of tabs.
+    pub fn total(&self) -> usize {
+        self.pinned.len() + self.unpinned.len()
+    }
+
+    /// Whether there are any pinned tabs.
+    pub fn has_pinned(&self) -> bool {
+        !self.pinned.is_empty()
+    }
+
+    /// Find a tab by ID across both areas.
+    pub fn find(&self, id: &str) -> Option<&'a Tab> {
+        self.pinned
+            .iter()
+            .chain(self.unpinned.iter())
+            .find(|t| t.id == id)
+            .copied()
+    }
+}
+
+/// Ensure all pinned tabs appear before unpinned tabs in the group.
+/// Returns the number of tabs that were moved.
+pub fn sort_pinned_first(group: &mut TabGroup) -> usize {
+    let tabs = group.get_tabs().to_vec();
+    let mut pinned: Vec<Tab> = tabs.iter().filter(|t| t.pinned).cloned().collect();
+    let unpinned: Vec<Tab> = tabs.iter().filter(|t| !t.pinned).cloned().collect();
+
+    let mut moved = 0;
+    let original_order: Vec<String> = tabs.iter().map(|t| t.id.clone()).collect();
+
+    pinned.extend(unpinned);
+    let new_order: Vec<String> = pinned.iter().map(|t| t.id.clone()).collect();
+
+    for (i, id) in new_order.iter().enumerate() {
+        if original_order.get(i) != Some(id) {
+            moved += 1;
+        }
+    }
+
+    // Rebuild group in correct order
+    group.close_all();
+    for tab in pinned {
+        group.add_tab(tab);
+    }
+
+    moved
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1308,5 +1506,80 @@ mod tests {
         assert_eq!(group.get_tab_index("a"), Some(0));
         assert_eq!(group.get_tab_index("c"), Some(2));
         assert_eq!(group.get_tab_index("missing"), None);
+    }
+
+    // -- TabLayout tests -----------------------------------------------------
+
+    #[test]
+    fn layout_shrink_computes_widths() {
+        let layout = TabLayout::new(200, TabOverflowStrategy::Shrink);
+        let widths = layout.compute_widths(5);
+        assert_eq!(widths.len(), 5);
+        assert_eq!(widths[0], 40); // 200/5 = 40, clamped to max 40
+    }
+
+    #[test]
+    fn layout_overflow_detection() {
+        let layout = TabLayout::new(100, TabOverflowStrategy::Scroll);
+        // 100 / 20 = 5 tabs visible at min_width=8 → actually 100/8=12
+        // With 20 tabs: ideal=5, clamped to min 8 → 100/8 = 12 visible, 20 total → overflow
+        assert!(layout.is_overflowing(20));
+        assert!(!layout.is_overflowing(3));
+    }
+
+    // -- TabDragOperation tests ----------------------------------------------
+
+    #[test]
+    fn drag_operation_applies_reorder() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        group.add_tab(make_tab("b"));
+        group.add_tab(make_tab("c"));
+        let op = TabDragOperation::new("a", 0, 2);
+        assert!(op.is_move());
+        assert_eq!(op.distance(), 2);
+        assert!(apply_drag_reorder(&mut group, &op));
+        assert_eq!(group.get_tab_index("a"), Some(2));
+    }
+
+    #[test]
+    fn drag_noop_when_same_index() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        let op = TabDragOperation::new("a", 0, 0);
+        assert!(!op.is_move());
+        assert!(!apply_drag_reorder(&mut group, &op));
+    }
+
+    // -- PinnedAreaSplit tests ------------------------------------------------
+
+    #[test]
+    fn pinned_area_split_separates() {
+        let mut group = TabGroup::new();
+        let mut t1 = make_tab("a");
+        t1.pinned = true;
+        group.add_tab(t1);
+        group.add_tab(make_tab("b"));
+
+        let split = PinnedAreaSplit::from_group(&group);
+        assert_eq!(split.pinned.len(), 1);
+        assert_eq!(split.unpinned.len(), 1);
+        assert!(split.has_pinned());
+        assert_eq!(split.total(), 2);
+        assert!(split.find("a").is_some());
+        assert!(split.find("missing").is_none());
+    }
+
+    #[test]
+    fn sort_pinned_first_reorders() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        let mut pinned = make_tab("b");
+        pinned.pinned = true;
+        group.add_tab(pinned);
+        group.add_tab(make_tab("c"));
+        let moved = sort_pinned_first(&mut group);
+        assert!(moved > 0);
+        assert_eq!(group.get_tab_index("b"), Some(0));
     }
 }

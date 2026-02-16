@@ -779,6 +779,357 @@ pub fn is_relative(path: &str) -> bool {
     !is_absolute(path)
 }
 
+// ---------------------------------------------------------------------------
+// PathTemplate – template-based path generation with variables
+// ---------------------------------------------------------------------------
+
+/// A template-based path generator that substitutes `${variable}` placeholders.
+#[derive(Debug, Clone)]
+pub struct PathTemplate {
+    template: String,
+    variables: std::collections::HashMap<String, String>,
+}
+
+impl PathTemplate {
+    /// Create a new path template from a template string.
+    ///
+    /// Variables are referenced as `${name}` in the template.
+    pub fn new(template: impl Into<String>) -> Self {
+        Self {
+            template: template.into(),
+            variables: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Set a variable value used during expansion.
+    pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.variables.insert(name.into(), value.into());
+        self
+    }
+
+    /// Expand the template, replacing all `${name}` occurrences.
+    ///
+    /// Unknown variables are left as-is.
+    pub fn expand(&self) -> String {
+        let mut result = self.template.clone();
+        for (key, value) in &self.variables {
+            let placeholder = format!("${{{key}}}");
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Return the names of all variables referenced in the template.
+    pub fn referenced_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        let bytes = self.template.as_bytes();
+        let mut i = 0;
+        while i < bytes.len().saturating_sub(2) {
+            if bytes[i] == b'$' && bytes[i + 1] == b'{' {
+                if let Some(end) = self.template[i + 2..].find('}') {
+                    let name = &self.template[i + 2..i + 2 + end];
+                    if !name.is_empty() && !vars.contains(&name.to_string()) {
+                        vars.push(name.to_string());
+                    }
+                    i += 3 + end;
+                } else {
+                    i += 1;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        vars
+    }
+
+    /// Check if all referenced variables have values set.
+    pub fn is_complete(&self) -> bool {
+        self.referenced_variables()
+            .iter()
+            .all(|v| self.variables.contains_key(v))
+    }
+
+    /// Return the list of variables that have no value set.
+    pub fn missing_variables(&self) -> Vec<String> {
+        self.referenced_variables()
+            .into_iter()
+            .filter(|v| !self.variables.contains_key(v))
+            .collect()
+    }
+}
+
+impl fmt::Display for PathTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.expand())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathMatcher – match paths against multiple glob-like patterns
+// ---------------------------------------------------------------------------
+
+/// Matches paths against a set of include/exclude patterns.
+///
+/// Patterns support `*` (match anything except `/`) and `**` (match
+/// everything including `/`).
+#[derive(Debug, Clone)]
+pub struct PathMatcher {
+    include_patterns: Vec<String>,
+    exclude_patterns: Vec<String>,
+}
+
+impl PathMatcher {
+    /// Create an empty path matcher.
+    pub fn new() -> Self {
+        Self {
+            include_patterns: Vec::new(),
+            exclude_patterns: Vec::new(),
+        }
+    }
+
+    /// Add an include pattern.
+    pub fn include(&mut self, pattern: impl Into<String>) -> &mut Self {
+        self.include_patterns.push(pattern.into());
+        self
+    }
+
+    /// Add an exclude pattern.
+    pub fn exclude(&mut self, pattern: impl Into<String>) -> &mut Self {
+        self.exclude_patterns.push(pattern.into());
+        self
+    }
+
+    /// Test whether `path` matches the configured patterns.
+    ///
+    /// A path matches if it matches at least one include pattern and no
+    /// exclude patterns.  If no include patterns have been added, every
+    /// path is considered included.
+    pub fn matches(&self, path: &str) -> bool {
+        let normalized = to_forward_slashes(path);
+        let included = if self.include_patterns.is_empty() {
+            true
+        } else {
+            self.include_patterns
+                .iter()
+                .any(|p| Self::glob_match(p, &normalized))
+        };
+        if !included {
+            return false;
+        }
+        !self
+            .exclude_patterns
+            .iter()
+            .any(|p| Self::glob_match(p, &normalized))
+    }
+
+    /// Simple glob matching: `*` matches non-`/` chars, `**` matches everything.
+    fn glob_match(pattern: &str, text: &str) -> bool {
+        let pat_parts: Vec<&str> = pattern.split("**").collect();
+        if pat_parts.len() == 1 {
+            return Self::simple_glob(pattern, text);
+        }
+        let mut pos = 0usize;
+        for (i, part) in pat_parts.iter().enumerate() {
+            if part.is_empty() {
+                continue;
+            }
+            // Strip leading/trailing path separators around the ** boundary
+            let part = part.trim_matches('/');
+            if part.is_empty() {
+                continue;
+            }
+            if i == 0 {
+                if !Self::simple_glob(part, &text[..part.len().min(text.len())]) {
+                    return false;
+                }
+                pos = part.len();
+            } else {
+                // Find matching segment in remaining text
+                let remaining = &text[pos..];
+                let remaining = remaining.trim_start_matches('/');
+                let mut found = false;
+                for start in 0..=remaining.len().saturating_sub(part.len()) {
+                    let candidate = &remaining[start..];
+                    if Self::simple_glob(part, &candidate[..part.len().min(candidate.len())]) {
+                        pos = text.len() - remaining.len() + start + part.len();
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Match a simple pattern (no `**`) against text.
+    fn simple_glob(pattern: &str, text: &str) -> bool {
+        let mut pi = 0usize;
+        let mut ti = 0usize;
+        let mut star_pi = usize::MAX;
+        let mut star_ti = 0usize;
+        let pb = pattern.as_bytes();
+        let tb = text.as_bytes();
+        while ti < tb.len() {
+            if pi < pb.len() && (pb[pi] == b'?' || pb[pi] == tb[ti]) {
+                pi += 1;
+                ti += 1;
+            } else if pi < pb.len() && pb[pi] == b'*' {
+                star_pi = pi;
+                star_ti = ti;
+                pi += 1;
+            } else if star_pi != usize::MAX {
+                pi = star_pi + 1;
+                star_ti += 1;
+                ti = star_ti;
+            } else {
+                return false;
+            }
+        }
+        while pi < pb.len() && pb[pi] == b'*' {
+            pi += 1;
+        }
+        pi == pb.len()
+    }
+
+    /// Return the total number of patterns (include + exclude).
+    pub fn pattern_count(&self) -> usize {
+        self.include_patterns.len() + self.exclude_patterns.len()
+    }
+}
+
+impl Default for PathMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathCanonicalizer – intelligently resolve . and .. segments
+// ---------------------------------------------------------------------------
+
+/// Resolve `.` and `..` segments without touching the filesystem.
+pub struct PathCanonicalizer;
+
+impl PathCanonicalizer {
+    /// Canonicalize a path by resolving `.` and `..` while preserving
+    /// leading `..` segments for relative paths.
+    pub fn canonicalize(path: &str) -> String {
+        let is_abs = is_absolute(path);
+        let fwd = to_forward_slashes(path);
+        let parts: Vec<&str> = fwd.split('/').filter(|s| !s.is_empty()).collect();
+        let mut stack: Vec<&str> = Vec::new();
+        for part in &parts {
+            match *part {
+                "." => {}
+                ".." => {
+                    if !stack.is_empty() && *stack.last().unwrap() != ".." {
+                        stack.pop();
+                    } else if !is_abs {
+                        stack.push("..");
+                    }
+                }
+                other => stack.push(other),
+            }
+        }
+        let joined = stack.join("/");
+        if is_abs {
+            format!("/{joined}")
+        } else if joined.is_empty() {
+            ".".to_string()
+        } else {
+            joined
+        }
+    }
+
+    /// Return the canonical depth (number of segments after resolution).
+    pub fn canonical_depth(path: &str) -> usize {
+        let c = Self::canonicalize(path);
+        c.split('/').filter(|s| !s.is_empty() && *s != ".").count()
+    }
+
+    /// Check if the path escapes its root (has unresolvable `..` at the front).
+    pub fn escapes_root(path: &str) -> bool {
+        let c = Self::canonicalize(path);
+        c.starts_with("../") || c == ".."
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathComponents – iteration and reconstruction extensions
+// ---------------------------------------------------------------------------
+
+impl PathComponents {
+    /// Iterate over all segments (dir parts + filename) as string slices.
+    pub fn segments(&self) -> Vec<&str> {
+        let mut segs: Vec<&str> = self.dir_parts.iter().map(|s| s.as_str()).collect();
+        let filename = self.filename();
+        if !filename.is_empty() {
+            // We can't return a reference to a temporary, so this method
+            // returns owned segments below via `segments_owned`.
+            segs.push(""); // placeholder
+        }
+        // Since we need to include the filename, use segments_owned instead
+        // for a complete view. This returns dir parts only.
+        self.dir_parts.iter().map(|s| s.as_str()).collect()
+    }
+
+    /// Return owned copies of every segment (dir parts + filename).
+    pub fn segments_owned(&self) -> Vec<String> {
+        let mut segs = self.dir_parts.clone();
+        let fname = self.filename();
+        if !fname.is_empty() {
+            segs.push(fname);
+        }
+        segs
+    }
+
+    /// Return the full filename (stem + extension).
+    pub fn filename(&self) -> String {
+        format!("{}{}", self.stem, self.extension)
+    }
+
+    /// Create a new `PathComponents` with only the first `n` directory parts.
+    pub fn truncate_dir(&self, n: usize) -> Self {
+        Self {
+            root: self.root.clone(),
+            dir_parts: self.dir_parts.iter().take(n).cloned().collect(),
+            stem: self.stem.clone(),
+            extension: self.extension.clone(),
+        }
+    }
+
+    /// Create a new `PathComponents` with an additional directory part appended.
+    pub fn push_dir(&self, part: impl Into<String>) -> Self {
+        let mut dp = self.dir_parts.clone();
+        dp.push(part.into());
+        Self {
+            root: self.root.clone(),
+            dir_parts: dp,
+            stem: self.stem.clone(),
+            extension: self.extension.clone(),
+        }
+    }
+
+    /// Return true if the path has a non-empty extension.
+    pub fn has_extension(&self) -> bool {
+        !self.extension.is_empty()
+    }
+
+    /// Return the extension without the leading dot, or `None`.
+    pub fn extension_without_dot(&self) -> Option<&str> {
+        if self.extension.starts_with('.') {
+            Some(&self.extension[1..])
+        } else if self.extension.is_empty() {
+            None
+        } else {
+            Some(&self.extension)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1325,5 +1676,134 @@ mod tests {
         assert!(is_relative("a/b/c"));
         assert!(is_relative("file.txt"));
         assert!(!is_relative("/absolute/path"));
+    }
+
+    // -- PathTemplate tests ------------------------------------------------
+
+    #[test]
+    fn path_template_expand_basic() {
+        let mut tpl = PathTemplate::new("${workspace}/src/${file}.rs");
+        tpl.set("workspace", "/home/user/project");
+        tpl.set("file", "main");
+        assert_eq!(tpl.expand(), "/home/user/project/src/main.rs");
+    }
+
+    #[test]
+    fn path_template_missing_variable_left_as_is() {
+        let tpl = PathTemplate::new("${base}/${name}.txt");
+        assert!(tpl.expand().contains("${base}"));
+        assert!(!tpl.is_complete());
+        assert_eq!(tpl.missing_variables(), vec!["base", "name"]);
+    }
+
+    #[test]
+    fn path_template_referenced_variables() {
+        let tpl = PathTemplate::new("${a}/${b}/${a}");
+        let vars = tpl.referenced_variables();
+        assert_eq!(vars, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn path_template_is_complete() {
+        let mut tpl = PathTemplate::new("${x}/${y}");
+        assert!(!tpl.is_complete());
+        tpl.set("x", "1");
+        assert!(!tpl.is_complete());
+        tpl.set("y", "2");
+        assert!(tpl.is_complete());
+    }
+
+    #[test]
+    fn path_template_display() {
+        let mut tpl = PathTemplate::new("${dir}/file.txt");
+        tpl.set("dir", "output");
+        assert_eq!(format!("{tpl}"), "output/file.txt");
+    }
+
+    // -- PathMatcher tests -------------------------------------------------
+
+    #[test]
+    fn path_matcher_include_only() {
+        let mut m = PathMatcher::new();
+        m.include("*.rs");
+        assert!(m.matches("main.rs"));
+        assert!(!m.matches("main.py"));
+    }
+
+    #[test]
+    fn path_matcher_exclude() {
+        let mut m = PathMatcher::new();
+        m.include("*").exclude("*.log");
+        assert!(m.matches("app.rs"));
+        assert!(!m.matches("debug.log"));
+    }
+
+    #[test]
+    fn path_matcher_doublestar() {
+        let mut m = PathMatcher::new();
+        m.include("src/**/*.rs");
+        assert!(m.matches("src/lib/parser.rs"));
+        assert!(m.matches("src/main.rs"));
+        assert!(!m.matches("tests/test.rs"));
+    }
+
+    #[test]
+    fn path_matcher_no_include_means_all() {
+        let m = PathMatcher::new();
+        assert!(m.matches("anything.txt"));
+    }
+
+    #[test]
+    fn path_matcher_pattern_count() {
+        let mut m = PathMatcher::new();
+        m.include("*.rs").exclude("*.bak");
+        assert_eq!(m.pattern_count(), 2);
+    }
+
+    // -- PathCanonicalizer tests -------------------------------------------
+
+    #[test]
+    fn canonicalizer_resolves_dot_and_dotdot() {
+        assert_eq!(PathCanonicalizer::canonicalize("a/./b/../c"), "a/c");
+        assert_eq!(PathCanonicalizer::canonicalize("/a/b/../c"), "/a/c");
+    }
+
+    #[test]
+    fn canonicalizer_relative_leading_dotdot() {
+        assert_eq!(PathCanonicalizer::canonicalize("../../a"), "../../a");
+        assert!(!PathCanonicalizer::escapes_root("a/b"));
+        assert!(PathCanonicalizer::escapes_root("../a"));
+    }
+
+    #[test]
+    fn canonicalizer_depth() {
+        assert_eq!(PathCanonicalizer::canonical_depth("a/b/c"), 3);
+        assert_eq!(PathCanonicalizer::canonical_depth("a/./b/../c"), 2);
+    }
+
+    // -- PathComponents extension tests ------------------------------------
+
+    #[test]
+    fn path_components_segments_owned() {
+        let pc = PathComponents::parse("src/lib/parser.rs");
+        let segs = pc.segments_owned();
+        assert_eq!(segs, vec!["src", "lib", "parser.rs"]);
+    }
+
+    #[test]
+    fn path_components_filename_and_extension() {
+        let pc = PathComponents::parse("a/b/hello.tar.gz");
+        assert_eq!(pc.filename(), "hello.tar.gz");
+        assert!(pc.has_extension());
+        assert_eq!(pc.extension_without_dot(), Some("gz"));
+    }
+
+    #[test]
+    fn path_components_truncate_and_push() {
+        let pc = PathComponents::parse("a/b/c/file.txt");
+        let truncated = pc.truncate_dir(1);
+        assert_eq!(truncated.dir_parts, vec!["a"]);
+        let pushed = pc.push_dir("d");
+        assert_eq!(pushed.dir_parts.last().unwrap(), "d");
     }
 }

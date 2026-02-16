@@ -801,6 +801,325 @@ pub fn env_path_contains(value: &str, path: &Path) -> bool {
     env_path_list(value).iter().any(|p| p == path)
 }
 
+/// A frozen snapshot of a [`ShellEnvironment`] that can be compared or restored.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnvSnapshot {
+    variables: HashMap<String, String>,
+    timestamp_epoch_ms: u64,
+    label: Option<String>,
+}
+
+impl EnvSnapshot {
+    /// Take a snapshot of the given shell environment.
+    pub fn take(env: &ShellEnvironment, label: Option<&str>) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        Self {
+            variables: env.variables.clone(),
+            timestamp_epoch_ms: now,
+            label: label.map(|s| s.to_string()),
+        }
+    }
+
+    /// Create a snapshot directly from a set of key-value pairs (useful for tests).
+    pub fn from_pairs(pairs: Vec<(&str, &str)>, label: Option<&str>) -> Self {
+        let variables = pairs
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        Self {
+            variables,
+            timestamp_epoch_ms: 0,
+            label: label.map(|s| s.to_string()),
+        }
+    }
+
+    /// Restore this snapshot into a [`ShellEnvironment`], replacing all variables.
+    pub fn restore(&self) -> ShellEnvironment {
+        ShellEnvironment {
+            variables: self.variables.clone(),
+        }
+    }
+
+    /// Return the optional label.
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+
+    /// Return the epoch-millisecond timestamp when the snapshot was taken.
+    pub fn timestamp_ms(&self) -> u64 {
+        self.timestamp_epoch_ms
+    }
+
+    /// Return the number of variables captured.
+    pub fn len(&self) -> usize {
+        self.variables.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+
+    /// Get a variable value from the snapshot.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.variables.get(key).map(|s| s.as_str())
+    }
+}
+
+impl fmt::Display for EnvSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EnvSnapshot({} vars, label={:?})",
+            self.variables.len(),
+            self.label
+        )
+    }
+}
+
+/// Represents the difference between two environment states.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnvDiff {
+    /// Variables added (present in `after` but not `before`).
+    pub added: HashMap<String, String>,
+    /// Variables removed (present in `before` but not `after`).
+    pub removed: HashMap<String, String>,
+    /// Variables whose values changed: key → (old_value, new_value).
+    pub changed: HashMap<String, (String, String)>,
+}
+
+impl EnvDiff {
+    /// Compute the diff between two snapshots.
+    pub fn between(before: &EnvSnapshot, after: &EnvSnapshot) -> Self {
+        let mut added = HashMap::new();
+        let mut removed = HashMap::new();
+        let mut changed = HashMap::new();
+
+        for (k, v) in &after.variables {
+            match before.variables.get(k) {
+                None => {
+                    added.insert(k.clone(), v.clone());
+                }
+                Some(old_v) if old_v != v => {
+                    changed.insert(k.clone(), (old_v.clone(), v.clone()));
+                }
+                _ => {}
+            }
+        }
+        for (k, v) in &before.variables {
+            if !after.variables.contains_key(k) {
+                removed.insert(k.clone(), v.clone());
+            }
+        }
+
+        Self { added, removed, changed }
+    }
+
+    /// Whether no differences exist.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.changed.is_empty()
+    }
+
+    /// Total number of individual changes (additions + removals + modifications).
+    pub fn total_changes(&self) -> usize {
+        self.added.len() + self.removed.len() + self.changed.len()
+    }
+
+    /// Return all affected variable names.
+    pub fn affected_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self
+            .added
+            .keys()
+            .chain(self.removed.keys())
+            .chain(self.changed.keys())
+            .map(|s| s.as_str())
+            .collect();
+        keys.sort();
+        keys.dedup();
+        keys
+    }
+}
+
+impl fmt::Display for EnvDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EnvDiff(+{} -{} ~{})",
+            self.added.len(),
+            self.removed.len(),
+            self.changed.len()
+        )
+    }
+}
+
+/// Manages a PATH-style environment variable, providing typed operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnvPathManager {
+    entries: Vec<PathBuf>,
+}
+
+impl EnvPathManager {
+    /// Create an empty path manager.
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Parse from a PATH-style string.
+    pub fn from_path_string(value: &str) -> Self {
+        Self {
+            entries: env_path_list(value),
+        }
+    }
+
+    /// Prepend a path, removing any existing duplicate.
+    pub fn prepend(&mut self, path: impl Into<PathBuf>) {
+        let path = path.into();
+        self.entries.retain(|p| p != &path);
+        self.entries.insert(0, path);
+    }
+
+    /// Append a path, removing any existing duplicate.
+    pub fn append(&mut self, path: impl Into<PathBuf>) {
+        let path = path.into();
+        self.entries.retain(|p| p != &path);
+        self.entries.push(path);
+    }
+
+    /// Remove a path. Returns true if it was present.
+    pub fn remove(&mut self, path: &Path) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|p| p != path);
+        self.entries.len() < before
+    }
+
+    /// Check whether a path is contained in the list.
+    pub fn contains(&self, path: &Path) -> bool {
+        self.entries.iter().any(|p| p == path)
+    }
+
+    /// Return the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the path list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the entries as a slice.
+    pub fn entries(&self) -> &[PathBuf] {
+        &self.entries
+    }
+
+    /// Serialize back to a PATH-style string.
+    pub fn to_path_string(&self) -> String {
+        env_path_join(&self.entries)
+    }
+
+    /// Remove entries that do not exist on disk.
+    pub fn remove_nonexistent(&mut self) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|p| p.exists());
+        before - self.entries.len()
+    }
+
+    /// Deduplicate entries, keeping the first occurrence of each path.
+    pub fn dedup(&mut self) {
+        let mut seen = Vec::new();
+        self.entries.retain(|p| {
+            if seen.contains(p) {
+                false
+            } else {
+                seen.push(p.clone());
+                true
+            }
+        });
+    }
+}
+
+impl Default for EnvPathManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for EnvPathManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EnvPathManager({} entries)", self.entries.len())
+    }
+}
+
+/// A named collection of environment variable overrides that can be applied together.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnvProfile {
+    name: String,
+    overrides: HashMap<String, Option<String>>,
+}
+
+impl EnvProfile {
+    /// Create a new empty profile with the given name.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            overrides: HashMap::new(),
+        }
+    }
+
+    /// Set a variable in this profile.
+    pub fn set_var(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.overrides.insert(key.into(), Some(value.into()));
+    }
+
+    /// Mark a variable for removal in this profile.
+    pub fn unset_var(&mut self, key: impl Into<String>) {
+        self.overrides.insert(key.into(), None);
+    }
+
+    /// Return the profile name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the number of overrides.
+    pub fn len(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Whether the profile has no overrides.
+    pub fn is_empty(&self) -> bool {
+        self.overrides.is_empty()
+    }
+
+    /// Apply this profile to a [`ShellEnvironment`].
+    pub fn apply_to(&self, env: &mut ShellEnvironment) {
+        for (key, value) in &self.overrides {
+            match value {
+                Some(v) => env.set(key.clone(), v.clone()),
+                None => {
+                    env.remove(key);
+                }
+            }
+        }
+    }
+
+    /// Return all keys that this profile would modify.
+    pub fn affected_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.overrides.keys().map(|s| s.as_str()).collect();
+        keys.sort();
+        keys
+    }
+}
+
+impl fmt::Display for EnvProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EnvProfile({}, {} overrides)", self.name, self.overrides.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1281,5 +1600,115 @@ mod tests {
     fn shell_environment_capture() {
         let env = ShellEnvironment::capture();
         assert!(!env.is_empty());
+    }
+
+    #[test]
+    fn env_snapshot_take_and_restore() {
+        let mut env = ShellEnvironment::new();
+        env.set("X", "1");
+        env.set("Y", "2");
+        let snap = EnvSnapshot::take(&env, Some("before-change"));
+        assert_eq!(snap.label(), Some("before-change"));
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.get("X"), Some("1"));
+
+        env.set("X", "changed");
+        env.remove("Y");
+        env.set("Z", "3");
+
+        let restored = snap.restore();
+        assert_eq!(restored.get("X"), Some("1"));
+        assert_eq!(restored.get("Y"), Some("2"));
+        assert_eq!(restored.get("Z"), None);
+    }
+
+    #[test]
+    fn env_diff_detects_all_change_types() {
+        let before = EnvSnapshot::from_pairs(
+            vec![("A", "1"), ("B", "2"), ("C", "3")],
+            None,
+        );
+        let after = EnvSnapshot::from_pairs(
+            vec![("A", "1"), ("B", "changed"), ("D", "4")],
+            None,
+        );
+        let diff = EnvDiff::between(&before, &after);
+
+        assert!(diff.added.contains_key("D"));
+        assert_eq!(diff.added["D"], "4");
+        assert!(diff.removed.contains_key("C"));
+        assert_eq!(diff.removed["C"], "3");
+        assert!(diff.changed.contains_key("B"));
+        assert_eq!(diff.changed["B"], ("2".to_string(), "changed".to_string()));
+        assert!(!diff.is_empty());
+        assert_eq!(diff.total_changes(), 3);
+
+        let keys = diff.affected_keys();
+        assert!(keys.contains(&"B"));
+        assert!(keys.contains(&"C"));
+        assert!(keys.contains(&"D"));
+    }
+
+    #[test]
+    fn env_diff_identical_snapshots_is_empty() {
+        let snap = EnvSnapshot::from_pairs(vec![("A", "1")], None);
+        let diff = EnvDiff::between(&snap, &snap);
+        assert!(diff.is_empty());
+        assert_eq!(diff.total_changes(), 0);
+        assert_eq!(format!("{diff}"), "EnvDiff(+0 -0 ~0)");
+    }
+
+    #[test]
+    fn env_path_manager_prepend_append_remove() {
+        let mut mgr = EnvPathManager::new();
+        assert!(mgr.is_empty());
+
+        mgr.append("/usr/bin");
+        mgr.append("/bin");
+        mgr.prepend("/usr/local/bin");
+        assert_eq!(mgr.len(), 3);
+        assert_eq!(mgr.entries()[0], PathBuf::from("/usr/local/bin"));
+        assert_eq!(mgr.entries()[2], PathBuf::from("/bin"));
+
+        // Prepending an existing entry moves it to front
+        mgr.prepend("/bin");
+        assert_eq!(mgr.len(), 3);
+        assert_eq!(mgr.entries()[0], PathBuf::from("/bin"));
+
+        assert!(mgr.contains(Path::new("/usr/bin")));
+        assert!(mgr.remove(Path::new("/usr/bin")));
+        assert!(!mgr.contains(Path::new("/usr/bin")));
+        assert_eq!(mgr.len(), 2);
+
+        let s = mgr.to_path_string();
+        assert!(s.contains("/bin"));
+    }
+
+    #[test]
+    fn env_profile_apply_sets_and_unsets() {
+        let mut profile = EnvProfile::new("test-profile");
+        assert_eq!(profile.name(), "test-profile");
+        assert!(profile.is_empty());
+
+        profile.set_var("NEW_VAR", "value");
+        profile.set_var("OVERRIDE", "new");
+        profile.unset_var("REMOVE_ME");
+        assert_eq!(profile.len(), 3);
+
+        let mut env = ShellEnvironment::from_pairs(vec![
+            ("OVERRIDE", "old"),
+            ("REMOVE_ME", "gone"),
+            ("KEEP", "yes"),
+        ]);
+        profile.apply_to(&mut env);
+
+        assert_eq!(env.get("NEW_VAR"), Some("value"));
+        assert_eq!(env.get("OVERRIDE"), Some("new"));
+        assert_eq!(env.get("REMOVE_ME"), None);
+        assert_eq!(env.get("KEEP"), Some("yes"));
+
+        let keys = profile.affected_keys();
+        assert_eq!(keys.len(), 3);
+        assert!(keys.contains(&"NEW_VAR"));
     }
 }

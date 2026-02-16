@@ -663,6 +663,252 @@ impl Default for WbLayoutValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LayoutConstraints
+// ---------------------------------------------------------------------------
+
+/// Minimum and maximum size constraints for a workbench part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LayoutConstraints {
+    pub min_width: u16,
+    pub min_height: u16,
+    pub max_width: Option<u16>,
+    pub max_height: Option<u16>,
+}
+
+impl LayoutConstraints {
+    /// Create constraints with only minimums.
+    pub fn new(min_width: u16, min_height: u16) -> Self {
+        Self {
+            min_width,
+            min_height,
+            max_width: None,
+            max_height: None,
+        }
+    }
+
+    /// Set the maximum width.
+    pub fn with_max_width(mut self, w: u16) -> Self {
+        self.max_width = Some(w);
+        self
+    }
+
+    /// Set the maximum height.
+    pub fn with_max_height(mut self, h: u16) -> Self {
+        self.max_height = Some(h);
+        self
+    }
+
+    /// Clamp a width value to these constraints.
+    pub fn clamp_width(&self, w: u16) -> u16 {
+        let w = w.max(self.min_width);
+        match self.max_width {
+            Some(max) => w.min(max),
+            None => w,
+        }
+    }
+
+    /// Clamp a height value to these constraints.
+    pub fn clamp_height(&self, h: u16) -> u16 {
+        let h = h.max(self.min_height);
+        match self.max_height {
+            Some(max) => h.min(max),
+            None => h,
+        }
+    }
+
+    /// Check if a given width/height pair satisfies these constraints.
+    pub fn satisfies(&self, width: u16, height: u16) -> bool {
+        width >= self.min_width
+            && height >= self.min_height
+            && self.max_width.map_or(true, |m| width <= m)
+            && self.max_height.map_or(true, |m| height <= m)
+    }
+
+    /// Merge two constraints, taking the tighter bound for each field.
+    pub fn merge(&self, other: &LayoutConstraints) -> LayoutConstraints {
+        LayoutConstraints {
+            min_width: self.min_width.max(other.min_width),
+            min_height: self.min_height.max(other.min_height),
+            max_width: match (self.max_width, other.max_width) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            },
+            max_height: match (self.max_height, other.max_height) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            },
+        }
+    }
+}
+
+impl Default for LayoutConstraints {
+    fn default() -> Self {
+        Self::new(0, 0)
+    }
+}
+
+impl fmt::Display for LayoutConstraints {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}x{} .. {}x{}",
+            self.min_width,
+            self.min_height,
+            self.max_width.map_or("∞".to_string(), |v| v.to_string()),
+            self.max_height.map_or("∞".to_string(), |v| v.to_string()),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutSnapshot
+// ---------------------------------------------------------------------------
+
+/// A serializable snapshot of the entire workbench layout.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutSnapshot {
+    pub state: LayoutState,
+    pub constraints: HashMap<Part, LayoutConstraints>,
+    pub timestamp: u64,
+    pub label: Option<String>,
+}
+
+impl LayoutSnapshot {
+    /// Capture a snapshot from a [`WorkbenchLayout`] and optional constraints.
+    pub fn capture(
+        layout: &WorkbenchLayout,
+        constraints: &HashMap<Part, LayoutConstraints>,
+        timestamp: u64,
+    ) -> Self {
+        Self {
+            state: layout_serialize(layout),
+            constraints: constraints.clone(),
+            timestamp,
+            label: None,
+        }
+    }
+
+    /// Attach a human-readable label to this snapshot.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// Restore the layout from this snapshot.
+    pub fn restore(&self) -> WorkbenchLayout {
+        layout_deserialize(&self.state)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutDiff
+// ---------------------------------------------------------------------------
+
+/// A single field-level change between two layout states.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutChange {
+    pub field: String,
+    pub old_value: String,
+    pub new_value: String,
+}
+
+/// Diff between two layout snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutDiff {
+    pub changes: Vec<LayoutChange>,
+}
+
+impl LayoutDiff {
+    /// Compute the diff between two [`LayoutState`] values.
+    pub fn diff(old: &LayoutState, new: &LayoutState) -> Self {
+        let mut changes = Vec::new();
+        if old.sidebar_width != new.sidebar_width {
+            changes.push(LayoutChange {
+                field: "sidebar_width".into(),
+                old_value: old.sidebar_width.to_string(),
+                new_value: new.sidebar_width.to_string(),
+            });
+        }
+        if old.panel_height != new.panel_height {
+            changes.push(LayoutChange {
+                field: "panel_height".into(),
+                old_value: old.panel_height.to_string(),
+                new_value: new.panel_height.to_string(),
+            });
+        }
+        if old.sidebar_visible != new.sidebar_visible {
+            changes.push(LayoutChange {
+                field: "sidebar_visible".into(),
+                old_value: old.sidebar_visible.to_string(),
+                new_value: new.sidebar_visible.to_string(),
+            });
+        }
+        if old.panel_visible != new.panel_visible {
+            changes.push(LayoutChange {
+                field: "panel_visible".into(),
+                old_value: old.panel_visible.to_string(),
+                new_value: new.panel_visible.to_string(),
+            });
+        }
+        if old.menubar_visible != new.menubar_visible {
+            changes.push(LayoutChange {
+                field: "menubar_visible".into(),
+                old_value: old.menubar_visible.to_string(),
+                new_value: new.menubar_visible.to_string(),
+            });
+        }
+        if old.activity_bar_visible != new.activity_bar_visible {
+            changes.push(LayoutChange {
+                field: "activity_bar_visible".into(),
+                old_value: old.activity_bar_visible.to_string(),
+                new_value: new.activity_bar_visible.to_string(),
+            });
+        }
+        Self { changes }
+    }
+
+    /// Returns true if the two states are identical.
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Number of fields that changed.
+    pub fn change_count(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Check if a specific field changed.
+    pub fn has_change(&self, field: &str) -> bool {
+        self.changes.iter().any(|c| c.field == field)
+    }
+
+    /// Get the change record for a specific field.
+    pub fn get_change(&self, field: &str) -> Option<&LayoutChange> {
+        self.changes.iter().find(|c| c.field == field)
+    }
+
+    /// List all field names that changed.
+    pub fn changed_fields(&self) -> Vec<&str> {
+        self.changes.iter().map(|c| c.field.as_str()).collect()
+    }
+}
+
+impl fmt::Display for LayoutDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            return write!(f, "(no changes)");
+        }
+        for (i, c) in self.changes.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {} -> {}", c.field, c.old_value, c.new_value)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1303,5 +1549,72 @@ mod tests {
     fn wb_layout_is_ascii_printable() {
         assert!(WbLayoutValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbLayoutValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ── LayoutConstraints tests ──
+
+    #[test]
+    fn layout_constraints_clamp_width() {
+        let c = LayoutConstraints::new(10, 5).with_max_width(100);
+        assert_eq!(c.clamp_width(0), 10);
+        assert_eq!(c.clamp_width(50), 50);
+        assert_eq!(c.clamp_width(200), 100);
+    }
+
+    #[test]
+    fn layout_constraints_satisfies() {
+        let c = LayoutConstraints::new(10, 10).with_max_width(100).with_max_height(80);
+        assert!(c.satisfies(50, 50));
+        assert!(!c.satisfies(5, 50));
+        assert!(!c.satisfies(50, 5));
+        assert!(!c.satisfies(101, 50));
+        assert!(!c.satisfies(50, 81));
+    }
+
+    #[test]
+    fn layout_constraints_merge() {
+        let a = LayoutConstraints::new(10, 20).with_max_width(200);
+        let b = LayoutConstraints::new(15, 10).with_max_width(150).with_max_height(100);
+        let m = a.merge(&b);
+        assert_eq!(m.min_width, 15);
+        assert_eq!(m.min_height, 20);
+        assert_eq!(m.max_width, Some(150));
+        assert_eq!(m.max_height, Some(100));
+    }
+
+    #[test]
+    fn layout_snapshot_capture_and_restore() {
+        let layout = WorkbenchLayout::new();
+        let constraints = HashMap::new();
+        let snap = LayoutSnapshot::capture(&layout, &constraints, 42);
+        assert_eq!(snap.timestamp, 42);
+        let restored = snap.restore();
+        assert_eq!(restored.get_sidebar_width(), layout.get_sidebar_width());
+        assert_eq!(restored.get_panel_height(), layout.get_panel_height());
+    }
+
+    #[test]
+    fn layout_diff_detects_changes() {
+        let mut layout = WorkbenchLayout::new();
+        let old_state = layout_serialize(&layout);
+        layout.set_sidebar_width(300);
+        layout.set_part_visible(Part::Panel, false);
+        let new_state = layout_serialize(&layout);
+        let diff = LayoutDiff::diff(&old_state, &new_state);
+        assert!(!diff.is_empty());
+        assert!(diff.has_change("sidebar_width"));
+        assert!(diff.has_change("panel_visible"));
+        assert!(!diff.has_change("menubar_visible"));
+        assert_eq!(diff.change_count(), 2);
+    }
+
+    #[test]
+    fn layout_diff_identical_is_empty() {
+        let layout = WorkbenchLayout::new();
+        let state = layout_serialize(&layout);
+        let diff = LayoutDiff::diff(&state, &state);
+        assert!(diff.is_empty());
+        assert_eq!(diff.change_count(), 0);
+        assert_eq!(format!("{}", diff), "(no changes)");
     }
 }

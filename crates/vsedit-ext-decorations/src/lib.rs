@@ -756,6 +756,204 @@ impl fmt::Display for TextEditorDecorationType {
     }
 }
 
+// ── DecorationPriority ──
+
+/// Priority ordering for overlapping decorations. Higher values take precedence.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DecorationPriority {
+    pub priority: i32,
+    pub key: String,
+}
+
+impl DecorationPriority {
+    pub fn new(key: impl Into<String>, priority: i32) -> Self {
+        Self { priority, key: key.into() }
+    }
+}
+
+impl fmt::Display for DecorationPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(priority={})", self.key, self.priority)
+    }
+}
+
+/// Registry of decoration priorities for resolving overlaps.
+#[derive(Debug, Clone, Default)]
+pub struct DecorationPriorityRegistry {
+    entries: Vec<DecorationPriority>,
+}
+
+impl DecorationPriorityRegistry {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn register(&mut self, key: impl Into<String>, priority: i32) {
+        let key = key.into();
+        if let Some(existing) = self.entries.iter_mut().find(|e| e.key == key) {
+            existing.priority = priority;
+        } else {
+            self.entries.push(DecorationPriority::new(key, priority));
+        }
+    }
+
+    /// Returns keys sorted by priority (highest first).
+    pub fn sorted_keys(&self) -> Vec<String> {
+        let mut sorted = self.entries.clone();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted.into_iter().map(|e| e.key).collect()
+    }
+
+    pub fn get_priority(&self, key: &str) -> Option<i32> {
+        self.entries.iter().find(|e| e.key == key).map(|e| e.priority)
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ── DecorationMerger ──
+
+/// Merge overlapping decoration ranges of the same type.
+pub struct DecorationMerger;
+
+impl DecorationMerger {
+    /// Merge a list of `DecorationOptions` by combining overlapping ranges.
+    /// Assumes all ranges are on the same URI and same decoration type.
+    pub fn merge(mut ranges: Vec<DecorationOptions>) -> Vec<DecorationOptions> {
+        if ranges.len() <= 1 {
+            return ranges;
+        }
+        ranges.sort_by(|a, b| {
+            a.start_line.cmp(&b.start_line)
+                .then(a.start_character.cmp(&b.start_character))
+        });
+        let mut merged: Vec<DecorationOptions> = Vec::new();
+        for r in ranges {
+            if let Some(last) = merged.last_mut() {
+                if r.start_line < last.end_line
+                    || (r.start_line == last.end_line && r.start_character <= last.end_character)
+                {
+                    // Extend the current range
+                    if r.end_line > last.end_line
+                        || (r.end_line == last.end_line && r.end_character > last.end_character)
+                    {
+                        last.end_line = r.end_line;
+                        last.end_character = r.end_character;
+                    }
+                    // Merge hover messages
+                    if last.hover_message.is_none() {
+                        last.hover_message = r.hover_message;
+                    }
+                    continue;
+                }
+            }
+            merged.push(r);
+        }
+        merged
+    }
+}
+
+// ── DecorationAnimator ──
+
+/// Animate decoration transitions between two states.
+#[derive(Debug, Clone)]
+pub struct DecorationAnimator {
+    pub from_color: Option<String>,
+    pub to_color: Option<String>,
+    pub steps: u32,
+}
+
+impl DecorationAnimator {
+    pub fn new(steps: u32) -> Self {
+        Self {
+            from_color: None,
+            to_color: None,
+            steps: steps.max(1),
+        }
+    }
+
+    pub fn from_color(mut self, color: impl Into<String>) -> Self {
+        self.from_color = Some(color.into());
+        self
+    }
+
+    pub fn to_color(mut self, color: impl Into<String>) -> Self {
+        self.to_color = Some(color.into());
+        self
+    }
+
+    /// Generate intermediate render options for each animation step.
+    /// Returns `steps` render options interpolating between from and to.
+    pub fn generate_steps(&self) -> Vec<DecorationRenderOptions> {
+        (0..self.steps)
+            .map(|i| {
+                let progress = if self.steps <= 1 { 1.0 } else { i as f64 / (self.steps - 1) as f64 };
+                let bg = if progress < 0.5 {
+                    self.from_color.clone()
+                } else {
+                    self.to_color.clone()
+                };
+                DecorationRenderOptions {
+                    background_color: bg,
+                    border: None,
+                    color: None,
+                    font_style: None,
+                    font_weight: None,
+                    is_whole_line: false,
+                }
+            })
+            .collect()
+    }
+
+    /// Returns the number of animation steps.
+    pub fn step_count(&self) -> u32 {
+        self.steps
+    }
+}
+
+// ── Batch operations on DecorationBridge ──
+
+impl DecorationBridge {
+    /// Register multiple decoration types at once.
+    pub fn register_types_batch(&mut self, types: Vec<(&str, DecorationRenderOptions)>) -> usize {
+        let mut count = 0;
+        for (key, options) in types {
+            if !self.has_type(key) {
+                self.register_type(key, options);
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Unregister multiple decoration types at once.
+    pub fn unregister_types_batch(&mut self, keys: &[&str]) -> usize {
+        let before = self.type_count();
+        for key in keys {
+            self.unregister_type(key);
+        }
+        before - self.type_count()
+    }
+
+    /// Clear all decorations for multiple URIs at once.
+    pub fn clear_uris_batch(&mut self, uris: &[&str]) {
+        for uri in uris {
+            self.clear_uri(uri);
+        }
+    }
+
+    /// Returns all registered type keys.
+    pub fn type_keys(&self) -> Vec<&str> {
+        self.types.iter().map(|t| t.key.as_str()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1321,5 +1519,114 @@ mod tests {
         bridge2.register_type("a", RenderOptionsBuilder::new().build());
         bridge2.register_type("b", RenderOptionsBuilder::new().build());
         assert_eq!(format!("{bridge2}"), "2 decoration types");
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn priority_registry_sorted() {
+        let mut reg = DecorationPriorityRegistry::new();
+        reg.register("error", 100);
+        reg.register("warning", 50);
+        reg.register("info", 10);
+        let keys = reg.sorted_keys();
+        assert_eq!(keys, vec!["error", "warning", "info"]);
+        assert_eq!(reg.get_priority("error"), Some(100));
+        assert_eq!(reg.len(), 3);
+    }
+
+    #[test]
+    fn priority_registry_update() {
+        let mut reg = DecorationPriorityRegistry::new();
+        reg.register("err", 10);
+        reg.register("err", 99);
+        assert_eq!(reg.len(), 1);
+        assert_eq!(reg.get_priority("err"), Some(99));
+    }
+
+    #[test]
+    fn merger_non_overlapping() {
+        let ranges = vec![
+            DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 5, hover_message: None },
+            DecorationOptions { start_line: 3, start_character: 0, end_line: 3, end_character: 5, hover_message: None },
+        ];
+        let merged = DecorationMerger::merge(ranges);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merger_overlapping() {
+        let ranges = vec![
+            DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 10, hover_message: None },
+            DecorationOptions { start_line: 1, start_character: 5, end_line: 1, end_character: 15, hover_message: None },
+            DecorationOptions { start_line: 1, start_character: 12, end_line: 2, end_character: 3, hover_message: None },
+        ];
+        let merged = DecorationMerger::merge(ranges);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_line, 1);
+        assert_eq!(merged[0].end_line, 2);
+        assert_eq!(merged[0].end_character, 3);
+    }
+
+    #[test]
+    fn animator_generate_steps() {
+        let animator = DecorationAnimator::new(4)
+            .from_color("red")
+            .to_color("blue");
+        let steps = animator.generate_steps();
+        assert_eq!(steps.len(), 4);
+        assert_eq!(steps[0].background_color, Some("red".into()));
+        assert_eq!(steps[3].background_color, Some("blue".into()));
+        assert_eq!(animator.step_count(), 4);
+    }
+
+    #[test]
+    fn animator_single_step() {
+        let animator = DecorationAnimator::new(1).to_color("green");
+        let steps = animator.generate_steps();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].background_color, Some("green".into()));
+    }
+
+    #[test]
+    fn bridge_batch_register() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().build();
+        let count = bridge.register_types_batch(vec![
+            ("a", opts.clone()),
+            ("b", opts.clone()),
+            ("c", opts),
+        ]);
+        assert_eq!(count, 3);
+        assert_eq!(bridge.type_count(), 3);
+        let keys = bridge.type_keys();
+        assert!(keys.contains(&"a"));
+        assert!(keys.contains(&"b"));
+    }
+
+    #[test]
+    fn bridge_batch_unregister() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().build();
+        bridge.register_type("a", opts.clone());
+        bridge.register_type("b", opts.clone());
+        bridge.register_type("c", opts);
+        let removed = bridge.unregister_types_batch(&["a", "c"]);
+        assert_eq!(removed, 2);
+        assert_eq!(bridge.type_count(), 1);
+        assert!(bridge.has_type("b"));
+    }
+
+    #[test]
+    fn bridge_clear_uris_batch() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().build();
+        bridge.register_type("hl", opts);
+        let r = DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 5, hover_message: None };
+        bridge.set_decorations("hl", "file:///a.rs", vec![r.clone()]);
+        bridge.set_decorations("hl", "file:///b.rs", vec![r]);
+        assert_eq!(bridge.applied_count(), 2);
+        bridge.clear_uris_batch(&["file:///a.rs", "file:///b.rs"]);
+        assert_eq!(bridge.applied_count(), 0);
     }
 }

@@ -756,6 +756,298 @@ impl fmt::Display for RemoteIndicator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RemoteConnectionPool — managing multiple connections
+// ---------------------------------------------------------------------------
+
+/// A managed connection with health monitoring and retry state.
+#[derive(Debug, Clone)]
+pub struct ManagedConnection {
+    pub name: String,
+    pub authority: RemoteAuthority,
+    pub state: ConnectionState,
+    pub retry_count: u32,
+    pub last_health_check_ms: Option<u64>,
+    pub healthy: bool,
+}
+
+impl ManagedConnection {
+    pub fn new(name: impl Into<String>, authority: RemoteAuthority) -> Self {
+        Self {
+            name: name.into(),
+            authority,
+            state: ConnectionState::Disconnected,
+            retry_count: 0,
+            last_health_check_ms: None,
+            healthy: false,
+        }
+    }
+
+    /// Whether this connection is currently connected.
+    pub fn is_connected(&self) -> bool {
+        self.state == ConnectionState::Connected
+    }
+
+    /// Whether this connection needs reconnection.
+    pub fn needs_reconnect(&self) -> bool {
+        matches!(self.state, ConnectionState::Error(_) | ConnectionState::Disconnected)
+            && self.healthy
+    }
+
+    /// Record a health check result.
+    pub fn record_health(&mut self, latency_ms: u64, is_healthy: bool) {
+        self.last_health_check_ms = Some(latency_ms);
+        self.healthy = is_healthy;
+    }
+}
+
+impl fmt::Display for ManagedConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ManagedConnection({}, {}, state={})",
+            self.name, self.authority, self.state
+        )
+    }
+}
+
+/// Pool of managed remote connections.
+pub struct RemoteConnectionPool {
+    connections: Vec<ManagedConnection>,
+    max_connections: usize,
+    retry_policy: RetryPolicy,
+}
+
+impl RemoteConnectionPool {
+    pub fn new(max_connections: usize) -> Self {
+        Self {
+            connections: Vec::new(),
+            max_connections,
+            retry_policy: RetryPolicy::default(),
+        }
+    }
+
+    /// Create with a custom retry policy.
+    pub fn with_retry_policy(mut self, policy: RetryPolicy) -> Self {
+        self.retry_policy = policy;
+        self
+    }
+
+    /// Add a new connection to the pool.
+    pub fn add(
+        &mut self,
+        name: impl Into<String>,
+        authority: RemoteAuthority,
+    ) -> Result<(), RemoteError> {
+        if self.connections.len() >= self.max_connections {
+            return Err(RemoteError::Other("connection pool full".into()));
+        }
+        let name = name.into();
+        if self.connections.iter().any(|c| c.name == name) {
+            return Err(RemoteError::Other(format!("connection '{}' already exists", name)));
+        }
+        self.connections.push(ManagedConnection::new(name, authority));
+        Ok(())
+    }
+
+    /// Remove a connection from the pool by name.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.connections.len();
+        self.connections.retain(|c| c.name != name);
+        self.connections.len() < before
+    }
+
+    /// Get a connection by name.
+    pub fn get(&self, name: &str) -> Option<&ManagedConnection> {
+        self.connections.iter().find(|c| c.name == name)
+    }
+
+    /// Get a mutable connection by name.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut ManagedConnection> {
+        self.connections.iter_mut().find(|c| c.name == name)
+    }
+
+    /// Connect a named connection.
+    pub fn connect(&mut self, name: &str) -> Result<(), RemoteError> {
+        let conn = self.connections.iter_mut().find(|c| c.name == name)
+            .ok_or(RemoteError::NotConnected)?;
+        conn.state = ConnectionState::Connected;
+        conn.retry_count = 0;
+        Ok(())
+    }
+
+    /// Disconnect a named connection.
+    pub fn disconnect(&mut self, name: &str) {
+        if let Some(conn) = self.connections.iter_mut().find(|c| c.name == name) {
+            conn.state = ConnectionState::Disconnected;
+        }
+    }
+
+    /// Set a connection to error state and increment retry counter.
+    pub fn set_error(&mut self, name: &str, message: String) {
+        if let Some(conn) = self.connections.iter_mut().find(|c| c.name == name) {
+            conn.state = ConnectionState::Error(message);
+            conn.retry_count += 1;
+        }
+    }
+
+    /// Number of connections in the pool.
+    pub fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    /// Whether the pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.connections.is_empty()
+    }
+
+    /// Number of currently connected connections.
+    pub fn connected_count(&self) -> usize {
+        self.connections.iter().filter(|c| c.is_connected()).count()
+    }
+
+    /// Number of connections in error state.
+    pub fn error_count(&self) -> usize {
+        self.connections.iter().filter(|c| matches!(c.state, ConnectionState::Error(_))).count()
+    }
+
+    /// All connections.
+    pub fn connections(&self) -> &[ManagedConnection] {
+        &self.connections
+    }
+
+    /// Check health for all connections, updating their status.
+    pub fn check_health(&mut self, results: &[(String, u64, bool)]) {
+        for (name, latency, healthy) in results {
+            if let Some(conn) = self.connections.iter_mut().find(|c| &c.name == name) {
+                conn.record_health(*latency, *healthy);
+            }
+        }
+    }
+
+    /// Get the list of connections that need reconnection and are within retry limits.
+    pub fn connections_needing_reconnect(&self) -> Vec<&ManagedConnection> {
+        self.connections.iter().filter(|c| {
+            c.needs_reconnect() && self.retry_policy.should_retry(c.retry_count)
+        }).collect()
+    }
+
+    /// Compute the retry delay for a connection based on its retry count.
+    pub fn retry_delay_for(&self, name: &str) -> Option<u64> {
+        self.connections.iter().find(|c| c.name == name).map(|c| {
+            self.retry_policy.delay_for_attempt(c.retry_count)
+        })
+    }
+
+    /// Disconnect all connections.
+    pub fn disconnect_all(&mut self) {
+        for conn in &mut self.connections {
+            conn.state = ConnectionState::Disconnected;
+        }
+    }
+
+    /// Get a summary of pool status.
+    pub fn summary(&self) -> ConnectionPoolSummary {
+        ConnectionPoolSummary {
+            total: self.connections.len(),
+            connected: self.connected_count(),
+            error: self.error_count(),
+            disconnected: self.connections.iter()
+                .filter(|c| c.state == ConnectionState::Disconnected)
+                .count(),
+        }
+    }
+}
+
+/// Summary of connection pool status.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionPoolSummary {
+    pub total: usize,
+    pub connected: usize,
+    pub error: usize,
+    pub disconnected: usize,
+}
+
+impl fmt::Display for ConnectionPoolSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Pool(total={}, connected={}, error={}, disconnected={})",
+            self.total, self.connected, self.error, self.disconnected
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Reconnection strategy with exponential backoff
+// ---------------------------------------------------------------------------
+
+/// Tracks reconnection attempts and computes backoff delays.
+#[derive(Debug, Clone)]
+pub struct ReconnectionStrategy {
+    pub policy: RetryPolicy,
+    pub current_attempt: u32,
+    pub total_attempts: u32,
+    pub last_delay_ms: u64,
+}
+
+impl ReconnectionStrategy {
+    pub fn new(policy: RetryPolicy) -> Self {
+        Self {
+            policy,
+            current_attempt: 0,
+            total_attempts: 0,
+            last_delay_ms: 0,
+        }
+    }
+
+    /// Record a failed attempt and compute the next delay.
+    /// Returns Some(delay_ms) if another retry is allowed, None if exhausted.
+    pub fn next_delay(&mut self) -> Option<u64> {
+        if !self.policy.should_retry(self.current_attempt) {
+            return None;
+        }
+        let delay = self.policy.delay_for_attempt(self.current_attempt);
+        self.current_attempt += 1;
+        self.total_attempts += 1;
+        self.last_delay_ms = delay;
+        Some(delay)
+    }
+
+    /// Record a successful connection (resets the attempt counter).
+    pub fn record_success(&mut self) {
+        self.current_attempt = 0;
+        self.last_delay_ms = 0;
+    }
+
+    /// Whether another retry is allowed.
+    pub fn can_retry(&self) -> bool {
+        self.policy.should_retry(self.current_attempt)
+    }
+
+    /// Reset to initial state.
+    pub fn reset(&mut self) {
+        self.current_attempt = 0;
+        self.total_attempts = 0;
+        self.last_delay_ms = 0;
+    }
+
+    /// Total number of attempts made (including across resets from success).
+    pub fn total_attempts(&self) -> u32 {
+        self.total_attempts
+    }
+}
+
+impl fmt::Display for ReconnectionStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Reconnection(attempt={}/{}, last_delay={}ms)",
+            self.current_attempt, self.policy.max_retries, self.last_delay_ms
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1290,5 +1582,103 @@ mod tests {
         assert!(auth.is_dev_container());
         let label = remote_label(&auth);
         assert!(label.contains("Dev Container"));
+    }
+
+    // ---- RemoteConnectionPool tests ----
+
+    #[test]
+    fn connection_pool_add_connect() {
+        let mut pool = RemoteConnectionPool::new(5);
+        let auth = RemoteAuthority::parse("ssh+myhost").unwrap();
+        pool.add("dev", auth).unwrap();
+        assert_eq!(pool.len(), 1);
+        assert_eq!(pool.connected_count(), 0);
+
+        pool.connect("dev").unwrap();
+        assert_eq!(pool.connected_count(), 1);
+        assert!(pool.get("dev").unwrap().is_connected());
+    }
+
+    #[test]
+    fn connection_pool_full() {
+        let mut pool = RemoteConnectionPool::new(1);
+        let auth1 = RemoteAuthority::parse("ssh+host1").unwrap();
+        let auth2 = RemoteAuthority::parse("ssh+host2").unwrap();
+        pool.add("a", auth1).unwrap();
+        let err = pool.add("b", auth2).unwrap_err();
+        assert!(matches!(err, RemoteError::Other(_)));
+    }
+
+    #[test]
+    fn connection_pool_error_and_summary() {
+        let mut pool = RemoteConnectionPool::new(3);
+        let auth = RemoteAuthority::parse("ssh+h1").unwrap();
+        pool.add("conn1", auth.clone()).unwrap();
+        pool.add("conn2", auth).unwrap();
+
+        pool.connect("conn1").unwrap();
+        pool.set_error("conn2", "timeout".into());
+
+        let summary = pool.summary();
+        assert_eq!(summary.total, 2);
+        assert_eq!(summary.connected, 1);
+        assert_eq!(summary.error, 1);
+    }
+
+    #[test]
+    fn connection_pool_health_check() {
+        let mut pool = RemoteConnectionPool::new(5);
+        let auth = RemoteAuthority::parse("ssh+h").unwrap();
+        pool.add("test", auth).unwrap();
+
+        pool.check_health(&[("test".to_string(), 50, true)]);
+        let conn = pool.get("test").unwrap();
+        assert!(conn.healthy);
+        assert_eq!(conn.last_health_check_ms, Some(50));
+    }
+
+    // ---- ReconnectionStrategy tests ----
+
+    #[test]
+    fn reconnection_strategy_backoff() {
+        let policy = RetryPolicy {
+            max_retries: 3,
+            initial_delay_ms: 100,
+            max_delay_ms: 10000,
+            backoff_factor: 2.0,
+        };
+        let mut strategy = ReconnectionStrategy::new(policy);
+        let d1 = strategy.next_delay().unwrap();
+        assert_eq!(d1, 100);
+        let d2 = strategy.next_delay().unwrap();
+        assert_eq!(d2, 200);
+        let d3 = strategy.next_delay().unwrap();
+        assert_eq!(d3, 400);
+        assert!(strategy.next_delay().is_none()); // exhausted
+    }
+
+    #[test]
+    fn reconnection_strategy_reset_on_success() {
+        let policy = RetryPolicy::default();
+        let mut strategy = ReconnectionStrategy::new(policy);
+        strategy.next_delay();
+        strategy.next_delay();
+        assert_eq!(strategy.current_attempt, 2);
+        strategy.record_success();
+        assert_eq!(strategy.current_attempt, 0);
+        assert!(strategy.can_retry());
+    }
+
+    #[test]
+    fn connection_pool_disconnect_all() {
+        let mut pool = RemoteConnectionPool::new(5);
+        let auth = RemoteAuthority::parse("ssh+h").unwrap();
+        pool.add("a", auth.clone()).unwrap();
+        pool.add("b", auth).unwrap();
+        pool.connect("a").unwrap();
+        pool.connect("b").unwrap();
+        assert_eq!(pool.connected_count(), 2);
+        pool.disconnect_all();
+        assert_eq!(pool.connected_count(), 0);
     }
 }

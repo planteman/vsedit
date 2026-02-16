@@ -882,6 +882,200 @@ fn snippet_plain_text_elem(elem: &SnippetElement, out: &mut String) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SnippetScope — language-specific snippet filtering
+// ---------------------------------------------------------------------------
+
+/// Associates a snippet with a set of language scopes.
+#[derive(Debug, Clone)]
+pub struct SnippetScope {
+    /// Language identifiers this snippet applies to (e.g., "rust", "python").
+    pub languages: Vec<String>,
+    /// The snippet definition.
+    pub definition: SnippetDefinition,
+}
+
+impl SnippetScope {
+    /// Create a new scoped snippet.
+    pub fn new(definition: SnippetDefinition, languages: Vec<String>) -> Self {
+        Self {
+            languages,
+            definition,
+        }
+    }
+
+    /// Check if this snippet applies to a given language.
+    pub fn applies_to(&self, language: &str) -> bool {
+        self.languages.iter().any(|l| l.eq_ignore_ascii_case(language))
+    }
+
+    /// Check if this snippet applies globally (no language restriction).
+    pub fn is_global(&self) -> bool {
+        self.languages.is_empty()
+    }
+}
+
+/// A registry that supports language-scoped snippets.
+#[derive(Debug, Clone)]
+pub struct ScopedSnippetRegistry {
+    snippets: Vec<SnippetScope>,
+}
+
+impl ScopedSnippetRegistry {
+    /// Create a new empty scoped registry.
+    pub fn new() -> Self {
+        Self {
+            snippets: Vec::new(),
+        }
+    }
+
+    /// Register a scoped snippet.
+    pub fn register(&mut self, scoped: SnippetScope) {
+        self.snippets.push(scoped);
+    }
+
+    /// Find all snippets applicable to a language (includes globals).
+    pub fn find_for_language(&self, language: &str) -> Vec<&SnippetDefinition> {
+        self.snippets
+            .iter()
+            .filter(|s| s.is_global() || s.applies_to(language))
+            .map(|s| &s.definition)
+            .collect()
+    }
+
+    /// Find snippets matching a prefix for a specific language.
+    pub fn find_by_prefix_for_language(&self, prefix: &str, language: &str) -> Vec<&SnippetDefinition> {
+        self.find_for_language(language)
+            .into_iter()
+            .filter(|d| d.prefix.starts_with(prefix))
+            .collect()
+    }
+
+    /// Number of registered scoped snippets.
+    pub fn len(&self) -> usize {
+        self.snippets.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.snippets.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet variable resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve a variable name to its value given a context.
+///
+/// Supports common VS Code snippet variables like TM_FILENAME,
+/// CURRENT_YEAR, CLIPBOARD, etc.
+pub fn resolve_variable(name: &str, vars: &SnippetVariables) -> Option<String> {
+    // First check user-provided variables
+    if let Some(v) = vars.get(name) {
+        return Some(v.to_string());
+    }
+    // Built-in dynamic variables
+    match name {
+        "TM_CURRENT_LINE" => Some(String::new()),
+        "TM_CURRENT_WORD" => Some(String::new()),
+        "TM_LINE_INDEX" => Some("0".to_string()),
+        "TM_LINE_NUMBER" => Some("1".to_string()),
+        "RANDOM" => Some("000000".to_string()),
+        "RANDOM_HEX" => Some("000000".to_string()),
+        "UUID" => Some("00000000-0000-0000-0000-000000000000".to_string()),
+        _ => None,
+    }
+}
+
+/// Resolve all variables in a snippet body string using the provided context.
+pub fn resolve_all_variables(body: &str, vars: &SnippetVariables) -> String {
+    let snippet = parse_snippet(body);
+    expand_snippet(&snippet, vars)
+}
+
+// ---------------------------------------------------------------------------
+// Snippet transformations (case transforms on placeholder defaults)
+// ---------------------------------------------------------------------------
+
+/// A case transformation that can be applied to a placeholder's resolved text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CaseTransform {
+    /// Convert text to uppercase.
+    Uppercase,
+    /// Convert text to lowercase.
+    Lowercase,
+    /// Capitalize the first character.
+    Capitalize,
+    /// Convert to camelCase from snake_case.
+    CamelCase,
+    /// Convert to snake_case from camelCase.
+    SnakeCase,
+}
+
+impl CaseTransform {
+    /// Apply this transformation to a string.
+    pub fn apply(&self, input: &str) -> String {
+        match self {
+            Self::Uppercase => input.to_uppercase(),
+            Self::Lowercase => input.to_lowercase(),
+            Self::Capitalize => {
+                let mut chars = input.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => {
+                        let mut s = c.to_uppercase().to_string();
+                        s.extend(chars);
+                        s
+                    }
+                }
+            }
+            Self::CamelCase => {
+                input
+                    .split('_')
+                    .enumerate()
+                    .map(|(i, part)| {
+                        if i == 0 {
+                            part.to_lowercase()
+                        } else {
+                            let mut chars = part.chars();
+                            match chars.next() {
+                                None => String::new(),
+                                Some(c) => {
+                                    let mut s = c.to_uppercase().to_string();
+                                    for ch in chars {
+                                        s.push(ch.to_lowercase().next().unwrap_or(ch));
+                                    }
+                                    s
+                                }
+                            }
+                        }
+                    })
+                    .collect()
+            }
+            Self::SnakeCase => {
+                let mut result = String::new();
+                for (i, ch) in input.chars().enumerate() {
+                    if ch.is_uppercase() && i > 0 {
+                        result.push('_');
+                    }
+                    result.push(ch.to_lowercase().next().unwrap_or(ch));
+                }
+                result
+            }
+        }
+    }
+}
+
+/// Apply a chain of case transformations in order.
+pub fn apply_case_transforms(input: &str, transforms: &[CaseTransform]) -> String {
+    let mut result = input.to_string();
+    for t in transforms {
+        result = t.apply(&result);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1307,5 +1501,74 @@ mod tests {
         let s = parse_snippet("hello $1 world ${2:default} end");
         let plain = snippet_to_plain_text(&s);
         assert_eq!(plain, "hello  world default end");
+    }
+
+    // -- SnippetScope tests --------------------------------------------------
+
+    #[test]
+    fn snippet_scope_applies_to_language() {
+        let def = SnippetDefinition::new("test", "tst", "hello $1");
+        let scope = SnippetScope::new(def, vec!["rust".into(), "python".into()]);
+        assert!(scope.applies_to("rust"));
+        assert!(scope.applies_to("Rust"));
+        assert!(!scope.applies_to("go"));
+        assert!(!scope.is_global());
+    }
+
+    #[test]
+    fn scoped_registry_filters_by_language() {
+        let mut reg = ScopedSnippetRegistry::new();
+        reg.register(SnippetScope::new(
+            SnippetDefinition::new("rs_fn", "fn", "fn $1() {}"),
+            vec!["rust".into()],
+        ));
+        reg.register(SnippetScope::new(
+            SnippetDefinition::new("py_def", "def", "def $1(): pass"),
+            vec!["python".into()],
+        ));
+        reg.register(SnippetScope::new(
+            SnippetDefinition::new("comment", "//", "// $1"),
+            vec![],
+        ));
+        assert_eq!(reg.find_for_language("rust").len(), 2); // rs_fn + global
+        assert_eq!(reg.find_for_language("python").len(), 2); // py_def + global
+        assert_eq!(reg.find_for_language("go").len(), 1); // global only
+    }
+
+    // -- Snippet transforms --------------------------------------------------
+
+    #[test]
+    fn transform_uppercase_lowercase() {
+        assert_eq!(CaseTransform::Uppercase.apply("hello"), "HELLO");
+        assert_eq!(CaseTransform::Lowercase.apply("HELLO"), "hello");
+        assert_eq!(CaseTransform::Capitalize.apply("hello"), "Hello");
+    }
+
+    #[test]
+    fn transform_camel_and_snake() {
+        assert_eq!(CaseTransform::CamelCase.apply("my_var_name"), "myVarName");
+        assert_eq!(CaseTransform::SnakeCase.apply("myVarName"), "my_var_name");
+    }
+
+    #[test]
+    fn apply_chained_transforms() {
+        let chain = vec![CaseTransform::SnakeCase, CaseTransform::Uppercase];
+        assert_eq!(apply_case_transforms("myVar", &chain), "MY_VAR");
+    }
+
+    // -- Variable resolution -------------------------------------------------
+
+    #[test]
+    fn resolve_variable_builtin() {
+        let vars = SnippetVariables::new();
+        assert_eq!(resolve_variable("TM_LINE_NUMBER", &vars), Some("1".into()));
+        assert!(resolve_variable("NONEXISTENT", &vars).is_none());
+    }
+
+    #[test]
+    fn resolve_variable_user_provided() {
+        let mut vars = SnippetVariables::new();
+        vars.set("MY_VAR", "custom_value");
+        assert_eq!(resolve_variable("MY_VAR", &vars), Some("custom_value".into()));
     }
 }

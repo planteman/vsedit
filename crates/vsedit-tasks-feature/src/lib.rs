@@ -763,6 +763,223 @@ impl Default for TasksFeatureValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Task dependency resolution
+// ---------------------------------------------------------------------------
+
+/// Resolves task execution order based on declared dependencies.
+#[derive(Debug, Clone)]
+pub struct TaskDependencyResolver {
+    /// Map from task name to its dependency names.
+    deps: HashMap<String, Vec<String>>,
+}
+
+impl TaskDependencyResolver {
+    pub fn new() -> Self {
+        Self {
+            deps: HashMap::new(),
+        }
+    }
+
+    /// Declare that `task` depends on `dependency`.
+    pub fn add_dependency(&mut self, task: &str, dependency: &str) {
+        self.deps
+            .entry(task.to_string())
+            .or_default()
+            .push(dependency.to_string());
+    }
+
+    /// Return the direct dependencies for a task.
+    pub fn dependencies_of(&self, task: &str) -> Vec<&str> {
+        self.deps
+            .get(task)
+            .map(|v| v.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Compute a topological execution order. Returns `Err` if a cycle is detected.
+    pub fn resolve_order(&self, tasks: &[&str]) -> Result<Vec<String>, String> {
+        let mut visited: HashMap<String, u8> = HashMap::new(); // 0=unvisited, 1=in-progress, 2=done
+        let mut order = Vec::new();
+
+        for &task in tasks {
+            if visited.get(task).copied().unwrap_or(0) == 0 {
+                self.visit(task, &mut visited, &mut order)?;
+            }
+        }
+        Ok(order)
+    }
+
+    fn visit(
+        &self,
+        task: &str,
+        visited: &mut HashMap<String, u8>,
+        order: &mut Vec<String>,
+    ) -> Result<(), String> {
+        let state = visited.get(task).copied().unwrap_or(0);
+        if state == 2 {
+            return Ok(());
+        }
+        if state == 1 {
+            return Err(format!("cycle detected involving task '{}'", task));
+        }
+        visited.insert(task.to_string(), 1);
+        if let Some(deps) = self.deps.get(task) {
+            for dep in deps {
+                self.visit(dep, visited, order)?;
+            }
+        }
+        visited.insert(task.to_string(), 2);
+        order.push(task.to_string());
+        Ok(())
+    }
+
+    /// Returns `true` if the given task has any dependencies.
+    pub fn has_dependencies(&self, task: &str) -> bool {
+        self.deps.get(task).map_or(false, |v| !v.is_empty())
+    }
+}
+
+impl Default for TaskDependencyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task output parser
+// ---------------------------------------------------------------------------
+
+/// Severity of a parsed output entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputSeverity {
+    Error,
+    Warning,
+    Info,
+}
+
+impl fmt::Display for OutputSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputSeverity::Error => write!(f, "error"),
+            OutputSeverity::Warning => write!(f, "warning"),
+            OutputSeverity::Info => write!(f, "info"),
+        }
+    }
+}
+
+/// A single parsed diagnostic from task output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedDiagnostic {
+    pub severity: OutputSeverity,
+    pub message: String,
+    pub line_number: Option<usize>,
+}
+
+/// Parses task output text and extracts diagnostics.
+pub struct TaskOutputParser;
+
+impl TaskOutputParser {
+    /// Parse output lines looking for error/warning markers.
+    pub fn parse(output: &str) -> Vec<ParsedDiagnostic> {
+        let mut diagnostics = Vec::new();
+        for (idx, line) in output.lines().enumerate() {
+            let lower = line.to_lowercase();
+            let severity = if lower.contains("error") {
+                Some(OutputSeverity::Error)
+            } else if lower.contains("warning") || lower.contains("warn") {
+                Some(OutputSeverity::Warning)
+            } else if lower.contains("info") || lower.contains("note") {
+                Some(OutputSeverity::Info)
+            } else {
+                None
+            };
+            if let Some(sev) = severity {
+                diagnostics.push(ParsedDiagnostic {
+                    severity: sev,
+                    message: line.trim().to_string(),
+                    line_number: Some(idx + 1),
+                });
+            }
+        }
+        diagnostics
+    }
+
+    /// Count errors in output.
+    pub fn error_count(output: &str) -> usize {
+        Self::parse(output)
+            .iter()
+            .filter(|d| d.severity == OutputSeverity::Error)
+            .count()
+    }
+
+    /// Count warnings in output.
+    pub fn warning_count(output: &str) -> usize {
+        Self::parse(output)
+            .iter()
+            .filter(|d| d.severity == OutputSeverity::Warning)
+            .count()
+    }
+
+    /// Returns `true` if the output contains no errors.
+    pub fn is_clean(output: &str) -> bool {
+        Self::error_count(output) == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task template
+// ---------------------------------------------------------------------------
+
+/// A template for creating tasks with variable substitution.
+#[derive(Debug, Clone)]
+pub struct TaskTemplate {
+    pub name_template: String,
+    pub command_template: String,
+    pub group: TaskGroup,
+    pub variables: HashMap<String, String>,
+}
+
+impl TaskTemplate {
+    pub fn new(name: &str, command: &str) -> Self {
+        Self {
+            name_template: name.to_string(),
+            command_template: command.to_string(),
+            group: TaskGroup::None,
+            variables: HashMap::new(),
+        }
+    }
+
+    /// Set a variable value for substitution.
+    pub fn set_var(&mut self, key: &str, value: &str) {
+        self.variables.insert(key.to_string(), value.to_string());
+    }
+
+    /// Set the task group.
+    pub fn with_group(mut self, group: TaskGroup) -> Self {
+        self.group = group;
+        self
+    }
+
+    fn substitute(&self, template: &str) -> String {
+        let mut result = template.to_string();
+        for (k, v) in &self.variables {
+            result = result.replace(&format!("${{{}}}", k), v);
+        }
+        result
+    }
+
+    /// Instantiate the template into a concrete `Task`.
+    pub fn instantiate(&self) -> Task {
+        TaskBuilder::new(
+            self.substitute(&self.name_template),
+            self.substitute(&self.command_template),
+        )
+        .group(self.group)
+        .build()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1333,5 +1550,92 @@ mod tests {
             .unwrap();
         assert_eq!(runner.failure_count(), 1);
         assert_eq!(runner.success_count(), 0);
+    }
+
+    // -- TaskDependencyResolver --
+
+    #[test]
+    fn dependency_resolver_linear_order() {
+        let mut r = TaskDependencyResolver::new();
+        r.add_dependency("build", "compile");
+        r.add_dependency("test", "build");
+        let order = r.resolve_order(&["test"]).unwrap();
+        assert_eq!(order, vec!["compile", "build", "test"]);
+    }
+
+    #[test]
+    fn dependency_resolver_cycle_detected() {
+        let mut r = TaskDependencyResolver::new();
+        r.add_dependency("a", "b");
+        r.add_dependency("b", "a");
+        assert!(r.resolve_order(&["a"]).is_err());
+    }
+
+    #[test]
+    fn dependency_resolver_no_deps() {
+        let r = TaskDependencyResolver::new();
+        let order = r.resolve_order(&["standalone"]).unwrap();
+        assert_eq!(order, vec!["standalone"]);
+        assert!(!r.has_dependencies("standalone"));
+    }
+
+    #[test]
+    fn dependency_resolver_diamond() {
+        let mut r = TaskDependencyResolver::new();
+        r.add_dependency("d", "b");
+        r.add_dependency("d", "c");
+        r.add_dependency("b", "a");
+        r.add_dependency("c", "a");
+        let order = r.resolve_order(&["d"]).unwrap();
+        // "a" must come before "b" and "c", and "d" last
+        let pos = |name: &str| order.iter().position(|s| s == name).unwrap();
+        assert!(pos("a") < pos("b"));
+        assert!(pos("a") < pos("c"));
+        assert!(pos("b") < pos("d"));
+        assert!(pos("c") < pos("d"));
+    }
+
+    // -- TaskOutputParser --
+
+    #[test]
+    fn output_parser_extracts_errors_and_warnings() {
+        let output = "compiling...\nerror: undefined variable\nwarning: unused import\nDone.";
+        let diags = TaskOutputParser::parse(output);
+        assert_eq!(diags.len(), 2);
+        assert_eq!(diags[0].severity, OutputSeverity::Error);
+        assert_eq!(diags[1].severity, OutputSeverity::Warning);
+        assert_eq!(TaskOutputParser::error_count(output), 1);
+        assert_eq!(TaskOutputParser::warning_count(output), 1);
+        assert!(!TaskOutputParser::is_clean(output));
+    }
+
+    #[test]
+    fn output_parser_clean_output() {
+        assert!(TaskOutputParser::is_clean("compiling...\nDone."));
+    }
+
+    // -- TaskTemplate --
+
+    #[test]
+    fn template_instantiate_with_vars() {
+        let mut tpl = TaskTemplate::new("build-${target}", "cargo build --target ${target}");
+        tpl.set_var("target", "x86_64");
+        let task = tpl.instantiate();
+        assert_eq!(task.name, "build-x86_64");
+        assert_eq!(task.command, "cargo build --target x86_64");
+    }
+
+    #[test]
+    fn template_with_group() {
+        let tpl = TaskTemplate::new("test", "cargo test").with_group(TaskGroup::Test);
+        let task = tpl.instantiate();
+        assert_eq!(task.group, TaskGroup::Test);
+    }
+
+    #[test]
+    fn output_severity_display() {
+        assert_eq!(format!("{}", OutputSeverity::Error), "error");
+        assert_eq!(format!("{}", OutputSeverity::Warning), "warning");
+        assert_eq!(format!("{}", OutputSeverity::Info), "info");
     }
 }

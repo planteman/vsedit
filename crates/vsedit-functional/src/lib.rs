@@ -732,6 +732,300 @@ pub fn throttle_immediate<F>(f: F, cooldown_ms: u64) -> Throttled<F> {
     Throttled::new(f, cooldown_ms)
 }
 
+// ---------------------------------------------------------------------------
+// Either type
+// ---------------------------------------------------------------------------
+
+/// A value that is one of two possible types.
+///
+/// Unlike `Result`, `Either` carries no success/failure semantics — both
+/// variants are equally valid.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Either<L, R> {
+    /// The left variant.
+    Left(L),
+    /// The right variant.
+    Right(R),
+}
+
+impl<L, R> Either<L, R> {
+    /// Returns `true` if this is a `Left` value.
+    pub fn is_left(&self) -> bool {
+        matches!(self, Either::Left(_))
+    }
+
+    /// Returns `true` if this is a `Right` value.
+    pub fn is_right(&self) -> bool {
+        matches!(self, Either::Right(_))
+    }
+
+    /// Extract the left value, or `None`.
+    pub fn left(self) -> Option<L> {
+        match self {
+            Either::Left(l) => Some(l),
+            Either::Right(_) => None,
+        }
+    }
+
+    /// Extract the right value, or `None`.
+    pub fn right(self) -> Option<R> {
+        match self {
+            Either::Left(_) => None,
+            Either::Right(r) => Some(r),
+        }
+    }
+
+    /// Map a function over the left value.
+    pub fn map_left<L2>(self, f: impl FnOnce(L) -> L2) -> Either<L2, R> {
+        match self {
+            Either::Left(l) => Either::Left(f(l)),
+            Either::Right(r) => Either::Right(r),
+        }
+    }
+
+    /// Map a function over the right value.
+    pub fn map_right<R2>(self, f: impl FnOnce(R) -> R2) -> Either<L, R2> {
+        match self {
+            Either::Left(l) => Either::Left(l),
+            Either::Right(r) => Either::Right(f(r)),
+        }
+    }
+
+    /// Fold both variants into a single value.
+    pub fn fold<T>(self, on_left: impl FnOnce(L) -> T, on_right: impl FnOnce(R) -> T) -> T {
+        match self {
+            Either::Left(l) => on_left(l),
+            Either::Right(r) => on_right(r),
+        }
+    }
+
+    /// Swap left and right.
+    pub fn swap(self) -> Either<R, L> {
+        match self {
+            Either::Left(l) => Either::Right(l),
+            Either::Right(r) => Either::Left(r),
+        }
+    }
+}
+
+impl<T> Either<T, T> {
+    /// Extract the inner value when both variants are the same type.
+    pub fn into_inner(self) -> T {
+        match self {
+            Either::Left(v) | Either::Right(v) => v,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Validated — like Result but accumulates all errors
+// ---------------------------------------------------------------------------
+
+/// A validation result that accumulates errors rather than short-circuiting.
+///
+/// `Validated::Ok(value)` holds a successfully validated value.
+/// `Validated::Errs(errors)` holds one or more validation errors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Validated<T, E> {
+    /// A valid value.
+    Ok(T),
+    /// One or more accumulated errors.
+    Errs(Vec<E>),
+}
+
+impl<T, E> Validated<T, E> {
+    /// Create a valid value.
+    pub fn ok(value: T) -> Self {
+        Validated::Ok(value)
+    }
+
+    /// Create a single-error invalid value.
+    pub fn err(error: E) -> Self {
+        Validated::Errs(vec![error])
+    }
+
+    /// Returns `true` if this is a valid value.
+    pub fn is_ok(&self) -> bool {
+        matches!(self, Validated::Ok(_))
+    }
+
+    /// Returns `true` if this contains errors.
+    pub fn is_err(&self) -> bool {
+        matches!(self, Validated::Errs(_))
+    }
+
+    /// Map a function over the valid value.
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Validated<U, E> {
+        match self {
+            Validated::Ok(v) => Validated::Ok(f(v)),
+            Validated::Errs(e) => Validated::Errs(e),
+        }
+    }
+
+    /// Convert into a standard `Result`, joining errors with the given
+    /// separator when there are multiple.
+    pub fn into_result(self) -> Result<T, Vec<E>> {
+        match self {
+            Validated::Ok(v) => Ok(v),
+            Validated::Errs(e) => Err(e),
+        }
+    }
+}
+
+/// Combine two `Validated` values. If both are `Ok`, applies `f` to produce
+/// the combined value. If either or both have errors, all errors are
+/// accumulated.
+pub fn validated_zip<A, B, C, E>(
+    va: Validated<A, E>,
+    vb: Validated<B, E>,
+    f: impl FnOnce(A, B) -> C,
+) -> Validated<C, E> {
+    match (va, vb) {
+        (Validated::Ok(a), Validated::Ok(b)) => Validated::Ok(f(a, b)),
+        (Validated::Errs(e), Validated::Ok(_)) => Validated::Errs(e),
+        (Validated::Ok(_), Validated::Errs(e)) => Validated::Errs(e),
+        (Validated::Errs(mut e1), Validated::Errs(e2)) => {
+            e1.extend(e2);
+            Validated::Errs(e1)
+        }
+    }
+}
+
+/// Run a list of validation checks against a value, accumulating all errors.
+/// Returns `Validated::Ok(value)` if all pass, otherwise `Validated::Errs`.
+pub fn validate_all<T, E>(
+    value: T,
+    checks: &[(fn(&T) -> bool, E)],
+) -> Validated<T, E>
+where
+    E: Clone,
+{
+    let errors: Vec<E> = checks
+        .iter()
+        .filter(|(pred, _)| !pred(&value))
+        .map(|(_, err)| err.clone())
+        .collect();
+    if errors.is_empty() {
+        Validated::Ok(value)
+    } else {
+        Validated::Errs(errors)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Result combinator helpers
+// ---------------------------------------------------------------------------
+
+/// Extension trait adding combinators to `Result`.
+pub trait ResultExt<T, E> {
+    /// If `Ok`, apply `f`; otherwise return `fallback`.
+    fn map_or_else_with<U>(self, fallback: impl FnOnce(E) -> U, f: impl FnOnce(T) -> U) -> U;
+
+    /// Tap into an `Ok` value for side-effects without consuming it.
+    fn tap_ok(self, f: impl FnOnce(&T)) -> Self;
+
+    /// Tap into an `Err` value for side-effects without consuming it.
+    fn tap_err(self, f: impl FnOnce(&E)) -> Self;
+}
+
+impl<T, E> ResultExt<T, E> for Result<T, E> {
+    fn map_or_else_with<U>(self, fallback: impl FnOnce(E) -> U, f: impl FnOnce(T) -> U) -> U {
+        match self {
+            Ok(v) => f(v),
+            Err(e) => fallback(e),
+        }
+    }
+
+    fn tap_ok(self, f: impl FnOnce(&T)) -> Self {
+        if let Ok(ref v) = self {
+            f(v);
+        }
+        self
+    }
+
+    fn tap_err(self, f: impl FnOnce(&E)) -> Self {
+        if let Err(ref e) = self {
+            f(e);
+        }
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Option combinator helpers
+// ---------------------------------------------------------------------------
+
+/// Extension trait adding combinators to `Option`.
+pub trait OptionExt<T> {
+    /// Tap into a `Some` value for side-effects without consuming it.
+    fn tap_some(self, f: impl FnOnce(&T)) -> Self;
+
+    /// Convert to a `Result` using `err_fn` to produce the error on `None`.
+    fn ok_or_else_with<E>(self, err_fn: impl FnOnce() -> E) -> Result<T, E>;
+
+    /// Return `self` if the predicate holds, otherwise `None`.
+    fn filter_with(self, pred: impl FnOnce(&T) -> bool) -> Self;
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    fn tap_some(self, f: impl FnOnce(&T)) -> Self {
+        if let Some(ref v) = self {
+            f(v);
+        }
+        self
+    }
+
+    fn ok_or_else_with<E>(self, err_fn: impl FnOnce() -> E) -> Result<T, E> {
+        self.ok_or_else(err_fn)
+    }
+
+    fn filter_with(self, pred: impl FnOnce(&T) -> bool) -> Self {
+        match self {
+            Some(ref v) if pred(v) => self,
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Converge — run two functions on same input, combine results
+// ---------------------------------------------------------------------------
+
+/// Apply two functions to the same input and combine their results.
+///
+/// `converge(split_a, split_b, merge)(x)` = `merge(split_a(x), split_b(x))`.
+pub fn converge<A, B, C, D>(
+    fa: impl Fn(&A) -> B,
+    fb: impl Fn(&A) -> C,
+    merge: impl Fn(B, C) -> D,
+) -> impl Fn(&A) -> D {
+    move |a| merge(fa(a), fb(a))
+}
+
+/// Apply a sequence of fallible functions, returning the first `Ok`.
+///
+/// Unlike [`find_map_result`], this takes a list of functions rather than
+/// mapping over items.
+pub fn first_ok<T: Clone, R, E>(
+    value: &T,
+    fns: &[fn(&T) -> Result<R, E>],
+) -> Result<R, FunctionalError> {
+    for f in fns {
+        if let Ok(r) = f(value) {
+            return Ok(r);
+        }
+    }
+    Err(FunctionalError::NoMatch)
+}
+
+/// Apply a transformation while a predicate holds, returning the final value.
+pub fn iterate_while<T>(mut value: T, pred: impl Fn(&T) -> bool, f: impl Fn(T) -> T) -> T {
+    while pred(&value) {
+        value = f(value);
+    }
+    value
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1266,5 +1560,110 @@ mod tests {
         assert_eq!(always_five(), 5);
         let always_hello = constant(String::from("hello"));
         assert_eq!(always_hello(), "hello");
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn test_either_left_right() {
+        let l: Either<i32, &str> = Either::Left(42);
+        assert!(l.is_left());
+        assert!(!l.is_right());
+        assert_eq!(l.left(), Some(42));
+
+        let r: Either<i32, &str> = Either::Right("hello");
+        assert!(r.is_right());
+        assert_eq!(r.right(), Some("hello"));
+
+        let swapped = Either::<i32, &str>::Left(1).swap();
+        assert_eq!(swapped, Either::Right(1));
+
+        let folded = Either::<i32, i32>::Left(3).fold(|l| l * 2, |r| r + 10);
+        assert_eq!(folded, 6);
+
+        let mapped = Either::<i32, &str>::Left(5).map_left(|x| x + 1);
+        assert_eq!(mapped, Either::Left(6));
+
+        let same: Either<i32, i32> = Either::Right(99);
+        assert_eq!(same.into_inner(), 99);
+    }
+
+    #[test]
+    fn test_validated_accumulates_errors() {
+        let v1: Validated<i32, &str> = Validated::ok(10);
+        let v2: Validated<i32, &str> = Validated::ok(20);
+        let combined = validated_zip(v1, v2, |a, b| a + b);
+        assert_eq!(combined, Validated::Ok(30));
+
+        let e1: Validated<i32, &str> = Validated::err("too small");
+        let e2: Validated<i32, &str> = Validated::err("too big");
+        let combined = validated_zip(e1, e2, |a, b| a + b);
+        assert_eq!(combined, Validated::Errs(vec!["too small", "too big"]));
+
+        let ok: Validated<i32, &str> = Validated::ok(5);
+        let err: Validated<i32, &str> = Validated::err("bad");
+        let combined = validated_zip(ok, err, |a, b| a + b);
+        assert!(combined.is_err());
+    }
+
+    #[test]
+    fn test_validate_all() {
+        let checks: Vec<(fn(&i32) -> bool, &str)> = vec![
+            (|x| *x > 0, "must be positive"),
+            (|x| *x < 100, "must be < 100"),
+            (|x| *x % 2 == 0, "must be even"),
+        ];
+        let valid = validate_all(42, &checks);
+        assert_eq!(valid, Validated::Ok(42));
+
+        let invalid = validate_all(-3, &checks);
+        match invalid {
+            Validated::Errs(errs) => {
+                assert!(errs.contains(&"must be positive"));
+                assert!(errs.contains(&"must be even"));
+                assert_eq!(errs.len(), 2);
+            }
+            _ => panic!("expected errors"),
+        }
+    }
+
+    #[test]
+    fn test_result_ext_tap_ok() {
+        use std::cell::RefCell;
+        let log: RefCell<Vec<i32>> = RefCell::new(Vec::new());
+        let r: Result<i32, &str> = Ok(42);
+        let r = r.tap_ok(|v| log.borrow_mut().push(*v));
+        assert_eq!(r, Ok(42));
+        assert_eq!(*log.borrow(), vec![42]);
+
+        let e: Result<i32, &str> = Err("bad");
+        let e = e.tap_ok(|v| log.borrow_mut().push(*v));
+        assert_eq!(e, Err("bad"));
+        assert_eq!(log.borrow().len(), 1); // not called
+    }
+
+    #[test]
+    fn test_option_ext_filter_with() {
+        let some_val: Option<i32> = Some(10);
+        assert_eq!(some_val.filter_with(|v| *v > 5), Some(10));
+        assert_eq!(Some(3).filter_with(|v: &i32| *v > 5), None);
+        assert_eq!(None::<i32>.filter_with(|_| true), None);
+    }
+
+    #[test]
+    fn test_converge() {
+        let sum_and_product = converge(
+            |xs: &Vec<i32>| xs.iter().sum::<i32>(),
+            |xs: &Vec<i32>| xs.iter().product::<i32>(),
+            |s, p| (s, p),
+        );
+        let data = vec![2, 3, 4];
+        assert_eq!(sum_and_product(&data), (9, 24));
+    }
+
+    #[test]
+    fn test_iterate_while() {
+        let result = iterate_while(1, |x| *x < 100, |x| x * 2);
+        assert_eq!(result, 128); // 1 → 2 → 4 → 8 → 16 → 32 → 64 → 128
     }
 }

@@ -742,6 +742,243 @@ impl ProblemsSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProblemMatcher — parse compiler output lines into Problems
+// ---------------------------------------------------------------------------
+
+/// A pattern-based matcher that parses compiler/linter output lines into
+/// [`Problem`] values. Each matcher has a regex-like pattern describing the
+/// expected format of a diagnostic line.
+#[derive(Debug, Clone)]
+pub struct ProblemMatcher {
+    /// Human-readable name for this matcher (e.g. "rustc", "gcc").
+    pub name: String,
+    /// The source label assigned to problems created by this matcher.
+    pub source: String,
+    /// Separator between file path, line, column, severity, and message.
+    /// For example `:` for `file.rs:10:5: error: msg`.
+    pub separator: char,
+    /// Index of the file-path field (0-based) after splitting by separator.
+    pub file_index: usize,
+    /// Index of the line-number field.
+    pub line_index: usize,
+    /// Index of the column-number field.
+    pub column_index: usize,
+    /// Index of the severity keyword field.
+    pub severity_index: usize,
+    /// Index of the message field. Everything from this index onward is joined.
+    pub message_index: usize,
+}
+
+impl ProblemMatcher {
+    /// Create a matcher for the common `file:line:col: severity: message` format
+    /// used by rustc, gcc, and many other compilers.
+    pub fn standard(name: impl Into<String>, source: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            source: source.into(),
+            separator: ':',
+            file_index: 0,
+            line_index: 1,
+            column_index: 2,
+            severity_index: 3,
+            message_index: 4,
+        }
+    }
+
+    /// Try to parse a single output line into a [`Problem`].
+    ///
+    /// Returns `None` if the line does not match the expected format.
+    pub fn parse_line(&self, line: &str) -> Option<Problem> {
+        let parts: Vec<&str> = line.splitn(self.message_index + 2, self.separator).collect();
+        if parts.len() <= self.message_index {
+            return None;
+        }
+
+        let file_path = parts.get(self.file_index)?.trim();
+        let line_num: u32 = parts.get(self.line_index)?.trim().parse().ok()?;
+        let col_num: u32 = parts.get(self.column_index)?.trim().parse().ok()?;
+        let severity_str = parts.get(self.severity_index)?.trim().to_lowercase();
+        let message = parts[self.message_index..].join(&self.separator.to_string());
+        let message = message.trim();
+
+        let severity = match severity_str.as_str() {
+            "error" => ProblemSeverity::Error,
+            "warning" | "warn" => ProblemSeverity::Warning,
+            "info" | "note" => ProblemSeverity::Info,
+            "hint" | "help" => ProblemSeverity::Hint,
+            _ => return None,
+        };
+
+        Some(Problem::new(severity, message, &self.source, file_path, line_num, col_num))
+    }
+
+    /// Parse multiple output lines, returning all successfully matched problems.
+    pub fn parse_output(&self, output: &str) -> Vec<Problem> {
+        output.lines().filter_map(|l| self.parse_line(l)).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiagnosticCodeAction — structured code actions attached to diagnostics
+// ---------------------------------------------------------------------------
+
+/// The kind of code action that can be applied to resolve a diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodeActionKind {
+    /// A quick-fix that directly resolves the diagnostic.
+    QuickFix,
+    /// A refactoring suggestion related to the diagnostic.
+    Refactor,
+    /// An action that extracts code into a new scope / function.
+    Extract,
+    /// A source-level organisation action (e.g. sort imports).
+    SourceOrganize,
+}
+
+impl fmt::Display for CodeActionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::QuickFix => write!(f, "quickfix"),
+            Self::Refactor => write!(f, "refactor"),
+            Self::Extract => write!(f, "extract"),
+            Self::SourceOrganize => write!(f, "source.organize"),
+        }
+    }
+}
+
+/// A code action that can be applied to fix or improve a diagnostic.
+#[derive(Debug, Clone)]
+pub struct DiagnosticCodeAction {
+    pub title: String,
+    pub kind: CodeActionKind,
+    pub file_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub new_text: String,
+    /// Whether this action is the *preferred* fix for the diagnostic.
+    pub is_preferred: bool,
+}
+
+impl DiagnosticCodeAction {
+    pub fn new(
+        title: impl Into<String>,
+        kind: CodeActionKind,
+        file_path: impl Into<String>,
+        line: u32,
+        column: u32,
+        new_text: impl Into<String>,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            kind,
+            file_path: file_path.into(),
+            line,
+            column,
+            new_text: new_text.into(),
+            is_preferred: false,
+        }
+    }
+
+    pub fn preferred(mut self) -> Self {
+        self.is_preferred = true;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProblemHeatmap — per-file problem density
+// ---------------------------------------------------------------------------
+
+/// Entry in a problem heatmap showing how many problems a single file has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeatmapEntry {
+    pub file_path: String,
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub info_count: usize,
+    pub hint_count: usize,
+}
+
+impl HeatmapEntry {
+    pub fn total(&self) -> usize {
+        self.error_count + self.warning_count + self.info_count + self.hint_count
+    }
+
+    /// Weighted score: errors count more than warnings, etc.
+    pub fn weighted_score(&self) -> usize {
+        self.error_count * 4 + self.warning_count * 2 + self.info_count + self.hint_count
+    }
+}
+
+/// Computes a heatmap of per-file problem density, sorted by weighted score
+/// descending (hottest files first).
+pub fn problem_heatmap(problems: &[Problem]) -> Vec<HeatmapEntry> {
+    let mut map: BTreeMap<&str, (usize, usize, usize, usize)> = BTreeMap::new();
+    for p in problems {
+        let entry = map.entry(p.file_path.as_str()).or_default();
+        match p.severity {
+            ProblemSeverity::Error => entry.0 += 1,
+            ProblemSeverity::Warning => entry.1 += 1,
+            ProblemSeverity::Info => entry.2 += 1,
+            ProblemSeverity::Hint => entry.3 += 1,
+        }
+    }
+    let mut entries: Vec<HeatmapEntry> = map
+        .into_iter()
+        .map(|(file, (e, w, i, h))| HeatmapEntry {
+            file_path: file.to_string(),
+            error_count: e,
+            warning_count: w,
+            info_count: i,
+            hint_count: h,
+        })
+        .collect();
+    entries.sort_by(|a, b| b.weighted_score().cmp(&a.weighted_score()));
+    entries
+}
+
+// ---------------------------------------------------------------------------
+// ProblemExporter — serialize problems to various text formats
+// ---------------------------------------------------------------------------
+
+/// Output format for exporting problems.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    /// Tab-separated values.
+    Tsv,
+    /// Simple human-readable text list.
+    Plain,
+}
+
+/// Export a list of problems to a string in the given format.
+pub fn export_problems(problems: &[Problem], format: ExportFormat) -> String {
+    let mut out = String::new();
+    match format {
+        ExportFormat::Tsv => {
+            out.push_str("severity\tfile\tline\tcol\tsource\tcode\tmessage\n");
+            for p in problems {
+                out.push_str(&format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    p.severity,
+                    p.file_path,
+                    p.line,
+                    p.column,
+                    p.source,
+                    p.code.as_deref().unwrap_or(""),
+                    p.message,
+                ));
+            }
+        }
+        ExportFormat::Plain => {
+            for p in problems {
+                out.push_str(&format!("{}\n", p));
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1276,5 +1513,157 @@ mod tests {
         let problems = sample_problems();
         let summary2 = ProblemsSummary::from_diagnostics(&problems);
         assert!(!summary2.is_clean());
+    }
+
+    // -- ProblemMatcher tests -----------------------------------------------
+
+    #[test]
+    fn problem_matcher_parse_standard_line() {
+        let matcher = ProblemMatcher::standard("rustc", "rustc");
+        let line = "src/main.rs:10:5: error: unused variable `x`";
+        let problem = matcher.parse_line(line).unwrap();
+        assert_eq!(problem.file_path, "src/main.rs");
+        assert_eq!(problem.line, 10);
+        assert_eq!(problem.column, 5);
+        assert_eq!(problem.severity, ProblemSeverity::Error);
+        assert!(problem.message.contains("unused variable"));
+    }
+
+    #[test]
+    fn problem_matcher_parse_warning() {
+        let matcher = ProblemMatcher::standard("gcc", "gcc");
+        let line = "lib.c:42:1: warning: implicit declaration";
+        let problem = matcher.parse_line(line).unwrap();
+        assert_eq!(problem.severity, ProblemSeverity::Warning);
+        assert_eq!(problem.line, 42);
+    }
+
+    #[test]
+    fn problem_matcher_rejects_invalid_line() {
+        let matcher = ProblemMatcher::standard("rustc", "rustc");
+        assert!(matcher.parse_line("not a diagnostic").is_none());
+        assert!(matcher.parse_line("").is_none());
+    }
+
+    #[test]
+    fn problem_matcher_parse_output_multi() {
+        let matcher = ProblemMatcher::standard("rustc", "rustc");
+        let output = "\
+src/a.rs:1:1: error: msg1
+some noise
+src/b.rs:5:3: warning: msg2
+";
+        let problems = matcher.parse_output(output);
+        assert_eq!(problems.len(), 2);
+        assert_eq!(problems[0].severity, ProblemSeverity::Error);
+        assert_eq!(problems[1].severity, ProblemSeverity::Warning);
+    }
+
+    #[test]
+    fn problem_matcher_hint_and_note() {
+        let matcher = ProblemMatcher::standard("rustc", "rustc");
+        let hint = matcher.parse_line("x.rs:1:1: hint: try this").unwrap();
+        assert_eq!(hint.severity, ProblemSeverity::Hint);
+        let note = matcher.parse_line("x.rs:2:1: note: see also").unwrap();
+        assert_eq!(note.severity, ProblemSeverity::Info);
+    }
+
+    // -- DiagnosticCodeAction tests -----------------------------------------
+
+    #[test]
+    fn diagnostic_code_action_creation() {
+        let action = DiagnosticCodeAction::new(
+            "Add missing import",
+            CodeActionKind::QuickFix,
+            "src/main.rs",
+            1,
+            1,
+            "use std::io;",
+        );
+        assert_eq!(action.title, "Add missing import");
+        assert_eq!(action.kind, CodeActionKind::QuickFix);
+        assert!(!action.is_preferred);
+
+        let preferred = action.preferred();
+        assert!(preferred.is_preferred);
+    }
+
+    #[test]
+    fn code_action_kind_display() {
+        assert_eq!(CodeActionKind::QuickFix.to_string(), "quickfix");
+        assert_eq!(CodeActionKind::Refactor.to_string(), "refactor");
+        assert_eq!(CodeActionKind::Extract.to_string(), "extract");
+        assert_eq!(CodeActionKind::SourceOrganize.to_string(), "source.organize");
+    }
+
+    // -- ProblemHeatmap tests -----------------------------------------------
+
+    #[test]
+    fn heatmap_sorted_by_weighted_score() {
+        let problems = vec![
+            Problem::new(ProblemSeverity::Error, "e1", "rustc", "hot.rs", 1, 1),
+            Problem::new(ProblemSeverity::Error, "e2", "rustc", "hot.rs", 2, 1),
+            Problem::new(ProblemSeverity::Warning, "w1", "clippy", "warm.rs", 1, 1),
+            Problem::new(ProblemSeverity::Hint, "h1", "clippy", "cool.rs", 1, 1),
+        ];
+        let heatmap = problem_heatmap(&problems);
+        assert_eq!(heatmap.len(), 3);
+        // hot.rs has 2 errors → weighted 8, warm.rs has 1 warning → weighted 2
+        assert_eq!(heatmap[0].file_path, "hot.rs");
+        assert_eq!(heatmap[0].weighted_score(), 8);
+        assert_eq!(heatmap[1].file_path, "warm.rs");
+        assert_eq!(heatmap[2].file_path, "cool.rs");
+    }
+
+    #[test]
+    fn heatmap_entry_total() {
+        let entry = HeatmapEntry {
+            file_path: "a.rs".to_string(),
+            error_count: 1,
+            warning_count: 2,
+            info_count: 3,
+            hint_count: 4,
+        };
+        assert_eq!(entry.total(), 10);
+        assert_eq!(entry.weighted_score(), 1 * 4 + 2 * 2 + 3 + 4);
+    }
+
+    #[test]
+    fn heatmap_empty_input() {
+        let heatmap = problem_heatmap(&[]);
+        assert!(heatmap.is_empty());
+    }
+
+    // -- ProblemExporter tests ----------------------------------------------
+
+    #[test]
+    fn export_tsv_format() {
+        let problems = vec![
+            Problem::new(ProblemSeverity::Error, "bad thing", "rustc", "a.rs", 1, 2)
+                .with_code("E0001"),
+        ];
+        let tsv = export_problems(&problems, ExportFormat::Tsv);
+        assert!(tsv.starts_with("severity\tfile\t"));
+        assert!(tsv.contains("Error\ta.rs\t1\t2\trustc\tE0001\tbad thing"));
+    }
+
+    #[test]
+    fn export_plain_format() {
+        let problems = vec![
+            Problem::new(ProblemSeverity::Warning, "unused", "clippy", "b.rs", 5, 1),
+        ];
+        let plain = export_problems(&problems, ExportFormat::Plain);
+        assert!(plain.contains("⚠"));
+        assert!(plain.contains("b.rs"));
+        assert!(plain.contains("unused"));
+    }
+
+    #[test]
+    fn export_empty_problems() {
+        let tsv = export_problems(&[], ExportFormat::Tsv);
+        // Header only
+        assert_eq!(tsv.lines().count(), 1);
+        let plain = export_problems(&[], ExportFormat::Plain);
+        assert!(plain.is_empty());
     }
 }

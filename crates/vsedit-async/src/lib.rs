@@ -878,6 +878,206 @@ impl Default for AsyncValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TaskPriority – priority levels for async tasks
+// ---------------------------------------------------------------------------
+
+/// Priority levels for scheduling async tasks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TaskPriority {
+    /// Background work that can be deferred.
+    Low = 0,
+    /// Normal priority (default).
+    Normal = 1,
+    /// User-facing work that should complete promptly.
+    High = 2,
+    /// Critical work that must run before anything else.
+    Critical = 3,
+}
+
+impl TaskPriority {
+    /// Return all priority levels from lowest to highest.
+    pub fn all() -> &'static [TaskPriority] {
+        &[
+            TaskPriority::Low,
+            TaskPriority::Normal,
+            TaskPriority::High,
+            TaskPriority::Critical,
+        ]
+    }
+
+    /// Return a human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            TaskPriority::Low => "low",
+            TaskPriority::Normal => "normal",
+            TaskPriority::High => "high",
+            TaskPriority::Critical => "critical",
+        }
+    }
+
+    /// Return `true` if this priority is at least `High`.
+    pub fn is_elevated(&self) -> bool {
+        *self >= TaskPriority::High
+    }
+}
+
+impl Default for TaskPriority {
+    fn default() -> Self {
+        TaskPriority::Normal
+    }
+}
+
+impl fmt::Display for TaskPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConcurrencyLimiter – semaphore-based concurrency control
+// ---------------------------------------------------------------------------
+
+/// Limits the number of concurrently executing async operations using a
+/// `tokio::sync::Semaphore`.
+pub struct ConcurrencyLimiter {
+    semaphore: Arc<tokio::sync::Semaphore>,
+    max_permits: usize,
+}
+
+impl ConcurrencyLimiter {
+    /// Create a limiter that allows at most `max_concurrent` tasks at once.
+    pub fn new(max_concurrent: usize) -> Self {
+        let max = max_concurrent.max(1);
+        Self {
+            semaphore: Arc::new(tokio::sync::Semaphore::new(max)),
+            max_permits: max,
+        }
+    }
+
+    /// Run `future` once a permit is available.  The permit is held for the
+    /// duration of the future and released automatically.
+    pub async fn run<F, T>(&self, future: F) -> T
+    where
+        F: Future<Output = T>,
+    {
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .expect("semaphore closed unexpectedly");
+        future.await
+    }
+
+    /// Return the maximum number of concurrent permits.
+    pub fn max_concurrent(&self) -> usize {
+        self.max_permits
+    }
+
+    /// Return the number of permits currently available (not held).
+    pub fn available_permits(&self) -> usize {
+        self.semaphore.available_permits()
+    }
+}
+
+impl fmt::Debug for ConcurrencyLimiter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ConcurrencyLimiter")
+            .field("max_permits", &self.max_permits)
+            .field("available", &self.available_permits())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AsyncBatcher – collect items and flush as a batch
+// ---------------------------------------------------------------------------
+
+/// Collects items and flushes them in batches once the batch size is reached.
+pub struct AsyncBatcher<T> {
+    batch_size: usize,
+    items: Arc<Mutex<Vec<T>>>,
+    total_flushed: Arc<Mutex<u64>>,
+}
+
+impl<T: Send + 'static> AsyncBatcher<T> {
+    /// Create a batcher that flushes every `batch_size` items.
+    pub fn new(batch_size: usize) -> Self {
+        Self {
+            batch_size: batch_size.max(1),
+            items: Arc::new(Mutex::new(Vec::new())),
+            total_flushed: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    /// Add an item. Returns `Some(batch)` if the batch is full and was
+    /// drained, otherwise `None`.
+    pub fn add(&self, item: T) -> Option<Vec<T>> {
+        let mut items = self.items.lock().unwrap();
+        items.push(item);
+        if items.len() >= self.batch_size {
+            let batch: Vec<T> = items.drain(..).collect();
+            let mut total = self.total_flushed.lock().unwrap();
+            *total += batch.len() as u64;
+            Some(batch)
+        } else {
+            None
+        }
+    }
+
+    /// Drain any remaining items regardless of batch size.
+    pub fn flush(&self) -> Vec<T> {
+        let mut items = self.items.lock().unwrap();
+        let batch: Vec<T> = items.drain(..).collect();
+        let mut total = self.total_flushed.lock().unwrap();
+        *total += batch.len() as u64;
+        batch
+    }
+
+    /// Return the number of items currently buffered.
+    pub fn pending(&self) -> usize {
+        self.items.lock().unwrap().len()
+    }
+
+    /// Return the total number of items flushed so far.
+    pub fn total_flushed(&self) -> u64 {
+        *self.total_flushed.lock().unwrap()
+    }
+
+    /// Return the configured batch size.
+    pub fn batch_size(&self) -> usize {
+        self.batch_size
+    }
+}
+
+impl<T: Send + 'static> fmt::Debug for AsyncBatcher<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AsyncBatcher")
+            .field("batch_size", &self.batch_size)
+            .field("pending", &self.pending())
+            .field("total_flushed", &self.total_flushed())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// race – return the first successful result from multiple futures
+// ---------------------------------------------------------------------------
+
+/// Run two futures concurrently and return the result of whichever completes
+/// first.
+pub async fn race<F1, F2, T>(a: F1, b: F2) -> T
+where
+    F1: Future<Output = T> + Send,
+    F2: Future<Output = T> + Send,
+    T: Send,
+{
+    tokio::select! {
+        v = a => v,
+        v = b => v,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1275,5 +1475,111 @@ mod tests {
     fn async_is_ascii_printable() {
         assert!(AsyncValidator::is_ascii_printable("Hello World 123"));
         assert!(!AsyncValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---- TaskPriority tests ----
+
+    #[test]
+    fn task_priority_ordering() {
+        assert!(TaskPriority::Low < TaskPriority::Normal);
+        assert!(TaskPriority::Normal < TaskPriority::High);
+        assert!(TaskPriority::High < TaskPriority::Critical);
+    }
+
+    #[test]
+    fn task_priority_default_is_normal() {
+        assert_eq!(TaskPriority::default(), TaskPriority::Normal);
+    }
+
+    #[test]
+    fn task_priority_is_elevated() {
+        assert!(!TaskPriority::Low.is_elevated());
+        assert!(!TaskPriority::Normal.is_elevated());
+        assert!(TaskPriority::High.is_elevated());
+        assert!(TaskPriority::Critical.is_elevated());
+    }
+
+    #[test]
+    fn task_priority_label_and_display() {
+        assert_eq!(TaskPriority::Low.label(), "low");
+        assert_eq!(format!("{}", TaskPriority::Critical), "critical");
+        assert_eq!(TaskPriority::all().len(), 4);
+    }
+
+    // ---- ConcurrencyLimiter tests ----
+
+    #[tokio::test]
+    async fn concurrency_limiter_runs_task() {
+        let limiter = ConcurrencyLimiter::new(2);
+        assert_eq!(limiter.max_concurrent(), 2);
+        assert_eq!(limiter.available_permits(), 2);
+        let result = limiter.run(async { 42 }).await;
+        assert_eq!(result, 42);
+        assert_eq!(limiter.available_permits(), 2);
+    }
+
+    #[tokio::test]
+    async fn concurrency_limiter_clamps_zero() {
+        let limiter = ConcurrencyLimiter::new(0);
+        assert_eq!(limiter.max_concurrent(), 1);
+    }
+
+    // ---- AsyncBatcher tests ----
+
+    #[test]
+    fn batcher_collects_and_flushes_on_threshold() {
+        let batcher = AsyncBatcher::new(3);
+        assert_eq!(batcher.batch_size(), 3);
+
+        assert!(batcher.add(1).is_none());
+        assert!(batcher.add(2).is_none());
+        assert_eq!(batcher.pending(), 2);
+
+        let batch = batcher.add(3);
+        assert!(batch.is_some());
+        assert_eq!(batch.unwrap(), vec![1, 2, 3]);
+        assert_eq!(batcher.pending(), 0);
+        assert_eq!(batcher.total_flushed(), 3);
+    }
+
+    #[test]
+    fn batcher_manual_flush_drains_partial() {
+        let batcher = AsyncBatcher::new(10);
+        batcher.add("a");
+        batcher.add("b");
+        let remaining = batcher.flush();
+        assert_eq!(remaining, vec!["a", "b"]);
+        assert_eq!(batcher.pending(), 0);
+        assert_eq!(batcher.total_flushed(), 2);
+    }
+
+    #[test]
+    fn batcher_debug_output() {
+        let batcher = AsyncBatcher::<u8>::new(5);
+        let dbg = format!("{:?}", batcher);
+        assert!(dbg.contains("AsyncBatcher"));
+        assert!(dbg.contains("batch_size"));
+    }
+
+    // ---- race tests ----
+
+    #[tokio::test]
+    async fn race_returns_first_result() {
+        let result = race(async { 1 }, async { 2 }).await;
+        // Either 1 or 2 is valid; both complete immediately.
+        assert!(result == 1 || result == 2);
+    }
+
+    #[tokio::test]
+    async fn race_fast_beats_slow() {
+        let result = race(
+            async { 42 },
+            async {
+                sleep(Duration::from_secs(60)).await;
+                0
+            },
+        )
+        .await;
+        assert_eq!(result, 42);
     }
 }

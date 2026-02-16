@@ -828,6 +828,244 @@ pub fn task_presentation(json: &serde_json::Value) -> TaskPresentation {
 }
 
 // ---------------------------------------------------------------------------
+// TaskTemplate — reusable task templates
+// ---------------------------------------------------------------------------
+
+/// A reusable task template that can be instantiated with variable overrides.
+///
+/// Templates store a base JSON configuration and a set of placeholder names.
+/// Calling [`instantiate`](TaskTemplate::instantiate) substitutes placeholders
+/// of the form `${key}` in string values throughout the JSON tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskTemplate {
+    /// Human-readable name for this template.
+    pub name: String,
+    /// Base configuration (must be a JSON object).
+    pub config: serde_json::Value,
+    /// Ordered list of placeholder keys expected in the config.
+    pub placeholders: Vec<String>,
+}
+
+impl TaskTemplate {
+    /// Create a new template.
+    pub fn new(
+        name: impl Into<String>,
+        config: serde_json::Value,
+        placeholders: Vec<String>,
+    ) -> Result<Self, TaskError> {
+        if !config.is_object() {
+            return Err(TaskError::InvalidConfig(
+                "template config must be a JSON object".into(),
+            ));
+        }
+        Ok(Self {
+            name: name.into(),
+            config,
+            placeholders,
+        })
+    }
+
+    /// Instantiate this template by replacing `${key}` with the supplied values.
+    ///
+    /// Keys not present in `vars` are left as-is.
+    pub fn instantiate(&self, vars: &BTreeMap<String, String>) -> serde_json::Value {
+        Self::substitute_value(&self.config, vars)
+    }
+
+    /// Returns `true` if every declared placeholder has a corresponding key
+    /// in `vars`.
+    pub fn is_fully_bound(&self, vars: &BTreeMap<String, String>) -> bool {
+        self.placeholders.iter().all(|p| vars.contains_key(p))
+    }
+
+    /// Return placeholder keys that are missing from `vars`.
+    pub fn missing_placeholders(&self, vars: &BTreeMap<String, String>) -> Vec<&str> {
+        self.placeholders
+            .iter()
+            .filter(|p| !vars.contains_key(p.as_str()))
+            .map(String::as_str)
+            .collect()
+    }
+
+    fn substitute_value(
+        value: &serde_json::Value,
+        vars: &BTreeMap<String, String>,
+    ) -> serde_json::Value {
+        match value {
+            serde_json::Value::String(s) => {
+                let mut result = s.clone();
+                for (key, val) in vars {
+                    result = result.replace(&format!("${{{key}}}"), val);
+                }
+                serde_json::Value::String(result)
+            }
+            serde_json::Value::Array(arr) => serde_json::Value::Array(
+                arr.iter().map(|v| Self::substitute_value(v, vars)).collect(),
+            ),
+            serde_json::Value::Object(obj) => {
+                let mut map = serde_json::Map::new();
+                for (k, v) in obj {
+                    map.insert(k.clone(), Self::substitute_value(v, vars));
+                }
+                serde_json::Value::Object(map)
+            }
+            other => other.clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskScheduler — dependency-aware task ordering
+// ---------------------------------------------------------------------------
+
+/// A dependency-aware scheduler that determines a valid execution order
+/// for a set of named tasks with declared dependencies.
+///
+/// Uses topological sorting (Kahn's algorithm) to produce an ordering
+/// that respects all dependency edges, or reports a cycle.
+#[derive(Debug, Default)]
+pub struct TaskScheduler {
+    /// Map from task id to its list of dependency ids.
+    deps: BTreeMap<String, Vec<String>>,
+}
+
+impl TaskScheduler {
+    /// Create an empty scheduler.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a task with no dependencies.
+    pub fn add_task(&mut self, id: impl Into<String>) {
+        self.deps.entry(id.into()).or_default();
+    }
+
+    /// Register a task that depends on another task.
+    ///
+    /// Both `id` and `dependency` are implicitly registered if not already
+    /// present.
+    pub fn add_dependency(&mut self, id: impl Into<String>, dependency: impl Into<String>) {
+        let dep = dependency.into();
+        let id = id.into();
+        self.deps.entry(dep.clone()).or_default();
+        self.deps.entry(id.clone()).or_default().push(dep);
+    }
+
+    /// Return all direct dependencies for a task.
+    pub fn dependencies_of(&self, id: &str) -> Option<&[String]> {
+        self.deps.get(id).map(Vec::as_slice)
+    }
+
+    /// Number of registered tasks.
+    pub fn task_count(&self) -> usize {
+        self.deps.len()
+    }
+
+    /// Compute a topological ordering of the tasks.
+    ///
+    /// Returns tasks in an order such that every task appears after all of
+    /// its dependencies.  Returns [`TaskError::DependencyCycle`] if the
+    /// graph contains a cycle.
+    pub fn schedule(&self) -> Result<Vec<String>, TaskError> {
+        // in-degree map
+        let mut in_degree: BTreeMap<&str, usize> = BTreeMap::new();
+        for id in self.deps.keys() {
+            in_degree.entry(id.as_str()).or_insert(0);
+        }
+        for (id, deps_list) in &self.deps {
+            in_degree.insert(id.as_str(), deps_list.len());
+        }
+
+        let mut queue: std::collections::VecDeque<&str> = in_degree
+            .iter()
+            .filter(|entry| *entry.1 == 0)
+            .map(|entry| *entry.0)
+            .collect();
+
+        let mut order: Vec<String> = Vec::with_capacity(self.deps.len());
+
+        while let Some(current) = queue.pop_front() {
+            order.push(current.to_string());
+            // For every task that lists `current` as a dependency, reduce
+            // its in-degree.
+            for (id, deps_list) in &self.deps {
+                if deps_list.iter().any(|d| d == current) {
+                    if let Some(deg) = in_degree.get_mut(id.as_str()) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push_back(id.as_str());
+                        }
+                    }
+                }
+            }
+        }
+
+        if order.len() != self.deps.len() {
+            // Find a task still with nonzero in-degree to report.
+            let stuck = in_degree
+                .iter()
+                .find(|entry| *entry.1 > 0)
+                .map(|entry| entry.0.to_string())
+                .unwrap_or_default();
+            return Err(TaskError::DependencyCycle(stuck));
+        }
+
+        Ok(order)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskExporter — export tasks to JSON
+// ---------------------------------------------------------------------------
+
+/// Serialise a collection of [`QueuedTask`]s or [`HistoryEntry`]s into a
+/// VS Code-style `tasks.json` fragment.
+pub struct TaskExporter;
+
+impl TaskExporter {
+    /// Export queued tasks as a JSON array.
+    pub fn export_queue(tasks: &[QueuedTask]) -> serde_json::Value {
+        serde_json::json!(tasks)
+    }
+
+    /// Export history entries as a JSON array.
+    pub fn export_history(entries: &[HistoryEntry]) -> serde_json::Value {
+        serde_json::json!(entries)
+    }
+
+    /// Export queued tasks into a VS Code compatible `tasks.json` wrapper.
+    pub fn export_tasks_json(tasks: &[QueuedTask]) -> serde_json::Value {
+        serde_json::json!({
+            "version": "2.0.0",
+            "tasks": tasks.iter().map(|t| {
+                serde_json::json!({
+                    "label": t.label,
+                    "group": {
+                        "kind": "build",
+                        "isDefault": false
+                    }
+                })
+            }).collect::<Vec<_>>()
+        })
+    }
+
+    /// Produce a human-readable summary string for a set of history entries.
+    pub fn summary(entries: &[HistoryEntry]) -> String {
+        if entries.is_empty() {
+            return "No task history.".to_string();
+        }
+        let total = entries.len();
+        let successes = entries.iter().filter(|e| e.result.is_success()).count();
+        let total_ms: u64 = entries.iter().map(|e| e.result.duration_ms).sum();
+        format!(
+            "{total} run(s): {successes} succeeded, {} failed, total time {}",
+            total - successes,
+            format_duration(total_ms),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1273,5 +1511,133 @@ mod tests {
         let json = serde_json::to_string(&pres).unwrap();
         let restored: TaskPresentation = serde_json::from_str(&json).unwrap();
         assert_eq!(pres, restored);
+    }
+
+    // -- TaskTemplate -------------------------------------------------------
+
+    #[test]
+    fn template_instantiate_replaces_placeholders() {
+        let tpl = TaskTemplate::new(
+            "cargo build",
+            serde_json::json!({
+                "label": "build ${profile}",
+                "command": "cargo",
+                "args": ["build", "--profile", "${profile}"]
+            }),
+            vec!["profile".into()],
+        )
+        .unwrap();
+
+        let mut vars = BTreeMap::new();
+        vars.insert("profile".into(), "release".into());
+
+        let result = tpl.instantiate(&vars);
+        assert_eq!(result["label"], "build release");
+        assert_eq!(result["args"][2], "release");
+    }
+
+    #[test]
+    fn template_missing_placeholders() {
+        let tpl = TaskTemplate::new(
+            "test",
+            serde_json::json!({"a": "${x}", "b": "${y}"}),
+            vec!["x".into(), "y".into()],
+        )
+        .unwrap();
+
+        let mut vars = BTreeMap::new();
+        vars.insert("x".into(), "1".into());
+
+        assert!(!tpl.is_fully_bound(&vars));
+        assert_eq!(tpl.missing_placeholders(&vars), vec!["y"]);
+
+        vars.insert("y".into(), "2".into());
+        assert!(tpl.is_fully_bound(&vars));
+        assert!(tpl.missing_placeholders(&vars).is_empty());
+    }
+
+    #[test]
+    fn template_rejects_non_object_config() {
+        let result = TaskTemplate::new("bad", serde_json::json!([1, 2]), vec![]);
+        assert!(result.is_err());
+    }
+
+    // -- TaskScheduler ------------------------------------------------------
+
+    #[test]
+    fn scheduler_linear_chain() {
+        let mut sched = TaskScheduler::new();
+        sched.add_task("compile");
+        sched.add_dependency("link", "compile");
+        sched.add_dependency("test", "link");
+
+        let order = sched.schedule().unwrap();
+        let pos = |name: &str| order.iter().position(|s| s == name).unwrap();
+        assert!(pos("compile") < pos("link"));
+        assert!(pos("link") < pos("test"));
+    }
+
+    #[test]
+    fn scheduler_detects_cycle() {
+        let mut sched = TaskScheduler::new();
+        sched.add_dependency("a", "b");
+        sched.add_dependency("b", "a");
+
+        let result = sched.schedule();
+        assert!(matches!(result, Err(TaskError::DependencyCycle(_))));
+    }
+
+    #[test]
+    fn scheduler_independent_tasks() {
+        let mut sched = TaskScheduler::new();
+        sched.add_task("lint");
+        sched.add_task("format");
+        sched.add_task("docs");
+
+        let order = sched.schedule().unwrap();
+        assert_eq!(order.len(), 3);
+    }
+
+    // -- TaskExporter -------------------------------------------------------
+
+    #[test]
+    fn exporter_summary_counts() {
+        let entries = vec![
+            HistoryEntry {
+                label: "build".into(),
+                result: TaskResult::new(0, String::new(), String::new(), 100),
+                started_at: 1,
+            },
+            HistoryEntry {
+                label: "test".into(),
+                result: TaskResult::new(1, String::new(), String::new(), 200),
+                started_at: 2,
+            },
+        ];
+
+        let summary = TaskExporter::summary(&entries);
+        assert!(summary.contains("2 run(s)"));
+        assert!(summary.contains("1 succeeded"));
+        assert!(summary.contains("1 failed"));
+    }
+
+    #[test]
+    fn exporter_empty_summary() {
+        assert_eq!(TaskExporter::summary(&[]), "No task history.");
+    }
+
+    #[test]
+    fn exporter_tasks_json_format() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "build release", TaskPriority::High);
+
+        let pending: Vec<QueuedTask> = {
+            let refs = q.pending_tasks();
+            refs.into_iter().cloned().collect()
+        };
+        let json = TaskExporter::export_tasks_json(&pending);
+        assert_eq!(json["version"], "2.0.0");
+        assert!(json["tasks"].is_array());
+        assert_eq!(json["tasks"][0]["label"], "build release");
     }
 }

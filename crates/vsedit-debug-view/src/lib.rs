@@ -900,6 +900,350 @@ impl BreakpointList {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WatchExpression — watch expression evaluation
+// ---------------------------------------------------------------------------
+
+/// Evaluation result of a watch expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WatchResult {
+    Value(String),
+    Error(String),
+    Pending,
+}
+
+/// A watch expression tracked in the debug view.
+#[derive(Debug, Clone)]
+pub struct WatchExpression {
+    pub expression: String,
+    pub result: WatchResult,
+    pub eval_count: u32,
+}
+
+impl WatchExpression {
+    pub fn new(expression: impl Into<String>) -> Self {
+        Self {
+            expression: expression.into(),
+            result: WatchResult::Pending,
+            eval_count: 0,
+        }
+    }
+
+    /// Record an evaluation result.
+    pub fn set_result(&mut self, value: impl Into<String>) {
+        self.result = WatchResult::Value(value.into());
+        self.eval_count += 1;
+    }
+
+    /// Record an evaluation error.
+    pub fn set_error(&mut self, error: impl Into<String>) {
+        self.result = WatchResult::Error(error.into());
+        self.eval_count += 1;
+    }
+
+    pub fn is_pending(&self) -> bool {
+        self.result == WatchResult::Pending
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.result, WatchResult::Error(_))
+    }
+
+    /// Display text for rendering.
+    pub fn display_text(&self) -> String {
+        match &self.result {
+            WatchResult::Value(v) => format!("{} = {}", self.expression, v),
+            WatchResult::Error(e) => format!("{} ⚠ {}", self.expression, e),
+            WatchResult::Pending => format!("{} …", self.expression),
+        }
+    }
+}
+
+/// Manages a list of watch expressions.
+#[derive(Debug, Clone, Default)]
+pub struct WatchExpressionList {
+    expressions: Vec<WatchExpression>,
+    selected: Option<usize>,
+}
+
+impl WatchExpressionList {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, expr: impl Into<String>) {
+        self.expressions.push(WatchExpression::new(expr));
+        if self.selected.is_none() {
+            self.selected = Some(0);
+        }
+    }
+
+    pub fn remove(&mut self, index: usize) -> bool {
+        if index < self.expressions.len() {
+            self.expressions.remove(index);
+            if self.expressions.is_empty() {
+                self.selected = None;
+            } else if let Some(sel) = self.selected {
+                if sel >= self.expressions.len() {
+                    self.selected = Some(self.expressions.len() - 1);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&WatchExpression> {
+        self.expressions.get(index)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut WatchExpression> {
+        self.expressions.get_mut(index)
+    }
+
+    pub fn len(&self) -> usize {
+        self.expressions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.expressions.is_empty()
+    }
+
+    /// Reset all expressions to pending.
+    pub fn reset_all(&mut self) {
+        for expr in &mut self.expressions {
+            expr.result = WatchResult::Pending;
+        }
+    }
+
+    /// Count of expressions with errors.
+    pub fn error_count(&self) -> usize {
+        self.expressions.iter().filter(|e| e.is_error()).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DebugConsoleHistory — command history for the debug console
+// ---------------------------------------------------------------------------
+
+/// Tracks debug console command history with navigation.
+#[derive(Debug, Clone, Default)]
+pub struct DebugConsoleHistory {
+    entries: Vec<String>,
+    cursor: Option<usize>,
+    max_entries: usize,
+}
+
+impl DebugConsoleHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: None,
+            max_entries,
+        }
+    }
+
+    /// Push a command into history, resetting the cursor.
+    pub fn push(&mut self, command: impl Into<String>) {
+        let cmd = command.into();
+        if cmd.is_empty() {
+            return;
+        }
+        // Deduplicate consecutive
+        if self.entries.last().map(|s| s.as_str()) == Some(&cmd) {
+            self.cursor = None;
+            return;
+        }
+        self.entries.push(cmd);
+        if self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+        self.cursor = None;
+    }
+
+    /// Navigate up (older). Returns the command at the cursor.
+    pub fn up(&mut self) -> Option<&str> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let idx = match self.cursor {
+            Some(i) => i.saturating_sub(1),
+            None => self.entries.len() - 1,
+        };
+        self.cursor = Some(idx);
+        self.entries.get(idx).map(|s| s.as_str())
+    }
+
+    /// Navigate down (newer). Returns the command at the cursor, or None if at end.
+    pub fn down(&mut self) -> Option<&str> {
+        match self.cursor {
+            Some(i) if i + 1 < self.entries.len() => {
+                self.cursor = Some(i + 1);
+                self.entries.get(i + 1).map(|s| s.as_str())
+            }
+            _ => {
+                self.cursor = None;
+                None
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = None;
+    }
+
+    /// Search history for entries containing the query.
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        self.entries
+            .iter()
+            .filter(|e| e.contains(query))
+            .map(|e| e.as_str())
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BreakpointCondition — conditional breakpoints
+// ---------------------------------------------------------------------------
+
+/// Type of breakpoint condition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConditionKind {
+    /// Break when expression evaluates to true.
+    Expression(String),
+    /// Break when hit count reaches value.
+    HitCount(u32),
+    /// Break when log message pattern matches.
+    LogMessage(String),
+}
+
+/// A condition attached to a breakpoint.
+#[derive(Debug, Clone)]
+pub struct BreakpointCondition {
+    pub kind: ConditionKind,
+    pub enabled: bool,
+    current_hits: u32,
+}
+
+impl BreakpointCondition {
+    pub fn expression(expr: impl Into<String>) -> Self {
+        Self {
+            kind: ConditionKind::Expression(expr.into()),
+            enabled: true,
+            current_hits: 0,
+        }
+    }
+
+    pub fn hit_count(count: u32) -> Self {
+        Self {
+            kind: ConditionKind::HitCount(count),
+            enabled: true,
+            current_hits: 0,
+        }
+    }
+
+    pub fn log_message(pattern: impl Into<String>) -> Self {
+        Self {
+            kind: ConditionKind::LogMessage(pattern.into()),
+            enabled: true,
+            current_hits: 0,
+        }
+    }
+
+    /// Record a hit and return whether the breakpoint should trigger.
+    pub fn record_hit(&mut self) -> bool {
+        if !self.enabled {
+            return true; // unconditional if disabled
+        }
+        self.current_hits += 1;
+        match &self.kind {
+            ConditionKind::HitCount(target) => self.current_hits >= *target,
+            ConditionKind::Expression(_) | ConditionKind::LogMessage(_) => true,
+        }
+    }
+
+    pub fn reset_hits(&mut self) {
+        self.current_hits = 0;
+    }
+
+    pub fn current_hits(&self) -> u32 {
+        self.current_hits
+    }
+
+    /// A human-readable description of the condition.
+    pub fn description(&self) -> String {
+        match &self.kind {
+            ConditionKind::Expression(e) => format!("when: {}", e),
+            ConditionKind::HitCount(n) => format!("hit count >= {}", n),
+            ConditionKind::LogMessage(m) => format!("log: {}", m),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VariableInspector — deep inspection extensions
+// ---------------------------------------------------------------------------
+
+impl VariableInspector {
+    /// Expand all top-level variables.
+    pub fn expand_all(&mut self) {
+        for var in &self.variables {
+            let path = var.name.clone();
+            if !self.is_expanded(&path) {
+                self.expanded_paths.push(path);
+            }
+        }
+    }
+
+    /// Collapse all expanded paths.
+    pub fn collapse_all(&mut self) {
+        self.expanded_paths.clear();
+    }
+
+    /// Number of currently expanded paths.
+    pub fn expanded_count(&self) -> usize {
+        self.expanded_paths.len()
+    }
+
+    /// Search variables (name or value) and return matching paths.
+    pub fn search(&self, query: &str) -> Vec<String> {
+        let mut results = Vec::new();
+        for var in &self.variables {
+            self.search_rec(var, &var.name, query, &mut results);
+        }
+        results
+    }
+
+    fn search_rec(&self, var: &DebugVariable, path: &str, query: &str, out: &mut Vec<String>) {
+        if var.name.contains(query) || var.value.contains(query) {
+            out.push(path.to_string());
+        }
+        for child in &var.children {
+            let child_path = format!("{}.{}", path, child.name);
+            self.search_rec(child, &child_path, query, out);
+        }
+    }
+
+    /// Get the total number of variables (recursive, all depths).
+    pub fn total_variable_count(&self) -> usize {
+        self.variables.iter().map(|v| Self::count_rec(v)).sum()
+    }
+
+    fn count_rec(var: &DebugVariable) -> usize {
+        1 + var.children.iter().map(|c| Self::count_rec(c)).sum::<usize>()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1336,5 +1680,134 @@ mod tests {
         assert_eq!(list.breakpoints_for_file("a.rs").len(), 2);
         assert_eq!(list.breakpoints_for_file("b.rs").len(), 1);
         assert!(list.breakpoints_for_file("c.rs").is_empty());
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn watch_expression_lifecycle() {
+        let mut w = WatchExpression::new("x + 1");
+        assert!(w.is_pending());
+        assert_eq!(w.display_text(), "x + 1 …");
+
+        w.set_result("42");
+        assert!(!w.is_pending());
+        assert!(!w.is_error());
+        assert_eq!(w.display_text(), "x + 1 = 42");
+        assert_eq!(w.eval_count, 1);
+
+        w.set_error("undefined");
+        assert!(w.is_error());
+        assert_eq!(w.display_text(), "x + 1 ⚠ undefined");
+        assert_eq!(w.eval_count, 2);
+    }
+
+    #[test]
+    fn watch_expression_list_operations() {
+        let mut list = WatchExpressionList::new();
+        list.add("a");
+        list.add("b");
+        assert_eq!(list.len(), 2);
+
+        list.get_mut(0).unwrap().set_error("fail");
+        assert_eq!(list.error_count(), 1);
+
+        list.reset_all();
+        assert!(list.get(0).unwrap().is_pending());
+        assert_eq!(list.error_count(), 0);
+
+        assert!(list.remove(0));
+        assert_eq!(list.len(), 1);
+        assert!(!list.remove(99));
+    }
+
+    #[test]
+    fn debug_console_history_navigation() {
+        let mut h = DebugConsoleHistory::new(5);
+        h.push("print x");
+        h.push("print y");
+        h.push("step");
+
+        assert_eq!(h.up(), Some("step"));
+        assert_eq!(h.up(), Some("print y"));
+        assert_eq!(h.up(), Some("print x"));
+        assert_eq!(h.up(), Some("print x")); // stays at start
+
+        assert_eq!(h.down(), Some("print y"));
+        assert_eq!(h.down(), Some("step"));
+        assert_eq!(h.down(), None); // past end
+    }
+
+    #[test]
+    fn debug_console_history_dedup_and_max() {
+        let mut h = DebugConsoleHistory::new(3);
+        h.push("a");
+        h.push("a"); // consecutive duplicate
+        assert_eq!(h.len(), 1);
+
+        h.push("b");
+        h.push("c");
+        h.push("d"); // exceeds max, drops oldest
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.search("a").len(), 0); // "a" was evicted
+    }
+
+    #[test]
+    fn debug_console_history_search() {
+        let mut h = DebugConsoleHistory::new(10);
+        h.push("print x");
+        h.push("step over");
+        h.push("print y");
+        let results = h.search("print");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn breakpoint_condition_hit_count() {
+        let mut cond = BreakpointCondition::hit_count(3);
+        assert_eq!(cond.description(), "hit count >= 3");
+        assert!(!cond.record_hit()); // 1
+        assert!(!cond.record_hit()); // 2
+        assert!(cond.record_hit());  // 3
+        assert_eq!(cond.current_hits(), 3);
+        cond.reset_hits();
+        assert_eq!(cond.current_hits(), 0);
+    }
+
+    #[test]
+    fn breakpoint_condition_expression() {
+        let mut cond = BreakpointCondition::expression("i > 5");
+        assert_eq!(cond.description(), "when: i > 5");
+        assert!(cond.record_hit()); // expressions always trigger
+    }
+
+    #[test]
+    fn variable_inspector_expand_collapse_all() {
+        let mut inspector = VariableInspector::new();
+        let child = DebugVariable::new("x", "1", "i32");
+        let parent = DebugVariable::new("obj", "{}", "Struct").with_children(vec![child]);
+        inspector.set_variables(vec![parent]);
+
+        inspector.expand_all();
+        assert_eq!(inspector.expanded_count(), 1);
+        assert_eq!(inspector.flatten().len(), 2); // parent + child
+
+        inspector.collapse_all();
+        assert_eq!(inspector.expanded_count(), 0);
+        assert_eq!(inspector.flatten().len(), 1); // parent only
+    }
+
+    #[test]
+    fn variable_inspector_search_and_count() {
+        let mut inspector = VariableInspector::new();
+        let child = DebugVariable::new("count", "42", "i32");
+        let parent = DebugVariable::new("stats", "{}", "Stats").with_children(vec![child]);
+        inspector.set_variables(vec![parent, DebugVariable::new("name", "hello", "String")]);
+
+        let results = inspector.search("count");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], "stats.count");
+
+        assert_eq!(inspector.total_variable_count(), 3); // stats + count + name
     }
 }

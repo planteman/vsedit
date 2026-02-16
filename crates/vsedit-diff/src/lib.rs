@@ -535,6 +535,232 @@ impl Default for DiffValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DiffStatistics — detailed diff statistics with percentages
+// ---------------------------------------------------------------------------
+
+/// Detailed diff statistics including line counts and percentages.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiffStatistics {
+    pub total_insertions: u32,
+    pub total_deletions: u32,
+    pub total_changes: u32,
+    pub original_line_count: u32,
+    pub modified_line_count: u32,
+}
+
+impl DiffStatistics {
+    /// Compute detailed statistics from a LineDiff.
+    pub fn from_line_diff(diff: &LineDiff) -> Self {
+        let stats = compute_stats(diff);
+        Self {
+            total_insertions: stats.insertions,
+            total_deletions: stats.deletions,
+            total_changes: stats.changes,
+            original_line_count: diff.original_line_count,
+            modified_line_count: diff.modified_line_count,
+        }
+    }
+
+    /// Total number of affected hunks.
+    pub fn hunk_count(&self) -> u32 {
+        self.total_insertions + self.total_deletions + self.total_changes
+    }
+
+    /// Percentage of original lines that were deleted.
+    pub fn deletion_percentage(&self) -> f64 {
+        if self.original_line_count == 0 {
+            return 0.0;
+        }
+        self.total_deletions as f64 / self.original_line_count as f64 * 100.0
+    }
+
+    /// Percentage of modified lines that are insertions.
+    pub fn insertion_percentage(&self) -> f64 {
+        if self.modified_line_count == 0 {
+            return 0.0;
+        }
+        self.total_insertions as f64 / self.modified_line_count as f64 * 100.0
+    }
+
+    /// Net line change (positive = growth, negative = shrinkage).
+    pub fn net_change(&self) -> i64 {
+        self.modified_line_count as i64 - self.original_line_count as i64
+    }
+
+    /// Whether the diff is empty (no changes).
+    pub fn is_empty(&self) -> bool {
+        self.total_insertions == 0 && self.total_deletions == 0 && self.total_changes == 0
+    }
+
+    /// Churn: total lines added + deleted + changed.
+    pub fn churn(&self) -> u32 {
+        self.total_insertions + self.total_deletions + self.total_changes
+    }
+
+    /// Format as a git-style summary: "+X -Y ~Z".
+    pub fn summary_string(&self) -> String {
+        format!("+{} -{} ~{}", self.total_insertions, self.total_deletions, self.total_changes)
+    }
+}
+
+impl fmt::Display for DiffStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "DiffStatistics(+{} -{} ~{}, {}→{} lines)",
+            self.total_insertions, self.total_deletions, self.total_changes,
+            self.original_line_count, self.modified_line_count
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Patch formatting
+// ---------------------------------------------------------------------------
+
+/// A formatted patch section with header and content lines.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PatchSection {
+    pub header: String,
+    pub added_lines: Vec<String>,
+    pub removed_lines: Vec<String>,
+    pub context_lines: Vec<String>,
+}
+
+impl PatchSection {
+    /// Create from a DiffHunk.
+    pub fn from_hunk(hunk: &DiffHunk) -> Self {
+        let header = format!(
+            "@@ -{},{} +{},{} @@",
+            hunk.original_start,
+            hunk.original_lines.len(),
+            hunk.modified_start,
+            hunk.modified_lines.len(),
+        );
+        Self {
+            header,
+            removed_lines: hunk.original_lines.clone(),
+            added_lines: hunk.modified_lines.clone(),
+            context_lines: Vec::new(),
+        }
+    }
+
+    /// Format as a string with +/- prefixes.
+    pub fn format(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&self.header);
+        out.push('\n');
+        for line in &self.removed_lines {
+            out.push('-');
+            out.push_str(line.trim_end_matches('\n'));
+            out.push('\n');
+        }
+        for line in &self.added_lines {
+            out.push('+');
+            out.push_str(line.trim_end_matches('\n'));
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Total number of lines in this section.
+    pub fn total_lines(&self) -> usize {
+        self.added_lines.len() + self.removed_lines.len() + self.context_lines.len()
+    }
+}
+
+impl fmt::Display for PatchSection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format())
+    }
+}
+
+/// Format all hunks as a complete patch.
+pub fn format_patch(original_name: &str, modified_name: &str, hunks: &[DiffHunk]) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("--- {}\n", original_name));
+    out.push_str(&format!("+++ {}\n", modified_name));
+    for hunk in hunks {
+        let section = PatchSection::from_hunk(hunk);
+        out.push_str(&section.format());
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Diff region merging for adjacent changes
+// ---------------------------------------------------------------------------
+
+/// Merge adjacent diff hunks that are within `max_gap` lines of each other.
+pub fn merge_adjacent_hunks(hunks: &[DiffHunk], max_gap: u32) -> Vec<DiffHunk> {
+    if hunks.is_empty() {
+        return Vec::new();
+    }
+    let mut result: Vec<DiffHunk> = Vec::new();
+    let mut current = hunks[0].clone();
+
+    for hunk in &hunks[1..] {
+        let current_end = current.original_start + current.original_lines.len() as u32;
+        let gap = hunk.original_start.saturating_sub(current_end);
+
+        if gap <= max_gap {
+            // Merge: extend current hunk
+            current.original_lines.extend(hunk.original_lines.iter().cloned());
+            current.modified_lines.extend(hunk.modified_lines.iter().cloned());
+            // Update type
+            if !current.original_lines.is_empty() && !current.modified_lines.is_empty() {
+                current.change_type = DiffHunkType::Modify;
+            }
+        } else {
+            result.push(current);
+            current = hunk.clone();
+        }
+    }
+    result.push(current);
+    result
+}
+
+/// Merge adjacent DiffChanges that are within `max_gap` lines of each other.
+pub fn merge_adjacent_changes(changes: &[DiffChange], max_gap: u32) -> Vec<DiffChange> {
+    if changes.is_empty() {
+        return Vec::new();
+    }
+    let mut result: Vec<DiffChange> = Vec::new();
+    let mut current = changes[0].clone();
+
+    for change in &changes[1..] {
+        let current_end = current.original_start + current.original_length;
+        let gap = change.original_start.saturating_sub(current_end);
+
+        if gap <= max_gap {
+            // Merge into current
+            let new_orig_end = (change.original_start + change.original_length)
+                .max(current.original_start + current.original_length);
+            let new_mod_end = (change.modified_start + change.modified_length)
+                .max(current.modified_start + current.modified_length);
+
+            current.original_length = new_orig_end - current.original_start;
+            current.modified_length = new_mod_end - current.modified_start;
+
+            // Adjust kind
+            if current.original_length > 0 && current.modified_length > 0 {
+                current.kind = DiffChangeKind::Change;
+            }
+        } else {
+            result.push(current);
+            current = change.clone();
+        }
+    }
+    result.push(current);
+    result
+}
+
+/// Count the total number of lines affected by a set of changes.
+pub fn total_affected_lines(changes: &[DiffChange]) -> u32 {
+    changes.iter().map(|c| c.original_length + c.modified_length).sum()
+}
+
 /// Type of change represented by a [`DiffHunk`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiffHunkType {
@@ -1291,5 +1517,83 @@ mod tests {
     fn diff_is_ascii_printable() {
         assert!(DiffValidator::is_ascii_printable("Hello World 123"));
         assert!(!DiffValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---- DiffStatistics tests ----
+
+    #[test]
+    fn diff_statistics_from_line_diff() {
+        let diff = compute_line_diff("a\nb\nc\n", "a\nx\nc\nd\n");
+        let stats = DiffStatistics::from_line_diff(&diff);
+        assert!(!stats.is_empty());
+        assert!(stats.net_change() > 0);
+        assert!(!stats.summary_string().is_empty());
+    }
+
+    #[test]
+    fn diff_statistics_empty_diff() {
+        let diff = compute_line_diff("hello\n", "hello\n");
+        let stats = DiffStatistics::from_line_diff(&diff);
+        assert!(stats.is_empty());
+        assert_eq!(stats.churn(), 0);
+    }
+
+    #[test]
+    fn diff_statistics_percentages() {
+        let diff = compute_line_diff("a\nb\nc\nd\n", "a\nc\nd\n");
+        let stats = DiffStatistics::from_line_diff(&diff);
+        assert!(stats.deletion_percentage() > 0.0);
+    }
+
+    // ---- Patch formatting tests ----
+
+    #[test]
+    fn format_patch_output() {
+        let hunks = compute_diff_hunks("hello\nworld\n", "hello\nearth\n");
+        let patch = format_patch("a.txt", "b.txt", &hunks);
+        assert!(patch.contains("--- a.txt"));
+        assert!(patch.contains("+++ b.txt"));
+        assert!(patch.contains("@@"));
+    }
+
+    #[test]
+    fn patch_section_from_hunk() {
+        let hunks = compute_diff_hunks("line1\nline2\n", "line1\nchanged\n");
+        assert!(!hunks.is_empty());
+        let section = PatchSection::from_hunk(&hunks[0]);
+        assert!(section.total_lines() > 0);
+        assert!(section.header.contains("@@"));
+    }
+
+    // ---- Merge adjacent changes tests ----
+
+    #[test]
+    fn merge_adjacent_changes_close_hunks() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Delete, original_start: 1, original_length: 1, modified_start: 1, modified_length: 0 },
+            DiffChange { kind: DiffChangeKind::Insert, original_start: 3, original_length: 0, modified_start: 2, modified_length: 1 },
+        ];
+        let merged = merge_adjacent_changes(&changes, 2);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].kind, DiffChangeKind::Change);
+    }
+
+    #[test]
+    fn merge_adjacent_changes_far_apart() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Delete, original_start: 1, original_length: 1, modified_start: 1, modified_length: 0 },
+            DiffChange { kind: DiffChangeKind::Insert, original_start: 100, original_length: 0, modified_start: 99, modified_length: 1 },
+        ];
+        let merged = merge_adjacent_changes(&changes, 2);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn total_affected_lines_count() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Delete, original_start: 1, original_length: 3, modified_start: 1, modified_length: 0 },
+            DiffChange { kind: DiffChangeKind::Insert, original_start: 5, original_length: 0, modified_start: 2, modified_length: 2 },
+        ];
+        assert_eq!(total_affected_lines(&changes), 5);
     }
 }

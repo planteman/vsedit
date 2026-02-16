@@ -742,6 +742,240 @@ impl RequestService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RequestRetryPolicy
+// ---------------------------------------------------------------------------
+
+/// A configurable retry policy with exponential backoff and jitter.
+#[derive(Debug, Clone)]
+pub struct RequestRetryPolicy {
+    pub max_retries: u32,
+    pub base_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub backoff_factor: f64,
+    pub jitter_percent: f64,
+}
+
+impl RequestRetryPolicy {
+    /// Create a new retry policy.
+    pub fn new(max_retries: u32, base_delay_ms: u64) -> Self {
+        Self {
+            max_retries,
+            base_delay_ms,
+            max_delay_ms: 30_000,
+            backoff_factor: 2.0,
+            jitter_percent: 0.0,
+        }
+    }
+
+    /// Set the maximum delay cap.
+    pub fn with_max_delay(mut self, ms: u64) -> Self {
+        self.max_delay_ms = ms;
+        self
+    }
+
+    /// Set the backoff multiplication factor.
+    pub fn with_backoff_factor(mut self, factor: f64) -> Self {
+        self.backoff_factor = factor;
+        self
+    }
+
+    /// Set jitter as a percentage (0.0–1.0) of the computed delay.
+    pub fn with_jitter(mut self, percent: f64) -> Self {
+        self.jitter_percent = percent.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Compute the delay for a given attempt number (0-based).
+    pub fn delay_for_attempt(&self, attempt: u32) -> u64 {
+        let base = self.base_delay_ms as f64 * self.backoff_factor.powi(attempt as i32);
+        let capped = base.min(self.max_delay_ms as f64);
+        capped as u64
+    }
+
+    /// Whether the given attempt number is within the allowed retries.
+    pub fn should_retry(&self, attempt: u32) -> bool {
+        attempt < self.max_retries
+    }
+
+    /// Total maximum delay if all retries are used (without jitter).
+    pub fn total_max_delay(&self) -> u64 {
+        (0..self.max_retries).map(|a| self.delay_for_attempt(a)).sum()
+    }
+}
+
+impl Default for RequestRetryPolicy {
+    fn default() -> Self {
+        Self::new(3, 100)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestMetrics
+// ---------------------------------------------------------------------------
+
+/// Tracks request metrics: latency, success rate, counts.
+#[derive(Debug, Clone)]
+pub struct RequestMetrics {
+    total_requests: u64,
+    successful_requests: u64,
+    failed_requests: u64,
+    total_latency_ms: u64,
+    min_latency_ms: Option<u64>,
+    max_latency_ms: Option<u64>,
+}
+
+impl RequestMetrics {
+    pub fn new() -> Self {
+        Self {
+            total_requests: 0,
+            successful_requests: 0,
+            failed_requests: 0,
+            total_latency_ms: 0,
+            min_latency_ms: None,
+            max_latency_ms: None,
+        }
+    }
+
+    /// Record a successful request with its latency.
+    pub fn record_success(&mut self, latency_ms: u64) {
+        self.total_requests += 1;
+        self.successful_requests += 1;
+        self.record_latency(latency_ms);
+    }
+
+    /// Record a failed request with its latency.
+    pub fn record_failure(&mut self, latency_ms: u64) {
+        self.total_requests += 1;
+        self.failed_requests += 1;
+        self.record_latency(latency_ms);
+    }
+
+    fn record_latency(&mut self, latency_ms: u64) {
+        self.total_latency_ms += latency_ms;
+        self.min_latency_ms = Some(self.min_latency_ms.map_or(latency_ms, |m| m.min(latency_ms)));
+        self.max_latency_ms = Some(self.max_latency_ms.map_or(latency_ms, |m| m.max(latency_ms)));
+    }
+
+    /// Average latency in milliseconds.
+    pub fn average_latency_ms(&self) -> f64 {
+        if self.total_requests == 0 {
+            return 0.0;
+        }
+        self.total_latency_ms as f64 / self.total_requests as f64
+    }
+
+    /// Success rate as a percentage (0.0–100.0).
+    pub fn success_rate(&self) -> f64 {
+        if self.total_requests == 0 {
+            return 0.0;
+        }
+        (self.successful_requests as f64 / self.total_requests as f64) * 100.0
+    }
+
+    /// Failure rate as a percentage (0.0–100.0).
+    pub fn failure_rate(&self) -> f64 {
+        if self.total_requests == 0 {
+            return 0.0;
+        }
+        (self.failed_requests as f64 / self.total_requests as f64) * 100.0
+    }
+
+    pub fn total(&self) -> u64 {
+        self.total_requests
+    }
+
+    pub fn min_latency(&self) -> Option<u64> {
+        self.min_latency_ms
+    }
+
+    pub fn max_latency(&self) -> Option<u64> {
+        self.max_latency_ms
+    }
+
+    /// Reset all metrics.
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+}
+
+impl Default for RequestMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for RequestMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Metrics: {} total, {:.1}% success, {:.1}ms avg latency",
+            self.total_requests,
+            self.success_rate(),
+            self.average_latency_ms(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestDeduplicator
+// ---------------------------------------------------------------------------
+
+/// Deduplicates requests by method, coalescing identical in-flight requests.
+pub struct RequestDeduplicator {
+    in_flight: std::collections::HashMap<String, RequestId>,
+}
+
+impl RequestDeduplicator {
+    pub fn new() -> Self {
+        Self {
+            in_flight: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Try to register a method as in-flight. Returns `Some(existing_id)` if
+    /// the method is already in flight, `None` if it was newly registered.
+    pub fn try_register(&mut self, method: &str, id: RequestId) -> Option<RequestId> {
+        if let Some(&existing) = self.in_flight.get(method) {
+            Some(existing)
+        } else {
+            self.in_flight.insert(method.to_string(), id);
+            None
+        }
+    }
+
+    /// Mark a method as completed, removing it from in-flight tracking.
+    pub fn complete(&mut self, method: &str) -> Option<RequestId> {
+        self.in_flight.remove(method)
+    }
+
+    /// Check if a method is currently in flight.
+    pub fn is_in_flight(&self, method: &str) -> bool {
+        self.in_flight.contains_key(method)
+    }
+
+    /// Number of in-flight methods.
+    pub fn in_flight_count(&self) -> usize {
+        self.in_flight.len()
+    }
+
+    /// Get the request ID for an in-flight method.
+    pub fn get_in_flight(&self, method: &str) -> Option<RequestId> {
+        self.in_flight.get(method).copied()
+    }
+
+    /// Clear all in-flight tracking.
+    pub fn clear(&mut self) {
+        self.in_flight.clear();
+    }
+}
+
+impl Default for RequestDeduplicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1305,5 +1539,66 @@ mod tests {
         let cancelled = svc.cancel_timed_out(100);
         assert_eq!(cancelled, 0);
         assert_eq!(svc.get_state(id), Some(&RequestState::Completed));
+    }
+
+    // ── RetryPolicy / Metrics / Deduplicator tests ──
+
+    #[test]
+    fn retry_policy_exponential_backoff() {
+        let policy = RequestRetryPolicy::new(5, 100).with_backoff_factor(2.0);
+        assert_eq!(policy.delay_for_attempt(0), 100);
+        assert_eq!(policy.delay_for_attempt(1), 200);
+        assert_eq!(policy.delay_for_attempt(2), 400);
+        assert!(policy.should_retry(2));
+        assert!(!policy.should_retry(5));
+    }
+
+    #[test]
+    fn retry_policy_max_delay_cap() {
+        let policy = RequestRetryPolicy::new(10, 1000).with_max_delay(5000);
+        assert_eq!(policy.delay_for_attempt(0), 1000);
+        assert_eq!(policy.delay_for_attempt(10), 5000); // capped
+    }
+
+    #[test]
+    fn request_metrics_tracking() {
+        let mut metrics = RequestMetrics::new();
+        metrics.record_success(50);
+        metrics.record_success(100);
+        metrics.record_failure(200);
+        assert_eq!(metrics.total(), 3);
+        assert!((metrics.success_rate() - 66.66).abs() < 1.0);
+        assert!((metrics.average_latency_ms() - 116.666).abs() < 1.0);
+        assert_eq!(metrics.min_latency(), Some(50));
+        assert_eq!(metrics.max_latency(), Some(200));
+    }
+
+    #[test]
+    fn request_metrics_reset() {
+        let mut metrics = RequestMetrics::new();
+        metrics.record_success(100);
+        metrics.reset();
+        assert_eq!(metrics.total(), 0);
+        assert_eq!(metrics.min_latency(), None);
+    }
+
+    #[test]
+    fn deduplicator_coalesces_requests() {
+        let mut dedup = RequestDeduplicator::new();
+        let id1 = RequestId(1);
+        let id2 = RequestId(2);
+        assert!(dedup.try_register("GET /users", id1).is_none());
+        assert_eq!(dedup.try_register("GET /users", id2), Some(id1));
+        assert!(dedup.is_in_flight("GET /users"));
+        assert_eq!(dedup.in_flight_count(), 1);
+        dedup.complete("GET /users");
+        assert!(!dedup.is_in_flight("GET /users"));
+    }
+
+    #[test]
+    fn retry_policy_total_max_delay() {
+        let policy = RequestRetryPolicy::new(3, 100).with_backoff_factor(2.0);
+        // 100 + 200 + 400 = 700
+        assert_eq!(policy.total_max_delay(), 700);
     }
 }

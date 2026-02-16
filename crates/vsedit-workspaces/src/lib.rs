@@ -726,6 +726,340 @@ pub fn resolve_workspace_path(folder: &WorkspaceFolder, relative: &str) -> Strin
     format!("{base}{clean}")
 }
 
+// ── Workspace Snapshot ──
+
+/// A point-in-time snapshot of a workspace configuration that can be restored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceSnapshot {
+    pub name: Option<String>,
+    pub folders: Vec<WorkspaceFolder>,
+    pub settings: HashMap<String, String>,
+    pub timestamp: u64,
+    pub label: String,
+}
+
+impl WorkspaceSnapshot {
+    /// Capture the current state of a workspace configuration.
+    pub fn capture(config: &WorkspaceConfiguration, timestamp: u64, label: impl Into<String>) -> Self {
+        Self {
+            name: config.name.clone(),
+            folders: config.folders.clone(),
+            settings: config.settings.clone(),
+            timestamp,
+            label: label.into(),
+        }
+    }
+
+    /// Restore this snapshot into the given workspace configuration, replacing all state.
+    pub fn restore_into(&self, config: &mut WorkspaceConfiguration) {
+        config.name = self.name.clone();
+        config.folders = self.folders.clone();
+        config.settings = self.settings.clone();
+    }
+
+    /// Return the number of folders captured in this snapshot.
+    pub fn folder_count(&self) -> usize {
+        self.folders.len()
+    }
+
+    /// Return the number of settings captured in this snapshot.
+    pub fn setting_count(&self) -> usize {
+        self.settings.len()
+    }
+}
+
+impl fmt::Display for WorkspaceSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Snapshot '{}' at {} ({} folder(s), {} setting(s))",
+            self.label,
+            self.timestamp,
+            self.folders.len(),
+            self.settings.len()
+        )
+    }
+}
+
+// ── Workspace Diff ──
+
+/// Describes a single difference between two workspace configurations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkspaceDiffEntry {
+    FolderAdded(String),
+    FolderRemoved(String),
+    SettingAdded(String),
+    SettingRemoved(String),
+    SettingChanged { key: String, old: String, new: String },
+    NameChanged { old: Option<String>, new: Option<String> },
+}
+
+/// The result of comparing two workspace configurations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceDiff {
+    pub entries: Vec<WorkspaceDiffEntry>,
+}
+
+impl WorkspaceDiff {
+    /// Compare two workspace configurations and produce a diff.
+    pub fn compare(before: &WorkspaceConfiguration, after: &WorkspaceConfiguration) -> Self {
+        let mut entries = Vec::new();
+
+        if before.name != after.name {
+            entries.push(WorkspaceDiffEntry::NameChanged {
+                old: before.name.clone(),
+                new: after.name.clone(),
+            });
+        }
+
+        let before_uris: std::collections::HashSet<&str> =
+            before.folders.iter().map(|f| f.uri.as_str()).collect();
+        let after_uris: std::collections::HashSet<&str> =
+            after.folders.iter().map(|f| f.uri.as_str()).collect();
+
+        for uri in &after_uris {
+            if !before_uris.contains(uri) {
+                entries.push(WorkspaceDiffEntry::FolderAdded(uri.to_string()));
+            }
+        }
+        for uri in &before_uris {
+            if !after_uris.contains(uri) {
+                entries.push(WorkspaceDiffEntry::FolderRemoved(uri.to_string()));
+            }
+        }
+
+        for (key, new_val) in &after.settings {
+            match before.settings.get(key) {
+                None => entries.push(WorkspaceDiffEntry::SettingAdded(key.clone())),
+                Some(old_val) if old_val != new_val => {
+                    entries.push(WorkspaceDiffEntry::SettingChanged {
+                        key: key.clone(),
+                        old: old_val.clone(),
+                        new: new_val.clone(),
+                    });
+                }
+                _ => {}
+            }
+        }
+        for key in before.settings.keys() {
+            if !after.settings.contains_key(key) {
+                entries.push(WorkspaceDiffEntry::SettingRemoved(key.clone()));
+            }
+        }
+
+        Self { entries }
+    }
+
+    /// Returns `true` if the two configurations are identical.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Number of differences found.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns only the folder-related changes.
+    pub fn folder_changes(&self) -> Vec<&WorkspaceDiffEntry> {
+        self.entries
+            .iter()
+            .filter(|e| matches!(e, WorkspaceDiffEntry::FolderAdded(_) | WorkspaceDiffEntry::FolderRemoved(_)))
+            .collect()
+    }
+
+    /// Returns only the setting-related changes.
+    pub fn setting_changes(&self) -> Vec<&WorkspaceDiffEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    WorkspaceDiffEntry::SettingAdded(_)
+                        | WorkspaceDiffEntry::SettingRemoved(_)
+                        | WorkspaceDiffEntry::SettingChanged { .. }
+                )
+            })
+            .collect()
+    }
+}
+
+// ── Workspace Template ──
+
+/// A reusable template for creating workspace configurations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceTemplate {
+    pub template_name: String,
+    pub description: String,
+    pub default_settings: Vec<(String, String)>,
+    pub folder_patterns: Vec<String>,
+}
+
+impl WorkspaceTemplate {
+    /// Create a new template with a name and description.
+    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            template_name: name.into(),
+            description: description.into(),
+            default_settings: Vec::new(),
+            folder_patterns: Vec::new(),
+        }
+    }
+
+    /// Add a default setting to the template.
+    pub fn add_setting(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.default_settings.push((key.into(), value.into()));
+    }
+
+    /// Add a folder pattern (e.g. "src", "tests") to the template.
+    pub fn add_folder_pattern(&mut self, pattern: impl Into<String>) {
+        self.folder_patterns.push(pattern.into());
+    }
+
+    /// Instantiate a workspace configuration from this template using a root path.
+    pub fn instantiate(&self, root: &str) -> Result<WorkspaceConfiguration, WorkspaceError> {
+        let mut config = WorkspaceConfiguration::new();
+        let root_trimmed = root.trim_end_matches('/');
+
+        for pattern in &self.folder_patterns {
+            let uri = format!("{}/{}", root_trimmed, pattern);
+            let name = pattern.clone();
+            config.try_add_folder(uri, name)?;
+        }
+
+        for (key, value) in &self.default_settings {
+            config.try_set_setting(key.clone(), value.clone())?;
+        }
+
+        Ok(config)
+    }
+
+    /// Number of default settings in the template.
+    pub fn setting_count(&self) -> usize {
+        self.default_settings.len()
+    }
+
+    /// Number of folder patterns in the template.
+    pub fn folder_pattern_count(&self) -> usize {
+        self.folder_patterns.len()
+    }
+}
+
+impl fmt::Display for WorkspaceTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Template '{}': {} ({} folder(s), {} setting(s))",
+            self.template_name,
+            self.description,
+            self.folder_patterns.len(),
+            self.default_settings.len()
+        )
+    }
+}
+
+// ── Workspace Health Check ──
+
+/// The severity of a health check finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+impl fmt::Display for HealthSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HealthSeverity::Info => write!(f, "INFO"),
+            HealthSeverity::Warning => write!(f, "WARN"),
+            HealthSeverity::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
+/// A single finding from a workspace health check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealthFinding {
+    pub severity: HealthSeverity,
+    pub message: String,
+}
+
+/// Results of running a health check on a workspace configuration.
+#[derive(Debug, Clone)]
+pub struct WorkspaceHealthCheck {
+    pub findings: Vec<HealthFinding>,
+}
+
+impl WorkspaceHealthCheck {
+    /// Run a health check against the given workspace configuration.
+    pub fn check(config: &WorkspaceConfiguration) -> Self {
+        let mut findings = Vec::new();
+
+        if config.name.is_none() {
+            findings.push(HealthFinding {
+                severity: HealthSeverity::Warning,
+                message: "Workspace has no name set".to_string(),
+            });
+        }
+
+        if config.folders.is_empty() {
+            findings.push(HealthFinding {
+                severity: HealthSeverity::Error,
+                message: "Workspace has no folders".to_string(),
+            });
+        }
+
+        // Check for folders with identical names (confusing for users).
+        let mut seen_names = std::collections::HashSet::new();
+        for folder in &config.folders {
+            if !seen_names.insert(&folder.name) {
+                findings.push(HealthFinding {
+                    severity: HealthSeverity::Warning,
+                    message: format!("Duplicate folder name: {}", folder.name),
+                });
+            }
+        }
+
+        // Check for settings with empty values.
+        for (key, value) in &config.settings {
+            if value.is_empty() {
+                findings.push(HealthFinding {
+                    severity: HealthSeverity::Info,
+                    message: format!("Setting '{}' has an empty value", key),
+                });
+            }
+        }
+
+        Self { findings }
+    }
+
+    /// Returns `true` if no findings were produced.
+    pub fn is_healthy(&self) -> bool {
+        self.findings.is_empty()
+    }
+
+    /// Returns `true` if any findings have Error severity.
+    pub fn has_errors(&self) -> bool {
+        self.findings.iter().any(|f| f.severity == HealthSeverity::Error)
+    }
+
+    /// Returns `true` if any findings have Warning severity.
+    pub fn has_warnings(&self) -> bool {
+        self.findings.iter().any(|f| f.severity == HealthSeverity::Warning)
+    }
+
+    /// Returns the total number of findings.
+    pub fn finding_count(&self) -> usize {
+        self.findings.len()
+    }
+
+    /// Filter findings by severity.
+    pub fn findings_by_severity(&self, severity: HealthSeverity) -> Vec<&HealthFinding> {
+        self.findings.iter().filter(|f| f.severity == severity).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1267,5 +1601,161 @@ mod tests {
         ws1.merge_settings(&ws2);
         assert_eq!(ws1.get_setting("key"), Some("new"));
         assert_eq!(ws1.get_setting("extra"), Some("val"));
+    }
+
+    // ── Snapshot tests ──
+
+    #[test]
+    fn snapshot_capture_and_restore() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.set_name("original".into()).unwrap();
+        ws.add_folder("/src".into(), "source".into());
+        ws.set_setting("editor.tabSize".into(), "4".into());
+
+        let snap = WorkspaceSnapshot::capture(&ws, 1000, "before refactor");
+        assert_eq!(snap.label, "before refactor");
+        assert_eq!(snap.timestamp, 1000);
+        assert_eq!(snap.folder_count(), 1);
+        assert_eq!(snap.setting_count(), 1);
+
+        // Mutate the workspace
+        ws.add_folder("/lib".into(), "library".into());
+        ws.set_setting("editor.tabSize".into(), "2".into());
+        ws.set_name("modified".into()).unwrap();
+        assert_eq!(ws.folder_count(), 2);
+
+        // Restore the snapshot
+        snap.restore_into(&mut ws);
+        assert_eq!(ws.folder_count(), 1);
+        assert_eq!(ws.name.as_deref(), Some("original"));
+        assert_eq!(ws.get_setting("editor.tabSize"), Some("4"));
+    }
+
+    #[test]
+    fn snapshot_display() {
+        let ws = WorkspaceConfiguration::new();
+        let snap = WorkspaceSnapshot::capture(&ws, 42, "empty");
+        let display = format!("{}", snap);
+        assert!(display.contains("empty"));
+        assert!(display.contains("42"));
+    }
+
+    // ── Diff tests ──
+
+    #[test]
+    fn diff_detects_all_change_types() {
+        let mut before = WorkspaceConfiguration::new();
+        before.set_name("old-name".into()).unwrap();
+        before.add_folder("/a".into(), "alpha".into());
+        before.add_folder("/removed".into(), "removed".into());
+        before.set_setting("keep".into(), "same".into());
+        before.set_setting("change".into(), "old-val".into());
+        before.set_setting("delete-me".into(), "x".into());
+
+        let mut after = WorkspaceConfiguration::new();
+        after.set_name("new-name".into()).unwrap();
+        after.add_folder("/a".into(), "alpha".into());
+        after.add_folder("/added".into(), "added".into());
+        after.set_setting("keep".into(), "same".into());
+        after.set_setting("change".into(), "new-val".into());
+        after.set_setting("new-setting".into(), "y".into());
+
+        let diff = WorkspaceDiff::compare(&before, &after);
+        assert!(!diff.is_empty());
+
+        // Name changed
+        assert!(diff.entries.contains(&WorkspaceDiffEntry::NameChanged {
+            old: Some("old-name".into()),
+            new: Some("new-name".into()),
+        }));
+        // Folder added/removed
+        assert!(diff.entries.contains(&WorkspaceDiffEntry::FolderAdded("/added".into())));
+        assert!(diff.entries.contains(&WorkspaceDiffEntry::FolderRemoved("/removed".into())));
+        // Setting changed/added/removed
+        assert!(diff.entries.contains(&WorkspaceDiffEntry::SettingChanged {
+            key: "change".into(),
+            old: "old-val".into(),
+            new: "new-val".into(),
+        }));
+        assert!(diff.entries.contains(&WorkspaceDiffEntry::SettingAdded("new-setting".into())));
+        assert!(diff.entries.contains(&WorkspaceDiffEntry::SettingRemoved("delete-me".into())));
+
+        assert!(!diff.folder_changes().is_empty());
+        assert!(!diff.setting_changes().is_empty());
+    }
+
+    #[test]
+    fn diff_identical_configs_is_empty() {
+        let config = WorkspaceConfigurationBuilder::new()
+            .name("same")
+            .folder("/a", "a")
+            .setting("k", "v")
+            .build()
+            .unwrap();
+        let diff = WorkspaceDiff::compare(&config, &config);
+        assert!(diff.is_empty());
+        assert_eq!(diff.len(), 0);
+    }
+
+    // ── Template tests ──
+
+    #[test]
+    fn template_instantiate_creates_config() {
+        let mut tmpl = WorkspaceTemplate::new("rust-project", "Standard Rust project layout");
+        tmpl.add_folder_pattern("src");
+        tmpl.add_folder_pattern("tests");
+        tmpl.add_setting("editor.tabSize", "4");
+        tmpl.add_setting("editor.formatOnSave", "true");
+
+        assert_eq!(tmpl.folder_pattern_count(), 2);
+        assert_eq!(tmpl.setting_count(), 2);
+
+        let config = tmpl.instantiate("/home/user/myproject").unwrap();
+        assert_eq!(config.folder_count(), 2);
+        assert_eq!(config.setting_count(), 2);
+        assert!(config.contains_uri("/home/user/myproject/src"));
+        assert!(config.contains_uri("/home/user/myproject/tests"));
+        assert_eq!(config.get_setting("editor.tabSize"), Some("4"));
+
+        let display = format!("{}", tmpl);
+        assert!(display.contains("rust-project"));
+    }
+
+    // ── Health check tests ──
+
+    #[test]
+    fn health_check_reports_issues() {
+        let mut ws = WorkspaceConfiguration::new();
+        // No name, no folders → should flag both
+        let hc = WorkspaceHealthCheck::check(&ws);
+        assert!(hc.has_errors()); // no folders
+        assert!(hc.has_warnings()); // no name
+        assert!(!hc.is_healthy());
+
+        // Add a folder and a name, add empty-value setting
+        ws.add_folder("/src".into(), "source".into());
+        ws.set_name("project".into()).unwrap();
+        ws.set_setting("placeholder".into(), "".into());
+
+        let hc2 = WorkspaceHealthCheck::check(&ws);
+        assert!(!hc2.has_errors());
+        assert!(!hc2.has_warnings());
+        // Info about empty setting value
+        let infos = hc2.findings_by_severity(HealthSeverity::Info);
+        assert_eq!(infos.len(), 1);
+        assert!(infos[0].message.contains("placeholder"));
+    }
+
+    #[test]
+    fn health_check_duplicate_folder_names() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.set_name("test".into()).unwrap();
+        ws.add_folder("/a".into(), "same-name".into());
+        ws.add_folder("/b".into(), "same-name".into());
+
+        let hc = WorkspaceHealthCheck::check(&ws);
+        assert!(hc.has_warnings());
+        let warnings = hc.findings_by_severity(HealthSeverity::Warning);
+        assert!(warnings.iter().any(|f| f.message.contains("Duplicate folder name")));
     }
 }

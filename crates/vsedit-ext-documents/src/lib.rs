@@ -813,6 +813,262 @@ impl fmt::Display for DocumentChangeAccumulator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DocumentVersion – version tracking with diff
+// ---------------------------------------------------------------------------
+
+/// Tracks document versions and their content snapshots.
+#[derive(Debug, Clone)]
+pub struct DocumentVersionEntry {
+    pub version: u32,
+    pub content: String,
+}
+
+/// Document version tracker with content diffing.
+#[derive(Debug, Clone)]
+pub struct DocumentVersionTracker {
+    uri: String,
+    versions: Vec<DocumentVersionEntry>,
+}
+
+impl DocumentVersionTracker {
+    pub fn new(uri: impl Into<String>, initial_content: impl Into<String>) -> Self {
+        Self {
+            uri: uri.into(),
+            versions: vec![DocumentVersionEntry {
+                version: 1,
+                content: initial_content.into(),
+            }],
+        }
+    }
+
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+
+    pub fn current_version(&self) -> u32 {
+        self.versions.last().map(|e| e.version).unwrap_or(0)
+    }
+
+    pub fn current_content(&self) -> &str {
+        self.versions.last().map(|e| e.content.as_str()).unwrap_or("")
+    }
+
+    /// Record a new version with full content.
+    pub fn push_version(&mut self, content: impl Into<String>) -> u32 {
+        let v = self.current_version() + 1;
+        self.versions.push(DocumentVersionEntry {
+            version: v,
+            content: content.into(),
+        });
+        v
+    }
+
+    pub fn version_count(&self) -> usize {
+        self.versions.len()
+    }
+
+    /// Get content at a specific version.
+    pub fn content_at(&self, version: u32) -> Option<&str> {
+        self.versions
+            .iter()
+            .find(|e| e.version == version)
+            .map(|e| e.content.as_str())
+    }
+
+    /// Compute a simple line-based diff between two versions.
+    /// Returns lines prefixed with '+' (added) or '-' (removed).
+    pub fn diff(&self, from_version: u32, to_version: u32) -> Option<Vec<String>> {
+        let from = self.content_at(from_version)?;
+        let to = self.content_at(to_version)?;
+        let from_lines: Vec<&str> = from.lines().collect();
+        let to_lines: Vec<&str> = to.lines().collect();
+        let mut result = Vec::new();
+
+        let mut i = 0;
+        let mut j = 0;
+        while i < from_lines.len() && j < to_lines.len() {
+            if from_lines[i] == to_lines[j] {
+                i += 1;
+                j += 1;
+            } else {
+                result.push(format!("-{}", from_lines[i]));
+                result.push(format!("+{}", to_lines[j]));
+                i += 1;
+                j += 1;
+            }
+        }
+        while i < from_lines.len() {
+            result.push(format!("-{}", from_lines[i]));
+            i += 1;
+        }
+        while j < to_lines.len() {
+            result.push(format!("+{}", to_lines[j]));
+            j += 1;
+        }
+        Some(result)
+    }
+
+    /// Check if content changed between two versions.
+    pub fn has_changed(&self, from_version: u32, to_version: u32) -> bool {
+        match (self.content_at(from_version), self.content_at(to_version)) {
+            (Some(a), Some(b)) => a != b,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for DocumentVersionTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "DocumentVersionTracker(uri={}, versions={})",
+            self.uri,
+            self.versions.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Document encoding detection
+// ---------------------------------------------------------------------------
+
+/// Detected encoding of a document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Ascii,
+    Latin1,
+    Unknown,
+}
+
+impl fmt::Display for DocumentEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Utf8 => "utf-8",
+            Self::Utf8Bom => "utf-8-bom",
+            Self::Utf16Le => "utf-16le",
+            Self::Utf16Be => "utf-16be",
+            Self::Ascii => "ascii",
+            Self::Latin1 => "latin1",
+            Self::Unknown => "unknown",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Detect encoding from raw bytes by inspecting BOM and content.
+pub fn detect_encoding(bytes: &[u8]) -> DocumentEncoding {
+    // BOM detection
+    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return DocumentEncoding::Utf8Bom;
+    }
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        return DocumentEncoding::Utf16Le;
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        return DocumentEncoding::Utf16Be;
+    }
+
+    // Check if pure ASCII
+    if bytes.iter().all(|&b| b < 128) {
+        return DocumentEncoding::Ascii;
+    }
+
+    // Check valid UTF-8
+    if std::str::from_utf8(bytes).is_ok() {
+        return DocumentEncoding::Utf8;
+    }
+
+    // Check if it looks like Latin-1 (no null bytes, high bytes present)
+    if bytes.iter().all(|&b| b != 0) {
+        return DocumentEncoding::Latin1;
+    }
+
+    DocumentEncoding::Unknown
+}
+
+// ---------------------------------------------------------------------------
+// Line ending normalization
+// ---------------------------------------------------------------------------
+
+/// Line ending style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LineEnding {
+    Lf,
+    CrLf,
+    Cr,
+    Mixed,
+}
+
+impl fmt::Display for LineEnding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lf => write!(f, "LF"),
+            Self::CrLf => write!(f, "CRLF"),
+            Self::Cr => write!(f, "CR"),
+            Self::Mixed => write!(f, "Mixed"),
+        }
+    }
+}
+
+/// Detect the dominant line ending style in text.
+pub fn detect_line_ending(text: &str) -> LineEnding {
+    let crlf_count = text.matches("\r\n").count();
+    // Count standalone \r (not part of \r\n)
+    let cr_only = text.chars().enumerate().filter(|&(i, c)| {
+        c == '\r' && text.as_bytes().get(i + 1) != Some(&b'\n')
+    }).count();
+    // Count standalone \n (not part of \r\n)
+    let lf_only = text.chars().enumerate().filter(|&(i, c)| {
+        c == '\n' && (i == 0 || text.as_bytes().get(i - 1) != Some(&b'\r'))
+    }).count();
+
+    let styles = [crlf_count > 0, lf_only > 0, cr_only > 0];
+    let distinct: usize = styles.iter().filter(|&&b| b).count();
+
+    if distinct > 1 {
+        return LineEnding::Mixed;
+    }
+    if crlf_count > 0 {
+        return LineEnding::CrLf;
+    }
+    if cr_only > 0 {
+        return LineEnding::Cr;
+    }
+    LineEnding::Lf
+}
+
+/// Normalize all line endings in text to the target style.
+pub fn normalize_line_endings(text: &str, target: LineEnding) -> String {
+    let target_str = match target {
+        LineEnding::Lf => "\n",
+        LineEnding::CrLf => "\r\n",
+        LineEnding::Cr => "\r",
+        LineEnding::Mixed => "\n", // default to LF for mixed
+    };
+    // First normalize all to \n, then convert to target
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    if target_str == "\n" {
+        normalized
+    } else {
+        normalized.replace('\n', target_str)
+    }
+}
+
+/// Count lines in text (handling all line ending styles).
+pub fn count_lines(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    // Normalize to \n then count
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    normalized.lines().count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1301,5 +1557,84 @@ mod tests {
         let p = DocumentContentProvider::new("vscode");
         let s = format!("{}", p);
         assert!(s.contains("vscode"));
+    }
+
+    // --- New tests for version tracking, encoding, line endings ---
+
+    #[test]
+    fn version_tracker_push_and_diff() {
+        let mut tracker = DocumentVersionTracker::new("file:///test.rs", "fn main() {}");
+        assert_eq!(tracker.current_version(), 1);
+        tracker.push_version("fn main() {\n    println!(\"hello\");\n}");
+        assert_eq!(tracker.current_version(), 2);
+        assert_eq!(tracker.version_count(), 2);
+        let diff = tracker.diff(1, 2).unwrap();
+        assert!(!diff.is_empty());
+        assert!(tracker.has_changed(1, 2));
+    }
+
+    #[test]
+    fn version_tracker_content_at() {
+        let mut tracker = DocumentVersionTracker::new("file:///a.txt", "v1");
+        tracker.push_version("v2");
+        tracker.push_version("v3");
+        assert_eq!(tracker.content_at(1), Some("v1"));
+        assert_eq!(tracker.content_at(3), Some("v3"));
+        assert!(tracker.content_at(99).is_none());
+    }
+
+    #[test]
+    fn detect_encoding_utf8_bom() {
+        let bytes = [0xEF, 0xBB, 0xBF, b'h', b'i'];
+        assert_eq!(detect_encoding(&bytes), DocumentEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn detect_encoding_ascii() {
+        assert_eq!(detect_encoding(b"Hello world"), DocumentEncoding::Ascii);
+    }
+
+    #[test]
+    fn detect_encoding_utf16le() {
+        let bytes = [0xFF, 0xFE, 0x00, 0x41];
+        assert_eq!(detect_encoding(&bytes), DocumentEncoding::Utf16Le);
+    }
+
+    #[test]
+    fn detect_line_ending_lf() {
+        assert_eq!(detect_line_ending("hello\nworld\n"), LineEnding::Lf);
+    }
+
+    #[test]
+    fn detect_line_ending_crlf() {
+        assert_eq!(detect_line_ending("hello\r\nworld\r\n"), LineEnding::CrLf);
+    }
+
+    #[test]
+    fn detect_line_ending_mixed() {
+        assert_eq!(detect_line_ending("hello\r\nworld\n"), LineEnding::Mixed);
+    }
+
+    #[test]
+    fn normalize_line_endings_to_lf() {
+        let input = "line1\r\nline2\rline3\n";
+        let result = normalize_line_endings(input, LineEnding::Lf);
+        assert_eq!(result, "line1\nline2\nline3\n");
+        assert_eq!(detect_line_ending(&result), LineEnding::Lf);
+    }
+
+    #[test]
+    fn normalize_line_endings_to_crlf() {
+        let input = "a\nb\n";
+        let result = normalize_line_endings(input, LineEnding::CrLf);
+        assert_eq!(result, "a\r\nb\r\n");
+    }
+
+    #[test]
+    fn count_lines_various() {
+        assert_eq!(count_lines(""), 0);
+        assert_eq!(count_lines("hello"), 1);
+        assert_eq!(count_lines("a\nb\nc"), 3);
+        assert_eq!(count_lines("a\r\nb\r\nc"), 3);
     }
 }

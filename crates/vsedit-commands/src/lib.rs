@@ -744,6 +744,307 @@ fn fuzzy_match_score(text: &[char], query: &[char]) -> Option<u32> {
 }
 
 // ---------------------------------------------------------------------------
+// CommandMacro – record and replay command sequences
+// ---------------------------------------------------------------------------
+
+/// A single step in a command macro.
+#[derive(Debug, Clone)]
+pub struct MacroStep {
+    pub command_id: String,
+    pub args: Vec<String>,
+}
+
+impl MacroStep {
+    pub fn new(command_id: impl Into<String>) -> Self {
+        Self {
+            command_id: command_id.into(),
+            args: Vec::new(),
+        }
+    }
+
+    pub fn with_args(command_id: impl Into<String>, args: Vec<String>) -> Self {
+        Self {
+            command_id: command_id.into(),
+            args,
+        }
+    }
+}
+
+impl fmt::Display for MacroStep {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.args.is_empty() {
+            write!(f, "{}", self.command_id)
+        } else {
+            write!(f, "{}({})", self.command_id, self.args.join(", "))
+        }
+    }
+}
+
+/// Records and replays sequences of commands.
+#[derive(Debug, Clone)]
+pub struct CommandMacro {
+    name: String,
+    steps: Vec<MacroStep>,
+    recording: bool,
+}
+
+impl CommandMacro {
+    /// Create a new named macro.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            steps: Vec::new(),
+            recording: false,
+        }
+    }
+
+    /// Start recording commands.
+    pub fn start_recording(&mut self) {
+        self.recording = true;
+        self.steps.clear();
+    }
+
+    /// Stop recording.
+    pub fn stop_recording(&mut self) {
+        self.recording = false;
+    }
+
+    /// Record a step (only while recording is active).
+    pub fn record_step(&mut self, step: MacroStep) -> bool {
+        if self.recording {
+            self.steps.push(step);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the recorded steps for replay.
+    pub fn steps(&self) -> &[MacroStep] {
+        &self.steps
+    }
+
+    /// Number of recorded steps.
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Whether the macro is currently recording.
+    pub fn is_recording(&self) -> bool {
+        self.recording
+    }
+
+    /// The macro name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Replay the macro by executing each step against the given registry.
+    pub fn replay(&self, registry: &CommandRegistry) -> Vec<CommandResult> {
+        self.steps
+            .iter()
+            .map(|step| registry.execute(&step.command_id, vec![]))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandCondition – conditional command execution
+// ---------------------------------------------------------------------------
+
+/// A predicate that determines whether a command should execute.
+#[derive(Debug, Clone)]
+pub struct CommandCondition {
+    context_key: String,
+    expected_value: Option<String>,
+    negated: bool,
+}
+
+impl CommandCondition {
+    /// Create a condition that checks if `context_key` is set (truthy).
+    pub fn when(context_key: impl Into<String>) -> Self {
+        Self {
+            context_key: context_key.into(),
+            expected_value: None,
+            negated: false,
+        }
+    }
+
+    /// Create a condition that checks if `context_key` equals `value`.
+    pub fn when_equals(context_key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            context_key: context_key.into(),
+            expected_value: Some(value.into()),
+            negated: false,
+        }
+    }
+
+    /// Negate the condition.
+    pub fn negate(mut self) -> Self {
+        self.negated = !self.negated;
+        self
+    }
+
+    /// Evaluate the condition against a context map.
+    pub fn evaluate(&self, context: &HashMap<String, String>) -> bool {
+        let result = match &self.expected_value {
+            Some(expected) => context.get(&self.context_key).map_or(false, |v| v == expected),
+            None => context.contains_key(&self.context_key),
+        };
+        if self.negated { !result } else { result }
+    }
+
+    /// Return the context key this condition inspects.
+    pub fn key(&self) -> &str {
+        &self.context_key
+    }
+}
+
+impl fmt::Display for CommandCondition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let prefix = if self.negated { "!" } else { "" };
+        match &self.expected_value {
+            Some(v) => write!(f, "{prefix}{} == '{v}'", self.context_key),
+            None => write!(f, "{prefix}{}", self.context_key),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandScheduler – schedule command execution
+// ---------------------------------------------------------------------------
+
+/// A scheduled command execution entry.
+#[derive(Debug, Clone)]
+pub struct ScheduledCommand {
+    pub command_id: String,
+    pub execute_at_ms: u64,
+    pub repeat_interval_ms: Option<u64>,
+    executed: bool,
+}
+
+/// Manages scheduled command execution.
+#[derive(Debug)]
+pub struct CommandScheduler {
+    entries: Vec<ScheduledCommand>,
+}
+
+impl CommandScheduler {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Schedule a one-shot command at the given timestamp (ms).
+    pub fn schedule_once(&mut self, command_id: impl Into<String>, at_ms: u64) {
+        self.entries.push(ScheduledCommand {
+            command_id: command_id.into(),
+            execute_at_ms: at_ms,
+            repeat_interval_ms: None,
+            executed: false,
+        });
+    }
+
+    /// Schedule a repeating command.
+    pub fn schedule_repeating(
+        &mut self,
+        command_id: impl Into<String>,
+        start_ms: u64,
+        interval_ms: u64,
+    ) {
+        self.entries.push(ScheduledCommand {
+            command_id: command_id.into(),
+            execute_at_ms: start_ms,
+            repeat_interval_ms: Some(interval_ms),
+            executed: false,
+        });
+    }
+
+    /// Tick the scheduler at the given current time.
+    /// Returns the list of command IDs that should be executed now.
+    pub fn tick(&mut self, now_ms: u64) -> Vec<String> {
+        let mut due = Vec::new();
+        for entry in &mut self.entries {
+            if !entry.executed && now_ms >= entry.execute_at_ms {
+                due.push(entry.command_id.clone());
+                if let Some(interval) = entry.repeat_interval_ms {
+                    entry.execute_at_ms += interval;
+                } else {
+                    entry.executed = true;
+                }
+            }
+        }
+        due
+    }
+
+    /// Number of pending (not-yet-executed) scheduled commands.
+    pub fn pending_count(&self) -> usize {
+        self.entries.iter().filter(|e| !e.executed).count()
+    }
+
+    /// Cancel all scheduled commands with the given ID.
+    pub fn cancel(&mut self, command_id: &str) {
+        self.entries.retain(|e| e.command_id != command_id);
+    }
+
+    /// Cancel all scheduled commands.
+    pub fn cancel_all(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl Default for CommandScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandAlias – alias resolution chains
+// ---------------------------------------------------------------------------
+
+impl CommandRegistry {
+    /// Resolve an alias chain: follows alias → alias → … → real command.
+    /// Returns `None` if the id is not an alias, or if a cycle is detected.
+    pub fn resolve_alias_chain(&self, id: &str) -> Option<String> {
+        let mut current = id.to_string();
+        let mut visited = std::collections::HashSet::new();
+        loop {
+            if !visited.insert(current.clone()) {
+                return None; // cycle detected
+            }
+            match self.resolve_alias(&current) {
+                Some(target) => current = target,
+                None => {
+                    if current == id {
+                        return None; // was never an alias
+                    }
+                    return Some(current);
+                }
+            }
+        }
+    }
+
+    /// Return the chain depth for an alias (0 if not an alias).
+    pub fn alias_chain_depth(&self, id: &str) -> usize {
+        let mut depth = 0;
+        let mut current = id.to_string();
+        let mut visited = std::collections::HashSet::new();
+        while visited.insert(current.clone()) {
+            match self.resolve_alias(&current) {
+                Some(target) => {
+                    depth += 1;
+                    current = target;
+                }
+                None => break,
+            }
+        }
+        depth
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1328,5 +1629,147 @@ mod tests {
         };
         let displayed = format!("{}", entry);
         assert_eq!(displayed, "file.save @ 1234567890");
+    }
+
+    // -- CommandMacro tests ------------------------------------------------
+
+    #[test]
+    fn macro_record_and_replay() {
+        let mut m = CommandMacro::new("test_macro");
+        m.start_recording();
+        assert!(m.is_recording());
+        assert!(m.record_step(MacroStep::new("cmd.a")));
+        assert!(m.record_step(MacroStep::new("cmd.b")));
+        m.stop_recording();
+        assert!(!m.is_recording());
+        assert_eq!(m.step_count(), 2);
+        assert_eq!(m.name(), "test_macro");
+        assert!(!m.record_step(MacroStep::new("cmd.c"))); // not recording
+    }
+
+    #[test]
+    fn macro_step_display() {
+        let s = MacroStep::new("editor.save");
+        assert_eq!(format!("{s}"), "editor.save");
+        let s2 = MacroStep::with_args("editor.open", vec!["file.rs".into()]);
+        assert_eq!(format!("{s2}"), "editor.open(file.rs)");
+    }
+
+    #[test]
+    fn macro_replay_executes() {
+        let registry = CommandRegistry::new();
+        let _r = registry.register("noop", Box::new(|_| Ok(None)));
+        let mut m = CommandMacro::new("m");
+        m.start_recording();
+        m.record_step(MacroStep::new("noop"));
+        m.record_step(MacroStep::new("noop"));
+        m.stop_recording();
+        let results = m.replay(&registry);
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|r| r.is_ok()));
+    }
+
+    // -- CommandCondition tests --------------------------------------------
+
+    #[test]
+    fn condition_when_key_present() {
+        let cond = CommandCondition::when("editorFocus");
+        let mut ctx = HashMap::new();
+        assert!(!cond.evaluate(&ctx));
+        ctx.insert("editorFocus".into(), "true".into());
+        assert!(cond.evaluate(&ctx));
+    }
+
+    #[test]
+    fn condition_when_equals() {
+        let cond = CommandCondition::when_equals("language", "rust");
+        let mut ctx = HashMap::new();
+        ctx.insert("language".into(), "python".into());
+        assert!(!cond.evaluate(&ctx));
+        ctx.insert("language".into(), "rust".into());
+        assert!(cond.evaluate(&ctx));
+    }
+
+    #[test]
+    fn condition_negate() {
+        let cond = CommandCondition::when("readOnly").negate();
+        let ctx = HashMap::new();
+        assert!(cond.evaluate(&ctx)); // key absent, negated → true
+    }
+
+    #[test]
+    fn condition_display() {
+        let c = CommandCondition::when("focus");
+        assert_eq!(format!("{c}"), "focus");
+        let c2 = CommandCondition::when("focus").negate();
+        assert_eq!(format!("{c2}"), "!focus");
+    }
+
+    // -- CommandScheduler tests --------------------------------------------
+
+    #[test]
+    fn scheduler_one_shot() {
+        let mut sched = CommandScheduler::new();
+        sched.schedule_once("cmd.a", 100);
+        assert_eq!(sched.pending_count(), 1);
+
+        let due = sched.tick(50);
+        assert!(due.is_empty());
+
+        let due = sched.tick(100);
+        assert_eq!(due, vec!["cmd.a"]);
+        assert_eq!(sched.pending_count(), 0);
+
+        // Should not fire again
+        let due = sched.tick(200);
+        assert!(due.is_empty());
+    }
+
+    #[test]
+    fn scheduler_repeating() {
+        let mut sched = CommandScheduler::new();
+        sched.schedule_repeating("cmd.r", 100, 50);
+
+        let due = sched.tick(100);
+        assert_eq!(due, vec!["cmd.r"]);
+
+        let due = sched.tick(149);
+        assert!(due.is_empty());
+
+        let due = sched.tick(150);
+        assert_eq!(due, vec!["cmd.r"]);
+    }
+
+    #[test]
+    fn scheduler_cancel() {
+        let mut sched = CommandScheduler::new();
+        sched.schedule_once("cmd.x", 100);
+        sched.schedule_once("cmd.y", 200);
+        sched.cancel("cmd.x");
+        assert_eq!(sched.pending_count(), 1);
+    }
+
+    // -- Alias chain tests -------------------------------------------------
+
+    #[test]
+    fn alias_chain_resolution() {
+        let registry = CommandRegistry::new();
+        let _r = registry.register("real.cmd", Box::new(|_| Ok(None)));
+        registry.register_alias("alias1", "real.cmd");
+        registry.register_alias("alias2", "alias1");
+
+        assert_eq!(registry.alias_chain_depth("alias2"), 2);
+        assert_eq!(
+            registry.resolve_alias_chain("alias2").unwrap(),
+            "real.cmd"
+        );
+    }
+
+    #[test]
+    fn alias_chain_non_alias_returns_none() {
+        let registry = CommandRegistry::new();
+        let _r = registry.register("real.cmd", Box::new(|_| Ok(None)));
+        assert!(registry.resolve_alias_chain("real.cmd").is_none());
+        assert_eq!(registry.alias_chain_depth("real.cmd"), 0);
     }
 }

@@ -752,6 +752,309 @@ impl OutputBridge {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OutputFormatter – configurable output templates
+// ---------------------------------------------------------------------------
+
+/// A formatter that applies configurable templates to output lines.
+#[derive(Debug, Clone)]
+pub struct OutputFormatter {
+    /// Template string with placeholders: {message}, {timestamp}, {level}, {channel}
+    template: String,
+    timestamp_format: TimestampFormat,
+}
+
+/// How timestamps are formatted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimestampFormat {
+    None,
+    Seconds,
+    Millis,
+    Iso8601,
+}
+
+impl fmt::Display for TimestampFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => write!(f, "none"),
+            Self::Seconds => write!(f, "seconds"),
+            Self::Millis => write!(f, "millis"),
+            Self::Iso8601 => write!(f, "iso8601"),
+        }
+    }
+}
+
+impl OutputFormatter {
+    pub fn new(template: impl Into<String>) -> Self {
+        Self {
+            template: template.into(),
+            timestamp_format: TimestampFormat::None,
+        }
+    }
+
+    pub fn with_timestamp(mut self, format: TimestampFormat) -> Self {
+        self.timestamp_format = format;
+        self
+    }
+
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+
+    pub fn timestamp_format(&self) -> TimestampFormat {
+        self.timestamp_format
+    }
+
+    /// Format a message using the template.
+    pub fn format(&self, message: &str, level: Option<LogLevel>, channel: Option<&str>) -> String {
+        let ts = self.format_timestamp();
+        let level_str = level.map(|l| l.label()).unwrap_or("");
+        let channel_str = channel.unwrap_or("");
+        self.template
+            .replace("{message}", message)
+            .replace("{timestamp}", &ts)
+            .replace("{level}", level_str)
+            .replace("{channel}", channel_str)
+    }
+
+    fn format_timestamp(&self) -> String {
+        match self.timestamp_format {
+            TimestampFormat::None => String::new(),
+            TimestampFormat::Seconds => {
+                let d = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default();
+                format!("{}", d.as_secs())
+            }
+            TimestampFormat::Millis => {
+                let d = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default();
+                format!("{}", d.as_millis())
+            }
+            TimestampFormat::Iso8601 => {
+                // Simple approximation without chrono
+                let d = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default();
+                format!("{}s", d.as_secs())
+            }
+        }
+    }
+
+    /// Default formatter: "[{level}] {message}"
+    pub fn default_formatter() -> Self {
+        Self::new("[{level}] {message}")
+    }
+
+    /// Verbose formatter with channel and timestamp.
+    pub fn verbose_formatter() -> Self {
+        Self::new("[{timestamp}] [{channel}] [{level}] {message}")
+            .with_timestamp(TimestampFormat::Seconds)
+    }
+}
+
+impl Default for OutputFormatter {
+    fn default() -> Self {
+        Self::default_formatter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputBuffer – buffering with flush intervals
+// ---------------------------------------------------------------------------
+
+/// Buffers output lines and flushes when capacity or interval is reached.
+#[derive(Debug, Clone)]
+pub struct OutputBuffer {
+    lines: Vec<String>,
+    capacity: usize,
+    total_flushed: usize,
+}
+
+impl OutputBuffer {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            lines: Vec::new(),
+            capacity: capacity.max(1),
+            total_flushed: 0,
+        }
+    }
+
+    /// Append a line. Returns `true` if the buffer is now full and should be flushed.
+    pub fn append(&mut self, line: impl Into<String>) -> bool {
+        self.lines.push(line.into());
+        self.lines.len() >= self.capacity
+    }
+
+    /// Take all buffered lines (draining the buffer).
+    pub fn flush(&mut self) -> Vec<String> {
+        self.total_flushed += self.lines.len();
+        std::mem::take(&mut self.lines)
+    }
+
+    /// Number of currently buffered lines.
+    pub fn buffered_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Total lines flushed since creation.
+    pub fn total_flushed(&self) -> usize {
+        self.total_flushed
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    /// Is the buffer at capacity?
+    pub fn is_full(&self) -> bool {
+        self.lines.len() >= self.capacity
+    }
+
+    /// Peek at buffered lines without flushing.
+    pub fn peek(&self) -> &[String] {
+        &self.lines
+    }
+
+    /// Clear without counting as flushed.
+    pub fn discard(&mut self) {
+        self.lines.clear();
+    }
+}
+
+impl fmt::Display for OutputBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputBuffer({}/{} lines, {} flushed)",
+            self.lines.len(),
+            self.capacity,
+            self.total_flushed
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelMerger – merge multiple channels into one
+// ---------------------------------------------------------------------------
+
+/// Merges output from multiple channels into a single unified stream.
+#[derive(Debug, Clone)]
+pub struct MergedLine {
+    pub source_channel: String,
+    pub content: String,
+    pub sequence: usize,
+}
+
+impl fmt::Display for MergedLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.source_channel, self.content)
+    }
+}
+
+/// Merges output from multiple channels into a unified view.
+#[derive(Debug, Clone)]
+pub struct OutputChannelMerger {
+    merged: Vec<MergedLine>,
+    sequence: usize,
+    channel_filter: Option<Vec<String>>,
+}
+
+impl OutputChannelMerger {
+    pub fn new() -> Self {
+        Self {
+            merged: Vec::new(),
+            sequence: 0,
+            channel_filter: None,
+        }
+    }
+
+    /// Only include lines from these channels.
+    pub fn with_filter(mut self, channels: Vec<String>) -> Self {
+        self.channel_filter = Some(channels);
+        self
+    }
+
+    /// Append a line from a specific channel.
+    pub fn append(&mut self, channel: impl Into<String>, content: impl Into<String>) {
+        let ch = channel.into();
+        if let Some(ref filter) = self.channel_filter {
+            if !filter.contains(&ch) {
+                return;
+            }
+        }
+        self.merged.push(MergedLine {
+            source_channel: ch,
+            content: content.into(),
+            sequence: self.sequence,
+        });
+        self.sequence += 1;
+    }
+
+    /// All merged lines in order.
+    pub fn lines(&self) -> &[MergedLine] {
+        &self.merged
+    }
+
+    /// Lines from a specific channel only.
+    pub fn lines_from(&self, channel: &str) -> Vec<&MergedLine> {
+        self.merged
+            .iter()
+            .filter(|l| l.source_channel == channel)
+            .collect()
+    }
+
+    /// Total line count.
+    pub fn line_count(&self) -> usize {
+        self.merged.len()
+    }
+
+    /// Distinct channels that have contributed lines.
+    pub fn active_channels(&self) -> Vec<&str> {
+        let mut channels: Vec<&str> = self
+            .merged
+            .iter()
+            .map(|l| l.source_channel.as_str())
+            .collect();
+        channels.sort();
+        channels.dedup();
+        channels
+    }
+
+    /// Clear all merged output.
+    pub fn clear(&mut self) {
+        self.merged.clear();
+    }
+
+    /// Tail N lines.
+    pub fn tail(&self, n: usize) -> &[MergedLine] {
+        let start = self.merged.len().saturating_sub(n);
+        &self.merged[start..]
+    }
+}
+
+impl Default for OutputChannelMerger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for OutputChannelMerger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputChannelMerger({} lines, {} channels)",
+            self.merged.len(),
+            self.active_channels().len()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1302,5 +1605,101 @@ mod tests {
         assert_eq!(format!("{}", LogLevel::Info), "INFO");
         assert_eq!(format!("{}", LogLevel::Warning), "WARN");
         assert_eq!(format!("{}", LogLevel::Error), "ERROR");
+    }
+
+    // --- New tests for formatter, buffer, merger ---
+
+    #[test]
+    fn output_formatter_basic() {
+        let fmt = OutputFormatter::new("[{level}] {message}");
+        let result = fmt.format("hello", Some(LogLevel::Info), None);
+        assert_eq!(result, "[INFO] hello");
+    }
+
+    #[test]
+    fn output_formatter_with_channel() {
+        let fmt = OutputFormatter::new("[{channel}] {message}");
+        let result = fmt.format("test", None, Some("build"));
+        assert_eq!(result, "[build] test");
+    }
+
+    #[test]
+    fn output_formatter_default() {
+        let fmt = OutputFormatter::default_formatter();
+        assert!(fmt.template().contains("{level}"));
+        assert!(fmt.template().contains("{message}"));
+    }
+
+    #[test]
+    fn output_buffer_flush_on_capacity() {
+        let mut buf = OutputBuffer::new(3);
+        assert!(!buf.append("line1"));
+        assert!(!buf.append("line2"));
+        assert!(buf.append("line3")); // full
+        assert_eq!(buf.buffered_count(), 3);
+        let lines = buf.flush();
+        assert_eq!(lines.len(), 3);
+        assert!(buf.is_empty());
+        assert_eq!(buf.total_flushed(), 3);
+    }
+
+    #[test]
+    fn output_buffer_peek_and_discard() {
+        let mut buf = OutputBuffer::new(10);
+        buf.append("a");
+        buf.append("b");
+        assert_eq!(buf.peek().len(), 2);
+        buf.discard();
+        assert!(buf.is_empty());
+        assert_eq!(buf.total_flushed(), 0); // discard doesn't count
+    }
+
+    #[test]
+    fn output_merger_basic() {
+        let mut merger = OutputChannelMerger::new();
+        merger.append("build", "compiling...");
+        merger.append("test", "running tests");
+        merger.append("build", "done");
+        assert_eq!(merger.line_count(), 3);
+        assert_eq!(merger.lines_from("build").len(), 2);
+        let channels = merger.active_channels();
+        assert!(channels.contains(&"build"));
+        assert!(channels.contains(&"test"));
+    }
+
+    #[test]
+    fn output_merger_filter() {
+        let mut merger = OutputChannelMerger::new()
+            .with_filter(vec!["build".to_string()]);
+        merger.append("build", "ok");
+        merger.append("test", "filtered out");
+        assert_eq!(merger.line_count(), 1);
+    }
+
+    #[test]
+    fn output_merger_tail() {
+        let mut merger = OutputChannelMerger::new();
+        for i in 0..10 {
+            merger.append("ch", format!("line {i}"));
+        }
+        let tail = merger.tail(3);
+        assert_eq!(tail.len(), 3);
+        assert_eq!(tail[0].content, "line 7");
+    }
+
+    #[test]
+    fn output_merger_display() {
+        let merger = OutputChannelMerger::new();
+        assert!(format!("{merger}").contains("0 lines"));
+    }
+
+    #[test]
+    fn merged_line_display() {
+        let line = MergedLine {
+            source_channel: "build".to_string(),
+            content: "ok".to_string(),
+            sequence: 0,
+        };
+        assert_eq!(format!("{line}"), "[build] ok");
     }
 }

@@ -824,6 +824,182 @@ pub fn sanitize_label(label: &str) -> String {
     label.chars().filter(|c| !c.is_control()).collect()
 }
 
+// ---------------------------------------------------------------------------
+// LabelTemplate — template-based label generation
+// ---------------------------------------------------------------------------
+
+/// A reusable label template with named placeholders.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelTemplate {
+    pattern: String,
+    placeholders: Vec<String>,
+}
+
+impl LabelTemplate {
+    /// Create a new template. Placeholders are `{name}` style.
+    pub fn new(pattern: impl Into<String>) -> Self {
+        let pattern = pattern.into();
+        let mut placeholders = Vec::new();
+        let mut rest = pattern.as_str();
+        while let Some(start) = rest.find('{') {
+            if let Some(end) = rest[start..].find('}') {
+                let name = &rest[start + 1..start + end];
+                if !name.is_empty() && !placeholders.contains(&name.to_string()) {
+                    placeholders.push(name.to_string());
+                }
+                rest = &rest[start + end + 1..];
+            } else {
+                break;
+            }
+        }
+        Self { pattern, placeholders }
+    }
+
+    /// Return the list of placeholder names found in the template.
+    pub fn placeholder_names(&self) -> &[String] {
+        &self.placeholders
+    }
+
+    /// Render the template by replacing placeholders with values from the map.
+    /// Missing keys are left as-is.
+    pub fn render(&self, values: &std::collections::HashMap<String, String>) -> String {
+        let mut result = self.pattern.clone();
+        for key in &self.placeholders {
+            if let Some(val) = values.get(key) {
+                result = result.replace(&format!("{{{key}}}"), val);
+            }
+        }
+        result
+    }
+
+    /// Return true if all placeholders have corresponding values.
+    pub fn is_complete(&self, values: &std::collections::HashMap<String, String>) -> bool {
+        self.placeholders.iter().all(|p| values.contains_key(p))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelLocalizer — localization support for labels
+// ---------------------------------------------------------------------------
+
+/// Simple localization map from key to translated string.
+#[derive(Debug, Clone, Default)]
+pub struct LabelLocalizer {
+    translations: std::collections::HashMap<String, String>,
+    fallback_locale: String,
+}
+
+impl LabelLocalizer {
+    pub fn new(fallback_locale: impl Into<String>) -> Self {
+        Self {
+            translations: std::collections::HashMap::new(),
+            fallback_locale: fallback_locale.into(),
+        }
+    }
+
+    /// Register a translation for a key.
+    pub fn add(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.translations.insert(key.into(), value.into());
+    }
+
+    /// Look up a translation, falling back to the key itself.
+    pub fn get<'a>(&'a self, key: &'a str) -> &'a str {
+        self.translations.get(key).map(|s| s.as_str()).unwrap_or(key)
+    }
+
+    /// Return how many translations are registered.
+    pub fn count(&self) -> usize {
+        self.translations.len()
+    }
+
+    /// Return the fallback locale identifier.
+    pub fn fallback_locale(&self) -> &str {
+        &self.fallback_locale
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelCache — cache computed labels
+// ---------------------------------------------------------------------------
+
+/// Caches computed label strings keyed by path.
+#[derive(Debug, Clone, Default)]
+pub struct LabelCache {
+    entries: std::collections::HashMap<String, String>,
+}
+
+impl LabelCache {
+    pub fn new() -> Self {
+        Self { entries: std::collections::HashMap::new() }
+    }
+
+    /// Get a cached label for a path, or compute and cache it.
+    pub fn get_or_insert(&mut self, path: &str, detail: LabelDetail) -> &str {
+        self.entries.entry(path.to_string())
+            .or_insert_with(|| format_file_label(path, detail))
+    }
+
+    /// Invalidate a cached entry.
+    pub fn invalidate(&mut self, path: &str) {
+        self.entries.remove(path);
+    }
+
+    /// Clear all cached labels.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Comparison and sorting for ResourceLabel
+// ---------------------------------------------------------------------------
+
+impl PartialOrd for ResourceLabel {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ResourceLabel {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name.cmp(&other.name)
+            .then_with(|| self.path.cmp(&other.path))
+    }
+}
+
+impl ResourceLabel {
+    /// Compare two labels by extension, then name.
+    pub fn cmp_by_extension(&self, other: &ResourceLabel) -> std::cmp::Ordering {
+        let ext_a = self.extension().unwrap_or("");
+        let ext_b = other.extension().unwrap_or("");
+        ext_a.cmp(ext_b).then_with(|| self.name.cmp(&other.name))
+    }
+
+    /// Return true if the label name contains the given query (case-insensitive).
+    pub fn matches_query(&self, query: &str) -> bool {
+        self.name.to_lowercase().contains(&query.to_lowercase())
+    }
+}
+
+/// Sort a slice of ResourceLabels by name.
+pub fn sort_labels_by_name(labels: &mut [ResourceLabel]) {
+    labels.sort();
+}
+
+/// Sort a slice of ResourceLabels by extension, then name.
+pub fn sort_labels_by_extension(labels: &mut [ResourceLabel]) {
+    labels.sort_by(|a, b| a.cmp_by_extension(b));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1344,5 +1520,82 @@ mod tests {
         assert_eq!(sanitize_label("line1\nline2\ttab"), "line1line2tab");
         assert_eq!(sanitize_label("clean string"), "clean string");
         assert_eq!(sanitize_label("\x07bell\x1b[31m"), "bell[31m");
+    }
+
+    // -- LabelTemplate tests ------------------------------------------------
+
+    #[test]
+    fn template_renders_placeholders() {
+        let tmpl = LabelTemplate::new("{name} — {dir}");
+        assert_eq!(tmpl.placeholder_names(), &["name", "dir"]);
+
+        let mut vals = std::collections::HashMap::new();
+        vals.insert("name".into(), "main.rs".into());
+        vals.insert("dir".into(), "src".into());
+        assert_eq!(tmpl.render(&vals), "main.rs — src");
+        assert!(tmpl.is_complete(&vals));
+    }
+
+    #[test]
+    fn template_missing_values_left_as_is() {
+        let tmpl = LabelTemplate::new("{x} + {y}");
+        let mut vals = std::collections::HashMap::new();
+        vals.insert("x".into(), "hello".into());
+        assert_eq!(tmpl.render(&vals), "hello + {y}");
+        assert!(!tmpl.is_complete(&vals));
+    }
+
+    // -- LabelLocalizer tests -----------------------------------------------
+
+    #[test]
+    fn localizer_lookup_and_fallback() {
+        let mut loc = LabelLocalizer::new("en");
+        loc.add("file", "File");
+        loc.add("edit", "Edit");
+        assert_eq!(loc.get("file"), "File");
+        assert_eq!(loc.get("unknown"), "unknown"); // fallback to key
+        assert_eq!(loc.count(), 2);
+        assert_eq!(loc.fallback_locale(), "en");
+    }
+
+    // -- LabelCache tests ---------------------------------------------------
+
+    #[test]
+    fn cache_stores_and_invalidates() {
+        let mut cache = LabelCache::new();
+        assert!(cache.is_empty());
+        let label = cache.get_or_insert("/home/user/main.rs", LabelDetail::Short).to_string();
+        assert_eq!(label, "main.rs");
+        assert_eq!(cache.len(), 1);
+
+        cache.invalidate("/home/user/main.rs");
+        assert!(cache.is_empty());
+    }
+
+    // -- ResourceLabel comparison tests -------------------------------------
+
+    #[test]
+    fn resource_label_sorting_by_name() {
+        let mut labels = vec![
+            ResourceLabel { name: "zebra.rs".into(), path: "/z".into(), description: None, icon: None },
+            ResourceLabel { name: "alpha.rs".into(), path: "/a".into(), description: None, icon: None },
+            ResourceLabel { name: "middle.rs".into(), path: "/m".into(), description: None, icon: None },
+        ];
+        sort_labels_by_name(&mut labels);
+        assert_eq!(labels[0].name, "alpha.rs");
+        assert_eq!(labels[2].name, "zebra.rs");
+    }
+
+    #[test]
+    fn resource_label_matches_query() {
+        let label = ResourceLabel {
+            name: "MyComponent.tsx".into(),
+            path: "/src/MyComponent.tsx".into(),
+            description: None,
+            icon: None,
+        };
+        assert!(label.matches_query("mycomp"));
+        assert!(label.matches_query("COMPONENT"));
+        assert!(!label.matches_query("xyz"));
     }
 }

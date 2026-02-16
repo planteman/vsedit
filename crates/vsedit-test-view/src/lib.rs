@@ -715,6 +715,229 @@ impl fmt::Display for TestResultSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TestFilter – filter tests by state, tag substring, or duration threshold
+// ---------------------------------------------------------------------------
+
+/// Criteria for filtering test items.
+#[derive(Debug, Clone, Default)]
+pub struct TestFilter {
+    /// If set, only items whose state is in this list pass.
+    pub states: Option<Vec<TestState>>,
+    /// If set, only items whose label contains this substring (case-insensitive) pass.
+    pub label_contains: Option<String>,
+    /// If set, only items whose duration_ms is at or above this threshold pass.
+    pub min_duration_ms: Option<f64>,
+    /// If set, only items whose duration_ms is at or below this threshold pass.
+    pub max_duration_ms: Option<f64>,
+}
+
+impl TestFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_states(mut self, states: Vec<TestState>) -> Self {
+        self.states = Some(states);
+        self
+    }
+
+    pub fn with_label_contains(mut self, sub: impl Into<String>) -> Self {
+        self.label_contains = Some(sub.into());
+        self
+    }
+
+    pub fn with_min_duration(mut self, ms: f64) -> Self {
+        self.min_duration_ms = Some(ms);
+        self
+    }
+
+    pub fn with_max_duration(mut self, ms: f64) -> Self {
+        self.max_duration_ms = Some(ms);
+        self
+    }
+
+    /// Returns `true` if the given item matches **all** active criteria.
+    pub fn matches(&self, item: &TestItem) -> bool {
+        if let Some(ref states) = self.states {
+            if !states.contains(&item.state) {
+                return false;
+            }
+        }
+        if let Some(ref sub) = self.label_contains {
+            if !item.label.to_lowercase().contains(&sub.to_lowercase()) {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_duration_ms {
+            match item.duration_ms {
+                Some(d) if d >= min => {}
+                _ => return false,
+            }
+        }
+        if let Some(max) = self.max_duration_ms {
+            match item.duration_ms {
+                Some(d) if d <= max => {}
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    /// Collect all leaf items from a tree that match the filter.
+    pub fn apply<'a>(&self, items: &'a [TestItem]) -> Vec<&'a TestItem> {
+        let mut out = Vec::new();
+        for item in items {
+            self.collect_matching(item, &mut out);
+        }
+        out
+    }
+
+    fn collect_matching<'a>(&self, item: &'a TestItem, out: &mut Vec<&'a TestItem>) {
+        if item.children.is_empty() {
+            if self.matches(item) {
+                out.push(item);
+            }
+        } else {
+            for child in &item.children {
+                self.collect_matching(child, out);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TestDurationAnalyzer – compute duration statistics over a set of test items
+// ---------------------------------------------------------------------------
+
+/// Statistics about test durations within a run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DurationStats {
+    pub count: usize,
+    pub total_ms: f64,
+    pub min_ms: f64,
+    pub max_ms: f64,
+    pub mean_ms: f64,
+    pub median_ms: f64,
+}
+
+/// Analyze durations across test items.
+pub struct TestDurationAnalyzer;
+
+impl TestDurationAnalyzer {
+    /// Compute duration statistics from a flat slice of test items.
+    /// Only items with `duration_ms` set are considered.
+    pub fn analyze(items: &[TestItem]) -> Option<DurationStats> {
+        let mut durations: Vec<f64> = items.iter().filter_map(|i| i.duration_ms).collect();
+        if durations.is_empty() {
+            return None;
+        }
+        durations.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let count = durations.len();
+        let total_ms: f64 = durations.iter().sum();
+        let min_ms = durations[0];
+        let max_ms = durations[count - 1];
+        let mean_ms = total_ms / count as f64;
+        let median_ms = if count % 2 == 0 {
+            (durations[count / 2 - 1] + durations[count / 2]) / 2.0
+        } else {
+            durations[count / 2]
+        };
+        Some(DurationStats { count, total_ms, min_ms, max_ms, mean_ms, median_ms })
+    }
+
+    /// Return the top-N slowest items (by duration_ms) from the flattened run.
+    pub fn slowest(run: &TestRun, n: usize) -> Vec<&TestItem> {
+        let mut with_dur: Vec<&TestItem> = run
+            .flatten_items()
+            .into_iter()
+            .filter(|i| i.duration_ms.is_some())
+            .collect();
+        with_dur.sort_by(|a, b| {
+            b.duration_ms
+                .partial_cmp(&a.duration_ms)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        with_dur.truncate(n);
+        with_dur
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TestHistory – track sequential test run snapshots
+// ---------------------------------------------------------------------------
+
+/// A snapshot of a single historical test run.
+#[derive(Debug, Clone)]
+pub struct TestRunSnapshot {
+    pub run_id: String,
+    pub run_name: String,
+    pub stats: TestRunStats,
+    pub timestamp: u64,
+}
+
+/// Keeps an ordered history of test run snapshots.
+#[derive(Debug, Clone, Default)]
+pub struct TestHistory {
+    snapshots: Vec<TestRunSnapshot>,
+    max_entries: usize,
+}
+
+impl TestHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            snapshots: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record a snapshot from a completed `TestRun`.
+    pub fn record(&mut self, run: &TestRun, timestamp: u64) {
+        let snapshot = TestRunSnapshot {
+            run_id: run.id.clone(),
+            run_name: run.name.clone(),
+            stats: run.get_stats(),
+            timestamp,
+        };
+        self.snapshots.push(snapshot);
+        if self.snapshots.len() > self.max_entries {
+            self.snapshots.remove(0);
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.snapshots.is_empty()
+    }
+
+    pub fn latest(&self) -> Option<&TestRunSnapshot> {
+        self.snapshots.last()
+    }
+
+    pub fn snapshots(&self) -> &[TestRunSnapshot] {
+        &self.snapshots
+    }
+
+    /// Compute the average pass rate across all recorded snapshots.
+    pub fn average_pass_rate(&self) -> f64 {
+        if self.snapshots.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = self.snapshots.iter().map(|s| s.stats.pass_rate).sum();
+        sum / self.snapshots.len() as f64
+    }
+
+    /// Return the snapshot with the worst (lowest) pass rate.
+    pub fn worst_run(&self) -> Option<&TestRunSnapshot> {
+        self.snapshots
+            .iter()
+            .min_by(|a, b| a.stats.pass_rate.partial_cmp(&b.stats.pass_rate).unwrap_or(std::cmp::Ordering::Equal))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1265,5 +1488,205 @@ mod tests {
         assert_eq!(summary.total, 0);
         assert_eq!(summary.status_line(), "No tests");
         assert!(!summary.all_passed());
+    }
+
+    // -----------------------------------------------------------------------
+    // TestFilter tests
+    // -----------------------------------------------------------------------
+
+    fn make_named_leaf(id: &str, label: &str, state: TestState, dur: Option<f64>) -> TestItem {
+        TestItem {
+            id: id.to_string(),
+            label: label.to_string(),
+            uri: None,
+            line: None,
+            state,
+            children: vec![],
+            duration_ms: dur,
+            message: None,
+        }
+    }
+
+    #[test]
+    fn test_filter_by_state() {
+        let items = vec![
+            make_named_leaf("a", "alpha", TestState::Passed, Some(10.0)),
+            make_named_leaf("b", "beta", TestState::Failed, Some(20.0)),
+            make_named_leaf("c", "gamma", TestState::Skipped, None),
+        ];
+        let filter = TestFilter::new().with_states(vec![TestState::Failed, TestState::Skipped]);
+        let matched = filter.apply(&items);
+        let ids: Vec<&str> = matched.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, vec!["b", "c"]);
+    }
+
+    #[test]
+    fn test_filter_by_label_case_insensitive() {
+        let items = vec![
+            make_named_leaf("a", "TestLogin", TestState::Passed, None),
+            make_named_leaf("b", "TestLogout", TestState::Passed, None),
+            make_named_leaf("c", "TestDashboard", TestState::Passed, None),
+        ];
+        let filter = TestFilter::new().with_label_contains("login");
+        let matched = filter.apply(&items);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, "a");
+    }
+
+    #[test]
+    fn test_filter_by_duration_range() {
+        let items = vec![
+            make_named_leaf("fast", "fast", TestState::Passed, Some(5.0)),
+            make_named_leaf("mid", "mid", TestState::Passed, Some(50.0)),
+            make_named_leaf("slow", "slow", TestState::Passed, Some(500.0)),
+            make_named_leaf("none", "none", TestState::Passed, None),
+        ];
+        let filter = TestFilter::new().with_min_duration(10.0).with_max_duration(100.0);
+        let matched = filter.apply(&items);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, "mid");
+    }
+
+    #[test]
+    fn test_filter_combined_criteria() {
+        let items = vec![
+            make_named_leaf("a", "TestAuth", TestState::Passed, Some(100.0)),
+            make_named_leaf("b", "TestAuth", TestState::Failed, Some(200.0)),
+            make_named_leaf("c", "TestDB", TestState::Passed, Some(300.0)),
+        ];
+        let filter = TestFilter::new()
+            .with_states(vec![TestState::Passed])
+            .with_label_contains("auth");
+        let matched = filter.apply(&items);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, "a");
+    }
+
+    #[test]
+    fn test_filter_empty_matches_all() {
+        let items = vec![
+            make_named_leaf("a", "x", TestState::Passed, None),
+            make_named_leaf("b", "y", TestState::Failed, None),
+        ];
+        let filter = TestFilter::new();
+        assert_eq!(filter.apply(&items).len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // TestDurationAnalyzer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_duration_analyzer_basic() {
+        let items = vec![
+            make_named_leaf("a", "a", TestState::Passed, Some(10.0)),
+            make_named_leaf("b", "b", TestState::Passed, Some(30.0)),
+            make_named_leaf("c", "c", TestState::Passed, Some(20.0)),
+        ];
+        let stats = TestDurationAnalyzer::analyze(&items).unwrap();
+        assert_eq!(stats.count, 3);
+        assert!((stats.total_ms - 60.0).abs() < f64::EPSILON);
+        assert!((stats.min_ms - 10.0).abs() < f64::EPSILON);
+        assert!((stats.max_ms - 30.0).abs() < f64::EPSILON);
+        assert!((stats.mean_ms - 20.0).abs() < f64::EPSILON);
+        assert!((stats.median_ms - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_duration_analyzer_none_when_empty() {
+        let items: Vec<TestItem> = vec![
+            make_named_leaf("a", "a", TestState::Passed, None),
+        ];
+        assert!(TestDurationAnalyzer::analyze(&items).is_none());
+    }
+
+    #[test]
+    fn test_duration_analyzer_slowest() {
+        let mut run = TestRun::new("r1", "Suite");
+        run.add_item(make_named_leaf("fast", "fast", TestState::Passed, Some(1.0)));
+        run.add_item(make_named_leaf("mid", "mid", TestState::Passed, Some(50.0)));
+        run.add_item(make_named_leaf("slow", "slow", TestState::Passed, Some(200.0)));
+        let slowest = TestDurationAnalyzer::slowest(&run, 2);
+        assert_eq!(slowest.len(), 2);
+        assert_eq!(slowest[0].id, "slow");
+        assert_eq!(slowest[1].id, "mid");
+    }
+
+    // -----------------------------------------------------------------------
+    // TestHistory tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_history_record_and_retrieve() {
+        let mut history = TestHistory::new(10);
+        assert!(history.is_empty());
+
+        let mut run = TestRun::new("r1", "Run 1");
+        run.add_item(test_item("t1", TestState::Passed));
+        history.record(&run, 1000);
+
+        assert_eq!(history.len(), 1);
+        let snap = history.latest().unwrap();
+        assert_eq!(snap.run_id, "r1");
+        assert_eq!(snap.timestamp, 1000);
+        assert_eq!(snap.stats.total, 1);
+        assert_eq!(snap.stats.passed, 1);
+    }
+
+    #[test]
+    fn test_history_evicts_oldest() {
+        let mut history = TestHistory::new(2);
+        let mut r1 = TestRun::new("r1", "A");
+        r1.add_item(test_item("t1", TestState::Passed));
+        history.record(&r1, 1);
+
+        let mut r2 = TestRun::new("r2", "B");
+        r2.add_item(test_item("t2", TestState::Failed));
+        history.record(&r2, 2);
+
+        let mut r3 = TestRun::new("r3", "C");
+        r3.add_item(test_item("t3", TestState::Passed));
+        history.record(&r3, 3);
+
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.snapshots()[0].run_id, "r2");
+        assert_eq!(history.snapshots()[1].run_id, "r3");
+    }
+
+    #[test]
+    fn test_history_average_pass_rate() {
+        let mut history = TestHistory::new(10);
+
+        // Run with 100% pass rate
+        let mut r1 = TestRun::new("r1", "good");
+        r1.add_item(test_item("t1", TestState::Passed));
+        history.record(&r1, 1);
+
+        // Run with 0% pass rate
+        let mut r2 = TestRun::new("r2", "bad");
+        r2.add_item(test_item("t2", TestState::Failed));
+        history.record(&r2, 2);
+
+        let avg = history.average_pass_rate();
+        assert!((avg - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_history_worst_run() {
+        let mut history = TestHistory::new(10);
+
+        let mut good = TestRun::new("good", "good");
+        good.add_item(test_item("t1", TestState::Passed));
+        good.add_item(test_item("t2", TestState::Passed));
+        history.record(&good, 1);
+
+        let mut bad = TestRun::new("bad", "bad");
+        bad.add_item(test_item("t3", TestState::Passed));
+        bad.add_item(test_item("t4", TestState::Failed));
+        bad.add_item(test_item("t5", TestState::Failed));
+        history.record(&bad, 2);
+
+        let worst = history.worst_run().unwrap();
+        assert_eq!(worst.run_id, "bad");
     }
 }

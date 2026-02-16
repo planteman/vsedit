@@ -779,6 +779,258 @@ impl<T> Default for ObservableHistory<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ObservableSet
+// ---------------------------------------------------------------------------
+
+/// A reactive set that fires change events when elements are added or removed.
+pub struct ObservableSet<T: Clone + Eq + std::hash::Hash + Send + Sync + 'static> {
+    items: Arc<Mutex<std::collections::HashSet<T>>>,
+    on_change: Emitter<Vec<T>>,
+}
+
+impl<T: Clone + Eq + std::hash::Hash + Send + Sync + 'static> ObservableSet<T> {
+    pub fn new() -> Self {
+        Self {
+            items: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            on_change: Emitter::new(),
+        }
+    }
+
+    /// Insert an element. Returns `true` if it was newly inserted.
+    pub fn insert(&self, value: T) -> bool {
+        let (inserted, snapshot) = {
+            let mut set = self.items.lock().unwrap();
+            let inserted = set.insert(value);
+            let snapshot: Vec<T> = set.iter().cloned().collect();
+            (inserted, snapshot)
+        };
+        if inserted {
+            self.on_change.fire(&snapshot);
+        }
+        inserted
+    }
+
+    /// Remove an element. Returns `true` if it was present.
+    pub fn remove(&self, value: &T) -> bool {
+        let (removed, snapshot) = {
+            let mut set = self.items.lock().unwrap();
+            let removed = set.remove(value);
+            let snapshot: Vec<T> = set.iter().cloned().collect();
+            (removed, snapshot)
+        };
+        if removed {
+            self.on_change.fire(&snapshot);
+        }
+        removed
+    }
+
+    /// Check if the set contains a value.
+    pub fn contains(&self, value: &T) -> bool {
+        self.items.lock().unwrap().contains(value)
+    }
+
+    /// Return the number of elements.
+    pub fn len(&self) -> usize {
+        self.items.lock().unwrap().len()
+    }
+
+    /// Return `true` if empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.lock().unwrap().is_empty()
+    }
+
+    /// Return all items as a vector.
+    pub fn to_vec(&self) -> Vec<T> {
+        self.items.lock().unwrap().iter().cloned().collect()
+    }
+
+    /// Clear the set.
+    pub fn clear(&self) {
+        self.items.lock().unwrap().clear();
+        self.on_change.fire(&Vec::new());
+    }
+
+    /// Subscribe to changes.
+    pub fn on_change(
+        &self,
+        listener: impl Fn(&Vec<T>) + Send + Sync + 'static,
+    ) -> DisposableHandle {
+        self.on_change.event().on(listener)
+    }
+}
+
+impl<T: Clone + Eq + std::hash::Hash + Send + Sync + 'static> Default for ObservableSet<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableProjection
+// ---------------------------------------------------------------------------
+
+/// Projects/maps an observable value through a transformation function.
+pub struct ObservableProjection<T, R>
+where
+    T: Clone + PartialEq + Send + Sync + 'static,
+    R: Clone + Send + Sync + 'static,
+{
+    source_value: Arc<Mutex<T>>,
+    projected: Arc<Mutex<R>>,
+    transform: Arc<dyn Fn(&T) -> R + Send + Sync>,
+}
+
+impl<T, R> ObservableProjection<T, R>
+where
+    T: Clone + PartialEq + Send + Sync + 'static,
+    R: Clone + Send + Sync + 'static,
+{
+    /// Create a new projection from an initial source value and a transform.
+    pub fn new(initial: T, transform: impl Fn(&T) -> R + Send + Sync + 'static) -> Self {
+        let projected = transform(&initial);
+        Self {
+            source_value: Arc::new(Mutex::new(initial)),
+            projected: Arc::new(Mutex::new(projected)),
+            transform: Arc::new(transform),
+        }
+    }
+
+    /// Update the source value and recompute the projection.
+    pub fn update(&self, value: T) {
+        let new_projected = (self.transform)(&value);
+        *self.source_value.lock().unwrap() = value;
+        *self.projected.lock().unwrap() = new_projected;
+    }
+
+    /// Get the current projected value.
+    pub fn get(&self) -> R {
+        self.projected.lock().unwrap().clone()
+    }
+
+    /// Get the current source value.
+    pub fn source(&self) -> T {
+        self.source_value.lock().unwrap().clone()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableHistory – branching & checkpoints
+// ---------------------------------------------------------------------------
+
+impl<T: Clone> ObservableHistory<T> {
+    /// Create a named checkpoint at the current position.
+    /// Returns the index that was checkpointed.
+    pub fn checkpoint(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Truncate history back to a checkpoint index, discarding later entries.
+    pub fn restore_checkpoint(&mut self, index: usize) {
+        if index < self.entries.len() {
+            self.entries.truncate(index);
+            self.next_sequence = index as u64;
+        }
+    }
+
+    /// Fork: clone entries up to `index` into a new history.
+    pub fn fork(&self, up_to: usize) -> ObservableHistory<T> {
+        let entries: Vec<HistoryEntry<T>> = self
+            .entries
+            .iter()
+            .take(up_to)
+            .map(|e| HistoryEntry {
+                value: e.value.clone(),
+                sequence: e.sequence,
+            })
+            .collect();
+        let next_seq = entries.len() as u64;
+        ObservableHistory {
+            entries,
+            next_sequence: next_seq,
+        }
+    }
+
+    /// Return entries recorded since the given sequence number.
+    pub fn since(&self, sequence: u64) -> Vec<&T> {
+        self.entries
+            .iter()
+            .filter(|e| e.sequence >= sequence)
+            .map(|e| &e.value)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableDebouncer
+// ---------------------------------------------------------------------------
+
+/// Tracks a pending value and only applies it after a settle period (logical debounce).
+pub struct ObservableDebouncer<T: Clone + PartialEq> {
+    pending: Option<T>,
+    committed: Option<T>,
+    change_count: u64,
+}
+
+impl<T: Clone + PartialEq> ObservableDebouncer<T> {
+    pub fn new() -> Self {
+        Self {
+            pending: None,
+            committed: None,
+            change_count: 0,
+        }
+    }
+
+    /// Stage a new value (not yet committed).
+    pub fn stage(&mut self, value: T) {
+        self.pending = Some(value);
+    }
+
+    /// Commit the pending value if it differs from the last committed value.
+    /// Returns `true` if a new value was committed.
+    pub fn commit(&mut self) -> bool {
+        if let Some(pending) = self.pending.take() {
+            if self.committed.as_ref() != Some(&pending) {
+                self.committed = Some(pending);
+                self.change_count += 1;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get the committed value.
+    pub fn committed(&self) -> Option<&T> {
+        self.committed.as_ref()
+    }
+
+    /// Get the pending value.
+    pub fn pending(&self) -> Option<&T> {
+        self.pending.as_ref()
+    }
+
+    /// How many times a value has been committed.
+    pub fn change_count(&self) -> u64 {
+        self.change_count
+    }
+
+    /// Returns `true` if there is a staged value waiting to be committed.
+    pub fn has_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    /// Discard any pending value without committing.
+    pub fn discard(&mut self) {
+        self.pending = None;
+    }
+}
+
+impl<T: Clone + PartialEq> Default for ObservableDebouncer<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1333,5 +1585,125 @@ mod tests {
         assert_eq!(history.len(), 0);
         assert!(history.is_empty());
         assert_eq!(history.latest(), None);
+    }
+
+    // -- ObservableSet --
+
+    #[test]
+    fn observable_set_insert_contains_remove() {
+        let set: ObservableSet<i32> = ObservableSet::new();
+        assert!(set.is_empty());
+        assert!(set.insert(1));
+        assert!(set.insert(2));
+        assert!(!set.insert(1)); // duplicate
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&1));
+        assert!(set.remove(&1));
+        assert!(!set.contains(&1));
+        assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    fn observable_set_clear_and_to_vec() {
+        let set: ObservableSet<String> = ObservableSet::new();
+        set.insert("a".into());
+        set.insert("b".into());
+        assert_eq!(set.to_vec().len(), 2);
+        set.clear();
+        assert!(set.is_empty());
+    }
+
+    // -- ObservableProjection --
+
+    #[test]
+    fn projection_maps_values() {
+        let proj = ObservableProjection::new(10_i32, |v| v * 2);
+        assert_eq!(proj.get(), 20);
+        assert_eq!(proj.source(), 10);
+        proj.update(5);
+        assert_eq!(proj.get(), 10);
+        assert_eq!(proj.source(), 5);
+    }
+
+    #[test]
+    fn projection_string_transform() {
+        let proj = ObservableProjection::new("hello".to_string(), |s| s.len());
+        assert_eq!(proj.get(), 5);
+        proj.update("hi".to_string());
+        assert_eq!(proj.get(), 2);
+    }
+
+    // -- ObservableHistory branching --
+
+    #[test]
+    fn history_checkpoint_and_restore() {
+        let mut h: ObservableHistory<i32> = ObservableHistory::new();
+        h.record(10);
+        h.record(20);
+        let cp = h.checkpoint();
+        assert_eq!(cp, 2);
+        h.record(30);
+        assert_eq!(h.len(), 3);
+        h.restore_checkpoint(cp);
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.latest(), Some(&20));
+    }
+
+    #[test]
+    fn history_fork() {
+        let mut h: ObservableHistory<&str> = ObservableHistory::new();
+        h.record("a");
+        h.record("b");
+        h.record("c");
+        let fork = h.fork(2);
+        assert_eq!(fork.len(), 2);
+        assert_eq!(fork.latest(), Some(&"b"));
+        assert_eq!(h.len(), 3); // original unchanged
+    }
+
+    #[test]
+    fn history_since() {
+        let mut h: ObservableHistory<i32> = ObservableHistory::new();
+        h.record(1);
+        h.record(2);
+        h.record(3);
+        let since = h.since(1);
+        assert_eq!(since, vec![&2, &3]);
+    }
+
+    // -- ObservableDebouncer --
+
+    #[test]
+    fn debouncer_stage_and_commit() {
+        let mut d: ObservableDebouncer<i32> = ObservableDebouncer::new();
+        assert!(!d.has_pending());
+        assert_eq!(d.committed(), None);
+
+        d.stage(42);
+        assert!(d.has_pending());
+        assert_eq!(d.pending(), Some(&42));
+        assert!(d.commit());
+        assert_eq!(d.committed(), Some(&42));
+        assert_eq!(d.change_count(), 1);
+    }
+
+    #[test]
+    fn debouncer_duplicate_commit_ignored() {
+        let mut d: ObservableDebouncer<i32> = ObservableDebouncer::new();
+        d.stage(5);
+        assert!(d.commit());
+        d.stage(5); // same value
+        assert!(!d.commit()); // no new commit
+        assert_eq!(d.change_count(), 1);
+    }
+
+    #[test]
+    fn debouncer_discard() {
+        let mut d: ObservableDebouncer<i32> = ObservableDebouncer::new();
+        d.stage(10);
+        d.discard();
+        assert!(!d.has_pending());
+        assert!(!d.commit());
+        assert_eq!(d.committed(), None);
     }
 }

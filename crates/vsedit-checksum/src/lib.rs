@@ -52,7 +52,7 @@ fn hex_nibble(c: u8) -> Option<u8> {
 }
 
 /// Supported checksum algorithms.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChecksumKind {
     /// SHA-256 (real, via sha2 crate).
     Sha256,
@@ -673,6 +673,144 @@ impl Default for ChecksumManifest {
     }
 }
 
+/// Incrementally computes a checksum over streamed chunks without
+/// buffering the entire input. Supports SHA-256 natively; other algorithms
+/// fall back to an internal buffer.
+pub struct IncrementalChecksum {
+    kind: ChecksumKind,
+    sha256_hasher: Option<Sha256>,
+    fallback_buf: Vec<u8>,
+    bytes_fed: u64,
+}
+
+impl IncrementalChecksum {
+    /// Create a new incremental hasher for the given algorithm.
+    pub fn new(kind: ChecksumKind) -> Self {
+        let sha256_hasher = if kind == ChecksumKind::Sha256 {
+            Some(Sha256::new())
+        } else {
+            None
+        };
+        Self {
+            kind,
+            sha256_hasher,
+            fallback_buf: Vec::new(),
+            bytes_fed: 0,
+        }
+    }
+
+    /// Feed a chunk of data into the hasher.
+    pub fn update(&mut self, data: &[u8]) {
+        self.bytes_fed += data.len() as u64;
+        if let Some(ref mut h) = self.sha256_hasher {
+            h.update(data);
+        } else {
+            self.fallback_buf.extend_from_slice(data);
+        }
+    }
+
+    /// Finalize the hash and return the hex digest.
+    pub fn finalize(self) -> String {
+        if let Some(h) = self.sha256_hasher {
+            hex_encode(&h.finalize())
+        } else {
+            compute_checksum(&self.fallback_buf, self.kind)
+        }
+    }
+
+    /// Return the total number of bytes fed so far.
+    pub fn bytes_fed(&self) -> u64 {
+        self.bytes_fed
+    }
+
+    /// Return the algorithm used by this hasher.
+    pub fn kind(&self) -> ChecksumKind {
+        self.kind
+    }
+}
+
+/// Computes checksums for data using multiple algorithms simultaneously.
+pub struct MultiChecksum {
+    kinds: Vec<ChecksumKind>,
+}
+
+impl MultiChecksum {
+    /// Create a new multi-algorithm hasher.
+    pub fn new(kinds: &[ChecksumKind]) -> Self {
+        Self {
+            kinds: kinds.to_vec(),
+        }
+    }
+
+    /// Compute all configured checksums for the given data.
+    pub fn compute(&self, data: &[u8]) -> Vec<ChecksumResult> {
+        self.kinds
+            .iter()
+            .map(|&k| compute_checksum_result(data, k))
+            .collect()
+    }
+
+    /// Verify data against a set of expected digests (one per algorithm, in order).
+    /// Returns a vector of booleans indicating which checks passed.
+    pub fn verify(&self, data: &[u8], expected: &[&str]) -> Vec<bool> {
+        self.kinds
+            .iter()
+            .zip(expected.iter())
+            .map(|(&k, &exp)| verify_checksum(data, exp, k))
+            .collect()
+    }
+}
+
+/// A cache that stores previously computed checksums keyed by a combination
+/// of content hash (FNV-64 of the data) and algorithm, avoiding redundant
+/// re-computation for identical inputs.
+#[derive(Debug, Clone)]
+pub struct ChecksumCache {
+    entries: HashMap<(u64, ChecksumKind), String>,
+}
+
+impl ChecksumCache {
+    /// Create an empty cache.
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Compute or retrieve from cache the checksum for `data` using `kind`.
+    pub fn get_or_compute(&mut self, data: &[u8], kind: ChecksumKind) -> String {
+        let content_key = simple_hash(data);
+        let key = (content_key, kind);
+        if let Some(cached) = self.entries.get(&key) {
+            return cached.clone();
+        }
+        let digest = compute_checksum(data, kind);
+        self.entries.insert(key, digest.clone());
+        digest
+    }
+
+    /// Return the number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return true if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all cached entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl Default for ChecksumCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Result of comparing two checksum strings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChecksumComparison {
@@ -1285,5 +1423,69 @@ mod tests {
     #[test]
     fn test_checksum_format() {
         assert_eq!(checksum_format("abcdef1234", "sha256"), "sha256:abcdef1234");
+    }
+
+    #[test]
+    fn incremental_sha256_matches_oneshot() {
+        let data = b"the quick brown fox jumps over the lazy dog";
+        let oneshot = compute_sha256(data);
+        let mut inc = IncrementalChecksum::new(ChecksumKind::Sha256);
+        inc.update(b"the quick ");
+        inc.update(b"brown fox ");
+        inc.update(b"jumps over ");
+        inc.update(b"the lazy dog");
+        assert_eq!(inc.bytes_fed(), data.len() as u64);
+        assert_eq!(inc.kind(), ChecksumKind::Sha256);
+        assert_eq!(inc.finalize(), oneshot);
+    }
+
+    #[test]
+    fn incremental_md5_matches_oneshot() {
+        let data = b"incremental md5 test";
+        let oneshot = compute_md5(data);
+        let mut inc = IncrementalChecksum::new(ChecksumKind::Md5);
+        inc.update(b"incremental ");
+        inc.update(b"md5 test");
+        assert_eq!(inc.finalize(), oneshot);
+    }
+
+    #[test]
+    fn multi_checksum_compute_all() {
+        let mc = MultiChecksum::new(&[ChecksumKind::Sha256, ChecksumKind::Md5, ChecksumKind::Crc32]);
+        let results = mc.compute(b"multi algo");
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].kind, ChecksumKind::Sha256);
+        assert_eq!(results[1].kind, ChecksumKind::Md5);
+        assert_eq!(results[2].kind, ChecksumKind::Crc32);
+        assert_eq!(results[0].hex_digest, compute_sha256(b"multi algo"));
+        assert_eq!(results[1].hex_digest, compute_md5(b"multi algo"));
+    }
+
+    #[test]
+    fn multi_checksum_verify() {
+        let data = b"verify multi";
+        let sha = compute_checksum(data, ChecksumKind::Sha256);
+        let md5 = compute_checksum(data, ChecksumKind::Md5);
+        let mc = MultiChecksum::new(&[ChecksumKind::Sha256, ChecksumKind::Md5]);
+        let results = mc.verify(data, &[&sha, &md5]);
+        assert_eq!(results, vec![true, true]);
+        let bad = mc.verify(data, &[&sha, "0000"]);
+        assert_eq!(bad, vec![true, false]);
+    }
+
+    #[test]
+    fn checksum_cache_avoids_recompute() {
+        let mut cache = ChecksumCache::new();
+        assert!(cache.is_empty());
+        let d1 = cache.get_or_compute(b"cached data", ChecksumKind::Sha256);
+        assert_eq!(cache.len(), 1);
+        let d2 = cache.get_or_compute(b"cached data", ChecksumKind::Sha256);
+        assert_eq!(d1, d2);
+        // Same data, different algorithm should be a separate entry
+        let d3 = cache.get_or_compute(b"cached data", ChecksumKind::Md5);
+        assert_eq!(cache.len(), 2);
+        assert_ne!(d1, d3);
+        cache.clear();
+        assert!(cache.is_empty());
     }
 }

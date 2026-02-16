@@ -531,6 +531,246 @@ impl Default for UriidentityValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UriPattern — matching URIs with glob patterns
+// ---------------------------------------------------------------------------
+
+/// A pattern for matching URIs using glob-style wildcards in the path.
+///
+/// Supports:
+/// - `*` matches any characters within a single path segment
+/// - `**` matches any number of path segments
+/// - `?` matches a single character
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UriPattern {
+    pub scheme: Option<String>,
+    pub authority: Option<String>,
+    pub path_pattern: String,
+}
+
+impl UriPattern {
+    /// Create a pattern matching any scheme/authority with the given path glob.
+    pub fn path_only(pattern: impl Into<String>) -> Self {
+        Self {
+            scheme: None,
+            authority: None,
+            path_pattern: pattern.into(),
+        }
+    }
+
+    /// Create a pattern for a specific scheme.
+    pub fn with_scheme(scheme: impl Into<String>, pattern: impl Into<String>) -> Self {
+        Self {
+            scheme: Some(scheme.into()),
+            authority: None,
+            path_pattern: pattern.into(),
+        }
+    }
+
+    /// Create a fully specified pattern.
+    pub fn full(
+        scheme: impl Into<String>,
+        authority: impl Into<String>,
+        pattern: impl Into<String>,
+    ) -> Self {
+        Self {
+            scheme: Some(scheme.into()),
+            authority: Some(authority.into()),
+            path_pattern: pattern.into(),
+        }
+    }
+
+    /// Test if a URI matches this pattern.
+    pub fn matches(&self, uri: &ResourceUri) -> bool {
+        if let Some(ref s) = self.scheme {
+            if !s.eq_ignore_ascii_case(&uri.scheme) {
+                return false;
+            }
+        }
+        if let Some(ref a) = self.authority {
+            if !a.eq_ignore_ascii_case(&uri.authority) {
+                return false;
+            }
+        }
+        glob_match(&self.path_pattern, &uri.path)
+    }
+
+    /// Test if a URI string matches this pattern.
+    pub fn matches_str(&self, uri_str: &str) -> bool {
+        if let Some(uri) = ResourceUri::from_string(uri_str) {
+            self.matches(&uri)
+        } else {
+            false
+        }
+    }
+}
+
+impl fmt::Display for UriPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref s) = self.scheme {
+            write!(f, "{}://", s)?;
+        }
+        if let Some(ref a) = self.authority {
+            write!(f, "{}", a)?;
+        }
+        write!(f, "{}", self.path_pattern)
+    }
+}
+
+/// Simple glob matching for paths.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    let pat_parts: Vec<&str> = pattern.split('/').collect();
+    let text_parts: Vec<&str> = text.split('/').collect();
+    glob_match_parts(&pat_parts, &text_parts)
+}
+
+fn glob_match_parts(pat_parts: &[&str], text_parts: &[&str]) -> bool {
+    if pat_parts.is_empty() {
+        return text_parts.is_empty();
+    }
+    if pat_parts[0] == "**" {
+        // Match zero or more segments
+        for i in 0..=text_parts.len() {
+            if glob_match_parts(&pat_parts[1..], &text_parts[i..]) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if text_parts.is_empty() {
+        return false;
+    }
+    if segment_matches(pat_parts[0], text_parts[0]) {
+        glob_match_parts(&pat_parts[1..], &text_parts[1..])
+    } else {
+        false
+    }
+}
+
+fn segment_matches(pattern: &str, text: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    let pat_bytes = pattern.as_bytes();
+    let text_bytes = text.as_bytes();
+    segment_match_dp(pat_bytes, text_bytes)
+}
+
+fn segment_match_dp(pat: &[u8], text: &[u8]) -> bool {
+    let (m, n) = (pat.len(), text.len());
+    let mut dp = vec![vec![false; n + 1]; m + 1];
+    dp[0][0] = true;
+    for i in 1..=m {
+        if pat[i - 1] == b'*' {
+            dp[i][0] = dp[i - 1][0];
+        }
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            if pat[i - 1] == b'*' {
+                dp[i][j] = dp[i - 1][j] || dp[i][j - 1];
+            } else if pat[i - 1] == b'?' || pat[i - 1] == text[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1];
+            }
+        }
+    }
+    dp[m][n]
+}
+
+// ---------------------------------------------------------------------------
+// URI normalization helpers
+// ---------------------------------------------------------------------------
+
+/// Normalize a URI by applying standard transformations.
+pub fn normalize_uri(uri: &ResourceUri) -> ResourceUri {
+    let mut path = uri.path.replace('\\', "/");
+    // Remove trailing slash unless root
+    if path.len() > 1 && path.ends_with('/') {
+        path.truncate(path.len() - 1);
+    }
+    // Normalize percent encoding
+    path = normalize_percent_encoding(&path);
+    // Remove duplicate slashes
+    while path.contains("//") {
+        path = path.replace("//", "/");
+    }
+    ResourceUri {
+        scheme: uri.scheme.to_lowercase(),
+        authority: uri.authority.to_lowercase(),
+        path,
+        query: uri.query.clone(),
+        fragment: uri.fragment.clone(),
+    }
+}
+
+/// Add a trailing slash to the URI path if not already present.
+pub fn ensure_trailing_slash(uri: &ResourceUri) -> ResourceUri {
+    let mut result = uri.clone();
+    if !result.path.ends_with('/') {
+        result.path.push('/');
+    }
+    result
+}
+
+/// Remove the trailing slash from the URI path (unless it's the root "/").
+pub fn remove_trailing_slash(uri: &ResourceUri) -> ResourceUri {
+    let mut result = uri.clone();
+    if result.path.len() > 1 && result.path.ends_with('/') {
+        result.path.pop();
+    }
+    result
+}
+
+/// Join a base URI with a relative path.
+pub fn uri_join(base: &ResourceUri, relative: &str) -> ResourceUri {
+    let mut base_path = base.path.clone();
+    if !base_path.ends_with('/') {
+        // Remove last segment to get directory
+        if let Some(idx) = base_path.rfind('/') {
+            base_path.truncate(idx + 1);
+        }
+    }
+
+    let mut segments: Vec<&str> = base_path.split('/').filter(|s| !s.is_empty()).collect();
+
+    for part in relative.split('/') {
+        match part {
+            "." | "" => {}
+            ".." => { segments.pop(); }
+            other => segments.push(other),
+        }
+    }
+
+    let joined = format!("/{}", segments.join("/"));
+    ResourceUri {
+        scheme: base.scheme.clone(),
+        authority: base.authority.clone(),
+        path: joined,
+        query: None,
+        fragment: None,
+    }
+}
+
+/// Compute the depth (number of path segments) of a URI.
+pub fn uri_depth(uri: &ResourceUri) -> usize {
+    uri.path.split('/').filter(|s| !s.is_empty()).count()
+}
+
+/// Returns true if `child` is a descendant of `parent` (its path starts with parent's path).
+pub fn uri_is_child(parent: &ResourceUri, child: &ResourceUri) -> bool {
+    if !parent.scheme.eq_ignore_ascii_case(&child.scheme)
+        || !parent.authority.eq_ignore_ascii_case(&child.authority)
+    {
+        return false;
+    }
+    let parent_path = if parent.path.ends_with('/') {
+        parent.path.clone()
+    } else {
+        format!("{}/", parent.path)
+    };
+    child.path.starts_with(&parent_path) && child.path.len() > parent_path.len()
+}
+
 /// Normalizer for URI identity comparison, supporting case-insensitive matching.
 #[derive(Debug, Clone)]
 pub struct UriIdentityNormalizer {
@@ -1291,5 +1531,86 @@ mod tests {
         assert_eq!(uri.path, "/path");
         assert_eq!(uri.query.as_deref(), Some("q=1"));
         assert_eq!(uri.fragment.as_deref(), Some("frag"));
+    }
+
+    // ---- UriPattern tests ----
+
+    #[test]
+    fn uri_pattern_exact_path() {
+        let pattern = UriPattern::path_only("/src/main.rs");
+        let uri = ResourceUri::file("/src/main.rs");
+        assert!(pattern.matches(&uri));
+
+        let uri2 = ResourceUri::file("/src/lib.rs");
+        assert!(!pattern.matches(&uri2));
+    }
+
+    #[test]
+    fn uri_pattern_wildcard() {
+        let pattern = UriPattern::path_only("/src/*.rs");
+        let uri1 = ResourceUri::file("/src/main.rs");
+        let uri2 = ResourceUri::file("/src/lib.rs");
+        let uri3 = ResourceUri::file("/src/deep/nested.rs");
+        assert!(pattern.matches(&uri1));
+        assert!(pattern.matches(&uri2));
+        assert!(!pattern.matches(&uri3));
+    }
+
+    #[test]
+    fn uri_pattern_double_wildcard() {
+        let pattern = UriPattern::path_only("/**/*.rs");
+        let uri1 = ResourceUri::file("/src/main.rs");
+        let uri2 = ResourceUri::file("/src/deep/nested.rs");
+        assert!(pattern.matches(&uri1));
+        assert!(pattern.matches(&uri2));
+    }
+
+    #[test]
+    fn uri_pattern_with_scheme() {
+        let pattern = UriPattern::with_scheme("https", "/api/*");
+        let uri1 = ResourceUri::new("https", "/api/users");
+        let uri2 = ResourceUri::new("http", "/api/users");
+        assert!(pattern.matches(&uri1));
+        assert!(!pattern.matches(&uri2));
+    }
+
+    // ---- URI normalization tests ----
+
+    #[test]
+    fn normalize_uri_removes_trailing_slash() {
+        let uri = ResourceUri::file("/home/user/project/");
+        let normalized = normalize_uri(&uri);
+        assert_eq!(normalized.path, "/home/user/project");
+    }
+
+    #[test]
+    fn normalize_uri_fixes_backslashes() {
+        let uri = ResourceUri::new("file", "C:\\Users\\test\\file.txt");
+        let normalized = normalize_uri(&uri);
+        assert_eq!(normalized.path, "C:/Users/test/file.txt");
+    }
+
+    #[test]
+    fn uri_join_relative() {
+        let base = ResourceUri::file("/home/user/project/src/main.rs");
+        let joined = uri_join(&base, "../lib.rs");
+        assert_eq!(joined.path, "/home/user/project/lib.rs");
+    }
+
+    #[test]
+    fn uri_is_child_check() {
+        let parent = ResourceUri::file("/home/user");
+        let child = ResourceUri::file("/home/user/project/file.rs");
+        let non_child = ResourceUri::file("/home/other/file.rs");
+        assert!(uri_is_child(&parent, &child));
+        assert!(!uri_is_child(&parent, &non_child));
+    }
+
+    #[test]
+    fn uri_depth_computation() {
+        let uri = ResourceUri::file("/home/user/project/src");
+        assert_eq!(uri_depth(&uri), 4);
+        let root = ResourceUri::file("/");
+        assert_eq!(uri_depth(&root), 0);
     }
 }

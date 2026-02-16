@@ -728,6 +728,271 @@ impl Default for CancellationTokenGroup {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CancellationPolicy – define cancellation policies
+// ---------------------------------------------------------------------------
+
+/// Defines how cancellation should be handled.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CancellationPolicy {
+    /// Cancel immediately with no grace period.
+    Immediate,
+    /// Allow a grace period before forcing cancellation.
+    Graceful { grace_period: Duration },
+    /// Cancel after a timeout, regardless of operation state.
+    Timeout { duration: Duration },
+}
+
+impl CancellationPolicy {
+    /// Returns the duration associated with this policy (0 for Immediate).
+    pub fn duration(&self) -> Duration {
+        match self {
+            CancellationPolicy::Immediate => Duration::ZERO,
+            CancellationPolicy::Graceful { grace_period } => *grace_period,
+            CancellationPolicy::Timeout { duration } => *duration,
+        }
+    }
+
+    /// Returns true if this policy allows a grace period.
+    pub fn has_grace_period(&self) -> bool {
+        matches!(self, CancellationPolicy::Graceful { .. })
+    }
+
+    /// Returns true if this is an immediate cancellation.
+    pub fn is_immediate(&self) -> bool {
+        matches!(self, CancellationPolicy::Immediate)
+    }
+
+    /// Check if the given elapsed duration exceeds this policy's limit.
+    pub fn is_expired(&self, elapsed: Duration) -> bool {
+        match self {
+            CancellationPolicy::Immediate => true,
+            CancellationPolicy::Graceful { grace_period } => elapsed >= *grace_period,
+            CancellationPolicy::Timeout { duration } => elapsed >= *duration,
+        }
+    }
+}
+
+impl fmt::Display for CancellationPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CancellationPolicy::Immediate => write!(f, "immediate"),
+            CancellationPolicy::Graceful { grace_period } => {
+                write!(f, "graceful({}ms)", grace_period.as_millis())
+            }
+            CancellationPolicy::Timeout { duration } => {
+                write!(f, "timeout({}ms)", duration.as_millis())
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationChain – chain tokens with priority
+// ---------------------------------------------------------------------------
+
+/// A prioritized chain of cancellation tokens. Higher priority tokens
+/// are checked first.
+#[derive(Debug, Clone)]
+pub struct CancellationChainEntry {
+    pub token: CancellationToken,
+    pub priority: u32,
+    pub label: String,
+}
+
+/// Chains multiple cancellation tokens with associated priorities.
+pub struct CancellationChain {
+    entries: Vec<CancellationChainEntry>,
+}
+
+impl CancellationChain {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add a token with the given priority and label.
+    pub fn add(&mut self, token: CancellationToken, priority: u32, label: impl Into<String>) {
+        self.entries.push(CancellationChainEntry {
+            token,
+            priority,
+            label: label.into(),
+        });
+        self.entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    /// Check if any token in the chain is cancelled, returning the
+    /// highest-priority cancelled entry's label.
+    pub fn check(&self) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|e| e.token.is_cancelled())
+            .map(|e| e.label.as_str())
+    }
+
+    /// Returns true if any token in the chain is cancelled.
+    pub fn is_cancelled(&self) -> bool {
+        self.entries.iter().any(|e| e.token.is_cancelled())
+    }
+
+    /// Number of tokens in the chain.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Check if the chain is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the label of the highest-priority token.
+    pub fn highest_priority_label(&self) -> Option<&str> {
+        self.entries.first().map(|e| e.label.as_str())
+    }
+}
+
+impl Default for CancellationChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationAuditLog – audit trail of cancellation events
+// ---------------------------------------------------------------------------
+
+/// A record of a cancellation event for auditing purposes.
+#[derive(Debug, Clone)]
+pub struct CancellationAuditEntry {
+    pub operation_name: String,
+    pub reason: String,
+    pub timestamp_ms: u64,
+    pub was_graceful: bool,
+}
+
+impl fmt::Display for CancellationAuditEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = if self.was_graceful {
+            "graceful"
+        } else {
+            "immediate"
+        };
+        write!(
+            f,
+            "[{}ms] {} cancelled ({kind}): {}",
+            self.timestamp_ms, self.operation_name, self.reason
+        )
+    }
+}
+
+/// An append-only log of cancellation events.
+pub struct CancellationAuditLog {
+    entries: Vec<CancellationAuditEntry>,
+    max_entries: usize,
+}
+
+impl CancellationAuditLog {
+    /// Create a new audit log with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record a cancellation event.
+    pub fn record(
+        &mut self,
+        operation_name: impl Into<String>,
+        reason: impl Into<String>,
+        timestamp_ms: u64,
+        was_graceful: bool,
+    ) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(CancellationAuditEntry {
+            operation_name: operation_name.into(),
+            reason: reason.into(),
+            timestamp_ms,
+            was_graceful,
+        });
+    }
+
+    /// Get all entries.
+    pub fn entries(&self) -> &[CancellationAuditEntry] {
+        &self.entries
+    }
+
+    /// Number of logged entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return entries matching the given operation name.
+    pub fn entries_for(&self, operation_name: &str) -> Vec<&CancellationAuditEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.operation_name == operation_name)
+            .collect()
+    }
+
+    /// Count of graceful vs immediate cancellations.
+    pub fn graceful_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.was_graceful).count()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationTokenGroup – merge/split extensions
+// ---------------------------------------------------------------------------
+
+impl CancellationTokenGroup {
+    /// Merge another group's tokens into this group.
+    pub fn merge(&mut self, other: &CancellationTokenGroup) {
+        for token in &other.tokens {
+            self.tokens.push(token.clone());
+        }
+    }
+
+    /// Split this group into two: cancelled tokens and non-cancelled tokens.
+    pub fn split_by_state(&self) -> (CancellationTokenGroup, CancellationTokenGroup) {
+        let mut cancelled = CancellationTokenGroup::new();
+        let mut active = CancellationTokenGroup::new();
+        for token in &self.tokens {
+            if token.is_cancelled() {
+                cancelled.add(token.clone());
+            } else {
+                active.add(token.clone());
+            }
+        }
+        (cancelled, active)
+    }
+
+    /// Remove all cancelled tokens from the group, returning how many were removed.
+    pub fn remove_cancelled(&mut self) -> usize {
+        let before = self.tokens.len();
+        self.tokens.retain(|t| !t.is_cancelled());
+        before - self.tokens.len()
+    }
+
+    /// Return tokens as a slice.
+    pub fn tokens(&self) -> &[CancellationToken] {
+        &self.tokens
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1329,5 +1594,149 @@ mod tests {
         s3.cancel();
         assert!(group.all_cancelled());
         assert_eq!(group.cancel_count(), 3);
+    }
+
+    // -- CancellationPolicy tests ------------------------------------------
+
+    #[test]
+    fn policy_immediate() {
+        let p = CancellationPolicy::Immediate;
+        assert!(p.is_immediate());
+        assert!(!p.has_grace_period());
+        assert_eq!(p.duration(), Duration::ZERO);
+        assert!(p.is_expired(Duration::ZERO));
+    }
+
+    #[test]
+    fn policy_graceful() {
+        let p = CancellationPolicy::Graceful {
+            grace_period: Duration::from_millis(500),
+        };
+        assert!(p.has_grace_period());
+        assert!(!p.is_expired(Duration::from_millis(100)));
+        assert!(p.is_expired(Duration::from_millis(500)));
+        assert_eq!(format!("{p}"), "graceful(500ms)");
+    }
+
+    #[test]
+    fn policy_timeout() {
+        let p = CancellationPolicy::Timeout {
+            duration: Duration::from_secs(5),
+        };
+        assert!(!p.is_immediate());
+        assert!(!p.is_expired(Duration::from_secs(3)));
+        assert!(p.is_expired(Duration::from_secs(5)));
+    }
+
+    // -- CancellationChain tests -------------------------------------------
+
+    #[test]
+    fn chain_priority_ordering() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+        let mut chain = CancellationChain::new();
+        chain.add(s1.token(), 10, "low");
+        chain.add(s2.token(), 100, "high");
+        assert_eq!(chain.len(), 2);
+        assert_eq!(chain.highest_priority_label(), Some("high"));
+
+        s1.cancel();
+        // "high" has priority 100 but "low" (priority 10) is cancelled
+        // chain.check() returns the highest-priority cancelled entry
+        // s1 was "low" priority 10, so check returns "low"
+        assert_eq!(chain.check(), Some("low"));
+    }
+
+    #[test]
+    fn chain_not_cancelled() {
+        let chain = CancellationChain::new();
+        assert!(!chain.is_cancelled());
+        assert!(chain.check().is_none());
+        assert!(chain.is_empty());
+    }
+
+    #[test]
+    fn chain_highest_priority_cancelled_first() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+        let mut chain = CancellationChain::new();
+        chain.add(s1.token(), 1, "low");
+        chain.add(s2.token(), 100, "high");
+
+        s2.cancel();
+        assert_eq!(chain.check(), Some("high"));
+    }
+
+    // -- CancellationAuditLog tests ----------------------------------------
+
+    #[test]
+    fn audit_log_record_and_query() {
+        let mut log = CancellationAuditLog::new(100);
+        log.record("download", "user request", 1000, true);
+        log.record("upload", "timeout", 2000, false);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log.graceful_count(), 1);
+        assert_eq!(log.entries_for("download").len(), 1);
+    }
+
+    #[test]
+    fn audit_log_max_entries_eviction() {
+        let mut log = CancellationAuditLog::new(2);
+        log.record("op1", "reason", 100, false);
+        log.record("op2", "reason", 200, false);
+        log.record("op3", "reason", 300, false);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log.entries()[0].operation_name, "op2");
+    }
+
+    #[test]
+    fn audit_entry_display() {
+        let entry = CancellationAuditEntry {
+            operation_name: "fetch".into(),
+            reason: "cancelled".into(),
+            timestamp_ms: 42,
+            was_graceful: false,
+        };
+        let s = format!("{entry}");
+        assert!(s.contains("fetch"));
+        assert!(s.contains("immediate"));
+    }
+
+    // -- CancellationTokenGroup merge/split tests --------------------------
+
+    #[test]
+    fn group_merge_and_split() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+        let s3 = CancellationTokenSource::new();
+
+        let mut g1 = CancellationTokenGroup::new();
+        g1.add(s1.token());
+        let mut g2 = CancellationTokenGroup::new();
+        g2.add(s2.token());
+        g2.add(s3.token());
+
+        g1.merge(&g2);
+        assert_eq!(g1.count(), 3);
+
+        s1.cancel();
+        let (cancelled, active) = g1.split_by_state();
+        assert_eq!(cancelled.count(), 1);
+        assert_eq!(active.count(), 2);
+    }
+
+    #[test]
+    fn group_remove_cancelled() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+
+        let mut group = CancellationTokenGroup::new();
+        group.add(s1.token());
+        group.add(s2.token());
+
+        s1.cancel();
+        let removed = group.remove_cancelled();
+        assert_eq!(removed, 1);
+        assert_eq!(group.count(), 1);
     }
 }

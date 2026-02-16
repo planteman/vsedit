@@ -738,6 +738,280 @@ impl fmt::Display for FileStatResult {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FileBreadcrumb – path segment navigation
+// ---------------------------------------------------------------------------
+
+/// A single segment in a file path breadcrumb trail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreadcrumbSegment {
+    /// The display label for this segment.
+    pub label: String,
+    /// The full path up to and including this segment.
+    pub path: String,
+    /// Whether this segment represents a directory.
+    pub is_directory: bool,
+}
+
+/// Breadcrumb trail for navigating file paths.
+///
+/// Splits a path into individual segments so that a UI can render clickable
+/// breadcrumbs (e.g. `src > components > Button.tsx`).
+#[derive(Debug, Clone)]
+pub struct FileBreadcrumb {
+    segments: Vec<BreadcrumbSegment>,
+}
+
+impl FileBreadcrumb {
+    /// Build a breadcrumb trail from a path string.
+    ///
+    /// The final segment is treated as a file unless the path ends with `/`.
+    pub fn from_path(path: &str) -> Self {
+        let is_dir_path = path.ends_with('/') || path.ends_with('\\');
+        let normalized = path.replace('\\', "/");
+        let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
+        let mut segments = Vec::new();
+        let mut accumulated = String::new();
+
+        for (i, part) in parts.iter().enumerate() {
+            if !accumulated.is_empty() || normalized.starts_with('/') {
+                accumulated.push('/');
+            }
+            accumulated.push_str(part);
+
+            let is_last = i == parts.len() - 1;
+            let is_directory = if is_last { is_dir_path } else { true };
+
+            segments.push(BreadcrumbSegment {
+                label: part.to_string(),
+                path: accumulated.clone(),
+                is_directory,
+            });
+        }
+
+        Self { segments }
+    }
+
+    /// Return the breadcrumb segments.
+    pub fn segments(&self) -> &[BreadcrumbSegment] {
+        &self.segments
+    }
+
+    /// Return the number of segments.
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Return the final segment label, or `None` if the path was empty.
+    pub fn file_name(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.label.as_str())
+    }
+
+    /// Return the parent path (everything except the last segment).
+    pub fn parent_path(&self) -> Option<&str> {
+        if self.segments.len() < 2 {
+            return None;
+        }
+        self.segments
+            .get(self.segments.len() - 2)
+            .map(|s| s.path.as_str())
+    }
+}
+
+impl fmt::Display for FileBreadcrumb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let labels: Vec<&str> = self.segments.iter().map(|s| s.label.as_str()).collect();
+        write!(f, "{}", labels.join(" > "))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileBookmarks – named bookmarks to frequently used paths
+// ---------------------------------------------------------------------------
+
+/// A bookmark to a specific file or directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileBookmark {
+    /// User-assigned name for the bookmark.
+    pub name: String,
+    /// The bookmarked URI.
+    pub uri: VsUri,
+    /// Optional descriptive note.
+    pub note: Option<String>,
+}
+
+/// A collection of file bookmarks.
+#[derive(Debug, Clone, Default)]
+pub struct FileBookmarks {
+    bookmarks: Vec<FileBookmark>,
+}
+
+impl FileBookmarks {
+    pub fn new() -> Self {
+        Self {
+            bookmarks: Vec::new(),
+        }
+    }
+
+    /// Add a bookmark. Returns `Err` if a bookmark with the same name exists.
+    pub fn add(&mut self, name: impl Into<String>, uri: VsUri, note: Option<String>) -> Result<(), String> {
+        let name = name.into();
+        if self.bookmarks.iter().any(|b| b.name == name) {
+            return Err(format!("bookmark '{}' already exists", name));
+        }
+        self.bookmarks.push(FileBookmark { name, uri, note });
+        Ok(())
+    }
+
+    /// Remove a bookmark by name. Returns `true` if found and removed.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.bookmarks.len();
+        self.bookmarks.retain(|b| b.name != name);
+        self.bookmarks.len() < before
+    }
+
+    /// Look up a bookmark by name.
+    pub fn get(&self, name: &str) -> Option<&FileBookmark> {
+        self.bookmarks.iter().find(|b| b.name == name)
+    }
+
+    /// Return all bookmarks.
+    pub fn all(&self) -> &[FileBookmark] {
+        &self.bookmarks
+    }
+
+    /// Return the number of bookmarks.
+    pub fn len(&self) -> usize {
+        self.bookmarks.len()
+    }
+
+    /// Whether the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.bookmarks.is_empty()
+    }
+
+    /// Rename a bookmark. Returns `Err` if the old name is not found or the
+    /// new name already exists.
+    pub fn rename(&mut self, old_name: &str, new_name: impl Into<String>) -> Result<(), String> {
+        let new_name = new_name.into();
+        if self.bookmarks.iter().any(|b| b.name == new_name) {
+            return Err(format!("bookmark '{}' already exists", new_name));
+        }
+        match self.bookmarks.iter_mut().find(|b| b.name == old_name) {
+            Some(b) => {
+                b.name = new_name;
+                Ok(())
+            }
+            None => Err(format!("bookmark '{}' not found", old_name)),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileCompare – line-level diff between two byte slices
+// ---------------------------------------------------------------------------
+
+/// The kind of change for a single line in a diff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffLineKind {
+    /// Line is the same in both inputs.
+    Equal,
+    /// Line was added in the new version.
+    Added,
+    /// Line was removed from the old version.
+    Removed,
+}
+
+/// A single line in a diff result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffLine {
+    pub kind: DiffLineKind,
+    pub content: String,
+}
+
+/// Summary statistics for a diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffSummary {
+    pub total_lines: usize,
+    pub added: usize,
+    pub removed: usize,
+    pub equal: usize,
+}
+
+/// Compare two byte slices line-by-line and return a simple diff.
+///
+/// This uses a straightforward longest-common-subsequence approach for
+/// correctness, but is not optimised for very large files.
+pub fn file_compare(old: &[u8], new: &[u8]) -> Vec<DiffLine> {
+    let old_str = String::from_utf8_lossy(old);
+    let new_str = String::from_utf8_lossy(new);
+    let old_lines: Vec<&str> = old_str.lines().collect();
+    let new_lines: Vec<&str> = new_str.lines().collect();
+
+    // Build LCS table
+    let m = old_lines.len();
+    let n = new_lines.len();
+    let mut dp = vec![vec![0u32; n + 1]; m + 1];
+    for i in (0..m).rev() {
+        for j in (0..n).rev() {
+            if old_lines[i] == new_lines[j] {
+                dp[i][j] = dp[i + 1][j + 1] + 1;
+            } else {
+                dp[i][j] = dp[i + 1][j].max(dp[i][j + 1]);
+            }
+        }
+    }
+
+    // Walk the table to produce diff lines
+    let mut result = Vec::new();
+    let mut i = 0;
+    let mut j = 0;
+    while i < m || j < n {
+        if i < m && j < n && old_lines[i] == new_lines[j] {
+            result.push(DiffLine {
+                kind: DiffLineKind::Equal,
+                content: old_lines[i].to_string(),
+            });
+            i += 1;
+            j += 1;
+        } else if j < n && (i >= m || dp[i][j + 1] >= dp[i + 1][j]) {
+            result.push(DiffLine {
+                kind: DiffLineKind::Added,
+                content: new_lines[j].to_string(),
+            });
+            j += 1;
+        } else {
+            result.push(DiffLine {
+                kind: DiffLineKind::Removed,
+                content: old_lines[i].to_string(),
+            });
+            i += 1;
+        }
+    }
+
+    result
+}
+
+/// Compute a [`DiffSummary`] from diff lines.
+pub fn diff_summary(lines: &[DiffLine]) -> DiffSummary {
+    let mut added = 0;
+    let mut removed = 0;
+    let mut equal = 0;
+    for line in lines {
+        match line.kind {
+            DiffLineKind::Added => added += 1,
+            DiffLineKind::Removed => removed += 1,
+            DiffLineKind::Equal => equal += 1,
+        }
+    }
+    DiffSummary {
+        total_lines: lines.len(),
+        added,
+        removed,
+        equal,
+    }
+}
+
 /// Parse a batch of path strings into [`FileStatResult`] values.
 ///
 /// This function does **not** access the filesystem – it only examines the
@@ -1277,5 +1551,146 @@ mod tests {
     fn files_is_ascii_printable() {
         assert!(FilesValidator::is_ascii_printable("Hello World 123"));
         assert!(!FilesValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---- FileBreadcrumb tests ----
+
+    #[test]
+    fn breadcrumb_from_absolute_path() {
+        let bc = FileBreadcrumb::from_path("/src/components/Button.tsx");
+        assert_eq!(bc.depth(), 3);
+        assert_eq!(bc.file_name(), Some("Button.tsx"));
+        assert_eq!(bc.segments()[0].label, "src");
+        assert!(bc.segments()[0].is_directory);
+        assert!(!bc.segments()[2].is_directory);
+        assert_eq!(bc.parent_path(), Some("/src/components"));
+    }
+
+    #[test]
+    fn breadcrumb_trailing_slash_is_dir() {
+        let bc = FileBreadcrumb::from_path("/usr/local/bin/");
+        assert_eq!(bc.depth(), 3);
+        assert!(bc.segments().last().unwrap().is_directory);
+    }
+
+    #[test]
+    fn breadcrumb_display() {
+        let bc = FileBreadcrumb::from_path("/a/b/c.rs");
+        assert_eq!(format!("{bc}"), "a > b > c.rs");
+    }
+
+    #[test]
+    fn breadcrumb_empty_path() {
+        let bc = FileBreadcrumb::from_path("");
+        assert_eq!(bc.depth(), 0);
+        assert_eq!(bc.file_name(), None);
+        assert_eq!(bc.parent_path(), None);
+    }
+
+    #[test]
+    fn breadcrumb_single_segment() {
+        let bc = FileBreadcrumb::from_path("file.txt");
+        assert_eq!(bc.depth(), 1);
+        assert_eq!(bc.file_name(), Some("file.txt"));
+        assert_eq!(bc.parent_path(), None);
+    }
+
+    // ---- FileBookmarks tests ----
+
+    #[test]
+    fn bookmarks_add_and_get() {
+        let mut bm = FileBookmarks::new();
+        let uri = VsUri::file("/home/user/project");
+        bm.add("project", uri.clone(), Some("Main project".into())).unwrap();
+        assert_eq!(bm.len(), 1);
+        assert!(!bm.is_empty());
+        let b = bm.get("project").unwrap();
+        assert_eq!(b.uri, uri);
+        assert_eq!(b.note.as_deref(), Some("Main project"));
+    }
+
+    #[test]
+    fn bookmarks_reject_duplicate_name() {
+        let mut bm = FileBookmarks::new();
+        bm.add("home", VsUri::file("/home"), None).unwrap();
+        assert!(bm.add("home", VsUri::file("/tmp"), None).is_err());
+    }
+
+    #[test]
+    fn bookmarks_remove() {
+        let mut bm = FileBookmarks::new();
+        bm.add("tmp", VsUri::file("/tmp"), None).unwrap();
+        assert!(bm.remove("tmp"));
+        assert!(bm.is_empty());
+        assert!(!bm.remove("nonexistent"));
+    }
+
+    #[test]
+    fn bookmarks_rename() {
+        let mut bm = FileBookmarks::new();
+        bm.add("old", VsUri::file("/a"), None).unwrap();
+        bm.rename("old", "new").unwrap();
+        assert!(bm.get("old").is_none());
+        assert!(bm.get("new").is_some());
+    }
+
+    #[test]
+    fn bookmarks_rename_conflict() {
+        let mut bm = FileBookmarks::new();
+        bm.add("a", VsUri::file("/a"), None).unwrap();
+        bm.add("b", VsUri::file("/b"), None).unwrap();
+        assert!(bm.rename("a", "b").is_err());
+    }
+
+    // ---- FileCompare / diff tests ----
+
+    #[test]
+    fn diff_identical_files() {
+        let content = b"line1\nline2\nline3\n";
+        let diff = file_compare(content, content);
+        let summary = diff_summary(&diff);
+        assert_eq!(summary.added, 0);
+        assert_eq!(summary.removed, 0);
+        assert_eq!(summary.equal, 3);
+    }
+
+    #[test]
+    fn diff_added_lines() {
+        let old = b"a\nb\n";
+        let new = b"a\nb\nc\n";
+        let diff = file_compare(old, new);
+        let summary = diff_summary(&diff);
+        assert_eq!(summary.added, 1);
+        assert_eq!(summary.removed, 0);
+    }
+
+    #[test]
+    fn diff_removed_lines() {
+        let old = b"a\nb\nc\n";
+        let new = b"a\nc\n";
+        let diff = file_compare(old, new);
+        let summary = diff_summary(&diff);
+        assert_eq!(summary.removed, 1);
+        assert_eq!(summary.added, 0);
+        assert_eq!(summary.equal, 2);
+    }
+
+    #[test]
+    fn diff_completely_different() {
+        let old = b"x\ny\n";
+        let new = b"a\nb\n";
+        let diff = file_compare(old, new);
+        let summary = diff_summary(&diff);
+        assert_eq!(summary.added, 2);
+        assert_eq!(summary.removed, 2);
+        assert_eq!(summary.equal, 0);
+    }
+
+    #[test]
+    fn diff_empty_to_content() {
+        let diff = file_compare(b"", b"hello\nworld\n");
+        let summary = diff_summary(&diff);
+        assert_eq!(summary.added, 2);
+        assert_eq!(summary.removed, 0);
     }
 }

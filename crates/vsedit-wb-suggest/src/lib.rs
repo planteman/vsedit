@@ -670,6 +670,228 @@ impl Default for SuggestionSorter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SuggestionGrouping
+// ---------------------------------------------------------------------------
+
+/// Groups completion items by kind or a custom source label.
+#[derive(Debug, Default)]
+pub struct SuggestionGrouping {
+    groups: std::collections::HashMap<String, Vec<CompletionItem>>,
+}
+
+impl SuggestionGrouping {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Group items by their `CompletionItemKind`.
+    pub fn group_by_kind(items: &[CompletionItem]) -> Self {
+        let mut sg = Self::new();
+        for item in items {
+            let key = format!("{:?}", item.kind);
+            sg.groups.entry(key).or_default().push(item.clone());
+        }
+        sg
+    }
+
+    /// Group items by a custom key extractor.
+    pub fn group_by<F: Fn(&CompletionItem) -> String>(items: &[CompletionItem], key_fn: F) -> Self {
+        let mut sg = Self::new();
+        for item in items {
+            sg.groups.entry(key_fn(item)).or_default().push(item.clone());
+        }
+        sg
+    }
+
+    /// Get group names.
+    pub fn group_names(&self) -> Vec<&str> {
+        self.groups.keys().map(String::as_str).collect()
+    }
+
+    /// Get items in a specific group.
+    pub fn get_group(&self, name: &str) -> Option<&[CompletionItem]> {
+        self.groups.get(name).map(Vec::as_slice)
+    }
+
+    /// Number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Total items across all groups.
+    pub fn total_items(&self) -> usize {
+        self.groups.values().map(Vec::len).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompletionSession
+// ---------------------------------------------------------------------------
+
+/// Tracks a completion session from trigger to accept/dismiss.
+#[derive(Debug)]
+pub struct CompletionSession {
+    trigger_character: Option<char>,
+    start_ms: u64,
+    end_ms: Option<u64>,
+    items_shown: usize,
+    accepted: bool,
+    prefix: String,
+}
+
+impl CompletionSession {
+    /// Start a new completion session.
+    pub fn start(prefix: &str, trigger_char: Option<char>, start_ms: u64) -> Self {
+        Self {
+            trigger_character: trigger_char,
+            start_ms,
+            end_ms: None,
+            items_shown: 0,
+            accepted: false,
+            prefix: prefix.to_string(),
+        }
+    }
+
+    /// Record the number of items shown.
+    pub fn set_items_shown(&mut self, count: usize) {
+        self.items_shown = count;
+    }
+
+    /// Mark the session as accepted (user picked an item).
+    pub fn accept(&mut self, end_ms: u64) {
+        self.end_ms = Some(end_ms);
+        self.accepted = true;
+    }
+
+    /// Mark the session as dismissed (user cancelled).
+    pub fn dismiss(&mut self, end_ms: u64) {
+        self.end_ms = Some(end_ms);
+        self.accepted = false;
+    }
+
+    /// Duration of the session in ms, or `None` if still active.
+    pub fn duration_ms(&self) -> Option<u64> {
+        self.end_ms.map(|end| end.saturating_sub(self.start_ms))
+    }
+
+    /// Whether the session is still active.
+    pub fn is_active(&self) -> bool {
+        self.end_ms.is_none()
+    }
+
+    /// Whether the session ended with an acceptance.
+    pub fn was_accepted(&self) -> bool {
+        self.accepted
+    }
+
+    /// The prefix that triggered the session.
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+
+    /// Items shown during this session.
+    pub fn items_shown(&self) -> usize {
+        self.items_shown
+    }
+
+    /// The trigger character, if any.
+    pub fn trigger_character(&self) -> Option<char> {
+        self.trigger_character
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestionCache
+// ---------------------------------------------------------------------------
+
+/// Simple LRU-style cache for completion results keyed by prefix.
+#[derive(Debug)]
+pub struct SuggestionCache {
+    capacity: usize,
+    entries: Vec<(String, Vec<CompletionItem>)>,
+}
+
+impl SuggestionCache {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Insert a result set for a prefix. Evicts the oldest entry if at capacity.
+    pub fn insert(&mut self, prefix: &str, items: Vec<CompletionItem>) {
+        // Remove existing entry for same prefix.
+        self.entries.retain(|(k, _)| k != prefix);
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((prefix.to_string(), items));
+    }
+
+    /// Get cached items for a prefix, moving it to most-recently-used.
+    pub fn get(&mut self, prefix: &str) -> Option<&[CompletionItem]> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == prefix) {
+            let entry = self.entries.remove(pos);
+            self.entries.push(entry);
+            self.entries.last().map(|(_, v)| v.as_slice())
+        } else {
+            None
+        }
+    }
+
+    /// Check if a prefix is cached.
+    pub fn contains(&self, prefix: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == prefix)
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all cached entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Invalidate entries whose prefix starts with the given string.
+    pub fn invalidate_prefix(&mut self, prefix: &str) {
+        self.entries.retain(|(k, _)| !k.starts_with(prefix));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompletionScoring contextual extension
+// ---------------------------------------------------------------------------
+
+impl CompletionScoring {
+    /// Score with contextual boost: items whose kind matches `preferred_kind`
+    /// get a bonus.
+    pub fn score_contextual(
+        query: &str,
+        item: &CompletionItem,
+        preferred_kind: Option<CompletionItemKind>,
+    ) -> u32 {
+        let mut s = Self::score_item(query, item);
+        if let Some(kind) = preferred_kind {
+            if item.kind == kind {
+                s += 15;
+            }
+        }
+        if item.preselect {
+            s += 20;
+        }
+        s
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1318,5 +1540,125 @@ mod tests {
         SuggestionSorter::new().by_score("for").sort(&mut items);
         // "format" has prefix match so should come first
         assert_eq!(items[0].label, "format");
+    }
+
+    // -----------------------------------------------------------------------
+    // SuggestionGrouping tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn suggestion_grouping_by_kind() {
+        let items = vec![
+            make_item("foo", CompletionItemKind::Function),
+            make_item("bar", CompletionItemKind::Variable),
+            make_item("baz", CompletionItemKind::Function),
+        ];
+        let groups = SuggestionGrouping::group_by_kind(&items);
+        assert_eq!(groups.group_count(), 2);
+        assert_eq!(groups.total_items(), 3);
+        assert_eq!(groups.get_group("Function").unwrap().len(), 2);
+        assert_eq!(groups.get_group("Variable").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn suggestion_grouping_custom_key() {
+        let items = vec![
+            make_item("get_name", CompletionItemKind::Method),
+            make_item("set_name", CompletionItemKind::Method),
+            make_item("get_age", CompletionItemKind::Method),
+        ];
+        let groups = SuggestionGrouping::group_by(&items, |item| {
+            if item.label.starts_with("get") { "getters".into() } else { "setters".into() }
+        });
+        assert_eq!(groups.get_group("getters").unwrap().len(), 2);
+        assert_eq!(groups.get_group("setters").unwrap().len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionSession tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn completion_session_lifecycle() {
+        let mut session = CompletionSession::start("fo", Some('.'), 1000);
+        assert!(session.is_active());
+        assert_eq!(session.prefix(), "fo");
+        assert_eq!(session.trigger_character(), Some('.'));
+
+        session.set_items_shown(5);
+        assert_eq!(session.items_shown(), 5);
+
+        session.accept(1200);
+        assert!(!session.is_active());
+        assert!(session.was_accepted());
+        assert_eq!(session.duration_ms(), Some(200));
+    }
+
+    #[test]
+    fn completion_session_dismiss() {
+        let mut session = CompletionSession::start("abc", None, 500);
+        session.dismiss(700);
+        assert!(!session.was_accepted());
+        assert_eq!(session.duration_ms(), Some(200));
+    }
+
+    // -----------------------------------------------------------------------
+    // SuggestionCache tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn suggestion_cache_basic() {
+        let mut cache = SuggestionCache::new(3);
+        assert!(cache.is_empty());
+
+        let items = vec![make_item("foo", CompletionItemKind::Function)];
+        cache.insert("fo", items.clone());
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains("fo"));
+
+        let cached = cache.get("fo").unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].label, "foo");
+    }
+
+    #[test]
+    fn suggestion_cache_eviction() {
+        let mut cache = SuggestionCache::new(2);
+        cache.insert("a", vec![make_item("a1", CompletionItemKind::Text)]);
+        cache.insert("b", vec![make_item("b1", CompletionItemKind::Text)]);
+        cache.insert("c", vec![make_item("c1", CompletionItemKind::Text)]);
+
+        assert_eq!(cache.len(), 2);
+        assert!(!cache.contains("a")); // evicted
+        assert!(cache.contains("b"));
+        assert!(cache.contains("c"));
+    }
+
+    #[test]
+    fn suggestion_cache_invalidate_prefix() {
+        let mut cache = SuggestionCache::new(10);
+        cache.insert("foo", vec![]);
+        cache.insert("foobar", vec![]);
+        cache.insert("bar", vec![]);
+        assert_eq!(cache.len(), 3);
+
+        cache.invalidate_prefix("foo");
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains("bar"));
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionScoring contextual test
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scoring_contextual_boost() {
+        let item_fn = make_item("format", CompletionItemKind::Function);
+        let item_var = make_item("format_str", CompletionItemKind::Variable);
+
+        let s_fn = CompletionScoring::score_contextual("for", &item_fn, Some(CompletionItemKind::Function));
+        let s_var = CompletionScoring::score_contextual("for", &item_var, Some(CompletionItemKind::Function));
+        // Function should get the kind boost
+        assert!(s_fn > s_var);
     }
 }

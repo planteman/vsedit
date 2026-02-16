@@ -702,6 +702,202 @@ pub fn compute_dropdown_layout(
     }
 }
 
+// ── MenuAccelerator ──
+
+/// Represents a keyboard accelerator (shortcut) for a menu item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MenuAccelerator {
+    pub modifiers: Vec<String>,
+    pub key: String,
+}
+
+impl MenuAccelerator {
+    /// Parse a shortcut string like "Ctrl+Shift+S" into modifiers and key.
+    pub fn parse(shortcut: &str) -> Result<Self, MenuError> {
+        let parts: Vec<&str> = shortcut.split('+').collect();
+        if parts.is_empty() || parts.last().map_or(true, |k| k.is_empty()) {
+            return Err(MenuError::InvalidShortcut(shortcut.to_string()));
+        }
+        let key = parts.last().unwrap().to_string();
+        let modifiers: Vec<String> = parts[..parts.len() - 1]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        Ok(Self { modifiers, key })
+    }
+
+    /// Returns the canonical string form, e.g. "Ctrl+Shift+S".
+    pub fn to_string_repr(&self) -> String {
+        if self.modifiers.is_empty() {
+            self.key.clone()
+        } else {
+            format!("{}+{}", self.modifiers.join("+"), self.key)
+        }
+    }
+
+    /// Returns true if the accelerator uses the Ctrl modifier.
+    pub fn has_ctrl(&self) -> bool {
+        self.modifiers.iter().any(|m| m.eq_ignore_ascii_case("ctrl"))
+    }
+
+    /// Returns true if the accelerator uses the Shift modifier.
+    pub fn has_shift(&self) -> bool {
+        self.modifiers.iter().any(|m| m.eq_ignore_ascii_case("shift"))
+    }
+
+    /// Returns true if the accelerator uses the Alt modifier.
+    pub fn has_alt(&self) -> bool {
+        self.modifiers.iter().any(|m| m.eq_ignore_ascii_case("alt"))
+    }
+
+    /// Returns the number of modifiers.
+    pub fn modifier_count(&self) -> usize {
+        self.modifiers.len()
+    }
+}
+
+impl fmt::Display for MenuAccelerator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string_repr())
+    }
+}
+
+// ── MenuSearchIndex ──
+
+/// Index for searching menu items by label substring.
+pub struct MenuSearchIndex {
+    entries: Vec<(String, String, String)>, // (menu_key, command_id, lowercase_title)
+}
+
+impl MenuSearchIndex {
+    /// Build a search index from a `MenuBarService`.
+    pub fn from_service(svc: &MenuBarService) -> Self {
+        let mut entries = Vec::new();
+        for (menu_key, entry) in svc.flatten_items() {
+            entries.push((
+                menu_key,
+                entry.command_id.clone(),
+                entry.title.to_lowercase(),
+            ));
+        }
+        Self { entries }
+    }
+
+    /// Search for entries whose title contains `query` (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<(&str, &str)> {
+        let q = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|(_, _, title)| title.contains(&q))
+            .map(|(menu, cmd, _)| (menu.as_str(), cmd.as_str()))
+            .collect()
+    }
+
+    /// Returns the total number of indexed entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the index is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ── MenuBreadcrumb ──
+
+/// Represents a breadcrumb trail for navigating nested menus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MenuBreadcrumb {
+    segments: Vec<String>,
+}
+
+impl MenuBreadcrumb {
+    /// Create an empty breadcrumb.
+    pub fn new() -> Self {
+        Self { segments: Vec::new() }
+    }
+
+    /// Push a new segment onto the trail.
+    pub fn push(&mut self, segment: impl Into<String>) {
+        self.segments.push(segment.into());
+    }
+
+    /// Pop the last segment from the trail.
+    pub fn pop(&mut self) -> Option<String> {
+        self.segments.pop()
+    }
+
+    /// Returns the full trail as "A > B > C".
+    pub fn display(&self) -> String {
+        self.segments.join(" > ")
+    }
+
+    /// Returns the current (last) segment, if any.
+    pub fn current(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+
+    /// Returns the depth (number of segments).
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Returns true if the breadcrumb is at the root (empty).
+    pub fn is_root(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    /// Build a breadcrumb from a menu path string like "File > Save As...".
+    pub fn from_path(path: &str) -> Self {
+        let segments: Vec<String> = path
+            .split('>')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        Self { segments }
+    }
+}
+
+impl Default for MenuBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for MenuBreadcrumb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display())
+    }
+}
+
+// ── Recent items tracking on MenuBarService ──
+
+impl MenuBarService {
+    /// Collect all accelerators from entries that have shortcuts.
+    pub fn collect_accelerators(&self) -> Vec<(String, MenuAccelerator)> {
+        let mut result = Vec::new();
+        for (_, entry) in self.flatten_items() {
+            if let Some(sc) = &entry.shortcut {
+                if let Ok(accel) = MenuAccelerator::parse(sc) {
+                    result.push((entry.command_id.clone(), accel));
+                }
+            }
+        }
+        result
+    }
+
+    /// Build a search index from the current state of this service.
+    pub fn build_search_index(&self) -> MenuSearchIndex {
+        MenuSearchIndex::from_service(self)
+    }
+
+    /// Returns a breadcrumb for the given command_id, if found.
+    pub fn breadcrumb_for(&self, command_id: &str) -> Option<MenuBreadcrumb> {
+        self.item_path(command_id).map(|p| MenuBreadcrumb::from_path(&p))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1319,5 +1515,102 @@ mod tests {
     fn invalid_shortcut_error_display() {
         let err = MenuError::InvalidShortcut("bad+key".into());
         assert_eq!(format!("{}", err), "invalid shortcut: bad+key");
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn accelerator_parse_ctrl_s() {
+        let accel = MenuAccelerator::parse("Ctrl+S").unwrap();
+        assert_eq!(accel.modifiers, vec!["Ctrl"]);
+        assert_eq!(accel.key, "S");
+        assert!(accel.has_ctrl());
+        assert!(!accel.has_shift());
+        assert!(!accel.has_alt());
+        assert_eq!(accel.to_string_repr(), "Ctrl+S");
+    }
+
+    #[test]
+    fn accelerator_parse_multi_modifier() {
+        let accel = MenuAccelerator::parse("Ctrl+Shift+S").unwrap();
+        assert_eq!(accel.modifier_count(), 2);
+        assert!(accel.has_ctrl());
+        assert!(accel.has_shift());
+        assert_eq!(format!("{}", accel), "Ctrl+Shift+S");
+    }
+
+    #[test]
+    fn accelerator_parse_bare_key() {
+        let accel = MenuAccelerator::parse("F5").unwrap();
+        assert!(accel.modifiers.is_empty());
+        assert_eq!(accel.key, "F5");
+        assert_eq!(accel.modifier_count(), 0);
+    }
+
+    #[test]
+    fn accelerator_parse_empty_fails() {
+        assert!(MenuAccelerator::parse("").is_err());
+    }
+
+    #[test]
+    fn search_index_finds_entries() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("openFile", 1));
+        svc.add_entry(&MenuId::File, titled_entry("save", "Save File", 2));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        let idx = svc.build_search_index();
+        assert_eq!(idx.len(), 3);
+        let results = idx.search("file");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn search_index_case_insensitive() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, titled_entry("zoomIn", "Zoom In", 1));
+        let idx = svc.build_search_index();
+        let results = idx.search("ZOOM");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1, "zoomIn");
+    }
+
+    #[test]
+    fn breadcrumb_from_path() {
+        let bc = MenuBreadcrumb::from_path("File > Save As...");
+        assert_eq!(bc.depth(), 2);
+        assert_eq!(bc.current(), Some("Save As..."));
+        assert_eq!(bc.display(), "File > Save As...");
+    }
+
+    #[test]
+    fn breadcrumb_push_pop() {
+        let mut bc = MenuBreadcrumb::new();
+        assert!(bc.is_root());
+        bc.push("File");
+        bc.push("Recent");
+        assert_eq!(bc.depth(), 2);
+        assert_eq!(bc.pop(), Some("Recent".to_string()));
+        assert_eq!(bc.depth(), 1);
+        assert_eq!(bc.current(), Some("File"));
+    }
+
+    #[test]
+    fn collect_accelerators_from_service() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1).with_shortcut("Ctrl+O"));
+        svc.add_entry(&MenuId::File, entry("save", 2).with_shortcut("Ctrl+S"));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        let accels = svc.collect_accelerators();
+        assert_eq!(accels.len(), 2);
+        assert!(accels.iter().all(|(_, a)| a.has_ctrl()));
+    }
+
+    #[test]
+    fn breadcrumb_for_command() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, titled_entry("saveAs", "Save As...", 2));
+        let bc = svc.breadcrumb_for("saveAs").unwrap();
+        assert_eq!(bc.depth(), 2);
+        assert_eq!(bc.current(), Some("Save As..."));
     }
 }

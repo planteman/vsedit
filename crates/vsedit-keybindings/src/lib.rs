@@ -730,6 +730,222 @@ pub fn find_binding_for_command<'a>(
 }
 
 // ---------------------------------------------------------------------------
+// Conflict severity
+// ---------------------------------------------------------------------------
+
+/// Severity level of a keybinding conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ConflictSeverity {
+    /// Both bindings share the exact same chord sequence.
+    Exact,
+    /// One binding is a prefix of another (chord shadowing).
+    Prefix,
+    /// Bindings share the first chord only.
+    Partial,
+}
+
+impl fmt::Display for ConflictSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConflictSeverity::Exact => write!(f, "Exact"),
+            ConflictSeverity::Prefix => write!(f, "Prefix"),
+            ConflictSeverity::Partial => write!(f, "Partial"),
+        }
+    }
+}
+
+/// A keybinding conflict with severity information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeverityConflict {
+    pub binding_a: Keybinding,
+    pub binding_b: Keybinding,
+    pub severity: ConflictSeverity,
+}
+
+/// Detect conflicts among categorized keybindings, annotated with severity.
+pub fn detect_conflicts_with_severity(bindings: &[CategorizedKeybinding]) -> Vec<SeverityConflict> {
+    let mut conflicts = Vec::new();
+    for i in 0..bindings.len() {
+        for j in (i + 1)..bindings.len() {
+            let a = &bindings[i].binding;
+            let b = &bindings[j].binding;
+            if a.parts == b.parts {
+                conflicts.push(SeverityConflict {
+                    binding_a: a.clone(),
+                    binding_b: b.clone(),
+                    severity: ConflictSeverity::Exact,
+                });
+            } else if a.parts.len() < b.parts.len() && b.parts.starts_with(&a.parts) {
+                conflicts.push(SeverityConflict {
+                    binding_a: a.clone(),
+                    binding_b: b.clone(),
+                    severity: ConflictSeverity::Prefix,
+                });
+            } else if b.parts.len() < a.parts.len() && a.parts.starts_with(&b.parts) {
+                conflicts.push(SeverityConflict {
+                    binding_a: a.clone(),
+                    binding_b: b.clone(),
+                    severity: ConflictSeverity::Prefix,
+                });
+            } else if !a.parts.is_empty()
+                && !b.parts.is_empty()
+                && a.parts[0] == b.parts[0]
+            {
+                conflicts.push(SeverityConflict {
+                    binding_a: a.clone(),
+                    binding_b: b.clone(),
+                    severity: ConflictSeverity::Partial,
+                });
+            }
+        }
+    }
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Cheat sheet generation
+// ---------------------------------------------------------------------------
+
+/// A single entry in a keybinding cheat sheet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheatSheetEntry {
+    pub command: String,
+    pub binding_label: String,
+    pub category: String,
+}
+
+/// A generated cheat sheet organized by category.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingCheatSheet {
+    pub entries: Vec<CheatSheetEntry>,
+}
+
+impl KeybindingCheatSheet {
+    /// Generate a cheat sheet from a slice of categorized keybindings.
+    pub fn generate(bindings: &[CategorizedKeybinding]) -> Self {
+        let mut entries: Vec<CheatSheetEntry> = bindings
+            .iter()
+            .map(|kb| CheatSheetEntry {
+                command: kb.command.clone(),
+                binding_label: kb.binding.to_string(),
+                category: format!("{}", kb.category),
+            })
+            .collect();
+        entries.sort_by(|a, b| a.category.cmp(&b.category).then(a.command.cmp(&b.command)));
+        Self { entries }
+    }
+
+    /// Render the cheat sheet as a human-readable multi-line string.
+    pub fn render(&self) -> String {
+        let mut result = String::new();
+        let mut current_cat = String::new();
+        for entry in &self.entries {
+            if entry.category != current_cat {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(&format!("[{}]\n", entry.category));
+                current_cat = entry.category.clone();
+            }
+            result.push_str(&format!("  {:30} {}\n", entry.command, entry.binding_label));
+        }
+        result
+    }
+
+    /// Return only entries matching a given category string.
+    pub fn filter_category(&self, category: &str) -> Vec<&CheatSheetEntry> {
+        self.entries.iter().filter(|e| e.category == category).collect()
+    }
+
+    /// Return the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if the cheat sheet has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Key sequence recorder
+// ---------------------------------------------------------------------------
+
+/// Records a sequence of key chords for macro creation.
+#[derive(Debug, Clone)]
+pub struct KeySequenceRecorder {
+    chords: Vec<KeyCodeChord>,
+    max_length: usize,
+    recording: bool,
+}
+
+impl KeySequenceRecorder {
+    /// Create a new recorder with the given maximum chord count.
+    pub fn new(max_length: usize) -> Self {
+        Self {
+            chords: Vec::new(),
+            max_length,
+            recording: false,
+        }
+    }
+
+    /// Start recording.
+    pub fn start(&mut self) {
+        self.chords.clear();
+        self.recording = true;
+    }
+
+    /// Stop recording and return the captured chords.
+    pub fn stop(&mut self) -> Vec<KeyCodeChord> {
+        self.recording = false;
+        self.chords.clone()
+    }
+
+    /// Returns `true` if currently recording.
+    pub fn is_recording(&self) -> bool {
+        self.recording
+    }
+
+    /// Record a chord. Returns `false` if the recorder is full or not recording.
+    pub fn record(&mut self, chord: KeyCodeChord) -> bool {
+        if !self.recording || self.chords.len() >= self.max_length {
+            return false;
+        }
+        self.chords.push(chord);
+        true
+    }
+
+    /// Return the number of recorded chords.
+    pub fn len(&self) -> usize {
+        self.chords.len()
+    }
+
+    /// Return `true` if no chords have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.chords.is_empty()
+    }
+
+    /// Build a `Keybinding` from the first one or two recorded chords.
+    pub fn to_keybinding(&self) -> Option<Keybinding> {
+        match self.chords.len() {
+            0 => None,
+            1 => Some(Keybinding::new(self.chords[0].clone())),
+            _ => Some(Keybinding::two_chords(
+                self.chords[0].clone(),
+                self.chords[1].clone(),
+            )),
+        }
+    }
+
+    /// Reset the recorder, clearing all recorded chords.
+    pub fn reset(&mut self) {
+        self.chords.clear();
+        self.recording = false;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1331,5 +1547,149 @@ mod tests {
             format!("{}", KeybindingCategory::Custom("user".into())),
             "Custom(user)"
         );
+    }
+
+    // -- Conflict severity --
+
+    #[test]
+    fn detect_exact_conflict_severity() {
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(chord.clone()),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(chord.clone()),
+                command: "save_all".into(),
+                category: KeybindingCategory::General,
+            },
+        ];
+        let conflicts = detect_conflicts_with_severity(&bindings);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].severity, ConflictSeverity::Exact);
+    }
+
+    #[test]
+    fn detect_prefix_conflict_severity() {
+        let k = KeyCodeChord::new(true, false, false, false, KeyCode::KeyK);
+        let c = KeyCodeChord::new(true, false, false, false, KeyCode::KeyC);
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(k.clone()),
+                command: "cut".into(),
+                category: KeybindingCategory::Editor,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::two_chords(k.clone(), c.clone()),
+                command: "comment".into(),
+                category: KeybindingCategory::Editor,
+            },
+        ];
+        let conflicts = detect_conflicts_with_severity(&bindings);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].severity, ConflictSeverity::Prefix);
+    }
+
+    #[test]
+    fn conflict_severity_display() {
+        assert_eq!(format!("{}", ConflictSeverity::Exact), "Exact");
+        assert_eq!(format!("{}", ConflictSeverity::Prefix), "Prefix");
+        assert_eq!(format!("{}", ConflictSeverity::Partial), "Partial");
+    }
+
+    // -- Cheat sheet --
+
+    #[test]
+    fn cheat_sheet_generate_and_render() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyZ)),
+                command: "undo".into(),
+                category: KeybindingCategory::Editor,
+            },
+        ];
+        let sheet = KeybindingCheatSheet::generate(&bindings);
+        assert_eq!(sheet.len(), 2);
+        assert!(!sheet.is_empty());
+        let rendered = sheet.render();
+        assert!(rendered.contains("[Editor]"));
+        assert!(rendered.contains("[General]"));
+        assert!(rendered.contains("save"));
+        assert!(rendered.contains("undo"));
+    }
+
+    #[test]
+    fn cheat_sheet_filter_category() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyZ)),
+                command: "undo".into(),
+                category: KeybindingCategory::Editor,
+            },
+        ];
+        let sheet = KeybindingCheatSheet::generate(&bindings);
+        let general = sheet.filter_category("General");
+        assert_eq!(general.len(), 1);
+        assert_eq!(general[0].command, "save");
+    }
+
+    // -- Key sequence recorder --
+
+    #[test]
+    fn recorder_basic_flow() {
+        let mut rec = KeySequenceRecorder::new(4);
+        assert!(!rec.is_recording());
+        assert!(rec.is_empty());
+
+        rec.start();
+        assert!(rec.is_recording());
+
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyA);
+        assert!(rec.record(chord.clone()));
+        assert_eq!(rec.len(), 1);
+
+        let chords = rec.stop();
+        assert_eq!(chords.len(), 1);
+        assert!(!rec.is_recording());
+
+        let kb = rec.to_keybinding();
+        assert!(kb.is_some());
+        assert_eq!(kb.unwrap().chord_count(), 1);
+    }
+
+    #[test]
+    fn recorder_max_length_enforced() {
+        let mut rec = KeySequenceRecorder::new(2);
+        rec.start();
+        let c1 = KeyCodeChord::new(true, false, false, false, KeyCode::KeyA);
+        let c2 = KeyCodeChord::new(true, false, false, false, KeyCode::KeyB);
+        let c3 = KeyCodeChord::new(true, false, false, false, KeyCode::KeyC);
+        assert!(rec.record(c1));
+        assert!(rec.record(c2));
+        assert!(!rec.record(c3));
+        assert_eq!(rec.len(), 2);
+    }
+
+    #[test]
+    fn recorder_reset() {
+        let mut rec = KeySequenceRecorder::new(4);
+        rec.start();
+        rec.record(KeyCodeChord::new(false, false, false, false, KeyCode::KeyX));
+        rec.reset();
+        assert!(!rec.is_recording());
+        assert!(rec.is_empty());
+        assert!(rec.to_keybinding().is_none());
     }
 }

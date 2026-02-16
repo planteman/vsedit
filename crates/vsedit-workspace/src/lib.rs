@@ -663,6 +663,280 @@ pub fn workspace_exclude_pattern(patterns: &[&str], path: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// WorkspaceSearchIndex
+// ---------------------------------------------------------------------------
+
+/// Search index for workspace files by name and content snippets.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceSearchIndex {
+    entries: Vec<WorkspaceSearchEntry>,
+}
+
+/// An indexed entry for search.
+#[derive(Debug, Clone)]
+pub struct WorkspaceSearchEntry {
+    pub path: String,
+    pub name: String,
+    pub content_snippet: Option<String>,
+}
+
+impl WorkspaceSearchIndex {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a file to the search index.
+    pub fn add(&mut self, path: &str, content_snippet: Option<&str>) {
+        let name = path
+            .rsplit('/')
+            .next()
+            .unwrap_or(path)
+            .to_string();
+        self.entries.push(WorkspaceSearchEntry {
+            path: path.to_string(),
+            name,
+            content_snippet: content_snippet.map(String::from),
+        });
+    }
+
+    /// Remove an entry by path.
+    pub fn remove(&mut self, path: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.path != path);
+        self.entries.len() < before
+    }
+
+    /// Search by file name substring (case-insensitive).
+    pub fn search_by_name(&self, query: &str) -> Vec<&WorkspaceSearchEntry> {
+        let lower = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.name.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Search by content snippet substring (case-insensitive).
+    pub fn search_by_content(&self, query: &str) -> Vec<&WorkspaceSearchEntry> {
+        let lower = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.content_snippet
+                    .as_ref()
+                    .map_or(false, |s| s.to_lowercase().contains(&lower))
+            })
+            .collect()
+    }
+
+    /// Number of indexed entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the index is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceLayoutConfig
+// ---------------------------------------------------------------------------
+
+/// Configuration for workspace panel layout.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WorkspaceLayoutConfig {
+    pub sidebar_visible: bool,
+    pub sidebar_position: SidebarPosition,
+    pub panel_visible: bool,
+    pub panel_position: PanelPosition,
+    pub editor_tab_size: u32,
+    pub minimap_enabled: bool,
+}
+
+/// Sidebar position in the workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SidebarPosition {
+    Left,
+    Right,
+}
+
+/// Panel position in the workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PanelPosition {
+    Bottom,
+    Right,
+    Left,
+}
+
+impl WorkspaceLayoutConfig {
+    pub fn new() -> Self {
+        Self {
+            sidebar_visible: true,
+            sidebar_position: SidebarPosition::Left,
+            panel_visible: true,
+            panel_position: PanelPosition::Bottom,
+            editor_tab_size: 4,
+            minimap_enabled: true,
+        }
+    }
+
+    pub fn toggle_sidebar(&mut self) {
+        self.sidebar_visible = !self.sidebar_visible;
+    }
+
+    pub fn toggle_panel(&mut self) {
+        self.panel_visible = !self.panel_visible;
+    }
+
+    pub fn toggle_minimap(&mut self) {
+        self.minimap_enabled = !self.minimap_enabled;
+    }
+
+    pub fn set_tab_size(&mut self, size: u32) {
+        if size > 0 && size <= 16 {
+            self.editor_tab_size = size;
+        }
+    }
+}
+
+impl Default for WorkspaceLayoutConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceSnapshot
+// ---------------------------------------------------------------------------
+
+/// A point-in-time snapshot of workspace state for comparison.
+#[derive(Debug, Clone)]
+pub struct WorkspaceSnapshot {
+    pub folder_paths: Vec<String>,
+    pub trust: WorkspaceTrust,
+    pub file_count: usize,
+    pub tags: Vec<String>,
+    pub timestamp_ms: u64,
+}
+
+impl WorkspaceSnapshot {
+    /// Capture a snapshot from a workspace and file index.
+    pub fn capture(ws: &Workspace, index: &WorkspaceFileIndex, timestamp_ms: u64) -> Self {
+        Self {
+            folder_paths: ws.get_folders().iter().map(|f| f.uri.path.clone()).collect(),
+            trust: ws.trust(),
+            file_count: index.file_count(),
+            tags: Vec::new(),
+            timestamp_ms,
+        }
+    }
+
+    /// Compare two snapshots and return a summary of differences.
+    pub fn diff(&self, other: &WorkspaceSnapshot) -> WorkspaceSnapshotDiff {
+        let folders_added: Vec<String> = other
+            .folder_paths
+            .iter()
+            .filter(|p| !self.folder_paths.contains(p))
+            .cloned()
+            .collect();
+        let folders_removed: Vec<String> = self
+            .folder_paths
+            .iter()
+            .filter(|p| !other.folder_paths.contains(p))
+            .cloned()
+            .collect();
+        WorkspaceSnapshotDiff {
+            folders_added,
+            folders_removed,
+            file_count_delta: other.file_count as i64 - self.file_count as i64,
+            trust_changed: self.trust != other.trust,
+        }
+    }
+}
+
+/// Differences between two workspace snapshots.
+#[derive(Debug, Clone)]
+pub struct WorkspaceSnapshotDiff {
+    pub folders_added: Vec<String>,
+    pub folders_removed: Vec<String>,
+    pub file_count_delta: i64,
+    pub trust_changed: bool,
+}
+
+impl WorkspaceSnapshotDiff {
+    /// Whether there are any differences.
+    pub fn has_changes(&self) -> bool {
+        !self.folders_added.is_empty()
+            || !self.folders_removed.is_empty()
+            || self.file_count_delta != 0
+            || self.trust_changed
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace tag/label extension
+// ---------------------------------------------------------------------------
+
+/// Tags/labels attached to a workspace for organization.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceTags {
+    tags: Vec<String>,
+}
+
+impl WorkspaceTags {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a tag if not already present.
+    pub fn add(&mut self, tag: &str) -> bool {
+        if self.tags.iter().any(|t| t == tag) {
+            return false;
+        }
+        self.tags.push(tag.to_string());
+        true
+    }
+
+    /// Remove a tag. Returns `true` if it was present.
+    pub fn remove(&mut self, tag: &str) -> bool {
+        let before = self.tags.len();
+        self.tags.retain(|t| t != tag);
+        self.tags.len() < before
+    }
+
+    /// Check if a tag exists.
+    pub fn contains(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    /// Return all tags.
+    pub fn all(&self) -> &[String] {
+        &self.tags
+    }
+
+    /// Number of tags.
+    pub fn len(&self) -> usize {
+        self.tags.len()
+    }
+
+    /// Whether there are no tags.
+    pub fn is_empty(&self) -> bool {
+        self.tags.is_empty()
+    }
+
+    /// Return tags matching a prefix (case-insensitive).
+    pub fn search(&self, prefix: &str) -> Vec<&str> {
+        let lower = prefix.to_lowercase();
+        self.tags
+            .iter()
+            .filter(|t| t.to_lowercase().starts_with(&lower))
+            .map(String::as_str)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1315,5 +1589,109 @@ mod tests {
         let json = serde_json::to_string(&t).unwrap();
         let parsed: WorkspaceTrust = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, WorkspaceTrust::Trusted);
+    }
+
+    #[test]
+    fn workspace_search_index_by_name() {
+        let mut idx = WorkspaceSearchIndex::new();
+        idx.add("/src/main.rs", Some("fn main() {}"));
+        idx.add("/src/lib.rs", Some("pub mod utils;"));
+        idx.add("/README.md", None);
+
+        let results = idx.search_by_name("main");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, "/src/main.rs");
+
+        let results = idx.search_by_name(".rs");
+        assert_eq!(results.len(), 2);
+        assert_eq!(idx.len(), 3);
+    }
+
+    #[test]
+    fn workspace_search_index_by_content() {
+        let mut idx = WorkspaceSearchIndex::new();
+        idx.add("/a.rs", Some("fn hello() {}"));
+        idx.add("/b.rs", Some("fn world() {}"));
+        idx.add("/c.rs", None);
+
+        let results = idx.search_by_content("hello");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, "/a.rs");
+    }
+
+    #[test]
+    fn workspace_layout_config_toggles() {
+        let mut cfg = WorkspaceLayoutConfig::new();
+        assert!(cfg.sidebar_visible);
+        cfg.toggle_sidebar();
+        assert!(!cfg.sidebar_visible);
+        cfg.toggle_sidebar();
+        assert!(cfg.sidebar_visible);
+
+        cfg.toggle_minimap();
+        assert!(!cfg.minimap_enabled);
+
+        cfg.set_tab_size(2);
+        assert_eq!(cfg.editor_tab_size, 2);
+        cfg.set_tab_size(0); // invalid, should not change
+        assert_eq!(cfg.editor_tab_size, 2);
+        cfg.set_tab_size(20); // too large, should not change
+        assert_eq!(cfg.editor_tab_size, 2);
+    }
+
+    #[test]
+    fn workspace_snapshot_diff() {
+        let snap1 = WorkspaceSnapshot {
+            folder_paths: vec!["/a".into(), "/b".into()],
+            trust: WorkspaceTrust::Trusted,
+            file_count: 10,
+            tags: vec![],
+            timestamp_ms: 1000,
+        };
+        let snap2 = WorkspaceSnapshot {
+            folder_paths: vec!["/a".into(), "/c".into()],
+            trust: WorkspaceTrust::Untrusted,
+            file_count: 15,
+            tags: vec![],
+            timestamp_ms: 2000,
+        };
+        let diff = snap1.diff(&snap2);
+        assert!(diff.has_changes());
+        assert_eq!(diff.folders_added, vec!["/c".to_string()]);
+        assert_eq!(diff.folders_removed, vec!["/b".to_string()]);
+        assert_eq!(diff.file_count_delta, 5);
+        assert!(diff.trust_changed);
+    }
+
+    #[test]
+    fn workspace_snapshot_no_diff() {
+        let snap = WorkspaceSnapshot {
+            folder_paths: vec!["/a".into()],
+            trust: WorkspaceTrust::Trusted,
+            file_count: 5,
+            tags: vec![],
+            timestamp_ms: 1000,
+        };
+        let diff = snap.diff(&snap);
+        assert!(!diff.has_changes());
+    }
+
+    #[test]
+    fn workspace_tags_operations() {
+        let mut tags = WorkspaceTags::new();
+        assert!(tags.is_empty());
+        assert!(tags.add("rust"));
+        assert!(tags.add("editor"));
+        assert!(!tags.add("rust")); // duplicate
+        assert_eq!(tags.len(), 2);
+        assert!(tags.contains("rust"));
+
+        let search = tags.search("ru");
+        assert_eq!(search.len(), 1);
+        assert_eq!(search[0], "rust");
+
+        assert!(tags.remove("rust"));
+        assert!(!tags.contains("rust"));
+        assert_eq!(tags.len(), 1);
     }
 }

@@ -827,6 +827,315 @@ impl VirtualFileStore {
     pub fn readonly_count(&self) -> usize {
         self.files.values().filter(|f| f.readonly).count()
     }
+
+    /// Search files by URI substring.
+    pub fn search_by_uri(&self, pattern: &str) -> Vec<&VirtualFileContent> {
+        self.files
+            .values()
+            .filter(|f| f.uri.contains(pattern))
+            .collect()
+    }
+
+    /// Search files whose text content contains the given substring.
+    pub fn search_by_content(&self, needle: &str) -> Vec<&VirtualFileContent> {
+        self.files
+            .values()
+            .filter(|f| {
+                f.text_content()
+                    .map_or(false, |text| text.contains(needle))
+            })
+            .collect()
+    }
+
+    /// Return total bytes across all files in the store.
+    pub fn total_bytes(&self) -> u64 {
+        self.files.values().map(|f| f.size()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FsPathMatcher
+// ---------------------------------------------------------------------------
+
+/// Glob-style pattern matcher for file paths.
+#[derive(Debug, Clone)]
+pub struct FsPathMatcher {
+    patterns: Vec<String>,
+    exclude_patterns: Vec<String>,
+}
+
+impl FsPathMatcher {
+    pub fn new() -> Self {
+        Self {
+            patterns: Vec::new(),
+            exclude_patterns: Vec::new(),
+        }
+    }
+
+    /// Add an include pattern (e.g. `"*.rs"`, `"src/**"`).
+    pub fn include(mut self, pattern: &str) -> Self {
+        self.patterns.push(pattern.to_string());
+        self
+    }
+
+    /// Add an exclude pattern.
+    pub fn exclude(mut self, pattern: &str) -> Self {
+        self.exclude_patterns.push(pattern.to_string());
+        self
+    }
+
+    /// Test whether a path matches any include pattern and no exclude pattern.
+    pub fn matches(&self, path: &str) -> bool {
+        if self.patterns.is_empty() {
+            return false;
+        }
+        let included = self.patterns.iter().any(|p| Self::glob_match(p, path));
+        if !included {
+            return false;
+        }
+        !self.exclude_patterns.iter().any(|p| Self::glob_match(p, path))
+    }
+
+    /// Simple glob match: `*` matches non-`/` chars, `**` matches everything.
+    fn glob_match(pattern: &str, path: &str) -> bool {
+        let pat = pattern.as_bytes();
+        let text = path.as_bytes();
+        Self::glob_match_inner(pat, text)
+    }
+
+    fn glob_match_inner(pat: &[u8], text: &[u8]) -> bool {
+        let mut pi = 0;
+        let mut ti = 0;
+        let mut star_pi: Option<usize> = None;
+        let mut star_ti: usize = 0;
+
+        while ti < text.len() {
+            if pi < pat.len() && pat[pi] == b'*' {
+                if pi + 1 < pat.len() && pat[pi + 1] == b'*' {
+                    let rest = if pi + 2 < pat.len() && pat[pi + 2] == b'/' {
+                        pi + 3
+                    } else {
+                        pi + 2
+                    };
+                    if rest >= pat.len() {
+                        return true;
+                    }
+                    for start in ti..=text.len() {
+                        if Self::glob_match_inner(&pat[rest..], &text[start..]) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                star_pi = Some(pi);
+                star_ti = ti;
+                pi += 1;
+                continue;
+            }
+            if pi < pat.len() && (pat[pi] == b'?' && text[ti] != b'/') {
+                pi += 1;
+                ti += 1;
+                continue;
+            }
+            if pi < pat.len() && pat[pi] == text[ti] {
+                pi += 1;
+                ti += 1;
+                continue;
+            }
+            if let Some(sp) = star_pi {
+                if text[ti] == b'/' {
+                    return false;
+                }
+                pi = sp + 1;
+                star_ti += 1;
+                ti = star_ti;
+                continue;
+            }
+            return false;
+        }
+        while pi < pat.len() && pat[pi] == b'*' {
+            pi += 1;
+        }
+        pi == pat.len()
+    }
+
+    /// Filter a list of paths, returning those that match.
+    pub fn filter<'a>(&self, paths: &'a [&str]) -> Vec<&'a str> {
+        paths.iter().copied().filter(|p| self.matches(p)).collect()
+    }
+}
+
+impl Default for FsPathMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VirtualDirectory
+// ---------------------------------------------------------------------------
+
+/// In-memory directory tree node.
+#[derive(Debug, Clone)]
+pub struct VirtualDirectory {
+    name: String,
+    children_dirs: Vec<VirtualDirectory>,
+    files: Vec<String>,
+}
+
+impl VirtualDirectory {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            children_dirs: Vec::new(),
+            files: Vec::new(),
+        }
+    }
+
+    /// Add a file to this directory.
+    pub fn add_file(&mut self, name: &str) {
+        if !self.files.contains(&name.to_string()) {
+            self.files.push(name.to_string());
+        }
+    }
+
+    /// Add a sub-directory.
+    pub fn add_dir(&mut self, dir: VirtualDirectory) {
+        if !self.children_dirs.iter().any(|d| d.name == dir.name) {
+            self.children_dirs.push(dir);
+        }
+    }
+
+    /// Get a sub-directory by name.
+    pub fn get_dir(&self, name: &str) -> Option<&VirtualDirectory> {
+        self.children_dirs.iter().find(|d| d.name == name)
+    }
+
+    /// Get a mutable sub-directory by name.
+    pub fn get_dir_mut(&mut self, name: &str) -> Option<&mut VirtualDirectory> {
+        self.children_dirs.iter_mut().find(|d| d.name == name)
+    }
+
+    /// Get or create a sub-directory by name.
+    pub fn ensure_dir(&mut self, name: &str) -> &mut VirtualDirectory {
+        if !self.children_dirs.iter().any(|d| d.name == name) {
+            self.children_dirs.push(VirtualDirectory::new(name));
+        }
+        self.children_dirs.iter_mut().find(|d| d.name == name).unwrap()
+    }
+
+    /// Total number of files in this directory (not recursive).
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    /// Total number of sub-directories.
+    pub fn dir_count(&self) -> usize {
+        self.children_dirs.len()
+    }
+
+    /// Recursively count all files.
+    pub fn total_file_count(&self) -> usize {
+        let mut count = self.files.len();
+        for child in &self.children_dirs {
+            count += child.total_file_count();
+        }
+        count
+    }
+
+    /// List all file paths recursively with the given prefix.
+    pub fn list_all_files(&self, prefix: &str) -> Vec<String> {
+        let mut result = Vec::new();
+        let current = if prefix.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}/{}", prefix, self.name)
+        };
+        for file in &self.files {
+            result.push(format!("{}/{}", current, file));
+        }
+        for child in &self.children_dirs {
+            result.extend(child.list_all_files(&current));
+        }
+        result
+    }
+
+    /// Name of this directory.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileChangeAccumulator
+// ---------------------------------------------------------------------------
+
+/// Accumulates file change events for batch processing with a debounce window.
+#[derive(Debug)]
+pub struct FileChangeAccumulator {
+    events: Vec<FileWatchEvent>,
+    debounce_ms: u64,
+    last_event_ms: Option<u64>,
+}
+
+impl FileChangeAccumulator {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self {
+            events: Vec::new(),
+            debounce_ms,
+            last_event_ms: None,
+        }
+    }
+
+    /// Push a new event with the given timestamp.
+    pub fn push(&mut self, event: FileWatchEvent, timestamp_ms: u64) {
+        self.events.push(event);
+        self.last_event_ms = Some(timestamp_ms);
+    }
+
+    /// Returns `true` if the debounce window has elapsed since the last event.
+    pub fn is_ready(&self, current_ms: u64) -> bool {
+        match self.last_event_ms {
+            Some(last) => current_ms.saturating_sub(last) >= self.debounce_ms,
+            None => false,
+        }
+    }
+
+    /// Drain all accumulated events if the debounce window has elapsed.
+    pub fn flush(&mut self, current_ms: u64) -> Vec<FileWatchEvent> {
+        if self.is_ready(current_ms) {
+            self.last_event_ms = None;
+            std::mem::take(&mut self.events)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Number of pending events.
+    pub fn pending_count(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Deduplicate events: keep only the latest event per URI.
+    pub fn deduplicate(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        let mut deduped = Vec::new();
+        for event in self.events.drain(..).rev() {
+            if seen.insert(event.uri().to_string()) {
+                deduped.push(event);
+            }
+        }
+        deduped.reverse();
+        self.events = deduped;
+    }
+
+    /// Return unique URIs from accumulated events.
+    pub fn affected_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.events.iter().map(|e| e.uri()).collect();
+        uris.sort_unstable();
+        uris.dedup();
+        uris
+    }
 }
 
 #[cfg(test)]
@@ -1315,5 +1624,104 @@ mod tests {
         assert_eq!(store.count(), 3);
         assert_eq!(store.readonly_count(), 2);
         assert_eq!(store.all_uris().len(), 3);
+    }
+
+    #[test]
+    fn fs_path_matcher_include_exclude() {
+        let matcher = FsPathMatcher::new()
+            .include("*.rs")
+            .exclude("*_test.rs");
+
+        assert!(matcher.matches("main.rs"));
+        assert!(matcher.matches("lib.rs"));
+        assert!(!matcher.matches("lib_test.rs"));
+        assert!(!matcher.matches("readme.md"));
+    }
+
+    #[test]
+    fn fs_path_matcher_glob_double_star() {
+        let matcher = FsPathMatcher::new().include("src/**");
+        assert!(matcher.matches("src/main.rs"));
+        assert!(matcher.matches("src/util/helpers.rs"));
+        assert!(!matcher.matches("tests/main.rs"));
+    }
+
+    #[test]
+    fn virtual_directory_tree() {
+        let mut root = VirtualDirectory::new("root");
+        root.add_file("README.md");
+        let src = root.ensure_dir("src");
+        src.add_file("main.rs");
+        src.add_file("lib.rs");
+
+        assert_eq!(root.file_count(), 1);
+        assert_eq!(root.dir_count(), 1);
+        assert_eq!(root.total_file_count(), 3);
+        assert!(root.get_dir("src").is_some());
+        assert!(root.get_dir("missing").is_none());
+    }
+
+    #[test]
+    fn virtual_directory_list_all_files() {
+        let mut root = VirtualDirectory::new("project");
+        root.add_file("Cargo.toml");
+        let src = root.ensure_dir("src");
+        src.add_file("main.rs");
+
+        let files = root.list_all_files("");
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|f| f.contains("Cargo.toml")));
+        assert!(files.iter().any(|f| f.contains("main.rs")));
+    }
+
+    #[test]
+    fn file_change_accumulator_debounce() {
+        let mut acc = FileChangeAccumulator::new(100);
+        acc.push(FileWatchEvent::Changed { uri: "file:///a.rs".into() }, 1000);
+        acc.push(FileWatchEvent::Changed { uri: "file:///b.rs".into() }, 1050);
+
+        assert!(!acc.is_ready(1099));
+        assert_eq!(acc.flush(1099).len(), 0);
+        assert_eq!(acc.pending_count(), 2);
+
+        assert!(acc.is_ready(1150));
+        let events = acc.flush(1150);
+        assert_eq!(events.len(), 2);
+        assert_eq!(acc.pending_count(), 0);
+    }
+
+    #[test]
+    fn file_change_accumulator_deduplicate() {
+        let mut acc = FileChangeAccumulator::new(50);
+        acc.push(FileWatchEvent::Changed { uri: "file:///a.rs".into() }, 100);
+        acc.push(FileWatchEvent::Changed { uri: "file:///b.rs".into() }, 110);
+        acc.push(FileWatchEvent::Changed { uri: "file:///a.rs".into() }, 120);
+        assert_eq!(acc.pending_count(), 3);
+        acc.deduplicate();
+        assert_eq!(acc.pending_count(), 2);
+        let uris = acc.affected_uris();
+        assert_eq!(uris.len(), 2);
+    }
+
+    #[test]
+    fn virtual_file_store_search_by_uri() {
+        let mut store = VirtualFileStore::new();
+        store.add(VirtualFileContent::new("file:///src/main.rs", b"fn main() {}".to_vec()));
+        store.add(VirtualFileContent::new("file:///src/lib.rs", b"pub mod foo;".to_vec()));
+        store.add(VirtualFileContent::new("file:///test/test.rs", b"#[test]".to_vec()));
+
+        let results = store.search_by_uri("src");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn virtual_file_store_search_by_content() {
+        let mut store = VirtualFileStore::new();
+        store.add(VirtualFileContent::new("file:///a.rs", b"fn hello() {}".to_vec()));
+        store.add(VirtualFileContent::new("file:///b.rs", b"fn world() {}".to_vec()));
+
+        let results = store.search_by_content("hello");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].uri, "file:///a.rs");
     }
 }

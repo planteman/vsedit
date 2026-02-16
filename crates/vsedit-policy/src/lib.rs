@@ -690,6 +690,267 @@ pub fn policy_report_access_summary(service: &PolicyService) -> (usize, usize) {
     (ro, lines.len() - ro)
 }
 
+// ---------------------------------------------------------------------------
+// PolicyDiffEntry — diff two PolicyService snapshots
+// ---------------------------------------------------------------------------
+
+/// Describes a single difference between two policy snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PolicyDiffKind {
+    /// Policy exists only in the left snapshot.
+    Removed,
+    /// Policy exists only in the right snapshot.
+    Added,
+    /// Policy exists in both but the value changed.
+    Changed,
+}
+
+/// A single entry in a policy diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyDiffEntry {
+    pub name: String,
+    pub kind: PolicyDiffKind,
+    pub old_value: Option<PolicyValue>,
+    pub new_value: Option<PolicyValue>,
+}
+
+impl fmt::Display for PolicyDiffEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            PolicyDiffKind::Added => {
+                write!(f, "+ {}: {}", self.name, self.new_value.as_ref().unwrap())
+            }
+            PolicyDiffKind::Removed => {
+                write!(f, "- {}: {}", self.name, self.old_value.as_ref().unwrap())
+            }
+            PolicyDiffKind::Changed => {
+                write!(
+                    f,
+                    "~ {}: {} -> {}",
+                    self.name,
+                    self.old_value.as_ref().unwrap(),
+                    self.new_value.as_ref().unwrap()
+                )
+            }
+        }
+    }
+}
+
+/// Compute the diff between two `PolicyService` instances.
+pub fn policy_diff(old: &PolicyService, new: &PolicyService) -> Vec<PolicyDiffEntry> {
+    let old_names: HashSet<String> = old.list_policies().into_iter().collect();
+    let new_names: HashSet<String> = new.list_policies().into_iter().collect();
+
+    let mut entries = Vec::new();
+
+    for name in &old_names {
+        if !new_names.contains(name) {
+            entries.push(PolicyDiffEntry {
+                name: name.clone(),
+                kind: PolicyDiffKind::Removed,
+                old_value: old.get_policy(name).map(|p| p.value.clone()),
+                new_value: None,
+            });
+        }
+    }
+
+    for name in &new_names {
+        if !old_names.contains(name) {
+            entries.push(PolicyDiffEntry {
+                name: name.clone(),
+                kind: PolicyDiffKind::Added,
+                old_value: None,
+                new_value: new.get_policy(name).map(|p| p.value.clone()),
+            });
+        } else {
+            let ov = &old.get_policy(name).unwrap().value;
+            let nv = &new.get_policy(name).unwrap().value;
+            if ov != nv {
+                entries.push(PolicyDiffEntry {
+                    name: name.clone(),
+                    kind: PolicyDiffKind::Changed,
+                    old_value: Some(ov.clone()),
+                    new_value: Some(nv.clone()),
+                });
+            }
+        }
+    }
+
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    entries
+}
+
+// ---------------------------------------------------------------------------
+// policy_export_json — minimal JSON serialization without serde
+// ---------------------------------------------------------------------------
+
+/// Export all policies in a `PolicyService` as a JSON string.
+///
+/// This is a lightweight serializer that avoids pulling in serde for a simple
+/// flat key→value map.
+pub fn policy_export_json(service: &PolicyService) -> String {
+    let names = service.list_policies();
+    if names.is_empty() {
+        return "{}".to_string();
+    }
+    let mut parts: Vec<String> = Vec::with_capacity(names.len());
+    for name in &names {
+        if let Some(policy) = service.get_policy(name) {
+            let json_val = match &policy.value {
+                PolicyValue::Bool(b) => format!("{b}"),
+                PolicyValue::Number(n) => format!("{n}"),
+                PolicyValue::String(s) => format!("\"{}\"", json_escape(s)),
+                PolicyValue::StringList(v) => {
+                    let items: Vec<String> =
+                        v.iter().map(|s| format!("\"{}\"", json_escape(s))).collect();
+                    format!("[{}]", items.join(","))
+                }
+            };
+            parts.push(format!("\"{}\":{}", json_escape(name), json_val));
+        }
+    }
+    format!("{{{}}}", parts.join(","))
+}
+
+/// Minimal JSON string escaping.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// PolicyAuditLog — record policy mutation events
+// ---------------------------------------------------------------------------
+
+/// The kind of mutation that occurred.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuditAction {
+    Set,
+    Remove,
+    MarkReadOnly,
+}
+
+impl fmt::Display for AuditAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AuditAction::Set => write!(f, "SET"),
+            AuditAction::Remove => write!(f, "REMOVE"),
+            AuditAction::MarkReadOnly => write!(f, "MARK_READ_ONLY"),
+        }
+    }
+}
+
+/// A single entry in the audit log.
+#[derive(Debug, Clone)]
+pub struct AuditEntry {
+    pub seq: u64,
+    pub action: AuditAction,
+    pub policy_name: String,
+    pub value_before: Option<PolicyValue>,
+    pub value_after: Option<PolicyValue>,
+}
+
+/// Append-only audit log for policy mutations.
+#[derive(Debug)]
+pub struct PolicyAuditLog {
+    entries: Vec<AuditEntry>,
+    next_seq: u64,
+}
+
+impl PolicyAuditLog {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_seq: 1,
+        }
+    }
+
+    /// Record a policy set/update.
+    pub fn record_set(
+        &mut self,
+        name: &str,
+        old: Option<&PolicyValue>,
+        new: &PolicyValue,
+    ) {
+        self.entries.push(AuditEntry {
+            seq: self.next_seq,
+            action: AuditAction::Set,
+            policy_name: name.to_string(),
+            value_before: old.cloned(),
+            value_after: Some(new.clone()),
+        });
+        self.next_seq += 1;
+    }
+
+    /// Record a policy removal.
+    pub fn record_remove(&mut self, name: &str, old: &PolicyValue) {
+        self.entries.push(AuditEntry {
+            seq: self.next_seq,
+            action: AuditAction::Remove,
+            policy_name: name.to_string(),
+            value_before: Some(old.clone()),
+            value_after: None,
+        });
+        self.next_seq += 1;
+    }
+
+    /// Record marking a policy as read-only.
+    pub fn record_mark_read_only(&mut self, name: &str) {
+        self.entries.push(AuditEntry {
+            seq: self.next_seq,
+            action: AuditAction::MarkReadOnly,
+            policy_name: name.to_string(),
+            value_before: None,
+            value_after: None,
+        });
+        self.next_seq += 1;
+    }
+
+    /// Return all entries.
+    pub fn entries(&self) -> &[AuditEntry] {
+        &self.entries
+    }
+
+    /// Return the number of recorded entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return entries filtered to a specific policy name.
+    pub fn entries_for(&self, name: &str) -> Vec<&AuditEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.policy_name == name)
+            .collect()
+    }
+
+    /// Clear the audit log.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl Default for PolicyAuditLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1248,5 +1509,122 @@ mod tests {
         let s = format!("{line}");
         assert!(s.contains("[read-only]"));
         assert!(s.contains("test.policy"));
+    }
+
+    // -- policy_diff tests --------------------------------------------------
+
+    #[test]
+    fn policy_diff_detects_added_removed_changed() {
+        let mut old_svc = PolicyService::new();
+        old_svc.set_policy("keep", PolicyValue::Number(1), None);
+        old_svc.set_policy("change_me", PolicyValue::Bool(true), None);
+        old_svc.set_policy("remove_me", PolicyValue::String("bye".into()), None);
+
+        let mut new_svc = PolicyService::new();
+        new_svc.set_policy("keep", PolicyValue::Number(1), None);
+        new_svc.set_policy("change_me", PolicyValue::Bool(false), None);
+        new_svc.set_policy("added", PolicyValue::Number(42), None);
+
+        let diff = policy_diff(&old_svc, &new_svc);
+        assert_eq!(diff.len(), 3);
+
+        let added = diff.iter().find(|e| e.name == "added").unwrap();
+        assert_eq!(added.kind, PolicyDiffKind::Added);
+        assert_eq!(added.new_value, Some(PolicyValue::Number(42)));
+
+        let changed = diff.iter().find(|e| e.name == "change_me").unwrap();
+        assert_eq!(changed.kind, PolicyDiffKind::Changed);
+        assert_eq!(changed.old_value, Some(PolicyValue::Bool(true)));
+        assert_eq!(changed.new_value, Some(PolicyValue::Bool(false)));
+
+        let removed = diff.iter().find(|e| e.name == "remove_me").unwrap();
+        assert_eq!(removed.kind, PolicyDiffKind::Removed);
+    }
+
+    #[test]
+    fn policy_diff_identical_services_empty() {
+        let mut a = PolicyService::new();
+        a.set_policy("x", PolicyValue::Bool(true), None);
+        let mut b = PolicyService::new();
+        b.set_policy("x", PolicyValue::Bool(true), None);
+        assert!(policy_diff(&a, &b).is_empty());
+    }
+
+    #[test]
+    fn policy_diff_entry_display() {
+        let entry = PolicyDiffEntry {
+            name: "telemetry".into(),
+            kind: PolicyDiffKind::Changed,
+            old_value: Some(PolicyValue::Bool(true)),
+            new_value: Some(PolicyValue::Bool(false)),
+        };
+        let s = format!("{entry}");
+        assert!(s.starts_with("~ telemetry:"));
+        assert!(s.contains("true"));
+        assert!(s.contains("false"));
+    }
+
+    // -- policy_export_json tests -------------------------------------------
+
+    #[test]
+    fn policy_export_json_empty() {
+        let svc = PolicyService::new();
+        assert_eq!(policy_export_json(&svc), "{}");
+    }
+
+    #[test]
+    fn policy_export_json_mixed_types() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("flag", PolicyValue::Bool(true), None);
+        svc.set_policy("count", PolicyValue::Number(7), None);
+        svc.set_policy("name", PolicyValue::String("hello".into()), None);
+        svc.set_policy(
+            "hosts",
+            PolicyValue::StringList(vec!["a.com".into(), "b.com".into()]),
+            None,
+        );
+
+        let json = policy_export_json(&svc);
+        assert!(json.contains("\"flag\":true"));
+        assert!(json.contains("\"count\":7"));
+        assert!(json.contains("\"name\":\"hello\""));
+        assert!(json.contains("\"hosts\":[\"a.com\",\"b.com\"]"));
+    }
+
+    // -- PolicyAuditLog tests -----------------------------------------------
+
+    #[test]
+    fn audit_log_records_and_filters() {
+        let mut log = PolicyAuditLog::new();
+        assert!(log.is_empty());
+
+        log.record_set("telemetry", None, &PolicyValue::Bool(true));
+        log.record_set(
+            "telemetry",
+            Some(&PolicyValue::Bool(true)),
+            &PolicyValue::Bool(false),
+        );
+        log.record_mark_read_only("telemetry");
+        log.record_remove("other", &PolicyValue::Number(1));
+
+        assert_eq!(log.len(), 4);
+        assert!(!log.is_empty());
+
+        let tel = log.entries_for("telemetry");
+        assert_eq!(tel.len(), 3);
+        assert_eq!(tel[0].action, AuditAction::Set);
+        assert_eq!(tel[0].seq, 1);
+        assert_eq!(tel[2].action, AuditAction::MarkReadOnly);
+
+        let other = log.entries_for("other");
+        assert_eq!(other.len(), 1);
+        assert_eq!(other[0].action, AuditAction::Remove);
+    }
+
+    #[test]
+    fn audit_action_display() {
+        assert_eq!(AuditAction::Set.to_string(), "SET");
+        assert_eq!(AuditAction::Remove.to_string(), "REMOVE");
+        assert_eq!(AuditAction::MarkReadOnly.to_string(), "MARK_READ_ONLY");
     }
 }

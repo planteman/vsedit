@@ -749,6 +749,206 @@ impl TelemetryFilter {
     }
 }
 
+// ── TelemetryBatchExporter ──
+
+/// Batch and export telemetry events.
+pub struct TelemetryBatchExporter {
+    batch: Vec<TelemetryEvent>,
+    max_batch_size: usize,
+    exported_count: usize,
+}
+
+impl TelemetryBatchExporter {
+    pub fn new(max_batch_size: usize) -> Self {
+        Self {
+            batch: Vec::new(),
+            max_batch_size,
+            exported_count: 0,
+        }
+    }
+
+    /// Add an event to the batch. Returns `true` if the batch is now full.
+    pub fn add(&mut self, event: TelemetryEvent) -> bool {
+        self.batch.push(event);
+        self.batch.len() >= self.max_batch_size
+    }
+
+    /// Drain the current batch, returning all queued events.
+    pub fn drain(&mut self) -> Vec<TelemetryEvent> {
+        self.exported_count += self.batch.len();
+        std::mem::take(&mut self.batch)
+    }
+
+    /// Returns the number of events in the current batch.
+    pub fn pending_count(&self) -> usize {
+        self.batch.len()
+    }
+
+    /// Returns the total number of events exported (drained) so far.
+    pub fn total_exported(&self) -> usize {
+        self.exported_count
+    }
+
+    /// Returns true if the batch is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.batch.len() >= self.max_batch_size
+    }
+}
+
+// ── TelemetryRateLimiter ──
+
+/// Rate limiter for telemetry events using a simple sliding window.
+pub struct TelemetryRateLimiter {
+    window_ms: u64,
+    max_events: usize,
+    timestamps: Vec<u64>,
+}
+
+impl TelemetryRateLimiter {
+    pub fn new(window_ms: u64, max_events: usize) -> Self {
+        Self {
+            window_ms,
+            max_events,
+            timestamps: Vec::new(),
+        }
+    }
+
+    /// Check if an event at the given timestamp should be allowed.
+    pub fn should_allow(&mut self, timestamp_ms: u64) -> bool {
+        // Remove expired timestamps
+        let cutoff = timestamp_ms.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&ts| ts > cutoff);
+        if self.timestamps.len() >= self.max_events {
+            return false;
+        }
+        self.timestamps.push(timestamp_ms);
+        true
+    }
+
+    /// Returns how many events have been recorded in the current window.
+    pub fn current_count(&self) -> usize {
+        self.timestamps.len()
+    }
+
+    /// Returns the number of remaining events allowed in the current window.
+    pub fn remaining(&self) -> usize {
+        self.max_events.saturating_sub(self.timestamps.len())
+    }
+
+    /// Reset the rate limiter.
+    pub fn reset(&mut self) {
+        self.timestamps.clear();
+    }
+}
+
+// ── TelemetryMetricsBucket ──
+
+/// Time-bucketed metrics accumulator.
+#[derive(Debug, Clone)]
+pub struct TelemetryMetricsBucket {
+    bucket_duration_ms: u64,
+    buckets: HashMap<u64, Vec<f64>>,
+}
+
+impl TelemetryMetricsBucket {
+    pub fn new(bucket_duration_ms: u64) -> Self {
+        Self {
+            bucket_duration_ms: bucket_duration_ms.max(1),
+            buckets: HashMap::new(),
+        }
+    }
+
+    /// Record a value at the given timestamp.
+    pub fn record(&mut self, timestamp_ms: u64, value: f64) {
+        let bucket_key = timestamp_ms / self.bucket_duration_ms;
+        self.buckets.entry(bucket_key).or_default().push(value);
+    }
+
+    /// Get the average value for a specific bucket.
+    pub fn bucket_avg(&self, timestamp_ms: u64) -> Option<f64> {
+        let bucket_key = timestamp_ms / self.bucket_duration_ms;
+        self.buckets.get(&bucket_key).map(|values| {
+            values.iter().sum::<f64>() / values.len() as f64
+        })
+    }
+
+    /// Get the sum of all values across all buckets.
+    pub fn total_sum(&self) -> f64 {
+        self.buckets.values().flat_map(|v| v.iter()).sum()
+    }
+
+    /// Get the total count of all recorded values.
+    pub fn total_count(&self) -> usize {
+        self.buckets.values().map(|v| v.len()).sum()
+    }
+
+    /// Returns the number of time buckets.
+    pub fn bucket_count(&self) -> usize {
+        self.buckets.len()
+    }
+
+    /// Get min and max values across all buckets.
+    pub fn min_max(&self) -> Option<(f64, f64)> {
+        let all: Vec<f64> = self.buckets.values().flat_map(|v| v.iter().copied()).collect();
+        if all.is_empty() {
+            return None;
+        }
+        let min = all.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max = all.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        Some((min, max))
+    }
+}
+
+// ── Statistical functions on TelemetryAggregator ──
+
+impl TelemetryAggregator {
+    /// Compute the standard deviation of a measurement across aggregated events.
+    pub fn measurement_stddev(&self, key: &str) -> Option<f64> {
+        let values: Vec<f64> = self
+            .events
+            .iter()
+            .flat_map(|e| e.measurements.iter())
+            .filter(|(k, _)| k == key)
+            .map(|(_, v)| *v)
+            .collect();
+        if values.len() < 2 {
+            return None;
+        }
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+        Some(variance.sqrt())
+    }
+
+    /// Compute the median of a measurement across aggregated events.
+    pub fn measurement_median(&self, key: &str) -> Option<f64> {
+        let mut values: Vec<f64> = self
+            .events
+            .iter()
+            .flat_map(|e| e.measurements.iter())
+            .filter(|(k, _)| k == key)
+            .map(|(_, v)| *v)
+            .collect();
+        if values.is_empty() {
+            return None;
+        }
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let mid = values.len() / 2;
+        if values.len() % 2 == 0 {
+            Some((values[mid - 1] + values[mid]) / 2.0)
+        } else {
+            Some(values[mid])
+        }
+    }
+
+    /// Count how many events have a specific property key.
+    pub fn count_with_property(&self, key: &str) -> usize {
+        self.events
+            .iter()
+            .filter(|e| e.properties.iter().any(|(k, _)| k == key))
+            .count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1322,5 +1522,107 @@ mod tests {
         assert_eq!(summary.error_count, 2);
         assert_eq!(summary.exception_count, 1);
         assert_eq!(summary.metric_count, 2);
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn batch_exporter_add_and_drain() {
+        let mut exporter = TelemetryBatchExporter::new(3);
+        let event = || TelemetryEventBuilder::new().name("e").build().unwrap();
+        assert!(!exporter.add(event()));
+        assert!(!exporter.add(event()));
+        assert!(exporter.add(event())); // batch is full
+        assert_eq!(exporter.pending_count(), 3);
+        assert!(exporter.is_full());
+        let drained = exporter.drain();
+        assert_eq!(drained.len(), 3);
+        assert_eq!(exporter.pending_count(), 0);
+        assert_eq!(exporter.total_exported(), 3);
+    }
+
+    #[test]
+    fn rate_limiter_allows_within_limit() {
+        let mut limiter = TelemetryRateLimiter::new(1000, 3);
+        assert!(limiter.should_allow(100));
+        assert!(limiter.should_allow(200));
+        assert!(limiter.should_allow(300));
+        assert!(!limiter.should_allow(400)); // exceeded
+        assert_eq!(limiter.remaining(), 0);
+    }
+
+    #[test]
+    fn rate_limiter_window_expiry() {
+        let mut limiter = TelemetryRateLimiter::new(100, 2);
+        assert!(limiter.should_allow(10));
+        assert!(limiter.should_allow(20));
+        assert!(!limiter.should_allow(30));
+        // After window expires (all old timestamps <= 100 are removed)
+        assert!(limiter.should_allow(200));
+        assert_eq!(limiter.current_count(), 1);
+    }
+
+    #[test]
+    fn metrics_bucket_record_and_avg() {
+        let mut bucket = TelemetryMetricsBucket::new(1000);
+        bucket.record(100, 10.0);
+        bucket.record(200, 20.0);
+        bucket.record(1500, 30.0); // different bucket
+        assert_eq!(bucket.bucket_count(), 2);
+        assert_eq!(bucket.bucket_avg(100), Some(15.0));
+        assert_eq!(bucket.bucket_avg(1500), Some(30.0));
+        assert_eq!(bucket.total_count(), 3);
+        assert!((bucket.total_sum() - 60.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn metrics_bucket_min_max() {
+        let mut bucket = TelemetryMetricsBucket::new(1000);
+        bucket.record(0, 5.0);
+        bucket.record(0, 25.0);
+        bucket.record(0, 15.0);
+        let (min, max) = bucket.min_max().unwrap();
+        assert!((min - 5.0).abs() < f64::EPSILON);
+        assert!((max - 25.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn aggregator_measurement_stddev() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("m1").measurement("latency", 10.0).build().unwrap());
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("m2").measurement("latency", 20.0).build().unwrap());
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("m3").measurement("latency", 30.0).build().unwrap());
+        let sd = agg.measurement_stddev("latency").unwrap();
+        // stddev of [10, 20, 30] = sqrt(200/3) ≈ 8.165
+        assert!((sd - 8.165).abs() < 0.01);
+    }
+
+    #[test]
+    fn aggregator_measurement_median() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("a").measurement("val", 3.0).build().unwrap());
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("b").measurement("val", 1.0).build().unwrap());
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("c").measurement("val", 2.0).build().unwrap());
+        assert_eq!(agg.measurement_median("val"), Some(2.0));
+        assert_eq!(agg.measurement_median("nonexistent"), None);
+    }
+
+    #[test]
+    fn aggregator_count_with_property() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("a").property("source", "ui").build().unwrap());
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("b").property("source", "api").build().unwrap());
+        agg.add_event(TelemetryEventBuilder::new()
+            .name("c").build().unwrap());
+        assert_eq!(agg.count_with_property("source"), 2);
+        assert_eq!(agg.count_with_property("missing"), 0);
     }
 }

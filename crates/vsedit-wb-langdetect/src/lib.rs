@@ -808,6 +808,298 @@ pub fn detection_confidence(filename: &str, content: &str) -> f64 {
     max_conf
 }
 
+// ---------------------------------------------------------------------------
+// LanguageConfidence – richer confidence scoring
+// ---------------------------------------------------------------------------
+
+/// Confidence level buckets for language detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ConfidenceLevel {
+    None,
+    Low,
+    Medium,
+    High,
+    Certain,
+}
+
+impl ConfidenceLevel {
+    /// Convert a raw 0.0–1.0 score into a bucket.
+    pub fn from_score(score: f64) -> Self {
+        if score <= 0.0 {
+            Self::None
+        } else if score < 0.3 {
+            Self::Low
+        } else if score < 0.6 {
+            Self::Medium
+        } else if score < 0.9 {
+            Self::High
+        } else {
+            Self::Certain
+        }
+    }
+
+    /// Minimum numeric threshold for this level.
+    pub fn min_score(self) -> f64 {
+        match self {
+            Self::None => 0.0,
+            Self::Low => 0.01,
+            Self::Medium => 0.3,
+            Self::High => 0.6,
+            Self::Certain => 0.9,
+        }
+    }
+}
+
+impl std::fmt::Display for ConfidenceLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::None => "none",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Certain => "certain",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Aggregated confidence from multiple detection strategies.
+#[derive(Debug, Clone)]
+pub struct LanguageConfidence {
+    pub language_id: String,
+    pub scores: Vec<(&'static str, f64)>,
+}
+
+impl LanguageConfidence {
+    pub fn new(language_id: impl Into<String>) -> Self {
+        Self {
+            language_id: language_id.into(),
+            scores: Vec::new(),
+        }
+    }
+
+    /// Record a score from a named strategy.
+    pub fn add_score(&mut self, strategy: &'static str, score: f64) {
+        self.scores.push((strategy, score.clamp(0.0, 1.0)));
+    }
+
+    /// Weighted average across all strategies.
+    pub fn combined_score(&self) -> f64 {
+        if self.scores.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = self.scores.iter().map(|(_, s)| s).sum();
+        sum / self.scores.len() as f64
+    }
+
+    /// Best single strategy score.
+    pub fn best_score(&self) -> f64 {
+        self.scores
+            .iter()
+            .map(|(_, s)| *s)
+            .fold(0.0_f64, f64::max)
+    }
+
+    pub fn level(&self) -> ConfidenceLevel {
+        ConfidenceLevel::from_score(self.combined_score())
+    }
+
+    pub fn strategy_count(&self) -> usize {
+        self.scores.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DetectionStrategy – pluggable multi-strategy detection
+// ---------------------------------------------------------------------------
+
+/// Which detection strategy produced the result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DetectionStrategy {
+    Extension,
+    Shebang,
+    MagicBytes,
+    ContentAnalysis,
+}
+
+impl std::fmt::Display for DetectionStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Extension => "extension",
+            Self::Shebang => "shebang",
+            Self::MagicBytes => "magic_bytes",
+            Self::ContentAnalysis => "content_analysis",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Result from a single detection strategy.
+#[derive(Debug, Clone)]
+pub struct StrategyResult {
+    pub strategy: DetectionStrategy,
+    pub language_id: String,
+    pub confidence: f64,
+}
+
+impl StrategyResult {
+    pub fn new(strategy: DetectionStrategy, lang: impl Into<String>, confidence: f64) -> Self {
+        Self {
+            strategy,
+            language_id: lang.into(),
+            confidence: confidence.clamp(0.0, 1.0),
+        }
+    }
+}
+
+/// Detect language by well-known magic byte signatures.
+pub fn detect_by_magic_bytes(bytes: &[u8]) -> Option<StrategyResult> {
+    if bytes.len() < 4 {
+        return None;
+    }
+    let sig: &[u8] = &bytes[..std::cmp::min(bytes.len(), 8)];
+    // PDF
+    if sig.starts_with(b"%PDF") {
+        return Some(StrategyResult::new(DetectionStrategy::MagicBytes, "pdf", 1.0));
+    }
+    // PNG
+    if sig.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        return Some(StrategyResult::new(DetectionStrategy::MagicBytes, "png", 1.0));
+    }
+    // ELF binary
+    if sig.starts_with(&[0x7F, 0x45, 0x4C, 0x46]) {
+        return Some(StrategyResult::new(DetectionStrategy::MagicBytes, "binary", 1.0));
+    }
+    // ZIP / DOCX / XLSX / JAR
+    if sig.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
+        return Some(StrategyResult::new(DetectionStrategy::MagicBytes, "zip", 0.8));
+    }
+    // GIF
+    if sig.starts_with(b"GIF8") {
+        return Some(StrategyResult::new(DetectionStrategy::MagicBytes, "gif", 1.0));
+    }
+    None
+}
+
+/// Run all strategies and merge into a single `LanguageConfidence`.
+pub fn detect_multi_strategy(filename: &str, content: &str) -> LanguageConfidence {
+    let mut results: std::collections::HashMap<String, LanguageConfidence> =
+        std::collections::HashMap::new();
+
+    // Strategy 1 – extension
+    if let Some(lang) = detect_by_extension(filename) {
+        let entry = results
+            .entry(lang.clone())
+            .or_insert_with(|| LanguageConfidence::new(&lang));
+        entry.add_score("extension", 0.85);
+    }
+
+    // Strategy 2 – shebang
+    if let Some(first_line) = content.lines().next() {
+        if let Some(lang) = detect_by_shebang(first_line) {
+            let entry = results
+                .entry(lang.clone())
+                .or_insert_with(|| LanguageConfidence::new(&lang));
+            entry.add_score("shebang", 0.95);
+        }
+    }
+
+    // Strategy 3 – magic bytes
+    if let Some(sr) = detect_by_magic_bytes(content.as_bytes()) {
+        let entry = results
+            .entry(sr.language_id.clone())
+            .or_insert_with(|| LanguageConfidence::new(&sr.language_id));
+        entry.add_score("magic_bytes", sr.confidence);
+    }
+
+    // Strategy 4 – content analysis
+    let content_results = detect_by_content(content);
+    for dr in &content_results {
+        let entry = results
+            .entry(dr.language_id().to_string())
+            .or_insert_with(|| LanguageConfidence::new(dr.language_id()));
+        entry.add_score("content_analysis", dr.confidence());
+    }
+
+    // Return the language with the best combined score
+    results
+        .into_values()
+        .max_by(|a, b| a.combined_score().partial_cmp(&b.combined_score()).unwrap())
+        .unwrap_or_else(|| LanguageConfidence::new("plaintext"))
+}
+
+// ---------------------------------------------------------------------------
+// Language family grouping
+// ---------------------------------------------------------------------------
+
+/// Broad language families.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LanguageFamily {
+    CFamily,
+    ScriptingDynamic,
+    Markup,
+    Functional,
+    Systems,
+    Data,
+    Shell,
+    Other,
+}
+
+impl std::fmt::Display for LanguageFamily {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::CFamily => "C-family",
+            Self::ScriptingDynamic => "scripting/dynamic",
+            Self::Markup => "markup",
+            Self::Functional => "functional",
+            Self::Systems => "systems",
+            Self::Data => "data",
+            Self::Shell => "shell",
+            Self::Other => "other",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Map a language id to its family.
+pub fn language_family(lang: &str) -> LanguageFamily {
+    match lang.to_lowercase().as_str() {
+        "c" | "cpp" | "csharp" | "java" | "objective-c" | "d" => LanguageFamily::CFamily,
+        "python" | "ruby" | "javascript" | "typescript" | "lua" | "perl" | "php" => {
+            LanguageFamily::ScriptingDynamic
+        }
+        "html" | "xml" | "markdown" | "latex" | "css" | "scss" => LanguageFamily::Markup,
+        "haskell" | "ocaml" | "erlang" | "elixir" | "clojure" | "lisp" | "scheme" => {
+            LanguageFamily::Functional
+        }
+        "rust" | "go" | "zig" | "nim" => LanguageFamily::Systems,
+        "json" | "yaml" | "toml" | "csv" | "sql" => LanguageFamily::Data,
+        "bash" | "zsh" | "fish" | "powershell" | "shellscript" => LanguageFamily::Shell,
+        _ => LanguageFamily::Other,
+    }
+}
+
+/// Return all language ids that belong to the given family from a list.
+pub fn filter_by_family<'a>(languages: &[&'a str], family: LanguageFamily) -> Vec<&'a str> {
+    languages
+        .iter()
+        .copied()
+        .filter(|l| language_family(l) == family)
+        .collect()
+}
+
+/// Group a list of language ids by family.
+pub fn group_by_family<'a>(
+    languages: &[&'a str],
+) -> std::collections::HashMap<LanguageFamily, Vec<&'a str>> {
+    let mut map: std::collections::HashMap<LanguageFamily, Vec<&'a str>> =
+        std::collections::HashMap::new();
+    for &lang in languages {
+        map.entry(language_family(lang)).or_default().push(lang);
+    }
+    map
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1298,5 +1590,76 @@ mod tests {
         let count = svc.language_count();
         assert!(count < svc.extension_count());
         assert!(count >= 15); // at least 15 unique languages
+    }
+
+    // --- New tests for LanguageConfidence, multi-strategy, families ---
+
+    #[test]
+    fn confidence_level_from_score() {
+        assert_eq!(ConfidenceLevel::from_score(0.0), ConfidenceLevel::None);
+        assert_eq!(ConfidenceLevel::from_score(0.1), ConfidenceLevel::Low);
+        assert_eq!(ConfidenceLevel::from_score(0.5), ConfidenceLevel::Medium);
+        assert_eq!(ConfidenceLevel::from_score(0.75), ConfidenceLevel::High);
+        assert_eq!(ConfidenceLevel::from_score(1.0), ConfidenceLevel::Certain);
+    }
+
+    #[test]
+    fn language_confidence_combined() {
+        let mut lc = LanguageConfidence::new("rust");
+        lc.add_score("ext", 0.8);
+        lc.add_score("content", 0.6);
+        let combined = lc.combined_score();
+        assert!((combined - 0.7).abs() < 1e-9);
+        assert_eq!(lc.best_score(), 0.8);
+        assert_eq!(lc.strategy_count(), 2);
+        assert_eq!(lc.level(), ConfidenceLevel::High);
+    }
+
+    #[test]
+    fn detect_magic_bytes_pdf() {
+        let data = b"%PDF-1.4 rest of file";
+        let result = detect_by_magic_bytes(data).unwrap();
+        assert_eq!(result.language_id, "pdf");
+        assert_eq!(result.strategy, DetectionStrategy::MagicBytes);
+        assert!((result.confidence - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn detect_magic_bytes_png_and_none() {
+        let png_header: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert_eq!(detect_by_magic_bytes(png_header).unwrap().language_id, "png");
+        assert!(detect_by_magic_bytes(b"hi").is_none());
+    }
+
+    #[test]
+    fn multi_strategy_with_extension_and_shebang() {
+        let lc = detect_multi_strategy("script.py", "#!/usr/bin/env python3\nprint('hi')");
+        assert_eq!(lc.language_id, "python");
+        assert!(lc.combined_score() > 0.5);
+        assert!(lc.strategy_count() >= 2);
+    }
+
+    #[test]
+    fn language_family_mapping() {
+        assert_eq!(language_family("rust"), LanguageFamily::Systems);
+        assert_eq!(language_family("python"), LanguageFamily::ScriptingDynamic);
+        assert_eq!(language_family("html"), LanguageFamily::Markup);
+        assert_eq!(language_family("json"), LanguageFamily::Data);
+        assert_eq!(language_family("unknown_lang"), LanguageFamily::Other);
+    }
+
+    #[test]
+    fn group_by_family_works() {
+        let langs = vec!["rust", "python", "json", "html", "go"];
+        let groups = group_by_family(&langs);
+        assert_eq!(groups[&LanguageFamily::Systems], vec!["rust", "go"]);
+        assert_eq!(groups[&LanguageFamily::Data], vec!["json"]);
+    }
+
+    #[test]
+    fn filter_by_family_works() {
+        let langs = vec!["c", "cpp", "python", "java"];
+        let c_fam = filter_by_family(&langs, LanguageFamily::CFamily);
+        assert_eq!(c_fam, vec!["c", "cpp", "java"]);
     }
 }

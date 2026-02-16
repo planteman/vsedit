@@ -714,6 +714,165 @@ pub fn format_relative_date(timestamp: u64, now: u64) -> String {
     }
 }
 
+// ── TimelineRange ──
+
+/// A half-open timestamp range `[start, end)` for querying timeline items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineRange {
+    pub start: u64,
+    pub end: u64,
+}
+
+impl TimelineRange {
+    /// Create a new range.  Panics if `start > end`.
+    pub fn new(start: u64, end: u64) -> Self {
+        assert!(start <= end, "start must be <= end");
+        Self { start, end }
+    }
+
+    /// Return `true` when `timestamp` falls inside the range.
+    pub fn contains(&self, timestamp: u64) -> bool {
+        timestamp >= self.start && timestamp < self.end
+    }
+
+    /// Duration of the range in seconds.
+    pub fn duration_secs(&self) -> u64 {
+        self.end - self.start
+    }
+
+    /// Filter a slice of items, returning only those inside the range.
+    pub fn filter<'a>(&self, items: &'a [TimelineItem]) -> Vec<&'a TimelineItem> {
+        items.iter().filter(|i| self.contains(i.timestamp)).collect()
+    }
+
+    /// Return `true` when two ranges overlap.
+    pub fn overlaps(&self, other: &TimelineRange) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+}
+
+impl fmt::Display for TimelineRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}..{})", self.start, self.end)
+    }
+}
+
+// ── Timeline aggregation ──
+
+/// Granularity for timeline aggregation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AggregationPeriod {
+    Day,
+    Week,
+}
+
+/// A single bucket produced by aggregation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AggregationBucket {
+    /// The bucket key (e.g. `"2024-01-15"` for Day).
+    pub key: String,
+    /// Number of items in this bucket.
+    pub count: usize,
+}
+
+/// Group timeline items by the given period and return counts per bucket.
+pub fn timeline_aggregate(
+    items: &[TimelineItem],
+    period: AggregationPeriod,
+) -> Vec<AggregationBucket> {
+    let mut map: HashMap<String, usize> = HashMap::new();
+    for item in items {
+        let key = match period {
+            AggregationPeriod::Day => unix_timestamp_to_date(item.timestamp),
+            AggregationPeriod::Week => {
+                // Use the Monday of the ISO week
+                let secs_per_day: u64 = 86400;
+                let day_index = item.timestamp / secs_per_day;
+                // epoch (1970-01-01) was a Thursday (weekday index 3, Mon=0)
+                let weekday = ((day_index + 3) % 7) as u64; // Mon=0 .. Sun=6
+                let monday_ts = (day_index - weekday) * secs_per_day;
+                format!("week-{}", unix_timestamp_to_date(monday_ts))
+            }
+        };
+        *map.entry(key).or_insert(0) += 1;
+    }
+    let mut buckets: Vec<AggregationBucket> = map
+        .into_iter()
+        .map(|(key, count)| AggregationBucket { key, count })
+        .collect();
+    buckets.sort_by(|a, b| a.key.cmp(&b.key));
+    buckets
+}
+
+// ── Timeline statistics ──
+
+/// Summary statistics for a set of timeline items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineStatistics {
+    /// Total number of items.
+    pub total_items: usize,
+    /// Number of unique authors.
+    pub unique_authors: usize,
+    /// The most active author (most commits).  `None` when items is empty.
+    pub most_active_author: Option<String>,
+    /// The busiest day (date string with most commits).
+    pub busiest_day: Option<String>,
+    /// Earliest timestamp.
+    pub earliest: Option<u64>,
+    /// Latest timestamp.
+    pub latest: Option<u64>,
+}
+
+/// Compute statistics for a set of timeline items.
+pub fn timeline_statistics(items: &[TimelineItem]) -> TimelineStatistics {
+    if items.is_empty() {
+        return TimelineStatistics {
+            total_items: 0,
+            unique_authors: 0,
+            most_active_author: None,
+            busiest_day: None,
+            earliest: None,
+            latest: None,
+        };
+    }
+
+    let mut author_counts: HashMap<&str, usize> = HashMap::new();
+    let mut day_counts: HashMap<String, usize> = HashMap::new();
+    let mut earliest = u64::MAX;
+    let mut latest = 0u64;
+
+    for item in items {
+        *author_counts.entry(item.author.as_str()).or_insert(0) += 1;
+        let day = unix_timestamp_to_date(item.timestamp);
+        *day_counts.entry(day).or_insert(0) += 1;
+        if item.timestamp < earliest {
+            earliest = item.timestamp;
+        }
+        if item.timestamp > latest {
+            latest = item.timestamp;
+        }
+    }
+
+    let most_active_author = author_counts
+        .iter()
+        .max_by_key(|(_, c)| **c)
+        .map(|(a, _)| a.to_string());
+
+    let busiest_day = day_counts
+        .iter()
+        .max_by_key(|(_, c)| **c)
+        .map(|(d, _)| d.clone());
+
+    TimelineStatistics {
+        total_items: items.len(),
+        unique_authors: author_counts.len(),
+        most_active_author,
+        busiest_day,
+        earliest: Some(earliest),
+        latest: Some(latest),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1293,5 +1452,79 @@ mod tests {
         let filtered = snap.filter(&filter);
         assert_eq!(filtered.len(), 2);
         assert!(filtered.iter().all(|i| i.timestamp >= 1700100000 && i.timestamp <= 1700200000));
+    }
+
+    // ── TimelineRange tests ──
+
+    #[test]
+    fn timeline_range_contains_and_filter() {
+        let range = TimelineRange::new(1700000000, 1700200000);
+        assert!(range.contains(1700000000));
+        assert!(range.contains(1700100000));
+        assert!(!range.contains(1700200000)); // half-open
+        let items = sample_items();
+        let filtered = range.filter(&items);
+        assert!(filtered.iter().all(|i| range.contains(i.timestamp)));
+    }
+
+    #[test]
+    fn timeline_range_overlaps() {
+        let r1 = TimelineRange::new(100, 200);
+        let r2 = TimelineRange::new(150, 250);
+        let r3 = TimelineRange::new(200, 300);
+        assert!(r1.overlaps(&r2));
+        assert!(!r1.overlaps(&r3));
+    }
+
+    // ── Timeline diff tests ──
+
+    #[test]
+    fn timeline_diff_via_snapshots() {
+        let a_items = vec![
+            TimelineItem { timestamp: 1, message: "m1".into(), author: "A".into(), sha: "s1".into() },
+            TimelineItem { timestamp: 2, message: "m2".into(), author: "B".into(), sha: "s2".into() },
+        ];
+        let b_items = vec![
+            TimelineItem { timestamp: 2, message: "m2".into(), author: "B".into(), sha: "s2".into() },
+            TimelineItem { timestamp: 3, message: "m3".into(), author: "C".into(), sha: "s3".into() },
+        ];
+        let snap_a = TimelineSnapshot::new("old", 0, a_items);
+        let snap_b = TimelineSnapshot::new("new", 1, b_items);
+        let diff = timeline_diff(&snap_a, &snap_b);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.added[0].sha, "s3");
+        assert_eq!(diff.removed.len(), 1);
+        assert_eq!(diff.removed[0].sha, "s1");
+    }
+
+    // ── Timeline aggregation tests ──
+
+    #[test]
+    fn timeline_aggregate_by_day() {
+        let items = sample_items();
+        let buckets = timeline_aggregate(&items, AggregationPeriod::Day);
+        assert!(!buckets.is_empty());
+        let total: usize = buckets.iter().map(|b| b.count).sum();
+        assert_eq!(total, items.len());
+    }
+
+    // ── Timeline statistics tests ──
+
+    #[test]
+    fn timeline_statistics_basic() {
+        let items = sample_items();
+        let stats = timeline_statistics(&items);
+        assert_eq!(stats.total_items, items.len());
+        assert!(stats.unique_authors > 0);
+        assert!(stats.most_active_author.is_some());
+        assert!(stats.busiest_day.is_some());
+        assert!(stats.earliest.unwrap() <= stats.latest.unwrap());
+    }
+
+    #[test]
+    fn timeline_statistics_empty() {
+        let stats = timeline_statistics(&[]);
+        assert_eq!(stats.total_items, 0);
+        assert!(stats.most_active_author.is_none());
     }
 }

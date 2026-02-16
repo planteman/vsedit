@@ -740,6 +740,238 @@ impl CallGraph {
     }
 }
 
+// ── CallChainAnalyzer ──
+
+/// Analyzer for finding call chains in a `CallGraph`.
+pub struct CallChainAnalyzer<'a> {
+    graph: &'a CallGraph,
+}
+
+impl<'a> CallChainAnalyzer<'a> {
+    pub fn new(graph: &'a CallGraph) -> Self {
+        Self { graph }
+    }
+
+    /// Find all simple (acyclic) paths from `start` to `end` using DFS.
+    /// Returns paths as vectors of item names.
+    pub fn find_paths(
+        &self,
+        start: &CallHierarchyItem,
+        end: &CallHierarchyItem,
+    ) -> Vec<Vec<String>> {
+        let start_key = CallGraph::key_for(start);
+        let end_key = CallGraph::key_for(end);
+        let mut results = Vec::new();
+        let mut path = vec![start_key.clone()];
+        let mut visited = HashSet::new();
+        visited.insert(start_key.clone());
+        self.dfs_paths(&start_key, &end_key, &mut visited, &mut path, &mut results);
+        results
+    }
+
+    fn dfs_paths(
+        &self,
+        current: &str,
+        end: &str,
+        visited: &mut HashSet<String>,
+        path: &mut Vec<String>,
+        results: &mut Vec<Vec<String>>,
+    ) {
+        if current == end && path.len() > 1 {
+            let names: Vec<String> = path
+                .iter()
+                .filter_map(|k| self.graph.items.get(k).map(|i| i.name.clone()))
+                .collect();
+            results.push(names);
+            return;
+        }
+        if let Some(neighbors) = self.graph.edges.get(current) {
+            for n in neighbors {
+                if !visited.contains(n) {
+                    visited.insert(n.clone());
+                    path.push(n.clone());
+                    self.dfs_paths(n, end, visited, path, results);
+                    path.pop();
+                    visited.remove(n);
+                }
+            }
+        }
+    }
+
+    /// Find the longest call chain starting from the given item.
+    /// Returns the chain as a list of item names.
+    pub fn longest_chain_from(&self, start: &CallHierarchyItem) -> Vec<String> {
+        let start_key = CallGraph::key_for(start);
+        let mut best = Vec::new();
+        let mut current = vec![start_key.clone()];
+        let mut visited = HashSet::new();
+        visited.insert(start_key.clone());
+        self.dfs_longest(&start_key, &mut visited, &mut current, &mut best);
+        best.iter()
+            .filter_map(|k| self.graph.items.get(k).map(|i| i.name.clone()))
+            .collect()
+    }
+
+    fn dfs_longest(
+        &self,
+        current: &str,
+        visited: &mut HashSet<String>,
+        path: &mut Vec<String>,
+        best: &mut Vec<String>,
+    ) {
+        if path.len() > best.len() {
+            *best = path.clone();
+        }
+        if let Some(neighbors) = self.graph.edges.get(current) {
+            for n in neighbors {
+                if !visited.contains(n) {
+                    visited.insert(n.clone());
+                    path.push(n.clone());
+                    self.dfs_longest(n, visited, path, best);
+                    path.pop();
+                    visited.remove(n);
+                }
+            }
+        }
+    }
+}
+
+// ── CallGraphExporter ──
+
+/// Export a `CallGraph` to text or DOT format.
+pub struct CallGraphExporter<'a> {
+    graph: &'a CallGraph,
+}
+
+impl<'a> CallGraphExporter<'a> {
+    pub fn new(graph: &'a CallGraph) -> Self {
+        Self { graph }
+    }
+
+    /// Export as plain text listing of edges.
+    pub fn to_text(&self) -> String {
+        let mut lines = Vec::new();
+        let mut keys: Vec<&String> = self.graph.edges.keys().collect();
+        keys.sort();
+        for caller_key in keys {
+            if let Some(callees) = self.graph.edges.get(caller_key) {
+                let caller_name = self.graph.items.get(caller_key)
+                    .map(|i| i.name.as_str())
+                    .unwrap_or(caller_key);
+                let mut callee_names: Vec<&str> = callees
+                    .iter()
+                    .map(|k| self.graph.items.get(k).map(|i| i.name.as_str()).unwrap_or(k.as_str()))
+                    .collect();
+                callee_names.sort();
+                for callee in callee_names {
+                    lines.push(format!("{} -> {}", caller_name, callee));
+                }
+            }
+        }
+        lines.join("\n")
+    }
+
+    /// Export as DOT graph format.
+    pub fn to_dot(&self) -> String {
+        let mut out = String::from("digraph CallGraph {\n");
+        let mut keys: Vec<&String> = self.graph.edges.keys().collect();
+        keys.sort();
+        for caller_key in keys {
+            if let Some(callees) = self.graph.edges.get(caller_key) {
+                let caller_name = self.graph.items.get(caller_key)
+                    .map(|i| i.name.as_str())
+                    .unwrap_or(caller_key);
+                let mut callee_keys: Vec<&String> = callees.iter().collect();
+                callee_keys.sort();
+                for callee_key in callee_keys {
+                    let callee_name = self.graph.items.get(callee_key)
+                        .map(|i| i.name.as_str())
+                        .unwrap_or(callee_key.as_str());
+                    out.push_str(&format!("  \"{}\" -> \"{}\";\n", caller_name, callee_name));
+                }
+            }
+        }
+        out.push('}');
+        out
+    }
+
+    /// Count the total number of edges in the graph.
+    pub fn edge_count(&self) -> usize {
+        self.graph.edges.values().map(|s| s.len()).sum()
+    }
+}
+
+// ── RecursionDetector ──
+
+/// Detect recursive call patterns in a `CallGraph`.
+pub struct RecursionDetector<'a> {
+    graph: &'a CallGraph,
+}
+
+impl<'a> RecursionDetector<'a> {
+    pub fn new(graph: &'a CallGraph) -> Self {
+        Self { graph }
+    }
+
+    /// Returns true if the given item directly calls itself.
+    pub fn is_directly_recursive(&self, item: &CallHierarchyItem) -> bool {
+        let key = CallGraph::key_for(item);
+        self.graph.edges.get(&key).map_or(false, |callees| callees.contains(&key))
+    }
+
+    /// Returns all items that are part of any cycle (direct or indirect recursion).
+    pub fn find_all_recursive_items(&self) -> Vec<&CallHierarchyItem> {
+        self.graph
+            .items
+            .values()
+            .filter(|item| self.graph.has_cycle_from(item))
+            .collect()
+    }
+
+    /// Detect all direct self-recursive items.
+    pub fn find_directly_recursive(&self) -> Vec<&CallHierarchyItem> {
+        self.graph
+            .items
+            .values()
+            .filter(|item| self.is_directly_recursive(item))
+            .collect()
+    }
+}
+
+// ── Depth-limited traversal on CallGraph ──
+
+impl CallGraph {
+    /// Collect all items reachable from `start` within `max_depth` edges.
+    pub fn reachable_within(&self, start: &CallHierarchyItem, max_depth: usize) -> Vec<&CallHierarchyItem> {
+        let start_key = Self::key_for(start);
+        let mut visited = HashSet::new();
+        visited.insert(start_key.clone());
+        let mut queue = VecDeque::new();
+        queue.push_back((start_key, 0usize));
+        let mut result = Vec::new();
+        while let Some((key, depth)) = queue.pop_front() {
+            if let Some(item) = self.items.get(&key) {
+                result.push(item);
+            }
+            if depth < max_depth {
+                if let Some(neighbors) = self.edges.get(&key) {
+                    for n in neighbors {
+                        if visited.insert(n.clone()) {
+                            queue.push_back((n.clone(), depth + 1));
+                        }
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Provide public access to the key function for external analyzers.
+    pub fn key_for_public(item: &CallHierarchyItem) -> String {
+        Self::key_for(item)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1321,5 +1553,109 @@ mod tests {
         assert!(names.contains("x"));
         assert!(names.contains("y"));
         assert!(names.contains("z"));
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn call_chain_analyzer_find_paths() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("main", SymbolKind::Function);
+        let b = sample_item("process", SymbolKind::Function);
+        let c = sample_item("output", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        graph.add_edge(&a, &c); // direct shortcut
+        let analyzer = CallChainAnalyzer::new(&graph);
+        let paths = analyzer.find_paths(&a, &c);
+        assert!(paths.len() >= 2);
+        // One path is [main, output], another is [main, process, output]
+        assert!(paths.iter().any(|p| p.len() == 2));
+        assert!(paths.iter().any(|p| p.len() == 3));
+    }
+
+    #[test]
+    fn call_chain_analyzer_longest_chain() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        let d = sample_item("d", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        graph.add_edge(&c, &d);
+        let analyzer = CallChainAnalyzer::new(&graph);
+        let chain = analyzer.longest_chain_from(&a);
+        assert_eq!(chain, vec!["a", "b", "c", "d"]);
+    }
+
+    #[test]
+    fn call_graph_exporter_text() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("alpha", SymbolKind::Function);
+        let b = sample_item("beta", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        let exporter = CallGraphExporter::new(&graph);
+        let text = exporter.to_text();
+        assert!(text.contains("alpha -> beta"));
+        assert_eq!(exporter.edge_count(), 1);
+    }
+
+    #[test]
+    fn call_graph_exporter_dot() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("foo", SymbolKind::Function);
+        let b = sample_item("bar", SymbolKind::Method);
+        graph.add_edge(&a, &b);
+        let exporter = CallGraphExporter::new(&graph);
+        let dot = exporter.to_dot();
+        assert!(dot.starts_with("digraph CallGraph {"));
+        assert!(dot.contains("\"foo\" -> \"bar\""));
+        assert!(dot.ends_with('}'));
+    }
+
+    #[test]
+    fn recursion_detector_direct() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("recurse", SymbolKind::Function);
+        graph.add_edge(&a, &a);
+        let detector = RecursionDetector::new(&graph);
+        assert!(detector.is_directly_recursive(&a));
+        let direct = detector.find_directly_recursive();
+        assert_eq!(direct.len(), 1);
+    }
+
+    #[test]
+    fn recursion_detector_indirect() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &a);
+        let detector = RecursionDetector::new(&graph);
+        assert!(!detector.is_directly_recursive(&a));
+        let recursive = detector.find_all_recursive_items();
+        assert_eq!(recursive.len(), 2);
+    }
+
+    #[test]
+    fn reachable_within_depth_limit() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        let d = sample_item("d", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        graph.add_edge(&c, &d);
+        // depth 1: a, b
+        let r1 = graph.reachable_within(&a, 1);
+        assert_eq!(r1.len(), 2);
+        // depth 0: just a
+        let r0 = graph.reachable_within(&a, 0);
+        assert_eq!(r0.len(), 1);
+        // depth 3: all four
+        let r3 = graph.reachable_within(&a, 3);
+        assert_eq!(r3.len(), 4);
     }
 }

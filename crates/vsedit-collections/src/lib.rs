@@ -855,6 +855,270 @@ impl<T: Disposable> Default for DisposableLinkedList<T> {
 }
 
 // ---------------------------------------------------------------------------
+// IntervalMap — range-based lookups
+// ---------------------------------------------------------------------------
+
+/// A non-overlapping interval map that maps half-open ranges `[start, end)`
+/// to values.
+#[derive(Debug, Clone)]
+pub struct IntervalMap<V> {
+    /// Sorted by start. Intervals must not overlap.
+    intervals: Vec<(u64, u64, V)>,
+}
+
+impl<V: Clone> IntervalMap<V> {
+    /// Create a new empty interval map.
+    pub fn new() -> Self {
+        Self {
+            intervals: Vec::new(),
+        }
+    }
+
+    /// Insert a half-open interval `[start, end)` with a value.
+    /// Returns `false` if the interval overlaps an existing one.
+    pub fn insert(&mut self, start: u64, end: u64, value: V) -> bool {
+        if start >= end {
+            return false;
+        }
+        // Check for overlap
+        for &(s, e, _) in &self.intervals {
+            if start < e && end > s {
+                return false;
+            }
+        }
+        self.intervals.push((start, end, value));
+        self.intervals.sort_by_key(|&(s, _, _)| s);
+        true
+    }
+
+    /// Query the value at a point. Returns `None` if no interval contains it.
+    pub fn query(&self, point: u64) -> Option<&V> {
+        for &(s, e, ref v) in &self.intervals {
+            if point >= s && point < e {
+                return Some(v);
+            }
+        }
+        None
+    }
+
+    /// Remove the interval containing the given point.
+    /// Returns the removed value if found.
+    pub fn remove_at(&mut self, point: u64) -> Option<V> {
+        if let Some(idx) = self.intervals.iter().position(|&(s, e, _)| point >= s && point < e) {
+            let (_, _, v) = self.intervals.remove(idx);
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Number of intervals in the map.
+    pub fn len(&self) -> usize {
+        self.intervals.len()
+    }
+
+    /// Whether the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.intervals.is_empty()
+    }
+
+    /// Return all intervals as `(start, end, &value)` triples.
+    pub fn iter(&self) -> impl Iterator<Item = (u64, u64, &V)> {
+        self.intervals.iter().map(|&(s, e, ref v)| (s, e, v))
+    }
+
+    /// Clear all intervals.
+    pub fn clear(&mut self) {
+        self.intervals.clear();
+    }
+
+    /// Find all intervals that overlap the query range `[start, end)`.
+    pub fn query_range(&self, start: u64, end: u64) -> Vec<(u64, u64, &V)> {
+        self.intervals
+            .iter()
+            .filter(|&&(s, e, _)| start < e && end > s)
+            .map(|&(s, e, ref v)| (s, e, v))
+            .collect()
+    }
+}
+
+impl<V: Clone> Default for IntervalMap<V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trie — prefix searching
+// ---------------------------------------------------------------------------
+
+/// A node in the trie.
+#[derive(Debug, Clone)]
+struct TrieNode {
+    children: HashMap<char, TrieNode>,
+    is_terminal: bool,
+}
+
+impl TrieNode {
+    fn new() -> Self {
+        Self {
+            children: HashMap::new(),
+            is_terminal: false,
+        }
+    }
+}
+
+/// A trie (prefix tree) for efficient prefix-based string lookups.
+#[derive(Debug, Clone)]
+pub struct Trie {
+    root: TrieNode,
+    size: usize,
+}
+
+impl Trie {
+    /// Create a new empty trie.
+    pub fn new() -> Self {
+        Self {
+            root: TrieNode::new(),
+            size: 0,
+        }
+    }
+
+    /// Insert a word into the trie.
+    pub fn insert(&mut self, word: &str) {
+        let mut node = &mut self.root;
+        for ch in word.chars() {
+            node = node.children.entry(ch).or_insert_with(TrieNode::new);
+        }
+        if !node.is_terminal {
+            node.is_terminal = true;
+            self.size += 1;
+        }
+    }
+
+    /// Check if a word exists in the trie.
+    pub fn contains(&self, word: &str) -> bool {
+        let mut node = &self.root;
+        for ch in word.chars() {
+            match node.children.get(&ch) {
+                Some(next) => node = next,
+                None => return false,
+            }
+        }
+        node.is_terminal
+    }
+
+    /// Check if any word in the trie starts with the given prefix.
+    pub fn has_prefix(&self, prefix: &str) -> bool {
+        let mut node = &self.root;
+        for ch in prefix.chars() {
+            match node.children.get(&ch) {
+                Some(next) => node = next,
+                None => return false,
+            }
+        }
+        true
+    }
+
+    /// Collect all words that start with the given prefix.
+    pub fn words_with_prefix(&self, prefix: &str) -> Vec<String> {
+        let mut node = &self.root;
+        for ch in prefix.chars() {
+            match node.children.get(&ch) {
+                Some(next) => node = next,
+                None => return Vec::new(),
+            }
+        }
+        let mut results = Vec::new();
+        self.collect_words(node, &mut prefix.to_string(), &mut results);
+        results
+    }
+
+    fn collect_words(&self, node: &TrieNode, current: &mut String, results: &mut Vec<String>) {
+        if node.is_terminal {
+            results.push(current.clone());
+        }
+        let mut keys: Vec<char> = node.children.keys().copied().collect();
+        keys.sort();
+        for ch in keys {
+            current.push(ch);
+            self.collect_words(&node.children[&ch], current, results);
+            current.pop();
+        }
+    }
+
+    /// Number of words in the trie.
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    /// Whether the trie is empty.
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+}
+
+impl Default for Trie {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// sorted_merge — merge two sorted iterators
+// ---------------------------------------------------------------------------
+
+/// Merge two sorted iterators into a single sorted iterator.
+///
+/// Both input iterators must yield elements in ascending order.
+/// The resulting iterator yields all elements from both in sorted order.
+pub fn sorted_merge<I, J, T>(a: I, b: J) -> SortedMerge<I::IntoIter, J::IntoIter, T>
+where
+    I: IntoIterator<Item = T>,
+    J: IntoIterator<Item = T>,
+    T: Ord,
+{
+    SortedMerge {
+        a: a.into_iter().peekable(),
+        b: b.into_iter().peekable(),
+    }
+}
+
+/// Iterator adapter that merges two sorted iterators.
+pub struct SortedMerge<A, B, T>
+where
+    A: Iterator<Item = T>,
+    B: Iterator<Item = T>,
+{
+    a: std::iter::Peekable<A>,
+    b: std::iter::Peekable<B>,
+}
+
+impl<A, B, T> Iterator for SortedMerge<A, B, T>
+where
+    A: Iterator<Item = T>,
+    B: Iterator<Item = T>,
+    T: Ord,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        match (self.a.peek(), self.b.peek()) {
+            (Some(a), Some(b)) => {
+                if a <= b {
+                    self.a.next()
+                } else {
+                    self.b.next()
+                }
+            }
+            (Some(_), None) => self.a.next(),
+            (None, Some(_)) => self.b.next(),
+            (None, None) => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1311,5 +1575,82 @@ mod tests {
         assert_eq!(pq.pop().as_deref(), Some("apple"));
         assert_eq!(pq.pop().as_deref(), Some("banana"));
         assert_eq!(pq.pop().as_deref(), Some("cherry"));
+    }
+
+    // -- IntervalMap tests ---------------------------------------------------
+
+    #[test]
+    fn interval_map_insert_and_query() {
+        let mut map = IntervalMap::new();
+        assert!(map.insert(0, 10, "a"));
+        assert!(map.insert(20, 30, "b"));
+        assert!(!map.insert(5, 15, "c")); // overlaps with [0,10)
+        assert_eq!(map.query(5), Some(&"a"));
+        assert_eq!(map.query(15), None);
+        assert_eq!(map.query(25), Some(&"b"));
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn interval_map_remove_and_range_query() {
+        let mut map = IntervalMap::new();
+        map.insert(0, 10, "x");
+        map.insert(20, 30, "y");
+        let overlapping = map.query_range(5, 25);
+        assert_eq!(overlapping.len(), 2);
+        assert_eq!(map.remove_at(5), Some("x"));
+        assert_eq!(map.len(), 1);
+    }
+
+    // -- Trie tests ----------------------------------------------------------
+
+    #[test]
+    fn trie_insert_contains_prefix() {
+        let mut trie = Trie::new();
+        trie.insert("hello");
+        trie.insert("help");
+        trie.insert("world");
+        assert!(trie.contains("hello"));
+        assert!(!trie.contains("hel"));
+        assert!(trie.has_prefix("hel"));
+        assert!(!trie.has_prefix("xyz"));
+        assert_eq!(trie.len(), 3);
+    }
+
+    #[test]
+    fn trie_words_with_prefix() {
+        let mut trie = Trie::new();
+        trie.insert("apple");
+        trie.insert("app");
+        trie.insert("application");
+        trie.insert("banana");
+        let words = trie.words_with_prefix("app");
+        assert_eq!(words, vec!["app", "apple", "application"]);
+    }
+
+    // -- sorted_merge tests --------------------------------------------------
+
+    #[test]
+    fn sorted_merge_two_sorted_lists() {
+        let a = vec![1, 3, 5, 7];
+        let b = vec![2, 4, 6, 8];
+        let merged: Vec<i32> = sorted_merge(a, b).collect();
+        assert_eq!(merged, vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+
+    #[test]
+    fn sorted_merge_one_empty() {
+        let a: Vec<i32> = vec![1, 2, 3];
+        let b: Vec<i32> = vec![];
+        let merged: Vec<i32> = sorted_merge(a, b).collect();
+        assert_eq!(merged, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn sorted_merge_with_duplicates() {
+        let a = vec![1, 3, 3];
+        let b = vec![2, 3, 4];
+        let merged: Vec<i32> = sorted_merge(a, b).collect();
+        assert_eq!(merged, vec![1, 2, 3, 3, 3, 4]);
     }
 }

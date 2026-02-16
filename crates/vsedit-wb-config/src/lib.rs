@@ -732,6 +732,220 @@ impl fmt::Display for ConfigValueType {
     }
 }
 
+/// A named snapshot of a [`ConfigurationModel`] at a point in time.
+#[derive(Debug, Clone)]
+pub struct ConfigSnapshot {
+    pub label: String,
+    pub entries: Vec<ConfigurationEntry>,
+    pub timestamp_epoch_ms: u64,
+}
+
+impl ConfigSnapshot {
+    /// Capture a snapshot of the given model.
+    pub fn capture(model: &ConfigurationModel, label: &str, timestamp_epoch_ms: u64) -> Self {
+        Self {
+            label: label.to_string(),
+            entries: model.snapshot(),
+            timestamp_epoch_ms,
+        }
+    }
+
+    /// Restore this snapshot into a fresh [`ConfigurationModel`].
+    pub fn restore(&self) -> ConfigurationModel {
+        let mut model = ConfigurationModel::new();
+        for entry in &self.entries {
+            if let Some(ref desc) = entry.description {
+                model.set_with_description(
+                    entry.key.clone(),
+                    entry.value.clone(),
+                    entry.scope,
+                    desc.clone(),
+                );
+            } else {
+                model.set(entry.key.clone(), entry.value.clone(), entry.scope);
+            }
+        }
+        model
+    }
+
+    /// Number of entries in this snapshot.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+/// Manages a history of [`ConfigSnapshot`]s.
+pub struct ConfigSnapshotHistory {
+    snapshots: Vec<ConfigSnapshot>,
+    max_snapshots: usize,
+}
+
+impl ConfigSnapshotHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(max_snapshots: usize) -> Self {
+        Self {
+            snapshots: Vec::new(),
+            max_snapshots,
+        }
+    }
+
+    /// Push a snapshot. If the history exceeds `max_snapshots`, the oldest is removed.
+    pub fn push(&mut self, snapshot: ConfigSnapshot) {
+        if self.snapshots.len() >= self.max_snapshots {
+            self.snapshots.remove(0);
+        }
+        self.snapshots.push(snapshot);
+    }
+
+    /// Return the most recent snapshot, if any.
+    pub fn latest(&self) -> Option<&ConfigSnapshot> {
+        self.snapshots.last()
+    }
+
+    /// Number of snapshots currently stored.
+    pub fn len(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.snapshots.is_empty()
+    }
+
+    /// Return all snapshot labels.
+    pub fn labels(&self) -> Vec<&str> {
+        self.snapshots.iter().map(|s| s.label.as_str()).collect()
+    }
+
+    /// Find a snapshot by label.
+    pub fn find_by_label(&self, label: &str) -> Option<&ConfigSnapshot> {
+        self.snapshots.iter().find(|s| s.label == label)
+    }
+}
+
+/// A single migration rule that renames or transforms a configuration key.
+#[derive(Debug, Clone)]
+pub struct ConfigMigrationRule {
+    pub old_key: String,
+    pub new_key: String,
+    pub transform_value: Option<fn(&str) -> String>,
+}
+
+/// Migrates configuration entries from old keys to new keys.
+pub struct ConfigMigration {
+    rules: Vec<ConfigMigrationRule>,
+}
+
+impl ConfigMigration {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Register a simple key rename (value is preserved).
+    pub fn rename(mut self, old_key: &str, new_key: &str) -> Self {
+        self.rules.push(ConfigMigrationRule {
+            old_key: old_key.to_string(),
+            new_key: new_key.to_string(),
+            transform_value: None,
+        });
+        self
+    }
+
+    /// Register a key rename with a value transformation.
+    pub fn rename_with_transform(
+        mut self,
+        old_key: &str,
+        new_key: &str,
+        transform: fn(&str) -> String,
+    ) -> Self {
+        self.rules.push(ConfigMigrationRule {
+            old_key: old_key.to_string(),
+            new_key: new_key.to_string(),
+            transform_value: Some(transform),
+        });
+        self
+    }
+
+    /// Apply all migration rules to the model, returning the number of keys migrated.
+    pub fn apply(&self, model: &mut ConfigurationModel) -> usize {
+        let mut migrated = 0;
+        for rule in &self.rules {
+            if let Some((value, scope)) = model
+                .get_with_scope(&rule.old_key)
+                .map(|(v, s)| (v.to_string(), *s))
+            {
+                let new_value = match rule.transform_value {
+                    Some(f) => f(&value),
+                    None => value,
+                };
+                model.set(rule.new_key.clone(), new_value, scope);
+                model.remove(&rule.old_key);
+                migrated += 1;
+            }
+        }
+        migrated
+    }
+
+    /// Number of registered rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl Default for ConfigMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Exports a [`ConfigurationModel`] to a simple key=value text format.
+pub struct ConfigExporter;
+
+impl ConfigExporter {
+    /// Export all entries as sorted `key = value` lines.
+    pub fn to_kv_string(model: &ConfigurationModel) -> String {
+        let mut entries: Vec<_> = model.snapshot();
+        entries.sort_by(|a, b| a.key.cmp(&b.key));
+        entries
+            .iter()
+            .map(|e| format!("{} = {}", e.key, e.value))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Export entries filtered by scope as sorted `key = value` lines.
+    pub fn to_kv_string_by_scope(
+        model: &ConfigurationModel,
+        scope: ConfigurationScope,
+    ) -> String {
+        let mut entries: Vec<_> = model
+            .snapshot()
+            .into_iter()
+            .filter(|e| e.scope == scope)
+            .collect();
+        entries.sort_by(|a, b| a.key.cmp(&b.key));
+        entries
+            .iter()
+            .map(|e| format!("{} = {}", e.key, e.value))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Export entries as `# description\nkey = value` blocks where descriptions exist.
+    pub fn to_commented_kv_string(model: &ConfigurationModel) -> String {
+        let mut entries: Vec<_> = model.snapshot();
+        entries.sort_by(|a, b| a.key.cmp(&b.key));
+        let mut lines = Vec::new();
+        for e in &entries {
+            if let Some(ref desc) = e.description {
+                lines.push(format!("# {}", desc));
+            }
+            lines.push(format!("{} = {}", e.key, e.value));
+        }
+        lines.join("\n")
+    }
+}
+
 /// Validate that a configuration value matches the expected type.
 pub fn config_validate_value(value: &str, expected_type: ConfigValueType) -> Result<(), String> {
     match expected_type {
@@ -1276,5 +1490,126 @@ mod tests {
         assert!(config_validate_value("true", ConfigValueType::Boolean).is_ok());
         assert!(config_validate_value("false", ConfigValueType::Boolean).is_ok());
         assert!(config_validate_value("yes", ConfigValueType::Boolean).is_err());
+    }
+
+    #[test]
+    fn config_snapshot_capture_and_restore() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set_with_description(
+            "editor.tabSize".into(),
+            "4".into(),
+            ConfigurationScope::User,
+            "Tab width".into(),
+        );
+        let snap = ConfigSnapshot::capture(&model, "before-refactor", 1000);
+        assert_eq!(snap.label, "before-refactor");
+        assert_eq!(snap.entry_count(), 2);
+
+        // Mutate the original and restore
+        model.clear();
+        assert_eq!(model.entry_count(), 0);
+
+        let restored = snap.restore();
+        assert_eq!(restored.get("editor.fontSize"), Some("14"));
+        assert_eq!(restored.get("editor.tabSize"), Some("4"));
+        assert_eq!(restored.get_description("editor.tabSize"), Some("Tab width"));
+    }
+
+    #[test]
+    fn config_snapshot_history_push_and_evict() {
+        let mut history = ConfigSnapshotHistory::new(2);
+        assert!(history.is_empty());
+
+        let model = ConfigurationModel::new();
+        history.push(ConfigSnapshot::capture(&model, "snap1", 100));
+        history.push(ConfigSnapshot::capture(&model, "snap2", 200));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.labels(), vec!["snap1", "snap2"]);
+
+        // Third push evicts the oldest
+        history.push(ConfigSnapshot::capture(&model, "snap3", 300));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.labels(), vec!["snap2", "snap3"]);
+        assert!(history.find_by_label("snap1").is_none());
+        assert!(history.find_by_label("snap3").is_some());
+        assert_eq!(history.latest().unwrap().label, "snap3");
+    }
+
+    #[test]
+    fn config_migration_rename_keys() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::Workspace);
+
+        let migration = ConfigMigration::new()
+            .rename("editor.fontSize", "editor.font.size")
+            .rename("editor.tabSize", "editor.tab.size");
+        assert_eq!(migration.rule_count(), 2);
+
+        let count = migration.apply(&mut model);
+        assert_eq!(count, 2);
+        assert_eq!(model.get("editor.font.size"), Some("14"));
+        assert_eq!(model.get("editor.tab.size"), Some("4"));
+        assert!(!model.has("editor.fontSize"));
+        assert!(!model.has("editor.tabSize"));
+        // Scope is preserved
+        let (_, scope) = model.get_with_scope("editor.tab.size").unwrap();
+        assert_eq!(*scope, ConfigurationScope::Workspace);
+    }
+
+    #[test]
+    fn config_migration_with_transform() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.wordWrap".into(), "on".into(), ConfigurationScope::User);
+
+        let migration = ConfigMigration::new().rename_with_transform(
+            "editor.wordWrap",
+            "editor.word.wrap",
+            |v| if v == "on" { "true".to_string() } else { "false".to_string() },
+        );
+        let count = migration.apply(&mut model);
+        assert_eq!(count, 1);
+        assert_eq!(model.get("editor.word.wrap"), Some("true"));
+        assert!(!model.has("editor.wordWrap"));
+    }
+
+    #[test]
+    fn config_exporter_to_kv_string() {
+        let mut model = ConfigurationModel::new();
+        model.set("b.key".into(), "2".into(), ConfigurationScope::User);
+        model.set("a.key".into(), "1".into(), ConfigurationScope::User);
+
+        let output = ConfigExporter::to_kv_string(&model);
+        assert_eq!(output, "a.key = 1\nb.key = 2");
+    }
+
+    #[test]
+    fn config_exporter_by_scope_filters() {
+        let mut model = ConfigurationModel::new();
+        model.set("a.key".into(), "1".into(), ConfigurationScope::User);
+        model.set("b.key".into(), "2".into(), ConfigurationScope::Workspace);
+
+        let user_output = ConfigExporter::to_kv_string_by_scope(&model, ConfigurationScope::User);
+        assert_eq!(user_output, "a.key = 1");
+        let ws_output = ConfigExporter::to_kv_string_by_scope(&model, ConfigurationScope::Workspace);
+        assert_eq!(ws_output, "b.key = 2");
+    }
+
+    #[test]
+    fn config_exporter_commented_kv_string() {
+        let mut model = ConfigurationModel::new();
+        model.set_with_description(
+            "a.key".into(),
+            "1".into(),
+            ConfigurationScope::User,
+            "The A key".into(),
+        );
+        model.set("b.key".into(), "2".into(), ConfigurationScope::User);
+
+        let output = ConfigExporter::to_commented_kv_string(&model);
+        assert!(output.contains("# The A key"));
+        assert!(output.contains("a.key = 1"));
+        assert!(output.contains("b.key = 2"));
     }
 }

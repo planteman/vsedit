@@ -774,6 +774,151 @@ impl OutputPanel {
     }
 }
 
+// ── OutputChannelExporter ──
+
+/// Format options for exporting output channel content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExportFormat {
+    /// Plain text, one line per content line.
+    Plain,
+    /// Lines prefixed with 1-based line numbers.
+    Numbered,
+    /// Lines prefixed with channel name and line number.
+    ChannelPrefixed,
+}
+
+/// Exports output channel content as a formatted string.
+pub struct OutputChannelExporter;
+
+impl OutputChannelExporter {
+    /// Export a single channel's content.
+    pub fn export(channel: &OutputChannel, format: &ExportFormat) -> String {
+        match format {
+            ExportFormat::Plain => channel.content.join("\n"),
+            ExportFormat::Numbered => channel
+                .content
+                .iter()
+                .enumerate()
+                .map(|(i, line)| format!("{:>4}: {}", i + 1, line))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            ExportFormat::ChannelPrefixed => channel
+                .content
+                .iter()
+                .enumerate()
+                .map(|(i, line)| format!("[{}:{:>4}] {}", channel.name, i + 1, line))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        }
+    }
+
+    /// Export all channels from a panel.
+    pub fn export_all(panel: &OutputPanel, format: &ExportFormat) -> String {
+        panel
+            .channels
+            .iter()
+            .map(|ch| {
+                let header = format!("=== {} ===", ch.name);
+                let body = Self::export(ch, format);
+                format!("{}\n{}", header, body)
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    /// Export only the active channel.
+    pub fn export_active(panel: &OutputPanel, format: &ExportFormat) -> Option<String> {
+        panel
+            .active_channel()
+            .map(|ch| Self::export(ch, format))
+    }
+}
+
+// ── Output rotation ──
+
+/// Configuration for automatic line rotation (trimming old lines).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputRotationPolicy {
+    /// Maximum number of lines to keep per channel.
+    pub max_lines: usize,
+    /// Number of lines to trim when the limit is hit.  Removes from the front.
+    pub trim_count: usize,
+}
+
+impl OutputRotationPolicy {
+    /// Create a new rotation policy.
+    pub fn new(max_lines: usize, trim_count: usize) -> Self {
+        Self {
+            max_lines,
+            trim_count: trim_count.min(max_lines),
+        }
+    }
+
+    /// Apply the policy to a channel, trimming old lines if necessary.
+    /// Returns the number of lines removed.
+    pub fn apply(&self, channel: &mut OutputChannel) -> usize {
+        if channel.content.len() <= self.max_lines {
+            return 0;
+        }
+        let to_remove = self.trim_count.min(channel.content.len());
+        channel.content.drain(0..to_remove);
+        to_remove
+    }
+
+    /// Check whether the channel currently exceeds the limit.
+    pub fn needs_rotation(&self, channel: &OutputChannel) -> bool {
+        channel.content.len() > self.max_lines
+    }
+}
+
+/// Apply a rotation policy to all channels in the panel.
+pub fn rotate_all_channels(panel: &mut OutputPanel, policy: &OutputRotationPolicy) -> usize {
+    let mut total_removed = 0;
+    for ch in &mut panel.channels {
+        total_removed += policy.apply(ch);
+    }
+    total_removed
+}
+
+// ── Channel content search with match positions ──
+
+/// A match position within a single channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelSearchHit {
+    pub line_index: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+}
+
+/// Search within a single channel's content (case-insensitive) and return all
+/// match positions.
+pub fn channel_search(channel: &OutputChannel, query: &str) -> Vec<ChannelSearchHit> {
+    let mut results = Vec::new();
+    if query.is_empty() {
+        return results;
+    }
+    let lower_query = query.to_lowercase();
+    for (line_idx, line) in channel.content.iter().enumerate() {
+        let lower_line = line.to_lowercase();
+        let mut start = 0;
+        while let Some(pos) = lower_line[start..].find(&lower_query) {
+            let abs_start = start + pos;
+            results.push(ChannelSearchHit {
+                line_index: line_idx,
+                start_col: abs_start,
+                end_col: abs_start + query.len(),
+            });
+            start = abs_start + 1;
+        }
+    }
+    results
+}
+
+/// Count the number of matches in a channel.
+pub fn channel_search_count(channel: &OutputChannel, query: &str) -> usize {
+    channel_search(channel, query).len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1297,5 +1442,79 @@ mod tests {
         assert!(f.matches("[error] connection timeout"));
         assert!(!f.matches("[error] disk full"));
         assert!(!f.matches("[info] timeout ignored"));
+    }
+
+    // ── OutputChannelExporter tests ──
+
+    #[test]
+    fn exporter_plain() {
+        let mut ch = OutputChannel::new("test");
+        ch.content.push("line 1".into());
+        ch.content.push("line 2".into());
+        let exported = OutputChannelExporter::export(&ch, &ExportFormat::Plain);
+        assert_eq!(exported, "line 1\nline 2");
+    }
+
+    #[test]
+    fn exporter_numbered() {
+        let mut ch = OutputChannel::new("test");
+        ch.content.push("hello".into());
+        let exported = OutputChannelExporter::export(&ch, &ExportFormat::Numbered);
+        assert!(exported.contains("1:"));
+        assert!(exported.contains("hello"));
+    }
+
+    #[test]
+    fn exporter_channel_prefixed() {
+        let mut ch = OutputChannel::new("mylog");
+        ch.content.push("msg".into());
+        let exported = OutputChannelExporter::export(&ch, &ExportFormat::ChannelPrefixed);
+        assert!(exported.contains("[mylog:"));
+        assert!(exported.contains("msg"));
+    }
+
+    // ── Output rotation tests ──
+
+    #[test]
+    fn rotation_policy_trims() {
+        let mut ch = OutputChannel::new("test");
+        for i in 0..20 {
+            ch.content.push(format!("line {}", i));
+        }
+        let policy = OutputRotationPolicy::new(10, 5);
+        assert!(policy.needs_rotation(&ch));
+        let removed = policy.apply(&mut ch);
+        assert_eq!(removed, 5);
+        assert_eq!(ch.content.len(), 15);
+    }
+
+    #[test]
+    fn rotation_policy_no_trim_needed() {
+        let mut ch = OutputChannel::new("test");
+        ch.content.push("single".into());
+        let policy = OutputRotationPolicy::new(10, 5);
+        assert!(!policy.needs_rotation(&ch));
+        assert_eq!(policy.apply(&mut ch), 0);
+    }
+
+    // ── Channel search tests ──
+
+    #[test]
+    fn channel_search_basic() {
+        let mut ch = OutputChannel::new("test");
+        ch.content.push("Hello World".into());
+        ch.content.push("hello again".into());
+        ch.content.push("no match here".into());
+        let hits = channel_search(&ch, "hello");
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].line_index, 0);
+        assert_eq!(hits[1].line_index, 1);
+    }
+
+    #[test]
+    fn channel_search_count_test() {
+        let mut ch = OutputChannel::new("test");
+        ch.content.push("aaa".into());
+        assert_eq!(channel_search_count(&ch, "a"), 3);
     }
 }

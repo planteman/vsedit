@@ -662,6 +662,174 @@ pub fn fold_region(model: &mut FoldingModel, start_line: u32, recursive: bool) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FoldingSnapshot – save and restore full fold state
+// ---------------------------------------------------------------------------
+
+/// A snapshot of the complete fold state that can be saved and restored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingSnapshot {
+    entries: Vec<(u32, u32, bool)>, // (start_line, end_line, is_collapsed)
+}
+
+impl FoldingSnapshot {
+    /// Capture the current fold state from a model.
+    pub fn capture(model: &FoldingModel) -> Self {
+        Self {
+            entries: model
+                .get_ranges()
+                .iter()
+                .map(|r| (r.start_line, r.end_line, r.is_collapsed))
+                .collect(),
+        }
+    }
+
+    /// Apply this snapshot to a model. Only ranges whose (start_line, end_line)
+    /// match an entry are updated.
+    pub fn apply(&self, model: &mut FoldingModel) {
+        for range in model.ranges.iter_mut() {
+            if let Some((_, _, collapsed)) = self.entries.iter().find(|(s, e, _)| {
+                *s == range.start_line && *e == range.end_line
+            }) {
+                range.is_collapsed = *collapsed;
+            }
+        }
+    }
+
+    /// Number of entries in the snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Count how many entries are collapsed in this snapshot.
+    pub fn collapsed_count(&self) -> usize {
+        self.entries.iter().filter(|(_, _, c)| *c).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FoldingDiff – compare two fold states
+// ---------------------------------------------------------------------------
+
+/// The kind of change between two fold states for a single range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FoldingChangeKind {
+    Folded,
+    Unfolded,
+    Added,
+    Removed,
+}
+
+/// A single difference between two fold snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingChange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: FoldingChangeKind,
+}
+
+/// Compute the differences between two snapshots.
+pub fn diff_snapshots(before: &FoldingSnapshot, after: &FoldingSnapshot) -> Vec<FoldingChange> {
+    let mut changes = Vec::new();
+
+    // Detect changes and removals by iterating `before`.
+    for &(s, e, collapsed_before) in &before.entries {
+        match after.entries.iter().find(|(as_, ae, _)| *as_ == s && *ae == e) {
+            Some(&(_, _, collapsed_after)) => {
+                if collapsed_before && !collapsed_after {
+                    changes.push(FoldingChange { start_line: s, end_line: e, kind: FoldingChangeKind::Unfolded });
+                } else if !collapsed_before && collapsed_after {
+                    changes.push(FoldingChange { start_line: s, end_line: e, kind: FoldingChangeKind::Folded });
+                }
+            }
+            None => {
+                changes.push(FoldingChange { start_line: s, end_line: e, kind: FoldingChangeKind::Removed });
+            }
+        }
+    }
+
+    // Detect additions (in `after` but not in `before`).
+    for &(s, e, _) in &after.entries {
+        if !before.entries.iter().any(|(bs, be, _)| *bs == s && *be == e) {
+            changes.push(FoldingChange { start_line: s, end_line: e, kind: FoldingChangeKind::Added });
+        }
+    }
+
+    changes
+}
+
+// ---------------------------------------------------------------------------
+// FoldingHistory – track fold/unfold operations over time
+// ---------------------------------------------------------------------------
+
+/// A recorded fold or unfold event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingEvent {
+    pub start_line: u32,
+    pub collapsed: bool,
+    pub seq: u64,
+}
+
+/// Tracks a sequence of fold/unfold events for undo-style replay.
+#[derive(Debug, Clone)]
+pub struct FoldingHistory {
+    events: Vec<FoldingEvent>,
+    next_seq: u64,
+}
+
+impl FoldingHistory {
+    pub fn new() -> Self {
+        Self { events: Vec::new(), next_seq: 0 }
+    }
+
+    /// Record a toggle event.
+    pub fn record(&mut self, start_line: u32, collapsed: bool) {
+        self.events.push(FoldingEvent { start_line, collapsed, seq: self.next_seq });
+        self.next_seq += 1;
+    }
+
+    /// Return all recorded events in order.
+    pub fn events(&self) -> &[FoldingEvent] {
+        &self.events
+    }
+
+    /// Pop the most recent event (for undo).
+    pub fn pop(&mut self) -> Option<FoldingEvent> {
+        self.events.pop()
+    }
+
+    /// Number of recorded events.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Undo the last event by applying its inverse to the model.
+    pub fn undo_last(&mut self, model: &mut FoldingModel) -> bool {
+        if let Some(event) = self.pop() {
+            for range in model.ranges.iter_mut() {
+                if range.start_line == event.start_line {
+                    range.is_collapsed = !event.collapsed;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+impl Default for FoldingHistory {
+    fn default() -> Self { Self::new() }
+}
+
 /// Unfold the range starting at `start_line`. When `recursive` is true, also
 /// unfold all nested ranges within the target.
 pub fn unfold_region(model: &mut FoldingModel, start_line: u32, recursive: bool) {
@@ -1263,5 +1431,93 @@ mod tests {
         assert!(!model.get_range_at(5).unwrap().is_collapsed);
         // Range outside the target should remain collapsed
         assert!(model.get_range_at(25).unwrap().is_collapsed);
+    }
+
+    // -- FoldingSnapshot tests ------------------------------------------------
+
+    #[test]
+    fn snapshot_capture_and_apply() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 15, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let snap = FoldingSnapshot::capture(&model);
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.collapsed_count(), 1);
+
+        // Mutate model, then restore from snapshot
+        model.unfold_all();
+        assert!(!model.get_range_at(1).unwrap().is_collapsed);
+        snap.apply(&mut model);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert!(!model.get_range_at(15).unwrap().is_collapsed);
+    }
+
+    #[test]
+    fn diff_snapshots_detects_fold_unfold() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 15, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: true },
+        ]);
+        let before = FoldingSnapshot::capture(&model);
+
+        model.toggle(1);   // fold line 1
+        model.toggle(15);  // unfold line 15
+        let after = FoldingSnapshot::capture(&model);
+
+        let diffs = diff_snapshots(&before, &after);
+        assert_eq!(diffs.len(), 2);
+        assert!(diffs.iter().any(|d| d.start_line == 1 && d.kind == FoldingChangeKind::Folded));
+        assert!(diffs.iter().any(|d| d.start_line == 15 && d.kind == FoldingChangeKind::Unfolded));
+    }
+
+    #[test]
+    fn diff_snapshots_detects_added_removed() {
+        let before = FoldingSnapshot { entries: vec![(1, 10, false), (20, 30, true)] };
+        let after = FoldingSnapshot { entries: vec![(1, 10, false), (40, 50, false)] };
+        let diffs = diff_snapshots(&before, &after);
+        assert!(diffs.iter().any(|d| d.start_line == 20 && d.kind == FoldingChangeKind::Removed));
+        assert!(diffs.iter().any(|d| d.start_line == 40 && d.kind == FoldingChangeKind::Added));
+    }
+
+    #[test]
+    fn folding_history_record_and_undo() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let mut history = FoldingHistory::new();
+
+        // Fold line 1 and record it
+        model.toggle(1);
+        history.record(1, true);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert_eq!(history.len(), 1);
+
+        // Undo should unfold it
+        let undone = history.undo_last(&mut model);
+        assert!(undone);
+        assert!(!model.get_range_at(1).unwrap().is_collapsed);
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn folding_history_multiple_events() {
+        let mut history = FoldingHistory::new();
+        history.record(1, true);
+        history.record(5, false);
+        history.record(10, true);
+        assert_eq!(history.len(), 3);
+
+        let events = history.events();
+        assert_eq!(events[0].seq, 0);
+        assert_eq!(events[1].seq, 1);
+        assert_eq!(events[2].seq, 2);
+
+        let last = history.pop().unwrap();
+        assert_eq!(last.start_line, 10);
+        assert_eq!(history.len(), 2);
     }
 }

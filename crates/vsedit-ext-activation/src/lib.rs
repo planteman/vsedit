@@ -777,6 +777,233 @@ impl ActivationEventFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ActivationPolicy
+// ---------------------------------------------------------------------------
+
+/// Defines when and how an extension should be activated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActivationPolicy {
+    /// Activate immediately on startup.
+    Eager,
+    /// Activate only when explicitly needed (default).
+    Lazy,
+    /// Activate on-demand when a specific event fires.
+    OnDemand(ActivationEvent),
+    /// Never activate automatically; requires manual activation.
+    Manual,
+}
+
+impl ActivationPolicy {
+    /// Returns `true` if this policy activates eagerly on startup.
+    pub fn is_eager(&self) -> bool {
+        matches!(self, Self::Eager)
+    }
+
+    /// Returns `true` if activation requires an explicit trigger.
+    pub fn requires_trigger(&self) -> bool {
+        matches!(self, Self::OnDemand(_) | Self::Manual)
+    }
+
+    /// Returns the triggering event, if this policy is on-demand.
+    pub fn trigger_event(&self) -> Option<&ActivationEvent> {
+        match self {
+            Self::OnDemand(event) => Some(event),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ActivationPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Eager => write!(f, "eager"),
+            Self::Lazy => write!(f, "lazy"),
+            Self::OnDemand(event) => write!(f, "on-demand({event})"),
+            Self::Manual => write!(f, "manual"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivationPriorityQueue
+// ---------------------------------------------------------------------------
+
+/// A priority-based activation queue. Lower priority values are activated first.
+#[derive(Debug)]
+pub struct ActivationPriorityQueue {
+    entries: Vec<(u32, String, ActivationEvent)>,
+}
+
+impl ActivationPriorityQueue {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Enqueue an extension for activation with the given priority.
+    pub fn enqueue(&mut self, priority: u32, ext_id: &str, event: ActivationEvent) {
+        self.entries.push((priority, ext_id.to_string(), event));
+        self.entries.sort_by_key(|(p, _, _)| *p);
+    }
+
+    /// Dequeue the highest-priority (lowest value) extension.
+    pub fn dequeue(&mut self) -> Option<(u32, String, ActivationEvent)> {
+        if self.entries.is_empty() {
+            None
+        } else {
+            Some(self.entries.remove(0))
+        }
+    }
+
+    /// Peek at the next extension without removing it.
+    pub fn peek(&self) -> Option<&(u32, String, ActivationEvent)> {
+        self.entries.first()
+    }
+
+    /// Number of pending activations.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all entries for a given extension.
+    pub fn remove_extension(&mut self, ext_id: &str) {
+        self.entries.retain(|(_, id, _)| id != ext_id);
+    }
+
+    /// Drain all entries, returning them in priority order.
+    pub fn drain_all(&mut self) -> Vec<(u32, String, ActivationEvent)> {
+        std::mem::take(&mut self.entries)
+    }
+}
+
+impl Default for ActivationPriorityQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivationCondition
+// ---------------------------------------------------------------------------
+
+/// A compound condition that must be satisfied before activation proceeds.
+#[derive(Debug, Clone)]
+pub struct ActivationCondition {
+    required_events: Vec<ActivationEvent>,
+    forbidden_events: Vec<ActivationEvent>,
+    min_delay_ms: Option<u64>,
+}
+
+impl ActivationCondition {
+    pub fn new() -> Self {
+        Self {
+            required_events: Vec::new(),
+            forbidden_events: Vec::new(),
+            min_delay_ms: None,
+        }
+    }
+
+    /// Add a required event that must have fired before activation.
+    pub fn require(mut self, event: ActivationEvent) -> Self {
+        self.required_events.push(event);
+        self
+    }
+
+    /// Add an event that must NOT have fired for activation to proceed.
+    pub fn forbid(mut self, event: ActivationEvent) -> Self {
+        self.forbidden_events.push(event);
+        self
+    }
+
+    /// Set a minimum delay (ms) since the first required event fired.
+    pub fn min_delay(mut self, ms: u64) -> Self {
+        self.min_delay_ms = Some(ms);
+        self
+    }
+
+    /// Evaluate the condition against a set of already-fired events and elapsed time.
+    pub fn is_satisfied(&self, fired: &[ActivationEvent], elapsed_ms: u64) -> bool {
+        for req in &self.required_events {
+            if !fired.contains(req) {
+                return false;
+            }
+        }
+        for forbidden in &self.forbidden_events {
+            if fired.contains(forbidden) {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_delay_ms {
+            if elapsed_ms < min {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Number of required events.
+    pub fn required_count(&self) -> usize {
+        self.required_events.len()
+    }
+
+    /// Number of forbidden events.
+    pub fn forbidden_count(&self) -> usize {
+        self.forbidden_events.len()
+    }
+}
+
+impl Default for ActivationCondition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivationPerformanceTracker percentile extension
+// ---------------------------------------------------------------------------
+
+impl ActivationPerformanceTracker {
+    /// Compute the p-th percentile (0..=100) of activation durations.
+    /// Returns `None` if there are no finished records.
+    pub fn percentile_ms(&self, p: u8) -> Option<f64> {
+        let p = p.min(100);
+        let mut durations: Vec<u64> = self.records.iter().filter_map(|r| r.duration_ms()).collect();
+        if durations.is_empty() {
+            return None;
+        }
+        durations.sort_unstable();
+        let rank = (p as f64 / 100.0) * (durations.len() as f64 - 1.0);
+        let lower = rank.floor() as usize;
+        let upper = rank.ceil() as usize;
+        if lower == upper {
+            Some(durations[lower] as f64)
+        } else {
+            let frac = rank - lower as f64;
+            Some(durations[lower] as f64 * (1.0 - frac) + durations[upper] as f64 * frac)
+        }
+    }
+
+    /// Median activation time in milliseconds.
+    pub fn median_ms(&self) -> Option<f64> {
+        self.percentile_ms(50)
+    }
+
+    /// 95th percentile activation time.
+    pub fn p95_ms(&self) -> Option<f64> {
+        self.percentile_ms(95)
+    }
+
+    /// Return references to all records.
+    pub fn all_records(&self) -> &[ActivationPerformanceRecord] {
+        &self.records
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1315,5 +1542,116 @@ mod tests {
         assert_eq!(matched.len(), 2);
         assert_eq!(matched[0], &ActivationEvent::OnLanguage("rust".into()));
         assert_eq!(matched[1], &ActivationEvent::OnCommand("myCmd".into()));
+    }
+
+    #[test]
+    fn activation_policy_properties() {
+        let eager = ActivationPolicy::Eager;
+        assert!(eager.is_eager());
+        assert!(!eager.requires_trigger());
+        assert!(eager.trigger_event().is_none());
+
+        let lazy = ActivationPolicy::Lazy;
+        assert!(!lazy.is_eager());
+
+        let on_demand = ActivationPolicy::OnDemand(ActivationEvent::OnLanguage("rust".into()));
+        assert!(on_demand.requires_trigger());
+        assert_eq!(
+            on_demand.trigger_event(),
+            Some(&ActivationEvent::OnLanguage("rust".into()))
+        );
+
+        let manual = ActivationPolicy::Manual;
+        assert!(manual.requires_trigger());
+        assert!(manual.trigger_event().is_none());
+    }
+
+    #[test]
+    fn activation_policy_display() {
+        assert_eq!(ActivationPolicy::Eager.to_string(), "eager");
+        assert_eq!(ActivationPolicy::Lazy.to_string(), "lazy");
+        assert_eq!(ActivationPolicy::Manual.to_string(), "manual");
+    }
+
+    #[test]
+    fn priority_queue_ordering() {
+        let mut q = ActivationPriorityQueue::new();
+        q.enqueue(10, "ext-c", ActivationEvent::Star);
+        q.enqueue(1, "ext-a", ActivationEvent::OnDebug);
+        q.enqueue(5, "ext-b", ActivationEvent::OnStartupFinished);
+
+        assert_eq!(q.len(), 3);
+        assert!(!q.is_empty());
+
+        let (p, id, _) = q.dequeue().unwrap();
+        assert_eq!(p, 1);
+        assert_eq!(id, "ext-a");
+
+        let (p, id, _) = q.dequeue().unwrap();
+        assert_eq!(p, 5);
+        assert_eq!(id, "ext-b");
+    }
+
+    #[test]
+    fn priority_queue_remove_extension() {
+        let mut q = ActivationPriorityQueue::new();
+        q.enqueue(1, "ext-a", ActivationEvent::Star);
+        q.enqueue(2, "ext-b", ActivationEvent::OnDebug);
+        q.enqueue(3, "ext-a", ActivationEvent::OnStartupFinished);
+        assert_eq!(q.len(), 3);
+
+        q.remove_extension("ext-a");
+        assert_eq!(q.len(), 1);
+        assert_eq!(q.peek().unwrap().1, "ext-b");
+    }
+
+    #[test]
+    fn activation_condition_evaluation() {
+        let cond = ActivationCondition::new()
+            .require(ActivationEvent::OnLanguage("rust".into()))
+            .forbid(ActivationEvent::OnDebug)
+            .min_delay(100);
+
+        let fired = vec![ActivationEvent::OnLanguage("rust".into())];
+        assert!(!cond.is_satisfied(&fired, 50)); // too early
+        assert!(cond.is_satisfied(&fired, 100)); // ok
+
+        let fired_with_debug = vec![
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::OnDebug,
+        ];
+        assert!(!cond.is_satisfied(&fired_with_debug, 200)); // forbidden
+
+        assert_eq!(cond.required_count(), 1);
+        assert_eq!(cond.forbidden_count(), 1);
+    }
+
+    #[test]
+    fn activation_condition_empty_satisfied() {
+        let cond = ActivationCondition::new();
+        assert!(cond.is_satisfied(&[], 0));
+    }
+
+    #[test]
+    fn performance_tracker_percentiles() {
+        let mut tracker = ActivationPerformanceTracker::new();
+        for i in 0..10 {
+            let idx = tracker.start_activation(
+                &format!("ext-{i}"),
+                ActivationEvent::Star,
+                i * 100,
+            );
+            tracker.end_activation(idx, i * 100 + (i + 1) * 10);
+        }
+
+        let median = tracker.median_ms().unwrap();
+        assert!(median > 0.0);
+
+        let p95 = tracker.p95_ms().unwrap();
+        assert!(p95 >= median);
+
+        let p0 = tracker.percentile_ms(0).unwrap();
+        let p100 = tracker.percentile_ms(100).unwrap();
+        assert!(p0 <= p100);
     }
 }

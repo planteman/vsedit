@@ -782,6 +782,275 @@ pub fn layout_visible_widgets(
     }).collect()
 }
 
+// ---------------------------------------------------------------------------
+// WidgetTree – parent/child widget relationships
+// ---------------------------------------------------------------------------
+
+/// Node in a widget tree, tracking parent/child and z-order.
+#[derive(Debug, Clone)]
+pub struct WidgetNode {
+    pub id: String,
+    pub parent: Option<String>,
+    pub children: Vec<String>,
+    pub z_order: i32,
+    pub bounds: (u16, u16, u16, u16), // x, y, w, h
+    pub visible: bool,
+}
+
+impl WidgetNode {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            parent: None,
+            children: Vec::new(),
+            z_order: 0,
+            bounds: (0, 0, 0, 0),
+            visible: true,
+        }
+    }
+
+    pub fn with_bounds(mut self, x: u16, y: u16, w: u16, h: u16) -> Self {
+        self.bounds = (x, y, w, h);
+        self
+    }
+
+    pub fn with_z_order(mut self, z: i32) -> Self {
+        self.z_order = z;
+        self
+    }
+
+    pub fn rect(&self) -> Rect {
+        let (x, y, w, h) = self.bounds;
+        Rect::new(x, y, w, h)
+    }
+
+    /// Point-in-rect hit test.
+    pub fn contains_point(&self, px: u16, py: u16) -> bool {
+        let (x, y, w, h) = self.bounds;
+        px >= x && px < x.saturating_add(w) && py >= y && py < y.saturating_add(h)
+    }
+}
+
+impl fmt::Display for WidgetNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "WidgetNode({}, z={}, children={})",
+            self.id,
+            self.z_order,
+            self.children.len()
+        )
+    }
+}
+
+/// Tree of widgets supporting parent-child relationships, z-ordering, hit testing.
+#[derive(Debug, Clone)]
+pub struct WidgetTree {
+    nodes: std::collections::HashMap<String, WidgetNode>,
+    root_ids: Vec<String>,
+}
+
+impl WidgetTree {
+    pub fn new() -> Self {
+        Self {
+            nodes: std::collections::HashMap::new(),
+            root_ids: Vec::new(),
+        }
+    }
+
+    /// Add a root widget (no parent).
+    pub fn add_root(&mut self, node: WidgetNode) {
+        let id = node.id.clone();
+        self.nodes.insert(id.clone(), node);
+        if !self.root_ids.contains(&id) {
+            self.root_ids.push(id);
+        }
+    }
+
+    /// Add a child widget under a parent.
+    pub fn add_child(&mut self, parent_id: &str, mut node: WidgetNode) {
+        node.parent = Some(parent_id.to_string());
+        let child_id = node.id.clone();
+        self.nodes.insert(child_id.clone(), node);
+        if let Some(parent) = self.nodes.get_mut(parent_id) {
+            if !parent.children.contains(&child_id) {
+                parent.children.push(child_id);
+            }
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&WidgetNode> {
+        self.nodes.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut WidgetNode> {
+        self.nodes.get_mut(id)
+    }
+
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn root_ids(&self) -> &[String] {
+        &self.root_ids
+    }
+
+    /// Depth of a node (0 for roots).
+    pub fn depth(&self, id: &str) -> usize {
+        let mut d = 0;
+        let mut current = id.to_string();
+        while let Some(node) = self.nodes.get(&current) {
+            if let Some(ref p) = node.parent {
+                d += 1;
+                current = p.clone();
+            } else {
+                break;
+            }
+        }
+        d
+    }
+
+    /// All descendants of a node (breadth-first).
+    pub fn descendants(&self, id: &str) -> Vec<&str> {
+        let mut result = Vec::new();
+        let mut queue = std::collections::VecDeque::new();
+        if let Some(node) = self.nodes.get(id) {
+            for c in &node.children {
+                queue.push_back(c.as_str());
+            }
+        }
+        while let Some(current) = queue.pop_front() {
+            result.push(current);
+            if let Some(node) = self.nodes.get(current) {
+                for c in &node.children {
+                    queue.push_back(c.as_str());
+                }
+            }
+        }
+        result
+    }
+
+    // --- Z-ordering ---
+
+    /// Return all visible node ids sorted by z-order (ascending = back to front).
+    pub fn z_sorted(&self) -> Vec<&str> {
+        let mut entries: Vec<(&str, i32)> = self
+            .nodes
+            .values()
+            .filter(|n| n.visible)
+            .map(|n| (n.id.as_str(), n.z_order))
+            .collect();
+        entries.sort_by_key(|(_, z)| *z);
+        entries.into_iter().map(|(id, _)| id).collect()
+    }
+
+    /// Bring a widget to the front (max z + 1).
+    pub fn bring_to_front(&mut self, id: &str) {
+        let max_z = self.nodes.values().map(|n| n.z_order).max().unwrap_or(0);
+        if let Some(node) = self.nodes.get_mut(id) {
+            node.z_order = max_z + 1;
+        }
+    }
+
+    /// Send a widget to the back (min z - 1).
+    pub fn send_to_back(&mut self, id: &str) {
+        let min_z = self.nodes.values().map(|n| n.z_order).min().unwrap_or(0);
+        if let Some(node) = self.nodes.get_mut(id) {
+            node.z_order = min_z - 1;
+        }
+    }
+
+    // --- Hit testing ---
+
+    /// Find the front-most visible widget that contains the point.
+    pub fn hit_test(&self, px: u16, py: u16) -> Option<&str> {
+        let sorted = self.z_sorted();
+        // Reverse: front-most (highest z) first
+        sorted
+            .into_iter()
+            .rev()
+            .find(|id| {
+                self.nodes
+                    .get(*id)
+                    .map(|n| n.contains_point(px, py))
+                    .unwrap_or(false)
+            })
+    }
+
+    /// All visible widgets containing the point, back to front.
+    pub fn hit_test_all(&self, px: u16, py: u16) -> Vec<&str> {
+        self.z_sorted()
+            .into_iter()
+            .filter(|id| {
+                self.nodes
+                    .get(*id)
+                    .map(|n| n.contains_point(px, py))
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
+
+    // --- Serialization helpers ---
+
+    /// Serialize the tree structure to a flat list of (id, parent, z, bounds) tuples.
+    pub fn to_entries(&self) -> Vec<(String, Option<String>, i32, (u16, u16, u16, u16))> {
+        let mut entries: Vec<_> = self
+            .nodes
+            .values()
+            .map(|n| (n.id.clone(), n.parent.clone(), n.z_order, n.bounds))
+            .collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
+    }
+
+    /// Reconstruct a tree from entries produced by `to_entries`.
+    pub fn from_entries(entries: &[(String, Option<String>, i32, (u16, u16, u16, u16))]) -> Self {
+        let mut tree = Self::new();
+        // First pass: add all nodes
+        for (id, _, z, bounds) in entries {
+            let node = WidgetNode::new(id.clone())
+                .with_z_order(*z)
+                .with_bounds(bounds.0, bounds.1, bounds.2, bounds.3);
+            tree.nodes.insert(id.clone(), node);
+        }
+        // Second pass: set parent/child relationships
+        for (id, parent, _, _) in entries {
+            if let Some(p) = parent {
+                if let Some(node) = tree.nodes.get_mut(id.as_str()) {
+                    node.parent = Some(p.clone());
+                }
+                if let Some(parent_node) = tree.nodes.get_mut(p.as_str()) {
+                    if !parent_node.children.contains(id) {
+                        parent_node.children.push(id.clone());
+                    }
+                }
+            } else {
+                if !tree.root_ids.contains(id) {
+                    tree.root_ids.push(id.clone());
+                }
+            }
+        }
+        tree
+    }
+}
+
+impl Default for WidgetTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for WidgetTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "WidgetTree({} nodes, {} roots)",
+            self.nodes.len(),
+            self.root_ids.len()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1300,5 +1569,85 @@ mod tests {
         g.add("x");
         g.add("x");
         assert_eq!(g.len(), 1);
+    }
+
+    // --- New tests for WidgetTree, z-ordering, hit testing, serialization ---
+
+    #[test]
+    fn widget_tree_parent_child() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("root"));
+        tree.add_child("root", WidgetNode::new("child1"));
+        tree.add_child("root", WidgetNode::new("child2"));
+        assert_eq!(tree.node_count(), 3);
+        assert_eq!(tree.depth("root"), 0);
+        assert_eq!(tree.depth("child1"), 1);
+        let descendants = tree.descendants("root");
+        assert_eq!(descendants.len(), 2);
+    }
+
+    #[test]
+    fn widget_tree_z_ordering() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("a").with_z_order(1));
+        tree.add_root(WidgetNode::new("b").with_z_order(3));
+        tree.add_root(WidgetNode::new("c").with_z_order(2));
+        let sorted = tree.z_sorted();
+        assert_eq!(sorted, vec!["a", "c", "b"]);
+        tree.bring_to_front("a");
+        let sorted2 = tree.z_sorted();
+        assert_eq!(sorted2.last(), Some(&"a"));
+    }
+
+    #[test]
+    fn widget_tree_hit_test() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("bg").with_bounds(0, 0, 100, 100).with_z_order(0));
+        tree.add_root(WidgetNode::new("fg").with_bounds(10, 10, 20, 20).with_z_order(1));
+        // Point in fg area – should hit fg (front-most)
+        assert_eq!(tree.hit_test(15, 15), Some("fg"));
+        // Point outside fg but inside bg
+        assert_eq!(tree.hit_test(5, 5), Some("bg"));
+        // Point outside both
+        assert_eq!(tree.hit_test(200, 200), None);
+    }
+
+    #[test]
+    fn widget_tree_hit_test_all() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("bg").with_bounds(0, 0, 100, 100).with_z_order(0));
+        tree.add_root(WidgetNode::new("fg").with_bounds(0, 0, 50, 50).with_z_order(1));
+        let hits = tree.hit_test_all(10, 10);
+        assert_eq!(hits, vec!["bg", "fg"]);
+    }
+
+    #[test]
+    fn widget_tree_serialization_roundtrip() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("root").with_bounds(0, 0, 80, 24).with_z_order(0));
+        tree.add_child("root", WidgetNode::new("child").with_bounds(5, 5, 10, 10).with_z_order(1));
+        let entries = tree.to_entries();
+        let tree2 = WidgetTree::from_entries(&entries);
+        assert_eq!(tree2.node_count(), 2);
+        assert_eq!(tree2.depth("child"), 1);
+        assert_eq!(tree2.root_ids().len(), 1);
+    }
+
+    #[test]
+    fn widget_node_contains_point() {
+        let node = WidgetNode::new("test").with_bounds(10, 20, 30, 40);
+        assert!(node.contains_point(10, 20)); // top-left
+        assert!(node.contains_point(39, 59)); // bottom-right edge - 1
+        assert!(!node.contains_point(40, 60)); // outside
+        assert!(!node.contains_point(9, 20)); // left of bounds
+    }
+
+    #[test]
+    fn widget_tree_send_to_back() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("a").with_z_order(1));
+        tree.add_root(WidgetNode::new("b").with_z_order(2));
+        tree.send_to_back("b");
+        assert_eq!(tree.z_sorted().first(), Some(&"b"));
     }
 }

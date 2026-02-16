@@ -637,6 +637,227 @@ impl Default for ExtLmValidator {
     }
 }
 
+// ── Token Budget ──
+
+/// Tracks token consumption against a fixed budget.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenBudget {
+    limit: usize,
+    used: usize,
+}
+
+impl TokenBudget {
+    /// Create a new budget with the given token limit.
+    pub fn new(limit: usize) -> Self {
+        Self { limit, used: 0 }
+    }
+
+    /// Try to consume `amount` tokens. Returns `true` if within budget.
+    pub fn try_consume(&mut self, amount: usize) -> bool {
+        if self.used + amount > self.limit {
+            return false;
+        }
+        self.used += amount;
+        true
+    }
+
+    /// Remaining tokens available in this budget.
+    pub fn remaining(&self) -> usize {
+        self.limit.saturating_sub(self.used)
+    }
+
+    /// Fraction of budget consumed, in [0.0, 1.0].
+    pub fn utilization(&self) -> f64 {
+        if self.limit == 0 {
+            return 1.0;
+        }
+        self.used as f64 / self.limit as f64
+    }
+
+    /// Reset consumption to zero without changing the limit.
+    pub fn reset(&mut self) {
+        self.used = 0;
+    }
+
+    /// Whether the budget is fully exhausted.
+    pub fn is_exhausted(&self) -> bool {
+        self.used >= self.limit
+    }
+
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
+
+    pub fn used(&self) -> usize {
+        self.used
+    }
+}
+
+impl fmt::Display for TokenBudget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TokenBudget({}/{}, {:.1}%)",
+            self.used,
+            self.limit,
+            self.utilization() * 100.0
+        )
+    }
+}
+
+// ── Model Capability Matrix ──
+
+/// Describes the capabilities a language model supports.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct ModelCapabilities {
+    pub supports_system_messages: bool,
+    pub supports_streaming: bool,
+    pub supports_function_calling: bool,
+    pub supports_vision: bool,
+    pub max_output_tokens: u32,
+}
+
+/// Maps model ids to their capabilities.
+#[derive(Debug, Clone, Default)]
+pub struct ModelCapabilityMatrix {
+    entries: Vec<(String, ModelCapabilities)>,
+}
+
+impl ModelCapabilityMatrix {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register capabilities for a model id.
+    pub fn register(&mut self, model_id: impl Into<String>, caps: ModelCapabilities) {
+        let id = model_id.into();
+        if let Some(entry) = self.entries.iter_mut().find(|(k, _)| *k == id) {
+            entry.1 = caps;
+        } else {
+            self.entries.push((id, caps));
+        }
+    }
+
+    /// Look up capabilities for a model.
+    pub fn get(&self, model_id: &str) -> Option<&ModelCapabilities> {
+        self.entries.iter().find(|(k, _)| k == model_id).map(|(_, v)| v)
+    }
+
+    /// Find all models that support a given feature predicate.
+    pub fn find_supporting(&self, predicate: impl Fn(&ModelCapabilities) -> bool) -> Vec<&str> {
+        self.entries
+            .iter()
+            .filter(|(_, c)| predicate(c))
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+// ── Prompt Template ──
+
+/// A reusable prompt template with `{{placeholder}}` substitution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PromptTemplate {
+    template: String,
+}
+
+impl PromptTemplate {
+    pub fn new(template: impl Into<String>) -> Self {
+        Self {
+            template: template.into(),
+        }
+    }
+
+    /// Render the template, replacing `{{key}}` with the corresponding value.
+    pub fn render(&self, vars: &[(&str, &str)]) -> String {
+        let mut result = self.template.clone();
+        for (key, value) in vars {
+            let placeholder = format!("{{{{{}}}}}", key);
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Return the set of placeholder names found in the template.
+    pub fn placeholders(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        let bytes = self.template.as_bytes();
+        let mut i = 0;
+        while i + 1 < bytes.len() {
+            if bytes[i] == b'{' && bytes[i + 1] == b'{' {
+                if let Some(end) = self.template[i + 2..].find("}}") {
+                    let name = &self.template[i + 2..i + 2 + end];
+                    if !name.is_empty() && !names.iter().any(|n: &String| n == name) {
+                        names.push(name.to_string());
+                    }
+                    i += 4 + end;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        names
+    }
+
+    /// Check that all placeholders in the template are provided.
+    pub fn validate_vars(&self, vars: &[(&str, &str)]) -> Result<(), Vec<String>> {
+        let required = self.placeholders();
+        let provided: Vec<&str> = vars.iter().map(|(k, _)| *k).collect();
+        let missing: Vec<String> = required
+            .into_iter()
+            .filter(|r| !provided.contains(&r.as_str()))
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(missing)
+        }
+    }
+}
+
+// ── Response Parser ──
+
+/// Utilities for extracting structured data from model responses.
+pub struct ResponseParser;
+
+impl ResponseParser {
+    /// Extract the first fenced code block from a response string.
+    pub fn extract_code_block(text: &str) -> Option<&str> {
+        let start_marker = "```";
+        let start = text.find(start_marker)?;
+        let after_start = start + start_marker.len();
+        // Skip optional language tag on the same line.
+        let content_start = text[after_start..].find('\n')? + after_start + 1;
+        let end = text[content_start..].find(start_marker)?;
+        let block = &text[content_start..content_start + end];
+        Some(block.trim_end_matches('\n'))
+    }
+
+    /// Extract all lines that start with `- ` as a bullet list.
+    pub fn extract_bullet_list(text: &str) -> Vec<&str> {
+        text.lines()
+            .filter_map(|line| {
+                let trimmed = line.trim_start();
+                trimmed.strip_prefix("- ")
+            })
+            .collect()
+    }
+
+    /// Count the number of sentences (heuristic: split on `. `, `! `, `? `).
+    pub fn sentence_count(text: &str) -> usize {
+        if text.trim().is_empty() {
+            return 0;
+        }
+        text.split(|c: char| c == '.' || c == '!' || c == '?')
+            .filter(|s| !s.trim().is_empty())
+            .count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1282,5 +1503,123 @@ mod tests {
         assert!(reg.unregister("x"));
         assert_eq!(reg.count(), 0);
         assert!(!reg.unregister("x"));
+    }
+
+    // ── Token Budget Tests ──
+
+    #[test]
+    fn token_budget_consume_and_remaining() {
+        let mut budget = TokenBudget::new(100);
+        assert_eq!(budget.remaining(), 100);
+        assert!(budget.try_consume(30));
+        assert_eq!(budget.remaining(), 70);
+        assert_eq!(budget.used(), 30);
+        assert!(!budget.is_exhausted());
+        // Cannot exceed limit
+        assert!(!budget.try_consume(71));
+        assert_eq!(budget.remaining(), 70);
+    }
+
+    #[test]
+    fn token_budget_utilization_and_display() {
+        let mut budget = TokenBudget::new(200);
+        budget.try_consume(100);
+        assert!((budget.utilization() - 0.5).abs() < f64::EPSILON);
+        let display = format!("{budget}");
+        assert!(display.contains("100/200"));
+    }
+
+    #[test]
+    fn token_budget_exhaustion_and_reset() {
+        let mut budget = TokenBudget::new(10);
+        budget.try_consume(10);
+        assert!(budget.is_exhausted());
+        assert!(!budget.try_consume(1));
+        budget.reset();
+        assert_eq!(budget.used(), 0);
+        assert!(!budget.is_exhausted());
+    }
+
+    // ── Model Capability Matrix Tests ──
+
+    #[test]
+    fn capability_matrix_register_and_query() {
+        let mut matrix = ModelCapabilityMatrix::new();
+        matrix.register("gpt-4", ModelCapabilities {
+            supports_system_messages: true,
+            supports_streaming: true,
+            supports_function_calling: true,
+            supports_vision: true,
+            max_output_tokens: 8192,
+        });
+        matrix.register("llama-2", ModelCapabilities {
+            supports_system_messages: true,
+            supports_streaming: false,
+            supports_function_calling: false,
+            supports_vision: false,
+            max_output_tokens: 4096,
+        });
+        assert_eq!(matrix.count(), 2);
+        let caps = matrix.get("gpt-4").unwrap();
+        assert!(caps.supports_vision);
+        let streamers = matrix.find_supporting(|c| c.supports_streaming);
+        assert_eq!(streamers, vec!["gpt-4"]);
+    }
+
+    #[test]
+    fn capability_matrix_overwrite() {
+        let mut matrix = ModelCapabilityMatrix::new();
+        matrix.register("m1", ModelCapabilities {
+            supports_vision: false,
+            ..Default::default()
+        });
+        matrix.register("m1", ModelCapabilities {
+            supports_vision: true,
+            ..Default::default()
+        });
+        assert_eq!(matrix.count(), 1);
+        assert!(matrix.get("m1").unwrap().supports_vision);
+    }
+
+    // ── Prompt Template Tests ──
+
+    #[test]
+    fn prompt_template_render_and_placeholders() {
+        let tpl = PromptTemplate::new("Hello {{name}}, you are a {{role}}.");
+        let placeholders = tpl.placeholders();
+        assert_eq!(placeholders, vec!["name", "role"]);
+        let rendered = tpl.render(&[("name", "Alice"), ("role", "developer")]);
+        assert_eq!(rendered, "Hello Alice, you are a developer.");
+    }
+
+    #[test]
+    fn prompt_template_validate_vars() {
+        let tpl = PromptTemplate::new("{{a}} and {{b}}");
+        assert!(tpl.validate_vars(&[("a", "1"), ("b", "2")]).is_ok());
+        let missing = tpl.validate_vars(&[("a", "1")]).unwrap_err();
+        assert_eq!(missing, vec!["b"]);
+    }
+
+    // ── Response Parser Tests ──
+
+    #[test]
+    fn response_parser_extract_code_block() {
+        let text = "Here is code:\n```rust\nfn main() {}\n```\nDone.";
+        let block = ResponseParser::extract_code_block(text).unwrap();
+        assert_eq!(block, "fn main() {}");
+    }
+
+    #[test]
+    fn response_parser_bullet_list() {
+        let text = "Items:\n- apple\n- banana\n  - cherry\nnot a bullet";
+        let items = ResponseParser::extract_bullet_list(text);
+        assert_eq!(items, vec!["apple", "banana", "cherry"]);
+    }
+
+    #[test]
+    fn response_parser_sentence_count() {
+        assert_eq!(ResponseParser::sentence_count("Hello. World! How?"), 3);
+        assert_eq!(ResponseParser::sentence_count(""), 0);
+        assert_eq!(ResponseParser::sentence_count("No punctuation here"), 1);
     }
 }

@@ -693,6 +693,221 @@ impl Default for OutputViewTailState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OutputRateLimiter — throttle log output to prevent flooding
+// ---------------------------------------------------------------------------
+
+/// Tracks message counts within a time window to enforce rate limits.
+pub struct OutputRateLimiter {
+    /// Maximum number of messages allowed within the window.
+    pub max_messages: usize,
+    /// Window duration in milliseconds.
+    pub window_ms: u64,
+    /// Timestamps (in ms) of messages accepted within the current window.
+    timestamps: Vec<u64>,
+    /// Number of messages that were dropped due to rate limiting.
+    pub dropped_count: u64,
+}
+
+impl OutputRateLimiter {
+    pub fn new(max_messages: usize, window_ms: u64) -> Self {
+        Self {
+            max_messages,
+            window_ms,
+            timestamps: Vec::new(),
+            dropped_count: 0,
+        }
+    }
+
+    /// Prune timestamps that fall outside the current window.
+    fn prune(&mut self, now_ms: u64) {
+        let cutoff = now_ms.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&ts| ts >= cutoff);
+    }
+
+    /// Try to accept a message at the given timestamp. Returns `true` if
+    /// the message is allowed, `false` if it was rate-limited.
+    pub fn try_accept(&mut self, now_ms: u64) -> bool {
+        self.prune(now_ms);
+        if self.timestamps.len() >= self.max_messages {
+            self.dropped_count += 1;
+            false
+        } else {
+            self.timestamps.push(now_ms);
+            true
+        }
+    }
+
+    /// Number of messages accepted in the current window.
+    pub fn current_count(&self) -> usize {
+        self.timestamps.len()
+    }
+
+    /// Remaining capacity in the current window (without pruning).
+    pub fn remaining(&self) -> usize {
+        self.max_messages.saturating_sub(self.timestamps.len())
+    }
+
+    /// Reset the limiter, clearing all state.
+    pub fn reset(&mut self) {
+        self.timestamps.clear();
+        self.dropped_count = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputFormatter — configurable line formatting
+// ---------------------------------------------------------------------------
+
+/// Controls how output lines are formatted before display.
+#[derive(Debug, Clone)]
+pub struct OutputFormatter {
+    /// Whether to prepend a line number to each line.
+    pub show_line_numbers: bool,
+    /// Whether to prepend a timestamp to each line.
+    pub show_timestamps: bool,
+    /// Optional prefix string added before every line.
+    pub prefix: Option<String>,
+    /// Maximum line length; longer lines are truncated with an ellipsis.
+    pub max_line_length: Option<usize>,
+}
+
+impl OutputFormatter {
+    pub fn new() -> Self {
+        Self {
+            show_line_numbers: false,
+            show_timestamps: false,
+            prefix: None,
+            max_line_length: None,
+        }
+    }
+
+    pub fn with_line_numbers(mut self) -> Self {
+        self.show_line_numbers = true;
+        self
+    }
+
+    pub fn with_timestamps(mut self) -> Self {
+        self.show_timestamps = true;
+        self
+    }
+
+    pub fn with_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = Some(prefix.into());
+        self
+    }
+
+    pub fn with_max_line_length(mut self, max: usize) -> Self {
+        self.max_line_length = Some(max);
+        self
+    }
+
+    /// Format a single line, given its zero-based index and an optional
+    /// timestamp value.
+    pub fn format_line(&self, index: usize, timestamp_ms: Option<u64>, line: &str) -> String {
+        let mut parts = Vec::new();
+        if self.show_line_numbers {
+            parts.push(format!("{:>5}", index + 1));
+        }
+        if self.show_timestamps {
+            if let Some(ts) = timestamp_ms {
+                parts.push(format!("[{ts}]"));
+            }
+        }
+        if let Some(ref pfx) = self.prefix {
+            parts.push(pfx.clone());
+        }
+        parts.push(line.to_string());
+        let mut result = parts.join(" ");
+        if let Some(max) = self.max_line_length {
+            if result.len() > max {
+                result.truncate(max.saturating_sub(3));
+                result.push_str("...");
+            }
+        }
+        result
+    }
+
+    /// Format all lines in a channel, returning the formatted output.
+    pub fn format_channel(&self, channel: &OutputChannel) -> Vec<String> {
+        channel
+            .lines
+            .iter()
+            .enumerate()
+            .map(|(i, line)| self.format_line(i, None, line))
+            .collect()
+    }
+}
+
+impl Default for OutputFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputExporter — export channel content in various formats
+// ---------------------------------------------------------------------------
+
+/// Supported export formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    PlainText,
+    Json,
+    Csv,
+}
+
+/// Exports output channel content to different string formats.
+pub struct OutputExporter;
+
+impl OutputExporter {
+    /// Export a channel's content in the specified format.
+    pub fn export(channel: &OutputChannel, format: ExportFormat) -> String {
+        match format {
+            ExportFormat::PlainText => channel.get_content(),
+            ExportFormat::Json => Self::to_json(channel),
+            ExportFormat::Csv => Self::to_csv(channel),
+        }
+    }
+
+    fn to_json(channel: &OutputChannel) -> String {
+        let mut out = String::from("{\n");
+        out.push_str(&format!("  \"channel\": \"{}\",\n", channel.name));
+        out.push_str(&format!("  \"id\": \"{}\",\n", channel.id));
+        out.push_str("  \"lines\": [\n");
+        for (i, line) in channel.lines.iter().enumerate() {
+            let escaped = line.replace('\\', "\\\\").replace('"', "\\\"");
+            if i + 1 < channel.lines.len() {
+                out.push_str(&format!("    \"{escaped}\",\n"));
+            } else {
+                out.push_str(&format!("    \"{escaped}\"\n"));
+            }
+        }
+        out.push_str("  ]\n}");
+        out
+    }
+
+    fn to_csv(channel: &OutputChannel) -> String {
+        let mut out = String::from("line_number,content\n");
+        for (i, line) in channel.lines.iter().enumerate() {
+            let escaped = line.replace('"', "\"\"");
+            out.push_str(&format!("{},\"{escaped}\"\n", i + 1));
+        }
+        out
+    }
+
+    /// Export all channels in a service as plain text, separated by headers.
+    pub fn export_service(service: &OutputService, format: ExportFormat) -> String {
+        let mut parts = Vec::new();
+        for ch in &service.channels {
+            let header = format!("=== {} ({}) ===", ch.name, ch.id);
+            let body = Self::export(ch, format);
+            parts.push(format!("{header}\n{body}"));
+        }
+        parts.join("\n\n")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1269,5 +1484,127 @@ mod tests {
         assert_eq!(ts.new_lines_count(15), 5);
         assert_eq!(ts.new_lines_count(10), 0);
         assert_eq!(ts.new_lines_count(5), 0);
+    }
+
+    // -- OutputRateLimiter tests --
+
+    #[test]
+    fn rate_limiter_accepts_within_limit() {
+        let mut rl = OutputRateLimiter::new(3, 1000);
+        assert!(rl.try_accept(100));
+        assert!(rl.try_accept(200));
+        assert!(rl.try_accept(300));
+        assert!(!rl.try_accept(400)); // 4th message within window → rejected
+        assert_eq!(rl.dropped_count, 1);
+        assert_eq!(rl.current_count(), 3);
+        assert_eq!(rl.remaining(), 0);
+    }
+
+    #[test]
+    fn rate_limiter_window_expiry() {
+        let mut rl = OutputRateLimiter::new(2, 100);
+        assert!(rl.try_accept(10));
+        assert!(rl.try_accept(20));
+        assert!(!rl.try_accept(30)); // full
+        // After the window expires, old timestamps are pruned
+        assert!(rl.try_accept(200)); // 200 - 100 = 100 cutoff; 10 and 20 pruned
+        assert_eq!(rl.current_count(), 1);
+    }
+
+    #[test]
+    fn rate_limiter_reset() {
+        let mut rl = OutputRateLimiter::new(2, 1000);
+        rl.try_accept(10);
+        rl.try_accept(20);
+        rl.try_accept(30); // dropped
+        assert_eq!(rl.dropped_count, 1);
+        rl.reset();
+        assert_eq!(rl.dropped_count, 0);
+        assert_eq!(rl.current_count(), 0);
+        assert_eq!(rl.remaining(), 2);
+    }
+
+    // -- OutputFormatter tests --
+
+    #[test]
+    fn formatter_plain() {
+        let fmt = OutputFormatter::new();
+        let result = fmt.format_line(0, None, "hello");
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn formatter_with_line_numbers_and_prefix() {
+        let fmt = OutputFormatter::new().with_line_numbers().with_prefix("|");
+        let result = fmt.format_line(0, None, "hello");
+        assert_eq!(result, "    1 | hello");
+    }
+
+    #[test]
+    fn formatter_truncation() {
+        let fmt = OutputFormatter::new().with_max_line_length(10);
+        let result = fmt.format_line(0, None, "this is a very long line");
+        assert_eq!(result.len(), 10);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn formatter_with_timestamps() {
+        let fmt = OutputFormatter::new().with_timestamps();
+        let result = fmt.format_line(0, Some(42), "msg");
+        assert_eq!(result, "[42] msg");
+    }
+
+    #[test]
+    fn formatter_format_channel() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("alpha");
+        ch.append_line("beta");
+        let fmt = OutputFormatter::new().with_line_numbers();
+        let lines = fmt.format_channel(&ch);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("1"));
+        assert!(lines[1].contains("2"));
+    }
+
+    // -- OutputExporter tests --
+
+    #[test]
+    fn exporter_plain_text() {
+        let mut ch = OutputChannel::new("ch1", "Build");
+        ch.append_line("line one");
+        ch.append_line("line two");
+        let exported = OutputExporter::export(&ch, ExportFormat::PlainText);
+        assert_eq!(exported, "line one\nline two");
+    }
+
+    #[test]
+    fn exporter_json() {
+        let mut ch = OutputChannel::new("ch1", "Build");
+        ch.append_line("hello");
+        let json = OutputExporter::export(&ch, ExportFormat::Json);
+        assert!(json.contains("\"channel\": \"Build\""));
+        assert!(json.contains("\"hello\""));
+    }
+
+    #[test]
+    fn exporter_csv() {
+        let mut ch = OutputChannel::new("ch1", "Build");
+        ch.append_line("hello");
+        ch.append_line("world");
+        let csv = OutputExporter::export(&ch, ExportFormat::Csv);
+        assert!(csv.starts_with("line_number,content\n"));
+        assert!(csv.contains("1,\"hello\""));
+        assert!(csv.contains("2,\"world\""));
+    }
+
+    #[test]
+    fn exporter_service() {
+        let mut svc = OutputService::new();
+        svc.create_channel("Build");
+        svc.get_channel_mut("channel-0").unwrap().append_line("ok");
+        let exported = OutputExporter::export_service(&svc, ExportFormat::PlainText);
+        assert!(exported.contains("=== Build (channel-0) ==="));
+        assert!(exported.contains("ok"));
     }
 }

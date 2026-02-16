@@ -734,6 +734,269 @@ impl fmt::Display for InlineChatAction {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatHistory — full conversation tracking
+// ---------------------------------------------------------------------------
+
+/// Role in a chat conversation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChatRole {
+    User,
+    Assistant,
+    System,
+}
+
+impl fmt::Display for ChatRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::User => write!(f, "user"),
+            Self::Assistant => write!(f, "assistant"),
+            Self::System => write!(f, "system"),
+        }
+    }
+}
+
+/// A single message in a chat conversation.
+#[derive(Debug, Clone)]
+pub struct ChatMessage {
+    pub role: ChatRole,
+    pub content: String,
+    pub timestamp_ms: u64,
+}
+
+impl ChatMessage {
+    /// Create a new chat message.
+    pub fn new(role: ChatRole, content: impl Into<String>, timestamp_ms: u64) -> Self {
+        Self {
+            role,
+            content: content.into(),
+            timestamp_ms,
+        }
+    }
+
+    /// Word count of the message content.
+    pub fn word_count(&self) -> usize {
+        self.content.split_whitespace().count()
+    }
+
+    /// Character count of the message content.
+    pub fn char_count(&self) -> usize {
+        self.content.len()
+    }
+}
+
+/// Tracks a full chat conversation with multiple turns.
+#[derive(Debug, Clone)]
+pub struct ChatHistory {
+    messages: Vec<ChatMessage>,
+    max_messages: Option<usize>,
+}
+
+impl ChatHistory {
+    /// Create a new empty chat history with no limit.
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+            max_messages: None,
+        }
+    }
+
+    /// Create a chat history with a maximum number of messages.
+    pub fn with_max(max: usize) -> Self {
+        Self {
+            messages: Vec::new(),
+            max_messages: Some(max),
+        }
+    }
+
+    /// Add a message to the history.
+    pub fn push(&mut self, msg: ChatMessage) {
+        self.messages.push(msg);
+        if let Some(max) = self.max_messages {
+            while self.messages.len() > max {
+                self.messages.remove(0);
+            }
+        }
+    }
+
+    /// Number of messages.
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+
+    /// Get all messages.
+    pub fn messages(&self) -> &[ChatMessage] {
+        &self.messages
+    }
+
+    /// Get messages by role.
+    pub fn messages_by_role(&self, role: &ChatRole) -> Vec<&ChatMessage> {
+        self.messages.iter().filter(|m| &m.role == role).collect()
+    }
+
+    /// Get the last message.
+    pub fn last(&self) -> Option<&ChatMessage> {
+        self.messages.last()
+    }
+
+    /// Total word count across all messages.
+    pub fn total_word_count(&self) -> usize {
+        self.messages.iter().map(|m| m.word_count()).sum()
+    }
+
+    /// Clear the history.
+    pub fn clear(&mut self) {
+        self.messages.clear();
+    }
+
+    /// Number of conversation turns (user+assistant pairs).
+    pub fn turn_count(&self) -> usize {
+        self.messages
+            .iter()
+            .filter(|m| m.role == ChatRole::User)
+            .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatMessageFormatter — format messages for display
+// ---------------------------------------------------------------------------
+
+/// Formats chat messages for terminal display.
+#[derive(Debug, Clone)]
+pub struct ChatMessageFormatter {
+    /// Maximum width in characters for wrapping.
+    pub max_width: usize,
+    /// Whether to show timestamps.
+    pub show_timestamps: bool,
+}
+
+impl ChatMessageFormatter {
+    /// Create a new formatter with defaults.
+    pub fn new(max_width: usize) -> Self {
+        Self {
+            max_width,
+            show_timestamps: false,
+        }
+    }
+
+    /// Format a single message for display.
+    pub fn format(&self, msg: &ChatMessage) -> String {
+        let role_prefix = match msg.role {
+            ChatRole::User => "You",
+            ChatRole::Assistant => "AI",
+            ChatRole::System => "System",
+        };
+        let mut out = String::new();
+        if self.show_timestamps {
+            out.push_str(&format!("[{}ms] ", msg.timestamp_ms));
+        }
+        out.push_str(&format!("{}: ", role_prefix));
+
+        // Word-wrap the content
+        let mut line_len = out.len();
+        for word in msg.content.split_whitespace() {
+            if line_len + word.len() + 1 > self.max_width && line_len > 0 {
+                out.push('\n');
+                line_len = 0;
+            }
+            if line_len > 0 {
+                out.push(' ');
+                line_len += 1;
+            }
+            out.push_str(word);
+            line_len += word.len();
+        }
+        out
+    }
+
+    /// Format a full history for display.
+    pub fn format_history(&self, history: &ChatHistory) -> String {
+        history
+            .messages()
+            .iter()
+            .map(|m| self.format(m))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StreamSimulator — simulate streaming responses in chunks
+// ---------------------------------------------------------------------------
+
+/// Simulates a streaming chat response broken into chunks.
+#[derive(Debug, Clone)]
+pub struct StreamSimulator {
+    full_text: String,
+    chunk_size: usize,
+    position: usize,
+}
+
+impl StreamSimulator {
+    /// Create a new stream simulator.
+    pub fn new(text: impl Into<String>, chunk_size: usize) -> Self {
+        Self {
+            full_text: text.into(),
+            chunk_size: chunk_size.max(1),
+            position: 0,
+        }
+    }
+
+    /// Get the next chunk of the stream, or `None` if finished.
+    pub fn next_chunk(&mut self) -> Option<&str> {
+        if self.position >= self.full_text.len() {
+            return None;
+        }
+        let end = (self.position + self.chunk_size).min(self.full_text.len());
+        let chunk = &self.full_text[self.position..end];
+        self.position = end;
+        Some(chunk)
+    }
+
+    /// Whether the stream is finished.
+    pub fn is_done(&self) -> bool {
+        self.position >= self.full_text.len()
+    }
+
+    /// Reset the stream to the beginning.
+    pub fn reset(&mut self) {
+        self.position = 0;
+    }
+
+    /// How much of the text has been consumed (0.0 to 1.0).
+    pub fn progress(&self) -> f64 {
+        if self.full_text.is_empty() {
+            return 1.0;
+        }
+        self.position as f64 / self.full_text.len() as f64
+    }
+
+    /// Collect all remaining chunks into a string.
+    pub fn collect_remaining(&mut self) -> String {
+        let mut out = String::new();
+        while let Some(chunk) = self.next_chunk() {
+            out.push_str(chunk);
+        }
+        out
+    }
+
+    /// Total length of the full text.
+    pub fn total_len(&self) -> usize {
+        self.full_text.len()
+    }
+
+    /// Number of bytes consumed so far.
+    pub fn consumed(&self) -> usize {
+        self.position
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1307,5 +1570,72 @@ mod tests {
         assert!(!InlineChatAction::AcceptPartial { hunk_index: 0 }
             .description()
             .is_empty());
+    }
+
+    // -- ChatHistory tests ---------------------------------------------------
+
+    #[test]
+    fn chat_history_push_and_query() {
+        let mut history = ChatHistory::new();
+        history.push(ChatMessage::new(ChatRole::User, "hello", 100));
+        history.push(ChatMessage::new(ChatRole::Assistant, "hi there", 200));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.turn_count(), 1);
+        assert_eq!(history.messages_by_role(&ChatRole::User).len(), 1);
+        assert_eq!(history.last().unwrap().role, ChatRole::Assistant);
+    }
+
+    #[test]
+    fn chat_history_with_max_evicts_old() {
+        let mut history = ChatHistory::with_max(2);
+        history.push(ChatMessage::new(ChatRole::User, "a", 1));
+        history.push(ChatMessage::new(ChatRole::User, "b", 2));
+        history.push(ChatMessage::new(ChatRole::User, "c", 3));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.messages()[0].content, "b");
+    }
+
+    // -- ChatMessageFormatter tests ------------------------------------------
+
+    #[test]
+    fn formatter_formats_message() {
+        let formatter = ChatMessageFormatter::new(80);
+        let msg = ChatMessage::new(ChatRole::User, "hello world", 0);
+        let formatted = formatter.format(&msg);
+        assert!(formatted.contains("You:"));
+        assert!(formatted.contains("hello"));
+    }
+
+    #[test]
+    fn formatter_with_timestamps() {
+        let mut formatter = ChatMessageFormatter::new(80);
+        formatter.show_timestamps = true;
+        let msg = ChatMessage::new(ChatRole::System, "init", 42);
+        let formatted = formatter.format(&msg);
+        assert!(formatted.contains("[42ms]"));
+        assert!(formatted.contains("System:"));
+    }
+
+    // -- StreamSimulator tests -----------------------------------------------
+
+    #[test]
+    fn stream_chunks_and_progress() {
+        let mut stream = StreamSimulator::new("hello world", 5);
+        assert_eq!(stream.next_chunk(), Some("hello"));
+        assert!(!stream.is_done());
+        assert!((stream.progress() - 5.0 / 11.0).abs() < 0.01);
+        assert_eq!(stream.next_chunk(), Some(" worl"));
+        assert_eq!(stream.next_chunk(), Some("d"));
+        assert!(stream.is_done());
+        assert_eq!(stream.next_chunk(), None);
+    }
+
+    #[test]
+    fn stream_collect_remaining() {
+        let mut stream = StreamSimulator::new("abcdef", 2);
+        let _ = stream.next_chunk(); // consume "ab"
+        let rest = stream.collect_remaining();
+        assert_eq!(rest, "cdef");
+        assert!(stream.is_done());
     }
 }

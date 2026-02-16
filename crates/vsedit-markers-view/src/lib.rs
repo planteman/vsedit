@@ -679,6 +679,182 @@ impl std::fmt::Display for MarkerStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MarkerQuickFix — quick fix suggestions for markers
+// ---------------------------------------------------------------------------
+
+/// A suggested fix for a diagnostic marker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerQuickFix {
+    /// Human-readable title of the fix (shown in UI).
+    pub title: String,
+    /// The URI of the file to edit.
+    pub uri: String,
+    /// Line where the fix should be applied.
+    pub line: u32,
+    /// Column where the fix should be applied.
+    pub col: u32,
+    /// Text to insert or replace.
+    pub new_text: String,
+    /// Whether the fix is "preferred" (auto-applicable).
+    pub is_preferred: bool,
+}
+
+impl MarkerQuickFix {
+    pub fn new(title: impl Into<String>, uri: impl Into<String>, line: u32, col: u32, new_text: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            uri: uri.into(),
+            line,
+            col,
+            new_text: new_text.into(),
+            is_preferred: false,
+        }
+    }
+
+    pub fn preferred(mut self) -> Self {
+        self.is_preferred = true;
+        self
+    }
+}
+
+impl std::fmt::Display for MarkerQuickFix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({}:{}:{})", self.title, self.uri, self.line, self.col)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerTrend — track marker trends over time
+// ---------------------------------------------------------------------------
+
+/// A snapshot of marker counts at a point in time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerSnapshot {
+    pub errors: usize,
+    pub warnings: usize,
+    pub total: usize,
+    pub timestamp_ms: u64,
+}
+
+/// Tracks marker count trends over successive snapshots.
+#[derive(Debug, Clone, Default)]
+pub struct MarkerTrend {
+    snapshots: Vec<MarkerSnapshot>,
+}
+
+impl MarkerTrend {
+    pub fn new() -> Self {
+        Self { snapshots: Vec::new() }
+    }
+
+    /// Record a snapshot from the current service state.
+    pub fn record(&mut self, service: &MarkersService, timestamp_ms: u64) {
+        let stats = service.get_stats();
+        self.snapshots.push(MarkerSnapshot {
+            errors: stats.errors,
+            warnings: stats.warnings,
+            total: stats.errors + stats.warnings + stats.infos + stats.hints,
+            timestamp_ms,
+        });
+    }
+
+    /// Return all recorded snapshots.
+    pub fn snapshots(&self) -> &[MarkerSnapshot] {
+        &self.snapshots
+    }
+
+    /// Return the change in total markers between the last two snapshots.
+    /// Positive means markers increased, negative means decreased.
+    pub fn total_delta(&self) -> i64 {
+        if self.snapshots.len() < 2 {
+            return 0;
+        }
+        let last = &self.snapshots[self.snapshots.len() - 1];
+        let prev = &self.snapshots[self.snapshots.len() - 2];
+        last.total as i64 - prev.total as i64
+    }
+
+    /// Return the change in error count between the last two snapshots.
+    pub fn error_delta(&self) -> i64 {
+        if self.snapshots.len() < 2 {
+            return 0;
+        }
+        let last = &self.snapshots[self.snapshots.len() - 1];
+        let prev = &self.snapshots[self.snapshots.len() - 2];
+        last.errors as i64 - prev.errors as i64
+    }
+
+    /// Return `true` if errors are trending downward over the last N snapshots.
+    pub fn errors_improving(&self, window: usize) -> bool {
+        if self.snapshots.len() < 2 || window < 2 {
+            return false;
+        }
+        let start = self.snapshots.len().saturating_sub(window);
+        let slice = &self.snapshots[start..];
+        slice.windows(2).all(|w| w[1].errors <= w[0].errors)
+    }
+
+    pub fn snapshot_count(&self) -> usize {
+        self.snapshots.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerDeduplicator — deduplicate similar markers
+// ---------------------------------------------------------------------------
+
+/// Deduplicates markers that have the same URI, message, and severity.
+pub struct MarkerDeduplicator;
+
+impl MarkerDeduplicator {
+    /// Remove duplicate markers from a slice, returning only unique ones.
+    /// Two markers are considered duplicates if they share the same URI,
+    /// severity, message, start_line, and start_col.
+    pub fn deduplicate(markers: &[Marker]) -> Vec<&Marker> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for m in markers {
+            let key = (&m.uri, &m.message, m.severity, m.start_line, m.start_col);
+            if seen.insert(key) {
+                result.push(m);
+            }
+        }
+        result
+    }
+
+    /// Count the number of duplicates that would be removed.
+    pub fn duplicate_count(markers: &[Marker]) -> usize {
+        markers.len() - Self::deduplicate(markers).len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk operations on MarkersService
+// ---------------------------------------------------------------------------
+
+impl MarkersService {
+    /// Replace all markers for a given URI atomically.
+    pub fn set_markers_for(&mut self, uri: &str, new_markers: Vec<Marker>) {
+        self.remove_markers_for(uri);
+        for m in new_markers {
+            self.markers.push(m);
+        }
+    }
+
+    /// Remove all markers matching a filter, returning how many were removed.
+    pub fn remove_matching(&mut self, filter: &MarkerFilter) -> usize {
+        let before = self.markers.len();
+        self.markers.retain(|m| !filter.matches(m));
+        before - self.markers.len()
+    }
+
+    /// Return a deduplicated view of all markers.
+    pub fn deduplicated(&self) -> Vec<&Marker> {
+        MarkerDeduplicator::deduplicate(&self.markers)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1339,5 +1515,102 @@ mod tests {
 
         let empty = MarkerStats { errors: 0, warnings: 0, infos: 0, hints: 0 };
         assert_eq!(format!("{}", empty), "0 errors, 0 warnings, 0 info, 0 hints");
+    }
+
+    // -- MarkerQuickFix tests -----------------------------------------------
+
+    #[test]
+    fn quick_fix_creation_and_display() {
+        let fix = MarkerQuickFix::new("Add import", "file:///main.rs", 1, 0, "use std::io;");
+        assert_eq!(fix.title, "Add import");
+        assert!(!fix.is_preferred);
+        let display = format!("{fix}");
+        assert!(display.contains("Add import"));
+        assert!(display.contains("main.rs"));
+    }
+
+    #[test]
+    fn quick_fix_preferred() {
+        let fix = MarkerQuickFix::new("Fix typo", "a.rs", 5, 3, "correct")
+            .preferred();
+        assert!(fix.is_preferred);
+    }
+
+    // -- MarkerTrend tests --------------------------------------------------
+
+    #[test]
+    fn trend_records_snapshots_and_deltas() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "w1"));
+
+        let mut trend = MarkerTrend::new();
+        trend.record(&svc, 100);
+        assert_eq!(trend.snapshot_count(), 1);
+        assert_eq!(trend.total_delta(), 0); // only one snapshot
+
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Error, "e2"));
+        trend.record(&svc, 200);
+        assert_eq!(trend.total_delta(), 1); // 3 - 2
+        assert_eq!(trend.error_delta(), 1); // 2 - 1
+    }
+
+    #[test]
+    fn trend_errors_improving() {
+        let mut trend = MarkerTrend::new();
+        trend.snapshots.push(MarkerSnapshot { errors: 5, warnings: 0, total: 5, timestamp_ms: 0 });
+        trend.snapshots.push(MarkerSnapshot { errors: 3, warnings: 0, total: 3, timestamp_ms: 100 });
+        trend.snapshots.push(MarkerSnapshot { errors: 1, warnings: 0, total: 1, timestamp_ms: 200 });
+        assert!(trend.errors_improving(3));
+
+        trend.snapshots.push(MarkerSnapshot { errors: 4, warnings: 0, total: 4, timestamp_ms: 300 });
+        assert!(!trend.errors_improving(3));
+    }
+
+    // -- MarkerDeduplicator tests -------------------------------------------
+
+    #[test]
+    fn deduplicator_removes_exact_duplicates() {
+        let m1 = make_marker("a.rs", MarkerSeverity::Error, "err");
+        let m2 = make_marker("a.rs", MarkerSeverity::Error, "err"); // duplicate
+        let m3 = make_marker("a.rs", MarkerSeverity::Warning, "warn");
+        let markers = vec![m1, m2, m3];
+        let deduped = MarkerDeduplicator::deduplicate(&markers);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(MarkerDeduplicator::duplicate_count(&markers), 1);
+    }
+
+    // -- Bulk operations tests ----------------------------------------------
+
+    #[test]
+    fn set_markers_for_replaces_atomically() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "old1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "old2"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Warning, "keep"));
+
+        let new = vec![make_marker("a.rs", MarkerSeverity::Info, "new1")];
+        svc.set_markers_for("a.rs", new);
+
+        assert_eq!(svc.get_markers("a.rs").len(), 1);
+        assert_eq!(svc.get_markers("a.rs")[0].message, "new1");
+        assert_eq!(svc.get_markers("b.rs").len(), 1);
+    }
+
+    #[test]
+    fn remove_matching_by_filter() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "w"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Error, "e2"));
+
+        let filter = MarkerFilter {
+            severity: Some(MarkerSeverity::Error),
+            source: None,
+            uri_pattern: None,
+        };
+        let removed = svc.remove_matching(&filter);
+        assert_eq!(removed, 2);
+        assert_eq!(svc.total_count(), 1);
     }
 }

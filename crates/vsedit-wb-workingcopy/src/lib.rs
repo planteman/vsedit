@@ -700,6 +700,317 @@ pub fn working_copy_discard(
     Some(DiscardResult { discarded, failed })
 }
 
+// ---------------------------------------------------------------------------
+// ChangesetSummary — aggregate description of a set of changes
+// ---------------------------------------------------------------------------
+
+/// A high-level summary describing a changeset for display or logging.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChangesetSummary {
+    pub title: String,
+    pub file_count: usize,
+    pub insertions: usize,
+    pub deletions: usize,
+    pub has_conflicts: bool,
+}
+
+impl ChangesetSummary {
+    /// Build a summary from a slice of diff summaries and an optional conflict flag.
+    pub fn from_diffs(title: impl Into<String>, diffs: &[DiffSummary], has_conflicts: bool) -> Self {
+        let mut insertions = 0;
+        let mut deletions = 0;
+        for d in diffs {
+            insertions += d.insertions;
+            deletions += d.deletions;
+        }
+        Self {
+            title: title.into(),
+            file_count: diffs.len(),
+            insertions,
+            deletions,
+            has_conflicts,
+        }
+    }
+
+    /// Total number of changed lines across all files.
+    pub fn total_changes(&self) -> usize {
+        self.insertions + self.deletions
+    }
+
+    /// Returns true when there are no file changes at all.
+    pub fn is_empty(&self) -> bool {
+        self.file_count == 0
+    }
+}
+
+impl fmt::Display for ChangesetSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {} file(s), +{} -{}{}",
+            self.title,
+            self.file_count,
+            self.insertions,
+            self.deletions,
+            if self.has_conflicts { " (conflicts)" } else { "" },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkingCopyDiff — collection of per-file diffs for a working copy
+// ---------------------------------------------------------------------------
+
+/// Holds per-file diff summaries for the entire working copy.
+#[derive(Debug, Clone, Default)]
+pub struct WorkingCopyDiff {
+    pub diffs: Vec<DiffSummary>,
+}
+
+impl WorkingCopyDiff {
+    pub fn new() -> Self {
+        Self { diffs: Vec::new() }
+    }
+
+    /// Add a diff for a single file.
+    pub fn add(&mut self, diff: DiffSummary) {
+        self.diffs.push(diff);
+    }
+
+    /// Total insertions across all files.
+    pub fn total_insertions(&self) -> usize {
+        self.diffs.iter().map(|d| d.insertions).sum()
+    }
+
+    /// Total deletions across all files.
+    pub fn total_deletions(&self) -> usize {
+        self.diffs.iter().map(|d| d.deletions).sum()
+    }
+
+    /// Number of files with changes.
+    pub fn file_count(&self) -> usize {
+        self.diffs.iter().filter(|d| !d.is_empty()).count()
+    }
+
+    /// Get the diff for a specific file path, if present.
+    pub fn get(&self, file_path: &str) -> Option<&DiffSummary> {
+        self.diffs.iter().find(|d| d.file_path == file_path)
+    }
+
+    /// Build a `ChangesetSummary` from this diff collection.
+    pub fn summarize(&self, title: impl Into<String>) -> ChangesetSummary {
+        ChangesetSummary::from_diffs(title, &self.diffs, false)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StagingArea — stage and unstage individual files
+// ---------------------------------------------------------------------------
+
+/// Manages staged and unstaged resources for a single provider, providing
+/// fine-grained control over which files are included in the next commit.
+#[derive(Debug, Clone)]
+pub struct StagingArea {
+    staged: Vec<ScmResource>,
+    unstaged: Vec<ScmResource>,
+}
+
+impl StagingArea {
+    pub fn new() -> Self {
+        Self {
+            staged: Vec::new(),
+            unstaged: Vec::new(),
+        }
+    }
+
+    /// Populate the unstaged list from a provider's non-staged groups.
+    pub fn from_provider(provider: &ScmProvider) -> Self {
+        let mut staged = Vec::new();
+        let mut unstaged = Vec::new();
+        for group in &provider.groups {
+            if group.id == "staged" {
+                staged.extend(group.resources.iter().cloned());
+            } else {
+                unstaged.extend(group.resources.iter().cloned());
+            }
+        }
+        Self { staged, unstaged }
+    }
+
+    /// Stage a file by URI. Returns true if the file was found in unstaged.
+    pub fn stage(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.unstaged.iter().position(|r| r.uri == uri) {
+            let resource = self.unstaged.remove(pos);
+            self.staged.push(resource);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Unstage a file by URI. Returns true if the file was found in staged.
+    pub fn unstage(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.staged.iter().position(|r| r.uri == uri) {
+            let resource = self.staged.remove(pos);
+            self.unstaged.push(resource);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Stage all currently unstaged files.
+    pub fn stage_all(&mut self) {
+        self.staged.append(&mut self.unstaged);
+    }
+
+    /// Unstage all currently staged files.
+    pub fn unstage_all(&mut self) {
+        self.unstaged.append(&mut self.staged);
+    }
+
+    pub fn staged_files(&self) -> &[ScmResource] {
+        &self.staged
+    }
+
+    pub fn unstaged_files(&self) -> &[ScmResource] {
+        &self.unstaged
+    }
+
+    pub fn staged_count(&self) -> usize {
+        self.staged.len()
+    }
+
+    pub fn unstaged_count(&self) -> usize {
+        self.unstaged.len()
+    }
+
+    /// Returns true when nothing is staged.
+    pub fn is_empty(&self) -> bool {
+        self.staged.is_empty()
+    }
+}
+
+impl Default for StagingArea {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConflictResolver — helpers for resolving merge conflicts
+// ---------------------------------------------------------------------------
+
+/// Strategy for resolving a merge conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictResolution {
+    AcceptCurrent,
+    AcceptIncoming,
+    AcceptBoth,
+    Manual,
+}
+
+/// Tracks conflict resolution decisions for resources.
+#[derive(Debug, Clone)]
+pub struct ConflictResolver {
+    resolutions: Vec<(String, ConflictResolution)>,
+}
+
+impl ConflictResolver {
+    pub fn new() -> Self {
+        Self {
+            resolutions: Vec::new(),
+        }
+    }
+
+    /// Record a resolution for a file URI.
+    pub fn resolve(&mut self, uri: impl Into<String>, resolution: ConflictResolution) {
+        let uri = uri.into();
+        if let Some(entry) = self.resolutions.iter_mut().find(|(u, _)| *u == uri) {
+            entry.1 = resolution;
+        } else {
+            self.resolutions.push((uri, resolution));
+        }
+    }
+
+    /// Get the resolution for a file, if one has been recorded.
+    pub fn get_resolution(&self, uri: &str) -> Option<ConflictResolution> {
+        self.resolutions.iter().find(|(u, _)| u == uri).map(|(_, r)| *r)
+    }
+
+    /// Number of resolved conflicts.
+    pub fn resolved_count(&self) -> usize {
+        self.resolutions.len()
+    }
+
+    /// Returns the URIs that still need manual resolution.
+    pub fn pending_manual(&self) -> Vec<&str> {
+        self.resolutions
+            .iter()
+            .filter(|(_, r)| *r == ConflictResolution::Manual)
+            .map(|(u, _)| u.as_str())
+            .collect()
+    }
+
+    /// Returns true when all recorded resolutions are non-manual.
+    pub fn all_auto_resolved(&self) -> bool {
+        self.resolutions.iter().all(|(_, r)| *r != ConflictResolution::Manual)
+    }
+
+    /// Extract conflicting resources from a provider.
+    pub fn find_conflicts(provider: &ScmProvider) -> Vec<&ScmResource> {
+        provider
+            .groups
+            .iter()
+            .flat_map(|g| &g.resources)
+            .filter(|r| r.status == ScmStatus::Conflict)
+            .collect()
+    }
+}
+
+impl Default for ConflictResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkingCopyExporter — serialize working copy state for external consumption
+// ---------------------------------------------------------------------------
+
+/// Exports a working copy provider state into a portable text format.
+pub struct WorkingCopyExporter;
+
+impl WorkingCopyExporter {
+    /// Export a provider's state as a list of status lines, one per resource.
+    /// Format: `GROUP_ID\tSTATUS\tURI[\tORIGINAL_URI]`
+    pub fn export_lines(provider: &ScmProvider) -> Vec<String> {
+        let mut lines = Vec::new();
+        for group in &provider.groups {
+            for res in &group.resources {
+                let status_str = status_label(res.status);
+                let line = if let Some(ref orig) = res.original_uri {
+                    format!("{}\t{}\t{}\t{}", group.id, status_str, res.uri, orig)
+                } else {
+                    format!("{}\t{}\t{}", group.id, status_str, res.uri)
+                };
+                lines.push(line);
+            }
+        }
+        lines
+    }
+
+    /// Export a provider's state as a single newline-separated string.
+    pub fn export_string(provider: &ScmProvider) -> String {
+        Self::export_lines(provider).join("\n")
+    }
+
+    /// Count total resources across all groups.
+    pub fn total_resource_count(provider: &ScmProvider) -> usize {
+        provider.groups.iter().map(|g| g.resources.len()).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1260,5 +1571,166 @@ mod tests {
             failed: vec![],
         };
         assert!(format!("{r}").contains("discarded 1"));
+    }
+
+    // -- ChangesetSummary tests ---------------------------------------------
+
+    #[test]
+    fn changeset_summary_from_diffs() {
+        let diffs = vec![
+            DiffSummary { insertions: 10, deletions: 3, file_path: "a.rs".into() },
+            DiffSummary { insertions: 0, deletions: 5, file_path: "b.rs".into() },
+        ];
+        let summary = ChangesetSummary::from_diffs("my commit", &diffs, false);
+        assert_eq!(summary.file_count, 2);
+        assert_eq!(summary.insertions, 10);
+        assert_eq!(summary.deletions, 8);
+        assert_eq!(summary.total_changes(), 18);
+        assert!(!summary.has_conflicts);
+        assert!(!summary.is_empty());
+        let display = format!("{summary}");
+        assert!(display.contains("+10"));
+        assert!(display.contains("-8"));
+        assert!(!display.contains("conflicts"));
+    }
+
+    #[test]
+    fn changeset_summary_with_conflicts_display() {
+        let summary = ChangesetSummary::from_diffs("merge", &[], true);
+        assert!(summary.is_empty());
+        let display = format!("{summary}");
+        assert!(display.contains("(conflicts)"));
+    }
+
+    // -- WorkingCopyDiff tests ----------------------------------------------
+
+    #[test]
+    fn working_copy_diff_aggregation() {
+        let mut wcd = WorkingCopyDiff::new();
+        wcd.add(DiffSummary { insertions: 5, deletions: 2, file_path: "x.rs".into() });
+        wcd.add(DiffSummary { insertions: 0, deletions: 0, file_path: "y.rs".into() });
+        wcd.add(DiffSummary { insertions: 3, deletions: 1, file_path: "z.rs".into() });
+        assert_eq!(wcd.total_insertions(), 8);
+        assert_eq!(wcd.total_deletions(), 3);
+        assert_eq!(wcd.file_count(), 2); // y.rs has no changes
+        assert!(wcd.get("x.rs").is_some());
+        assert!(wcd.get("missing.rs").is_none());
+        let summary = wcd.summarize("snapshot");
+        assert_eq!(summary.file_count, 3);
+        assert_eq!(summary.total_changes(), 11);
+    }
+
+    // -- StagingArea tests --------------------------------------------------
+
+    #[test]
+    fn staging_area_stage_and_unstage() {
+        let mut sa = StagingArea::new();
+        sa.unstaged.push(ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None });
+        sa.unstaged.push(ScmResource { uri: "b.rs".into(), status: ScmStatus::Added, original_uri: None });
+        assert_eq!(sa.unstaged_count(), 2);
+        assert_eq!(sa.staged_count(), 0);
+        assert!(sa.is_empty());
+
+        assert!(sa.stage("a.rs"));
+        assert_eq!(sa.staged_count(), 1);
+        assert_eq!(sa.unstaged_count(), 1);
+        assert!(!sa.stage("nonexistent.rs"));
+
+        assert!(sa.unstage("a.rs"));
+        assert_eq!(sa.staged_count(), 0);
+        assert_eq!(sa.unstaged_count(), 2);
+
+        sa.stage_all();
+        assert_eq!(sa.staged_count(), 2);
+        assert_eq!(sa.unstaged_count(), 0);
+
+        sa.unstage_all();
+        assert_eq!(sa.staged_count(), 0);
+        assert_eq!(sa.unstaged_count(), 2);
+    }
+
+    #[test]
+    fn staging_area_from_provider() {
+        let provider = ScmProvider {
+            id: "git".into(),
+            label: "Git".into(),
+            root_uri: "/ws".into(),
+            groups: vec![
+                ScmGroup {
+                    id: "changes".into(), label: "Changes".into(),
+                    resources: vec![
+                        ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None },
+                    ],
+                },
+                ScmGroup {
+                    id: "staged".into(), label: "Staged".into(),
+                    resources: vec![
+                        ScmResource { uri: "b.rs".into(), status: ScmStatus::Added, original_uri: None },
+                    ],
+                },
+            ],
+            count: 2,
+        };
+        let sa = StagingArea::from_provider(&provider);
+        assert_eq!(sa.staged_count(), 1);
+        assert_eq!(sa.unstaged_count(), 1);
+        assert_eq!(sa.staged_files()[0].uri, "b.rs");
+        assert_eq!(sa.unstaged_files()[0].uri, "a.rs");
+    }
+
+    // -- ConflictResolver tests ---------------------------------------------
+
+    #[test]
+    fn conflict_resolver_resolve_and_query() {
+        let mut cr = ConflictResolver::new();
+        cr.resolve("a.rs", ConflictResolution::AcceptCurrent);
+        cr.resolve("b.rs", ConflictResolution::Manual);
+        cr.resolve("c.rs", ConflictResolution::AcceptIncoming);
+        assert_eq!(cr.resolved_count(), 3);
+        assert_eq!(cr.get_resolution("a.rs"), Some(ConflictResolution::AcceptCurrent));
+        assert_eq!(cr.get_resolution("missing"), None);
+        assert!(!cr.all_auto_resolved());
+        let pending = cr.pending_manual();
+        assert_eq!(pending, vec!["b.rs"]);
+
+        // overwrite resolution
+        cr.resolve("b.rs", ConflictResolution::AcceptBoth);
+        assert!(cr.all_auto_resolved());
+        assert_eq!(cr.resolved_count(), 3);
+    }
+
+    // -- WorkingCopyExporter tests ------------------------------------------
+
+    #[test]
+    fn exporter_produces_correct_lines() {
+        let provider = ScmProvider {
+            id: "git".into(),
+            label: "Git".into(),
+            root_uri: "/ws".into(),
+            groups: vec![
+                ScmGroup {
+                    id: "changes".into(), label: "Changes".into(),
+                    resources: vec![
+                        ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None },
+                    ],
+                },
+                ScmGroup {
+                    id: "staged".into(), label: "Staged".into(),
+                    resources: vec![
+                        ScmResource { uri: "new.rs".into(), status: ScmStatus::Renamed, original_uri: Some("old.rs".into()) },
+                    ],
+                },
+            ],
+            count: 2,
+        };
+        let lines = WorkingCopyExporter::export_lines(&provider);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "changes\tModified\ta.rs");
+        assert_eq!(lines[1], "staged\tRenamed\tnew.rs\told.rs");
+        assert_eq!(WorkingCopyExporter::total_resource_count(&provider), 2);
+
+        let export_str = WorkingCopyExporter::export_string(&provider);
+        assert!(export_str.contains("changes\tModified\ta.rs"));
+        assert!(export_str.contains('\n'));
     }
 }

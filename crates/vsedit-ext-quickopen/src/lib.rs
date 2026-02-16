@@ -739,6 +739,174 @@ impl QuickOpenHistory {
     }
 }
 
+// ── QuickOpenGrouper ──
+
+/// Groups quick-pick items by a key derived from each item (e.g. file
+/// extension, directory prefix). The groups are returned in alphabetical order
+/// of the key, and the items within each group retain their original order.
+pub struct QuickOpenGrouper;
+
+impl QuickOpenGrouper {
+    /// Group items using the provided key function.
+    pub fn group_by<F>(items: &[QuickPickItem], key_fn: F) -> Vec<(String, Vec<&QuickPickItem>)>
+    where
+        F: Fn(&QuickPickItem) -> String,
+    {
+        let mut map: Vec<(String, Vec<&QuickPickItem>)> = Vec::new();
+        for item in items {
+            let k = key_fn(item);
+            if let Some(entry) = map.iter_mut().find(|(key, _)| key == &k) {
+                entry.1.push(item);
+            } else {
+                map.push((k, vec![item]));
+            }
+        }
+        map.sort_by(|a, b| a.0.cmp(&b.0));
+        map
+    }
+
+    /// Group items by file extension (the part after the last `.`).
+    /// Items without an extension are grouped under `"(none)"`.
+    pub fn group_by_extension(items: &[QuickPickItem]) -> Vec<(String, Vec<&QuickPickItem>)> {
+        Self::group_by(items, |item| {
+            item.label
+                .rsplit_once('.')
+                .map(|(_, ext)| ext.to_lowercase())
+                .unwrap_or_else(|| "(none)".to_string())
+        })
+    }
+
+    /// Group items by directory prefix (the part before the last `/`).
+    /// Items without a `/` are grouped under `"."`.
+    pub fn group_by_directory(items: &[QuickPickItem]) -> Vec<(String, Vec<&QuickPickItem>)> {
+        Self::group_by(items, |item| {
+            item.label
+                .rsplit_once('/')
+                .map(|(dir, _)| dir.to_string())
+                .unwrap_or_else(|| ".".to_string())
+        })
+    }
+}
+
+// ── QuickOpenPreview ──
+
+/// Lightweight preview metadata that can be attached to a quick-pick item.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct QuickOpenPreview {
+    /// The path (or URI) of the file to preview.
+    pub path: String,
+    /// Optional line number to scroll to in the preview.
+    pub line: Option<usize>,
+    /// Optional column offset.
+    pub column: Option<usize>,
+    /// Optional short text snippet to show in the preview pane.
+    pub snippet: Option<String>,
+}
+
+impl QuickOpenPreview {
+    pub fn new(path: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            line: None,
+            column: None,
+            snippet: None,
+        }
+    }
+
+    pub fn with_line(mut self, line: usize) -> Self {
+        self.line = Some(line);
+        self
+    }
+
+    pub fn with_column(mut self, column: usize) -> Self {
+        self.column = Some(column);
+        self
+    }
+
+    pub fn with_snippet(mut self, snippet: impl Into<String>) -> Self {
+        self.snippet = Some(snippet.into());
+        self
+    }
+
+    /// Format as `path:line:col`.
+    pub fn location_string(&self) -> String {
+        match (self.line, self.column) {
+            (Some(l), Some(c)) => format!("{}:{}:{}", self.path, l, c),
+            (Some(l), None) => format!("{}:{}", self.path, l),
+            _ => self.path.clone(),
+        }
+    }
+}
+
+// ── QuickOpenFilter (by type / location) ──
+
+/// Predicate-based filter that can combine multiple criteria to narrow down
+/// quick-pick items before they are displayed.
+pub struct QuickOpenFilter {
+    extensions: Option<Vec<String>>,
+    prefix: Option<String>,
+    exclude_labels: Vec<String>,
+}
+
+impl QuickOpenFilter {
+    pub fn new() -> Self {
+        Self {
+            extensions: None,
+            prefix: None,
+            exclude_labels: Vec::new(),
+        }
+    }
+
+    /// Only keep items whose label ends with one of the given extensions
+    /// (e.g. `["rs", "toml"]`).
+    pub fn with_extensions(mut self, exts: &[&str]) -> Self {
+        self.extensions = Some(exts.iter().map(|s| s.to_lowercase()).collect());
+        self
+    }
+
+    /// Only keep items whose label starts with the given prefix.
+    pub fn with_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = Some(prefix.into());
+        self
+    }
+
+    /// Exclude items whose label matches any of the given strings exactly.
+    pub fn exclude(mut self, label: impl Into<String>) -> Self {
+        self.exclude_labels.push(label.into());
+        self
+    }
+
+    /// Apply all configured predicates and return matching items.
+    pub fn apply<'a>(&self, items: &'a [QuickPickItem]) -> Vec<&'a QuickPickItem> {
+        items
+            .iter()
+            .filter(|item| {
+                if let Some(ref exts) = self.extensions {
+                    let label_lower = item.label.to_lowercase();
+                    if !exts.iter().any(|ext| label_lower.ends_with(&format!(".{}", ext))) {
+                        return false;
+                    }
+                }
+                if let Some(ref pfx) = self.prefix {
+                    if !item.label.starts_with(pfx.as_str()) {
+                        return false;
+                    }
+                }
+                if self.exclude_labels.contains(&item.label) {
+                    return false;
+                }
+                true
+            })
+            .collect()
+    }
+}
+
+impl Default for QuickOpenFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Filters and scores `items` against `query`, returning only those with a
 /// positive score, sorted in descending order by score.
 pub fn quick_open_filter(
@@ -1280,5 +1448,104 @@ mod tests {
     fn ext_quickopen_is_ascii_printable() {
         assert!(ExtQuickopenValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtQuickopenValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ── New tests: QuickOpenGrouper, QuickOpenPreview, QuickOpenFilter ──
+
+    #[test]
+    fn grouper_by_extension() {
+        let items = vec![
+            test_item("main.rs"),
+            test_item("lib.rs"),
+            test_item("Cargo.toml"),
+            test_item("README"),
+        ];
+        let groups = QuickOpenGrouper::group_by_extension(&items);
+        // Expect groups: "(none)", "rs", "toml" (sorted alphabetically)
+        let keys: Vec<&str> = groups.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, vec!["(none)", "rs", "toml"]);
+        // The "rs" group should have 2 items
+        let rs_group = groups.iter().find(|(k, _)| k == "rs").unwrap();
+        assert_eq!(rs_group.1.len(), 2);
+        assert_eq!(rs_group.1[0].label, "main.rs");
+        assert_eq!(rs_group.1[1].label, "lib.rs");
+    }
+
+    #[test]
+    fn grouper_by_directory() {
+        let items = vec![
+            test_item("src/main.rs"),
+            test_item("src/lib.rs"),
+            test_item("tests/integration.rs"),
+            test_item("Cargo.toml"),
+        ];
+        let groups = QuickOpenGrouper::group_by_directory(&items);
+        let keys: Vec<&str> = groups.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, vec![".", "src", "tests"]);
+        let src = groups.iter().find(|(k, _)| k == "src").unwrap();
+        assert_eq!(src.1.len(), 2);
+    }
+
+    #[test]
+    fn preview_location_string() {
+        let p = QuickOpenPreview::new("src/main.rs")
+            .with_line(42)
+            .with_column(10);
+        assert_eq!(p.location_string(), "src/main.rs:42:10");
+
+        let p2 = QuickOpenPreview::new("README.md").with_line(1);
+        assert_eq!(p2.location_string(), "README.md:1");
+
+        let p3 = QuickOpenPreview::new("LICENSE");
+        assert_eq!(p3.location_string(), "LICENSE");
+    }
+
+    #[test]
+    fn preview_serialization_roundtrip() {
+        let preview = QuickOpenPreview::new("src/lib.rs")
+            .with_line(10)
+            .with_snippet("fn main() {}");
+        let json = serde_json::to_string(&preview).unwrap();
+        let back: QuickOpenPreview = serde_json::from_str(&json).unwrap();
+        assert_eq!(preview, back);
+        assert_eq!(back.snippet.as_deref(), Some("fn main() {}"));
+    }
+
+    #[test]
+    fn filter_by_extension() {
+        let items = vec![
+            test_item("main.rs"),
+            test_item("lib.rs"),
+            test_item("Cargo.toml"),
+            test_item("README.md"),
+        ];
+        let filter = QuickOpenFilter::new().with_extensions(&["rs"]);
+        let result = filter.apply(&items);
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().all(|i| i.label.ends_with(".rs")));
+    }
+
+    #[test]
+    fn filter_by_prefix_and_exclude() {
+        let items = vec![
+            test_item("src/main.rs"),
+            test_item("src/lib.rs"),
+            test_item("tests/it.rs"),
+            test_item("src/secret.rs"),
+        ];
+        let filter = QuickOpenFilter::new()
+            .with_prefix("src/")
+            .exclude("src/secret.rs");
+        let result = filter.apply(&items);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].label, "src/main.rs");
+        assert_eq!(result[1].label, "src/lib.rs");
+    }
+
+    #[test]
+    fn filter_default_passes_all() {
+        let items = vec![test_item("a"), test_item("b")];
+        let filter = QuickOpenFilter::default();
+        assert_eq!(filter.apply(&items).len(), 2);
     }
 }

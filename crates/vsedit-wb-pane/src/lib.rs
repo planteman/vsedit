@@ -745,6 +745,236 @@ impl PaneResizeHandle {
     }
 }
 
+/// Tracks navigation history across panes, supporting back/forward traversal.
+#[derive(Debug, Clone)]
+pub struct PaneHistory {
+    entries: Vec<String>,
+    cursor: usize,
+    capacity: usize,
+}
+
+impl PaneHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: 0,
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Record a visit to the pane with the given id.
+    /// Truncates any forward history beyond the current cursor.
+    pub fn visit(&mut self, pane_id: impl Into<String>) {
+        let id = pane_id.into();
+        // Truncate forward history
+        self.entries.truncate(self.cursor);
+        self.entries.push(id);
+        // Evict oldest if over capacity
+        if self.entries.len() > self.capacity {
+            let overflow = self.entries.len() - self.capacity;
+            self.entries.drain(..overflow);
+        }
+        self.cursor = self.entries.len();
+    }
+
+    /// Navigate back, returning the previous pane id if available.
+    pub fn back(&mut self) -> Option<&str> {
+        if self.cursor > 1 {
+            self.cursor -= 1;
+            Some(&self.entries[self.cursor - 1])
+        } else {
+            None
+        }
+    }
+
+    /// Navigate forward, returning the next pane id if available.
+    pub fn forward(&mut self) -> Option<&str> {
+        if self.cursor < self.entries.len() {
+            let entry = &self.entries[self.cursor];
+            self.cursor += 1;
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// The pane id at the current cursor position, if any.
+    pub fn current(&self) -> Option<&str> {
+        if self.cursor > 0 && self.cursor <= self.entries.len() {
+            Some(&self.entries[self.cursor - 1])
+        } else {
+            None
+        }
+    }
+
+    /// Number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+
+    /// Whether a back navigation is possible.
+    pub fn can_go_back(&self) -> bool {
+        self.cursor > 1
+    }
+
+    /// Whether a forward navigation is possible.
+    pub fn can_go_forward(&self) -> bool {
+        self.cursor < self.entries.len()
+    }
+}
+
+/// Direction in which a pane can be split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+/// Result of splitting a pane into two regions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SplitResult {
+    pub original: Rectangle,
+    pub new_pane: Rectangle,
+}
+
+/// Splits a [`Rectangle`] in a given direction at a ratio (0.0–1.0).
+/// The ratio determines how much space the original pane keeps.
+pub fn split_rectangle(rect: Rectangle, direction: SplitDirection, ratio: f64) -> SplitResult {
+    let ratio = ratio.clamp(0.1, 0.9);
+    match direction {
+        SplitDirection::Left | SplitDirection::Right => {
+            let orig_w = (rect.width as f64 * ratio) as u32;
+            let new_w = rect.width - orig_w;
+            if direction == SplitDirection::Right {
+                SplitResult {
+                    original: Rectangle::new(rect.x, rect.y, orig_w, rect.height),
+                    new_pane: Rectangle::new(rect.x + orig_w, rect.y, new_w, rect.height),
+                }
+            } else {
+                SplitResult {
+                    original: Rectangle::new(rect.x + new_w, rect.y, orig_w, rect.height),
+                    new_pane: Rectangle::new(rect.x, rect.y, new_w, rect.height),
+                }
+            }
+        }
+        SplitDirection::Up | SplitDirection::Down => {
+            let orig_h = (rect.height as f64 * ratio) as u32;
+            let new_h = rect.height - orig_h;
+            if direction == SplitDirection::Down {
+                SplitResult {
+                    original: Rectangle::new(rect.x, rect.y, rect.width, orig_h),
+                    new_pane: Rectangle::new(rect.x, rect.y + orig_h, rect.width, new_h),
+                }
+            } else {
+                SplitResult {
+                    original: Rectangle::new(rect.x, rect.y + new_h, rect.width, orig_h),
+                    new_pane: Rectangle::new(rect.x, rect.y, rect.width, new_h),
+                }
+            }
+        }
+    }
+}
+
+/// Manages a linear focus chain across panes, supporting next/previous cycling.
+#[derive(Debug, Clone)]
+pub struct PaneFocusChain {
+    order: Vec<String>,
+    active: Option<usize>,
+}
+
+impl PaneFocusChain {
+    pub fn new() -> Self {
+        Self {
+            order: Vec::new(),
+            active: None,
+        }
+    }
+
+    /// Build a focus chain from the visible panes in a service.
+    pub fn from_service(service: &PaneService) -> Self {
+        let order: Vec<String> = service
+            .panes
+            .iter()
+            .filter(|p| p.visible)
+            .map(|p| p.id.clone())
+            .collect();
+        let active = if order.is_empty() { None } else { Some(0) };
+        Self { order, active }
+    }
+
+    /// Move focus to the next pane in the chain, wrapping around.
+    pub fn focus_next(&mut self) -> Option<&str> {
+        if self.order.is_empty() {
+            return None;
+        }
+        let idx = match self.active {
+            Some(i) => (i + 1) % self.order.len(),
+            None => 0,
+        };
+        self.active = Some(idx);
+        Some(&self.order[idx])
+    }
+
+    /// Move focus to the previous pane in the chain, wrapping around.
+    pub fn focus_prev(&mut self) -> Option<&str> {
+        if self.order.is_empty() {
+            return None;
+        }
+        let idx = match self.active {
+            Some(0) => self.order.len() - 1,
+            Some(i) => i - 1,
+            None => self.order.len() - 1,
+        };
+        self.active = Some(idx);
+        Some(&self.order[idx])
+    }
+
+    /// The currently focused pane id.
+    pub fn current(&self) -> Option<&str> {
+        self.active.map(|i| self.order[i].as_str())
+    }
+
+    /// Number of panes in the focus chain.
+    pub fn len(&self) -> usize {
+        self.order.len()
+    }
+
+    /// Whether the focus chain is empty.
+    pub fn is_empty(&self) -> bool {
+        self.order.is_empty()
+    }
+
+    /// Set focus to a specific pane id. Returns false if not in the chain.
+    pub fn focus_on(&mut self, id: &str) -> bool {
+        if let Some(idx) = self.order.iter().position(|s| s == id) {
+            self.active = Some(idx);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for PaneFocusChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Swaps the titles and visible status of two panes in the service.
 pub fn pane_swap(service: &mut PaneService, id_a: &str, id_b: &str) -> Result<(), String> {
     let idx_a = service
@@ -1256,5 +1486,174 @@ mod tests {
         svc.add_pane(pane("x", PaneLocation::Editor));
         assert!(pane_swap(&mut svc, "x", "missing").is_err());
         assert!(pane_swap(&mut svc, "missing", "x").is_err());
+    }
+
+    #[test]
+    fn history_back_forward() {
+        let mut h = PaneHistory::new(10);
+        assert!(h.is_empty());
+        assert!(h.current().is_none());
+
+        h.visit("p1");
+        h.visit("p2");
+        h.visit("p3");
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.current(), Some("p3"));
+
+        assert!(h.can_go_back());
+        assert_eq!(h.back(), Some("p2"));
+        assert_eq!(h.current(), Some("p2"));
+        assert_eq!(h.back(), Some("p1"));
+        assert!(!h.can_go_back());
+        assert_eq!(h.back(), None);
+
+        assert!(h.can_go_forward());
+        assert_eq!(h.forward(), Some("p2"));
+        assert_eq!(h.forward(), Some("p3"));
+        assert!(!h.can_go_forward());
+        assert_eq!(h.forward(), None);
+    }
+
+    #[test]
+    fn history_truncates_forward_on_visit() {
+        let mut h = PaneHistory::new(10);
+        h.visit("a");
+        h.visit("b");
+        h.visit("c");
+        h.back(); // cursor at b
+        h.visit("d"); // should drop "c"
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.current(), Some("d"));
+        assert!(!h.can_go_forward());
+    }
+
+    #[test]
+    fn history_capacity_eviction() {
+        let mut h = PaneHistory::new(3);
+        h.visit("a");
+        h.visit("b");
+        h.visit("c");
+        h.visit("d");
+        assert_eq!(h.len(), 3);
+        // oldest "a" should have been evicted
+        assert_eq!(h.current(), Some("d"));
+        h.back();
+        assert_eq!(h.current(), Some("c"));
+        h.back();
+        assert_eq!(h.current(), Some("b"));
+        assert!(!h.can_go_back());
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut h = PaneHistory::new(10);
+        h.visit("a");
+        h.visit("b");
+        h.clear();
+        assert!(h.is_empty());
+        assert_eq!(h.current(), None);
+    }
+
+    #[test]
+    fn split_rectangle_right() {
+        let r = Rectangle::new(0, 0, 1000, 600);
+        let result = split_rectangle(r, SplitDirection::Right, 0.5);
+        assert_eq!(result.original.width, 500);
+        assert_eq!(result.new_pane.width, 500);
+        assert_eq!(result.original.x, 0);
+        assert_eq!(result.new_pane.x, 500);
+        assert_eq!(result.original.height, 600);
+        assert_eq!(result.new_pane.height, 600);
+    }
+
+    #[test]
+    fn split_rectangle_down() {
+        let r = Rectangle::new(10, 20, 800, 400);
+        let result = split_rectangle(r, SplitDirection::Down, 0.75);
+        let orig_h = (400.0 * 0.75) as u32;
+        assert_eq!(result.original.height, orig_h);
+        assert_eq!(result.new_pane.height, 400 - orig_h);
+        assert_eq!(result.original.y, 20);
+        assert_eq!(result.new_pane.y, 20 + orig_h);
+    }
+
+    #[test]
+    fn split_rectangle_left_and_up() {
+        let r = Rectangle::new(0, 0, 600, 400);
+        let left = split_rectangle(r, SplitDirection::Left, 0.5);
+        // new pane goes to the left, original shifts right
+        assert_eq!(left.new_pane.x, 0);
+        assert_eq!(left.original.x, 300);
+
+        let up = split_rectangle(r, SplitDirection::Up, 0.5);
+        assert_eq!(up.new_pane.y, 0);
+        assert_eq!(up.original.y, 200);
+    }
+
+    #[test]
+    fn split_rectangle_ratio_clamped() {
+        let r = Rectangle::new(0, 0, 1000, 500);
+        // Ratio below 0.1 should clamp to 0.1
+        let result = split_rectangle(r, SplitDirection::Right, 0.01);
+        assert_eq!(result.original.width, 100); // 10% of 1000
+        // Ratio above 0.9 should clamp to 0.9
+        let result2 = split_rectangle(r, SplitDirection::Right, 0.99);
+        assert_eq!(result2.original.width, 900);
+    }
+
+    #[test]
+    fn focus_chain_cycling() {
+        let mut svc = PaneService::new();
+        svc.add_pane(pane("f1", PaneLocation::Editor));
+        svc.add_pane(pane("f2", PaneLocation::Editor));
+        svc.add_pane(pane("f3", PaneLocation::Panel));
+
+        let mut chain = PaneFocusChain::from_service(&svc);
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain.current(), Some("f1"));
+
+        assert_eq!(chain.focus_next(), Some("f2"));
+        assert_eq!(chain.focus_next(), Some("f3"));
+        // wraps around
+        assert_eq!(chain.focus_next(), Some("f1"));
+
+        // go previous wraps
+        assert_eq!(chain.focus_prev(), Some("f3"));
+        assert_eq!(chain.focus_prev(), Some("f2"));
+    }
+
+    #[test]
+    fn focus_chain_skips_hidden() {
+        let mut svc = PaneService::new();
+        svc.add_pane(pane("v1", PaneLocation::Editor));
+        let mut h = pane("h1", PaneLocation::Editor);
+        h.visible = false;
+        svc.add_pane(h);
+        svc.add_pane(pane("v2", PaneLocation::Editor));
+
+        let chain = PaneFocusChain::from_service(&svc);
+        assert_eq!(chain.len(), 2);
+        assert_eq!(chain.current(), Some("v1"));
+    }
+
+    #[test]
+    fn focus_chain_focus_on() {
+        let mut chain = PaneFocusChain::new();
+        chain.order = vec!["a".into(), "b".into(), "c".into()];
+        chain.active = Some(0);
+
+        assert!(chain.focus_on("c"));
+        assert_eq!(chain.current(), Some("c"));
+        assert!(!chain.focus_on("missing"));
+        assert_eq!(chain.current(), Some("c"));
+    }
+
+    #[test]
+    fn focus_chain_empty() {
+        let mut chain = PaneFocusChain::new();
+        assert!(chain.is_empty());
+        assert_eq!(chain.current(), None);
+        assert_eq!(chain.focus_next(), None);
+        assert_eq!(chain.focus_prev(), None);
     }
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::path::Path;
 
 use syntect::easy::HighlightLines;
@@ -683,6 +684,274 @@ impl Default for SyntaxHighlighter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScopeStack — nested syntax scopes
+// ---------------------------------------------------------------------------
+
+/// A stack of nested syntax scopes (e.g. "source.rust", "meta.function", "entity.name").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopeStack {
+    scopes: Vec<String>,
+}
+
+impl ScopeStack {
+    /// Create an empty scope stack.
+    pub fn new() -> Self {
+        Self { scopes: Vec::new() }
+    }
+
+    /// Create a scope stack from a dotted scope string like "source.rust meta.function".
+    pub fn from_str(scope_str: &str) -> Self {
+        let scopes = scope_str.split_whitespace().map(|s| s.to_string()).collect();
+        Self { scopes }
+    }
+
+    /// Push a new scope onto the stack.
+    pub fn push(&mut self, scope: impl Into<String>) {
+        self.scopes.push(scope.into());
+    }
+
+    /// Pop the top scope.
+    pub fn pop(&mut self) -> Option<String> {
+        self.scopes.pop()
+    }
+
+    /// The current depth of the scope stack.
+    pub fn depth(&self) -> usize {
+        self.scopes.len()
+    }
+
+    /// Returns true if the stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.scopes.is_empty()
+    }
+
+    /// The top (most specific) scope.
+    pub fn top(&self) -> Option<&str> {
+        self.scopes.last().map(|s| s.as_str())
+    }
+
+    /// The bottom (most general) scope.
+    pub fn bottom(&self) -> Option<&str> {
+        self.scopes.first().map(|s| s.as_str())
+    }
+
+    /// All scopes as a slice.
+    pub fn scopes(&self) -> &[String] {
+        &self.scopes
+    }
+
+    /// Convert to a space-separated string.
+    pub fn to_scope_string(&self) -> String {
+        self.scopes.join(" ")
+    }
+
+    /// Check whether this stack matches a scope selector.
+    /// A selector matches if any scope in the stack starts with the selector prefix.
+    pub fn matches_selector(&self, selector: &str) -> bool {
+        self.scopes.iter().any(|s| scope_matches_selector(s, selector))
+    }
+
+    /// Compute specificity score for a selector match.
+    /// Higher = more specific match. Returns 0 for no match.
+    pub fn specificity(&self, selector: &str) -> u32 {
+        let mut best = 0u32;
+        for (i, scope) in self.scopes.iter().enumerate() {
+            if scope_matches_selector(scope, selector) {
+                // Deeper position + more dots = more specific
+                let depth_score = (i as u32 + 1) * 10;
+                let parts_score = selector.matches('.').count() as u32 + 1;
+                let score = depth_score + parts_score;
+                if score > best {
+                    best = score;
+                }
+            }
+        }
+        best
+    }
+
+    /// Find the best matching selector from a list.
+    /// Returns the selector with the highest specificity score.
+    pub fn best_match<'a>(&self, selectors: &[&'a str]) -> Option<&'a str> {
+        let mut best_selector: Option<&str> = None;
+        let mut best_score = 0u32;
+        for &sel in selectors {
+            let score = self.specificity(sel);
+            if score > best_score {
+                best_score = score;
+                best_selector = Some(sel);
+            }
+        }
+        best_selector
+    }
+
+    /// Returns true if this stack has a scope that exactly equals the given scope.
+    pub fn contains_exact(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|s| s == scope)
+    }
+
+    /// Returns true if any scope in the stack starts with the given prefix.
+    pub fn contains_prefix(&self, prefix: &str) -> bool {
+        self.scopes.iter().any(|s| s.starts_with(prefix))
+    }
+}
+
+impl Default for ScopeStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ScopeStack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_scope_string())
+    }
+}
+
+/// Check if a scope matches a selector.
+/// A selector "entity.name" matches "entity.name.function" but not "entity".
+fn scope_matches_selector(scope: &str, selector: &str) -> bool {
+    if scope == selector {
+        return true;
+    }
+    // The selector is a prefix: "entity.name" matches "entity.name.function"
+    scope.starts_with(selector) && scope.as_bytes().get(selector.len()) == Some(&b'.')
+}
+
+// ---------------------------------------------------------------------------
+// ScopeSelector — with wildcard pattern matching
+// ---------------------------------------------------------------------------
+
+/// A scope selector that can include wildcard patterns.
+///
+/// Supports:
+/// - Exact match: "source.rust"
+/// - Prefix match: "source.rust" matches "source.rust.macro"
+/// - Wildcard: "source.*" matches "source.rust", "source.python"
+/// - Double wildcard: "**.function" matches any scope ending with ".function"
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopeSelector {
+    pub pattern: String,
+    pub parts: Vec<ScopeSelectorPart>,
+}
+
+/// A part of a scope selector pattern.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScopeSelectorPart {
+    Exact(String),
+    Wildcard,
+    DoubleWildcard,
+}
+
+impl ScopeSelector {
+    /// Parse a scope selector pattern.
+    pub fn new(pattern: &str) -> Self {
+        let parts: Vec<ScopeSelectorPart> = pattern
+            .split('.')
+            .map(|part| match part {
+                "**" => ScopeSelectorPart::DoubleWildcard,
+                "*" => ScopeSelectorPart::Wildcard,
+                other => ScopeSelectorPart::Exact(other.to_string()),
+            })
+            .collect();
+        Self {
+            pattern: pattern.to_string(),
+            parts,
+        }
+    }
+
+    /// Test if a scope string matches this selector.
+    pub fn matches(&self, scope: &str) -> bool {
+        let scope_parts: Vec<&str> = scope.split('.').collect();
+        Self::match_parts(&self.parts, &scope_parts)
+    }
+
+    fn match_parts(selector_parts: &[ScopeSelectorPart], scope_parts: &[&str]) -> bool {
+        if selector_parts.is_empty() {
+            return true; // empty selector matches everything
+        }
+        if scope_parts.is_empty() {
+            return selector_parts.iter().all(|p| matches!(p, ScopeSelectorPart::DoubleWildcard));
+        }
+
+        match &selector_parts[0] {
+            ScopeSelectorPart::Exact(expected) => {
+                if scope_parts[0] == expected.as_str() {
+                    Self::match_parts(&selector_parts[1..], &scope_parts[1..])
+                } else {
+                    false
+                }
+            }
+            ScopeSelectorPart::Wildcard => {
+                // Match exactly one part
+                Self::match_parts(&selector_parts[1..], &scope_parts[1..])
+            }
+            ScopeSelectorPart::DoubleWildcard => {
+                // Match zero or more parts
+                for i in 0..=scope_parts.len() {
+                    if Self::match_parts(&selector_parts[1..], &scope_parts[i..]) {
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+    }
+
+    /// Compute the specificity score for a match.
+    /// More exact parts = higher specificity. Returns 0 for no match.
+    pub fn specificity(&self, scope: &str) -> u32 {
+        if !self.matches(scope) {
+            return 0;
+        }
+        let mut score = 0u32;
+        for part in &self.parts {
+            match part {
+                ScopeSelectorPart::Exact(_) => score += 10,
+                ScopeSelectorPart::Wildcard => score += 1,
+                ScopeSelectorPart::DoubleWildcard => score += 0,
+            }
+        }
+        score
+    }
+}
+
+impl fmt::Display for ScopeSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.pattern)
+    }
+}
+
+/// Find the best matching selector from a list for a given scope.
+pub fn best_selector_match<'a>(scope: &str, selectors: &[&'a ScopeSelector]) -> Option<&'a ScopeSelector> {
+    let mut best: Option<&ScopeSelector> = None;
+    let mut best_score = 0u32;
+    for &sel in selectors {
+        let score = sel.specificity(scope);
+        if score > best_score {
+            best_score = score;
+            best = Some(sel);
+        }
+    }
+    best
+}
+
+/// Resolve a scope stack against a list of selectors, returning the best match.
+pub fn resolve_scope_stack<'a>(stack: &ScopeStack, selectors: &[&'a ScopeSelector]) -> Option<&'a ScopeSelector> {
+    let mut best: Option<&ScopeSelector> = None;
+    let mut best_score = 0u32;
+    for scope in stack.scopes() {
+        for &sel in selectors {
+            let score = sel.specificity(scope);
+            if score > best_score {
+                best_score = score;
+                best = Some(sel);
+            }
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1289,5 +1558,99 @@ mod tests {
     fn syntax_highlighter_default() {
         let hl = SyntaxHighlighter::default();
         assert_eq!(hl.theme_name(), "base16-ocean.dark");
+    }
+
+    // ---- ScopeStack tests ----
+
+    #[test]
+    fn scope_stack_push_pop() {
+        let mut stack = ScopeStack::new();
+        assert!(stack.is_empty());
+        stack.push("source.rust");
+        stack.push("meta.function");
+        stack.push("entity.name.function");
+        assert_eq!(stack.depth(), 3);
+        assert_eq!(stack.top(), Some("entity.name.function"));
+        assert_eq!(stack.bottom(), Some("source.rust"));
+        let popped = stack.pop();
+        assert_eq!(popped, Some("entity.name.function".to_string()));
+        assert_eq!(stack.depth(), 2);
+    }
+
+    #[test]
+    fn scope_stack_from_str() {
+        let stack = ScopeStack::from_str("source.rust meta.function entity.name");
+        assert_eq!(stack.depth(), 3);
+        assert_eq!(stack.to_scope_string(), "source.rust meta.function entity.name");
+    }
+
+    #[test]
+    fn scope_stack_matches_selector() {
+        let stack = ScopeStack::from_str("source.rust meta.function entity.name.function");
+        assert!(stack.matches_selector("source.rust"));
+        assert!(stack.matches_selector("entity.name"));
+        assert!(!stack.matches_selector("source.python"));
+    }
+
+    #[test]
+    fn scope_stack_specificity_scoring() {
+        let stack = ScopeStack::from_str("source.rust meta.function entity.name.function");
+        let score_source = stack.specificity("source");
+        let score_entity = stack.specificity("entity.name.function");
+        // entity.name.function is deeper and more specific
+        assert!(score_entity > score_source);
+    }
+
+    #[test]
+    fn scope_stack_best_match() {
+        let stack = ScopeStack::from_str("source.rust entity.name.function");
+        let selectors = vec!["source", "entity.name", "entity.name.function"];
+        let best = stack.best_match(&selectors);
+        assert_eq!(best, Some("entity.name.function"));
+    }
+
+    // ---- ScopeSelector tests ----
+
+    #[test]
+    fn scope_selector_exact_match() {
+        let sel = ScopeSelector::new("source.rust");
+        assert!(sel.matches("source.rust"));
+        assert!(!sel.matches("source.python"));
+        assert!(!sel.matches("source"));
+    }
+
+    #[test]
+    fn scope_selector_wildcard() {
+        let sel = ScopeSelector::new("source.*");
+        assert!(sel.matches("source.rust"));
+        assert!(sel.matches("source.python"));
+        assert!(!sel.matches("meta.function"));
+    }
+
+    #[test]
+    fn scope_selector_double_wildcard() {
+        let sel = ScopeSelector::new("**.function");
+        assert!(sel.matches("entity.name.function"));
+        assert!(sel.matches("meta.function"));
+        assert!(sel.matches("function"));
+    }
+
+    #[test]
+    fn scope_selector_specificity() {
+        let exact = ScopeSelector::new("source.rust");
+        let wild = ScopeSelector::new("source.*");
+        let s_exact = exact.specificity("source.rust");
+        let s_wild = wild.specificity("source.rust");
+        assert!(s_exact > s_wild);
+    }
+
+    #[test]
+    fn resolve_scope_stack_best_selector() {
+        let stack = ScopeStack::from_str("source.rust entity.name.function");
+        let sel1 = ScopeSelector::new("source.*");
+        let sel2 = ScopeSelector::new("entity.name.function");
+        let selectors: Vec<&ScopeSelector> = vec![&sel1, &sel2];
+        let best = resolve_scope_stack(&stack, &selectors);
+        assert_eq!(best.unwrap().pattern, "entity.name.function");
     }
 }

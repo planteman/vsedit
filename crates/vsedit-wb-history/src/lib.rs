@@ -1,5 +1,6 @@
 //! Navigation history.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Errors that can occur during history navigation.
@@ -616,6 +617,222 @@ impl NavigationHistoryService {
 impl Default for NavigationHistoryService {
     fn default() -> Self {
         Self::new(100)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryBookmark — named bookmarks within a navigation history
+// ---------------------------------------------------------------------------
+
+/// A named bookmark that captures a position in the history for quick recall.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HistoryBookmark {
+    pub name: String,
+    pub entry: NavigationEntry,
+}
+
+impl HistoryBookmark {
+    pub fn new(name: impl Into<String>, entry: NavigationEntry) -> Self {
+        Self {
+            name: name.into(),
+            entry,
+        }
+    }
+}
+
+impl fmt::Display for HistoryBookmark {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.name, self.entry)
+    }
+}
+
+/// Manages a collection of named bookmarks.
+#[derive(Debug, Clone, Default)]
+pub struct BookmarkManager {
+    bookmarks: Vec<HistoryBookmark>,
+}
+
+impl BookmarkManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a bookmark. If a bookmark with the same name exists, it is replaced.
+    pub fn set(&mut self, bookmark: HistoryBookmark) {
+        if let Some(pos) = self.bookmarks.iter().position(|b| b.name == bookmark.name) {
+            self.bookmarks[pos] = bookmark;
+        } else {
+            self.bookmarks.push(bookmark);
+        }
+    }
+
+    /// Retrieve a bookmark by name.
+    pub fn get(&self, name: &str) -> Option<&HistoryBookmark> {
+        self.bookmarks.iter().find(|b| b.name == name)
+    }
+
+    /// Remove a bookmark by name. Returns `true` if it existed.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.bookmarks.len();
+        self.bookmarks.retain(|b| b.name != name);
+        self.bookmarks.len() < before
+    }
+
+    /// List all bookmark names.
+    pub fn names(&self) -> Vec<&str> {
+        self.bookmarks.iter().map(|b| b.name.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.bookmarks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bookmarks.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistorySearch — search/filter entries within a NavigationHistory
+// ---------------------------------------------------------------------------
+
+/// Search results from a history query.
+#[derive(Debug, Clone)]
+pub struct HistorySearchResult {
+    pub index: usize,
+    pub entry: HistoryNavigationEntry,
+}
+
+/// Provides search capabilities over a `NavigationHistory`.
+pub struct HistorySearch;
+
+impl HistorySearch {
+    /// Find all entries whose URI contains the given substring.
+    pub fn search_uri(history: &NavigationHistory, query: &str) -> Vec<HistorySearchResult> {
+        history
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.uri.contains(query))
+            .map(|(i, e)| HistorySearchResult {
+                index: i,
+                entry: e.clone(),
+            })
+            .collect()
+    }
+
+    /// Find entries within a line range in a specific URI.
+    pub fn search_line_range(
+        history: &NavigationHistory,
+        uri: &str,
+        start_line: u32,
+        end_line: u32,
+    ) -> Vec<HistorySearchResult> {
+        history
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.uri == uri && e.line >= start_line && e.line <= end_line)
+            .map(|(i, e)| HistorySearchResult {
+                index: i,
+                entry: e.clone(),
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryFrequencyStats — frequency analysis of visited URIs
+// ---------------------------------------------------------------------------
+
+/// Frequency analysis of navigation history entries.
+#[derive(Debug, Clone, Default)]
+pub struct HistoryFrequencyStats {
+    uri_counts: HashMap<String, usize>,
+    total_visits: usize,
+}
+
+impl HistoryFrequencyStats {
+    /// Build frequency stats from a `NavigationHistory`.
+    pub fn from_history(history: &NavigationHistory) -> Self {
+        let mut uri_counts = HashMap::new();
+        for entry in &history.entries {
+            *uri_counts.entry(entry.uri.clone()).or_insert(0) += 1;
+        }
+        Self {
+            total_visits: history.entries.len(),
+            uri_counts,
+        }
+    }
+
+    /// Number of times a specific URI was visited.
+    pub fn visit_count(&self, uri: &str) -> usize {
+        self.uri_counts.get(uri).copied().unwrap_or(0)
+    }
+
+    /// Number of distinct URIs visited.
+    pub fn unique_uris(&self) -> usize {
+        self.uri_counts.len()
+    }
+
+    /// Total number of visits across all URIs.
+    pub fn total_visits(&self) -> usize {
+        self.total_visits
+    }
+
+    /// Return the most visited URI and its count, or `None` if empty.
+    pub fn most_visited(&self) -> Option<(&str, usize)> {
+        self.uri_counts
+            .iter()
+            .max_by_key(|(_, count)| **count)
+            .map(|(uri, &count)| (uri.as_str(), count))
+    }
+
+    /// Return URIs sorted by visit count (descending).
+    pub fn ranked(&self) -> Vec<(&str, usize)> {
+        let mut pairs: Vec<_> = self
+            .uri_counts
+            .iter()
+            .map(|(uri, &count)| (uri.as_str(), count))
+            .collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1));
+        pairs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryCompactor — merge duplicate entries
+// ---------------------------------------------------------------------------
+
+/// Compacts a `NavigationHistory` by merging globally duplicate entries.
+pub struct HistoryCompactor;
+
+impl HistoryCompactor {
+    /// Remove all globally duplicate (uri, line) pairs, keeping only the last
+    /// occurrence of each. Resets `current` to the last entry.
+    pub fn compact(history: &mut NavigationHistory) {
+        let mut seen = HashMap::<(String, u32), usize>::new();
+        // Track last occurrence index of each (uri, line) pair.
+        for (i, entry) in history.entries.iter().enumerate() {
+            seen.insert((entry.uri.clone(), entry.line), i);
+        }
+        let keep: Vec<bool> = (0..history.entries.len())
+            .map(|i| {
+                let entry = &history.entries[i];
+                seen.get(&(entry.uri.clone(), entry.line)) == Some(&i)
+            })
+            .collect();
+        let mut idx = 0;
+        history.entries.retain(|_| {
+            let k = keep[idx];
+            idx += 1;
+            k
+        });
+        if history.entries.is_empty() {
+            history.current = None;
+        } else {
+            history.current = Some(history.entries.len() - 1);
+        }
     }
 }
 
@@ -1273,5 +1490,161 @@ mod tests {
         svc.navigate_back();
         assert_eq!(svc.back_stack_size(), 1);
         assert_eq!(svc.forward_stack_size(), 1);
+    }
+
+    // --- BookmarkManager tests ---
+
+    #[test]
+    fn bookmark_manager_set_and_get() {
+        let mut mgr = BookmarkManager::new();
+        let bm = HistoryBookmark::new("home", NavigationEntry::new("main.rs", 1, 0));
+        mgr.set(bm);
+        assert_eq!(mgr.len(), 1);
+        let found = mgr.get("home").unwrap();
+        assert_eq!(found.entry.uri, "main.rs");
+    }
+
+    #[test]
+    fn bookmark_manager_replace_existing() {
+        let mut mgr = BookmarkManager::new();
+        mgr.set(HistoryBookmark::new("x", NavigationEntry::new("a.rs", 1, 0)));
+        mgr.set(HistoryBookmark::new("x", NavigationEntry::new("b.rs", 99, 0)));
+        assert_eq!(mgr.len(), 1);
+        assert_eq!(mgr.get("x").unwrap().entry.uri, "b.rs");
+    }
+
+    #[test]
+    fn bookmark_manager_remove() {
+        let mut mgr = BookmarkManager::new();
+        mgr.set(HistoryBookmark::new("a", NavigationEntry::new("a.rs", 1, 0)));
+        assert!(mgr.remove("a"));
+        assert!(!mgr.remove("a"));
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn bookmark_display() {
+        let bm = HistoryBookmark::new("spot", NavigationEntry::new("lib.rs", 42, 5));
+        assert_eq!(format!("{bm}"), "[spot] lib.rs:42:5");
+    }
+
+    #[test]
+    fn bookmark_names_listing() {
+        let mut mgr = BookmarkManager::new();
+        mgr.set(HistoryBookmark::new("alpha", NavigationEntry::new("a.rs", 1, 0)));
+        mgr.set(HistoryBookmark::new("beta", NavigationEntry::new("b.rs", 1, 0)));
+        let names = mgr.names();
+        assert!(names.contains(&"alpha"));
+        assert!(names.contains(&"beta"));
+    }
+
+    // --- HistorySearch tests ---
+
+    #[test]
+    fn history_search_uri_substring() {
+        let mut h = NavigationHistory::new(20);
+        h.push(entry("src/main.rs", 1));
+        h.push(entry("src/lib.rs", 10));
+        h.push(entry("tests/test.rs", 5));
+
+        let results = HistorySearch::search_uri(&h, "src/");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].entry.uri, "src/main.rs");
+        assert_eq!(results[1].entry.uri, "src/lib.rs");
+    }
+
+    #[test]
+    fn history_search_line_range() {
+        let mut h = NavigationHistory::new(20);
+        h.push(entry("a.rs", 5));
+        h.push(entry("a.rs", 15));
+        h.push(entry("a.rs", 25));
+        h.push(entry("b.rs", 10));
+
+        let results = HistorySearch::search_line_range(&h, "a.rs", 10, 20);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].entry.line, 15);
+    }
+
+    // --- HistoryFrequencyStats tests ---
+
+    #[test]
+    fn frequency_stats_basic() {
+        let mut h = NavigationHistory::new(20);
+        h.push(entry("a.rs", 1));
+        h.push(entry("b.rs", 2));
+        h.push(entry("a.rs", 3));
+        h.push(entry("a.rs", 4));
+        h.push(entry("c.rs", 5));
+
+        let stats = HistoryFrequencyStats::from_history(&h);
+        assert_eq!(stats.total_visits(), 5);
+        assert_eq!(stats.unique_uris(), 3);
+        assert_eq!(stats.visit_count("a.rs"), 3);
+        assert_eq!(stats.visit_count("b.rs"), 1);
+        assert_eq!(stats.visit_count("missing.rs"), 0);
+
+        let (most_uri, most_count) = stats.most_visited().unwrap();
+        assert_eq!(most_uri, "a.rs");
+        assert_eq!(most_count, 3);
+    }
+
+    #[test]
+    fn frequency_stats_ranked_order() {
+        let mut h = NavigationHistory::new(20);
+        h.push(entry("a.rs", 1));
+        h.push(entry("b.rs", 1));
+        h.push(entry("b.rs", 2));
+        h.push(entry("c.rs", 1));
+        h.push(entry("c.rs", 2));
+        h.push(entry("c.rs", 3));
+
+        let stats = HistoryFrequencyStats::from_history(&h);
+        let ranked = stats.ranked();
+        assert_eq!(ranked[0].0, "c.rs");
+        assert_eq!(ranked[0].1, 3);
+        assert_eq!(ranked[1].0, "b.rs");
+        assert_eq!(ranked[1].1, 2);
+        assert_eq!(ranked[2].0, "a.rs");
+        assert_eq!(ranked[2].1, 1);
+    }
+
+    // --- HistoryCompactor tests ---
+
+    #[test]
+    fn compactor_removes_global_duplicates() {
+        let mut h = NavigationHistory::new(20);
+        h.push(entry("a.rs", 1));
+        h.push(entry("b.rs", 2));
+        h.push(entry("a.rs", 1)); // duplicate of first
+        h.push(entry("c.rs", 3));
+        h.push(entry("b.rs", 2)); // duplicate of second
+
+        HistoryCompactor::compact(&mut h);
+        // Should keep last occurrence of each: a.rs:1, c.rs:3, b.rs:2
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.entries[0].uri, "a.rs");
+        assert_eq!(h.entries[1].uri, "c.rs");
+        assert_eq!(h.entries[2].uri, "b.rs");
+    }
+
+    #[test]
+    fn compactor_no_duplicates_unchanged() {
+        let mut h = NavigationHistory::new(20);
+        h.push(entry("a.rs", 1));
+        h.push(entry("b.rs", 2));
+        h.push(entry("c.rs", 3));
+
+        HistoryCompactor::compact(&mut h);
+        assert_eq!(h.len(), 3);
+    }
+
+    #[test]
+    fn frequency_stats_empty_history() {
+        let h = NavigationHistory::new(10);
+        let stats = HistoryFrequencyStats::from_history(&h);
+        assert_eq!(stats.total_visits(), 0);
+        assert_eq!(stats.unique_uris(), 0);
+        assert!(stats.most_visited().is_none());
     }
 }

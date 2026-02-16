@@ -663,6 +663,186 @@ impl RetryState {
     }
 }
 
+// ── RpcCallTimer (wall-clock based) ──
+
+/// Tracks the wall-clock elapsed time for an RPC call.
+#[derive(Debug, Clone)]
+pub struct RpcCallTimer {
+    pub request_id: u64,
+    pub method: String,
+    pub started_at: std::time::Instant,
+    pub timeout: std::time::Duration,
+}
+
+impl RpcCallTimer {
+    /// Start a timer for a request.
+    pub fn start(request_id: u64, method: impl Into<String>, timeout: std::time::Duration) -> Self {
+        Self {
+            request_id,
+            method: method.into(),
+            started_at: std::time::Instant::now(),
+            timeout,
+        }
+    }
+
+    /// Return `true` when the timeout has been exceeded.
+    pub fn is_timed_out(&self) -> bool {
+        self.started_at.elapsed() >= self.timeout
+    }
+
+    /// Return the elapsed duration since the timer started.
+    pub fn elapsed(&self) -> std::time::Duration {
+        self.started_at.elapsed()
+    }
+
+    /// Return the remaining duration, or zero if timed out.
+    pub fn remaining(&self) -> std::time::Duration {
+        self.timeout.saturating_sub(self.started_at.elapsed())
+    }
+}
+
+// ── RPC method registry ──
+
+/// A handler function that takes JSON args and returns a JSON result.
+pub type RpcHandlerFn = Box<dyn Fn(Vec<serde_json::Value>) -> Result<serde_json::Value, RpcError> + Send>;
+
+/// A registry that maps method names to handler functions.
+pub struct RpcMethodRegistry {
+    handlers: HashMap<String, RpcHandlerFn>,
+}
+
+impl RpcMethodRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self {
+            handlers: HashMap::new(),
+        }
+    }
+
+    /// Register a handler for a method name.
+    pub fn register(
+        &mut self,
+        method: impl Into<String>,
+        handler: impl Fn(Vec<serde_json::Value>) -> Result<serde_json::Value, RpcError> + Send + 'static,
+    ) {
+        self.handlers.insert(method.into(), Box::new(handler));
+    }
+
+    /// Return `true` if a handler is registered for `method`.
+    pub fn has_method(&self, method: &str) -> bool {
+        self.handlers.contains_key(method)
+    }
+
+    /// List all registered method names.
+    pub fn methods(&self) -> Vec<&str> {
+        self.handlers.keys().map(|k| k.as_str()).collect()
+    }
+
+    /// Dispatch a request to the appropriate handler, returning a response.
+    pub fn dispatch(&self, request: &RpcRequest) -> RpcResponse {
+        match self.handlers.get(&request.method) {
+            Some(handler) => {
+                let result = handler(request.args.clone());
+                RpcResponse {
+                    id: request.id,
+                    result,
+                }
+            }
+            None => RpcResponse {
+                id: request.id,
+                result: Err(RpcError {
+                    message: format!("method '{}' not found", request.method),
+                    name: Some("MethodNotFound".into()),
+                    stack: None,
+                }),
+            },
+        }
+    }
+
+    /// Number of registered handlers.
+    pub fn len(&self) -> usize {
+        self.handlers.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.handlers.is_empty()
+    }
+}
+
+impl Default for RpcMethodRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Request/response correlation ──
+
+/// Tracks pending RPC requests and correlates them with incoming responses.
+pub struct RpcCorrelator {
+    pending: HashMap<u64, RpcCallTimer>,
+}
+
+impl RpcCorrelator {
+    /// Create a new correlator.
+    pub fn new() -> Self {
+        Self {
+            pending: HashMap::new(),
+        }
+    }
+
+    /// Record that a request has been sent.
+    pub fn track(
+        &mut self,
+        request: &RpcRequest,
+        timeout: std::time::Duration,
+    ) {
+        self.pending.insert(
+            request.id,
+            RpcCallTimer::start(request.id, &request.method, timeout),
+        );
+    }
+
+    /// Attempt to correlate a response with a pending request.
+    /// Returns the timer if the response matches a tracked request.
+    pub fn correlate(&mut self, response: &RpcResponse) -> Option<RpcCallTimer> {
+        self.pending.remove(&response.id)
+    }
+
+    /// Return the number of pending (unresolved) requests.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Return IDs of requests that have timed out.
+    pub fn timed_out_ids(&self) -> Vec<u64> {
+        self.pending
+            .values()
+            .filter(|t| t.is_timed_out())
+            .map(|t| t.request_id)
+            .collect()
+    }
+
+    /// Remove and return all timed-out request timers.
+    pub fn drain_timed_out(&mut self) -> Vec<RpcCallTimer> {
+        let ids: Vec<u64> = self.timed_out_ids();
+        ids.into_iter()
+            .filter_map(|id| self.pending.remove(&id))
+            .collect()
+    }
+
+    /// Return `true` when a request with the given ID is still pending.
+    pub fn is_pending(&self, id: u64) -> bool {
+        self.pending.contains_key(&id)
+    }
+}
+
+impl Default for RpcCorrelator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1294,5 +1474,100 @@ mod tests {
     fn ext_rpc_is_ascii_printable() {
         assert!(ExtRpcValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtRpcValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ── RpcBatch tests (new) ──
+
+    #[test]
+    fn rpc_batch_add_and_payload_size() {
+        let mut batch = RpcBatch::new(10);
+        assert!(batch.is_empty());
+        let msg = RpcMessage::Request(RpcRequest {
+            id: 1,
+            proxy_id: "proxy".into(),
+            method: "doThing".into(),
+            args: vec![json!(42)],
+        });
+        batch.add(msg).unwrap();
+        assert_eq!(batch.len(), 1);
+        assert!(!batch.is_full());
+        assert!(batch.total_payload_size() > 0);
+    }
+
+    // ── RpcCallTimer tests ──
+
+    #[test]
+    fn rpc_call_timer_not_timed_out() {
+        let timer = RpcCallTimer::start(1, "test", std::time::Duration::from_secs(60));
+        assert!(!timer.is_timed_out());
+        assert!(timer.remaining() > std::time::Duration::ZERO);
+        assert_eq!(timer.request_id, 1);
+        assert_eq!(timer.method, "test");
+    }
+
+    // ── RpcMethodRegistry tests ──
+
+    #[test]
+    fn rpc_registry_dispatch() {
+        let mut reg = RpcMethodRegistry::new();
+        reg.register("add", |args| {
+            let a = args[0].as_i64().unwrap();
+            let b = args[1].as_i64().unwrap();
+            Ok(json!(a + b))
+        });
+        assert!(reg.has_method("add"));
+        assert!(!reg.has_method("sub"));
+        assert_eq!(reg.len(), 1);
+
+        let req = RpcRequest {
+            id: 10,
+            proxy_id: "p".into(),
+            method: "add".into(),
+            args: vec![json!(3), json!(4)],
+        };
+        let resp = reg.dispatch(&req);
+        assert_eq!(resp.id, 10);
+        assert_eq!(resp.result.unwrap(), json!(7));
+    }
+
+    #[test]
+    fn rpc_registry_method_not_found() {
+        let reg = RpcMethodRegistry::new();
+        let req = RpcRequest {
+            id: 1,
+            proxy_id: "p".into(),
+            method: "nope".into(),
+            args: vec![],
+        };
+        let resp = reg.dispatch(&req);
+        assert!(resp.result.is_err());
+    }
+
+    // ── RpcCorrelator tests ──
+
+    #[test]
+    fn rpc_correlator_track_and_correlate() {
+        let mut corr = RpcCorrelator::new();
+        let req = RpcRequest {
+            id: 42,
+            proxy_id: "p".into(),
+            method: "m".into(),
+            args: vec![],
+        };
+        corr.track(&req, std::time::Duration::from_secs(60));
+        assert_eq!(corr.pending_count(), 1);
+        assert!(corr.is_pending(42));
+
+        let resp = RpcResponse { id: 42, result: Ok(json!(null)) };
+        let timer = corr.correlate(&resp).unwrap();
+        assert_eq!(timer.request_id, 42);
+        assert_eq!(corr.pending_count(), 0);
+    }
+
+    #[test]
+    fn rpc_correlator_unknown_response() {
+        let mut corr = RpcCorrelator::new();
+        let resp = RpcResponse { id: 999, result: Ok(json!(null)) };
+        assert!(corr.correlate(&resp).is_none());
     }
 }

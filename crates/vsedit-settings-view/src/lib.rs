@@ -819,6 +819,292 @@ pub fn filter_modified(entries: &[SettingEntry]) -> Vec<usize> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// SettingsSnapshot – capture a point-in-time state
+// ---------------------------------------------------------------------------
+
+/// A frozen snapshot of setting IDs to their values at a point in time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SettingsSnapshot {
+    /// Pairs of `(setting_id, value)` sorted by id.
+    entries: Vec<(String, String)>,
+    pub label: String,
+}
+
+impl SettingsSnapshot {
+    /// Capture the current values from a slice of entries.
+    pub fn capture(entries: &[SettingEntry], label: impl Into<String>) -> Self {
+        let mut pairs: Vec<(String, String)> = entries
+            .iter()
+            .map(|e| (e.id.clone(), e.current_value.clone()))
+            .collect();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        Self {
+            entries: pairs,
+            label: label.into(),
+        }
+    }
+
+    /// Look up the value for a given setting id.
+    pub fn get(&self, id: &str) -> Option<&str> {
+        self.entries
+            .binary_search_by_key(&id, |(k, _)| k.as_str())
+            .ok()
+            .map(|i| self.entries[i].1.as_str())
+    }
+
+    /// Number of settings in the snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsDiff – compare two snapshots
+// ---------------------------------------------------------------------------
+
+/// The kind of change between two snapshots.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiffKind {
+    Added,
+    Removed,
+    Changed { old: String, new: String },
+}
+
+/// A single difference between two snapshots.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SettingsDiffEntry {
+    pub id: String,
+    pub kind: DiffKind,
+}
+
+/// Compute the differences between two snapshots.
+pub fn diff_snapshots(before: &SettingsSnapshot, after: &SettingsSnapshot) -> Vec<SettingsDiffEntry> {
+    let mut diffs = Vec::new();
+    let mut bi = 0;
+    let mut ai = 0;
+
+    while bi < before.entries.len() && ai < after.entries.len() {
+        let (ref bk, ref bv) = before.entries[bi];
+        let (ref ak, ref av) = after.entries[ai];
+        match bk.cmp(ak) {
+            std::cmp::Ordering::Less => {
+                diffs.push(SettingsDiffEntry {
+                    id: bk.clone(),
+                    kind: DiffKind::Removed,
+                });
+                bi += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                diffs.push(SettingsDiffEntry {
+                    id: ak.clone(),
+                    kind: DiffKind::Added,
+                });
+                ai += 1;
+            }
+            std::cmp::Ordering::Equal => {
+                if bv != av {
+                    diffs.push(SettingsDiffEntry {
+                        id: bk.clone(),
+                        kind: DiffKind::Changed {
+                            old: bv.clone(),
+                            new: av.clone(),
+                        },
+                    });
+                }
+                bi += 1;
+                ai += 1;
+            }
+        }
+    }
+    while bi < before.entries.len() {
+        diffs.push(SettingsDiffEntry {
+            id: before.entries[bi].0.clone(),
+            kind: DiffKind::Removed,
+        });
+        bi += 1;
+    }
+    while ai < after.entries.len() {
+        diffs.push(SettingsDiffEntry {
+            id: after.entries[ai].0.clone(),
+            kind: DiffKind::Added,
+        });
+        ai += 1;
+    }
+    diffs
+}
+
+// ---------------------------------------------------------------------------
+// SettingsHistory – track changes over time
+// ---------------------------------------------------------------------------
+
+/// Records value changes so they can be undone/redone.
+#[derive(Debug, Clone)]
+pub struct SettingsHistory {
+    undo_stack: Vec<HistoryRecord>,
+    redo_stack: Vec<HistoryRecord>,
+}
+
+/// A single change record.
+#[derive(Debug, Clone)]
+pub struct HistoryRecord {
+    pub setting_id: String,
+    pub old_value: String,
+    pub new_value: String,
+}
+
+impl SettingsHistory {
+    pub fn new() -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+        }
+    }
+
+    /// Record a change. Clears the redo stack.
+    pub fn record(&mut self, setting_id: impl Into<String>, old_value: impl Into<String>, new_value: impl Into<String>) {
+        self.undo_stack.push(HistoryRecord {
+            setting_id: setting_id.into(),
+            old_value: old_value.into(),
+            new_value: new_value.into(),
+        });
+        self.redo_stack.clear();
+    }
+
+    /// Pop the most recent change and push it onto the redo stack.
+    /// Returns the record so the caller can apply the old value.
+    pub fn undo(&mut self) -> Option<HistoryRecord> {
+        if let Some(rec) = self.undo_stack.pop() {
+            self.redo_stack.push(rec.clone());
+            Some(rec)
+        } else {
+            None
+        }
+    }
+
+    /// Re-apply the most recently undone change.
+    pub fn redo(&mut self) -> Option<HistoryRecord> {
+        if let Some(rec) = self.redo_stack.pop() {
+            self.undo_stack.push(rec.clone());
+            Some(rec)
+        } else {
+            None
+        }
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    pub fn undo_count(&self) -> usize {
+        self.undo_stack.len()
+    }
+}
+
+impl Default for SettingsHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk operations
+// ---------------------------------------------------------------------------
+
+/// Reset all entries to their default values, returning how many were changed.
+pub fn bulk_reset_to_defaults(entries: &mut [SettingEntry]) -> usize {
+    let mut count = 0;
+    for entry in entries.iter_mut() {
+        if entry.current_value != entry.default_value {
+            entry.current_value = entry.default_value.clone();
+            entry.modified = false;
+            count += 1;
+        }
+    }
+    count
+}
+
+/// Apply a batch of `(setting_id, new_value)` pairs, returning how many matched.
+pub fn bulk_apply(entries: &mut [SettingEntry], changes: &[(&str, &str)]) -> usize {
+    let mut applied = 0;
+    for (id, val) in changes {
+        if let Some(entry) = entries.iter_mut().find(|e| e.id == *id) {
+            entry.current_value = (*val).to_string();
+            entry.modified = entry.current_value != entry.default_value;
+            applied += 1;
+        }
+    }
+    applied
+}
+
+// ---------------------------------------------------------------------------
+// SettingsExporter – serialise to a simple key=value format
+// ---------------------------------------------------------------------------
+
+/// Export settings to a simple `key = value` text format (one per line).
+pub fn export_as_kv(entries: &[SettingEntry], modified_only: bool) -> String {
+    let mut out = String::new();
+    for e in entries {
+        if modified_only && !e.modified && e.current_value == e.default_value {
+            continue;
+        }
+        out.push_str(&e.id);
+        out.push_str(" = ");
+        out.push_str(&e.current_value);
+        out.push('\n');
+    }
+    out
+}
+
+/// Import settings from `key = value` lines, returning `(id, value)` pairs.
+pub fn parse_kv(text: &str) -> Vec<(String, String)> {
+    text.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            let mut parts = line.splitn(2, '=');
+            let key = parts.next()?.trim().to_string();
+            let val = parts.next()?.trim().to_string();
+            if key.is_empty() {
+                return None;
+            }
+            Some((key, val))
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// SettingsAccessibility helpers
+// ---------------------------------------------------------------------------
+
+/// Summary line for screen readers: "{title}: {value} ({type})".
+pub fn accessibility_label(entry: &SettingEntry) -> String {
+    let type_label = match &entry.setting_type {
+        SettingType::Boolean => "toggle",
+        SettingType::String => "text",
+        SettingType::Number => "number",
+        SettingType::Enum(_) => "dropdown",
+        SettingType::Array => "list",
+        SettingType::Object => "object",
+    };
+    let modified = if entry.modified { ", modified" } else { "" };
+    format!(
+        "{}: {} ({}{})",
+        entry.title, entry.current_value, type_label, modified
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1252,5 +1538,176 @@ mod tests {
         entries[3].current_value = "Courier".to_string();
         let modified = filter_modified(&entries);
         assert_eq!(modified, vec![1, 3]);
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsSnapshot + SettingsDiff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn snapshot_capture_and_get() {
+        let entries = sample_entries();
+        let snap = SettingsSnapshot::capture(&entries, "v1");
+        assert_eq!(snap.len(), 4);
+        assert!(!snap.is_empty());
+        assert_eq!(snap.label, "v1");
+        assert_eq!(snap.get("editor.fontSize"), Some("14"));
+        assert_eq!(snap.get("terminal.fontFamily"), Some("monospace"));
+        assert_eq!(snap.get("nonexistent"), None);
+    }
+
+    #[test]
+    fn diff_snapshots_detects_changes() {
+        let mut entries = sample_entries();
+        let before = SettingsSnapshot::capture(&entries, "before");
+
+        entries[0].current_value = "18".to_string();
+        let after = SettingsSnapshot::capture(&entries, "after");
+
+        let diffs = diff_snapshots(&before, &after);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].id, "editor.fontSize");
+        assert_eq!(
+            diffs[0].kind,
+            DiffKind::Changed {
+                old: "14".to_string(),
+                new: "18".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn diff_snapshots_added_removed() {
+        let entries_a = vec![sample_entries()[0].clone()];
+        let entries_b = vec![sample_entries()[3].clone()];
+        let snap_a = SettingsSnapshot::capture(&entries_a, "a");
+        let snap_b = SettingsSnapshot::capture(&entries_b, "b");
+
+        let diffs = diff_snapshots(&snap_a, &snap_b);
+        assert_eq!(diffs.len(), 2);
+        // editor.fontSize removed, terminal.fontFamily added
+        assert!(diffs.iter().any(|d| d.id == "editor.fontSize" && d.kind == DiffKind::Removed));
+        assert!(diffs.iter().any(|d| d.id == "terminal.fontFamily" && d.kind == DiffKind::Added));
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsHistory tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn history_undo_redo() {
+        let mut h = SettingsHistory::new();
+        assert!(!h.can_undo());
+        assert!(!h.can_redo());
+
+        h.record("editor.fontSize", "14", "18");
+        h.record("editor.wordWrap", "off", "on");
+        assert_eq!(h.undo_count(), 2);
+
+        let rec = h.undo().unwrap();
+        assert_eq!(rec.setting_id, "editor.wordWrap");
+        assert_eq!(rec.old_value, "off");
+        assert!(h.can_redo());
+
+        let rec = h.redo().unwrap();
+        assert_eq!(rec.setting_id, "editor.wordWrap");
+        assert_eq!(rec.new_value, "on");
+        assert!(!h.can_redo());
+    }
+
+    #[test]
+    fn history_record_clears_redo() {
+        let mut h = SettingsHistory::new();
+        h.record("a", "1", "2");
+        h.undo();
+        assert!(h.can_redo());
+        h.record("b", "3", "4");
+        assert!(!h.can_redo());
+    }
+
+    // -----------------------------------------------------------------------
+    // Bulk operation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bulk_reset_to_defaults_resets_modified() {
+        let mut entries = sample_entries();
+        entries[0].current_value = "20".to_string();
+        entries[0].modified = true;
+        entries[2].current_value = "false".to_string();
+        entries[2].modified = true;
+
+        let count = bulk_reset_to_defaults(&mut entries);
+        assert_eq!(count, 2);
+        assert_eq!(entries[0].current_value, "14");
+        assert!(!entries[0].modified);
+        assert_eq!(entries[2].current_value, "true");
+    }
+
+    #[test]
+    fn bulk_apply_applies_matching() {
+        let mut entries = sample_entries();
+        let changes = vec![
+            ("editor.fontSize", "20"),
+            ("terminal.fontFamily", "Consolas"),
+            ("nonexistent.key", "ignored"),
+        ];
+        let applied = bulk_apply(&mut entries, &changes);
+        assert_eq!(applied, 2);
+        assert_eq!(entries[0].current_value, "20");
+        assert!(entries[0].modified);
+        assert_eq!(entries[3].current_value, "Consolas");
+    }
+
+    // -----------------------------------------------------------------------
+    // Export/import tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn export_kv_all() {
+        let entries = sample_entries();
+        let text = export_as_kv(&entries, false);
+        assert!(text.contains("editor.fontSize = 14\n"));
+        assert!(text.contains("terminal.fontFamily = monospace\n"));
+    }
+
+    #[test]
+    fn export_kv_modified_only() {
+        let mut entries = sample_entries();
+        let text = export_as_kv(&entries, true);
+        assert!(text.is_empty());
+
+        entries[0].current_value = "20".to_string();
+        entries[0].modified = true;
+        let text = export_as_kv(&entries, true);
+        assert_eq!(text, "editor.fontSize = 20\n");
+    }
+
+    #[test]
+    fn parse_kv_roundtrip() {
+        let input = "editor.fontSize = 20\n# comment\n\nterminal.fontFamily = Consolas\n";
+        let pairs = parse_kv(input);
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0], ("editor.fontSize".to_string(), "20".to_string()));
+        assert_eq!(pairs[1], ("terminal.fontFamily".to_string(), "Consolas".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Accessibility tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn accessibility_label_format() {
+        let entry = &sample_entries()[0];
+        let label = accessibility_label(entry);
+        assert_eq!(label, "Font Size: 14 (number)");
+    }
+
+    #[test]
+    fn accessibility_label_modified() {
+        let mut entry = sample_entries()[0].clone();
+        entry.modified = true;
+        let label = accessibility_label(&entry);
+        assert!(label.contains(", modified"));
     }
 }

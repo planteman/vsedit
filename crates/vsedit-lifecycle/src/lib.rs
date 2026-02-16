@@ -840,6 +840,280 @@ impl Drop for DisposableGuard {
 }
 
 // ---------------------------------------------------------------------------
+// LifecyclePhase – ordered startup/shutdown phases
+// ---------------------------------------------------------------------------
+
+/// Ordered lifecycle phases for the application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum LifecyclePhase {
+    Starting,
+    Ready,
+    Restored,
+    Eventually,
+    ShuttingDown,
+}
+
+impl std::fmt::Display for LifecyclePhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Starting => "Starting",
+            Self::Ready => "Ready",
+            Self::Restored => "Restored",
+            Self::Eventually => "Eventually",
+            Self::ShuttingDown => "ShuttingDown",
+        };
+        f.write_str(s)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleHook – phase-transition callbacks
+// ---------------------------------------------------------------------------
+
+/// A registered callback for a lifecycle phase transition.
+pub struct LifecycleHook {
+    phase: LifecyclePhase,
+    callback: Box<dyn FnOnce() + Send>,
+}
+
+impl LifecycleHook {
+    pub fn new(phase: LifecyclePhase, callback: impl FnOnce() + Send + 'static) -> Self {
+        Self {
+            phase,
+            callback: Box::new(callback),
+        }
+    }
+
+    pub fn phase(&self) -> LifecyclePhase {
+        self.phase
+    }
+
+    /// Consume the hook and run its callback.
+    pub fn invoke(self) {
+        (self.callback)();
+    }
+}
+
+impl std::fmt::Debug for LifecycleHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LifecycleHook")
+            .field("phase", &self.phase)
+            .finish()
+    }
+}
+
+/// Registry that collects hooks and fires them when phases transition.
+pub struct LifecycleHookRegistry {
+    hooks: Vec<LifecycleHook>,
+    current_phase: LifecyclePhase,
+}
+
+impl LifecycleHookRegistry {
+    pub fn new() -> Self {
+        Self {
+            hooks: Vec::new(),
+            current_phase: LifecyclePhase::Starting,
+        }
+    }
+
+    pub fn current_phase(&self) -> LifecyclePhase {
+        self.current_phase
+    }
+
+    /// Register a hook for a given phase.
+    /// If that phase has already passed, the hook fires immediately.
+    pub fn register(&mut self, hook: LifecycleHook) {
+        if hook.phase() <= self.current_phase {
+            hook.invoke();
+        } else {
+            self.hooks.push(hook);
+        }
+    }
+
+    /// Advance to the given phase, firing all matching hooks.
+    pub fn advance_to(&mut self, phase: LifecyclePhase) {
+        if phase <= self.current_phase {
+            return;
+        }
+        self.current_phase = phase;
+        let mut remaining = Vec::new();
+        for hook in self.hooks.drain(..) {
+            if hook.phase() <= phase {
+                hook.invoke();
+            } else {
+                remaining.push(hook);
+            }
+        }
+        self.hooks = remaining;
+    }
+
+    /// Number of pending (not-yet-fired) hooks.
+    pub fn pending_count(&self) -> usize {
+        self.hooks.len()
+    }
+}
+
+impl Default for LifecycleHookRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecyclePhaseTiming – duration tracking per phase
+// ---------------------------------------------------------------------------
+
+/// Tracks wall-clock duration of each lifecycle phase.
+#[derive(Debug, Clone)]
+pub struct LifecyclePhaseTiming {
+    entries: Vec<(LifecyclePhase, std::time::Instant)>,
+}
+
+impl LifecyclePhaseTiming {
+    pub fn new() -> Self {
+        Self {
+            entries: vec![(LifecyclePhase::Starting, std::time::Instant::now())],
+        }
+    }
+
+    /// Record transition to a new phase.
+    pub fn mark(&mut self, phase: LifecyclePhase) {
+        self.entries.push((phase, std::time::Instant::now()));
+    }
+
+    /// Duration between two adjacent phase entries.
+    pub fn duration_of(&self, phase: LifecyclePhase) -> Option<std::time::Duration> {
+        let idx = self.entries.iter().position(|(p, _)| *p == phase)?;
+        if idx + 1 < self.entries.len() {
+            Some(self.entries[idx + 1].1.duration_since(self.entries[idx].1))
+        } else {
+            // Last entry – elapsed since that mark
+            Some(self.entries[idx].1.elapsed())
+        }
+    }
+
+    /// Total elapsed since first entry.
+    pub fn total_elapsed(&self) -> std::time::Duration {
+        if let Some(first) = self.entries.first() {
+            first.1.elapsed()
+        } else {
+            std::time::Duration::ZERO
+        }
+    }
+
+    /// Number of recorded phase transitions.
+    pub fn phase_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// The phases in order.
+    pub fn phases(&self) -> Vec<LifecyclePhase> {
+        self.entries.iter().map(|(p, _)| *p).collect()
+    }
+}
+
+impl Default for LifecyclePhaseTiming {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HealthCheck – lifecycle health aggregation
+// ---------------------------------------------------------------------------
+
+/// Result of a single health check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded(String),
+    Unhealthy(String),
+}
+
+impl std::fmt::Display for HealthStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Healthy => write!(f, "healthy"),
+            Self::Degraded(msg) => write!(f, "degraded: {msg}"),
+            Self::Unhealthy(msg) => write!(f, "unhealthy: {msg}"),
+        }
+    }
+}
+
+/// A named health check entry.
+#[derive(Debug, Clone)]
+pub struct HealthCheckEntry {
+    pub name: String,
+    pub status: HealthStatus,
+}
+
+/// Aggregates multiple health checks into a summary.
+#[derive(Debug, Clone)]
+pub struct HealthCheckAggregator {
+    entries: Vec<HealthCheckEntry>,
+}
+
+impl HealthCheckAggregator {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, name: impl Into<String>, status: HealthStatus) {
+        self.entries.push(HealthCheckEntry {
+            name: name.into(),
+            status,
+        });
+    }
+
+    /// Overall status: unhealthy if any unhealthy, degraded if any degraded, else healthy.
+    pub fn overall(&self) -> HealthStatus {
+        let mut worst = HealthStatus::Healthy;
+        for e in &self.entries {
+            match &e.status {
+                HealthStatus::Unhealthy(msg) => return HealthStatus::Unhealthy(msg.clone()),
+                HealthStatus::Degraded(msg) => worst = HealthStatus::Degraded(msg.clone()),
+                HealthStatus::Healthy => {}
+            }
+        }
+        worst
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        self.overall() == HealthStatus::Healthy
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn healthy_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.status == HealthStatus::Healthy)
+            .count()
+    }
+
+    pub fn unhealthy_entries(&self) -> Vec<&HealthCheckEntry> {
+        self.entries
+            .iter()
+            .filter(|e| matches!(e.status, HealthStatus::Unhealthy(_)))
+            .collect()
+    }
+
+    pub fn entries(&self) -> &[HealthCheckEntry] {
+        &self.entries
+    }
+}
+
+impl Default for HealthCheckAggregator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1300,5 +1574,87 @@ mod tests {
         }
         // After guard is dropped, the store should be disposed.
         assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    // --- New tests for LifecycleHook, PhaseTiming, HealthCheck ---
+
+    #[test]
+    fn lifecycle_hook_registry_advance() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let c = Arc::clone(&counter);
+        let mut reg = LifecycleHookRegistry::new();
+        reg.register(LifecycleHook::new(LifecyclePhase::Ready, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        }));
+        assert_eq!(reg.pending_count(), 1);
+        reg.advance_to(LifecyclePhase::Ready);
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+        assert_eq!(reg.pending_count(), 0);
+    }
+
+    #[test]
+    fn lifecycle_hook_fires_immediately_if_past() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let c = Arc::clone(&counter);
+        let mut reg = LifecycleHookRegistry::new();
+        reg.advance_to(LifecyclePhase::Restored);
+        reg.register(LifecycleHook::new(LifecyclePhase::Ready, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        }));
+        // Should have fired immediately since Ready < Restored
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+        assert_eq!(reg.pending_count(), 0);
+    }
+
+    #[test]
+    fn phase_timing_basic() {
+        let mut timing = LifecyclePhaseTiming::new();
+        timing.mark(LifecyclePhase::Ready);
+        assert_eq!(timing.phase_count(), 2); // Starting + Ready
+        assert!(timing.duration_of(LifecyclePhase::Starting).is_some());
+        assert!(timing.total_elapsed() >= std::time::Duration::ZERO);
+        assert_eq!(timing.phases(), vec![LifecyclePhase::Starting, LifecyclePhase::Ready]);
+    }
+
+    #[test]
+    fn health_check_aggregator_healthy() {
+        let mut agg = HealthCheckAggregator::new();
+        agg.add("db", HealthStatus::Healthy);
+        agg.add("cache", HealthStatus::Healthy);
+        assert!(agg.is_healthy());
+        assert_eq!(agg.healthy_count(), 2);
+        assert_eq!(agg.entry_count(), 2);
+    }
+
+    #[test]
+    fn health_check_aggregator_degraded() {
+        let mut agg = HealthCheckAggregator::new();
+        agg.add("db", HealthStatus::Healthy);
+        agg.add("cache", HealthStatus::Degraded("slow".into()));
+        assert!(!agg.is_healthy());
+        assert!(matches!(agg.overall(), HealthStatus::Degraded(_)));
+    }
+
+    #[test]
+    fn health_check_aggregator_unhealthy_wins() {
+        let mut agg = HealthCheckAggregator::new();
+        agg.add("db", HealthStatus::Unhealthy("down".into()));
+        agg.add("cache", HealthStatus::Degraded("slow".into()));
+        assert!(matches!(agg.overall(), HealthStatus::Unhealthy(_)));
+        assert_eq!(agg.unhealthy_entries().len(), 1);
+    }
+
+    #[test]
+    fn lifecycle_phase_ordering() {
+        assert!(LifecyclePhase::Starting < LifecyclePhase::Ready);
+        assert!(LifecyclePhase::Ready < LifecyclePhase::Restored);
+        assert!(LifecyclePhase::Restored < LifecyclePhase::Eventually);
+        assert!(LifecyclePhase::Eventually < LifecyclePhase::ShuttingDown);
+    }
+
+    #[test]
+    fn lifecycle_phase_display() {
+        assert_eq!(format!("{}", LifecyclePhase::Starting), "Starting");
+        assert_eq!(format!("{}", LifecyclePhase::ShuttingDown), "ShuttingDown");
     }
 }

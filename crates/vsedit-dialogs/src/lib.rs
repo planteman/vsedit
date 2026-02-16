@@ -827,6 +827,257 @@ pub fn dialog_button_layout(buttons: &[String], platform: Platform) -> Vec<Strin
     }
 }
 
+// ---------------------------------------------------------------------------
+// DialogQueue — queue dialogs to show sequentially
+// ---------------------------------------------------------------------------
+
+/// Represents a queued dialog to be shown.
+#[derive(Debug, Clone)]
+pub enum QueuedDialog {
+    Message(MessageDialogOptions),
+    Confirm(ConfirmDialogOptions),
+    Input(InputDialogOptions),
+}
+
+/// Manages a queue of dialogs to show one at a time.
+#[derive(Debug, Clone, Default)]
+pub struct DialogQueue {
+    queue: Vec<QueuedDialog>,
+}
+
+impl DialogQueue {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, dialog: QueuedDialog) {
+        self.queue.push(dialog);
+    }
+
+    /// Dequeue the next dialog to display.
+    pub fn pop(&mut self) -> Option<QueuedDialog> {
+        if self.queue.is_empty() {
+            None
+        } else {
+            Some(self.queue.remove(0))
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
+
+    /// Peek at the next dialog without removing it.
+    pub fn peek(&self) -> Option<&QueuedDialog> {
+        self.queue.first()
+    }
+
+    /// Count of each dialog type in the queue.
+    pub fn counts(&self) -> (usize, usize, usize) {
+        let mut msg = 0;
+        let mut confirm = 0;
+        let mut input = 0;
+        for d in &self.queue {
+            match d {
+                QueuedDialog::Message(_) => msg += 1,
+                QueuedDialog::Confirm(_) => confirm += 1,
+                QueuedDialog::Input(_) => input += 1,
+            }
+        }
+        (msg, confirm, input)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogPreset — predefined dialog configurations
+// ---------------------------------------------------------------------------
+
+/// Common preset dialog configurations.
+pub struct DialogPreset;
+
+impl DialogPreset {
+    /// "Are you sure?" confirmation dialog.
+    pub fn confirm_delete(item_name: &str) -> ConfirmDialogOptions {
+        ConfirmDialogOptions {
+            message: format!("Delete \"{}\"?", item_name),
+            detail: Some("This action cannot be undone.".into()),
+            primary_button: "Delete".into(),
+            secondary_button: Some("Cancel".into()),
+            severity: Severity::Warning,
+        }
+    }
+
+    /// Unsaved changes confirmation.
+    pub fn unsaved_changes(file_name: &str) -> ConfirmDialogOptions {
+        ConfirmDialogOptions {
+            message: format!("Do you want to save changes to \"{}\"?", file_name),
+            detail: Some("Your changes will be lost if you don't save them.".into()),
+            primary_button: "Save".into(),
+            secondary_button: Some("Don't Save".into()),
+            severity: Severity::Warning,
+        }
+    }
+
+    /// Error message dialog.
+    pub fn error(message: impl Into<String>) -> MessageDialogOptions {
+        MessageDialogOptions {
+            severity: Severity::Error,
+            message: message.into(),
+            detail: None,
+            buttons: vec![DialogButton { label: "OK".into(), is_secondary: false }],
+            cancel_button: None,
+            checkbox_label: None,
+            checkbox_checked: false,
+        }
+    }
+
+    /// Information message dialog.
+    pub fn info(message: impl Into<String>) -> MessageDialogOptions {
+        MessageDialogOptions {
+            severity: Severity::Info,
+            message: message.into(),
+            detail: None,
+            buttons: vec![DialogButton { label: "OK".into(), is_secondary: false }],
+            cancel_button: None,
+            checkbox_label: None,
+            checkbox_checked: false,
+        }
+    }
+
+    /// Simple text input dialog.
+    pub fn text_input(prompt: impl Into<String>, placeholder: impl Into<String>) -> InputDialogOptions {
+        InputDialogOptions {
+            prompt: prompt.into(),
+            value: None,
+            placeholder: Some(placeholder.into()),
+            password: false,
+            validate_input: false,
+        }
+    }
+
+    /// Rename item input dialog.
+    pub fn rename(current_name: &str) -> InputDialogOptions {
+        InputDialogOptions {
+            prompt: "Enter new name".into(),
+            value: Some(current_name.into()),
+            placeholder: None,
+            password: false,
+            validate_input: true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogAccessibility — accessibility annotations
+// ---------------------------------------------------------------------------
+
+/// ARIA-like role for a dialog element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AriaRole {
+    Dialog,
+    AlertDialog,
+    Form,
+}
+
+/// Accessibility annotations for dialog elements.
+#[derive(Debug, Clone)]
+pub struct DialogAccessibility {
+    pub role: AriaRole,
+    pub label: String,
+    pub description: Option<String>,
+    pub live_region: bool,
+}
+
+impl DialogAccessibility {
+    pub fn new(role: AriaRole, label: impl Into<String>) -> Self {
+        Self {
+            role,
+            label: label.into(),
+            description: None,
+            live_region: false,
+        }
+    }
+
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    pub fn with_live_region(mut self) -> Self {
+        self.live_region = true;
+        self
+    }
+
+    /// Generate accessibility attributes for the dialog.
+    pub fn for_message(severity: Severity, message: &str) -> Self {
+        let role = match severity {
+            Severity::Error | Severity::Warning => AriaRole::AlertDialog,
+            Severity::Info => AriaRole::Dialog,
+        };
+        Self::new(role, message)
+            .with_live_region()
+    }
+
+    pub fn for_input(prompt: &str) -> Self {
+        Self::new(AriaRole::Form, prompt)
+    }
+
+    pub fn for_confirm(message: &str) -> Self {
+        Self::new(AriaRole::AlertDialog, message)
+            .with_live_region()
+    }
+
+    /// Summary text for screen readers.
+    pub fn announce_text(&self) -> String {
+        match &self.description {
+            Some(desc) => format!("{}: {}", self.label, desc),
+            None => self.label.clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InputValidator — pattern-based validation
+// ---------------------------------------------------------------------------
+
+impl InputValidator {
+    /// Set a pattern (simple substring match) for validation.
+    pub fn with_pattern(mut self, pattern: impl Into<String>) -> Self {
+        self.pattern = Some(pattern.into());
+        self
+    }
+
+    /// Validate against the pattern if set.
+    pub fn validate_pattern(&self, input: &str) -> Result<(), String> {
+        if let Some(ref pat) = self.pattern {
+            if !input.contains(pat.as_str()) {
+                return Err(format!("Input must match pattern: {}", pat));
+            }
+        }
+        Ok(())
+    }
+
+    /// Full validation including pattern.
+    pub fn validate_all(&self, input: &str) -> Result<(), String> {
+        self.validate(input)?;
+        self.validate_pattern(input)?;
+        Ok(())
+    }
+
+    /// Check if the input would be valid (boolean convenience).
+    pub fn is_valid(&self, input: &str) -> bool {
+        self.validate_all(input).is_ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1338,5 +1589,111 @@ mod tests {
         let buttons = vec!["Save".into(), "Don't Save".into(), "Cancel".into()];
         let layout = dialog_button_layout(&buttons, Platform::Windows);
         assert_eq!(layout, vec!["Save", "Don't Save", "Cancel"]);
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn dialog_queue_push_pop_peek() {
+        let mut q = DialogQueue::new();
+        q.push(QueuedDialog::Message(DialogPreset::info("hello")));
+        q.push(QueuedDialog::Confirm(DialogPreset::confirm_delete("file.rs")));
+        q.push(QueuedDialog::Input(DialogPreset::text_input("Name", "enter name")));
+
+        assert_eq!(q.len(), 3);
+        let (msg, confirm, input) = q.counts();
+        assert_eq!((msg, confirm, input), (1, 1, 1));
+
+        assert!(matches!(q.peek(), Some(QueuedDialog::Message(_))));
+        let first = q.pop().unwrap();
+        assert!(matches!(first, QueuedDialog::Message(_)));
+        assert_eq!(q.len(), 2);
+    }
+
+    #[test]
+    fn dialog_queue_clear() {
+        let mut q = DialogQueue::new();
+        q.push(QueuedDialog::Message(DialogPreset::error("fail")));
+        q.push(QueuedDialog::Message(DialogPreset::info("ok")));
+        q.clear();
+        assert!(q.is_empty());
+        assert!(q.pop().is_none());
+    }
+
+    #[test]
+    fn dialog_preset_confirm_delete() {
+        let opts = DialogPreset::confirm_delete("main.rs");
+        assert!(opts.message.contains("main.rs"));
+        assert_eq!(opts.severity, Severity::Warning);
+        assert_eq!(opts.primary_button, "Delete");
+    }
+
+    #[test]
+    fn dialog_preset_unsaved_changes() {
+        let opts = DialogPreset::unsaved_changes("config.toml");
+        assert!(opts.message.contains("config.toml"));
+        assert_eq!(opts.primary_button, "Save");
+    }
+
+    #[test]
+    fn dialog_preset_error_and_info() {
+        let err = DialogPreset::error("Something broke");
+        assert_eq!(err.severity, Severity::Error);
+        assert_eq!(err.buttons.len(), 1);
+
+        let info = DialogPreset::info("Done!");
+        assert_eq!(info.severity, Severity::Info);
+    }
+
+    #[test]
+    fn dialog_preset_rename() {
+        let opts = DialogPreset::rename("old_name.txt");
+        assert_eq!(opts.value, Some("old_name.txt".into()));
+        assert!(opts.validate_input);
+    }
+
+    #[test]
+    fn dialog_accessibility_for_message() {
+        let a = DialogAccessibility::for_message(Severity::Error, "File not found");
+        assert_eq!(a.role, AriaRole::AlertDialog);
+        assert!(a.live_region);
+        assert_eq!(a.announce_text(), "File not found");
+    }
+
+    #[test]
+    fn dialog_accessibility_with_description() {
+        let a = DialogAccessibility::new(AriaRole::Dialog, "Save")
+            .with_description("Save current file");
+        assert_eq!(a.announce_text(), "Save: Save current file");
+    }
+
+    #[test]
+    fn dialog_accessibility_for_input_and_confirm() {
+        let input_a = DialogAccessibility::for_input("Enter name");
+        assert_eq!(input_a.role, AriaRole::Form);
+
+        let confirm_a = DialogAccessibility::for_confirm("Are you sure?");
+        assert_eq!(confirm_a.role, AriaRole::AlertDialog);
+        assert!(confirm_a.live_region);
+    }
+
+    #[test]
+    fn input_validator_with_pattern() {
+        let v = InputValidator::new()
+            .with_pattern("@")
+            .with_required(true);
+        assert!(v.validate_all("user@host").is_ok());
+        assert!(v.validate_all("noatsign").is_err());
+        assert!(v.validate_all("").is_err()); // required
+    }
+
+    #[test]
+    fn input_validator_is_valid_convenience() {
+        let v = InputValidator::new()
+            .with_min_length(3)
+            .with_max_length(10);
+        assert!(v.is_valid("hello"));
+        assert!(!v.is_valid("hi"));
+        assert!(!v.is_valid("way too long string here"));
     }
 }

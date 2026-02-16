@@ -738,6 +738,267 @@ impl OutputSeverity {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OutputChannelFilter — filter output by severity or pattern
+// ---------------------------------------------------------------------------
+
+/// Filter configuration for an output channel.
+#[derive(Debug, Clone)]
+pub struct OutputChannelFilter {
+    pub min_severity: Option<OutputSeverity>,
+    pub pattern: Option<String>,
+    pub exclude_pattern: Option<String>,
+}
+
+impl OutputChannelFilter {
+    pub fn new() -> Self {
+        Self {
+            min_severity: None,
+            pattern: None,
+            exclude_pattern: None,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: OutputSeverity) -> Self {
+        self.min_severity = Some(severity);
+        self
+    }
+
+    pub fn with_pattern(mut self, pattern: impl Into<String>) -> Self {
+        self.pattern = Some(pattern.into());
+        self
+    }
+
+    pub fn with_exclude(mut self, pattern: impl Into<String>) -> Self {
+        self.exclude_pattern = Some(pattern.into());
+        self
+    }
+
+    /// Check if a log entry passes the filter.
+    pub fn matches_entry(&self, entry: &LogEntry) -> bool {
+        if let Some(ref min) = self.min_severity {
+            if !entry.matches_filter(min) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Check if a line of text passes the pattern filters.
+    pub fn matches_line(&self, line: &str) -> bool {
+        if let Some(ref pat) = self.pattern {
+            if !line.contains(pat.as_str()) {
+                return false;
+            }
+        }
+        if let Some(ref excl) = self.exclude_pattern {
+            if line.contains(excl.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filter lines from channel content.
+    pub fn filter_content<'a>(&self, content: &'a str) -> Vec<&'a str> {
+        content.lines().filter(|l| self.matches_line(l)).collect()
+    }
+}
+
+impl Default for OutputChannelFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelExporter — export channel content
+// ---------------------------------------------------------------------------
+
+/// Export format for output channel content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    PlainText,
+    Csv,
+    Json,
+}
+
+/// Exports output channel content to various formats.
+pub struct OutputChannelExporter;
+
+impl OutputChannelExporter {
+    /// Export raw content as plain text with optional line numbers.
+    pub fn export_plain(content: &str, line_numbers: bool) -> String {
+        if !line_numbers {
+            return content.to_string();
+        }
+        content
+            .lines()
+            .enumerate()
+            .map(|(i, l)| format!("{:>4}: {}", i + 1, l))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Export lines as CSV (line_number, content).
+    pub fn export_csv(content: &str) -> String {
+        let mut out = String::from("line,content\n");
+        for (i, line) in content.lines().enumerate() {
+            let escaped = line.replace('"', "\"\"");
+            out.push_str(&format!("{},\"{}\"\n", i + 1, escaped));
+        }
+        out
+    }
+
+    /// Export lines as a JSON array of objects.
+    pub fn export_json(content: &str) -> String {
+        let entries: Vec<String> = content
+            .lines()
+            .enumerate()
+            .map(|(i, l)| {
+                let escaped = l.replace('\\', "\\\\").replace('"', "\\\"");
+                format!("  {{\"line\": {}, \"text\": \"{}\"}}", i + 1, escaped)
+            })
+            .collect();
+        format!("[\n{}\n]", entries.join(",\n"))
+    }
+
+    /// Export using the specified format.
+    pub fn export(content: &str, format: ExportFormat) -> String {
+        match format {
+            ExportFormat::PlainText => Self::export_plain(content, true),
+            ExportFormat::Csv => Self::export_csv(content),
+            ExportFormat::Json => Self::export_json(content),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelSearch — search within output channels
+// ---------------------------------------------------------------------------
+
+/// A search match within a channel's content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchMatch {
+    pub channel_id: String,
+    pub line_number: usize,
+    pub line_content: String,
+    pub match_start: usize,
+    pub match_end: usize,
+}
+
+/// Search across output channels.
+pub struct OutputChannelSearch;
+
+impl OutputChannelSearch {
+    /// Find all occurrences of `query` in a channel's content.
+    pub fn search_channel(channel_id: &str, content: &str, query: &str) -> Vec<SearchMatch> {
+        let mut results = Vec::new();
+        if query.is_empty() {
+            return results;
+        }
+        for (line_num, line) in content.lines().enumerate() {
+            let mut start = 0;
+            while let Some(pos) = line[start..].find(query) {
+                let abs_start = start + pos;
+                results.push(SearchMatch {
+                    channel_id: channel_id.to_string(),
+                    line_number: line_num + 1,
+                    line_content: line.to_string(),
+                    match_start: abs_start,
+                    match_end: abs_start + query.len(),
+                });
+                start = abs_start + query.len();
+            }
+        }
+        results
+    }
+
+    /// Case-insensitive search.
+    pub fn search_channel_ci(channel_id: &str, content: &str, query: &str) -> Vec<SearchMatch> {
+        let lower_content = content.to_lowercase();
+        let lower_query = query.to_lowercase();
+        let mut results = Vec::new();
+        if lower_query.is_empty() {
+            return results;
+        }
+        for (line_num, (orig_line, lower_line)) in content.lines().zip(lower_content.lines()).enumerate() {
+            let mut start = 0;
+            while let Some(pos) = lower_line[start..].find(&lower_query) {
+                let abs_start = start + pos;
+                results.push(SearchMatch {
+                    channel_id: channel_id.to_string(),
+                    line_number: line_num + 1,
+                    line_content: orig_line.to_string(),
+                    match_start: abs_start,
+                    match_end: abs_start + query.len(),
+                });
+                start = abs_start + query.len();
+            }
+        }
+        results
+    }
+
+    /// Count total matches across all channels.
+    pub fn count_matches(service: &OutputChannelService, query: &str) -> usize {
+        let mut total = 0;
+        for id in service.channel_ids() {
+            if let Some(content) = service.get_content(id) {
+                total += Self::search_channel(id, content, query).len();
+            }
+        }
+        total
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelService — channel grouping
+// ---------------------------------------------------------------------------
+
+/// A named group of output channels.
+#[derive(Debug, Clone)]
+pub struct OutputChannelGroup {
+    pub name: String,
+    pub channel_ids: Vec<String>,
+}
+
+impl OutputChannelGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            channel_ids: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, id: impl Into<String>) {
+        self.channel_ids.push(id.into());
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.channel_ids.retain(|i| i != id);
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.channel_ids.iter().any(|i| i == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.channel_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.channel_ids.is_empty()
+    }
+
+    /// Total line count across grouped channels.
+    pub fn total_lines(&self, service: &OutputChannelService) -> usize {
+        self.channel_ids
+            .iter()
+            .filter_map(|id| service.get_line_count(id).ok())
+            .sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1336,5 +1597,123 @@ mod tests {
         assert!(OutputSeverity::Error.at_least(&OutputSeverity::Warning));
         assert!(OutputSeverity::Warning.at_least(&OutputSeverity::Info));
         assert!(!OutputSeverity::Info.at_least(&OutputSeverity::Error));
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn output_channel_filter_by_pattern() {
+        let filter = OutputChannelFilter::new()
+            .with_pattern("error")
+            .with_exclude("debug");
+        let content = "error: something failed\ndebug: error trace\ninfo: ok\nerror: again";
+        let filtered = filter.filter_content(content);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered[0].contains("something failed"));
+        assert!(filtered[1].contains("again"));
+    }
+
+    #[test]
+    fn output_channel_filter_severity() {
+        let filter = OutputChannelFilter::new().with_severity(OutputSeverity::Warning);
+        let info = LogEntry::new(OutputSeverity::Info, "hello", "ch");
+        let warn = LogEntry::new(OutputSeverity::Warning, "watch out", "ch");
+        let err = LogEntry::new(OutputSeverity::Error, "fail", "ch");
+        assert!(!filter.matches_entry(&info));
+        assert!(filter.matches_entry(&warn));
+        assert!(filter.matches_entry(&err));
+    }
+
+    #[test]
+    fn output_channel_exporter_plain_text() {
+        let content = "line one\nline two";
+        let plain = OutputChannelExporter::export_plain(content, true);
+        assert!(plain.contains("   1: line one"));
+        assert!(plain.contains("   2: line two"));
+        let no_nums = OutputChannelExporter::export_plain(content, false);
+        assert_eq!(no_nums, content);
+    }
+
+    #[test]
+    fn output_channel_exporter_csv() {
+        let content = "hello\nworld";
+        let csv = OutputChannelExporter::export_csv(content);
+        assert!(csv.starts_with("line,content\n"));
+        assert!(csv.contains("1,\"hello\""));
+        assert!(csv.contains("2,\"world\""));
+    }
+
+    #[test]
+    fn output_channel_exporter_json() {
+        let content = "first\nsecond";
+        let json = OutputChannelExporter::export_json(content);
+        assert!(json.starts_with("["));
+        assert!(json.ends_with("]"));
+        assert!(json.contains("\"line\": 1"));
+        assert!(json.contains("\"text\": \"first\""));
+    }
+
+    #[test]
+    fn output_channel_search_basic() {
+        let matches = OutputChannelSearch::search_channel("ch1", "error: foo\nok\nerror: bar", "error");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].line_number, 1);
+        assert_eq!(matches[0].match_start, 0);
+        assert_eq!(matches[1].line_number, 3);
+    }
+
+    #[test]
+    fn output_channel_search_case_insensitive() {
+        let matches = OutputChannelSearch::search_channel_ci("ch1", "Error: FOO\nok\nERROR: bar", "error");
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn output_channel_search_count_across_channels() {
+        let mut svc = OutputChannelService::new();
+        let id1 = svc.create_channel(desc("ch1"));
+        let id2 = svc.create_channel(desc("ch2"));
+        svc.append(&id1, "error here\nok");
+        svc.append(&id2, "another error\nmore error");
+        let count = OutputChannelSearch::count_matches(&svc, "error");
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn output_channel_group_operations() {
+        let mut group = OutputChannelGroup::new("Build");
+        group.add("rust");
+        group.add("cargo");
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("rust"));
+        group.remove("rust");
+        assert!(!group.contains("rust"));
+        assert_eq!(group.len(), 1);
+    }
+
+    #[test]
+    fn output_channel_group_total_lines() {
+        let mut svc = OutputChannelService::new();
+        let id1 = svc.create_channel(desc("a"));
+        let id2 = svc.create_channel(desc("b"));
+        svc.append_line(&id1, "line1");
+        svc.append_line(&id1, "line2");
+        svc.append_line(&id2, "line3");
+
+        let mut group = OutputChannelGroup::new("all");
+        group.add("a");
+        group.add("b");
+        assert_eq!(group.total_lines(&svc), 3);
+    }
+
+    #[test]
+    fn output_exporter_format_dispatch() {
+        let content = "hello";
+        let plain = OutputChannelExporter::export(content, ExportFormat::PlainText);
+        assert!(plain.contains("1:"));
+        let csv = OutputChannelExporter::export(content, ExportFormat::Csv);
+        assert!(csv.contains("line,content"));
+        let json = OutputChannelExporter::export(content, ExportFormat::Json);
+        assert!(json.contains("\"text\""));
     }
 }

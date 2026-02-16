@@ -759,6 +759,347 @@ pub fn auto_resolve(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Merge conflict statistics by side
+// ---------------------------------------------------------------------------
+
+/// Breakdown of conflicts by which side changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConflictsBySource {
+    /// Conflicts where only the current branch changed.
+    pub current_only: usize,
+    /// Conflicts where only the incoming branch changed.
+    pub incoming_only: usize,
+    /// Conflicts where both sides changed.
+    pub both_changed: usize,
+    /// Trivial conflicts (both sides identical).
+    pub trivial: usize,
+}
+
+impl ConflictsBySource {
+    /// Compute from a slice of merge conflicts.
+    pub fn from_conflicts(conflicts: &[MergeConflict]) -> Self {
+        let mut current_only = 0;
+        let mut incoming_only = 0;
+        let mut both_changed = 0;
+        let mut trivial = 0;
+        for c in conflicts {
+            if c.is_trivial() {
+                trivial += 1;
+            } else if c.current_text == c.base_text {
+                incoming_only += 1;
+            } else if c.incoming_text == c.base_text {
+                current_only += 1;
+            } else {
+                both_changed += 1;
+            }
+        }
+        Self { current_only, incoming_only, both_changed, trivial }
+    }
+}
+
+impl fmt::Display for ConflictsBySource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ConflictsBySource(current={}, incoming={}, both={}, trivial={})",
+            self.current_only, self.incoming_only, self.both_changed, self.trivial
+        )
+    }
+}
+
+impl MergeEditorWidget {
+    /// Return breakdown of conflicts by source side.
+    pub fn conflicts_by_source(&self) -> ConflictsBySource {
+        ConflictsBySource::from_conflicts(&self.conflicts)
+    }
+
+    /// The resolution ratio as a fraction in [0.0, 1.0].
+    pub fn resolution_ratio(&self) -> f64 {
+        if self.conflicts.is_empty() {
+            return 1.0;
+        }
+        self.resolved_count() as f64 / self.conflicts.len() as f64
+    }
+
+    /// Total number of affected lines across all conflicts.
+    pub fn total_affected_lines(&self) -> u32 {
+        self.conflicts.iter().map(|c| c.line_span()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeSession — tracks multiple files being merged
+// ---------------------------------------------------------------------------
+
+/// Status of a file within a merge session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MergeFileStatus {
+    Pending,
+    InProgress,
+    Resolved,
+    Skipped,
+}
+
+impl fmt::Display for MergeFileStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MergeFileStatus::Pending => write!(f, "Pending"),
+            MergeFileStatus::InProgress => write!(f, "InProgress"),
+            MergeFileStatus::Resolved => write!(f, "Resolved"),
+            MergeFileStatus::Skipped => write!(f, "Skipped"),
+        }
+    }
+}
+
+/// A file entry in a merge session.
+#[derive(Debug, Clone)]
+pub struct MergeFileEntry {
+    pub path: String,
+    pub status: MergeFileStatus,
+    pub editor: MergeEditorWidget,
+}
+
+impl MergeFileEntry {
+    pub fn new(path: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            status: MergeFileStatus::Pending,
+            editor: MergeEditorWidget::new(),
+        }
+    }
+
+    /// Mark this entry as resolved if all conflicts are resolved.
+    pub fn try_finish(&mut self) -> bool {
+        if self.editor.all_resolved() {
+            self.status = MergeFileStatus::Resolved;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// A session that tracks multiple files being merged.
+#[derive(Debug, Clone)]
+pub struct MergeSession {
+    pub files: Vec<MergeFileEntry>,
+    pub current_file: usize,
+}
+
+impl MergeSession {
+    pub fn new() -> Self {
+        Self { files: Vec::new(), current_file: 0 }
+    }
+
+    /// Add a file to this merge session.
+    pub fn add_file(&mut self, path: impl Into<String>) -> usize {
+        let idx = self.files.len();
+        self.files.push(MergeFileEntry::new(path));
+        idx
+    }
+
+    /// Get the current file entry, if any.
+    pub fn current_entry(&self) -> Option<&MergeFileEntry> {
+        self.files.get(self.current_file)
+    }
+
+    /// Get a mutable reference to the current file entry.
+    pub fn current_entry_mut(&mut self) -> Option<&mut MergeFileEntry> {
+        self.files.get_mut(self.current_file)
+    }
+
+    /// Advance to the next file.
+    pub fn next_file(&mut self) -> bool {
+        if self.current_file + 1 < self.files.len() {
+            self.current_file += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Go back to the previous file.
+    pub fn prev_file(&mut self) -> bool {
+        if self.current_file > 0 {
+            self.current_file -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Number of files in the session.
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    /// Number of fully resolved files.
+    pub fn resolved_file_count(&self) -> usize {
+        self.files.iter().filter(|f| f.status == MergeFileStatus::Resolved).count()
+    }
+
+    /// Number of files still pending or in progress.
+    pub fn pending_file_count(&self) -> usize {
+        self.files.iter().filter(|f| {
+            f.status == MergeFileStatus::Pending || f.status == MergeFileStatus::InProgress
+        }).count()
+    }
+
+    /// Overall session progress as a fraction in [0.0, 1.0].
+    pub fn progress(&self) -> f64 {
+        if self.files.is_empty() {
+            return 1.0;
+        }
+        let done = self.files.iter().filter(|f| {
+            f.status == MergeFileStatus::Resolved || f.status == MergeFileStatus::Skipped
+        }).count();
+        done as f64 / self.files.len() as f64
+    }
+
+    /// Skip the current file and advance.
+    pub fn skip_current(&mut self) {
+        if let Some(entry) = self.files.get_mut(self.current_file) {
+            entry.status = MergeFileStatus::Skipped;
+        }
+        self.next_file();
+    }
+
+    /// Check whether the entire session is complete.
+    pub fn is_complete(&self) -> bool {
+        self.files.iter().all(|f| {
+            f.status == MergeFileStatus::Resolved || f.status == MergeFileStatus::Skipped
+        })
+    }
+}
+
+impl Default for MergeSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for MergeSession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MergeSession({}/{} resolved, file {}/{})",
+            self.resolved_file_count(),
+            self.file_count(),
+            self.current_file + 1,
+            self.file_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Serialization of merge results
+// ---------------------------------------------------------------------------
+
+/// Serializable representation of a merge result for a single file.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MergeResultRecord {
+    pub path: String,
+    pub status: MergeFileStatus,
+    pub total_conflicts: usize,
+    pub resolved_conflicts: usize,
+    pub merged_lines: Vec<String>,
+}
+
+impl MergeResultRecord {
+    /// Create from a merge file entry.
+    pub fn from_entry(entry: &MergeFileEntry) -> Self {
+        Self {
+            path: entry.path.clone(),
+            status: entry.status.clone(),
+            total_conflicts: entry.editor.conflicts.len(),
+            resolved_conflicts: entry.editor.resolved_count(),
+            merged_lines: entry.editor.get_merged_result(),
+        }
+    }
+
+    /// The merged content as a single string.
+    pub fn merged_text(&self) -> String {
+        self.merged_lines.join("\n")
+    }
+
+    /// Whether this file was fully resolved.
+    pub fn is_fully_resolved(&self) -> bool {
+        self.total_conflicts == self.resolved_conflicts && self.total_conflicts > 0
+    }
+}
+
+impl fmt::Display for MergeResultRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MergeResult({}: {}/{} conflicts resolved, status={})",
+            self.path, self.resolved_conflicts, self.total_conflicts, self.status
+        )
+    }
+}
+
+/// Serialize the entire session into result records.
+pub fn serialize_session_results(session: &MergeSession) -> Vec<MergeResultRecord> {
+    session.files.iter().map(MergeResultRecord::from_entry).collect()
+}
+
+/// Summary of a full merge session.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MergeSessionSummary {
+    pub total_files: usize,
+    pub resolved_files: usize,
+    pub skipped_files: usize,
+    pub total_conflicts: usize,
+    pub resolved_conflicts: usize,
+}
+
+impl MergeSessionSummary {
+    pub fn from_session(session: &MergeSession) -> Self {
+        let mut total_conflicts = 0;
+        let mut resolved_conflicts = 0;
+        let mut skipped = 0;
+        let mut resolved_files = 0;
+        for f in &session.files {
+            total_conflicts += f.editor.conflicts.len();
+            resolved_conflicts += f.editor.resolved_count();
+            if f.status == MergeFileStatus::Resolved {
+                resolved_files += 1;
+            }
+            if f.status == MergeFileStatus::Skipped {
+                skipped += 1;
+            }
+        }
+        Self {
+            total_files: session.files.len(),
+            resolved_files,
+            skipped_files: skipped,
+            total_conflicts,
+            resolved_conflicts,
+        }
+    }
+
+    /// Overall conflict resolution ratio.
+    pub fn conflict_resolution_ratio(&self) -> f64 {
+        if self.total_conflicts == 0 {
+            return 1.0;
+        }
+        self.resolved_conflicts as f64 / self.total_conflicts as f64
+    }
+}
+
+impl fmt::Display for MergeSessionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SessionSummary(files={}/{}, skipped={}, conflicts={}/{})",
+            self.resolved_files, self.total_files,
+            self.skipped_files,
+            self.resolved_conflicts, self.total_conflicts
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1288,5 +1629,114 @@ d
         let result = auto_resolve(&base, &ours, &theirs);
         assert!(result.had_conflicts);
         assert_eq!(result.conflict_count, 2);
+    }
+
+    // ---- ConflictsBySource tests ----
+
+    #[test]
+    fn conflicts_by_source_breakdown() {
+        let mut widget = MergeEditorWidget::new();
+        // current_only: current differs, incoming == base
+        widget.add_conflict(MergeConflictBuilder::new().region(0, 2).current_text("X").incoming_text("base").base_text("base").build().unwrap());
+        // incoming_only: incoming differs, current == base
+        widget.add_conflict(MergeConflictBuilder::new().region(2, 4).current_text("base").incoming_text("Y").base_text("base").build().unwrap());
+        // both changed
+        widget.add_conflict(MergeConflictBuilder::new().region(4, 6).current_text("A").incoming_text("B").base_text("base").build().unwrap());
+        // trivial: current == incoming
+        widget.add_conflict(MergeConflictBuilder::new().region(6, 8).current_text("same").incoming_text("same").base_text("base").build().unwrap());
+
+        let by_source = widget.conflicts_by_source();
+        assert_eq!(by_source.current_only, 1);
+        assert_eq!(by_source.incoming_only, 1);
+        assert_eq!(by_source.both_changed, 1);
+        assert_eq!(by_source.trivial, 1);
+    }
+
+    #[test]
+    fn resolution_ratio_computation() {
+        let mut widget = MergeEditorWidget::new();
+        widget.add_conflict(MergeConflictBuilder::new().region(0, 2).current_text("a").incoming_text("b").base_text("c").build().unwrap());
+        widget.add_conflict(MergeConflictBuilder::new().region(2, 4).current_text("d").incoming_text("e").base_text("f").build().unwrap());
+        assert!((widget.resolution_ratio() - 0.0).abs() < f64::EPSILON);
+
+        widget.resolve_conflict(0, MergeResolution::AcceptCurrent);
+        assert!((widget.resolution_ratio() - 0.5).abs() < f64::EPSILON);
+
+        widget.resolve_conflict(1, MergeResolution::AcceptIncoming);
+        assert!((widget.resolution_ratio() - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ---- MergeSession tests ----
+
+    #[test]
+    fn merge_session_file_tracking() {
+        let mut session = MergeSession::new();
+        session.add_file("file_a.rs");
+        session.add_file("file_b.rs");
+        session.add_file("file_c.rs");
+        assert_eq!(session.file_count(), 3);
+        assert_eq!(session.resolved_file_count(), 0);
+        assert!(!session.is_complete());
+
+        // Navigate
+        assert!(session.next_file());
+        assert_eq!(session.current_file, 1);
+        assert!(session.prev_file());
+        assert_eq!(session.current_file, 0);
+    }
+
+    #[test]
+    fn merge_session_skip_and_progress() {
+        let mut session = MergeSession::new();
+        session.add_file("a.rs");
+        session.add_file("b.rs");
+        session.skip_current();
+        assert!((session.progress() - 0.5).abs() < f64::EPSILON);
+        session.files[1].status = MergeFileStatus::Resolved;
+        assert!(session.is_complete());
+        assert!((session.progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn merge_result_record_serialization() {
+        let mut session = MergeSession::new();
+        session.add_file("test.rs");
+        {
+            let entry = session.current_entry_mut().unwrap();
+            entry.editor.add_conflict(
+                MergeConflictBuilder::new().region(0, 2).current_text("a").incoming_text("b").base_text("c").build().unwrap(),
+            );
+            entry.editor.resolve_conflict(0, MergeResolution::AcceptCurrent);
+            entry.status = MergeFileStatus::InProgress;
+            entry.try_finish();
+        }
+        let records = serialize_session_results(&session);
+        assert_eq!(records.len(), 1);
+        assert!(records[0].is_fully_resolved());
+        assert_eq!(records[0].merged_lines, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn merge_session_summary() {
+        let mut session = MergeSession::new();
+        session.add_file("x.rs");
+        session.add_file("y.rs");
+        {
+            let entry = &mut session.files[0];
+            entry.editor.add_conflict(
+                MergeConflictBuilder::new().region(0, 2).current_text("a").incoming_text("b").base_text("c").build().unwrap(),
+            );
+            entry.editor.resolve_conflict(0, MergeResolution::AcceptCurrent);
+            entry.status = MergeFileStatus::Resolved;
+        }
+        session.files[1].status = MergeFileStatus::Skipped;
+
+        let summary = MergeSessionSummary::from_session(&session);
+        assert_eq!(summary.total_files, 2);
+        assert_eq!(summary.resolved_files, 1);
+        assert_eq!(summary.skipped_files, 1);
+        assert_eq!(summary.total_conflicts, 1);
+        assert_eq!(summary.resolved_conflicts, 1);
+        assert!((summary.conflict_resolution_ratio() - 1.0).abs() < f64::EPSILON);
     }
 }

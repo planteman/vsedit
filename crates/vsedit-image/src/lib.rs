@@ -685,6 +685,192 @@ pub fn image_resize(
     out
 }
 
+// ---------------------------------------------------------------------------
+// ImageThumbnail – thumbnail generation metadata
+// ---------------------------------------------------------------------------
+
+/// Describes how to generate a thumbnail for an image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageThumbnail {
+    pub original_width: u32,
+    pub original_height: u32,
+    pub thumb_width: u32,
+    pub thumb_height: u32,
+}
+
+impl ImageThumbnail {
+    /// Compute thumbnail dimensions that fit within `max_side × max_side`
+    /// while preserving the aspect ratio of the original image.
+    pub fn new(original_width: u32, original_height: u32, max_side: u32) -> Self {
+        let (tw, th) = if original_width == 0 || original_height == 0 || max_side == 0 {
+            (0, 0)
+        } else if original_width >= original_height {
+            let scale = max_side as f64 / original_width as f64;
+            let w = max_side.min(original_width);
+            let h = ((original_height as f64 * scale).round() as u32).max(1).min(original_height);
+            (w, h)
+        } else {
+            let scale = max_side as f64 / original_height as f64;
+            let w = ((original_width as f64 * scale).round() as u32).max(1).min(original_width);
+            let h = max_side.min(original_height);
+            (w, h)
+        };
+        Self {
+            original_width,
+            original_height,
+            thumb_width: tw,
+            thumb_height: th,
+        }
+    }
+
+    /// The scale factor from original to thumbnail.
+    pub fn scale_factor(&self) -> f64 {
+        if self.original_width == 0 {
+            return 0.0;
+        }
+        self.thumb_width as f64 / self.original_width as f64
+    }
+}
+
+impl fmt::Display for ImageThumbnail {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}x{} → {}x{}",
+            self.original_width, self.original_height, self.thumb_width, self.thumb_height
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ImageTransform – rotation / flip descriptors
+// ---------------------------------------------------------------------------
+
+/// Rotation angles in 90-degree increments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rotation {
+    None,
+    Cw90,
+    Cw180,
+    Cw270,
+}
+
+/// Flip axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlipAxis {
+    Horizontal,
+    Vertical,
+}
+
+/// A chain of transforms to apply to an image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageTransform {
+    pub rotation: Rotation,
+    pub flips: Vec<FlipAxis>,
+}
+
+impl ImageTransform {
+    pub fn new() -> Self {
+        Self {
+            rotation: Rotation::None,
+            flips: Vec::new(),
+        }
+    }
+
+    pub fn rotate(mut self, rotation: Rotation) -> Self {
+        self.rotation = rotation;
+        self
+    }
+
+    pub fn flip(mut self, axis: FlipAxis) -> Self {
+        self.flips.push(axis);
+        self
+    }
+
+    /// Return the resulting dimensions after applying the rotation.
+    pub fn transformed_dimensions(&self, width: u32, height: u32) -> (u32, u32) {
+        match self.rotation {
+            Rotation::Cw90 | Rotation::Cw270 => (height, width),
+            _ => (width, height),
+        }
+    }
+
+    /// True when the transform is a no-op.
+    pub fn is_identity(&self) -> bool {
+        self.rotation == Rotation::None && self.flips.is_empty()
+    }
+}
+
+impl Default for ImageTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ImageCompare – pixel-level comparison helpers
+// ---------------------------------------------------------------------------
+
+/// Result of comparing two same-sized grayscale images.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageCompareResult {
+    pub width: usize,
+    pub height: usize,
+    pub total_pixels: usize,
+    pub differing_pixels: usize,
+    pub mean_absolute_error: f64,
+}
+
+impl ImageCompareResult {
+    /// Fraction of pixels that differ (0.0 = identical, 1.0 = all different).
+    pub fn diff_ratio(&self) -> f64 {
+        if self.total_pixels == 0 {
+            return 0.0;
+        }
+        self.differing_pixels as f64 / self.total_pixels as f64
+    }
+}
+
+/// Compare two equal-sized grayscale pixel buffers.
+///
+/// Returns `Err` if the buffers have different lengths or the dimensions are
+/// inconsistent with the buffer length.
+pub fn image_compare(
+    a: &[u8],
+    b: &[u8],
+    width: usize,
+    height: usize,
+) -> Result<ImageCompareResult, ImageError> {
+    let expected_len = width * height;
+    if a.len() != expected_len || b.len() != expected_len {
+        return Err(ImageError::InvalidDimensions {
+            width: width as u32,
+            height: height as u32,
+        });
+    }
+    let mut differing = 0usize;
+    let mut total_error: u64 = 0;
+    for (pa, pb) in a.iter().zip(b.iter()) {
+        let diff = (*pa as i16 - *pb as i16).unsigned_abs() as u64;
+        if diff > 0 {
+            differing += 1;
+        }
+        total_error += diff;
+    }
+    let mae = if expected_len == 0 {
+        0.0
+    } else {
+        total_error as f64 / expected_len as f64
+    };
+    Ok(ImageCompareResult {
+        width,
+        height,
+        total_pixels: expected_len,
+        differing_pixels: differing,
+        mean_absolute_error: mae,
+    })
+}
+
 /// Compute the largest dimensions that fit within `max_w × max_h` while
 /// preserving the aspect ratio of `src_w × src_h`.
 pub fn image_fit_dimensions(src_w: u32, src_h: u32, max_w: u32, max_h: u32) -> (u32, u32) {
@@ -1281,5 +1467,102 @@ mod tests {
     fn image_is_ascii_printable() {
         assert!(ImageValidator::is_ascii_printable("Hello World 123"));
         assert!(!ImageValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---------------------------------------------------------------
+    // ImageThumbnail tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn thumbnail_landscape() {
+        let t = ImageThumbnail::new(2000, 1000, 200);
+        assert_eq!(t.thumb_width, 200);
+        assert_eq!(t.thumb_height, 100);
+        assert!((t.scale_factor() - 0.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn thumbnail_portrait() {
+        let t = ImageThumbnail::new(1000, 2000, 200);
+        assert_eq!(t.thumb_width, 100);
+        assert_eq!(t.thumb_height, 200);
+    }
+
+    #[test]
+    fn thumbnail_zero_dimension() {
+        let t = ImageThumbnail::new(0, 100, 50);
+        assert_eq!(t.thumb_width, 0);
+        assert_eq!(t.thumb_height, 0);
+        assert!((t.scale_factor() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn thumbnail_display() {
+        let t = ImageThumbnail::new(800, 600, 100);
+        let s = format!("{t}");
+        assert!(s.contains("800x600"));
+        assert!(s.contains("→"));
+    }
+
+    // ---------------------------------------------------------------
+    // ImageTransform tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn transform_identity() {
+        let t = ImageTransform::new();
+        assert!(t.is_identity());
+        assert_eq!(t.transformed_dimensions(800, 600), (800, 600));
+    }
+
+    #[test]
+    fn transform_rotate_90() {
+        let t = ImageTransform::new().rotate(Rotation::Cw90);
+        assert!(!t.is_identity());
+        assert_eq!(t.transformed_dimensions(800, 600), (600, 800));
+    }
+
+    #[test]
+    fn transform_rotate_180_keeps_dims() {
+        let t = ImageTransform::new().rotate(Rotation::Cw180);
+        assert_eq!(t.transformed_dimensions(800, 600), (800, 600));
+    }
+
+    #[test]
+    fn transform_flip_not_identity() {
+        let t = ImageTransform::new().flip(FlipAxis::Horizontal);
+        assert!(!t.is_identity());
+    }
+
+    // ---------------------------------------------------------------
+    // ImageCompare tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn compare_identical_images() {
+        let a = vec![100u8; 16];
+        let b = vec![100u8; 16];
+        let r = image_compare(&a, &b, 4, 4).unwrap();
+        assert_eq!(r.differing_pixels, 0);
+        assert!((r.mean_absolute_error - 0.0).abs() < f64::EPSILON);
+        assert!((r.diff_ratio() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compare_all_different() {
+        let a = vec![0u8; 4];
+        let b = vec![255u8; 4];
+        let r = image_compare(&a, &b, 2, 2).unwrap();
+        assert_eq!(r.differing_pixels, 4);
+        assert!((r.mean_absolute_error - 255.0).abs() < f64::EPSILON);
+        assert!((r.diff_ratio() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compare_size_mismatch() {
+        let a = vec![0u8; 4];
+        let b = vec![0u8; 4];
+        let r = image_compare(&a, &b, 3, 3);
+        assert!(r.is_err());
     }
 }

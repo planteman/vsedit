@@ -718,6 +718,204 @@ pub fn parse_lsp_definition(response: &serde_json::Value) -> Vec<Location> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// GotoBreadcrumb — breadcrumb navigation trail
+// ---------------------------------------------------------------------------
+
+/// A breadcrumb entry representing a visited symbol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreadcrumbEntry {
+    pub label: String,
+    pub location: Location,
+}
+
+/// Breadcrumb trail showing the navigation path through symbols.
+#[derive(Debug, Clone, Default)]
+pub struct GotoBreadcrumb {
+    entries: Vec<BreadcrumbEntry>,
+    max_depth: usize,
+}
+
+impl GotoBreadcrumb {
+    pub fn new(max_depth: usize) -> Self {
+        Self { entries: Vec::new(), max_depth }
+    }
+
+    /// Push a new breadcrumb entry.
+    pub fn push(&mut self, label: impl Into<String>, location: Location) {
+        if self.entries.len() >= self.max_depth {
+            self.entries.remove(0);
+        }
+        self.entries.push(BreadcrumbEntry { label: label.into(), location });
+    }
+
+    /// Pop and return the last breadcrumb.
+    pub fn pop(&mut self) -> Option<BreadcrumbEntry> {
+        self.entries.pop()
+    }
+
+    /// Return the current trail as a path string (e.g. "main > parse > token").
+    pub fn trail_string(&self, separator: &str) -> String {
+        self.entries.iter().map(|e| e.label.as_str()).collect::<Vec<_>>().join(separator)
+    }
+
+    /// Return the current depth.
+    pub fn depth(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return all entries.
+    pub fn entries(&self) -> &[BreadcrumbEntry] {
+        &self.entries
+    }
+
+    /// Clear the entire trail.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoBookmarkManager — bookmark goto locations
+// ---------------------------------------------------------------------------
+
+/// A saved bookmark for a goto location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GotoBookmark {
+    pub name: String,
+    pub location: Location,
+}
+
+/// Manages a collection of named bookmarks.
+#[derive(Debug, Clone, Default)]
+pub struct GotoBookmarkManager {
+    bookmarks: Vec<GotoBookmark>,
+}
+
+impl GotoBookmarkManager {
+    pub fn new() -> Self {
+        Self { bookmarks: Vec::new() }
+    }
+
+    /// Add a bookmark. If a bookmark with the same name exists, update it.
+    pub fn add(&mut self, name: impl Into<String>, location: Location) {
+        let name = name.into();
+        if let Some(existing) = self.bookmarks.iter_mut().find(|b| b.name == name) {
+            existing.location = location;
+        } else {
+            self.bookmarks.push(GotoBookmark { name, location });
+        }
+    }
+
+    /// Remove a bookmark by name. Returns true if found.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.bookmarks.len();
+        self.bookmarks.retain(|b| b.name != name);
+        self.bookmarks.len() < before
+    }
+
+    /// Look up a bookmark by name.
+    pub fn get(&self, name: &str) -> Option<&GotoBookmark> {
+        self.bookmarks.iter().find(|b| b.name == name)
+    }
+
+    /// Return all bookmarks for a given file URI.
+    pub fn bookmarks_in_file(&self, uri: &str) -> Vec<&GotoBookmark> {
+        self.bookmarks.iter().filter(|b| b.location.uri == uri).collect()
+    }
+
+    /// Return the total number of bookmarks.
+    pub fn count(&self) -> usize {
+        self.bookmarks.len()
+    }
+
+    /// List all bookmark names sorted alphabetically.
+    pub fn names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.bookmarks.iter().map(|b| b.name.as_str()).collect();
+        names.sort_unstable();
+        names
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoPredictor — predict likely goto targets based on history
+// ---------------------------------------------------------------------------
+
+/// Tracks goto target frequency and predicts likely targets.
+#[derive(Debug, Clone, Default)]
+pub struct GotoPredictor {
+    target_counts: std::collections::HashMap<String, u32>,
+}
+
+impl GotoPredictor {
+    pub fn new() -> Self {
+        Self { target_counts: std::collections::HashMap::new() }
+    }
+
+    /// Record that the user navigated to a target URI.
+    pub fn record_navigation(&mut self, target_uri: &str) {
+        *self.target_counts.entry(target_uri.to_string()).or_insert(0) += 1;
+    }
+
+    /// Return the top-N most frequently visited targets.
+    pub fn predict(&self, limit: usize) -> Vec<(&str, u32)> {
+        let mut entries: Vec<(&str, u32)> = self.target_counts.iter()
+            .map(|(k, v)| (k.as_str(), *v))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(limit);
+        entries
+    }
+
+    /// Return the visit count for a specific URI.
+    pub fn visit_count(&self, uri: &str) -> u32 {
+        self.target_counts.get(uri).copied().unwrap_or(0)
+    }
+
+    /// Total unique targets tracked.
+    pub fn unique_targets(&self) -> usize {
+        self.target_counts.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoHistory frequency analysis
+// ---------------------------------------------------------------------------
+
+impl GotoHistory {
+    /// Count how many times each file appears in the history.
+    pub fn file_frequency(&self) -> Vec<(&str, usize)> {
+        let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for entry in &self.entries {
+            *counts.entry(entry.uri.as_str()).or_insert(0) += 1;
+        }
+        let mut freq: Vec<(&str, usize)> = counts.into_iter().collect();
+        freq.sort_by(|a, b| b.1.cmp(&a.1));
+        freq
+    }
+
+    /// Return the total number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return all unique file URIs visited.
+    pub fn unique_files(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.entries.iter().map(|e| e.uri.as_str()).collect();
+        uris.sort_unstable();
+        uris.dedup();
+        uris
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1350,5 +1548,101 @@ mod tests {
         ]);
         assert_eq!(format!("{r}"), "3 results in 2 files");
         assert_eq!(format!("{}", GotoResult::None), "0 results in 0 files");
+    }
+
+    // -- GotoBreadcrumb tests -----------------------------------------------
+
+    #[test]
+    fn breadcrumb_push_pop_and_trail() {
+        let mut bc = GotoBreadcrumb::new(10);
+        assert!(bc.is_empty());
+
+        bc.push("main", Location::new("file:///main.rs", 1, 0));
+        bc.push("parse", Location::new("file:///parser.rs", 20, 5));
+        bc.push("token", Location::new("file:///lexer.rs", 50, 0));
+
+        assert_eq!(bc.depth(), 3);
+        assert_eq!(bc.trail_string(" > "), "main > parse > token");
+
+        let popped = bc.pop().unwrap();
+        assert_eq!(popped.label, "token");
+        assert_eq!(bc.depth(), 2);
+    }
+
+    #[test]
+    fn breadcrumb_max_depth() {
+        let mut bc = GotoBreadcrumb::new(2);
+        bc.push("a", Location::new("a.rs", 1, 0));
+        bc.push("b", Location::new("b.rs", 1, 0));
+        bc.push("c", Location::new("c.rs", 1, 0)); // should evict "a"
+        assert_eq!(bc.depth(), 2);
+        assert_eq!(bc.entries()[0].label, "b");
+    }
+
+    // -- GotoBookmarkManager tests ------------------------------------------
+
+    #[test]
+    fn bookmark_add_get_remove() {
+        let mut mgr = GotoBookmarkManager::new();
+        mgr.add("start", Location::new("main.rs", 1, 0));
+        mgr.add("loop", Location::new("main.rs", 50, 0));
+        mgr.add("helper", Location::new("util.rs", 10, 0));
+
+        assert_eq!(mgr.count(), 3);
+        assert!(mgr.get("start").is_some());
+        assert_eq!(mgr.bookmarks_in_file("main.rs").len(), 2);
+
+        assert!(mgr.remove("loop"));
+        assert_eq!(mgr.count(), 2);
+        assert!(!mgr.remove("nonexistent"));
+
+        let names = mgr.names();
+        assert_eq!(names, vec!["helper", "start"]);
+    }
+
+    #[test]
+    fn bookmark_update_existing() {
+        let mut mgr = GotoBookmarkManager::new();
+        mgr.add("x", Location::new("a.rs", 1, 0));
+        mgr.add("x", Location::new("b.rs", 99, 0)); // update
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.get("x").unwrap().location.uri, "b.rs");
+    }
+
+    // -- GotoPredictor tests ------------------------------------------------
+
+    #[test]
+    fn predictor_tracks_and_predicts() {
+        let mut pred = GotoPredictor::new();
+        pred.record_navigation("file:///a.rs");
+        pred.record_navigation("file:///b.rs");
+        pred.record_navigation("file:///a.rs");
+        pred.record_navigation("file:///a.rs");
+        pred.record_navigation("file:///c.rs");
+
+        assert_eq!(pred.unique_targets(), 3);
+        assert_eq!(pred.visit_count("file:///a.rs"), 3);
+
+        let top = pred.predict(2);
+        assert_eq!(top[0].0, "file:///a.rs");
+        assert_eq!(top[0].1, 3);
+    }
+
+    // -- GotoHistory frequency analysis tests --------------------------------
+
+    #[test]
+    fn history_file_frequency() {
+        let mut hist = GotoHistory::new();
+        hist.push(Location::new("a.rs", 1, 0));
+        hist.push(Location::new("b.rs", 5, 0));
+        hist.push(Location::new("a.rs", 10, 0));
+
+        let freq = hist.file_frequency();
+        assert_eq!(freq[0].0, "a.rs");
+        assert_eq!(freq[0].1, 2);
+        assert_eq!(hist.len(), 3);
+
+        let files = hist.unique_files();
+        assert_eq!(files.len(), 2);
     }
 }

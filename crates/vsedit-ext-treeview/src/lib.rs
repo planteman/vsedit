@@ -667,6 +667,193 @@ impl Default for ExtTreeviewValidator {
     }
 }
 
+// ── Tree Serializer ──
+
+/// Serializes and deserializes a tree to/from a compact JSON representation.
+pub struct TreeViewSerializer;
+
+impl TreeViewSerializer {
+    /// Serialize a tree into a JSON string.
+    pub fn to_json(items: &[TreeItem]) -> Result<String, serde_json::Error> {
+        serde_json::to_string(items)
+    }
+
+    /// Serialize a tree into a pretty-printed JSON string.
+    pub fn to_json_pretty(items: &[TreeItem]) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(items)
+    }
+
+    /// Deserialize a tree from a JSON string.
+    pub fn from_json(json: &str) -> Result<Vec<TreeItem>, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Compute the depth of the deepest leaf in the tree.
+    pub fn max_depth(items: &[TreeItem]) -> usize {
+        items
+            .iter()
+            .map(|item| {
+                if item.children.is_empty() {
+                    1
+                } else {
+                    1 + Self::max_depth(&item.children)
+                }
+            })
+            .max()
+            .unwrap_or(0)
+    }
+}
+
+// ── Tree Accessibility ──
+
+/// ARIA-style accessibility role for tree view items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TreeItemRole {
+    TreeItem,
+    Group,
+    None,
+}
+
+/// Accessibility metadata attached to a tree item.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TreeItemAccessibility {
+    pub role: TreeItemRole,
+    pub label: String,
+    pub level: u32,
+    pub set_size: u32,
+    pub pos_in_set: u32,
+    pub expanded: Option<bool>,
+}
+
+impl TreeItemAccessibility {
+    /// Generate accessibility metadata for a flat list of sibling items at a given depth level.
+    pub fn for_siblings(items: &[TreeItem], level: u32) -> Vec<TreeItemAccessibility> {
+        let set_size = items.len() as u32;
+        items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let role = if item.children.is_empty() {
+                    TreeItemRole::TreeItem
+                } else {
+                    TreeItemRole::Group
+                };
+                let expanded = match item.collapsible_state {
+                    TreeItemCollapsibleState::Expanded => Some(true),
+                    TreeItemCollapsibleState::Collapsed => Some(false),
+                    TreeItemCollapsibleState::None => None,
+                };
+                TreeItemAccessibility {
+                    role,
+                    label: item.label.clone(),
+                    level,
+                    set_size,
+                    pos_in_set: (i + 1) as u32,
+                    expanded,
+                }
+            })
+            .collect()
+    }
+
+    /// Generate a full accessibility tree (depth-first) for the given items.
+    pub fn for_tree(items: &[TreeItem]) -> Vec<TreeItemAccessibility> {
+        fn walk(items: &[TreeItem], level: u32, out: &mut Vec<TreeItemAccessibility>) {
+            let siblings = TreeItemAccessibility::for_siblings(items, level);
+            for (acc, item) in siblings.into_iter().zip(items.iter()) {
+                out.push(acc);
+                if !item.children.is_empty() {
+                    walk(&item.children, level + 1, out);
+                }
+            }
+        }
+        let mut result = Vec::new();
+        walk(items, 1, &mut result);
+        result
+    }
+}
+
+// ── Tree Selection ──
+
+/// Manages multi-selection state for a tree view.
+#[derive(Debug, Clone)]
+pub struct TreeViewSelection {
+    selected: Vec<String>,
+    anchor: Option<String>,
+}
+
+impl TreeViewSelection {
+    pub fn new() -> Self {
+        Self {
+            selected: Vec::new(),
+            anchor: None,
+        }
+    }
+
+    /// Select a single item, clearing any previous selection.
+    pub fn select(&mut self, item_id: &str) {
+        self.selected.clear();
+        self.selected.push(item_id.to_string());
+        self.anchor = Some(item_id.to_string());
+    }
+
+    /// Toggle selection of an item (add if absent, remove if present).
+    pub fn toggle(&mut self, item_id: &str) {
+        if let Some(pos) = self.selected.iter().position(|s| s == item_id) {
+            self.selected.remove(pos);
+        } else {
+            self.selected.push(item_id.to_string());
+            self.anchor = Some(item_id.to_string());
+        }
+    }
+
+    /// Extend selection by adding items between the anchor and the given target
+    /// in the provided flat ordering of IDs.
+    pub fn select_range(&mut self, target_id: &str, flat_ids: &[&str]) {
+        let anchor = match &self.anchor {
+            Some(a) => a.clone(),
+            None => {
+                self.select(target_id);
+                return;
+            }
+        };
+        let anchor_pos = flat_ids.iter().position(|id| *id == anchor);
+        let target_pos = flat_ids.iter().position(|id| *id == target_id);
+        if let (Some(a), Some(t)) = (anchor_pos, target_pos) {
+            let (start, end) = if a <= t { (a, t) } else { (t, a) };
+            for id in &flat_ids[start..=end] {
+                let s = id.to_string();
+                if !self.selected.contains(&s) {
+                    self.selected.push(s);
+                }
+            }
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.selected.clear();
+        self.anchor = None;
+    }
+
+    pub fn is_selected(&self, item_id: &str) -> bool {
+        self.selected.iter().any(|s| s == item_id)
+    }
+
+    pub fn selected_items(&self) -> &[String] {
+        &self.selected
+    }
+
+    pub fn count(&self) -> usize {
+        self.selected.len()
+    }
+}
+
+impl Default for TreeViewSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1276,5 +1463,132 @@ mod tests {
         assert_eq!(filtered[0].children.len(), 1);
         assert_eq!(filtered[0].children[0].id, "child2");
         assert_eq!(filtered[0].children[0].children.len(), 1);
+    }
+
+    // ── Serializer Tests ──
+
+    #[test]
+    fn serializer_roundtrip() {
+        let tree = sample_tree();
+        let json = TreeViewSerializer::to_json(&tree).unwrap();
+        let restored = TreeViewSerializer::from_json(&json).unwrap();
+        assert_eq!(tree, restored);
+    }
+
+    #[test]
+    fn serializer_pretty_roundtrip() {
+        let tree = sample_tree();
+        let json = TreeViewSerializer::to_json_pretty(&tree).unwrap();
+        assert!(json.contains('\n'));
+        let restored = TreeViewSerializer::from_json(&json).unwrap();
+        assert_eq!(tree, restored);
+    }
+
+    #[test]
+    fn serializer_max_depth_flat() {
+        let items = vec![make_item("a", "A", vec![]), make_item("b", "B", vec![])];
+        assert_eq!(TreeViewSerializer::max_depth(&items), 1);
+    }
+
+    #[test]
+    fn serializer_max_depth_nested() {
+        let tree = sample_tree();
+        // src -> lib -> nested = depth 3
+        assert_eq!(TreeViewSerializer::max_depth(&tree), 3);
+    }
+
+    #[test]
+    fn serializer_max_depth_empty() {
+        let items: Vec<TreeItem> = vec![];
+        assert_eq!(TreeViewSerializer::max_depth(&items), 0);
+    }
+
+    // ── Accessibility Tests ──
+
+    #[test]
+    fn accessibility_for_siblings() {
+        let items = vec![
+            make_item("a", "Alpha", vec![]),
+            make_item("b", "Beta", vec![make_item("c", "Child", vec![])]),
+        ];
+        let acc = TreeItemAccessibility::for_siblings(&items, 1);
+        assert_eq!(acc.len(), 2);
+        assert_eq!(acc[0].role, TreeItemRole::TreeItem);
+        assert_eq!(acc[0].level, 1);
+        assert_eq!(acc[0].set_size, 2);
+        assert_eq!(acc[0].pos_in_set, 1);
+        assert_eq!(acc[0].expanded, None);
+        assert_eq!(acc[1].role, TreeItemRole::Group);
+        assert_eq!(acc[1].expanded, Some(false)); // Collapsed
+    }
+
+    #[test]
+    fn accessibility_for_tree_depth_first() {
+        let tree = make_test_tree();
+        let acc = TreeItemAccessibility::for_tree(&tree);
+        // root, child1, child2, grandchild = 4 entries
+        assert_eq!(acc.len(), 4);
+        assert_eq!(acc[0].label, "Root");
+        assert_eq!(acc[0].level, 1);
+        assert_eq!(acc[1].label, "Alpha File");
+        assert_eq!(acc[1].level, 2);
+        assert_eq!(acc[3].label, "Gamma Item");
+        assert_eq!(acc[3].level, 3);
+    }
+
+    // ── Selection Tests ──
+
+    #[test]
+    fn selection_single_select() {
+        let mut sel = TreeViewSelection::new();
+        sel.select("a");
+        assert!(sel.is_selected("a"));
+        assert_eq!(sel.count(), 1);
+        sel.select("b");
+        assert!(!sel.is_selected("a"));
+        assert!(sel.is_selected("b"));
+        assert_eq!(sel.count(), 1);
+    }
+
+    #[test]
+    fn selection_toggle() {
+        let mut sel = TreeViewSelection::new();
+        sel.toggle("a");
+        assert!(sel.is_selected("a"));
+        sel.toggle("b");
+        assert_eq!(sel.count(), 2);
+        sel.toggle("a");
+        assert!(!sel.is_selected("a"));
+        assert_eq!(sel.count(), 1);
+    }
+
+    #[test]
+    fn selection_range() {
+        let mut sel = TreeViewSelection::new();
+        let ids = vec!["a", "b", "c", "d", "e"];
+        sel.select("b");
+        sel.select_range("d", &ids);
+        assert!(sel.is_selected("b"));
+        assert!(sel.is_selected("c"));
+        assert!(sel.is_selected("d"));
+        assert!(!sel.is_selected("a"));
+        assert!(!sel.is_selected("e"));
+    }
+
+    #[test]
+    fn selection_clear() {
+        let mut sel = TreeViewSelection::new();
+        sel.select("x");
+        sel.toggle("y");
+        sel.clear();
+        assert_eq!(sel.count(), 0);
+        assert!(!sel.is_selected("x"));
+    }
+
+    #[test]
+    fn selection_default_empty() {
+        let sel = TreeViewSelection::default();
+        assert_eq!(sel.count(), 0);
+        assert!(sel.selected_items().is_empty());
     }
 }

@@ -782,6 +782,172 @@ impl Default for WebviewPersistenceStore {
     }
 }
 
+// ── Webview Theme Adapter ──
+
+/// Known webview colour themes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WebviewThemeKind {
+    Light,
+    Dark,
+    HighContrast,
+}
+
+/// Maps a colour theme to CSS custom-property values that a webview can inject.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WebviewThemeAdapter {
+    pub kind: WebviewThemeKind,
+    pub foreground: String,
+    pub background: String,
+    pub accent: String,
+    pub font_family: String,
+}
+
+impl WebviewThemeAdapter {
+    /// Create an adapter with sensible defaults for the given theme kind.
+    pub fn from_kind(kind: WebviewThemeKind) -> Self {
+        match kind {
+            WebviewThemeKind::Light => Self {
+                kind,
+                foreground: "#1e1e1e".into(),
+                background: "#ffffff".into(),
+                accent: "#0066b8".into(),
+                font_family: "system-ui, sans-serif".into(),
+            },
+            WebviewThemeKind::Dark => Self {
+                kind,
+                foreground: "#cccccc".into(),
+                background: "#1e1e1e".into(),
+                accent: "#569cd6".into(),
+                font_family: "system-ui, sans-serif".into(),
+            },
+            WebviewThemeKind::HighContrast => Self {
+                kind,
+                foreground: "#ffffff".into(),
+                background: "#000000".into(),
+                accent: "#ffff00".into(),
+                font_family: "system-ui, sans-serif".into(),
+            },
+        }
+    }
+
+    /// Render a `<style>` block containing CSS custom properties for the theme.
+    pub fn to_css_variables(&self) -> String {
+        format!(
+            ":root {{\n  --vscode-foreground: {};\n  --vscode-background: {};\n  --vscode-accent: {};\n  --vscode-font-family: {};\n}}",
+            self.foreground, self.background, self.accent, self.font_family
+        )
+    }
+
+    /// Wrap existing HTML content with theme CSS injected into a `<style>` tag.
+    pub fn wrap_html(&self, body_html: &str) -> String {
+        format!(
+            "<style>{}</style>\n{}",
+            self.to_css_variables(),
+            body_html
+        )
+    }
+}
+
+impl Default for WebviewThemeAdapter {
+    fn default() -> Self {
+        Self::from_kind(WebviewThemeKind::Dark)
+    }
+}
+
+// ── Webview Resource Loader ──
+
+/// Entry in the resource loader mapping a short alias to a resolved URI.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResourceEntry {
+    pub alias: String,
+    pub uri: String,
+}
+
+/// Manages a set of named resource mappings so extensions can reference assets
+/// by alias instead of full URIs.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WebviewResourceLoader {
+    entries: Vec<ResourceEntry>,
+}
+
+impl WebviewResourceLoader {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a resource alias. Returns an error if the alias already exists.
+    pub fn register(
+        &mut self,
+        alias: impl Into<String>,
+        uri: impl Into<String>,
+    ) -> Result<(), WebviewError> {
+        let alias = alias.into();
+        let uri = uri.into();
+        if alias.is_empty() {
+            return Err(WebviewError::InvalidContent("alias must not be empty".into()));
+        }
+        if self.entries.iter().any(|e| e.alias == alias) {
+            return Err(WebviewError::DuplicateHandle(0));
+        }
+        if !validate_webview_uri(&uri) {
+            return Err(WebviewError::InvalidResourceRoot(uri));
+        }
+        self.entries.push(ResourceEntry { alias, uri });
+        Ok(())
+    }
+
+    /// Resolve an alias to its URI, returning `None` if unregistered.
+    pub fn resolve(&self, alias: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|e| e.alias == alias)
+            .map(|e| e.uri.as_str())
+    }
+
+    /// Remove a resource entry by alias. Returns `true` if it existed.
+    pub fn unregister(&mut self, alias: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.alias != alias);
+        self.entries.len() < before
+    }
+
+    /// Return all registered aliases.
+    pub fn aliases(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.alias.as_str()).collect()
+    }
+
+    /// Generate `<link>` / `<script>` tags for all registered resources based
+    /// on file extension heuristics.
+    pub fn to_html_tags(&self) -> String {
+        let mut out = String::new();
+        for entry in &self.entries {
+            if entry.uri.ends_with(".css") {
+                out.push_str(&format!(
+                    "<link rel=\"stylesheet\" href=\"{}\">\n",
+                    entry.uri
+                ));
+            } else if entry.uri.ends_with(".js") {
+                out.push_str(&format!(
+                    "<script src=\"{}\"></script>\n",
+                    entry.uri
+                ));
+            }
+        }
+        out
+    }
+
+    /// Return the total number of registered resources.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` when no resources are registered.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1285,5 +1451,96 @@ mod tests {
         let json = store.to_json();
         let restored = WebviewPersistenceStore::from_json(&json).unwrap();
         assert_eq!(store, restored);
+    }
+
+    // ── WebviewThemeAdapter tests ──
+
+    #[test]
+    fn theme_adapter_light_defaults() {
+        let adapter = WebviewThemeAdapter::from_kind(WebviewThemeKind::Light);
+        assert_eq!(adapter.kind, WebviewThemeKind::Light);
+        assert_eq!(adapter.background, "#ffffff");
+        assert_eq!(adapter.foreground, "#1e1e1e");
+    }
+
+    #[test]
+    fn theme_adapter_css_variables() {
+        let adapter = WebviewThemeAdapter::from_kind(WebviewThemeKind::Dark);
+        let css = adapter.to_css_variables();
+        assert!(css.contains("--vscode-foreground: #cccccc"));
+        assert!(css.contains("--vscode-background: #1e1e1e"));
+        assert!(css.contains("--vscode-accent: #569cd6"));
+        assert!(css.starts_with(":root {"));
+    }
+
+    #[test]
+    fn theme_adapter_wrap_html() {
+        let adapter = WebviewThemeAdapter::from_kind(WebviewThemeKind::HighContrast);
+        let wrapped = adapter.wrap_html("<p>content</p>");
+        assert!(wrapped.contains("<style>"));
+        assert!(wrapped.contains("--vscode-foreground: #ffffff"));
+        assert!(wrapped.ends_with("<p>content</p>"));
+    }
+
+    #[test]
+    fn theme_adapter_serde_roundtrip() {
+        let adapter = WebviewThemeAdapter::from_kind(WebviewThemeKind::Dark);
+        let json = serde_json::to_string(&adapter).unwrap();
+        let back: WebviewThemeAdapter = serde_json::from_str(&json).unwrap();
+        assert_eq!(adapter, back);
+    }
+
+    #[test]
+    fn theme_kind_serde() {
+        let kind = WebviewThemeKind::HighContrast;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"highContrast\"");
+        let back: WebviewThemeKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, WebviewThemeKind::HighContrast);
+    }
+
+    // ── WebviewResourceLoader tests ──
+
+    #[test]
+    fn resource_loader_register_and_resolve() {
+        let mut loader = WebviewResourceLoader::new();
+        loader.register("styles", "https://cdn.example.com/app.css").unwrap();
+        loader.register("script", "https://cdn.example.com/app.js").unwrap();
+        assert_eq!(loader.len(), 2);
+        assert_eq!(loader.resolve("styles"), Some("https://cdn.example.com/app.css"));
+        assert_eq!(loader.resolve("missing"), None);
+    }
+
+    #[test]
+    fn resource_loader_rejects_duplicate_alias() {
+        let mut loader = WebviewResourceLoader::new();
+        loader.register("a", "https://x.com/a.css").unwrap();
+        assert!(loader.register("a", "https://x.com/b.css").is_err());
+    }
+
+    #[test]
+    fn resource_loader_rejects_invalid_uri() {
+        let mut loader = WebviewResourceLoader::new();
+        let res = loader.register("bad", "ftp://evil.com/file");
+        assert!(matches!(res, Err(WebviewError::InvalidResourceRoot(_))));
+    }
+
+    #[test]
+    fn resource_loader_unregister() {
+        let mut loader = WebviewResourceLoader::new();
+        loader.register("x", "https://cdn.example.com/x.js").unwrap();
+        assert!(loader.unregister("x"));
+        assert!(!loader.unregister("x"));
+        assert!(loader.is_empty());
+    }
+
+    #[test]
+    fn resource_loader_html_tags() {
+        let mut loader = WebviewResourceLoader::new();
+        loader.register("style", "https://cdn.example.com/app.css").unwrap();
+        loader.register("main", "https://cdn.example.com/main.js").unwrap();
+        let tags = loader.to_html_tags();
+        assert!(tags.contains("<link rel=\"stylesheet\" href=\"https://cdn.example.com/app.css\">"));
+        assert!(tags.contains("<script src=\"https://cdn.example.com/main.js\"></script>"));
     }
 }
