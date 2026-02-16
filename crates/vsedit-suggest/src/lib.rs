@@ -527,6 +527,76 @@ impl SnippetCompletionProvider {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LSP completion provider
+// ---------------------------------------------------------------------------
+
+/// Converts an LSP completion item kind number to our `CompletionItemKind`.
+fn lsp_kind_to_completion_kind(kind: u64) -> CompletionItemKind {
+    match kind {
+        1 => CompletionItemKind::Text,
+        2 => CompletionItemKind::Method,
+        3 => CompletionItemKind::Function,
+        4 => CompletionItemKind::Constructor,
+        5 => CompletionItemKind::Field,
+        6 => CompletionItemKind::Variable,
+        7 => CompletionItemKind::Class,
+        8 => CompletionItemKind::Interface,
+        9 => CompletionItemKind::Module,
+        10 => CompletionItemKind::Property,
+        11 => CompletionItemKind::Unit,
+        12 => CompletionItemKind::Value,
+        13 => CompletionItemKind::Enum,
+        14 => CompletionItemKind::Keyword,
+        15 => CompletionItemKind::Snippet,
+        16 => CompletionItemKind::Color,
+        17 => CompletionItemKind::File,
+        18 => CompletionItemKind::Reference,
+        19 => CompletionItemKind::Folder,
+        20 => CompletionItemKind::EnumMember,
+        21 => CompletionItemKind::Constant,
+        22 => CompletionItemKind::Struct,
+        23 => CompletionItemKind::Event,
+        24 => CompletionItemKind::Operator,
+        25 => CompletionItemKind::TypeParameter,
+        _ => CompletionItemKind::Text,
+    }
+}
+
+/// Converts an LSP completion item (as JSON) to our `CompletionItem` format.
+pub fn from_lsp_completion(item: &serde_json::Value) -> Option<CompletionItem> {
+    let label = item.get("label")?.as_str()?;
+    let kind = item
+        .get("kind")
+        .and_then(|k| k.as_u64())
+        .map(lsp_kind_to_completion_kind)
+        .unwrap_or(CompletionItemKind::Text);
+    let detail = item.get("detail").and_then(|d| d.as_str()).map(String::from);
+    let insert_text = item
+        .get("insertText")
+        .and_then(|t| t.as_str())
+        .map(String::from);
+
+    let mut ci = CompletionItem::new(label, kind);
+    ci.detail = detail;
+    ci.insert_text = insert_text;
+    Some(ci)
+}
+
+/// Parse an LSP completion response into a list of `CompletionItem`s.
+///
+/// Handles both `CompletionList` (`{ items: [...] }`) and bare `CompletionItem[]`
+/// response shapes.
+pub fn parse_lsp_completions(response: &serde_json::Value) -> Vec<CompletionItem> {
+    if let Some(items) = response.get("items").and_then(|i| i.as_array()) {
+        items.iter().filter_map(from_lsp_completion).collect()
+    } else if let Some(items) = response.as_array() {
+        items.iter().filter_map(from_lsp_completion).collect()
+    } else {
+        Vec::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -953,5 +1023,68 @@ mod tests {
             arguments: vec![],
         };
         assert_eq!(cmd.command, "editor.action.triggerSuggest");
+    }
+
+    // -----------------------------------------------------------------------
+    // LSP completion parsing tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_lsp_completion_list() {
+        let json = serde_json::json!({
+            "isIncomplete": false,
+            "items": [
+                { "label": "println", "kind": 3, "detail": "macro" },
+                { "label": "format", "kind": 3, "insertText": "format!(\"$1\")" },
+            ]
+        });
+        let items = parse_lsp_completions(&json);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].label, "println");
+        assert_eq!(items[0].kind, CompletionItemKind::Function);
+        assert_eq!(items[0].detail.as_deref(), Some("macro"));
+        assert_eq!(items[1].insert_text.as_deref(), Some("format!(\"$1\")"));
+    }
+
+    #[test]
+    fn parse_lsp_completion_array() {
+        let json = serde_json::json!([
+            { "label": "foo", "kind": 6 },
+            { "label": "bar" },
+        ]);
+        let items = parse_lsp_completions(&json);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].kind, CompletionItemKind::Variable);
+        assert_eq!(items[1].kind, CompletionItemKind::Text);
+    }
+
+    #[test]
+    fn parse_lsp_completion_empty() {
+        assert!(parse_lsp_completions(&serde_json::json!(null)).is_empty());
+        assert!(parse_lsp_completions(&serde_json::json!({})).is_empty());
+        assert!(parse_lsp_completions(&serde_json::json!([])).is_empty());
+    }
+
+    #[test]
+    fn parse_lsp_completion_malformed_items() {
+        let json = serde_json::json!([
+            { "kind": 3 },           // missing label
+            { "label": 42 },         // label not a string
+            { "label": "ok", "kind": 999 },
+        ]);
+        let items = parse_lsp_completions(&json);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "ok");
+        assert_eq!(items[0].kind, CompletionItemKind::Text); // unknown kind
+    }
+
+    #[test]
+    fn from_lsp_completion_all_kinds() {
+        for kind_num in 1u64..=25 {
+            let json = serde_json::json!({ "label": "x", "kind": kind_num });
+            let item = from_lsp_completion(&json).unwrap();
+            assert_ne!(item.label, "");
+            // All valid kinds should map to something other than crashing
+        }
     }
 }

@@ -3576,6 +3576,9 @@ dependencies = [
 [[package]]
 name = "vsedit-goto"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-hash"
@@ -3588,6 +3591,9 @@ dependencies = [
 [[package]]
 name = "vsedit-hover"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-hover-contrib"
@@ -4138,7 +4144,15 @@ dependencies = [
 name = "vsedit-suggest"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "vsedit-languages",
+]
+
+[[package]]
+name = "vsedit-syntax"
+version = "0.1.0"
+dependencies = [
+ "syntect",
 ]
 
 [[package]]

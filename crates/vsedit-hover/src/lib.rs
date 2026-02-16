@@ -898,6 +898,33 @@ pub fn render_hover(hover: &Hover, max_width: u16) -> Vec<String> {
     output
 }
 
+// ---------------------------------------------------------------------------
+// LSP hover parsing
+// ---------------------------------------------------------------------------
+
+/// Parse an LSP hover response into displayable content.
+///
+/// Handles `MarkupContent` (`{ kind, value }`), `MarkedString` (plain string),
+/// and `MarkedString[]` (array of strings) response shapes.
+pub fn parse_lsp_hover(response: &serde_json::Value) -> Option<HoverContent> {
+    let contents = response.get("contents")?;
+    if let Some(value) = contents.get("value").and_then(|v| v.as_str()) {
+        let kind = contents
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or("plaintext");
+        Some(if kind == "markdown" {
+            HoverContent::Markdown(value.to_string())
+        } else {
+            HoverContent::Text(value.to_string())
+        })
+    } else if let Some(text) = contents.as_str() {
+        Some(HoverContent::Text(text.to_string()))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1368,5 +1395,67 @@ mod tests {
         let output = render_hover(&hover, 80);
         assert!(!output.is_empty());
         assert!(output.iter().any(|l| l.contains("let x = 1;")));
+    }
+
+    // -----------------------------------------------------------------------
+    // LSP hover parsing tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_lsp_hover_markup_markdown() {
+        let json = serde_json::json!({
+            "contents": { "kind": "markdown", "value": "# Hello\n**bold**" }
+        });
+        let content = parse_lsp_hover(&json).unwrap();
+        match content {
+            HoverContent::Markdown(s) => assert!(s.contains("**bold**")),
+            _ => panic!("expected Markdown variant"),
+        }
+    }
+
+    #[test]
+    fn parse_lsp_hover_markup_plaintext() {
+        let json = serde_json::json!({
+            "contents": { "kind": "plaintext", "value": "some info" }
+        });
+        let content = parse_lsp_hover(&json).unwrap();
+        match content {
+            HoverContent::Text(s) => assert_eq!(s, "some info"),
+            _ => panic!("expected Text variant"),
+        }
+    }
+
+    #[test]
+    fn parse_lsp_hover_plain_string() {
+        let json = serde_json::json!({ "contents": "just text" });
+        let content = parse_lsp_hover(&json).unwrap();
+        match content {
+            HoverContent::Text(s) => assert_eq!(s, "just text"),
+            _ => panic!("expected Text variant"),
+        }
+    }
+
+    #[test]
+    fn parse_lsp_hover_missing_contents() {
+        assert!(parse_lsp_hover(&serde_json::json!({})).is_none());
+        assert!(parse_lsp_hover(&serde_json::json!(null)).is_none());
+    }
+
+    #[test]
+    fn parse_lsp_hover_empty_object_contents() {
+        let json = serde_json::json!({ "contents": {} });
+        assert!(parse_lsp_hover(&json).is_none());
+    }
+
+    #[test]
+    fn parse_lsp_hover_no_kind_defaults_plaintext() {
+        let json = serde_json::json!({
+            "contents": { "value": "no kind field" }
+        });
+        let content = parse_lsp_hover(&json).unwrap();
+        match content {
+            HoverContent::Text(s) => assert_eq!(s, "no kind field"),
+            _ => panic!("expected Text variant"),
+        }
     }
 }

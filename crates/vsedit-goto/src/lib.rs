@@ -603,6 +603,46 @@ impl Default for PeekState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LSP definition parsing
+// ---------------------------------------------------------------------------
+
+/// Parse a single LSP `Location` object into our `Location` type.
+fn parse_single_location(val: &serde_json::Value) -> Option<Location> {
+    let uri = val.get("uri")?.as_str()?;
+    let range = val.get("range")?;
+    let start = range.get("start")?;
+    let line = start.get("line")?.as_u64()? as u32;
+    let col = start.get("character")?.as_u64()? as u32;
+
+    let (end_line, end_col) = range.get("end").and_then(|end| {
+        let el = end.get("line")?.as_u64()? as u32;
+        let ec = end.get("character")?.as_u64()? as u32;
+        Some((el, ec))
+    }).unzip();
+
+    Some(Location {
+        uri: uri.to_string(),
+        line,
+        column: col,
+        end_line,
+        end_column: end_col,
+    })
+}
+
+/// Parse an LSP definition response into a list of `Location`s.
+///
+/// Handles both a single `Location` object and a `Location[]` array.
+pub fn parse_lsp_definition(response: &serde_json::Value) -> Vec<Location> {
+    if let Some(loc) = parse_single_location(response) {
+        vec![loc]
+    } else if let Some(arr) = response.as_array() {
+        arr.iter().filter_map(parse_single_location).collect()
+    } else {
+        Vec::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1069,5 +1109,78 @@ mod tests {
         ]);
         let grouped = peek.results_by_file();
         assert_eq!(grouped.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // LSP definition parsing tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_lsp_definition_single_location() {
+        let json = serde_json::json!({
+            "uri": "file:///src/main.rs",
+            "range": {
+                "start": { "line": 10, "character": 4 },
+                "end": { "line": 10, "character": 12 }
+            }
+        });
+        let locs = parse_lsp_definition(&json);
+        assert_eq!(locs.len(), 1);
+        assert_eq!(locs[0].uri, "file:///src/main.rs");
+        assert_eq!(locs[0].line, 10);
+        assert_eq!(locs[0].column, 4);
+        assert_eq!(locs[0].end_line, Some(10));
+        assert_eq!(locs[0].end_column, Some(12));
+    }
+
+    #[test]
+    fn parse_lsp_definition_array() {
+        let json = serde_json::json!([
+            {
+                "uri": "file:///a.rs",
+                "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 5 } }
+            },
+            {
+                "uri": "file:///b.rs",
+                "range": { "start": { "line": 20, "character": 3 }, "end": { "line": 20, "character": 10 } }
+            },
+        ]);
+        let locs = parse_lsp_definition(&json);
+        assert_eq!(locs.len(), 2);
+        assert_eq!(locs[0].uri, "file:///a.rs");
+        assert_eq!(locs[1].line, 20);
+    }
+
+    #[test]
+    fn parse_lsp_definition_empty() {
+        assert!(parse_lsp_definition(&serde_json::json!(null)).is_empty());
+        assert!(parse_lsp_definition(&serde_json::json!({})).is_empty());
+        assert!(parse_lsp_definition(&serde_json::json!([])).is_empty());
+    }
+
+    #[test]
+    fn parse_lsp_definition_malformed() {
+        let json = serde_json::json!([
+            { "uri": "file:///a.rs" },                             // missing range
+            { "range": { "start": { "line": 0, "character": 0 } } }, // missing uri
+            { "uri": "file:///ok.rs", "range": { "start": { "line": 5, "character": 2 }, "end": { "line": 5, "character": 8 } } },
+        ]);
+        let locs = parse_lsp_definition(&json);
+        assert_eq!(locs.len(), 1);
+        assert_eq!(locs[0].uri, "file:///ok.rs");
+    }
+
+    #[test]
+    fn parse_lsp_definition_no_end_range() {
+        let json = serde_json::json!({
+            "uri": "file:///test.rs",
+            "range": { "start": { "line": 3, "character": 7 } }
+        });
+        let locs = parse_lsp_definition(&json);
+        assert_eq!(locs.len(), 1);
+        assert_eq!(locs[0].line, 3);
+        assert_eq!(locs[0].column, 7);
+        assert!(locs[0].end_line.is_none());
+        assert!(locs[0].end_column.is_none());
     }
 }
