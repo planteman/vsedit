@@ -2,10 +2,19 @@
 //!
 //! Provides [`SearchQuery`], [`SearchEngine`], [`SearchResults`], [`SearchView`],
 //! and [`ReplaceOperation`] for workspace-wide find and replace.
+//!
+//! Also re-exports file-system search, replace, fuzzy file name search, and
+//! symbol extraction from [`vsedit_wb_search`].
 
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+
+// Re-export workspace search functionality
+pub use vsedit_wb_search::{
+    execute_replace, extract_symbols, preview_replace, replace_all, search_file_names,
+    search_files, FileQuickPick, ReplaceQuery, SymbolEntry, SymbolKind,
+};
 
 use globset::{Glob, GlobMatcher};
 use ratatui::{
@@ -754,6 +763,116 @@ impl SearchView {
             }
         }
     }
+
+    /// Execute search using the `vsedit-wb-search` file-system engine and
+    /// convert results into the view's [`SearchResults`] format.
+    pub fn execute_search_via_service(&mut self, root: &Path) {
+        let wb_query = vsedit_wb_search::SearchQuery {
+            pattern: self.search_text.clone(),
+            is_regex: self.is_regex,
+            case_sensitive: self.is_case_sensitive,
+            whole_word: self.is_whole_word,
+            include_pattern: if self.include_text.is_empty() {
+                None
+            } else {
+                Some(self.include_text.clone())
+            },
+            exclude_pattern: if self.exclude_text.is_empty() {
+                None
+            } else {
+                Some(self.exclude_text.clone())
+            },
+        };
+
+        let wb_results = vsedit_wb_search::search_files(&wb_query, root);
+
+        let file_matches: Vec<FileMatches> = wb_results
+            .into_iter()
+            .map(|sr| {
+                let file_path = PathBuf::from(&sr.matches[0].uri);
+                let matches = sr
+                    .matches
+                    .iter()
+                    .map(|m| SearchMatch {
+                        file_path: PathBuf::from(&m.uri),
+                        line_number: m.line,
+                        column: m.column,
+                        line_content: m.preview.clone(),
+                        match_range: (m.column as usize)..(m.column as usize + m.length as usize),
+                        preview: m.preview.clone(),
+                    })
+                    .collect();
+                FileMatches::new(file_path, matches)
+            })
+            .collect();
+
+        self.results = SearchResults::new(file_matches);
+        self.selected_result = if self.results.total_matches() > 0 {
+            Some(0)
+        } else {
+            None
+        };
+        self.scroll_offset = 0;
+    }
+
+    /// Preview what replacing the selected match would look like.
+    pub fn preview_replace_selected(&self) -> Option<String> {
+        let idx = self.selected_result?;
+        let m = self.get_match_at_entry(idx)?;
+        let wb_match = vsedit_wb_search::SearchMatch {
+            uri: m.file_path.to_string_lossy().to_string(),
+            line: m.line_number,
+            column: m.column,
+            length: (m.match_range.end - m.match_range.start) as u32,
+            preview: m.line_content.clone(),
+        };
+        Some(vsedit_wb_search::preview_replace(&wb_match, &self.replace_text))
+    }
+
+    /// Replace all search results across files using the wb-search engine.
+    pub fn replace_all_via_service(&mut self, root: &Path) -> usize {
+        let wb_query = vsedit_wb_search::SearchQuery {
+            pattern: self.search_text.clone(),
+            is_regex: self.is_regex,
+            case_sensitive: self.is_case_sensitive,
+            whole_word: self.is_whole_word,
+            include_pattern: if self.include_text.is_empty() {
+                None
+            } else {
+                Some(self.include_text.clone())
+            },
+            exclude_pattern: if self.exclude_text.is_empty() {
+                None
+            } else {
+                Some(self.exclude_text.clone())
+            },
+        };
+        let rq = vsedit_wb_search::ReplaceQuery::new(wb_query, &self.replace_text);
+        let count = vsedit_wb_search::replace_all(&rq, root);
+        // Re-run search to refresh results
+        self.execute_search_via_service(root);
+        count
+    }
+
+    /// Get the match at a given visible entry index, or `None` if it's a file header.
+    fn get_match_at_entry(&self, entry_idx: usize) -> Option<&SearchMatch> {
+        let mut idx = 0;
+        for fm in self.results.files() {
+            if idx == entry_idx {
+                return None; // file header
+            }
+            idx += 1;
+            if fm.is_expanded {
+                for m in &fm.matches {
+                    if idx == entry_idx {
+                        return Some(m);
+                    }
+                    idx += 1;
+                }
+            }
+        }
+        None
+    }
 }
 
 impl Default for SearchView {
@@ -1200,5 +1319,152 @@ mod tests {
         let preview = SearchEngine::build_preview(line, 16, 19);
         // Should contain "fox" and surrounding context
         assert!(preview.contains("fox"));
+    }
+
+    // -- Wired service tests (vsedit-wb-search integration) --
+
+    #[test]
+    fn execute_search_via_service_finds_files() {
+        let dir = temp_dir();
+        write_file(&dir, "data.txt", "needle in haystack\nneedle again");
+        write_file(&dir, "other.txt", "no match here");
+
+        let mut v = SearchView::new();
+        v.search_text = "needle".into();
+        v.execute_search_via_service(&dir);
+
+        assert_eq!(v.results.total_matches(), 2);
+        assert_eq!(v.results.total_files(), 1);
+        assert_eq!(v.selected_result, Some(0));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn execute_search_via_service_with_include() {
+        let dir = temp_dir();
+        write_file(&dir, "code.rs", "find_me");
+        write_file(&dir, "readme.md", "find_me");
+
+        let mut v = SearchView::new();
+        v.search_text = "find_me".into();
+        v.include_text = "*.rs".into();
+        v.execute_search_via_service(&dir);
+
+        assert_eq!(v.results.total_files(), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn preview_replace_selected_works() {
+        let mut v = SearchView::new();
+        v.replace_text = "universe".into();
+        v.results = SearchResults::new(vec![FileMatches::new(
+            PathBuf::from("test.rs"),
+            vec![SearchMatch {
+                file_path: PathBuf::from("test.rs"),
+                line_number: 1,
+                column: 6,
+                line_content: "hello world".into(),
+                match_range: 6..11,
+                preview: "hello world".into(),
+            }],
+        )]);
+        // Entry 0 is file header, entry 1 is the match
+        v.selected_result = Some(1);
+        let preview = v.preview_replace_selected().unwrap();
+        assert_eq!(preview, "hello universe");
+    }
+
+    #[test]
+    fn preview_replace_on_file_header_returns_none() {
+        let mut v = SearchView::new();
+        v.replace_text = "x".into();
+        v.results = SearchResults::new(vec![FileMatches::new(
+            PathBuf::from("a.txt"),
+            vec![SearchMatch {
+                file_path: PathBuf::from("a.txt"),
+                line_number: 1,
+                column: 0,
+                line_content: "hello".into(),
+                match_range: 0..5,
+                preview: "hello".into(),
+            }],
+        )]);
+        v.selected_result = Some(0); // file header
+        assert!(v.preview_replace_selected().is_none());
+    }
+
+    #[test]
+    fn replace_all_via_service_modifies_files() {
+        let dir = temp_dir();
+        write_file(&dir, "a.txt", "foo bar\nfoo baz\n");
+
+        let mut v = SearchView::new();
+        v.search_text = "foo".into();
+        v.is_case_sensitive = true;
+        v.replace_text = "qux".into();
+
+        let count = v.replace_all_via_service(&dir);
+        assert_eq!(count, 2);
+
+        let content = fs::read_to_string(dir.join("a.txt")).unwrap();
+        assert!(content.contains("qux bar"));
+        assert!(content.contains("qux baz"));
+        assert!(!content.contains("foo"));
+
+        // Results should be empty after replace (no more matches)
+        assert_eq!(v.results.total_matches(), 0);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn get_match_at_entry_returns_correct_match() {
+        let mut v = SearchView::new();
+        v.results = SearchResults::new(vec![FileMatches::new(
+            PathBuf::from("test.rs"),
+            vec![
+                SearchMatch {
+                    file_path: PathBuf::from("test.rs"),
+                    line_number: 5,
+                    column: 3,
+                    line_content: "abc".into(),
+                    match_range: 3..6,
+                    preview: "abc".into(),
+                },
+                SearchMatch {
+                    file_path: PathBuf::from("test.rs"),
+                    line_number: 10,
+                    column: 0,
+                    line_content: "def".into(),
+                    match_range: 0..3,
+                    preview: "def".into(),
+                },
+            ],
+        )]);
+
+        assert!(v.get_match_at_entry(0).is_none()); // file header
+        let m1 = v.get_match_at_entry(1).unwrap();
+        assert_eq!(m1.line_number, 5);
+        let m2 = v.get_match_at_entry(2).unwrap();
+        assert_eq!(m2.line_number, 10);
+        assert!(v.get_match_at_entry(3).is_none()); // out of bounds
+    }
+
+    #[test]
+    fn re_exported_types_accessible() {
+        // Verify re-exports from vsedit-wb-search are available
+        let _qp = FileQuickPick::new();
+        let _sk = SymbolKind::Function;
+        let _rq = ReplaceQuery::new(
+            vsedit_wb_search::SearchQuery {
+                pattern: "x".into(),
+                is_regex: false,
+                case_sensitive: true,
+                whole_word: false,
+                include_pattern: None,
+                exclude_pattern: None,
+            },
+            "y",
+        );
     }
 }
