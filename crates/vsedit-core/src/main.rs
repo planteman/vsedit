@@ -46,6 +46,7 @@ use vsedit_platform::Platform;
 use vsedit_accessibility::ScreenReaderSupport;
 use vsedit_remote::RemoteService;
 use vsedit_state::{StateScope, StateService};
+use vsedit_wb_clipboard::ClipboardService;
 use vsedit_theme::dark_plus;
 use vsedit_tui::{restore_terminal, setup_terminal};
 use vsedit_userdatasync::{SyncResource, SyncService};
@@ -145,6 +146,7 @@ struct AppState {
     sync_service: SyncService,
     screen_reader: ScreenReaderSupport,
     remote_service: RemoteService,
+    clipboard_service: ClipboardService,
     _workspace: Workspace,
     file_path: Option<PathBuf>,
 }
@@ -457,6 +459,7 @@ async fn run() -> io::Result<()> {
         sync_service,
         screen_reader,
         remote_service,
+        clipboard_service: ClipboardService::new(100),
         _workspace: workspace,
         file_path,
     };
@@ -960,6 +963,26 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
             KeyCode::Char('y') => {
                 app.controller.execute_action(EditorAction::Redo);
                 sync_state(app);
+                return false;
+            }
+            KeyCode::Char('c') => {
+                app.controller.execute_action(EditorAction::Copy);
+                let text = app.controller.clipboard.clone();
+                app.clipboard_service.write_text(text, 0);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('x') => {
+                app.controller.execute_action(EditorAction::Cut);
+                let text = app.controller.clipboard.clone();
+                app.clipboard_service.write_text(text, 0);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Char('v') => {
+                if let Some(text) = app.clipboard_service.read_text() {
+                    exec_editor_mutating(app, EditorAction::Paste(text.to_string()));
+                }
                 return false;
             }
             KeyCode::Char('a') => {

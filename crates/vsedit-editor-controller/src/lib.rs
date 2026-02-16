@@ -70,6 +70,18 @@ pub enum EditorAction {
     JumpToMatchingBracket,
     GoToLine(u32),
 
+    // -- clipboard --
+    Copy,
+    Cut,
+    Paste(String),
+
+    // -- find/replace --
+    Find(String),
+    FindNext,
+    FindPrevious,
+    Replace(String, String),
+    ReplaceAll(String, String),
+
     // -- history --
     Undo,
     Redo,
@@ -83,6 +95,9 @@ pub enum EditorAction {
 pub struct EditorController {
     pub model: TextModel,
     pub cursors: CursorController,
+    pub clipboard: String,
+    pub find_results: Vec<(usize, usize)>,
+    pub find_index: usize,
 }
 
 impl EditorController {
@@ -91,6 +106,9 @@ impl EditorController {
         Self {
             model: TextModel::new(text),
             cursors: CursorController::new(),
+            clipboard: String::new(),
+            find_results: Vec::new(),
+            find_index: 0,
         }
     }
 
@@ -152,6 +170,26 @@ impl EditorController {
             EditorAction::PageDown(lines) => self.page_down(lines),
             EditorAction::JumpToMatchingBracket => self.jump_to_matching_bracket(),
             EditorAction::GoToLine(line) => self.go_to_line(line),
+
+            // -- clipboard --------------------------------------------------
+            EditorAction::Copy => self.copy(),
+            EditorAction::Cut => self.cut(),
+            EditorAction::Paste(ref text) => self.insert_text(text),
+
+            // -- find/replace -----------------------------------------------
+            EditorAction::Find(ref query) => self.find(query),
+            EditorAction::FindNext => self.find_next(),
+            EditorAction::FindPrevious => self.find_previous(),
+            EditorAction::Replace(ref search, ref replacement) => {
+                let s = search.clone();
+                let r = replacement.clone();
+                self.replace_current(&s, &r);
+            }
+            EditorAction::ReplaceAll(ref search, ref replacement) => {
+                let s = search.clone();
+                let r = replacement.clone();
+                self.replace_all(&s, &r);
+            }
 
             // -- history --------------------------------------------------------
             EditorAction::Undo => { self.model.undo(); }
@@ -830,6 +868,116 @@ impl EditorController {
         );
     }
 
+    // -- clipboard ----------------------------------------------------------
+
+    /// Copy selected text (or the current line if no selection) to the
+    /// internal clipboard.
+    fn copy(&mut self) {
+        let sel = self.cursors.get_primary().selection.as_range();
+        if sel.is_empty() {
+            let line = self.cursors.get_primary().position().line;
+            let content = self.model.get_line_content(line).to_string();
+            self.clipboard = content + "\n";
+        } else {
+            self.clipboard = self.model.get_value_in_range(sel);
+        }
+    }
+
+    /// Cut selected text (or the current line) to the internal clipboard.
+    fn cut(&mut self) {
+        let sel = self.cursors.get_primary().selection.as_range();
+        if sel.is_empty() {
+            let line = self.cursors.get_primary().position().line;
+            let content = self.model.get_line_content(line).to_string();
+            self.clipboard = content + "\n";
+            self.delete_line();
+        } else {
+            self.clipboard = self.model.get_value_in_range(sel);
+            self.model.delete(sel);
+            self.cursors.set_state(0, CursorState::from_position(sel.start));
+            self.cursors.merge_overlapping();
+        }
+    }
+
+    // -- find/replace -------------------------------------------------------
+
+    /// Populate find results for the given query.
+    fn find(&mut self, query: &str) {
+        let matches = self.model.find_matches(query, false, true);
+        self.find_results = matches
+            .iter()
+            .map(|r| {
+                (
+                    self.model.position_to_offset(r.start),
+                    self.model.position_to_offset(r.end),
+                )
+            })
+            .collect();
+        self.find_index = 0;
+        // Jump to first match if any.
+        if let Some(&(start, _end)) = self.find_results.first() {
+            let pos = self.model.offset_to_position(start);
+            self.cursors.set_state(0, CursorState::from_position(pos));
+        }
+    }
+
+    /// Move to the next find result.
+    fn find_next(&mut self) {
+        if self.find_results.is_empty() {
+            return;
+        }
+        self.find_index = (self.find_index + 1) % self.find_results.len();
+        let (start, _end) = self.find_results[self.find_index];
+        let pos = self.model.offset_to_position(start);
+        self.cursors.set_state(0, CursorState::from_position(pos));
+    }
+
+    /// Move to the previous find result.
+    fn find_previous(&mut self) {
+        if self.find_results.is_empty() {
+            return;
+        }
+        if self.find_index == 0 {
+            self.find_index = self.find_results.len() - 1;
+        } else {
+            self.find_index -= 1;
+        }
+        let (start, _end) = self.find_results[self.find_index];
+        let pos = self.model.offset_to_position(start);
+        self.cursors.set_state(0, CursorState::from_position(pos));
+    }
+
+    /// Replace the current find match with replacement text.
+    fn replace_current(&mut self, search: &str, replacement: &str) {
+        if self.find_results.is_empty() {
+            return;
+        }
+        let idx = self.find_index.min(self.find_results.len() - 1);
+        let (start_off, end_off) = self.find_results[idx];
+        let start = self.model.offset_to_position(start_off);
+        let end = self.model.offset_to_position(end_off);
+        self.model.apply_edit(Range::from_positions(start, end), replacement);
+        // Re-run the find to refresh results.
+        self.find(search);
+    }
+
+    /// Replace all find matches.
+    fn replace_all(&mut self, search: &str, replacement: &str) {
+        if self.find_results.is_empty() {
+            self.find(search);
+        }
+        // Replace from bottom to top to keep offsets valid.
+        let mut results = self.find_results.clone();
+        results.sort_by(|a, b| b.0.cmp(&a.0));
+        for (start_off, end_off) in results {
+            let start = self.model.offset_to_position(start_off);
+            let end = self.model.offset_to_position(end_off);
+            self.model.apply_edit(Range::from_positions(start, end), replacement);
+        }
+        self.find_results.clear();
+        self.find_index = 0;
+    }
+
     // -- Selection operations -----------------------------------------------
 
     /// Select the word under the primary cursor (double-click behavior).
@@ -1285,5 +1433,114 @@ mod tests {
         let mut c = ctrl("line1\nline2\nline3");
         c.execute_action(EditorAction::GoToLine(3));
         assert_eq!(c.cursors.get_primary().position(), Position::new(3, 1));
+    }
+
+    // -- clipboard tests ---------------------------------------------------
+
+    #[test]
+    fn copy_with_selection() {
+        let mut c = ctrl("hello world");
+        c.cursors.set_state(
+            0,
+            CursorState {
+                selection: Selection::from_positions(
+                    Position::new(1, 1),
+                    Position::new(1, 6),
+                ),
+            },
+        );
+        c.execute_action(EditorAction::Copy);
+        assert_eq!(c.clipboard, "hello");
+        assert_eq!(c.model.get_value(), "hello world");
+    }
+
+    #[test]
+    fn copy_no_selection_copies_line() {
+        let mut c = ctrl("hello\nworld");
+        c.cursors.set_state(0, CursorState::from_position(Position::new(1, 3)));
+        c.execute_action(EditorAction::Copy);
+        assert_eq!(c.clipboard, "hello\n");
+        assert_eq!(c.model.get_value(), "hello\nworld");
+    }
+
+    #[test]
+    fn cut_with_selection() {
+        let mut c = ctrl("hello world");
+        c.cursors.set_state(
+            0,
+            CursorState {
+                selection: Selection::from_positions(
+                    Position::new(1, 1),
+                    Position::new(1, 6),
+                ),
+            },
+        );
+        c.execute_action(EditorAction::Cut);
+        assert_eq!(c.clipboard, "hello");
+        assert_eq!(c.model.get_value(), " world");
+    }
+
+    #[test]
+    fn cut_no_selection_cuts_line() {
+        let mut c = ctrl("hello\nworld");
+        c.cursors.set_state(0, CursorState::from_position(Position::new(1, 3)));
+        c.execute_action(EditorAction::Cut);
+        assert_eq!(c.clipboard, "hello\n");
+        assert_eq!(c.model.get_value(), "world");
+    }
+
+    #[test]
+    fn paste_inserts_text() {
+        let mut c = ctrl("hello");
+        c.cursors.set_state(0, CursorState::from_position(Position::new(1, 6)));
+        c.execute_action(EditorAction::Paste(" world".into()));
+        assert_eq!(c.model.get_value(), "hello world");
+    }
+
+    // -- find/replace tests ------------------------------------------------
+
+    #[test]
+    fn find_populates_results() {
+        let mut c = ctrl("hello world hello");
+        c.execute_action(EditorAction::Find("hello".into()));
+        assert_eq!(c.find_results.len(), 2);
+        assert_eq!(c.find_index, 0);
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 1));
+    }
+
+    #[test]
+    fn find_next_cycles() {
+        let mut c = ctrl("aa bb aa");
+        c.execute_action(EditorAction::Find("aa".into()));
+        assert_eq!(c.find_results.len(), 2);
+        c.execute_action(EditorAction::FindNext);
+        assert_eq!(c.find_index, 1);
+        c.execute_action(EditorAction::FindNext);
+        assert_eq!(c.find_index, 0);
+    }
+
+    #[test]
+    fn find_previous_cycles() {
+        let mut c = ctrl("aa bb aa");
+        c.execute_action(EditorAction::Find("aa".into()));
+        c.execute_action(EditorAction::FindPrevious);
+        assert_eq!(c.find_index, 1);
+    }
+
+    #[test]
+    fn replace_current_match() {
+        let mut c = ctrl("hello world hello");
+        c.execute_action(EditorAction::Find("hello".into()));
+        c.execute_action(EditorAction::Replace("hello".into(), "hi".into()));
+        assert_eq!(c.model.get_value(), "hi world hello");
+    }
+
+    #[test]
+    fn replace_all_matches() {
+        let mut c = ctrl("hello world hello");
+        c.execute_action(EditorAction::Find("hello".into()));
+        c.execute_action(EditorAction::ReplaceAll("hello".into(), "hi".into()));
+        assert_eq!(c.model.get_value(), "hi world hi");
+        assert!(c.find_results.is_empty());
     }
 }

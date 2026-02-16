@@ -3023,6 +3023,7 @@ dependencies = [
  "vsedit-tui",
  "vsedit-uri",
  "vsedit-userdatasync",
+ "vsedit-wb-clipboard",
  "vsedit-workbench",
  "vsedit-workspace",
 ]

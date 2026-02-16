@@ -34,6 +34,7 @@ vsedit-ext-testing = { path = "../vsedit-ext-testing" }
 vsedit-userdatasync = { path = "../vsedit-userdatasync" }
 vsedit-accessibility = { path = "../vsedit-accessibility" }
 vsedit-remote = { path = "../vsedit-remote" }
+vsedit-wb-clipboard = { path = "../vsedit-wb-clipboard" }
 clap = { workspace = true }
 crossterm = { workspace = true }
 futures = { workspace = true }
