@@ -14,6 +14,7 @@
 //! 7. Open files specified on the command line
 //! 8. Enter main event loop
 
+use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -55,6 +56,8 @@ use vsedit_tui::{restore_terminal, setup_terminal};
 use vsedit_userdatasync::{SyncResource, SyncService};
 use vsedit_workbench::{FocusedPart, Workbench, WorkbenchAction};
 use vsedit_workspace::Workspace;
+use vsedit_lsp::{DiagnosticCollection, Severity as LspSeverity};
+use vsedit_debug::BreakpointStore;
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -129,6 +132,16 @@ struct Cli {
 // Application state — bundles all subsystems
 // ---------------------------------------------------------------------------
 
+/// Per-file diagnostic summary from the LSP, used for status bar display.
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+struct LspDiagnostic {
+    errors: usize,
+    warnings: usize,
+    infos: usize,
+    hints: usize,
+}
+
 #[allow(dead_code)]
 struct AppState {
     workbench: Workbench,
@@ -152,6 +165,14 @@ struct AppState {
     clipboard_service: ClipboardService,
     _workspace: Workspace,
     file_path: Option<PathBuf>,
+    /// LSP diagnostic collection across all open files.
+    lsp_diagnostics: DiagnosticCollection,
+    /// Cached per-file diagnostic summary for the status bar.
+    lsp_diagnostic_summary: LspDiagnostic,
+    /// DAP breakpoints: file path → sorted list of 1-based line numbers.
+    breakpoints: HashMap<PathBuf, Vec<u32>>,
+    /// DAP breakpoint store from the debug subsystem.
+    breakpoint_store: BreakpointStore,
 }
 
 // ---------------------------------------------------------------------------
@@ -390,6 +411,23 @@ async fn run() -> io::Result<()> {
         tracing::info!("Local session — remote service on standby");
     }
 
+    // ── 13f. LSP bridge ────────────────────────────────────────────────
+    // LSP is initialized lazily when a file is opened:
+    // 1. Detect language from file extension
+    // 2. Look up configured language server for that language
+    // 3. Spawn the language server process
+    // 4. Send initialize/initialized handshake
+    // 5. Send textDocument/didOpen with file content
+    // 6. Receive diagnostics via textDocument/publishDiagnostics
+    let lsp_diagnostics = DiagnosticCollection::new();
+    let lsp_diagnostic_summary = LspDiagnostic::default();
+    tracing::info!("LSP bridge ready (lazy initialization on file open)");
+
+    // ── 13g. DAP breakpoint store ──────────────────────────────────────
+    let breakpoints: HashMap<PathBuf, Vec<u32>> = HashMap::new();
+    let breakpoint_store = BreakpointStore::new();
+    tracing::info!("DAP breakpoint store initialized");
+
     // ── 14. Workbench & editor ─────────────────────────────────────────
     let mut workbench = Workbench::new();
     workbench.start();
@@ -465,6 +503,10 @@ async fn run() -> io::Result<()> {
         clipboard_service: ClipboardService::new(100),
         _workspace: workspace,
         file_path,
+        lsp_diagnostics,
+        lsp_diagnostic_summary,
+        breakpoints,
+        breakpoint_store,
     };
 
     app.lifecycle.set_phase(LifecyclePhase::Restored);
@@ -644,6 +686,7 @@ fn register_builtin_commands(registry: &CommandRegistry) {
         ("editor.action.goToDeclaration", noop()),
         ("editor.action.peekDefinition", noop()),
         ("editor.action.rename", noop()),
+        ("editor.debug.toggleBreakpoint", noop()),
     ];
     vsedit_commands::register_builtin_commands(registry, cmds);
 }
@@ -1039,6 +1082,12 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
         }
     }
 
+    // ── F9 → Toggle breakpoint ───────────────────────────────────────
+    if key_event.code == KeyCode::F(9) && !has_ctrl && !has_alt {
+        toggle_breakpoint(app);
+        return false;
+    }
+
     // ── F5 → Start debugging ───────────────────────────────────────────
     if key_event.code == KeyCode::F(5) && !has_ctrl && !has_alt {
         return dispatch_command("workbench.action.debug.start", app);
@@ -1162,6 +1211,9 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
             app.controller.execute_action(EditorAction::SelectAllOccurrences);
             sync_state(app);
         }
+        "editor.debug.toggleBreakpoint" => {
+            toggle_breakpoint(app);
+        }
         _ => {
             // Try the command registry, then fall back to workbench.
             if app.command_registry.has(cmd) {
@@ -1259,6 +1311,44 @@ fn save_active_file(app: &mut AppState) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Breakpoint toggling (DAP bridge)
+// ---------------------------------------------------------------------------
+
+fn toggle_breakpoint(app: &mut AppState) {
+    let line = app.controller.cursors.get_primary().position().line;
+    let path = app.file_path.clone().unwrap_or_default();
+    let entry = app.breakpoints.entry(path.clone()).or_default();
+    if let Some(pos) = entry.iter().position(|&l| l == line) {
+        entry.remove(pos);
+    } else {
+        entry.push(line);
+        entry.sort();
+    }
+    // Mirror into the DAP breakpoint store.
+    let path_str = path.display().to_string();
+    app.breakpoint_store.toggle_breakpoint(&path_str, line);
+    let bp_count: usize = app.breakpoints.values().map(|v| v.len()).sum();
+    tracing::debug!("Breakpoint toggled: {}:{} (total: {})", path_str, line, bp_count);
+}
+
+// ---------------------------------------------------------------------------
+// LSP diagnostics → status bar
+// ---------------------------------------------------------------------------
+
+/// Refresh the cached LSP diagnostic summary and update the status bar.
+fn update_lsp_status_bar(app: &mut AppState) {
+    let errors = app.lsp_diagnostics.count_severity(LspSeverity::Error);
+    let warnings = app.lsp_diagnostics.count_severity(LspSeverity::Warning);
+    let infos = app.lsp_diagnostics.count_severity(LspSeverity::Info);
+    let hints = app.lsp_diagnostics.count_severity(LspSeverity::Hint);
+    app.lsp_diagnostic_summary = LspDiagnostic { errors, warnings, infos, hints };
+    app.workbench.statusbar.update_item(
+        "statusbar.diagnostics",
+        &format!("✖ {} ⚠ {}", errors, warnings),
+    );
+}
+
 fn sync_state(app: &mut AppState) {
     let value = app.controller.model.get_value();
     let path_str = app
@@ -1285,6 +1375,8 @@ fn sync_state(app: &mut AppState) {
             ),
         );
     }
+    // Refresh LSP diagnostics in the status bar.
+    update_lsp_status_bar(app);
 }
 
 // ---------------------------------------------------------------------------

@@ -239,6 +239,70 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── Extension Search Result (convenience wrapper) ──
+
+/// Simplified search result for marketplace UI display.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExtensionSearchResult {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub version: String,
+    pub download_count: u64,
+}
+
+impl From<&GalleryExtension> for ExtensionSearchResult {
+    fn from(ext: &GalleryExtension) -> Self {
+        Self {
+            id: ext.id.clone(),
+            name: ext.display_name.clone(),
+            description: ext.description.clone(),
+            version: ext.version.clone(),
+            download_count: ext.download_count,
+        }
+    }
+}
+
+/// Search the Open VSX marketplace and return simplified results.
+pub async fn search_extensions(query: &str) -> Result<Vec<ExtensionSearchResult>, String> {
+    let gq = GalleryQuery::new(query);
+    let gallery_results = search_gallery(&gq).await?;
+    Ok(gallery_results.iter().map(ExtensionSearchResult::from).collect())
+}
+
+/// Install an extension by its marketplace id (e.g. "publisher.name").
+/// Downloads from the Open VSX registry and extracts to `ext_dir`.
+pub async fn install_extension_by_id(
+    id: &str,
+    ext_dir: &std::path::Path,
+) -> Result<InstalledExtension, String> {
+    // Fetch the extension metadata to get the download URL.
+    let url = format!("{OPEN_VSX_API}/-/search?query={}&size=1", urlencoded(id));
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("gallery returned status {}", resp.status()));
+    }
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("failed to parse JSON: {e}"))?;
+    let results = parse_gallery_response(&body)?;
+    let ext = results
+        .into_iter()
+        .find(|e| e.id == id)
+        .ok_or_else(|| format!("extension '{id}' not found in gallery"))?;
+    let download_url = ext
+        .download_url
+        .ok_or_else(|| format!("no download URL for '{id}'"))?;
+    install_extension(&download_url, ext_dir).await
+}
+
 // ── Gallery Client (Open VSX) ──
 
 /// Default Open VSX API endpoint.

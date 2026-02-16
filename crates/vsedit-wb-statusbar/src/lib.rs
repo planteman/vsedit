@@ -141,6 +141,18 @@ pub fn register_default_items(svc: &mut StatusBarService) {
     });
 
     svc.add_item(StatusBarItem {
+        id: "statusbar.diagnostics".into(),
+        text: "✖ 0 ⚠ 0".into(),
+        tooltip: Some("Errors and Warnings".into()),
+        command: Some("workbench.actions.view.problems".into()),
+        alignment: StatusBarAlignment::Left,
+        priority: 90,
+        visible: true,
+        background_color: None,
+        foreground_color: None,
+    });
+
+    svc.add_item(StatusBarItem {
         id: "statusbar.lineColumn".into(),
         text: "Ln 1, Col 1".into(),
         tooltip: Some("Go to Line/Column".into()),
@@ -621,8 +633,9 @@ mod tests {
         register_default_items(&mut svc);
 
         let left = svc.get_left_items();
-        assert_eq!(left.len(), 1);
+        assert_eq!(left.len(), 2);
         assert_eq!(left[0].id, "statusbar.branch");
+        assert_eq!(left[1].id, "statusbar.diagnostics");
 
         let right = svc.get_right_items();
         assert_eq!(right.len(), 6);

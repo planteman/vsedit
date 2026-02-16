@@ -39,6 +39,8 @@ vsedit-wb-clipboard = { path = "../vsedit-wb-clipboard" }
 vsedit-wb-layout = { path = "../vsedit-wb-layout" }
 vsedit-editor-types = { path = "../vsedit-editor-types" }
 vsedit-text-model = { path = "../vsedit-text-model" }
+vsedit-lsp = { path = "../vsedit-lsp" }
+vsedit-debug = { path = "../vsedit-debug" }
 clap = { workspace = true }
 crossterm = { workspace = true }
 futures = { workspace = true }
