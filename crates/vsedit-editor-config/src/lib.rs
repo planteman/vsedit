@@ -641,6 +641,117 @@ impl Default for EditorConfigValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Per-file-type config overrides
+// ---------------------------------------------------------------------------
+
+/// A set of editor config overrides keyed by a file-type glob pattern.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EditorConfigOverride {
+    /// Glob pattern, e.g. "*.rs", "*.md", "Makefile".
+    pub pattern: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tab_size: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub insert_spaces: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub word_wrap: Option<WordWrap>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rulers: Option<Vec<u32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trim_trailing_whitespace: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub insert_final_newline: Option<bool>,
+}
+
+impl EditorConfigOverride {
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+            tab_size: None,
+            insert_spaces: None,
+            word_wrap: None,
+            rulers: None,
+            trim_trailing_whitespace: None,
+            insert_final_newline: None,
+        }
+    }
+
+    pub fn with_tab_size(mut self, size: u32) -> Self {
+        self.tab_size = Some(size);
+        self
+    }
+
+    pub fn with_insert_spaces(mut self, val: bool) -> Self {
+        self.insert_spaces = Some(val);
+        self
+    }
+
+    pub fn with_word_wrap(mut self, wrap: WordWrap) -> Self {
+        self.word_wrap = Some(wrap);
+        self
+    }
+
+    pub fn with_rulers(mut self, rulers: Vec<u32>) -> Self {
+        self.rulers = Some(rulers);
+        self
+    }
+
+    pub fn with_trim_trailing_whitespace(mut self, val: bool) -> Self {
+        self.trim_trailing_whitespace = Some(val);
+        self
+    }
+
+    pub fn with_insert_final_newline(mut self, val: bool) -> Self {
+        self.insert_final_newline = Some(val);
+        self
+    }
+
+    /// Check if a filename matches this override's pattern.
+    pub fn matches(&self, filename: &str) -> bool {
+        if self.pattern.starts_with('*') {
+            let suffix = &self.pattern[1..];
+            filename.ends_with(suffix)
+        } else {
+            filename == self.pattern
+        }
+    }
+}
+
+/// Registry of per-file-type overrides.
+#[derive(Debug, Clone, Default)]
+pub struct OverrideRegistry {
+    overrides: Vec<EditorConfigOverride>,
+}
+
+impl OverrideRegistry {
+    pub fn new() -> Self {
+        Self { overrides: Vec::new() }
+    }
+
+    pub fn add(&mut self, ov: EditorConfigOverride) {
+        self.overrides.push(ov);
+    }
+
+    /// Find the first override whose pattern matches the given filename.
+    pub fn find(&self, filename: &str) -> Option<&EditorConfigOverride> {
+        self.overrides.iter().find(|o| o.matches(filename))
+    }
+
+    /// Find all overrides matching the filename, in registration order.
+    pub fn find_all(&self, filename: &str) -> Vec<&EditorConfigOverride> {
+        self.overrides.iter().filter(|o| o.matches(filename)).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.overrides.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.overrides.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1063,5 +1174,70 @@ mod tests {
     fn editor_config_is_ascii_printable() {
         assert!(EditorConfigValidator::is_ascii_printable("Hello World 123"));
         assert!(!EditorConfigValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- EditorConfigOverride --
+
+    #[test]
+    fn override_matches_glob() {
+        let ov = EditorConfigOverride::new("*.rs").with_tab_size(4);
+        assert!(ov.matches("main.rs"));
+        assert!(ov.matches("lib.rs"));
+        assert!(!ov.matches("main.py"));
+    }
+
+    #[test]
+    fn override_matches_exact() {
+        let ov = EditorConfigOverride::new("Makefile");
+        assert!(ov.matches("Makefile"));
+        assert!(!ov.matches("Makefile.bak"));
+    }
+
+    #[test]
+    fn override_builder_chain() {
+        let ov = EditorConfigOverride::new("*.md")
+            .with_word_wrap(WordWrap::On)
+            .with_rulers(vec![80])
+            .with_trim_trailing_whitespace(true)
+            .with_insert_final_newline(true);
+        assert_eq!(ov.word_wrap, Some(WordWrap::On));
+        assert_eq!(ov.rulers, Some(vec![80]));
+        assert_eq!(ov.trim_trailing_whitespace, Some(true));
+    }
+
+    #[test]
+    fn override_registry_find() {
+        let mut reg = OverrideRegistry::new();
+        reg.add(EditorConfigOverride::new("*.rs").with_tab_size(4));
+        reg.add(EditorConfigOverride::new("*.py").with_tab_size(2));
+        assert_eq!(reg.find("test.rs").unwrap().tab_size, Some(4));
+        assert_eq!(reg.find("test.py").unwrap().tab_size, Some(2));
+        assert!(reg.find("test.js").is_none());
+    }
+
+    #[test]
+    fn override_registry_find_all() {
+        let mut reg = OverrideRegistry::new();
+        reg.add(EditorConfigOverride::new("*.rs").with_tab_size(4));
+        reg.add(EditorConfigOverride::new("*.rs").with_insert_spaces(true));
+        assert_eq!(reg.find_all("main.rs").len(), 2);
+        assert_eq!(reg.find_all("main.py").len(), 0);
+    }
+
+    #[test]
+    fn override_serde_roundtrip() {
+        let ov = EditorConfigOverride::new("*.rs")
+            .with_tab_size(4)
+            .with_insert_spaces(true);
+        let json = serde_json::to_string(&ov).unwrap();
+        let ov2: EditorConfigOverride = serde_json::from_str(&json).unwrap();
+        assert_eq!(ov, ov2);
+    }
+
+    #[test]
+    fn override_serde_skips_none() {
+        let ov = EditorConfigOverride::new("*.md");
+        let json = serde_json::to_string(&ov).unwrap();
+        assert!(!json.contains("tab_size"));
     }
 }

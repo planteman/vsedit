@@ -533,6 +533,96 @@ pub fn active_parameter_range(sig: &SignatureInformation, active_param: u32) -> 
     Some((start, start + param.label.len()))
 }
 
+// ---------------------------------------------------------------------------
+// ParameterHintCycle – cycling through overloads
+// ---------------------------------------------------------------------------
+
+/// Manages cycling through multiple signature overloads.
+#[derive(Debug, Clone)]
+pub struct ParameterHintCycle {
+    total_signatures: usize,
+    current_index: usize,
+}
+
+impl ParameterHintCycle {
+    /// Create a new cycle with the given number of signatures.
+    pub fn new(total_signatures: usize) -> Self {
+        Self {
+            total_signatures,
+            current_index: 0,
+        }
+    }
+
+    /// Advance to the next overload, wrapping around.
+    pub fn next(&mut self) -> usize {
+        if self.total_signatures == 0 {
+            return 0;
+        }
+        self.current_index = (self.current_index + 1) % self.total_signatures;
+        self.current_index
+    }
+
+    /// Go to the previous overload, wrapping around.
+    pub fn prev(&mut self) -> usize {
+        if self.total_signatures == 0 {
+            return 0;
+        }
+        if self.current_index == 0 {
+            self.current_index = self.total_signatures - 1;
+        } else {
+            self.current_index -= 1;
+        }
+        self.current_index
+    }
+
+    /// Jump to a specific index. Returns `false` if out of range.
+    pub fn set_index(&mut self, idx: usize) -> bool {
+        if idx < self.total_signatures {
+            self.current_index = idx;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Current signature index.
+    pub fn current(&self) -> usize {
+        self.current_index
+    }
+
+    /// Total number of signatures.
+    pub fn total(&self) -> usize {
+        self.total_signatures
+    }
+
+    /// Format the cycle indicator, e.g., "2/5".
+    pub fn display_indicator(&self) -> String {
+        if self.total_signatures == 0 {
+            return String::new();
+        }
+        format!("{}/{}", self.current_index + 1, self.total_signatures)
+    }
+
+    /// Apply this cycle to a `SignatureHelp`, updating its `active_signature`.
+    pub fn apply_to(&self, help: &mut SignatureHelp) {
+        help.active_signature = self.current_index as u32;
+    }
+
+    /// Update the total and reset to 0 if the total changed.
+    pub fn update_total(&mut self, new_total: usize) {
+        if new_total != self.total_signatures {
+            self.total_signatures = new_total;
+            self.current_index = 0;
+        }
+    }
+}
+
+impl fmt::Display for ParameterHintCycle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_indicator())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1053,5 +1143,70 @@ mod tests {
         };
         assert!(!should_trigger('(', &cfg));
         assert!(!should_retrigger(',', &cfg));
+    }
+
+    #[test]
+    fn hint_cycle_next_wraps() {
+        let mut cycle = ParameterHintCycle::new(3);
+        assert_eq!(cycle.current(), 0);
+        assert_eq!(cycle.next(), 1);
+        assert_eq!(cycle.next(), 2);
+        assert_eq!(cycle.next(), 0); // wraps
+    }
+
+    #[test]
+    fn hint_cycle_prev_wraps() {
+        let mut cycle = ParameterHintCycle::new(3);
+        assert_eq!(cycle.prev(), 2); // wraps backward
+        assert_eq!(cycle.prev(), 1);
+        assert_eq!(cycle.prev(), 0);
+    }
+
+    #[test]
+    fn hint_cycle_set_index() {
+        let mut cycle = ParameterHintCycle::new(5);
+        assert!(cycle.set_index(3));
+        assert_eq!(cycle.current(), 3);
+        assert!(!cycle.set_index(10)); // out of range
+        assert_eq!(cycle.current(), 3); // unchanged
+    }
+
+    #[test]
+    fn hint_cycle_display_indicator() {
+        let mut cycle = ParameterHintCycle::new(5);
+        assert_eq!(cycle.display_indicator(), "1/5");
+        cycle.next();
+        assert_eq!(cycle.display_indicator(), "2/5");
+    }
+
+    #[test]
+    fn hint_cycle_empty() {
+        let mut cycle = ParameterHintCycle::new(0);
+        assert_eq!(cycle.next(), 0);
+        assert_eq!(cycle.prev(), 0);
+        assert_eq!(cycle.display_indicator(), "");
+    }
+
+    #[test]
+    fn hint_cycle_apply_to_help() {
+        let mut cycle = ParameterHintCycle::new(3);
+        cycle.next();
+        cycle.next();
+        let mut help = SignatureHelp {
+            signatures: vec![],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        cycle.apply_to(&mut help);
+        assert_eq!(help.active_signature, 2);
+    }
+
+    #[test]
+    fn hint_cycle_update_total_resets() {
+        let mut cycle = ParameterHintCycle::new(5);
+        cycle.set_index(3);
+        cycle.update_total(10);
+        assert_eq!(cycle.current(), 0);
+        assert_eq!(cycle.total(), 10);
     }
 }

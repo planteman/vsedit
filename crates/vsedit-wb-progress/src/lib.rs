@@ -601,6 +601,106 @@ impl ProgressService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProgressTimer – elapsed time tracking for progress bars
+// ---------------------------------------------------------------------------
+
+/// Tracks elapsed time for a progress operation using monotonic instants.
+#[derive(Debug, Clone)]
+pub struct ProgressTimer {
+    start: std::time::Instant,
+    label: String,
+    paused_elapsed: Option<std::time::Duration>,
+}
+
+impl ProgressTimer {
+    /// Start a new timer with the given label.
+    pub fn start(label: impl Into<String>) -> Self {
+        Self {
+            start: std::time::Instant::now(),
+            label: label.into(),
+            paused_elapsed: None,
+        }
+    }
+
+    /// Elapsed time since the timer was started (excluding paused time).
+    pub fn elapsed(&self) -> std::time::Duration {
+        match self.paused_elapsed {
+            Some(d) => d,
+            None => self.start.elapsed(),
+        }
+    }
+
+    /// Pause the timer, freezing the elapsed duration.
+    pub fn pause(&mut self) {
+        if self.paused_elapsed.is_none() {
+            self.paused_elapsed = Some(self.start.elapsed());
+        }
+    }
+
+    /// Resume the timer after a pause.
+    pub fn resume(&mut self) {
+        if let Some(paused) = self.paused_elapsed.take() {
+            self.start = std::time::Instant::now() - paused;
+        }
+    }
+
+    /// Whether the timer is currently paused.
+    pub fn is_paused(&self) -> bool {
+        self.paused_elapsed.is_some()
+    }
+
+    /// The label associated with this timer.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// Format elapsed time as a human-readable string (e.g., "1m 23s" or "45s").
+    pub fn elapsed_display(&self) -> String {
+        format_duration(self.elapsed())
+    }
+}
+
+impl fmt::Display for ProgressTimer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.label, self.elapsed_display())
+    }
+}
+
+/// Format a duration as a human-readable string.
+pub fn format_duration(d: std::time::Duration) -> String {
+    let total_secs = d.as_secs();
+    if total_secs >= 3600 {
+        let h = total_secs / 3600;
+        let m = (total_secs % 3600) / 60;
+        let s = total_secs % 60;
+        format!("{h}h {m}m {s}s")
+    } else if total_secs >= 60 {
+        let m = total_secs / 60;
+        let s = total_secs % 60;
+        format!("{m}m {s}s")
+    } else if total_secs > 0 {
+        format!("{total_secs}s")
+    } else {
+        let ms = d.as_millis();
+        format!("{ms}ms")
+    }
+}
+
+/// Estimate remaining time given current progress (0.0..=1.0) and elapsed duration.
+pub fn estimate_remaining(progress: f64, elapsed: std::time::Duration) -> Option<std::time::Duration> {
+    if progress <= 0.0 || progress > 1.0 {
+        return None;
+    }
+    let total_estimate = elapsed.as_secs_f64() / progress;
+    let remaining = total_estimate - elapsed.as_secs_f64();
+    if remaining < 0.0 {
+        None
+    } else {
+        Some(std::time::Duration::from_secs_f64(remaining))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1047,5 +1147,64 @@ mod tests {
     fn wb_progress_is_ascii_printable() {
         assert!(WbProgressValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbProgressValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn progress_timer_label() {
+        let timer = ProgressTimer::start("Building");
+        assert_eq!(timer.label(), "Building");
+    }
+
+    #[test]
+    fn progress_timer_elapsed_increases() {
+        let timer = ProgressTimer::start("test");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        assert!(timer.elapsed().as_millis() >= 5);
+    }
+
+    #[test]
+    fn progress_timer_pause_resume() {
+        let mut timer = ProgressTimer::start("test");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        timer.pause();
+        assert!(timer.is_paused());
+        let paused_elapsed = timer.elapsed();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        // Elapsed should not change while paused
+        assert_eq!(timer.elapsed(), paused_elapsed);
+        timer.resume();
+        assert!(!timer.is_paused());
+    }
+
+    #[test]
+    fn format_duration_ms() {
+        let d = std::time::Duration::from_millis(500);
+        assert_eq!(format_duration(d), "500ms");
+    }
+
+    #[test]
+    fn format_duration_minutes() {
+        let d = std::time::Duration::from_secs(125);
+        assert_eq!(format_duration(d), "2m 5s");
+    }
+
+    #[test]
+    fn format_duration_hours() {
+        let d = std::time::Duration::from_secs(3723);
+        assert_eq!(format_duration(d), "1h 2m 3s");
+    }
+
+    #[test]
+    fn estimate_remaining_half() {
+        let elapsed = std::time::Duration::from_secs(10);
+        let remaining = estimate_remaining(0.5, elapsed).unwrap();
+        assert!((remaining.as_secs_f64() - 10.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn estimate_remaining_invalid() {
+        let elapsed = std::time::Duration::from_secs(10);
+        assert!(estimate_remaining(0.0, elapsed).is_none());
+        assert!(estimate_remaining(-0.5, elapsed).is_none());
     }
 }

@@ -668,6 +668,67 @@ impl Default for MulticursorValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Cursor merging
+// ---------------------------------------------------------------------------
+
+/// Merge overlapping or adjacent selections in a list.
+///
+/// Selections are first sorted by start position, then merged when they
+/// overlap or are directly adjacent (end of one == start of next).
+/// Returns a new list with no overlaps.
+pub fn cursor_merge_overlapping(selections: &[Selection]) -> Vec<Selection> {
+    if selections.is_empty() {
+        return Vec::new();
+    }
+
+    let mut sorted: Vec<Selection> = selections.to_vec();
+    sorted.sort_by(|a, b| {
+        a.start.line.cmp(&b.start.line)
+            .then(a.start.column.cmp(&b.start.column))
+    });
+
+    let mut merged: Vec<Selection> = Vec::new();
+    merged.push(sorted[0]);
+
+    for sel in &sorted[1..] {
+        let last = merged.last_mut().unwrap();
+        if sel.start.line < last.end.line
+            || (sel.start.line == last.end.line && sel.start.column <= last.end.column)
+        {
+            // Overlapping or adjacent – extend the end if needed
+            if sel.end.line > last.end.line
+                || (sel.end.line == last.end.line && sel.end.column > last.end.column)
+            {
+                last.end = sel.end;
+            }
+        } else {
+            merged.push(*sel);
+        }
+    }
+
+    merged
+}
+
+/// Deduplicate cursor positions (same line+column), preserving order of first occurrence.
+pub fn cursor_deduplicate(positions: &[CursorPosition]) -> Vec<CursorPosition> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for p in positions {
+        let key = (p.line, p.column);
+        if seen.insert(key) {
+            result.push(*p);
+        }
+    }
+    result
+}
+
+/// Check if any two selections in the list overlap.
+pub fn has_overlapping_selections(selections: &[Selection]) -> bool {
+    let merged = cursor_merge_overlapping(selections);
+    merged.len() < selections.len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1070,5 +1131,76 @@ mod tests {
     fn multicursor_is_ascii_printable() {
         assert!(MulticursorValidator::is_ascii_printable("Hello World 123"));
         assert!(!MulticursorValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- cursor_merge_overlapping --
+
+    #[test]
+    fn merge_non_overlapping() {
+        let sels = vec![
+            Selection { start: CursorPosition { line: 1, column: 1 }, end: CursorPosition { line: 1, column: 5 } },
+            Selection { start: CursorPosition { line: 2, column: 1 }, end: CursorPosition { line: 2, column: 5 } },
+        ];
+        let merged = cursor_merge_overlapping(&sels);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_overlapping_same_line() {
+        let sels = vec![
+            Selection { start: CursorPosition { line: 1, column: 1 }, end: CursorPosition { line: 1, column: 10 } },
+            Selection { start: CursorPosition { line: 1, column: 5 }, end: CursorPosition { line: 1, column: 15 } },
+        ];
+        let merged = cursor_merge_overlapping(&sels);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start.column, 1);
+        assert_eq!(merged[0].end.column, 15);
+    }
+
+    #[test]
+    fn merge_adjacent() {
+        let sels = vec![
+            Selection { start: CursorPosition { line: 1, column: 1 }, end: CursorPosition { line: 1, column: 5 } },
+            Selection { start: CursorPosition { line: 1, column: 5 }, end: CursorPosition { line: 1, column: 10 } },
+        ];
+        let merged = cursor_merge_overlapping(&sels);
+        assert_eq!(merged.len(), 1);
+    }
+
+    #[test]
+    fn merge_empty_list() {
+        let merged = cursor_merge_overlapping(&[]);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn merge_unsorted_input() {
+        let sels = vec![
+            Selection { start: CursorPosition { line: 3, column: 1 }, end: CursorPosition { line: 3, column: 5 } },
+            Selection { start: CursorPosition { line: 1, column: 1 }, end: CursorPosition { line: 1, column: 5 } },
+        ];
+        let merged = cursor_merge_overlapping(&sels);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].start.line, 1);
+    }
+
+    #[test]
+    fn deduplicate_cursors() {
+        let positions = vec![
+            CursorPosition { line: 1, column: 5 },
+            CursorPosition { line: 2, column: 3 },
+            CursorPosition { line: 1, column: 5 },
+        ];
+        let deduped = cursor_deduplicate(&positions);
+        assert_eq!(deduped.len(), 2);
+    }
+
+    #[test]
+    fn has_overlapping_detects() {
+        let sels = vec![
+            Selection { start: CursorPosition { line: 1, column: 1 }, end: CursorPosition { line: 1, column: 10 } },
+            Selection { start: CursorPosition { line: 1, column: 5 }, end: CursorPosition { line: 1, column: 15 } },
+        ];
+        assert!(has_overlapping_selections(&sels));
     }
 }

@@ -579,6 +579,74 @@ impl Default for WbPreferencesValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// preference_reset_to_default — individual setting reset
+// ---------------------------------------------------------------------------
+
+/// Result of resetting a preference to its default value.
+#[derive(Debug, Clone)]
+pub struct PreferenceResetResult {
+    pub key: String,
+    pub old_value: String,
+    pub new_value: String,
+    pub was_already_default: bool,
+}
+
+impl fmt::Display for PreferenceResetResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.was_already_default {
+            write!(f, "'{}' already at default", self.key)
+        } else {
+            write!(f, "'{}': '{}' -> '{}'", self.key, self.old_value, self.new_value)
+        }
+    }
+}
+
+/// Reset a single preference to its default value.
+/// Returns the old and new values.
+pub fn preference_reset_to_default(
+    service: &mut PreferencesService,
+    key: &str,
+) -> Result<PreferenceResetResult, PreferenceError> {
+    let descriptor = service
+        .get_descriptor(key)
+        .ok_or_else(|| PreferenceError::KeyNotFound(key.to_string()))?;
+    let default_value = descriptor.default_value.clone();
+    let old_value = service.get_value(key).to_string();
+    let was_already_default = old_value == default_value;
+    if !was_already_default {
+        service.reset(key);
+    }
+    Ok(PreferenceResetResult {
+        key: key.to_string(),
+        old_value,
+        new_value: default_value,
+        was_already_default,
+    })
+}
+
+/// Reset all preferences in a given scope to their defaults.
+pub fn preference_reset_scope(
+    service: &mut PreferencesService,
+    scope: PreferenceScope,
+) -> Vec<PreferenceResetResult> {
+    let keys: Vec<String> = service
+        .get_descriptors_by_scope(scope)
+        .iter()
+        .map(|d| d.key.clone())
+        .collect();
+    keys.iter()
+        .filter_map(|k| preference_reset_to_default(service, k).ok())
+        .collect()
+}
+
+/// Count how many preferences differ from their default values.
+pub fn preference_count_modified(service: &PreferencesService) -> usize {
+    service
+        .list_overrides()
+        .len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1067,5 +1135,90 @@ mod tests {
     fn wb_preferences_is_ascii_printable() {
         assert!(WbPreferencesValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbPreferencesValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- preference_reset_to_default tests ----------------------------------
+
+    fn make_pref_service() -> PreferencesService {
+        let mut svc = PreferencesService::new();
+        svc.register(PreferenceDescriptor {
+            key: "editor.fontSize".into(),
+            preference_type: PreferenceType::Number,
+            default_value: "14".into(),
+            description: String::new(),
+            enum_values: vec![],
+            scope: PreferenceScope::Window,
+        });
+        svc.set_override("editor.fontSize", "16");
+        svc.register(PreferenceDescriptor {
+            key: "editor.tabSize".into(),
+            preference_type: PreferenceType::Number,
+            default_value: "4".into(),
+            description: String::new(),
+            enum_values: vec![],
+            scope: PreferenceScope::Window,
+        });
+        svc
+    }
+
+    #[test]
+    fn reset_modified_preference() {
+        let mut svc = make_pref_service();
+        let result = preference_reset_to_default(&mut svc, "editor.fontSize").unwrap();
+        assert!(!result.was_already_default);
+        assert_eq!(result.old_value, "16");
+        assert_eq!(result.new_value, "14");
+    }
+
+    #[test]
+    fn reset_already_default() {
+        let mut svc = make_pref_service();
+        let result = preference_reset_to_default(&mut svc, "editor.tabSize").unwrap();
+        assert!(result.was_already_default);
+    }
+
+    #[test]
+    fn reset_not_found() {
+        let mut svc = make_pref_service();
+        let result = preference_reset_to_default(&mut svc, "nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn reset_scope() {
+        let mut svc = make_pref_service();
+        let results = preference_reset_scope(&mut svc, PreferenceScope::Window);
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn count_modified() {
+        let svc = make_pref_service();
+        let count = preference_count_modified(&svc);
+        assert_eq!(count, 1); // only fontSize differs
+    }
+
+    #[test]
+    fn reset_result_display_modified() {
+        let r = PreferenceResetResult {
+            key: "editor.fontSize".into(),
+            old_value: "16".into(),
+            new_value: "14".into(),
+            was_already_default: false,
+        };
+        let s = format!("{r}");
+        assert!(s.contains("16"));
+        assert!(s.contains("14"));
+    }
+
+    #[test]
+    fn reset_result_display_default() {
+        let r = PreferenceResetResult {
+            key: "x".into(),
+            old_value: "1".into(),
+            new_value: "1".into(),
+            was_already_default: true,
+        };
+        assert!(format!("{r}").contains("already at default"));
     }
 }

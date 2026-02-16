@@ -615,6 +615,72 @@ pub fn find_workspace_files(root: &str) -> Vec<String> {
     results
 }
 
+// ---------------------------------------------------------------------------
+// Workspace path to URI conversion
+// ---------------------------------------------------------------------------
+
+/// Convert a workspace filesystem path to a file URI.
+///
+/// This performs simple percent-encoding of spaces and follows the `file://`
+/// URI scheme convention. On Windows-style paths (starting with a drive letter)
+/// a leading slash is prepended.
+///
+/// # Examples
+/// ```
+/// # use vsedit_workspaces::workspace_to_uri;
+/// assert_eq!(workspace_to_uri("/home/user/project"), "file:///home/user/project");
+/// ```
+pub fn workspace_to_uri(path: &str) -> String {
+    let encoded = path
+        .replace('%', "%25")
+        .replace(' ', "%20")
+        .replace('#', "%23")
+        .replace('?', "%3F");
+
+    // Windows-style absolute path: C:\foo  →  file:///C:/foo
+    if encoded.len() >= 2 && encoded.as_bytes()[0].is_ascii_alphabetic() && encoded.as_bytes()[1] == b':' {
+        let unix_style = encoded.replace('\\', "/");
+        format!("file:///{unix_style}")
+    } else {
+        format!("file://{encoded}")
+    }
+}
+
+/// Convert a file URI back to a workspace filesystem path.
+///
+/// Reverses the encoding done by [`workspace_to_uri`]. Returns `None` if the
+/// URI does not start with `file://`.
+pub fn uri_to_workspace_path(uri: &str) -> Option<String> {
+    let rest = uri.strip_prefix("file://")?;
+    let decoded = rest
+        .replace("%20", " ")
+        .replace("%23", "#")
+        .replace("%3F", "?")
+        .replace("%25", "%");
+
+    // Windows: /C:/foo → C:\foo
+    if decoded.len() >= 3
+        && decoded.starts_with('/')
+        && decoded.as_bytes()[1].is_ascii_alphabetic()
+        && decoded.as_bytes()[2] == b':'
+    {
+        Some(decoded[1..].replace('/', "\\"))
+    } else {
+        Some(decoded.to_string())
+    }
+}
+
+/// Resolve a relative path against a workspace folder URI.
+pub fn resolve_workspace_path(folder: &WorkspaceFolder, relative: &str) -> String {
+    let base = if folder.uri.ends_with('/') {
+        folder.uri.clone()
+    } else {
+        format!("{}/", folder.uri)
+    };
+    let clean = relative.trim_start_matches('/');
+    format!("{base}{clean}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1046,5 +1112,48 @@ mod tests {
     fn find_workspace_files_nonexistent_dir() {
         let files = find_workspace_files("/nonexistent_path_12345");
         assert!(files.is_empty());
+    }
+
+    #[test]
+    fn workspace_to_uri_unix() {
+        assert_eq!(workspace_to_uri("/home/user/project"), "file:///home/user/project");
+    }
+
+    #[test]
+    fn workspace_to_uri_with_spaces() {
+        assert_eq!(workspace_to_uri("/home/user/my project"), "file:///home/user/my%20project");
+    }
+
+    #[test]
+    fn workspace_to_uri_windows() {
+        let uri = workspace_to_uri("C:\\Users\\me\\code");
+        assert!(uri.starts_with("file:///C:"));
+        assert!(uri.contains("/Users/me/code"));
+    }
+
+    #[test]
+    fn uri_to_workspace_path_unix() {
+        let path = uri_to_workspace_path("file:///home/user/project").unwrap();
+        assert_eq!(path, "/home/user/project");
+    }
+
+    #[test]
+    fn uri_to_workspace_path_invalid() {
+        assert!(uri_to_workspace_path("http://example.com").is_none());
+    }
+
+    #[test]
+    fn uri_roundtrip() {
+        let original = "/home/user/my project";
+        let uri = workspace_to_uri(original);
+        let back = uri_to_workspace_path(&uri).unwrap();
+        assert_eq!(back, original);
+    }
+
+    #[test]
+    fn resolve_workspace_path_basic() {
+        let folder = WorkspaceFolder { uri: "/workspace".to_string(), name: "ws".to_string(), index: 0 };
+        let resolved = resolve_workspace_path(&folder, "src/main.rs");
+        assert_eq!(resolved, "/workspace/src/main.rs");
     }
 }

@@ -604,6 +604,100 @@ impl fmt::Display for MinimapColorScheme {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MinimapRender using braille character blocks
+// ---------------------------------------------------------------------------
+
+/// Braille-based minimap rendering.
+///
+/// Uses Unicode Braille characters (U+2800–U+28FF) to represent source code
+/// lines in a compact form. Each braille character encodes a 2×4 dot pattern,
+/// so a single character can represent 2 columns × 4 rows of pixels.
+pub struct MinimapBrailleRenderer {
+    /// Width in braille characters.
+    pub width: usize,
+}
+
+impl MinimapBrailleRenderer {
+    /// Create a renderer with a given column width.
+    pub fn new(width: usize) -> Self {
+        Self { width }
+    }
+
+    /// Render a single source line as a braille string.
+    ///
+    /// Each non-space character contributes a dot in the braille cell.
+    /// This produces a 1-row-high string of braille characters.
+    pub fn render_line(&self, line: &str) -> String {
+        let mut result = String::with_capacity(self.width);
+        let bytes = line.as_bytes();
+
+        for col in 0..self.width {
+            let c0 = col * 2;
+            let c1 = c0 + 1;
+            let has_c0 = c0 < bytes.len() && bytes[c0] != b' ';
+            let has_c1 = c1 < bytes.len() && bytes[c1] != b' ';
+
+            // Map to braille dots: we use the top two dots of the braille cell.
+            // Dot 1 (top-left) = 0x01, Dot 4 (top-right) = 0x08
+            let mut dots: u32 = 0;
+            if has_c0 {
+                dots |= 0x01; // dot 1
+            }
+            if has_c1 {
+                dots |= 0x08; // dot 4
+            }
+
+            result.push(char::from_u32(0x2800 + dots).unwrap_or(' '));
+        }
+        result
+    }
+
+    /// Render multiple source lines into braille rows.
+    /// Groups of 4 source lines are combined into one braille row.
+    pub fn render_block(&self, lines: &[&str]) -> Vec<String> {
+        let mut rows = Vec::new();
+        for chunk in lines.chunks(4) {
+            let mut row = String::with_capacity(self.width);
+            for col in 0..self.width {
+                let c0 = col * 2;
+                let c1 = c0 + 1;
+                let mut dots: u32 = 0;
+                // Braille dot mapping for rows 0..4:
+                // Row 0: dot1=0x01, dot4=0x08
+                // Row 1: dot2=0x02, dot5=0x10
+                // Row 2: dot3=0x04, dot6=0x20
+                // Row 3: dot7=0x40, dot8=0x80
+                let dot_pairs: [(u32, u32); 4] = [
+                    (0x01, 0x08),
+                    (0x02, 0x10),
+                    (0x04, 0x20),
+                    (0x40, 0x80),
+                ];
+                for (row_idx, &(left, right)) in dot_pairs.iter().enumerate() {
+                    if let Some(line) = chunk.get(row_idx) {
+                        let bytes = line.as_bytes();
+                        if c0 < bytes.len() && bytes[c0] != b' ' {
+                            dots |= left;
+                        }
+                        if c1 < bytes.len() && bytes[c1] != b' ' {
+                            dots |= right;
+                        }
+                    }
+                }
+                row.push(char::from_u32(0x2800 + dots).unwrap_or(' '));
+            }
+            rows.push(row);
+        }
+        rows
+    }
+
+    /// Calculate how many braille rows are needed for a document with `line_count` lines.
+    pub fn rows_needed(&self, line_count: usize) -> usize {
+        (line_count + 3) / 4
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1057,5 +1151,55 @@ mod tests {
         scheme.set_color(1, [200, 200, 200]);
         assert_eq!(scheme.color_count(), 1);
         assert_eq!(scheme.get_color(1), [200, 200, 200]);
+    }
+
+    #[test]
+    fn braille_render_line_empty() {
+        let r = MinimapBrailleRenderer::new(5);
+        let line = r.render_line("");
+        assert_eq!(line.len(), 5 * 3); // braille chars are 3 bytes each in UTF-8
+        assert!(line.chars().all(|c| c == '\u{2800}')); // all blank braille
+    }
+
+    #[test]
+    fn braille_render_line_content() {
+        let r = MinimapBrailleRenderer::new(3);
+        let line = r.render_line("ab cd");
+        // First cell covers cols 0,1 ('a','b') → dots 1+4 = 0x09
+        let chars: Vec<char> = line.chars().collect();
+        assert_eq!(chars[0], '\u{2809}'); // both dots
+    }
+
+    #[test]
+    fn braille_render_block_single_row() {
+        let r = MinimapBrailleRenderer::new(2);
+        let lines: Vec<&str> = vec!["ab", "cd", "ef", "gh"];
+        let rows = r.render_block(&lines);
+        assert_eq!(rows.len(), 1); // 4 lines = 1 braille row
+    }
+
+    #[test]
+    fn braille_render_block_multiple_rows() {
+        let r = MinimapBrailleRenderer::new(2);
+        let lines: Vec<&str> = vec!["a", "b", "c", "d", "e"];
+        let rows = r.render_block(&lines);
+        assert_eq!(rows.len(), 2); // 5 lines = ceil(5/4) = 2 braille rows
+    }
+
+    #[test]
+    fn braille_rows_needed() {
+        let r = MinimapBrailleRenderer::new(10);
+        assert_eq!(r.rows_needed(0), 0);
+        assert_eq!(r.rows_needed(1), 1);
+        assert_eq!(r.rows_needed(4), 1);
+        assert_eq!(r.rows_needed(5), 2);
+        assert_eq!(r.rows_needed(100), 25);
+    }
+
+    #[test]
+    fn braille_render_line_spaces_are_blank() {
+        let r = MinimapBrailleRenderer::new(3);
+        let line = r.render_line("      "); // all spaces
+        assert!(line.chars().all(|c| c == '\u{2800}')); // all blank
     }
 }

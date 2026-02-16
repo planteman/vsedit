@@ -584,6 +584,87 @@ impl Default for WbOutputValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// output_channel_scroll_lock — freeze output scroll position
+// ---------------------------------------------------------------------------
+
+/// Scroll lock state for an output channel.
+#[derive(Debug, Clone)]
+pub struct ScrollLockState {
+    pub channel_id: String,
+    pub locked: bool,
+    /// The line number the view is frozen at (when locked).
+    pub frozen_line: Option<usize>,
+    /// Total lines when lock was engaged.
+    pub lines_at_lock: usize,
+}
+
+impl ScrollLockState {
+    pub fn new(channel_id: &str) -> Self {
+        Self {
+            channel_id: channel_id.to_string(),
+            locked: false,
+            frozen_line: None,
+            lines_at_lock: 0,
+        }
+    }
+
+    /// Number of lines added since the lock was engaged.
+    pub fn lines_since_lock(&self, current_line_count: usize) -> usize {
+        if !self.locked {
+            return 0;
+        }
+        current_line_count.saturating_sub(self.lines_at_lock)
+    }
+}
+
+impl fmt::Display for ScrollLockState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.locked {
+            write!(f, "scroll-lock ON at line {:?}", self.frozen_line)
+        } else {
+            write!(f, "scroll-lock OFF")
+        }
+    }
+}
+
+/// Engage scroll lock on a channel, freezing at the current last line.
+pub fn output_channel_scroll_lock(
+    service: &OutputChannelService,
+    channel_id: &str,
+) -> Result<ScrollLockState, OutputError> {
+    let state = service
+        .get_channel(channel_id)
+        .ok_or_else(|| OutputError::ChannelNotFound(channel_id.to_string()))?;
+    let line_count = state.line_count();
+    Ok(ScrollLockState {
+        channel_id: channel_id.to_string(),
+        locked: true,
+        frozen_line: if line_count > 0 { Some(line_count - 1) } else { Some(0) },
+        lines_at_lock: line_count,
+    })
+}
+
+/// Disengage scroll lock.
+pub fn output_channel_scroll_unlock(lock: &mut ScrollLockState) {
+    lock.locked = false;
+    lock.frozen_line = None;
+}
+
+/// Toggle scroll lock on/off.
+pub fn output_channel_scroll_toggle(
+    lock: &mut ScrollLockState,
+    service: &OutputChannelService,
+) -> Result<(), OutputError> {
+    if lock.locked {
+        output_channel_scroll_unlock(lock);
+    } else {
+        let new_lock = output_channel_scroll_lock(service, &lock.channel_id)?;
+        *lock = new_lock;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1066,5 +1147,71 @@ mod tests {
     fn wb_output_is_ascii_printable() {
         assert!(WbOutputValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbOutputValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- output_channel_scroll_lock tests -----------------------------------
+
+    fn make_output_service_with_content() -> OutputChannelService {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(OutputChannelDescriptor {
+            id: "ch1".into(),
+            name: "Build".into(),
+            language_id: None,
+            log: false,
+        });
+        svc.append("ch1", "line1\nline2\nline3\n");
+        svc
+    }
+
+    #[test]
+    fn scroll_lock_engages() {
+        let svc = make_output_service_with_content();
+        let lock = output_channel_scroll_lock(&svc, "ch1").unwrap();
+        assert!(lock.locked);
+        assert!(lock.frozen_line.is_some());
+        assert!(lock.lines_at_lock > 0);
+    }
+
+    #[test]
+    fn scroll_lock_channel_not_found() {
+        let svc = OutputChannelService::new();
+        let result = output_channel_scroll_lock(&svc, "missing");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn scroll_unlock() {
+        let svc = make_output_service_with_content();
+        let mut lock = output_channel_scroll_lock(&svc, "ch1").unwrap();
+        output_channel_scroll_unlock(&mut lock);
+        assert!(!lock.locked);
+        assert!(lock.frozen_line.is_none());
+    }
+
+    #[test]
+    fn scroll_toggle() {
+        let svc = make_output_service_with_content();
+        let mut lock = ScrollLockState::new("ch1");
+        output_channel_scroll_toggle(&mut lock, &svc).unwrap();
+        assert!(lock.locked);
+        output_channel_scroll_toggle(&mut lock, &svc).unwrap();
+        assert!(!lock.locked);
+    }
+
+    #[test]
+    fn scroll_lock_lines_since() {
+        let lock = ScrollLockState {
+            channel_id: "ch1".into(),
+            locked: true,
+            frozen_line: Some(3),
+            lines_at_lock: 4,
+        };
+        assert_eq!(lock.lines_since_lock(10), 6);
+    }
+
+    #[test]
+    fn scroll_lock_display() {
+        let lock = ScrollLockState::new("ch1");
+        assert!(format!("{lock}").contains("OFF"));
     }
 }

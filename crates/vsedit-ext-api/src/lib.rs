@@ -743,6 +743,69 @@ pub fn api_supported_features(caps: &ApiCapabilities) -> Vec<&'static str> {
     features
 }
 
+// ---------------------------------------------------------------------------
+// api_version_compare — semver comparison
+// ---------------------------------------------------------------------------
+
+/// Result of comparing two API versions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VersionOrdering {
+    /// The first version is older than the second.
+    Older,
+    /// The versions are the same.
+    Same,
+    /// The first version is newer than the second.
+    Newer,
+}
+
+/// Parse a semver string into (major, minor, patch). Returns None if invalid.
+pub fn parse_semver(version: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    Some((
+        parts[0].parse().ok()?,
+        parts[1].parse().ok()?,
+        parts[2].parse().ok()?,
+    ))
+}
+
+/// Compare two semver version strings.
+/// Returns None if either version string is invalid.
+pub fn api_version_compare(a: &str, b: &str) -> Option<VersionOrdering> {
+    let (a_maj, a_min, a_pat) = parse_semver(a)?;
+    let (b_maj, b_min, b_pat) = parse_semver(b)?;
+
+    let result = (a_maj, a_min, a_pat).cmp(&(b_maj, b_min, b_pat));
+    Some(match result {
+        std::cmp::Ordering::Less => VersionOrdering::Older,
+        std::cmp::Ordering::Equal => VersionOrdering::Same,
+        std::cmp::Ordering::Greater => VersionOrdering::Newer,
+    })
+}
+
+/// Check whether a required API version is satisfied by the current API_VERSION.
+pub fn api_version_satisfies(required: &str) -> Option<bool> {
+    match api_version_compare(API_VERSION, required)? {
+        VersionOrdering::Older => Some(false),
+        _ => Some(true),
+    }
+}
+
+/// Return the newer of two version strings. Returns None if either is invalid.
+pub fn api_version_max<'a>(a: &'a str, b: &'a str) -> Option<&'a str> {
+    match api_version_compare(a, b)? {
+        VersionOrdering::Older => Some(b),
+        _ => Some(a),
+    }
+}
+
+/// Check if a version string is a valid semver triple.
+pub fn is_valid_semver(version: &str) -> bool {
+    parse_semver(version).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1092,5 +1155,64 @@ mod tests {
     fn ext_api_is_ascii_printable() {
         assert!(ExtApiValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtApiValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- api_version_compare tests ------------------------------------------
+
+    #[test]
+    fn version_compare_same() {
+        assert_eq!(api_version_compare("1.0.0", "1.0.0"), Some(VersionOrdering::Same));
+    }
+
+    #[test]
+    fn version_compare_older_major() {
+        assert_eq!(api_version_compare("1.0.0", "2.0.0"), Some(VersionOrdering::Older));
+    }
+
+    #[test]
+    fn version_compare_newer_minor() {
+        assert_eq!(api_version_compare("1.5.0", "1.3.0"), Some(VersionOrdering::Newer));
+    }
+
+    #[test]
+    fn version_compare_patch() {
+        assert_eq!(api_version_compare("1.0.1", "1.0.2"), Some(VersionOrdering::Older));
+        assert_eq!(api_version_compare("1.0.3", "1.0.2"), Some(VersionOrdering::Newer));
+    }
+
+    #[test]
+    fn version_compare_invalid() {
+        assert_eq!(api_version_compare("1.0", "1.0.0"), None);
+        assert_eq!(api_version_compare("abc", "1.0.0"), None);
+    }
+
+    #[test]
+    fn version_satisfies_current() {
+        assert_eq!(api_version_satisfies("1.0.0"), Some(true));
+    }
+
+    #[test]
+    fn version_satisfies_too_new() {
+        assert_eq!(api_version_satisfies("99.0.0"), Some(false));
+    }
+
+    #[test]
+    fn version_max_picks_newer() {
+        assert_eq!(api_version_max("1.2.0", "1.3.0"), Some("1.3.0"));
+        assert_eq!(api_version_max("2.0.0", "1.9.9"), Some("2.0.0"));
+    }
+
+    #[test]
+    fn is_valid_semver_checks() {
+        assert!(is_valid_semver("1.0.0"));
+        assert!(is_valid_semver("0.0.1"));
+        assert!(!is_valid_semver("1.0"));
+        assert!(!is_valid_semver(""));
+        assert!(!is_valid_semver("a.b.c"));
+    }
+
+    #[test]
+    fn parse_semver_valid() {
+        assert_eq!(parse_semver("1.110.0"), Some((1, 110, 0)));
     }
 }

@@ -525,6 +525,65 @@ impl Default for EditorTypesValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Selection direction and position containment
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for SelectionDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SelectionDirection::LeftToRight => write!(f, "LeftToRight"),
+            SelectionDirection::RightToLeft => write!(f, "RightToLeft"),
+        }
+    }
+}
+
+impl Selection {
+    /// Returns `true` if this selection is empty (anchor == active).
+    pub fn is_empty_selection(&self) -> bool {
+        self.anchor == self.active
+    }
+
+    /// Returns the length of the selection in lines (inclusive).
+    pub fn line_span(&self) -> u32 {
+        let range = self.as_range();
+        let start = range.start.line;
+        let end = range.end.line;
+        if start <= end { end - start + 1 } else { start - end + 1 }
+    }
+}
+
+/// Check whether a position is contained within a range (inclusive of start, exclusive of end).
+///
+/// A position `p` is "contained" if `range.start <= p < range.end`, following
+/// the convention used by VS Code's `Range.contains(Position)`.
+pub fn selection_contains_position(range: &Range, pos: &Position) -> bool {
+    if pos < &range.start {
+        return false;
+    }
+    if pos >= &range.end {
+        return false;
+    }
+    true
+}
+
+/// Check whether a range fully contains another range.
+pub fn range_contains_range(outer: &Range, inner: &Range) -> bool {
+    selection_contains_position(outer, &inner.start)
+        && (inner.end <= outer.end)
+}
+
+/// Compute the intersection of two ranges, if any.
+pub fn range_intersection(a: &Range, b: &Range) -> Option<Range> {
+    let start = Position::max(a.start, b.start);
+    let end = Position::min(a.end, b.end);
+    if start < end {
+        Some(Range::from_positions(start, end))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1046,5 +1105,61 @@ mod tests {
     fn editor_types_is_ascii_printable() {
         assert!(EditorTypesValidator::is_ascii_printable("Hello World 123"));
         assert!(!EditorTypesValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn selection_direction_forward() {
+        let sel = Selection::from_positions(Position::new(1, 1), Position::new(1, 10));
+        assert_eq!(sel.direction(), SelectionDirection::LeftToRight);
+    }
+
+    #[test]
+    fn selection_direction_backward() {
+        let sel = Selection::from_positions(Position::new(1, 10), Position::new(1, 1));
+        assert_eq!(sel.direction(), SelectionDirection::RightToLeft);
+    }
+
+    #[test]
+    fn selection_direction_empty() {
+        let sel = Selection::from_positions(Position::new(3, 5), Position::new(3, 5));
+        assert_eq!(sel.direction(), SelectionDirection::LeftToRight);
+        assert!(sel.is_empty_selection());
+    }
+
+    #[test]
+    fn selection_contains_position_inside() {
+        let range = Range::new(1, 1, 1, 10);
+        assert!(selection_contains_position(&range, &Position::new(1, 5)));
+        assert!(selection_contains_position(&range, &Position::new(1, 1)));
+        assert!(!selection_contains_position(&range, &Position::new(1, 10))); // exclusive end
+    }
+
+    #[test]
+    fn selection_contains_position_outside() {
+        let range = Range::new(2, 1, 5, 1);
+        assert!(!selection_contains_position(&range, &Position::new(1, 1)));
+        assert!(!selection_contains_position(&range, &Position::new(6, 1)));
+    }
+
+    #[test]
+    fn range_intersection_overlapping() {
+        let a = Range::new(1, 1, 3, 1);
+        let b = Range::new(2, 1, 5, 1);
+        let inter = super::range_intersection(&a, &b).unwrap();
+        assert_eq!(inter.start, Position::new(2, 1));
+        assert_eq!(inter.end, Position::new(3, 1));
+    }
+
+    #[test]
+    fn range_intersection_no_overlap() {
+        let a = Range::new(1, 1, 2, 1);
+        let b = Range::new(3, 1, 4, 1);
+        assert!(super::range_intersection(&a, &b).is_none());
+    }
+
+    #[test]
+    fn selection_line_span() {
+        let sel = Selection::from_positions(Position::new(2, 1), Position::new(5, 10));
+        assert_eq!(sel.line_span(), 4);
     }
 }

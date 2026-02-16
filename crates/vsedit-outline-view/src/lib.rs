@@ -110,6 +110,7 @@ impl OutlineElement {
     }
 }
 
+#[derive(Clone)]
 pub struct OutlineModel {
     pub elements: Vec<OutlineElement>,
     pub uri: String,
@@ -582,6 +583,83 @@ impl OutlineModel {
         kinds.sort_by_key(|k| format!("{k:?}"));
         kinds.dedup();
         kinds
+    }
+}
+
+// ---------------------------------------------------------------------------
+// outline_sort_by_position
+// ---------------------------------------------------------------------------
+
+/// Sort order for outline elements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutlineSortOrder {
+    /// Sort by start line (ascending).
+    ByPosition,
+    /// Sort alphabetically by label.
+    ByName,
+    /// Sort by symbol kind (grouping similar kinds together).
+    ByKind,
+}
+
+/// Sort outline elements by their start-line position (ascending).
+/// Children within each element are also sorted recursively.
+pub fn outline_sort_by_position(elements: &mut [OutlineElement]) {
+    elements.sort_by_key(|e| e.range_start_line);
+    for elem in elements.iter_mut() {
+        outline_sort_by_position(&mut elem.children);
+    }
+}
+
+/// Sort outline elements alphabetically by label (case-insensitive).
+/// Children within each element are also sorted recursively.
+pub fn outline_sort_by_name(elements: &mut [OutlineElement]) {
+    elements.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    for elem in elements.iter_mut() {
+        outline_sort_by_name(&mut elem.children);
+    }
+}
+
+/// Sort outline elements by kind ordinal, then by label within same kind.
+pub fn outline_sort_by_kind(elements: &mut [OutlineElement]) {
+    elements.sort_by(|a, b| {
+        let ka = format!("{:?}", a.kind);
+        let kb = format!("{:?}", b.kind);
+        ka.cmp(&kb).then_with(|| a.label.cmp(&b.label))
+    });
+    for elem in elements.iter_mut() {
+        outline_sort_by_kind(&mut elem.children);
+    }
+}
+
+/// Apply the specified sort order to outline elements.
+pub fn outline_sort(elements: &mut [OutlineElement], order: OutlineSortOrder) {
+    match order {
+        OutlineSortOrder::ByPosition => outline_sort_by_position(elements),
+        OutlineSortOrder::ByName => outline_sort_by_name(elements),
+        OutlineSortOrder::ByKind => outline_sort_by_kind(elements),
+    }
+}
+
+impl OutlineModel {
+    /// Return a clone of this model with elements sorted by position.
+    pub fn sorted_by_position(&self) -> Self {
+        let mut clone = self.clone();
+        outline_sort_by_position(&mut clone.elements);
+        clone
+    }
+
+    /// Return a clone of this model with elements sorted by name.
+    pub fn sorted_by_name(&self) -> Self {
+        let mut clone = self.clone();
+        outline_sort_by_name(&mut clone.elements);
+        clone
+    }
+
+    /// Return a clone with the specified sort order applied.
+    pub fn sorted(&self, order: OutlineSortOrder) -> Self {
+        let mut clone = self.clone();
+        outline_sort(&mut clone.elements, order);
+        clone
     }
 }
 
@@ -1065,5 +1143,85 @@ mod tests {
     fn outline_view_is_ascii_printable() {
         assert!(OutlineViewValidator::is_ascii_printable("Hello World 123"));
         assert!(!OutlineViewValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- outline_sort_by_position tests -------------------------------------
+
+    #[test]
+    fn sort_by_position_reorders_by_start_line() {
+        let mut elements = vec![
+            elem("gamma", OutlineKind::Function, 30, 40),
+            elem("alpha", OutlineKind::Function, 1, 10),
+            elem("beta", OutlineKind::Function, 15, 25),
+        ];
+        outline_sort_by_position(&mut elements);
+        assert_eq!(elements[0].label, "alpha");
+        assert_eq!(elements[1].label, "beta");
+        assert_eq!(elements[2].label, "gamma");
+    }
+
+    #[test]
+    fn sort_by_position_recursive() {
+        let mut parent = elem("Parent", OutlineKind::Class, 1, 50);
+        parent.children = vec![
+            elem("z_method", OutlineKind::Method, 30, 40),
+            elem("a_method", OutlineKind::Method, 5, 15),
+        ];
+        let mut elements = vec![parent];
+        outline_sort_by_position(&mut elements);
+        assert_eq!(elements[0].children[0].label, "a_method");
+        assert_eq!(elements[0].children[1].label, "z_method");
+    }
+
+    #[test]
+    fn sort_by_name_alphabetical() {
+        let mut elements = vec![
+            elem("Zebra", OutlineKind::Class, 1, 10),
+            elem("apple", OutlineKind::Class, 11, 20),
+            elem("Mango", OutlineKind::Class, 21, 30),
+        ];
+        outline_sort_by_name(&mut elements);
+        assert_eq!(elements[0].label, "apple");
+        assert_eq!(elements[1].label, "Mango");
+        assert_eq!(elements[2].label, "Zebra");
+    }
+
+    #[test]
+    fn sort_by_kind_groups_same_kinds() {
+        let mut elements = vec![
+            elem("b_var", OutlineKind::Variable, 20, 21),
+            elem("a_fn", OutlineKind::Function, 1, 10),
+            elem("a_var", OutlineKind::Variable, 15, 16),
+            elem("b_fn", OutlineKind::Function, 11, 20),
+        ];
+        outline_sort_by_kind(&mut elements);
+        assert_eq!(elements[0].kind, elements[1].kind);
+        assert_eq!(elements[2].kind, elements[3].kind);
+    }
+
+    #[test]
+    fn model_sorted_by_position() {
+        let model = OutlineModel {
+            elements: vec![
+                elem("second", OutlineKind::Function, 20, 30),
+                elem("first", OutlineKind::Function, 1, 10),
+            ],
+            uri: String::from("test://file"),
+        };
+        let sorted = model.sorted_by_position();
+        assert_eq!(sorted.elements[0].label, "first");
+        assert_eq!(sorted.elements[1].label, "second");
+        // Original unchanged
+        assert_eq!(model.elements[0].label, "second");
+    }
+
+    #[test]
+    fn outline_sort_dispatch() {
+        let mut elements = vec![
+            elem("z", OutlineKind::Variable, 1, 2),
+            elem("a", OutlineKind::Variable, 3, 4),
+        ];
+        outline_sort(&mut elements, OutlineSortOrder::ByName);
+        assert_eq!(elements[0].label, "a");
     }
 }

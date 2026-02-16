@@ -790,6 +790,107 @@ impl fmt::Display for IndentRange {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Content-based indentation detection
+// ---------------------------------------------------------------------------
+
+/// Result of content-based indentation detection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentDetection {
+    pub style: IndentStyle,
+    /// Confidence level: 0.0–1.0 (represented as 0–100 to avoid floats).
+    pub confidence: u8,
+    /// Number of indented lines analysed.
+    pub sample_count: usize,
+}
+
+impl fmt::Display for IndentDetection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} (confidence {}%, {} samples)", self.style, self.confidence, self.sample_count)
+    }
+}
+
+/// Detect indentation from content with confidence scoring.
+///
+/// Unlike `detect_indentation`, this performs deeper analysis:
+/// it looks at indent deltas between consecutive lines and votes
+/// on the most likely indent unit size.
+pub fn indentation_detect_from_content(text: &str) -> IndentDetection {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.is_empty() {
+        return IndentDetection { style: IndentStyle::Spaces(4), confidence: 0, sample_count: 0 };
+    }
+
+    let mut tab_lines = 0u32;
+    let mut space_lines = 0u32;
+    let mut delta_votes: [u32; 9] = [0; 9]; // index 1..=8
+    let mut prev_indent: Option<usize> = None;
+    let mut sample_count = 0usize;
+
+    for line in &lines {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            prev_indent = None;
+            continue;
+        }
+
+        let indent_part = &line[..line.len() - trimmed.len()];
+        if indent_part.is_empty() {
+            prev_indent = Some(0);
+            continue;
+        }
+
+        sample_count += 1;
+
+        if indent_part.starts_with('\t') {
+            tab_lines += 1;
+        } else {
+            space_lines += 1;
+            let width = indent_part.len();
+            if let Some(prev) = prev_indent {
+                let delta = if width > prev { width - prev } else { prev - width };
+                if delta > 0 && delta <= 8 {
+                    delta_votes[delta] += 1;
+                }
+            }
+        }
+        prev_indent = Some(indent_part.len());
+    }
+
+    if sample_count == 0 {
+        return IndentDetection { style: IndentStyle::Spaces(4), confidence: 0, sample_count: 0 };
+    }
+
+    let total = tab_lines + space_lines;
+    if tab_lines > space_lines {
+        let confidence = if total > 0 { ((tab_lines as u64 * 100) / total as u64) as u8 } else { 0 };
+        return IndentDetection { style: IndentStyle::Tabs, confidence, sample_count };
+    }
+
+    // Find the best space width
+    let best_width = delta_votes[1..].iter()
+        .enumerate()
+        .max_by_key(|&(_, &v)| v)
+        .map(|(i, _)| i + 1)
+        .unwrap_or(4);
+
+    let total_votes: u32 = delta_votes[1..].iter().sum();
+    let best_votes = delta_votes[best_width];
+    let confidence = if total_votes > 0 {
+        ((best_votes as u64 * 100) / total_votes as u64).min(100) as u8
+    } else if space_lines > 0 {
+        50
+    } else {
+        0
+    };
+
+    IndentDetection {
+        style: IndentStyle::Spaces(best_width as u32),
+        confidence,
+        sample_count,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1093,5 +1194,52 @@ mod tests {
         };
         assert_eq!(format!("{guide}"), "Guide(col=4, lines=1-5, depth=1)");
         assert_eq!(guide.line_span(), 5);
+    }
+
+    // -- indentation_detect_from_content --
+
+    #[test]
+    fn detect_content_spaces_4() {
+        let text = "fn main() {\n    let x = 1;\n    if true {\n        inner();\n    }\n}\n";
+        let d = indentation_detect_from_content(text);
+        assert_eq!(d.style, IndentStyle::Spaces(4));
+        assert!(d.confidence > 50);
+    }
+
+    #[test]
+    fn detect_content_spaces_2() {
+        let text = "function f() {\n  let x = 1;\n  if (true) {\n    inner();\n  }\n}\n";
+        let d = indentation_detect_from_content(text);
+        assert_eq!(d.style, IndentStyle::Spaces(2));
+    }
+
+    #[test]
+    fn detect_content_tabs() {
+        let text = "fn main() {\n\tlet x = 1;\n\tif true {\n\t\tinner();\n\t}\n}\n";
+        let d = indentation_detect_from_content(text);
+        assert_eq!(d.style, IndentStyle::Tabs);
+        assert!(d.confidence > 50);
+    }
+
+    #[test]
+    fn detect_content_empty() {
+        let d = indentation_detect_from_content("");
+        assert_eq!(d.confidence, 0);
+        assert_eq!(d.sample_count, 0);
+    }
+
+    #[test]
+    fn detect_content_no_indent() {
+        let text = "line1\nline2\nline3\n";
+        let d = indentation_detect_from_content(text);
+        assert_eq!(d.sample_count, 0);
+    }
+
+    #[test]
+    fn indent_detection_display() {
+        let d = IndentDetection { style: IndentStyle::Spaces(4), confidence: 85, sample_count: 20 };
+        let s = format!("{d}");
+        assert!(s.contains("85%"));
+        assert!(s.contains("20 samples"));
     }
 }

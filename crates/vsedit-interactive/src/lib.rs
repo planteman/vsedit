@@ -625,6 +625,129 @@ impl Default for InteractiveValidator {
         Self::new()
     }
 }
+// ---------------------------------------------------------------------------
+// Interactive zones (clickable regions)
+// ---------------------------------------------------------------------------
+
+/// A clickable/interactive region within a cell's rendered output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InteractiveZone {
+    pub id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub tooltip: Option<String>,
+    pub action: ZoneAction,
+}
+
+/// What happens when a zone is clicked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ZoneAction {
+    /// Navigate to a URL.
+    OpenUrl(String),
+    /// Execute a command by ID.
+    RunCommand(String),
+    /// Copy text to clipboard.
+    CopyText(String),
+    /// No action (purely decorative zone).
+    None,
+}
+
+impl fmt::Display for ZoneAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ZoneAction::OpenUrl(u) => write!(f, "open:{u}"),
+            ZoneAction::RunCommand(c) => write!(f, "cmd:{c}"),
+            ZoneAction::CopyText(_) => write!(f, "copy"),
+            ZoneAction::None => write!(f, "none"),
+        }
+    }
+}
+
+impl InteractiveZone {
+    pub fn new(id: impl Into<String>, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Self {
+        Self {
+            id: id.into(),
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            tooltip: None,
+            action: ZoneAction::None,
+        }
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    pub fn with_action(mut self, action: ZoneAction) -> Self {
+        self.action = action;
+        self
+    }
+
+    /// Check if a position (line, col) falls within this zone.
+    pub fn contains(&self, line: u32, col: u32) -> bool {
+        if line < self.start_line || line > self.end_line {
+            return false;
+        }
+        if self.start_line == self.end_line {
+            return col >= self.start_col && col <= self.end_col;
+        }
+        if line == self.start_line {
+            return col >= self.start_col;
+        }
+        if line == self.end_line {
+            return col <= self.end_col;
+        }
+        true
+    }
+
+    /// Check if this zone overlaps with another.
+    pub fn overlaps(&self, other: &InteractiveZone) -> bool {
+        !(self.end_line < other.start_line
+            || other.end_line < self.start_line
+            || (self.end_line == other.start_line && self.end_col < other.start_col)
+            || (other.end_line == self.start_line && other.end_col < self.start_col))
+    }
+}
+
+/// Manages a collection of interactive zones.
+pub struct ZoneTracker {
+    zones: Vec<InteractiveZone>,
+}
+
+impl ZoneTracker {
+    pub fn new() -> Self {
+        Self { zones: Vec::new() }
+    }
+
+    pub fn add(&mut self, zone: InteractiveZone) {
+        self.zones.push(zone);
+    }
+
+    pub fn hit_test(&self, line: u32, col: u32) -> Option<&InteractiveZone> {
+        self.zones.iter().find(|z| z.contains(line, col))
+    }
+
+    pub fn zones_on_line(&self, line: u32) -> Vec<&InteractiveZone> {
+        self.zones.iter().filter(|z| line >= z.start_line && line <= z.end_line).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.zones.clear();
+    }
+
+    pub fn count(&self) -> usize {
+        self.zones.len()
+    }
+
+    pub fn remove_by_id(&mut self, id: &str) {
+        self.zones.retain(|z| z.id != id);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1061,5 +1184,73 @@ mod tests {
     fn interactive_is_ascii_printable() {
         assert!(InteractiveValidator::is_ascii_printable("Hello World 123"));
         assert!(!InteractiveValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- InteractiveZone --
+
+    #[test]
+    fn zone_contains_single_line() {
+        let z = InteractiveZone::new("z1", 5, 10, 5, 20);
+        assert!(z.contains(5, 10));
+        assert!(z.contains(5, 15));
+        assert!(z.contains(5, 20));
+        assert!(!z.contains(5, 9));
+        assert!(!z.contains(5, 21));
+        assert!(!z.contains(4, 15));
+    }
+
+    #[test]
+    fn zone_contains_multi_line() {
+        let z = InteractiveZone::new("z1", 3, 5, 6, 10);
+        assert!(z.contains(3, 5));
+        assert!(z.contains(4, 0));
+        assert!(z.contains(6, 10));
+        assert!(!z.contains(6, 11));
+        assert!(!z.contains(2, 5));
+    }
+
+    #[test]
+    fn zone_tracker_hit_test() {
+        let mut tracker = ZoneTracker::new();
+        tracker.add(InteractiveZone::new("a", 1, 0, 1, 10));
+        tracker.add(InteractiveZone::new("b", 3, 0, 3, 5));
+        assert_eq!(tracker.hit_test(1, 5).unwrap().id, "a");
+        assert_eq!(tracker.hit_test(3, 3).unwrap().id, "b");
+        assert!(tracker.hit_test(2, 0).is_none());
+    }
+
+    #[test]
+    fn zone_tracker_zones_on_line() {
+        let mut tracker = ZoneTracker::new();
+        tracker.add(InteractiveZone::new("a", 1, 0, 2, 10));
+        tracker.add(InteractiveZone::new("b", 2, 5, 2, 15));
+        let on_2 = tracker.zones_on_line(2);
+        assert_eq!(on_2.len(), 2);
+    }
+
+    #[test]
+    fn zone_tracker_remove_by_id() {
+        let mut tracker = ZoneTracker::new();
+        tracker.add(InteractiveZone::new("a", 1, 0, 1, 10));
+        tracker.add(InteractiveZone::new("b", 2, 0, 2, 10));
+        tracker.remove_by_id("a");
+        assert_eq!(tracker.count(), 1);
+        assert!(tracker.hit_test(1, 5).is_none());
+    }
+
+    #[test]
+    fn zone_overlaps_detection() {
+        let z1 = InteractiveZone::new("a", 1, 0, 1, 10);
+        let z2 = InteractiveZone::new("b", 1, 5, 1, 15);
+        let z3 = InteractiveZone::new("c", 2, 0, 2, 5);
+        assert!(z1.overlaps(&z2));
+        assert!(!z1.overlaps(&z3));
+    }
+
+    #[test]
+    fn zone_action_display() {
+        assert_eq!(format!("{}", ZoneAction::OpenUrl("http://x".into())), "open:http://x");
+        assert_eq!(format!("{}", ZoneAction::RunCommand("copy".into())), "cmd:copy");
+        assert_eq!(format!("{}", ZoneAction::None), "none");
     }
 }

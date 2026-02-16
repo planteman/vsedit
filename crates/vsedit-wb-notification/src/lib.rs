@@ -627,6 +627,89 @@ impl Default for WbNotificationValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Notification stack management
+// ---------------------------------------------------------------------------
+
+/// A stack of notifications with ordering and filtering.
+#[derive(Debug, Default)]
+pub struct NotificationStack {
+    notifications: Vec<WorkbenchNotification>,
+    max_visible: usize,
+}
+
+impl NotificationStack {
+    /// Create a new notification stack with a maximum number of visible notifications.
+    pub fn new(max_visible: usize) -> Self {
+        Self {
+            notifications: Vec::new(),
+            max_visible,
+        }
+    }
+
+    /// Push a notification onto the stack.
+    pub fn push(&mut self, notification: WorkbenchNotification) {
+        self.notifications.push(notification);
+    }
+
+    /// Remove a notification by its ID. Returns `true` if found and removed.
+    pub fn remove(&mut self, id: u64) -> bool {
+        let len = self.notifications.len();
+        self.notifications.retain(|n| n.id != id);
+        self.notifications.len() != len
+    }
+
+    /// Close a notification by its ID without removing it.
+    pub fn close(&mut self, id: u64) -> bool {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
+            n.closed = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the visible (non-closed) notifications, limited to `max_visible`.
+    /// Urgent notifications appear first.
+    pub fn visible(&self) -> Vec<&WorkbenchNotification> {
+        let mut active: Vec<&WorkbenchNotification> = self.notifications
+            .iter()
+            .filter(|n| !n.closed)
+            .collect();
+        // Sort: Urgent first, then Default, then Silent
+        active.sort_by(|a, b| b.priority.cmp(&a.priority));
+        active.truncate(self.max_visible);
+        active
+    }
+
+    /// Total number of notifications (including closed).
+    pub fn total(&self) -> usize {
+        self.notifications.len()
+    }
+
+    /// Number of active (non-closed) notifications.
+    pub fn active_count(&self) -> usize {
+        self.notifications.iter().filter(|n| !n.closed).count()
+    }
+
+    /// Remove all closed notifications.
+    pub fn prune_closed(&mut self) {
+        self.notifications.retain(|n| !n.closed);
+    }
+
+    /// Close all notifications.
+    pub fn close_all(&mut self) {
+        for n in &mut self.notifications {
+            n.closed = true;
+        }
+    }
+
+    /// Check if a notification with the given ID exists in the stack.
+    pub fn contains(&self, id: u64) -> bool {
+        self.notifications.iter().any(|n| n.id == id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1050,5 +1133,104 @@ mod tests {
     fn wb_notification_is_ascii_printable() {
         assert!(WbNotificationValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbNotificationValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn notification_stack_push_and_count() {
+        let mut stack = NotificationStack::new(5);
+        stack.push(WorkbenchNotification {
+            id: 1,
+            message: "Hello".to_string(),
+            priority: NotificationPriority::Default,
+            source: None,
+            actions: vec![],
+            progress: None,
+            closeable: true,
+            closed: false,
+        });
+        assert_eq!(stack.total(), 1);
+        assert_eq!(stack.active_count(), 1);
+    }
+
+    #[test]
+    fn notification_stack_remove() {
+        let mut stack = NotificationStack::new(5);
+        stack.push(WorkbenchNotification {
+            id: 1, message: "A".to_string(), priority: NotificationPriority::Default,
+            source: None, actions: vec![], progress: None, closeable: true, closed: false,
+        });
+        assert!(stack.remove(1));
+        assert_eq!(stack.total(), 0);
+        assert!(!stack.remove(999));
+    }
+
+    #[test]
+    fn notification_stack_close() {
+        let mut stack = NotificationStack::new(5);
+        stack.push(WorkbenchNotification {
+            id: 1, message: "A".to_string(), priority: NotificationPriority::Default,
+            source: None, actions: vec![], progress: None, closeable: true, closed: false,
+        });
+        stack.close(1);
+        assert_eq!(stack.active_count(), 0);
+        assert_eq!(stack.total(), 1);
+    }
+
+    #[test]
+    fn notification_stack_visible_priority_order() {
+        let mut stack = NotificationStack::new(5);
+        stack.push(WorkbenchNotification {
+            id: 1, message: "Low".to_string(), priority: NotificationPriority::Silent,
+            source: None, actions: vec![], progress: None, closeable: true, closed: false,
+        });
+        stack.push(WorkbenchNotification {
+            id: 2, message: "High".to_string(), priority: NotificationPriority::Urgent,
+            source: None, actions: vec![], progress: None, closeable: true, closed: false,
+        });
+        let visible = stack.visible();
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].priority, NotificationPriority::Urgent);
+    }
+
+    #[test]
+    fn notification_stack_max_visible() {
+        let mut stack = NotificationStack::new(2);
+        for i in 0..5 {
+            stack.push(WorkbenchNotification {
+                id: i, message: format!("N{i}"), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            });
+        }
+        assert_eq!(stack.visible().len(), 2);
+        assert_eq!(stack.active_count(), 5);
+    }
+
+    #[test]
+    fn notification_stack_prune_closed() {
+        let mut stack = NotificationStack::new(5);
+        stack.push(WorkbenchNotification {
+            id: 1, message: "A".to_string(), priority: NotificationPriority::Default,
+            source: None, actions: vec![], progress: None, closeable: true, closed: true,
+        });
+        stack.push(WorkbenchNotification {
+            id: 2, message: "B".to_string(), priority: NotificationPriority::Default,
+            source: None, actions: vec![], progress: None, closeable: true, closed: false,
+        });
+        stack.prune_closed();
+        assert_eq!(stack.total(), 1);
+        assert!(stack.contains(2));
+    }
+
+    #[test]
+    fn notification_stack_close_all() {
+        let mut stack = NotificationStack::new(5);
+        for i in 0..3 {
+            stack.push(WorkbenchNotification {
+                id: i, message: format!("N{i}"), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            });
+        }
+        stack.close_all();
+        assert_eq!(stack.active_count(), 0);
     }
 }

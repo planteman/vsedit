@@ -620,6 +620,91 @@ impl Default for ActionsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Action weight / priority sorting
+// ---------------------------------------------------------------------------
+
+/// Weight assigned to an action for priority-based sorting in menus and palettes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActionWeight {
+    /// Primary sort group (lower groups appear first).
+    pub group: u32,
+    /// Order within the group (lower values first).
+    pub order: i32,
+}
+
+impl ActionWeight {
+    pub const fn new(group: u32, order: i32) -> Self {
+        Self { group, order }
+    }
+
+    /// Default weight: group 0, order 0.
+    pub const fn default_weight() -> Self {
+        Self { group: 0, order: 0 }
+    }
+
+    /// Compare two weights for sorting.
+    pub fn cmp_priority(&self, other: &Self) -> std::cmp::Ordering {
+        self.group.cmp(&other.group).then(self.order.cmp(&other.order))
+    }
+}
+
+impl Default for ActionWeight {
+    fn default() -> Self {
+        Self::default_weight()
+    }
+}
+
+impl fmt::Display for ActionWeight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.group, self.order)
+    }
+}
+
+impl PartialOrd for ActionWeight {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp_priority(other))
+    }
+}
+
+impl Ord for ActionWeight {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.cmp_priority(other)
+    }
+}
+
+/// A weighted action entry for sorting.
+#[derive(Debug, Clone)]
+pub struct WeightedAction {
+    pub id: String,
+    pub label: String,
+    pub weight: ActionWeight,
+}
+
+impl WeightedAction {
+    pub fn new(id: impl Into<String>, label: impl Into<String>, weight: ActionWeight) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            weight,
+        }
+    }
+}
+
+/// Sort a list of weighted actions by their weight.
+pub fn sort_actions_by_weight(actions: &mut [WeightedAction]) {
+    actions.sort_by(|a, b| a.weight.cmp(&b.weight));
+}
+
+/// Group weighted actions by their group number.
+pub fn group_actions(actions: &[WeightedAction]) -> Vec<Vec<&WeightedAction>> {
+    let mut map: std::collections::BTreeMap<u32, Vec<&WeightedAction>> = std::collections::BTreeMap::new();
+    for a in actions {
+        map.entry(a.weight.group).or_default().push(a);
+    }
+    map.into_values().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1070,5 +1155,55 @@ mod tests {
     fn actions_is_ascii_printable() {
         assert!(ActionsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ActionsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- ActionWeight --
+
+    #[test]
+    fn action_weight_ordering() {
+        let a = ActionWeight::new(0, 1);
+        let b = ActionWeight::new(0, 2);
+        let c = ActionWeight::new(1, 0);
+        assert!(a < b);
+        assert!(b < c);
+    }
+
+    #[test]
+    fn action_weight_display() {
+        let w = ActionWeight::new(2, 5);
+        assert_eq!(format!("{w}"), "2:5");
+    }
+
+    #[test]
+    fn sort_actions_by_weight_order() {
+        let mut actions = vec![
+            WeightedAction::new("c", "C", ActionWeight::new(1, 0)),
+            WeightedAction::new("a", "A", ActionWeight::new(0, 1)),
+            WeightedAction::new("b", "B", ActionWeight::new(0, 5)),
+        ];
+        sort_actions_by_weight(&mut actions);
+        assert_eq!(actions[0].id, "a");
+        assert_eq!(actions[1].id, "b");
+        assert_eq!(actions[2].id, "c");
+    }
+
+    #[test]
+    fn group_actions_splits_by_group() {
+        let actions = vec![
+            WeightedAction::new("a", "A", ActionWeight::new(0, 0)),
+            WeightedAction::new("b", "B", ActionWeight::new(1, 0)),
+            WeightedAction::new("c", "C", ActionWeight::new(0, 1)),
+        ];
+        let groups = group_actions(&actions);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].len(), 2);
+        assert_eq!(groups[1].len(), 1);
+    }
+
+    #[test]
+    fn action_weight_default() {
+        let w = ActionWeight::default();
+        assert_eq!(w.group, 0);
+        assert_eq!(w.order, 0);
     }
 }

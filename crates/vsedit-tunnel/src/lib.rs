@@ -647,6 +647,96 @@ impl Default for TunnelValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
+
+/// Status of a health check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded,
+    Unhealthy,
+}
+
+impl fmt::Display for HealthStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HealthStatus::Healthy => write!(f, "healthy"),
+            HealthStatus::Degraded => write!(f, "degraded"),
+            HealthStatus::Unhealthy => write!(f, "unhealthy"),
+        }
+    }
+}
+
+/// Monitors tunnel connection health over a sliding window of latency samples.
+pub struct TunnelHealthCheck {
+    samples: Vec<u64>,
+    max_samples: usize,
+    degraded_threshold_ms: u64,
+    unhealthy_threshold_ms: u64,
+    consecutive_failures: u32,
+    failure_limit: u32,
+}
+
+impl TunnelHealthCheck {
+    pub fn new(max_samples: usize, degraded_ms: u64, unhealthy_ms: u64) -> Self {
+        Self {
+            samples: Vec::new(),
+            max_samples,
+            degraded_threshold_ms: degraded_ms,
+            unhealthy_threshold_ms: unhealthy_ms,
+            consecutive_failures: 0,
+            failure_limit: 3,
+        }
+    }
+
+    pub fn with_failure_limit(mut self, limit: u32) -> Self {
+        self.failure_limit = limit;
+        self
+    }
+
+    pub fn record_latency(&mut self, latency_ms: u64) {
+        self.consecutive_failures = 0;
+        if self.samples.len() >= self.max_samples {
+            self.samples.remove(0);
+        }
+        self.samples.push(latency_ms);
+    }
+
+    pub fn record_failure(&mut self) {
+        self.consecutive_failures += 1;
+    }
+
+    pub fn average_latency(&self) -> Option<u64> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        Some(self.samples.iter().sum::<u64>() / self.samples.len() as u64)
+    }
+
+    pub fn status(&self) -> HealthStatus {
+        if self.consecutive_failures >= self.failure_limit {
+            return HealthStatus::Unhealthy;
+        }
+        match self.average_latency() {
+            None => HealthStatus::Healthy,
+            Some(avg) if avg >= self.unhealthy_threshold_ms => HealthStatus::Unhealthy,
+            Some(avg) if avg >= self.degraded_threshold_ms => HealthStatus::Degraded,
+            _ => HealthStatus::Healthy,
+        }
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn reset(&mut self) {
+        self.samples.clear();
+        self.consecutive_failures = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1057,5 +1147,72 @@ mod tests {
     fn tunnel_is_ascii_printable() {
         assert!(TunnelValidator::is_ascii_printable("Hello World 123"));
         assert!(!TunnelValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- TunnelHealthCheck --
+
+    #[test]
+    fn health_check_initial_healthy() {
+        let hc = TunnelHealthCheck::new(10, 100, 500);
+        assert_eq!(hc.status(), HealthStatus::Healthy);
+        assert_eq!(hc.sample_count(), 0);
+        assert_eq!(hc.average_latency(), None);
+    }
+
+    #[test]
+    fn health_check_records_latency() {
+        let mut hc = TunnelHealthCheck::new(5, 100, 500);
+        hc.record_latency(50);
+        hc.record_latency(70);
+        assert_eq!(hc.sample_count(), 2);
+        assert_eq!(hc.average_latency(), Some(60));
+        assert_eq!(hc.status(), HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn health_check_degraded() {
+        let mut hc = TunnelHealthCheck::new(5, 100, 500);
+        hc.record_latency(150);
+        hc.record_latency(200);
+        assert_eq!(hc.status(), HealthStatus::Degraded);
+    }
+
+    #[test]
+    fn health_check_unhealthy_latency() {
+        let mut hc = TunnelHealthCheck::new(5, 100, 500);
+        hc.record_latency(600);
+        hc.record_latency(700);
+        assert_eq!(hc.status(), HealthStatus::Unhealthy);
+    }
+
+    #[test]
+    fn health_check_unhealthy_failures() {
+        let mut hc = TunnelHealthCheck::new(5, 100, 500).with_failure_limit(3);
+        hc.record_failure();
+        hc.record_failure();
+        assert_ne!(hc.status(), HealthStatus::Unhealthy);
+        hc.record_failure();
+        assert_eq!(hc.status(), HealthStatus::Unhealthy);
+    }
+
+    #[test]
+    fn health_check_sliding_window() {
+        let mut hc = TunnelHealthCheck::new(3, 100, 500);
+        hc.record_latency(50);
+        hc.record_latency(60);
+        hc.record_latency(70);
+        hc.record_latency(80);
+        assert_eq!(hc.sample_count(), 3);
+        assert_eq!(hc.average_latency(), Some(70));
+    }
+
+    #[test]
+    fn health_check_reset() {
+        let mut hc = TunnelHealthCheck::new(5, 100, 500);
+        hc.record_latency(200);
+        hc.record_failure();
+        hc.reset();
+        assert_eq!(hc.sample_count(), 0);
+        assert_eq!(hc.status(), HealthStatus::Healthy);
     }
 }

@@ -594,6 +594,87 @@ pub fn deserialize_items(s: &str) -> Vec<Result<TimelineItem, TimelineError>> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Group timeline entries by date
+// ---------------------------------------------------------------------------
+
+/// A group of timeline items sharing the same date label.
+#[derive(Debug, Clone)]
+pub struct TimelineDateGroup {
+    /// The date label (e.g., "2024-01-15" or "Today").
+    pub label: String,
+    /// Items in this group, ordered by timestamp descending.
+    pub items: Vec<TimelineItem>,
+}
+
+/// Group timeline items by calendar day (UTC).
+///
+/// Each item's `timestamp` is a Unix epoch in seconds. Items are grouped
+/// by their date in the format "YYYY-MM-DD", and groups are ordered
+/// most recent first. Within each group, items are sorted newest first.
+pub fn timeline_group_by_date(items: &[TimelineItem]) -> Vec<TimelineDateGroup> {
+    let mut groups: HashMap<String, Vec<TimelineItem>> = HashMap::new();
+
+    for item in items {
+        let date_label = unix_timestamp_to_date(item.timestamp);
+        groups
+            .entry(date_label)
+            .or_default()
+            .push(item.clone());
+    }
+
+    let mut result: Vec<TimelineDateGroup> = groups
+        .into_iter()
+        .map(|(label, mut items)| {
+            items.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            TimelineDateGroup { label, items }
+        })
+        .collect();
+
+    // Sort groups by date descending (most recent first)
+    result.sort_by(|a, b| b.label.cmp(&a.label));
+    result
+}
+
+/// Convert a Unix timestamp (seconds since epoch) to a "YYYY-MM-DD" date string (UTC).
+fn unix_timestamp_to_date(timestamp: u64) -> String {
+    const SECS_PER_DAY: u64 = 86400;
+    let days = timestamp / SECS_PER_DAY;
+
+    // Algorithm to convert days since epoch to (year, month, day)
+    // Based on Howard Hinnant's civil_from_days algorithm
+    let z = days as i64 + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64; // day of era [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    format!("{:04}-{:02}-{:02}", y, m, d)
+}
+
+/// Format a timestamp relative to "now" for display (e.g., "Today", "Yesterday", "3 days ago").
+pub fn format_relative_date(timestamp: u64, now: u64) -> String {
+    if now < timestamp {
+        return "in the future".to_string();
+    }
+    let diff_secs = now - timestamp;
+    let diff_days = diff_secs / 86400;
+    match diff_days {
+        0 => "Today".to_string(),
+        1 => "Yesterday".to_string(),
+        2..=6 => format!("{diff_days} days ago"),
+        7..=13 => "Last week".to_string(),
+        14..=29 => format!("{} weeks ago", diff_days / 7),
+        30..=59 => "Last month".to_string(),
+        _ => format!("{} months ago", diff_days / 30),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1054,5 +1135,63 @@ mod tests {
         let s = format!("{filter}");
         assert!(s.contains("source=git"));
         assert!(s.contains("labels=[bug]"));
+    }
+
+    #[test]
+    fn group_by_date_same_day() {
+        let items = vec![
+            TimelineItem { timestamp: 1000, message: "A".into(), author: "x".into(), sha: "a".into() },
+            TimelineItem { timestamp: 1500, message: "B".into(), author: "x".into(), sha: "b".into() },
+        ];
+        let groups = timeline_group_by_date(&items);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].items.len(), 2);
+        // Should be sorted newest first
+        assert_eq!(groups[0].items[0].timestamp, 1500);
+    }
+
+    #[test]
+    fn group_by_date_different_days() {
+        let items = vec![
+            TimelineItem { timestamp: 86400 * 0 + 100, message: "Day0".into(), author: "x".into(), sha: "a".into() },
+            TimelineItem { timestamp: 86400 * 1 + 100, message: "Day1".into(), author: "x".into(), sha: "b".into() },
+            TimelineItem { timestamp: 86400 * 2 + 100, message: "Day2".into(), author: "x".into(), sha: "c".into() },
+        ];
+        let groups = timeline_group_by_date(&items);
+        assert_eq!(groups.len(), 3);
+        // Most recent first
+        assert!(groups[0].label > groups[1].label);
+    }
+
+    #[test]
+    fn group_by_date_empty() {
+        let groups = timeline_group_by_date(&[]);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn format_relative_date_today() {
+        let now = 1700000000;
+        assert_eq!(format_relative_date(now - 3600, now), "Today");
+    }
+
+    #[test]
+    fn format_relative_date_yesterday() {
+        let now = 1700000000;
+        assert_eq!(format_relative_date(now - 86400 - 100, now), "Yesterday");
+    }
+
+    #[test]
+    fn format_relative_date_days_ago() {
+        let now = 1700000000;
+        let result = format_relative_date(now - 86400 * 5, now);
+        assert!(result.contains("5 days ago"));
+    }
+
+    #[test]
+    fn unix_timestamp_to_date_epoch() {
+        // Unix epoch is 1970-01-01
+        let date = unix_timestamp_to_date(0);
+        assert_eq!(date, "1970-01-01");
     }
 }

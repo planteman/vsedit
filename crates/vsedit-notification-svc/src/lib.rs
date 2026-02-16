@@ -646,6 +646,101 @@ impl NotificationService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Notification grouping
+// ---------------------------------------------------------------------------
+
+/// A group of similar notifications collapsed into a single display item.
+#[derive(Debug, Clone)]
+pub struct NotificationGroup {
+    /// Representative notification (first in the group).
+    pub representative: String,
+    /// Severity (highest severity in the group).
+    pub severity: NotificationSeverity,
+    /// Count of collapsed notifications.
+    pub count: usize,
+    /// Source, if all notifications share the same source.
+    pub source: Option<String>,
+}
+
+impl NotificationGroup {
+    pub fn new(message: impl Into<String>, severity: NotificationSeverity) -> Self {
+        Self {
+            representative: message.into(),
+            severity,
+            count: 1,
+            source: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Summary string like "File not found (x3)".
+    pub fn summary(&self) -> String {
+        if self.count > 1 {
+            format!("{} (x{})", self.representative, self.count)
+        } else {
+            self.representative.clone()
+        }
+    }
+}
+
+impl fmt::Display for NotificationGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+/// Group notifications by their message text, collapsing duplicates.
+///
+/// Returns groups sorted by count (most frequent first).
+pub fn notification_group(notifications: &[Notification]) -> Vec<NotificationGroup> {
+    use std::collections::HashMap;
+    let mut map: HashMap<&str, NotificationGroup> = HashMap::new();
+
+    for n in notifications {
+        let entry = map.entry(n.message.as_str()).or_insert_with(|| {
+            let mut g = NotificationGroup::new(&n.message, n.severity);
+            g.source = n.source.clone();
+            g.count = 0;
+            g
+        });
+        entry.count += 1;
+        // Escalate severity: Error > Warning > Info
+        if n.severity as u8 > entry.severity as u8 {
+            entry.severity = n.severity;
+        }
+    }
+
+    let mut groups: Vec<NotificationGroup> = map.into_values().collect();
+    groups.sort_by(|a, b| b.count.cmp(&a.count));
+    groups
+}
+
+/// Group notifications by source instead of message.
+pub fn notification_group_by_source(notifications: &[Notification]) -> Vec<NotificationGroup> {
+    use std::collections::HashMap;
+    let mut map: HashMap<String, NotificationGroup> = HashMap::new();
+
+    for n in notifications {
+        let key = n.source.as_deref().unwrap_or("(unknown)").to_string();
+        let entry = map.entry(key.clone()).or_insert_with(|| {
+            NotificationGroup::new(&key, n.severity).with_source(key.clone())
+        });
+        entry.count += 1;
+        if n.severity as u8 > entry.severity as u8 {
+            entry.severity = n.severity;
+        }
+    }
+
+    let mut groups: Vec<NotificationGroup> = map.into_values().collect();
+    groups.sort_by(|a, b| b.count.cmp(&a.count));
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1073,5 +1168,56 @@ mod tests {
     fn notification_svc_is_ascii_printable() {
         assert!(NotificationSvcValidator::is_ascii_printable("Hello World 123"));
         assert!(!NotificationSvcValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- notification_group --
+
+    #[test]
+    fn group_collapses_duplicates() {
+        let notifications = vec![
+            Notification { id: 1, message: "File not found".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "File not found".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 3, message: "Save complete".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+        ];
+        let groups = notification_group(&notifications);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].count, 2);
+        assert_eq!(groups[0].representative, "File not found");
+    }
+
+    #[test]
+    fn group_summary_single() {
+        let g = NotificationGroup::new("hello", NotificationSeverity::Info);
+        assert_eq!(g.summary(), "hello");
+    }
+
+    #[test]
+    fn group_summary_multiple() {
+        let mut g = NotificationGroup::new("err", NotificationSeverity::Error);
+        g.count = 5;
+        assert_eq!(g.summary(), "err (x5)");
+    }
+
+    #[test]
+    fn group_escalates_severity() {
+        let notifications = vec![
+            Notification { id: 1, message: "problem".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "problem".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+        ];
+        let groups = notification_group(&notifications);
+        assert_eq!(groups[0].severity, NotificationSeverity::Error);
+    }
+
+    #[test]
+    fn group_empty_input() {
+        let groups = notification_group(&[]);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn group_display() {
+        let mut g = NotificationGroup::new("test", NotificationSeverity::Warning);
+        g.count = 3;
+        assert_eq!(format!("{g}"), "test (x3)");
     }
 }

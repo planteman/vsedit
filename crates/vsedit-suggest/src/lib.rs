@@ -597,6 +597,67 @@ pub fn parse_lsp_completions(response: &serde_json::Value) -> Vec<CompletionItem
     }
 }
 
+// ---------------------------------------------------------------------------
+// suggest_details_panel — show documentation alongside completions
+// ---------------------------------------------------------------------------
+
+/// Content for the details panel shown alongside a completion.
+#[derive(Debug, Clone)]
+pub struct DetailsPanel {
+    pub label: String,
+    pub kind: CompletionItemKind,
+    pub detail: Option<String>,
+    pub documentation: Option<String>,
+    pub deprecated: bool,
+}
+
+impl DetailsPanel {
+    /// Render the details panel as a multi-line string.
+    pub fn render(&self) -> String {
+        let mut out = format!("{} ({})", self.label, self.kind);
+        if self.deprecated {
+            out.push_str(" [deprecated]");
+        }
+        out.push('\n');
+        if let Some(ref detail) = self.detail {
+            out.push_str(detail);
+            out.push('\n');
+        }
+        if let Some(ref doc) = self.documentation {
+            out.push_str("---\n");
+            out.push_str(doc);
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Returns true if there is any content to display beyond the label.
+    pub fn has_content(&self) -> bool {
+        self.detail.is_some() || self.documentation.is_some()
+    }
+}
+
+/// Build a details panel from a completion item.
+pub fn suggest_details_panel(item: &CompletionItem) -> DetailsPanel {
+    DetailsPanel {
+        label: item.label.clone(),
+        kind: item.kind,
+        detail: item.detail.clone(),
+        documentation: item.documentation.clone(),
+        deprecated: item.deprecated,
+    }
+}
+
+/// Build details panels for all items in a completion list.
+pub fn suggest_details_panels(list: &CompletionList) -> Vec<DetailsPanel> {
+    list.items.iter().map(suggest_details_panel).collect()
+}
+
+/// Find the details panel for the currently selected (first) item.
+pub fn suggest_active_details(list: &CompletionList) -> Option<DetailsPanel> {
+    list.items.first().map(suggest_details_panel)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1086,5 +1147,80 @@ mod tests {
             assert_ne!(item.label, "");
             // All valid kinds should map to something other than crashing
         }
+    }
+
+    // -- suggest_details_panel tests ----------------------------------------
+
+    #[test]
+    fn details_panel_from_item() {
+        let item = CompletionItem::new("println", CompletionItemKind::Function)
+            .with_detail("macro".to_string())
+            .with_documentation("Prints to stdout".to_string());
+        let panel = suggest_details_panel(&item);
+        assert_eq!(panel.label, "println");
+        assert_eq!(panel.kind, CompletionItemKind::Function);
+        assert_eq!(panel.detail.as_deref(), Some("macro"));
+        assert!(panel.has_content());
+    }
+
+    #[test]
+    fn details_panel_render_full() {
+        let panel = DetailsPanel {
+            label: "format".into(),
+            kind: CompletionItemKind::Function,
+            detail: Some("macro".into()),
+            documentation: Some("Creates a String.".into()),
+            deprecated: false,
+        };
+        let rendered = panel.render();
+        assert!(rendered.contains("format (Function)"));
+        assert!(rendered.contains("macro"));
+        assert!(rendered.contains("Creates a String."));
+    }
+
+    #[test]
+    fn details_panel_render_deprecated() {
+        let panel = DetailsPanel {
+            label: "old_fn".into(),
+            kind: CompletionItemKind::Function,
+            detail: None,
+            documentation: None,
+            deprecated: true,
+        };
+        let rendered = panel.render();
+        assert!(rendered.contains("[deprecated]"));
+    }
+
+    #[test]
+    fn details_panel_no_content() {
+        let item = CompletionItem::new("x", CompletionItemKind::Variable);
+        let panel = suggest_details_panel(&item);
+        assert!(!panel.has_content());
+    }
+
+    #[test]
+    fn details_panels_list() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("a", CompletionItemKind::Variable),
+            CompletionItem::new("b", CompletionItemKind::Function),
+        ]);
+        let panels = suggest_details_panels(&list);
+        assert_eq!(panels.len(), 2);
+    }
+
+    #[test]
+    fn active_details_returns_first() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("first", CompletionItemKind::Keyword),
+            CompletionItem::new("second", CompletionItemKind::Variable),
+        ]);
+        let panel = suggest_active_details(&list).unwrap();
+        assert_eq!(panel.label, "first");
+    }
+
+    #[test]
+    fn active_details_empty_list() {
+        let list = CompletionList::new(vec![]);
+        assert!(suggest_active_details(&list).is_none());
     }
 }

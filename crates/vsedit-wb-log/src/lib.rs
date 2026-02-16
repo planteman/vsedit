@@ -542,6 +542,86 @@ pub fn log_search<'a>(
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// log_rotate — manage log sizes
+// ---------------------------------------------------------------------------
+
+/// Configuration for log rotation.
+#[derive(Debug, Clone)]
+pub struct LogRotateConfig {
+    /// Maximum number of entries before rotation.
+    pub max_entries: usize,
+    /// Number of entries to keep after rotation (most recent).
+    pub keep_entries: usize,
+    /// Minimum log level to retain during rotation (entries below are always dropped).
+    pub min_retain_level: LogLevel,
+}
+
+impl Default for LogRotateConfig {
+    fn default() -> Self {
+        Self {
+            max_entries: 10_000,
+            keep_entries: 5_000,
+            min_retain_level: LogLevel::Trace,
+        }
+    }
+}
+
+/// Result of a log rotation operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogRotateResult {
+    pub entries_before: usize,
+    pub entries_after: usize,
+    pub entries_dropped: usize,
+}
+
+impl LogRotateResult {
+    pub fn did_rotate(&self) -> bool {
+        self.entries_dropped > 0
+    }
+}
+
+impl fmt::Display for LogRotateResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "rotated: {} -> {} (dropped {})",
+            self.entries_before, self.entries_after, self.entries_dropped,
+        )
+    }
+}
+
+/// Rotate log entries in-place: if entries exceed `config.max_entries`,
+/// keep only the most recent `config.keep_entries` that meet the minimum level.
+pub fn log_rotate(entries: &mut Vec<LogEntry>, config: &LogRotateConfig) -> LogRotateResult {
+    let entries_before = entries.len();
+    if entries_before <= config.max_entries {
+        return LogRotateResult {
+            entries_before,
+            entries_after: entries_before,
+            entries_dropped: 0,
+        };
+    }
+    // Filter by minimum level, then keep the tail.
+    let filtered: Vec<LogEntry> = entries
+        .drain(..)
+        .filter(|e| e.level >= config.min_retain_level)
+        .collect();
+    let start = filtered.len().saturating_sub(config.keep_entries);
+    *entries = filtered.into_iter().skip(start).collect();
+    let entries_after = entries.len();
+    LogRotateResult {
+        entries_before,
+        entries_after,
+        entries_dropped: entries_before - entries_after,
+    }
+}
+
+/// Check whether a log rotation is needed given current entry count and config.
+pub fn log_needs_rotation(entry_count: usize, config: &LogRotateConfig) -> bool {
+    entry_count > config.max_entries
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1076,5 +1156,70 @@ mod tests {
         // "app" appears as source on "started" and "out of memory"
         let results = log_search(&entries, "app", false, LogSearchFields::All);
         assert_eq!(results.len(), 2);
+    }
+
+    // -- log_rotate tests ---------------------------------------------------
+
+    #[test]
+    fn rotate_not_needed() {
+        let mut entries = vec![
+            LogEntry { level: LogLevel::Info, message: "a".into(), source: None, timestamp: 1 },
+        ];
+        let config = LogRotateConfig { max_entries: 10, keep_entries: 5, min_retain_level: LogLevel::Trace };
+        let result = log_rotate(&mut entries, &config);
+        assert!(!result.did_rotate());
+        assert_eq!(entries.len(), 1);
+    }
+
+    #[test]
+    fn rotate_trims_to_keep_entries() {
+        let mut entries: Vec<LogEntry> = (0..20)
+            .map(|i| LogEntry { level: LogLevel::Info, message: format!("msg{i}"), source: None, timestamp: i })
+            .collect();
+        let config = LogRotateConfig { max_entries: 10, keep_entries: 5, min_retain_level: LogLevel::Trace };
+        let result = log_rotate(&mut entries, &config);
+        assert!(result.did_rotate());
+        assert_eq!(result.entries_before, 20);
+        assert_eq!(entries.len(), 5);
+        assert_eq!(entries[0].message, "msg15");
+    }
+
+    #[test]
+    fn rotate_filters_by_level() {
+        let mut entries: Vec<LogEntry> = (0..20)
+            .map(|i| LogEntry {
+                level: if i % 2 == 0 { LogLevel::Debug } else { LogLevel::Error },
+                message: format!("msg{i}"),
+                source: None,
+                timestamp: i,
+            })
+            .collect();
+        let config = LogRotateConfig { max_entries: 10, keep_entries: 100, min_retain_level: LogLevel::Error };
+        let result = log_rotate(&mut entries, &config);
+        assert!(result.did_rotate());
+        assert!(entries.iter().all(|e| e.level >= LogLevel::Error));
+    }
+
+    #[test]
+    fn rotate_result_display() {
+        let result = LogRotateResult { entries_before: 100, entries_after: 50, entries_dropped: 50 };
+        let s = format!("{result}");
+        assert!(s.contains("100 -> 50"));
+        assert!(s.contains("dropped 50"));
+    }
+
+    #[test]
+    fn needs_rotation() {
+        let config = LogRotateConfig::default();
+        assert!(!log_needs_rotation(5_000, &config));
+        assert!(log_needs_rotation(10_001, &config));
+    }
+
+    #[test]
+    fn rotate_config_default() {
+        let config = LogRotateConfig::default();
+        assert_eq!(config.max_entries, 10_000);
+        assert_eq!(config.keep_entries, 5_000);
+        assert_eq!(config.min_retain_level, LogLevel::Trace);
     }
 }

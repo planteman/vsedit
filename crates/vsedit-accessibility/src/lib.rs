@@ -743,6 +743,99 @@ impl Default for ColorBlindSupport {
 }
 
 // ---------------------------------------------------------------------------
+// Accessible buffer
+// ---------------------------------------------------------------------------
+
+/// Accumulates accessible text fragments for screen reader output.
+///
+/// This is used to build up a single screen reader announcement from
+/// multiple sources (e.g. current line, diagnostics, cursor position).
+#[derive(Debug, Clone)]
+pub struct AccessibleBuffer {
+    fragments: Vec<AccessibleFragment>,
+}
+
+#[derive(Debug, Clone)]
+struct AccessibleFragment {
+    text: String,
+    role: AccessibilityRole,
+    priority: u8,
+}
+
+impl AccessibleBuffer {
+    pub fn new() -> Self {
+        Self { fragments: Vec::new() }
+    }
+
+    /// Append a text fragment with a role and priority (0 = lowest).
+    pub fn push(&mut self, text: impl Into<String>, role: AccessibilityRole, priority: u8) {
+        self.fragments.push(AccessibleFragment {
+            text: text.into(),
+            role,
+            priority,
+        });
+    }
+
+    /// Append a plain text fragment with default role and priority.
+    pub fn push_text(&mut self, text: impl Into<String>) {
+        self.push(text, AccessibilityRole::TextBox, 0);
+    }
+
+    /// Append a status message at higher priority.
+    pub fn push_status(&mut self, text: impl Into<String>) {
+        self.push(text, AccessibilityRole::StatusBar, 5);
+    }
+
+    /// Render the buffer into a single string, sorted by priority (high first),
+    /// with fragments separated by ". ".
+    pub fn render(&self) -> String {
+        let mut sorted: Vec<_> = self.fragments.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        let parts: Vec<&str> = sorted.iter().map(|f| f.text.as_str()).collect();
+        parts.join(". ")
+    }
+
+    /// Return the number of accumulated fragments.
+    pub fn len(&self) -> usize {
+        self.fragments.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fragments.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.fragments.clear();
+    }
+
+    /// Write the rendered output to a writer (e.g. for piping to a screen reader).
+    pub fn write_to(&self, w: &mut dyn Write) -> std::io::Result<()> {
+        write!(w, "{}", self.render())
+    }
+
+    /// Return fragments filtered by role.
+    pub fn fragments_by_role(&self, role: AccessibilityRole) -> Vec<&str> {
+        self.fragments
+            .iter()
+            .filter(|f| f.role == role)
+            .map(|f| f.text.as_str())
+            .collect()
+    }
+}
+
+impl Default for AccessibleBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for AccessibleBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1073,5 +1166,70 @@ mod tests {
         let display = format!("{content}");
         assert!(display.contains("Line 3"));
         assert!(display.contains("let x = 1;"));
+    }
+
+    // -- AccessibleBuffer --
+
+    #[test]
+    fn accessible_buffer_empty() {
+        let buf = AccessibleBuffer::new();
+        assert!(buf.is_empty());
+        assert_eq!(buf.render(), "");
+    }
+
+    #[test]
+    fn accessible_buffer_push_and_render() {
+        let mut buf = AccessibleBuffer::new();
+        buf.push_text("Line 5: let x = 1");
+        buf.push_status("2 errors");
+        let rendered = buf.render();
+        assert!(rendered.starts_with("2 errors"));
+        assert!(rendered.contains("let x = 1"));
+    }
+
+    #[test]
+    fn accessible_buffer_priority_ordering() {
+        let mut buf = AccessibleBuffer::new();
+        buf.push("low", AccessibilityRole::TextBox, 0);
+        buf.push("high", AccessibilityRole::StatusBar, 10);
+        buf.push("mid", AccessibilityRole::Button, 5);
+        assert!(buf.render().starts_with("high"));
+    }
+
+    #[test]
+    fn accessible_buffer_clear() {
+        let mut buf = AccessibleBuffer::new();
+        buf.push_text("hello");
+        buf.clear();
+        assert!(buf.is_empty());
+        assert_eq!(buf.len(), 0);
+    }
+
+    #[test]
+    fn accessible_buffer_write_to() {
+        let mut buf = AccessibleBuffer::new();
+        buf.push_text("test output");
+        let mut output = Vec::new();
+        buf.write_to(&mut output).unwrap();
+        assert_eq!(String::from_utf8(output).unwrap(), "test output");
+    }
+
+    #[test]
+    fn accessible_buffer_fragments_by_role() {
+        let mut buf = AccessibleBuffer::new();
+        buf.push_text("line content");
+        buf.push_status("status msg");
+        buf.push_text("more content");
+        let text_frags = buf.fragments_by_role(AccessibilityRole::TextBox);
+        assert_eq!(text_frags.len(), 2);
+        let status_frags = buf.fragments_by_role(AccessibilityRole::StatusBar);
+        assert_eq!(status_frags.len(), 1);
+    }
+
+    #[test]
+    fn accessible_buffer_display() {
+        let mut buf = AccessibleBuffer::new();
+        buf.push_text("hello");
+        assert_eq!(format!("{buf}"), "hello");
     }
 }

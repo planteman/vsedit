@@ -593,6 +593,117 @@ impl SnippetExporter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// snippet_variable_resolver — resolve tab stop variables
+// ---------------------------------------------------------------------------
+
+/// Known snippet variables matching VS Code's snippet variable reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnippetVariable {
+    TmFilename,
+    TmFilenameBase,
+    TmDirectory,
+    TmFilepath,
+    TmSelectedText,
+    TmCurrentLine,
+    TmCurrentWord,
+    TmLineIndex,
+    TmLineNumber,
+    ClipboardContent,
+    WorkspaceName,
+    WorkspaceFolder,
+}
+
+impl SnippetVariable {
+    /// Return the placeholder token (e.g. `$TM_FILENAME`).
+    pub fn token(&self) -> &'static str {
+        match self {
+            Self::TmFilename => "$TM_FILENAME",
+            Self::TmFilenameBase => "$TM_FILENAME_BASE",
+            Self::TmDirectory => "$TM_DIRECTORY",
+            Self::TmFilepath => "$TM_FILEPATH",
+            Self::TmSelectedText => "$TM_SELECTED_TEXT",
+            Self::TmCurrentLine => "$TM_CURRENT_LINE",
+            Self::TmCurrentWord => "$TM_CURRENT_WORD",
+            Self::TmLineIndex => "$TM_LINE_INDEX",
+            Self::TmLineNumber => "$TM_LINE_NUMBER",
+            Self::ClipboardContent => "$CLIPBOARD",
+            Self::WorkspaceName => "$WORKSPACE_NAME",
+            Self::WorkspaceFolder => "$WORKSPACE_FOLDER",
+        }
+    }
+
+    /// All known variables.
+    pub fn all() -> &'static [SnippetVariable] {
+        &[
+            Self::TmFilename, Self::TmFilenameBase, Self::TmDirectory,
+            Self::TmFilepath, Self::TmSelectedText, Self::TmCurrentLine,
+            Self::TmCurrentWord, Self::TmLineIndex, Self::TmLineNumber,
+            Self::ClipboardContent, Self::WorkspaceName, Self::WorkspaceFolder,
+        ]
+    }
+}
+
+/// Context for resolving snippet variables.
+#[derive(Debug, Clone, Default)]
+pub struct SnippetVariableContext {
+    pub filename: Option<String>,
+    pub filepath: Option<String>,
+    pub directory: Option<String>,
+    pub selected_text: Option<String>,
+    pub current_line: Option<String>,
+    pub current_word: Option<String>,
+    pub line_index: Option<u32>,
+    pub line_number: Option<u32>,
+    pub clipboard: Option<String>,
+    pub workspace_name: Option<String>,
+    pub workspace_folder: Option<String>,
+}
+
+impl SnippetVariableContext {
+    fn resolve_var(&self, var: SnippetVariable) -> String {
+        match var {
+            SnippetVariable::TmFilename => self.filename.clone().unwrap_or_default(),
+            SnippetVariable::TmFilenameBase => {
+                self.filename.as_ref()
+                    .and_then(|f| f.rsplit('.').last().map(String::from))
+                    .unwrap_or_default()
+            }
+            SnippetVariable::TmDirectory => self.directory.clone().unwrap_or_default(),
+            SnippetVariable::TmFilepath => self.filepath.clone().unwrap_or_default(),
+            SnippetVariable::TmSelectedText => self.selected_text.clone().unwrap_or_default(),
+            SnippetVariable::TmCurrentLine => self.current_line.clone().unwrap_or_default(),
+            SnippetVariable::TmCurrentWord => self.current_word.clone().unwrap_or_default(),
+            SnippetVariable::TmLineIndex => self.line_index.map(|n| n.to_string()).unwrap_or_else(|| "0".into()),
+            SnippetVariable::TmLineNumber => self.line_number.map(|n| n.to_string()).unwrap_or_else(|| "1".into()),
+            SnippetVariable::ClipboardContent => self.clipboard.clone().unwrap_or_default(),
+            SnippetVariable::WorkspaceName => self.workspace_name.clone().unwrap_or_default(),
+            SnippetVariable::WorkspaceFolder => self.workspace_folder.clone().unwrap_or_default(),
+        }
+    }
+}
+
+/// Resolve all known snippet variables in a body string.
+pub fn snippet_variable_resolver(body: &str, ctx: &SnippetVariableContext) -> String {
+    let mut result = body.to_string();
+    // Sort by token length descending so longer tokens (e.g. $TM_FILENAME_BASE)
+    // are replaced before shorter prefixes (e.g. $TM_FILENAME).
+    let mut vars: Vec<SnippetVariable> = SnippetVariable::all().to_vec();
+    vars.sort_by(|a, b| b.token().len().cmp(&a.token().len()));
+    for var in &vars {
+        let replacement = ctx.resolve_var(*var);
+        result = result.replace(var.token(), &replacement);
+    }
+    result
+}
+
+/// Resolve variables in all lines of a snippet body.
+pub fn snippet_resolve_body(body: &[String], ctx: &SnippetVariableContext) -> Vec<String> {
+    body.iter()
+        .map(|line| snippet_variable_resolver(line, ctx))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1073,5 +1184,77 @@ mod tests {
             source: SnippetSource::User,
         };
         assert!(SnippetValidator::validate(&snippet).is_ok());
+    }
+
+    // -- snippet_variable_resolver tests ------------------------------------
+
+    #[test]
+    fn resolve_tm_filename() {
+        let ctx = SnippetVariableContext {
+            filename: Some("main.rs".into()),
+            ..Default::default()
+        };
+        let result = snippet_variable_resolver("file: $TM_FILENAME", &ctx);
+        assert_eq!(result, "file: main.rs");
+    }
+
+    #[test]
+    fn resolve_tm_filename_base() {
+        let ctx = SnippetVariableContext {
+            filename: Some("main.rs".into()),
+            ..Default::default()
+        };
+        let result = snippet_variable_resolver("base: $TM_FILENAME_BASE", &ctx);
+        assert_eq!(result, "base: main");
+    }
+
+    #[test]
+    fn resolve_multiple_variables() {
+        let ctx = SnippetVariableContext {
+            filename: Some("lib.rs".into()),
+            line_number: Some(42),
+            workspace_name: Some("myproject".into()),
+            ..Default::default()
+        };
+        let result = snippet_variable_resolver(
+            "// $WORKSPACE_NAME - $TM_FILENAME:$TM_LINE_NUMBER",
+            &ctx,
+        );
+        assert_eq!(result, "// myproject - lib.rs:42");
+    }
+
+    #[test]
+    fn resolve_missing_variables_empty() {
+        let ctx = SnippetVariableContext::default();
+        let result = snippet_variable_resolver("sel=$TM_SELECTED_TEXT end", &ctx);
+        assert_eq!(result, "sel= end");
+    }
+
+    #[test]
+    fn resolve_body_multi_line() {
+        let ctx = SnippetVariableContext {
+            filename: Some("test.rs".into()),
+            clipboard: Some("pasted".into()),
+            ..Default::default()
+        };
+        let body = vec![
+            "// $TM_FILENAME".into(),
+            "let x = \"$CLIPBOARD\";".into(),
+        ];
+        let resolved = snippet_resolve_body(&body, &ctx);
+        assert_eq!(resolved[0], "// test.rs");
+        assert_eq!(resolved[1], "let x = \"pasted\";");
+    }
+
+    #[test]
+    fn snippet_variable_all_count() {
+        assert_eq!(SnippetVariable::all().len(), 12);
+    }
+
+    #[test]
+    fn snippet_variable_tokens_unique() {
+        let tokens: Vec<&str> = SnippetVariable::all().iter().map(|v| v.token()).collect();
+        let unique: std::collections::HashSet<&str> = tokens.iter().copied().collect();
+        assert_eq!(tokens.len(), unique.len());
     }
 }

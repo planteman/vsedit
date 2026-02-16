@@ -622,6 +622,98 @@ impl fmt::Display for ClipboardDiffResult {
     }
 }
 
+// ---------------------------------------------------------------------------
+// clipboard_monitor — track clipboard changes
+// ---------------------------------------------------------------------------
+
+/// A record of a clipboard change event.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClipboardChange {
+    pub old_text: Option<String>,
+    pub new_text: String,
+    pub timestamp: u64,
+    pub source_mode: SourceMode,
+}
+
+/// Monitor that tracks clipboard changes over time.
+pub struct ClipboardMonitor {
+    changes: Vec<ClipboardChange>,
+    last_text: Option<String>,
+    max_changes: usize,
+}
+
+impl ClipboardMonitor {
+    pub fn new(max_changes: usize) -> Self {
+        Self {
+            changes: Vec::new(),
+            last_text: None,
+            max_changes,
+        }
+    }
+
+    /// Record a new clipboard value. Only records if text actually changed.
+    pub fn record(&mut self, text: String, timestamp: u64, source_mode: SourceMode) -> bool {
+        if self.last_text.as_deref() == Some(&text) {
+            return false;
+        }
+        let change = ClipboardChange {
+            old_text: self.last_text.take(),
+            new_text: text.clone(),
+            timestamp,
+            source_mode,
+        };
+        self.last_text = Some(text);
+        self.changes.push(change);
+        if self.changes.len() > self.max_changes {
+            self.changes.remove(0);
+        }
+        true
+    }
+
+    /// Number of recorded changes.
+    pub fn change_count(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Get the most recent change.
+    pub fn last_change(&self) -> Option<&ClipboardChange> {
+        self.changes.last()
+    }
+
+    /// Get all recorded changes.
+    pub fn changes(&self) -> &[ClipboardChange] {
+        &self.changes
+    }
+
+    /// Clear all recorded changes.
+    pub fn clear(&mut self) {
+        self.changes.clear();
+        self.last_text = None;
+    }
+
+    /// Get changes within a timestamp range (inclusive).
+    pub fn changes_in_range(&self, from: u64, to: u64) -> Vec<&ClipboardChange> {
+        self.changes
+            .iter()
+            .filter(|c| c.timestamp >= from && c.timestamp <= to)
+            .collect()
+    }
+
+    /// Return the frequency of changes (changes per second) over the recorded history.
+    pub fn change_frequency(&self) -> f64 {
+        if self.changes.len() < 2 {
+            return 0.0;
+        }
+        let first = self.changes.first().unwrap().timestamp;
+        let last = self.changes.last().unwrap().timestamp;
+        let span = last.saturating_sub(first);
+        if span == 0 {
+            return 0.0;
+        }
+        self.changes.len() as f64 / span as f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1079,5 +1171,74 @@ mod tests {
         let diff = clipboard_diff(&a, &b);
         assert!(!diff.has_changes());
         assert!(diff.text_equal);
+    }
+
+    // -- clipboard_monitor tests --------------------------------------------
+
+    #[test]
+    fn monitor_records_change() {
+        let mut mon = ClipboardMonitor::new(10);
+        let recorded = mon.record("hello".into(), 1, SourceMode::Normal);
+        assert!(recorded);
+        assert_eq!(mon.change_count(), 1);
+    }
+
+    #[test]
+    fn monitor_skips_duplicate() {
+        let mut mon = ClipboardMonitor::new(10);
+        mon.record("hello".into(), 1, SourceMode::Normal);
+        let recorded = mon.record("hello".into(), 2, SourceMode::Normal);
+        assert!(!recorded);
+        assert_eq!(mon.change_count(), 1);
+    }
+
+    #[test]
+    fn monitor_tracks_old_text() {
+        let mut mon = ClipboardMonitor::new(10);
+        mon.record("first".into(), 1, SourceMode::Normal);
+        mon.record("second".into(), 2, SourceMode::Normal);
+        let last = mon.last_change().unwrap();
+        assert_eq!(last.old_text.as_deref(), Some("first"));
+        assert_eq!(last.new_text, "second");
+    }
+
+    #[test]
+    fn monitor_respects_max_changes() {
+        let mut mon = ClipboardMonitor::new(2);
+        mon.record("a".into(), 1, SourceMode::Normal);
+        mon.record("b".into(), 2, SourceMode::Normal);
+        mon.record("c".into(), 3, SourceMode::Normal);
+        assert_eq!(mon.change_count(), 2);
+        assert_eq!(mon.changes()[0].new_text, "b");
+    }
+
+    #[test]
+    fn monitor_changes_in_range() {
+        let mut mon = ClipboardMonitor::new(10);
+        mon.record("a".into(), 10, SourceMode::Normal);
+        mon.record("b".into(), 20, SourceMode::Normal);
+        mon.record("c".into(), 30, SourceMode::Normal);
+        let range = mon.changes_in_range(15, 25);
+        assert_eq!(range.len(), 1);
+        assert_eq!(range[0].new_text, "b");
+    }
+
+    #[test]
+    fn monitor_clear() {
+        let mut mon = ClipboardMonitor::new(10);
+        mon.record("test".into(), 1, SourceMode::Normal);
+        mon.clear();
+        assert_eq!(mon.change_count(), 0);
+        assert!(mon.last_change().is_none());
+    }
+
+    #[test]
+    fn monitor_change_frequency() {
+        let mut mon = ClipboardMonitor::new(10);
+        mon.record("a".into(), 0, SourceMode::Normal);
+        mon.record("b".into(), 10, SourceMode::Normal);
+        mon.record("c".into(), 20, SourceMode::Normal);
+        let freq = mon.change_frequency();
+        assert!((freq - 0.15).abs() < 0.01);
     }
 }

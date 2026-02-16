@@ -539,7 +539,7 @@ impl Default for TestViewValidator {
 // Re-export VS Code Testing API types from ext-testing
 pub use vsedit_ext_testing::{
     CoverageStats, DetailedCoverage, FileCoverage, TestItemCollection, TestOutputMessage,
-    TestRunHistory, TestRunProfileKind, TestRunRequest, TestRunResult, TestResultSummary, TestTag,
+    TestRunHistory, TestRunProfileKind, TestRunRequest, TestRunResult, TestTag,
     VscTestItem, VscTestRun, TestController, TestRunProfile, TestFramework,
     compute_summary, detect_test_framework, render_test_tree, render_result_line,
     CargoTestDiscoverer,
@@ -602,6 +602,117 @@ pub fn render_output_panel(run: &TestRun) -> String {
         out.push_str(&format!("{icon} {}{duration}{msg}\n", item.label));
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// TestResultSummary with pass/fail/skip counts
+// ---------------------------------------------------------------------------
+
+/// Aggregated summary of test results computed from a tree of `TestItem`s.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TestResultSummary {
+    pub passed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub errored: usize,
+    pub running: usize,
+    pub queued: usize,
+    pub total: usize,
+    pub total_duration_ms: u64,
+}
+
+impl TestResultSummary {
+    /// Compute a summary by recursively walking a slice of test items.
+    pub fn from_items(items: &[TestItem]) -> Self {
+        let mut summary = Self::default();
+        for item in items {
+            summary.count_item(item);
+        }
+        summary
+    }
+
+    fn count_item(&mut self, item: &TestItem) {
+        if item.children.is_empty() {
+            // Leaf node — this is an actual test
+            self.total += 1;
+            match item.state {
+                TestState::Passed => self.passed += 1,
+                TestState::Failed => self.failed += 1,
+                TestState::Skipped => self.skipped += 1,
+                TestState::Errored => self.errored += 1,
+                TestState::Running => self.running += 1,
+                TestState::Queued => self.queued += 1,
+            }
+            if let Some(dur) = item.duration_ms {
+                self.total_duration_ms += dur as u64;
+            }
+        } else {
+            // Container node — recurse into children
+            for child in &item.children {
+                self.count_item(child);
+            }
+        }
+    }
+
+    /// Returns the pass rate as a value between 0.0 and 1.0.
+    /// Returns 0.0 if no tests have completed.
+    pub fn pass_rate(&self) -> f64 {
+        let completed = self.passed + self.failed + self.errored;
+        if completed == 0 {
+            0.0
+        } else {
+            self.passed as f64 / completed as f64
+        }
+    }
+
+    /// Whether all tests have passed (none failed or errored).
+    pub fn all_passed(&self) -> bool {
+        self.failed == 0 && self.errored == 0 && self.passed > 0
+    }
+
+    /// Whether there are any failures.
+    pub fn has_failures(&self) -> bool {
+        self.failed > 0 || self.errored > 0
+    }
+
+    /// Format the summary as a status line, e.g., "5 passed, 2 failed, 1 skipped (120ms)".
+    pub fn status_line(&self) -> String {
+        let mut parts = Vec::new();
+        if self.passed > 0 {
+            parts.push(format!("{} passed", self.passed));
+        }
+        if self.failed > 0 {
+            parts.push(format!("{} failed", self.failed));
+        }
+        if self.errored > 0 {
+            parts.push(format!("{} errored", self.errored));
+        }
+        if self.skipped > 0 {
+            parts.push(format!("{} skipped", self.skipped));
+        }
+        if self.running > 0 {
+            parts.push(format!("{} running", self.running));
+        }
+        if self.queued > 0 {
+            parts.push(format!("{} queued", self.queued));
+        }
+        let status = if parts.is_empty() {
+            "No tests".to_string()
+        } else {
+            parts.join(", ")
+        };
+        if self.total_duration_ms > 0 {
+            format!("{status} ({}ms)", self.total_duration_ms)
+        } else {
+            status
+        }
+    }
+}
+
+impl fmt::Display for TestResultSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.status_line())
+    }
 }
 
 #[cfg(test)]
@@ -1057,5 +1168,102 @@ mod tests {
     fn test_view_is_ascii_printable() {
         assert!(TestViewValidator::is_ascii_printable("Hello World 123"));
         assert!(!TestViewValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    fn make_leaf(state: TestState, dur_ms: Option<f64>) -> TestItem {
+        TestItem {
+            id: "t".to_string(),
+            label: "test".to_string(),
+            uri: None,
+            line: None,
+            state,
+            children: vec![],
+            duration_ms: dur_ms,
+            message: None,
+        }
+    }
+
+    #[test]
+    fn test_result_summary_all_passed() {
+        let items = vec![
+            make_leaf(TestState::Passed, Some(10.0)),
+            make_leaf(TestState::Passed, Some(20.0)),
+        ];
+        let summary = TestResultSummary::from_items(&items);
+        assert_eq!(summary.passed, 2);
+        assert_eq!(summary.total, 2);
+        assert_eq!(summary.total_duration_ms, 30);
+        assert!(summary.all_passed());
+        assert!(!summary.has_failures());
+    }
+
+    #[test]
+    fn test_result_summary_mixed() {
+        let items = vec![
+            make_leaf(TestState::Passed, Some(10.0)),
+            make_leaf(TestState::Failed, Some(5.0)),
+            make_leaf(TestState::Skipped, None),
+        ];
+        let summary = TestResultSummary::from_items(&items);
+        assert_eq!(summary.passed, 1);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.skipped, 1);
+        assert_eq!(summary.total, 3);
+        assert!(summary.has_failures());
+        assert!(!summary.all_passed());
+    }
+
+    #[test]
+    fn test_result_summary_nested() {
+        let suite = TestItem {
+            id: "suite".to_string(),
+            label: "Suite".to_string(),
+            uri: None,
+            line: None,
+            state: TestState::Passed,
+            children: vec![
+                make_leaf(TestState::Passed, Some(5.0)),
+                make_leaf(TestState::Failed, Some(3.0)),
+            ],
+            duration_ms: None,
+            message: None,
+        };
+        let summary = TestResultSummary::from_items(&[suite]);
+        assert_eq!(summary.total, 2); // only leaf tests counted
+        assert_eq!(summary.passed, 1);
+        assert_eq!(summary.failed, 1);
+    }
+
+    #[test]
+    fn test_result_summary_pass_rate() {
+        let items = vec![
+            make_leaf(TestState::Passed, None),
+            make_leaf(TestState::Passed, None),
+            make_leaf(TestState::Failed, None),
+        ];
+        let summary = TestResultSummary::from_items(&items);
+        let rate = summary.pass_rate();
+        assert!((rate - 2.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_result_summary_status_line() {
+        let items = vec![
+            make_leaf(TestState::Passed, Some(100.0)),
+            make_leaf(TestState::Skipped, None),
+        ];
+        let summary = TestResultSummary::from_items(&items);
+        let line = summary.status_line();
+        assert!(line.contains("1 passed"));
+        assert!(line.contains("1 skipped"));
+        assert!(line.contains("100ms"));
+    }
+
+    #[test]
+    fn test_result_summary_empty() {
+        let summary = TestResultSummary::from_items(&[]);
+        assert_eq!(summary.total, 0);
+        assert_eq!(summary.status_line(), "No tests");
+        assert!(!summary.all_passed());
     }
 }

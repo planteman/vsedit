@@ -666,6 +666,100 @@ impl Default for ExtScmValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SCM history
+// ---------------------------------------------------------------------------
+
+/// A single item in a file's SCM history.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScmHistoryItem {
+    /// Commit or changeset ID.
+    pub id: String,
+    /// Short summary / commit message first line.
+    pub message: String,
+    /// Author name.
+    pub author: String,
+    /// Unix timestamp of the commit.
+    pub timestamp: u64,
+    /// File path at the time of this commit (may differ from current due to renames).
+    pub path: String,
+}
+
+impl ScmHistoryItem {
+    pub fn new(
+        id: impl Into<String>,
+        message: impl Into<String>,
+        author: impl Into<String>,
+        timestamp: u64,
+        path: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            message: message.into(),
+            author: author.into(),
+            timestamp,
+            path: path.into(),
+        }
+    }
+
+    /// Return a short form of the ID (first 7 chars, like git short SHA).
+    pub fn short_id(&self) -> &str {
+        if self.id.len() > 7 { &self.id[..7] } else { &self.id }
+    }
+
+    /// Return the first line of the commit message.
+    pub fn subject(&self) -> &str {
+        self.message.lines().next().unwrap_or("")
+    }
+}
+
+impl fmt::Display for ScmHistoryItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {} ({})", self.short_id(), self.subject(), self.author)
+    }
+}
+
+/// A list of history items with helper methods.
+#[derive(Debug, Clone, Default)]
+pub struct ScmHistory {
+    items: Vec<ScmHistoryItem>,
+}
+
+impl ScmHistory {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn push(&mut self, item: ScmHistoryItem) {
+        self.items.push(item);
+    }
+
+    /// Return items sorted by timestamp, newest first.
+    pub fn newest_first(&self) -> Vec<&ScmHistoryItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        sorted
+    }
+
+    /// Filter history to a specific author.
+    pub fn by_author(&self, author: &str) -> Vec<&ScmHistoryItem> {
+        self.items.iter().filter(|i| i.author == author).collect()
+    }
+
+    /// Return the most recent item.
+    pub fn latest(&self) -> Option<&ScmHistoryItem> {
+        self.items.iter().max_by_key(|i| i.timestamp)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1065,5 +1159,64 @@ mod tests {
     fn ext_scm_is_ascii_printable() {
         assert!(ExtScmValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtScmValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- ScmHistoryItem --
+
+    #[test]
+    fn history_item_short_id() {
+        let item = ScmHistoryItem::new("abc1234567890", "Fix bug", "Alice", 1000, "src/main.rs");
+        assert_eq!(item.short_id(), "abc1234");
+    }
+
+    #[test]
+    fn history_item_short_id_already_short() {
+        let item = ScmHistoryItem::new("abc", "Fix", "Bob", 100, "f.rs");
+        assert_eq!(item.short_id(), "abc");
+    }
+
+    #[test]
+    fn history_item_subject() {
+        let item = ScmHistoryItem::new("abc", "First line\nSecond line", "A", 100, "f.rs");
+        assert_eq!(item.subject(), "First line");
+    }
+
+    #[test]
+    fn history_item_display() {
+        let item = ScmHistoryItem::new("abc1234567890", "Fix bug", "Alice", 1000, "src/main.rs");
+        let s = format!("{item}");
+        assert!(s.contains("abc1234"));
+        assert!(s.contains("Fix bug"));
+        assert!(s.contains("Alice"));
+    }
+
+    #[test]
+    fn history_newest_first() {
+        let mut h = ScmHistory::new();
+        h.push(ScmHistoryItem::new("a", "old", "A", 100, "f.rs"));
+        h.push(ScmHistoryItem::new("b", "new", "A", 300, "f.rs"));
+        h.push(ScmHistoryItem::new("c", "mid", "A", 200, "f.rs"));
+        let sorted = h.newest_first();
+        assert_eq!(sorted[0].id, "b");
+        assert_eq!(sorted[1].id, "c");
+        assert_eq!(sorted[2].id, "a");
+    }
+
+    #[test]
+    fn history_by_author() {
+        let mut h = ScmHistory::new();
+        h.push(ScmHistoryItem::new("a", "m", "Alice", 100, "f.rs"));
+        h.push(ScmHistoryItem::new("b", "m", "Bob", 200, "f.rs"));
+        h.push(ScmHistoryItem::new("c", "m", "Alice", 300, "f.rs"));
+        assert_eq!(h.by_author("Alice").len(), 2);
+        assert_eq!(h.by_author("Bob").len(), 1);
+    }
+
+    #[test]
+    fn history_latest() {
+        let mut h = ScmHistory::new();
+        h.push(ScmHistoryItem::new("a", "old", "A", 100, "f.rs"));
+        h.push(ScmHistoryItem::new("b", "new", "A", 500, "f.rs"));
+        assert_eq!(h.latest().unwrap().id, "b");
     }
 }

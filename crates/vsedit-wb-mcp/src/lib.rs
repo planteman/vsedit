@@ -555,6 +555,87 @@ impl Default for WbMcpValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// mcp_tool_invoke — MCP tool execution
+// ---------------------------------------------------------------------------
+
+/// The result of invoking an MCP tool.
+#[derive(Debug, Clone, PartialEq)]
+pub struct McpToolResult {
+    pub tool_name: String,
+    pub server_id: String,
+    pub success: bool,
+    pub output: String,
+    pub duration_ms: u64,
+}
+
+impl McpToolResult {
+    pub fn is_error(&self) -> bool {
+        !self.success
+    }
+}
+
+impl fmt::Display for McpToolResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.success { "OK" } else { "FAILED" };
+        write!(
+            f,
+            "[{}] {}.{}: {} ({}ms)",
+            status, self.server_id, self.tool_name, self.output, self.duration_ms,
+        )
+    }
+}
+
+/// Request to invoke an MCP tool.
+#[derive(Debug, Clone)]
+pub struct McpToolInvokeRequest {
+    pub server_id: String,
+    pub tool_name: String,
+    pub arguments: std::collections::HashMap<String, String>,
+}
+
+/// Validate and prepare an MCP tool invocation. Returns an error string if
+/// the server or tool is not found / not connected.
+pub fn mcp_tool_invoke(
+    service: &McpService,
+    request: &McpToolInvokeRequest,
+) -> Result<McpToolResult, String> {
+    let server = service
+        .get_server(&request.server_id)
+        .ok_or_else(|| format!("server not found: {}", request.server_id))?;
+    if !server.connected {
+        return Err(format!("server not connected: {}", request.server_id));
+    }
+    if !server.has_tool(&request.tool_name) {
+        return Err(format!(
+            "tool '{}' not found on server '{}'",
+            request.tool_name, request.server_id,
+        ));
+    }
+    // In a real implementation this would make an RPC call.
+    // For now we return a simulated successful result.
+    Ok(McpToolResult {
+        tool_name: request.tool_name.clone(),
+        server_id: request.server_id.clone(),
+        success: true,
+        output: format!("invoked {} with {} args", request.tool_name, request.arguments.len()),
+        duration_ms: 0,
+    })
+}
+
+/// List all invocable tools across all connected servers.
+pub fn mcp_list_invocable(service: &McpService) -> Vec<(&McpServer, &McpTool)> {
+    let mut result = Vec::new();
+    for server in service.get_all_servers() {
+        if server.connected {
+            for tool in &server.tools {
+                result.push((server, tool));
+            }
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1064,5 +1145,101 @@ mod tests {
     fn wb_mcp_is_ascii_printable() {
         assert!(WbMcpValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbMcpValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- mcp_tool_invoke tests ----------------------------------------------
+
+    fn test_mcp_service() -> McpService {
+        let mut svc = McpService::new();
+        svc.add_server(McpServer {
+            id: "srv1".into(),
+            name: "Test Server".into(),
+            tools: vec![
+                McpTool { name: "search".into(), description: "Search files".into(), input_schema: None },
+                McpTool { name: "read".into(), description: "Read file".into(), input_schema: None },
+            ],
+            resources: vec![],
+            connected: true,
+        });
+        svc.add_server(McpServer {
+            id: "srv2".into(),
+            name: "Offline".into(),
+            tools: vec![
+                McpTool { name: "write".into(), description: "Write".into(), input_schema: None },
+            ],
+            resources: vec![],
+            connected: false,
+        });
+        svc
+    }
+
+    #[test]
+    fn invoke_tool_success() {
+        let svc = test_mcp_service();
+        let req = McpToolInvokeRequest {
+            server_id: "srv1".into(),
+            tool_name: "search".into(),
+            arguments: std::collections::HashMap::new(),
+        };
+        let result = mcp_tool_invoke(&svc, &req).unwrap();
+        assert!(result.success);
+        assert_eq!(result.tool_name, "search");
+    }
+
+    #[test]
+    fn invoke_tool_server_not_found() {
+        let svc = test_mcp_service();
+        let req = McpToolInvokeRequest {
+            server_id: "missing".into(),
+            tool_name: "search".into(),
+            arguments: std::collections::HashMap::new(),
+        };
+        assert!(mcp_tool_invoke(&svc, &req).is_err());
+    }
+
+    #[test]
+    fn invoke_tool_server_disconnected() {
+        let svc = test_mcp_service();
+        let req = McpToolInvokeRequest {
+            server_id: "srv2".into(),
+            tool_name: "write".into(),
+            arguments: std::collections::HashMap::new(),
+        };
+        let err = mcp_tool_invoke(&svc, &req).unwrap_err();
+        assert!(err.contains("not connected"));
+    }
+
+    #[test]
+    fn invoke_tool_not_found() {
+        let svc = test_mcp_service();
+        let req = McpToolInvokeRequest {
+            server_id: "srv1".into(),
+            tool_name: "nonexistent".into(),
+            arguments: std::collections::HashMap::new(),
+        };
+        let err = mcp_tool_invoke(&svc, &req).unwrap_err();
+        assert!(err.contains("not found"));
+    }
+
+    #[test]
+    fn tool_result_display() {
+        let result = McpToolResult {
+            tool_name: "search".into(),
+            server_id: "srv1".into(),
+            success: true,
+            output: "found 3 files".into(),
+            duration_ms: 42,
+        };
+        let s = format!("{result}");
+        assert!(s.contains("[OK]"));
+        assert!(s.contains("42ms"));
+    }
+
+    #[test]
+    fn list_invocable_only_connected() {
+        let svc = test_mcp_service();
+        let invocable = mcp_list_invocable(&svc);
+        assert_eq!(invocable.len(), 2); // only srv1's tools
+        assert!(invocable.iter().all(|(s, _)| s.connected));
     }
 }

@@ -600,6 +600,84 @@ impl<T: Clone + PartialEq> UndoRedoStack<T> {
 
 impl std::error::Error for UndoRedoError {}
 
+// ---------------------------------------------------------------------------
+// undo_group — group multiple edits into one undo step
+// ---------------------------------------------------------------------------
+
+/// Execute a closure while grouping all edits into a single undo step.
+/// Any edits pushed to the service inside `f` will be part of one group.
+pub fn undo_group<T: Clone, F>(
+    service: &mut UndoRedoService<T>,
+    cursor_before: Option<CursorState>,
+    cursor_after: Option<CursorState>,
+    f: F,
+) where
+    F: FnOnce(&mut UndoRedoService<T>),
+{
+    service.open_group(cursor_before);
+    f(service);
+    service.close_group(cursor_after);
+}
+
+/// Group builder for constructing undo groups incrementally.
+#[derive(Debug)]
+pub struct UndoGroupBuilder<T: Clone> {
+    edits: Vec<T>,
+    cursor_before: Option<CursorState>,
+    cursor_after: Option<CursorState>,
+}
+
+impl<T: Clone> UndoGroupBuilder<T> {
+    pub fn new() -> Self {
+        Self {
+            edits: Vec::new(),
+            cursor_before: None,
+            cursor_after: None,
+        }
+    }
+
+    pub fn cursor_before(mut self, state: CursorState) -> Self {
+        self.cursor_before = Some(state);
+        self
+    }
+
+    pub fn cursor_after(mut self, state: CursorState) -> Self {
+        self.cursor_after = Some(state);
+        self
+    }
+
+    pub fn add_edit(mut self, edit: T) -> Self {
+        self.edits.push(edit);
+        self
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
+    /// Commit the builder contents as a single undo group.
+    pub fn commit(self, service: &mut UndoRedoService<T>) {
+        if self.edits.is_empty() {
+            return;
+        }
+        service.open_group(self.cursor_before);
+        for edit in self.edits {
+            service.push_edit(edit, None, None);
+        }
+        service.close_group(self.cursor_after);
+    }
+}
+
+impl<T: Clone> Default for UndoGroupBuilder<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1091,5 +1169,85 @@ mod tests {
 
         let restored = svc.undo_with_cursor().unwrap();
         assert_eq!(restored, before);
+    }
+
+    // -- undo_group tests ---------------------------------------------------
+
+    #[test]
+    fn undo_group_combines_edits() {
+        let mut svc = UndoRedoService::<i32>::new();
+        undo_group(&mut svc, None, None, |s| {
+            s.push_edit(1, None, None);
+            s.push_edit(2, None, None);
+            s.push_edit(3, None, None);
+        });
+        assert_eq!(svc.undo_count(), 1);
+        let g = svc.undo().unwrap();
+        assert_eq!(g.edits, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn undo_group_with_cursors() {
+        let mut svc = UndoRedoService::<&str>::new();
+        let before = CursorState::single(1, 1);
+        let after = CursorState::single(1, 10);
+        undo_group(&mut svc, Some(before.clone()), Some(after.clone()), |s| {
+            s.push_edit("a", None, None);
+            s.push_edit("b", None, None);
+        });
+        let restored = svc.undo_with_cursor().unwrap();
+        assert_eq!(restored, before);
+    }
+
+    #[test]
+    fn undo_group_empty_closure() {
+        let mut svc = UndoRedoService::<i32>::new();
+        undo_group(&mut svc, None, None, |_| {});
+        // Empty group still created (service handles empty groups)
+        assert!(svc.undo_count() <= 1);
+    }
+
+    #[test]
+    fn builder_commit() {
+        let mut svc = UndoRedoService::<i32>::new();
+        UndoGroupBuilder::new()
+            .add_edit(10)
+            .add_edit(20)
+            .add_edit(30)
+            .commit(&mut svc);
+        assert_eq!(svc.undo_count(), 1);
+        let g = svc.undo().unwrap();
+        assert_eq!(g.edits, vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn builder_empty_does_not_commit() {
+        let mut svc = UndoRedoService::<i32>::new();
+        UndoGroupBuilder::new().commit(&mut svc);
+        assert_eq!(svc.undo_count(), 0);
+    }
+
+    #[test]
+    fn builder_with_cursors() {
+        let mut svc = UndoRedoService::<i32>::new();
+        let before = CursorState::single(5, 1);
+        let after = CursorState::single(5, 20);
+        UndoGroupBuilder::new()
+            .cursor_before(before.clone())
+            .cursor_after(after.clone())
+            .add_edit(42)
+            .commit(&mut svc);
+        let restored = svc.undo_with_cursor().unwrap();
+        assert_eq!(restored, before);
+    }
+
+    #[test]
+    fn builder_edit_count_and_is_empty() {
+        let builder = UndoGroupBuilder::<i32>::new();
+        assert!(builder.is_empty());
+        assert_eq!(builder.edit_count(), 0);
+        let builder = builder.add_edit(1).add_edit(2);
+        assert!(!builder.is_empty());
+        assert_eq!(builder.edit_count(), 2);
     }
 }

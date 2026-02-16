@@ -637,6 +637,77 @@ impl Default for HoverContribValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Hover priority
+// ---------------------------------------------------------------------------
+
+/// Priority level for hover providers, controlling display order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum HoverPriority {
+    /// Lowest – shown last.
+    Fallback = 0,
+    /// Normal extension hover.
+    Normal = 1,
+    /// Language service hover (type info, docs).
+    LanguageService = 2,
+    /// Built-in hover (e.g. color preview, regex).
+    Builtin = 3,
+}
+
+impl fmt::Display for HoverPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HoverPriority::Fallback => write!(f, "fallback"),
+            HoverPriority::Normal => write!(f, "normal"),
+            HoverPriority::LanguageService => write!(f, "language-service"),
+            HoverPriority::Builtin => write!(f, "builtin"),
+        }
+    }
+}
+
+/// A hover result tagged with its provider's priority.
+#[derive(Debug, Clone)]
+pub struct PrioritizedHover {
+    pub hover: Hover,
+    pub priority: HoverPriority,
+    pub provider_id: String,
+}
+
+impl PrioritizedHover {
+    pub fn new(hover: Hover, priority: HoverPriority, provider_id: impl Into<String>) -> Self {
+        Self {
+            hover,
+            priority,
+            provider_id: provider_id.into(),
+        }
+    }
+}
+
+/// Sort and deduplicate hover results by priority (highest first).
+pub fn sort_hovers_by_priority(mut hovers: Vec<PrioritizedHover>) -> Vec<PrioritizedHover> {
+    hovers.sort_by(|a, b| b.priority.cmp(&a.priority));
+    hovers
+}
+
+/// Merge prioritized hovers into a single Hover, ordered by priority.
+pub fn merge_prioritized(hovers: Vec<PrioritizedHover>) -> Hover {
+    let sorted = sort_hovers_by_priority(hovers);
+    let mut contents = Vec::new();
+    let mut range: Option<HoverRange> = None;
+    for ph in sorted {
+        contents.extend(ph.hover.contents);
+        if range.is_none() {
+            range = ph.hover.range;
+        }
+    }
+    Hover { contents, range }
+}
+
+/// Filter prioritized hovers to keep only those at or above a minimum priority.
+pub fn filter_by_min_priority(hovers: Vec<PrioritizedHover>, min: HoverPriority) -> Vec<PrioritizedHover> {
+    hovers.into_iter().filter(|h| h.priority >= min).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1063,5 +1134,72 @@ mod tests {
     fn hover_contrib_is_ascii_printable() {
         assert!(HoverContribValidator::is_ascii_printable("Hello World 123"));
         assert!(!HoverContribValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- HoverPriority --
+
+    #[test]
+    fn hover_priority_ordering() {
+        assert!(HoverPriority::Builtin > HoverPriority::LanguageService);
+        assert!(HoverPriority::LanguageService > HoverPriority::Normal);
+        assert!(HoverPriority::Normal > HoverPriority::Fallback);
+    }
+
+    #[test]
+    fn hover_priority_display() {
+        assert_eq!(format!("{}", HoverPriority::Fallback), "fallback");
+        assert_eq!(format!("{}", HoverPriority::Builtin), "builtin");
+        assert_eq!(format!("{}", HoverPriority::LanguageService), "language-service");
+    }
+
+    #[test]
+    fn sort_hovers_by_priority_order() {
+        let hovers = vec![
+            PrioritizedHover::new(
+                Hover { contents: vec![MarkdownString::new("low")], range: None },
+                HoverPriority::Fallback, "ext1",
+            ),
+            PrioritizedHover::new(
+                Hover { contents: vec![MarkdownString::new("high")], range: None },
+                HoverPriority::Builtin, "builtin",
+            ),
+        ];
+        let sorted = sort_hovers_by_priority(hovers);
+        assert_eq!(sorted[0].priority, HoverPriority::Builtin);
+        assert_eq!(sorted[1].priority, HoverPriority::Fallback);
+    }
+
+    #[test]
+    fn merge_prioritized_combines_contents() {
+        let hovers = vec![
+            PrioritizedHover::new(
+                Hover { contents: vec![MarkdownString::new("A")], range: None },
+                HoverPriority::Normal, "p1",
+            ),
+            PrioritizedHover::new(
+                Hover { contents: vec![MarkdownString::new("B")], range: None },
+                HoverPriority::Builtin, "p2",
+            ),
+        ];
+        let merged = merge_prioritized(hovers);
+        assert_eq!(merged.contents.len(), 2);
+        assert_eq!(merged.contents[0].value, "B");
+    }
+
+    #[test]
+    fn filter_by_min_priority_excludes_low() {
+        let hovers = vec![
+            PrioritizedHover::new(
+                Hover { contents: vec![], range: None },
+                HoverPriority::Fallback, "a",
+            ),
+            PrioritizedHover::new(
+                Hover { contents: vec![], range: None },
+                HoverPriority::LanguageService, "b",
+            ),
+        ];
+        let filtered = filter_by_min_priority(hovers, HoverPriority::Normal);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].provider_id, "b");
     }
 }

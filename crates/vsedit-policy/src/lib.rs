@@ -610,6 +610,86 @@ impl Default for PolicyEngine {
     }
 }
 
+// ---------------------------------------------------------------------------
+// policy_report — human-readable policy summary
+// ---------------------------------------------------------------------------
+
+/// A single line in a policy report.
+#[derive(Debug, Clone)]
+pub struct PolicyReportLine {
+    pub name: String,
+    pub value: String,
+    pub scope: String,
+    pub read_only: bool,
+}
+
+impl fmt::Display for PolicyReportLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ro = if self.read_only { " [read-only]" } else { "" };
+        write!(f, "{}: {} (scope: {}){}", self.name, self.value, self.scope, ro)
+    }
+}
+
+impl PolicyService {
+    /// Returns `true` if the named policy is marked as read-only.
+    pub fn is_read_only(&self, name: &str) -> bool {
+        self.read_only.contains(name)
+    }
+}
+
+/// Generate a human-readable policy report from a `PolicyService`.
+pub fn policy_report(service: &PolicyService) -> Vec<PolicyReportLine> {
+    let mut lines: Vec<PolicyReportLine> = service
+        .list_policies()
+        .iter()
+        .filter_map(|name| {
+            service.get_policy(name).map(|policy| PolicyReportLine {
+                name: name.clone(),
+                value: format!("{}", policy.value),
+                scope: "default".to_string(),
+                read_only: service.is_read_only(name),
+            })
+        })
+        .collect();
+    lines.sort_by(|a, b| a.name.cmp(&b.name));
+    lines
+}
+
+/// Format a full policy report as a multi-line string.
+pub fn policy_report_text(service: &PolicyService) -> String {
+    let lines = policy_report(service);
+    if lines.is_empty() {
+        return "No policies configured.".to_string();
+    }
+    let mut out = String::from("Policy Report\n");
+    out.push_str(&"=".repeat(40));
+    out.push('\n');
+    for line in &lines {
+        out.push_str(&format!("{line}\n"));
+    }
+    out.push_str(&format!("\nTotal: {} policies", lines.len()));
+    out
+}
+
+/// Summarize policy counts by scope.
+pub fn policy_report_by_scope(service: &PolicyService) -> Vec<(String, usize)> {
+    let lines = policy_report(service);
+    let mut scope_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for line in &lines {
+        *scope_counts.entry(line.scope.clone()).or_insert(0) += 1;
+    }
+    let mut result: Vec<(String, usize)> = scope_counts.into_iter().collect();
+    result.sort_by(|a, b| a.0.cmp(&b.0));
+    result
+}
+
+/// Count read-only vs writable policies.
+pub fn policy_report_access_summary(service: &PolicyService) -> (usize, usize) {
+    let lines = policy_report(service);
+    let ro = lines.iter().filter(|l| l.read_only).count();
+    (ro, lines.len() - ro)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1095,5 +1175,78 @@ mod tests {
     fn policy_is_ascii_printable() {
         assert!(PolicyValidator::is_ascii_printable("Hello World 123"));
         assert!(!PolicyValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- policy_report tests ------------------------------------------------
+
+    fn sample_service() -> PolicyService {
+        let mut svc = PolicyService::new();
+        svc.set_policy("editor.fontSize", PolicyValue::Number(14), None);
+        svc.set_policy("editor.tabSize", PolicyValue::Number(4), None);
+        svc.set_policy("security.workspace.trust", PolicyValue::Bool(true), None);
+        svc.mark_read_only("security.workspace.trust").unwrap();
+        svc.set_policy("telemetry.level", PolicyValue::String("all".into()), None);
+        svc
+    }
+
+    #[test]
+    fn policy_report_lists_all_policies() {
+        let svc = sample_service();
+        let report = policy_report(&svc);
+        assert_eq!(report.len(), 4);
+    }
+
+    #[test]
+    fn policy_report_sorted_by_name() {
+        let svc = sample_service();
+        let report = policy_report(&svc);
+        let names: Vec<&str> = report.iter().map(|l| l.name.as_str()).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
+    }
+
+    #[test]
+    fn policy_report_text_contains_header() {
+        let svc = sample_service();
+        let text = policy_report_text(&svc);
+        assert!(text.starts_with("Policy Report\n"));
+        assert!(text.contains("Total: 4 policies"));
+    }
+
+    #[test]
+    fn policy_report_text_empty_engine() {
+        let svc = PolicyService::new();
+        let text = policy_report_text(&svc);
+        assert_eq!(text, "No policies configured.");
+    }
+
+    #[test]
+    fn policy_report_by_scope_counts() {
+        let svc = sample_service();
+        let scopes = policy_report_by_scope(&svc);
+        let default_count = scopes.iter().find(|(s, _)| s == "default").unwrap().1;
+        assert_eq!(default_count, 4);
+    }
+
+    #[test]
+    fn policy_report_access_summary_counts() {
+        let svc = sample_service();
+        let (ro, rw) = policy_report_access_summary(&svc);
+        assert_eq!(ro, 1);
+        assert_eq!(rw, 3);
+    }
+
+    #[test]
+    fn policy_report_line_display() {
+        let line = PolicyReportLine {
+            name: "test.policy".into(),
+            value: "42".into(),
+            scope: "user".into(),
+            read_only: true,
+        };
+        let s = format!("{line}");
+        assert!(s.contains("[read-only]"));
+        assert!(s.contains("test.policy"));
     }
 }

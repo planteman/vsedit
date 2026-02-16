@@ -533,6 +533,92 @@ impl LinkedEditingHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Word boundary detection for linked editing
+// ---------------------------------------------------------------------------
+
+/// Detect word boundaries in the given text, returning ranges `(start_byte, end_byte)`
+/// for each word. A "word" is a contiguous run of alphanumeric or underscore characters.
+pub fn linked_edit_detect_word_boundaries(text: &str) -> Vec<(usize, usize)> {
+    let mut result = Vec::new();
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if is_word_byte(bytes[i]) {
+            let start = i;
+            while i < bytes.len() && is_word_byte(bytes[i]) {
+                i += 1;
+            }
+            result.push((start, i));
+        } else {
+            i += 1;
+        }
+    }
+    result
+}
+
+fn is_word_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Find all occurrences of `word` in `text` and return their byte offset ranges.
+pub fn linked_edit_find_word_occurrences(text: &str, word: &str) -> Vec<(usize, usize)> {
+    if word.is_empty() {
+        return Vec::new();
+    }
+    let mut results = Vec::new();
+    let mut start = 0;
+    while let Some(pos) = text[start..].find(word) {
+        let abs_pos = start + pos;
+        let end_pos = abs_pos + word.len();
+        // Ensure it's a whole-word match
+        let before_ok = abs_pos == 0 || !is_word_byte(text.as_bytes()[abs_pos - 1]);
+        let after_ok = end_pos >= text.len() || !is_word_byte(text.as_bytes()[end_pos]);
+        if before_ok && after_ok {
+            results.push((abs_pos, end_pos));
+        }
+        start = abs_pos + 1;
+    }
+    results
+}
+
+/// Build a `LinkedEditGroup` from all occurrences of `word` in `text`.
+pub fn linked_edit_group_from_word(text: &str, word: &str) -> LinkedEditGroup {
+    let ranges = linked_edit_find_word_occurrences(text, word);
+    LinkedEditGroup::new(ranges, word)
+}
+
+/// Convert a byte-offset range to a `LinkedEditingRange` using (line, col) coordinates.
+pub fn byte_range_to_editing_range(text: &str, start: usize, end: usize) -> Option<LinkedEditingRange> {
+    let (start_line, start_col) = byte_offset_to_line_col(text, start)?;
+    let (end_line, end_col) = byte_offset_to_line_col(text, end)?;
+    Some(LinkedEditingRange::new(start_line, start_col, end_line, end_col))
+}
+
+fn byte_offset_to_line_col(text: &str, offset: usize) -> Option<(u32, u32)> {
+    if offset > text.len() {
+        return None;
+    }
+    let mut line = 0u32;
+    let mut col = 0u32;
+    for (i, byte) in text.bytes().enumerate() {
+        if i == offset {
+            return Some((line, col));
+        }
+        if byte == b'\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+    if offset == text.len() {
+        Some((line, col))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1047,5 +1133,65 @@ mod tests {
         let group = LinkedEditGroup::new(vec![(6, 11)], "world");
         let result = apply_group_edit(text, &group, "rust").unwrap();
         assert_eq!(result, "hello rust");
+    }
+
+    #[test]
+    fn detect_word_boundaries_basic() {
+        let boundaries = linked_edit_detect_word_boundaries("hello world foo_bar");
+        assert_eq!(boundaries, vec![(0, 5), (6, 11), (12, 19)]);
+    }
+
+    #[test]
+    fn detect_word_boundaries_empty() {
+        let boundaries = linked_edit_detect_word_boundaries("");
+        assert!(boundaries.is_empty());
+    }
+
+    #[test]
+    fn detect_word_boundaries_punctuation() {
+        let boundaries = linked_edit_detect_word_boundaries("a.b(c)");
+        assert_eq!(boundaries, vec![(0, 1), (2, 3), (4, 5)]);
+    }
+
+    #[test]
+    fn find_word_occurrences_basic() {
+        let text = "let x = x + x;";
+        let occs = linked_edit_find_word_occurrences(text, "x");
+        assert_eq!(occs.len(), 3);
+    }
+
+    #[test]
+    fn find_word_occurrences_no_partial() {
+        let text = "fox foxes";
+        let occs = linked_edit_find_word_occurrences(text, "fox");
+        assert_eq!(occs.len(), 1); // "foxes" should not match
+        assert_eq!(occs[0], (0, 3));
+    }
+
+    #[test]
+    fn linked_edit_group_from_word_basic() {
+        let text = "fn foo() { foo(); }";
+        let group = linked_edit_group_from_word(text, "foo");
+        assert_eq!(group.ranges.len(), 2);
+        assert_eq!(group.current_text, "foo");
+    }
+
+    #[test]
+    fn byte_range_to_editing_range_single_line() {
+        let text = "hello world";
+        let range = byte_range_to_editing_range(text, 6, 11).unwrap();
+        assert_eq!(range.start_line, 0);
+        assert_eq!(range.start_col, 6);
+        assert_eq!(range.end_col, 11);
+    }
+
+    #[test]
+    fn byte_range_to_editing_range_multiline() {
+        let text = "line1\nline2\nline3";
+        let range = byte_range_to_editing_range(text, 6, 11).unwrap();
+        assert_eq!(range.start_line, 1);
+        assert_eq!(range.start_col, 0);
+        assert_eq!(range.end_line, 1);
+        assert_eq!(range.end_col, 5);
     }
 }

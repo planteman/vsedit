@@ -720,6 +720,114 @@ pub fn merge_task_configs(
 }
 
 // ---------------------------------------------------------------------------
+// task_presentation — terminal display options
+// ---------------------------------------------------------------------------
+
+/// How the task terminal panel is revealed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskRevealKind {
+    Always,
+    Silent,
+    Never,
+}
+
+impl Default for TaskRevealKind {
+    fn default() -> Self {
+        Self::Always
+    }
+}
+
+/// Where the task terminal panel appears.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskPanelKind {
+    Shared,
+    Dedicated,
+    New,
+}
+
+impl Default for TaskPanelKind {
+    fn default() -> Self {
+        Self::Shared
+    }
+}
+
+/// Presentation options controlling how a task's terminal behaves.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskPresentation {
+    pub reveal: TaskRevealKind,
+    pub focus: bool,
+    pub echo: bool,
+    pub show_reuse_message: bool,
+    pub panel: TaskPanelKind,
+    pub clear: bool,
+    pub close: bool,
+}
+
+impl Default for TaskPresentation {
+    fn default() -> Self {
+        Self {
+            reveal: TaskRevealKind::Always,
+            focus: false,
+            echo: true,
+            show_reuse_message: true,
+            panel: TaskPanelKind::Shared,
+            clear: false,
+            close: false,
+        }
+    }
+}
+
+impl fmt::Display for TaskPresentation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "reveal={:?}, focus={}, echo={}, panel={:?}, clear={}, close={}",
+            self.reveal, self.focus, self.echo, self.panel, self.clear, self.close,
+        )
+    }
+}
+
+/// Parse presentation options from a JSON value (as found in tasks.json).
+pub fn task_presentation(json: &serde_json::Value) -> TaskPresentation {
+    let mut pres = TaskPresentation::default();
+    if let Some(obj) = json.as_object() {
+        if let Some(r) = obj.get("reveal").and_then(|v| v.as_str()) {
+            pres.reveal = match r {
+                "silent" => TaskRevealKind::Silent,
+                "never" => TaskRevealKind::Never,
+                _ => TaskRevealKind::Always,
+            };
+        }
+        if let Some(f) = obj.get("focus").and_then(|v| v.as_bool()) {
+            pres.focus = f;
+        }
+        if let Some(e) = obj.get("echo").and_then(|v| v.as_bool()) {
+            pres.echo = e;
+        }
+        if let Some(s) = obj.get("showReuseMessage").and_then(|v| v.as_bool()) {
+            pres.show_reuse_message = s;
+        }
+        if let Some(p) = obj.get("panel").and_then(|v| v.as_str()) {
+            pres.panel = match p {
+                "dedicated" => TaskPanelKind::Dedicated,
+                "new" => TaskPanelKind::New,
+                _ => TaskPanelKind::Shared,
+            };
+        }
+        if let Some(c) = obj.get("clear").and_then(|v| v.as_bool()) {
+            pres.clear = c;
+        }
+        if let Some(c) = obj.get("close").and_then(|v| v.as_bool()) {
+            pres.close = c;
+        }
+    }
+    pres
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1086,5 +1194,84 @@ mod tests {
         let base = serde_json::json!("not an object");
         let overlay = serde_json::json!({});
         assert!(merge_task_configs(&base, &overlay).is_err());
+    }
+
+    // -- task_presentation tests --------------------------------------------
+
+    #[test]
+    fn task_presentation_default_values() {
+        let pres = TaskPresentation::default();
+        assert_eq!(pres.reveal, TaskRevealKind::Always);
+        assert!(!pres.focus);
+        assert!(pres.echo);
+        assert!(pres.show_reuse_message);
+        assert_eq!(pres.panel, TaskPanelKind::Shared);
+        assert!(!pres.clear);
+        assert!(!pres.close);
+    }
+
+    #[test]
+    fn task_presentation_from_json_full() {
+        let json = serde_json::json!({
+            "reveal": "silent",
+            "focus": true,
+            "echo": false,
+            "showReuseMessage": false,
+            "panel": "dedicated",
+            "clear": true,
+            "close": true,
+        });
+        let pres = task_presentation(&json);
+        assert_eq!(pres.reveal, TaskRevealKind::Silent);
+        assert!(pres.focus);
+        assert!(!pres.echo);
+        assert!(!pres.show_reuse_message);
+        assert_eq!(pres.panel, TaskPanelKind::Dedicated);
+        assert!(pres.clear);
+        assert!(pres.close);
+    }
+
+    #[test]
+    fn task_presentation_from_json_partial() {
+        let json = serde_json::json!({ "reveal": "never" });
+        let pres = task_presentation(&json);
+        assert_eq!(pres.reveal, TaskRevealKind::Never);
+        assert!(pres.echo); // default preserved
+    }
+
+    #[test]
+    fn task_presentation_from_empty_json() {
+        let pres = task_presentation(&serde_json::json!({}));
+        assert_eq!(pres, TaskPresentation::default());
+    }
+
+    #[test]
+    fn task_presentation_from_non_object() {
+        let pres = task_presentation(&serde_json::json!("not an object"));
+        assert_eq!(pres, TaskPresentation::default());
+    }
+
+    #[test]
+    fn task_presentation_display() {
+        let pres = TaskPresentation::default();
+        let s = format!("{pres}");
+        assert!(s.contains("reveal=Always"));
+        assert!(s.contains("panel=Shared"));
+    }
+
+    #[test]
+    fn task_presentation_serde_roundtrip() {
+        let pres = TaskPresentation {
+            reveal: TaskRevealKind::Silent,
+            focus: true,
+            echo: false,
+            show_reuse_message: false,
+            panel: TaskPanelKind::New,
+            clear: true,
+            close: true,
+        };
+        let json = serde_json::to_string(&pres).unwrap();
+        let restored: TaskPresentation = serde_json::from_str(&json).unwrap();
+        assert_eq!(pres, restored);
     }
 }

@@ -550,6 +550,101 @@ impl AuthPermissionChecker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Auth provider capabilities
+// ---------------------------------------------------------------------------
+
+/// Capabilities that an authentication provider may support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AuthProviderCapability {
+    /// Provider supports silent/background token refresh.
+    SilentRefresh,
+    /// Provider supports multi-account sign-in.
+    MultiAccount,
+    /// Provider can supply scoped tokens.
+    ScopedTokens,
+    /// Provider supports device-code flow (for headless).
+    DeviceCodeFlow,
+    /// Provider supports PKCE authorization code flow.
+    Pkce,
+    /// Provider can revoke tokens.
+    TokenRevocation,
+}
+
+impl fmt::Display for AuthProviderCapability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SilentRefresh => write!(f, "silent-refresh"),
+            Self::MultiAccount => write!(f, "multi-account"),
+            Self::ScopedTokens => write!(f, "scoped-tokens"),
+            Self::DeviceCodeFlow => write!(f, "device-code-flow"),
+            Self::Pkce => write!(f, "pkce"),
+            Self::TokenRevocation => write!(f, "token-revocation"),
+        }
+    }
+}
+
+/// A set of capabilities advertised by an auth provider.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AuthCapabilitySet {
+    capabilities: Vec<AuthProviderCapability>,
+}
+
+impl AuthCapabilitySet {
+    pub fn new() -> Self {
+        Self { capabilities: Vec::new() }
+    }
+
+    pub fn add(&mut self, cap: AuthProviderCapability) {
+        if !self.capabilities.contains(&cap) {
+            self.capabilities.push(cap);
+        }
+    }
+
+    pub fn has(&self, cap: AuthProviderCapability) -> bool {
+        self.capabilities.contains(&cap)
+    }
+
+    pub fn has_all(&self, caps: &[AuthProviderCapability]) -> bool {
+        caps.iter().all(|c| self.has(*c))
+    }
+
+    pub fn has_any(&self, caps: &[AuthProviderCapability]) -> bool {
+        caps.iter().any(|c| self.has(*c))
+    }
+
+    pub fn len(&self) -> usize {
+        self.capabilities.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.capabilities.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &AuthProviderCapability> {
+        self.capabilities.iter()
+    }
+
+    /// Check if this provider is suitable for headless environments.
+    pub fn supports_headless(&self) -> bool {
+        self.has(AuthProviderCapability::DeviceCodeFlow)
+    }
+
+    /// Check if this provider supports secure token lifecycle.
+    pub fn supports_secure_lifecycle(&self) -> bool {
+        self.has(AuthProviderCapability::SilentRefresh)
+            && self.has(AuthProviderCapability::TokenRevocation)
+    }
+}
+
+impl fmt::Display for AuthCapabilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let names: Vec<String> = self.capabilities.iter().map(|c| format!("{c}")).collect();
+        write!(f, "[{}]", names.join(", "))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1064,5 +1159,65 @@ mod tests {
         };
         assert!(AuthPermissionChecker::has_any(&session, &["repo", "user"]));
         assert!(!AuthPermissionChecker::has_any(&session, &["admin", "write"]));
+    }
+
+    // -- AuthProviderCapability --
+
+    #[test]
+    fn capability_display() {
+        assert_eq!(format!("{}", AuthProviderCapability::SilentRefresh), "silent-refresh");
+        assert_eq!(format!("{}", AuthProviderCapability::Pkce), "pkce");
+    }
+
+    #[test]
+    fn capability_set_add_dedup() {
+        let mut set = AuthCapabilitySet::new();
+        set.add(AuthProviderCapability::SilentRefresh);
+        set.add(AuthProviderCapability::SilentRefresh);
+        assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    fn capability_set_has_all() {
+        let mut set = AuthCapabilitySet::new();
+        set.add(AuthProviderCapability::SilentRefresh);
+        set.add(AuthProviderCapability::Pkce);
+        assert!(set.has_all(&[AuthProviderCapability::SilentRefresh, AuthProviderCapability::Pkce]));
+        assert!(!set.has_all(&[AuthProviderCapability::SilentRefresh, AuthProviderCapability::MultiAccount]));
+    }
+
+    #[test]
+    fn capability_set_has_any() {
+        let mut set = AuthCapabilitySet::new();
+        set.add(AuthProviderCapability::DeviceCodeFlow);
+        assert!(set.has_any(&[AuthProviderCapability::DeviceCodeFlow, AuthProviderCapability::Pkce]));
+        assert!(!set.has_any(&[AuthProviderCapability::Pkce, AuthProviderCapability::MultiAccount]));
+    }
+
+    #[test]
+    fn capability_set_headless() {
+        let mut set = AuthCapabilitySet::new();
+        assert!(!set.supports_headless());
+        set.add(AuthProviderCapability::DeviceCodeFlow);
+        assert!(set.supports_headless());
+    }
+
+    #[test]
+    fn capability_set_secure_lifecycle() {
+        let mut set = AuthCapabilitySet::new();
+        set.add(AuthProviderCapability::SilentRefresh);
+        assert!(!set.supports_secure_lifecycle());
+        set.add(AuthProviderCapability::TokenRevocation);
+        assert!(set.supports_secure_lifecycle());
+    }
+
+    #[test]
+    fn capability_set_display() {
+        let mut set = AuthCapabilitySet::new();
+        set.add(AuthProviderCapability::SilentRefresh);
+        set.add(AuthProviderCapability::Pkce);
+        let s = format!("{set}");
+        assert!(s.contains("silent-refresh"));
+        assert!(s.contains("pkce"));
     }
 }

@@ -678,6 +678,95 @@ impl Default for ExtWindowValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Window state tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks the current state of the application window.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowState {
+    /// Whether the window currently has focus.
+    pub focused: bool,
+    /// Whether the window is visible (not minimized/hidden).
+    pub visible: bool,
+    /// Whether the window is maximized.
+    pub maximized: bool,
+    /// Whether the window is in fullscreen mode.
+    pub fullscreen: bool,
+}
+
+impl WindowState {
+    /// A window that is focused, visible, and not maximized.
+    pub fn active() -> Self {
+        Self {
+            focused: true,
+            visible: true,
+            maximized: false,
+            fullscreen: false,
+        }
+    }
+
+    /// A window that is not focused and not visible.
+    pub fn inactive() -> Self {
+        Self {
+            focused: false,
+            visible: false,
+            maximized: false,
+            fullscreen: false,
+        }
+    }
+
+    /// Whether the window is currently active (focused and visible).
+    pub fn is_active(&self) -> bool {
+        self.focused && self.visible
+    }
+
+    /// Apply a state change event.
+    pub fn apply_focus_change(&mut self, focused: bool) {
+        self.focused = focused;
+    }
+
+    /// Apply a visibility change.
+    pub fn apply_visibility_change(&mut self, visible: bool) {
+        self.visible = visible;
+        if !visible {
+            self.focused = false;
+        }
+    }
+
+    /// Toggle maximized state.
+    pub fn toggle_maximized(&mut self) {
+        self.maximized = !self.maximized;
+        if self.maximized {
+            self.fullscreen = false;
+        }
+    }
+
+    /// Toggle fullscreen state.
+    pub fn toggle_fullscreen(&mut self) {
+        self.fullscreen = !self.fullscreen;
+        if self.fullscreen {
+            self.maximized = false;
+        }
+    }
+}
+
+impl Default for WindowState {
+    fn default() -> Self {
+        Self::active()
+    }
+}
+
+impl fmt::Display for WindowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Window(focused={}, visible={}, maximized={}, fullscreen={})",
+            self.focused, self.visible, self.maximized, self.fullscreen
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1051,5 +1140,66 @@ mod tests {
     fn ext_window_is_ascii_printable() {
         assert!(ExtWindowValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtWindowValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn window_state_active() {
+        let ws = WindowState::active();
+        assert!(ws.is_active());
+        assert!(ws.focused);
+        assert!(ws.visible);
+    }
+
+    #[test]
+    fn window_state_inactive() {
+        let ws = WindowState::inactive();
+        assert!(!ws.is_active());
+        assert!(!ws.focused);
+        assert!(!ws.visible);
+    }
+
+    #[test]
+    fn window_state_focus_change() {
+        let mut ws = WindowState::active();
+        ws.apply_focus_change(false);
+        assert!(!ws.focused);
+        assert!(ws.visible);
+        assert!(!ws.is_active());
+    }
+
+    #[test]
+    fn window_state_visibility_clears_focus() {
+        let mut ws = WindowState::active();
+        ws.apply_visibility_change(false);
+        assert!(!ws.visible);
+        assert!(!ws.focused);
+    }
+
+    #[test]
+    fn window_state_toggle_maximized() {
+        let mut ws = WindowState::active();
+        ws.toggle_maximized();
+        assert!(ws.maximized);
+        assert!(!ws.fullscreen);
+        ws.toggle_maximized();
+        assert!(!ws.maximized);
+    }
+
+    #[test]
+    fn window_state_fullscreen_clears_maximized() {
+        let mut ws = WindowState::active();
+        ws.toggle_maximized();
+        assert!(ws.maximized);
+        ws.toggle_fullscreen();
+        assert!(ws.fullscreen);
+        assert!(!ws.maximized);
+    }
+
+    #[test]
+    fn window_state_serialization() {
+        let ws = WindowState::active();
+        let json = serde_json::to_string(&ws).unwrap();
+        let ws2: WindowState = serde_json::from_str(&json).unwrap();
+        assert_eq!(ws, ws2);
     }
 }

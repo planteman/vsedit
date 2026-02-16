@@ -682,6 +682,65 @@ fn render_single_toast(area: Rect, buf: &mut Buffer, notif: &Notification) {
 }
 
 // ---------------------------------------------------------------------------
+// Notification throttling
+// ---------------------------------------------------------------------------
+
+/// A rate-limiter that prevents duplicate or too-frequent notifications.
+///
+/// It tracks recently shown notification messages and suppresses repeats
+/// within a configurable time window.
+pub struct NotificationThrottle {
+    /// Maps message text → timestamp of last display.
+    recent: std::collections::HashMap<String, Instant>,
+    /// Minimum time between identical notifications.
+    cooldown: Duration,
+}
+
+impl NotificationThrottle {
+    pub fn new(cooldown: Duration) -> Self {
+        Self {
+            recent: std::collections::HashMap::new(),
+            cooldown,
+        }
+    }
+
+    /// Check if a notification with the given message should be shown.
+    /// Returns `true` if enough time has elapsed since the last identical message.
+    pub fn should_show(&mut self, message: &str, now: Instant) -> bool {
+        if let Some(last) = self.recent.get(message) {
+            if now.duration_since(*last) < self.cooldown {
+                return false;
+            }
+        }
+        self.recent.insert(message.to_string(), now);
+        true
+    }
+
+    /// Filter a list of notifications, keeping only those that pass the throttle.
+    pub fn filter_notifications<'a>(&mut self, notifications: &'a [Notification], now: Instant) -> Vec<&'a Notification> {
+        notifications
+            .iter()
+            .filter(|n| self.should_show(&n.message, now))
+            .collect()
+    }
+
+    /// Remove entries older than the cooldown period to prevent memory growth.
+    pub fn evict_stale(&mut self, now: Instant) {
+        self.recent.retain(|_, ts| now.duration_since(*ts) < self.cooldown);
+    }
+
+    /// Number of messages currently tracked.
+    pub fn tracked_count(&self) -> usize {
+        self.recent.len()
+    }
+
+    /// Clear all tracked messages.
+    pub fn reset(&mut self) {
+        self.recent.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1087,5 +1146,57 @@ mod tests {
         let id = handle.id();
         let notifs = svc.active_notifications();
         assert_eq!(notifs[0].id, id);
+    }
+
+    // -- notification_throttle --
+
+    #[test]
+    fn throttle_allows_first() {
+        let mut throttle = NotificationThrottle::new(Duration::from_secs(5));
+        let now = Instant::now();
+        assert!(throttle.should_show("hello", now));
+    }
+
+    #[test]
+    fn throttle_blocks_duplicate() {
+        let mut throttle = NotificationThrottle::new(Duration::from_secs(5));
+        let now = Instant::now();
+        assert!(throttle.should_show("hello", now));
+        assert!(!throttle.should_show("hello", now));
+    }
+
+    #[test]
+    fn throttle_allows_after_cooldown() {
+        let mut throttle = NotificationThrottle::new(Duration::from_secs(1));
+        let t1 = Instant::now();
+        assert!(throttle.should_show("hello", t1));
+        let t2 = t1 + Duration::from_secs(2);
+        assert!(throttle.should_show("hello", t2));
+    }
+
+    #[test]
+    fn throttle_different_messages() {
+        let mut throttle = NotificationThrottle::new(Duration::from_secs(5));
+        let now = Instant::now();
+        assert!(throttle.should_show("aaa", now));
+        assert!(throttle.should_show("bbb", now));
+    }
+
+    #[test]
+    fn throttle_evict_stale() {
+        let mut throttle = NotificationThrottle::new(Duration::from_secs(1));
+        let t1 = Instant::now();
+        throttle.should_show("old", t1);
+        let t2 = t1 + Duration::from_secs(2);
+        throttle.evict_stale(t2);
+        assert_eq!(throttle.tracked_count(), 0);
+    }
+
+    #[test]
+    fn throttle_reset() {
+        let mut throttle = NotificationThrottle::new(Duration::from_secs(5));
+        throttle.should_show("test", Instant::now());
+        throttle.reset();
+        assert_eq!(throttle.tracked_count(), 0);
     }
 }

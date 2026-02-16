@@ -622,6 +622,88 @@ impl Default for UpdateValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// update_check_interval — configurable update frequency
+// ---------------------------------------------------------------------------
+
+/// Predefined update check intervals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateCheckInterval {
+    /// Check every hour.
+    Hourly,
+    /// Check every 4 hours.
+    FourHours,
+    /// Check every 12 hours.
+    TwelveHours,
+    /// Check once a day.
+    Daily,
+    /// Check once a week.
+    Weekly,
+    /// Never auto-check.
+    Never,
+    /// Custom interval in seconds.
+    Custom(u64),
+}
+
+impl UpdateCheckInterval {
+    /// Return the interval as seconds.
+    pub fn as_secs(&self) -> Option<u64> {
+        match self {
+            Self::Hourly => Some(3_600),
+            Self::FourHours => Some(14_400),
+            Self::TwelveHours => Some(43_200),
+            Self::Daily => Some(86_400),
+            Self::Weekly => Some(604_800),
+            Self::Never => None,
+            Self::Custom(s) => Some(*s),
+        }
+    }
+
+    /// Return true if automatic checking is enabled.
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self, Self::Never)
+    }
+
+    /// Parse from a string label (case-insensitive).
+    pub fn from_label(label: &str) -> Self {
+        match label.to_lowercase().as_str() {
+            "hourly" => Self::Hourly,
+            "4hours" | "four_hours" | "fourhours" => Self::FourHours,
+            "12hours" | "twelve_hours" | "twelvehours" => Self::TwelveHours,
+            "daily" => Self::Daily,
+            "weekly" => Self::Weekly,
+            "never" | "off" | "disabled" => Self::Never,
+            _ => label.parse::<u64>().map(Self::Custom).unwrap_or(Self::Daily),
+        }
+    }
+}
+
+impl fmt::Display for UpdateCheckInterval {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hourly => write!(f, "hourly"),
+            Self::FourHours => write!(f, "every 4 hours"),
+            Self::TwelveHours => write!(f, "every 12 hours"),
+            Self::Daily => write!(f, "daily"),
+            Self::Weekly => write!(f, "weekly"),
+            Self::Never => write!(f, "never"),
+            Self::Custom(s) => write!(f, "every {s}s"),
+        }
+    }
+}
+
+/// Determine whether enough time has passed since the last check.
+pub fn update_check_interval(
+    interval: UpdateCheckInterval,
+    last_check_timestamp: u64,
+    current_timestamp: u64,
+) -> bool {
+    match interval.as_secs() {
+        None => false,
+        Some(secs) => current_timestamp.saturating_sub(last_check_timestamp) >= secs,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1071,5 +1153,48 @@ mod tests {
     fn update_is_ascii_printable() {
         assert!(UpdateValidator::is_ascii_printable("Hello World 123"));
         assert!(!UpdateValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- update_check_interval tests ----------------------------------------
+
+    #[test]
+    fn interval_as_secs() {
+        assert_eq!(UpdateCheckInterval::Hourly.as_secs(), Some(3_600));
+        assert_eq!(UpdateCheckInterval::Daily.as_secs(), Some(86_400));
+        assert_eq!(UpdateCheckInterval::Weekly.as_secs(), Some(604_800));
+        assert_eq!(UpdateCheckInterval::Never.as_secs(), None);
+        assert_eq!(UpdateCheckInterval::Custom(120).as_secs(), Some(120));
+    }
+
+    #[test]
+    fn interval_is_enabled() {
+        assert!(UpdateCheckInterval::Hourly.is_enabled());
+        assert!(!UpdateCheckInterval::Never.is_enabled());
+    }
+
+    #[test]
+    fn interval_from_label() {
+        assert_eq!(UpdateCheckInterval::from_label("hourly"), UpdateCheckInterval::Hourly);
+        assert_eq!(UpdateCheckInterval::from_label("DAILY"), UpdateCheckInterval::Daily);
+        assert_eq!(UpdateCheckInterval::from_label("never"), UpdateCheckInterval::Never);
+        assert_eq!(UpdateCheckInterval::from_label("off"), UpdateCheckInterval::Never);
+        assert_eq!(UpdateCheckInterval::from_label("3600"), UpdateCheckInterval::Custom(3600));
+    }
+
+    #[test]
+    fn check_interval_enough_time() {
+        assert!(update_check_interval(UpdateCheckInterval::Hourly, 0, 3_600));
+        assert!(!update_check_interval(UpdateCheckInterval::Hourly, 0, 3_599));
+    }
+
+    #[test]
+    fn check_interval_never() {
+        assert!(!update_check_interval(UpdateCheckInterval::Never, 0, 999_999));
+    }
+
+    #[test]
+    fn interval_display() {
+        assert_eq!(format!("{}", UpdateCheckInterval::Daily), "daily");
+        assert_eq!(format!("{}", UpdateCheckInterval::Custom(60)), "every 60s");
     }
 }

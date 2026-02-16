@@ -583,6 +583,117 @@ impl Default for WbActionsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Action bar orientation
+// ---------------------------------------------------------------------------
+
+/// Layout orientation for an action bar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionBarOrientation {
+    Horizontal,
+    Vertical,
+}
+
+impl fmt::Display for ActionBarOrientation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ActionBarOrientation::Horizontal => write!(f, "horizontal"),
+            ActionBarOrientation::Vertical => write!(f, "vertical"),
+        }
+    }
+}
+
+/// Configuration for an action bar's layout and behaviour.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionBarConfig {
+    pub orientation: ActionBarOrientation,
+    pub max_visible: usize,
+    pub show_labels: bool,
+    pub icon_size: u16,
+    items: Vec<ActionBarItem>,
+}
+
+/// An item in the action bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionBarItem {
+    pub action_id: String,
+    pub icon: String,
+    pub label: String,
+    pub order: i32,
+    pub visible: bool,
+}
+
+impl ActionBarItem {
+    pub fn new(action_id: impl Into<String>, icon: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            action_id: action_id.into(),
+            icon: icon.into(),
+            label: label.into(),
+            order: 0,
+            visible: true,
+        }
+    }
+
+    pub fn with_order(mut self, order: i32) -> Self {
+        self.order = order;
+        self
+    }
+
+    pub fn hidden(mut self) -> Self {
+        self.visible = false;
+        self
+    }
+}
+
+impl ActionBarConfig {
+    pub fn new(orientation: ActionBarOrientation) -> Self {
+        Self {
+            orientation,
+            max_visible: 8,
+            show_labels: true,
+            icon_size: 16,
+            items: Vec::new(),
+        }
+    }
+
+    pub fn with_max_visible(mut self, max: usize) -> Self {
+        self.max_visible = max;
+        self
+    }
+
+    pub fn with_show_labels(mut self, show: bool) -> Self {
+        self.show_labels = show;
+        self
+    }
+
+    pub fn add_item(&mut self, item: ActionBarItem) {
+        self.items.push(item);
+    }
+
+    /// Return visible items sorted by order, capped at max_visible.
+    pub fn visible_items(&self) -> Vec<&ActionBarItem> {
+        let mut items: Vec<_> = self.items.iter().filter(|i| i.visible).collect();
+        items.sort_by_key(|i| i.order);
+        items.truncate(self.max_visible);
+        items
+    }
+
+    /// Return items that didn't fit in the visible set (overflow menu).
+    pub fn overflow_items(&self) -> Vec<&ActionBarItem> {
+        let mut items: Vec<_> = self.items.iter().filter(|i| i.visible).collect();
+        items.sort_by_key(|i| i.order);
+        if items.len() > self.max_visible {
+            items.split_off(self.max_visible)
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1061,5 +1172,62 @@ mod tests {
     fn wb_actions_is_ascii_printable() {
         assert!(WbActionsValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbActionsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- ActionBarOrientation --
+
+    #[test]
+    fn action_bar_orientation_display() {
+        assert_eq!(format!("{}", ActionBarOrientation::Horizontal), "horizontal");
+        assert_eq!(format!("{}", ActionBarOrientation::Vertical), "vertical");
+    }
+
+    #[test]
+    fn action_bar_visible_items_sorted() {
+        let mut bar = ActionBarConfig::new(ActionBarOrientation::Horizontal).with_max_visible(3);
+        bar.add_item(ActionBarItem::new("c", "ic", "C").with_order(3));
+        bar.add_item(ActionBarItem::new("a", "ia", "A").with_order(1));
+        bar.add_item(ActionBarItem::new("b", "ib", "B").with_order(2));
+        let vis = bar.visible_items();
+        assert_eq!(vis.len(), 3);
+        assert_eq!(vis[0].action_id, "a");
+        assert_eq!(vis[1].action_id, "b");
+        assert_eq!(vis[2].action_id, "c");
+    }
+
+    #[test]
+    fn action_bar_overflow() {
+        let mut bar = ActionBarConfig::new(ActionBarOrientation::Vertical).with_max_visible(2);
+        bar.add_item(ActionBarItem::new("a", "i", "A").with_order(1));
+        bar.add_item(ActionBarItem::new("b", "i", "B").with_order(2));
+        bar.add_item(ActionBarItem::new("c", "i", "C").with_order(3));
+        assert_eq!(bar.visible_items().len(), 2);
+        assert_eq!(bar.overflow_items().len(), 1);
+        assert_eq!(bar.overflow_items()[0].action_id, "c");
+    }
+
+    #[test]
+    fn action_bar_hidden_items_excluded() {
+        let mut bar = ActionBarConfig::new(ActionBarOrientation::Horizontal);
+        bar.add_item(ActionBarItem::new("a", "i", "A"));
+        bar.add_item(ActionBarItem::new("b", "i", "B").hidden());
+        assert_eq!(bar.visible_items().len(), 1);
+        assert_eq!(bar.item_count(), 2);
+    }
+
+    #[test]
+    fn action_bar_item_builder() {
+        let item = ActionBarItem::new("save", "💾", "Save").with_order(5);
+        assert_eq!(item.action_id, "save");
+        assert_eq!(item.order, 5);
+        assert!(item.visible);
+    }
+
+    #[test]
+    fn action_bar_config_defaults() {
+        let bar = ActionBarConfig::new(ActionBarOrientation::Horizontal);
+        assert_eq!(bar.orientation, ActionBarOrientation::Horizontal);
+        assert_eq!(bar.max_visible, 8);
+        assert!(bar.show_labels);
     }
 }

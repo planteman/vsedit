@@ -547,6 +547,84 @@ impl Default for WbAccountsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AccountSession management with token refresh
+// ---------------------------------------------------------------------------
+
+/// Represents a session with an expiration timestamp and refresh capability.
+#[derive(Debug, Clone)]
+pub struct AccountSession {
+    pub session: AuthSession,
+    /// Unix timestamp (seconds) when the token expires. `None` means no expiry.
+    pub expires_at: Option<u64>,
+    /// The refresh token, if available.
+    pub refresh_token: Option<String>,
+}
+
+impl AccountSession {
+    /// Create a new session with optional expiry and refresh token.
+    pub fn new(session: AuthSession, expires_at: Option<u64>, refresh_token: Option<String>) -> Self {
+        Self {
+            session,
+            expires_at,
+            refresh_token,
+        }
+    }
+
+    /// Check if the session's access token has expired, given the current time.
+    pub fn is_expired(&self, now: u64) -> bool {
+        match self.expires_at {
+            Some(exp) => now >= exp,
+            None => false,
+        }
+    }
+
+    /// Check if the session is nearing expiry (within `buffer_secs` seconds).
+    pub fn needs_refresh(&self, now: u64, buffer_secs: u64) -> bool {
+        match self.expires_at {
+            Some(exp) => now + buffer_secs >= exp,
+            None => false,
+        }
+    }
+
+    /// Whether this session has a refresh token available.
+    pub fn can_refresh(&self) -> bool {
+        self.refresh_token.is_some()
+    }
+
+    /// Simulate refreshing the token: update the access token, expiry, and optionally a new refresh token.
+    pub fn refresh(&mut self, new_access_token: String, new_expires_at: Option<u64>, new_refresh_token: Option<String>) {
+        self.session.access_token = new_access_token;
+        self.expires_at = new_expires_at;
+        if let Some(rt) = new_refresh_token {
+            self.refresh_token = Some(rt);
+        }
+    }
+
+    /// Time remaining until expiry (in seconds). Returns 0 if already expired or no expiry set.
+    pub fn time_remaining(&self, now: u64) -> u64 {
+        match self.expires_at {
+            Some(exp) if exp > now => exp - now,
+            _ => 0,
+        }
+    }
+
+    /// Returns the account display name for convenience.
+    pub fn display_name(&self) -> &str {
+        self.session.account.display_name()
+    }
+}
+
+impl fmt::Display for AccountSession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AccountSession({}", self.session.account)?;
+        if let Some(exp) = self.expires_at {
+            write!(f, ", expires={exp}")?;
+        }
+        write!(f, ")")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1055,5 +1133,68 @@ mod tests {
     fn wb_accounts_is_ascii_printable() {
         assert!(WbAccountsValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbAccountsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    fn make_test_account_session(expires_at: Option<u64>) -> AccountSession {
+        let account = AccountInfo {
+            id: "acc1".to_string(),
+            label: "Test User".to_string(),
+            provider_id: "github".to_string(),
+            email: Some("test@test.com".to_string()),
+        };
+        let session = AuthSession {
+            id: "sess1".to_string(),
+            account,
+            scopes: vec!["repo".to_string()],
+            access_token: "token123".to_string(),
+        };
+        AccountSession::new(session, expires_at, Some("refresh_abc".to_string()))
+    }
+
+    #[test]
+    fn account_session_not_expired() {
+        let sess = make_test_account_session(Some(2000));
+        assert!(!sess.is_expired(1000));
+    }
+
+    #[test]
+    fn account_session_expired() {
+        let sess = make_test_account_session(Some(1000));
+        assert!(sess.is_expired(1500));
+    }
+
+    #[test]
+    fn account_session_no_expiry() {
+        let sess = make_test_account_session(None);
+        assert!(!sess.is_expired(99999));
+    }
+
+    #[test]
+    fn account_session_needs_refresh() {
+        let sess = make_test_account_session(Some(1100));
+        assert!(sess.needs_refresh(1000, 200)); // 1000 + 200 >= 1100
+        assert!(!sess.needs_refresh(800, 200)); // 800 + 200 < 1100
+    }
+
+    #[test]
+    fn account_session_refresh() {
+        let mut sess = make_test_account_session(Some(1000));
+        sess.refresh("new_token".to_string(), Some(2000), Some("new_refresh".to_string()));
+        assert_eq!(sess.session.access_token, "new_token");
+        assert_eq!(sess.expires_at, Some(2000));
+        assert_eq!(sess.refresh_token.as_deref(), Some("new_refresh"));
+    }
+
+    #[test]
+    fn account_session_time_remaining() {
+        let sess = make_test_account_session(Some(2000));
+        assert_eq!(sess.time_remaining(1500), 500);
+        assert_eq!(sess.time_remaining(2500), 0);
+    }
+
+    #[test]
+    fn account_session_display_name() {
+        let sess = make_test_account_session(Some(1000));
+        assert_eq!(sess.display_name(), "Test User");
     }
 }

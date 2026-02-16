@@ -1,5 +1,7 @@
 //! Dirty file tracking.
 
+use std::fmt;
+
 /// Status of a resource in source control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScmStatus {
@@ -92,6 +94,10 @@ impl WorkingCopyService {
 
     pub fn get_provider(&self, id: &str) -> Option<&ScmProvider> {
         self.providers.iter().find(|p| p.id == id)
+    }
+
+    pub fn get_provider_mut(&mut self, id: &str) -> Option<&mut ScmProvider> {
+        self.providers.iter_mut().find(|p| p.id == id)
     }
 
     /// Adds a resource to a specific group within a provider.
@@ -594,6 +600,106 @@ impl ScmCommitPreview {
     }
 }
 
+// ---------------------------------------------------------------------------
+// working_copy_stage_all / working_copy_discard — SCM operations
+// ---------------------------------------------------------------------------
+
+/// Result of a stage-all operation.
+#[derive(Debug, Clone)]
+pub struct StageAllResult {
+    pub provider_id: String,
+    pub staged_count: usize,
+    pub from_group: String,
+    pub to_group: String,
+}
+
+impl fmt::Display for StageAllResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "staged {} files from '{}' to '{}'",
+            self.staged_count, self.from_group, self.to_group,
+        )
+    }
+}
+
+/// Result of a discard operation.
+#[derive(Debug, Clone)]
+pub struct DiscardResult {
+    pub discarded: Vec<String>,
+    pub failed: Vec<String>,
+}
+
+impl DiscardResult {
+    pub fn success_count(&self) -> usize {
+        self.discarded.len()
+    }
+
+    pub fn failure_count(&self) -> usize {
+        self.failed.len()
+    }
+
+    pub fn all_succeeded(&self) -> bool {
+        self.failed.is_empty()
+    }
+}
+
+impl fmt::Display for DiscardResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "discarded {} files, {} failed",
+            self.discarded.len(),
+            self.failed.len(),
+        )
+    }
+}
+
+/// Move all resources from a source group to a target group within a provider.
+/// This simulates `git add .` by moving from "changes" to "staged".
+pub fn working_copy_stage_all(
+    service: &mut WorkingCopyService,
+    provider_id: &str,
+    from_group_id: &str,
+    to_group_id: &str,
+) -> Option<StageAllResult> {
+    let provider = service.get_provider_mut(provider_id)?;
+    let from_idx = provider.groups.iter().position(|g| g.id == from_group_id)?;
+    let resources: Vec<ScmResource> = provider.groups[from_idx].resources.drain(..).collect();
+    let count = resources.len();
+    let to_idx = provider.groups.iter().position(|g| g.id == to_group_id)?;
+    provider.groups[to_idx].resources.extend(resources);
+    Some(StageAllResult {
+        provider_id: provider_id.to_string(),
+        staged_count: count,
+        from_group: from_group_id.to_string(),
+        to_group: to_group_id.to_string(),
+    })
+}
+
+/// Discard (remove) resources matching the given URIs from a group.
+/// Returns which URIs were successfully discarded and which were not found.
+pub fn working_copy_discard(
+    service: &mut WorkingCopyService,
+    provider_id: &str,
+    group_id: &str,
+    uris: &[&str],
+) -> Option<DiscardResult> {
+    let provider = service.get_provider_mut(provider_id)?;
+    let group = provider.groups.iter_mut().find(|g| g.id == group_id)?;
+    let mut discarded = Vec::new();
+    let mut failed = Vec::new();
+    for uri in uris {
+        if let Some(pos) = group.resources.iter().position(|r| r.uri == *uri) {
+            group.resources.remove(pos);
+            discarded.push(uri.to_string());
+        } else {
+            failed.push(uri.to_string());
+        }
+    }
+    Some(DiscardResult { discarded, failed })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1073,5 +1179,86 @@ mod tests {
         let listing = ScmCommitPreview::file_listing(&group);
         assert_eq!(listing[0], "A new.rs");
         assert_eq!(listing[1], "R old_name.rs -> new_name.rs");
+    }
+
+    // -- working_copy_stage_all / discard tests ------------------------------
+
+    fn make_working_copy_service() -> WorkingCopyService {
+        let mut svc = WorkingCopyService::new();
+        svc.register_provider(ScmProvider {
+            id: "git".into(),
+            label: "Git".into(),
+            root_uri: "/workspace".into(),
+            groups: vec![
+                ScmGroup {
+                    id: "changes".into(),
+                    label: "Changes".into(),
+                    resources: vec![
+                        ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None },
+                        ScmResource { uri: "b.rs".into(), status: ScmStatus::Added, original_uri: None },
+                    ],
+                },
+                ScmGroup {
+                    id: "staged".into(),
+                    label: "Staged Changes".into(),
+                    resources: vec![],
+                },
+            ],
+            count: 2,
+        });
+        svc
+    }
+
+    #[test]
+    fn stage_all_moves_resources() {
+        let mut svc = make_working_copy_service();
+        let result = working_copy_stage_all(&mut svc, "git", "changes", "staged").unwrap();
+        assert_eq!(result.staged_count, 2);
+        let provider = svc.get_provider_mut("git").unwrap();
+        assert!(provider.groups.iter().find(|g| g.id == "changes").unwrap().resources.is_empty());
+        assert_eq!(provider.groups.iter().find(|g| g.id == "staged").unwrap().resources.len(), 2);
+    }
+
+    #[test]
+    fn stage_all_no_provider() {
+        let mut svc = make_working_copy_service();
+        assert!(working_copy_stage_all(&mut svc, "svn", "changes", "staged").is_none());
+    }
+
+    #[test]
+    fn discard_removes_resources() {
+        let mut svc = make_working_copy_service();
+        let result = working_copy_discard(&mut svc, "git", "changes", &["a.rs"]).unwrap();
+        assert_eq!(result.success_count(), 1);
+        assert!(result.all_succeeded());
+    }
+
+    #[test]
+    fn discard_reports_not_found() {
+        let mut svc = make_working_copy_service();
+        let result = working_copy_discard(&mut svc, "git", "changes", &["x.rs"]).unwrap();
+        assert_eq!(result.failure_count(), 1);
+        assert!(!result.all_succeeded());
+    }
+
+    #[test]
+    fn stage_all_result_display() {
+        let r = StageAllResult {
+            provider_id: "git".into(),
+            staged_count: 3,
+            from_group: "changes".into(),
+            to_group: "staged".into(),
+        };
+        let s = format!("{r}");
+        assert!(s.contains("3 files"));
+    }
+
+    #[test]
+    fn discard_result_display() {
+        let r = DiscardResult {
+            discarded: vec!["a.rs".into()],
+            failed: vec![],
+        };
+        assert!(format!("{r}").contains("discarded 1"));
     }
 }

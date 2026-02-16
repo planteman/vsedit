@@ -610,6 +610,99 @@ impl Default for SignValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Signature parameter display helpers for tooltips
+// ---------------------------------------------------------------------------
+
+/// A parameter in a signature for tooltip rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureParameter {
+    pub name: String,
+    pub param_type: String,
+    pub documentation: Option<String>,
+    pub is_optional: bool,
+    pub default_value: Option<String>,
+}
+
+impl SignatureParameter {
+    pub fn new(name: impl Into<String>, param_type: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            param_type: param_type.into(),
+            documentation: None,
+            is_optional: false,
+            default_value: None,
+        }
+    }
+
+    pub fn optional(mut self) -> Self {
+        self.is_optional = true;
+        self
+    }
+
+    pub fn with_default(mut self, default: impl Into<String>) -> Self {
+        self.default_value = Some(default.into());
+        self.is_optional = true;
+        self
+    }
+
+    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
+        self.documentation = Some(doc.into());
+        self
+    }
+
+    /// Format the parameter for inline display in a signature.
+    /// Example: "name: string", "count?: number = 0"
+    pub fn display_inline(&self) -> String {
+        let mut s = self.name.clone();
+        if self.is_optional {
+            s.push('?');
+        }
+        s.push_str(": ");
+        s.push_str(&self.param_type);
+        if let Some(ref default) = self.default_value {
+            s.push_str(" = ");
+            s.push_str(default);
+        }
+        s
+    }
+
+    /// Format the parameter for a tooltip line.
+    /// Example: "@param name — Description text"
+    pub fn display_tooltip(&self) -> String {
+        let mut s = format!("@param {} — ", self.name);
+        if let Some(ref doc) = self.documentation {
+            s.push_str(doc);
+        } else {
+            s.push_str(&self.param_type);
+            if self.is_optional {
+                s.push_str(" (optional)");
+            }
+        }
+        s
+    }
+}
+
+impl fmt::Display for SignatureParameter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_inline())
+    }
+}
+
+/// Format a complete signature with parameters for tooltip display.
+pub fn format_signature_tooltip(name: &str, params: &[SignatureParameter]) -> String {
+    let param_strs: Vec<String> = params.iter().map(|p| p.display_inline()).collect();
+    let sig = format!("{}({})", name, param_strs.join(", "));
+    let mut tooltip = sig;
+    for p in params {
+        if p.documentation.is_some() {
+            tooltip.push('\n');
+            tooltip.push_str(&p.display_tooltip());
+        }
+    }
+    tooltip
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1052,5 +1145,58 @@ mod tests {
     fn sign_is_ascii_printable() {
         assert!(SignValidator::is_ascii_printable("Hello World 123"));
         assert!(!SignValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn signature_param_display_inline_basic() {
+        let p = SignatureParameter::new("name", "string");
+        assert_eq!(p.display_inline(), "name: string");
+    }
+
+    #[test]
+    fn signature_param_display_inline_optional() {
+        let p = SignatureParameter::new("count", "number").optional();
+        assert_eq!(p.display_inline(), "count?: number");
+    }
+
+    #[test]
+    fn signature_param_display_inline_with_default() {
+        let p = SignatureParameter::new("count", "number").with_default("0");
+        assert_eq!(p.display_inline(), "count?: number = 0");
+    }
+
+    #[test]
+    fn signature_param_tooltip_with_doc() {
+        let p = SignatureParameter::new("path", "string")
+            .with_doc("The file path to open");
+        let tooltip = p.display_tooltip();
+        assert!(tooltip.contains("@param path"));
+        assert!(tooltip.contains("The file path to open"));
+    }
+
+    #[test]
+    fn signature_param_tooltip_without_doc() {
+        let p = SignatureParameter::new("x", "i32").optional();
+        let tooltip = p.display_tooltip();
+        assert!(tooltip.contains("i32"));
+        assert!(tooltip.contains("(optional)"));
+    }
+
+    #[test]
+    fn format_signature_tooltip_multiple_params() {
+        let params = vec![
+            SignatureParameter::new("a", "i32").with_doc("First value"),
+            SignatureParameter::new("b", "i32").with_doc("Second value"),
+        ];
+        let tooltip = format_signature_tooltip("add", &params);
+        assert!(tooltip.starts_with("add(a: i32, b: i32)"));
+        assert!(tooltip.contains("@param a"));
+        assert!(tooltip.contains("@param b"));
+    }
+
+    #[test]
+    fn signature_param_display_trait() {
+        let p = SignatureParameter::new("x", "f64");
+        assert_eq!(format!("{p}"), "x: f64");
     }
 }

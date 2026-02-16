@@ -659,6 +659,103 @@ impl Default for WbEditorValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EditorTab label formatting with modified indicator
+// ---------------------------------------------------------------------------
+
+/// Options for formatting an editor tab label.
+#[derive(Debug, Clone)]
+pub struct TabLabelOptions {
+    /// Character to show when the file is modified/dirty.
+    pub dirty_indicator: char,
+    /// Character to show when the tab is pinned.
+    pub pin_indicator: char,
+    /// Maximum label width (0 = unlimited).
+    pub max_width: usize,
+    /// Whether to show the file extension.
+    pub show_extension: bool,
+}
+
+impl Default for TabLabelOptions {
+    fn default() -> Self {
+        Self {
+            dirty_indicator: '●',
+            pin_indicator: '📌',
+            max_width: 0,
+            show_extension: true,
+        }
+    }
+}
+
+/// Format an editor tab label for display, including modified and pin indicators.
+pub fn format_tab_label(tab: &EditorTabInfo, opts: &TabLabelOptions) -> String {
+    let mut name = if opts.show_extension {
+        extract_filename(&tab.label)
+    } else {
+        strip_extension(&extract_filename(&tab.label))
+    };
+
+    if opts.max_width > 0 && name.len() > opts.max_width {
+        name = truncate_label(&name, opts.max_width);
+    }
+
+    let mut result = String::new();
+    if tab.pinned {
+        result.push(opts.pin_indicator);
+        result.push(' ');
+    }
+    result.push_str(&name);
+    if tab.dirty {
+        result.push(' ');
+        result.push(opts.dirty_indicator);
+    }
+    result
+}
+
+/// Extract the filename portion from a path or URI.
+fn extract_filename(path: &str) -> String {
+    path.rsplit(['/', '\\']).next().unwrap_or(path).to_string()
+}
+
+/// Strip the file extension from a filename.
+fn strip_extension(filename: &str) -> String {
+    match filename.rsplit_once('.') {
+        Some((stem, _)) if !stem.is_empty() => stem.to_string(),
+        _ => filename.to_string(),
+    }
+}
+
+/// Truncate a label to `max_width`, appending "…" if truncated.
+fn truncate_label(s: &str, max_width: usize) -> String {
+    if max_width == 0 || s.len() <= max_width {
+        return s.to_string();
+    }
+    let mut truncated: String = s.chars().take(max_width.saturating_sub(1)).collect();
+    truncated.push('…');
+    truncated
+}
+
+/// Build a tab label suitable for a breadcrumb or title bar display.
+/// Format: "filename — folder"
+pub fn format_tab_breadcrumb(tab: &EditorTabInfo) -> String {
+    let filename = extract_filename(&tab.uri);
+    let parent = extract_parent(&tab.uri);
+    if parent.is_empty() {
+        filename
+    } else {
+        format!("{filename} — {parent}")
+    }
+}
+
+fn extract_parent(path: &str) -> String {
+    let parts: Vec<&str> = path.rsplitn(2, ['/', '\\']).collect();
+    if parts.len() > 1 {
+        parts[1].rsplit(['/', '\\']).next().unwrap_or(parts[1]).to_string()
+    } else {
+        String::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1049,5 +1146,88 @@ mod tests {
     fn wb_editor_is_ascii_printable() {
         assert!(WbEditorValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbEditorValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn format_tab_label_clean() {
+        let tab = EditorTabInfo {
+            uri: "file:///src/main.rs".to_string(),
+            label: "main.rs".to_string(),
+            dirty: false,
+            pinned: false,
+            preview: false,
+        };
+        let result = format_tab_label(&tab, &TabLabelOptions::default());
+        assert_eq!(result, "main.rs");
+    }
+
+    #[test]
+    fn format_tab_label_dirty() {
+        let tab = EditorTabInfo {
+            uri: "file:///src/main.rs".to_string(),
+            label: "main.rs".to_string(),
+            dirty: true,
+            pinned: false,
+            preview: false,
+        };
+        let result = format_tab_label(&tab, &TabLabelOptions::default());
+        assert!(result.contains('●'));
+        assert!(result.starts_with("main.rs"));
+    }
+
+    #[test]
+    fn format_tab_label_pinned() {
+        let tab = EditorTabInfo {
+            uri: "file:///src/main.rs".to_string(),
+            label: "main.rs".to_string(),
+            dirty: false,
+            pinned: true,
+            preview: false,
+        };
+        let result = format_tab_label(&tab, &TabLabelOptions::default());
+        assert!(result.contains('📌'));
+    }
+
+    #[test]
+    fn format_tab_label_no_extension() {
+        let tab = EditorTabInfo {
+            uri: "file:///src/main.rs".to_string(),
+            label: "main.rs".to_string(),
+            dirty: false,
+            pinned: false,
+            preview: false,
+        };
+        let opts = TabLabelOptions { show_extension: false, ..TabLabelOptions::default() };
+        let result = format_tab_label(&tab, &opts);
+        assert_eq!(result, "main");
+    }
+
+    #[test]
+    fn format_tab_label_truncated() {
+        let tab = EditorTabInfo {
+            uri: "file:///src/very_long_filename.rs".to_string(),
+            label: "very_long_filename.rs".to_string(),
+            dirty: false,
+            pinned: false,
+            preview: false,
+        };
+        let opts = TabLabelOptions { max_width: 10, ..TabLabelOptions::default() };
+        let result = format_tab_label(&tab, &opts);
+        assert!(result.chars().count() <= 10); // char count respects multi-byte '…'
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn format_tab_breadcrumb_with_parent() {
+        let tab = EditorTabInfo {
+            uri: "/home/user/project/src/main.rs".to_string(),
+            label: "main.rs".to_string(),
+            dirty: false,
+            pinned: false,
+            preview: false,
+        };
+        let result = format_tab_breadcrumb(&tab);
+        assert!(result.contains("main.rs"));
+        assert!(result.contains("src"));
     }
 }

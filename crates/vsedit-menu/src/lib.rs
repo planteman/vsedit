@@ -635,6 +635,121 @@ pub fn menu_action_resolve(
     }).collect()
 }
 
+// ---------------------------------------------------------------------------
+// Keyboard shortcut label formatting
+// ---------------------------------------------------------------------------
+
+/// Modifier keys for a keyboard shortcut.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyModifiers {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
+impl KeyModifiers {
+    pub fn none() -> Self {
+        Self { ctrl: false, shift: false, alt: false, meta: false }
+    }
+
+    pub fn ctrl() -> Self {
+        Self { ctrl: true, shift: false, alt: false, meta: false }
+    }
+
+    pub fn ctrl_shift() -> Self {
+        Self { ctrl: true, shift: true, alt: false, meta: false }
+    }
+}
+
+/// A parsed keyboard shortcut with modifiers and a key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyboardShortcut {
+    pub modifiers: KeyModifiers,
+    pub key: String,
+}
+
+impl KeyboardShortcut {
+    pub fn new(modifiers: KeyModifiers, key: impl Into<String>) -> Self {
+        Self { modifiers, key: key.into() }
+    }
+
+    /// Parse a shortcut string like "Ctrl+Shift+P" into a `KeyboardShortcut`.
+    pub fn parse(input: &str) -> Option<Self> {
+        let parts: Vec<&str> = input.split('+').map(|s| s.trim()).collect();
+        if parts.is_empty() {
+            return None;
+        }
+        let mut modifiers = KeyModifiers::none();
+        for &part in &parts[..parts.len() - 1] {
+            match part.to_lowercase().as_str() {
+                "ctrl" | "control" => modifiers.ctrl = true,
+                "shift" => modifiers.shift = true,
+                "alt" | "option" => modifiers.alt = true,
+                "meta" | "cmd" | "command" | "super" | "win" => modifiers.meta = true,
+                _ => return None,
+            }
+        }
+        let key = parts.last()?.to_string();
+        if key.is_empty() {
+            return None;
+        }
+        Some(Self { modifiers, key })
+    }
+}
+
+/// Platform hint for formatting shortcut labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShortcutPlatform {
+    Windows,
+    Mac,
+    Linux,
+}
+
+/// Format a keyboard shortcut for display in a menu item.
+///
+/// On Mac, uses symbols (⌘, ⇧, ⌥, ⌃). On Windows/Linux, uses text labels.
+pub fn menu_keyboard_shortcut_label(shortcut: &KeyboardShortcut, platform: ShortcutPlatform) -> String {
+    let mut parts = Vec::new();
+    match platform {
+        ShortcutPlatform::Mac => {
+            if shortcut.modifiers.ctrl { parts.push("⌃".to_string()); }
+            if shortcut.modifiers.alt { parts.push("⌥".to_string()); }
+            if shortcut.modifiers.shift { parts.push("⇧".to_string()); }
+            if shortcut.modifiers.meta { parts.push("⌘".to_string()); }
+            parts.push(shortcut.key.to_uppercase());
+            parts.join("")
+        }
+        ShortcutPlatform::Windows | ShortcutPlatform::Linux => {
+            if shortcut.modifiers.ctrl { parts.push("Ctrl".to_string()); }
+            if shortcut.modifiers.alt { parts.push("Alt".to_string()); }
+            if shortcut.modifiers.shift { parts.push("Shift".to_string()); }
+            if shortcut.modifiers.meta { parts.push("Win".to_string()); }
+            parts.push(shortcut.key.to_string());
+            parts.join("+")
+        }
+    }
+}
+
+/// Format a `MenuItem`'s label with its keybinding for display.
+/// Returns something like "Save          Ctrl+S" padded to `width`.
+pub fn format_menu_item_with_shortcut(item: &MenuItem, width: usize) -> String {
+    match &item.keybinding {
+        Some(kb) => {
+            let label_len = item.label.len();
+            let kb_len = kb.len();
+            let total = label_len + kb_len;
+            if total + 2 <= width {
+                let padding = width - total;
+                format!("{}{:>pad$}", item.label, kb, pad = padding)
+            } else {
+                format!("{} {}", item.label, kb)
+            }
+        }
+        None => item.label.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1044,5 +1159,59 @@ mod tests {
     fn menu_is_ascii_printable() {
         assert!(MenuValidator::is_ascii_printable("Hello World 123"));
         assert!(!MenuValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn keyboard_shortcut_parse_ctrl_s() {
+        let sc = KeyboardShortcut::parse("Ctrl+S").unwrap();
+        assert!(sc.modifiers.ctrl);
+        assert!(!sc.modifiers.shift);
+        assert_eq!(sc.key, "S");
+    }
+
+    #[test]
+    fn keyboard_shortcut_parse_ctrl_shift_p() {
+        let sc = KeyboardShortcut::parse("Ctrl+Shift+P").unwrap();
+        assert!(sc.modifiers.ctrl);
+        assert!(sc.modifiers.shift);
+        assert_eq!(sc.key, "P");
+    }
+
+    #[test]
+    fn keyboard_shortcut_parse_invalid() {
+        assert!(KeyboardShortcut::parse("").is_none());
+        assert!(KeyboardShortcut::parse("+").is_none());
+    }
+
+    #[test]
+    fn shortcut_label_mac() {
+        let sc = KeyboardShortcut::new(KeyModifiers::ctrl_shift(), "P");
+        let label = menu_keyboard_shortcut_label(&sc, ShortcutPlatform::Mac);
+        assert!(label.contains('⌃'));
+        assert!(label.contains('⇧'));
+        assert!(label.contains('P'));
+    }
+
+    #[test]
+    fn shortcut_label_windows() {
+        let sc = KeyboardShortcut::new(KeyModifiers::ctrl(), "S");
+        let label = menu_keyboard_shortcut_label(&sc, ShortcutPlatform::Windows);
+        assert_eq!(label, "Ctrl+S");
+    }
+
+    #[test]
+    fn format_item_with_shortcut() {
+        let mut item = MenuItem::action("save", "Save");
+        item.keybinding = Some("Ctrl+S".to_string());
+        let result = format_menu_item_with_shortcut(&item, 30);
+        assert!(result.contains("Save"));
+        assert!(result.contains("Ctrl+S"));
+    }
+
+    #[test]
+    fn format_item_without_shortcut() {
+        let item = MenuItem::action("open", "Open");
+        let result = format_menu_item_with_shortcut(&item, 30);
+        assert_eq!(result, "Open");
     }
 }

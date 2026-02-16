@@ -685,6 +685,98 @@ impl Default for WhitespaceValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Whitespace normalization
+// ---------------------------------------------------------------------------
+
+/// Strategy for normalizing mixed whitespace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NormalizeTarget {
+    /// Convert all indentation to spaces.
+    Spaces(usize),
+    /// Convert all indentation to tabs.
+    Tabs,
+}
+
+/// Normalize mixed tabs and spaces in the indentation of each line.
+///
+/// Non-indentation whitespace (inside the line content) is left untouched.
+pub fn whitespace_normalize(text: &str, target: NormalizeTarget) -> String {
+    let mut result = String::with_capacity(text.len());
+    for (i, line) in text.lines().enumerate() {
+        if i > 0 {
+            result.push('\n');
+        }
+        let content = line.trim_start();
+        if content.is_empty() {
+            result.push_str(line);
+            continue;
+        }
+        let indent_len = line.len() - content.len();
+        let indent = &line[..indent_len];
+        // Count the effective width of the existing indent
+        let width = indent_width(indent);
+        let new_indent = match target {
+            NormalizeTarget::Spaces(size) => " ".repeat(width),
+            NormalizeTarget::Tabs => {
+                let tabs = width / 4; // default tab width
+                let spaces = width % 4;
+                "\t".repeat(tabs) + &" ".repeat(spaces)
+            }
+        };
+        result.push_str(&new_indent);
+        result.push_str(content);
+    }
+    if text.ends_with('\n') {
+        result.push('\n');
+    }
+    result
+}
+
+/// Compute the visual width of an indentation string, where tabs count as 4 spaces.
+fn indent_width(indent: &str) -> usize {
+    let mut w = 0;
+    for ch in indent.chars() {
+        match ch {
+            '\t' => w += 4,
+            ' ' => w += 1,
+            _ => break,
+        }
+    }
+    w
+}
+
+/// Report summarizing normalization results.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NormalizeReport {
+    pub lines_changed: usize,
+    pub total_lines: usize,
+}
+
+impl NormalizeReport {
+    /// Build a report by comparing original and normalized text.
+    pub fn compare(original: &str, normalized: &str) -> Self {
+        let orig_lines: Vec<&str> = original.lines().collect();
+        let norm_lines: Vec<&str> = normalized.lines().collect();
+        let total = orig_lines.len().max(norm_lines.len());
+        let mut changed = 0;
+        for i in 0..total {
+            let a = orig_lines.get(i).unwrap_or(&"");
+            let b = norm_lines.get(i).unwrap_or(&"");
+            if a != b {
+                changed += 1;
+            }
+        }
+        Self { lines_changed: changed, total_lines: total }
+    }
+}
+
+impl fmt::Display for NormalizeReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{} lines changed", self.lines_changed, self.total_lines)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1058,5 +1150,58 @@ mod tests {
     fn whitespace_is_ascii_printable() {
         assert!(WhitespaceValidator::is_ascii_printable("Hello World 123"));
         assert!(!WhitespaceValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- whitespace_normalize --
+
+    #[test]
+    fn normalize_tabs_to_spaces() {
+        let input = "\tline1\n\t\tline2\nline3";
+        let result = whitespace_normalize(input, NormalizeTarget::Spaces(4));
+        assert_eq!(result, "    line1\n        line2\nline3");
+    }
+
+    #[test]
+    fn normalize_spaces_to_tabs() {
+        let input = "    line1\n        line2\nline3";
+        let result = whitespace_normalize(input, NormalizeTarget::Tabs);
+        assert_eq!(result, "\tline1\n\t\tline2\nline3");
+    }
+
+    #[test]
+    fn normalize_mixed_to_spaces() {
+        let input = "\t line1\n  \tline2";
+        let result = whitespace_normalize(input, NormalizeTarget::Spaces(4));
+        // Tab=4 + 1 space = 5 spaces
+        assert!(result.starts_with("     line1"));
+    }
+
+    #[test]
+    fn normalize_preserves_empty_lines() {
+        let input = "line1\n\nline3";
+        let result = whitespace_normalize(input, NormalizeTarget::Spaces(4));
+        assert_eq!(result, "line1\n\nline3");
+    }
+
+    #[test]
+    fn normalize_preserves_trailing_newline() {
+        let input = "\tline1\n";
+        let result = whitespace_normalize(input, NormalizeTarget::Spaces(4));
+        assert!(result.ends_with('\n'));
+    }
+
+    #[test]
+    fn normalize_report_counts_changes() {
+        let original = "\tline1\nline2\n\tline3";
+        let normalized = whitespace_normalize(original, NormalizeTarget::Spaces(4));
+        let report = NormalizeReport::compare(original, &normalized);
+        assert_eq!(report.lines_changed, 2);
+        assert_eq!(report.total_lines, 3);
+    }
+
+    #[test]
+    fn normalize_report_display() {
+        let r = NormalizeReport { lines_changed: 5, total_lines: 10 };
+        assert_eq!(format!("{r}"), "5/10 lines changed");
     }
 }
