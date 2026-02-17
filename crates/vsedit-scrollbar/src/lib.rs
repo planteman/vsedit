@@ -1172,6 +1172,417 @@ impl MinimapRenderer {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ScrollbarAnnotation – colored markers on the scrollbar track (VS Code style)
+// ---------------------------------------------------------------------------
+
+/// The kind of annotation shown on the scrollbar track or overview ruler.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AnnotationKind {
+    /// A diagnostic error (red).
+    Error,
+    /// A diagnostic warning (yellow/amber).
+    Warning,
+    /// An informational hint (blue).
+    Info,
+    /// Search result highlight (orange).
+    SearchResult,
+    /// Selection / cursor highlight (cyan).
+    Selection,
+    /// Git modification indicator (blue in gutter).
+    GitModified,
+    /// Git addition indicator (green in gutter).
+    GitAdded,
+    /// Git deletion indicator (red in gutter).
+    GitDeleted,
+    /// A user-defined custom annotation.
+    Custom(u8),
+}
+
+impl AnnotationKind {
+    /// Default RGBA colour for this annotation kind, matching VS Code defaults.
+    pub fn default_color(&self) -> u32 {
+        match self {
+            AnnotationKind::Error => 0xFF1212CC,
+            AnnotationKind::Warning => 0xFFC800CC,
+            AnnotationKind::Info => 0x3794FFCC,
+            AnnotationKind::SearchResult => 0xEA5C00CC,
+            AnnotationKind::Selection => 0x1A85FFAA,
+            AnnotationKind::GitModified => 0x1B81A8CC,
+            AnnotationKind::GitAdded => 0x2EA04366,
+            AnnotationKind::GitDeleted => 0xF85149CC,
+            AnnotationKind::Custom(_) => 0xFFFFFF80,
+        }
+    }
+
+    /// Priority for z-ordering: higher values are drawn on top.
+    pub fn priority(&self) -> u8 {
+        match self {
+            AnnotationKind::Error => 100,
+            AnnotationKind::Warning => 90,
+            AnnotationKind::Info => 70,
+            AnnotationKind::SearchResult => 80,
+            AnnotationKind::Selection => 60,
+            AnnotationKind::GitModified => 40,
+            AnnotationKind::GitAdded => 30,
+            AnnotationKind::GitDeleted => 50,
+            AnnotationKind::Custom(p) => *p,
+        }
+    }
+}
+
+impl fmt::Display for AnnotationKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnnotationKind::Error => write!(f, "error"),
+            AnnotationKind::Warning => write!(f, "warning"),
+            AnnotationKind::Info => write!(f, "info"),
+            AnnotationKind::SearchResult => write!(f, "search"),
+            AnnotationKind::Selection => write!(f, "selection"),
+            AnnotationKind::GitModified => write!(f, "git-modified"),
+            AnnotationKind::GitAdded => write!(f, "git-added"),
+            AnnotationKind::GitDeleted => write!(f, "git-deleted"),
+            AnnotationKind::Custom(id) => write!(f, "custom({})", id),
+        }
+    }
+}
+
+/// A single annotation to render on the scrollbar track.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScrollbarAnnotation {
+    /// First line covered by this annotation (0-based).
+    pub line_start: usize,
+    /// Last line covered by this annotation (inclusive, 0-based).
+    pub line_end: usize,
+    /// Kind of annotation (determines default colour and z-order).
+    pub kind: AnnotationKind,
+    /// Optional RGBA override colour (packed `0xRRGGBBAA`).
+    pub color_override: Option<u32>,
+}
+
+impl ScrollbarAnnotation {
+    /// Create a new annotation spanning a single line.
+    pub fn single_line(line: usize, kind: AnnotationKind) -> Self {
+        Self {
+            line_start: line,
+            line_end: line,
+            kind,
+            color_override: None,
+        }
+    }
+
+    /// Create an annotation spanning an inclusive range of lines.
+    pub fn line_range(start: usize, end: usize, kind: AnnotationKind) -> Self {
+        let (s, e) = if start <= end { (start, end) } else { (end, start) };
+        Self {
+            line_start: s,
+            line_end: e,
+            kind,
+            color_override: None,
+        }
+    }
+
+    /// Set a custom colour override.
+    pub fn with_color(mut self, color: u32) -> Self {
+        self.color_override = Some(color);
+        self
+    }
+
+    /// Effective colour to use when rendering.
+    pub fn effective_color(&self) -> u32 {
+        self.color_override.unwrap_or_else(|| self.kind.default_color())
+    }
+
+    /// Number of lines spanned by this annotation.
+    pub fn line_span(&self) -> usize {
+        self.line_end - self.line_start + 1
+    }
+
+    /// Returns `true` if this annotation overlaps the given line range `[lo, hi]`.
+    pub fn overlaps_range(&self, lo: usize, hi: usize) -> bool {
+        self.line_end >= lo && self.line_start <= hi
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OverviewRuler – VS Code-style overview ruler rendering
+// ---------------------------------------------------------------------------
+
+/// Layout position for the overview ruler relative to the scrollbar track.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverviewRulerLane {
+    /// Left third of the ruler width.
+    Left,
+    /// Centre third of the ruler width.
+    Center,
+    /// Right third of the ruler width.
+    Right,
+    /// Full width of the ruler.
+    Full,
+}
+
+/// Pre-computed rectangle for drawing a single overview ruler decoration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OverviewRulerDecoration {
+    /// Y offset from the top of the ruler track, in pixels.
+    pub y: f64,
+    /// Height of the decoration, in pixels (minimum 2px for visibility).
+    pub height: f64,
+    /// X offset within the ruler width, in pixels.
+    pub x: f64,
+    /// Width of the decoration, in pixels.
+    pub width: f64,
+    /// Colour to draw (`0xRRGGBBAA`).
+    pub color: u32,
+}
+
+/// Computes overview ruler decorations from a set of annotations.
+#[derive(Debug, Clone)]
+pub struct OverviewRuler {
+    /// Height of the overview ruler in pixels (usually equals the scrollbar track height).
+    pub track_height: f64,
+    /// Width of the ruler in pixels.
+    pub ruler_width: f64,
+    /// Total number of lines in the document.
+    pub total_lines: usize,
+}
+
+impl OverviewRuler {
+    pub fn new(track_height: f64, ruler_width: f64, total_lines: usize) -> Self {
+        Self { track_height, ruler_width, total_lines }
+    }
+
+    /// Map a line number to a y-pixel coordinate.
+    fn line_to_y(&self, line: usize) -> f64 {
+        if self.total_lines == 0 {
+            return 0.0;
+        }
+        (line as f64 / self.total_lines as f64) * self.track_height
+    }
+
+    /// X offset and width for a given lane.
+    fn lane_rect(&self, lane: OverviewRulerLane) -> (f64, f64) {
+        let third = self.ruler_width / 3.0;
+        match lane {
+            OverviewRulerLane::Left => (0.0, third),
+            OverviewRulerLane::Center => (third, third),
+            OverviewRulerLane::Right => (third * 2.0, third),
+            OverviewRulerLane::Full => (0.0, self.ruler_width),
+        }
+    }
+
+    /// Build a decoration rect for a single annotation + lane.
+    pub fn decoration_for(
+        &self,
+        annotation: &ScrollbarAnnotation,
+        lane: OverviewRulerLane,
+    ) -> OverviewRulerDecoration {
+        let y_start = self.line_to_y(annotation.line_start);
+        let y_end = self.line_to_y(annotation.line_end + 1);
+        let raw_height = y_end - y_start;
+        let height = raw_height.max(2.0);
+        let (x, width) = self.lane_rect(lane);
+        OverviewRulerDecoration {
+            y: y_start,
+            height,
+            x,
+            width,
+            color: annotation.effective_color(),
+        }
+    }
+
+    /// Compute decorations for a slice of `(annotation, lane)` pairs, sorted by
+    /// rendering priority (lowest priority first so high-priority paints on top).
+    pub fn compute_decorations(
+        &self,
+        entries: &[(&ScrollbarAnnotation, OverviewRulerLane)],
+    ) -> Vec<OverviewRulerDecoration> {
+        let mut sorted: Vec<_> = entries.to_vec();
+        sorted.sort_by_key(|(a, _)| a.kind.priority());
+        sorted.iter().map(|(a, lane)| self.decoration_for(a, *lane)).collect()
+    }
+
+    /// Count how many annotations fall within a visible line range.
+    pub fn annotations_in_view(
+        annotations: &[ScrollbarAnnotation],
+        first_line: usize,
+        last_line: usize,
+    ) -> usize {
+        annotations.iter().filter(|a| a.overlaps_range(first_line, last_line)).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThumbSizeCalculator – advanced thumb sizing matching VS Code heuristics
+// ---------------------------------------------------------------------------
+
+/// Configuration-driven thumb size calculator.
+///
+/// VS Code uses a combination of proportional sizing, minimum size enforcement,
+/// and optional "slider background" when content is very large.
+#[derive(Debug, Clone)]
+pub struct ThumbSizeCalculator {
+    /// Minimum thumb length in pixels.
+    pub min_thumb_px: f64,
+    /// Maximum fraction of the track the thumb can occupy (1.0 = fill whole track).
+    pub max_thumb_fraction: f64,
+    /// If content exceeds this many lines, enable "large file" mode (slimmer thumb).
+    pub large_file_threshold: usize,
+    /// Thumb size reduction factor in large-file mode.
+    pub large_file_factor: f64,
+}
+
+impl ThumbSizeCalculator {
+    pub fn new() -> Self {
+        Self {
+            min_thumb_px: 20.0,
+            max_thumb_fraction: 1.0,
+            large_file_threshold: 10_000,
+            large_file_factor: 0.8,
+        }
+    }
+
+    /// Builder: override minimum thumb size.
+    pub fn with_min_thumb(mut self, px: f64) -> Self {
+        self.min_thumb_px = px.max(1.0);
+        self
+    }
+
+    /// Builder: override max thumb fraction.
+    pub fn with_max_fraction(mut self, frac: f64) -> Self {
+        self.max_thumb_fraction = frac.clamp(0.01, 1.0);
+        self
+    }
+
+    /// Builder: set the large-file threshold.
+    pub fn with_large_file_threshold(mut self, lines: usize) -> Self {
+        self.large_file_threshold = lines.max(1);
+        self
+    }
+
+    /// Compute the thumb size in pixels for the given parameters.
+    pub fn compute(
+        &self,
+        viewport_lines: usize,
+        total_lines: usize,
+        track_px: f64,
+    ) -> f64 {
+        if total_lines == 0 || viewport_lines >= total_lines {
+            return (track_px * self.max_thumb_fraction).max(self.min_thumb_px);
+        }
+        let ratio = viewport_lines as f64 / total_lines as f64;
+        let mut size = ratio * track_px;
+
+        if total_lines > self.large_file_threshold {
+            size *= self.large_file_factor;
+        }
+
+        size.clamp(self.min_thumb_px, track_px * self.max_thumb_fraction)
+    }
+
+    /// Convenience: compute thumb position along the track for a given scroll fraction.
+    pub fn thumb_position(
+        &self,
+        scroll_fraction: f64,
+        track_px: f64,
+        thumb_size: f64,
+    ) -> f64 {
+        let available = (track_px - thumb_size).max(0.0);
+        scroll_fraction.clamp(0.0, 1.0) * available
+    }
+}
+
+impl Default for ThumbSizeCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClickToPosition – translate a click on the scrollbar to content coordinates
+// ---------------------------------------------------------------------------
+
+/// Result of translating a scrollbar click into content coordinates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClickPositionResult {
+    /// Target scroll offset in content-pixels.
+    pub scroll_offset: f64,
+    /// Equivalent line number (0-based) assuming the given line height.
+    pub target_line: usize,
+    /// Fraction along the track where the click occurred (`0.0..=1.0`).
+    pub track_fraction: f64,
+}
+
+/// Translates a click on the scrollbar into a content position.
+///
+/// This handles the common VS Code behaviour: clicking on the scrollbar
+/// track jumps so the *centre* of the viewport aligns with the click position.
+pub fn click_to_position(
+    click_y: f64,
+    track: &ScrollbarTrack,
+    state: &ScrollState,
+    line_height_px: f64,
+) -> ClickPositionResult {
+    let relative = (click_y - track.position).clamp(0.0, track.length);
+    let fraction = if track.length > 0.0 { relative / track.length } else { 0.0 };
+
+    let content_size = match track.orientation {
+        ScrollbarOrientation::Vertical => state.content_height,
+        ScrollbarOrientation::Horizontal => state.content_width,
+    };
+    let viewport_size = match track.orientation {
+        ScrollbarOrientation::Vertical => state.viewport_height,
+        ScrollbarOrientation::Horizontal => state.viewport_width,
+    };
+
+    // Centre the viewport around the clicked position in content space.
+    let content_y = fraction * content_size;
+    let max_scroll = (content_size - viewport_size).max(0.0);
+    let scroll_offset = (content_y - viewport_size / 2.0).clamp(0.0, max_scroll);
+
+    let target_line = if line_height_px > 0.0 {
+        (scroll_offset / line_height_px).round() as usize
+    } else {
+        0
+    };
+
+    ClickPositionResult {
+        scroll_offset,
+        target_line,
+        track_fraction: fraction,
+    }
+}
+
+/// Helper: extract RGBA components from a packed `0xRRGGBBAA` colour.
+pub fn rgba_components(packed: u32) -> (u8, u8, u8, u8) {
+    let r = ((packed >> 24) & 0xFF) as u8;
+    let g = ((packed >> 16) & 0xFF) as u8;
+    let b = ((packed >> 8) & 0xFF) as u8;
+    let a = (packed & 0xFF) as u8;
+    (r, g, b, a)
+}
+
+/// Helper: pack RGBA components into a `0xRRGGBBAA` u32.
+pub fn pack_rgba(r: u8, g: u8, b: u8, a: u8) -> u32 {
+    (u32::from(r) << 24) | (u32::from(g) << 16) | (u32::from(b) << 8) | u32::from(a)
+}
+
+/// Alpha-blend `fg` over `bg`, both in `0xRRGGBBAA` format.
+/// Uses standard "over" compositing.
+pub fn alpha_blend(fg: u32, bg: u32) -> u32 {
+    let (fr, fg_g, fb, fa) = rgba_components(fg);
+    let (br, bg_g, bb, ba) = rgba_components(bg);
+    let alpha = fa as f64 / 255.0;
+    let inv = 1.0 - alpha;
+    let r = (fr as f64 * alpha + br as f64 * inv) as u8;
+    let g = (fg_g as f64 * alpha + bg_g as f64 * inv) as u8;
+    let b = (fb as f64 * alpha + bb as f64 * inv) as u8;
+    let a = (fa as f64 + ba as f64 * inv).min(255.0) as u8;
+    pack_rgba(r, g, b, a)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2226,4 +2637,266 @@ mod tests {
         assert_eq!(found[0].line_start, 0);
         assert_eq!(found[1].line_start, 50);
     }
+
+    // ---------------------------------------------------------------
+    // ScrollbarAnnotation tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn annotation_single_line() {
+        let a = ScrollbarAnnotation::single_line(42, AnnotationKind::Error);
+        assert_eq!(a.line_start, 42);
+        assert_eq!(a.line_end, 42);
+        assert_eq!(a.line_span(), 1);
+        assert_eq!(a.kind, AnnotationKind::Error);
+        assert!(a.color_override.is_none());
+    }
+
+    #[test]
+    fn annotation_line_range_normalised() {
+        let a = ScrollbarAnnotation::line_range(50, 10, AnnotationKind::Warning);
+        assert_eq!(a.line_start, 10);
+        assert_eq!(a.line_end, 50);
+        assert_eq!(a.line_span(), 41);
+    }
+
+    #[test]
+    fn annotation_color_override() {
+        let a = ScrollbarAnnotation::single_line(0, AnnotationKind::Info)
+            .with_color(0xDEADBEEF);
+        assert_eq!(a.effective_color(), 0xDEADBEEF);
+    }
+
+    #[test]
+    fn annotation_default_color() {
+        let a = ScrollbarAnnotation::single_line(0, AnnotationKind::SearchResult);
+        assert_eq!(a.effective_color(), AnnotationKind::SearchResult.default_color());
+    }
+
+    #[test]
+    fn annotation_overlaps_range() {
+        let a = ScrollbarAnnotation::line_range(10, 20, AnnotationKind::Error);
+        assert!(a.overlaps_range(15, 25));
+        assert!(a.overlaps_range(5, 15));
+        assert!(a.overlaps_range(0, 100));
+        assert!(!a.overlaps_range(21, 30));
+        assert!(!a.overlaps_range(0, 9));
+    }
+
+    #[test]
+    fn annotation_kind_display() {
+        assert_eq!(format!("{}", AnnotationKind::Error), "error");
+        assert_eq!(format!("{}", AnnotationKind::GitAdded), "git-added");
+        assert_eq!(format!("{}", AnnotationKind::Custom(7)), "custom(7)");
+    }
+
+    #[test]
+    fn annotation_kind_priority_ordering() {
+        assert!(AnnotationKind::Error.priority() > AnnotationKind::Warning.priority());
+        assert!(AnnotationKind::Warning.priority() > AnnotationKind::Info.priority());
+        assert!(AnnotationKind::SearchResult.priority() > AnnotationKind::Info.priority());
+    }
+
+    // ---------------------------------------------------------------
+    // OverviewRuler tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn overview_ruler_decoration_for_full_lane() {
+        let ruler = OverviewRuler::new(1000.0, 30.0, 500);
+        let ann = ScrollbarAnnotation::single_line(250, AnnotationKind::Error);
+        let dec = ruler.decoration_for(&ann, OverviewRulerLane::Full);
+        assert!((dec.x - 0.0).abs() < f64::EPSILON);
+        assert!((dec.width - 30.0).abs() < f64::EPSILON);
+        assert!(dec.height >= 2.0);
+        assert_eq!(dec.color, AnnotationKind::Error.default_color());
+    }
+
+    #[test]
+    fn overview_ruler_lane_rect_thirds() {
+        let ruler = OverviewRuler::new(100.0, 30.0, 100);
+        let (lx, lw) = ruler.lane_rect(OverviewRulerLane::Left);
+        let (cx, cw) = ruler.lane_rect(OverviewRulerLane::Center);
+        let (rx, rw) = ruler.lane_rect(OverviewRulerLane::Right);
+        assert!((lx - 0.0).abs() < f64::EPSILON);
+        assert!((lw - 10.0).abs() < f64::EPSILON);
+        assert!((cx - 10.0).abs() < f64::EPSILON);
+        assert!((cw - 10.0).abs() < f64::EPSILON);
+        assert!((rx - 20.0).abs() < f64::EPSILON);
+        assert!((rw - 10.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn overview_ruler_compute_decorations_sorted_by_priority() {
+        let ruler = OverviewRuler::new(1000.0, 30.0, 100);
+        let a_err = ScrollbarAnnotation::single_line(10, AnnotationKind::Error);
+        let a_info = ScrollbarAnnotation::single_line(20, AnnotationKind::Info);
+        let entries = vec![
+            (&a_err, OverviewRulerLane::Full),
+            (&a_info, OverviewRulerLane::Left),
+        ];
+        let decs = ruler.compute_decorations(&entries);
+        assert_eq!(decs.len(), 2);
+        // Info (priority 70) is drawn first, Error (100) on top
+        assert_eq!(decs[0].color, AnnotationKind::Info.default_color());
+        assert_eq!(decs[1].color, AnnotationKind::Error.default_color());
+    }
+
+    #[test]
+    fn overview_ruler_annotations_in_view() {
+        let anns = vec![
+            ScrollbarAnnotation::single_line(5, AnnotationKind::Error),
+            ScrollbarAnnotation::line_range(10, 20, AnnotationKind::Warning),
+            ScrollbarAnnotation::single_line(50, AnnotationKind::Info),
+        ];
+        assert_eq!(OverviewRuler::annotations_in_view(&anns, 0, 15), 2);
+        assert_eq!(OverviewRuler::annotations_in_view(&anns, 25, 100), 1);
+        assert_eq!(OverviewRuler::annotations_in_view(&anns, 0, 100), 3);
+    }
+
+    #[test]
+    fn overview_ruler_zero_lines() {
+        let ruler = OverviewRuler::new(500.0, 20.0, 0);
+        let ann = ScrollbarAnnotation::single_line(0, AnnotationKind::Error);
+        let dec = ruler.decoration_for(&ann, OverviewRulerLane::Full);
+        assert!((dec.y - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ---------------------------------------------------------------
+    // ThumbSizeCalculator tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn thumb_calc_default() {
+        let calc = ThumbSizeCalculator::new();
+        assert!((calc.min_thumb_px - 20.0).abs() < f64::EPSILON);
+        assert!((calc.max_thumb_fraction - 1.0).abs() < f64::EPSILON);
+        assert_eq!(calc.large_file_threshold, 10_000);
+    }
+
+    #[test]
+    fn thumb_calc_viewport_fills_content() {
+        let calc = ThumbSizeCalculator::new();
+        let size = calc.compute(100, 50, 600.0);
+        assert!(size >= calc.min_thumb_px);
+    }
+
+    #[test]
+    fn thumb_calc_proportional() {
+        let calc = ThumbSizeCalculator::new();
+        let size = calc.compute(100, 1000, 600.0);
+        // 100/1000 * 600 = 60, above the 20px minimum
+        assert!((size - 60.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn thumb_calc_large_file_reduction() {
+        let calc = ThumbSizeCalculator::new().with_large_file_threshold(500);
+        let size_normal = calc.compute(100, 400, 600.0);
+        let size_large = calc.compute(100, 600, 600.0);
+        // Large-file mode applies a 0.8 factor
+        assert!(size_large < size_normal);
+    }
+
+    #[test]
+    fn thumb_calc_min_clamp() {
+        let calc = ThumbSizeCalculator::new().with_min_thumb(50.0);
+        let size = calc.compute(1, 1_000_000, 600.0);
+        assert!((size - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn thumb_calc_position() {
+        let calc = ThumbSizeCalculator::new();
+        let pos = calc.thumb_position(0.5, 600.0, 60.0);
+        // 0.5 * (600 - 60) = 270
+        assert!((pos - 270.0).abs() < f64::EPSILON);
+    }
+
+    // ---------------------------------------------------------------
+    // click_to_position tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn click_to_position_centre_viewport() {
+        let track = ScrollbarTrack::new(0.0, 500.0, ScrollbarOrientation::Vertical);
+        let state = ScrollState::new(800.0, 200.0, 800.0, 2000.0);
+        let result = click_to_position(250.0, &track, &state, 20.0);
+        // fraction = 250/500 = 0.5, content_y = 0.5*2000 = 1000
+        // scroll = 1000 - 100 = 900, max = 1800
+        assert!((result.scroll_offset - 900.0).abs() < f64::EPSILON);
+        assert!((result.track_fraction - 0.5).abs() < f64::EPSILON);
+        assert_eq!(result.target_line, 45); // 900/20 = 45
+    }
+
+    #[test]
+    fn click_to_position_clamp_top() {
+        let track = ScrollbarTrack::new(0.0, 500.0, ScrollbarOrientation::Vertical);
+        let state = ScrollState::new(800.0, 200.0, 800.0, 2000.0);
+        let result = click_to_position(0.0, &track, &state, 20.0);
+        assert!((result.scroll_offset - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn click_to_position_clamp_bottom() {
+        let track = ScrollbarTrack::new(0.0, 500.0, ScrollbarOrientation::Vertical);
+        let state = ScrollState::new(800.0, 200.0, 800.0, 2000.0);
+        let result = click_to_position(500.0, &track, &state, 20.0);
+        assert!((result.scroll_offset - 1800.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn click_to_position_zero_line_height() {
+        let track = ScrollbarTrack::new(0.0, 500.0, ScrollbarOrientation::Vertical);
+        let state = ScrollState::new(800.0, 200.0, 800.0, 2000.0);
+        let result = click_to_position(250.0, &track, &state, 0.0);
+        assert_eq!(result.target_line, 0);
+    }
+
+    // ---------------------------------------------------------------
+    // Colour utility tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn rgba_roundtrip() {
+        let packed = pack_rgba(0xDE, 0xAD, 0xBE, 0xEF);
+        let (r, g, b, a) = rgba_components(packed);
+        assert_eq!((r, g, b, a), (0xDE, 0xAD, 0xBE, 0xEF));
+    }
+
+    #[test]
+    fn alpha_blend_opaque_fg() {
+        let fg = pack_rgba(255, 0, 0, 255); // fully opaque red
+        let bg = pack_rgba(0, 255, 0, 255); // fully opaque green
+        let result = alpha_blend(fg, bg);
+        let (r, g, b, _) = rgba_components(result);
+        assert_eq!(r, 255);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn alpha_blend_transparent_fg() {
+        let fg = pack_rgba(255, 0, 0, 0); // fully transparent red
+        let bg = pack_rgba(0, 255, 0, 255);
+        let result = alpha_blend(fg, bg);
+        let (r, g, b, _) = rgba_components(result);
+        assert_eq!(r, 0);
+        assert_eq!(g, 255);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn alpha_blend_half_alpha() {
+        let fg = pack_rgba(200, 100, 0, 128);
+        let bg = pack_rgba(0, 0, 200, 255);
+        let result = alpha_blend(fg, bg);
+        let (r, g, b, _a) = rgba_components(result);
+        // ~50% blend
+        assert!(r > 90 && r < 110);
+        assert!(g > 45 && g < 60);
+        assert!(b > 90 && b < 110);
+    }
+
+
 }
