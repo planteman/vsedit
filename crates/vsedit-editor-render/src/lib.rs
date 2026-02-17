@@ -3,6 +3,7 @@
 //! Provides viewport-aware rendering of editor lines with decoration merging
 //! for selections, search highlights, diagnostics, and other visual markers.
 
+use std::collections::HashMap;
 use std::fmt;
 /// A rendered editor line for terminal output.
 #[derive(Debug, Clone)]
@@ -1170,6 +1171,288 @@ impl Default for CursorBlinkState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RenderLineDecoration – overlay decoration collector
+// ---------------------------------------------------------------------------
+
+/// Kind of overlay decoration applied to a rendered line region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OverlayDecorationKind {
+    Underline,
+    Highlight,
+    InlineText,
+    Gutter,
+}
+
+impl fmt::Display for OverlayDecorationKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Underline => write!(f, "Underline"),
+            Self::Highlight => write!(f, "Highlight"),
+            Self::InlineText => write!(f, "InlineText"),
+            Self::Gutter => write!(f, "Gutter"),
+        }
+    }
+}
+
+/// A single overlay decoration entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OverlayDecoration {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub kind: OverlayDecorationKind,
+    pub text: Option<String>,
+}
+
+/// Collects and queries overlay decorations across lines.
+#[derive(Debug, Clone, Default)]
+pub struct RenderLineDecoration {
+    pub decorations: Vec<OverlayDecoration>,
+}
+
+impl RenderLineDecoration {
+    pub fn new() -> Self {
+        Self {
+            decorations: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, dec: OverlayDecoration) {
+        self.decorations.push(dec);
+    }
+
+    pub fn decorations_for_line(&self, line: u32) -> Vec<&OverlayDecoration> {
+        self.decorations.iter().filter(|d| d.line == line).collect()
+    }
+
+    pub fn has_decorations(&self, line: u32) -> bool {
+        self.decorations.iter().any(|d| d.line == line)
+    }
+
+    pub fn remove_for_line(&mut self, line: u32) {
+        self.decorations.retain(|d| d.line != line);
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.decorations.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.decorations.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderWhitespaceTokenizer – visible whitespace rendering
+// ---------------------------------------------------------------------------
+
+/// Classification of a whitespace region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WhitespaceKind {
+    Space,
+    Tab,
+    TrailingSpace,
+}
+
+impl fmt::Display for WhitespaceKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Space => write!(f, "Space"),
+            Self::Tab => write!(f, "Tab"),
+            Self::TrailingSpace => write!(f, "TrailingSpace"),
+        }
+    }
+}
+
+/// A contiguous whitespace region inside a line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WhitespaceToken {
+    pub kind: WhitespaceKind,
+    pub start: usize,
+    pub len: usize,
+}
+
+/// Tokenizes and renders visible whitespace indicators.
+pub struct RenderWhitespaceTokenizer;
+
+impl RenderWhitespaceTokenizer {
+    /// Splits `line` into whitespace tokens preserving their byte offsets.
+    pub fn tokenize(line: &str) -> Vec<WhitespaceToken> {
+        let trimmed = line.trim_end_matches(|c: char| c == ' ' || c == '\t');
+        let trailing_start = trimmed.len();
+        let mut tokens = Vec::new();
+        let mut idx = 0;
+        for ch in line.chars() {
+            let clen = ch.len_utf8();
+            match ch {
+                '\t' => {
+                    let kind = if idx >= trailing_start {
+                        WhitespaceKind::TrailingSpace
+                    } else {
+                        WhitespaceKind::Tab
+                    };
+                    tokens.push(WhitespaceToken { kind, start: idx, len: clen });
+                }
+                ' ' => {
+                    let kind = if idx >= trailing_start {
+                        WhitespaceKind::TrailingSpace
+                    } else {
+                        WhitespaceKind::Space
+                    };
+                    tokens.push(WhitespaceToken { kind, start: idx, len: clen });
+                }
+                _ => {}
+            }
+            idx += clen;
+        }
+        tokens
+    }
+
+    /// Returns a copy of `line` with whitespace replaced by visible indicators.
+    /// Spaces → `·`, tabs → `→`, trailing spaces → `•`.
+    pub fn render_visible(line: &str) -> String {
+        let trimmed_len = line.trim_end_matches(|c: char| c == ' ' || c == '\t').len();
+        let mut out = String::with_capacity(line.len() * 2);
+        for (i, ch) in line.char_indices() {
+            match ch {
+                ' ' if i >= trimmed_len => out.push('•'),
+                ' ' => out.push('·'),
+                '\t' if i >= trimmed_len => out.push('•'),
+                '\t' => out.push('→'),
+                other => out.push(other),
+            }
+        }
+        out
+    }
+
+    /// Returns `true` when `line` ends with whitespace.
+    pub fn has_trailing_whitespace(line: &str) -> bool {
+        line.ends_with(' ') || line.ends_with('\t')
+    }
+
+    /// Number of leading whitespace characters.
+    pub fn leading_whitespace_len(line: &str) -> usize {
+        line.chars().take_while(|c| c.is_whitespace()).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderMinimapLine – braille-based minimap rendering
+// ---------------------------------------------------------------------------
+
+/// Renders simplified braille-character minimap lines.
+pub struct RenderMinimapLine;
+
+impl RenderMinimapLine {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Renders `line` as braille characters of the given `width`.
+    /// Non-space characters map to `⣿`, spaces to `⠀` (braille blank).
+    pub fn render_braille(line: &str, width: usize) -> String {
+        if width == 0 {
+            return String::new();
+        }
+        let chars: Vec<char> = line.chars().collect();
+        let mut out = String::with_capacity(width * 3);
+        for i in 0..width {
+            let ch = chars.get(i).copied().unwrap_or(' ');
+            if ch != ' ' && ch != '\t' {
+                out.push('⣿');
+            } else {
+                out.push('⠀');
+            }
+        }
+        out
+    }
+
+    /// Ratio of non-whitespace characters to total length (`0.0`–`1.0`).
+    pub fn line_density(line: &str) -> f32 {
+        if line.is_empty() {
+            return 0.0;
+        }
+        let total = line.len() as f32;
+        let non_ws = line.chars().filter(|c| !c.is_whitespace()).count() as f32;
+        non_ws / total
+    }
+
+    /// Renders a block of source lines into minimap braille strings.
+    pub fn render_minimap_block(lines: &[&str], width: usize) -> Vec<String> {
+        lines.iter().map(|l| Self::render_braille(l, width)).collect()
+    }
+}
+
+impl Default for RenderMinimapLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineDirtyTracker – per-line dirty state with generation counter
+// ---------------------------------------------------------------------------
+
+/// Tracks which lines need re-rendering and exposes a generation counter
+/// that increments on bulk operations.
+#[derive(Debug, Clone)]
+pub struct LineDirtyTracker {
+    dirty_lines: HashMap<u32, bool>,
+    generation: u64,
+}
+
+impl LineDirtyTracker {
+    pub fn new() -> Self {
+        Self {
+            dirty_lines: HashMap::new(),
+            generation: 0,
+        }
+    }
+
+    pub fn mark_dirty(&mut self, line: u32) {
+        self.dirty_lines.insert(line, true);
+    }
+
+    pub fn mark_clean(&mut self, line: u32) {
+        self.dirty_lines.remove(&line);
+    }
+
+    pub fn is_dirty(&self, line: u32) -> bool {
+        self.dirty_lines.get(&line).copied().unwrap_or(false)
+    }
+
+    pub fn dirty_count(&self) -> usize {
+        self.dirty_lines.len()
+    }
+
+    pub fn all_dirty_lines(&self) -> Vec<u32> {
+        let mut lines: Vec<u32> = self.dirty_lines.keys().copied().collect();
+        lines.sort_unstable();
+        lines
+    }
+
+    pub fn mark_all_clean(&mut self) {
+        self.dirty_lines.clear();
+    }
+
+    /// Increments and returns the new generation value.
+    pub fn bump_generation(&mut self) -> u64 {
+        self.generation += 1;
+        self.generation
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+}
+
+impl Default for LineDirtyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2031,5 +2314,211 @@ mod tests {
         assert!(blink.should_draw()); // always drawn when disabled
         assert!(!blink.tick(10000)); // tick never changes phase
         assert_eq!(blink.phase, BlinkPhase::Visible);
+    }
+
+    // -- RenderLineDecoration tests -----------------------------------------
+
+    #[test]
+    fn render_line_decoration_add_and_query() {
+        let mut rld = RenderLineDecoration::new();
+        assert_eq!(rld.total_count(), 0);
+        assert!(!rld.has_decorations(1));
+
+        rld.add(OverlayDecoration {
+            line: 1,
+            start_col: 0,
+            end_col: 5,
+            kind: OverlayDecorationKind::Underline,
+            text: None,
+        });
+        rld.add(OverlayDecoration {
+            line: 1,
+            start_col: 6,
+            end_col: 10,
+            kind: OverlayDecorationKind::Highlight,
+            text: None,
+        });
+        rld.add(OverlayDecoration {
+            line: 2,
+            start_col: 0,
+            end_col: 3,
+            kind: OverlayDecorationKind::Gutter,
+            text: Some("!".to_string()),
+        });
+
+        assert_eq!(rld.total_count(), 3);
+        assert!(rld.has_decorations(1));
+        assert!(rld.has_decorations(2));
+        assert!(!rld.has_decorations(3));
+
+        let line1 = rld.decorations_for_line(1);
+        assert_eq!(line1.len(), 2);
+        assert_eq!(line1[0].kind, OverlayDecorationKind::Underline);
+    }
+
+    #[test]
+    fn render_line_decoration_remove_and_clear() {
+        let mut rld = RenderLineDecoration::new();
+        rld.add(OverlayDecoration {
+            line: 1, start_col: 0, end_col: 5,
+            kind: OverlayDecorationKind::InlineText,
+            text: Some("hint".to_string()),
+        });
+        rld.add(OverlayDecoration {
+            line: 2, start_col: 0, end_col: 3,
+            kind: OverlayDecorationKind::Highlight,
+            text: None,
+        });
+        rld.remove_for_line(1);
+        assert!(!rld.has_decorations(1));
+        assert_eq!(rld.total_count(), 1);
+
+        rld.clear();
+        assert_eq!(rld.total_count(), 0);
+    }
+
+    #[test]
+    fn overlay_decoration_kind_display() {
+        assert_eq!(OverlayDecorationKind::Underline.to_string(), "Underline");
+        assert_eq!(OverlayDecorationKind::Highlight.to_string(), "Highlight");
+        assert_eq!(OverlayDecorationKind::InlineText.to_string(), "InlineText");
+        assert_eq!(OverlayDecorationKind::Gutter.to_string(), "Gutter");
+    }
+
+    // -- RenderWhitespaceTokenizer tests ------------------------------------
+
+    #[test]
+    fn whitespace_tokenize_basic() {
+        let tokens = RenderWhitespaceTokenizer::tokenize("  hello  ");
+        assert!(tokens.len() >= 4);
+        assert_eq!(tokens[0].kind, WhitespaceKind::Space);
+        assert_eq!(tokens[1].kind, WhitespaceKind::Space);
+        // last two spaces are trailing
+        let trailing: Vec<_> = tokens.iter().filter(|t| t.kind == WhitespaceKind::TrailingSpace).collect();
+        assert_eq!(trailing.len(), 2);
+    }
+
+    #[test]
+    fn whitespace_tokenize_tabs() {
+        let tokens = RenderWhitespaceTokenizer::tokenize("\thello");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, WhitespaceKind::Tab);
+        assert_eq!(tokens[0].start, 0);
+    }
+
+    #[test]
+    fn whitespace_render_visible() {
+        let vis = RenderWhitespaceTokenizer::render_visible("  hi  ");
+        assert_eq!(vis, "··hi••");
+    }
+
+    #[test]
+    fn whitespace_render_visible_tabs() {
+        let vis = RenderWhitespaceTokenizer::render_visible("\thi");
+        assert_eq!(vis, "→hi");
+    }
+
+    #[test]
+    fn whitespace_has_trailing() {
+        assert!(RenderWhitespaceTokenizer::has_trailing_whitespace("hello "));
+        assert!(RenderWhitespaceTokenizer::has_trailing_whitespace("hello\t"));
+        assert!(!RenderWhitespaceTokenizer::has_trailing_whitespace("hello"));
+        assert!(!RenderWhitespaceTokenizer::has_trailing_whitespace(""));
+    }
+
+    #[test]
+    fn whitespace_leading_len() {
+        assert_eq!(RenderWhitespaceTokenizer::leading_whitespace_len("   abc"), 3);
+        assert_eq!(RenderWhitespaceTokenizer::leading_whitespace_len("\tabc"), 1);
+        assert_eq!(RenderWhitespaceTokenizer::leading_whitespace_len("abc"), 0);
+        assert_eq!(RenderWhitespaceTokenizer::leading_whitespace_len(""), 0);
+    }
+
+    #[test]
+    fn whitespace_kind_display() {
+        assert_eq!(WhitespaceKind::Space.to_string(), "Space");
+        assert_eq!(WhitespaceKind::Tab.to_string(), "Tab");
+        assert_eq!(WhitespaceKind::TrailingSpace.to_string(), "TrailingSpace");
+    }
+
+    // -- RenderMinimapLine tests --------------------------------------------
+
+    #[test]
+    fn minimap_render_braille_basic() {
+        let result = RenderMinimapLine::render_braille("hello", 5);
+        assert_eq!(result, "⣿⣿⣿⣿⣿");
+    }
+
+    #[test]
+    fn minimap_render_braille_with_spaces() {
+        let result = RenderMinimapLine::render_braille("a b", 4);
+        assert_eq!(result, "⣿⠀⣿⠀"); // 'a' ' ' 'b' padding-space
+    }
+
+    #[test]
+    fn minimap_render_braille_zero_width() {
+        assert_eq!(RenderMinimapLine::render_braille("hello", 0), "");
+    }
+
+    #[test]
+    fn minimap_line_density() {
+        let d = RenderMinimapLine::line_density("hello");
+        assert!((d - 1.0).abs() < f32::EPSILON);
+
+        let d2 = RenderMinimapLine::line_density("  ");
+        assert!((d2 - 0.0).abs() < f32::EPSILON);
+
+        assert!((RenderMinimapLine::line_density("") - 0.0).abs() < f32::EPSILON);
+
+        let d3 = RenderMinimapLine::line_density("ab cd");
+        // 4 non-ws out of 5 chars
+        assert!((d3 - 0.8).abs() < 0.01);
+    }
+
+    #[test]
+    fn minimap_render_block() {
+        let lines = vec!["abc", "   ", "x"];
+        let block = RenderMinimapLine::render_minimap_block(&lines, 3);
+        assert_eq!(block.len(), 3);
+        assert_eq!(block[0], "⣿⣿⣿");
+        assert_eq!(block[1], "⠀⠀⠀");
+        assert_eq!(block[2], "⣿⠀⠀");
+    }
+
+    // -- LineDirtyTracker tests ---------------------------------------------
+
+    #[test]
+    fn line_dirty_tracker_basic() {
+        let mut tracker = LineDirtyTracker::new();
+        assert_eq!(tracker.dirty_count(), 0);
+        assert_eq!(tracker.generation(), 0);
+
+        tracker.mark_dirty(5);
+        tracker.mark_dirty(10);
+        assert!(tracker.is_dirty(5));
+        assert!(tracker.is_dirty(10));
+        assert!(!tracker.is_dirty(7));
+        assert_eq!(tracker.dirty_count(), 2);
+        assert_eq!(tracker.all_dirty_lines(), vec![5, 10]);
+    }
+
+    #[test]
+    fn line_dirty_tracker_clean_and_generation() {
+        let mut tracker = LineDirtyTracker::new();
+        tracker.mark_dirty(1);
+        tracker.mark_dirty(2);
+        tracker.mark_dirty(3);
+        tracker.mark_clean(2);
+        assert!(!tracker.is_dirty(2));
+        assert_eq!(tracker.dirty_count(), 2);
+
+        tracker.mark_all_clean();
+        assert_eq!(tracker.dirty_count(), 0);
+
+        let g = tracker.bump_generation();
+        assert_eq!(g, 1);
+        assert_eq!(tracker.generation(), 1);
+        let g2 = tracker.bump_generation();
+        assert_eq!(g2, 2);
     }
 }

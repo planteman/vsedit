@@ -1194,6 +1194,177 @@ pub fn partition_quickfixes(actions: &[CodeAction]) -> (Vec<CodeAction>, Vec<Cod
     (fixes, rest)
 }
 
+
+// ---------------------------------------------------------------------------
+// CodeActionPreferred — auto-fix selection
+// ---------------------------------------------------------------------------
+
+/// Selects the best preferred action from a set.
+pub struct CodeActionPreferred;
+
+impl CodeActionPreferred {
+    pub fn find_preferred(actions: &[CodeAction]) -> Option<&CodeAction> {
+        actions.iter().find(|a| a.is_preferred)
+    }
+
+    pub fn find_all_preferred(actions: &[CodeAction]) -> Vec<&CodeAction> {
+        actions.iter().filter(|a| a.is_preferred).collect()
+    }
+
+    pub fn find_best_fix(actions: &[CodeAction]) -> Option<&CodeAction> {
+        actions.iter().find(|a| a.is_preferred && a.kind == CodeActionKind::QuickFix)
+    }
+
+    pub fn preferred_count(actions: &[CodeAction]) -> usize {
+        actions.iter().filter(|a| a.is_preferred).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CodeActionWidget — grouped display
+// ---------------------------------------------------------------------------
+
+/// A group of code actions with the same kind.
+pub struct CodeActionGroup {
+    pub kind: CodeActionKind,
+    pub actions: Vec<CodeAction>,
+}
+
+/// Groups code actions by kind for display in a widget.
+pub struct CodeActionWidget {
+    groups: Vec<CodeActionGroup>,
+}
+
+impl CodeActionWidget {
+    pub fn from_actions(actions: Vec<CodeAction>) -> Self {
+        let mut map: HashMap<String, Vec<CodeAction>> = HashMap::new();
+        for action in actions {
+            map.entry(action.kind.as_str().to_string()).or_default().push(action);
+        }
+        let mut groups: Vec<CodeActionGroup> = map
+            .into_iter()
+            .filter_map(|(kind_str, actions)| {
+                CodeActionKind::from_str(&kind_str).map(|kind| CodeActionGroup { kind, actions })
+            })
+            .collect();
+        groups.sort_by_key(|g| g.kind.as_str());
+        Self { groups }
+    }
+
+    pub fn group_count(&self) -> usize { self.groups.len() }
+
+    pub fn total_actions(&self) -> usize {
+        self.groups.iter().map(|g| g.actions.len()).sum()
+    }
+
+    pub fn actions_for_kind(&self, kind: &CodeActionKind) -> Vec<&CodeAction> {
+        self.groups.iter().filter(|g| &g.kind == kind).flat_map(|g| g.actions.iter()).collect()
+    }
+
+    pub fn groups(&self) -> &[CodeActionGroup] { &self.groups }
+
+    pub fn first_action(&self) -> Option<&CodeAction> {
+        self.groups.first().and_then(|g| g.actions.first())
+    }
+}
+
+impl fmt::Display for CodeActionWidget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CodeActionWidget({} groups, {} actions)", self.group_count(), self.total_actions())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CodeActionKeybinding — quick access
+// ---------------------------------------------------------------------------
+
+/// Associates a keybinding with a code action kind.
+#[derive(Debug, Clone)]
+pub struct CodeActionKeybinding {
+    pub key: String,
+    pub kind: CodeActionKind,
+    pub when_clause: Option<String>,
+}
+
+impl CodeActionKeybinding {
+    pub fn new(key: impl Into<String>, kind: CodeActionKind) -> Self {
+        Self { key: key.into(), kind, when_clause: None }
+    }
+
+    pub fn with_when(mut self, when: impl Into<String>) -> Self {
+        self.when_clause = Some(when.into());
+        self
+    }
+
+    pub fn matches_key(&self, key: &str) -> bool { self.key == key }
+}
+
+impl fmt::Display for CodeActionKeybinding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} -> {}", self.key, self.kind.as_str())
+    }
+}
+
+/// Manages keybindings for code actions.
+pub struct CodeActionKeybindingRegistry {
+    bindings: Vec<CodeActionKeybinding>,
+}
+
+impl CodeActionKeybindingRegistry {
+    pub fn new() -> Self { Self { bindings: Vec::new() } }
+
+    pub fn register(&mut self, binding: CodeActionKeybinding) { self.bindings.push(binding); }
+
+    pub fn find_by_key(&self, key: &str) -> Option<&CodeActionKeybinding> {
+        self.bindings.iter().find(|b| b.matches_key(key))
+    }
+
+    pub fn len(&self) -> usize { self.bindings.len() }
+    pub fn is_empty(&self) -> bool { self.bindings.is_empty() }
+}
+
+impl Default for CodeActionKeybindingRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// CodeActionSourceFilter — filter by source
+// ---------------------------------------------------------------------------
+
+/// Filters code actions by source kind.
+pub struct CodeActionSourceFilter {
+    allowed_kinds: Vec<CodeActionKind>,
+}
+
+impl CodeActionSourceFilter {
+    pub fn allow_all() -> Self { Self { allowed_kinds: vec![] } }
+
+    pub fn only(kinds: Vec<CodeActionKind>) -> Self { Self { allowed_kinds: kinds } }
+
+    pub fn apply<'a>(&self, actions: &'a [CodeAction]) -> Vec<&'a CodeAction> {
+        if self.allowed_kinds.is_empty() {
+            return actions.iter().collect();
+        }
+        actions.iter().filter(|a| self.allowed_kinds.contains(&a.kind)).collect()
+    }
+
+    pub fn allowed_count(&self) -> usize { self.allowed_kinds.len() }
+
+    pub fn is_allowed(&self, kind: &CodeActionKind) -> bool {
+        self.allowed_kinds.is_empty() || self.allowed_kinds.contains(kind)
+    }
+}
+
+impl fmt::Display for CodeActionSourceFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.allowed_kinds.is_empty() {
+            write!(f, "CodeActionSourceFilter(all)")
+        } else {
+            write!(f, "CodeActionSourceFilter({} kinds)", self.allowed_kinds.len())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2049,4 +2220,119 @@ mod tests {
         assert_eq!(format!("{}", DiagnosticSeverity::Error), "error");
         assert_eq!(format!("{}", DiagnosticSeverity::Information), "info");
     }
+
+
+    #[test]
+    fn preferred_find_single() {
+        let actions = vec![
+            CodeAction::new("fix1", CodeActionKind::QuickFix),
+            CodeAction::new("fix2", CodeActionKind::QuickFix).preferred(),
+        ];
+        assert_eq!(CodeActionPreferred::find_preferred(&actions).unwrap().title, "fix2");
+    }
+
+    #[test]
+    fn preferred_find_all() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::QuickFix).preferred(),
+            CodeAction::new("b", CodeActionKind::Refactor).preferred(),
+            CodeAction::new("c", CodeActionKind::Source),
+        ];
+        assert_eq!(CodeActionPreferred::find_all_preferred(&actions).len(), 2);
+    }
+
+    #[test]
+    fn preferred_best_fix() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::Refactor).preferred(),
+            CodeAction::new("b", CodeActionKind::QuickFix).preferred(),
+        ];
+        assert_eq!(CodeActionPreferred::find_best_fix(&actions).unwrap().title, "b");
+    }
+
+    #[test]
+    fn preferred_count() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::QuickFix).preferred(),
+            CodeAction::new("b", CodeActionKind::Refactor),
+        ];
+        assert_eq!(CodeActionPreferred::preferred_count(&actions), 1);
+    }
+
+    #[test]
+    fn widget_grouping() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::QuickFix),
+            CodeAction::new("b", CodeActionKind::QuickFix),
+            CodeAction::new("c", CodeActionKind::Refactor),
+        ];
+        let widget = CodeActionWidget::from_actions(actions);
+        assert_eq!(widget.group_count(), 2);
+        assert_eq!(widget.total_actions(), 3);
+    }
+
+    #[test]
+    fn widget_actions_for_kind() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::QuickFix),
+            CodeAction::new("b", CodeActionKind::Source),
+        ];
+        let widget = CodeActionWidget::from_actions(actions);
+        assert_eq!(widget.actions_for_kind(&CodeActionKind::QuickFix).len(), 1);
+    }
+
+    #[test]
+    fn widget_display() {
+        let widget = CodeActionWidget::from_actions(vec![]);
+        assert!(format!("{widget}").contains("0 groups"));
+    }
+
+    #[test]
+    fn keybinding_matches() {
+        let kb = CodeActionKeybinding::new("ctrl+.", CodeActionKind::QuickFix);
+        assert!(kb.matches_key("ctrl+."));
+        assert!(!kb.matches_key("ctrl+,"));
+    }
+
+    #[test]
+    fn keybinding_registry() {
+        let mut reg = CodeActionKeybindingRegistry::new();
+        reg.register(CodeActionKeybinding::new("ctrl+.", CodeActionKind::QuickFix));
+        reg.register(CodeActionKeybinding::new("ctrl+shift+r", CodeActionKind::Refactor));
+        assert_eq!(reg.len(), 2);
+        assert!(reg.find_by_key("ctrl+.").is_some());
+    }
+
+    #[test]
+    fn source_filter_allow_all() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::QuickFix),
+            CodeAction::new("b", CodeActionKind::Refactor),
+        ];
+        let filter = CodeActionSourceFilter::allow_all();
+        assert_eq!(filter.apply(&actions).len(), 2);
+    }
+
+    #[test]
+    fn source_filter_only() {
+        let actions = vec![
+            CodeAction::new("a", CodeActionKind::QuickFix),
+            CodeAction::new("b", CodeActionKind::Refactor),
+        ];
+        let filter = CodeActionSourceFilter::only(vec![CodeActionKind::QuickFix]);
+        assert_eq!(filter.apply(&actions).len(), 1);
+    }
+
+    #[test]
+    fn keybinding_display() {
+        let kb = CodeActionKeybinding::new("ctrl+.", CodeActionKind::QuickFix);
+        assert!(format!("{kb}").contains("ctrl+."));
+    }
+
+    #[test]
+    fn source_filter_display() {
+        let f = CodeActionSourceFilter::allow_all();
+        assert!(format!("{f}").contains("all"));
+    }
+
 }

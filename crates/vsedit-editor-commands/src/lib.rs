@@ -1393,6 +1393,277 @@ impl CoreEditorCommand {
     }
 }
 
+// ── EditorCommandMacro ──────────────────────────────────────────────────
+
+/// A compound command that groups multiple sub-commands under a single name.
+#[derive(Debug, Clone)]
+pub struct EditorCommandMacro {
+    name: String,
+    commands: Vec<String>,
+}
+
+impl EditorCommandMacro {
+    /// Create a new empty macro with the given name.
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            commands: Vec::new(),
+        }
+    }
+
+    /// Append a sub-command to this macro.
+    pub fn add_command(&mut self, command: &str) {
+        self.commands.push(command.to_string());
+    }
+
+    /// Return the ordered list of sub-commands.
+    pub fn commands(&self) -> &[String] {
+        &self.commands
+    }
+
+    /// Return the macro name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Number of sub-commands in this macro.
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    /// Whether this macro contains no sub-commands.
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+
+    /// Produce the list of commands that would execute, without side effects.
+    pub fn execute_dry_run(&self) -> Vec<String> {
+        self.commands.clone()
+    }
+}
+
+impl fmt::Display for EditorCommandMacro {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Macro({}, {} commands)", self.name, self.commands.len())
+    }
+}
+
+// ── EditorCommandRepeat ─────────────────────────────────────────────────
+
+/// Tracks command history so the last command can be repeated (like vi `.`).
+#[derive(Debug, Clone)]
+pub struct EditorCommandRepeat {
+    history: Vec<String>,
+}
+
+impl EditorCommandRepeat {
+    /// Create a new, empty repeat tracker.
+    pub fn new() -> Self {
+        Self {
+            history: Vec::new(),
+        }
+    }
+
+    /// Record a command execution.
+    pub fn record(&mut self, command: &str) {
+        self.history.push(command.to_string());
+    }
+
+    /// Return the most recently recorded command, if any.
+    pub fn last_command(&self) -> Option<&str> {
+        self.history.last().map(|s| s.as_str())
+    }
+
+    /// Repeat the last command, returning a clone of its identifier.
+    pub fn repeat(&self) -> Option<String> {
+        self.history.last().cloned()
+    }
+
+    /// Produce `n` copies of the last command for batch replay.
+    pub fn repeat_n(&self, n: usize) -> Vec<String> {
+        match self.history.last() {
+            Some(cmd) => vec![cmd.clone(); n],
+            None => Vec::new(),
+        }
+    }
+
+    /// Full history of recorded commands.
+    pub fn history(&self) -> &[String] {
+        &self.history
+    }
+
+    /// Number of commands in the history.
+    pub fn history_len(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Clear the recorded history.
+    pub fn clear(&mut self) {
+        self.history.clear();
+    }
+}
+
+impl fmt::Display for EditorCommandRepeat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.last_command() {
+            Some(cmd) => write!(f, "Repeat(last={})", cmd),
+            None => write!(f, "Repeat(empty)"),
+        }
+    }
+}
+
+// ── EditorCommandScope ──────────────────────────────────────────────────
+
+/// Selection modes that determine how a command operates on text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EditorCommandScope {
+    Character,
+    Line,
+    Block,
+    Word,
+    Paragraph,
+}
+
+impl EditorCommandScope {
+    /// Parse a scope from its string label.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "character" => Some(Self::Character),
+            "line" => Some(Self::Line),
+            "block" => Some(Self::Block),
+            "word" => Some(Self::Word),
+            "paragraph" => Some(Self::Paragraph),
+            _ => None,
+        }
+    }
+
+    /// Short human-readable label.
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Character => "character",
+            Self::Line => "line",
+            Self::Block => "block",
+            Self::Word => "word",
+            Self::Paragraph => "paragraph",
+        }
+    }
+
+    /// Whether this scope operates on whole lines.
+    pub fn is_line_based(&self) -> bool {
+        matches!(self, Self::Line | Self::Block | Self::Paragraph)
+    }
+
+    /// Human-readable description of the scope.
+    pub fn description(&self) -> &str {
+        match self {
+            Self::Character => "Operate on individual characters",
+            Self::Line => "Operate on entire lines",
+            Self::Block => "Operate on rectangular blocks",
+            Self::Word => "Operate on word boundaries",
+            Self::Paragraph => "Operate on paragraph boundaries",
+        }
+    }
+}
+
+impl Default for EditorCommandScope {
+    fn default() -> Self {
+        Self::Character
+    }
+}
+
+impl fmt::Display for EditorCommandScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label())
+    }
+}
+
+// ── CommandExecutionLogger ──────────────────────────────────────────────
+
+/// A single recorded command execution.
+#[derive(Debug, Clone)]
+pub struct CommandExecution {
+    pub command: String,
+    pub success: bool,
+    pub duration_us: u64,
+}
+
+impl fmt::Display for CommandExecution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.success { "ok" } else { "err" };
+        write!(f, "{}({}, {}µs)", self.command, status, self.duration_us)
+    }
+}
+
+/// Logs command executions with timing and success/failure tracking.
+#[derive(Debug, Clone)]
+pub struct CommandExecutionLogger {
+    executions: Vec<CommandExecution>,
+}
+
+impl CommandExecutionLogger {
+    /// Create an empty logger.
+    pub fn new() -> Self {
+        Self {
+            executions: Vec::new(),
+        }
+    }
+
+    /// Record a command execution.
+    pub fn log_execution(&mut self, command: &str, success: bool, duration_us: u64) {
+        self.executions.push(CommandExecution {
+            command: command.to_string(),
+            success,
+            duration_us,
+        });
+    }
+
+    /// All recorded executions.
+    pub fn executions(&self) -> &[CommandExecution] {
+        &self.executions
+    }
+
+    /// Number of successful executions.
+    pub fn successful_count(&self) -> usize {
+        self.executions.iter().filter(|e| e.success).count()
+    }
+
+    /// Number of failed executions.
+    pub fn failed_count(&self) -> usize {
+        self.executions.iter().filter(|e| !e.success).count()
+    }
+
+    /// Sum of all recorded durations in microseconds.
+    pub fn total_duration_us(&self) -> u64 {
+        self.executions.iter().map(|e| e.duration_us).sum()
+    }
+
+    /// The most recently logged execution, if any.
+    pub fn most_recent(&self) -> Option<&CommandExecution> {
+        self.executions.last()
+    }
+
+    /// All executions whose command matches the given identifier.
+    pub fn by_command(&self, command: &str) -> Vec<&CommandExecution> {
+        self.executions
+            .iter()
+            .filter(|e| e.command == command)
+            .collect()
+    }
+}
+
+impl fmt::Display for CommandExecutionLogger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Logger(total={}, ok={}, err={}, duration={}µs)",
+            self.executions.len(),
+            self.successful_count(),
+            self.failed_count(),
+            self.total_duration_us()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2190,6 +2461,145 @@ mod tests {
         assert_eq!(CoreEditorCommand::CursorUp.inverse(), Some(CoreEditorCommand::CursorDown));
         assert_eq!(CoreEditorCommand::CursorTop.inverse(), Some(CoreEditorCommand::CursorBottom));
         assert_eq!(CoreEditorCommand::IndentLine.inverse(), Some(CoreEditorCommand::OutdentLine));
+    }
+
+    // ── EditorCommandMacro tests ──
+
+    #[test]
+    fn macro_empty_on_creation() {
+        let m = EditorCommandMacro::new("my_macro");
+        assert_eq!(m.name(), "my_macro");
+        assert!(m.is_empty());
+        assert_eq!(m.len(), 0);
+    }
+
+    #[test]
+    fn macro_add_and_list_commands() {
+        let mut m = EditorCommandMacro::new("build");
+        m.add_command("save");
+        m.add_command("compile");
+        m.add_command("test");
+        assert_eq!(m.len(), 3);
+        assert!(!m.is_empty());
+        assert_eq!(m.commands(), &["save", "compile", "test"]);
+    }
+
+    #[test]
+    fn macro_dry_run_clones_commands() {
+        let mut m = EditorCommandMacro::new("deploy");
+        m.add_command("build");
+        m.add_command("push");
+        let dry = m.execute_dry_run();
+        assert_eq!(dry, vec!["build".to_string(), "push".to_string()]);
+    }
+
+    #[test]
+    fn macro_display() {
+        let mut m = EditorCommandMacro::new("fmt");
+        m.add_command("indent");
+        let s = format!("{m}");
+        assert!(s.contains("fmt"));
+        assert!(s.contains("1 commands"));
+    }
+
+    // ── EditorCommandRepeat tests ──
+
+    #[test]
+    fn repeat_empty_initially() {
+        let r = EditorCommandRepeat::new();
+        assert!(r.last_command().is_none());
+        assert!(r.repeat().is_none());
+        assert_eq!(r.history_len(), 0);
+    }
+
+    #[test]
+    fn repeat_records_and_replays() {
+        let mut r = EditorCommandRepeat::new();
+        r.record("deleteLeft");
+        r.record("type");
+        assert_eq!(r.last_command(), Some("type"));
+        assert_eq!(r.repeat(), Some("type".to_string()));
+        assert_eq!(r.history_len(), 2);
+    }
+
+    #[test]
+    fn repeat_n_produces_copies() {
+        let mut r = EditorCommandRepeat::new();
+        r.record("undo");
+        let v = r.repeat_n(3);
+        assert_eq!(v, vec!["undo".to_string(); 3]);
+    }
+
+    #[test]
+    fn repeat_clear_resets() {
+        let mut r = EditorCommandRepeat::new();
+        r.record("redo");
+        r.clear();
+        assert!(r.last_command().is_none());
+        assert_eq!(r.history_len(), 0);
+    }
+
+    // ── EditorCommandScope tests ──
+
+    #[test]
+    fn scope_default_is_character() {
+        assert_eq!(EditorCommandScope::default(), EditorCommandScope::Character);
+    }
+
+    #[test]
+    fn scope_from_str_round_trip() {
+        for label in &["character", "line", "block", "word", "paragraph"] {
+            let scope = EditorCommandScope::from_str(label).unwrap();
+            assert_eq!(scope.label(), *label);
+        }
+        assert!(EditorCommandScope::from_str("unknown").is_none());
+    }
+
+    #[test]
+    fn scope_is_line_based() {
+        assert!(!EditorCommandScope::Character.is_line_based());
+        assert!(EditorCommandScope::Line.is_line_based());
+        assert!(EditorCommandScope::Block.is_line_based());
+        assert!(!EditorCommandScope::Word.is_line_based());
+        assert!(EditorCommandScope::Paragraph.is_line_based());
+    }
+
+    #[test]
+    fn scope_description_non_empty() {
+        for scope in &[
+            EditorCommandScope::Character,
+            EditorCommandScope::Line,
+            EditorCommandScope::Block,
+            EditorCommandScope::Word,
+            EditorCommandScope::Paragraph,
+        ] {
+            assert!(!scope.description().is_empty());
+        }
+    }
+
+    // ── CommandExecutionLogger tests ──
+
+    #[test]
+    fn logger_tracks_executions() {
+        let mut logger = CommandExecutionLogger::new();
+        logger.log_execution("type", true, 50);
+        logger.log_execution("deleteLeft", false, 120);
+        logger.log_execution("type", true, 30);
+        assert_eq!(logger.successful_count(), 2);
+        assert_eq!(logger.failed_count(), 1);
+        assert_eq!(logger.total_duration_us(), 200);
+        assert_eq!(logger.most_recent().unwrap().command, "type");
+    }
+
+    #[test]
+    fn logger_by_command_filters() {
+        let mut logger = CommandExecutionLogger::new();
+        logger.log_execution("undo", true, 10);
+        logger.log_execution("redo", true, 20);
+        logger.log_execution("undo", false, 15);
+        let undo_execs = logger.by_command("undo");
+        assert_eq!(undo_execs.len(), 2);
+        assert!(undo_execs.iter().all(|e| e.command == "undo"));
     }
 
     #[test]

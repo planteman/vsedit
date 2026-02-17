@@ -1251,6 +1251,322 @@ impl From<TerminalProfileConfig> for TerminalInstance {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Reconnection
+// ---------------------------------------------------------------------------
+
+/// State of a terminal reconnection attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReconnectionState {
+    Idle,
+    Attempting,
+    Connected,
+    Failed,
+}
+
+impl fmt::Display for ReconnectionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Idle => write!(f, "idle"),
+            Self::Attempting => write!(f, "attempting"),
+            Self::Connected => write!(f, "connected"),
+            Self::Failed => write!(f, "failed"),
+        }
+    }
+}
+
+/// Tracks reconnection attempts with exponential back-off.
+#[derive(Debug, Clone)]
+pub struct TerminalReconnection {
+    pub attempts: u32,
+    pub max_attempts: u32,
+    pub delay_ms: u64,
+    pub state: ReconnectionState,
+}
+
+impl TerminalReconnection {
+    pub fn new(max_attempts: u32, delay_ms: u64) -> Self {
+        Self {
+            attempts: 0,
+            max_attempts,
+            delay_ms,
+            state: ReconnectionState::Idle,
+        }
+    }
+
+    /// Try another reconnection attempt. Returns `false` when attempts are
+    /// exhausted.
+    pub fn attempt(&mut self) -> bool {
+        if self.attempts >= self.max_attempts {
+            self.state = ReconnectionState::Failed;
+            return false;
+        }
+        self.attempts += 1;
+        self.state = ReconnectionState::Attempting;
+        true
+    }
+
+    pub fn reset(&mut self) {
+        self.attempts = 0;
+        self.state = ReconnectionState::Idle;
+    }
+
+    pub fn succeeded(&mut self) {
+        self.state = ReconnectionState::Connected;
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.state == ReconnectionState::Connected
+    }
+
+    pub fn attempts_remaining(&self) -> u32 {
+        self.max_attempts.saturating_sub(self.attempts)
+    }
+
+    /// Exponential back-off: `delay_ms * 2^(attempts - 1)`, minimum `delay_ms`.
+    pub fn next_delay(&self) -> u64 {
+        if self.attempts == 0 {
+            return self.delay_ms;
+        }
+        self.delay_ms.saturating_mul(1u64 << (self.attempts - 1).min(31))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Audio / Visual Bell
+// ---------------------------------------------------------------------------
+
+/// Action to take when the terminal bell fires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BellAction {
+    Audio,
+    Visual,
+    Both,
+    Muted,
+    Disabled,
+}
+
+impl fmt::Display for BellAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Audio => write!(f, "audio"),
+            Self::Visual => write!(f, "visual"),
+            Self::Both => write!(f, "both"),
+            Self::Muted => write!(f, "muted"),
+            Self::Disabled => write!(f, "disabled"),
+        }
+    }
+}
+
+/// Manages bell behaviour including mute windows.
+#[derive(Debug, Clone)]
+pub struct TerminalAudioBell {
+    pub enabled: bool,
+    pub visual_bell: bool,
+    pub bell_count: u32,
+    pub muted_until: Option<u64>,
+}
+
+impl TerminalAudioBell {
+    pub fn new() -> Self {
+        Self {
+            enabled: true,
+            visual_bell: false,
+            bell_count: 0,
+            muted_until: None,
+        }
+    }
+
+    /// Process a bell event at the given timestamp and return the action taken.
+    pub fn on_bell(&mut self, now: u64) -> BellAction {
+        self.bell_count += 1;
+        if !self.enabled {
+            return BellAction::Disabled;
+        }
+        if self.is_muted(now) {
+            return BellAction::Muted;
+        }
+        match self.visual_bell {
+            true => BellAction::Both,
+            false => BellAction::Audio,
+        }
+    }
+
+    pub fn enable_visual(&mut self) {
+        self.visual_bell = true;
+    }
+
+    pub fn mute_for(&mut self, duration: u64, now: u64) {
+        self.muted_until = Some(now.saturating_add(duration));
+    }
+
+    pub fn is_muted(&self, now: u64) -> bool {
+        self.muted_until.map_or(false, |until| now < until)
+    }
+
+    pub fn total_bells(&self) -> u32 {
+        self.bell_count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mouse / Selection Tracking
+// ---------------------------------------------------------------------------
+
+/// A rectangular selection range in the terminal grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SelectionRange {
+    pub start_col: u16,
+    pub start_row: u16,
+    pub end_col: u16,
+    pub end_row: u16,
+}
+
+impl SelectionRange {
+    /// Number of lines the selection spans (inclusive).
+    pub fn span_lines(&self) -> u16 {
+        self.end_row.saturating_sub(self.start_row) + 1
+    }
+
+    pub fn is_single_line(&self) -> bool {
+        self.start_row == self.end_row
+    }
+}
+
+impl fmt::Display for SelectionRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "({},{})..({},{})",
+            self.start_col, self.start_row, self.end_col, self.end_row
+        )
+    }
+}
+
+/// Tracks mouse-driven text selection in the terminal viewport.
+#[derive(Debug, Clone)]
+pub struct TerminalMouseTracker {
+    pub selecting: bool,
+    pub start_pos: Option<(u16, u16)>,
+    pub end_pos: Option<(u16, u16)>,
+    pub selection_text: Option<String>,
+}
+
+impl TerminalMouseTracker {
+    pub fn new() -> Self {
+        Self {
+            selecting: false,
+            start_pos: None,
+            end_pos: None,
+            selection_text: None,
+        }
+    }
+
+    pub fn start_selection(&mut self, col: u16, row: u16) {
+        self.selecting = true;
+        self.start_pos = Some((col, row));
+        self.end_pos = None;
+        self.selection_text = None;
+    }
+
+    pub fn update_selection(&mut self, col: u16, row: u16) {
+        if self.selecting {
+            self.end_pos = Some((col, row));
+        }
+    }
+
+    pub fn end_selection(&mut self) -> Option<SelectionRange> {
+        self.selecting = false;
+        match (self.start_pos, self.end_pos) {
+            (Some((sc, sr)), Some((ec, er))) => {
+                // Normalise so start <= end.
+                let (start_col, start_row, end_col, end_row) = if (sr, sc) <= (er, ec) {
+                    (sc, sr, ec, er)
+                } else {
+                    (ec, er, sc, sr)
+                };
+                Some(SelectionRange {
+                    start_col,
+                    start_row,
+                    end_col,
+                    end_row,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.selecting = false;
+        self.start_pos = None;
+        self.end_pos = None;
+        self.selection_text = None;
+    }
+
+    pub fn is_selecting(&self) -> bool {
+        self.selecting
+    }
+
+    pub fn has_selection(&self) -> bool {
+        self.start_pos.is_some() && self.end_pos.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Resize Debouncer
+// ---------------------------------------------------------------------------
+
+/// Debounces rapid resize events so the terminal is only resized once the user
+/// has finished dragging.
+#[derive(Debug, Clone)]
+pub struct TerminalResizeDebouncer {
+    pub pending: Option<TerminalDimensions>,
+    pub last_applied: Option<TerminalDimensions>,
+    pub debounce_ms: u64,
+    pub last_event_time: u64,
+}
+
+impl TerminalResizeDebouncer {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self {
+            pending: None,
+            last_applied: None,
+            debounce_ms,
+            last_event_time: 0,
+        }
+    }
+
+    pub fn on_resize(&mut self, dims: TerminalDimensions, now: u64) {
+        self.pending = Some(dims);
+        self.last_event_time = now;
+    }
+
+    /// Returns `true` when enough time has elapsed since the last event.
+    pub fn should_apply(&self, now: u64) -> bool {
+        self.pending.is_some() && now.saturating_sub(self.last_event_time) >= self.debounce_ms
+    }
+
+    /// Consume the pending dimensions, moving them to `last_applied`.
+    pub fn apply(&mut self) -> Option<TerminalDimensions> {
+        if let Some(dims) = self.pending.take() {
+            self.last_applied = Some(dims.clone());
+            Some(dims)
+        } else {
+            None
+        }
+    }
+
+    pub fn has_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    pub fn reset(&mut self) {
+        self.pending = None;
+        self.last_applied = None;
+        self.last_event_time = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2032,5 +2348,169 @@ mod tests {
         assert_eq!(AnsiColor::Palette(42).to_string(), "palette(42)");
         assert_eq!(AnsiColor::Rgb(10, 20, 30).to_string(), "rgb(10,20,30)");
         assert_eq!(AnsiColor::Reset.to_string(), "reset");
+    }
+
+    // -- Reconnection tests --------------------------------------------------
+
+    #[test]
+    fn reconnection_basic_flow() {
+        let mut r = TerminalReconnection::new(3, 100);
+        assert_eq!(r.attempts_remaining(), 3);
+        assert!(r.attempt());
+        assert_eq!(r.state, ReconnectionState::Attempting);
+        assert_eq!(r.attempts_remaining(), 2);
+        r.succeeded();
+        assert!(r.is_connected());
+    }
+
+    #[test]
+    fn reconnection_exhaustion() {
+        let mut r = TerminalReconnection::new(2, 50);
+        assert!(r.attempt());
+        assert!(r.attempt());
+        assert!(!r.attempt());
+        assert_eq!(r.state, ReconnectionState::Failed);
+        assert_eq!(r.attempts_remaining(), 0);
+    }
+
+    #[test]
+    fn reconnection_reset() {
+        let mut r = TerminalReconnection::new(1, 10);
+        assert!(r.attempt());
+        r.reset();
+        assert_eq!(r.attempts, 0);
+        assert_eq!(r.state, ReconnectionState::Idle);
+        assert!(r.attempt()); // can attempt again after reset
+    }
+
+    #[test]
+    fn reconnection_exponential_backoff() {
+        let mut r = TerminalReconnection::new(5, 100);
+        assert_eq!(r.next_delay(), 100); // before any attempt
+        r.attempt();
+        assert_eq!(r.next_delay(), 100); // 100 * 2^0
+        r.attempt();
+        assert_eq!(r.next_delay(), 200); // 100 * 2^1
+        r.attempt();
+        assert_eq!(r.next_delay(), 400); // 100 * 2^2
+    }
+
+    #[test]
+    fn reconnection_state_display() {
+        assert_eq!(ReconnectionState::Idle.to_string(), "idle");
+        assert_eq!(ReconnectionState::Attempting.to_string(), "attempting");
+        assert_eq!(ReconnectionState::Connected.to_string(), "connected");
+        assert_eq!(ReconnectionState::Failed.to_string(), "failed");
+    }
+
+    // -- Audio bell tests ----------------------------------------------------
+
+    #[test]
+    fn bell_audio_only() {
+        let mut bell = TerminalAudioBell::new();
+        assert_eq!(bell.on_bell(1000), BellAction::Audio);
+        assert_eq!(bell.total_bells(), 1);
+    }
+
+    #[test]
+    fn bell_visual_both() {
+        let mut bell = TerminalAudioBell::new();
+        bell.enable_visual();
+        assert_eq!(bell.on_bell(1000), BellAction::Both);
+    }
+
+    #[test]
+    fn bell_muted() {
+        let mut bell = TerminalAudioBell::new();
+        bell.mute_for(500, 1000);
+        assert!(bell.is_muted(1200));
+        assert_eq!(bell.on_bell(1200), BellAction::Muted);
+        assert!(!bell.is_muted(1500));
+        assert_eq!(bell.on_bell(1500), BellAction::Audio);
+    }
+
+    #[test]
+    fn bell_disabled() {
+        let mut bell = TerminalAudioBell::new();
+        bell.enabled = false;
+        assert_eq!(bell.on_bell(0), BellAction::Disabled);
+        assert_eq!(bell.total_bells(), 1);
+    }
+
+    #[test]
+    fn bell_action_display() {
+        assert_eq!(BellAction::Audio.to_string(), "audio");
+        assert_eq!(BellAction::Visual.to_string(), "visual");
+        assert_eq!(BellAction::Both.to_string(), "both");
+        assert_eq!(BellAction::Muted.to_string(), "muted");
+        assert_eq!(BellAction::Disabled.to_string(), "disabled");
+    }
+
+    // -- Mouse tracker tests -------------------------------------------------
+
+    #[test]
+    fn mouse_selection_lifecycle() {
+        let mut mt = TerminalMouseTracker::new();
+        assert!(!mt.is_selecting());
+        mt.start_selection(5, 10);
+        assert!(mt.is_selecting());
+        mt.update_selection(20, 12);
+        assert!(mt.has_selection());
+        let range = mt.end_selection().unwrap();
+        assert!(!mt.is_selecting());
+        assert_eq!(range.start_col, 5);
+        assert_eq!(range.start_row, 10);
+        assert_eq!(range.end_col, 20);
+        assert_eq!(range.end_row, 12);
+        assert_eq!(range.span_lines(), 3);
+        assert!(!range.is_single_line());
+    }
+
+    #[test]
+    fn mouse_selection_single_line() {
+        let mut mt = TerminalMouseTracker::new();
+        mt.start_selection(0, 5);
+        mt.update_selection(40, 5);
+        let range = mt.end_selection().unwrap();
+        assert!(range.is_single_line());
+        assert_eq!(range.span_lines(), 1);
+        assert_eq!(range.to_string(), "(0,5)..(40,5)");
+    }
+
+    #[test]
+    fn mouse_clear() {
+        let mut mt = TerminalMouseTracker::new();
+        mt.start_selection(1, 1);
+        mt.update_selection(10, 10);
+        mt.clear();
+        assert!(!mt.is_selecting());
+        assert!(!mt.has_selection());
+        assert!(mt.end_selection().is_none());
+    }
+
+    // -- Resize debouncer tests ----------------------------------------------
+
+    #[test]
+    fn resize_debounce_timing() {
+        let mut d = TerminalResizeDebouncer::new(100);
+        let dims = TerminalDimensions { columns: 120, rows: 40 };
+        d.on_resize(dims.clone(), 1000);
+        assert!(d.has_pending());
+        assert!(!d.should_apply(1050));
+        assert!(d.should_apply(1100));
+        let applied = d.apply().unwrap();
+        assert_eq!(applied, dims);
+        assert!(!d.has_pending());
+        assert_eq!(d.last_applied, Some(dims));
+    }
+
+    #[test]
+    fn resize_debounce_reset() {
+        let mut d = TerminalResizeDebouncer::new(50);
+        d.on_resize(TerminalDimensions { columns: 80, rows: 24 }, 500);
+        d.reset();
+        assert!(!d.has_pending());
+        assert!(d.last_applied.is_none());
+        assert!(d.apply().is_none());
     }
 }

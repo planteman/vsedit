@@ -1401,6 +1401,295 @@ impl ProductTelemetryKeyManager {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProductQuality
+// ---------------------------------------------------------------------------
+
+/// Represents the quality level of a product build.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProductQuality {
+    Stable,
+    Insiders,
+    Exploration,
+    Development,
+}
+
+impl ProductQuality {
+    /// Parse a quality level from a string (case-insensitive).
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "stable" => Some(Self::Stable),
+            "insiders" | "insider" => Some(Self::Insiders),
+            "exploration" => Some(Self::Exploration),
+            "development" | "dev" => Some(Self::Development),
+            _ => None,
+        }
+    }
+
+    /// Human-readable label for this quality level.
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Stable => "Stable",
+            Self::Insiders => "Insiders",
+            Self::Exploration => "Exploration",
+            Self::Development => "Development",
+        }
+    }
+
+    /// Returns `true` if this is the stable release channel.
+    pub fn is_stable(&self) -> bool {
+        matches!(self, Self::Stable)
+    }
+
+    /// Returns `true` for any non-stable quality level.
+    pub fn is_prerelease(&self) -> bool {
+        !self.is_stable()
+    }
+
+    /// Returns the update channel name used for this quality level.
+    pub fn update_channel(&self) -> &str {
+        match self {
+            Self::Stable => "stable",
+            Self::Insiders => "insiders",
+            Self::Exploration => "exploration",
+            Self::Development => "dev",
+        }
+    }
+}
+
+impl Default for ProductQuality {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
+impl fmt::Display for ProductQuality {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProductBuildInfo
+// ---------------------------------------------------------------------------
+
+/// Metadata about a specific product build.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductBuildInfo {
+    pub commit_sha: String,
+    pub build_date: String,
+    pub version: String,
+    pub platform: String,
+}
+
+impl ProductBuildInfo {
+    /// Create a new build info record.
+    pub fn new(commit: &str, date: &str, version: &str, platform: &str) -> Self {
+        Self {
+            commit_sha: commit.to_string(),
+            build_date: date.to_string(),
+            version: version.to_string(),
+            platform: platform.to_string(),
+        }
+    }
+
+    /// Returns the first 8 characters of the commit SHA, or the full
+    /// string if it is shorter than 8 characters.
+    pub fn short_commit(&self) -> &str {
+        if self.commit_sha.len() >= 8 {
+            &self.commit_sha[..8]
+        } else {
+            &self.commit_sha
+        }
+    }
+
+    /// A build is considered a development build when the commit SHA is
+    /// empty or set to the placeholder value `"unknown"`.
+    pub fn is_development_build(&self) -> bool {
+        self.commit_sha.is_empty() || self.commit_sha == "unknown"
+    }
+
+    /// One-line human-readable summary of this build.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} ({}) on {} [{}]",
+            self.version,
+            self.short_commit(),
+            self.platform,
+            self.build_date
+        )
+    }
+}
+
+impl fmt::Display for ProductBuildInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteKind & ProductRemoteIndicator
+// ---------------------------------------------------------------------------
+
+/// The kind of remote session the product is running in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RemoteKind {
+    SSH,
+    WSL,
+    Container,
+    Tunnel,
+    Web,
+}
+
+impl fmt::Display for RemoteKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::SSH => "SSH",
+            Self::WSL => "WSL",
+            Self::Container => "Container",
+            Self::Tunnel => "Tunnel",
+            Self::Web => "Web",
+        };
+        f.write_str(label)
+    }
+}
+
+/// Tracks whether the product is running in a remote session.
+#[derive(Debug, Clone)]
+pub struct ProductRemoteIndicator {
+    kind: Option<RemoteKind>,
+}
+
+impl ProductRemoteIndicator {
+    /// Create a new indicator with no remote session.
+    pub fn new() -> Self {
+        Self { kind: None }
+    }
+
+    /// Mark the product as running in the given remote session type.
+    pub fn set_remote(&mut self, kind: RemoteKind) {
+        self.kind = Some(kind);
+    }
+
+    /// Returns `true` if a remote session is active.
+    pub fn is_remote(&self) -> bool {
+        self.kind.is_some()
+    }
+
+    /// Returns the kind of remote session, if any.
+    pub fn remote_kind(&self) -> Option<&RemoteKind> {
+        self.kind.as_ref()
+    }
+
+    /// Human-readable label describing the current state.
+    pub fn label(&self) -> &str {
+        match &self.kind {
+            Some(RemoteKind::SSH) => "Remote (SSH)",
+            Some(RemoteKind::WSL) => "Remote (WSL)",
+            Some(RemoteKind::Container) => "Remote (Container)",
+            Some(RemoteKind::Tunnel) => "Remote (Tunnel)",
+            Some(RemoteKind::Web) => "Remote (Web)",
+            None => "Local",
+        }
+    }
+}
+
+impl Default for ProductRemoteIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ProductRemoteIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProductCapabilityMatrix
+// ---------------------------------------------------------------------------
+
+/// Tracks a set of named capabilities and whether each is enabled.
+#[derive(Debug, Clone)]
+pub struct ProductCapabilityMatrix {
+    capabilities: std::collections::HashMap<String, bool>,
+}
+
+impl ProductCapabilityMatrix {
+    /// Create an empty capability matrix.
+    pub fn new() -> Self {
+        Self {
+            capabilities: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register a capability with an initial enabled/disabled state.
+    pub fn register(&mut self, capability: &str, enabled: bool) {
+        self.capabilities.insert(capability.to_string(), enabled);
+    }
+
+    /// Returns `true` if the capability exists and is enabled.
+    pub fn is_enabled(&self, capability: &str) -> bool {
+        self.capabilities.get(capability).copied().unwrap_or(false)
+    }
+
+    /// Enable a previously registered capability (no-op if not registered).
+    pub fn enable(&mut self, capability: &str) {
+        if let Some(v) = self.capabilities.get_mut(capability) {
+            *v = true;
+        }
+    }
+
+    /// Disable a previously registered capability (no-op if not registered).
+    pub fn disable(&mut self, capability: &str) {
+        if let Some(v) = self.capabilities.get_mut(capability) {
+            *v = false;
+        }
+    }
+
+    /// Returns the names of all enabled capabilities.
+    pub fn enabled_capabilities(&self) -> Vec<&str> {
+        let mut result: Vec<&str> = self
+            .capabilities
+            .iter()
+            .filter(|(_, v)| **v)
+            .map(|(k, _)| k.as_str())
+            .collect();
+        result.sort();
+        result
+    }
+
+    /// Returns all capabilities with their enabled/disabled state.
+    pub fn all_capabilities(&self) -> Vec<(&str, bool)> {
+        let mut result: Vec<(&str, bool)> = self
+            .capabilities
+            .iter()
+            .map(|(k, v)| (k.as_str(), *v))
+            .collect();
+        result.sort_by_key(|(k, _)| *k);
+        result
+    }
+
+    /// Total number of registered capabilities.
+    pub fn count(&self) -> usize {
+        self.capabilities.len()
+    }
+}
+
+impl Default for ProductCapabilityMatrix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ProductCapabilityMatrix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let enabled = self.enabled_capabilities().len();
+        write!(f, "{}/{} capabilities enabled", enabled, self.count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2149,6 +2438,126 @@ mod tests {
     fn license_invalid_length() {
         let v = ProductLicenseValidator::new("VSEDIT-", 21);
         assert!(!v.is_valid("VSEDIT-SHORT"));
+    }
+
+    // -- ProductQuality tests --
+
+    #[test]
+    fn quality_default_is_stable() {
+        let q = ProductQuality::default();
+        assert!(q.is_stable());
+        assert!(!q.is_prerelease());
+        assert_eq!(q.label(), "Stable");
+    }
+
+    #[test]
+    fn quality_from_str_variants() {
+        assert_eq!(ProductQuality::from_str("stable"), Some(ProductQuality::Stable));
+        assert_eq!(ProductQuality::from_str("Insiders"), Some(ProductQuality::Insiders));
+        assert_eq!(ProductQuality::from_str("insider"), Some(ProductQuality::Insiders));
+        assert_eq!(ProductQuality::from_str("dev"), Some(ProductQuality::Development));
+        assert_eq!(ProductQuality::from_str("exploration"), Some(ProductQuality::Exploration));
+        assert_eq!(ProductQuality::from_str("unknown"), None);
+    }
+
+    #[test]
+    fn quality_update_channels() {
+        assert_eq!(ProductQuality::Stable.update_channel(), "stable");
+        assert_eq!(ProductQuality::Insiders.update_channel(), "insiders");
+        assert_eq!(ProductQuality::Development.update_channel(), "dev");
+    }
+
+    #[test]
+    fn quality_display() {
+        assert_eq!(format!("{}", ProductQuality::Exploration), "Exploration");
+    }
+
+    // -- ProductBuildInfo tests --
+
+    #[test]
+    fn build_info_short_commit() {
+        let info = ProductBuildInfo::new("abc12345def", "2024-01-15", "1.0.0", "linux-x64");
+        assert_eq!(info.short_commit(), "abc12345");
+        assert!(!info.is_development_build());
+    }
+
+    #[test]
+    fn build_info_dev_build() {
+        let info = ProductBuildInfo::new("unknown", "2024-01-15", "0.0.0-dev", "linux-x64");
+        assert!(info.is_development_build());
+
+        let empty = ProductBuildInfo::new("", "2024-01-15", "0.0.0-dev", "linux-x64");
+        assert!(empty.is_development_build());
+    }
+
+    #[test]
+    fn build_info_summary() {
+        let info = ProductBuildInfo::new("abc12345def", "2024-01-15", "1.0.0", "linux-x64");
+        let s = info.summary();
+        assert!(s.contains("1.0.0"));
+        assert!(s.contains("abc12345"));
+        assert!(s.contains("linux-x64"));
+    }
+
+    // -- ProductRemoteIndicator tests --
+
+    #[test]
+    fn remote_indicator_local_by_default() {
+        let ri = ProductRemoteIndicator::new();
+        assert!(!ri.is_remote());
+        assert_eq!(ri.remote_kind(), None);
+        assert_eq!(ri.label(), "Local");
+    }
+
+    #[test]
+    fn remote_indicator_set_ssh() {
+        let mut ri = ProductRemoteIndicator::new();
+        ri.set_remote(RemoteKind::SSH);
+        assert!(ri.is_remote());
+        assert_eq!(ri.remote_kind(), Some(&RemoteKind::SSH));
+        assert_eq!(ri.label(), "Remote (SSH)");
+    }
+
+    #[test]
+    fn remote_kind_display() {
+        assert_eq!(format!("{}", RemoteKind::Container), "Container");
+        assert_eq!(format!("{}", RemoteKind::Web), "Web");
+    }
+
+    // -- ProductCapabilityMatrix tests --
+
+    #[test]
+    fn capability_matrix_register_and_query() {
+        let mut m = ProductCapabilityMatrix::new();
+        m.register("terminal", true);
+        m.register("debug", false);
+        assert!(m.is_enabled("terminal"));
+        assert!(!m.is_enabled("debug"));
+        assert!(!m.is_enabled("nonexistent"));
+        assert_eq!(m.count(), 2);
+    }
+
+    #[test]
+    fn capability_matrix_enable_disable() {
+        let mut m = ProductCapabilityMatrix::new();
+        m.register("git", false);
+        assert!(!m.is_enabled("git"));
+        m.enable("git");
+        assert!(m.is_enabled("git"));
+        m.disable("git");
+        assert!(!m.is_enabled("git"));
+    }
+
+    #[test]
+    fn capability_matrix_lists() {
+        let mut m = ProductCapabilityMatrix::new();
+        m.register("alpha", true);
+        m.register("beta", false);
+        m.register("gamma", true);
+        let enabled = m.enabled_capabilities();
+        assert_eq!(enabled, vec!["alpha", "gamma"]);
+        let all = m.all_capabilities();
+        assert_eq!(all.len(), 3);
     }
 
     // -- ProductTelemetryKeyManager tests --

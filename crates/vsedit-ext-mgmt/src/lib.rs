@@ -3,6 +3,7 @@
 //! RPC bridge between the extension host and the main thread for extension management.
 
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -1205,6 +1206,398 @@ pub struct RankedResult {
     pub score: f64,
 }
 
+// ── Extension Rollback ──
+
+/// A record of a single installed version of an extension.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VersionRecord {
+    pub version: String,
+    pub installed_at: u64,
+    pub path: Option<String>,
+}
+
+/// Tracks version history for extensions to support rollback operations.
+#[derive(Debug, Clone)]
+pub struct ExtensionRollback {
+    pub history: HashMap<String, Vec<VersionRecord>>,
+}
+
+impl ExtensionRollback {
+    pub fn new() -> Self {
+        Self {
+            history: HashMap::new(),
+        }
+    }
+
+    /// Record a new installation event for the given extension.
+    pub fn record_install(&mut self, ext_id: &str, version: &str, timestamp: u64) {
+        let records = self.history.entry(ext_id.to_string()).or_default();
+        records.push(VersionRecord {
+            version: version.to_string(),
+            installed_at: timestamp,
+            path: None,
+        });
+    }
+
+    /// Return the second-to-last version record, if one exists.
+    pub fn previous_version(&self, ext_id: &str) -> Option<&VersionRecord> {
+        self.history.get(ext_id).and_then(|records| {
+            if records.len() >= 2 {
+                Some(&records[records.len() - 2])
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Whether there is a previous version available to roll back to.
+    pub fn can_rollback(&self, ext_id: &str) -> bool {
+        self.previous_version(ext_id).is_some()
+    }
+
+    /// Return all version records for the given extension.
+    pub fn version_history(&self, ext_id: &str) -> Vec<&VersionRecord> {
+        self.history
+            .get(ext_id)
+            .map(|records| records.iter().collect())
+            .unwrap_or_default()
+    }
+
+    /// Return the version string of the rollback target (previous version).
+    pub fn rollback_target(&self, ext_id: &str) -> Option<&str> {
+        self.previous_version(ext_id).map(|r| r.version.as_str())
+    }
+
+    /// Total number of version records across all extensions.
+    pub fn total_records(&self) -> usize {
+        self.history.values().map(|v| v.len()).sum()
+    }
+}
+
+// ── Extension Compatibility Checker ──
+
+/// The result of a compatibility check.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompatResult {
+    pub compatible: bool,
+    pub engine_ok: bool,
+    pub api_ok: bool,
+    pub message: String,
+}
+
+impl CompatResult {
+    pub fn is_compatible(&self) -> bool {
+        self.compatible
+    }
+}
+
+impl fmt::Display for CompatResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.compatible {
+            write!(f, "Compatible: {}", self.message)
+        } else {
+            write!(f, "Incompatible: {}", self.message)
+        }
+    }
+}
+
+/// Parse a semver string into (major, minor, patch), defaulting missing parts to 0.
+pub fn parse_semver(version: &str) -> (u32, u32, u32) {
+    let parts: Vec<&str> = version.split('.').collect();
+    let major = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+    let minor = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let patch = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+    (major, minor, patch)
+}
+
+/// Check semver compatibility: major must match, minor must be >= required.
+pub fn is_semver_compatible(have: &str, need: &str) -> bool {
+    let (have_major, have_minor, _) = parse_semver(have);
+    let (need_major, need_minor, _) = parse_semver(need);
+    have_major == need_major && have_minor >= need_minor
+}
+
+/// Checks whether extensions are compatible with the current engine and API versions.
+#[derive(Debug, Clone)]
+pub struct ExtensionCompatibilityChecker {
+    pub engine_version: String,
+    pub api_version: String,
+}
+
+impl ExtensionCompatibilityChecker {
+    pub fn new(engine: &str, api: &str) -> Self {
+        Self {
+            engine_version: engine.to_string(),
+            api_version: api.to_string(),
+        }
+    }
+
+    /// Check if the given required versions are compatible with this checker's versions.
+    pub fn check_compatible(
+        &self,
+        required_engine: &str,
+        required_api: Option<&str>,
+    ) -> CompatResult {
+        let engine_ok = is_semver_compatible(&self.engine_version, required_engine);
+        let api_ok = match required_api {
+            Some(api) => is_semver_compatible(&self.api_version, api),
+            None => true,
+        };
+        let compatible = engine_ok && api_ok;
+        let message = if compatible {
+            "All version requirements satisfied".to_string()
+        } else if !engine_ok && !api_ok {
+            format!(
+                "Engine {} incompatible with required {}; API {} incompatible with required {}",
+                self.engine_version,
+                required_engine,
+                self.api_version,
+                required_api.unwrap_or("none"),
+            )
+        } else if !engine_ok {
+            format!(
+                "Engine {} incompatible with required {}",
+                self.engine_version, required_engine,
+            )
+        } else {
+            format!(
+                "API {} incompatible with required {}",
+                self.api_version,
+                required_api.unwrap_or("none"),
+            )
+        };
+        CompatResult {
+            compatible,
+            engine_ok,
+            api_ok,
+            message,
+        }
+    }
+}
+
+// ── Extension Bulk Operations ──
+
+/// The type of bulk operation to perform on an extension.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BulkOpType {
+    Install,
+    Update,
+    Uninstall,
+    Enable,
+    Disable,
+}
+
+impl fmt::Display for BulkOpType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BulkOpType::Install => write!(f, "Install"),
+            BulkOpType::Update => write!(f, "Update"),
+            BulkOpType::Uninstall => write!(f, "Uninstall"),
+            BulkOpType::Enable => write!(f, "Enable"),
+            BulkOpType::Disable => write!(f, "Disable"),
+        }
+    }
+}
+
+/// The current status of a bulk operation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BulkOpStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Failed(String),
+}
+
+impl fmt::Display for BulkOpStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BulkOpStatus::Pending => write!(f, "Pending"),
+            BulkOpStatus::InProgress => write!(f, "InProgress"),
+            BulkOpStatus::Completed => write!(f, "Completed"),
+            BulkOpStatus::Failed(reason) => write!(f, "Failed: {reason}"),
+        }
+    }
+}
+
+/// A single operation in a bulk batch.
+#[derive(Debug, Clone)]
+pub struct BulkOp {
+    pub ext_id: String,
+    pub op_type: BulkOpType,
+    pub status: BulkOpStatus,
+}
+
+/// Manages a batch of extension operations.
+#[derive(Debug, Clone)]
+pub struct ExtensionBulkOperation {
+    pub operations: Vec<BulkOp>,
+}
+
+impl ExtensionBulkOperation {
+    pub fn new() -> Self {
+        Self {
+            operations: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, ext_id: &str, op: BulkOpType) {
+        self.operations.push(BulkOp {
+            ext_id: ext_id.to_string(),
+            op_type: op,
+            status: BulkOpStatus::Pending,
+        });
+    }
+
+    pub fn mark_in_progress(&mut self, ext_id: &str) -> bool {
+        for op in &mut self.operations {
+            if op.ext_id == ext_id && op.status == BulkOpStatus::Pending {
+                op.status = BulkOpStatus::InProgress;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn mark_completed(&mut self, ext_id: &str) -> bool {
+        for op in &mut self.operations {
+            if op.ext_id == ext_id && op.status == BulkOpStatus::InProgress {
+                op.status = BulkOpStatus::Completed;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn mark_failed(&mut self, ext_id: &str, reason: &str) -> bool {
+        for op in &mut self.operations {
+            if op.ext_id == ext_id && op.status == BulkOpStatus::InProgress {
+                op.status = BulkOpStatus::Failed(reason.to_string());
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.operations
+            .iter()
+            .filter(|op| op.status == BulkOpStatus::Pending)
+            .count()
+    }
+
+    pub fn completed_count(&self) -> usize {
+        self.operations
+            .iter()
+            .filter(|op| op.status == BulkOpStatus::Completed)
+            .count()
+    }
+
+    pub fn failed_count(&self) -> usize {
+        self.operations
+            .iter()
+            .filter(|op| matches!(op.status, BulkOpStatus::Failed(_)))
+            .count()
+    }
+
+    pub fn all_completed(&self) -> bool {
+        !self.operations.is_empty()
+            && self
+                .operations
+                .iter()
+                .all(|op| op.status == BulkOpStatus::Completed)
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{} total, {} pending, {} completed, {} failed",
+            self.operations.len(),
+            self.pending_count(),
+            self.completed_count(),
+            self.failed_count(),
+        )
+    }
+}
+
+// ── Extension Size Calculator ──
+
+/// Size category for an extension based on its byte size.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SizeCategory {
+    Tiny,
+    Small,
+    Medium,
+    Large,
+    Huge,
+}
+
+impl fmt::Display for SizeCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SizeCategory::Tiny => write!(f, "Tiny"),
+            SizeCategory::Small => write!(f, "Small"),
+            SizeCategory::Medium => write!(f, "Medium"),
+            SizeCategory::Large => write!(f, "Large"),
+            SizeCategory::Huge => write!(f, "Huge"),
+        }
+    }
+}
+
+/// Utilities for estimating and formatting extension sizes.
+#[derive(Debug, Clone)]
+pub struct ExtensionSizeCalculator;
+
+impl ExtensionSizeCalculator {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Format a byte count into a human-readable string.
+    pub fn format_size(bytes: u64) -> String {
+        const KB: u64 = 1024;
+        const MB: u64 = 1024 * KB;
+        const GB: u64 = 1024 * MB;
+        if bytes >= GB {
+            format!("{:.1} GB", bytes as f64 / GB as f64)
+        } else if bytes >= MB {
+            format!("{:.1} MB", bytes as f64 / MB as f64)
+        } else if bytes >= KB {
+            format!("{:.1} KB", bytes as f64 / KB as f64)
+        } else {
+            format!("{} B", bytes)
+        }
+    }
+
+    /// Estimate the installed size as approximately 2x the download size.
+    pub fn estimate_install_size(download_size: u64) -> u64 {
+        download_size.saturating_mul(2)
+    }
+
+    /// Sum up estimated install sizes for a slice of extensions.
+    /// Uses a simple fixed estimate per extension (1 MB each) since
+    /// `ExtensionInfo` does not carry a size field.
+    pub fn total_size(extensions: &[ExtensionInfo]) -> u64 {
+        const DEFAULT_ESTIMATE: u64 = 1_048_576; // 1 MB
+        extensions.len() as u64 * DEFAULT_ESTIMATE
+    }
+
+    /// Classify a byte count into a size category.
+    pub fn size_category(bytes: u64) -> SizeCategory {
+        const KB: u64 = 1024;
+        const MB: u64 = 1024 * KB;
+        if bytes < 100 * KB {
+            SizeCategory::Tiny
+        } else if bytes < MB {
+            SizeCategory::Small
+        } else if bytes < 10 * MB {
+            SizeCategory::Medium
+        } else if bytes < 100 * MB {
+            SizeCategory::Large
+        } else {
+            SizeCategory::Huge
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2034,5 +2427,169 @@ mod tests {
         // Exact name match + huge downloads should rank first
         assert_eq!(ranked[0].id, "rust-lang.rust");
         assert!(ranked[0].score > ranked[1].score);
+    }
+
+    // ── Rollback Tests ──
+
+    #[test]
+    fn rollback_record_and_previous() {
+        let mut rb = ExtensionRollback::new();
+        rb.record_install("ext.a", "1.0.0", 100);
+        assert!(!rb.can_rollback("ext.a"));
+        assert_eq!(rb.rollback_target("ext.a"), None);
+
+        rb.record_install("ext.a", "1.1.0", 200);
+        assert!(rb.can_rollback("ext.a"));
+        let prev = rb.previous_version("ext.a").unwrap();
+        assert_eq!(prev.version, "1.0.0");
+        assert_eq!(prev.installed_at, 100);
+        assert_eq!(rb.rollback_target("ext.a"), Some("1.0.0"));
+    }
+
+    #[test]
+    fn rollback_version_history_and_total() {
+        let mut rb = ExtensionRollback::new();
+        rb.record_install("ext.a", "1.0.0", 10);
+        rb.record_install("ext.a", "2.0.0", 20);
+        rb.record_install("ext.b", "0.1.0", 30);
+        assert_eq!(rb.version_history("ext.a").len(), 2);
+        assert_eq!(rb.version_history("ext.b").len(), 1);
+        assert_eq!(rb.version_history("ext.missing").len(), 0);
+        assert_eq!(rb.total_records(), 3);
+    }
+
+    // ── Compatibility Tests ──
+
+    #[test]
+    fn parse_semver_basic() {
+        assert_eq!(parse_semver("1.2.3"), (1, 2, 3));
+        assert_eq!(parse_semver("2.0"), (2, 0, 0));
+        assert_eq!(parse_semver("3"), (3, 0, 0));
+        assert_eq!(parse_semver(""), (0, 0, 0));
+    }
+
+    #[test]
+    fn semver_compatible_checks() {
+        assert!(is_semver_compatible("1.5.0", "1.3.0"));
+        assert!(is_semver_compatible("1.3.0", "1.3.0"));
+        assert!(!is_semver_compatible("1.2.0", "1.3.0"));
+        assert!(!is_semver_compatible("2.5.0", "1.3.0"));
+    }
+
+    #[test]
+    fn compat_checker_all_ok() {
+        let checker = ExtensionCompatibilityChecker::new("1.80.0", "1.5.0");
+        let result = checker.check_compatible("1.70.0", Some("1.4.0"));
+        assert!(result.is_compatible());
+        assert!(result.engine_ok);
+        assert!(result.api_ok);
+    }
+
+    #[test]
+    fn compat_checker_engine_fail() {
+        let checker = ExtensionCompatibilityChecker::new("1.60.0", "1.5.0");
+        let result = checker.check_compatible("1.70.0", None);
+        assert!(!result.is_compatible());
+        assert!(!result.engine_ok);
+        assert!(result.api_ok);
+        assert!(result.to_string().contains("Incompatible"));
+    }
+
+    #[test]
+    fn compat_result_display() {
+        let ok = CompatResult {
+            compatible: true,
+            engine_ok: true,
+            api_ok: true,
+            message: "OK".into(),
+        };
+        assert!(ok.to_string().starts_with("Compatible"));
+    }
+
+    // ── Bulk Operation Tests ──
+
+    #[test]
+    fn bulk_op_lifecycle() {
+        let mut bulk = ExtensionBulkOperation::new();
+        bulk.add("ext.a", BulkOpType::Install);
+        bulk.add("ext.b", BulkOpType::Update);
+        assert_eq!(bulk.pending_count(), 2);
+        assert!(!bulk.all_completed());
+
+        assert!(bulk.mark_in_progress("ext.a"));
+        assert_eq!(bulk.pending_count(), 1);
+
+        assert!(bulk.mark_completed("ext.a"));
+        assert_eq!(bulk.completed_count(), 1);
+
+        assert!(bulk.mark_in_progress("ext.b"));
+        assert!(bulk.mark_failed("ext.b", "network error"));
+        assert_eq!(bulk.failed_count(), 1);
+        assert!(!bulk.all_completed());
+    }
+
+    #[test]
+    fn bulk_op_summary_format() {
+        let mut bulk = ExtensionBulkOperation::new();
+        bulk.add("ext.a", BulkOpType::Enable);
+        bulk.add("ext.b", BulkOpType::Disable);
+        let s = bulk.summary();
+        assert!(s.contains("2 total"));
+        assert!(s.contains("2 pending"));
+    }
+
+    #[test]
+    fn bulk_op_display_types() {
+        assert_eq!(format!("{}", BulkOpType::Install), "Install");
+        assert_eq!(format!("{}", BulkOpType::Uninstall), "Uninstall");
+        assert_eq!(format!("{}", BulkOpStatus::Pending), "Pending");
+        assert_eq!(
+            format!("{}", BulkOpStatus::Failed("oops".into())),
+            "Failed: oops"
+        );
+    }
+
+    // ── Size Calculator Tests ──
+
+    #[test]
+    fn format_size_human_readable() {
+        assert_eq!(ExtensionSizeCalculator::format_size(42), "42 B");
+        assert_eq!(ExtensionSizeCalculator::format_size(1024), "1.0 KB");
+        assert_eq!(
+            ExtensionSizeCalculator::format_size(1_572_864),
+            "1.5 MB"
+        );
+        assert_eq!(
+            ExtensionSizeCalculator::format_size(1_073_741_824),
+            "1.0 GB"
+        );
+    }
+
+    #[test]
+    fn estimate_install_size_doubles() {
+        assert_eq!(ExtensionSizeCalculator::estimate_install_size(500), 1000);
+        assert_eq!(ExtensionSizeCalculator::estimate_install_size(0), 0);
+    }
+
+    #[test]
+    fn size_category_boundaries() {
+        assert_eq!(ExtensionSizeCalculator::size_category(50), SizeCategory::Tiny);
+        assert_eq!(
+            ExtensionSizeCalculator::size_category(500_000),
+            SizeCategory::Small
+        );
+        assert_eq!(
+            ExtensionSizeCalculator::size_category(5_000_000),
+            SizeCategory::Medium
+        );
+        assert_eq!(
+            ExtensionSizeCalculator::size_category(50_000_000),
+            SizeCategory::Large
+        );
+        assert_eq!(
+            ExtensionSizeCalculator::size_category(500_000_000),
+            SizeCategory::Huge
+        );
+        assert_eq!(format!("{}", SizeCategory::Tiny), "Tiny");
     }
 }

@@ -1172,6 +1172,491 @@ impl ITextModel for TextModel {
 }
 
 // ---------------------------------------------------------------------------
+// TextModelSnapshot — rich point-in-time copy
+// ---------------------------------------------------------------------------
+
+/// A point-in-time copy of document text with pre-computed statistics.
+///
+/// Unlike [`ModelSnapshot`] (which stores version and encoding metadata),
+/// `TextModelSnapshot` focuses on content analysis: line count, word count,
+/// character count, and line-level access.
+#[derive(Debug, Clone)]
+pub struct TextModelSnapshot {
+    text: String,
+    lines: Vec<String>,
+    word_count: usize,
+}
+
+impl TextModelSnapshot {
+    /// Create a snapshot from raw text.
+    pub fn from_text(text: &str) -> Self {
+        let lines: Vec<String> = if text.is_empty() {
+            vec![String::new()]
+        } else {
+            text.split('\n')
+                .map(|l| l.strip_suffix('\r').unwrap_or(l).to_owned())
+                .collect()
+        };
+        let word_count = text.split_whitespace().count();
+        Self {
+            text: text.to_owned(),
+            lines,
+            word_count,
+        }
+    }
+
+    /// The full text of the snapshot.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Number of lines (always ≥ 1).
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Whitespace-delimited word count.
+    pub fn word_count(&self) -> usize {
+        self.word_count
+    }
+
+    /// Return the content of a 1-based line number.
+    pub fn get_line(&self, line_num: usize) -> Option<&str> {
+        if line_num == 0 || line_num > self.lines.len() {
+            None
+        } else {
+            Some(self.lines[line_num - 1].as_str())
+        }
+    }
+
+    /// Number of Unicode scalar values (characters).
+    pub fn char_count(&self) -> usize {
+        self.text.chars().count()
+    }
+
+    /// Whether the snapshot text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+}
+
+impl std::fmt::Display for TextModelSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TextModelSnapshot({} lines, {} words, {} chars)",
+            self.line_count(),
+            self.word_count(),
+            self.char_count(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextModelBracketTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks bracket balance across processed lines.
+///
+/// Supports `()`, `[]`, and `{}`. Characters inside string literals and
+/// comments are still counted (a simple, fast approximation).
+#[derive(Debug, Clone)]
+pub struct TextModelBracketTracker {
+    round_open: usize,
+    round_close: usize,
+    square_open: usize,
+    square_close: usize,
+    curly_open: usize,
+    curly_close: usize,
+}
+
+impl TextModelBracketTracker {
+    /// Create a new tracker with zero counts.
+    pub fn new() -> Self {
+        Self {
+            round_open: 0,
+            round_close: 0,
+            square_open: 0,
+            square_close: 0,
+            curly_open: 0,
+            curly_close: 0,
+        }
+    }
+
+    /// Process a single line, updating bracket counts.
+    pub fn process_line(&mut self, line: &str) {
+        for ch in line.chars() {
+            match ch {
+                '(' => self.round_open += 1,
+                ')' => {
+                    if self.round_open > self.round_close {
+                        self.round_close += 1;
+                    } else {
+                        self.round_close += 1;
+                    }
+                }
+                '[' => self.square_open += 1,
+                ']' => {
+                    if self.square_open > self.square_close {
+                        self.square_close += 1;
+                    } else {
+                        self.square_close += 1;
+                    }
+                }
+                '{' => self.curly_open += 1,
+                '}' => {
+                    if self.curly_open > self.curly_close {
+                        self.curly_close += 1;
+                    } else {
+                        self.curly_close += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Net nesting depth (opens minus closes), summed over all bracket types.
+    pub fn depth(&self) -> i32 {
+        let opens = (self.round_open + self.square_open + self.curly_open) as i32;
+        let closes = (self.round_close + self.square_close + self.curly_close) as i32;
+        opens - closes
+    }
+
+    /// `true` if every opened bracket has a matching close.
+    pub fn is_balanced(&self) -> bool {
+        self.round_open == self.round_close
+            && self.square_open == self.square_close
+            && self.curly_open == self.curly_close
+    }
+
+    /// Number of opening brackets without a matching close.
+    pub fn unmatched_open(&self) -> usize {
+        self.round_open.saturating_sub(self.round_close)
+            + self.square_open.saturating_sub(self.square_close)
+            + self.curly_open.saturating_sub(self.curly_close)
+    }
+
+    /// Number of closing brackets without a matching open.
+    pub fn unmatched_close(&self) -> usize {
+        self.round_close.saturating_sub(self.round_open)
+            + self.square_close.saturating_sub(self.square_open)
+            + self.curly_close.saturating_sub(self.curly_open)
+    }
+
+    /// Reset all counters to zero.
+    pub fn reset(&mut self) {
+        self.round_open = 0;
+        self.round_close = 0;
+        self.square_open = 0;
+        self.square_close = 0;
+        self.curly_open = 0;
+        self.curly_close = 0;
+    }
+}
+
+impl Default for TextModelBracketTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TextModelBracketTracker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "BracketTracker(depth={}, balanced={})",
+            self.depth(),
+            self.is_balanced()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextModelSearcher / SearchMatch
+// ---------------------------------------------------------------------------
+
+/// A single search hit within a text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchMatch {
+    /// 1-based line number.
+    pub line: usize,
+    /// 1-based column (byte offset within the line + 1).
+    pub column: usize,
+    /// Length of the matched text in bytes.
+    pub length: usize,
+    /// The matched text itself.
+    pub text: String,
+}
+
+impl std::fmt::Display for SearchMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Match({}:{}, len={}, {:?})",
+            self.line, self.column, self.length, self.text
+        )
+    }
+}
+
+/// Multi-mode searcher for text content.
+///
+/// Provides literal, case-insensitive, and whole-word search modes.
+pub struct TextModelSearcher;
+
+impl TextModelSearcher {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Find all literal (case-sensitive) occurrences of `query` in `text`.
+    pub fn search_literal(&self, text: &str, query: &str) -> Vec<SearchMatch> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let mut results = Vec::new();
+        for (line_idx, line) in text.split('\n').enumerate() {
+            let line_clean = line.strip_suffix('\r').unwrap_or(line);
+            let mut start = 0;
+            while let Some(pos) = line_clean[start..].find(query) {
+                let col = start + pos;
+                results.push(SearchMatch {
+                    line: line_idx + 1,
+                    column: col + 1,
+                    length: query.len(),
+                    text: query.to_owned(),
+                });
+                start = col + query.len();
+            }
+        }
+        results
+    }
+
+    /// Find all case-insensitive occurrences of `query` in `text`.
+    pub fn search_case_insensitive(&self, text: &str, query: &str) -> Vec<SearchMatch> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let query_lower = query.to_lowercase();
+        let mut results = Vec::new();
+        for (line_idx, line) in text.split('\n').enumerate() {
+            let line_clean = line.strip_suffix('\r').unwrap_or(line);
+            let line_lower = line_clean.to_lowercase();
+            let mut start = 0;
+            while let Some(pos) = line_lower[start..].find(&query_lower) {
+                let col = start + pos;
+                let matched = &line_clean[col..col + query.len()];
+                results.push(SearchMatch {
+                    line: line_idx + 1,
+                    column: col + 1,
+                    length: query.len(),
+                    text: matched.to_owned(),
+                });
+                start = col + query.len();
+            }
+        }
+        results
+    }
+
+    /// Find whole-word occurrences of `word` in `text`.
+    ///
+    /// A "word boundary" is defined as a transition between a word character
+    /// (`[A-Za-z0-9_]`) and a non-word character (or start/end of line).
+    pub fn search_word(&self, text: &str, word: &str) -> Vec<SearchMatch> {
+        if word.is_empty() {
+            return Vec::new();
+        }
+        let pattern = format!(r"\b{}\b", regex::escape(word));
+        let re = Regex::new(&pattern).expect("valid regex from escaped word");
+        let mut results = Vec::new();
+        for (line_idx, line) in text.split('\n').enumerate() {
+            let line_clean = line.strip_suffix('\r').unwrap_or(line);
+            for m in re.find_iter(line_clean) {
+                results.push(SearchMatch {
+                    line: line_idx + 1,
+                    column: m.start() + 1,
+                    length: m.len(),
+                    text: m.as_str().to_owned(),
+                });
+            }
+        }
+        results
+    }
+
+    /// Count the total number of literal matches of `query` in `text`.
+    pub fn count_matches(&self, text: &str, query: &str) -> usize {
+        self.search_literal(text, query).len()
+    }
+}
+
+impl Default for TextModelSearcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TextModelSearcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextModelSearcher")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextModelEncodingDetector / EncodingGuess / LineEndingKind
+// ---------------------------------------------------------------------------
+
+/// Detected line ending style (richer than [`DetectedLineEnding`], includes CR).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineEndingKind {
+    /// Unix `\n`.
+    LF,
+    /// Windows `\r\n`.
+    CRLF,
+    /// Classic Mac `\r` (no following `\n`).
+    CR,
+    /// A mix of styles.
+    Mixed,
+}
+
+impl std::fmt::Display for LineEndingKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LineEndingKind::LF => write!(f, "LF"),
+            LineEndingKind::CRLF => write!(f, "CRLF"),
+            LineEndingKind::CR => write!(f, "CR"),
+            LineEndingKind::Mixed => write!(f, "Mixed"),
+        }
+    }
+}
+
+/// Result of encoding detection.
+#[derive(Debug, Clone)]
+pub struct EncodingGuess {
+    /// Name of the detected encoding (e.g. `"UTF-8"`, `"UTF-16LE"`).
+    pub encoding: String,
+    /// Confidence in `[0.0, 1.0]`.
+    pub confidence: f64,
+    /// Whether a BOM was found.
+    pub has_bom: bool,
+}
+
+impl std::fmt::Display for EncodingGuess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "EncodingGuess({}, confidence={:.2}, bom={})",
+            self.encoding, self.confidence, self.has_bom
+        )
+    }
+}
+
+/// Heuristic encoding detector for byte buffers.
+pub struct TextModelEncodingDetector;
+
+impl TextModelEncodingDetector {
+    /// Detect the most likely encoding of `bytes`.
+    pub fn detect(bytes: &[u8]) -> EncodingGuess {
+        if Self::has_utf8_bom(bytes) {
+            return EncodingGuess {
+                encoding: "UTF-8-BOM".to_owned(),
+                confidence: 1.0,
+                has_bom: true,
+            };
+        }
+        if Self::has_utf16_le_bom(bytes) {
+            return EncodingGuess {
+                encoding: "UTF-16LE".to_owned(),
+                confidence: 1.0,
+                has_bom: true,
+            };
+        }
+        if Self::has_utf16_be_bom(bytes) {
+            return EncodingGuess {
+                encoding: "UTF-16BE".to_owned(),
+                confidence: 1.0,
+                has_bom: true,
+            };
+        }
+        if Self::is_utf8(bytes) {
+            EncodingGuess {
+                encoding: "UTF-8".to_owned(),
+                confidence: 0.95,
+                has_bom: false,
+            }
+        } else {
+            EncodingGuess {
+                encoding: "Latin-1".to_owned(),
+                confidence: 0.5,
+                has_bom: false,
+            }
+        }
+    }
+
+    /// Check whether `bytes` are valid UTF-8.
+    pub fn is_utf8(bytes: &[u8]) -> bool {
+        std::str::from_utf8(bytes).is_ok()
+    }
+
+    /// Check for a UTF-8 BOM (`EF BB BF`).
+    pub fn has_utf8_bom(bytes: &[u8]) -> bool {
+        bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF
+    }
+
+    /// Check for a UTF-16 LE BOM (`FF FE`).
+    pub fn has_utf16_le_bom(bytes: &[u8]) -> bool {
+        bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE
+    }
+
+    /// Check for a UTF-16 BE BOM (`FE FF`).
+    pub fn has_utf16_be_bom(bytes: &[u8]) -> bool {
+        bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF
+    }
+
+    /// Detect the line ending style used in `text`.
+    pub fn detect_line_ending(text: &str) -> LineEndingKind {
+        let mut lf = 0u32;
+        let mut crlf = 0u32;
+        let mut cr = 0u32;
+        let bytes = text.as_bytes();
+        let len = bytes.len();
+        let mut i = 0;
+        while i < len {
+            if bytes[i] == b'\r' {
+                if i + 1 < len && bytes[i + 1] == b'\n' {
+                    crlf += 1;
+                    i += 2;
+                } else {
+                    cr += 1;
+                    i += 1;
+                }
+            } else if bytes[i] == b'\n' {
+                lf += 1;
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+        let kinds_present =
+            (if lf > 0 { 1 } else { 0 }) + (if crlf > 0 { 1 } else { 0 }) + (if cr > 0 { 1 } else { 0 });
+        if kinds_present > 1 {
+            LineEndingKind::Mixed
+        } else if crlf > 0 {
+            LineEndingKind::CRLF
+        } else if cr > 0 {
+            LineEndingKind::CR
+        } else {
+            LineEndingKind::LF
+        }
+    }
+}
+
+impl std::fmt::Display for TextModelEncodingDetector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextModelEncodingDetector")
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -2185,6 +2670,141 @@ mod tests {
         let model = TextModel::new("only");
         assert_eq!(model.first_line(), "only");
         assert_eq!(model.last_line(), "only");
+    }
+
+    // -- TextModelSnapshot ---------------------------------------------------
+
+    #[test]
+    fn text_model_snapshot_from_text() {
+        let snap = TextModelSnapshot::from_text("hello world\nfoo bar baz");
+        assert_eq!(snap.line_count(), 2);
+        assert_eq!(snap.word_count(), 5);
+        assert_eq!(snap.get_line(1), Some("hello world"));
+        assert_eq!(snap.get_line(2), Some("foo bar baz"));
+        assert_eq!(snap.get_line(3), None);
+        assert_eq!(snap.char_count(), 23);
+        assert!(!snap.is_empty());
+    }
+
+    #[test]
+    fn text_model_snapshot_empty() {
+        let snap = TextModelSnapshot::from_text("");
+        assert!(snap.is_empty());
+        assert_eq!(snap.line_count(), 1);
+        assert_eq!(snap.word_count(), 0);
+        assert_eq!(snap.char_count(), 0);
+        assert_eq!(snap.get_line(1), Some(""));
+    }
+
+    #[test]
+    fn text_model_snapshot_display() {
+        let snap = TextModelSnapshot::from_text("a b c");
+        let display = format!("{}", snap);
+        assert!(display.contains("1 lines"));
+        assert!(display.contains("3 words"));
+    }
+
+    // -- TextModelBracketTracker ---------------------------------------------
+
+    #[test]
+    fn bracket_tracker_balanced() {
+        let mut tracker = TextModelBracketTracker::new();
+        tracker.process_line("fn main() { let v = vec![1, 2]; }");
+        assert!(tracker.is_balanced());
+        assert_eq!(tracker.depth(), 0);
+    }
+
+    #[test]
+    fn bracket_tracker_unbalanced() {
+        let mut tracker = TextModelBracketTracker::new();
+        tracker.process_line("fn foo() {");
+        assert!(!tracker.is_balanced());
+        assert_eq!(tracker.unmatched_open(), 1);
+        assert_eq!(tracker.unmatched_close(), 0);
+    }
+
+    #[test]
+    fn bracket_tracker_reset() {
+        let mut tracker = TextModelBracketTracker::new();
+        tracker.process_line("((()))");
+        assert!(tracker.is_balanced());
+        tracker.reset();
+        assert_eq!(tracker.depth(), 0);
+        assert!(tracker.is_balanced());
+    }
+
+    // -- TextModelSearcher ---------------------------------------------------
+
+    #[test]
+    fn searcher_literal() {
+        let s = TextModelSearcher::new();
+        let results = s.search_literal("hello world\nhello again", "hello");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].line, 1);
+        assert_eq!(results[0].column, 1);
+        assert_eq!(results[1].line, 2);
+    }
+
+    #[test]
+    fn searcher_case_insensitive() {
+        let s = TextModelSearcher::new();
+        let results = s.search_case_insensitive("Hello HELLO hello", "hello");
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].text, "Hello");
+        assert_eq!(results[1].text, "HELLO");
+    }
+
+    #[test]
+    fn searcher_word_boundary() {
+        let s = TextModelSearcher::new();
+        let results = s.search_word("the theorem is there", "the");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].column, 1);
+    }
+
+    #[test]
+    fn searcher_count_matches() {
+        let s = TextModelSearcher::new();
+        assert_eq!(s.count_matches("aaa", "a"), 3);
+        assert_eq!(s.count_matches("aaa", "aa"), 1);
+    }
+
+    // -- TextModelEncodingDetector -------------------------------------------
+
+    #[test]
+    fn encoding_detect_utf8_bom() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        let guess = TextModelEncodingDetector::detect(bytes);
+        assert_eq!(guess.encoding, "UTF-8-BOM");
+        assert!(guess.has_bom);
+        assert!((guess.confidence - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn encoding_detect_plain_utf8() {
+        let guess = TextModelEncodingDetector::detect(b"hello world");
+        assert_eq!(guess.encoding, "UTF-8");
+        assert!(!guess.has_bom);
+    }
+
+    #[test]
+    fn encoding_line_ending_detection() {
+        assert_eq!(
+            TextModelEncodingDetector::detect_line_ending("a\nb\nc"),
+            LineEndingKind::LF
+        );
+        assert_eq!(
+            TextModelEncodingDetector::detect_line_ending("a\r\nb\r\n"),
+            LineEndingKind::CRLF
+        );
+        assert_eq!(
+            TextModelEncodingDetector::detect_line_ending("a\rb\r"),
+            LineEndingKind::CR
+        );
+        assert_eq!(
+            TextModelEncodingDetector::detect_line_ending("a\nb\r\n"),
+            LineEndingKind::Mixed
+        );
     }
 
     #[test]

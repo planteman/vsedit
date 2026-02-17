@@ -3,7 +3,7 @@
 //! Equivalent to VS Code's `vs/platform/lifecycle/common/lifecycle.ts`.
 //! Manages application phases and shutdown confirmation.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -1251,6 +1251,307 @@ impl ShutdownGuard {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LifecycleHookRegistry
+// ---------------------------------------------------------------------------
+
+/// Result of running a single lifecycle hook.
+#[derive(Debug, Clone)]
+pub struct HookResult {
+    /// Name of the hook that was run.
+    pub name: String,
+    /// Whether the hook completed successfully.
+    pub success: bool,
+    /// Error message if the hook failed.
+    pub error: Option<String>,
+}
+
+impl fmt::Display for HookResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.success {
+            write!(f, "hook '{}': ok", self.name)
+        } else {
+            write!(f, "hook '{}': FAILED - {}", self.name, self.error.as_deref().unwrap_or("unknown"))
+        }
+    }
+}
+
+/// Entry in the hook registry: a named, prioritised callback for a phase.
+struct PrioritisedHook {
+    phase: String,
+    priority: i32,
+    name: String,
+    hook: Box<dyn Fn() -> Result<(), String>>,
+}
+
+/// Registry of hooks with priorities, keyed by phase name.
+pub struct LifecycleHookRegistry {
+    hooks: Vec<PrioritisedHook>,
+}
+
+impl Default for LifecycleHookRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LifecycleHookRegistry {
+    pub fn new() -> Self {
+        Self { hooks: Vec::new() }
+    }
+
+    /// Register a hook for a given phase with a numeric priority (lower = earlier).
+    pub fn register(
+        &mut self,
+        phase: &str,
+        priority: i32,
+        name: &str,
+        hook: Box<dyn Fn() -> Result<(), String>>,
+    ) {
+        self.hooks.push(PrioritisedHook {
+            phase: phase.to_string(),
+            priority,
+            name: name.to_string(),
+            hook,
+        });
+    }
+
+    /// Run all hooks registered for `phase` in priority order (lower first).
+    pub fn run_hooks(&self, phase: &str) -> Vec<HookResult> {
+        let mut indices: Vec<usize> = self
+            .hooks
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| h.phase == phase)
+            .map(|(i, _)| i)
+            .collect();
+        indices.sort_by_key(|&i| self.hooks[i].priority);
+
+        indices
+            .into_iter()
+            .map(|i| {
+                let h = &self.hooks[i];
+                match (h.hook)() {
+                    Ok(()) => HookResult { name: h.name.clone(), success: true, error: None },
+                    Err(e) => HookResult { name: h.name.clone(), success: false, error: Some(e) },
+                }
+            })
+            .collect()
+    }
+
+    /// Total number of registered hooks across all phases.
+    pub fn hook_count(&self) -> usize {
+        self.hooks.len()
+    }
+
+    /// Number of hooks registered for a specific phase.
+    pub fn hooks_for_phase(&self, phase: &str) -> usize {
+        self.hooks.iter().filter(|h| h.phase == phase).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleHealthCheck
+// ---------------------------------------------------------------------------
+
+/// Health status of a single check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckHealthStatus {
+    Healthy,
+    Degraded(String),
+    Unhealthy(String),
+}
+
+impl fmt::Display for CheckHealthStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CheckHealthStatus::Healthy => write!(f, "healthy"),
+            CheckHealthStatus::Degraded(msg) => write!(f, "degraded: {msg}"),
+            CheckHealthStatus::Unhealthy(msg) => write!(f, "unhealthy: {msg}"),
+        }
+    }
+}
+
+impl Default for CheckHealthStatus {
+    fn default() -> Self {
+        CheckHealthStatus::Healthy
+    }
+}
+
+/// Aggregated health report from all registered checks.
+#[derive(Debug, Clone)]
+pub struct HealthReport {
+    /// Individual check results.
+    pub checks: Vec<(String, CheckHealthStatus)>,
+    /// `true` only when every check is `Healthy`.
+    pub overall_healthy: bool,
+}
+
+impl fmt::Display for HealthReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = if self.overall_healthy { "HEALTHY" } else { "UNHEALTHY" };
+        write!(f, "HealthReport({label}, {} checks)", self.checks.len())
+    }
+}
+
+/// Collects named health-check callbacks and runs them on demand.
+pub struct LifecycleHealthChecker {
+    checks: Vec<(String, Box<dyn Fn() -> CheckHealthStatus>)>,
+}
+
+impl Default for LifecycleHealthChecker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LifecycleHealthChecker {
+    pub fn new() -> Self {
+        Self { checks: Vec::new() }
+    }
+
+    /// Register a named health check.
+    pub fn register_check(&mut self, name: &str, check: Box<dyn Fn() -> CheckHealthStatus>) {
+        self.checks.push((name.to_string(), check));
+    }
+
+    /// Execute every registered check and return an aggregated report.
+    pub fn run_all(&self) -> HealthReport {
+        let results: Vec<(String, CheckHealthStatus)> = self
+            .checks
+            .iter()
+            .map(|(name, check)| (name.clone(), check()))
+            .collect();
+        let overall_healthy = results.iter().all(|(_, s)| matches!(s, CheckHealthStatus::Healthy));
+        HealthReport { checks: results, overall_healthy }
+    }
+
+    /// Convenience: returns `true` when every check is healthy.
+    pub fn is_healthy(&self) -> bool {
+        self.run_all().overall_healthy
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleRecovery
+// ---------------------------------------------------------------------------
+
+/// Stores key-value recovery data for crash recovery.
+#[derive(Debug, Clone, Default)]
+pub struct LifecycleRecovery {
+    state: HashMap<String, String>,
+}
+
+impl LifecycleRecovery {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Persist a piece of recovery state.
+    pub fn save_state(&mut self, key: &str, data: &str) {
+        self.state.insert(key.to_string(), data.to_string());
+    }
+
+    /// Retrieve previously saved state.
+    pub fn get_state(&self, key: &str) -> Option<&str> {
+        self.state.get(key).map(|s| s.as_str())
+    }
+
+    /// Remove a single key.
+    pub fn remove_state(&mut self, key: &str) {
+        self.state.remove(key);
+    }
+
+    /// Returns `true` if any recovery data has been saved.
+    pub fn has_recovery_data(&self) -> bool {
+        !self.state.is_empty()
+    }
+
+    /// Returns all stored keys.
+    pub fn state_keys(&self) -> Vec<&str> {
+        self.state.keys().map(|k| k.as_str()).collect()
+    }
+
+    /// Remove all recovery data.
+    pub fn clear_all(&mut self) {
+        self.state.clear();
+    }
+}
+
+impl fmt::Display for LifecycleRecovery {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LifecycleRecovery({} keys)", self.state.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleEventBus
+// ---------------------------------------------------------------------------
+
+/// A typed lifecycle event with a kind, timestamp, and optional payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleEvent {
+    /// The kind/type of event (e.g. "phase_change", "shutdown").
+    pub kind: String,
+    /// Millisecond timestamp (relative or absolute).
+    pub timestamp_ms: u64,
+    /// Optional free-form data payload.
+    pub data: Option<String>,
+}
+
+impl fmt::Display for LifecycleEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.data {
+            Some(d) => write!(f, "[{}ms] {}: {}", self.timestamp_ms, self.kind, d),
+            None => write!(f, "[{}ms] {}", self.timestamp_ms, self.kind),
+        }
+    }
+}
+
+impl Default for LifecycleEvent {
+    fn default() -> Self {
+        Self { kind: String::new(), timestamp_ms: 0, data: None }
+    }
+}
+
+/// Simple typed event bus that records lifecycle events and allows querying.
+#[derive(Debug, Default)]
+pub struct LifecycleEventBus {
+    events: Vec<LifecycleEvent>,
+}
+
+impl LifecycleEventBus {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Emit (record) a lifecycle event.
+    pub fn emit(&mut self, event: LifecycleEvent) {
+        self.events.push(event);
+    }
+
+    /// Full history of emitted events.
+    pub fn history(&self) -> &[LifecycleEvent] {
+        &self.events
+    }
+
+    /// The most recently emitted event, if any.
+    pub fn last_event(&self) -> Option<&LifecycleEvent> {
+        self.events.last()
+    }
+
+    /// Return all events matching a given kind string.
+    pub fn events_of_kind(&self, kind: &str) -> Vec<&LifecycleEvent> {
+        self.events.iter().filter(|e| e.kind == kind).collect()
+    }
+}
+
+impl fmt::Display for LifecycleEventBus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LifecycleEventBus({} events)", self.events.len())
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -2154,6 +2455,159 @@ mod tests {
         assert_eq!(StartupPhase::ServiceInit.previous(), Some(StartupPhase::EarlyInit));
         assert_eq!(StartupPhase::ExtensionLoad.previous(), Some(StartupPhase::ServiceInit));
         assert_eq!(StartupPhase::Ready.previous(), Some(StartupPhase::ExtensionLoad));
+    }
+
+    // --- LifecycleHookRegistry tests ---
+
+    #[test]
+    fn hook_registry_register_and_run() {
+        let mut reg = LifecycleHookRegistry::new();
+        reg.register("startup", 2, "second", Box::new(|| Ok(())));
+        reg.register("startup", 1, "first", Box::new(|| Ok(())));
+        reg.register("shutdown", 0, "cleanup", Box::new(|| Err("disk full".into())));
+        assert_eq!(reg.hook_count(), 3);
+        assert_eq!(reg.hooks_for_phase("startup"), 2);
+        assert_eq!(reg.hooks_for_phase("shutdown"), 1);
+        assert_eq!(reg.hooks_for_phase("missing"), 0);
+
+        let results = reg.run_hooks("startup");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].name, "first");
+        assert!(results[0].success);
+        assert_eq!(results[1].name, "second");
+        assert!(results[1].success);
+    }
+
+    #[test]
+    fn hook_registry_priority_ordering() {
+        let mut reg = LifecycleHookRegistry::new();
+        reg.register("init", 10, "late", Box::new(|| Ok(())));
+        reg.register("init", -5, "early", Box::new(|| Ok(())));
+        reg.register("init", 0, "middle", Box::new(|| Ok(())));
+        let results = reg.run_hooks("init");
+        let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, vec!["early", "middle", "late"]);
+    }
+
+    #[test]
+    fn hook_registry_failure_captured() {
+        let mut reg = LifecycleHookRegistry::new();
+        reg.register("phase", 0, "bad", Box::new(|| Err("boom".into())));
+        let results = reg.run_hooks("phase");
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert_eq!(results[0].error.as_deref(), Some("boom"));
+        let display = format!("{}", results[0]);
+        assert!(display.contains("FAILED"));
+    }
+
+    #[test]
+    fn hook_registry_default() {
+        let reg = LifecycleHookRegistry::default();
+        assert_eq!(reg.hook_count(), 0);
+    }
+
+    // --- LifecycleHealthChecker tests ---
+
+    #[test]
+    fn health_checker_all_healthy() {
+        let mut hc = LifecycleHealthChecker::new();
+        hc.register_check("cpu", Box::new(|| CheckHealthStatus::Healthy));
+        hc.register_check("mem", Box::new(|| CheckHealthStatus::Healthy));
+        assert!(hc.is_healthy());
+        let report = hc.run_all();
+        assert!(report.overall_healthy);
+        assert_eq!(report.checks.len(), 2);
+    }
+
+    #[test]
+    fn health_checker_degraded_not_healthy() {
+        let mut hc = LifecycleHealthChecker::new();
+        hc.register_check("disk", Box::new(|| CheckHealthStatus::Degraded("90% full".into())));
+        assert!(!hc.is_healthy());
+        let report = hc.run_all();
+        assert!(!report.overall_healthy);
+        assert_eq!(report.checks[0].1, CheckHealthStatus::Degraded("90% full".into()));
+    }
+
+    #[test]
+    fn health_checker_display() {
+        let mut hc = LifecycleHealthChecker::new();
+        hc.register_check("net", Box::new(|| CheckHealthStatus::Unhealthy("timeout".into())));
+        let report = hc.run_all();
+        let s = format!("{report}");
+        assert!(s.contains("UNHEALTHY"));
+        let status_s = format!("{}", CheckHealthStatus::Unhealthy("timeout".into()));
+        assert!(status_s.contains("unhealthy"));
+    }
+
+    #[test]
+    fn health_status_default() {
+        assert_eq!(CheckHealthStatus::default(), CheckHealthStatus::Healthy);
+    }
+
+    // --- LifecycleRecovery tests ---
+
+    #[test]
+    fn recovery_save_get_remove() {
+        let mut rec = LifecycleRecovery::new();
+        assert!(!rec.has_recovery_data());
+        rec.save_state("cursor", "line=42,col=10");
+        rec.save_state("scroll", "top=100");
+        assert!(rec.has_recovery_data());
+        assert_eq!(rec.get_state("cursor"), Some("line=42,col=10"));
+        assert_eq!(rec.get_state("missing"), None);
+        assert_eq!(rec.state_keys().len(), 2);
+
+        rec.remove_state("cursor");
+        assert_eq!(rec.get_state("cursor"), None);
+        assert!(rec.has_recovery_data());
+
+        rec.clear_all();
+        assert!(!rec.has_recovery_data());
+    }
+
+    #[test]
+    fn recovery_display() {
+        let mut rec = LifecycleRecovery::new();
+        rec.save_state("a", "1");
+        let s = format!("{rec}");
+        assert!(s.contains("1 keys"));
+    }
+
+    // --- LifecycleEventBus tests ---
+
+    #[test]
+    fn event_bus_emit_and_query() {
+        let mut bus = LifecycleEventBus::new();
+        assert!(bus.history().is_empty());
+        assert!(bus.last_event().is_none());
+
+        bus.emit(LifecycleEvent { kind: "phase_change".into(), timestamp_ms: 100, data: Some("Ready".into()) });
+        bus.emit(LifecycleEvent { kind: "shutdown".into(), timestamp_ms: 200, data: None });
+        bus.emit(LifecycleEvent { kind: "phase_change".into(), timestamp_ms: 300, data: Some("Restored".into()) });
+
+        assert_eq!(bus.history().len(), 3);
+        assert_eq!(bus.last_event().unwrap().kind, "phase_change");
+        assert_eq!(bus.events_of_kind("phase_change").len(), 2);
+        assert_eq!(bus.events_of_kind("shutdown").len(), 1);
+        assert_eq!(bus.events_of_kind("other").len(), 0);
+    }
+
+    #[test]
+    fn event_bus_display() {
+        let mut bus = LifecycleEventBus::new();
+        bus.emit(LifecycleEvent::default());
+        let s = format!("{bus}");
+        assert!(s.contains("1 events"));
+    }
+
+    #[test]
+    fn lifecycle_event_display() {
+        let with_data = LifecycleEvent { kind: "init".into(), timestamp_ms: 42, data: Some("ok".into()) };
+        assert!(format!("{with_data}").contains("[42ms] init: ok"));
+        let without = LifecycleEvent { kind: "done".into(), timestamp_ms: 99, data: None };
+        assert!(format!("{without}").contains("[99ms] done"));
     }
 
     #[test]

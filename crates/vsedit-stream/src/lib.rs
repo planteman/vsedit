@@ -1310,6 +1310,298 @@ where
     None
 }
 
+// ---------------------------------------------------------------------------
+// StreamSplitter – splits byte data on a delimiter
+// ---------------------------------------------------------------------------
+
+/// Splits byte data on a single-byte delimiter, yielding complete chunks.
+///
+/// Data is fed incrementally via [`feed`](StreamSplitter::feed) and complete
+/// chunks (everything between delimiters) are retrieved one at a time via
+/// [`next_chunk`](StreamSplitter::next_chunk).
+pub struct StreamSplitter {
+    delimiter: u8,
+    buffer: Vec<u8>,
+    chunks: std::collections::VecDeque<Vec<u8>>,
+}
+
+impl StreamSplitter {
+    /// Create a splitter that splits on the given byte delimiter.
+    pub fn new(delimiter: u8) -> Self {
+        Self {
+            delimiter,
+            buffer: Vec::new(),
+            chunks: std::collections::VecDeque::new(),
+        }
+    }
+
+    /// Convenience constructor that splits on `\n`.
+    pub fn line_splitter() -> Self {
+        Self::new(b'\n')
+    }
+
+    /// Feed additional data into the splitter.
+    ///
+    /// Any complete chunks (terminated by the delimiter) become available
+    /// through [`next_chunk`](StreamSplitter::next_chunk). Bytes after the
+    /// last delimiter are retained internally as pending data.
+    pub fn feed(&mut self, data: &[u8]) {
+        for &byte in data {
+            if byte == self.delimiter {
+                let chunk = std::mem::take(&mut self.buffer);
+                self.chunks.push_back(chunk);
+            } else {
+                self.buffer.push(byte);
+            }
+        }
+    }
+
+    /// Return the next complete chunk, or `None` if no complete chunk is ready.
+    pub fn next_chunk(&mut self) -> Option<Vec<u8>> {
+        self.chunks.pop_front()
+    }
+
+    /// Number of bytes currently buffered but not yet part of a complete chunk.
+    pub fn pending_bytes(&self) -> usize {
+        self.buffer.len()
+    }
+}
+
+impl fmt::Display for StreamSplitter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StreamSplitter(delimiter=0x{:02X}, ready={}, pending={})",
+            self.delimiter,
+            self.chunks.len(),
+            self.buffer.len(),
+        )
+    }
+}
+
+impl Default for StreamSplitter {
+    fn default() -> Self {
+        Self::line_splitter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ByteRingBuffer – fixed-capacity byte buffer with backpressure
+// ---------------------------------------------------------------------------
+
+/// A fixed-capacity byte buffer that provides backpressure by limiting writes
+/// to the available space.
+///
+/// Internally uses a ring buffer so that reads free space for future writes
+/// without copying data on every operation.
+pub struct ByteRingBuffer {
+    buf: Vec<u8>,
+    capacity: usize,
+    head: usize,
+    len: usize,
+}
+
+impl ByteRingBuffer {
+    /// Create a buffer with the given maximum capacity in bytes.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            buf: vec![0u8; capacity],
+            capacity,
+            head: 0,
+            len: 0,
+        }
+    }
+
+    /// Write as many bytes from `data` as fit into the buffer.
+    ///
+    /// Returns the number of bytes actually written. When the buffer is full
+    /// zero is returned, providing backpressure to the producer.
+    pub fn write(&mut self, data: &[u8]) -> usize {
+        let writable = data.len().min(self.available_space());
+        for &b in &data[..writable] {
+            let idx = (self.head + self.len) % self.capacity;
+            self.buf[idx] = b;
+            self.len += 1;
+        }
+        writable
+    }
+
+    /// Read up to `buf.len()` bytes from the buffer into `buf`.
+    ///
+    /// Returns the number of bytes actually read.
+    pub fn read(&mut self, buf: &mut [u8]) -> usize {
+        let readable = buf.len().min(self.len);
+        for slot in buf.iter_mut().take(readable) {
+            *slot = self.buf[self.head];
+            self.head = (self.head + 1) % self.capacity;
+            self.len -= 1;
+        }
+        readable
+    }
+
+    /// Number of bytes currently stored.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Whether the buffer has reached its capacity.
+    pub fn is_full(&self) -> bool {
+        self.len == self.capacity
+    }
+
+    /// Whether the buffer contains no data.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Number of additional bytes that can be written before the buffer is full.
+    pub fn available_space(&self) -> usize {
+        self.capacity - self.len
+    }
+}
+
+impl fmt::Display for ByteRingBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ByteRingBuffer(used={}, capacity={})",
+            self.len, self.capacity,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StreamTee – duplicates data to multiple output buffers
+// ---------------------------------------------------------------------------
+
+/// Duplicates incoming data to multiple independent output buffers.
+///
+/// Each output is an index-addressed `Vec<u8>` that accumulates bytes written
+/// through [`write`](StreamTee::write) and can be drained independently via
+/// [`read_output`](StreamTee::read_output).
+pub struct StreamTee {
+    outputs: Vec<Vec<u8>>,
+}
+
+impl StreamTee {
+    /// Create a new tee with no outputs.
+    pub fn new() -> Self {
+        Self {
+            outputs: Vec::new(),
+        }
+    }
+
+    /// Register a new output buffer and return its index.
+    pub fn add_output(&mut self) -> usize {
+        let idx = self.outputs.len();
+        self.outputs.push(Vec::new());
+        idx
+    }
+
+    /// Write `data` to every registered output buffer.
+    pub fn write(&mut self, data: &[u8]) {
+        for output in &mut self.outputs {
+            output.extend_from_slice(data);
+        }
+    }
+
+    /// Drain and return all buffered bytes for the output at `index`.
+    ///
+    /// Returns an empty `Vec` if the index is out of range.
+    pub fn read_output(&mut self, index: usize) -> Vec<u8> {
+        match self.outputs.get_mut(index) {
+            Some(buf) => std::mem::take(buf),
+            None => Vec::new(),
+        }
+    }
+
+    /// Number of registered output buffers.
+    pub fn output_count(&self) -> usize {
+        self.outputs.len()
+    }
+}
+
+impl Default for StreamTee {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for StreamTee {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let total: usize = self.outputs.iter().map(|o| o.len()).sum();
+        write!(
+            f,
+            "StreamTee(outputs={}, buffered_bytes={})",
+            self.outputs.len(),
+            total,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StreamProgressReporter – tracks byte-level streaming progress
+// ---------------------------------------------------------------------------
+
+/// Tracks progress of a streaming operation with a known total size.
+pub struct StreamProgressReporter {
+    total_bytes: u64,
+    processed: u64,
+}
+
+impl StreamProgressReporter {
+    /// Create a reporter for an operation that will process `total_bytes`.
+    pub fn new(total_bytes: u64) -> Self {
+        Self {
+            total_bytes,
+            processed: 0,
+        }
+    }
+
+    /// Record that `bytes` more bytes have been processed.
+    pub fn record(&mut self, bytes: u64) {
+        self.processed = self.processed.saturating_add(bytes);
+        if self.processed > self.total_bytes {
+            self.processed = self.total_bytes;
+        }
+    }
+
+    /// Total bytes processed so far.
+    pub fn bytes_processed(&self) -> u64 {
+        self.processed
+    }
+
+    /// Completion percentage in the range `0.0..=100.0`.
+    pub fn percentage(&self) -> f64 {
+        if self.total_bytes == 0 {
+            return 100.0;
+        }
+        (self.processed as f64 / self.total_bytes as f64) * 100.0
+    }
+
+    /// Whether the operation is considered complete.
+    pub fn is_complete(&self) -> bool {
+        self.processed >= self.total_bytes
+    }
+
+    /// Bytes remaining to be processed.
+    pub fn remaining_bytes(&self) -> u64 {
+        self.total_bytes.saturating_sub(self.processed)
+    }
+}
+
+impl fmt::Display for StreamProgressReporter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StreamProgressReporter({}/{} bytes, {:.1}%)",
+            self.processed,
+            self.total_bytes,
+            self.percentage(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2120,6 +2412,157 @@ mod tests {
         ]);
         let found = find_first(&mut stream, |s: &String| s.len() > 5);
         assert_eq!(found, Some("banana".to_string()));
+    }
+
+    // -- StreamSplitter -------------------------------------------------------
+
+    #[test]
+    fn splitter_splits_on_delimiter() {
+        let mut sp = StreamSplitter::new(b',');
+        sp.feed(b"hello,world,foo");
+        assert_eq!(sp.next_chunk(), Some(b"hello".to_vec()));
+        assert_eq!(sp.next_chunk(), Some(b"world".to_vec()));
+        assert_eq!(sp.next_chunk(), None);
+        assert_eq!(sp.pending_bytes(), 3); // "foo"
+    }
+
+    #[test]
+    fn splitter_line_splitter_and_pending() {
+        let mut sp = StreamSplitter::line_splitter();
+        sp.feed(b"line1\nline2\npartial");
+        assert_eq!(sp.next_chunk(), Some(b"line1".to_vec()));
+        assert_eq!(sp.next_chunk(), Some(b"line2".to_vec()));
+        assert_eq!(sp.next_chunk(), None);
+        assert_eq!(sp.pending_bytes(), 7); // "partial"
+    }
+
+    #[test]
+    fn splitter_incremental_feed() {
+        let mut sp = StreamSplitter::new(b'\n');
+        sp.feed(b"hel");
+        assert_eq!(sp.next_chunk(), None);
+        sp.feed(b"lo\nwor");
+        assert_eq!(sp.next_chunk(), Some(b"hello".to_vec()));
+        assert_eq!(sp.next_chunk(), None);
+        sp.feed(b"ld\n");
+        assert_eq!(sp.next_chunk(), Some(b"world".to_vec()));
+    }
+
+    #[test]
+    fn splitter_display_and_default() {
+        let sp = StreamSplitter::default();
+        let s = sp.to_string();
+        assert!(s.contains("0x0A")); // '\n'
+        assert!(s.contains("ready=0"));
+    }
+
+    // -- ByteRingBuffer -------------------------------------------------------
+
+    #[test]
+    fn ring_buffer_write_and_read() {
+        let mut rb = ByteRingBuffer::new(8);
+        assert_eq!(rb.write(b"hello"), 5);
+        assert_eq!(rb.len(), 5);
+        assert_eq!(rb.available_space(), 3);
+        let mut out = [0u8; 5];
+        assert_eq!(rb.read(&mut out), 5);
+        assert_eq!(&out, b"hello");
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn ring_buffer_backpressure() {
+        let mut rb = ByteRingBuffer::new(4);
+        assert_eq!(rb.write(b"abcdef"), 4); // only 4 fit
+        assert!(rb.is_full());
+        assert_eq!(rb.write(b"x"), 0); // backpressure
+        let mut out = [0u8; 2];
+        rb.read(&mut out);
+        assert_eq!(&out, b"ab");
+        assert_eq!(rb.available_space(), 2);
+        assert_eq!(rb.write(b"xy"), 2); // wraps around
+        let mut out2 = [0u8; 4];
+        rb.read(&mut out2);
+        assert_eq!(&out2, b"cdxy");
+    }
+
+    #[test]
+    fn ring_buffer_display() {
+        let rb = ByteRingBuffer::new(16);
+        let s = rb.to_string();
+        assert!(s.contains("used=0"));
+        assert!(s.contains("capacity=16"));
+    }
+
+    // -- StreamTee -------------------------------------------------------------
+
+    #[test]
+    fn tee_duplicates_to_outputs() {
+        let mut tee = StreamTee::new();
+        let a = tee.add_output();
+        let b = tee.add_output();
+        tee.write(b"hello");
+        tee.write(b" world");
+        assert_eq!(tee.output_count(), 2);
+        assert_eq!(tee.read_output(a), b"hello world");
+        assert_eq!(tee.read_output(b), b"hello world");
+        // after drain, outputs are empty
+        assert_eq!(tee.read_output(a), b"");
+    }
+
+    #[test]
+    fn tee_out_of_range_returns_empty() {
+        let mut tee = StreamTee::default();
+        assert_eq!(tee.read_output(99), b"");
+    }
+
+    #[test]
+    fn tee_display() {
+        let mut tee = StreamTee::new();
+        tee.add_output();
+        tee.write(b"abc");
+        let s = tee.to_string();
+        assert!(s.contains("outputs=1"));
+        assert!(s.contains("buffered_bytes=3"));
+    }
+
+    // -- StreamProgressReporter ------------------------------------------------
+
+    #[test]
+    fn progress_tracks_bytes() {
+        let mut pr = StreamProgressReporter::new(200);
+        assert_eq!(pr.bytes_processed(), 0);
+        assert!(!pr.is_complete());
+        assert_eq!(pr.remaining_bytes(), 200);
+        pr.record(50);
+        assert!((pr.percentage() - 25.0).abs() < f64::EPSILON);
+        pr.record(150);
+        assert!(pr.is_complete());
+        assert_eq!(pr.remaining_bytes(), 0);
+    }
+
+    #[test]
+    fn progress_clamps_over_total() {
+        let mut pr = StreamProgressReporter::new(10);
+        pr.record(999);
+        assert_eq!(pr.bytes_processed(), 10);
+        assert!(pr.is_complete());
+    }
+
+    #[test]
+    fn progress_zero_total_is_complete() {
+        let pr = StreamProgressReporter::new(0);
+        assert!(pr.is_complete());
+        assert!((pr.percentage() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn progress_display() {
+        let mut pr = StreamProgressReporter::new(100);
+        pr.record(30);
+        let s = pr.to_string();
+        assert!(s.contains("30/100"));
+        assert!(s.contains("30.0%"));
     }
 
     #[test]

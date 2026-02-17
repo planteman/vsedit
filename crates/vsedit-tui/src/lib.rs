@@ -1333,6 +1333,139 @@ impl CellGrid {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// TuiMouseRegion
+// ---------------------------------------------------------------------------
+
+pub struct TuiMouseRegion {
+    pub id: String,
+    pub x: u16, pub y: u16, pub width: u16, pub height: u16,
+}
+
+impl TuiMouseRegion {
+    pub fn new(id: impl Into<String>, x: u16, y: u16, width: u16, height: u16) -> Self {
+        Self { id: id.into(), x, y, width, height }
+    }
+    pub fn contains(&self, px: u16, py: u16) -> bool {
+        px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
+    }
+    pub fn area(&self) -> u32 { self.width as u32 * self.height as u32 }
+}
+
+impl fmt::Display for TuiMouseRegion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MouseRegion({}: {}x{} at {},{})", self.id, self.width, self.height, self.x, self.y)
+    }
+}
+
+pub struct TuiMouseRegionRegistry { regions: Vec<TuiMouseRegion> }
+
+impl TuiMouseRegionRegistry {
+    pub fn new() -> Self { Self { regions: Vec::new() } }
+    pub fn register(&mut self, region: TuiMouseRegion) { self.regions.push(region); }
+    pub fn hit_test(&self, x: u16, y: u16) -> Option<&TuiMouseRegion> {
+        self.regions.iter().rev().find(|r| r.contains(x, y))
+    }
+    pub fn clear(&mut self) { self.regions.clear(); }
+    pub fn len(&self) -> usize { self.regions.len() }
+    pub fn is_empty(&self) -> bool { self.regions.is_empty() }
+}
+
+impl Default for TuiMouseRegionRegistry { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// TuiDoubleClick
+// ---------------------------------------------------------------------------
+
+pub struct TuiDoubleClick {
+    last_click_time_ms: Option<u64>,
+    last_click_pos: Option<(u16, u16)>,
+    threshold_ms: u64,
+}
+
+impl TuiDoubleClick {
+    pub fn new(threshold_ms: u64) -> Self {
+        Self { last_click_time_ms: None, last_click_pos: None, threshold_ms }
+    }
+
+    pub fn process_click(&mut self, x: u16, y: u16, time_ms: u64) -> bool {
+        let is_double = match (self.last_click_time_ms, self.last_click_pos) {
+            (Some(lt), Some((lx, ly))) => time_ms - lt <= self.threshold_ms && lx == x && ly == y,
+            _ => false,
+        };
+        if is_double { self.last_click_time_ms = None; self.last_click_pos = None; }
+        else { self.last_click_time_ms = Some(time_ms); self.last_click_pos = Some((x, y)); }
+        is_double
+    }
+
+    pub fn reset(&mut self) { self.last_click_time_ms = None; self.last_click_pos = None; }
+}
+
+impl Default for TuiDoubleClick { fn default() -> Self { Self::new(500) } }
+
+// ---------------------------------------------------------------------------
+// TuiFocusTrap
+// ---------------------------------------------------------------------------
+
+pub struct TuiFocusTrap {
+    active: bool,
+    trapped_region: Option<TuiMouseRegion>,
+    previous_focus_id: Option<String>,
+}
+
+impl TuiFocusTrap {
+    pub fn new() -> Self { Self { active: false, trapped_region: None, previous_focus_id: None } }
+
+    pub fn activate(&mut self, region: TuiMouseRegion, current_focus: Option<String>) {
+        self.active = true; self.trapped_region = Some(region); self.previous_focus_id = current_focus;
+    }
+
+    pub fn deactivate(&mut self) -> Option<String> {
+        self.active = false; self.trapped_region = None; self.previous_focus_id.take()
+    }
+
+    pub fn is_active(&self) -> bool { self.active }
+
+    pub fn is_within_trap(&self, x: u16, y: u16) -> bool {
+        self.trapped_region.as_ref().map_or(false, |r| r.contains(x, y))
+    }
+}
+
+impl Default for TuiFocusTrap { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// TuiFrameRateController
+// ---------------------------------------------------------------------------
+
+pub struct TuiFrameRateController {
+    target_fps: u32,
+    frame_count: u64,
+    last_frame_time_ms: u64,
+}
+
+impl TuiFrameRateController {
+    pub fn new(target_fps: u32) -> Self {
+        Self { target_fps, frame_count: 0, last_frame_time_ms: 0 }
+    }
+    pub fn target_fps(&self) -> u32 { self.target_fps }
+    pub fn frame_duration_ms(&self) -> u64 { if self.target_fps == 0 { 0 } else { 1000 / self.target_fps as u64 } }
+    pub fn should_render(&self, current_time_ms: u64) -> bool {
+        current_time_ms >= self.last_frame_time_ms + self.frame_duration_ms()
+    }
+    pub fn record_frame(&mut self, time_ms: u64) { self.frame_count += 1; self.last_frame_time_ms = time_ms; }
+    pub fn frame_count(&self) -> u64 { self.frame_count }
+    pub fn set_target_fps(&mut self, fps: u32) { self.target_fps = fps; }
+}
+
+impl Default for TuiFrameRateController { fn default() -> Self { Self::new(60) } }
+
+impl fmt::Display for TuiFrameRateController {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FrameRateController({}fps, {} frames)", self.target_fps, self.frame_count)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2066,4 +2199,90 @@ mod tests {
         assert_eq!(dst.get(2, 2), Some('A'));
         assert_eq!(dst.get(3, 1), Some(' '));
     }
+
+
+    #[test]
+    fn mouse_region_contains() {
+        let r = TuiMouseRegion::new("btn", 10, 20, 5, 3);
+        assert!(r.contains(10, 20));
+        assert!(r.contains(14, 22));
+        assert!(!r.contains(15, 20));
+    }
+
+    #[test]
+    fn mouse_region_area() {
+        assert_eq!(TuiMouseRegion::new("x", 0, 0, 10, 5).area(), 50);
+    }
+
+    #[test]
+    fn mouse_registry_hit() {
+        let mut reg = TuiMouseRegionRegistry::new();
+        reg.register(TuiMouseRegion::new("a", 0, 0, 10, 10));
+        reg.register(TuiMouseRegion::new("b", 5, 5, 10, 10));
+        assert_eq!(reg.hit_test(7, 7).unwrap().id, "b");
+    }
+
+    #[test]
+    fn mouse_registry_miss() {
+        assert!(TuiMouseRegionRegistry::new().hit_test(0, 0).is_none());
+    }
+
+    #[test]
+    fn double_click_detection() {
+        let mut dc = TuiDoubleClick::new(300);
+        assert!(!dc.process_click(5, 5, 100));
+        assert!(dc.process_click(5, 5, 200));
+    }
+
+    #[test]
+    fn double_click_too_slow() {
+        let mut dc = TuiDoubleClick::new(300);
+        dc.process_click(5, 5, 100);
+        assert!(!dc.process_click(5, 5, 500));
+    }
+
+    #[test]
+    fn double_click_diff_pos() {
+        let mut dc = TuiDoubleClick::new(300);
+        dc.process_click(5, 5, 100);
+        assert!(!dc.process_click(6, 5, 200));
+    }
+
+    #[test]
+    fn focus_trap_activate() {
+        let mut trap = TuiFocusTrap::new();
+        trap.activate(TuiMouseRegion::new("d", 10, 10, 20, 15), Some("ed".into()));
+        assert!(trap.is_active());
+        assert!(trap.is_within_trap(15, 15));
+        assert!(!trap.is_within_trap(5, 5));
+    }
+
+    #[test]
+    fn focus_trap_deactivate() {
+        let mut trap = TuiFocusTrap::new();
+        trap.activate(TuiMouseRegion::new("d", 0, 0, 10, 10), Some("prev".into()));
+        assert_eq!(trap.deactivate(), Some("prev".into()));
+        assert!(!trap.is_active());
+    }
+
+    #[test]
+    fn frame_rate_basic() {
+        let mut frc = TuiFrameRateController::new(60);
+        assert_eq!(frc.frame_duration_ms(), 16);
+        assert!(frc.should_render(16));
+        frc.record_frame(16);
+        assert!(!frc.should_render(26));
+        assert!(frc.should_render(33));
+    }
+
+    #[test]
+    fn frame_rate_display() {
+        assert!(format!("{}", TuiFrameRateController::new(30)).contains("30fps"));
+    }
+
+    #[test]
+    fn mouse_region_display() {
+        assert!(format!("{}", TuiMouseRegion::new("btn", 0, 0, 10, 5)).contains("btn"));
+    }
+
 }

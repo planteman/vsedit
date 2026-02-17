@@ -1283,6 +1283,175 @@ impl Default for ExtTestingValidator {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// TestItemNameFilter
+// ---------------------------------------------------------------------------
+
+pub struct TestItemNameFilter {
+    name_pattern: Option<String>,
+    tags: Vec<String>,
+}
+
+impl TestItemNameFilter {
+    pub fn new() -> Self { Self { name_pattern: None, tags: Vec::new() } }
+
+    pub fn with_name(mut self, pattern: impl Into<String>) -> Self {
+        self.name_pattern = Some(pattern.into()); self
+    }
+
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into()); self
+    }
+
+    pub fn matches(&self, item: &TestItem) -> bool {
+        if let Some(ref pat) = self.name_pattern {
+            if !item.label.to_lowercase().contains(&pat.to_lowercase()) { return false; }
+        }
+        true
+    }
+
+    pub fn filter_items<'a>(&self, items: &'a [TestItem]) -> Vec<&'a TestItem> {
+        items.iter().filter(|i| self.matches(i)).collect()
+    }
+}
+
+impl Default for TestItemNameFilter { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// TestRunOutputCapture
+// ---------------------------------------------------------------------------
+
+pub struct TestRunOutputCapture {
+    raw_output: String,
+    stripped_output: String,
+}
+
+impl TestRunOutputCapture {
+    pub fn new() -> Self { Self { raw_output: String::new(), stripped_output: String::new() } }
+
+    pub fn append(&mut self, text: &str) {
+        self.raw_output.push_str(text);
+        self.stripped_output.push_str(&Self::strip_ansi(text));
+    }
+
+    pub fn raw(&self) -> &str { &self.raw_output }
+    pub fn stripped(&self) -> &str { &self.stripped_output }
+
+    pub fn strip_ansi(input: &str) -> String {
+        let mut result = String::new();
+        let mut in_escape = false;
+        for ch in input.chars() {
+            if ch == '\x1b' || ch == '\u{1b}' { in_escape = true; continue; }
+            if in_escape {
+                if ch.is_ascii_alphabetic() { in_escape = false; }
+                continue;
+            }
+            result.push(ch);
+        }
+        result
+    }
+
+    pub fn line_count(&self) -> usize { self.stripped_output.lines().count() }
+    pub fn clear(&mut self) { self.raw_output.clear(); self.stripped_output.clear(); }
+}
+
+impl Default for TestRunOutputCapture { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// TestCoverageMap
+// ---------------------------------------------------------------------------
+
+pub struct TestCoverageMap {
+    entries: std::collections::HashMap<String, Vec<bool>>,
+}
+
+impl TestCoverageMap {
+    pub fn new() -> Self { Self { entries: std::collections::HashMap::new() } }
+
+    pub fn set_file_coverage(&mut self, file: impl Into<String>, line_coverage: Vec<bool>) {
+        self.entries.insert(file.into(), line_coverage);
+    }
+
+    pub fn get_file_coverage(&self, file: &str) -> Option<&[bool]> {
+        self.entries.get(file).map(|v| v.as_slice())
+    }
+
+    pub fn file_coverage_percent(&self, file: &str) -> Option<f64> {
+        self.entries.get(file).map(|lines| {
+            if lines.is_empty() { return 0.0; }
+            let covered = lines.iter().filter(|&&b| b).count();
+            covered as f64 / lines.len() as f64 * 100.0
+        })
+    }
+
+    pub fn total_coverage_percent(&self) -> f64 {
+        let mut total = 0usize;
+        let mut covered = 0usize;
+        for lines in self.entries.values() {
+            total += lines.len();
+            covered += lines.iter().filter(|&&b| b).count();
+        }
+        if total == 0 { 0.0 } else { covered as f64 / total as f64 * 100.0 }
+    }
+
+    pub fn file_count(&self) -> usize { self.entries.len() }
+    pub fn uncovered_lines(&self, file: &str) -> Vec<usize> {
+        self.entries.get(file).map(|lines| {
+            lines.iter().enumerate().filter(|(_, b)| !**b).map(|(i, _)| i).collect()
+        }).unwrap_or_default()
+    }
+}
+
+impl Default for TestCoverageMap { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// TestDiffViewer
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct TestDiffLine {
+    pub kind: TestDiffKind,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TestDiffKind { Same, Added, Removed }
+
+pub struct TestDiffViewer;
+
+impl TestDiffViewer {
+    pub fn diff(expected: &str, actual: &str) -> Vec<TestDiffLine> {
+        let exp_lines: Vec<&str> = expected.lines().collect();
+        let act_lines: Vec<&str> = actual.lines().collect();
+        let mut result = Vec::new();
+        let max = exp_lines.len().max(act_lines.len());
+        for i in 0..max {
+            match (exp_lines.get(i), act_lines.get(i)) {
+                (Some(e), Some(a)) if e == a => {
+                    result.push(TestDiffLine { kind: TestDiffKind::Same, content: e.to_string() });
+                }
+                (Some(e), Some(a)) => {
+                    result.push(TestDiffLine { kind: TestDiffKind::Removed, content: e.to_string() });
+                    result.push(TestDiffLine { kind: TestDiffKind::Added, content: a.to_string() });
+                }
+                (Some(e), None) => {
+                    result.push(TestDiffLine { kind: TestDiffKind::Removed, content: e.to_string() });
+                }
+                (None, Some(a)) => {
+                    result.push(TestDiffLine { kind: TestDiffKind::Added, content: a.to_string() });
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
+    pub fn has_differences(expected: &str, actual: &str) -> bool {
+        Self::diff(expected, actual).iter().any(|l| l.kind != TestDiffKind::Same)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2069,4 +2238,93 @@ ignored_line
         let items = discover_tests_from_output(TestFramework::Unknown, "anything");
         assert!(items.is_empty());
     }
+
+
+    #[test]
+    fn name_filter_by_name() {
+        let items = vec![
+            TestItem::leaf("t1", "test_add"),
+            TestItem::leaf("t2", "test_sub"),
+            TestItem::leaf("t3", "bench_mul"),
+        ];
+        let f = TestItemNameFilter::new().with_name("test");
+        assert_eq!(f.filter_items(&items).len(), 2);
+    }
+
+    #[test]
+    fn name_filter_all() {
+        let items = vec![TestItem::leaf("t1", "test_add")];
+        let f = TestItemNameFilter::new();
+        assert_eq!(f.filter_items(&items).len(), 1);
+    }
+
+    #[test]
+    fn output_capture_basic() {
+        let mut cap = TestRunOutputCapture::new();
+        cap.append("hello\nworld");
+        assert!(cap.stripped().contains("hello"));
+        assert_eq!(cap.line_count(), 2);
+    }
+
+    #[test]
+    fn output_capture_clear() {
+        let mut cap = TestRunOutputCapture::new();
+        cap.append("data");
+        cap.clear();
+        assert!(cap.stripped().is_empty());
+    }
+
+    #[test]
+    fn coverage_map_basic() {
+        let mut cm = TestCoverageMap::new();
+        cm.set_file_coverage("main.rs", vec![true, true, false, true]);
+        assert!((cm.file_coverage_percent("main.rs").unwrap() - 75.0).abs() < 0.01);
+        assert_eq!(cm.uncovered_lines("main.rs"), vec![2]);
+    }
+
+    #[test]
+    fn coverage_map_total() {
+        let mut cm = TestCoverageMap::new();
+        cm.set_file_coverage("a.rs", vec![true, false]);
+        cm.set_file_coverage("b.rs", vec![true, true]);
+        assert!((cm.total_coverage_percent() - 75.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn coverage_map_empty() {
+        let cm = TestCoverageMap::new();
+        assert!((cm.total_coverage_percent() - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn diff_viewer_same() {
+        let diff = TestDiffViewer::diff("a\nb", "a\nb");
+        assert!(diff.iter().all(|l| l.kind == TestDiffKind::Same));
+    }
+
+    #[test]
+    fn diff_viewer_different() {
+        let diff = TestDiffViewer::diff("a\nb", "a\nc");
+        assert!(TestDiffViewer::has_differences("a\nb", "a\nc"));
+    }
+
+    #[test]
+    fn diff_viewer_added() {
+        let diff = TestDiffViewer::diff("a", "a\nb");
+        assert!(diff.iter().any(|l| l.kind == TestDiffKind::Added));
+    }
+
+    #[test]
+    fn diff_viewer_removed() {
+        let diff = TestDiffViewer::diff("a\nb", "a");
+        assert!(diff.iter().any(|l| l.kind == TestDiffKind::Removed));
+    }
+
+    #[test]
+    fn coverage_file_count() {
+        let mut cm = TestCoverageMap::new();
+        cm.set_file_coverage("a.rs", vec![true]);
+        assert_eq!(cm.file_count(), 1);
+    }
+
 }

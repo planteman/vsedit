@@ -4,6 +4,7 @@
 //! debug adapter protocol.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 
 /// Proxy identifier for this extension API namespace.
@@ -1121,6 +1122,266 @@ impl DebugOutputLog {
     }
 }
 
+// ── Breakpoint Conditions ──
+
+/// Operator for hit-count based breakpoint conditions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HitCountOp {
+    Equal,
+    GreaterThan,
+    GreaterEqual,
+    /// Break every N-th hit.
+    Multiple,
+}
+
+/// A hit-count condition attached to a breakpoint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HitCountCondition {
+    pub operator: HitCountOp,
+    pub value: u32,
+}
+
+/// Conditional breakpoint descriptor.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugBreakpointCondition {
+    pub expression: String,
+    pub hit_count_condition: Option<HitCountCondition>,
+    pub log_message: Option<String>,
+}
+
+impl DebugBreakpointCondition {
+    pub fn new(expr: &str) -> Self {
+        Self {
+            expression: expr.to_string(),
+            hit_count_condition: None,
+            log_message: None,
+        }
+    }
+
+    pub fn with_hit_count(mut self, op: HitCountOp, value: u32) -> Self {
+        self.hit_count_condition = Some(HitCountCondition { operator: op, value });
+        self
+    }
+
+    pub fn with_log_message(mut self, msg: &str) -> Self {
+        self.log_message = Some(msg.to_string());
+        self
+    }
+
+    /// Returns `true` when the debugger should pause, given the current
+    /// cumulative `hit_count` for this breakpoint location.
+    pub fn should_break(&self, hit_count: u32) -> bool {
+        match &self.hit_count_condition {
+            None => true,
+            Some(cond) => match cond.operator {
+                HitCountOp::Equal => hit_count == cond.value,
+                HitCountOp::GreaterThan => hit_count > cond.value,
+                HitCountOp::GreaterEqual => hit_count >= cond.value,
+                HitCountOp::Multiple => cond.value > 0 && hit_count % cond.value == 0,
+            },
+        }
+    }
+
+    pub fn evaluate_expression(&self) -> &str {
+        &self.expression
+    }
+}
+
+impl fmt::Display for DebugBreakpointCondition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Condition: {}", self.expression)?;
+        if let Some(ref hc) = self.hit_count_condition {
+            let op_str = match hc.operator {
+                HitCountOp::Equal => "==",
+                HitCountOp::GreaterThan => ">",
+                HitCountOp::GreaterEqual => ">=",
+                HitCountOp::Multiple => "%",
+            };
+            write!(f, " (hit count {} {})", op_str, hc.value)?;
+        }
+        if let Some(ref msg) = self.log_message {
+            write!(f, " [log: {}]", msg)?;
+        }
+        Ok(())
+    }
+}
+
+// ── Watch Expressions ──
+
+/// A single entry in the watch panel, supporting a tree of children.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchEntry {
+    pub expression: String,
+    pub value: Option<String>,
+    pub children: Vec<WatchEntry>,
+    pub expandable: bool,
+}
+
+/// Watch tree: a hierarchical collection of watch entries with child expansion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugWatchTree {
+    pub expressions: Vec<WatchEntry>,
+}
+
+impl DebugWatchTree {
+    pub fn new() -> Self {
+        Self { expressions: Vec::new() }
+    }
+
+    pub fn add_expression(&mut self, expr: &str) {
+        self.expressions.push(WatchEntry {
+            expression: expr.to_string(),
+            value: None,
+            children: Vec::new(),
+            expandable: false,
+        });
+    }
+
+    pub fn update_value(&mut self, expr: &str, value: &str) -> bool {
+        for entry in &mut self.expressions {
+            if entry.expression == expr {
+                entry.value = Some(value.to_string());
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn remove(&mut self, expr: &str) -> bool {
+        let before = self.expressions.len();
+        self.expressions.retain(|e| e.expression != expr);
+        self.expressions.len() != before
+    }
+
+    pub fn get(&self, expr: &str) -> Option<&WatchEntry> {
+        self.expressions.iter().find(|e| e.expression == expr)
+    }
+
+    pub fn all_expressions(&self) -> Vec<&str> {
+        self.expressions.iter().map(|e| e.expression.as_str()).collect()
+    }
+
+    /// Render a human-readable, indented tree view of all watch entries.
+    pub fn render_tree(&self) -> String {
+        let mut buf = String::new();
+        for entry in &self.expressions {
+            Self::render_entry(&mut buf, entry, 0);
+        }
+        buf
+    }
+
+    fn render_entry(buf: &mut String, entry: &WatchEntry, depth: usize) {
+        let indent = "  ".repeat(depth);
+        match &entry.value {
+            Some(v) => buf.push_str(&format!("{}{} = {}\n", indent, entry.expression, v)),
+            None => buf.push_str(&format!("{}{}\n", indent, entry.expression)),
+        }
+        for child in &entry.children {
+            Self::render_entry(buf, child, depth + 1);
+        }
+    }
+}
+
+// ── Hover Evaluator ──
+
+/// Caches hover evaluation results so repeated hovers over the same
+/// expression avoid redundant DAP requests.
+#[derive(Debug, Clone)]
+pub struct DebugHoverEvaluator {
+    pub cache: HashMap<String, String>,
+    pub max_cache_size: usize,
+}
+
+impl DebugHoverEvaluator {
+    pub fn new(max_cache: usize) -> Self {
+        Self {
+            cache: HashMap::new(),
+            max_cache_size: max_cache,
+        }
+    }
+
+    /// Store an evaluated result. If the cache is at capacity the insertion
+    /// is still performed but the oldest arbitrary entry is evicted first.
+    pub fn evaluate(&mut self, expression: &str, value: &str) {
+        if self.cache.len() >= self.max_cache_size && !self.cache.contains_key(expression) {
+            if let Some(key) = self.cache.keys().next().cloned() {
+                self.cache.remove(&key);
+            }
+        }
+        self.cache.insert(expression.to_string(), value.to_string());
+    }
+
+    pub fn get_cached(&self, expression: &str) -> Option<&str> {
+        self.cache.get(expression).map(|s| s.as_str())
+    }
+
+    pub fn invalidate_all(&mut self) {
+        self.cache.clear();
+    }
+
+    pub fn cache_size(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn format_hover(expression: &str, value: &str) -> String {
+        format!("{} = {}", expression, value)
+    }
+}
+
+// ── Call Stack ──
+
+/// Debug call-stack navigator wrapping a sequence of existing `StackFrame`s.
+#[derive(Debug, Clone)]
+pub struct DebugCallStack {
+    pub frames: Vec<StackFrame>,
+}
+
+impl DebugCallStack {
+    pub fn new() -> Self {
+        Self { frames: Vec::new() }
+    }
+
+    pub fn push_frame(&mut self, frame: StackFrame) {
+        self.frames.push(frame);
+    }
+
+    pub fn pop_frame(&mut self) -> Option<StackFrame> {
+        self.frames.pop()
+    }
+
+    /// The most recently pushed frame (top of stack).
+    pub fn current_frame(&self) -> Option<&StackFrame> {
+        self.frames.last()
+    }
+
+    pub fn depth(&self) -> usize {
+        self.frames.len()
+    }
+
+    pub fn frame_at(&self, index: usize) -> Option<&StackFrame> {
+        self.frames.get(index)
+    }
+
+    /// Navigate toward the caller (lower index).
+    pub fn navigate_up(&self, from: usize) -> Option<usize> {
+        if from > 0 { Some(from - 1) } else { None }
+    }
+
+    /// Navigate toward the callee (higher index).
+    pub fn navigate_down(&self, from: usize) -> Option<usize> {
+        if from + 1 < self.frames.len() { Some(from + 1) } else { None }
+    }
+
+    /// Render the call stack for display, most-recent frame first.
+    pub fn render(&self) -> String {
+        let mut buf = String::new();
+        for (i, frame) in self.frames.iter().enumerate().rev() {
+            buf.push_str(&format!("#{} {}\n", i, frame));
+        }
+        buf
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2029,5 +2290,159 @@ mod tests {
         log.append_with_source(DebugOutputCategory::Console, "msg", "adapter.js");
         let entries = log.filter_by_category(DebugOutputCategory::Console);
         assert_eq!(entries[0].source.as_deref(), Some("adapter.js"));
+    }
+
+    // ── Breakpoint condition tests ──
+
+    #[test]
+    fn breakpoint_condition_no_hit_count() {
+        let cond = DebugBreakpointCondition::new("x > 5");
+        assert!(cond.should_break(1));
+        assert!(cond.should_break(100));
+        assert_eq!(cond.evaluate_expression(), "x > 5");
+    }
+
+    #[test]
+    fn breakpoint_condition_equal_hit() {
+        let cond = DebugBreakpointCondition::new("true")
+            .with_hit_count(HitCountOp::Equal, 3);
+        assert!(!cond.should_break(1));
+        assert!(!cond.should_break(2));
+        assert!(cond.should_break(3));
+        assert!(!cond.should_break(4));
+    }
+
+    #[test]
+    fn breakpoint_condition_greater_than() {
+        let cond = DebugBreakpointCondition::new("true")
+            .with_hit_count(HitCountOp::GreaterThan, 2);
+        assert!(!cond.should_break(1));
+        assert!(!cond.should_break(2));
+        assert!(cond.should_break(3));
+    }
+
+    #[test]
+    fn breakpoint_condition_multiple() {
+        let cond = DebugBreakpointCondition::new("true")
+            .with_hit_count(HitCountOp::Multiple, 5);
+        assert!(cond.should_break(5));
+        assert!(cond.should_break(10));
+        assert!(!cond.should_break(7));
+    }
+
+    #[test]
+    fn breakpoint_condition_display() {
+        let cond = DebugBreakpointCondition::new("i == 0")
+            .with_hit_count(HitCountOp::GreaterEqual, 10)
+            .with_log_message("loop iteration");
+        let text = format!("{}", cond);
+        assert!(text.contains("i == 0"));
+        assert!(text.contains(">= 10"));
+        assert!(text.contains("loop iteration"));
+    }
+
+    // ── Watch expression tests ──
+
+    #[test]
+    fn watch_add_update_remove() {
+        let mut w = DebugWatchTree::new();
+        w.add_expression("my_var");
+        assert_eq!(w.all_expressions(), vec!["my_var"]);
+
+        assert!(w.update_value("my_var", "42"));
+        assert_eq!(w.get("my_var").unwrap().value.as_deref(), Some("42"));
+
+        assert!(w.remove("my_var"));
+        assert!(w.get("my_var").is_none());
+    }
+
+    #[test]
+    fn watch_render_tree() {
+        let mut w = DebugWatchTree::new();
+        w.add_expression("obj");
+        w.update_value("obj", "{...}");
+        w.expressions[0].expandable = true;
+        w.expressions[0].children.push(WatchEntry {
+            expression: "obj.x".into(),
+            value: Some("1".into()),
+            children: vec![],
+            expandable: false,
+        });
+        let tree = w.render_tree();
+        assert!(tree.contains("obj = {...}"));
+        assert!(tree.contains("  obj.x = 1"));
+    }
+
+    // ── Hover evaluator tests ──
+
+    #[test]
+    fn hover_cache_and_invalidate() {
+        let mut h = DebugHoverEvaluator::new(3);
+        h.evaluate("x", "10");
+        h.evaluate("y", "20");
+        assert_eq!(h.get_cached("x"), Some("10"));
+        assert_eq!(h.cache_size(), 2);
+
+        h.invalidate_all();
+        assert_eq!(h.cache_size(), 0);
+        assert_eq!(h.get_cached("x"), None);
+    }
+
+    #[test]
+    fn hover_cache_eviction() {
+        let mut h = DebugHoverEvaluator::new(2);
+        h.evaluate("a", "1");
+        h.evaluate("b", "2");
+        h.evaluate("c", "3");
+        assert_eq!(h.cache_size(), 2);
+        assert_eq!(h.get_cached("c"), Some("3"));
+    }
+
+    #[test]
+    fn hover_format() {
+        assert_eq!(DebugHoverEvaluator::format_hover("counter", "7"), "counter = 7");
+    }
+
+    // ── Call stack tests ──
+
+    #[test]
+    fn call_stack_push_pop() {
+        let mut cs = DebugCallStack::new();
+        cs.push_frame(StackFrame::new(1, "main", 10, 1).with_source("main.rs"));
+        cs.push_frame(StackFrame::new(2, "foo", 20, 5));
+        assert_eq!(cs.depth(), 2);
+        assert_eq!(cs.current_frame().unwrap().name, "foo");
+
+        let popped = cs.pop_frame().unwrap();
+        assert_eq!(popped.name, "foo");
+        assert_eq!(cs.depth(), 1);
+    }
+
+    #[test]
+    fn call_stack_navigation() {
+        let mut cs = DebugCallStack::new();
+        cs.push_frame(StackFrame::new(0, "a", 1, 1));
+        cs.push_frame(StackFrame::new(1, "b", 2, 1));
+        cs.push_frame(StackFrame::new(2, "c", 3, 1));
+
+        assert_eq!(cs.navigate_up(2), Some(1));
+        assert_eq!(cs.navigate_up(0), None);
+        assert_eq!(cs.navigate_down(1), Some(2));
+        assert_eq!(cs.navigate_down(2), None);
+    }
+
+    #[test]
+    fn call_stack_render_and_display() {
+        let mut cs = DebugCallStack::new();
+        cs.push_frame(StackFrame::new(0, "main", 1, 1).with_source("main.rs"));
+        cs.push_frame(StackFrame::new(1, "helper", 5, 3));
+        let rendered = cs.render();
+        assert!(rendered.contains("#1 helper"));
+        assert!(rendered.contains("#0 main"));
+        assert!(rendered.contains("main.rs"));
+
+        let frame = cs.frame_at(0).unwrap();
+        let display = format!("{}", frame);
+        assert!(display.contains("main.rs"));
     }
 }

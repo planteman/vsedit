@@ -1274,6 +1274,347 @@ impl FileFilterBuilder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ExplainerComplexity
+// ---------------------------------------------------------------------------
+
+/// Describes how complex a glob pattern is from a human-readability perspective.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExplainerComplexity {
+    /// A pattern with at most one wildcard segment (e.g. `*.rs`).
+    Simple,
+    /// A pattern with multiple wildcard segments or character classes.
+    Moderate,
+    /// A pattern with recursive globs, alternations, or nested braces.
+    Complex,
+}
+
+impl fmt::Display for ExplainerComplexity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExplainerComplexity::Simple => write!(f, "Simple"),
+            ExplainerComplexity::Moderate => write!(f, "Moderate"),
+            ExplainerComplexity::Complex => write!(f, "Complex"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GlobOptimizer
+// ---------------------------------------------------------------------------
+
+/// Collects glob patterns and removes redundant ones.
+///
+/// A pattern is considered redundant when a broader pattern already covers it.
+/// For example, `*.rs` covers `main.rs`, so if both are present `main.rs` is
+/// dropped.
+#[derive(Debug, Clone)]
+pub struct GlobOptimizer {
+    patterns: Vec<String>,
+}
+
+impl GlobOptimizer {
+    /// Create a new, empty optimizer.
+    pub fn new() -> Self {
+        Self {
+            patterns: Vec::new(),
+        }
+    }
+
+    /// Add a pattern to the optimizer.
+    pub fn add_pattern(&mut self, pattern: &str) {
+        self.patterns.push(pattern.to_string());
+    }
+
+    /// Return the number of patterns currently tracked.
+    pub fn pattern_count(&self) -> usize {
+        self.patterns.len()
+    }
+
+    /// Return `true` if any pattern is a subset of another.
+    pub fn has_redundant(&self) -> bool {
+        for (i, a) in self.patterns.iter().enumerate() {
+            for (j, b) in self.patterns.iter().enumerate() {
+                if i != j && Self::covers(b, a) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Return an optimized list with redundant patterns removed.
+    ///
+    /// A pattern is removed when another pattern in the set already covers it
+    /// (i.e. every path matched by the narrower pattern is also matched by the
+    /// broader one).
+    pub fn optimize(&self) -> Vec<String> {
+        let mut result: Vec<String> = Vec::new();
+        for (i, candidate) in self.patterns.iter().enumerate() {
+            let dominated = self.patterns.iter().enumerate().any(|(j, other)| {
+                i != j && Self::covers(other, candidate)
+            });
+            if !dominated {
+                if !result.contains(candidate) {
+                    result.push(candidate.clone());
+                }
+            }
+        }
+        result
+    }
+
+    /// Returns `true` when `broad` covers every path that `narrow` would match.
+    ///
+    /// This uses a simple heuristic:
+    /// - `**` covers everything.
+    /// - `*.ext` covers any literal filename ending with `.ext`.
+    /// - `dir/**` covers `dir/sub/**` and `dir/file`.
+    /// - `**/*.ext` covers `*.ext` and any `path/*.ext`.
+    /// - Identical patterns cover each other.
+    fn covers(broad: &str, narrow: &str) -> bool {
+        if broad == narrow {
+            return false; // identical – not "covered", just duplicate
+        }
+        if broad == "**" || broad == "**/*" {
+            return true;
+        }
+        // `*.ext` covers a literal filename with that extension
+        if let Some(ext) = broad.strip_prefix("*.") {
+            if !narrow.contains('*') && !narrow.contains('?') {
+                if narrow.ends_with(&format!(".{ext}")) && !narrow.contains('/') {
+                    return true;
+                }
+            }
+        }
+        // `**/*.ext` covers `*.ext` and `any/path/*.ext`
+        if let Some(suffix) = broad.strip_prefix("**/") {
+            if narrow == suffix {
+                return true;
+            }
+            if narrow.ends_with(suffix) {
+                return true;
+            }
+        }
+        // `dir/**` covers `dir/anything`
+        if let Some(prefix) = broad.strip_suffix("/**") {
+            if narrow.starts_with(prefix) && narrow.len() > prefix.len() {
+                let rest = &narrow[prefix.len()..];
+                if rest.starts_with('/') {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+impl Default for GlobOptimizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GlobExplainer
+// ---------------------------------------------------------------------------
+
+/// Provides human-readable descriptions of glob patterns.
+pub struct GlobExplainer;
+
+impl GlobExplainer {
+    /// Return a human-readable explanation of `pattern`.
+    pub fn explain(pattern: &str) -> String {
+        if pattern == "**" || pattern == "**/*" {
+            return "Matches all files recursively".to_string();
+        }
+        if let Some(ext) = pattern.strip_prefix("**/*.") {
+            return format!("Matches .{ext} files in any subdirectory");
+        }
+        if let Some(dir) = pattern.strip_suffix("/**") {
+            return format!("Matches everything inside {dir}/");
+        }
+        if let Some(ext) = pattern.strip_prefix("*.") {
+            if !ext.contains('*') && !ext.contains('?') {
+                return format!("Matches any file ending with .{ext}");
+            }
+        }
+        if !pattern.contains('*') && !pattern.contains('?') && !pattern.contains('[') {
+            return format!("Matches the literal path \"{pattern}\"");
+        }
+        if pattern.contains("**") {
+            return format!("Matches paths matching the recursive pattern \"{pattern}\"");
+        }
+        format!("Matches paths matching \"{pattern}\"")
+    }
+
+    /// Classify the complexity of `pattern`.
+    pub fn complexity(pattern: &str) -> ExplainerComplexity {
+        let has_doublestar = pattern.contains("**");
+        let has_braces = pattern.contains('{');
+        let has_brackets = pattern.contains('[');
+        let single_wildcards = pattern.matches('*').count()
+            - pattern.matches("**").count() * 2;
+        let question_marks = pattern.matches('?').count();
+
+        if has_braces || (has_doublestar && (has_brackets || single_wildcards > 0)) {
+            return ExplainerComplexity::Complex;
+        }
+        if has_doublestar || has_brackets || single_wildcards + question_marks > 1 {
+            return ExplainerComplexity::Moderate;
+        }
+        ExplainerComplexity::Simple
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GlobNegation
+// ---------------------------------------------------------------------------
+
+/// Manages include / exclude pattern lists using simple string matching.
+///
+/// A path is considered *included* when it matches at least one include
+/// pattern **and** does not match any exclude pattern.  Matching is performed
+/// with simple heuristics (suffix / contains checks) so that patterns do not
+/// need to be valid glob syntax.
+#[derive(Debug, Clone)]
+pub struct GlobNegation {
+    includes: Vec<String>,
+    excludes: Vec<String>,
+}
+
+impl GlobNegation {
+    /// Create a new, empty negation filter.
+    pub fn new() -> Self {
+        Self {
+            includes: Vec::new(),
+            excludes: Vec::new(),
+        }
+    }
+
+    /// Add an include pattern.
+    pub fn add_include(&mut self, pattern: &str) {
+        self.includes.push(pattern.to_string());
+    }
+
+    /// Add an exclude pattern.
+    pub fn add_exclude(&mut self, pattern: &str) {
+        self.excludes.push(pattern.to_string());
+    }
+
+    /// Number of include patterns.
+    pub fn include_count(&self) -> usize {
+        self.includes.len()
+    }
+
+    /// Number of exclude patterns.
+    pub fn exclude_count(&self) -> usize {
+        self.excludes.len()
+    }
+
+    /// Return `true` if `path` is included and not excluded.
+    pub fn is_included(&self, path: &str) -> bool {
+        let dominated_include = self.includes.iter().any(|p| Self::simple_match(p, path));
+        if !dominated_include {
+            return false;
+        }
+        let dominated_exclude = self.excludes.iter().any(|p| Self::simple_match(p, path));
+        !dominated_exclude
+    }
+
+    /// Simple string-based matching.
+    ///
+    /// - `*.ext`  → suffix match on `.ext`
+    /// - `dir/**` → prefix match on `dir/`
+    /// - `**/x`   → suffix match on `/x` or exact match `x`
+    /// - literal   → exact match or contained-in-path check
+    fn simple_match(pattern: &str, path: &str) -> bool {
+        if let Some(ext) = pattern.strip_prefix('*') {
+            return path.ends_with(ext);
+        }
+        if let Some(prefix) = pattern.strip_suffix("/**") {
+            return path.starts_with(prefix) && path.len() > prefix.len();
+        }
+        if let Some(suffix) = pattern.strip_prefix("**/") {
+            return path == suffix || path.ends_with(&format!("/{suffix}"));
+        }
+        path == pattern || path.contains(pattern)
+    }
+}
+
+impl Default for GlobNegation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GlobPriorityOrder
+// ---------------------------------------------------------------------------
+
+/// Stores glob patterns with an associated priority and can return them sorted
+/// by priority (highest first).
+#[derive(Debug, Clone)]
+pub struct GlobPriorityOrder {
+    entries: Vec<(String, u32)>,
+}
+
+impl GlobPriorityOrder {
+    /// Create a new, empty priority list.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add a pattern with the given priority.
+    pub fn add_pattern(&mut self, pattern: &str, priority: u32) {
+        self.entries.push((pattern.to_string(), priority));
+    }
+
+    /// Return patterns sorted by priority (highest first).
+    pub fn sorted_patterns(&self) -> Vec<(&str, u32)> {
+        let mut refs: Vec<(&str, u32)> = self
+            .entries
+            .iter()
+            .map(|(p, pri)| (p.as_str(), *pri))
+            .collect();
+        refs.sort_by(|a, b| b.1.cmp(&a.1));
+        refs
+    }
+
+    /// Return the pattern with the highest priority, or `None` if empty.
+    pub fn highest_priority(&self) -> Option<(&str, u32)> {
+        self.entries
+            .iter()
+            .max_by_key(|(_, pri)| *pri)
+            .map(|(p, pri)| (p.as_str(), *pri))
+    }
+
+    /// Return the pattern with the lowest priority, or `None` if empty.
+    pub fn lowest_priority(&self) -> Option<(&str, u32)> {
+        self.entries
+            .iter()
+            .min_by_key(|(_, pri)| *pri)
+            .map(|(p, pri)| (p.as_str(), *pri))
+    }
+
+    /// Return the number of stored patterns.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if no patterns have been added.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for GlobPriorityOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2001,5 +2342,150 @@ mod tests {
         let b = FileFilterBuilder::new();
         assert!(b.is_empty());
         assert_eq!(b.include_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // GlobOptimizer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn optimizer_removes_literal_covered_by_wildcard() {
+        let mut opt = GlobOptimizer::new();
+        opt.add_pattern("*.rs");
+        opt.add_pattern("main.rs");
+        assert!(opt.has_redundant());
+        let result = opt.optimize();
+        assert_eq!(result, vec!["*.rs"]);
+    }
+
+    #[test]
+    fn optimizer_keeps_unrelated_patterns() {
+        let mut opt = GlobOptimizer::new();
+        opt.add_pattern("*.rs");
+        opt.add_pattern("*.toml");
+        assert!(!opt.has_redundant());
+        assert_eq!(opt.optimize().len(), 2);
+    }
+
+    #[test]
+    fn optimizer_doublestar_covers_everything() {
+        let mut opt = GlobOptimizer::new();
+        opt.add_pattern("**");
+        opt.add_pattern("src/main.rs");
+        opt.add_pattern("*.toml");
+        assert_eq!(opt.optimize(), vec!["**"]);
+    }
+
+    #[test]
+    fn optimizer_pattern_count() {
+        let mut opt = GlobOptimizer::new();
+        assert_eq!(opt.pattern_count(), 0);
+        opt.add_pattern("*.rs");
+        opt.add_pattern("*.ts");
+        assert_eq!(opt.pattern_count(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // GlobExplainer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn explainer_star_ext() {
+        let desc = GlobExplainer::explain("*.rs");
+        assert!(desc.contains(".rs"), "got: {desc}");
+    }
+
+    #[test]
+    fn explainer_doublestar_ext() {
+        let desc = GlobExplainer::explain("**/*.txt");
+        assert!(desc.contains(".txt"), "got: {desc}");
+        assert!(desc.contains("subdirectory"), "got: {desc}");
+    }
+
+    #[test]
+    fn explainer_dir_star() {
+        let desc = GlobExplainer::explain("src/**");
+        assert!(desc.contains("src/"), "got: {desc}");
+    }
+
+    #[test]
+    fn complexity_simple() {
+        assert_eq!(GlobExplainer::complexity("*.rs"), ExplainerComplexity::Simple);
+    }
+
+    #[test]
+    fn complexity_moderate() {
+        assert_eq!(GlobExplainer::complexity("**/*.rs"), ExplainerComplexity::Complex);
+    }
+
+    #[test]
+    fn complexity_display() {
+        assert_eq!(format!("{}", ExplainerComplexity::Simple), "Simple");
+        assert_eq!(format!("{}", ExplainerComplexity::Complex), "Complex");
+    }
+
+    // -----------------------------------------------------------------------
+    // GlobNegation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn negation_include_and_exclude() {
+        let mut neg = GlobNegation::new();
+        neg.add_include("*.rs");
+        neg.add_exclude("*.bak");
+        assert!(neg.is_included("main.rs"));
+        assert!(!neg.is_included("backup.bak"));
+        assert!(!neg.is_included("readme.md"));
+    }
+
+    #[test]
+    fn negation_counts() {
+        let mut neg = GlobNegation::new();
+        neg.add_include("*.rs");
+        neg.add_include("*.toml");
+        neg.add_exclude("*.bak");
+        assert_eq!(neg.include_count(), 2);
+        assert_eq!(neg.exclude_count(), 1);
+    }
+
+    #[test]
+    fn negation_exclude_overrides_include() {
+        let mut neg = GlobNegation::new();
+        neg.add_include("*.rs");
+        neg.add_exclude("*.rs");
+        assert!(!neg.is_included("main.rs"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GlobPriorityOrder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn priority_sorted() {
+        let mut prio = GlobPriorityOrder::new();
+        prio.add_pattern("*.rs", 10);
+        prio.add_pattern("*.toml", 50);
+        prio.add_pattern("*.lock", 1);
+        let sorted = prio.sorted_patterns();
+        assert_eq!(sorted[0], ("*.toml", 50));
+        assert_eq!(sorted[2], ("*.lock", 1));
+    }
+
+    #[test]
+    fn priority_highest_lowest() {
+        let mut prio = GlobPriorityOrder::new();
+        prio.add_pattern("a", 5);
+        prio.add_pattern("b", 100);
+        prio.add_pattern("c", 1);
+        assert_eq!(prio.highest_priority(), Some(("b", 100)));
+        assert_eq!(prio.lowest_priority(), Some(("c", 1)));
+    }
+
+    #[test]
+    fn priority_empty() {
+        let prio = GlobPriorityOrder::new();
+        assert!(prio.is_empty());
+        assert_eq!(prio.len(), 0);
+        assert_eq!(prio.highest_priority(), None);
     }
 }

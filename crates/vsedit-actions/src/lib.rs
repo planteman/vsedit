@@ -1217,6 +1217,288 @@ impl UndoGroupStack {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PreCondition checking
+// ---------------------------------------------------------------------------
+
+/// A single precondition: a context key must equal an expected value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreCondition {
+    pub key: String,
+    pub expected_value: String,
+}
+
+/// Result of evaluating preconditions against a context.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PreConditionResult {
+    /// All preconditions are satisfied.
+    Satisfied,
+    /// A precondition failed.
+    Failed {
+        missing_key: Option<String>,
+        wrong_value: Option<(String, String, String)>,
+    },
+}
+
+impl fmt::Display for PreConditionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PreConditionResult::Satisfied => write!(f, "all preconditions satisfied"),
+            PreConditionResult::Failed {
+                missing_key: Some(k),
+                ..
+            } => write!(f, "missing context key: {k}"),
+            PreConditionResult::Failed {
+                wrong_value: Some((key, expected, actual)),
+                ..
+            } => write!(
+                f,
+                "key \"{key}\": expected \"{expected}\", got \"{actual}\""
+            ),
+            PreConditionResult::Failed { .. } => write!(f, "precondition failed"),
+        }
+    }
+}
+
+/// Validates whether an action can run based on context key/value pairs.
+#[derive(Debug, Clone)]
+pub struct ActionPreConditionChecker {
+    conditions: Vec<PreCondition>,
+}
+
+impl ActionPreConditionChecker {
+    pub fn new() -> Self {
+        Self {
+            conditions: Vec::new(),
+        }
+    }
+
+    pub fn add_condition(&mut self, key: &str, value: &str) {
+        self.conditions.push(PreCondition {
+            key: key.to_string(),
+            expected_value: value.to_string(),
+        });
+    }
+
+    pub fn check(&self, context: &HashMap<String, String>) -> PreConditionResult {
+        for cond in &self.conditions {
+            match context.get(&cond.key) {
+                None => {
+                    return PreConditionResult::Failed {
+                        missing_key: Some(cond.key.clone()),
+                        wrong_value: None,
+                    };
+                }
+                Some(actual) if actual != &cond.expected_value => {
+                    return PreConditionResult::Failed {
+                        missing_key: None,
+                        wrong_value: Some((
+                            cond.key.clone(),
+                            cond.expected_value.clone(),
+                            actual.clone(),
+                        )),
+                    };
+                }
+                _ => {}
+            }
+        }
+        PreConditionResult::Satisfied
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible action groups
+// ---------------------------------------------------------------------------
+
+/// State of a single collapsible action group.
+#[derive(Debug, Clone)]
+pub struct ActionGroupState {
+    pub label: String,
+    pub collapsed: bool,
+    pub action_ids: Vec<String>,
+}
+
+/// Manages collapsible menu sections for action groups.
+#[derive(Debug, Clone)]
+pub struct ActionGroupCollapse {
+    groups: HashMap<String, ActionGroupState>,
+}
+
+impl ActionGroupCollapse {
+    pub fn new() -> Self {
+        Self {
+            groups: HashMap::new(),
+        }
+    }
+
+    pub fn add_group(&mut self, id: &str, label: &str) {
+        self.groups.insert(
+            id.to_string(),
+            ActionGroupState {
+                label: label.to_string(),
+                collapsed: false,
+                action_ids: Vec::new(),
+            },
+        );
+    }
+
+    /// Adds an action to an existing group. Returns `false` if the group does not exist.
+    pub fn add_action_to_group(&mut self, group_id: &str, action_id: &str) -> bool {
+        match self.groups.get_mut(group_id) {
+            Some(state) => {
+                state.action_ids.push(action_id.to_string());
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Toggles the collapsed state of a group. Returns `false` if the group does not exist.
+    pub fn toggle_group(&mut self, id: &str) -> bool {
+        match self.groups.get_mut(id) {
+            Some(state) => {
+                state.collapsed = !state.collapsed;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Returns visible action ids for a group.
+    /// If collapsed, returns an empty vec; otherwise returns all action ids.
+    pub fn visible_actions(&self, group_id: &str) -> Vec<&str> {
+        match self.groups.get(group_id) {
+            Some(state) if !state.collapsed => {
+                state.action_ids.iter().map(|s| s.as_str()).collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keybinding rendering
+// ---------------------------------------------------------------------------
+
+/// Renders keybinding labels for display in menus and tooltips.
+#[derive(Debug, Clone)]
+pub struct ActionKeybindingRenderer;
+
+impl ActionKeybindingRenderer {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Joins key parts with `+`, e.g. `["Ctrl","Shift","P"]` → `"Ctrl+Shift+P"`.
+    pub fn render_keybinding(parts: &[&str]) -> String {
+        parts.join("+")
+    }
+
+    /// Renders a two-chord keybinding, e.g. `"Ctrl+K Ctrl+C"`.
+    pub fn render_chord(first: &[&str], second: &[&str]) -> String {
+        format!(
+            "{} {}",
+            Self::render_keybinding(first),
+            Self::render_keybinding(second)
+        )
+    }
+
+    /// Maps modifier names to platform-specific symbols.
+    pub fn platform_label(key: &str, is_mac: bool) -> String {
+        if is_mac {
+            match key {
+                "Ctrl" => "⌘".to_string(),
+                "Alt" => "⌥".to_string(),
+                "Shift" => "⇧".to_string(),
+                "Meta" => "⌃".to_string(),
+                other => other.to_string(),
+            }
+        } else {
+            key.to_string()
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Execution metrics
+// ---------------------------------------------------------------------------
+
+/// Record of a single action execution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActionExecution {
+    pub action_id: String,
+    pub duration_ms: u64,
+    pub success: bool,
+    pub timestamp: u64,
+}
+
+/// Tracks execution metrics for actions.
+#[derive(Debug, Clone)]
+pub struct ActionExecutionMetrics {
+    executions: Vec<ActionExecution>,
+}
+
+impl ActionExecutionMetrics {
+    pub fn new() -> Self {
+        Self {
+            executions: Vec::new(),
+        }
+    }
+
+    pub fn record(&mut self, action_id: &str, duration_ms: u64, success: bool, timestamp: u64) {
+        self.executions.push(ActionExecution {
+            action_id: action_id.to_string(),
+            duration_ms,
+            success,
+            timestamp,
+        });
+    }
+
+    pub fn total_executions(&self) -> usize {
+        self.executions.len()
+    }
+
+    pub fn success_rate(&self) -> f64 {
+        if self.executions.is_empty() {
+            return 0.0;
+        }
+        let successes = self.executions.iter().filter(|e| e.success).count();
+        successes as f64 / self.executions.len() as f64
+    }
+
+    pub fn average_duration_ms(&self) -> f64 {
+        if self.executions.is_empty() {
+            return 0.0;
+        }
+        let total: u64 = self.executions.iter().map(|e| e.duration_ms).sum();
+        total as f64 / self.executions.len() as f64
+    }
+
+    /// Returns the action_id with the most executions, or `None` if empty.
+    pub fn most_used_action(&self) -> Option<&str> {
+        if self.executions.is_empty() {
+            return None;
+        }
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for e in &self.executions {
+            *counts.entry(e.action_id.as_str()).or_insert(0) += 1;
+        }
+        counts
+            .into_iter()
+            .max_by_key(|&(_, count)| count)
+            .map(|(id, _)| id)
+    }
+
+    /// Returns references to all failed executions.
+    pub fn failures(&self) -> Vec<&ActionExecution> {
+        self.executions.iter().filter(|e| !e.success).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1998,5 +2280,175 @@ mod tests {
 
         stack.clear();
         assert!(stack.is_empty());
+    }
+
+    // -- ActionPreConditionChecker tests --
+
+    #[test]
+    fn precondition_satisfied_when_context_matches() {
+        let mut checker = ActionPreConditionChecker::new();
+        checker.add_condition("editorLangId", "rust");
+        checker.add_condition("isDebugging", "false");
+
+        let mut ctx = HashMap::new();
+        ctx.insert("editorLangId".to_string(), "rust".to_string());
+        ctx.insert("isDebugging".to_string(), "false".to_string());
+
+        assert_eq!(checker.check(&ctx), PreConditionResult::Satisfied);
+    }
+
+    #[test]
+    fn precondition_fails_on_missing_key() {
+        let mut checker = ActionPreConditionChecker::new();
+        checker.add_condition("editorLangId", "rust");
+
+        let ctx = HashMap::new();
+        let result = checker.check(&ctx);
+        assert_eq!(
+            result,
+            PreConditionResult::Failed {
+                missing_key: Some("editorLangId".to_string()),
+                wrong_value: None,
+            }
+        );
+        assert!(format!("{result}").contains("missing context key"));
+    }
+
+    #[test]
+    fn precondition_fails_on_wrong_value() {
+        let mut checker = ActionPreConditionChecker::new();
+        checker.add_condition("editorLangId", "rust");
+
+        let mut ctx = HashMap::new();
+        ctx.insert("editorLangId".to_string(), "python".to_string());
+
+        let result = checker.check(&ctx);
+        assert_eq!(
+            result,
+            PreConditionResult::Failed {
+                missing_key: None,
+                wrong_value: Some((
+                    "editorLangId".to_string(),
+                    "rust".to_string(),
+                    "python".to_string()
+                )),
+            }
+        );
+        assert!(format!("{result}").contains("expected"));
+    }
+
+    // -- ActionGroupCollapse tests --
+
+    #[test]
+    fn group_collapse_add_and_count() {
+        let mut collapse = ActionGroupCollapse::new();
+        assert_eq!(collapse.group_count(), 0);
+
+        collapse.add_group("file", "File");
+        collapse.add_group("edit", "Edit");
+        assert_eq!(collapse.group_count(), 2);
+    }
+
+    #[test]
+    fn group_collapse_add_action_to_group() {
+        let mut collapse = ActionGroupCollapse::new();
+        collapse.add_group("nav", "Navigation");
+
+        assert!(collapse.add_action_to_group("nav", "goto.line"));
+        assert!(collapse.add_action_to_group("nav", "goto.symbol"));
+        assert!(!collapse.add_action_to_group("nonexistent", "foo"));
+    }
+
+    #[test]
+    fn group_collapse_toggle_and_visible() {
+        let mut collapse = ActionGroupCollapse::new();
+        collapse.add_group("nav", "Navigation");
+        collapse.add_action_to_group("nav", "goto.line");
+        collapse.add_action_to_group("nav", "goto.symbol");
+
+        assert_eq!(collapse.visible_actions("nav"), vec!["goto.line", "goto.symbol"]);
+
+        assert!(collapse.toggle_group("nav"));
+        assert!(collapse.visible_actions("nav").is_empty());
+
+        assert!(collapse.toggle_group("nav"));
+        assert_eq!(collapse.visible_actions("nav").len(), 2);
+
+        assert!(!collapse.toggle_group("nonexistent"));
+    }
+
+    // -- ActionKeybindingRenderer tests --
+
+    #[test]
+    fn render_keybinding_joins_parts() {
+        assert_eq!(
+            ActionKeybindingRenderer::render_keybinding(&["Ctrl", "Shift", "P"]),
+            "Ctrl+Shift+P"
+        );
+    }
+
+    #[test]
+    fn render_chord_two_sequences() {
+        assert_eq!(
+            ActionKeybindingRenderer::render_chord(&["Ctrl", "K"], &["Ctrl", "C"]),
+            "Ctrl+K Ctrl+C"
+        );
+    }
+
+    #[test]
+    fn platform_label_mac_modifiers() {
+        assert_eq!(ActionKeybindingRenderer::platform_label("Ctrl", true), "⌘");
+        assert_eq!(ActionKeybindingRenderer::platform_label("Alt", true), "⌥");
+        assert_eq!(ActionKeybindingRenderer::platform_label("Shift", true), "⇧");
+        assert_eq!(ActionKeybindingRenderer::platform_label("Meta", true), "⌃");
+        assert_eq!(ActionKeybindingRenderer::platform_label("P", true), "P");
+        assert_eq!(ActionKeybindingRenderer::platform_label("Ctrl", false), "Ctrl");
+    }
+
+    // -- ActionExecutionMetrics tests --
+
+    #[test]
+    fn metrics_record_and_totals() {
+        let mut metrics = ActionExecutionMetrics::new();
+        assert_eq!(metrics.total_executions(), 0);
+        assert_eq!(metrics.success_rate(), 0.0);
+        assert_eq!(metrics.average_duration_ms(), 0.0);
+        assert!(metrics.most_used_action().is_none());
+
+        metrics.record("editor.save", 10, true, 1000);
+        metrics.record("editor.save", 20, true, 2000);
+        metrics.record("editor.format", 30, false, 3000);
+
+        assert_eq!(metrics.total_executions(), 3);
+    }
+
+    #[test]
+    fn metrics_success_rate_and_average() {
+        let mut metrics = ActionExecutionMetrics::new();
+        metrics.record("a", 10, true, 1);
+        metrics.record("b", 30, true, 2);
+        metrics.record("c", 20, false, 3);
+
+        let rate = metrics.success_rate();
+        assert!((rate - 2.0 / 3.0).abs() < 1e-9);
+
+        let avg = metrics.average_duration_ms();
+        assert!((avg - 20.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn metrics_most_used_and_failures() {
+        let mut metrics = ActionExecutionMetrics::new();
+        metrics.record("save", 5, true, 1);
+        metrics.record("save", 6, true, 2);
+        metrics.record("save", 7, false, 3);
+        metrics.record("format", 10, false, 4);
+
+        assert_eq!(metrics.most_used_action(), Some("save"));
+
+        let fails = metrics.failures();
+        assert_eq!(fails.len(), 2);
+        assert!(!fails[0].success);
+        assert!(!fails[1].success);
     }
 }

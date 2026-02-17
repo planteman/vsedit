@@ -1344,6 +1344,363 @@ impl RenderConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TextRenderTabExpander
+// ---------------------------------------------------------------------------
+
+/// Expands tab characters to spaces with configurable tab-stop width.
+#[derive(Debug, Clone)]
+pub struct TextRenderTabExpander {
+    tab_width: usize,
+}
+
+impl TextRenderTabExpander {
+    /// Create a new tab expander with the given tab-stop width.
+    ///
+    /// # Panics
+    /// Panics if `tab_width` is zero.
+    pub fn new(tab_width: usize) -> Self {
+        assert!(tab_width > 0, "tab_width must be at least 1");
+        Self { tab_width }
+    }
+
+    /// Expand tabs in a single line, aligning to tab stops.
+    pub fn expand(&self, line: &str) -> String {
+        let mut result = String::with_capacity(line.len());
+        let mut col: usize = 0;
+        for ch in line.chars() {
+            if ch == '\t' {
+                let spaces = self.tab_width - (col % self.tab_width);
+                for _ in 0..spaces {
+                    result.push(' ');
+                }
+                col += spaces;
+            } else {
+                result.push(ch);
+                col += UnicodeWidthChar::width(ch).unwrap_or(1);
+            }
+        }
+        result
+    }
+
+    /// Expand tabs across all lines in a multi-line string.
+    pub fn expand_all(&self, text: &str) -> String {
+        text.lines()
+            .map(|line| self.expand(line))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Return the configured tab width.
+    pub fn tab_width(&self) -> usize {
+        self.tab_width
+    }
+}
+
+impl fmt::Display for TextRenderTabExpander {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TabExpander(width={})", self.tab_width)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextRenderTruncator
+// ---------------------------------------------------------------------------
+
+/// Truncates text to a maximum display width with configurable ellipsis placement.
+#[derive(Debug, Clone)]
+pub struct TextRenderTruncator {
+    max_width: usize,
+}
+
+impl TextRenderTruncator {
+    /// Create a new truncator with the given maximum display width.
+    pub fn new(max_width: usize) -> Self {
+        Self { max_width }
+    }
+
+    /// Return the configured maximum width.
+    pub fn max_width(&self) -> usize {
+        self.max_width
+    }
+
+    /// Returns `true` if the text's display width exceeds `max_width`.
+    pub fn would_truncate(&self, text: &str) -> bool {
+        UnicodeWidthStr::width(text) > self.max_width
+    }
+
+    /// Truncate from the end, appending "…" if needed.
+    pub fn truncate_end(&self, text: &str) -> String {
+        let text_width = UnicodeWidthStr::width(text);
+        if text_width <= self.max_width {
+            return text.to_string();
+        }
+        let ellipsis = "…";
+        let ellipsis_width = UnicodeWidthStr::width(ellipsis);
+        if self.max_width <= ellipsis_width {
+            return ellipsis.to_string();
+        }
+        let target = self.max_width - ellipsis_width;
+        let mut result = String::new();
+        let mut col: usize = 0;
+        for ch in text.chars() {
+            let cw = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if col + cw > target {
+                break;
+            }
+            result.push(ch);
+            col += cw;
+        }
+        result.push_str(ellipsis);
+        result
+    }
+
+    /// Truncate from the start, prepending "…" if needed.
+    pub fn truncate_start(&self, text: &str) -> String {
+        let text_width = UnicodeWidthStr::width(text);
+        if text_width <= self.max_width {
+            return text.to_string();
+        }
+        let ellipsis = "…";
+        let ellipsis_width = UnicodeWidthStr::width(ellipsis);
+        if self.max_width <= ellipsis_width {
+            return ellipsis.to_string();
+        }
+        let target = self.max_width - ellipsis_width;
+        // Walk backwards to collect `target` columns from the end.
+        let chars: Vec<char> = text.chars().collect();
+        let mut col: usize = 0;
+        let mut start_idx = chars.len();
+        for i in (0..chars.len()).rev() {
+            let cw = UnicodeWidthChar::width(chars[i]).unwrap_or(0);
+            if col + cw > target {
+                break;
+            }
+            col += cw;
+            start_idx = i;
+        }
+        let mut result = String::from(ellipsis);
+        for &ch in &chars[start_idx..] {
+            result.push(ch);
+        }
+        result
+    }
+
+    /// Truncate from the middle, inserting "…" in the center.
+    pub fn truncate_middle(&self, text: &str) -> String {
+        let text_width = UnicodeWidthStr::width(text);
+        if text_width <= self.max_width {
+            return text.to_string();
+        }
+        let ellipsis = "…";
+        let ellipsis_width = UnicodeWidthStr::width(ellipsis);
+        if self.max_width <= ellipsis_width {
+            return ellipsis.to_string();
+        }
+        let available = self.max_width - ellipsis_width;
+        let left_budget = (available + 1) / 2;
+        let right_budget = available / 2;
+
+        // Collect left portion.
+        let mut left = String::new();
+        let mut col: usize = 0;
+        let chars: Vec<char> = text.chars().collect();
+        let mut left_end = 0;
+        for (i, &ch) in chars.iter().enumerate() {
+            let cw = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if col + cw > left_budget {
+                break;
+            }
+            left.push(ch);
+            col += cw;
+            left_end = i + 1;
+        }
+
+        // Collect right portion from the end.
+        let mut right_chars: Vec<char> = Vec::new();
+        let mut rcol: usize = 0;
+        for &ch in chars.iter().rev() {
+            let cw = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if rcol + cw > right_budget {
+                break;
+            }
+            right_chars.push(ch);
+            rcol += cw;
+        }
+        right_chars.reverse();
+        let _ = left_end; // suppress unused warning
+
+        let mut result = left;
+        result.push_str(ellipsis);
+        for ch in right_chars {
+            result.push(ch);
+        }
+        result
+    }
+}
+
+impl fmt::Display for TextRenderTruncator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Truncator(max_width={})", self.max_width)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextRenderLineNumber
+// ---------------------------------------------------------------------------
+
+/// Generates line number gutter text with right-aligned numbers.
+#[derive(Debug, Clone)]
+pub struct TextRenderLineNumber {
+    total_lines: usize,
+    width: usize,
+}
+
+impl TextRenderLineNumber {
+    /// Create a new line number formatter for a document with `total_lines` lines.
+    pub fn new(total_lines: usize) -> Self {
+        let width = if total_lines == 0 {
+            1
+        } else {
+            total_lines.to_string().len()
+        };
+        Self { total_lines, width }
+    }
+
+    /// Format a line number, right-aligned to the gutter width.
+    pub fn format_line_number(&self, line: usize) -> String {
+        format!("{:>width$}", line, width = self.width)
+    }
+
+    /// Return the width of the gutter (number of digit columns).
+    pub fn gutter_width(&self) -> usize {
+        self.width
+    }
+
+    /// Return the separator string placed after the line number.
+    pub fn separator(&self) -> &str {
+        " | "
+    }
+
+    /// Format a line number with the separator appended, e.g. `"  42 | "`.
+    pub fn format_with_separator(&self, line: usize) -> String {
+        format!("{}{}", self.format_line_number(line), self.separator())
+    }
+}
+
+impl fmt::Display for TextRenderLineNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LineNumber(total={}, gutter_width={})",
+            self.total_lines, self.width
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextRenderDiffHighlight
+// ---------------------------------------------------------------------------
+
+/// The kind of change a diff line represents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffLineKind {
+    Added,
+    Deleted,
+    Unchanged,
+}
+
+impl fmt::Display for DiffLineKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiffLineKind::Added => write!(f, "+"),
+            DiffLineKind::Deleted => write!(f, "-"),
+            DiffLineKind::Unchanged => write!(f, " "),
+        }
+    }
+}
+
+/// A single line in a rendered diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffLine {
+    pub line_num: usize,
+    pub text: String,
+    pub kind: DiffLineKind,
+}
+
+impl fmt::Display for DiffLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.kind, self.text)
+    }
+}
+
+/// Collects diff additions, deletions, and unchanged lines for rendering.
+#[derive(Debug, Clone)]
+pub struct TextRenderDiffHighlight {
+    lines: Vec<DiffLine>,
+}
+
+impl TextRenderDiffHighlight {
+    /// Create a new, empty diff highlighter.
+    pub fn new() -> Self {
+        Self { lines: Vec::new() }
+    }
+
+    /// Record an added line.
+    pub fn add_addition(&mut self, line_num: usize, text: &str) {
+        self.lines.push(DiffLine {
+            line_num,
+            text: text.to_string(),
+            kind: DiffLineKind::Added,
+        });
+    }
+
+    /// Record a deleted line.
+    pub fn add_deletion(&mut self, line_num: usize, text: &str) {
+        self.lines.push(DiffLine {
+            line_num,
+            text: text.to_string(),
+            kind: DiffLineKind::Deleted,
+        });
+    }
+
+    /// Record an unchanged context line.
+    pub fn add_unchanged(&mut self, line_num: usize, text: &str) {
+        self.lines.push(DiffLine {
+            line_num,
+            text: text.to_string(),
+            kind: DiffLineKind::Unchanged,
+        });
+    }
+
+    /// Return all collected diff lines.
+    pub fn render(&self) -> Vec<DiffLine> {
+        self.lines.clone()
+    }
+
+    /// Count the number of added lines.
+    pub fn addition_count(&self) -> usize {
+        self.lines.iter().filter(|l| l.kind == DiffLineKind::Added).count()
+    }
+
+    /// Count the number of deleted lines.
+    pub fn deletion_count(&self) -> usize {
+        self.lines
+            .iter()
+            .filter(|l| l.kind == DiffLineKind::Deleted)
+            .count()
+    }
+}
+
+impl fmt::Display for TextRenderDiffHighlight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in &self.lines {
+            writeln!(f, "{}", line)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2193,5 +2550,137 @@ mod tests {
         let cfg2 = cfg.with_max_width(120);
         assert_eq!(cfg2.max_width, 120);
         assert_eq!(cfg2.tab_size, cfg.tab_size);
+    }
+
+    // ---- TextRenderTabExpander tests ----
+
+    #[test]
+    fn tab_expander_basic() {
+        let exp = TextRenderTabExpander::new(4);
+        assert_eq!(exp.expand("a\tb"), "a   b");
+        assert_eq!(exp.expand("\t"), "    ");
+        assert_eq!(exp.expand("ab\tc"), "ab  c");
+    }
+
+    #[test]
+    fn tab_expander_no_tabs() {
+        let exp = TextRenderTabExpander::new(4);
+        assert_eq!(exp.expand("hello"), "hello");
+    }
+
+    #[test]
+    fn tab_expander_expand_all() {
+        let exp = TextRenderTabExpander::new(4);
+        let result = exp.expand_all("a\tb\ncd\te");
+        assert_eq!(result, "a   b\ncd  e");
+    }
+
+    #[test]
+    fn tab_expander_display_and_clone() {
+        let exp = TextRenderTabExpander::new(8);
+        assert_eq!(exp.tab_width(), 8);
+        let display = format!("{}", exp);
+        assert!(display.contains("8"));
+        let cloned = exp.clone();
+        assert_eq!(cloned.tab_width(), 8);
+    }
+
+    // ---- TextRenderTruncator tests ----
+
+    #[test]
+    fn truncator_end() {
+        let tr = TextRenderTruncator::new(8);
+        assert_eq!(tr.truncate_end("hello world!"), "hello w…");
+        assert_eq!(tr.truncate_end("short"), "short");
+    }
+
+    #[test]
+    fn truncator_start() {
+        let tr = TextRenderTruncator::new(8);
+        let result = tr.truncate_start("hello world!");
+        assert!(result.starts_with('…'));
+        assert_eq!(UnicodeWidthStr::width(result.as_str()), 8);
+    }
+
+    #[test]
+    fn truncator_middle() {
+        let tr = TextRenderTruncator::new(9);
+        let result = tr.truncate_middle("hello world!");
+        assert!(result.contains('…'));
+        assert!(UnicodeWidthStr::width(result.as_str()) <= 9);
+    }
+
+    #[test]
+    fn truncator_would_truncate() {
+        let tr = TextRenderTruncator::new(5);
+        assert!(tr.would_truncate("hello world"));
+        assert!(!tr.would_truncate("hi"));
+    }
+
+    #[test]
+    fn truncator_display() {
+        let tr = TextRenderTruncator::new(42);
+        assert_eq!(format!("{}", tr), "Truncator(max_width=42)");
+        assert_eq!(tr.max_width(), 42);
+    }
+
+    // ---- TextRenderLineNumber tests ----
+
+    #[test]
+    fn line_number_formatting() {
+        let ln = TextRenderLineNumber::new(100);
+        assert_eq!(ln.gutter_width(), 3);
+        assert_eq!(ln.format_line_number(1), "  1");
+        assert_eq!(ln.format_line_number(42), " 42");
+        assert_eq!(ln.format_line_number(100), "100");
+    }
+
+    #[test]
+    fn line_number_with_separator() {
+        let ln = TextRenderLineNumber::new(999);
+        assert_eq!(ln.format_with_separator(42), " 42 | ");
+        assert_eq!(ln.separator(), " | ");
+        let display = format!("{}", ln);
+        assert!(display.contains("999"));
+    }
+
+    // ---- TextRenderDiffHighlight tests ----
+
+    #[test]
+    fn diff_highlight_counts() {
+        let mut diff = TextRenderDiffHighlight::new();
+        diff.add_addition(1, "new line");
+        diff.add_deletion(2, "old line");
+        diff.add_unchanged(3, "context");
+        diff.add_addition(4, "another new");
+        assert_eq!(diff.addition_count(), 2);
+        assert_eq!(diff.deletion_count(), 1);
+        let rendered = diff.render();
+        assert_eq!(rendered.len(), 4);
+        assert_eq!(rendered[0].kind, DiffLineKind::Added);
+        assert_eq!(rendered[1].kind, DiffLineKind::Deleted);
+        assert_eq!(rendered[2].kind, DiffLineKind::Unchanged);
+    }
+
+    #[test]
+    fn diff_line_display() {
+        let line = DiffLine {
+            line_num: 10,
+            text: "hello".to_string(),
+            kind: DiffLineKind::Added,
+        };
+        assert_eq!(format!("{}", line), "+ hello");
+        assert_eq!(format!("{}", DiffLineKind::Deleted), "-");
+        assert_eq!(format!("{}", DiffLineKind::Unchanged), " ");
+    }
+
+    #[test]
+    fn diff_highlight_display() {
+        let mut diff = TextRenderDiffHighlight::new();
+        diff.add_addition(1, "added");
+        diff.add_deletion(2, "removed");
+        let output = format!("{}", diff);
+        assert!(output.contains("+ added"));
+        assert!(output.contains("- removed"));
     }
 }

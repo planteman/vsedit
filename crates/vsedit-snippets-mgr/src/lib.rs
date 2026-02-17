@@ -1301,6 +1301,323 @@ impl SnippetFormatConverter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ImportedSnippet – lightweight snippet representation for import/export
+// ---------------------------------------------------------------------------
+
+/// A lightweight snippet representation used during import and export,
+/// independent of the internal [`Snippet`] type.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportedSnippet {
+    pub name: String,
+    pub prefix: String,
+    pub body: Vec<String>,
+    pub description: Option<String>,
+    pub scope: Option<String>,
+}
+
+impl std::fmt::Display for ImportedSnippet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} (prefix: {})", self.name, self.prefix)?;
+        if let Some(ref scope) = self.scope {
+            write!(f, " [scope: {scope}]")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetJsonImporter – parse VS Code JSON into ImportedSnippet
+// ---------------------------------------------------------------------------
+
+/// Parses VS Code snippet JSON into [`ImportedSnippet`] values.
+pub struct SnippetJsonImporter;
+
+impl SnippetJsonImporter {
+    /// Parse a VS Code snippet JSON string into a list of [`ImportedSnippet`].
+    pub fn from_vscode_json(json: &str) -> Result<Vec<ImportedSnippet>, String> {
+        let value: serde_json::Value =
+            serde_json::from_str(json).map_err(|e| format!("invalid JSON: {e}"))?;
+        Self::from_json_value(&value)
+    }
+
+    /// Parse a pre-parsed [`serde_json::Value`] into a list of [`ImportedSnippet`].
+    pub fn from_json_value(value: &serde_json::Value) -> Result<Vec<ImportedSnippet>, String> {
+        let obj = value.as_object().ok_or("expected top-level JSON object")?;
+        let mut snippets = Vec::new();
+
+        for (name, entry) in obj {
+            let entry_obj = entry
+                .as_object()
+                .ok_or_else(|| format!("expected object for snippet '{name}'"))?;
+
+            let prefix = match entry_obj.get("prefix") {
+                Some(serde_json::Value::Array(arr)) => arr
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .next()
+                    .unwrap_or(name.as_str())
+                    .to_string(),
+                Some(serde_json::Value::String(s)) => s.clone(),
+                _ => name.clone(),
+            };
+
+            let body = match entry_obj.get("body") {
+                Some(serde_json::Value::Array(arr)) => {
+                    arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+                }
+                Some(serde_json::Value::String(s)) => {
+                    s.split('\n').map(String::from).collect()
+                }
+                _ => Vec::new(),
+            };
+
+            let description = entry_obj
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+
+            let scope = entry_obj
+                .get("scope")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+
+            snippets.push(ImportedSnippet {
+                name: name.clone(),
+                prefix,
+                body,
+                description,
+                scope,
+            });
+        }
+
+        Ok(snippets)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetJsonExporter – build and export snippet collections to JSON
+// ---------------------------------------------------------------------------
+
+/// Accumulates [`ImportedSnippet`] values and serialises them to JSON.
+pub struct SnippetJsonExporter {
+    snippets: Vec<ImportedSnippet>,
+}
+
+impl SnippetJsonExporter {
+    pub fn new() -> Self {
+        Self {
+            snippets: Vec::new(),
+        }
+    }
+
+    pub fn add_snippet(&mut self, snippet: ImportedSnippet) {
+        self.snippets.push(snippet);
+    }
+
+    /// Serialise to formatted (pretty-printed) JSON.
+    pub fn to_json(&self) -> String {
+        let value = self.build_json_value();
+        serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Serialise to compact single-line JSON.
+    pub fn to_json_compact(&self) -> String {
+        let value = self.build_json_value();
+        serde_json::to_string(&value).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    pub fn snippet_count(&self) -> usize {
+        self.snippets.len()
+    }
+
+    fn build_json_value(&self) -> serde_json::Value {
+        let mut map = serde_json::Map::new();
+        for s in &self.snippets {
+            let mut entry = serde_json::Map::new();
+            entry.insert(
+                "prefix".to_string(),
+                serde_json::Value::String(s.prefix.clone()),
+            );
+            let body_vals: Vec<serde_json::Value> =
+                s.body.iter().map(|l| serde_json::Value::String(l.clone())).collect();
+            entry.insert("body".to_string(), serde_json::Value::Array(body_vals));
+            if let Some(ref desc) = s.description {
+                entry.insert(
+                    "description".to_string(),
+                    serde_json::Value::String(desc.clone()),
+                );
+            }
+            if let Some(ref scope) = s.scope {
+                entry.insert(
+                    "scope".to_string(),
+                    serde_json::Value::String(scope.clone()),
+                );
+            }
+            map.insert(s.name.clone(), serde_json::Value::Object(entry));
+        }
+        serde_json::Value::Object(map)
+    }
+}
+
+impl std::fmt::Display for SnippetJsonExporter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SnippetJsonExporter({} snippets)", self.snippets.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetConflictDetector – scope-aware prefix clash detection
+// ---------------------------------------------------------------------------
+
+/// A detected prefix conflict between two or more snippets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SnippetPrefixConflict {
+    pub prefix: String,
+    /// Names of snippets that share this prefix.
+    pub snippets: Vec<String>,
+    /// Whether all conflicting snippets target the same scope.
+    pub is_same_scope: bool,
+}
+
+impl std::fmt::Display for SnippetPrefixConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "prefix '{}' shared by [{}] (same_scope={})",
+            self.prefix,
+            self.snippets.join(", "),
+            self.is_same_scope,
+        )
+    }
+}
+
+/// Detects prefix clashes between snippets, taking scope into account.
+pub struct SnippetConflictDetector {
+    entries: Vec<(String, String, Option<String>)>, // (name, prefix, scope)
+}
+
+impl SnippetConflictDetector {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn add_snippet(&mut self, name: &str, prefix: &str, scope: Option<&str>) {
+        self.entries.push((
+            name.to_string(),
+            prefix.to_string(),
+            scope.map(String::from),
+        ));
+    }
+
+    /// Return all detected prefix conflicts.
+    pub fn detect_conflicts(&self) -> Vec<SnippetPrefixConflict> {
+        let mut prefix_map: HashMap<String, Vec<(String, Option<String>)>> = HashMap::new();
+        for (name, prefix, scope) in &self.entries {
+            prefix_map
+                .entry(prefix.clone())
+                .or_default()
+                .push((name.clone(), scope.clone()));
+        }
+
+        let mut conflicts = Vec::new();
+        for (prefix, entries) in &prefix_map {
+            if entries.len() > 1 {
+                let names: Vec<String> = entries.iter().map(|(n, _)| n.clone()).collect();
+                let scopes: Vec<Option<&str>> =
+                    entries.iter().map(|(_, s)| s.as_deref()).collect();
+                let is_same_scope = scopes.windows(2).all(|w| w[0] == w[1]);
+                conflicts.push(SnippetPrefixConflict {
+                    prefix: prefix.clone(),
+                    snippets: names,
+                    is_same_scope,
+                });
+            }
+        }
+        conflicts.sort_by(|a, b| a.prefix.cmp(&b.prefix));
+        conflicts
+    }
+
+    pub fn has_conflicts(&self) -> bool {
+        !self.detect_conflicts().is_empty()
+    }
+
+    pub fn conflict_count(&self) -> usize {
+        self.detect_conflicts().len()
+    }
+}
+
+impl std::fmt::Display for SnippetConflictDetector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.conflict_count();
+        write!(f, "SnippetConflictDetector({n} conflicts)")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetUsageStats – track how often snippets are used
+// ---------------------------------------------------------------------------
+
+/// Tracks usage counts for snippets.
+pub struct SnippetUsageStats {
+    counts: HashMap<String, usize>,
+}
+
+impl SnippetUsageStats {
+    pub fn new() -> Self {
+        Self {
+            counts: HashMap::new(),
+        }
+    }
+
+    pub fn record_usage(&mut self, snippet_name: &str) {
+        *self.counts.entry(snippet_name.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn usage_count(&self, snippet_name: &str) -> usize {
+        self.counts.get(snippet_name).copied().unwrap_or(0)
+    }
+
+    /// Return the *n* most-used snippets, sorted descending by count.
+    pub fn most_used(&self, n: usize) -> Vec<(String, usize)> {
+        let mut items: Vec<(String, usize)> =
+            self.counts.iter().map(|(k, &v)| (k.clone(), v)).collect();
+        items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        items.truncate(n);
+        items
+    }
+
+    /// Return the *n* least-used snippets, sorted ascending by count.
+    pub fn least_used(&self, n: usize) -> Vec<(String, usize)> {
+        let mut items: Vec<(String, usize)> =
+            self.counts.iter().map(|(k, &v)| (k.clone(), v)).collect();
+        items.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
+        items.truncate(n);
+        items
+    }
+
+    pub fn total_usages(&self) -> usize {
+        self.counts.values().sum()
+    }
+
+    pub fn unique_snippets_used(&self) -> usize {
+        self.counts.len()
+    }
+}
+
+impl std::fmt::Display for SnippetUsageStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SnippetUsageStats(total={}, unique={})",
+            self.total_usages(),
+            self.unique_snippets_used(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2163,6 +2480,184 @@ mod tests {
         assert!(json.contains("\"prefix\""));
         assert!(json.contains("\"body\""));
         assert!(json.contains("\"description\""));
+    }
+
+    // -----------------------------------------------------------------------
+    // SnippetJsonImporter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn json_importer_parses_vscode_json() {
+        let json = r#"{
+            "ForLoop": {
+                "prefix": "for",
+                "body": ["for ${1:item} in ${2:iter} {", "    $0", "}"],
+                "description": "A for loop",
+                "scope": "rust"
+            }
+        }"#;
+        let snippets = SnippetJsonImporter::from_vscode_json(json).unwrap();
+        assert_eq!(snippets.len(), 1);
+        assert_eq!(snippets[0].name, "ForLoop");
+        assert_eq!(snippets[0].prefix, "for");
+        assert_eq!(snippets[0].body.len(), 3);
+        assert_eq!(snippets[0].description.as_deref(), Some("A for loop"));
+        assert_eq!(snippets[0].scope.as_deref(), Some("rust"));
+    }
+
+    #[test]
+    fn json_importer_from_json_value() {
+        let val: serde_json::Value = serde_json::from_str(r#"{
+            "Hello": { "prefix": "hel", "body": ["Hello, world!"] }
+        }"#).unwrap();
+        let snippets = SnippetJsonImporter::from_json_value(&val).unwrap();
+        assert_eq!(snippets.len(), 1);
+        assert_eq!(snippets[0].prefix, "hel");
+    }
+
+    #[test]
+    fn json_importer_invalid_json_returns_error() {
+        let result = SnippetJsonImporter::from_vscode_json("not json");
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // SnippetJsonExporter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn json_exporter_roundtrip() {
+        let mut exporter = SnippetJsonExporter::new();
+        exporter.add_snippet(ImportedSnippet {
+            name: "Test".into(),
+            prefix: "tst".into(),
+            body: vec!["line1".into()],
+            description: Some("desc".into()),
+            scope: None,
+        });
+        assert_eq!(exporter.snippet_count(), 1);
+
+        let json = exporter.to_json();
+        assert!(json.contains("\"Test\""));
+        assert!(json.contains("\"tst\""));
+
+        let compact = exporter.to_json_compact();
+        assert!(!compact.contains('\n'));
+
+        // Round-trip: parse the exported JSON back
+        let reimported = SnippetJsonImporter::from_vscode_json(&json).unwrap();
+        assert_eq!(reimported.len(), 1);
+        assert_eq!(reimported[0].name, "Test");
+    }
+
+    #[test]
+    fn json_exporter_display() {
+        let exporter = SnippetJsonExporter::new();
+        assert_eq!(format!("{exporter}"), "SnippetJsonExporter(0 snippets)");
+    }
+
+    // -----------------------------------------------------------------------
+    // SnippetConflictDetector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn conflict_detector_no_conflicts() {
+        let mut det = SnippetConflictDetector::new();
+        det.add_snippet("a", "aa", Some("rust"));
+        det.add_snippet("b", "bb", Some("rust"));
+        assert!(!det.has_conflicts());
+        assert_eq!(det.conflict_count(), 0);
+    }
+
+    #[test]
+    fn conflict_detector_same_scope_conflict() {
+        let mut det = SnippetConflictDetector::new();
+        det.add_snippet("for-loop", "for", Some("rust"));
+        det.add_snippet("foreach", "for", Some("rust"));
+        let conflicts = det.detect_conflicts();
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].prefix, "for");
+        assert_eq!(conflicts[0].snippets.len(), 2);
+        assert!(conflicts[0].is_same_scope);
+    }
+
+    #[test]
+    fn conflict_detector_different_scope() {
+        let mut det = SnippetConflictDetector::new();
+        det.add_snippet("for-rs", "for", Some("rust"));
+        det.add_snippet("for-py", "for", Some("python"));
+        let conflicts = det.detect_conflicts();
+        assert_eq!(conflicts.len(), 1);
+        assert!(!conflicts[0].is_same_scope);
+    }
+
+    #[test]
+    fn conflict_detector_display() {
+        let det = SnippetConflictDetector::new();
+        assert_eq!(format!("{det}"), "SnippetConflictDetector(0 conflicts)");
+    }
+
+    // -----------------------------------------------------------------------
+    // SnippetUsageStats tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn usage_stats_record_and_query() {
+        let mut stats = SnippetUsageStats::new();
+        stats.record_usage("for-loop");
+        stats.record_usage("for-loop");
+        stats.record_usage("if-else");
+        assert_eq!(stats.usage_count("for-loop"), 2);
+        assert_eq!(stats.usage_count("if-else"), 1);
+        assert_eq!(stats.usage_count("unknown"), 0);
+        assert_eq!(stats.total_usages(), 3);
+        assert_eq!(stats.unique_snippets_used(), 2);
+    }
+
+    #[test]
+    fn usage_stats_most_and_least_used() {
+        let mut stats = SnippetUsageStats::new();
+        stats.record_usage("a");
+        stats.record_usage("b");
+        stats.record_usage("b");
+        stats.record_usage("c");
+        stats.record_usage("c");
+        stats.record_usage("c");
+
+        let most = stats.most_used(2);
+        assert_eq!(most.len(), 2);
+        assert_eq!(most[0].0, "c");
+        assert_eq!(most[0].1, 3);
+
+        let least = stats.least_used(1);
+        assert_eq!(least.len(), 1);
+        assert_eq!(least[0].0, "a");
+        assert_eq!(least[0].1, 1);
+    }
+
+    #[test]
+    fn usage_stats_display() {
+        let stats = SnippetUsageStats::new();
+        assert_eq!(format!("{stats}"), "SnippetUsageStats(total=0, unique=0)");
+    }
+
+    // -----------------------------------------------------------------------
+    // ImportedSnippet Display test
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn imported_snippet_display() {
+        let s = ImportedSnippet {
+            name: "MySnippet".into(),
+            prefix: "ms".into(),
+            body: vec!["body".into()],
+            description: None,
+            scope: Some("rust".into()),
+        };
+        let display = format!("{s}");
+        assert!(display.contains("MySnippet"));
+        assert!(display.contains("ms"));
+        assert!(display.contains("rust"));
     }
 
     #[test]

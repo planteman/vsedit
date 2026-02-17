@@ -1363,6 +1363,142 @@ impl fmt::Display for UriSanitizer {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// OpenerPriorityManager
+// ---------------------------------------------------------------------------
+
+pub struct OpenerPriorityManager {
+    priorities: Vec<(String, i32)>,
+}
+
+impl OpenerPriorityManager {
+    pub fn new() -> Self { Self { priorities: Vec::new() } }
+
+    pub fn set_priority(&mut self, handler_id: impl Into<String>, priority: i32) {
+        let id = handler_id.into();
+        if let Some(entry) = self.priorities.iter_mut().find(|(h, _)| h == &id) {
+            entry.1 = priority;
+        } else {
+            self.priorities.push((id, priority));
+        }
+    }
+
+    pub fn get_priority(&self, handler_id: &str) -> Option<i32> {
+        self.priorities.iter().find(|(h, _)| h == handler_id).map(|(_, p)| *p)
+    }
+
+    pub fn sorted_handlers(&self) -> Vec<String> {
+        let mut sorted = self.priorities.clone();
+        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.into_iter().map(|(h, _)| h).collect()
+    }
+
+    pub fn len(&self) -> usize { self.priorities.len() }
+}
+
+impl Default for OpenerPriorityManager { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// OpenerSchemeRouter
+// ---------------------------------------------------------------------------
+
+pub struct OpenerSchemeRouter {
+    routes: std::collections::HashMap<String, String>,
+}
+
+impl OpenerSchemeRouter {
+    pub fn new() -> Self { Self { routes: std::collections::HashMap::new() } }
+
+    pub fn register_scheme(&mut self, scheme: impl Into<String>, handler: impl Into<String>) {
+        self.routes.insert(scheme.into(), handler.into());
+    }
+
+    pub fn route(&self, uri: &str) -> Option<&str> {
+        extract_scheme(uri).and_then(|s| self.routes.get(s)).map(|s| s.as_str())
+    }
+
+    pub fn has_scheme(&self, scheme: &str) -> bool { self.routes.contains_key(scheme) }
+    pub fn scheme_count(&self) -> usize { self.routes.len() }
+    pub fn remove_scheme(&mut self, scheme: &str) -> bool { self.routes.remove(scheme).is_some() }
+}
+
+impl Default for OpenerSchemeRouter { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// OpenerConfirmDialog
+// ---------------------------------------------------------------------------
+
+pub struct OpenerConfirmDialog {
+    pub uri: String,
+    pub message: String,
+    pub is_external: bool,
+}
+
+impl OpenerConfirmDialog {
+    pub fn for_external_link(uri: impl Into<String>) -> Self {
+        let uri = uri.into();
+        let message = format!("Open external link: {}?", &uri);
+        Self { uri, message, is_external: true }
+    }
+
+    pub fn for_file(uri: impl Into<String>) -> Self {
+        let uri = uri.into();
+        let message = format!("Open file: {}?", &uri);
+        Self { uri, message, is_external: false }
+    }
+
+    pub fn should_confirm(uri: &str) -> bool {
+        is_http_uri(uri)
+    }
+}
+
+impl std::fmt::Display for OpenerConfirmDialog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OpenerMetricsTracker
+// ---------------------------------------------------------------------------
+
+pub struct OpenerMetricsTracker {
+    opens: u64,
+    failures: u64,
+    by_scheme: std::collections::HashMap<String, u64>,
+}
+
+impl OpenerMetricsTracker {
+    pub fn new() -> Self { Self { opens: 0, failures: 0, by_scheme: std::collections::HashMap::new() } }
+
+    pub fn record_open(&mut self, uri: &str) {
+        self.opens += 1;
+        if let Some(scheme) = extract_scheme(uri) {
+            *self.by_scheme.entry(scheme.to_string()).or_insert(0) += 1;
+        }
+    }
+
+    pub fn record_failure(&mut self) { self.failures += 1; }
+
+    pub fn total_opens(&self) -> u64 { self.opens }
+    pub fn total_failures(&self) -> u64 { self.failures }
+    pub fn opens_for_scheme(&self, scheme: &str) -> u64 { self.by_scheme.get(scheme).copied().unwrap_or(0) }
+    pub fn success_rate(&self) -> f64 {
+        let total = self.opens + self.failures;
+        if total == 0 { 1.0 } else { self.opens as f64 / total as f64 }
+    }
+    pub fn reset(&mut self) { self.opens = 0; self.failures = 0; self.by_scheme.clear(); }
+}
+
+impl Default for OpenerMetricsTracker { fn default() -> Self { Self::new() } }
+
+impl std::fmt::Display for OpenerMetricsTracker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OpenerMetrics(opens={}, failures={})", self.opens, self.failures)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2082,4 +2218,98 @@ mod tests {
         let cleaned = s.sanitize(uri).unwrap();
         assert_eq!(cleaned, uri);
     }
+
+
+    #[test]
+    fn priority_manager_basic() {
+        let mut pm = OpenerPriorityManager::new();
+        pm.set_priority("vscode", 10);
+        pm.set_priority("browser", 5);
+        assert_eq!(pm.get_priority("vscode"), Some(10));
+        assert_eq!(pm.sorted_handlers(), vec!["vscode", "browser"]);
+    }
+
+    #[test]
+    fn priority_manager_update() {
+        let mut pm = OpenerPriorityManager::new();
+        pm.set_priority("a", 1);
+        pm.set_priority("a", 10);
+        assert_eq!(pm.get_priority("a"), Some(10));
+        assert_eq!(pm.len(), 1);
+    }
+
+    #[test]
+    fn scheme_router_basic() {
+        let mut r = OpenerSchemeRouter::new();
+        r.register_scheme("vscode", "internal");
+        r.register_scheme("https", "browser");
+        assert_eq!(r.route("https://example.com"), Some("browser"));
+        assert_eq!(r.route("vscode://ext/cmd"), Some("internal"));
+    }
+
+    #[test]
+    fn scheme_router_missing() {
+        let r = OpenerSchemeRouter::new();
+        assert_eq!(r.route("ftp://x"), None);
+    }
+
+    #[test]
+    fn scheme_router_remove() {
+        let mut r = OpenerSchemeRouter::new();
+        r.register_scheme("x", "h");
+        assert!(r.remove_scheme("x"));
+        assert!(!r.has_scheme("x"));
+    }
+
+    #[test]
+    fn confirm_dialog_external() {
+        let d = OpenerConfirmDialog::for_external_link("https://evil.com");
+        assert!(d.is_external);
+        assert!(d.message.contains("https://evil.com"));
+    }
+
+    #[test]
+    fn confirm_dialog_should_confirm() {
+        assert!(OpenerConfirmDialog::should_confirm("https://example.com"));
+        assert!(!OpenerConfirmDialog::should_confirm("file:///tmp"));
+    }
+
+    #[test]
+    fn metrics_tracker_basic() {
+        let mut m = OpenerMetricsTracker::new();
+        m.record_open("https://example.com");
+        m.record_open("https://other.com");
+        m.record_open("file:///tmp");
+        assert_eq!(m.total_opens(), 3);
+        assert_eq!(m.opens_for_scheme("https"), 2);
+    }
+
+    #[test]
+    fn metrics_tracker_failure() {
+        let mut m = OpenerMetricsTracker::new();
+        m.record_open("https://x");
+        m.record_failure();
+        assert!((m.success_rate() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn metrics_tracker_display() {
+        let m = OpenerMetricsTracker::new();
+        assert!(format!("{m}").contains("opens=0"));
+    }
+
+    #[test]
+    fn confirm_dialog_file() {
+        let d = OpenerConfirmDialog::for_file("file:///tmp/test");
+        assert!(!d.is_external);
+    }
+
+    #[test]
+    fn metrics_tracker_reset() {
+        let mut m = OpenerMetricsTracker::new();
+        m.record_open("https://x");
+        m.reset();
+        assert_eq!(m.total_opens(), 0);
+    }
+
 }

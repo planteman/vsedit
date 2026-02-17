@@ -1118,6 +1118,315 @@ impl From<&ColorTheme> for ThemeSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ThemePreview – generate color swatches for a theme
+// ---------------------------------------------------------------------------
+
+/// A single color swatch entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColorSwatch {
+    pub key: String,
+    pub hex_value: String,
+    pub label: String,
+}
+
+impl ColorSwatch {
+    /// Render a swatch as `"key: #hex"`.
+    pub fn render(&self) -> String {
+        format!("{}: {}", self.key, self.hex_value)
+    }
+}
+
+impl fmt::Display for ColorSwatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.label, self.hex_value)
+    }
+}
+
+/// Generates preview swatches for theme colors.
+#[derive(Debug)]
+pub struct ThemePreview;
+
+impl ThemePreview {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Build swatches for the given color keys that exist in the theme.
+    pub fn generate_swatches(theme: &ColorTheme, keys: &[&str]) -> Vec<ColorSwatch> {
+        keys.iter()
+            .filter_map(|&k| {
+                theme.colors.get(k).map(|hex| ColorSwatch {
+                    key: k.to_string(),
+                    hex_value: hex.clone(),
+                    label: k.to_string(),
+                })
+            })
+            .collect()
+    }
+
+    /// Render a multi-line preview string from a slice of swatches.
+    pub fn render_preview(swatches: &[ColorSwatch]) -> String {
+        if swatches.is_empty() {
+            return String::from("(no swatches)");
+        }
+        swatches
+            .iter()
+            .map(|s| s.render())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Return the total number of color entries in a theme.
+    pub fn swatch_count(theme: &ColorTheme) -> usize {
+        theme.colors.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeMigrator – migrate deprecated color keys
+// ---------------------------------------------------------------------------
+
+/// Describes a single key migration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColorMigration {
+    pub old_key: String,
+    pub new_key: String,
+    pub transform: Option<String>,
+}
+
+impl fmt::Display for ColorMigration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.transform {
+            Some(t) => write!(f, "{} -> {} ({})", self.old_key, self.new_key, t),
+            None => write!(f, "{} -> {}", self.old_key, self.new_key),
+        }
+    }
+}
+
+/// Migrates deprecated colour keys to their replacements.
+#[derive(Debug, Clone)]
+pub struct ThemeMigrator {
+    pub migrations: Vec<ColorMigration>,
+}
+
+impl ThemeMigrator {
+    pub fn new() -> Self {
+        Self {
+            migrations: Vec::new(),
+        }
+    }
+
+    /// Register a migration from `old` to `new`.
+    pub fn add_migration(&mut self, old: &str, new: &str) {
+        self.migrations.push(ColorMigration {
+            old_key: old.to_string(),
+            new_key: new.to_string(),
+            transform: None,
+        });
+    }
+
+    /// Apply all registered migrations to `theme`, moving values from old keys
+    /// to new keys (only when the old key is present and the new key is absent).
+    /// Returns the number of migrations actually applied.
+    pub fn migrate_theme(&self, theme: &mut ColorTheme) -> usize {
+        let mut count = 0;
+        for m in &self.migrations {
+            if theme.colors.contains_key(&m.old_key) && !theme.colors.contains_key(&m.new_key) {
+                if let Some(val) = theme.colors.remove(&m.old_key) {
+                    theme.colors.insert(m.new_key.clone(), val);
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    /// Return the list of deprecated keys that are still present in `theme`.
+    pub fn has_deprecated_keys(&self, theme: &ColorTheme) -> Vec<String> {
+        self.migrations
+            .iter()
+            .filter(|m| theme.colors.contains_key(&m.old_key))
+            .map(|m| m.old_key.clone())
+            .collect()
+    }
+
+    /// Number of registered migrations.
+    pub fn migration_count(&self) -> usize {
+        self.migrations.len()
+    }
+}
+
+impl fmt::Display for ThemeMigrator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ThemeMigrator({} migrations)", self.migrations.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeContributionMerger – merge prioritised colour contributions
+// ---------------------------------------------------------------------------
+
+/// A single theme contribution from an extension or module.
+#[derive(Debug, Clone)]
+pub struct ThemeContribution {
+    pub source: String,
+    pub colors: HashMap<String, String>,
+    pub priority: u32,
+}
+
+impl fmt::Display for ThemeContribution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} ({} colors, priority {})",
+            self.source,
+            self.colors.len(),
+            self.priority,
+        )
+    }
+}
+
+/// Merges a base colour map with prioritised contributions.
+#[derive(Debug, Clone)]
+pub struct ThemeContributionMerger {
+    pub base_colors: HashMap<String, String>,
+    pub contributions: Vec<ThemeContribution>,
+}
+
+impl ThemeContributionMerger {
+    pub fn new() -> Self {
+        Self {
+            base_colors: HashMap::new(),
+            contributions: Vec::new(),
+        }
+    }
+
+    /// Set the base colours (lowest priority).
+    pub fn set_base(&mut self, colors: HashMap<String, String>) {
+        self.base_colors = colors;
+    }
+
+    /// Add a contribution with a given priority.
+    pub fn add_contribution(
+        &mut self,
+        source: &str,
+        colors: HashMap<String, String>,
+        priority: u32,
+    ) {
+        self.contributions.push(ThemeContribution {
+            source: source.to_string(),
+            colors,
+            priority,
+        });
+    }
+
+    /// Merge all contributions on top of the base. Higher priority wins.
+    pub fn merge(&self) -> HashMap<String, String> {
+        let mut result = self.base_colors.clone();
+        let mut sorted: Vec<&ThemeContribution> = self.contributions.iter().collect();
+        sorted.sort_by_key(|c| c.priority);
+        for contrib in sorted {
+            for (k, v) in &contrib.colors {
+                result.insert(k.clone(), v.clone());
+            }
+        }
+        result
+    }
+
+    /// Return keys that appear in more than one contribution.
+    pub fn conflict_keys(&self) -> Vec<String> {
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for contrib in &self.contributions {
+            for k in contrib.colors.keys() {
+                *counts.entry(k.as_str()).or_insert(0) += 1;
+            }
+        }
+        let mut keys: Vec<String> = counts
+            .into_iter()
+            .filter(|&(_, c)| c > 1)
+            .map(|(k, _)| k.to_string())
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// Number of registered contributions.
+    pub fn contribution_count(&self) -> usize {
+        self.contributions.len()
+    }
+}
+
+impl fmt::Display for ThemeContributionMerger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ThemeContributionMerger({} base, {} contributions)",
+            self.base_colors.len(),
+            self.contributions.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeIconMapper – map file types to icons
+// ---------------------------------------------------------------------------
+
+/// Maps file-type identifiers to icon representations.
+#[derive(Debug, Clone)]
+pub struct ThemeIconMapper {
+    pub icon_map: HashMap<String, String>,
+}
+
+impl ThemeIconMapper {
+    pub fn new() -> Self {
+        Self {
+            icon_map: HashMap::new(),
+        }
+    }
+
+    /// Create a mapper pre-populated with common defaults.
+    pub fn with_defaults() -> Self {
+        let mut m = Self::new();
+        m.icon_map.insert("file".into(), "📄".into());
+        m.icon_map.insert("folder".into(), "📁".into());
+        m.icon_map.insert("rust".into(), "🦀".into());
+        m.icon_map.insert("python".into(), "🐍".into());
+        m.icon_map.insert("javascript".into(), "📜".into());
+        m
+    }
+
+    /// Resolve an icon for the given file type; falls back to "📄".
+    pub fn resolve_icon(&self, file_type: &str) -> &str {
+        self.icon_map
+            .get(file_type)
+            .map(|s| s.as_str())
+            .unwrap_or("📄")
+    }
+
+    /// Register a custom file-type → icon mapping.
+    pub fn register(&mut self, file_type: &str, icon: &str) {
+        self.icon_map
+            .insert(file_type.to_string(), icon.to_string());
+    }
+
+    /// Number of registered icons.
+    pub fn icon_count(&self) -> usize {
+        self.icon_map.len()
+    }
+
+    /// Check whether an icon is registered for the given file type.
+    pub fn has_icon(&self, file_type: &str) -> bool {
+        self.icon_map.contains_key(file_type)
+    }
+}
+
+impl fmt::Display for ThemeIconMapper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ThemeIconMapper({} icons)", self.icon_map.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2029,5 +2338,157 @@ mod tests {
             new: "#fff".into(),
         };
         assert_eq!(format!("{}", changed), "~ k: #000 -> #fff");
+    }
+
+    // ---- ThemePreview tests ----
+
+    #[test]
+    fn preview_generate_swatches() {
+        let theme = dark_theme();
+        let swatches =
+            ThemePreview::generate_swatches(&theme, &["editor.background", "editor.foreground"]);
+        assert_eq!(swatches.len(), 2);
+        assert_eq!(swatches[0].key, "editor.background");
+        assert_eq!(swatches[0].hex_value, "#1e1e1e");
+        assert_eq!(swatches[0].render(), "editor.background: #1e1e1e");
+    }
+
+    #[test]
+    fn preview_missing_keys_skipped() {
+        let theme = dark_theme();
+        let swatches =
+            ThemePreview::generate_swatches(&theme, &["editor.background", "nonexistent"]);
+        assert_eq!(swatches.len(), 1);
+    }
+
+    #[test]
+    fn preview_render_preview() {
+        let swatches = vec![
+            ColorSwatch {
+                key: "a".into(),
+                hex_value: "#111".into(),
+                label: "a".into(),
+            },
+            ColorSwatch {
+                key: "b".into(),
+                hex_value: "#222".into(),
+                label: "b".into(),
+            },
+        ];
+        let out = ThemePreview::render_preview(&swatches);
+        assert!(out.contains("a: #111"));
+        assert!(out.contains('\n'));
+        assert_eq!(ThemePreview::render_preview(&[]), "(no swatches)");
+    }
+
+    #[test]
+    fn preview_swatch_count() {
+        let theme = dark_theme();
+        assert_eq!(ThemePreview::swatch_count(&theme), 2);
+    }
+
+    // ---- ThemeMigrator tests ----
+
+    #[test]
+    fn migrator_apply_migrations() {
+        let mut migrator = ThemeMigrator::new();
+        migrator.add_migration("old.bg", "editor.background2");
+        migrator.add_migration("old.fg", "editor.foreground2");
+        assert_eq!(migrator.migration_count(), 2);
+
+        let mut theme = dark_theme();
+        theme.colors.insert("old.bg".into(), "#aaa".into());
+        theme.colors.insert("old.fg".into(), "#bbb".into());
+        let applied = migrator.migrate_theme(&mut theme);
+        assert_eq!(applied, 2);
+        assert!(!theme.colors.contains_key("old.bg"));
+        assert_eq!(theme.colors.get("editor.background2").unwrap(), "#aaa");
+    }
+
+    #[test]
+    fn migrator_skips_when_new_key_exists() {
+        let mut migrator = ThemeMigrator::new();
+        migrator.add_migration("editor.background", "editor.foreground");
+        let mut theme = dark_theme();
+        let applied = migrator.migrate_theme(&mut theme);
+        assert_eq!(applied, 0);
+    }
+
+    #[test]
+    fn migrator_has_deprecated_keys() {
+        let mut migrator = ThemeMigrator::new();
+        migrator.add_migration("editor.background", "new.bg");
+        let theme = dark_theme();
+        let deprecated = migrator.has_deprecated_keys(&theme);
+        assert_eq!(deprecated, vec!["editor.background"]);
+    }
+
+    // ---- ThemeContributionMerger tests ----
+
+    #[test]
+    fn merger_higher_priority_wins() {
+        let mut merger = ThemeContributionMerger::new();
+        let mut base = HashMap::new();
+        base.insert("bg".into(), "#000".into());
+        merger.set_base(base);
+
+        let mut low = HashMap::new();
+        low.insert("bg".into(), "#111".into());
+        merger.add_contribution("ext-a", low, 1);
+
+        let mut high = HashMap::new();
+        high.insert("bg".into(), "#222".into());
+        merger.add_contribution("ext-b", high, 10);
+
+        let merged = merger.merge();
+        assert_eq!(merged.get("bg").unwrap(), "#222");
+    }
+
+    #[test]
+    fn merger_conflict_keys() {
+        let mut merger = ThemeContributionMerger::new();
+        let mut a = HashMap::new();
+        a.insert("bg".into(), "#000".into());
+        merger.add_contribution("a", a, 1);
+        let mut b = HashMap::new();
+        b.insert("bg".into(), "#111".into());
+        merger.add_contribution("b", b, 2);
+
+        let conflicts = merger.conflict_keys();
+        assert_eq!(conflicts, vec!["bg"]);
+        assert_eq!(merger.contribution_count(), 2);
+    }
+
+    #[test]
+    fn merger_base_preserved_without_contributions() {
+        let mut merger = ThemeContributionMerger::new();
+        let mut base = HashMap::new();
+        base.insert("fg".into(), "#fff".into());
+        merger.set_base(base);
+        let merged = merger.merge();
+        assert_eq!(merged.get("fg").unwrap(), "#fff");
+    }
+
+    // ---- ThemeIconMapper tests ----
+
+    #[test]
+    fn icon_mapper_defaults() {
+        let mapper = ThemeIconMapper::with_defaults();
+        assert_eq!(mapper.icon_count(), 5);
+        assert_eq!(mapper.resolve_icon("rust"), "🦀");
+        assert_eq!(mapper.resolve_icon("python"), "🐍");
+        assert_eq!(mapper.resolve_icon("unknown"), "📄");
+        assert!(mapper.has_icon("folder"));
+        assert!(!mapper.has_icon("go"));
+    }
+
+    #[test]
+    fn icon_mapper_register_custom() {
+        let mut mapper = ThemeIconMapper::new();
+        assert_eq!(mapper.icon_count(), 0);
+        mapper.register("go", "🐹");
+        assert!(mapper.has_icon("go"));
+        assert_eq!(mapper.resolve_icon("go"), "🐹");
+        assert_eq!(mapper.icon_count(), 1);
     }
 }

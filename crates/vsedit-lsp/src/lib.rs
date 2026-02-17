@@ -1237,6 +1237,300 @@ impl fmt::Display for CompletionList {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Diagnostic filtering
+// ---------------------------------------------------------------------------
+
+/// Severity levels for LSP diagnostics, ordered from most to least severe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiagnosticSeverityLevel {
+    Error,
+    Warning,
+    Information,
+    Hint,
+}
+
+impl DiagnosticSeverityLevel {
+    /// Returns a numeric rank where lower values are more severe.
+    pub fn severity_rank(s: &DiagnosticSeverityLevel) -> u8 {
+        match s {
+            DiagnosticSeverityLevel::Error => 0,
+            DiagnosticSeverityLevel::Warning => 1,
+            DiagnosticSeverityLevel::Information => 2,
+            DiagnosticSeverityLevel::Hint => 3,
+        }
+    }
+}
+
+impl Ord for DiagnosticSeverityLevel {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // More severe (lower rank) sorts first.
+        DiagnosticSeverityLevel::severity_rank(self)
+            .cmp(&DiagnosticSeverityLevel::severity_rank(other))
+    }
+}
+
+impl PartialOrd for DiagnosticSeverityLevel {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl fmt::Display for DiagnosticSeverityLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiagnosticSeverityLevel::Error => f.write_str("error"),
+            DiagnosticSeverityLevel::Warning => f.write_str("warning"),
+            DiagnosticSeverityLevel::Information => f.write_str("information"),
+            DiagnosticSeverityLevel::Hint => f.write_str("hint"),
+        }
+    }
+}
+
+/// Filters diagnostics by severity, code, and source.
+#[derive(Debug, Clone)]
+pub struct LspDiagnosticFilter {
+    pub min_severity: DiagnosticSeverityLevel,
+    pub ignored_codes: Vec<String>,
+    pub source_filter: Option<String>,
+}
+
+impl LspDiagnosticFilter {
+    pub fn new(min: DiagnosticSeverityLevel) -> Self {
+        Self {
+            min_severity: min,
+            ignored_codes: Vec::new(),
+            source_filter: None,
+        }
+    }
+
+    pub fn ignore_code(&mut self, code: &str) {
+        self.ignored_codes.push(code.to_string());
+    }
+
+    pub fn set_source_filter(&mut self, source: &str) {
+        self.source_filter = Some(source.to_string());
+    }
+
+    /// Returns `true` when a diagnostic with the given attributes should be
+    /// displayed according to this filter.
+    pub fn should_show(
+        &self,
+        severity: &DiagnosticSeverityLevel,
+        code: Option<&str>,
+        source: Option<&str>,
+    ) -> bool {
+        // Reject if less severe than the minimum.
+        if DiagnosticSeverityLevel::severity_rank(severity)
+            > DiagnosticSeverityLevel::severity_rank(&self.min_severity)
+        {
+            return false;
+        }
+        // Reject if the code is on the ignore list.
+        if let Some(c) = code {
+            if self.ignored_codes.iter().any(|ic| ic == c) {
+                return false;
+            }
+        }
+        // Reject if a source filter is set and the source doesn't match.
+        if let Some(ref sf) = self.source_filter {
+            match source {
+                Some(s) if s == sf => {}
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Code-action / quick-fix helpers
+// ---------------------------------------------------------------------------
+
+/// A lightweight representation of an LSP code-action quick-fix.
+#[derive(Debug, Clone)]
+pub struct LspCodeActionQuickFix {
+    pub title: String,
+    pub kind: String,
+    pub edit_count: usize,
+    pub is_preferred: bool,
+}
+
+impl LspCodeActionQuickFix {
+    pub fn new(title: &str, kind: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            kind: kind.to_string(),
+            edit_count: 0,
+            is_preferred: false,
+        }
+    }
+
+    pub fn with_preferred(mut self) -> Self {
+        self.is_preferred = true;
+        self
+    }
+
+    pub fn with_edits(mut self, count: usize) -> Self {
+        self.edit_count = count;
+        self
+    }
+
+    /// Returns `true` when the action kind starts with `"quickfix"`.
+    pub fn is_quick_fix(&self) -> bool {
+        self.kind.starts_with("quickfix")
+    }
+
+    pub fn summary(&self) -> String {
+        let preferred = if self.is_preferred { " [preferred]" } else { "" };
+        format!(
+            "{} ({}, {} edit(s)){}",
+            self.title, self.kind, self.edit_count, preferred
+        )
+    }
+}
+
+impl fmt::Display for LspCodeActionQuickFix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace symbol search
+// ---------------------------------------------------------------------------
+
+/// A single symbol found via workspace-symbol search.
+#[derive(Debug, Clone)]
+pub struct WorkspaceSymbol {
+    pub name: String,
+    pub kind: String,
+    pub location: String,
+    pub container: Option<String>,
+}
+
+impl fmt::Display for WorkspaceSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}] @ {}", self.name, self.kind, self.location)?;
+        if let Some(ref c) = self.container {
+            write!(f, " (in {})", c)?;
+        }
+        Ok(())
+    }
+}
+
+/// Collects workspace-symbol search results.
+#[derive(Debug, Clone)]
+pub struct LspWorkspaceSymbolSearch {
+    pub query: String,
+    pub results: Vec<WorkspaceSymbol>,
+}
+
+impl LspWorkspaceSymbolSearch {
+    pub fn new(query: &str) -> Self {
+        Self {
+            query: query.to_string(),
+            results: Vec::new(),
+        }
+    }
+
+    pub fn add_result(&mut self, symbol: WorkspaceSymbol) {
+        self.results.push(symbol);
+    }
+
+    pub fn filter_by_kind<'a>(&'a self, kind: &str) -> Vec<&'a WorkspaceSymbol> {
+        self.results.iter().filter(|s| s.kind == kind).collect()
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.results.len()
+    }
+
+    pub fn has_results(&self) -> bool {
+        !self.results.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Progress tracking
+// ---------------------------------------------------------------------------
+
+/// State of a single progress token.
+#[derive(Debug, Clone)]
+pub struct ProgressState {
+    pub title: String,
+    pub message: Option<String>,
+    pub percentage: Option<u32>,
+    pub done: bool,
+}
+
+/// Tracks `$/progress` notifications from one or more language servers.
+#[derive(Debug, Clone)]
+pub struct LspProgressTracker {
+    pub tokens: HashMap<String, ProgressState>,
+}
+
+impl LspProgressTracker {
+    pub fn new() -> Self {
+        Self {
+            tokens: HashMap::new(),
+        }
+    }
+
+    pub fn begin(&mut self, token: &str, title: &str) {
+        self.tokens.insert(
+            token.to_string(),
+            ProgressState {
+                title: title.to_string(),
+                message: None,
+                percentage: None,
+                done: false,
+            },
+        );
+    }
+
+    pub fn report(&mut self, token: &str, message: Option<&str>, percentage: Option<u32>) {
+        if let Some(state) = self.tokens.get_mut(token) {
+            state.message = message.map(|m| m.to_string());
+            state.percentage = percentage;
+        }
+    }
+
+    pub fn end(&mut self, token: &str) {
+        if let Some(state) = self.tokens.get_mut(token) {
+            state.done = true;
+            state.message = None;
+            state.percentage = Some(100);
+        }
+    }
+
+    /// Number of progress tokens that are still active (not done).
+    pub fn active_count(&self) -> usize {
+        self.tokens.values().filter(|s| !s.done).count()
+    }
+
+    pub fn is_done(&self, token: &str) -> bool {
+        self.tokens.get(token).map_or(true, |s| s.done)
+    }
+
+    /// Renders a simple ASCII progress bar, e.g. `[=====>    ]`.
+    pub fn render_progress_bar(pct: u32, width: usize) -> String {
+        let pct = pct.min(100) as usize;
+        let filled = width * pct / 100;
+        let empty = width - filled;
+        let arrow = if filled > 0 && empty > 0 { ">" } else { "" };
+        let fill = "=".repeat(if arrow.is_empty() { filled } else { filled.saturating_sub(1) });
+        let space = " ".repeat(if arrow.is_empty() { empty } else { empty.saturating_sub(0) });
+        format!("[{}{}{}]", fill, arrow, space)
+    }
+}
+
+impl Default for LspProgressTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2018,5 +2312,180 @@ mod tests {
         assert_eq!(CompletionKind::Variable.symbol(), 'v');
         assert_eq!(format!("{}", CompletionKind::Struct), "struct");
         assert_eq!(format!("{}", CompletionKind::EnumMember), "enum member");
+    }
+
+    // -----------------------------------------------------------------------
+    // DiagnosticSeverityLevel & LspDiagnosticFilter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn severity_level_ordering() {
+        assert!(DiagnosticSeverityLevel::Error < DiagnosticSeverityLevel::Warning);
+        assert!(DiagnosticSeverityLevel::Warning < DiagnosticSeverityLevel::Information);
+        assert!(DiagnosticSeverityLevel::Information < DiagnosticSeverityLevel::Hint);
+    }
+
+    #[test]
+    fn severity_level_display() {
+        assert_eq!(format!("{}", DiagnosticSeverityLevel::Error), "error");
+        assert_eq!(format!("{}", DiagnosticSeverityLevel::Warning), "warning");
+        assert_eq!(
+            format!("{}", DiagnosticSeverityLevel::Information),
+            "information"
+        );
+        assert_eq!(format!("{}", DiagnosticSeverityLevel::Hint), "hint");
+    }
+
+    #[test]
+    fn diagnostic_filter_severity() {
+        let filter = LspDiagnosticFilter::new(DiagnosticSeverityLevel::Warning);
+        assert!(filter.should_show(&DiagnosticSeverityLevel::Error, None, None));
+        assert!(filter.should_show(&DiagnosticSeverityLevel::Warning, None, None));
+        assert!(!filter.should_show(&DiagnosticSeverityLevel::Information, None, None));
+        assert!(!filter.should_show(&DiagnosticSeverityLevel::Hint, None, None));
+    }
+
+    #[test]
+    fn diagnostic_filter_ignored_codes() {
+        let mut filter = LspDiagnosticFilter::new(DiagnosticSeverityLevel::Hint);
+        filter.ignore_code("E0001");
+        filter.ignore_code("W0042");
+
+        assert!(filter.should_show(&DiagnosticSeverityLevel::Error, Some("E9999"), None));
+        assert!(!filter.should_show(&DiagnosticSeverityLevel::Error, Some("E0001"), None));
+        assert!(!filter.should_show(&DiagnosticSeverityLevel::Warning, Some("W0042"), None));
+        // No code provided — not ignored.
+        assert!(filter.should_show(&DiagnosticSeverityLevel::Warning, None, None));
+    }
+
+    #[test]
+    fn diagnostic_filter_source() {
+        let mut filter = LspDiagnosticFilter::new(DiagnosticSeverityLevel::Hint);
+        filter.set_source_filter("rustc");
+
+        assert!(filter.should_show(&DiagnosticSeverityLevel::Error, None, Some("rustc")));
+        assert!(!filter.should_show(&DiagnosticSeverityLevel::Error, None, Some("clippy")));
+        assert!(!filter.should_show(&DiagnosticSeverityLevel::Error, None, None));
+    }
+
+    // -----------------------------------------------------------------------
+    // LspCodeActionQuickFix tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn code_action_quick_fix_builder() {
+        let action = LspCodeActionQuickFix::new("Add import", "quickfix.import")
+            .with_preferred()
+            .with_edits(3);
+
+        assert!(action.is_quick_fix());
+        assert!(action.is_preferred);
+        assert_eq!(action.edit_count, 3);
+        assert!(action.summary().contains("[preferred]"));
+        assert!(action.summary().contains("3 edit(s)"));
+    }
+
+    #[test]
+    fn code_action_non_quickfix() {
+        let action = LspCodeActionQuickFix::new("Refactor", "refactor.extract");
+        assert!(!action.is_quick_fix());
+        assert!(!action.is_preferred);
+        let display = format!("{action}");
+        assert!(display.contains("Refactor"));
+        assert!(!display.contains("[preferred]"));
+    }
+
+    // -----------------------------------------------------------------------
+    // WorkspaceSymbol & LspWorkspaceSymbolSearch tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn workspace_symbol_display() {
+        let sym = WorkspaceSymbol {
+            name: "MyStruct".into(),
+            kind: "struct".into(),
+            location: "src/lib.rs:10".into(),
+            container: Some("my_mod".into()),
+        };
+        let s = format!("{sym}");
+        assert!(s.contains("MyStruct"));
+        assert!(s.contains("[struct]"));
+        assert!(s.contains("(in my_mod)"));
+    }
+
+    #[test]
+    fn workspace_symbol_search_filter() {
+        let mut search = LspWorkspaceSymbolSearch::new("Foo");
+        assert!(!search.has_results());
+        assert_eq!(search.result_count(), 0);
+
+        search.add_result(WorkspaceSymbol {
+            name: "FooBar".into(),
+            kind: "function".into(),
+            location: "a.rs:1".into(),
+            container: None,
+        });
+        search.add_result(WorkspaceSymbol {
+            name: "FooBaz".into(),
+            kind: "struct".into(),
+            location: "b.rs:2".into(),
+            container: None,
+        });
+        search.add_result(WorkspaceSymbol {
+            name: "FooQux".into(),
+            kind: "function".into(),
+            location: "c.rs:3".into(),
+            container: None,
+        });
+
+        assert!(search.has_results());
+        assert_eq!(search.result_count(), 3);
+        let funcs = search.filter_by_kind("function");
+        assert_eq!(funcs.len(), 2);
+        let structs = search.filter_by_kind("struct");
+        assert_eq!(structs.len(), 1);
+        assert_eq!(structs[0].name, "FooBaz");
+    }
+
+    // -----------------------------------------------------------------------
+    // LspProgressTracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn progress_tracker_lifecycle() {
+        let mut tracker = LspProgressTracker::new();
+        assert_eq!(tracker.active_count(), 0);
+        assert!(tracker.is_done("tok1"));
+
+        tracker.begin("tok1", "Indexing");
+        assert_eq!(tracker.active_count(), 1);
+        assert!(!tracker.is_done("tok1"));
+
+        tracker.report("tok1", Some("50%"), Some(50));
+        assert_eq!(tracker.tokens["tok1"].percentage, Some(50));
+
+        tracker.end("tok1");
+        assert!(tracker.is_done("tok1"));
+        assert_eq!(tracker.active_count(), 0);
+        assert_eq!(tracker.tokens["tok1"].percentage, Some(100));
+    }
+
+    #[test]
+    fn progress_tracker_render_bar() {
+        let bar = LspProgressTracker::render_progress_bar(0, 10);
+        assert!(bar.starts_with('['));
+        assert!(bar.ends_with(']'));
+
+        let full = LspProgressTracker::render_progress_bar(100, 10);
+        assert!(full.contains("=========="));
+
+        let half = LspProgressTracker::render_progress_bar(50, 10);
+        assert!(half.contains('>'));
+    }
+
+    #[test]
+    fn progress_tracker_default() {
+        let tracker = LspProgressTracker::default();
+        assert_eq!(tracker.active_count(), 0);
     }
 }

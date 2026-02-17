@@ -1232,6 +1232,144 @@ impl MergeSession {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// MergeConflictDetector
+// ---------------------------------------------------------------------------
+
+pub struct MergeConflictDetector;
+
+impl MergeConflictDetector {
+    /// Detect conflict markers in text and return their line ranges.
+    pub fn detect_markers(text: &str) -> Vec<(usize, usize)> {
+        let lines: Vec<&str> = text.lines().collect();
+        let mut conflicts = Vec::new();
+        let mut start = None;
+        for (i, line) in lines.iter().enumerate() {
+            if line.starts_with("<<<<<<<") { start = Some(i); }
+            if line.starts_with(">>>>>>>") {
+                if let Some(s) = start {
+                    conflicts.push((s, i));
+                    start = None;
+                }
+            }
+        }
+        conflicts
+    }
+
+    /// Count the number of conflict regions.
+    pub fn conflict_count(text: &str) -> usize {
+        Self::detect_markers(text).len()
+    }
+
+    /// Check if text has any unresolved conflicts.
+    pub fn has_conflicts(text: &str) -> bool {
+        Self::conflict_count(text) > 0
+    }
+
+    /// Extract the content between conflict markers at a given index.
+    pub fn extract_conflict_text(text: &str, index: usize) -> Option<String> {
+        let markers = Self::detect_markers(text);
+        markers.get(index).map(|&(start, end)| {
+            let lines: Vec<&str> = text.lines().collect();
+            lines[start..=end].join("\n")
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeAutoResolver
+// ---------------------------------------------------------------------------
+
+pub struct MergeAutoResolver;
+
+impl MergeAutoResolver {
+    /// Attempt to auto-resolve a conflict where one side is empty.
+    pub fn try_auto_resolve(conflict: &MergeConflict) -> Option<MergeResolution> {
+        if conflict.incoming_text.trim().is_empty() {
+            return Some(MergeResolution::AcceptCurrent);
+        }
+        if conflict.current_text.trim().is_empty() {
+            return Some(MergeResolution::AcceptIncoming);
+        }
+        if conflict.current_text == conflict.incoming_text {
+            return Some(MergeResolution::AcceptCurrent);
+        }
+        None
+    }
+
+    /// Auto-resolve all trivial conflicts in a widget, returning a vec of resolutions.
+    pub fn auto_resolve_all(widget: &MergeEditorWidget) -> Vec<Option<MergeResolution>> {
+        let mut resolutions: Vec<Option<MergeResolution>> = vec![None; widget.conflicts.len()];
+        for i in 0..widget.conflicts.len() {
+            if let Some(res) = Self::try_auto_resolve(&widget.conflicts[i]) {
+                resolutions[i] = Some(res);
+            }
+        }
+        resolutions
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeBase3WayViewer
+// ---------------------------------------------------------------------------
+
+pub struct MergeBase3WayViewer {
+    pub base: String,
+    pub current: String,
+    pub incoming: String,
+}
+
+impl MergeBase3WayViewer {
+    pub fn new(base: impl Into<String>, current: impl Into<String>, incoming: impl Into<String>) -> Self {
+        Self { base: base.into(), current: current.into(), incoming: incoming.into() }
+    }
+
+    pub fn base_lines(&self) -> Vec<&str> { self.base.lines().collect() }
+    pub fn current_lines(&self) -> Vec<&str> { self.current.lines().collect() }
+    pub fn incoming_lines(&self) -> Vec<&str> { self.incoming.lines().collect() }
+
+    pub fn has_base_changes(&self) -> bool { self.base != self.current }
+    pub fn has_incoming_changes(&self) -> bool { self.base != self.incoming }
+    pub fn is_trivial(&self) -> bool { !self.has_base_changes() || !self.has_incoming_changes() }
+}
+
+impl fmt::Display for MergeBase3WayViewer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "3Way(base={} lines, current={} lines, incoming={} lines)",
+            self.base_lines().len(), self.current_lines().len(), self.incoming_lines().len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeResultPreview
+// ---------------------------------------------------------------------------
+
+pub struct MergeResultPreview {
+    preview_lines: Vec<String>,
+    has_unresolved: bool,
+}
+
+impl MergeResultPreview {
+    pub fn from_widget(widget: &MergeEditorWidget) -> Self {
+        let lines = widget.get_merged_result();
+        let has_unresolved = widget.unresolved_count() > 0;
+        Self { preview_lines: lines, has_unresolved }
+    }
+
+    pub fn lines(&self) -> &[String] { &self.preview_lines }
+    pub fn line_count(&self) -> usize { self.preview_lines.len() }
+    pub fn has_unresolved(&self) -> bool { self.has_unresolved }
+
+    pub fn as_text(&self) -> String { self.preview_lines.join("\n") }
+}
+
+impl fmt::Display for MergeResultPreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Preview({} lines, unresolved={})", self.line_count(), self.has_unresolved)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2105,4 +2243,98 @@ d
         session.files[0].editor.resolve_conflict(0, MergeResolution::AcceptCurrent);
         assert_eq!(session.total_unresolved_conflicts(), 2);
     }
+
+
+    #[test]
+    fn conflict_detector_basic() {
+        let text = "line1\n<<<<<<< HEAD\ncurrent\n=======\nincoming\n>>>>>>> branch\nline2";
+        assert_eq!(MergeConflictDetector::conflict_count(text), 1);
+        assert!(MergeConflictDetector::has_conflicts(text));
+    }
+
+    #[test]
+    fn conflict_detector_no_conflicts() {
+        assert!(!MergeConflictDetector::has_conflicts("normal text"));
+    }
+
+    #[test]
+    fn conflict_detector_multiple() {
+        let text = "<<<<<<< HEAD\na\n=======\nb\n>>>>>>>\n<<<<<<< HEAD\nc\n=======\nd\n>>>>>>>";
+        assert_eq!(MergeConflictDetector::conflict_count(text), 2);
+    }
+
+    #[test]
+    fn conflict_detector_extract() {
+        let text = "<<<<<<< HEAD\ncurrent\n=======\nincoming\n>>>>>>> branch";
+        let extracted = MergeConflictDetector::extract_conflict_text(text, 0);
+        assert!(extracted.is_some());
+    }
+
+    #[test]
+    fn auto_resolver_empty_incoming() {
+        let conflict = MergeConflictBuilder::new()
+            .region(0, 5)
+            .current_text("hello")
+            .incoming_text("")
+            .build().unwrap();
+        assert_eq!(MergeAutoResolver::try_auto_resolve(&conflict), Some(MergeResolution::AcceptCurrent));
+    }
+
+    #[test]
+    fn auto_resolver_empty_current() {
+        let conflict = MergeConflictBuilder::new()
+            .region(0, 5)
+            .current_text("")
+            .incoming_text("hello")
+            .build().unwrap();
+        assert_eq!(MergeAutoResolver::try_auto_resolve(&conflict), Some(MergeResolution::AcceptIncoming));
+    }
+
+    #[test]
+    fn auto_resolver_identical() {
+        let conflict = MergeConflictBuilder::new()
+            .region(0, 5)
+            .current_text("same")
+            .incoming_text("same")
+            .build().unwrap();
+        assert_eq!(MergeAutoResolver::try_auto_resolve(&conflict), Some(MergeResolution::AcceptCurrent));
+    }
+
+    #[test]
+    fn auto_resolver_no_auto() {
+        let conflict = MergeConflictBuilder::new()
+            .region(0, 5)
+            .current_text("version a")
+            .incoming_text("version b")
+            .build().unwrap();
+        assert_eq!(MergeAutoResolver::try_auto_resolve(&conflict), None);
+    }
+
+    #[test]
+    fn three_way_viewer_basic() {
+        let viewer = MergeBase3WayViewer::new("base", "current", "incoming");
+        assert!(viewer.has_base_changes());
+        assert!(viewer.has_incoming_changes());
+        assert!(!viewer.is_trivial());
+    }
+
+    #[test]
+    fn three_way_viewer_trivial() {
+        let viewer = MergeBase3WayViewer::new("same", "same", "different");
+        assert!(viewer.is_trivial());
+    }
+
+    #[test]
+    fn result_preview() {
+        let widget = MergeEditorWidget::new();
+        let preview = MergeResultPreview::from_widget(&widget);
+        assert!(!preview.has_unresolved());
+    }
+
+    #[test]
+    fn three_way_display() {
+        let v = MergeBase3WayViewer::new("a\nb", "c", "d");
+        assert!(format!("{v}").contains("3Way"));
+    }
+
 }

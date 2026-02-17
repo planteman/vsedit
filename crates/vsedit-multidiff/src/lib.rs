@@ -962,6 +962,357 @@ impl MultiDiffHunkActions {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MultiDiffSearch – search across all diffs
+// ---------------------------------------------------------------------------
+
+/// A single search match across multiple diff files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiDiffSearchResult {
+    pub file_path: String,
+    pub line_num: usize,
+    pub line_text: String,
+    pub match_start: usize,
+    pub match_end: usize,
+}
+
+impl fmt::Display for MultiDiffSearchResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}: {} ({}..{})",
+            self.file_path, self.line_num, self.line_text, self.match_start, self.match_end,
+        )
+    }
+}
+
+/// Searches across content from multiple diff files.
+#[derive(Debug, Clone, Default)]
+pub struct MultiDiffSearch {
+    entries: Vec<(String, String)>,
+}
+
+impl MultiDiffSearch {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn add_diff(&mut self, file_path: &str, content: &str) {
+        self.entries.push((file_path.to_string(), content.to_string()));
+    }
+
+    pub fn search(&self, query: &str) -> Vec<MultiDiffSearchResult> {
+        let mut results = Vec::new();
+        if query.is_empty() {
+            return results;
+        }
+        for (path, content) in &self.entries {
+            for (idx, line) in content.lines().enumerate() {
+                let mut start = 0;
+                while let Some(pos) = line[start..].find(query) {
+                    let abs = start + pos;
+                    results.push(MultiDiffSearchResult {
+                        file_path: path.clone(),
+                        line_num: idx + 1,
+                        line_text: line.to_string(),
+                        match_start: abs,
+                        match_end: abs + query.len(),
+                    });
+                    start = abs + query.len();
+                }
+            }
+        }
+        results
+    }
+
+    pub fn search_count(&self, query: &str) -> usize {
+        self.search(query).len()
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl fmt::Display for MultiDiffSearch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MultiDiffSearch({} files)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiDiffExport – export diffs to unified patch format
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct ExportEntry {
+    file_path: String,
+    old_lines: Vec<String>,
+    new_lines: Vec<String>,
+}
+
+/// Exports diffs to unified patch format.
+#[derive(Debug, Clone, Default)]
+pub struct MultiDiffExport {
+    entries: Vec<ExportEntry>,
+}
+
+impl MultiDiffExport {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn add_file_diff(&mut self, file_path: &str, old_lines: &[&str], new_lines: &[&str]) {
+        self.entries.push(ExportEntry {
+            file_path: file_path.to_string(),
+            old_lines: old_lines.iter().map(|s| s.to_string()).collect(),
+            new_lines: new_lines.iter().map(|s| s.to_string()).collect(),
+        });
+    }
+
+    pub fn to_unified_diff(&self) -> String {
+        let mut out = String::new();
+        for entry in &self.entries {
+            out.push_str(&format!("--- a/{}\n", entry.file_path));
+            out.push_str(&format!("+++ b/{}\n", entry.file_path));
+            let old_len = entry.old_lines.len();
+            let new_len = entry.new_lines.len();
+            out.push_str(&format!("@@ -1,{old_len} +1,{new_len} @@\n"));
+
+            let max = old_len.max(new_len);
+            let mut oi = 0;
+            let mut ni = 0;
+            while oi < old_len || ni < new_len {
+                if oi < old_len && ni < new_len && entry.old_lines[oi] == entry.new_lines[ni] {
+                    out.push_str(&format!(" {}\n", entry.old_lines[oi]));
+                    oi += 1;
+                    ni += 1;
+                } else {
+                    // emit removals first, then additions
+                    let mut removed = 0;
+                    let save_oi = oi;
+                    while oi < old_len
+                        && (ni >= new_len || entry.old_lines[oi] != entry.new_lines[ni])
+                    {
+                        out.push_str(&format!("-{}\n", entry.old_lines[oi]));
+                        oi += 1;
+                        removed += 1;
+                        if removed >= (max - save_oi) {
+                            break;
+                        }
+                    }
+                    while ni < new_len
+                        && (oi >= old_len || entry.new_lines[ni] != entry.old_lines[oi])
+                    {
+                        out.push_str(&format!("+{}\n", entry.new_lines[ni]));
+                        ni += 1;
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl fmt::Display for MultiDiffExport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MultiDiffExport({} files)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiDiffMerge – merge adjacent hunks
+// ---------------------------------------------------------------------------
+
+/// A hunk resulting from merging adjacent hunks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergedHunk {
+    pub file: String,
+    pub start: usize,
+    pub old_count: usize,
+    pub new_count: usize,
+    pub content: String,
+}
+
+impl fmt::Display for MergedHunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}@{} -{}/+{}",
+            self.file, self.start, self.old_count, self.new_count,
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RawHunk {
+    file: String,
+    start: usize,
+    old_count: usize,
+    new_count: usize,
+    content: String,
+}
+
+/// Combines multiple hunks, merging those within a gap threshold.
+#[derive(Debug, Clone, Default)]
+pub struct MultiDiffMerge {
+    hunks: Vec<RawHunk>,
+}
+
+impl MultiDiffMerge {
+    pub fn new() -> Self {
+        Self { hunks: Vec::new() }
+    }
+
+    pub fn add_hunk(&mut self, file: &str, start: usize, old_count: usize, new_count: usize, content: &str) {
+        self.hunks.push(RawHunk {
+            file: file.to_string(),
+            start,
+            old_count,
+            new_count,
+            content: content.to_string(),
+        });
+    }
+
+    /// Merge hunks for the same file that are within `max_gap` lines of each other.
+    pub fn merge_adjacent(&self, max_gap: usize) -> Vec<MergedHunk> {
+        // Group by file, preserving insertion order within each file.
+        let mut by_file: Vec<(String, Vec<&RawHunk>)> = Vec::new();
+        for h in &self.hunks {
+            if let Some(entry) = by_file.iter_mut().find(|(f, _)| *f == h.file) {
+                entry.1.push(h);
+            } else {
+                by_file.push((h.file.clone(), vec![h]));
+            }
+        }
+
+        let mut merged = Vec::new();
+        for (file, mut group) in by_file {
+            group.sort_by_key(|h| h.start);
+
+            let mut cur_start = group[0].start;
+            let mut cur_old = group[0].old_count;
+            let mut cur_new = group[0].new_count;
+            let mut cur_content = group[0].content.clone();
+
+            for h in group.iter().skip(1) {
+                let cur_end = cur_start + cur_old;
+                if h.start <= cur_end + max_gap {
+                    let gap = h.start.saturating_sub(cur_end);
+                    for _ in 0..gap {
+                        cur_content.push('\n');
+                    }
+                    cur_content.push_str(&h.content);
+                    let new_end = (cur_start + cur_old).max(h.start + h.old_count);
+                    cur_old = new_end - cur_start;
+                    let new_new_end = (cur_start + cur_new).max(h.start + h.new_count);
+                    cur_new = new_new_end - cur_start;
+                } else {
+                    merged.push(MergedHunk {
+                        file: file.clone(),
+                        start: cur_start,
+                        old_count: cur_old,
+                        new_count: cur_new,
+                        content: cur_content,
+                    });
+                    cur_start = h.start;
+                    cur_old = h.old_count;
+                    cur_new = h.new_count;
+                    cur_content = h.content.clone();
+                }
+            }
+            merged.push(MergedHunk {
+                file: file.clone(),
+                start: cur_start,
+                old_count: cur_old,
+                new_count: cur_new,
+                content: cur_content,
+            });
+        }
+        merged
+    }
+
+    pub fn hunk_count(&self) -> usize {
+        self.hunks.len()
+    }
+}
+
+impl fmt::Display for MultiDiffMerge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MultiDiffMerge({} hunks)", self.hunks.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiDiffFilter – filter diffs by change type
+// ---------------------------------------------------------------------------
+
+/// The kind of change for filtering purposes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiffChangeKind {
+    Added,
+    Removed,
+    Modified,
+    Renamed,
+}
+
+impl fmt::Display for DiffChangeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiffChangeKind::Added => write!(f, "Added"),
+            DiffChangeKind::Removed => write!(f, "Removed"),
+            DiffChangeKind::Modified => write!(f, "Modified"),
+            DiffChangeKind::Renamed => write!(f, "Renamed"),
+        }
+    }
+}
+
+/// Filters diff files by their change type.
+#[derive(Debug, Clone, Default)]
+pub struct MultiDiffFilter {
+    changes: Vec<(String, DiffChangeKind)>,
+}
+
+impl MultiDiffFilter {
+    pub fn new() -> Self {
+        Self { changes: Vec::new() }
+    }
+
+    pub fn add_change(&mut self, file: &str, kind: DiffChangeKind) {
+        self.changes.push((file.to_string(), kind));
+    }
+
+    pub fn files_with_kind(&self, kind: DiffChangeKind) -> Vec<&str> {
+        self.changes
+            .iter()
+            .filter(|(_, k)| *k == kind)
+            .map(|(f, _)| f.as_str())
+            .collect()
+    }
+
+    pub fn filter_by_kind(&self, kind: DiffChangeKind) -> Vec<&str> {
+        self.files_with_kind(kind)
+    }
+
+    pub fn total_files(&self) -> usize {
+        self.changes.len()
+    }
+
+    pub fn count_by_kind(&self, kind: DiffChangeKind) -> usize {
+        self.changes.iter().filter(|(_, k)| *k == kind).count()
+    }
+}
+
+impl fmt::Display for MultiDiffFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MultiDiffFilter({} files)", self.changes.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2182,5 +2533,144 @@ mod diff_view_tests {
         let view = DiffView::from_texts("a\n", "a\n", "left.rs", "right.rs");
         assert_eq!(view.title_left, "left.rs");
         assert_eq!(view.title_right, "right.rs");
+    }
+
+    // --- MultiDiffSearch tests ---
+
+    #[test]
+    fn search_finds_matches_across_files() {
+        let mut s = MultiDiffSearch::new();
+        s.add_diff("a.rs", "fn main() {}\nlet x = 1;");
+        s.add_diff("b.rs", "fn helper() {}\nfn aux() {}");
+        let results = s.search("fn");
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].file_path, "a.rs");
+        assert_eq!(results[1].file_path, "b.rs");
+    }
+
+    #[test]
+    fn search_empty_query_returns_nothing() {
+        let mut s = MultiDiffSearch::new();
+        s.add_diff("a.rs", "hello world");
+        assert_eq!(s.search("").len(), 0);
+    }
+
+    #[test]
+    fn search_count_and_file_count() {
+        let mut s = MultiDiffSearch::new();
+        s.add_diff("x.rs", "aaa\naab\naaa");
+        s.add_diff("y.rs", "bbb");
+        assert_eq!(s.file_count(), 2);
+        assert_eq!(s.search_count("aa"), 3);
+    }
+
+    #[test]
+    fn search_result_display() {
+        let r = MultiDiffSearchResult {
+            file_path: "f.rs".into(),
+            line_num: 3,
+            line_text: "let x = 42;".into(),
+            match_start: 4,
+            match_end: 5,
+        };
+        let disp = format!("{r}");
+        assert!(disp.contains("f.rs:3"));
+    }
+
+    // --- MultiDiffExport tests ---
+
+    #[test]
+    fn export_unified_diff_headers() {
+        let mut e = MultiDiffExport::new();
+        e.add_file_diff("main.rs", &["a", "b"], &["a", "c"]);
+        let diff = e.to_unified_diff();
+        assert!(diff.contains("--- a/main.rs"));
+        assert!(diff.contains("+++ b/main.rs"));
+        assert!(diff.contains("@@ -1,2 +1,2 @@"));
+    }
+
+    #[test]
+    fn export_file_count() {
+        let mut e = MultiDiffExport::new();
+        assert_eq!(e.file_count(), 0);
+        e.add_file_diff("a.rs", &["x"], &["y"]);
+        e.add_file_diff("b.rs", &["x"], &["y"]);
+        assert_eq!(e.file_count(), 2);
+    }
+
+    #[test]
+    fn export_display() {
+        let e = MultiDiffExport::new();
+        assert_eq!(format!("{e}"), "MultiDiffExport(0 files)");
+    }
+
+    // --- MultiDiffMerge tests ---
+
+    #[test]
+    fn merge_adjacent_hunks() {
+        let mut m = MultiDiffMerge::new();
+        m.add_hunk("f.rs", 1, 3, 3, "abc");
+        m.add_hunk("f.rs", 5, 2, 2, "de");
+        let merged = m.merge_adjacent(2);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].file, "f.rs");
+        assert_eq!(merged[0].start, 1);
+    }
+
+    #[test]
+    fn merge_non_adjacent_hunks() {
+        let mut m = MultiDiffMerge::new();
+        m.add_hunk("f.rs", 1, 2, 2, "ab");
+        m.add_hunk("f.rs", 20, 2, 2, "xy");
+        let merged = m.merge_adjacent(1);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_hunk_count() {
+        let mut m = MultiDiffMerge::new();
+        m.add_hunk("a.rs", 1, 1, 1, "x");
+        m.add_hunk("a.rs", 5, 1, 1, "y");
+        m.add_hunk("b.rs", 1, 1, 1, "z");
+        assert_eq!(m.hunk_count(), 3);
+    }
+
+    // --- MultiDiffFilter tests ---
+
+    #[test]
+    fn filter_by_kind_returns_correct_files() {
+        let mut f = MultiDiffFilter::new();
+        f.add_change("a.rs", DiffChangeKind::Added);
+        f.add_change("b.rs", DiffChangeKind::Modified);
+        f.add_change("c.rs", DiffChangeKind::Added);
+        let added = f.files_with_kind(DiffChangeKind::Added);
+        assert_eq!(added, vec!["a.rs", "c.rs"]);
+    }
+
+    #[test]
+    fn filter_total_and_count_by_kind() {
+        let mut f = MultiDiffFilter::new();
+        f.add_change("a.rs", DiffChangeKind::Removed);
+        f.add_change("b.rs", DiffChangeKind::Removed);
+        f.add_change("c.rs", DiffChangeKind::Renamed);
+        assert_eq!(f.total_files(), 3);
+        assert_eq!(f.count_by_kind(DiffChangeKind::Removed), 2);
+        assert_eq!(f.count_by_kind(DiffChangeKind::Renamed), 1);
+        assert_eq!(f.count_by_kind(DiffChangeKind::Added), 0);
+    }
+
+    #[test]
+    fn filter_display() {
+        let mut f = MultiDiffFilter::new();
+        f.add_change("x.rs", DiffChangeKind::Modified);
+        assert_eq!(format!("{f}"), "MultiDiffFilter(1 files)");
+    }
+
+    #[test]
+    fn diff_change_kind_display() {
+        assert_eq!(format!("{}", DiffChangeKind::Added), "Added");
+        assert_eq!(format!("{}", DiffChangeKind::Removed), "Removed");
+        assert_eq!(format!("{}", DiffChangeKind::Modified), "Modified");
+        assert_eq!(format!("{}", DiffChangeKind::Renamed), "Renamed");
     }
 }

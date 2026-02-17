@@ -1,5 +1,6 @@
 //! Quick input model service.
 
+use std::collections::HashMap;
 use std::fmt;
 
 // ---------------------------------------------------------------------------
@@ -1237,6 +1238,289 @@ impl RichQuickPickItem {
     }
 }
 
+// ---------------------------------------------------------------------------
+// QuickInputTheme
+// ---------------------------------------------------------------------------
+
+/// Theme configuration for quick input UI elements.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickInputTheme {
+    pub background: String,
+    pub foreground: String,
+    pub highlight_color: String,
+    pub border_color: String,
+    pub selected_bg: String,
+}
+
+impl QuickInputTheme {
+    /// Create a theme with sensible dark defaults.
+    pub fn new() -> Self {
+        Self {
+            background: "#1e1e1e".into(),
+            foreground: "#cccccc".into(),
+            highlight_color: "#007acc".into(),
+            border_color: "#454545".into(),
+            selected_bg: "#094771".into(),
+        }
+    }
+
+    /// Predefined dark theme.
+    pub fn dark() -> Self {
+        Self::new()
+    }
+
+    /// Predefined light theme.
+    pub fn light() -> Self {
+        Self {
+            background: "#ffffff".into(),
+            foreground: "#333333".into(),
+            highlight_color: "#0066b8".into(),
+            border_color: "#c8c8c8".into(),
+            selected_bg: "#dceafa".into(),
+        }
+    }
+
+    /// Override the highlight color.
+    pub fn with_highlight(mut self, color: &str) -> Self {
+        self.highlight_color = color.into();
+        self
+    }
+
+    /// Return a map of CSS-like variable names to their color values.
+    pub fn css_vars(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("--quick-input-bg".into(), self.background.clone());
+        map.insert("--quick-input-fg".into(), self.foreground.clone());
+        map.insert("--quick-input-highlight".into(), self.highlight_color.clone());
+        map.insert("--quick-input-border".into(), self.border_color.clone());
+        map.insert("--quick-input-selected-bg".into(), self.selected_bg.clone());
+        map
+    }
+}
+
+impl Default for QuickInputTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputAccessibility
+// ---------------------------------------------------------------------------
+
+/// ARIA live region behaviour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AriaLive {
+    Off,
+    Polite,
+    Assertive,
+}
+
+impl fmt::Display for AriaLive {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AriaLive::Off => write!(f, "off"),
+            AriaLive::Polite => write!(f, "polite"),
+            AriaLive::Assertive => write!(f, "assertive"),
+        }
+    }
+}
+
+/// Accessibility metadata for a quick input widget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickInputAccessibility {
+    pub role: String,
+    pub label: String,
+    pub live_region: AriaLive,
+    pub expanded: bool,
+}
+
+impl QuickInputAccessibility {
+    /// Create with sensible defaults for a listbox.
+    pub fn new(label: &str) -> Self {
+        Self {
+            role: "listbox".into(),
+            label: label.into(),
+            live_region: AriaLive::Polite,
+            expanded: false,
+        }
+    }
+
+    /// Override the ARIA role.
+    pub fn with_role(mut self, role: &str) -> Self {
+        self.role = role.into();
+        self
+    }
+
+    /// Produce a human-readable announcement string.
+    pub fn announce(&self) -> String {
+        format!(
+            "role=\"{}\" aria-label=\"{}\" aria-live=\"{}\" aria-expanded=\"{}\"",
+            self.role, self.label, self.live_region, self.expanded,
+        )
+    }
+
+    /// Set whether the widget is expanded.
+    pub fn set_expanded(&mut self, expanded: bool) {
+        self.expanded = expanded;
+    }
+
+    /// Return a map of ARIA attribute names to their values.
+    pub fn aria_attrs(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("role".into(), self.role.clone());
+        map.insert("aria-label".into(), self.label.clone());
+        map.insert("aria-live".into(), self.live_region.to_string());
+        map.insert("aria-expanded".into(), self.expanded.to_string());
+        map
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputSeparator
+// ---------------------------------------------------------------------------
+
+/// The visual style of a separator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeparatorKind {
+    Line,
+    Space,
+    Label,
+}
+
+/// A separator that can appear between quick-pick items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickInputSeparator {
+    pub label: Option<String>,
+    pub kind: SeparatorKind,
+}
+
+impl QuickInputSeparator {
+    /// A thin horizontal line separator.
+    pub fn line() -> Self {
+        Self { label: None, kind: SeparatorKind::Line }
+    }
+
+    /// An empty space separator.
+    pub fn space() -> Self {
+        Self { label: None, kind: SeparatorKind::Space }
+    }
+
+    /// A labeled separator such as `── Recent ──`.
+    pub fn labeled(text: &str) -> Self {
+        Self { label: Some(text.into()), kind: SeparatorKind::Label }
+    }
+
+    /// Render the separator to a fixed `width`.
+    pub fn render(&self, width: usize) -> String {
+        match self.kind {
+            SeparatorKind::Line => "─".repeat(width),
+            SeparatorKind::Space => String::new(),
+            SeparatorKind::Label => {
+                let text = self.label.as_deref().unwrap_or("");
+                let content = format!(" {} ", text);
+                let content_len = content.chars().count();
+                if width <= content_len {
+                    return content;
+                }
+                let remaining = width - content_len;
+                let left = remaining / 2;
+                let right = remaining - left;
+                format!(
+                    "{}{}{}",
+                    "─".repeat(left),
+                    content,
+                    "─".repeat(right),
+                )
+            }
+        }
+    }
+}
+
+impl fmt::Display for QuickInputSeparator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render(40))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputBusyIndicator
+// ---------------------------------------------------------------------------
+
+const SPINNER_FRAMES: &[char] = &['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+/// A busy / progress indicator for long-running quick-input operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct QuickInputBusyIndicator {
+    pub active: bool,
+    pub message: Option<String>,
+    pub progress: Option<f32>,
+    pub spinner_frame: usize,
+}
+
+impl QuickInputBusyIndicator {
+    /// Create an inactive indicator.
+    pub fn new() -> Self {
+        Self {
+            active: false,
+            message: None,
+            progress: None,
+            spinner_frame: 0,
+        }
+    }
+
+    /// Start the indicator with a message.
+    pub fn start(&mut self, msg: &str) {
+        self.active = true;
+        self.message = Some(msg.into());
+        self.spinner_frame = 0;
+    }
+
+    /// Stop the indicator and clear state.
+    pub fn stop(&mut self) {
+        self.active = false;
+        self.message = None;
+        self.progress = None;
+        self.spinner_frame = 0;
+    }
+
+    /// Set progress as a percentage (0.0–100.0), clamped.
+    pub fn set_progress(&mut self, pct: f32) {
+        self.progress = Some(pct.clamp(0.0, 100.0));
+    }
+
+    /// Advance the spinner and return the current frame character.
+    pub fn tick(&mut self) -> char {
+        let ch = SPINNER_FRAMES[self.spinner_frame % SPINNER_FRAMES.len()];
+        self.spinner_frame = self.spinner_frame.wrapping_add(1);
+        ch
+    }
+
+    /// Render the indicator to a string.
+    pub fn render(&self) -> String {
+        if !self.active {
+            return String::new();
+        }
+        let spinner = SPINNER_FRAMES[self.spinner_frame % SPINNER_FRAMES.len()];
+        let msg = self.message.as_deref().unwrap_or("");
+        match self.progress {
+            Some(pct) => format!("{} {} ({:.0}%)", spinner, msg, pct),
+            None => format!("{} {}", spinner, msg),
+        }
+    }
+
+    /// Whether the indicator is currently active.
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+}
+
+impl Default for QuickInputBusyIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2008,5 +2292,161 @@ mod tests {
 
         let b2 = QuickPickBadge::new("!").with_tooltip("Warning");
         assert_eq!(b2.tooltip.as_deref(), Some("Warning"));
+    }
+
+    // -----------------------------------------------------------------------
+    // QuickInputTheme tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn theme_default_is_dark() {
+        let theme = QuickInputTheme::new();
+        assert_eq!(theme.background, "#1e1e1e");
+        assert_eq!(theme, QuickInputTheme::dark());
+    }
+
+    #[test]
+    fn theme_light_differs_from_dark() {
+        let dark = QuickInputTheme::dark();
+        let light = QuickInputTheme::light();
+        assert_ne!(dark.background, light.background);
+        assert_ne!(dark.foreground, light.foreground);
+    }
+
+    #[test]
+    fn theme_with_highlight_overrides() {
+        let theme = QuickInputTheme::new().with_highlight("#ff0000");
+        assert_eq!(theme.highlight_color, "#ff0000");
+        assert_eq!(theme.background, "#1e1e1e"); // unchanged
+    }
+
+    #[test]
+    fn theme_css_vars_has_all_keys() {
+        let vars = QuickInputTheme::new().css_vars();
+        assert_eq!(vars.len(), 5);
+        assert_eq!(vars["--quick-input-bg"], "#1e1e1e");
+        assert!(vars.contains_key("--quick-input-selected-bg"));
+    }
+
+    // -----------------------------------------------------------------------
+    // QuickInputAccessibility tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn accessibility_defaults() {
+        let a11y = QuickInputAccessibility::new("Command Palette");
+        assert_eq!(a11y.role, "listbox");
+        assert_eq!(a11y.live_region, AriaLive::Polite);
+        assert!(!a11y.expanded);
+    }
+
+    #[test]
+    fn accessibility_with_role_and_expand() {
+        let mut a11y = QuickInputAccessibility::new("Search")
+            .with_role("combobox");
+        assert_eq!(a11y.role, "combobox");
+        a11y.set_expanded(true);
+        assert!(a11y.expanded);
+        let ann = a11y.announce();
+        assert!(ann.contains("combobox"));
+        assert!(ann.contains("aria-expanded=\"true\""));
+    }
+
+    #[test]
+    fn accessibility_aria_attrs_map() {
+        let a11y = QuickInputAccessibility::new("Files");
+        let attrs = a11y.aria_attrs();
+        assert_eq!(attrs["role"], "listbox");
+        assert_eq!(attrs["aria-label"], "Files");
+        assert_eq!(attrs["aria-live"], "polite");
+        assert_eq!(attrs["aria-expanded"], "false");
+    }
+
+    #[test]
+    fn aria_live_display() {
+        assert_eq!(AriaLive::Off.to_string(), "off");
+        assert_eq!(AriaLive::Polite.to_string(), "polite");
+        assert_eq!(AriaLive::Assertive.to_string(), "assertive");
+    }
+
+    // -----------------------------------------------------------------------
+    // QuickInputSeparator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn separator_line_render() {
+        let sep = QuickInputSeparator::line();
+        let rendered = sep.render(10);
+        assert_eq!(rendered.chars().count(), 10);
+        assert!(rendered.chars().all(|c| c == '─'));
+    }
+
+    #[test]
+    fn separator_space_render_empty() {
+        let sep = QuickInputSeparator::space();
+        assert!(sep.render(20).is_empty());
+    }
+
+    #[test]
+    fn separator_labeled_render() {
+        let sep = QuickInputSeparator::labeled("Recent");
+        let rendered = sep.render(30);
+        assert!(rendered.contains("Recent"));
+        assert!(rendered.contains('─'));
+    }
+
+    #[test]
+    fn separator_display_uses_default_width() {
+        let sep = QuickInputSeparator::line();
+        let display = sep.to_string();
+        assert_eq!(display.chars().count(), 40);
+    }
+
+    // -----------------------------------------------------------------------
+    // QuickInputBusyIndicator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn busy_indicator_lifecycle() {
+        let mut ind = QuickInputBusyIndicator::new();
+        assert!(!ind.is_active());
+        assert!(ind.render().is_empty());
+
+        ind.start("Loading…");
+        assert!(ind.is_active());
+        let r = ind.render();
+        assert!(r.contains("Loading…"));
+
+        ind.stop();
+        assert!(!ind.is_active());
+        assert!(ind.render().is_empty());
+    }
+
+    #[test]
+    fn busy_indicator_tick_cycles() {
+        let mut ind = QuickInputBusyIndicator::new();
+        let first = ind.tick();
+        assert_eq!(first, '⠋');
+        let second = ind.tick();
+        assert_eq!(second, '⠙');
+        // Cycle through all 10 frames and wrap
+        for _ in 2..10 {
+            ind.tick();
+        }
+        assert_eq!(ind.tick(), '⠋');
+    }
+
+    #[test]
+    fn busy_indicator_progress() {
+        let mut ind = QuickInputBusyIndicator::new();
+        ind.start("Indexing");
+        ind.set_progress(42.5);
+        let r = ind.render();
+        assert!(r.contains("42%") || r.contains("43%"));
+        assert!(r.contains("Indexing"));
+
+        // Clamp above 100
+        ind.set_progress(150.0);
+        assert_eq!(ind.progress, Some(100.0));
     }
 }

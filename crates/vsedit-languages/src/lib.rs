@@ -1033,6 +1033,340 @@ impl From<&str> for LanguageBracketConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Language auto-detection by content patterns
+// ---------------------------------------------------------------------------
+
+/// Detects language by file content patterns such as shebangs, magic comments,
+/// and XML declarations. Unlike [`LanguageDetector`] which uses built-in
+/// heuristics, this type focuses on explicit first-line markers and allows
+/// full customization of patterns.
+pub struct LanguageAutoDetector {
+    patterns: Vec<(regex::Regex, String)>,
+}
+
+impl LanguageAutoDetector {
+    /// Create a detector pre-loaded with common content patterns.
+    pub fn new() -> Self {
+        let defaults: &[(&str, &str)] = &[
+            (r"^#!\s*/usr/bin/env\s+(\S+)", ""),   // generic shebang (env form)
+            (r"^#!\s*/bin/(\S+)", ""),               // generic shebang (direct form)
+            (r"^<\?xml\b", "xml"),
+            (r"^<!DOCTYPE\s+html", "html"),
+            (r"^#\s*-\*-\s*mode:\s*(\S+)", ""),      // Emacs mode line
+            (r"^//\s*-\*-\s*mode:\s*(\S+)", ""),      // C-style mode line
+            (r"^<\?php", "php"),
+        ];
+        let mut patterns = Vec::new();
+        for &(pat, lang) in defaults {
+            if let Ok(re) = regex::Regex::new(pat) {
+                patterns.push((re, lang.to_string()));
+            }
+        }
+        Self { patterns }
+    }
+
+    /// Detect language from the full file content.
+    ///
+    /// Checks the first line against all registered patterns. For shebang
+    /// patterns the interpreter name is mapped to a canonical language id.
+    pub fn detect_by_content(&self, content: &str) -> Option<String> {
+        let first_line = content.lines().next().unwrap_or("");
+        self.detect_by_first_line(first_line)
+    }
+
+    /// Detect language from just the first line of a file.
+    pub fn detect_by_first_line(&self, line: &str) -> Option<String> {
+        let trimmed = line.trim();
+        for (re, lang) in &self.patterns {
+            if let Some(caps) = re.captures(trimmed) {
+                if !lang.is_empty() {
+                    return Some(lang.clone());
+                }
+                // Extract the captured interpreter/mode name.
+                if let Some(m) = caps.get(1) {
+                    return Some(Self::normalize_interpreter(m.as_str()));
+                }
+            }
+        }
+        None
+    }
+
+    /// Register a custom pattern. The pattern is tested against the first line
+    /// of the file; if it matches, `language_id` is returned.
+    pub fn add_pattern(&mut self, pattern: &str, language_id: &str) -> Result<(), regex::Error> {
+        let re = regex::Regex::new(pattern)?;
+        self.patterns.push((re, language_id.to_string()));
+        Ok(())
+    }
+
+    /// Return the number of registered patterns.
+    pub fn pattern_count(&self) -> usize {
+        self.patterns.len()
+    }
+
+    /// Map common interpreter names to canonical language identifiers.
+    fn normalize_interpreter(name: &str) -> String {
+        match name {
+            "python" | "python3" | "python2" => "python".to_string(),
+            "node" | "nodejs" => "javascript".to_string(),
+            "ruby" | "irb" => "ruby".to_string(),
+            "perl" | "perl5" | "perl6" => "perl".to_string(),
+            "bash" | "sh" | "zsh" | "fish" | "dash" => "shellscript".to_string(),
+            "php" => "php".to_string(),
+            "lua" | "luajit" => "lua".to_string(),
+            other => other.to_string(),
+        }
+    }
+}
+
+impl Default for LanguageAutoDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LanguageAutoDetector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageAutoDetector({} patterns)", self.patterns.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language configuration resolver
+// ---------------------------------------------------------------------------
+
+/// Resolved editing configuration for a language, with easy access to comment
+/// style and auto-closing pairs.
+#[derive(Debug, Clone)]
+pub struct LanguageResolvedEditConfig {
+    /// Line comment prefix, if any (e.g. `"//"`).
+    pub line_comment: Option<String>,
+    /// Block comment opening delimiter, if any (e.g. `"/*"`).
+    pub block_comment_start: Option<String>,
+    /// Block comment closing delimiter, if any (e.g. `"*/"`).
+    pub block_comment_end: Option<String>,
+    /// Auto-closing pairs as `(open, close)` tuples.
+    pub auto_closing_pairs: Vec<(String, String)>,
+}
+
+/// Resolves comment style and bracket configuration for a language by
+/// consulting a [`LanguageService`].
+pub struct LanguageConfigurationResolver<'a> {
+    svc: &'a LanguageService,
+}
+
+impl<'a> LanguageConfigurationResolver<'a> {
+    /// Create a resolver backed by the given service.
+    pub fn new(svc: &'a LanguageService) -> Self {
+        Self { svc }
+    }
+
+    /// Resolve the editing configuration for `language_id`.
+    ///
+    /// Returns a simplified [`LanguageResolvedEditConfig`] with comment and
+    /// auto-closing pair information. If the language has no registered edit
+    /// config, sensible defaults are returned.
+    pub fn resolve(&self, language_id: &str) -> LanguageResolvedEditConfig {
+        match self.svc.get_edit_config(language_id) {
+            Some(cfg) => {
+                let (bcs, bce) = match &cfg.comments.block_comment {
+                    Some((s, e)) => (Some(s.clone()), Some(e.clone())),
+                    None => (None, None),
+                };
+                LanguageResolvedEditConfig {
+                    line_comment: cfg.comments.line_comment.clone(),
+                    block_comment_start: bcs,
+                    block_comment_end: bce,
+                    auto_closing_pairs: cfg
+                        .auto_closing_pairs
+                        .iter()
+                        .map(|p| (p.open.clone(), p.close.clone()))
+                        .collect(),
+                }
+            }
+            None => LanguageResolvedEditConfig {
+                line_comment: None,
+                block_comment_start: None,
+                block_comment_end: None,
+                auto_closing_pairs: Vec::new(),
+            },
+        }
+    }
+
+    /// Check whether a language supports line comments.
+    pub fn has_line_comment(&self, language_id: &str) -> bool {
+        self.resolve(language_id).line_comment.is_some()
+    }
+
+    /// Check whether a language supports block comments.
+    pub fn has_block_comment(&self, language_id: &str) -> bool {
+        self.resolve(language_id).block_comment_start.is_some()
+    }
+}
+
+impl std::fmt::Display for LanguageConfigurationResolver<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageConfigurationResolver")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Embedded language scope tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks a stack of embedded languages, e.g. JavaScript inside HTML `<script>`
+/// tags, or CSS inside `<style>` tags.
+///
+/// The bottom of the stack is the host language; subsequent entries represent
+/// nested embedded regions.
+#[derive(Debug, Clone)]
+pub struct LanguageScope {
+    stack: Vec<String>,
+}
+
+impl LanguageScope {
+    /// Create a scope tracker rooted at `host_language`.
+    pub fn new(host_language: &str) -> Self {
+        Self {
+            stack: vec![host_language.to_string()],
+        }
+    }
+
+    /// Push an embedded language onto the scope stack.
+    pub fn push_scope(&mut self, lang_id: &str) {
+        self.stack.push(lang_id.to_string());
+    }
+
+    /// Pop the most recently pushed scope, returning its language id.
+    ///
+    /// The host language (bottom of the stack) is never popped; attempting to
+    /// pop when only the host remains returns `None`.
+    pub fn pop_scope(&mut self) -> Option<String> {
+        if self.stack.len() > 1 {
+            self.stack.pop()
+        } else {
+            None
+        }
+    }
+
+    /// Return the language id of the current (innermost) scope.
+    pub fn current_language(&self) -> &str {
+        self.stack.last().map(|s| s.as_str()).unwrap_or("plaintext")
+    }
+
+    /// Return the nesting depth. A depth of 1 means only the host language is
+    /// active (no embedded regions).
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Return the host (root) language.
+    pub fn host_language(&self) -> &str {
+        self.stack.first().map(|s| s.as_str()).unwrap_or("plaintext")
+    }
+
+    /// Return `true` if currently inside an embedded region.
+    pub fn is_embedded(&self) -> bool {
+        self.stack.len() > 1
+    }
+}
+
+impl std::fmt::Display for LanguageScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageScope({})", self.stack.join(" > "))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language alias mapper
+// ---------------------------------------------------------------------------
+
+/// Bidirectional mapper between language aliases and canonical language
+/// identifiers.
+///
+/// Unlike [`LanguageIdNormalizer`], this mapper supports reverse lookups:
+/// given a canonical id, find all known aliases.
+pub struct LanguageAliasMapper {
+    /// alias (lowercased) → canonical id
+    to_canonical: std::collections::HashMap<String, String>,
+    /// canonical id → set of aliases
+    from_canonical: std::collections::HashMap<String, Vec<String>>,
+}
+
+impl LanguageAliasMapper {
+    /// Create an empty mapper.
+    pub fn new() -> Self {
+        Self {
+            to_canonical: std::collections::HashMap::new(),
+            from_canonical: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register `alias` as an alternate name for `canonical`.
+    pub fn add_alias(&mut self, alias: &str, canonical: &str) {
+        let alias_lower = alias.to_lowercase();
+        let canon_lower = canonical.to_lowercase();
+        self.to_canonical
+            .insert(alias_lower.clone(), canon_lower.clone());
+        self.from_canonical
+            .entry(canon_lower)
+            .or_default()
+            .push(alias_lower);
+    }
+
+    /// Resolve a name to its canonical language id.
+    ///
+    /// If the name is not a known alias it is returned as-is (lowercased).
+    pub fn resolve<'a>(&'a self, name: &'a str) -> &'a str {
+        let lower = name.to_lowercase();
+        // Need to check the map; if found return the stored canonical value,
+        // otherwise return name unchanged.
+        match self.to_canonical.get(&lower) {
+            Some(canonical) => canonical.as_str(),
+            None => name,
+        }
+    }
+
+    /// Return all aliases registered for `canonical`.
+    pub fn aliases_for(&self, canonical: &str) -> Vec<String> {
+        let canon_lower = canonical.to_lowercase();
+        self.from_canonical
+            .get(&canon_lower)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Return the total number of alias mappings.
+    pub fn alias_count(&self) -> usize {
+        self.to_canonical.len()
+    }
+
+    /// Return `true` if two names resolve to the same canonical id.
+    pub fn are_equivalent(&self, a: &str, b: &str) -> bool {
+        let ra = self.to_canonical.get(&a.to_lowercase()).map(|s| s.as_str()).unwrap_or(a);
+        let rb = self.to_canonical.get(&b.to_lowercase()).map(|s| s.as_str()).unwrap_or(b);
+        ra.eq_ignore_ascii_case(rb)
+    }
+}
+
+impl Default for LanguageAliasMapper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LanguageAliasMapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "LanguageAliasMapper({} aliases, {} canonical ids)",
+            self.to_canonical.len(),
+            self.from_canonical.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -2121,5 +2455,146 @@ mod tests {
         assert!(cfg.is_open_bracket("("));
         assert!(cfg.is_close_bracket("]"));
         assert_eq!(cfg.matching_close("{"), Some("}"));
+    }
+
+    // -- LanguageAutoDetector -----------------------------------------------
+
+    #[test]
+    fn auto_detector_shebang_env_python() {
+        let det = LanguageAutoDetector::new();
+        assert_eq!(
+            det.detect_by_first_line("#!/usr/bin/env python3"),
+            Some("python".to_string()),
+        );
+    }
+
+    #[test]
+    fn auto_detector_shebang_direct_bash() {
+        let det = LanguageAutoDetector::new();
+        assert_eq!(
+            det.detect_by_first_line("#!/bin/bash"),
+            Some("shellscript".to_string()),
+        );
+    }
+
+    #[test]
+    fn auto_detector_xml_declaration() {
+        let det = LanguageAutoDetector::new();
+        let content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root/>";
+        assert_eq!(det.detect_by_content(content), Some("xml".to_string()));
+    }
+
+    #[test]
+    fn auto_detector_custom_pattern() {
+        let mut det = LanguageAutoDetector::new();
+        det.add_pattern(r"^%!PS", "postscript").unwrap();
+        assert_eq!(
+            det.detect_by_first_line("%!PS-Adobe-3.0"),
+            Some("postscript".to_string()),
+        );
+    }
+
+    #[test]
+    fn auto_detector_no_match() {
+        let det = LanguageAutoDetector::new();
+        assert_eq!(det.detect_by_first_line("hello world"), None);
+    }
+
+    // -- LanguageConfigurationResolver --------------------------------------
+
+    #[test]
+    fn resolver_rust_comments() {
+        let svc = make_registry();
+        let resolver = LanguageConfigurationResolver::new(&svc);
+        let cfg = resolver.resolve("rust");
+        assert_eq!(cfg.line_comment.as_deref(), Some("//"));
+        assert_eq!(cfg.block_comment_start.as_deref(), Some("/*"));
+        assert_eq!(cfg.block_comment_end.as_deref(), Some("*/"));
+        assert!(!cfg.auto_closing_pairs.is_empty());
+    }
+
+    #[test]
+    fn resolver_unknown_language_defaults() {
+        let svc = make_registry();
+        let resolver = LanguageConfigurationResolver::new(&svc);
+        let cfg = resolver.resolve("nonexistent");
+        assert!(cfg.line_comment.is_none());
+        assert!(cfg.block_comment_start.is_none());
+        assert!(cfg.auto_closing_pairs.is_empty());
+    }
+
+    #[test]
+    fn resolver_has_comment_helpers() {
+        let svc = make_registry();
+        let resolver = LanguageConfigurationResolver::new(&svc);
+        assert!(resolver.has_line_comment("rust"));
+        assert!(resolver.has_block_comment("rust"));
+        assert!(!resolver.has_line_comment("html"));
+    }
+
+    // -- LanguageScope ------------------------------------------------------
+
+    #[test]
+    fn scope_host_language() {
+        let scope = LanguageScope::new("html");
+        assert_eq!(scope.current_language(), "html");
+        assert_eq!(scope.depth(), 1);
+        assert!(!scope.is_embedded());
+    }
+
+    #[test]
+    fn scope_push_and_pop() {
+        let mut scope = LanguageScope::new("html");
+        scope.push_scope("javascript");
+        assert_eq!(scope.current_language(), "javascript");
+        assert_eq!(scope.depth(), 2);
+        assert!(scope.is_embedded());
+
+        scope.push_scope("css");
+        assert_eq!(scope.current_language(), "css");
+        assert_eq!(scope.depth(), 3);
+
+        assert_eq!(scope.pop_scope(), Some("css".to_string()));
+        assert_eq!(scope.current_language(), "javascript");
+
+        assert_eq!(scope.pop_scope(), Some("javascript".to_string()));
+        assert_eq!(scope.current_language(), "html");
+
+        // Cannot pop the host language
+        assert_eq!(scope.pop_scope(), None);
+        assert_eq!(scope.depth(), 1);
+    }
+
+    // -- LanguageAliasMapper ------------------------------------------------
+
+    #[test]
+    fn alias_mapper_resolve() {
+        let mut mapper = LanguageAliasMapper::new();
+        mapper.add_alias("js", "javascript");
+        mapper.add_alias("ts", "typescript");
+        assert_eq!(mapper.resolve("js"), "javascript");
+        assert_eq!(mapper.resolve("ts"), "typescript");
+        // Unknown names pass through unchanged
+        assert_eq!(mapper.resolve("rust"), "rust");
+    }
+
+    #[test]
+    fn alias_mapper_aliases_for() {
+        let mut mapper = LanguageAliasMapper::new();
+        mapper.add_alias("js", "javascript");
+        mapper.add_alias("ecmascript", "javascript");
+        let aliases = mapper.aliases_for("javascript");
+        assert_eq!(aliases.len(), 2);
+        assert!(aliases.contains(&"js".to_string()));
+        assert!(aliases.contains(&"ecmascript".to_string()));
+    }
+
+    #[test]
+    fn alias_mapper_equivalence() {
+        let mut mapper = LanguageAliasMapper::new();
+        mapper.add_alias("js", "javascript");
+        mapper.add_alias("ecma", "javascript");
+        assert!(mapper.are_equivalent("js", "ecma"));
+        assert!(!mapper.are_equivalent("js", "python"));
     }
 }

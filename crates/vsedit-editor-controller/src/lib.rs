@@ -1368,6 +1368,332 @@ fn compute_end_position(start: Position, text: &str) -> Position {
 }
 
 // ---------------------------------------------------------------------------
+// MacroAction / ControllerMacroRecorder
+// ---------------------------------------------------------------------------
+
+/// An individual action that can be recorded and replayed by the macro system.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MacroAction {
+    Insert(String),
+    Delete(usize),
+    MoveCursor(i32, i32),
+    Select(usize, usize),
+}
+
+impl std::fmt::Display for MacroAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MacroAction::Insert(s) => write!(f, "Insert({s:?})"),
+            MacroAction::Delete(n) => write!(f, "Delete({n})"),
+            MacroAction::MoveCursor(dx, dy) => write!(f, "MoveCursor({dx}, {dy})"),
+            MacroAction::Select(start, end) => write!(f, "Select({start}, {end})"),
+        }
+    }
+}
+
+/// Records and replays keystroke sequences for macro functionality.
+pub struct ControllerMacroRecorder {
+    recording: bool,
+    actions: Vec<MacroAction>,
+}
+
+impl ControllerMacroRecorder {
+    pub fn new() -> Self {
+        Self {
+            recording: false,
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn start_recording(&mut self) {
+        self.recording = true;
+        self.actions.clear();
+    }
+
+    pub fn stop_recording(&mut self) -> Vec<MacroAction> {
+        self.recording = false;
+        std::mem::take(&mut self.actions)
+    }
+
+    pub fn record_action(&mut self, action: MacroAction) {
+        if self.recording {
+            self.actions.push(action);
+        }
+    }
+
+    pub fn is_recording(&self) -> bool {
+        self.recording
+    }
+
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+}
+
+impl Default for ControllerMacroRecorder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Gesture / ClickType / ControllerGestureRecognizer
+// ---------------------------------------------------------------------------
+
+/// A mouse gesture recognised from a down-move-up sequence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Gesture {
+    Select,
+    Drag { from: (u16, u16), to: (u16, u16) },
+    None,
+}
+
+impl std::fmt::Display for Gesture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Gesture::Select => write!(f, "Select"),
+            Gesture::Drag { from, to } => {
+                write!(f, "Drag({},{} -> {},{})", from.0, from.1, to.0, to.1)
+            }
+            Gesture::None => write!(f, "None"),
+        }
+    }
+}
+
+/// The click multiplicity detected by the gesture recognizer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClickType {
+    Single,
+    Double,
+    Triple,
+}
+
+impl std::fmt::Display for ClickType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self {
+            ClickType::Single => "Single",
+            ClickType::Double => "Double",
+            ClickType::Triple => "Triple",
+        };
+        f.write_str(label)
+    }
+}
+
+/// Recognises mouse gestures from raw pointer events.
+pub struct ControllerGestureRecognizer {
+    down_pos: Option<(u16, u16)>,
+    last_pos: Option<(u16, u16)>,
+    moved: bool,
+}
+
+impl ControllerGestureRecognizer {
+    pub fn new() -> Self {
+        Self {
+            down_pos: None,
+            last_pos: None,
+            moved: false,
+        }
+    }
+
+    pub fn on_mouse_down(&mut self, x: u16, y: u16) {
+        self.down_pos = Some((x, y));
+        self.last_pos = Some((x, y));
+        self.moved = false;
+    }
+
+    pub fn on_mouse_move(&mut self, x: u16, y: u16) {
+        if let Some(down) = self.down_pos {
+            if (x, y) != down {
+                self.moved = true;
+            }
+        }
+        self.last_pos = Some((x, y));
+    }
+
+    pub fn on_mouse_up(&mut self) -> Option<Gesture> {
+        let result = match (self.down_pos, self.last_pos, self.moved) {
+            (Some(from), Some(to), true) => Some(Gesture::Drag { from, to }),
+            (Some(_), Some(_), false) => Some(Gesture::Select),
+            _ => Some(Gesture::None),
+        };
+        self.down_pos = None;
+        self.last_pos = None;
+        self.moved = false;
+        result
+    }
+
+    pub fn on_click(&mut self, x: u16, y: u16, count: u8) -> ClickType {
+        self.on_mouse_down(x, y);
+        match count {
+            2 => ClickType::Double,
+            n if n >= 3 => ClickType::Triple,
+            _ => ClickType::Single,
+        }
+    }
+}
+
+impl Default for ControllerGestureRecognizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditKind / EditAction / ControllerUndoGrouping
+// ---------------------------------------------------------------------------
+
+/// The kind of mutation an [`EditAction`] represents.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EditKind {
+    Insert,
+    Delete,
+    Replace,
+}
+
+impl std::fmt::Display for EditKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self {
+            EditKind::Insert => "Insert",
+            EditKind::Delete => "Delete",
+            EditKind::Replace => "Replace",
+        };
+        f.write_str(label)
+    }
+}
+
+/// A single edit that can be grouped for undo purposes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EditAction {
+    pub kind: EditKind,
+    pub text: String,
+    pub position: (usize, usize),
+}
+
+impl std::fmt::Display for EditAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}({:?} @ {},{})",
+            self.kind, self.text, self.position.0, self.position.1
+        )
+    }
+}
+
+/// An undo group: a labelled collection of edits treated as one undo step.
+struct UndoGroup {
+    label: String,
+    edits: Vec<EditAction>,
+}
+
+/// Groups sequential edits so they can be undone as a single operation.
+pub struct ControllerUndoGrouping {
+    groups: Vec<UndoGroup>,
+    active_label: Option<String>,
+}
+
+impl ControllerUndoGrouping {
+    pub fn new() -> Self {
+        Self {
+            groups: Vec::new(),
+            active_label: None,
+        }
+    }
+
+    pub fn begin_group(&mut self, label: &str) {
+        self.active_label = Some(label.to_string());
+        self.groups.push(UndoGroup {
+            label: label.to_string(),
+            edits: Vec::new(),
+        });
+    }
+
+    pub fn end_group(&mut self) {
+        self.active_label = None;
+    }
+
+    pub fn add_edit(&mut self, edit: EditAction) {
+        if let Some(group) = self.groups.last_mut() {
+            if self.active_label.is_some() {
+                group.edits.push(edit);
+            }
+        }
+    }
+
+    pub fn current_group(&self) -> Option<&str> {
+        self.active_label.as_deref()
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Returns the label of the most recent group, if any.
+    pub fn last_group_label(&self) -> Option<&str> {
+        self.groups.last().map(|g| g.label.as_str())
+    }
+
+    pub fn is_grouping(&self) -> bool {
+        self.active_label.is_some()
+    }
+}
+
+impl Default for ControllerUndoGrouping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ControllerInputDebouncer
+// ---------------------------------------------------------------------------
+
+/// Debounces rapid input events so that only one is processed per threshold
+/// window.
+pub struct ControllerInputDebouncer {
+    threshold_ms: u64,
+    last_ts: Option<u64>,
+    dropped: usize,
+}
+
+impl ControllerInputDebouncer {
+    pub fn new(threshold_ms: u64) -> Self {
+        Self {
+            threshold_ms,
+            last_ts: None,
+            dropped: 0,
+        }
+    }
+
+    /// Returns `true` when enough time has elapsed since the last processed
+    /// event; otherwise the event is silently dropped.
+    pub fn should_process(&mut self, timestamp_ms: u64) -> bool {
+        match self.last_ts {
+            Some(prev) if timestamp_ms.saturating_sub(prev) < self.threshold_ms => {
+                self.dropped += 1;
+                false
+            }
+            _ => {
+                self.last_ts = Some(timestamp_ms);
+                true
+            }
+        }
+    }
+
+    pub fn last_processed(&self) -> Option<u64> {
+        self.last_ts
+    }
+
+    pub fn events_dropped(&self) -> usize {
+        self.dropped
+    }
+
+    pub fn reset(&mut self) {
+        self.last_ts = None;
+        self.dropped = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -2157,5 +2483,144 @@ mod tests {
         let range = c.selection_range();
         assert_eq!(range.start, Position::new(1, 1));
         assert_eq!(range.end, Position::new(2, 3));
+    }
+
+    // --- ControllerMacroRecorder tests ---
+
+    #[test]
+    fn macro_recorder_starts_not_recording() {
+        let rec = ControllerMacroRecorder::new();
+        assert!(!rec.is_recording());
+        assert_eq!(rec.action_count(), 0);
+    }
+
+    #[test]
+    fn macro_recorder_records_actions() {
+        let mut rec = ControllerMacroRecorder::new();
+        rec.start_recording();
+        assert!(rec.is_recording());
+        rec.record_action(MacroAction::Insert("hi".into()));
+        rec.record_action(MacroAction::Delete(3));
+        rec.record_action(MacroAction::MoveCursor(1, -1));
+        assert_eq!(rec.action_count(), 3);
+        let actions = rec.stop_recording();
+        assert!(!rec.is_recording());
+        assert_eq!(actions.len(), 3);
+        assert_eq!(actions[0], MacroAction::Insert("hi".into()));
+        assert_eq!(actions[2], MacroAction::MoveCursor(1, -1));
+    }
+
+    #[test]
+    fn macro_recorder_ignores_when_not_recording() {
+        let mut rec = ControllerMacroRecorder::new();
+        rec.record_action(MacroAction::Delete(1));
+        assert_eq!(rec.action_count(), 0);
+    }
+
+    #[test]
+    fn macro_action_display() {
+        assert_eq!(MacroAction::Select(0, 5).to_string(), "Select(0, 5)");
+        assert_eq!(MacroAction::Delete(2).to_string(), "Delete(2)");
+    }
+
+    // --- ControllerGestureRecognizer tests ---
+
+    #[test]
+    fn gesture_recognizer_select() {
+        let mut g = ControllerGestureRecognizer::new();
+        g.on_mouse_down(10, 20);
+        let gesture = g.on_mouse_up();
+        assert_eq!(gesture, Some(Gesture::Select));
+    }
+
+    #[test]
+    fn gesture_recognizer_drag() {
+        let mut g = ControllerGestureRecognizer::new();
+        g.on_mouse_down(5, 5);
+        g.on_mouse_move(15, 25);
+        let gesture = g.on_mouse_up();
+        assert_eq!(
+            gesture,
+            Some(Gesture::Drag {
+                from: (5, 5),
+                to: (15, 25)
+            })
+        );
+    }
+
+    #[test]
+    fn gesture_click_types() {
+        let mut g = ControllerGestureRecognizer::new();
+        assert_eq!(g.on_click(1, 1, 1), ClickType::Single);
+        assert_eq!(g.on_click(1, 1, 2), ClickType::Double);
+        assert_eq!(g.on_click(1, 1, 3), ClickType::Triple);
+    }
+
+    #[test]
+    fn gesture_display() {
+        assert_eq!(Gesture::None.to_string(), "None");
+        assert_eq!(ClickType::Double.to_string(), "Double");
+    }
+
+    // --- ControllerUndoGrouping tests ---
+
+    #[test]
+    fn undo_grouping_basic() {
+        let mut ug = ControllerUndoGrouping::new();
+        assert!(!ug.is_grouping());
+        assert_eq!(ug.group_count(), 0);
+        ug.begin_group("typing");
+        assert!(ug.is_grouping());
+        assert_eq!(ug.current_group(), Some("typing"));
+        ug.add_edit(EditAction {
+            kind: EditKind::Insert,
+            text: "a".into(),
+            position: (1, 1),
+        });
+        ug.end_group();
+        assert!(!ug.is_grouping());
+        assert_eq!(ug.group_count(), 1);
+    }
+
+    #[test]
+    fn edit_action_display() {
+        let ea = EditAction {
+            kind: EditKind::Replace,
+            text: "x".into(),
+            position: (3, 7),
+        };
+        assert_eq!(ea.to_string(), "Replace(\"x\" @ 3,7)");
+    }
+
+    // --- ControllerInputDebouncer tests ---
+
+    #[test]
+    fn debouncer_processes_first_event() {
+        let mut d = ControllerInputDebouncer::new(50);
+        assert!(d.should_process(100));
+        assert_eq!(d.last_processed(), Some(100));
+        assert_eq!(d.events_dropped(), 0);
+    }
+
+    #[test]
+    fn debouncer_drops_rapid_events() {
+        let mut d = ControllerInputDebouncer::new(50);
+        assert!(d.should_process(100));
+        assert!(!d.should_process(120));
+        assert!(!d.should_process(140));
+        assert_eq!(d.events_dropped(), 2);
+        assert!(d.should_process(160));
+        assert_eq!(d.events_dropped(), 2);
+    }
+
+    #[test]
+    fn debouncer_reset() {
+        let mut d = ControllerInputDebouncer::new(50);
+        d.should_process(100);
+        d.should_process(110);
+        d.reset();
+        assert_eq!(d.last_processed(), None);
+        assert_eq!(d.events_dropped(), 0);
+        assert!(d.should_process(10));
     }
 }

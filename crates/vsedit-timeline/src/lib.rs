@@ -1239,6 +1239,157 @@ pub fn group_by_relative_date(
         .collect()
 }
 
+
+// ---------------------------------------------------------------------------
+// TimelineProviderRegistry
+// ---------------------------------------------------------------------------
+
+pub struct TimelineProviderRegistry {
+    providers: Vec<(String, Box<dyn TimelineProvider>)>,
+}
+
+impl TimelineProviderRegistry {
+    pub fn new() -> Self { Self { providers: Vec::new() } }
+
+    pub fn register(&mut self, id: impl Into<String>, provider: Box<dyn TimelineProvider>) {
+        self.providers.push((id.into(), provider));
+    }
+
+    pub fn get(&self, id: &str) -> Option<&dyn TimelineProvider> {
+        self.providers.iter().find(|(pid, _)| pid == id).map(|(_, p)| p.as_ref())
+    }
+
+    pub fn provider_ids(&self) -> Vec<&str> {
+        self.providers.iter().map(|(id, _)| id.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize { self.providers.len() }
+    pub fn is_empty(&self) -> bool { self.providers.is_empty() }
+
+    pub fn unregister(&mut self, id: &str) -> bool {
+        if let Some(i) = self.providers.iter().position(|(pid, _)| pid == id) {
+            self.providers.remove(i);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for TimelineProviderRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// TimelineEntryCompare
+// ---------------------------------------------------------------------------
+
+pub struct TimelineEntryCompare;
+
+impl TimelineEntryCompare {
+    /// Compare two timeline entries by timestamp.
+    pub fn by_timestamp(a: &TimelineItem, b: &TimelineItem) -> std::cmp::Ordering {
+        a.timestamp.cmp(&b.timestamp)
+    }
+
+    /// Compare by author then timestamp.
+    pub fn by_author_then_time(a: &TimelineItem, b: &TimelineItem) -> std::cmp::Ordering {
+        a.author.cmp(&b.author).then(a.timestamp.cmp(&b.timestamp))
+    }
+
+    /// Find items that appear in new but not old (by commit hash).
+    pub fn new_items<'a>(old: &[TimelineItem], new: &'a [TimelineItem]) -> Vec<&'a TimelineItem> {
+        let old_hashes: std::collections::HashSet<&str> = old.iter().map(|i| i.sha.as_str()).collect();
+        new.iter().filter(|i| !old_hashes.contains(i.sha.as_str())).collect()
+    }
+
+    /// Find items removed (in old but not new).
+    pub fn removed_items<'a>(old: &'a [TimelineItem], new: &[TimelineItem]) -> Vec<&'a TimelineItem> {
+        let new_hashes: std::collections::HashSet<&str> = new.iter().map(|i| i.sha.as_str()).collect();
+        old.iter().filter(|i| !new_hashes.contains(i.sha.as_str())).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TimelineRefreshDebouncer
+// ---------------------------------------------------------------------------
+
+pub struct TimelineRefreshDebouncer {
+    last_refresh_ms: u64,
+    debounce_ms: u64,
+    pending: bool,
+}
+
+impl TimelineRefreshDebouncer {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self { last_refresh_ms: 0, debounce_ms, pending: false }
+    }
+
+    pub fn request_refresh(&mut self, now_ms: u64) -> bool {
+        if now_ms >= self.last_refresh_ms + self.debounce_ms {
+            self.last_refresh_ms = now_ms;
+            self.pending = false;
+            true
+        } else {
+            self.pending = true;
+            false
+        }
+    }
+
+    pub fn is_pending(&self) -> bool { self.pending }
+
+    pub fn check_pending(&mut self, now_ms: u64) -> bool {
+        if self.pending && now_ms >= self.last_refresh_ms + self.debounce_ms {
+            self.last_refresh_ms = now_ms;
+            self.pending = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn debounce_ms(&self) -> u64 { self.debounce_ms }
+}
+
+impl Default for TimelineRefreshDebouncer {
+    fn default() -> Self { Self::new(500) }
+}
+
+// ---------------------------------------------------------------------------
+// TimelineExportFormatter
+// ---------------------------------------------------------------------------
+
+pub struct TimelineExportFormatter;
+
+impl TimelineExportFormatter {
+    /// Format items as CSV.
+    pub fn to_csv(items: &[TimelineItem]) -> String {
+        let mut out = String::from("sha,author,message,timestamp\n");
+        for item in items {
+            out.push_str(&format!("{},{},{},{}\n",
+                item.sha, item.author, item.message.replace(',', ";"), item.timestamp));
+        }
+        out
+    }
+
+    /// Format items as JSON-like text.
+    pub fn to_json_text(items: &[TimelineItem]) -> String {
+        let mut out = String::from("[\n");
+        for (i, item) in items.iter().enumerate() {
+            out.push_str(&format!("  {{\"sha\":\"{}\",\"author\":\"{}\",\"message\":\"{}\",\"timestamp\":{}}}",
+                item.sha, item.author, item.message, item.timestamp));
+            if i < items.len() - 1 { out.push_str(",\n"); }
+        }
+        out.push_str("\n]");
+        out
+    }
+
+    /// Format as plain text summary.
+    pub fn to_plain_text(items: &[TimelineItem]) -> String {
+        items.iter().map(|i| format!("{}: {} ({})", i.sha, i.message, i.author)).collect::<Vec<_>>().join("\n")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2109,4 +2260,101 @@ mod tests {
         assert_eq!(format!("{}", RelativeDateBucket::Today), "Today");
         assert_eq!(format!("{}", RelativeDateBucket::Older), "Older");
     }
+
+
+    #[test]
+    fn provider_registry_basic() {
+        let mut reg = TimelineProviderRegistry::new();
+        reg.register("git", Box::new(GitTimelineProvider::new("/tmp")));
+        assert_eq!(reg.len(), 1);
+        assert!(reg.get("git").is_some());
+    }
+
+    #[test]
+    fn provider_registry_unregister() {
+        let mut reg = TimelineProviderRegistry::new();
+        reg.register("git", Box::new(GitTimelineProvider::new("/tmp")));
+        assert!(reg.unregister("git"));
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn entry_compare_by_timestamp() {
+        let a = TimelineItem { timestamp: 100, message: "a".into(), author: "x".into(), sha: "1".into() };
+        let b = TimelineItem { timestamp: 200, message: "b".into(), author: "x".into(), sha: "2".into() };
+        assert_eq!(TimelineEntryCompare::by_timestamp(&a, &b), std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn entry_compare_new_items() {
+        let old = vec![TimelineItem { timestamp: 0, message: "".into(), author: "".into(), sha: "1".into() }];
+        let new = vec![
+            TimelineItem { timestamp: 0, message: "".into(), author: "".into(), sha: "1".into() },
+            TimelineItem { timestamp: 0, message: "".into(), author: "".into(), sha: "2".into() },
+        ];
+        assert_eq!(TimelineEntryCompare::new_items(&old, &new).len(), 1);
+    }
+
+    #[test]
+    fn entry_compare_removed_items() {
+        let old = vec![
+            TimelineItem { timestamp: 0, message: "".into(), author: "".into(), sha: "1".into() },
+            TimelineItem { timestamp: 0, message: "".into(), author: "".into(), sha: "2".into() },
+        ];
+        let new = vec![TimelineItem { timestamp: 0, message: "".into(), author: "".into(), sha: "1".into() }];
+        assert_eq!(TimelineEntryCompare::removed_items(&old, &new).len(), 1);
+    }
+
+    #[test]
+    fn debouncer_basic() {
+        let mut d = TimelineRefreshDebouncer::new(100);
+        assert!(d.request_refresh(100));
+        assert!(!d.request_refresh(150));
+        assert!(d.is_pending());
+        assert!(d.request_refresh(200));
+    }
+
+    #[test]
+    fn debouncer_check_pending() {
+        let mut d = TimelineRefreshDebouncer::new(100);
+        d.request_refresh(100);
+        d.request_refresh(150);
+        assert!(d.check_pending(200));
+    }
+
+    #[test]
+    fn export_csv() {
+        let items = vec![TimelineItem { timestamp: 100, message: "init".into(), author: "dev".into(), sha: "abc".into() }];
+        let csv = TimelineExportFormatter::to_csv(&items);
+        assert!(csv.contains("abc"));
+        assert!(csv.contains("dev"));
+    }
+
+    #[test]
+    fn export_json() {
+        let items = vec![TimelineItem { timestamp: 100, message: "init".into(), author: "dev".into(), sha: "abc".into() }];
+        let json = TimelineExportFormatter::to_json_text(&items);
+        assert!(json.contains("abc"));
+    }
+
+    #[test]
+    fn export_plain() {
+        let items = vec![TimelineItem { timestamp: 100, message: "init".into(), author: "dev".into(), sha: "abc".into() }];
+        let text = TimelineExportFormatter::to_plain_text(&items);
+        assert!(text.contains("init"));
+    }
+
+    #[test]
+    fn provider_registry_ids() {
+        let mut reg = TimelineProviderRegistry::new();
+        reg.register("git", Box::new(GitTimelineProvider::new("/tmp")));
+        assert_eq!(reg.provider_ids(), vec!["git"]);
+    }
+
+    #[test]
+    fn debouncer_default() {
+        let d = TimelineRefreshDebouncer::default();
+        assert_eq!(d.debounce_ms(), 500);
+    }
+
 }

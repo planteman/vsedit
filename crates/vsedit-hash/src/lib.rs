@@ -1216,6 +1216,153 @@ pub fn hex_similarity(a: &str, b: &str) -> f64 {
     matching as f64 / a.len() as f64
 }
 
+
+// ---------------------------------------------------------------------------
+// MultiFieldHasher
+// ---------------------------------------------------------------------------
+
+pub struct MultiFieldHasher {
+    state: u64,
+}
+
+impl MultiFieldHasher {
+    pub fn new() -> Self { Self { state: 0xcbf29ce484222325 } }
+
+    pub fn feed_str(&mut self, s: &str) -> &mut Self {
+        for byte in s.as_bytes() {
+            self.state ^= *byte as u64;
+            self.state = self.state.wrapping_mul(0x100000001b3);
+        }
+        self
+    }
+
+    pub fn feed_u64(&mut self, n: u64) -> &mut Self {
+        self.feed_str(&n.to_string())
+    }
+
+    pub fn feed_bool(&mut self, b: bool) -> &mut Self {
+        self.feed_str(if b { "T" } else { "F" })
+    }
+
+    pub fn finish(&self) -> u64 { self.state }
+
+    pub fn finish_hex(&self) -> String { format!("{:016x}", self.state) }
+
+    pub fn reset(&mut self) { self.state = 0xcbf29ce484222325; }
+}
+
+impl Default for MultiFieldHasher { fn default() -> Self { Self::new() } }
+
+impl std::fmt::Display for MultiFieldHasher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MultiFieldHasher(0x{:016x})", self.state)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SetMembershipFilter
+// ---------------------------------------------------------------------------
+
+pub struct SetMembershipFilter {
+    bits: Vec<bool>,
+    size: usize,
+    num_hashes: usize,
+}
+
+impl SetMembershipFilter {
+    pub fn new(size: usize, num_hashes: usize) -> Self {
+        Self { bits: vec![false; size], size, num_hashes }
+    }
+
+    fn hash_indices(&self, item: &str) -> Vec<usize> {
+        let h1 = string_hash(item) as usize;
+        let h2 = fnv1a_hash(item.as_bytes()) as usize;
+        (0..self.num_hashes).map(|i| (h1.wrapping_add(i.wrapping_mul(h2))) % self.size).collect()
+    }
+
+    pub fn insert(&mut self, item: &str) {
+        for idx in self.hash_indices(item) { self.bits[idx] = true; }
+    }
+
+    pub fn might_contain(&self, item: &str) -> bool {
+        self.hash_indices(item).iter().all(|&idx| self.bits[idx])
+    }
+
+    pub fn false_positive_rate(&self) -> f64 {
+        let set_bits = self.bits.iter().filter(|&&b| b).count();
+        (set_bits as f64 / self.size as f64).powi(self.num_hashes as i32)
+    }
+
+    pub fn clear(&mut self) { self.bits.iter_mut().for_each(|b| *b = false); }
+}
+
+// ---------------------------------------------------------------------------
+// DistributionRing
+// ---------------------------------------------------------------------------
+
+pub struct DistributionRing {
+    nodes: Vec<(u32, String)>,
+}
+
+impl DistributionRing {
+    pub fn new() -> Self { Self { nodes: Vec::new() } }
+
+    pub fn add_node(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        let hash = string_hash(&name);
+        self.nodes.push((hash, name));
+        self.nodes.sort_by_key(|(h, _)| *h);
+    }
+
+    pub fn get_node(&self, key: &str) -> Option<&str> {
+        if self.nodes.is_empty() { return None; }
+        let hash = string_hash(key);
+        let idx = self.nodes.iter().position(|(h, _)| *h >= hash).unwrap_or(0);
+        Some(&self.nodes[idx].1)
+    }
+
+    pub fn node_count(&self) -> usize { self.nodes.len() }
+
+    pub fn remove_node(&mut self, name: &str) -> bool {
+        if let Some(i) = self.nodes.iter().position(|(_, n)| n == name) { self.nodes.remove(i); true } else { false }
+    }
+}
+
+impl Default for DistributionRing { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// HashBenchmark
+// ---------------------------------------------------------------------------
+
+pub struct HashBenchmark {
+    results: Vec<(String, u64)>,
+}
+
+impl HashBenchmark {
+    pub fn new() -> Self { Self { results: Vec::new() } }
+
+    pub fn record(&mut self, algorithm: impl Into<String>, duration_ns: u64) {
+        self.results.push((algorithm.into(), duration_ns));
+    }
+
+    pub fn fastest(&self) -> Option<(&str, u64)> {
+        self.results.iter().min_by_key(|(_, d)| *d).map(|(a, d)| (a.as_str(), *d))
+    }
+
+    pub fn slowest(&self) -> Option<(&str, u64)> {
+        self.results.iter().max_by_key(|(_, d)| *d).map(|(a, d)| (a.as_str(), *d))
+    }
+
+    pub fn average_ns(&self) -> Option<u64> {
+        if self.results.is_empty() { None }
+        else { Some(self.results.iter().map(|(_, d)| d).sum::<u64>() / self.results.len() as u64) }
+    }
+
+    pub fn count(&self) -> usize { self.results.len() }
+}
+
+impl Default for HashBenchmark { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2095,4 +2242,106 @@ mod tests {
         // 2 of 4 nibbles match
         assert!((score - 0.5).abs() < f64::EPSILON);
     }
+
+
+    #[test]
+    fn multi_field_hasher_basic() {
+        let mut h = MultiFieldHasher::new();
+        h.feed_str("hello").feed_u64(42).feed_bool(true);
+        let result = h.finish();
+        assert_ne!(result, 0);
+    }
+
+    #[test]
+    fn multi_field_hasher_deterministic() {
+        let mut h1 = MultiFieldHasher::new();
+        let mut h2 = MultiFieldHasher::new();
+        h1.feed_str("test");
+        h2.feed_str("test");
+        assert_eq!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn multi_field_hasher_different() {
+        let mut h1 = MultiFieldHasher::new();
+        let mut h2 = MultiFieldHasher::new();
+        h1.feed_str("a");
+        h2.feed_str("b");
+        assert_ne!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn multi_field_hasher_hex() {
+        let h = MultiFieldHasher::new();
+        assert_eq!(h.finish_hex().len(), 16);
+    }
+
+    #[test]
+    fn set_membership_filter() {
+        let mut f = SetMembershipFilter::new(1000, 3);
+        f.insert("hello");
+        f.insert("world");
+        assert!(f.might_contain("hello"));
+        assert!(f.might_contain("world"));
+    }
+
+    #[test]
+    fn set_membership_filter_false_positive() {
+        let f = SetMembershipFilter::new(1000, 3);
+        assert!(!f.might_contain("not_inserted"));
+    }
+
+    #[test]
+    fn distribution_ring_basic() {
+        let mut ring = DistributionRing::new();
+        ring.add_node("node1");
+        ring.add_node("node2");
+        let node = ring.get_node("some_key");
+        assert!(node.is_some());
+    }
+
+    #[test]
+    fn distribution_ring_consistent() {
+        let mut ring = DistributionRing::new();
+        ring.add_node("a");
+        ring.add_node("b");
+        let n1 = ring.get_node("key").unwrap().to_string();
+        let n2 = ring.get_node("key").unwrap().to_string();
+        assert_eq!(n1, n2);
+    }
+
+    #[test]
+    fn distribution_ring_remove() {
+        let mut ring = DistributionRing::new();
+        ring.add_node("a");
+        assert!(ring.remove_node("a"));
+        assert_eq!(ring.node_count(), 0);
+    }
+
+    #[test]
+    fn hash_benchmark_basic() {
+        let mut b = HashBenchmark::new();
+        b.record("sha256", 1000);
+        b.record("fnv1a", 200);
+        assert_eq!(b.fastest().unwrap().0, "fnv1a");
+        assert_eq!(b.slowest().unwrap().0, "sha256");
+        assert_eq!(b.average_ns(), Some(600));
+    }
+
+    #[test]
+    fn hash_benchmark_empty() {
+        let b = HashBenchmark::new();
+        assert_eq!(b.fastest(), None);
+        assert_eq!(b.average_ns(), None);
+    }
+
+    #[test]
+    fn multi_field_hasher_reset() {
+        let mut h = MultiFieldHasher::new();
+        let initial = h.finish();
+        h.feed_str("data");
+        h.reset();
+        assert_eq!(h.finish(), initial);
+    }
+
 }

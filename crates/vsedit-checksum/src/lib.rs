@@ -1177,6 +1177,274 @@ impl fmt::Display for ChecksumResult {
     }
 }
 
+// ---------------------------------------------------------------------------
+// VerifyResult & ChecksumVerifier
+// ---------------------------------------------------------------------------
+
+/// Outcome of comparing a computed checksum with an expected value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerifyResult {
+    /// The checksums matched.
+    Match,
+    /// The checksums did not match.
+    Mismatch {
+        /// The checksum that was computed from the data.
+        computed: String,
+        /// The checksum that was expected.
+        expected: String,
+    },
+}
+
+impl fmt::Display for VerifyResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerifyResult::Match => write!(f, "checksum OK"),
+            VerifyResult::Mismatch { computed, expected } => {
+                write!(f, "MISMATCH computed={computed} expected={expected}")
+            }
+        }
+    }
+}
+
+/// One-shot verifier that compares a computed checksum against an expected hex
+/// string, returning a [`VerifyResult`].
+#[derive(Debug, Clone)]
+pub struct DataVerifier {
+    kind: ChecksumKind,
+    expected: String,
+}
+
+impl DataVerifier {
+    /// Create a new verifier for the given algorithm and expected hex digest.
+    pub fn new(kind: ChecksumKind, expected: &str) -> Self {
+        Self {
+            kind,
+            expected: expected.to_lowercase(),
+        }
+    }
+
+    /// Compute the checksum of `data` and compare it to the expected value.
+    pub fn verify(&self, data: &[u8]) -> VerifyResult {
+        let computed = compute_checksum(data, self.kind);
+        if computed.eq_ignore_ascii_case(&self.expected) {
+            VerifyResult::Match
+        } else {
+            VerifyResult::Mismatch {
+                computed,
+                expected: self.expected.clone(),
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChecksumFileEntry & ChecksumFile
+// ---------------------------------------------------------------------------
+
+/// A single entry in a `.sha256sum`-style checksum file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChecksumFileEntry {
+    /// The hex-encoded digest.
+    pub hex: String,
+    /// Whether the file was marked as binary (`*` prefix on filename).
+    pub binary: bool,
+    /// The filename that was checksummed.
+    pub filename: String,
+}
+
+/// Parsed representation of a `.sha256sum`-format checksum file.
+///
+/// Each non-empty, non-comment line is expected to have the format
+/// `<hex>  <filename>` or `<hex> *<filename>`.
+#[derive(Debug, Clone)]
+pub struct ChecksumFile {
+    entries: Vec<ChecksumFileEntry>,
+}
+
+impl ChecksumFile {
+    /// Parse the textual content of a checksum file.
+    pub fn parse(content: &str) -> Self {
+        let mut entries = Vec::new();
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            // Format: <hex> ( <sp> | *)<filename>
+            // The separator is two spaces or one space followed by `*`.
+            if let Some(pos) = line.find("  ").or_else(|| line.find(" *")) {
+                let hex = line[..pos].to_lowercase();
+                let rest = &line[pos..];
+                let (binary, filename) = if rest.starts_with(" *") {
+                    (true, rest[2..].to_string())
+                } else {
+                    // "  filename"
+                    (false, rest[2..].to_string())
+                };
+                entries.push(ChecksumFileEntry {
+                    hex,
+                    binary,
+                    filename,
+                });
+            }
+        }
+        Self { entries }
+    }
+
+    /// Return a slice of all parsed entries.
+    pub fn entries(&self) -> &[ChecksumFileEntry] {
+        &self.entries
+    }
+
+    /// Find the first entry whose filename matches `filename`.
+    pub fn find_entry(&self, filename: &str) -> Option<&ChecksumFileEntry> {
+        self.entries.iter().find(|e| e.filename == filename)
+    }
+}
+
+impl fmt::Display for ChecksumFile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for entry in &self.entries {
+            if entry.binary {
+                writeln!(f, "{} *{}", entry.hex, entry.filename)?;
+            } else {
+                writeln!(f, "{}  {}", entry.hex, entry.filename)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BatchChecksum
+// ---------------------------------------------------------------------------
+
+/// Compute checksums for multiple named byte slices in one pass.
+#[derive(Debug, Clone)]
+pub struct BatchChecksum {
+    kind: ChecksumKind,
+    results: Vec<(String, ChecksumResult)>,
+}
+
+impl BatchChecksum {
+    /// Create a new batch using the given algorithm.
+    pub fn new(kind: ChecksumKind) -> Self {
+        Self {
+            kind,
+            results: Vec::new(),
+        }
+    }
+
+    /// Add a named data slice; the checksum is computed immediately.
+    pub fn add(&mut self, name: &str, data: &[u8]) {
+        let result = compute_checksum_result(data, self.kind);
+        self.results.push((name.to_string(), result));
+    }
+
+    /// Return a slice of `(name, ChecksumResult)` pairs.
+    pub fn results(&self) -> &[(String, ChecksumResult)] {
+        &self.results
+    }
+
+    /// Check whether every name present in `expected` has a matching hex
+    /// digest in the batch results.
+    pub fn all_match(&self, expected: &HashMap<String, String>) -> bool {
+        for (name, result) in &self.results {
+            if let Some(exp) = expected.get(name) {
+                if !result.matches(exp) {
+                    return false;
+                }
+            }
+        }
+        // Also ensure every key in `expected` was present in results.
+        for key in expected.keys() {
+            if !self.results.iter().any(|(n, _)| n == key) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChecksumCache
+// ---------------------------------------------------------------------------
+
+/// Cached checksum entry with an associated modification time for invalidation.
+#[derive(Debug, Clone)]
+struct MtimeCacheEntry {
+    mtime: u64,
+    hex: String,
+}
+
+/// An in-memory cache of previously computed checksums, keyed by file path,
+/// with modification-time–based invalidation.  Unlike [`ChecksumCache`] (which
+/// is keyed by content hash + algorithm), this cache is designed for
+/// file-system workflows where the caller tracks modification times.
+#[derive(Debug, Clone)]
+pub struct MtimeChecksumCache {
+    entries: HashMap<String, MtimeCacheEntry>,
+}
+
+impl MtimeChecksumCache {
+    /// Create an empty cache.
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Return the cached hex digest for `path` if the stored mtime matches
+    /// `current_mtime`. Returns `None` on cache miss or stale entry.
+    pub fn get(&self, path: &str, current_mtime: u64) -> Option<&str> {
+        self.entries.get(path).and_then(|e| {
+            if e.mtime == current_mtime {
+                Some(e.hex.as_str())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Insert (or replace) a cache entry for `path`.
+    pub fn insert(&mut self, path: &str, mtime: u64, hex: String) {
+        self.entries.insert(
+            path.to_string(),
+            MtimeCacheEntry { mtime, hex },
+        );
+    }
+
+    /// Remove a single entry from the cache.
+    pub fn invalidate(&mut self, path: &str) {
+        self.entries.remove(path);
+    }
+
+    /// Remove every entry whose stored mtime differs from the value in
+    /// `current_mtimes`, or that is absent from `current_mtimes`.
+    pub fn invalidate_stale(&mut self, current_mtimes: &HashMap<String, u64>) {
+        self.entries.retain(|path, entry| {
+            current_mtimes
+                .get(path)
+                .map_or(false, |&mt| mt == entry.mtime)
+        });
+    }
+
+    /// Number of entries currently in the cache.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for MtimeChecksumCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1996,6 +2264,179 @@ mod tests {
         assert!(result.matches(&result.hex_digest));
         let display = format!("{result}");
         assert!(display.starts_with("SHA-256:"));
+    }
+
+    // ------------------------------------------------------------------
+    // DataVerifier tests
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn verifier_match() {
+        let data = b"hello";
+        let expected = compute_checksum(data, ChecksumKind::Sha256);
+        let v = DataVerifier::new(ChecksumKind::Sha256, &expected);
+        assert_eq!(v.verify(data), VerifyResult::Match);
+    }
+
+    #[test]
+    fn verifier_mismatch() {
+        let v = DataVerifier::new(ChecksumKind::Sha256, "0000");
+        match v.verify(b"hello") {
+            VerifyResult::Mismatch { computed, expected } => {
+                assert_ne!(computed, expected);
+                assert_eq!(expected, "0000");
+            }
+            VerifyResult::Match => panic!("expected mismatch"),
+        }
+    }
+
+    #[test]
+    fn verify_result_display() {
+        assert_eq!(format!("{}", VerifyResult::Match), "checksum OK");
+        let m = VerifyResult::Mismatch {
+            computed: "aa".into(),
+            expected: "bb".into(),
+        };
+        let s = format!("{m}");
+        assert!(s.contains("MISMATCH"));
+        assert!(s.contains("aa"));
+        assert!(s.contains("bb"));
+    }
+
+    // ------------------------------------------------------------------
+    // ChecksumFile tests
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn checksum_file_parse_text_mode() {
+        let content = "abcd1234  readme.txt\nef567890  notes.md\n";
+        let cf = ChecksumFile::parse(content);
+        assert_eq!(cf.entries().len(), 2);
+        assert_eq!(cf.entries()[0].filename, "readme.txt");
+        assert!(!cf.entries()[0].binary);
+        assert_eq!(cf.entries()[1].hex, "ef567890");
+    }
+
+    #[test]
+    fn checksum_file_parse_binary_mode() {
+        let content = "abcd1234 *image.bin\n";
+        let cf = ChecksumFile::parse(content);
+        assert_eq!(cf.entries().len(), 1);
+        assert!(cf.entries()[0].binary);
+        assert_eq!(cf.entries()[0].filename, "image.bin");
+    }
+
+    #[test]
+    fn checksum_file_find_entry() {
+        let content = "aaaa  a.txt\nbbbb  b.txt\n";
+        let cf = ChecksumFile::parse(content);
+        assert!(cf.find_entry("a.txt").is_some());
+        assert_eq!(cf.find_entry("a.txt").unwrap().hex, "aaaa");
+        assert!(cf.find_entry("missing.txt").is_none());
+    }
+
+    #[test]
+    fn checksum_file_roundtrip() {
+        let content = "abcd1234  readme.txt\nef567890 *image.bin\n";
+        let cf = ChecksumFile::parse(content);
+        let output = cf.to_string();
+        let cf2 = ChecksumFile::parse(&output);
+        assert_eq!(cf.entries(), cf2.entries());
+    }
+
+    #[test]
+    fn checksum_file_skips_comments_and_blanks() {
+        let content = "# this is a comment\n\naaaa  file.txt\n";
+        let cf = ChecksumFile::parse(content);
+        assert_eq!(cf.entries().len(), 1);
+    }
+
+    // ------------------------------------------------------------------
+    // BatchChecksum tests
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn batch_checksum_basic() {
+        let mut batch = BatchChecksum::new(ChecksumKind::Sha256);
+        batch.add("a", b"hello");
+        batch.add("b", b"world");
+        assert_eq!(batch.results().len(), 2);
+        assert_eq!(batch.results()[0].0, "a");
+        assert_eq!(batch.results()[1].0, "b");
+    }
+
+    #[test]
+    fn batch_checksum_all_match() {
+        let mut batch = BatchChecksum::new(ChecksumKind::Sha256);
+        batch.add("x", b"data1");
+        batch.add("y", b"data2");
+        let mut expected = HashMap::new();
+        expected.insert("x".to_string(), batch.results()[0].1.hex_digest.clone());
+        expected.insert("y".to_string(), batch.results()[1].1.hex_digest.clone());
+        assert!(batch.all_match(&expected));
+
+        // Change one expected value → should fail.
+        expected.insert("x".to_string(), "wrong".to_string());
+        assert!(!batch.all_match(&expected));
+    }
+
+    #[test]
+    fn batch_checksum_missing_key() {
+        let mut batch = BatchChecksum::new(ChecksumKind::Fnv64);
+        batch.add("a", b"abc");
+        let mut expected = HashMap::new();
+        expected.insert("a".to_string(), batch.results()[0].1.hex_digest.clone());
+        expected.insert("b".to_string(), "1234".to_string());
+        // "b" is in expected but not in results → should fail.
+        assert!(!batch.all_match(&expected));
+    }
+
+    // ------------------------------------------------------------------
+    // MtimeChecksumCache tests
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn cache_insert_and_get() {
+        let mut cache = MtimeChecksumCache::new();
+        cache.insert("file.txt", 100, "aabbcc".to_string());
+        assert_eq!(cache.get("file.txt", 100), Some("aabbcc"));
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn cache_stale_mtime() {
+        let mut cache = MtimeChecksumCache::new();
+        cache.insert("f.txt", 10, "abc".to_string());
+        // Different mtime → miss.
+        assert_eq!(cache.get("f.txt", 20), None);
+        // Correct mtime → hit.
+        assert_eq!(cache.get("f.txt", 10), Some("abc"));
+    }
+
+    #[test]
+    fn cache_invalidate_single() {
+        let mut cache = MtimeChecksumCache::new();
+        cache.insert("a.txt", 1, "aa".to_string());
+        cache.insert("b.txt", 2, "bb".to_string());
+        cache.invalidate("a.txt");
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("a.txt", 1).is_none());
+        assert!(cache.get("b.txt", 2).is_some());
+    }
+
+    #[test]
+    fn cache_invalidate_stale() {
+        let mut cache = MtimeChecksumCache::new();
+        cache.insert("a.txt", 1, "aa".to_string());
+        cache.insert("b.txt", 2, "bb".to_string());
+        cache.insert("c.txt", 3, "cc".to_string());
+        let mut current = HashMap::new();
+        current.insert("a.txt".to_string(), 1u64); // same mtime → keep
+        current.insert("b.txt".to_string(), 99u64); // different mtime → remove
+        // "c.txt" absent from current → remove
+        cache.invalidate_stale(&current);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("a.txt", 1).is_some());
     }
 
 }

@@ -1112,6 +1112,261 @@ pub fn select_best_overload(help: &mut SignatureHelp, arg_count: usize) -> Optio
     Some(best)
 }
 
+// ---------------------------------------------------------------------------
+// ParameterHintCycler – lightweight overload navigator
+// ---------------------------------------------------------------------------
+
+/// A lightweight navigator for cycling through signature overloads.
+///
+/// Unlike [`ParameterHintCycle`] which couples to [`SignatureHelp`], this struct
+/// is self-contained and can be used in any UI that needs wrap-around indexing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParameterHintCycler {
+    pub total_signatures: usize,
+    pub current_index: usize,
+}
+
+impl ParameterHintCycler {
+    /// Create a new cycler for the given number of overloads.
+    pub fn new(total: usize) -> Self {
+        Self {
+            total_signatures: total,
+            current_index: 0,
+        }
+    }
+
+    /// Advance to the next overload, wrapping around to 0 after the last.
+    pub fn next(&mut self) -> usize {
+        if self.total_signatures == 0 {
+            return 0;
+        }
+        self.current_index = (self.current_index + 1) % self.total_signatures;
+        self.current_index
+    }
+
+    /// Move to the previous overload, wrapping to the last after 0.
+    pub fn prev(&mut self) -> usize {
+        if self.total_signatures == 0 {
+            return 0;
+        }
+        if self.current_index == 0 {
+            self.current_index = self.total_signatures - 1;
+        } else {
+            self.current_index -= 1;
+        }
+        self.current_index
+    }
+
+    /// Return the current index without advancing.
+    pub fn current(&self) -> usize {
+        self.current_index
+    }
+
+    /// Jump directly to an index. Returns `false` if out of range.
+    pub fn jump_to(&mut self, index: usize) -> bool {
+        if index >= self.total_signatures {
+            return false;
+        }
+        self.current_index = index;
+        true
+    }
+
+    /// Returns `true` when there is exactly one signature (no cycling needed).
+    pub fn is_single(&self) -> bool {
+        self.total_signatures == 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ParameterBoldHighlighter – markup the active parameter
+// ---------------------------------------------------------------------------
+
+/// Produces a highlighted version of a signature label by wrapping the active
+/// parameter in bold markers (`**...**`).
+pub struct ParameterBoldHighlighter;
+
+impl ParameterBoldHighlighter {
+    /// Wrap the active parameter's text in `**...**` inside the label.
+    ///
+    /// If `param_index` is out of range or the parameter text is not found in
+    /// `label`, the original label is returned unchanged.
+    pub fn highlight(label: &str, param_index: usize, params: &[ParameterInformation]) -> String {
+        let ranges = Self::extract_parameter_ranges(label, params);
+        if let Some(&(start, end)) = ranges.get(param_index) {
+            Self::format_with_marker(label, start, end)
+        } else {
+            label.to_string()
+        }
+    }
+
+    /// Find the byte-offset `(start, end)` of each parameter label inside the
+    /// signature label. Searches left-to-right, skipping already-matched spans.
+    pub fn extract_parameter_ranges(
+        label: &str,
+        params: &[ParameterInformation],
+    ) -> Vec<(usize, usize)> {
+        let mut ranges = Vec::with_capacity(params.len());
+        let mut search_from = 0;
+        for p in params {
+            if let Some(rel) = label[search_from..].find(&p.label) {
+                let abs_start = search_from + rel;
+                let abs_end = abs_start + p.label.len();
+                ranges.push((abs_start, abs_end));
+                search_from = abs_end;
+            }
+        }
+        ranges
+    }
+
+    /// Insert bold markers around `label[active_start..active_end]`.
+    pub fn format_with_marker(label: &str, active_start: usize, active_end: usize) -> String {
+        let mut out = String::with_capacity(label.len() + 4);
+        out.push_str(&label[..active_start]);
+        out.push_str("**");
+        out.push_str(&label[active_start..active_end]);
+        out.push_str("**");
+        out.push_str(&label[active_end..]);
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TriggerCharDetector – configurable trigger / retrigger character sets
+// ---------------------------------------------------------------------------
+
+/// Holds the set of characters that trigger or retrigger signature help.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TriggerCharDetector {
+    pub trigger_chars: Vec<char>,
+    pub retrigger_chars: Vec<char>,
+}
+
+impl TriggerCharDetector {
+    /// Create an empty detector (no triggers).
+    pub fn new() -> Self {
+        Self {
+            trigger_chars: Vec::new(),
+            retrigger_chars: Vec::new(),
+        }
+    }
+
+    /// Create a detector pre-loaded with the common defaults: `(` triggers,
+    /// `,` retriggers.
+    pub fn with_defaults() -> Self {
+        Self {
+            trigger_chars: vec!['('],
+            retrigger_chars: vec![','],
+        }
+    }
+
+    /// Register an additional trigger character.
+    pub fn add_trigger(&mut self, ch: char) {
+        if !self.trigger_chars.contains(&ch) {
+            self.trigger_chars.push(ch);
+        }
+    }
+
+    /// Register an additional retrigger character.
+    pub fn add_retrigger(&mut self, ch: char) {
+        if !self.retrigger_chars.contains(&ch) {
+            self.retrigger_chars.push(ch);
+        }
+    }
+
+    /// Returns `true` if `ch` is a trigger character.
+    pub fn should_trigger(&self, ch: char) -> bool {
+        self.trigger_chars.contains(&ch)
+    }
+
+    /// Returns `true` if `ch` is a retrigger character.
+    pub fn should_retrigger(&self, ch: char) -> bool {
+        self.retrigger_chars.contains(&ch)
+    }
+
+    /// Returns `true` if `ch` is either a trigger or retrigger character.
+    pub fn is_trigger_or_retrigger(&self, ch: char) -> bool {
+        self.should_trigger(ch) || self.should_retrigger(ch)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RetriggerAction / RetriggerState – track paren-depth and retrigger events
+// ---------------------------------------------------------------------------
+
+/// The action produced by [`RetriggerState::on_char`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetriggerAction {
+    /// No signature-help action needed.
+    None,
+    /// A new parameter list was opened.
+    Open,
+    /// The user moved to the next parameter (e.g. typed `,`).
+    Retrigger,
+    /// The parameter list was closed.
+    Close,
+}
+
+impl fmt::Display for RetriggerAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RetriggerAction::None => write!(f, "None"),
+            RetriggerAction::Open => write!(f, "Open"),
+            RetriggerAction::Retrigger => write!(f, "Retrigger"),
+            RetriggerAction::Close => write!(f, "Close"),
+        }
+    }
+}
+
+/// Tracks the nesting depth of parentheses to decide whether a character
+/// should open, retrigger, or close signature help.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetriggerState {
+    pub active: bool,
+    pub depth: u32,
+    pub last_trigger_char: Option<char>,
+}
+
+impl RetriggerState {
+    /// Create an inactive state with zero depth.
+    pub fn new() -> Self {
+        Self {
+            active: false,
+            depth: 0,
+            last_trigger_char: Option::None,
+        }
+    }
+
+    /// Feed a character and return the resulting action.
+    ///
+    /// Logic:
+    /// * `(` → depth += 1, active = true → `Open`
+    /// * `)` → depth -= 1 (saturating), if depth reaches 0 → `Close`
+    /// * `,` when active → `Retrigger`
+    /// * anything else → `None`
+    pub fn on_char(&mut self, ch: char, detector: &TriggerCharDetector) -> RetriggerAction {
+        if ch == '(' {
+            self.depth += 1;
+            self.active = true;
+            self.last_trigger_char = Some(ch);
+            return RetriggerAction::Open;
+        }
+        if ch == ')' {
+            self.depth = self.depth.saturating_sub(1);
+            self.last_trigger_char = Some(ch);
+            if self.depth == 0 {
+                self.active = false;
+                return RetriggerAction::Close;
+            }
+            return RetriggerAction::None;
+        }
+        if self.active && detector.should_retrigger(ch) {
+            self.last_trigger_char = Some(ch);
+            return RetriggerAction::Retrigger;
+        }
+        RetriggerAction::None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2002,5 +2257,192 @@ mod tests {
         let best = select_best_overload(&mut help, 2).unwrap();
         assert_eq!(best, 1);
         assert_eq!(help.active_signature, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // ParameterHintCycler tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cycler_next_wraps() {
+        let mut c = ParameterHintCycler::new(3);
+        assert_eq!(c.current(), 0);
+        assert_eq!(c.next(), 1);
+        assert_eq!(c.next(), 2);
+        assert_eq!(c.next(), 0); // wrap
+    }
+
+    #[test]
+    fn cycler_prev_wraps() {
+        let mut c = ParameterHintCycler::new(3);
+        assert_eq!(c.prev(), 2); // wrap backward
+        assert_eq!(c.prev(), 1);
+        assert_eq!(c.prev(), 0);
+    }
+
+    #[test]
+    fn cycler_jump_to_valid_and_invalid() {
+        let mut c = ParameterHintCycler::new(4);
+        assert!(c.jump_to(3));
+        assert_eq!(c.current(), 3);
+        assert!(!c.jump_to(4)); // out of range
+        assert_eq!(c.current(), 3); // unchanged
+        assert!(!c.jump_to(100));
+    }
+
+    #[test]
+    fn cycler_is_single() {
+        assert!(ParameterHintCycler::new(1).is_single());
+        assert!(!ParameterHintCycler::new(0).is_single());
+        assert!(!ParameterHintCycler::new(2).is_single());
+    }
+
+    #[test]
+    fn cycler_zero_total() {
+        let mut c = ParameterHintCycler::new(0);
+        assert_eq!(c.next(), 0);
+        assert_eq!(c.prev(), 0);
+        assert!(!c.jump_to(0));
+    }
+
+    // -----------------------------------------------------------------------
+    // ParameterBoldHighlighter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn highlighter_basic() {
+        let params = vec![
+            ParameterInformation { label: "x: i32".into(), documentation: None },
+            ParameterInformation { label: "y: &str".into(), documentation: None },
+        ];
+        let label = "fn foo(x: i32, y: &str)";
+        let h = ParameterBoldHighlighter::highlight(label, 0, &params);
+        assert!(h.contains("**x: i32**"));
+        assert!(!h.contains("**y: &str**"));
+    }
+
+    #[test]
+    fn highlighter_second_param() {
+        let params = vec![
+            ParameterInformation { label: "x: i32".into(), documentation: None },
+            ParameterInformation { label: "y: &str".into(), documentation: None },
+        ];
+        let label = "fn foo(x: i32, y: &str)";
+        let h = ParameterBoldHighlighter::highlight(label, 1, &params);
+        assert!(h.contains("**y: &str**"));
+    }
+
+    #[test]
+    fn highlighter_out_of_range_returns_original() {
+        let params = vec![
+            ParameterInformation { label: "x: i32".into(), documentation: None },
+        ];
+        let label = "fn foo(x: i32)";
+        assert_eq!(ParameterBoldHighlighter::highlight(label, 5, &params), label);
+    }
+
+    #[test]
+    fn extract_parameter_ranges_correct() {
+        let params = vec![
+            ParameterInformation { label: "a: u8".into(), documentation: None },
+            ParameterInformation { label: "b: u8".into(), documentation: None },
+        ];
+        let label = "fn f(a: u8, b: u8)";
+        let ranges = ParameterBoldHighlighter::extract_parameter_ranges(label, &params);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(&label[ranges[0].0..ranges[0].1], "a: u8");
+        assert_eq!(&label[ranges[1].0..ranges[1].1], "b: u8");
+    }
+
+    #[test]
+    fn format_with_marker_works() {
+        let label = "fn f(x: i32)";
+        let out = ParameterBoldHighlighter::format_with_marker(label, 5, 11);
+        assert_eq!(out, "fn f(**x: i32**)");
+    }
+
+    // -----------------------------------------------------------------------
+    // TriggerCharDetector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn trigger_detector_defaults() {
+        let d = TriggerCharDetector::with_defaults();
+        assert!(d.should_trigger('('));
+        assert!(!d.should_trigger(','));
+        assert!(d.should_retrigger(','));
+        assert!(!d.should_retrigger('('));
+        assert!(d.is_trigger_or_retrigger('('));
+        assert!(d.is_trigger_or_retrigger(','));
+        assert!(!d.is_trigger_or_retrigger('x'));
+    }
+
+    #[test]
+    fn trigger_detector_add_chars() {
+        let mut d = TriggerCharDetector::new();
+        assert!(!d.should_trigger('<'));
+        d.add_trigger('<');
+        assert!(d.should_trigger('<'));
+        // duplicate add is idempotent
+        d.add_trigger('<');
+        assert_eq!(d.trigger_chars.len(), 1);
+
+        d.add_retrigger(';');
+        assert!(d.should_retrigger(';'));
+    }
+
+    // -----------------------------------------------------------------------
+    // RetriggerState tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn retrigger_state_open_retrigger_close() {
+        let det = TriggerCharDetector::with_defaults();
+        let mut st = RetriggerState::new();
+        assert!(!st.active);
+
+        assert_eq!(st.on_char('(', &det), RetriggerAction::Open);
+        assert!(st.active);
+        assert_eq!(st.depth, 1);
+
+        assert_eq!(st.on_char(',', &det), RetriggerAction::Retrigger);
+
+        assert_eq!(st.on_char(')', &det), RetriggerAction::Close);
+        assert!(!st.active);
+        assert_eq!(st.depth, 0);
+    }
+
+    #[test]
+    fn retrigger_state_nested_parens() {
+        let det = TriggerCharDetector::with_defaults();
+        let mut st = RetriggerState::new();
+
+        assert_eq!(st.on_char('(', &det), RetriggerAction::Open);
+        assert_eq!(st.on_char('(', &det), RetriggerAction::Open);
+        assert_eq!(st.depth, 2);
+
+        // closing inner paren doesn't close signature help
+        assert_eq!(st.on_char(')', &det), RetriggerAction::None);
+        assert!(st.active);
+        assert_eq!(st.depth, 1);
+
+        // closing outer paren closes
+        assert_eq!(st.on_char(')', &det), RetriggerAction::Close);
+        assert!(!st.active);
+    }
+
+    #[test]
+    fn retrigger_action_display() {
+        assert_eq!(format!("{}", RetriggerAction::None), "None");
+        assert_eq!(format!("{}", RetriggerAction::Open), "Open");
+        assert_eq!(format!("{}", RetriggerAction::Retrigger), "Retrigger");
+        assert_eq!(format!("{}", RetriggerAction::Close), "Close");
+    }
+
+    #[test]
+    fn retrigger_state_ignores_comma_when_inactive() {
+        let det = TriggerCharDetector::with_defaults();
+        let mut st = RetriggerState::new();
+        assert_eq!(st.on_char(',', &det), RetriggerAction::None);
     }
 }

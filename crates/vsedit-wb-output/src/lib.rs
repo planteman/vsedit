@@ -1195,6 +1195,171 @@ impl OutputChannelGroup {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// OutputLanguageMode -- syntax highlighting mode
+// ---------------------------------------------------------------------------
+
+pub struct OutputLanguageMode {
+    pub channel_id: String,
+    pub language_id: String,
+}
+
+impl OutputLanguageMode {
+    pub fn new(channel_id: impl Into<String>, language_id: impl Into<String>) -> Self {
+        Self { channel_id: channel_id.into(), language_id: language_id.into() }
+    }
+
+    pub fn is_log(&self) -> bool { self.language_id == "log" }
+    pub fn is_plain(&self) -> bool { self.language_id == "plaintext" }
+}
+
+impl fmt::Display for OutputLanguageMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.channel_id, self.language_id)
+    }
+}
+
+/// Manages language modes for output channels.
+pub struct OutputLanguageModeRegistry {
+    modes: std::collections::HashMap<String, String>,
+}
+
+impl OutputLanguageModeRegistry {
+    pub fn new() -> Self { Self { modes: std::collections::HashMap::new() } }
+
+    pub fn set_mode(&mut self, channel_id: impl Into<String>, language_id: impl Into<String>) {
+        self.modes.insert(channel_id.into(), language_id.into());
+    }
+
+    pub fn get_mode(&self, channel_id: &str) -> Option<&str> {
+        self.modes.get(channel_id).map(|s| s.as_str())
+    }
+
+    pub fn remove_mode(&mut self, channel_id: &str) -> bool {
+        self.modes.remove(channel_id).is_some()
+    }
+
+    pub fn len(&self) -> usize { self.modes.len() }
+    pub fn is_empty(&self) -> bool { self.modes.is_empty() }
+}
+
+impl Default for OutputLanguageModeRegistry { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// OutputChannelGroupByExtension
+// ---------------------------------------------------------------------------
+
+pub struct OutputChannelGroupByExtension {
+    groups: std::collections::HashMap<String, Vec<String>>,
+}
+
+impl OutputChannelGroupByExtension {
+    pub fn new() -> Self { Self { groups: std::collections::HashMap::new() } }
+
+    pub fn add_channel(&mut self, extension: impl Into<String>, channel_id: impl Into<String>) {
+        self.groups.entry(extension.into()).or_default().push(channel_id.into());
+    }
+
+    pub fn channels_for_extension(&self, ext: &str) -> Vec<&str> {
+        self.groups.get(ext).map(|v| v.iter().map(|s| s.as_str()).collect()).unwrap_or_default()
+    }
+
+    pub fn extension_count(&self) -> usize { self.groups.len() }
+    pub fn total_channels(&self) -> usize { self.groups.values().map(|v| v.len()).sum() }
+}
+
+impl Default for OutputChannelGroupByExtension { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// OutputLogLevelFilter
+// ---------------------------------------------------------------------------
+
+pub struct OutputLogLevelFilter {
+    min_severity: OutputSeverity,
+}
+
+impl OutputLogLevelFilter {
+    pub fn new(min: OutputSeverity) -> Self { Self { min_severity: min } }
+
+    pub fn passes(&self, severity: &OutputSeverity) -> bool {
+        severity_rank(severity) >= severity_rank(&self.min_severity)
+    }
+
+    pub fn filter_entries<'a>(&self, entries: &'a [LogEntry]) -> Vec<&'a LogEntry> {
+        entries.iter().filter(|e| self.passes(&e.severity)).collect()
+    }
+
+    pub fn min_severity(&self) -> &OutputSeverity { &self.min_severity }
+
+    pub fn set_min_severity(&mut self, severity: OutputSeverity) { self.min_severity = severity; }
+}
+
+impl Default for OutputLogLevelFilter {
+    fn default() -> Self { Self::new(OutputSeverity::Info) }
+}
+
+impl fmt::Display for OutputLogLevelFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LogLevelFilter(min={})", self.min_severity)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelAppendOptimizer
+// ---------------------------------------------------------------------------
+
+pub struct OutputChannelAppendOptimizer {
+    buffer: String,
+    flush_threshold: usize,
+    total_appends: u64,
+    total_flushes: u64,
+}
+
+impl OutputChannelAppendOptimizer {
+    pub fn new(flush_threshold: usize) -> Self {
+        Self { buffer: String::new(), flush_threshold, total_appends: 0, total_flushes: 0 }
+    }
+
+    pub fn append(&mut self, text: &str) -> Option<String> {
+        self.buffer.push_str(text);
+        self.total_appends += 1;
+        if self.buffer.len() >= self.flush_threshold {
+            self.total_flushes += 1;
+            Some(std::mem::take(&mut self.buffer))
+        } else {
+            None
+        }
+    }
+
+    pub fn flush(&mut self) -> Option<String> {
+        if self.buffer.is_empty() { None }
+        else {
+            self.total_flushes += 1;
+            Some(std::mem::take(&mut self.buffer))
+        }
+    }
+
+    pub fn buffered_len(&self) -> usize { self.buffer.len() }
+    pub fn total_appends(&self) -> u64 { self.total_appends }
+    pub fn total_flushes(&self) -> u64 { self.total_flushes }
+
+    pub fn efficiency(&self) -> f64 {
+        if self.total_appends == 0 { return 1.0; }
+        1.0 - (self.total_flushes as f64 / self.total_appends as f64)
+    }
+}
+
+impl Default for OutputChannelAppendOptimizer {
+    fn default() -> Self { Self::new(4096) }
+}
+
+impl fmt::Display for OutputChannelAppendOptimizer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AppendOptimizer(buffered={}, flushes={})", self.buffered_len(), self.total_flushes)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2113,4 +2278,107 @@ mod tests {
         let store = LogStore::default();
         assert!(store.is_empty());
     }
+
+
+    #[test]
+    fn language_mode_basic() {
+        let mode = OutputLanguageMode::new("ch1", "log");
+        assert!(mode.is_log());
+        assert!(!mode.is_plain());
+    }
+
+    #[test]
+    fn language_mode_display() {
+        let mode = OutputLanguageMode::new("ch1", "rust");
+        assert!(format!("{mode}").contains("ch1:rust"));
+    }
+
+    #[test]
+    fn language_mode_registry() {
+        let mut reg = OutputLanguageModeRegistry::new();
+        reg.set_mode("ch1", "log");
+        assert_eq!(reg.get_mode("ch1"), Some("log"));
+        assert!(reg.remove_mode("ch1"));
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn group_by_extension() {
+        let mut g = OutputChannelGroupByExtension::new();
+        g.add_channel("rust-analyzer", "ra-output");
+        g.add_channel("rust-analyzer", "ra-trace");
+        g.add_channel("eslint", "eslint-output");
+        assert_eq!(g.channels_for_extension("rust-analyzer").len(), 2);
+        assert_eq!(g.extension_count(), 2);
+        assert_eq!(g.total_channels(), 3);
+    }
+
+    #[test]
+    fn log_level_filter_basic() {
+        let filter = OutputLogLevelFilter::new(OutputSeverity::Warning);
+        assert!(filter.passes(&OutputSeverity::Error));
+        assert!(filter.passes(&OutputSeverity::Warning));
+        assert!(!filter.passes(&OutputSeverity::Info));
+    }
+
+    #[test]
+    fn log_level_filter_entries() {
+        let entries = vec![
+            LogEntry::new(OutputSeverity::Info, "info msg", "ch1"),
+            LogEntry::new(OutputSeverity::Error, "error msg", "ch1"),
+        ];
+        let filter = OutputLogLevelFilter::new(OutputSeverity::Warning);
+        assert_eq!(filter.filter_entries(&entries).len(), 1);
+    }
+
+    #[test]
+    fn log_level_filter_display() {
+        let f = OutputLogLevelFilter::default();
+        assert!(format!("{f}").contains("min="));
+    }
+
+    #[test]
+    fn append_optimizer_buffering() {
+        let mut opt = OutputChannelAppendOptimizer::new(10);
+        assert!(opt.append("hi").is_none());
+        assert_eq!(opt.buffered_len(), 2);
+    }
+
+    #[test]
+    fn append_optimizer_flush_threshold() {
+        let mut opt = OutputChannelAppendOptimizer::new(5);
+        let result = opt.append("hello world");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn append_optimizer_manual_flush() {
+        let mut opt = OutputChannelAppendOptimizer::new(100);
+        opt.append("data");
+        let flushed = opt.flush();
+        assert!(flushed.is_some());
+        assert_eq!(opt.buffered_len(), 0);
+    }
+
+    #[test]
+    fn append_optimizer_efficiency() {
+        let mut opt = OutputChannelAppendOptimizer::new(100);
+        opt.append("a");
+        opt.append("b");
+        opt.append("c");
+        assert!(opt.efficiency() > 0.9);
+    }
+
+    #[test]
+    fn append_optimizer_display() {
+        let opt = OutputChannelAppendOptimizer::default();
+        assert!(format!("{opt}").contains("buffered=0"));
+    }
+
+    #[test]
+    fn group_by_extension_empty() {
+        let g = OutputChannelGroupByExtension::new();
+        assert!(g.channels_for_extension("x").is_empty());
+    }
+
 }

@@ -1088,6 +1088,250 @@ impl LayoutSplit {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LayoutAnimation
+// ---------------------------------------------------------------------------
+
+/// Drives a smooth animated transition between two sets of split ratios.
+#[derive(Debug, Clone)]
+pub struct LayoutAnimation {
+    pub from_ratios: Vec<f32>,
+    pub to_ratios: Vec<f32>,
+    pub progress: f32,
+    pub duration_ms: u32,
+}
+
+impl LayoutAnimation {
+    /// Create a new animation that interpolates from `from` to `to` over
+    /// `duration_ms` milliseconds.
+    pub fn new(from: Vec<f32>, to: Vec<f32>, duration_ms: u32) -> Self {
+        Self {
+            from_ratios: from,
+            to_ratios: to,
+            progress: 0.0,
+            duration_ms,
+        }
+    }
+
+    /// Advance the animation by `elapsed_ms` milliseconds.
+    /// Returns `true` when the animation has finished.
+    pub fn tick(&mut self, elapsed_ms: u32) -> bool {
+        if self.duration_ms == 0 {
+            self.progress = 1.0;
+            return true;
+        }
+        let step = elapsed_ms as f32 / self.duration_ms as f32;
+        self.progress = (self.progress + step).min(1.0);
+        self.progress >= 1.0
+    }
+
+    /// Linearly interpolate between `from_ratios` and `to_ratios` based on
+    /// the current `progress`.
+    pub fn current_ratios(&self) -> Vec<f32> {
+        let len = self.from_ratios.len().min(self.to_ratios.len());
+        (0..len)
+            .map(|i| {
+                let a = self.from_ratios[i];
+                let b = self.to_ratios[i];
+                a + (b - a) * self.progress
+            })
+            .collect()
+    }
+
+    /// Return `true` when progress has reached 1.0.
+    pub fn is_complete(&self) -> bool {
+        self.progress >= 1.0
+    }
+
+    /// Reset the animation back to the beginning.
+    pub fn reset(&mut self) {
+        self.progress = 0.0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutReset
+// ---------------------------------------------------------------------------
+
+/// Stores named default ratio sets so a layout can be restored to its
+/// original proportions.
+#[derive(Debug, Clone)]
+pub struct LayoutReset {
+    defaults: HashMap<String, Vec<f32>>,
+}
+
+impl LayoutReset {
+    pub fn new() -> Self {
+        Self {
+            defaults: HashMap::new(),
+        }
+    }
+
+    /// Register a default ratio set for the given layout id.
+    pub fn register_default(&mut self, layout_id: &str, ratios: Vec<f32>) {
+        self.defaults.insert(layout_id.to_string(), ratios);
+    }
+
+    /// Look up the default ratios for `layout_id`.
+    pub fn get_default(&self, layout_id: &str) -> Option<&Vec<f32>> {
+        self.defaults.get(layout_id)
+    }
+
+    /// Return `true` if a default has been registered for `layout_id`.
+    pub fn has_default(&self, layout_id: &str) -> bool {
+        self.defaults.contains_key(layout_id)
+    }
+
+    /// Clone and return the default ratios for `layout_id`, if registered.
+    pub fn reset_to_default(&self, layout_id: &str) -> Option<Vec<f32>> {
+        self.defaults.get(layout_id).cloned()
+    }
+
+    /// Number of registered defaults.
+    pub fn registered_count(&self) -> usize {
+        self.defaults.len()
+    }
+}
+
+impl Default for LayoutReset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutZoneDetector
+// ---------------------------------------------------------------------------
+
+/// Which edge of a pane a resize zone is attached to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeEdge {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
+impl fmt::Display for ResizeEdge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResizeEdge::Left => write!(f, "Left"),
+            ResizeEdge::Right => write!(f, "Right"),
+            ResizeEdge::Top => write!(f, "Top"),
+            ResizeEdge::Bottom => write!(f, "Bottom"),
+        }
+    }
+}
+
+/// A rectangular zone that represents a draggable resize handle.
+#[derive(Debug, Clone)]
+pub struct ResizeZone {
+    pub x: u16,
+    pub y: u16,
+    pub width: u16,
+    pub height: u16,
+    pub edge: ResizeEdge,
+}
+
+/// Collects [`ResizeZone`]s and performs hit-testing against mouse
+/// coordinates.
+#[derive(Debug, Clone)]
+pub struct LayoutZoneDetector {
+    zones: Vec<ResizeZone>,
+}
+
+impl LayoutZoneDetector {
+    pub fn new() -> Self {
+        Self { zones: Vec::new() }
+    }
+
+    /// Append a resize zone.
+    pub fn add_zone(&mut self, zone: ResizeZone) {
+        self.zones.push(zone);
+    }
+
+    /// Return the first zone whose bounding rectangle contains (`mx`, `my`).
+    pub fn hit_test(&self, mx: u16, my: u16) -> Option<&ResizeZone> {
+        self.zones.iter().find(|z| {
+            mx >= z.x
+                && mx < z.x.saturating_add(z.width)
+                && my >= z.y
+                && my < z.y.saturating_add(z.height)
+        })
+    }
+
+    /// Number of registered zones.
+    pub fn zone_count(&self) -> usize {
+        self.zones.len()
+    }
+
+    /// Remove all zones.
+    pub fn clear(&mut self) {
+        self.zones.clear();
+    }
+}
+
+impl Default for LayoutZoneDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutPersistence
+// ---------------------------------------------------------------------------
+
+/// Simple versioned store for persisting layout ratio data.
+#[derive(Debug, Clone)]
+pub struct LayoutPersistence {
+    pub version: u32,
+    data: HashMap<String, Vec<f32>>,
+}
+
+impl LayoutPersistence {
+    pub fn new(version: u32) -> Self {
+        Self {
+            version,
+            data: HashMap::new(),
+        }
+    }
+
+    /// Save (or overwrite) ratio data for the given layout id.
+    pub fn save_layout(&mut self, id: &str, ratios: Vec<f32>) {
+        self.data.insert(id.to_string(), ratios);
+    }
+
+    /// Retrieve previously saved ratios.
+    pub fn load_layout(&self, id: &str) -> Option<&Vec<f32>> {
+        self.data.get(id)
+    }
+
+    /// Produce a simple textual representation of the stored data.
+    ///
+    /// Format: `version:<ver>\n<id>:<r0>,<r1>,...\n`
+    pub fn serialize(&self) -> String {
+        let mut out = format!("version:{}\n", self.version);
+        let mut keys: Vec<&String> = self.data.keys().collect();
+        keys.sort();
+        for key in keys {
+            let ratios = &self.data[key];
+            let vals: Vec<String> = ratios.iter().map(|r| format!("{r}")).collect();
+            out.push_str(&format!("{}:{}\n", key, vals.join(",")));
+        }
+        out
+    }
+
+    /// Return `true` when the stored version is older than `current_version`.
+    pub fn needs_migration(&self, current_version: u32) -> bool {
+        self.version < current_version
+    }
+
+    /// Number of stored layouts.
+    pub fn layout_count(&self) -> usize {
+        self.data.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2000,5 +2244,147 @@ mod tests {
         assert!(split.ratio_at(0).is_some());
         assert!(split.ratio_at(5).is_none());
         assert!((split.ratio_sum() - 1.0).abs() < 0.01);
+    }
+
+    // -----------------------------------------------------------------------
+    // LayoutAnimation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn animation_starts_at_zero_progress() {
+        let anim = LayoutAnimation::new(vec![0.5, 0.5], vec![0.7, 0.3], 300);
+        assert!(!anim.is_complete());
+        assert!((anim.progress - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn animation_tick_advances_progress() {
+        let mut anim = LayoutAnimation::new(vec![0.5, 0.5], vec![1.0, 0.0], 100);
+        let done = anim.tick(50);
+        assert!(!done);
+        assert!((anim.progress - 0.5).abs() < 0.01);
+        let done = anim.tick(50);
+        assert!(done);
+        assert!(anim.is_complete());
+    }
+
+    #[test]
+    fn animation_current_ratios_interpolates() {
+        let mut anim = LayoutAnimation::new(vec![0.0, 1.0], vec![1.0, 0.0], 200);
+        anim.tick(100); // 50 %
+        let cur = anim.current_ratios();
+        assert!((cur[0] - 0.5).abs() < 0.01);
+        assert!((cur[1] - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn animation_reset_returns_to_start() {
+        let mut anim = LayoutAnimation::new(vec![0.5, 0.5], vec![1.0, 0.0], 100);
+        anim.tick(100);
+        assert!(anim.is_complete());
+        anim.reset();
+        assert!(!anim.is_complete());
+        assert!((anim.progress - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn animation_zero_duration_completes_immediately() {
+        let mut anim = LayoutAnimation::new(vec![0.3, 0.7], vec![0.6, 0.4], 0);
+        assert!(anim.tick(0));
+        assert!(anim.is_complete());
+    }
+
+    // -----------------------------------------------------------------------
+    // LayoutReset tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn reset_register_and_retrieve() {
+        let mut lr = LayoutReset::new();
+        lr.register_default("editor", vec![0.5, 0.5]);
+        assert!(lr.has_default("editor"));
+        assert!(!lr.has_default("panel"));
+        assert_eq!(lr.registered_count(), 1);
+        let ratios = lr.get_default("editor").unwrap();
+        assert_eq!(ratios.len(), 2);
+    }
+
+    #[test]
+    fn reset_to_default_clones_data() {
+        let mut lr = LayoutReset::new();
+        lr.register_default("sidebar", vec![0.25, 0.75]);
+        let cloned = lr.reset_to_default("sidebar").unwrap();
+        assert_eq!(cloned, vec![0.25, 0.75]);
+        assert!(lr.reset_to_default("missing").is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // LayoutZoneDetector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn zone_detector_hit_test() {
+        let mut det = LayoutZoneDetector::new();
+        det.add_zone(ResizeZone {
+            x: 10,
+            y: 10,
+            width: 5,
+            height: 20,
+            edge: ResizeEdge::Right,
+        });
+        assert!(det.hit_test(12, 15).is_some());
+        assert!(det.hit_test(0, 0).is_none());
+        assert_eq!(det.zone_count(), 1);
+    }
+
+    #[test]
+    fn zone_detector_clear() {
+        let mut det = LayoutZoneDetector::new();
+        det.add_zone(ResizeZone {
+            x: 0,
+            y: 0,
+            width: 3,
+            height: 3,
+            edge: ResizeEdge::Left,
+        });
+        assert_eq!(det.zone_count(), 1);
+        det.clear();
+        assert_eq!(det.zone_count(), 0);
+    }
+
+    #[test]
+    fn resize_edge_display() {
+        assert_eq!(format!("{}", ResizeEdge::Top), "Top");
+        assert_eq!(format!("{}", ResizeEdge::Bottom), "Bottom");
+    }
+
+    // -----------------------------------------------------------------------
+    // LayoutPersistence tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn persistence_save_and_load() {
+        let mut p = LayoutPersistence::new(1);
+        p.save_layout("main", vec![0.6, 0.4]);
+        let loaded = p.load_layout("main").unwrap();
+        assert_eq!(loaded, &vec![0.6, 0.4]);
+        assert_eq!(p.layout_count(), 1);
+    }
+
+    #[test]
+    fn persistence_serialize_format() {
+        let mut p = LayoutPersistence::new(2);
+        p.save_layout("a", vec![0.5, 0.5]);
+        let s = p.serialize();
+        assert!(s.starts_with("version:2\n"));
+        assert!(s.contains("a:0.5,0.5"));
+    }
+
+    #[test]
+    fn persistence_needs_migration() {
+        let p = LayoutPersistence::new(1);
+        assert!(p.needs_migration(2));
+        assert!(!p.needs_migration(1));
+        assert!(!p.needs_migration(0));
     }
 }

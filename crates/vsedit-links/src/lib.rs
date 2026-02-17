@@ -1196,6 +1196,122 @@ pub fn categorize_url(url: &str) -> UrlCategory {
     UrlCategory::Web
 }
 
+
+// ---------------------------------------------------------------------------
+// LinkAccessibilityChecker
+// ---------------------------------------------------------------------------
+
+pub struct LinkAccessibilityChecker;
+
+impl LinkAccessibilityChecker {
+    pub fn check_url_format(url: &str) -> Result<(), String> {
+        if url.is_empty() { return Err("empty URL".into()); }
+        if !url.contains("://") && !url.starts_with('/') { return Err("missing scheme".into()); }
+        if url.len() > 2048 { return Err("URL too long".into()); }
+        Ok(())
+    }
+
+    pub fn is_localhost(url: &str) -> bool {
+        url.contains("localhost") || url.contains("127.0.0.1") || url.contains("::1")
+    }
+
+    pub fn is_secure(url: &str) -> bool {
+        url.starts_with("https://") || url.starts_with("ftps://")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LinkHighlightRange
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkHighlightRange {
+    pub start_col: u32,
+    pub end_col: u32,
+    pub line: u32,
+    pub url: String,
+}
+
+impl LinkHighlightRange {
+    pub fn new(line: u32, start: u32, end: u32, url: impl Into<String>) -> Self {
+        Self { line, start_col: start, end_col: end, url: url.into() }
+    }
+
+    pub fn length(&self) -> u32 { self.end_col.saturating_sub(self.start_col) }
+
+    pub fn contains_column(&self, col: u32) -> bool { col >= self.start_col && col < self.end_col }
+}
+
+impl std::fmt::Display for LinkHighlightRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Link(L{}:{}-{})", self.line, self.start_col, self.end_col)
+    }
+}
+
+/// Builds highlight ranges from detected URLs.
+pub struct LinkHighlighter;
+
+impl LinkHighlighter {
+    pub fn highlight_line(line_num: u32, text: &str) -> Vec<LinkHighlightRange> {
+        detect_urls(text).into_iter().map(|(start, end, url)| {
+            LinkHighlightRange::new(line_num, start as u32, end as u32, url)
+        }).collect()
+    }
+
+    pub fn highlight_lines(lines: &[&str]) -> Vec<LinkHighlightRange> {
+        lines.iter().enumerate().flat_map(|(i, line)| {
+            Self::highlight_line(i as u32, line)
+        }).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LinkProtocolFilter
+// ---------------------------------------------------------------------------
+
+pub struct LinkProtocolFilter {
+    allowed: Vec<String>,
+}
+
+impl LinkProtocolFilter {
+    pub fn new() -> Self { Self { allowed: vec!["http".into(), "https".into(), "file".into()] } }
+
+    pub fn with_protocols(protocols: Vec<String>) -> Self { Self { allowed: protocols } }
+
+    pub fn is_allowed(&self, url: &str) -> bool {
+        if let Some(scheme) = url.split("://").next() {
+            self.allowed.iter().any(|a| a == scheme)
+        } else {
+            false
+        }
+    }
+
+    pub fn add_protocol(&mut self, proto: impl Into<String>) { self.allowed.push(proto.into()); }
+    pub fn protocols(&self) -> &[String] { &self.allowed }
+}
+
+impl Default for LinkProtocolFilter { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// LinkTooltipPreview
+// ---------------------------------------------------------------------------
+
+pub struct LinkTooltipPreview;
+
+impl LinkTooltipPreview {
+    pub fn generate(url: &str) -> String {
+        let truncated = if url.len() > 80 { format!("{}...", &url[..77]) } else { url.to_string() };
+        if url.starts_with("https://") { format!("Open: {} (secure)", truncated) }
+        else if url.starts_with("http://") { format!("Open: {} (insecure)", truncated) }
+        else if url.starts_with("file://") { format!("Open file: {}", truncated) }
+        else { format!("Open: {}", truncated) }
+    }
+
+    pub fn is_external(url: &str) -> bool {
+        url.starts_with("http://") || url.starts_with("https://")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2068,4 +2184,82 @@ mod tests {
     fn categorize_url_generic_web() {
         assert_eq!(categorize_url("https://example.com/page"), UrlCategory::Web);
     }
+
+
+    #[test]
+    fn accessibility_check_valid() {
+        assert!(LinkAccessibilityChecker::check_url_format("https://example.com").is_ok());
+    }
+
+    #[test]
+    fn accessibility_check_empty() {
+        assert!(LinkAccessibilityChecker::check_url_format("").is_err());
+    }
+
+    #[test]
+    fn accessibility_localhost() {
+        assert!(LinkAccessibilityChecker::is_localhost("http://localhost:8080"));
+        assert!(!LinkAccessibilityChecker::is_localhost("http://example.com"));
+    }
+
+    #[test]
+    fn accessibility_secure() {
+        assert!(LinkAccessibilityChecker::is_secure("https://example.com"));
+        assert!(!LinkAccessibilityChecker::is_secure("http://example.com"));
+    }
+
+    #[test]
+    fn highlight_range_basic() {
+        let r = LinkHighlightRange::new(0, 5, 20, "http://example.com");
+        assert_eq!(r.length(), 15);
+        assert!(r.contains_column(10));
+        assert!(!r.contains_column(20));
+    }
+
+    #[test]
+    fn highlight_range_display() {
+        let r = LinkHighlightRange::new(1, 0, 10, "x");
+        assert!(format!("{r}").contains("L1"));
+    }
+
+    #[test]
+    fn highlighter_line() {
+        let ranges = LinkHighlighter::highlight_line(0, "visit https://rust-lang.org today");
+        assert!(!ranges.is_empty());
+    }
+
+    #[test]
+    fn protocol_filter_defaults() {
+        let f = LinkProtocolFilter::new();
+        assert!(f.is_allowed("https://example.com"));
+        assert!(f.is_allowed("http://example.com"));
+        assert!(f.is_allowed("file:///tmp"));
+        assert!(!f.is_allowed("ftp://example.com"));
+    }
+
+    #[test]
+    fn protocol_filter_custom() {
+        let mut f = LinkProtocolFilter::new();
+        f.add_protocol("ftp");
+        assert!(f.is_allowed("ftp://example.com"));
+    }
+
+    #[test]
+    fn tooltip_preview_https() {
+        let t = LinkTooltipPreview::generate("https://example.com");
+        assert!(t.contains("secure"));
+    }
+
+    #[test]
+    fn tooltip_preview_http() {
+        let t = LinkTooltipPreview::generate("http://example.com");
+        assert!(t.contains("insecure"));
+    }
+
+    #[test]
+    fn tooltip_is_external() {
+        assert!(LinkTooltipPreview::is_external("https://example.com"));
+        assert!(!LinkTooltipPreview::is_external("file:///tmp"));
+    }
+
 }

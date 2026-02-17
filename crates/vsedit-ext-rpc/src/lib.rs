@@ -1185,6 +1185,134 @@ impl RpcHealthMonitor {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// RpcMessageValidator
+// ---------------------------------------------------------------------------
+
+pub struct RpcMessageValidator {
+    max_method_length: usize,
+    max_payload_bytes: usize,
+}
+
+impl RpcMessageValidator {
+    pub fn new() -> Self { Self { max_method_length: 256, max_payload_bytes: 1_048_576 } }
+
+    pub fn with_max_method_length(mut self, len: usize) -> Self { self.max_method_length = len; self }
+    pub fn with_max_payload(mut self, bytes: usize) -> Self { self.max_payload_bytes = bytes; self }
+
+    pub fn validate_request(&self, req: &RpcRequest) -> Result<(), String> {
+        if req.method.is_empty() { return Err("method is empty".into()); }
+        if req.method.len() > self.max_method_length { return Err("method too long".into()); }
+        let payload_size = serde_json::to_string(&req.args).map(|s| s.len()).unwrap_or(0);
+        if payload_size > self.max_payload_bytes { return Err("payload too large".into()); }
+        Ok(())
+    }
+
+    pub fn validate_response(&self, resp: &RpcResponse) -> Result<(), String> {
+        if let Err(ref err) = resp.result {
+            if err.message.is_empty() { return Err("error message is empty".into()); }
+        }
+        Ok(())
+    }
+
+    pub fn validate_message(&self, msg: &RpcMessage) -> Result<(), String> {
+        match msg {
+            RpcMessage::Request(req) => self.validate_request(req),
+            RpcMessage::Response(resp) => self.validate_response(resp),
+            RpcMessage::Event(_) => Ok(()),
+        }
+    }
+}
+
+impl Default for RpcMessageValidator { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// RpcBatchExecutor
+// ---------------------------------------------------------------------------
+
+pub struct RpcBatchExecutor {
+    requests: Vec<RpcRequest>,
+    results: Vec<Option<RpcResponse>>,
+}
+
+impl RpcBatchExecutor {
+    pub fn new() -> Self { Self { requests: Vec::new(), results: Vec::new() } }
+
+    pub fn add(&mut self, method: impl Into<String>, args: Vec<serde_json::Value>) {
+        let id = self.requests.len() as u64;
+        self.requests.push(RpcRequest { id, proxy_id: String::new(), method: method.into(), args });
+        self.results.push(None);
+    }
+
+    pub fn set_result(&mut self, index: usize, resp: RpcResponse) {
+        if index < self.results.len() { self.results[index] = Some(resp); }
+    }
+
+    pub fn is_complete(&self) -> bool { self.results.iter().all(|r| r.is_some()) }
+    pub fn pending_count(&self) -> usize { self.results.iter().filter(|r| r.is_none()).count() }
+    pub fn request_count(&self) -> usize { self.requests.len() }
+    pub fn requests(&self) -> &[RpcRequest] { &self.requests }
+}
+
+impl Default for RpcBatchExecutor { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// RpcTimeoutConfig
+// ---------------------------------------------------------------------------
+
+pub struct RpcTimeoutConfig {
+    default_timeout_ms: u64,
+    method_timeouts: std::collections::HashMap<String, u64>,
+}
+
+impl RpcTimeoutConfig {
+    pub fn new(default_ms: u64) -> Self {
+        Self { default_timeout_ms: default_ms, method_timeouts: std::collections::HashMap::new() }
+    }
+
+    pub fn set_method_timeout(&mut self, method: impl Into<String>, timeout_ms: u64) {
+        self.method_timeouts.insert(method.into(), timeout_ms);
+    }
+
+    pub fn timeout_for(&self, method: &str) -> u64 {
+        self.method_timeouts.get(method).copied().unwrap_or(self.default_timeout_ms)
+    }
+
+    pub fn default_timeout(&self) -> u64 { self.default_timeout_ms }
+    pub fn custom_timeout_count(&self) -> usize { self.method_timeouts.len() }
+}
+
+impl Default for RpcTimeoutConfig { fn default() -> Self { Self::new(30_000) } }
+
+// ---------------------------------------------------------------------------
+// RpcMessageSizeLimiter
+// ---------------------------------------------------------------------------
+
+pub struct RpcMessageSizeLimiter {
+    max_size_bytes: usize,
+    rejected_count: u64,
+}
+
+impl RpcMessageSizeLimiter {
+    pub fn new(max_size_bytes: usize) -> Self { Self { max_size_bytes, rejected_count: 0 } }
+
+    pub fn check(&mut self, message: &str) -> Result<(), String> {
+        if message.len() > self.max_size_bytes {
+            self.rejected_count += 1;
+            Err(format!("message size {} exceeds limit {}", message.len(), self.max_size_bytes))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn rejected_count(&self) -> u64 { self.rejected_count }
+    pub fn max_size(&self) -> usize { self.max_size_bytes }
+    pub fn set_max_size(&mut self, size: usize) { self.max_size_bytes = size; }
+}
+
+impl Default for RpcMessageSizeLimiter { fn default() -> Self { Self::new(10 * 1024 * 1024) } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2087,4 +2215,95 @@ mod tests {
         hm.record_heartbeat(300, 30);
         assert_eq!(hm.avg_latency_ms(), Some(20));
     }
+
+
+    #[test]
+    fn msg_validator_valid_request() {
+        let v = RpcMessageValidator::new();
+        let req = RpcRequest { id: 1, proxy_id: String::new(), method: "test".into(), args: vec![] };
+        assert!(v.validate_request(&req).is_ok());
+    }
+
+    #[test]
+    fn msg_validator_empty_method() {
+        let v = RpcMessageValidator::new();
+        let req = RpcRequest { id: 1, proxy_id: String::new(), method: "".into(), args: vec![] };
+        assert!(v.validate_request(&req).is_err());
+    }
+
+    #[test]
+    fn msg_validator_long_method() {
+        let v = RpcMessageValidator::new().with_max_method_length(5);
+        let req = RpcRequest { id: 1, proxy_id: String::new(), method: "toolong".into(), args: vec![] };
+        assert!(v.validate_request(&req).is_err());
+    }
+
+    #[test]
+    fn batch_executor_basic() {
+        let mut be = RpcBatchExecutor::new();
+        be.add("method1", vec![]);
+        be.add("method2", vec![]);
+        assert_eq!(be.request_count(), 2);
+        assert!(!be.is_complete());
+    }
+
+    #[test]
+    fn batch_executor_complete() {
+        let mut be = RpcBatchExecutor::new();
+        be.add("m", vec![]);
+        be.set_result(0, RpcResponse { id: 0, result: Ok(json!("ok")) });
+        assert!(be.is_complete());
+    }
+
+    #[test]
+    fn batch_executor_pending() {
+        let mut be = RpcBatchExecutor::new();
+        be.add("a", vec![]);
+        be.add("b", vec![]);
+        be.set_result(0, RpcResponse { id: 0, result: Ok(json!(null)) });
+        assert_eq!(be.pending_count(), 1);
+    }
+
+    #[test]
+    fn timeout_config_default() {
+        let tc = RpcTimeoutConfig::new(5000);
+        assert_eq!(tc.timeout_for("any"), 5000);
+    }
+
+    #[test]
+    fn timeout_config_custom() {
+        let mut tc = RpcTimeoutConfig::new(5000);
+        tc.set_method_timeout("heavy", 30000);
+        assert_eq!(tc.timeout_for("heavy"), 30000);
+        assert_eq!(tc.timeout_for("light"), 5000);
+    }
+
+    #[test]
+    fn size_limiter_pass() {
+        let mut l = RpcMessageSizeLimiter::new(100);
+        assert!(l.check("small").is_ok());
+        assert_eq!(l.rejected_count(), 0);
+    }
+
+    #[test]
+    fn size_limiter_reject() {
+        let mut l = RpcMessageSizeLimiter::new(5);
+        assert!(l.check("this is too long").is_err());
+        assert_eq!(l.rejected_count(), 1);
+    }
+
+    #[test]
+    fn msg_validator_message() {
+        let v = RpcMessageValidator::new();
+        let msg = RpcMessage::Event(RpcEvent { proxy_id: String::new(), event_name: "test".into(), data: json!({}) });
+        assert!(v.validate_message(&msg).is_ok());
+    }
+
+    #[test]
+    fn timeout_config_count() {
+        let mut tc = RpcTimeoutConfig::new(1000);
+        tc.set_method_timeout("a", 2000);
+        assert_eq!(tc.custom_timeout_count(), 1);
+    }
+
 }

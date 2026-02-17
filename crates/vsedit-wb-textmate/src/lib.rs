@@ -1118,6 +1118,255 @@ where
     }
 }
 
+// ---------------------------------------------------------------------------
+// TextMateThemeConverter – colour space helpers
+// ---------------------------------------------------------------------------
+
+/// Utilities for converting `syntect::highlighting::Color` values to various
+/// representations and computing basic colour metrics.
+pub struct TextMateThemeConverter;
+
+impl TextMateThemeConverter {
+    /// Create a new converter (stateless).
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Approximate an RGB colour to the xterm-256 palette index using the
+    /// standard 6×6×6 colour cube (indices 16..=231).
+    pub fn color_to_ansi256(color: syntect::highlighting::Color) -> u8 {
+        let r_idx = Self::rgb_component_to_cube(color.r);
+        let g_idx = Self::rgb_component_to_cube(color.g);
+        let b_idx = Self::rgb_component_to_cube(color.b);
+        16 + 36 * r_idx + 6 * g_idx + b_idx
+    }
+
+    /// Format an RGB colour as a CSS hex string (e.g. `#ff8000`).
+    pub fn color_to_hex(color: syntect::highlighting::Color) -> String {
+        format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b)
+    }
+
+    /// Return `true` when the perceived luminance of the colour is below 128,
+    /// i.e. the colour is "dark".
+    pub fn is_dark_color(color: syntect::highlighting::Color) -> bool {
+        Self::luminance(color) < 128.0
+    }
+
+    /// Compute a simple contrast ratio between two colours based on the
+    /// difference of their perceived luminances.  Returns a value in
+    /// `[1.0, 21.0]` (following the simplified W3C formula).
+    pub fn contrast_ratio(
+        a: syntect::highlighting::Color,
+        b: syntect::highlighting::Color,
+    ) -> f64 {
+        let la = Self::relative_luminance(a);
+        let lb = Self::relative_luminance(b);
+        let (lighter, darker) = if la > lb { (la, lb) } else { (lb, la) };
+        (lighter + 0.05) / (darker + 0.05)
+    }
+
+    // -- private helpers --
+
+    fn rgb_component_to_cube(v: u8) -> u8 {
+        if v < 48 {
+            0
+        } else if v < 115 {
+            1
+        } else {
+            (((v as u16) - 35) / 40).min(5) as u8
+        }
+    }
+
+    fn luminance(c: syntect::highlighting::Color) -> f64 {
+        0.299 * c.r as f64 + 0.587 * c.g as f64 + 0.114 * c.b as f64
+    }
+
+    fn relative_luminance(c: syntect::highlighting::Color) -> f64 {
+        fn linearize(v: u8) -> f64 {
+            let s = v as f64 / 255.0;
+            if s <= 0.03928 {
+                s / 12.92
+            } else {
+                ((s + 0.055) / 1.055).powf(2.4)
+            }
+        }
+        0.2126 * linearize(c.r) + 0.7152 * linearize(c.g) + 0.0722 * linearize(c.b)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextMateScopeInspector – debug helper for scope ↔ colour mappings
+// ---------------------------------------------------------------------------
+
+/// A single entry mapping a scope name to optional foreground / background
+/// colour hex strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopeEntry {
+    /// The scope string (e.g. `"source.rust"`).
+    pub scope: String,
+    /// Optional foreground colour as hex.
+    pub fg: Option<String>,
+    /// Optional background colour as hex.
+    pub bg: Option<String>,
+}
+
+/// Collects `ScopeEntry` items for inspection and debugging of theme-to-scope
+/// assignments.
+#[derive(Debug, Clone, Default)]
+pub struct TextMateScopeInspector {
+    entries: Vec<ScopeEntry>,
+}
+
+impl TextMateScopeInspector {
+    /// Create an empty inspector.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a scope → colour mapping.
+    pub fn add_entry(&mut self, scope: &str, fg: Option<&str>, bg: Option<&str>) {
+        self.entries.push(ScopeEntry {
+            scope: scope.to_string(),
+            fg: fg.map(String::from),
+            bg: bg.map(String::from),
+        });
+    }
+
+    /// Return all entries whose scope starts with `prefix`.
+    pub fn find_by_scope(&self, prefix: &str) -> Vec<&ScopeEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.scope.starts_with(prefix))
+            .collect()
+    }
+
+    /// Produce a human-readable dump of all entries.
+    pub fn dump(&self) -> String {
+        let mut buf = String::new();
+        for e in &self.entries {
+            buf.push_str(&e.scope);
+            if let Some(ref fg) = e.fg {
+                buf.push_str("  fg=");
+                buf.push_str(fg);
+            }
+            if let Some(ref bg) = e.bg {
+                buf.push_str("  bg=");
+                buf.push_str(bg);
+            }
+            buf.push('\n');
+        }
+        buf
+    }
+
+    /// Number of recorded entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` when no entries have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextMateGrammarCache – track which grammars have been loaded
+// ---------------------------------------------------------------------------
+
+/// Lightweight bookkeeping for lazily loaded grammars.
+#[derive(Debug, Clone, Default)]
+pub struct TextMateGrammarCache {
+    loaded: std::collections::HashMap<String, bool>,
+    load_order: Vec<String>,
+}
+
+impl TextMateGrammarCache {
+    /// Create an empty cache.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Mark a grammar as loaded, recording its load order.
+    pub fn mark_loaded(&mut self, grammar_id: &str) {
+        if self.loaded.insert(grammar_id.to_string(), true).is_none() {
+            self.load_order.push(grammar_id.to_string());
+        }
+    }
+
+    /// Check whether a grammar has been loaded.
+    pub fn is_loaded(&self, grammar_id: &str) -> bool {
+        self.loaded.get(grammar_id).copied().unwrap_or(false)
+    }
+
+    /// Number of currently loaded grammars.
+    pub fn loaded_count(&self) -> usize {
+        self.loaded.len()
+    }
+
+    /// The order in which grammars were first loaded.
+    pub fn load_order(&self) -> &[String] {
+        &self.load_order
+    }
+
+    /// Evict a grammar from the cache. Returns `true` if it was present.
+    pub fn evict(&mut self, grammar_id: &str) -> bool {
+        let removed = self.loaded.remove(grammar_id).is_some();
+        if removed {
+            self.load_order.retain(|id| id != grammar_id);
+        }
+        removed
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScopePriorityResolver – compare scope specificity
+// ---------------------------------------------------------------------------
+
+/// Determines which of several scope strings is most specific by counting
+/// dot-separated components.
+pub struct ScopePriorityResolver;
+
+impl ScopePriorityResolver {
+    /// Create a new resolver (stateless).
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Priority of a scope is the number of dot-separated components.
+    /// More components ⇒ higher priority.
+    pub fn priority(scope: &str) -> u32 {
+        if scope.is_empty() {
+            return 0;
+        }
+        scope.chars().filter(|&c| c == '.').count() as u32 + 1
+    }
+
+    /// Compare two scopes by specificity (dot count).
+    pub fn compare_specificity(a: &str, b: &str) -> std::cmp::Ordering {
+        Self::priority(a).cmp(&Self::priority(b))
+    }
+
+    /// Return the most specific scope from a slice, or `None` if the slice
+    /// is empty.
+    pub fn most_specific(scopes: &[&str]) -> Option<String> {
+        scopes
+            .iter()
+            .max_by(|a, b| Self::compare_specificity(a, b))
+            .map(|s| s.to_string())
+    }
+
+    /// Return `true` if `child` is a sub-scope of `parent`, i.e. `parent` is
+    /// a dot-aligned prefix of `child`.
+    pub fn is_subscope(parent: &str, child: &str) -> bool {
+        if parent == child {
+            return false;
+        }
+        child == parent
+            || (child.starts_with(parent)
+                && child.as_bytes().get(parent.len()) == Some(&b'.'))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1999,5 +2248,128 @@ mod tests {
         };
         let mapped = map_segment_text(&line, |s| s.to_uppercase());
         assert_eq!(mapped.plain_text(), "HELLO");
+    }
+
+    // ---- TextMateThemeConverter tests ----
+
+    #[test]
+    fn theme_converter_color_to_hex() {
+        let c = Color { r: 255, g: 128, b: 0, a: 255 };
+        assert_eq!(TextMateThemeConverter::color_to_hex(c), "#ff8000");
+        let black = Color { r: 0, g: 0, b: 0, a: 255 };
+        assert_eq!(TextMateThemeConverter::color_to_hex(black), "#000000");
+    }
+
+    #[test]
+    fn theme_converter_color_to_ansi256() {
+        let white = Color { r: 255, g: 255, b: 255, a: 255 };
+        let idx = TextMateThemeConverter::color_to_ansi256(white);
+        // White maps to cube(5,5,5) = 16 + 36*5 + 6*5 + 5 = 231
+        assert_eq!(idx, 231);
+        let black = Color { r: 0, g: 0, b: 0, a: 255 };
+        assert_eq!(TextMateThemeConverter::color_to_ansi256(black), 16);
+    }
+
+    #[test]
+    fn theme_converter_is_dark_color() {
+        let dark = Color { r: 10, g: 10, b: 10, a: 255 };
+        assert!(TextMateThemeConverter::is_dark_color(dark));
+        let bright = Color { r: 255, g: 255, b: 255, a: 255 };
+        assert!(!TextMateThemeConverter::is_dark_color(bright));
+    }
+
+    #[test]
+    fn theme_converter_contrast_ratio() {
+        let black = Color { r: 0, g: 0, b: 0, a: 255 };
+        let white = Color { r: 255, g: 255, b: 255, a: 255 };
+        let ratio = TextMateThemeConverter::contrast_ratio(black, white);
+        assert!(ratio > 15.0, "black/white contrast should be high, got {ratio}");
+        let self_ratio = TextMateThemeConverter::contrast_ratio(black, black);
+        assert!((self_ratio - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn theme_converter_new() {
+        let _conv = TextMateThemeConverter::new();
+    }
+
+    // ---- TextMateScopeInspector tests ----
+
+    #[test]
+    fn scope_inspector_add_and_find() {
+        let mut insp = TextMateScopeInspector::new();
+        assert!(insp.is_empty());
+        insp.add_entry("source.rust", Some("#ff0000"), None);
+        insp.add_entry("source.python", None, Some("#000000"));
+        insp.add_entry("keyword.control", Some("#00ff00"), Some("#111111"));
+        assert_eq!(insp.len(), 3);
+
+        let found = insp.find_by_scope("source");
+        assert_eq!(found.len(), 2);
+        let kw = insp.find_by_scope("keyword");
+        assert_eq!(kw.len(), 1);
+        assert_eq!(kw[0].fg.as_deref(), Some("#00ff00"));
+    }
+
+    #[test]
+    fn scope_inspector_dump_format() {
+        let mut insp = TextMateScopeInspector::new();
+        insp.add_entry("source.rust", Some("#ff0000"), None);
+        let dump = insp.dump();
+        assert!(dump.contains("source.rust"));
+        assert!(dump.contains("fg=#ff0000"));
+        assert!(!dump.contains("bg="));
+    }
+
+    // ---- TextMateGrammarCache tests ----
+
+    #[test]
+    fn grammar_cache_load_and_evict() {
+        let mut cache = TextMateGrammarCache::new();
+        assert_eq!(cache.loaded_count(), 0);
+        assert!(!cache.is_loaded("rust"));
+
+        cache.mark_loaded("rust");
+        cache.mark_loaded("python");
+        cache.mark_loaded("rust"); // duplicate – no-op
+        assert_eq!(cache.loaded_count(), 2);
+        assert!(cache.is_loaded("rust"));
+        assert_eq!(cache.load_order(), &["rust", "python"]);
+
+        assert!(cache.evict("rust"));
+        assert!(!cache.is_loaded("rust"));
+        assert_eq!(cache.loaded_count(), 1);
+        assert!(!cache.evict("rust")); // already gone
+    }
+
+    // ---- ScopePriorityResolver tests ----
+
+    #[test]
+    fn scope_priority_dot_count() {
+        assert_eq!(ScopePriorityResolver::priority("source"), 1);
+        assert_eq!(ScopePriorityResolver::priority("source.rust"), 2);
+        assert_eq!(ScopePriorityResolver::priority("source.rust.macro"), 3);
+        assert_eq!(ScopePriorityResolver::priority(""), 0);
+    }
+
+    #[test]
+    fn scope_priority_compare_and_most_specific() {
+        use std::cmp::Ordering;
+        assert_eq!(
+            ScopePriorityResolver::compare_specificity("source", "source.rust"),
+            Ordering::Less
+        );
+        let scopes: Vec<&str> = vec!["source", "source.rust", "source.rust.macro"];
+        let best = ScopePriorityResolver::most_specific(&scopes);
+        assert_eq!(best.as_deref(), Some("source.rust.macro"));
+        assert_eq!(ScopePriorityResolver::most_specific(&[]), None);
+    }
+
+    #[test]
+    fn scope_priority_is_subscope() {
+        assert!(ScopePriorityResolver::is_subscope("source", "source.rust"));
+        assert!(ScopePriorityResolver::is_subscope("source.rust", "source.rust.macro"));
+        assert!(!ScopePriorityResolver::is_subscope("source.rust", "source.rust"));
+        assert!(!ScopePriorityResolver::is_subscope("source.r", "source.rust"));
     }
 }

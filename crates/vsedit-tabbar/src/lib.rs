@@ -1184,6 +1184,256 @@ impl Default for SplitView {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Drag-and-drop reordering
+// ---------------------------------------------------------------------------
+
+/// The result of a completed drag-and-drop reorder operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DragResult {
+    pub tab_id: String,
+    pub from_index: usize,
+    pub to_index: usize,
+}
+
+impl fmt::Display for DragResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Moved tab '{}' from index {} to {}",
+            self.tab_id, self.from_index, self.to_index
+        )
+    }
+}
+
+/// Tracks the state of a tab drag-reorder gesture.
+#[derive(Debug, Clone, Default)]
+pub struct TabBarDragReorder {
+    pub dragging: Option<String>,
+    pub original_index: Option<usize>,
+    pub current_index: Option<usize>,
+}
+
+impl TabBarDragReorder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Begin dragging the tab identified by `tab_id` from `index`.
+    pub fn start_drag(&mut self, tab_id: &str, index: usize) {
+        self.dragging = Some(tab_id.to_string());
+        self.original_index = Some(index);
+        self.current_index = Some(index);
+    }
+
+    /// Update the position the dragged tab has been moved to.
+    pub fn move_to(&mut self, index: usize) {
+        if self.dragging.is_some() {
+            self.current_index = Some(index);
+        }
+    }
+
+    /// Complete the drag and return the result if the tab actually moved.
+    pub fn end_drag(&mut self) -> Option<DragResult> {
+        let tab_id = self.dragging.take()?;
+        let from = self.original_index.take()?;
+        let to = self.current_index.take()?;
+        if from == to {
+            return None;
+        }
+        Some(DragResult {
+            tab_id,
+            from_index: from,
+            to_index: to,
+        })
+    }
+
+    pub fn is_dragging(&self) -> bool {
+        self.dragging.is_some()
+    }
+
+    /// Cancel the current drag without producing a result.
+    pub fn cancel(&mut self) {
+        self.dragging = None;
+        self.original_index = None;
+        self.current_index = None;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tab-bar overflow
+// ---------------------------------------------------------------------------
+
+/// Manages the overflow dropdown that appears when tabs exceed visible space.
+#[derive(Debug, Clone)]
+pub struct TabBarOverflow {
+    pub visible_count: usize,
+    pub total_count: usize,
+    pub overflow_items: Vec<String>,
+}
+
+impl TabBarOverflow {
+    pub fn new(visible: usize, total: usize) -> Self {
+        Self {
+            visible_count: visible,
+            total_count: total,
+            overflow_items: Vec::new(),
+        }
+    }
+
+    pub fn has_overflow(&self) -> bool {
+        self.total_count > self.visible_count
+    }
+
+    pub fn overflow_count(&self) -> usize {
+        self.total_count.saturating_sub(self.visible_count)
+    }
+
+    pub fn add_overflow_item(&mut self, label: &str) {
+        self.overflow_items.push(label.to_string());
+    }
+
+    /// A short label such as "+3 more" for use in the UI.
+    pub fn overflow_label(&self) -> String {
+        let n = self.overflow_count();
+        if n == 0 {
+            String::new()
+        } else {
+            format!("+{n} more")
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.overflow_items.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Preview / transient tabs
+// ---------------------------------------------------------------------------
+
+/// Manages a single preview (transient) tab that can be promoted to permanent.
+#[derive(Debug, Clone, Default)]
+pub struct TabBarPreview {
+    pub preview_tab_id: Option<String>,
+    pub auto_close_on_edit: bool,
+}
+
+impl TabBarPreview {
+    pub fn new() -> Self {
+        Self {
+            preview_tab_id: None,
+            auto_close_on_edit: true,
+        }
+    }
+
+    pub fn set_preview(&mut self, tab_id: &str) {
+        self.preview_tab_id = Some(tab_id.to_string());
+    }
+
+    pub fn clear_preview(&mut self) {
+        self.preview_tab_id = None;
+    }
+
+    pub fn is_preview(&self, tab_id: &str) -> bool {
+        self.preview_tab_id.as_deref() == Some(tab_id)
+    }
+
+    /// Promote the preview tab to a permanent tab.
+    /// Returns `true` if `tab_id` was the current preview.
+    pub fn promote_to_permanent(&mut self, tab_id: &str) -> bool {
+        if self.is_preview(tab_id) {
+            self.preview_tab_id = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn has_preview(&self) -> bool {
+        self.preview_tab_id.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Close confirmation
+// ---------------------------------------------------------------------------
+
+/// Why a tab close requires confirmation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CloseReason {
+    Dirty,
+    Pinned,
+    LastTab,
+}
+
+impl fmt::Display for CloseReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CloseReason::Dirty => write!(f, "unsaved changes"),
+            CloseReason::Pinned => write!(f, "tab is pinned"),
+            CloseReason::LastTab => write!(f, "last remaining tab"),
+        }
+    }
+}
+
+/// A pending close request that may need user confirmation.
+#[derive(Debug, Clone)]
+pub struct CloseRequest {
+    pub tab_id: String,
+    pub reason: CloseReason,
+    pub confirmed: bool,
+}
+
+/// Collects and resolves close-confirmation requests.
+#[derive(Debug, Clone, Default)]
+pub struct TabCloseConfirmation {
+    pub pending: Vec<CloseRequest>,
+}
+
+impl TabCloseConfirmation {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a new close request for the given tab.
+    pub fn request_close(&mut self, tab_id: &str, reason: CloseReason) {
+        self.pending.push(CloseRequest {
+            tab_id: tab_id.to_string(),
+            reason,
+            confirmed: false,
+        });
+    }
+
+    /// Confirm the close of a tab. Returns `true` if a matching request was found.
+    pub fn confirm(&mut self, tab_id: &str) -> bool {
+        for req in &mut self.pending {
+            if req.tab_id == tab_id && !req.confirmed {
+                req.confirmed = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Reject (remove) a close request. Returns `true` if a matching request was found.
+    pub fn reject(&mut self, tab_id: &str) -> bool {
+        let before = self.pending.len();
+        self.pending.retain(|r| r.tab_id != tab_id);
+        self.pending.len() < before
+    }
+
+    /// Number of unconfirmed pending close requests.
+    pub fn pending_count(&self) -> usize {
+        self.pending.iter().filter(|r| !r.confirmed).count()
+    }
+
+    /// A tab needs confirmation before closing if it is dirty or pinned.
+    pub fn needs_confirmation(tab: &Tab) -> bool {
+        tab.dirty || tab.pinned
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2008,5 +2258,150 @@ mod tests {
 
         // Now only one pane left — can't close it
         assert!(sv.close_pane(0).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // TabBarDragReorder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn drag_reorder_basic_flow() {
+        let mut dr = TabBarDragReorder::new();
+        assert!(!dr.is_dragging());
+
+        dr.start_drag("tab1", 0);
+        assert!(dr.is_dragging());
+
+        dr.move_to(2);
+        let result = dr.end_drag().expect("should produce a result");
+        assert_eq!(result.tab_id, "tab1");
+        assert_eq!(result.from_index, 0);
+        assert_eq!(result.to_index, 2);
+        assert!(!dr.is_dragging());
+    }
+
+    #[test]
+    fn drag_reorder_no_move() {
+        let mut dr = TabBarDragReorder::new();
+        dr.start_drag("tab1", 3);
+        // End without moving — same index, should return None
+        assert!(dr.end_drag().is_none());
+    }
+
+    #[test]
+    fn drag_reorder_cancel_resets_state() {
+        let mut dr = TabBarDragReorder::new();
+        dr.start_drag("tab1", 1);
+        dr.move_to(4);
+        dr.cancel();
+        assert!(!dr.is_dragging());
+        assert!(dr.end_drag().is_none());
+    }
+
+    #[test]
+    fn drag_result_display() {
+        let result = DragResult {
+            tab_id: "file.rs".to_string(),
+            from_index: 0,
+            to_index: 3,
+        };
+        assert_eq!(result.to_string(), "Moved tab 'file.rs' from index 0 to 3");
+    }
+
+    // -----------------------------------------------------------------------
+    // TabBarOverflow tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn overflow_basic() {
+        let ov = TabBarOverflow::new(5, 8);
+        assert!(ov.has_overflow());
+        assert_eq!(ov.overflow_count(), 3);
+        assert_eq!(ov.overflow_label(), "+3 more");
+    }
+
+    #[test]
+    fn overflow_none() {
+        let ov = TabBarOverflow::new(10, 10);
+        assert!(!ov.has_overflow());
+        assert_eq!(ov.overflow_count(), 0);
+        assert_eq!(ov.overflow_label(), "");
+    }
+
+    #[test]
+    fn overflow_items_and_clear() {
+        let mut ov = TabBarOverflow::new(2, 5);
+        ov.add_overflow_item("tab3");
+        ov.add_overflow_item("tab4");
+        assert_eq!(ov.overflow_items.len(), 2);
+        ov.clear();
+        assert!(ov.overflow_items.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // TabBarPreview tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn preview_set_and_promote() {
+        let mut p = TabBarPreview::new();
+        assert!(!p.has_preview());
+
+        p.set_preview("tmp");
+        assert!(p.has_preview());
+        assert!(p.is_preview("tmp"));
+        assert!(!p.is_preview("other"));
+
+        assert!(p.promote_to_permanent("tmp"));
+        assert!(!p.has_preview());
+        // Promoting again returns false
+        assert!(!p.promote_to_permanent("tmp"));
+    }
+
+    #[test]
+    fn preview_clear() {
+        let mut p = TabBarPreview::new();
+        p.set_preview("x");
+        p.clear_preview();
+        assert!(!p.has_preview());
+    }
+
+    // -----------------------------------------------------------------------
+    // TabCloseConfirmation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn close_confirm_flow() {
+        let mut cc = TabCloseConfirmation::new();
+        cc.request_close("t1", CloseReason::Dirty);
+        cc.request_close("t2", CloseReason::Pinned);
+        assert_eq!(cc.pending_count(), 2);
+
+        assert!(cc.confirm("t1"));
+        assert_eq!(cc.pending_count(), 1);
+
+        assert!(cc.reject("t2"));
+        assert_eq!(cc.pending_count(), 0);
+    }
+
+    #[test]
+    fn close_needs_confirmation() {
+        let clean = make_tab("clean");
+        assert!(!TabCloseConfirmation::needs_confirmation(&clean));
+
+        let mut dirty = make_tab("dirty");
+        dirty.dirty = true;
+        assert!(TabCloseConfirmation::needs_confirmation(&dirty));
+
+        let mut pinned = make_tab("pinned");
+        pinned.pinned = true;
+        assert!(TabCloseConfirmation::needs_confirmation(&pinned));
+    }
+
+    #[test]
+    fn close_reason_display() {
+        assert_eq!(CloseReason::Dirty.to_string(), "unsaved changes");
+        assert_eq!(CloseReason::Pinned.to_string(), "tab is pinned");
+        assert_eq!(CloseReason::LastTab.to_string(), "last remaining tab");
     }
 }

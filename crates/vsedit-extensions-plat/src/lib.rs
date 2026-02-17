@@ -1355,6 +1355,243 @@ impl ExtensionToggle {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ExtensionStartupTracker – profiles extension activation times
+// ---------------------------------------------------------------------------
+
+/// Tracks activation duration for each extension to identify slow activations.
+pub struct ExtensionStartupTracker {
+    activations: std::collections::HashMap<String, u64>,
+}
+
+impl ExtensionStartupTracker {
+    pub fn new() -> Self {
+        Self {
+            activations: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Record activation time in milliseconds for an extension.
+    pub fn record_activation(&mut self, ext_id: &str, duration_ms: u64) {
+        self.activations.insert(ext_id.to_string(), duration_ms);
+    }
+
+    /// Get activation time for a specific extension.
+    pub fn activation_time(&self, ext_id: &str) -> Option<u64> {
+        self.activations.get(ext_id).copied()
+    }
+
+    /// Return the `n` slowest extensions sorted by descending activation time.
+    pub fn slowest(&self, n: usize) -> Vec<(String, u64)> {
+        let mut entries: Vec<(String, u64)> = self
+            .activations
+            .iter()
+            .map(|(id, &ms)| (id.clone(), ms))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
+    }
+
+    /// Sum of all recorded activation times.
+    pub fn total_activation_time(&self) -> u64 {
+        self.activations.values().sum()
+    }
+
+    /// Average activation time across all recorded extensions.
+    pub fn average_activation_time(&self) -> f64 {
+        if self.activations.is_empty() {
+            return 0.0;
+        }
+        self.total_activation_time() as f64 / self.activations.len() as f64
+    }
+
+    /// Number of extensions with recorded activation times.
+    pub fn extension_count(&self) -> usize {
+        self.activations.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionResourceLoader – tracks bundled assets for extensions
+// ---------------------------------------------------------------------------
+
+/// Metadata for a single bundled resource file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceInfo {
+    pub path: String,
+    pub size_bytes: u64,
+}
+
+/// Manages the set of bundled resources belonging to an extension.
+pub struct ExtensionResourceLoader {
+    ext_id: String,
+    resources: std::collections::HashMap<String, ResourceInfo>,
+}
+
+impl ExtensionResourceLoader {
+    pub fn new(ext_id: &str) -> Self {
+        Self {
+            ext_id: ext_id.to_string(),
+            resources: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register a resource by its relative path and size.
+    pub fn register_resource(&mut self, relative_path: &str, size_bytes: u64) {
+        self.resources.insert(
+            relative_path.to_string(),
+            ResourceInfo {
+                path: relative_path.to_string(),
+                size_bytes,
+            },
+        );
+    }
+
+    /// Look up a resource by relative path.
+    pub fn get_resource(&self, relative_path: &str) -> Option<&ResourceInfo> {
+        self.resources.get(relative_path)
+    }
+
+    /// Total size in bytes of all registered resources.
+    pub fn total_size(&self) -> u64 {
+        self.resources.values().map(|r| r.size_bytes).sum()
+    }
+
+    /// Number of registered resources.
+    pub fn resource_count(&self) -> usize {
+        self.resources.len()
+    }
+
+    /// List relative paths of all registered resources.
+    pub fn resources(&self) -> Vec<&str> {
+        self.resources.keys().map(|k| k.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionConfigDefault – manages extension configuration contributions
+// ---------------------------------------------------------------------------
+
+struct ConfigEntry {
+    key: String,
+    value: String,
+    description: String,
+}
+
+/// Stores default configuration values contributed by an extension.
+pub struct ExtensionConfigDefault {
+    ext_id: String,
+    entries: Vec<ConfigEntry>,
+}
+
+impl ExtensionConfigDefault {
+    pub fn new(ext_id: &str) -> Self {
+        Self {
+            ext_id: ext_id.to_string(),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add a default configuration entry. If the key already exists it is overwritten.
+    pub fn add_default(&mut self, key: &str, value: &str, description: &str) {
+        if let Some(existing) = self.entries.iter_mut().find(|e| e.key == key) {
+            existing.value = value.to_string();
+            existing.description = description.to_string();
+        } else {
+            self.entries.push(ConfigEntry {
+                key: key.to_string(),
+                value: value.to_string(),
+                description: description.to_string(),
+            });
+        }
+    }
+
+    /// Get the default value for a configuration key.
+    pub fn get_default(&self, key: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|e| e.key == key)
+            .map(|e| e.value.as_str())
+    }
+
+    /// Return all defaults as `(key, value, description)` tuples.
+    pub fn defaults(&self) -> Vec<(&str, &str, &str)> {
+        self.entries
+            .iter()
+            .map(|e| (e.key.as_str(), e.value.as_str(), e.description.as_str()))
+            .collect()
+    }
+
+    /// Number of registered defaults.
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Check whether a key is registered.
+    pub fn has_key(&self, key: &str) -> bool {
+        self.entries.iter().any(|e| e.key == key)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionPackExpander – expands extension packs to individual extensions
+// ---------------------------------------------------------------------------
+
+/// Represents an extension pack and its member extensions.
+pub struct ExtensionPackExpander {
+    pack_id: String,
+    members: Vec<String>,
+}
+
+impl ExtensionPackExpander {
+    pub fn new(pack_id: &str) -> Self {
+        Self {
+            pack_id: pack_id.to_string(),
+            members: Vec::new(),
+        }
+    }
+
+    /// Add a member extension to the pack.
+    pub fn add_member(&mut self, ext_id: &str) {
+        if !self.members.iter().any(|m| m == ext_id) {
+            self.members.push(ext_id.to_string());
+        }
+    }
+
+    /// Ordered list of member extension IDs.
+    pub fn members(&self) -> &[String] {
+        &self.members
+    }
+
+    /// Check whether the pack contains a specific extension.
+    pub fn contains(&self, ext_id: &str) -> bool {
+        self.members.iter().any(|m| m == ext_id)
+    }
+
+    /// Number of member extensions.
+    pub fn member_count(&self) -> usize {
+        self.members.len()
+    }
+
+    /// The pack's own identifier.
+    pub fn pack_id(&self) -> &str {
+        &self.pack_id
+    }
+}
+
+impl fmt::Display for ExtensionPackExpander {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "pack {} ({} members: {})",
+            self.pack_id,
+            self.members.len(),
+            self.members.join(", ")
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2178,6 +2415,149 @@ mod tests {
         t.disable("c", DisableReason::User);
         assert_eq!(t.disabled_by_reason(&DisableReason::User).len(), 2);
         assert_eq!(t.disabled_count(), 3);
+    }
+
+    // -- ExtensionStartupTracker tests --
+
+    #[test]
+    fn startup_tracker_record_and_query() {
+        let mut tracker = ExtensionStartupTracker::new();
+        tracker.record_activation("ext-a", 120);
+        tracker.record_activation("ext-b", 300);
+        assert_eq!(tracker.activation_time("ext-a"), Some(120));
+        assert_eq!(tracker.activation_time("ext-b"), Some(300));
+        assert_eq!(tracker.activation_time("ext-c"), None);
+        assert_eq!(tracker.extension_count(), 2);
+    }
+
+    #[test]
+    fn startup_tracker_slowest_and_totals() {
+        let mut tracker = ExtensionStartupTracker::new();
+        tracker.record_activation("fast", 10);
+        tracker.record_activation("medium", 50);
+        tracker.record_activation("slow", 200);
+        let slowest = tracker.slowest(2);
+        assert_eq!(slowest.len(), 2);
+        assert_eq!(slowest[0].0, "slow");
+        assert_eq!(slowest[1].0, "medium");
+        assert_eq!(tracker.total_activation_time(), 260);
+        assert!((tracker.average_activation_time() - 86.666).abs() < 1.0);
+    }
+
+    #[test]
+    fn startup_tracker_empty() {
+        let tracker = ExtensionStartupTracker::new();
+        assert_eq!(tracker.extension_count(), 0);
+        assert_eq!(tracker.total_activation_time(), 0);
+        assert_eq!(tracker.average_activation_time(), 0.0);
+        assert!(tracker.slowest(5).is_empty());
+    }
+
+    // -- ExtensionResourceLoader tests --
+
+    #[test]
+    fn resource_loader_register_and_query() {
+        let mut loader = ExtensionResourceLoader::new("my.ext");
+        loader.register_resource("icons/logo.png", 4096);
+        loader.register_resource("data/schema.json", 512);
+        assert_eq!(loader.resource_count(), 2);
+        let info = loader.get_resource("icons/logo.png").unwrap();
+        assert_eq!(info.size_bytes, 4096);
+        assert_eq!(info.path, "icons/logo.png");
+        assert_eq!(loader.total_size(), 4608);
+    }
+
+    #[test]
+    fn resource_loader_missing() {
+        let loader = ExtensionResourceLoader::new("my.ext");
+        assert!(loader.get_resource("nope").is_none());
+        assert_eq!(loader.resource_count(), 0);
+        assert_eq!(loader.total_size(), 0);
+    }
+
+    // -- ExtensionConfigDefault tests --
+
+    #[test]
+    fn config_default_add_and_query() {
+        let mut cfg = ExtensionConfigDefault::new("my.ext");
+        cfg.add_default("theme", "dark", "Default color theme");
+        cfg.add_default("fontSize", "14", "Editor font size");
+        assert_eq!(cfg.get_default("theme"), Some("dark"));
+        assert!(cfg.has_key("fontSize"));
+        assert!(!cfg.has_key("missing"));
+        assert_eq!(cfg.count(), 2);
+    }
+
+    #[test]
+    fn config_default_overwrite() {
+        let mut cfg = ExtensionConfigDefault::new("my.ext");
+        cfg.add_default("theme", "dark", "Theme");
+        cfg.add_default("theme", "light", "Updated theme");
+        assert_eq!(cfg.get_default("theme"), Some("light"));
+        assert_eq!(cfg.count(), 1);
+    }
+
+    #[test]
+    fn config_default_defaults_list() {
+        let mut cfg = ExtensionConfigDefault::new("my.ext");
+        cfg.add_default("a", "1", "first");
+        cfg.add_default("b", "2", "second");
+        let defs = cfg.defaults();
+        assert_eq!(defs.len(), 2);
+        assert_eq!(defs[0], ("a", "1", "first"));
+    }
+
+    // -- ExtensionPackExpander tests --
+
+    #[test]
+    fn pack_expander_add_and_query() {
+        let mut pack = ExtensionPackExpander::new("pack.web");
+        pack.add_member("ext-html");
+        pack.add_member("ext-css");
+        pack.add_member("ext-js");
+        assert_eq!(pack.member_count(), 3);
+        assert!(pack.contains("ext-css"));
+        assert!(!pack.contains("ext-go"));
+        assert_eq!(pack.pack_id(), "pack.web");
+        assert_eq!(pack.members(), &["ext-html", "ext-css", "ext-js"]);
+    }
+
+    #[test]
+    fn pack_expander_no_duplicates() {
+        let mut pack = ExtensionPackExpander::new("pack.dup");
+        pack.add_member("ext-a");
+        pack.add_member("ext-a");
+        assert_eq!(pack.member_count(), 1);
+    }
+
+    #[test]
+    fn pack_expander_display() {
+        let mut pack = ExtensionPackExpander::new("pack.test");
+        pack.add_member("ext-a");
+        pack.add_member("ext-b");
+        let s = format!("{pack}");
+        assert!(s.contains("pack.test"));
+        assert!(s.contains("2 members"));
+    }
+
+    #[test]
+    fn resource_loader_resources_list() {
+        let mut loader = ExtensionResourceLoader::new("my.ext");
+        loader.register_resource("a.txt", 100);
+        loader.register_resource("b.txt", 200);
+        let paths = loader.resources();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&"a.txt"));
+        assert!(paths.contains(&"b.txt"));
+    }
+
+    #[test]
+    fn startup_tracker_overwrite() {
+        let mut tracker = ExtensionStartupTracker::new();
+        tracker.record_activation("ext-a", 100);
+        tracker.record_activation("ext-a", 250);
+        assert_eq!(tracker.activation_time("ext-a"), Some(250));
+        assert_eq!(tracker.extension_count(), 1);
     }
 
     #[test]

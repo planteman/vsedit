@@ -1165,6 +1165,149 @@ impl OutputDiff {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// OutputViewWordWrap
+// ---------------------------------------------------------------------------
+
+pub struct OutputViewWordWrap {
+    enabled: bool,
+    wrap_column: usize,
+}
+
+impl OutputViewWordWrap {
+    pub fn new(enabled: bool, wrap_column: usize) -> Self { Self { enabled, wrap_column } }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn wrap_column(&self) -> usize { self.wrap_column }
+    pub fn set_wrap_column(&mut self, col: usize) { self.wrap_column = col; }
+
+    pub fn wrap_line(&self, line: &str) -> Vec<String> {
+        if !self.enabled || line.len() <= self.wrap_column {
+            return vec![line.to_string()];
+        }
+        let mut result = Vec::new();
+        let mut remaining = line;
+        while remaining.len() > self.wrap_column {
+            let (chunk, rest) = remaining.split_at(self.wrap_column);
+            result.push(chunk.to_string());
+            remaining = rest;
+        }
+        if !remaining.is_empty() { result.push(remaining.to_string()); }
+        result
+    }
+}
+
+impl Default for OutputViewWordWrap {
+    fn default() -> Self { Self::new(false, 120) }
+}
+
+impl fmt::Display for OutputViewWordWrap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "WordWrap(enabled={}, col={})", self.enabled, self.wrap_column)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputViewTimestamp
+// ---------------------------------------------------------------------------
+
+pub struct OutputViewTimestamp;
+
+impl OutputViewTimestamp {
+    pub fn format_ms(ms: u64) -> String {
+        let total_secs = ms / 1000;
+        let millis = ms % 1000;
+        let hours = total_secs / 3600;
+        let minutes = (total_secs % 3600) / 60;
+        let seconds = total_secs % 60;
+        format!("{:02}:{:02}:{:02}.{:03}", hours, minutes, seconds, millis)
+    }
+
+    pub fn format_elapsed(base_ms: u64, current_ms: u64) -> String {
+        format!("+{}", Self::format_ms(current_ms.saturating_sub(base_ms)))
+    }
+
+    pub fn stamp_line(line: &str, timestamp_ms: u64) -> String {
+        format!("[{}] {}", Self::format_ms(timestamp_ms), line)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputViewCopySelection
+// ---------------------------------------------------------------------------
+
+pub struct OutputViewCopySelection {
+    start_line: usize,
+    end_line: usize,
+    selected_text: String,
+}
+
+impl OutputViewCopySelection {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start_line: start, end_line: end, selected_text: String::new() }
+    }
+
+    pub fn from_lines(lines: &[String], start: usize, end: usize) -> Self {
+        let end = end.min(lines.len());
+        let start = start.min(end);
+        let text = lines[start..end].join("\n");
+        Self { start_line: start, end_line: end, selected_text: text }
+    }
+
+    pub fn start_line(&self) -> usize { self.start_line }
+    pub fn end_line(&self) -> usize { self.end_line }
+    pub fn text(&self) -> &str { &self.selected_text }
+    pub fn line_count(&self) -> usize { self.end_line.saturating_sub(self.start_line) }
+    pub fn is_empty(&self) -> bool { self.selected_text.is_empty() }
+}
+
+impl fmt::Display for OutputViewCopySelection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Selection(lines {}..{})", self.start_line, self.end_line)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputTextSearcher
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct OutputTextSearchResult {
+    pub line_index: usize,
+    pub column: usize,
+    pub length: usize,
+    pub line_text: String,
+}
+
+pub struct OutputTextSearcher;
+
+impl OutputTextSearcher {
+    pub fn search(lines: &[String], pattern: &str) -> Vec<OutputTextSearchResult> {
+        let pattern_lower = pattern.to_lowercase();
+        let mut results = Vec::new();
+        for (i, line) in lines.iter().enumerate() {
+            let line_lower = line.to_lowercase();
+            let mut start = 0;
+            while let Some(pos) = line_lower[start..].find(&pattern_lower) {
+                results.push(OutputTextSearchResult {
+                    line_index: i, column: start + pos, length: pattern.len(), line_text: line.clone(),
+                });
+                start += pos + 1;
+            }
+        }
+        results
+    }
+
+    pub fn count_matches(lines: &[String], pattern: &str) -> usize {
+        Self::search(lines, pattern).len()
+    }
+
+    pub fn find_first(lines: &[String], pattern: &str) -> Option<OutputTextSearchResult> {
+        Self::search(lines, pattern).into_iter().next()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2056,4 +2199,83 @@ mod tests {
         let snap3 = OutputChannelSnapshot::capture(&ch);
         assert_eq!(OutputDiff::diff(&snap1, &snap3), DiffKind::Changed);
     }
+
+
+    #[test]
+    fn word_wrap_disabled() {
+        let wrap = OutputViewWordWrap::new(false, 10);
+        assert_eq!(wrap.wrap_line("hello world"), vec!["hello world"]);
+    }
+
+    #[test]
+    fn word_wrap_enabled() {
+        let wrap = OutputViewWordWrap::new(true, 5);
+        let lines = wrap.wrap_line("hello world!");
+        assert_eq!(lines.len(), 3);
+    }
+
+    #[test]
+    fn word_wrap_toggle() {
+        let mut wrap = OutputViewWordWrap::new(false, 80);
+        wrap.toggle();
+        assert!(wrap.is_enabled());
+    }
+
+    #[test]
+    fn timestamp_format_ms() {
+        assert_eq!(OutputViewTimestamp::format_ms(0), "00:00:00.000");
+        assert_eq!(OutputViewTimestamp::format_ms(3661234), "01:01:01.234");
+    }
+
+    #[test]
+    fn timestamp_format_elapsed() {
+        let s = OutputViewTimestamp::format_elapsed(1000, 2500);
+        assert!(s.starts_with('+'));
+    }
+
+    #[test]
+    fn timestamp_stamp_line() {
+        let line = OutputViewTimestamp::stamp_line("hello", 1000);
+        assert!(line.starts_with('['));
+        assert!(line.contains("hello"));
+    }
+
+    #[test]
+    fn copy_selection_basic() {
+        let lines: Vec<String> = vec!["a".into(), "b".into(), "c".into()];
+        let sel = OutputViewCopySelection::from_lines(&lines, 0, 2);
+        assert_eq!(sel.line_count(), 2);
+    }
+
+    #[test]
+    fn copy_selection_display() {
+        let sel = OutputViewCopySelection::new(0, 5);
+        assert!(format!("{sel}").contains("0..5"));
+    }
+
+    #[test]
+    fn text_searcher_basic() {
+        let lines: Vec<String> = vec!["hello world".into(), "world hello".into()];
+        let results = OutputTextSearcher::search(&lines, "hello");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn text_searcher_count() {
+        let lines: Vec<String> = vec!["aaa".into(), "aa".into()];
+        assert_eq!(OutputTextSearcher::count_matches(&lines, "a"), 5);
+    }
+
+    #[test]
+    fn text_searcher_case_insensitive() {
+        let lines: Vec<String> = vec!["Hello World".into()];
+        assert_eq!(OutputTextSearcher::search(&lines, "hello").len(), 1);
+    }
+
+    #[test]
+    fn word_wrap_display() {
+        let wrap = OutputViewWordWrap::default();
+        assert!(format!("{wrap}").contains("enabled=false"));
+    }
+
 }

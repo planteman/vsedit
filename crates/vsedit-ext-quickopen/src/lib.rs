@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for QuickPick/InputBox.
 
+use std::collections::HashMap;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -1237,6 +1238,240 @@ pub fn quick_open_filter(
     results
 }
 
+// ── ScoredMatch ──
+
+/// Result of scoring a query against a target string, including the positions
+/// in the target where each query character was matched.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScoredMatch {
+    /// Overall score for this match (higher is better).
+    pub score: f64,
+    /// Indices into the target string where the query characters matched.
+    pub matched_positions: Vec<usize>,
+}
+
+impl fmt::Display for ScoredMatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ScoredMatch(score={:.2}, positions={:?})",
+            self.score, self.matched_positions
+        )
+    }
+}
+
+// ── QuickOpenScorer ──
+
+/// Scorer that produces [`ScoredMatch`] results with character-level match
+/// positions, enabling rich highlighting in the UI.
+pub struct QuickOpenScorer {
+    consecutive_bonus: f64,
+    prefix_bonus: f64,
+}
+
+impl QuickOpenScorer {
+    /// Creates a new scorer with default bonuses.
+    pub fn new() -> Self {
+        Self {
+            consecutive_bonus: 2.0,
+            prefix_bonus: 3.0,
+        }
+    }
+
+    /// Fuzzy-matches `query` against `target` and returns a [`ScoredMatch`] if
+    /// every character in `query` appears (in order) in `target`.
+    pub fn score_with_positions(&self, query: &str, target: &str) -> Option<ScoredMatch> {
+        if query.is_empty() {
+            return Some(ScoredMatch {
+                score: 0.0,
+                matched_positions: Vec::new(),
+            });
+        }
+
+        let query_lower: Vec<char> = query.chars().map(|c| c.to_ascii_lowercase()).collect();
+        let target_chars: Vec<char> = target.chars().collect();
+        let target_lower: Vec<char> = target_chars.iter().map(|c| c.to_ascii_lowercase()).collect();
+
+        let mut positions = Vec::with_capacity(query_lower.len());
+        let mut t_idx = 0;
+
+        for &qch in &query_lower {
+            let mut found = false;
+            while t_idx < target_lower.len() {
+                if target_lower[t_idx] == qch {
+                    positions.push(t_idx);
+                    t_idx += 1;
+                    found = true;
+                    break;
+                }
+                t_idx += 1;
+            }
+            if !found {
+                return None;
+            }
+        }
+
+        let mut score = positions.len() as f64;
+
+        // Bonus for consecutive matched positions.
+        for pair in positions.windows(2) {
+            if pair[1] == pair[0] + 1 {
+                score += self.consecutive_bonus;
+            }
+        }
+
+        // Bonus when the match starts at position 0 (prefix match).
+        if positions.first() == Some(&0) {
+            score += self.prefix_bonus;
+        }
+
+        Some(ScoredMatch {
+            score,
+            matched_positions: positions,
+        })
+    }
+
+    /// Wraps matched characters in `[..]` brackets to visualize the match.
+    ///
+    /// Example: `highlight_text("main.rs", &[0, 5])` → `"[m]ain.[r]s"`.
+    pub fn highlight_text(target: &str, positions: &[usize]) -> String {
+        let chars: Vec<char> = target.chars().collect();
+        let mut out = String::with_capacity(target.len() + positions.len() * 2);
+        for (i, ch) in chars.iter().enumerate() {
+            if positions.contains(&i) {
+                out.push('[');
+                out.push(*ch);
+                out.push(']');
+            } else {
+                out.push(*ch);
+            }
+        }
+        out
+    }
+}
+
+impl Default for QuickOpenScorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── QuickOpenFileIcon ──
+
+/// Maps file extensions to emoji icons for display in quick-pick lists.
+pub struct QuickOpenFileIcon {
+    icon_map: HashMap<String, String>,
+}
+
+impl QuickOpenFileIcon {
+    /// Creates an empty icon resolver.
+    pub fn new() -> Self {
+        Self {
+            icon_map: HashMap::new(),
+        }
+    }
+
+    /// Creates an icon resolver pre-loaded with common extension mappings.
+    pub fn with_defaults() -> Self {
+        let mut m = Self::new();
+        m.register("rs", "🦀");
+        m.register("py", "🐍");
+        m.register("js", "📜");
+        m.register("ts", "📘");
+        m.register("md", "📝");
+        m.register("toml", "⚙\u{fe0f}");
+        m.register("json", "📋");
+        m.register("yaml", "📋");
+        m.register("yml", "📋");
+        m.register("html", "🌐");
+        m.register("css", "🎨");
+        m.register("sh", "🐚");
+        m.register("go", "🐹");
+        m.register("c", "⚡");
+        m.register("cpp", "⚡");
+        m.register("h", "⚡");
+        m
+    }
+
+    /// Resolves an icon for the given filename by extracting its extension. If
+    /// no mapping exists the default icon `"📄"` is returned.
+    pub fn resolve(&self, filename: &str) -> &str {
+        filename
+            .rsplit_once('.')
+            .and_then(|(_, ext)| self.icon_map.get(&ext.to_ascii_lowercase()))
+            .map(|s| s.as_str())
+            .unwrap_or("📄")
+    }
+
+    /// Registers (or overwrites) an icon mapping for the given extension.
+    pub fn register(&mut self, ext: &str, icon: &str) {
+        self.icon_map
+            .insert(ext.to_ascii_lowercase(), icon.to_string());
+    }
+}
+
+impl Default for QuickOpenFileIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── QuickOpenItemGrouper ──
+
+/// Collects [`QuickPickItem`]s into named groups for sectioned display.
+pub struct QuickOpenItemGrouper {
+    groups: Vec<(String, Vec<QuickPickItem>)>,
+}
+
+impl QuickOpenItemGrouper {
+    /// Creates an empty grouper.
+    pub fn new() -> Self {
+        Self {
+            groups: Vec::new(),
+        }
+    }
+
+    /// Adds an item under the given category, creating the category if needed.
+    pub fn add_item(&mut self, category: &str, item: QuickPickItem) {
+        if let Some(entry) = self.groups.iter_mut().find(|(k, _)| k == category) {
+            entry.1.push(item);
+        } else {
+            self.groups
+                .push((category.to_string(), vec![item]));
+        }
+    }
+
+    /// Returns the category names in insertion order.
+    pub fn groups(&self) -> Vec<&str> {
+        self.groups.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    /// Returns the items within a category (empty slice if not found).
+    pub fn items_in_group(&self, category: &str) -> Vec<&QuickPickItem> {
+        self.groups
+            .iter()
+            .find(|(k, _)| k == category)
+            .map(|(_, items)| items.iter().collect())
+            .unwrap_or_default()
+    }
+
+    /// Total number of items across all groups.
+    pub fn total_items(&self) -> usize {
+        self.groups.iter().map(|(_, v)| v.len()).sum()
+    }
+
+    /// Number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+}
+
+impl Default for QuickOpenItemGrouper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2005,5 +2240,140 @@ mod tests {
         // Oldest entry "a" should have been evicted
         assert!(cache.get("a").is_none());
         assert!(cache.get("c").is_some());
+    }
+
+    // ── QuickOpenScorer tests ──
+
+    #[test]
+    fn scorer_matches_all_chars_in_order() {
+        let scorer = QuickOpenScorer::new();
+        let result = scorer.score_with_positions("mr", "main.rs").unwrap();
+        assert_eq!(result.matched_positions.len(), 2);
+        assert!(result.score > 0.0);
+        // 'm' at 0, 'r' at 5
+        assert_eq!(result.matched_positions[0], 0);
+        assert_eq!(result.matched_positions[1], 5);
+    }
+
+    #[test]
+    fn scorer_returns_none_on_no_match() {
+        let scorer = QuickOpenScorer::new();
+        assert!(scorer.score_with_positions("xyz", "main.rs").is_none());
+    }
+
+    #[test]
+    fn scorer_empty_query_matches_everything() {
+        let scorer = QuickOpenScorer::new();
+        let result = scorer.score_with_positions("", "anything").unwrap();
+        assert!(result.matched_positions.is_empty());
+        assert!((result.score - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scorer_consecutive_bonus() {
+        let scorer = QuickOpenScorer::new();
+        // "mai" in "main.rs" => positions 0,1,2 (all consecutive)
+        let consec = scorer.score_with_positions("mai", "main.rs").unwrap();
+        // "m.r" in "main.rs" => positions 0,4,5 (only one consecutive pair)
+        let sparse = scorer.score_with_positions("mrs", "main.rs").unwrap();
+        assert!(consec.score > sparse.score);
+    }
+
+    #[test]
+    fn scorer_prefix_bonus_applied() {
+        let scorer = QuickOpenScorer::new();
+        let prefix = scorer.score_with_positions("m", "main.rs").unwrap();
+        let non_prefix = scorer.score_with_positions("r", "main.rs").unwrap();
+        assert!(prefix.score > non_prefix.score);
+    }
+
+    #[test]
+    fn highlight_text_wraps_matched_chars() {
+        let highlighted = QuickOpenScorer::highlight_text("main.rs", &[0, 5]);
+        assert_eq!(highlighted, "[m]ain.[r]s");
+    }
+
+    #[test]
+    fn highlight_text_empty_positions() {
+        let highlighted = QuickOpenScorer::highlight_text("hello", &[]);
+        assert_eq!(highlighted, "hello");
+    }
+
+    #[test]
+    fn scored_match_display() {
+        let sm = ScoredMatch {
+            score: 7.5,
+            matched_positions: vec![0, 2],
+        };
+        let s = format!("{sm}");
+        assert!(s.contains("7.50"));
+        assert!(s.contains("[0, 2]"));
+    }
+
+    // ── QuickOpenFileIcon tests ──
+
+    #[test]
+    fn file_icon_defaults_resolve_known() {
+        let icons = QuickOpenFileIcon::with_defaults();
+        assert_eq!(icons.resolve("main.rs"), "🦀");
+        assert_eq!(icons.resolve("script.py"), "🐍");
+        assert_eq!(icons.resolve("app.js"), "📜");
+        assert_eq!(icons.resolve("index.ts"), "📘");
+        assert_eq!(icons.resolve("README.md"), "📝");
+    }
+
+    #[test]
+    fn file_icon_unknown_extension_default() {
+        let icons = QuickOpenFileIcon::with_defaults();
+        assert_eq!(icons.resolve("file.xyz"), "📄");
+        assert_eq!(icons.resolve("noext"), "📄");
+    }
+
+    #[test]
+    fn file_icon_register_custom() {
+        let mut icons = QuickOpenFileIcon::new();
+        icons.register("zig", "⚡");
+        assert_eq!(icons.resolve("build.zig"), "⚡");
+        assert_eq!(icons.resolve("other.txt"), "📄");
+    }
+
+    // ── QuickOpenItemGrouper tests ──
+
+    #[test]
+    fn item_grouper_add_and_count() {
+        let mut g = QuickOpenItemGrouper::new();
+        g.add_item("rust", test_item("main.rs"));
+        g.add_item("rust", test_item("lib.rs"));
+        g.add_item("docs", test_item("README.md"));
+        assert_eq!(g.group_count(), 2);
+        assert_eq!(g.total_items(), 3);
+    }
+
+    #[test]
+    fn item_grouper_groups_ordered_by_insertion() {
+        let mut g = QuickOpenItemGrouper::new();
+        g.add_item("beta", test_item("b"));
+        g.add_item("alpha", test_item("a"));
+        assert_eq!(g.groups(), vec!["beta", "alpha"]);
+    }
+
+    #[test]
+    fn item_grouper_items_in_group() {
+        let mut g = QuickOpenItemGrouper::new();
+        g.add_item("src", test_item("main.rs"));
+        g.add_item("src", test_item("lib.rs"));
+        let items = g.items_in_group("src");
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].label, "main.rs");
+        assert_eq!(items[1].label, "lib.rs");
+        assert!(g.items_in_group("missing").is_empty());
+    }
+
+    #[test]
+    fn item_grouper_empty() {
+        let g = QuickOpenItemGrouper::new();
+        assert_eq!(g.group_count(), 0);
+        assert_eq!(g.total_items(), 0);
+        assert!(g.groups().is_empty());
     }
 }

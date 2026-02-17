@@ -1254,6 +1254,370 @@ impl SettingsRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SettingsSearchIndex – full-text search over settings entries
+// ---------------------------------------------------------------------------
+
+/// Where a search query matched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MatchLocation {
+    Key,
+    Label,
+    Description,
+}
+
+impl fmt::Display for MatchLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MatchLocation::Key => write!(f, "key"),
+            MatchLocation::Label => write!(f, "label"),
+            MatchLocation::Description => write!(f, "description"),
+        }
+    }
+}
+
+/// A single search hit returned by [`SettingsSearchIndex::search`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchResult {
+    pub key: String,
+    pub score: u32,
+    pub match_location: MatchLocation,
+}
+
+impl fmt::Display for SearchResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} (score={}, {})", self.key, self.score, self.match_location)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SearchEntry {
+    key: String,
+    label: String,
+    description: String,
+}
+
+/// Full-text search index for settings.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsSearchIndex {
+    entries: Vec<SearchEntry>,
+}
+
+impl SettingsSearchIndex {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add an entry to the index.
+    pub fn add_entry(&mut self, key: &str, label: &str, description: &str) {
+        self.entries.push(SearchEntry {
+            key: key.to_string(),
+            label: label.to_string(),
+            description: description.to_string(),
+        });
+    }
+
+    /// Search the index. Results are sorted by descending score.
+    /// Scoring: exact key match = 100, key contains = 80, label contains = 50,
+    /// description contains = 20.
+    pub fn search(&self, query: &str) -> Vec<SearchResult> {
+        let q = query.to_lowercase();
+        let mut results: Vec<SearchResult> = Vec::new();
+
+        for entry in &self.entries {
+            let key_lower = entry.key.to_lowercase();
+            let label_lower = entry.label.to_lowercase();
+            let desc_lower = entry.description.to_lowercase();
+
+            if key_lower == q {
+                results.push(SearchResult {
+                    key: entry.key.clone(),
+                    score: 100,
+                    match_location: MatchLocation::Key,
+                });
+            } else if key_lower.contains(&q) {
+                results.push(SearchResult {
+                    key: entry.key.clone(),
+                    score: 80,
+                    match_location: MatchLocation::Key,
+                });
+            } else if label_lower.contains(&q) {
+                results.push(SearchResult {
+                    key: entry.key.clone(),
+                    score: 50,
+                    match_location: MatchLocation::Label,
+                });
+            } else if desc_lower.contains(&q) {
+                results.push(SearchResult {
+                    key: entry.key.clone(),
+                    score: 20,
+                    match_location: MatchLocation::Description,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl fmt::Display for SettingsSearchIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SearchIndex({} entries)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsModifiedIndicator – tracks settings that differ from defaults
+// ---------------------------------------------------------------------------
+
+/// Tracks which settings currently differ from their default values.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsModifiedIndicator {
+    modified: HashMap<String, (String, String)>,
+}
+
+impl SettingsModifiedIndicator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record that `key` has been modified. If `current_value` equals
+    /// `default_value` the entry is removed (no longer modified).
+    pub fn mark_modified(&mut self, key: &str, current_value: &str, default_value: &str) {
+        if current_value == default_value {
+            self.modified.remove(key);
+        } else {
+            self.modified.insert(
+                key.to_string(),
+                (current_value.to_string(), default_value.to_string()),
+            );
+        }
+    }
+
+    pub fn is_modified(&self, key: &str) -> bool {
+        self.modified.contains_key(key)
+    }
+
+    pub fn modified_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.modified.keys().map(|k| k.as_str()).collect();
+        keys.sort();
+        keys
+    }
+
+    pub fn modified_count(&self) -> usize {
+        self.modified.len()
+    }
+
+    pub fn clear(&mut self, key: &str) {
+        self.modified.remove(key);
+    }
+}
+
+impl fmt::Display for SettingsModifiedIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ModifiedIndicator({} modified)", self.modified.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsResetHandler – manages reset-to-default operations
+// ---------------------------------------------------------------------------
+
+/// Stores default values and provides reset operations.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsResetHandler {
+    defaults: HashMap<String, String>,
+}
+
+impl SettingsResetHandler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register_default(&mut self, key: &str, default_value: &str) {
+        self.defaults.insert(key.to_string(), default_value.to_string());
+    }
+
+    pub fn get_default(&self, key: &str) -> Option<&str> {
+        self.defaults.get(key).map(|s| s.as_str())
+    }
+
+    /// Return the default value for `key`, consuming it as an owned `String`.
+    pub fn reset(&self, key: &str) -> Option<String> {
+        self.defaults.get(key).cloned()
+    }
+
+    /// Return all registered defaults as `(key, default_value)` pairs, sorted
+    /// by key.
+    pub fn reset_all(&self) -> Vec<(String, String)> {
+        let mut pairs: Vec<(String, String)> = self
+            .defaults
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        pairs
+    }
+
+    pub fn has_default(&self, key: &str) -> bool {
+        self.defaults.contains_key(key)
+    }
+}
+
+impl fmt::Display for SettingsResetHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ResetHandler({} defaults)", self.defaults.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsTableOfContents – hierarchical section navigator
+// ---------------------------------------------------------------------------
+
+/// A single node in the table-of-contents tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TocEntry {
+    pub path: String,
+    pub label: String,
+    pub children: Vec<TocEntry>,
+}
+
+impl TocEntry {
+    fn new(path: &str, label: &str) -> Self {
+        Self {
+            path: path.to_string(),
+            label: label.to_string(),
+            children: Vec::new(),
+        }
+    }
+
+    fn depth(&self) -> usize {
+        if self.children.is_empty() {
+            1
+        } else {
+            1 + self.children.iter().map(|c| c.depth()).max().unwrap_or(0)
+        }
+    }
+}
+
+impl Default for TocEntry {
+    fn default() -> Self {
+        Self {
+            path: String::new(),
+            label: String::new(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl fmt::Display for TocEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.label, self.path)?;
+        if !self.children.is_empty() {
+            write!(f, " [{} children]", self.children.len())?;
+        }
+        Ok(())
+    }
+}
+
+/// Hierarchical section navigator for the settings UI.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsTableOfContents {
+    roots: Vec<TocEntry>,
+}
+
+impl SettingsTableOfContents {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a section. The `path` uses dot-separated segments to express
+    /// hierarchy (e.g. `"editor.font"` creates an `"editor"` root with a
+    /// `"font"` child).
+    pub fn add_section(&mut self, path: &str, label: &str) {
+        let parts: Vec<&str> = path.split('.').collect();
+        Self::insert(&mut self.roots, &parts, 0, path, label);
+    }
+
+    fn insert(
+        nodes: &mut Vec<TocEntry>,
+        parts: &[&str],
+        idx: usize,
+        full_path: &str,
+        label: &str,
+    ) {
+        if idx >= parts.len() {
+            return;
+        }
+
+        let segment = parts[idx];
+        let partial_path: String = parts[..=idx].join(".");
+
+        let pos = nodes.iter().position(|n| n.path == partial_path);
+        let node_idx = match pos {
+            Some(i) => i,
+            None => {
+                let entry_label = if idx == parts.len() - 1 { label } else { segment };
+                nodes.push(TocEntry::new(&partial_path, entry_label));
+                nodes.len() - 1
+            }
+        };
+
+        // Update label if this is the final segment.
+        if idx == parts.len() - 1 {
+            nodes[node_idx].label = label.to_string();
+        }
+
+        if idx + 1 < parts.len() {
+            Self::insert(&mut nodes[node_idx].children, parts, idx + 1, full_path, label);
+        }
+    }
+
+    /// Return references to the top-level sections.
+    pub fn sections(&self) -> Vec<&TocEntry> {
+        self.roots.iter().collect()
+    }
+
+    /// Find a section by its full dot-separated path.
+    pub fn find_section(&self, path: &str) -> Option<&TocEntry> {
+        let parts: Vec<&str> = path.split('.').collect();
+        Self::find_in(&self.roots, &parts, 0)
+    }
+
+    fn find_in<'a>(nodes: &'a [TocEntry], parts: &[&str], idx: usize) -> Option<&'a TocEntry> {
+        if idx >= parts.len() {
+            return None;
+        }
+        let partial: String = parts[..=idx].join(".");
+        let node = nodes.iter().find(|n| n.path == partial)?;
+        if idx == parts.len() - 1 {
+            Some(node)
+        } else {
+            Self::find_in(&node.children, parts, idx + 1)
+        }
+    }
+
+    /// Maximum nesting depth (0 when empty).
+    pub fn depth(&self) -> usize {
+        self.roots.iter().map(|r| r.depth()).max().unwrap_or(0)
+    }
+}
+
+impl fmt::Display for SettingsTableOfContents {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TableOfContents({} roots, depth={})", self.roots.len(), self.depth())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2126,5 +2490,142 @@ mod tests {
         assert!(format!("{k}").contains("one of"));
         let k = ValidationRuleKind::RegexPattern("test".into());
         assert!(format!("{k}").contains("test"));
+    }
+
+    // --- SettingsSearchIndex ---
+
+    #[test]
+    fn search_index_empty() {
+        let idx = SettingsSearchIndex::new();
+        assert!(idx.is_empty());
+        assert_eq!(idx.len(), 0);
+        assert!(idx.search("anything").is_empty());
+        assert_eq!(format!("{idx}"), "SearchIndex(0 entries)");
+    }
+
+    #[test]
+    fn search_index_exact_key_scores_highest() {
+        let mut idx = SettingsSearchIndex::new();
+        idx.add_entry("editor.fontSize", "Font Size", "Controls the font size");
+        idx.add_entry("editor.fontFamily", "Font Family", "Controls the font family");
+        idx.add_entry("terminal.fontSize", "Terminal Font", "fontSize for terminal");
+
+        let results = idx.search("editor.fontSize");
+        assert_eq!(results[0].key, "editor.fontSize");
+        assert_eq!(results[0].score, 100);
+        assert_eq!(results[0].match_location, MatchLocation::Key);
+    }
+
+    #[test]
+    fn search_index_scoring_order() {
+        let mut idx = SettingsSearchIndex::new();
+        idx.add_entry("theme.color", "Theme Color", "Pick a color theme");
+        idx.add_entry("editor.tab", "Color Scheme", "Set colors");
+        idx.add_entry("misc.opt", "Option", "Some color option");
+
+        let results = idx.search("color");
+        assert!(results.len() >= 3);
+        assert!(results[0].score >= results[1].score);
+        assert!(results[1].score >= results[2].score);
+    }
+
+    #[test]
+    fn search_result_display() {
+        let r = SearchResult { key: "k".into(), score: 50, match_location: MatchLocation::Label };
+        assert!(format!("{r}").contains("label"));
+    }
+
+    // --- SettingsModifiedIndicator ---
+
+    #[test]
+    fn modified_indicator_basic() {
+        let mut ind = SettingsModifiedIndicator::new();
+        assert_eq!(ind.modified_count(), 0);
+        ind.mark_modified("a", "1", "2");
+        assert!(ind.is_modified("a"));
+        assert_eq!(ind.modified_count(), 1);
+        assert_eq!(ind.modified_keys(), vec!["a"]);
+        ind.clear("a");
+        assert!(!ind.is_modified("a"));
+        assert_eq!(ind.modified_count(), 0);
+    }
+
+    #[test]
+    fn modified_indicator_same_value_not_modified() {
+        let mut ind = SettingsModifiedIndicator::new();
+        ind.mark_modified("x", "val", "val");
+        assert!(!ind.is_modified("x"));
+    }
+
+    #[test]
+    fn modified_indicator_display() {
+        let ind = SettingsModifiedIndicator::new();
+        assert!(format!("{ind}").contains("0 modified"));
+    }
+
+    // --- SettingsResetHandler ---
+
+    #[test]
+    fn reset_handler_register_and_get() {
+        let mut rh = SettingsResetHandler::new();
+        rh.register_default("font", "14");
+        assert!(rh.has_default("font"));
+        assert_eq!(rh.get_default("font"), Some("14"));
+        assert_eq!(rh.reset("font"), Some("14".to_string()));
+        assert_eq!(rh.get_default("missing"), None);
+    }
+
+    #[test]
+    fn reset_handler_reset_all_sorted() {
+        let mut rh = SettingsResetHandler::new();
+        rh.register_default("z.key", "z");
+        rh.register_default("a.key", "a");
+        let all = rh.reset_all();
+        assert_eq!(all[0].0, "a.key");
+        assert_eq!(all[1].0, "z.key");
+        assert!(format!("{rh}").contains("2 defaults"));
+    }
+
+    // --- SettingsTableOfContents ---
+
+    #[test]
+    fn toc_empty() {
+        let toc = SettingsTableOfContents::new();
+        assert_eq!(toc.depth(), 0);
+        assert!(toc.sections().is_empty());
+        assert!(toc.find_section("x").is_none());
+    }
+
+    #[test]
+    fn toc_nested_sections() {
+        let mut toc = SettingsTableOfContents::new();
+        toc.add_section("editor", "Editor");
+        toc.add_section("editor.font", "Font");
+        toc.add_section("editor.font.size", "Size");
+        toc.add_section("terminal", "Terminal");
+
+        assert_eq!(toc.sections().len(), 2);
+        assert_eq!(toc.depth(), 3);
+
+        let font = toc.find_section("editor.font").unwrap();
+        assert_eq!(font.label, "Font");
+        assert_eq!(font.children.len(), 1);
+
+        assert!(toc.find_section("editor.font.size").is_some());
+        assert!(toc.find_section("nonexistent").is_none());
+    }
+
+    #[test]
+    fn toc_display() {
+        let mut toc = SettingsTableOfContents::new();
+        toc.add_section("a", "A");
+        assert!(format!("{toc}").contains("1 roots"));
+    }
+
+    #[test]
+    fn toc_entry_display() {
+        let entry = TocEntry::new("editor.font", "Font");
+        assert!(format!("{entry}").contains("Font"));
+        assert!(format!("{entry}").contains("editor.font"));
     }
 }

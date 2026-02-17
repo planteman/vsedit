@@ -3,6 +3,7 @@
 //! Equivalent to VS Code's `vs/base/common/cancellation.ts`.
 //! Provides cooperative cancellation for async operations.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
 
@@ -1175,6 +1176,174 @@ impl OperationGuard {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// CancellationRegistry — tracks all tokens
+// ---------------------------------------------------------------------------
+
+/// Registry that tracks all active cancellation token sources.
+pub struct CancellationRegistry {
+    sources: HashMap<String, CancellationTokenSource>,
+}
+
+impl CancellationRegistry {
+    pub fn new() -> Self { Self { sources: HashMap::new() } }
+
+    pub fn register(&mut self, name: impl Into<String>) -> CancellationToken {
+        let source = CancellationTokenSource::new();
+        let token = source.token();
+        self.sources.insert(name.into(), source);
+        token
+    }
+
+    pub fn cancel(&self, name: &str) -> bool {
+        if let Some(source) = self.sources.get(name) { source.cancel(); true } else { false }
+    }
+
+    pub fn cancel_all(&self) {
+        for source in self.sources.values() { source.cancel(); }
+    }
+
+    pub fn len(&self) -> usize { self.sources.len() }
+    pub fn is_empty(&self) -> bool { self.sources.is_empty() }
+
+    pub fn remove(&mut self, name: &str) -> bool { self.sources.remove(name).is_some() }
+
+    pub fn cancelled_names(&self) -> Vec<&str> {
+        self.sources.iter().filter(|(_, s)| s.is_cancelled()).map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn active_names(&self) -> Vec<&str> {
+        self.sources.iter().filter(|(_, s)| !s.is_cancelled()).map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn is_cancelled(&self, name: &str) -> Option<bool> {
+        self.sources.get(name).map(|s| s.is_cancelled())
+    }
+}
+
+impl Default for CancellationRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for CancellationRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CancellationRegistry({} sources)", self.sources.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationTimeout — auto-cancel after duration
+// ---------------------------------------------------------------------------
+
+/// Auto-cancel configuration with a duration.
+pub struct CancellationTimeout {
+    source: CancellationTokenSource,
+    duration: Duration,
+}
+
+impl CancellationTimeout {
+    pub fn new(duration: Duration) -> Self {
+        Self { source: CancellationTokenSource::new(), duration }
+    }
+
+    pub fn token(&self) -> CancellationToken { self.source.token() }
+    pub fn duration(&self) -> Duration { self.duration }
+    pub fn cancel_now(&self) { self.source.cancel(); }
+    pub fn is_cancelled(&self) -> bool { self.source.is_cancelled() }
+}
+
+impl fmt::Display for CancellationTimeout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CancellationTimeout({}ms)", self.duration.as_millis())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationLinker — parent-child chains
+// ---------------------------------------------------------------------------
+
+/// Links cancellation tokens in parent-child relationships.
+pub struct CancellationLinker {
+    children: Vec<CancellationTokenSource>,
+    parent_token: CancellationToken,
+}
+
+impl CancellationLinker {
+    pub fn new(parent_token: CancellationToken) -> Self {
+        Self { children: Vec::new(), parent_token }
+    }
+
+    pub fn create_child(&mut self) -> CancellationToken {
+        let source = CancellationTokenSource::new();
+        let token = source.token();
+        self.children.push(source);
+        token
+    }
+
+    pub fn cancel_children(&self) {
+        for child in &self.children { child.cancel(); }
+    }
+
+    pub fn child_count(&self) -> usize { self.children.len() }
+
+    pub fn is_parent_cancelled(&self) -> bool { self.parent_token.is_cancelled() }
+
+    pub fn propagate(&self) {
+        if self.parent_token.is_cancelled() { self.cancel_children(); }
+    }
+}
+
+impl fmt::Display for CancellationLinker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CancellationLinker({} children)", self.children.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationStatistics
+// ---------------------------------------------------------------------------
+
+/// Tracks cancellation statistics.
+pub struct CancellationStatistics {
+    pub total_created: u64,
+    pub total_cancelled: u64,
+    pub total_timed_out: u64,
+    pub total_completed: u64,
+}
+
+impl CancellationStatistics {
+    pub fn new() -> Self {
+        Self { total_created: 0, total_cancelled: 0, total_timed_out: 0, total_completed: 0 }
+    }
+
+    pub fn record_creation(&mut self) { self.total_created += 1; }
+    pub fn record_cancellation(&mut self) { self.total_cancelled += 1; }
+    pub fn record_timeout(&mut self) { self.total_timed_out += 1; }
+    pub fn record_completion(&mut self) { self.total_completed += 1; }
+
+    pub fn cancellation_rate(&self) -> f64 {
+        if self.total_created == 0 { 0.0 } else { self.total_cancelled as f64 / self.total_created as f64 }
+    }
+
+    pub fn completion_rate(&self) -> f64 {
+        if self.total_created == 0 { 0.0 } else { self.total_completed as f64 / self.total_created as f64 }
+    }
+
+    pub fn reset(&mut self) { *self = Self::new(); }
+}
+
+impl Default for CancellationStatistics {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for CancellationStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CancellationStatistics(created={}, cancelled={}, completed={})",
+            self.total_created, self.total_cancelled, self.total_completed)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2051,4 +2220,122 @@ mod tests {
         assert_eq!(removed, 1);
         assert_eq!(group.count(), 1);
     }
+
+
+    #[test]
+    fn registry_register_and_cancel() {
+        let mut reg = CancellationRegistry::new();
+        let token = reg.register("op1");
+        assert!(!token.is_cancelled());
+        assert!(reg.cancel("op1"));
+        assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn registry_cancel_all() {
+        let mut reg = CancellationRegistry::new();
+        let t1 = reg.register("a");
+        let t2 = reg.register("b");
+        reg.cancel_all();
+        assert!(t1.is_cancelled());
+        assert!(t2.is_cancelled());
+    }
+
+    #[test]
+    fn registry_remove() {
+        let mut reg = CancellationRegistry::new();
+        reg.register("x");
+        assert!(reg.remove("x"));
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn registry_cancelled_names() {
+        let mut reg = CancellationRegistry::new();
+        reg.register("a");
+        reg.register("b");
+        reg.cancel("a");
+        assert!(reg.cancelled_names().contains(&"a"));
+    }
+
+    #[test]
+    fn registry_active_names() {
+        let mut reg = CancellationRegistry::new();
+        reg.register("a");
+        reg.register("b");
+        reg.cancel("a");
+        let active = reg.active_names();
+        assert!(!active.contains(&"a"));
+        assert!(active.contains(&"b"));
+    }
+
+    #[test]
+    fn timeout_basic() {
+        let timeout = CancellationTimeout::new(Duration::from_millis(100));
+        assert!(!timeout.is_cancelled());
+        timeout.cancel_now();
+        assert!(timeout.is_cancelled());
+    }
+
+    #[test]
+    fn timeout_display() {
+        let timeout = CancellationTimeout::new(Duration::from_millis(500));
+        assert!(format!("{timeout}").contains("500ms"));
+    }
+
+    #[test]
+    fn linker_create_child() {
+        let source = CancellationTokenSource::new();
+        let mut linker = CancellationLinker::new(source.token());
+        let child = linker.create_child();
+        assert!(!child.is_cancelled());
+        assert_eq!(linker.child_count(), 1);
+    }
+
+    #[test]
+    fn linker_propagate() {
+        let source = CancellationTokenSource::new();
+        let parent_token = source.token();
+        let mut linker = CancellationLinker::new(parent_token);
+        let child = linker.create_child();
+        source.cancel();
+        linker.propagate();
+        assert!(child.is_cancelled());
+    }
+
+    #[test]
+    fn statistics_basic() {
+        let mut stats = CancellationStatistics::new();
+        stats.record_creation();
+        stats.record_creation();
+        stats.record_cancellation();
+        stats.record_completion();
+        assert_eq!(stats.total_created, 2);
+        assert!((stats.cancellation_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn statistics_reset() {
+        let mut stats = CancellationStatistics::new();
+        stats.record_creation();
+        stats.reset();
+        assert_eq!(stats.total_created, 0);
+    }
+
+    #[test]
+    fn statistics_display() {
+        let stats = CancellationStatistics::new();
+        assert!(format!("{stats}").contains("created=0"));
+    }
+
+    #[test]
+    fn registry_is_cancelled_check() {
+        let mut reg = CancellationRegistry::new();
+        reg.register("op");
+        assert_eq!(reg.is_cancelled("op"), Some(false));
+        reg.cancel("op");
+        assert_eq!(reg.is_cancelled("op"), Some(true));
+        assert_eq!(reg.is_cancelled("missing"), None);
+    }
+
 }

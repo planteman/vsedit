@@ -1399,6 +1399,313 @@ impl WorkspaceFolderOrdering {
     }
 }
 
+// ── Bulk file operations builder ──
+
+/// Represents a single bulk file operation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BulkFileOp {
+    CreateFile { path: String, content: String },
+    DeleteFile { path: String },
+    RenameFile { old: String, new: String },
+    TextEdit { path: String, line: usize, old_text: String, new_text: String },
+}
+
+impl fmt::Display for BulkFileOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CreateFile { path, .. } => write!(f, "Create({path})"),
+            Self::DeleteFile { path } => write!(f, "Delete({path})"),
+            Self::RenameFile { old, new } => write!(f, "Rename({old} -> {new})"),
+            Self::TextEdit { path, line, .. } => write!(f, "TextEdit({path}:{line})"),
+        }
+    }
+}
+
+/// Builds a list of bulk file operations for batch application.
+#[derive(Debug, Clone, Default)]
+pub struct BulkFileEditBuilder {
+    ops: Vec<BulkFileOp>,
+}
+
+impl BulkFileEditBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Queue a file creation.
+    pub fn create_file(&mut self, path: &str, content: &str) {
+        self.ops.push(BulkFileOp::CreateFile {
+            path: path.to_string(),
+            content: content.to_string(),
+        });
+    }
+
+    /// Queue a file deletion.
+    pub fn delete_file(&mut self, path: &str) {
+        self.ops.push(BulkFileOp::DeleteFile {
+            path: path.to_string(),
+        });
+    }
+
+    /// Queue a file rename.
+    pub fn rename_file(&mut self, old_path: &str, new_path: &str) {
+        self.ops.push(BulkFileOp::RenameFile {
+            old: old_path.to_string(),
+            new: new_path.to_string(),
+        });
+    }
+
+    /// Queue a text replacement at a specific line.
+    pub fn replace_text(&mut self, path: &str, line: usize, old_text: &str, new_text: &str) {
+        self.ops.push(BulkFileOp::TextEdit {
+            path: path.to_string(),
+            line,
+            old_text: old_text.to_string(),
+            new_text: new_text.to_string(),
+        });
+    }
+
+    /// Return all queued edits.
+    pub fn edits(&self) -> &[BulkFileOp] {
+        &self.ops
+    }
+
+    /// Number of queued edits.
+    pub fn edit_count(&self) -> usize {
+        self.ops.len()
+    }
+
+    /// Whether any edits have been queued.
+    pub fn has_edits(&self) -> bool {
+        !self.ops.is_empty()
+    }
+}
+
+impl fmt::Display for BulkFileEditBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BulkFileEditBuilder({} ops)", self.ops.len())
+    }
+}
+
+// ── Workspace config editor ──
+
+/// Editor for workspace configuration as a key-value map of JSON values.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceConfigEditor {
+    entries: HashMap<String, serde_json::Value>,
+}
+
+impl WorkspaceConfigEditor {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a configuration value.
+    pub fn set(&mut self, key: &str, value: serde_json::Value) {
+        self.entries.insert(key.to_string(), value);
+    }
+
+    /// Get a configuration value by key.
+    pub fn get(&self, key: &str) -> Option<&serde_json::Value> {
+        self.entries.get(key)
+    }
+
+    /// Remove a configuration value, returning it if it existed.
+    pub fn remove(&mut self, key: &str) -> Option<serde_json::Value> {
+        self.entries.remove(key)
+    }
+
+    /// Serialize all entries to a JSON string.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(&self.entries).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// List all configuration keys.
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.keys().map(|k| k.as_str()).collect()
+    }
+
+    /// Number of configuration entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the configuration is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl fmt::Display for WorkspaceConfigEditor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "WorkspaceConfigEditor({} entries)", self.entries.len())
+    }
+}
+
+// ── Workspace symbol registry ──
+
+/// A registered symbol provider with its target language.
+#[derive(Debug, Clone, PartialEq)]
+struct SymbolProvider {
+    name: String,
+    language: String,
+}
+
+/// Registry for workspace symbol providers, indexed by language.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceSymbolRegistry {
+    providers: Vec<SymbolProvider>,
+}
+
+impl WorkspaceSymbolRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a symbol provider for a language.
+    pub fn register_provider(&mut self, name: &str, language: &str) {
+        self.providers.push(SymbolProvider {
+            name: name.to_string(),
+            language: language.to_string(),
+        });
+    }
+
+    /// Return all provider names registered for the given language.
+    pub fn providers_for_language(&self, language: &str) -> Vec<&str> {
+        self.providers
+            .iter()
+            .filter(|p| p.language == language)
+            .map(|p| p.name.as_str())
+            .collect()
+    }
+
+    /// Return all (name, language) pairs.
+    pub fn all_providers(&self) -> Vec<(&str, &str)> {
+        self.providers
+            .iter()
+            .map(|p| (p.name.as_str(), p.language.as_str()))
+            .collect()
+    }
+
+    /// Number of registered providers.
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// Whether a provider with the given name is registered.
+    pub fn has_provider(&self, name: &str) -> bool {
+        self.providers.iter().any(|p| p.name == name)
+    }
+}
+
+impl fmt::Display for WorkspaceSymbolRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "WorkspaceSymbolRegistry({} providers)", self.providers.len())
+    }
+}
+
+// ── Workspace diagnostics summary ──
+
+/// Severity level for a diagnostic entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiagSeverity {
+    Error,
+    Warning,
+    Info,
+    Hint,
+}
+
+impl fmt::Display for DiagSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+            Self::Info => write!(f, "info"),
+            Self::Hint => write!(f, "hint"),
+        }
+    }
+}
+
+/// A single diagnostic entry tied to a file.
+#[derive(Debug, Clone, PartialEq)]
+struct DiagEntry {
+    file: String,
+    severity: DiagSeverity,
+    message: String,
+}
+
+/// Accumulates diagnostics across a workspace and provides summary queries.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceDiagnosticsSummary {
+    entries: Vec<DiagEntry>,
+}
+
+impl WorkspaceDiagnosticsSummary {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a diagnostic for a file.
+    pub fn add_diagnostic(&mut self, file: &str, severity: DiagSeverity, message: &str) {
+        self.entries.push(DiagEntry {
+            file: file.to_string(),
+            severity,
+            message: message.to_string(),
+        });
+    }
+
+    /// Count of diagnostics with `Error` severity.
+    pub fn error_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity == DiagSeverity::Error).count()
+    }
+
+    /// Count of diagnostics with `Warning` severity.
+    pub fn warning_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity == DiagSeverity::Warning).count()
+    }
+
+    /// Count of diagnostics with `Info` severity.
+    pub fn info_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity == DiagSeverity::Info).count()
+    }
+
+    /// Unique files that have at least one `Error` diagnostic.
+    pub fn files_with_errors(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self
+            .entries
+            .iter()
+            .filter(|e| e.severity == DiagSeverity::Error)
+            .map(|e| e.file.as_str())
+            .collect();
+        files.sort();
+        files.dedup();
+        files
+    }
+
+    /// Total number of diagnostics.
+    pub fn total(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether there are zero diagnostics.
+    pub fn is_clean(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl fmt::Display for WorkspaceDiagnosticsSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Diagnostics(errors={}, warnings={}, info={}, total={})",
+            self.error_count(),
+            self.warning_count(),
+            self.info_count(),
+            self.total(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2187,5 +2494,150 @@ mod tests {
         assert_eq!(o.index_of("b"), Some(1));
         assert_eq!(o.index_of("z"), None);
         assert_eq!(o.len(), 2);
+    }
+
+    // -- BulkFileEditBuilder tests --
+
+    #[test]
+    fn bulk_edit_create_and_delete() {
+        let mut b = BulkFileEditBuilder::new();
+        assert!(!b.has_edits());
+        b.create_file("src/new.rs", "fn main() {}");
+        b.delete_file("src/old.rs");
+        assert_eq!(b.edit_count(), 2);
+        assert!(b.has_edits());
+        assert_eq!(
+            b.edits()[0],
+            BulkFileOp::CreateFile {
+                path: "src/new.rs".into(),
+                content: "fn main() {}".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn bulk_edit_rename_and_replace() {
+        let mut b = BulkFileEditBuilder::new();
+        b.rename_file("a.rs", "b.rs");
+        b.replace_text("b.rs", 10, "old", "new");
+        assert_eq!(b.edit_count(), 2);
+        assert_eq!(
+            b.edits()[1],
+            BulkFileOp::TextEdit {
+                path: "b.rs".into(),
+                line: 10,
+                old_text: "old".into(),
+                new_text: "new".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn bulk_edit_display() {
+        let mut b = BulkFileEditBuilder::new();
+        b.create_file("x.rs", "");
+        assert_eq!(format!("{b}"), "BulkFileEditBuilder(1 ops)");
+        assert_eq!(format!("{}", b.edits()[0]), "Create(x.rs)");
+    }
+
+    // -- WorkspaceConfigEditor tests --
+
+    #[test]
+    fn config_editor_set_get_remove() {
+        let mut cfg = WorkspaceConfigEditor::new();
+        cfg.set("theme", serde_json::json!("dark"));
+        assert_eq!(cfg.get("theme"), Some(&serde_json::json!("dark")));
+        assert_eq!(cfg.len(), 1);
+        let removed = cfg.remove("theme");
+        assert_eq!(removed, Some(serde_json::json!("dark")));
+        assert!(cfg.is_empty());
+    }
+
+    #[test]
+    fn config_editor_to_json() {
+        let mut cfg = WorkspaceConfigEditor::new();
+        cfg.set("fontSize", serde_json::json!(14));
+        let json = cfg.to_json();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["fontSize"], serde_json::json!(14));
+    }
+
+    #[test]
+    fn config_editor_keys_and_display() {
+        let mut cfg = WorkspaceConfigEditor::new();
+        cfg.set("a", serde_json::json!(1));
+        cfg.set("b", serde_json::json!(2));
+        assert_eq!(cfg.keys().len(), 2);
+        assert_eq!(format!("{cfg}"), "WorkspaceConfigEditor(2 entries)");
+    }
+
+    // -- WorkspaceSymbolRegistry tests --
+
+    #[test]
+    fn symbol_registry_register_and_query() {
+        let mut reg = WorkspaceSymbolRegistry::new();
+        reg.register_provider("rust-analyzer", "rust");
+        reg.register_provider("gopls", "go");
+        reg.register_provider("rust-tags", "rust");
+        assert_eq!(reg.providers_for_language("rust"), vec!["rust-analyzer", "rust-tags"]);
+        assert_eq!(reg.providers_for_language("go"), vec!["gopls"]);
+        assert!(reg.providers_for_language("python").is_empty());
+    }
+
+    #[test]
+    fn symbol_registry_all_and_has() {
+        let mut reg = WorkspaceSymbolRegistry::new();
+        reg.register_provider("tsserver", "typescript");
+        assert_eq!(reg.provider_count(), 1);
+        assert!(reg.has_provider("tsserver"));
+        assert!(!reg.has_provider("missing"));
+        assert_eq!(reg.all_providers(), vec![("tsserver", "typescript")]);
+        assert_eq!(format!("{reg}"), "WorkspaceSymbolRegistry(1 providers)");
+    }
+
+    // -- WorkspaceDiagnosticsSummary tests --
+
+    #[test]
+    fn diagnostics_summary_counts() {
+        let mut diag = WorkspaceDiagnosticsSummary::new();
+        assert!(diag.is_clean());
+        diag.add_diagnostic("main.rs", DiagSeverity::Error, "missing semicolon");
+        diag.add_diagnostic("main.rs", DiagSeverity::Warning, "unused variable");
+        diag.add_diagnostic("lib.rs", DiagSeverity::Error, "type mismatch");
+        diag.add_diagnostic("lib.rs", DiagSeverity::Info, "consider refactoring");
+        assert_eq!(diag.error_count(), 2);
+        assert_eq!(diag.warning_count(), 1);
+        assert_eq!(diag.info_count(), 1);
+        assert_eq!(diag.total(), 4);
+        assert!(!diag.is_clean());
+    }
+
+    #[test]
+    fn diagnostics_files_with_errors() {
+        let mut diag = WorkspaceDiagnosticsSummary::new();
+        diag.add_diagnostic("b.rs", DiagSeverity::Error, "err1");
+        diag.add_diagnostic("a.rs", DiagSeverity::Error, "err2");
+        diag.add_diagnostic("a.rs", DiagSeverity::Warning, "warn");
+        let files = diag.files_with_errors();
+        assert_eq!(files, vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn diagnostics_display() {
+        let mut diag = WorkspaceDiagnosticsSummary::new();
+        diag.add_diagnostic("x.rs", DiagSeverity::Error, "e");
+        diag.add_diagnostic("x.rs", DiagSeverity::Hint, "h");
+        assert_eq!(
+            format!("{diag}"),
+            "Diagnostics(errors=1, warnings=0, info=0, total=2)"
+        );
+    }
+
+    #[test]
+    fn diag_severity_display() {
+        assert_eq!(format!("{}", DiagSeverity::Error), "error");
+        assert_eq!(format!("{}", DiagSeverity::Warning), "warning");
+        assert_eq!(format!("{}", DiagSeverity::Info), "info");
+        assert_eq!(format!("{}", DiagSeverity::Hint), "hint");
     }
 }

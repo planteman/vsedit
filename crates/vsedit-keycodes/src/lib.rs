@@ -1275,6 +1275,174 @@ impl KeyCombo {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// KeyCodeLabel -- display strings for key codes
+// ---------------------------------------------------------------------------
+
+pub struct KeyCodeLabel;
+
+impl KeyCodeLabel {
+    pub fn label(kc: KeyCode) -> &'static str {
+        match kc {
+            KeyCode::Backspace => "Backspace",
+            KeyCode::Tab => "Tab",
+            KeyCode::Enter => "Enter",
+            KeyCode::Escape => "Esc",
+            KeyCode::Space => "Space",
+            KeyCode::Delete => "Del",
+            KeyCode::Home => "Home",
+            KeyCode::End => "End",
+            KeyCode::PageUp => "PgUp",
+            KeyCode::PageDown => "PgDn",
+            KeyCode::UpArrow => "Up",
+            KeyCode::DownArrow => "Down",
+            KeyCode::LeftArrow => "Left",
+            KeyCode::RightArrow => "Right",
+            KeyCode::Insert => "Ins",
+            _ => kc.display_name(),
+        }
+    }
+
+    pub fn modifier_symbol(kc: KeyCode) -> Option<char> {
+        match kc {
+            KeyCode::Ctrl => Some('^'),
+            KeyCode::Shift => Some('S'),
+            KeyCode::Alt => Some('A'),
+            KeyCode::Meta => Some('M'),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyCodeCategoryMap -- grouping by category
+// ---------------------------------------------------------------------------
+
+pub struct KeyCodeCategoryMap;
+
+impl KeyCodeCategoryMap {
+    pub fn codes_for_category(cat: KeyCategory) -> Vec<KeyCode> {
+        let all_codes = [
+            KeyCode::Ctrl, KeyCode::Shift, KeyCode::Alt, KeyCode::Meta,
+            KeyCode::UpArrow, KeyCode::DownArrow, KeyCode::LeftArrow, KeyCode::RightArrow,
+            KeyCode::Home, KeyCode::End, KeyCode::PageUp, KeyCode::PageDown,
+            KeyCode::F1, KeyCode::F2, KeyCode::F3, KeyCode::F4,
+            KeyCode::F5, KeyCode::F6, KeyCode::F7, KeyCode::F8,
+            KeyCode::F9, KeyCode::F10, KeyCode::F11, KeyCode::F12,
+            KeyCode::KeyA, KeyCode::KeyB, KeyCode::KeyC, KeyCode::KeyD,
+            KeyCode::Digit0, KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3,
+            KeyCode::Backspace, KeyCode::Tab, KeyCode::Enter, KeyCode::Escape,
+            KeyCode::Space, KeyCode::Delete, KeyCode::Insert,
+        ];
+        all_codes.iter().filter(|c| c.category() == cat).copied().collect()
+    }
+
+    pub fn same_category(a: KeyCode, b: KeyCode) -> bool {
+        a.category() == b.category()
+    }
+
+    pub fn category_name(cat: KeyCategory) -> &'static str {
+        match cat {
+            KeyCategory::Modifier => "Modifier",
+            KeyCategory::Navigation => "Navigation",
+            KeyCategory::Function => "Function",
+            KeyCategory::Letter => "Letter",
+            KeyCategory::Digit => "Digit",
+            KeyCategory::Navigation => "Navigation",
+            KeyCategory::Numpad => "Numpad",
+            KeyCategory::Punctuation => "Punctuation",
+            KeyCategory::Media => "Media",
+            KeyCategory::Other => "Other",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScanCode + ScanCodeMapping
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ScanCode(pub u16);
+
+impl ScanCode {
+    pub fn from_key_code(kc: KeyCode) -> Self { ScanCode(kc as u16) }
+    pub fn value(self) -> u16 { self.0 }
+}
+
+impl std::fmt::Display for ScanCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ScanCode(0x{:04X})", self.0)
+    }
+}
+
+pub struct ScanCodeMapping {
+    entries: Vec<(KeyCode, ScanCode)>,
+}
+
+impl ScanCodeMapping {
+    pub fn new() -> Self { Self { entries: Vec::new() } }
+    pub fn add(&mut self, kc: KeyCode, sc: ScanCode) { self.entries.push((kc, sc)); }
+    pub fn to_scan_code(&self, kc: KeyCode) -> Option<ScanCode> {
+        self.entries.iter().find(|(k, _)| *k == kc).map(|(_, s)| *s)
+    }
+    pub fn from_scan_code(&self, sc: ScanCode) -> Option<KeyCode> {
+        self.entries.iter().find(|(_, s)| *s == sc).map(|(k, _)| *k)
+    }
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+}
+
+impl Default for ScanCodeMapping {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// KeyStringParser
+// ---------------------------------------------------------------------------
+
+pub struct KeyStringParser;
+
+impl KeyStringParser {
+    pub fn parse_modifiers(s: &str) -> (bool, bool, bool, bool) {
+        let lower = s.to_lowercase();
+        let parts: Vec<&str> = lower.split('+').collect();
+        let ctrl = parts.iter().any(|p| *p == "ctrl" || *p == "control");
+        let shift = parts.iter().any(|p| *p == "shift");
+        let alt = parts.iter().any(|p| *p == "alt" || *p == "option");
+        let meta = parts.iter().any(|p| *p == "meta" || *p == "cmd" || *p == "command" || *p == "win");
+        (ctrl, shift, alt, meta)
+    }
+
+    pub fn parse_key(s: &str) -> KeyCode { string_to_key_code(s) }
+
+    pub fn is_valid_key_string(s: &str) -> bool {
+        if s.is_empty() { return false; }
+        let parts: Vec<&str> = s.split('+').collect();
+        !parts.is_empty() && parts.iter().all(|p| !p.is_empty())
+    }
+
+    pub fn normalize(s: &str) -> String {
+        let parts: Vec<&str> = s.split('+').collect();
+        let mut modifiers = Vec::new();
+        let mut keys = Vec::new();
+        for part in parts {
+            let lower = part.to_lowercase();
+            match lower.as_str() {
+                "ctrl" | "control" => modifiers.push("Ctrl"),
+                "shift" => modifiers.push("Shift"),
+                "alt" | "option" => modifiers.push("Alt"),
+                "meta" | "cmd" | "command" | "win" => modifiers.push("Meta"),
+                _ => keys.push(part),
+            }
+        }
+        modifiers.sort();
+        let mut result: Vec<&str> = modifiers;
+        result.extend(keys);
+        result.join("+")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2056,4 +2224,78 @@ mod tests {
         combo.push(KeyCodeChord::just(KeyCode::KeyB));
         assert_eq!(combo.len(), 2);
     }
+
+
+    #[test]
+    fn key_code_label_common() {
+        assert_eq!(KeyCodeLabel::label(KeyCode::Backspace), "Backspace");
+        assert_eq!(KeyCodeLabel::label(KeyCode::Escape), "Esc");
+        assert_eq!(KeyCodeLabel::label(KeyCode::Enter), "Enter");
+    }
+
+    #[test]
+    fn key_code_label_modifier_symbol() {
+        assert_eq!(KeyCodeLabel::modifier_symbol(KeyCode::Ctrl), Some('^'));
+        assert_eq!(KeyCodeLabel::modifier_symbol(KeyCode::KeyA), None);
+    }
+
+    #[test]
+    fn category_map_codes() {
+        let mods = KeyCodeCategoryMap::codes_for_category(KeyCategory::Modifier);
+        assert!(mods.contains(&KeyCode::Ctrl));
+    }
+
+    #[test]
+    fn category_map_same() {
+        assert!(KeyCodeCategoryMap::same_category(KeyCode::KeyA, KeyCode::KeyB));
+        assert!(!KeyCodeCategoryMap::same_category(KeyCode::KeyA, KeyCode::Ctrl));
+    }
+
+    #[test]
+    fn category_map_name() {
+        assert_eq!(KeyCodeCategoryMap::category_name(KeyCategory::Letter), "Letter");
+    }
+
+    #[test]
+    fn scan_code_from_key() {
+        let sc = ScanCode::from_key_code(KeyCode::KeyA);
+        assert!(sc.value() > 0);
+    }
+
+    #[test]
+    fn scan_code_display() {
+        let sc = ScanCode(0x1E);
+        assert!(format!("{sc}").contains("001E"));
+    }
+
+    #[test]
+    fn scan_code_mapping_basic() {
+        let mut m = ScanCodeMapping::new();
+        m.add(KeyCode::KeyA, ScanCode(30));
+        assert_eq!(m.to_scan_code(KeyCode::KeyA), Some(ScanCode(30)));
+        assert_eq!(m.from_scan_code(ScanCode(30)), Some(KeyCode::KeyA));
+    }
+
+    #[test]
+    fn key_string_parser_modifiers() {
+        let (ctrl, shift, alt, meta) = KeyStringParser::parse_modifiers("ctrl+shift+a");
+        assert!(ctrl && shift && !alt && !meta);
+    }
+
+    #[test]
+    fn key_string_parser_valid() {
+        assert!(KeyStringParser::is_valid_key_string("ctrl+a"));
+        assert!(!KeyStringParser::is_valid_key_string(""));
+    }
+
+    #[test]
+    fn key_string_parser_normalize() {
+        assert_eq!(KeyStringParser::normalize("shift+ctrl+a"), "Ctrl+Shift+a");
+    }
+
+    #[test]
+    fn key_string_parser_parse_key() {
+        assert_eq!(KeyStringParser::parse_key("a"), KeyCode::KeyA);
+    }
+
 }

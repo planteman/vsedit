@@ -1099,6 +1099,281 @@ impl fmt::Display for TranslationCoverage {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LangPackResolver – find the best locale match from available locales
+// ---------------------------------------------------------------------------
+
+/// Resolves a requested locale against a set of available locales using
+/// a two-tier strategy: exact match first, then language-only fallback.
+#[derive(Debug, Clone)]
+pub struct LangPackResolver {
+    available: Vec<Locale>,
+}
+
+impl LangPackResolver {
+    /// Create a resolver with the given set of available locales.
+    pub fn new(available: Vec<Locale>) -> Self {
+        Self { available }
+    }
+
+    /// Resolve a single requested locale.
+    ///
+    /// 1. Exact match (language + country).
+    /// 2. Language-only match (first locale whose language matches).
+    /// 3. `None` if nothing matches.
+    pub fn resolve(&self, requested: &Locale) -> Option<&Locale> {
+        // Exact match
+        if let Some(loc) = self.available.iter().find(|l| {
+            l.language == requested.language && l.country == requested.country
+        }) {
+            return Some(loc);
+        }
+        // Language-only fallback
+        self.available
+            .iter()
+            .find(|l| l.language == requested.language)
+    }
+
+    /// Try each locale in `preferred` order, returning the first match.
+    pub fn resolve_chain(&self, preferred: &[Locale]) -> Option<&Locale> {
+        for req in preferred {
+            if let Some(loc) = self.resolve(req) {
+                return Some(loc);
+            }
+        }
+        None
+    }
+
+    /// Return the unique set of language codes available.
+    pub fn available_languages(&self) -> Vec<&str> {
+        let mut langs: Vec<&str> = self
+            .available
+            .iter()
+            .map(|l| l.language.as_str())
+            .collect();
+        langs.sort_unstable();
+        langs.dedup();
+        langs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LangPackMerger – combine translations from multiple packs
+// ---------------------------------------------------------------------------
+
+/// Merges translations from several [`LanguagePack`]s.  Packs added later
+/// override keys from earlier packs.
+#[derive(Debug, Clone)]
+pub struct LangPackMerger {
+    packs: Vec<(String, HashMap<String, String>)>,
+}
+
+impl LangPackMerger {
+    pub fn new() -> Self {
+        Self { packs: Vec::new() }
+    }
+
+    /// Record a pack's translations for merging.
+    pub fn add_pack(&mut self, pack: &LanguagePack) {
+        self.packs
+            .push((pack.locale.id(), pack.translations.clone()));
+    }
+
+    /// Produce the merged translation map (later packs win).
+    pub fn merge(&self) -> HashMap<String, String> {
+        let mut merged = HashMap::new();
+        for (_id, translations) in &self.packs {
+            for (k, v) in translations {
+                merged.insert(k.clone(), v.clone());
+            }
+        }
+        merged
+    }
+
+    /// Total number of unique keys across all packs.
+    pub fn key_count(&self) -> usize {
+        self.merge().len()
+    }
+
+    /// Keys that appear in more than one pack with *different* values.
+    pub fn conflicts(&self) -> Vec<String> {
+        let mut seen: HashMap<String, String> = HashMap::new();
+        let mut conflicts: Vec<String> = Vec::new();
+        for (_id, translations) in &self.packs {
+            for (k, v) in translations {
+                if let Some(prev) = seen.get(k) {
+                    if prev != v && !conflicts.contains(k) {
+                        conflicts.push(k.clone());
+                    }
+                } else {
+                    seen.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        conflicts.sort();
+        conflicts
+    }
+}
+
+impl Default for LangPackMerger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LangPackValidator / ValidationReport – validate against a reference
+// ---------------------------------------------------------------------------
+
+/// Report produced by [`LangPackValidator::validate`].
+#[derive(Debug, Clone)]
+pub struct ValidationReport {
+    /// Keys present in the reference but missing from the pack.
+    pub missing_keys: Vec<String>,
+    /// Keys present in the pack but absent from the reference.
+    pub extra_keys: Vec<String>,
+    /// Keys whose values are empty strings.
+    pub empty_values: Vec<String>,
+}
+
+impl ValidationReport {
+    /// A pack is valid when there are no missing keys and no empty values.
+    pub fn is_valid(&self) -> bool {
+        self.missing_keys.is_empty() && self.empty_values.is_empty()
+    }
+
+    /// Human-readable summary line.
+    pub fn summary(&self) -> String {
+        if self.is_valid() && self.extra_keys.is_empty() {
+            return "validation passed".to_string();
+        }
+        let mut parts: Vec<String> = Vec::new();
+        if !self.missing_keys.is_empty() {
+            parts.push(format!("{} missing", self.missing_keys.len()));
+        }
+        if !self.extra_keys.is_empty() {
+            parts.push(format!("{} extra", self.extra_keys.len()));
+        }
+        if !self.empty_values.is_empty() {
+            parts.push(format!("{} empty", self.empty_values.len()));
+        }
+        parts.join(", ")
+    }
+}
+
+impl fmt::Display for ValidationReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+/// Validates a [`LanguagePack`] against a reference set of keys.
+#[derive(Debug, Clone)]
+pub struct LangPackValidator {
+    reference_keys: Vec<String>,
+}
+
+impl LangPackValidator {
+    pub fn new(reference_keys: Vec<String>) -> Self {
+        Self { reference_keys }
+    }
+
+    /// Check `pack` against the reference keys and return a report.
+    pub fn validate(&self, pack: &LanguagePack) -> ValidationReport {
+        let mut missing_keys: Vec<String> = self
+            .reference_keys
+            .iter()
+            .filter(|k| !pack.translations.contains_key(k.as_str()))
+            .cloned()
+            .collect();
+        missing_keys.sort();
+
+        let ref_set: std::collections::HashSet<&str> =
+            self.reference_keys.iter().map(|s| s.as_str()).collect();
+        let mut extra_keys: Vec<String> = pack
+            .translations
+            .keys()
+            .filter(|k| !ref_set.contains(k.as_str()))
+            .cloned()
+            .collect();
+        extra_keys.sort();
+
+        let mut empty_values: Vec<String> = pack
+            .translations
+            .iter()
+            .filter(|(_, v)| v.is_empty())
+            .map(|(k, _)| k.clone())
+            .collect();
+        empty_values.sort();
+
+        ValidationReport {
+            missing_keys,
+            extra_keys,
+            empty_values,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RuntimeLocalizer – runtime string lookup with fallback
+// ---------------------------------------------------------------------------
+
+/// Provides runtime translation lookups with optional fallback pack.
+#[derive(Debug, Clone)]
+pub struct RuntimeLocalizer {
+    primary: LanguagePack,
+    fallback: Option<LanguagePack>,
+}
+
+impl RuntimeLocalizer {
+    pub fn new(primary: LanguagePack) -> Self {
+        Self {
+            primary,
+            fallback: None,
+        }
+    }
+
+    /// Set a fallback pack (builder pattern).
+    pub fn with_fallback(mut self, fb: LanguagePack) -> Self {
+        self.fallback = Some(fb);
+        self
+    }
+
+    /// Look up `key` in the primary pack, then fallback, then return the key
+    /// itself as a last resort.
+    pub fn get<'a>(&'a self, key: &'a str) -> &'a str {
+        if let Some(v) = self.primary.translations.get(key) {
+            return v.as_str();
+        }
+        if let Some(fb) = &self.fallback {
+            if let Some(v) = fb.translations.get(key) {
+                return v.as_str();
+            }
+        }
+        key
+    }
+
+    /// Look up `key` and replace `{name}` placeholders with supplied args.
+    pub fn get_formatted(&self, key: &str, args: &[(&str, &str)]) -> String {
+        let template = self.get(key);
+        let mut result = template.to_string();
+        for (name, value) in args {
+            let placeholder = format!("{{{}}}", name);
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Check whether `key` exists in primary or fallback.
+    pub fn has_key(&self, key: &str) -> bool {
+        self.primary.translations.contains_key(key)
+            || self
+                .fallback
+                .as_ref()
+                .map_or(false, |fb| fb.translations.contains_key(key))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1999,5 +2274,207 @@ mod tests {
         };
         let cov = TranslationCoverage::compute(&reference, &target);
         assert_eq!(cov.to_string(), "50.0% (1/2, missing 1)");
+    }
+
+    // -----------------------------------------------------------------------
+    // LangPackResolver tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn resolver_exact_match() {
+        let resolver = LangPackResolver::new(vec![
+            Locale::parse("en-US"),
+            Locale::parse("en-GB"),
+            Locale::parse("fr"),
+        ]);
+        let req = Locale::parse("en-GB");
+        let resolved = resolver.resolve(&req).unwrap();
+        assert_eq!(resolved.to_string(), "en-GB");
+    }
+
+    #[test]
+    fn resolver_language_fallback() {
+        let resolver = LangPackResolver::new(vec![
+            Locale::parse("en-US"),
+            Locale::parse("fr-FR"),
+        ]);
+        let req = Locale::parse("fr-CA");
+        let resolved = resolver.resolve(&req).unwrap();
+        assert_eq!(resolved.language, "fr");
+    }
+
+    #[test]
+    fn resolver_no_match() {
+        let resolver = LangPackResolver::new(vec![Locale::parse("en-US")]);
+        assert!(resolver.resolve(&Locale::parse("de")).is_none());
+    }
+
+    #[test]
+    fn resolver_chain() {
+        let resolver = LangPackResolver::new(vec![
+            Locale::parse("en-US"),
+            Locale::parse("de"),
+        ]);
+        let prefs = vec![Locale::parse("ja"), Locale::parse("de")];
+        let resolved = resolver.resolve_chain(&prefs).unwrap();
+        assert_eq!(resolved.to_string(), "de");
+    }
+
+    #[test]
+    fn resolver_available_languages() {
+        let resolver = LangPackResolver::new(vec![
+            Locale::parse("en-US"),
+            Locale::parse("en-GB"),
+            Locale::parse("fr"),
+        ]);
+        let langs = resolver.available_languages();
+        assert_eq!(langs, vec!["en", "fr"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // LangPackMerger tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn merger_later_overrides() {
+        let pack1 = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([
+                ("greet".into(), "Hello".into()),
+                ("bye".into(), "Goodbye".into()),
+            ]),
+        };
+        let pack2 = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([("greet".into(), "Hi".into())]),
+        };
+        let mut merger = LangPackMerger::new();
+        merger.add_pack(&pack1);
+        merger.add_pack(&pack2);
+        let merged = merger.merge();
+        assert_eq!(merged.get("greet").unwrap(), "Hi");
+        assert_eq!(merged.get("bye").unwrap(), "Goodbye");
+        assert_eq!(merger.key_count(), 2);
+    }
+
+    #[test]
+    fn merger_conflicts() {
+        let pack1 = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([
+                ("a".into(), "A1".into()),
+                ("b".into(), "B".into()),
+            ]),
+        };
+        let pack2 = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([
+                ("a".into(), "A2".into()),
+                ("b".into(), "B".into()),
+            ]),
+        };
+        let mut merger = LangPackMerger::new();
+        merger.add_pack(&pack1);
+        merger.add_pack(&pack2);
+        let conflicts = merger.conflicts();
+        assert_eq!(conflicts, vec!["a"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // LangPackValidator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn validator_all_present() {
+        let validator =
+            LangPackValidator::new(vec!["greet".into(), "bye".into()]);
+        let pack = LanguagePack {
+            locale: Locale::parse("fr"),
+            translations: HashMap::from([
+                ("greet".into(), "Bonjour".into()),
+                ("bye".into(), "Au revoir".into()),
+            ]),
+        };
+        let report = validator.validate(&pack);
+        assert!(report.is_valid());
+        assert_eq!(report.to_string(), "validation passed");
+    }
+
+    #[test]
+    fn validator_missing_and_extra() {
+        let validator =
+            LangPackValidator::new(vec!["a".into(), "b".into(), "c".into()]);
+        let pack = LanguagePack {
+            locale: Locale::parse("de"),
+            translations: HashMap::from([
+                ("a".into(), "A".into()),
+                ("d".into(), "D".into()),
+            ]),
+        };
+        let report = validator.validate(&pack);
+        assert!(!report.is_valid());
+        assert_eq!(report.missing_keys, vec!["b", "c"]);
+        assert_eq!(report.extra_keys, vec!["d"]);
+    }
+
+    #[test]
+    fn validator_empty_values() {
+        let validator = LangPackValidator::new(vec!["x".into()]);
+        let pack = LanguagePack {
+            locale: Locale::parse("ja"),
+            translations: HashMap::from([("x".into(), "".into())]),
+        };
+        let report = validator.validate(&pack);
+        assert!(!report.is_valid());
+        assert_eq!(report.empty_values, vec!["x"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // RuntimeLocalizer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn runtime_localizer_primary_lookup() {
+        let pack = LanguagePack {
+            locale: Locale::parse("es"),
+            translations: HashMap::from([("hello".into(), "Hola".into())]),
+        };
+        let loc = RuntimeLocalizer::new(pack);
+        assert_eq!(loc.get("hello"), "Hola");
+        assert_eq!(loc.get("missing"), "missing");
+    }
+
+    #[test]
+    fn runtime_localizer_fallback() {
+        let primary = LanguagePack {
+            locale: Locale::parse("fr"),
+            translations: HashMap::from([("a".into(), "A-fr".into())]),
+        };
+        let fallback = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([
+                ("a".into(), "A-en".into()),
+                ("b".into(), "B-en".into()),
+            ]),
+        };
+        let loc = RuntimeLocalizer::new(primary).with_fallback(fallback);
+        assert_eq!(loc.get("a"), "A-fr");
+        assert_eq!(loc.get("b"), "B-en");
+        assert!(loc.has_key("b"));
+        assert!(!loc.has_key("z"));
+    }
+
+    #[test]
+    fn runtime_localizer_formatted() {
+        let pack = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([(
+                "welcome".into(),
+                "Hello, {user}! You have {count} messages.".into(),
+            )]),
+        };
+        let loc = RuntimeLocalizer::new(pack);
+        let msg = loc.get_formatted("welcome", &[("user", "Alice"), ("count", "5")]);
+        assert_eq!(msg, "Hello, Alice! You have 5 messages.");
     }
 }

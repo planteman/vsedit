@@ -1197,6 +1197,138 @@ impl NotificationHistory {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// NotificationStackLayout
+// ---------------------------------------------------------------------------
+
+pub struct NotificationStackLayout {
+    pub max_visible: usize,
+    pub position_x: u16,
+    pub position_y: u16,
+    pub width: u16,
+    pub item_height: u16,
+    pub gap: u16,
+}
+
+impl NotificationStackLayout {
+    pub fn new(max_visible: usize) -> Self {
+        Self { max_visible, position_x: 0, position_y: 0, width: 60, item_height: 3, gap: 1 }
+    }
+
+    pub fn total_height(&self, count: usize) -> u16 {
+        let visible = count.min(self.max_visible) as u16;
+        if visible == 0 { 0 } else { visible * self.item_height + (visible - 1) * self.gap }
+    }
+
+    pub fn item_y(&self, index: usize) -> u16 {
+        self.position_y + index as u16 * (self.item_height + self.gap)
+    }
+
+    pub fn is_overflowing(&self, count: usize) -> bool { count > self.max_visible }
+    pub fn overflow_count(&self, count: usize) -> usize { count.saturating_sub(self.max_visible) }
+}
+
+impl Default for NotificationStackLayout { fn default() -> Self { Self::new(5) } }
+
+impl fmt::Display for NotificationStackLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StackLayout(max={})", self.max_visible)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationDismissAllHandler
+// ---------------------------------------------------------------------------
+
+pub struct NotificationDismissAllHandler;
+
+impl NotificationDismissAllHandler {
+    pub fn dismiss_all(service: &mut NotificationWorkbenchService) -> usize {
+        let active: Vec<u64> = service.get_active().iter().map(|n| n.id).collect();
+        let count = active.len();
+        for id in active { service.close(id); }
+        count
+    }
+
+    pub fn dismiss_by_priority(service: &mut NotificationWorkbenchService, priority: NotificationPriority) -> usize {
+        let ids: Vec<u64> = service.get_by_priority(priority).iter().map(|n| n.id).collect();
+        let count = ids.len();
+        for id in ids { service.close(id); }
+        count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationDoNotDisturb
+// ---------------------------------------------------------------------------
+
+pub struct NotificationDoNotDisturb {
+    enabled: bool,
+    allow_urgent: bool,
+    queued_count: u64,
+}
+
+impl NotificationDoNotDisturb {
+    pub fn new() -> Self { Self { enabled: false, allow_urgent: true, queued_count: 0 } }
+
+    pub fn enable(&mut self) { self.enabled = true; }
+    pub fn disable(&mut self) { self.enabled = false; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+
+    pub fn should_show(&self, priority: &NotificationPriority) -> bool {
+        if !self.enabled { return true; }
+        if self.allow_urgent && matches!(priority, NotificationPriority::Urgent) { return true; }
+        false
+    }
+
+    pub fn record_queued(&mut self) { self.queued_count += 1; }
+    pub fn queued_count(&self) -> u64 { self.queued_count }
+    pub fn set_allow_urgent(&mut self, allow: bool) { self.allow_urgent = allow; }
+}
+
+impl Default for NotificationDoNotDisturb { fn default() -> Self { Self::new() } }
+
+impl fmt::Display for NotificationDoNotDisturb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DND(enabled={}, queued={})", self.enabled, self.queued_count)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationSourceTracker
+// ---------------------------------------------------------------------------
+
+pub struct NotificationSourceTracker {
+    counts: std::collections::HashMap<String, u64>,
+}
+
+impl NotificationSourceTracker {
+    pub fn new() -> Self { Self { counts: std::collections::HashMap::new() } }
+
+    pub fn record(&mut self, source: &str) {
+        *self.counts.entry(source.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn count_for(&self, source: &str) -> u64 {
+        self.counts.get(source).copied().unwrap_or(0)
+    }
+
+    pub fn top_sources(&self, limit: usize) -> Vec<(&str, u64)> {
+        let mut sorted: Vec<(&str, u64)> = self.counts.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.truncate(limit);
+        sorted
+    }
+
+    pub fn total(&self) -> u64 { self.counts.values().sum() }
+    pub fn source_count(&self) -> usize { self.counts.len() }
+    pub fn clear(&mut self) { self.counts.clear(); }
+}
+
+impl Default for NotificationSourceTracker { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2071,4 +2203,108 @@ mod tests {
         assert_eq!(batch.messages(), vec!["step 1", "step 2", "step 3"]);
         assert_eq!(batch.label(), "deploy");
     }
+
+
+    #[test]
+    fn stack_layout_height() {
+        let layout = NotificationStackLayout::new(5);
+        assert_eq!(layout.total_height(0), 0);
+        assert_eq!(layout.total_height(2), 2 * 3 + 1);
+    }
+
+    #[test]
+    fn stack_layout_overflow() {
+        let layout = NotificationStackLayout::new(3);
+        assert!(!layout.is_overflowing(2));
+        assert!(layout.is_overflowing(5));
+        assert_eq!(layout.overflow_count(5), 2);
+    }
+
+    #[test]
+    fn dismiss_all_handler() {
+        let mut svc = NotificationWorkbenchService::new();
+        svc.notify("a", NotificationPriority::Default);
+        svc.notify("b", NotificationPriority::Default);
+        let count = NotificationDismissAllHandler::dismiss_all(&mut svc);
+        assert_eq!(count, 2);
+        assert_eq!(svc.active_count(), 0);
+    }
+
+    #[test]
+    fn dismiss_by_priority() {
+        let mut svc = NotificationWorkbenchService::new();
+        svc.notify("a", NotificationPriority::Default);
+        svc.notify("b", NotificationPriority::Urgent);
+        let count = NotificationDismissAllHandler::dismiss_by_priority(&mut svc, NotificationPriority::Default);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn dnd_basic() {
+        let mut dnd = NotificationDoNotDisturb::new();
+        assert!(!dnd.is_enabled());
+        assert!(dnd.should_show(&NotificationPriority::Default));
+        dnd.enable();
+        assert!(!dnd.should_show(&NotificationPriority::Default));
+        assert!(dnd.should_show(&NotificationPriority::Urgent));
+    }
+
+    #[test]
+    fn dnd_toggle() {
+        let mut dnd = NotificationDoNotDisturb::new();
+        dnd.toggle();
+        assert!(dnd.is_enabled());
+        dnd.toggle();
+        assert!(!dnd.is_enabled());
+    }
+
+    #[test]
+    fn dnd_no_urgent() {
+        let mut dnd = NotificationDoNotDisturb::new();
+        dnd.enable();
+        dnd.set_allow_urgent(false);
+        assert!(!dnd.should_show(&NotificationPriority::Urgent));
+    }
+
+    #[test]
+    fn source_tracker_basic() {
+        let mut tracker = NotificationSourceTracker::new();
+        tracker.record("ext1");
+        tracker.record("ext1");
+        tracker.record("ext2");
+        assert_eq!(tracker.count_for("ext1"), 2);
+        assert_eq!(tracker.total(), 3);
+        assert_eq!(tracker.source_count(), 2);
+    }
+
+    #[test]
+    fn source_tracker_top() {
+        let mut tracker = NotificationSourceTracker::new();
+        tracker.record("a");
+        tracker.record("b");
+        tracker.record("b");
+        let top = tracker.top_sources(1);
+        assert_eq!(top[0].0, "b");
+    }
+
+    #[test]
+    fn stack_layout_display() {
+        let layout = NotificationStackLayout::new(5);
+        assert!(format!("{layout}").contains("max=5"));
+    }
+
+    #[test]
+    fn dnd_display() {
+        let dnd = NotificationDoNotDisturb::new();
+        assert!(format!("{dnd}").contains("enabled=false"));
+    }
+
+    #[test]
+    fn source_tracker_clear() {
+        let mut t = NotificationSourceTracker::new();
+        t.record("a");
+        t.clear();
+        assert_eq!(t.total(), 0);
+    }
+
 }

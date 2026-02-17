@@ -1259,6 +1259,148 @@ impl ColorPalette {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// StyleCascade -- cascading style resolution
+// ---------------------------------------------------------------------------
+
+pub struct StyleCascade {
+    layers: Vec<(String, Style)>,
+}
+
+impl StyleCascade {
+    pub fn new() -> Self { Self { layers: Vec::new() } }
+
+    pub fn push(&mut self, name: impl Into<String>, style: Style) {
+        self.layers.push((name.into(), style));
+    }
+
+    pub fn resolve(&self) -> Style {
+        let mut result = Style::default();
+        for (_, style) in &self.layers {
+            if style.fg.is_some() { result.fg = style.fg; }
+            if style.bg.is_some() { result.bg = style.bg; }
+            result = result.patch(*style);
+        }
+        result
+    }
+
+    pub fn len(&self) -> usize { self.layers.len() }
+    pub fn is_empty(&self) -> bool { self.layers.is_empty() }
+    pub fn clear(&mut self) { self.layers.clear(); }
+
+    pub fn remove_layer(&mut self, name: &str) -> bool {
+        if let Some(i) = self.layers.iter().position(|(n, _)| n == name) { self.layers.remove(i); true } else { false }
+    }
+}
+
+impl Default for StyleCascade { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// StyleMediaQuery -- terminal capability detection
+// ---------------------------------------------------------------------------
+
+pub struct StyleMediaQuery {
+    pub supports_256_colors: bool,
+    pub supports_true_color: bool,
+    pub supports_bold: bool,
+    pub supports_italic: bool,
+    pub terminal_width: u16,
+}
+
+impl StyleMediaQuery {
+    pub fn basic() -> Self {
+        Self { supports_256_colors: false, supports_true_color: false, supports_bold: true, supports_italic: false, terminal_width: 80 }
+    }
+
+    pub fn full() -> Self {
+        Self { supports_256_colors: true, supports_true_color: true, supports_bold: true, supports_italic: true, terminal_width: 120 }
+    }
+
+    pub fn best_color_depth(&self) -> u32 {
+        if self.supports_true_color { 24 }
+        else if self.supports_256_colors { 8 }
+        else { 4 }
+    }
+
+    pub fn is_wide(&self) -> bool { self.terminal_width >= 120 }
+    pub fn is_narrow(&self) -> bool { self.terminal_width < 80 }
+}
+
+impl Default for StyleMediaQuery { fn default() -> Self { Self::basic() } }
+
+impl std::fmt::Display for StyleMediaQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MediaQuery({}bit, {}cols)", self.best_color_depth(), self.terminal_width)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StyleVariableResolver
+// ---------------------------------------------------------------------------
+
+pub struct StyleVariableResolver {
+    variables: std::collections::HashMap<String, String>,
+}
+
+impl StyleVariableResolver {
+    pub fn new() -> Self { Self { variables: std::collections::HashMap::new() } }
+
+    pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        self.variables.insert(name.into(), value.into());
+    }
+
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.variables.get(name).map(|s| s.as_str())
+    }
+
+    pub fn resolve_string(&self, template: &str) -> String {
+        let mut result = template.to_string();
+        for (name, value) in &self.variables {
+            let var_ref = format!("${{{}}}", name);
+            result = result.replace(&var_ref, value);
+        }
+        result
+    }
+
+    pub fn len(&self) -> usize { self.variables.len() }
+    pub fn is_empty(&self) -> bool { self.variables.is_empty() }
+    pub fn clear(&mut self) { self.variables.clear(); }
+}
+
+impl Default for StyleVariableResolver { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// StyleDiffComparison
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StyleDiffChange {
+    FgChanged,
+    BgChanged,
+    ModifierChanged,
+    NoChange,
+}
+
+pub struct StyleDiffComparison;
+
+impl StyleDiffComparison {
+    pub fn compare(a: &Style, b: &Style) -> Vec<StyleDiffChange> {
+        let mut changes = Vec::new();
+        if a.fg != b.fg { changes.push(StyleDiffChange::FgChanged); }
+        if a.bg != b.bg { changes.push(StyleDiffChange::BgChanged); }
+        if a.add_modifier != b.add_modifier || a.sub_modifier != b.sub_modifier {
+            changes.push(StyleDiffChange::ModifierChanged);
+        }
+        if changes.is_empty() { changes.push(StyleDiffChange::NoChange); }
+        changes
+    }
+
+    pub fn are_equal(a: &Style, b: &Style) -> bool {
+        Self::compare(a, b) == vec![StyleDiffChange::NoChange]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2088,4 +2230,93 @@ mod tests {
         assert!(!base.remove("a"));
         assert_eq!(base.len(), 2);
     }
+
+
+    #[test]
+    fn cascade_resolve() {
+        let mut cascade = StyleCascade::new();
+        cascade.push("base", Style::default().fg(Color::White));
+        cascade.push("theme", Style::default().bg(Color::Black));
+        let resolved = cascade.resolve();
+        assert!(resolved.fg.is_some() || resolved.bg.is_some());
+    }
+
+    #[test]
+    fn cascade_remove() {
+        let mut cascade = StyleCascade::new();
+        cascade.push("a", Style::default());
+        assert!(cascade.remove_layer("a"));
+        assert!(cascade.is_empty());
+    }
+
+    #[test]
+    fn media_query_basic() {
+        let mq = StyleMediaQuery::basic();
+        assert_eq!(mq.best_color_depth(), 4);
+        assert!(!mq.is_wide());
+    }
+
+    #[test]
+    fn media_query_full() {
+        let mq = StyleMediaQuery::full();
+        assert_eq!(mq.best_color_depth(), 24);
+        assert!(mq.is_wide());
+    }
+
+    #[test]
+    fn media_query_display() {
+        let mq = StyleMediaQuery::basic();
+        assert!(format!("{mq}").contains("4bit"));
+    }
+
+    #[test]
+    fn variable_resolver_basic() {
+        let mut vr = StyleVariableResolver::new();
+        vr.set("color", "red");
+        assert_eq!(vr.get("color"), Some("red"));
+        assert_eq!(vr.resolve_string("fg: ${color}"), "fg: red");
+    }
+
+    #[test]
+    fn variable_resolver_missing() {
+        let vr = StyleVariableResolver::new();
+        assert_eq!(vr.resolve_string("${missing}"), "${missing}");
+    }
+
+    #[test]
+    fn style_diff_same() {
+        let s = Style::default();
+        assert!(StyleDiffComparison::are_equal(&s, &s));
+    }
+
+    #[test]
+    fn style_diff_fg_changed() {
+        let a = Style::default().fg(Color::Red);
+        let b = Style::default().fg(Color::Blue);
+        let changes = StyleDiffComparison::compare(&a, &b);
+        assert!(changes.contains(&StyleDiffChange::FgChanged));
+    }
+
+    #[test]
+    fn style_diff_bg_changed() {
+        let a = Style::default();
+        let b = Style::default().bg(Color::Green);
+        assert!(!StyleDiffComparison::are_equal(&a, &b));
+    }
+
+    #[test]
+    fn cascade_len() {
+        let mut c = StyleCascade::new();
+        c.push("a", Style::default());
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn variable_resolver_clear() {
+        let mut vr = StyleVariableResolver::new();
+        vr.set("a", "b");
+        vr.clear();
+        assert!(vr.is_empty());
+    }
+
 }

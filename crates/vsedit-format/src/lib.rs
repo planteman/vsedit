@@ -1308,6 +1308,388 @@ pub fn ensure_blank_line_between_blocks(text: &str) -> String {
     result.join("\n")
 }
 
+// ---------------------------------------------------------------------------
+// FormatEdit – a single formatting edit targeting a line range
+// ---------------------------------------------------------------------------
+
+/// Represents a single formatting edit applied to a contiguous range of lines.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormatEdit {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub new_text: String,
+}
+
+impl std::fmt::Display for FormatEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Edit[{}..{}]: {}",
+            self.start_line,
+            self.end_line,
+            if self.new_text.len() > 40 {
+                format!("{}…", &self.new_text[..40])
+            } else {
+                self.new_text.clone()
+            }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormatRangeOptimizer
+// ---------------------------------------------------------------------------
+
+/// Minimizes formatting edits by merging adjacent or overlapping ranges.
+#[derive(Debug, Clone)]
+pub struct FormatRangeOptimizer {
+    edits: Vec<FormatEdit>,
+}
+
+impl FormatRangeOptimizer {
+    pub fn new() -> Self {
+        Self { edits: Vec::new() }
+    }
+
+    pub fn add_edit(&mut self, start_line: usize, end_line: usize, new_text: &str) {
+        self.edits.push(FormatEdit {
+            start_line,
+            end_line,
+            new_text: new_text.to_string(),
+        });
+    }
+
+    /// Returns the number of raw (unoptimized) edits recorded so far.
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    /// Merges adjacent or overlapping edits into the smallest set of
+    /// non-overlapping edits.  When two edits overlap, their texts are
+    /// concatenated with a newline separator.
+    pub fn optimize(&self) -> Vec<FormatEdit> {
+        if self.edits.is_empty() {
+            return Vec::new();
+        }
+
+        let mut sorted: Vec<FormatEdit> = self.edits.clone();
+        sorted.sort_by_key(|e| (e.start_line, e.end_line));
+
+        let mut merged: Vec<FormatEdit> = Vec::new();
+        merged.push(sorted[0].clone());
+
+        for edit in sorted.iter().skip(1) {
+            let last = merged.last_mut().unwrap();
+            // Adjacent means edit.start_line <= last.end_line + 1
+            if edit.start_line <= last.end_line + 1 {
+                if edit.end_line > last.end_line {
+                    last.end_line = edit.end_line;
+                }
+                last.new_text.push('\n');
+                last.new_text.push_str(&edit.new_text);
+            } else {
+                merged.push(edit.clone());
+            }
+        }
+        merged
+    }
+}
+
+impl Default for FormatRangeOptimizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FormatRangeOptimizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FormatRangeOptimizer({} edits)", self.edits.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormatConflictResolver
+// ---------------------------------------------------------------------------
+
+/// Resolves conflicts between edits produced by multiple formatters.
+///
+/// When edits from different formatters overlap, the formatter with the
+/// higher priority value wins.
+#[derive(Debug, Clone)]
+pub struct FormatConflictResolver {
+    formatters: Vec<(String, u32)>,
+    edits: Vec<(String, FormatEdit)>,
+}
+
+impl FormatConflictResolver {
+    pub fn new() -> Self {
+        Self {
+            formatters: Vec::new(),
+            edits: Vec::new(),
+        }
+    }
+
+    pub fn add_formatter(&mut self, name: &str, priority: u32) {
+        self.formatters.push((name.to_string(), priority));
+    }
+
+    pub fn add_edit(
+        &mut self,
+        formatter: &str,
+        start_line: usize,
+        end_line: usize,
+        new_text: &str,
+    ) {
+        self.edits.push((
+            formatter.to_string(),
+            FormatEdit {
+                start_line,
+                end_line,
+                new_text: new_text.to_string(),
+            },
+        ));
+    }
+
+    /// Returns `true` when two or more edits from *different* formatters
+    /// cover overlapping line ranges.
+    pub fn has_conflicts(&self) -> bool {
+        self.conflict_count() > 0
+    }
+
+    /// Counts the number of edit pairs that conflict.
+    pub fn conflict_count(&self) -> usize {
+        let mut count = 0usize;
+        for i in 0..self.edits.len() {
+            for j in (i + 1)..self.edits.len() {
+                let (ref name_a, ref edit_a) = self.edits[i];
+                let (ref name_b, ref edit_b) = self.edits[j];
+                if name_a != name_b && Self::overlaps(edit_a, edit_b) {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    /// Resolves all edits: when edits overlap the higher-priority formatter
+    /// wins and the lower-priority edit is discarded.
+    pub fn resolve(&self) -> Vec<FormatEdit> {
+        // Pair each edit with its formatter priority.
+        let mut prioritized: Vec<(u32, &FormatEdit)> = self
+            .edits
+            .iter()
+            .map(|(name, edit)| {
+                let prio = self
+                    .formatters
+                    .iter()
+                    .find(|(n, _)| n == name)
+                    .map(|(_, p)| *p)
+                    .unwrap_or(0);
+                (prio, edit)
+            })
+            .collect();
+
+        // Sort by start_line, then by descending priority so the winner
+        // appears first for each position.
+        prioritized.sort_by(|a, b| {
+            a.1.start_line
+                .cmp(&b.1.start_line)
+                .then(b.0.cmp(&a.0))
+        });
+
+        let mut result: Vec<FormatEdit> = Vec::new();
+        for (_, edit) in &prioritized {
+            let dominated = result.iter().any(|existing| {
+                Self::overlaps(existing, edit)
+            });
+            if !dominated {
+                result.push((*edit).clone());
+            }
+        }
+
+        result.sort_by_key(|e| e.start_line);
+        result
+    }
+
+    fn overlaps(a: &FormatEdit, b: &FormatEdit) -> bool {
+        a.start_line <= b.end_line && b.start_line <= a.end_line
+    }
+}
+
+impl Default for FormatConflictResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FormatConflictResolver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FormatConflictResolver({} formatters, {} edits)",
+            self.formatters.len(),
+            self.edits.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormatOnPasteHandler
+// ---------------------------------------------------------------------------
+
+/// Handles formatting of pasted content: re-indentation, trailing-whitespace
+/// removal, and line-ending normalisation.
+#[derive(Debug, Clone)]
+pub struct FormatOnPasteHandler {
+    indent_size: usize,
+}
+
+impl FormatOnPasteHandler {
+    pub fn new() -> Self {
+        Self { indent_size: 4 }
+    }
+
+    pub fn set_indent_size(&mut self, size: usize) {
+        self.indent_size = size;
+    }
+
+    /// Re-indents every line of `text` so that the *minimum* indentation in
+    /// the input maps to `target_indent` levels (each level being
+    /// `indent_size` spaces).  Relative indentation between lines is
+    /// preserved.
+    pub fn reindent(&self, text: &str, target_indent: usize) -> String {
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return String::new();
+        }
+
+        let min_indent = lines
+            .iter()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| l.len() - l.trim_start().len())
+            .min()
+            .unwrap_or(0);
+
+        let target_spaces = target_indent * self.indent_size;
+
+        lines
+            .iter()
+            .map(|line| {
+                if line.trim().is_empty() {
+                    String::new()
+                } else {
+                    let cur = line.len() - line.trim_start().len();
+                    let relative = cur.saturating_sub(min_indent);
+                    let new_indent = target_spaces + relative;
+                    format!("{}{}", " ".repeat(new_indent), line.trim_start())
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Removes trailing whitespace from every line.
+    pub fn trim_trailing(&self, text: &str) -> String {
+        text.lines()
+            .map(|l| l.trim_end())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Normalises line endings to `\n`.
+    pub fn normalize_line_endings(&self, text: &str) -> String {
+        text.replace("\r\n", "\n").replace('\r', "\n")
+    }
+}
+
+impl Default for FormatOnPasteHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FormatOnPasteHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FormatOnPasteHandler(indent_size={})", self.indent_size)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormatProgressIndicator
+// ---------------------------------------------------------------------------
+
+/// Tracks the progress of a multi-file formatting operation.
+#[derive(Debug, Clone)]
+pub struct FormatProgressIndicator {
+    total_files: usize,
+    current_file: Option<String>,
+    completed: usize,
+    skipped: usize,
+}
+
+impl FormatProgressIndicator {
+    pub fn new(total_files: usize) -> Self {
+        Self {
+            total_files,
+            current_file: None,
+            completed: 0,
+            skipped: 0,
+        }
+    }
+
+    pub fn start_file(&mut self, path: &str) {
+        self.current_file = Some(path.to_string());
+    }
+
+    pub fn complete_file(&mut self) {
+        self.completed += 1;
+        self.current_file = None;
+    }
+
+    pub fn skip_file(&mut self) {
+        self.skipped += 1;
+        self.current_file = None;
+    }
+
+    pub fn current_file(&self) -> Option<&str> {
+        self.current_file.as_deref()
+    }
+
+    pub fn completed(&self) -> usize {
+        self.completed
+    }
+
+    pub fn skipped(&self) -> usize {
+        self.skipped
+    }
+
+    /// Returns the percentage of files processed (completed + skipped) out of
+    /// the total.  Returns `100.0` when total is zero.
+    pub fn percentage(&self) -> f64 {
+        if self.total_files == 0 {
+            return 100.0;
+        }
+        ((self.completed + self.skipped) as f64 / self.total_files as f64) * 100.0
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.completed + self.skipped >= self.total_files
+    }
+}
+
+impl std::fmt::Display for FormatProgressIndicator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Progress: {:.1}% ({}/{} done, {} skipped)",
+            self.percentage(),
+            self.completed,
+            self.total_files,
+            self.skipped,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2156,5 +2538,149 @@ mod tests {
         let input = "fn a() {}\n\nfn b() {}";
         let result = ensure_blank_line_between_blocks(input);
         assert_eq!(result, "fn a() {}\n\nfn b() {}");
+    }
+
+    // -- FormatRangeOptimizer ------------------------------------------------
+
+    #[test]
+    fn range_optimizer_empty() {
+        let opt = FormatRangeOptimizer::new();
+        assert_eq!(opt.edit_count(), 0);
+        assert!(opt.optimize().is_empty());
+    }
+
+    #[test]
+    fn range_optimizer_no_merge() {
+        let mut opt = FormatRangeOptimizer::new();
+        opt.add_edit(1, 3, "aaa");
+        opt.add_edit(10, 12, "bbb");
+        assert_eq!(opt.edit_count(), 2);
+        let merged = opt.optimize();
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn range_optimizer_merges_adjacent() {
+        let mut opt = FormatRangeOptimizer::new();
+        opt.add_edit(1, 3, "aaa");
+        opt.add_edit(4, 6, "bbb");
+        let merged = opt.optimize();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_line, 1);
+        assert_eq!(merged[0].end_line, 6);
+        assert!(merged[0].new_text.contains("aaa"));
+        assert!(merged[0].new_text.contains("bbb"));
+    }
+
+    #[test]
+    fn range_optimizer_merges_overlapping() {
+        let mut opt = FormatRangeOptimizer::new();
+        opt.add_edit(1, 5, "alpha");
+        opt.add_edit(3, 7, "beta");
+        let merged = opt.optimize();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].end_line, 7);
+    }
+
+    #[test]
+    fn range_optimizer_display() {
+        let opt = FormatRangeOptimizer::new();
+        let display = format!("{opt}");
+        assert!(display.contains("0 edits"));
+    }
+
+    // -- FormatConflictResolver ----------------------------------------------
+
+    #[test]
+    fn conflict_resolver_no_conflicts() {
+        let mut resolver = FormatConflictResolver::new();
+        resolver.add_formatter("rustfmt", 10);
+        resolver.add_formatter("prettier", 5);
+        resolver.add_edit("rustfmt", 1, 3, "aaa");
+        resolver.add_edit("prettier", 10, 12, "bbb");
+        assert!(!resolver.has_conflicts());
+        assert_eq!(resolver.conflict_count(), 0);
+        assert_eq!(resolver.resolve().len(), 2);
+    }
+
+    #[test]
+    fn conflict_resolver_higher_priority_wins() {
+        let mut resolver = FormatConflictResolver::new();
+        resolver.add_formatter("rustfmt", 10);
+        resolver.add_formatter("prettier", 5);
+        resolver.add_edit("rustfmt", 1, 5, "rust-output");
+        resolver.add_edit("prettier", 3, 7, "prettier-output");
+        assert!(resolver.has_conflicts());
+        assert_eq!(resolver.conflict_count(), 1);
+        let resolved = resolver.resolve();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].new_text, "rust-output");
+    }
+
+    #[test]
+    fn conflict_resolver_display() {
+        let mut resolver = FormatConflictResolver::new();
+        resolver.add_formatter("a", 1);
+        let s = format!("{resolver}");
+        assert!(s.contains("1 formatters"));
+    }
+
+    // -- FormatOnPasteHandler ------------------------------------------------
+
+    #[test]
+    fn paste_handler_reindent() {
+        let handler = FormatOnPasteHandler::new();
+        let input = "  line1\n    line2\n  line3";
+        let result = handler.reindent(input, 2);
+        // target_indent=2 => 8 base spaces; line2 had 2 extra relative
+        assert!(result.starts_with("        line1"));
+        assert!(result.contains("          line2"));
+    }
+
+    #[test]
+    fn paste_handler_trim_trailing() {
+        let handler = FormatOnPasteHandler::new();
+        let result = handler.trim_trailing("hello   \nworld  ");
+        assert_eq!(result, "hello\nworld");
+    }
+
+    #[test]
+    fn paste_handler_normalize_line_endings() {
+        let handler = FormatOnPasteHandler::new();
+        let result = handler.normalize_line_endings("a\r\nb\rc\n");
+        assert_eq!(result, "a\nb\nc\n");
+    }
+
+    // -- FormatProgressIndicator ---------------------------------------------
+
+    #[test]
+    fn progress_indicator_lifecycle() {
+        let mut progress = FormatProgressIndicator::new(3);
+        assert_eq!(progress.percentage(), 0.0);
+        assert!(!progress.is_complete());
+
+        progress.start_file("a.rs");
+        assert_eq!(progress.current_file(), Some("a.rs"));
+        progress.complete_file();
+        assert_eq!(progress.completed(), 1);
+        assert!(progress.current_file().is_none());
+
+        progress.start_file("b.rs");
+        progress.skip_file();
+        assert_eq!(progress.skipped(), 1);
+
+        progress.start_file("c.rs");
+        progress.complete_file();
+        assert!(progress.is_complete());
+
+        let pct = progress.percentage();
+        assert!((pct - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn progress_indicator_display() {
+        let progress = FormatProgressIndicator::new(10);
+        let s = format!("{progress}");
+        assert!(s.contains("0.0%"));
     }
 }

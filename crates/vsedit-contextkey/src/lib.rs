@@ -1136,6 +1136,212 @@ impl Default for ContextKeyValidator {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// ContextKeySerializer — persistence for context key state
+// ---------------------------------------------------------------------------
+
+/// Serializes context key state to a portable string representation.
+pub struct ContextKeySerializer;
+
+impl ContextKeySerializer {
+    /// Serialize a set of context keys to a single string.
+    pub fn serialize(keys: &HashMap<String, ContextKeyValue>) -> String {
+        let mut entries: Vec<String> = keys
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, context_key_serialize(v)))
+            .collect();
+        entries.sort();
+        entries.join(";")
+    }
+
+    /// Deserialize a serialized string back into key-value pairs.
+    pub fn deserialize(s: &str) -> HashMap<String, ContextKeyValue> {
+        let mut map = HashMap::new();
+        if s.is_empty() {
+            return map;
+        }
+        for entry in s.split(';') {
+            if let Some(eq_pos) = entry.find('=') {
+                let key = entry[..eq_pos].to_string();
+                let val = context_key_deserialize(&entry[eq_pos + 1..]);
+                map.insert(key, val);
+            }
+        }
+        map
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyDebugView — shows all active keys
+// ---------------------------------------------------------------------------
+
+/// Debug view showing all active keys and their values.
+pub struct ContextKeyDebugView {
+    entries: Vec<(String, ContextKeyValue)>,
+}
+
+impl ContextKeyDebugView {
+    /// Build a debug view from a context key service.
+    pub fn from_service(svc: &ContextKeyService) -> Self {
+        let keys = svc.all_keys();
+        let mut entries = Vec::new();
+        for k in keys {
+            if let Some(v) = svc.get_context(&k) {
+                entries.push((k, v));
+            }
+        }
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Self { entries }
+    }
+
+    /// Number of entries in the debug view.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the debug view is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get a reference to all entries.
+    pub fn entries(&self) -> &[(String, ContextKeyValue)] {
+        &self.entries
+    }
+
+    /// Find a key in the debug view.
+    pub fn find(&self, key: &str) -> Option<&ContextKeyValue> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    /// Format as a readable table.
+    pub fn format_table(&self) -> String {
+        let mut out = String::new();
+        for (k, v) in &self.entries {
+            out.push_str(&format!("{}: {}\n", k, v));
+        }
+        out
+    }
+}
+
+impl fmt::Display for ContextKeyDebugView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ContextKeyDebugView({} keys)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyHistory — tracks changes to context keys
+// ---------------------------------------------------------------------------
+
+/// A record of a single context key change.
+#[derive(Debug, Clone)]
+pub struct ContextKeyMutation {
+    pub key: String,
+    pub old_value: Option<ContextKeyValue>,
+    pub new_value: Option<ContextKeyValue>,
+    pub timestamp: u64,
+}
+
+impl fmt::Display for ContextKeyMutation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{}: {:?} -> {:?}", self.key, self.timestamp, self.old_value, self.new_value)
+    }
+}
+
+/// Tracks a history of context key changes.
+pub struct ContextKeyHistory {
+    changes: Vec<ContextKeyMutation>,
+    max_entries: usize,
+}
+
+impl ContextKeyHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self { changes: Vec::new(), max_entries }
+    }
+
+    pub fn record(&mut self, key: impl Into<String>, old: Option<ContextKeyValue>, new: Option<ContextKeyValue>, timestamp: u64) {
+        if self.changes.len() >= self.max_entries {
+            self.changes.remove(0);
+        }
+        self.changes.push(ContextKeyMutation { key: key.into(), old_value: old, new_value: new, timestamp });
+    }
+
+    pub fn changes(&self) -> &[ContextKeyMutation] { &self.changes }
+
+    pub fn changes_for_key(&self, key: &str) -> Vec<&ContextKeyMutation> {
+        self.changes.iter().filter(|c| c.key == key).collect()
+    }
+
+    pub fn len(&self) -> usize { self.changes.len() }
+    pub fn is_empty(&self) -> bool { self.changes.is_empty() }
+    pub fn clear(&mut self) { self.changes.clear(); }
+
+    pub fn changes_since(&self, timestamp: u64) -> Vec<&ContextKeyMutation> {
+        self.changes.iter().filter(|c| c.timestamp >= timestamp).collect()
+    }
+
+    pub fn last_change(&self) -> Option<&ContextKeyMutation> { self.changes.last() }
+
+    pub fn changed_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.changes.iter().map(|c| c.key.clone()).collect();
+        keys.sort();
+        keys.dedup();
+        keys
+    }
+}
+
+impl Default for ContextKeyHistory {
+    fn default() -> Self { Self::new(1000) }
+}
+
+impl fmt::Display for ContextKeyHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ContextKeyHistory({} changes)", self.changes.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyEventBatch — batch notification of changes
+// ---------------------------------------------------------------------------
+
+/// Batch of context key change events for efficient notification.
+pub struct ContextKeyEventBatch {
+    events: Vec<ContextKeyMutation>,
+}
+
+impl ContextKeyEventBatch {
+    pub fn new() -> Self { Self { events: Vec::new() } }
+
+    pub fn add(&mut self, key: impl Into<String>, old: Option<ContextKeyValue>, new: Option<ContextKeyValue>, timestamp: u64) {
+        self.events.push(ContextKeyMutation { key: key.into(), old_value: old, new_value: new, timestamp });
+    }
+
+    pub fn len(&self) -> usize { self.events.len() }
+    pub fn is_empty(&self) -> bool { self.events.is_empty() }
+
+    pub fn affected_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.events.iter().map(|e| e.key.as_str()).collect();
+        keys.sort();
+        keys.dedup();
+        keys
+    }
+
+    pub fn drain(&mut self) -> Vec<ContextKeyMutation> { std::mem::take(&mut self.events) }
+    pub fn events(&self) -> &[ContextKeyMutation] { &self.events }
+}
+
+impl Default for ContextKeyEventBatch {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for ContextKeyEventBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ContextKeyEventBatch({} events)", self.events.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2042,4 +2248,131 @@ mod tests {
         assert!(result.unknown_keys.contains(&"supportedLangs".to_string()));
         assert!(!result.unknown_keys.contains(&"lang".to_string()));
     }
+
+
+    #[test]
+    fn serializer_roundtrip() {
+        let mut keys = HashMap::new();
+        keys.insert("a".into(), ContextKeyValue::Bool(true));
+        keys.insert("b".into(), ContextKeyValue::String("hello".into()));
+        let serialized = ContextKeySerializer::serialize(&keys);
+        let deserialized = ContextKeySerializer::deserialize(&serialized);
+        assert_eq!(deserialized.get("a"), Some(&ContextKeyValue::Bool(true)));
+        assert_eq!(deserialized.get("b"), Some(&ContextKeyValue::String("hello".into())));
+    }
+
+    #[test]
+    fn serializer_empty() {
+        let keys = HashMap::new();
+        let s = ContextKeySerializer::serialize(&keys);
+        assert!(s.is_empty());
+        assert!(ContextKeySerializer::deserialize(&s).is_empty());
+    }
+
+    #[test]
+    fn debug_view_from_service() {
+        let svc = ContextKeyService::new();
+        svc.set_context("editor.visible", ContextKeyValue::Bool(true));
+        svc.set_context("theme", ContextKeyValue::String("dark".into()));
+        let view = ContextKeyDebugView::from_service(&svc);
+        assert_eq!(view.len(), 2);
+        assert!(view.find("editor.visible").is_some());
+        assert!(view.find("missing").is_none());
+    }
+
+    #[test]
+    fn debug_view_format_table() {
+        let svc = ContextKeyService::new();
+        svc.set_context("key1", ContextKeyValue::Number(42.0));
+        let view = ContextKeyDebugView::from_service(&svc);
+        let table = view.format_table();
+        assert!(table.contains("key1"));
+    }
+
+    #[test]
+    fn debug_view_display() {
+        let view = ContextKeyDebugView { entries: vec![] };
+        assert_eq!(format!("{view}"), "ContextKeyDebugView(0 keys)");
+    }
+
+    #[test]
+    fn history_record_and_query() {
+        let mut history = ContextKeyHistory::new(10);
+        history.record("key1", None, Some(ContextKeyValue::Bool(true)), 100);
+        history.record("key2", None, Some(ContextKeyValue::Number(1.0)), 200);
+        history.record("key1", Some(ContextKeyValue::Bool(true)), Some(ContextKeyValue::Bool(false)), 300);
+        assert_eq!(history.len(), 3);
+        assert_eq!(history.changes_for_key("key1").len(), 2);
+    }
+
+    #[test]
+    fn history_changes_since() {
+        let mut history = ContextKeyHistory::new(10);
+        history.record("a", None, None, 100);
+        history.record("b", None, None, 200);
+        history.record("c", None, None, 300);
+        assert_eq!(history.changes_since(200).len(), 2);
+    }
+
+    #[test]
+    fn history_max_entries() {
+        let mut history = ContextKeyHistory::new(2);
+        history.record("a", None, None, 1);
+        history.record("b", None, None, 2);
+        history.record("c", None, None, 3);
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.changes()[0].key, "b");
+    }
+
+    #[test]
+    fn history_changed_keys() {
+        let mut history = ContextKeyHistory::new(10);
+        history.record("b", None, None, 1);
+        history.record("a", None, None, 2);
+        history.record("b", None, None, 3);
+        assert_eq!(history.changed_keys(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn history_last_change() {
+        let mut history = ContextKeyHistory::new(10);
+        assert!(history.last_change().is_none());
+        history.record("x", None, None, 42);
+        assert_eq!(history.last_change().unwrap().key, "x");
+    }
+
+    #[test]
+    fn event_batch_basic() {
+        let mut batch = ContextKeyEventBatch::new();
+        assert!(batch.is_empty());
+        batch.add("key1", None, Some(ContextKeyValue::Bool(true)), 100);
+        batch.add("key2", None, None, 200);
+        assert_eq!(batch.len(), 2);
+        let keys = batch.affected_keys();
+        assert!(keys.contains(&"key1"));
+    }
+
+    #[test]
+    fn event_batch_drain() {
+        let mut batch = ContextKeyEventBatch::new();
+        batch.add("a", None, None, 1);
+        batch.add("b", None, None, 2);
+        let drained = batch.drain();
+        assert_eq!(drained.len(), 2);
+        assert!(batch.is_empty());
+    }
+
+    #[test]
+    fn event_batch_display() {
+        let batch = ContextKeyEventBatch::new();
+        assert_eq!(format!("{batch}"), "ContextKeyEventBatch(0 events)");
+    }
+
+    #[test]
+    fn context_key_change_display() {
+        let change = ContextKeyMutation { key: "foo".into(), old_value: None, new_value: Some(ContextKeyValue::Bool(true)), timestamp: 42 };
+        let s = format!("{change}");
+        assert!(s.contains("foo"));
+    }
+
 }

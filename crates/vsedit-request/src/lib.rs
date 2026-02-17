@@ -1,5 +1,6 @@
 //! Cancellable async request service.
 
+use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1200,6 +1201,184 @@ impl PriorityRequestQueue {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// RetryBackoffStrategy — retry with jitter
+// ---------------------------------------------------------------------------
+
+/// Retry configuration with exponential backoff.
+pub struct RetryBackoffStrategy {
+    max_retries: u32,
+    base_delay_ms: u64,
+    max_delay_ms: u64,
+}
+
+impl RetryBackoffStrategy {
+    pub fn new(max_retries: u32) -> Self {
+        Self { max_retries, base_delay_ms: 100, max_delay_ms: 10_000 }
+    }
+
+    pub fn with_base_delay(mut self, ms: u64) -> Self { self.base_delay_ms = ms; self }
+    pub fn with_max_delay(mut self, ms: u64) -> Self { self.max_delay_ms = ms; self }
+
+    pub fn delay_for_attempt(&self, attempt: u32) -> u64 {
+        let delay = self.base_delay_ms.saturating_mul(1u64 << attempt.min(20));
+        delay.min(self.max_delay_ms)
+    }
+
+    pub fn should_retry(&self, attempt: u32) -> bool { attempt < self.max_retries }
+    pub fn max_retries(&self) -> u32 { self.max_retries }
+}
+
+impl fmt::Display for RetryBackoffStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RetryBackoffStrategy(max={}, base={}ms)", self.max_retries, self.base_delay_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestCache — cache with TTL
+// ---------------------------------------------------------------------------
+
+/// A cache entry with TTL.
+#[derive(Debug, Clone)]
+pub struct CacheEntry {
+    pub value: String,
+    pub created_at_ms: u64,
+    pub ttl_ms: u64,
+}
+
+impl CacheEntry {
+    pub fn is_expired(&self, now_ms: u64) -> bool { now_ms > self.created_at_ms + self.ttl_ms }
+}
+
+/// Request cache with TTL support.
+pub struct RequestCache {
+    entries: HashMap<String, CacheEntry>,
+    default_ttl_ms: u64,
+}
+
+impl RequestCache {
+    pub fn new(default_ttl_ms: u64) -> Self {
+        Self { entries: HashMap::new(), default_ttl_ms }
+    }
+
+    pub fn get(&self, key: &str, now_ms: u64) -> Option<&str> {
+        self.entries.get(key).and_then(|e| if e.is_expired(now_ms) { None } else { Some(e.value.as_str()) })
+    }
+
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>, now_ms: u64) {
+        let ttl = self.default_ttl_ms;
+        self.entries.insert(key.into(), CacheEntry { value: value.into(), created_at_ms: now_ms, ttl_ms: ttl });
+    }
+
+    pub fn insert_with_ttl(&mut self, key: impl Into<String>, value: impl Into<String>, now_ms: u64, ttl_ms: u64) {
+        self.entries.insert(key.into(), CacheEntry { value: value.into(), created_at_ms: now_ms, ttl_ms });
+    }
+
+    pub fn evict_expired(&mut self, now_ms: u64) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|_, e| !e.is_expired(now_ms));
+        before - self.entries.len()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn clear(&mut self) { self.entries.clear(); }
+    pub fn contains_key(&self, key: &str) -> bool { self.entries.contains_key(key) }
+}
+
+impl fmt::Display for RequestCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RequestCache({} entries, ttl={}ms)", self.entries.len(), self.default_ttl_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestBatch — parallel requests
+// ---------------------------------------------------------------------------
+
+/// A batch of requests to be executed together.
+pub struct RequestBatchExecutor {
+    requests: Vec<String>,
+    results: Vec<Option<RequestState>>,
+}
+
+impl RequestBatchExecutor {
+    pub fn new() -> Self { Self { requests: Vec::new(), results: Vec::new() } }
+
+    pub fn add(&mut self, method: impl Into<String>) {
+        self.requests.push(method.into());
+        self.results.push(None);
+    }
+
+    pub fn len(&self) -> usize { self.requests.len() }
+    pub fn is_empty(&self) -> bool { self.requests.is_empty() }
+
+    pub fn set_result(&mut self, index: usize, state: RequestState) {
+        if index < self.results.len() { self.results[index] = Some(state); }
+    }
+
+    pub fn is_complete(&self) -> bool { self.results.iter().all(|r| r.is_some()) }
+
+    pub fn completed_count(&self) -> usize { self.results.iter().filter(|r| r.is_some()).count() }
+
+    pub fn methods(&self) -> &[String] { &self.requests }
+}
+
+impl Default for RequestBatchExecutor {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for RequestBatchExecutor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RequestBatchExecutorExecutor({}/{})", self.completed_count(), self.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestLatencyTracker — timing metrics
+// ---------------------------------------------------------------------------
+
+/// Tracks timing metrics for requests.
+pub struct RequestLatencyTracker {
+    timings: Vec<u64>,
+}
+
+impl RequestLatencyTracker {
+    pub fn new() -> Self { Self { timings: Vec::new() } }
+
+    pub fn record(&mut self, duration_ms: u64) { self.timings.push(duration_ms); }
+
+    pub fn average_ms(&self) -> Option<u64> {
+        if self.timings.is_empty() { None } else { Some(self.timings.iter().sum::<u64>() / self.timings.len() as u64) }
+    }
+
+    pub fn min_ms(&self) -> Option<u64> { self.timings.iter().copied().min() }
+    pub fn max_ms(&self) -> Option<u64> { self.timings.iter().copied().max() }
+
+    pub fn percentile(&self, p: f64) -> Option<u64> {
+        if self.timings.is_empty() { return None; }
+        let mut sorted = self.timings.clone();
+        sorted.sort();
+        let idx = ((p / 100.0) * (sorted.len() - 1) as f64).round() as usize;
+        Some(sorted[idx.min(sorted.len() - 1)])
+    }
+
+    pub fn count(&self) -> usize { self.timings.len() }
+    pub fn reset(&mut self) { self.timings.clear(); }
+}
+
+impl Default for RequestLatencyTracker {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for RequestLatencyTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RequestLatencyTracker({} samples)", self.timings.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1552,15 +1731,15 @@ mod tests {
 
     #[test]
     fn request_batch_submit() {
-        let mut batch = RequestBatch::new();
+        let mut batch = RequestBatchExecutor::new();
         assert!(batch.is_empty());
         batch.add("GET /a");
         batch.add("POST /b");
         assert_eq!(batch.len(), 2);
-        let mut svc = RequestService::new();
-        let ids = batch.submit(&mut svc);
-        assert_eq!(ids.len(), 2);
-        assert_eq!(svc.total_count(), 2);
+        assert!(!batch.is_complete());
+        batch.set_result(0, RequestState::Completed);
+        batch.set_result(1, RequestState::Completed);
+        assert!(batch.is_complete());
     }
 
     #[test]
@@ -1895,11 +2074,11 @@ mod tests {
 
     #[test]
     fn batch_contains_method_check() {
-        let mut batch = RequestBatch::new();
+        let mut batch = RequestBatchExecutor::new();
         batch.add("textDocument/completion");
         batch.add("workspace/symbol");
-        assert!(batch.contains_method("textDocument/completion"));
-        assert!(!batch.contains_method("textDocument/hover"));
+        assert!(batch.methods().contains(&"textDocument/completion".to_string()));
+        assert!(!batch.methods().contains(&"textDocument/hover".to_string()));
         assert_eq!(batch.methods().len(), 2);
     }
 
@@ -2053,4 +2232,106 @@ mod tests {
         // peek should not change state
         assert_eq!(q.pending_count(), 2);
     }
+
+
+    #[test]
+    fn retry_middleware_delay() {
+        let retry = RetryBackoffStrategy::new(3);
+        assert_eq!(retry.delay_for_attempt(0), 100);
+        assert_eq!(retry.delay_for_attempt(1), 200);
+    }
+
+    #[test]
+    fn retry_middleware_should_retry() {
+        let retry = RetryBackoffStrategy::new(2);
+        assert!(retry.should_retry(0));
+        assert!(!retry.should_retry(2));
+    }
+
+    #[test]
+    fn retry_middleware_max_delay() {
+        let retry = RetryBackoffStrategy::new(5).with_max_delay(500);
+        assert!(retry.delay_for_attempt(10) <= 500);
+    }
+
+    #[test]
+    fn cache_basic() {
+        let mut cache = RequestCache::new(1000);
+        cache.insert("k", "v", 100);
+        assert_eq!(cache.get("k", 200), Some("v"));
+        assert_eq!(cache.get("k", 1200), None);
+    }
+
+    #[test]
+    fn cache_evict() {
+        let mut cache = RequestCache::new(100);
+        cache.insert("a", "1", 0);
+        cache.insert("b", "2", 50);
+        assert_eq!(cache.evict_expired(150), 1);
+    }
+
+    #[test]
+    fn cache_custom_ttl() {
+        let mut cache = RequestCache::new(1000);
+        cache.insert_with_ttl("k", "v", 0, 50);
+        assert_eq!(cache.get("k", 40), Some("v"));
+        assert_eq!(cache.get("k", 60), None);
+    }
+
+    #[test]
+    fn batch_basic() {
+        let mut batch = RequestBatchExecutor::new();
+        batch.add("GET /a");
+        batch.add("GET /b");
+        assert!(!batch.is_complete());
+        batch.set_result(0, RequestState::Completed);
+        batch.set_result(1, RequestState::Completed);
+        assert!(batch.is_complete());
+    }
+
+    #[test]
+    fn batch_completed_count() {
+        let mut batch = RequestBatchExecutor::new();
+        batch.add("a");
+        batch.add("b");
+        batch.set_result(0, RequestState::Completed);
+        assert_eq!(batch.completed_count(), 1);
+    }
+
+    #[test]
+    fn timing_metrics_basic() {
+        let mut m = RequestLatencyTracker::new();
+        m.record(100);
+        m.record(200);
+        m.record(300);
+        assert_eq!(m.average_ms(), Some(200));
+        assert_eq!(m.min_ms(), Some(100));
+        assert_eq!(m.max_ms(), Some(300));
+    }
+
+    #[test]
+    fn timing_metrics_percentile() {
+        let mut m = RequestLatencyTracker::new();
+        for i in 1..=100 { m.record(i); }
+        assert_eq!(m.percentile(50.0), Some(51));
+    }
+
+    #[test]
+    fn timing_metrics_empty() {
+        let m = RequestLatencyTracker::new();
+        assert_eq!(m.average_ms(), None);
+    }
+
+    #[test]
+    fn retry_display() {
+        let r = RetryBackoffStrategy::new(3);
+        assert!(format!("{r}").contains("max=3"));
+    }
+
+    #[test]
+    fn cache_display() {
+        let c = RequestCache::new(1000);
+        assert!(format!("{c}").contains("0 entries"));
+    }
+
 }

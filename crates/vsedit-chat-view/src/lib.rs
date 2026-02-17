@@ -1,5 +1,6 @@
 //! Chat view panel.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Errors that can occur in chat operations.
@@ -1326,6 +1327,294 @@ impl ChatMentionPicker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatViewTheme
+// ---------------------------------------------------------------------------
+
+/// Custom color theme for the chat UI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatViewTheme {
+    pub user_message_color: String,
+    pub assistant_message_color: String,
+    pub system_message_color: String,
+    pub background_color: String,
+    pub border_color: String,
+}
+
+impl ChatViewTheme {
+    /// Dark theme defaults.
+    pub fn default_dark() -> Self {
+        Self {
+            user_message_color: "#569cd6".to_string(),
+            assistant_message_color: "#b5cea8".to_string(),
+            system_message_color: "#808080".to_string(),
+            background_color: "#1e1e1e".to_string(),
+            border_color: "#333333".to_string(),
+        }
+    }
+
+    /// Light theme defaults.
+    pub fn default_light() -> Self {
+        Self {
+            user_message_color: "#0451a5".to_string(),
+            assistant_message_color: "#098658".to_string(),
+            system_message_color: "#6a6a6a".to_string(),
+            background_color: "#ffffff".to_string(),
+            border_color: "#cccccc".to_string(),
+        }
+    }
+
+    /// Set the user message color (builder pattern).
+    pub fn with_user_color(mut self, color: &str) -> Self {
+        self.user_message_color = color.to_string();
+        self
+    }
+
+    /// Set the assistant message color (builder pattern).
+    pub fn with_assistant_color(mut self, color: &str) -> Self {
+        self.assistant_message_color = color.to_string();
+        self
+    }
+
+    /// Returns `true` if the background color looks dark (starts with low hex).
+    pub fn is_dark(&self) -> bool {
+        let bg = self.background_color.trim_start_matches('#');
+        if bg.len() < 2 {
+            return false;
+        }
+        let first_byte = u8::from_str_radix(&bg[..2], 16).unwrap_or(128);
+        first_byte < 128
+    }
+}
+
+impl Default for ChatViewTheme {
+    fn default() -> Self {
+        Self::default_dark()
+    }
+}
+
+impl fmt::Display for ChatViewTheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Theme(bg={}, border={}, user={}, assistant={}, system={})",
+            self.background_color,
+            self.border_color,
+            self.user_message_color,
+            self.assistant_message_color,
+            self.system_message_color,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatViewAccessibility
+// ---------------------------------------------------------------------------
+
+/// Screen reader and accessibility support for the chat view.
+#[derive(Debug, Clone, Default)]
+pub struct ChatViewAccessibility {
+    announcements: Vec<String>,
+    aria_labels: HashMap<String, String>,
+}
+
+impl ChatViewAccessibility {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Queue a screen-reader announcement.
+    pub fn announce(&mut self, text: &str) {
+        if !text.is_empty() {
+            self.announcements.push(text.to_string());
+        }
+    }
+
+    /// All queued announcements.
+    pub fn announcements(&self) -> &[String] {
+        &self.announcements
+    }
+
+    /// Associate an ARIA label with a UI element.
+    pub fn set_aria_label(&mut self, element: &str, label: &str) {
+        self.aria_labels
+            .insert(element.to_string(), label.to_string());
+    }
+
+    /// Retrieve the ARIA label for a UI element.
+    pub fn get_aria_label(&self, element: &str) -> Option<&str> {
+        self.aria_labels.get(element).map(|s| s.as_str())
+    }
+
+    /// All registered element-label pairs.
+    pub fn labels(&self) -> Vec<(&str, &str)> {
+        self.aria_labels
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect()
+    }
+
+    /// Discard all pending announcements.
+    pub fn clear_announcements(&mut self) {
+        self.announcements.clear();
+    }
+}
+
+impl fmt::Display for ChatViewAccessibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Accessibility(announcements={}, labels={})",
+            self.announcements.len(),
+            self.aria_labels.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatViewSearch
+// ---------------------------------------------------------------------------
+
+/// Result of searching within chat messages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatViewSearchResult {
+    pub message_id: usize,
+    pub role: String,
+    pub snippet: String,
+    pub match_start: usize,
+}
+
+/// Indexed message stored for searching.
+#[derive(Debug, Clone)]
+struct SearchableMessage {
+    id: usize,
+    role: String,
+    content: String,
+}
+
+/// Search within chat messages.
+#[derive(Debug, Clone, Default)]
+pub struct ChatViewSearch {
+    messages: Vec<SearchableMessage>,
+}
+
+impl ChatViewSearch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Index a message for later searching.
+    pub fn add_message(&mut self, id: usize, role: &str, content: &str) {
+        self.messages.push(SearchableMessage {
+            id,
+            role: role.to_string(),
+            content: content.to_string(),
+        });
+    }
+
+    /// Find all messages containing `query` (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<ChatViewSearchResult> {
+        let q = query.to_lowercase();
+        let mut results = Vec::new();
+        for msg in &self.messages {
+            let lower = msg.content.to_lowercase();
+            if let Some(pos) = lower.find(&q) {
+                let snippet_end = (pos + 60).min(msg.content.len());
+                let snippet_start = pos;
+                results.push(ChatViewSearchResult {
+                    message_id: msg.id,
+                    role: msg.role.clone(),
+                    snippet: msg.content[snippet_start..snippet_end].to_string(),
+                    match_start: pos,
+                });
+            }
+        }
+        results
+    }
+
+    /// Count total matches across all messages for `query`.
+    pub fn search_count(&self, query: &str) -> usize {
+        let q = query.to_lowercase();
+        self.messages
+            .iter()
+            .filter(|m| m.content.to_lowercase().contains(&q))
+            .count()
+    }
+
+    /// Number of indexed messages.
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
+    }
+}
+
+impl fmt::Display for ChatViewSearch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ChatViewSearch(messages={})", self.messages.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatViewExporter
+// ---------------------------------------------------------------------------
+
+/// Entry stored for export.
+#[derive(Debug, Clone)]
+struct ExportMessage {
+    role: String,
+    content: String,
+    timestamp: String,
+}
+
+/// Export chat history to markdown or plain text.
+#[derive(Debug, Clone, Default)]
+pub struct ChatViewExporter {
+    messages: Vec<ExportMessage>,
+}
+
+impl ChatViewExporter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a message for export.
+    pub fn add_message(&mut self, role: &str, content: &str, timestamp: &str) {
+        self.messages.push(ExportMessage {
+            role: role.to_string(),
+            content: content.to_string(),
+            timestamp: timestamp.to_string(),
+        });
+    }
+
+    /// Render the chat as Markdown.
+    pub fn to_markdown(&self) -> String {
+        let mut out = String::from("# Chat Export\n\n");
+        for msg in &self.messages {
+            out.push_str(&format!("## {} ({})\n\n{}\n\n", msg.role, msg.timestamp, msg.content));
+        }
+        out
+    }
+
+    /// Render the chat as plain text.
+    pub fn to_plain_text(&self) -> String {
+        let mut out = String::new();
+        for msg in &self.messages {
+            out.push_str(&format!("[{}] {}: {}\n", msg.timestamp, msg.role, msg.content));
+        }
+        out
+    }
+
+    /// Number of messages recorded for export.
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
+    }
+}
+
+impl fmt::Display for ChatViewExporter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ChatViewExporter(messages={})", self.messages.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2184,6 +2473,123 @@ mod tests {
     fn mention_picker_extract() {
         let mentions = ChatMentionPicker::extract_mentions("Hey @alice and @bob check this");
         assert_eq!(mentions, vec!["alice", "bob"]);
+    }
+
+    // -- ChatViewTheme tests ------------------------------------------------
+
+    #[test]
+    fn theme_dark_is_dark() {
+        let theme = ChatViewTheme::default_dark();
+        assert!(theme.is_dark());
+        assert_eq!(theme.background_color, "#1e1e1e");
+    }
+
+    #[test]
+    fn theme_light_is_not_dark() {
+        let theme = ChatViewTheme::default_light();
+        assert!(!theme.is_dark());
+    }
+
+    #[test]
+    fn theme_builder_pattern() {
+        let theme = ChatViewTheme::default_dark()
+            .with_user_color("#ff0000")
+            .with_assistant_color("#00ff00");
+        assert_eq!(theme.user_message_color, "#ff0000");
+        assert_eq!(theme.assistant_message_color, "#00ff00");
+    }
+
+    #[test]
+    fn theme_default_is_dark() {
+        let theme = ChatViewTheme::default();
+        assert_eq!(theme, ChatViewTheme::default_dark());
+    }
+
+    #[test]
+    fn theme_display() {
+        let theme = ChatViewTheme::default_dark();
+        let s = format!("{theme}");
+        assert!(s.contains("#1e1e1e"));
+    }
+
+    // -- ChatViewAccessibility tests ----------------------------------------
+
+    #[test]
+    fn accessibility_announce_and_clear() {
+        let mut a11y = ChatViewAccessibility::new();
+        a11y.announce("New message received");
+        a11y.announce("Typing indicator shown");
+        assert_eq!(a11y.announcements().len(), 2);
+        a11y.clear_announcements();
+        assert_eq!(a11y.announcements().len(), 0);
+    }
+
+    #[test]
+    fn accessibility_aria_labels() {
+        let mut a11y = ChatViewAccessibility::new();
+        a11y.set_aria_label("input", "Message input field");
+        a11y.set_aria_label("send", "Send message button");
+        assert_eq!(a11y.get_aria_label("input"), Some("Message input field"));
+        assert_eq!(a11y.get_aria_label("missing"), None);
+        assert_eq!(a11y.labels().len(), 2);
+    }
+
+    #[test]
+    fn accessibility_empty_announce_ignored() {
+        let mut a11y = ChatViewAccessibility::new();
+        a11y.announce("");
+        assert!(a11y.announcements().is_empty());
+    }
+
+    // -- ChatViewSearch tests -----------------------------------------------
+
+    #[test]
+    fn search_basic() {
+        let mut search = ChatViewSearch::new();
+        search.add_message(0, "user", "Hello world");
+        search.add_message(1, "assistant", "World is great");
+        let results = search.search("world");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].message_id, 0);
+        assert_eq!(results[0].match_start, 6);
+    }
+
+    #[test]
+    fn search_count_and_message_count() {
+        let mut search = ChatViewSearch::new();
+        search.add_message(0, "user", "Rust is fast");
+        search.add_message(1, "assistant", "Rust is safe");
+        search.add_message(2, "user", "Python is fun");
+        assert_eq!(search.search_count("rust"), 2);
+        assert_eq!(search.message_count(), 3);
+    }
+
+    #[test]
+    fn search_no_match() {
+        let search = ChatViewSearch::new();
+        assert!(search.search("anything").is_empty());
+    }
+
+    // -- ChatViewExporter tests ---------------------------------------------
+
+    #[test]
+    fn exporter_markdown() {
+        let mut exp = ChatViewExporter::new();
+        exp.add_message("user", "Hi there", "2024-01-01T00:00:00Z");
+        exp.add_message("assistant", "Hello!", "2024-01-01T00:00:01Z");
+        let md = exp.to_markdown();
+        assert!(md.starts_with("# Chat Export"));
+        assert!(md.contains("## user"));
+        assert!(md.contains("Hi there"));
+        assert_eq!(exp.message_count(), 2);
+    }
+
+    #[test]
+    fn exporter_plain_text() {
+        let mut exp = ChatViewExporter::new();
+        exp.add_message("user", "Hello", "10:00");
+        let txt = exp.to_plain_text();
+        assert!(txt.contains("[10:00] user: Hello"));
     }
 
     #[test]

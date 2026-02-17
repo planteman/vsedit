@@ -1292,6 +1292,164 @@ impl Default for WorkspaceEventLog {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// WorkspaceRecommendation
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct WorkspaceRecommendation {
+    pub extension_id: String,
+    pub reason: String,
+}
+
+impl WorkspaceRecommendation {
+    pub fn new(ext_id: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self { extension_id: ext_id.into(), reason: reason.into() }
+    }
+}
+
+impl fmt::Display for WorkspaceRecommendation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.extension_id, self.reason)
+    }
+}
+
+pub struct WorkspaceRecommendations {
+    recommendations: Vec<WorkspaceRecommendation>,
+}
+
+impl WorkspaceRecommendations {
+    pub fn new() -> Self { Self { recommendations: Vec::new() } }
+
+    pub fn add(&mut self, rec: WorkspaceRecommendation) { self.recommendations.push(rec); }
+
+    pub fn recommend_for_files(&mut self, files: &[&str]) {
+        for file in files {
+            if file.ends_with(".rs") || file.ends_with(".toml") {
+                self.add(WorkspaceRecommendation::new("rust-analyzer", "Rust files detected"));
+            }
+            if file.ends_with(".py") {
+                self.add(WorkspaceRecommendation::new("ms-python.python", "Python files detected"));
+            }
+            if file.ends_with(".ts") || file.ends_with(".js") {
+                self.add(WorkspaceRecommendation::new("esbenp.prettier-vscode", "JS/TS files detected"));
+            }
+        }
+        self.recommendations.dedup_by(|a, b| a.extension_id == b.extension_id);
+    }
+
+    pub fn list(&self) -> &[WorkspaceRecommendation] { &self.recommendations }
+    pub fn len(&self) -> usize { self.recommendations.len() }
+    pub fn is_empty(&self) -> bool { self.recommendations.is_empty() }
+}
+
+impl Default for WorkspaceRecommendations { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// WorkspaceTaskRunnerConfig
+// ---------------------------------------------------------------------------
+
+pub struct WorkspaceTaskRunnerConfig {
+    tasks: Vec<(String, String)>,
+}
+
+impl WorkspaceTaskRunnerConfig {
+    pub fn new() -> Self { Self { tasks: Vec::new() } }
+
+    pub fn add_task(&mut self, label: impl Into<String>, command: impl Into<String>) {
+        self.tasks.push((label.into(), command.into()));
+    }
+
+    pub fn get_command(&self, label: &str) -> Option<&str> {
+        self.tasks.iter().find(|(l, _)| l == label).map(|(_, c)| c.as_str())
+    }
+
+    pub fn task_labels(&self) -> Vec<&str> { self.tasks.iter().map(|(l, _)| l.as_str()).collect() }
+    pub fn len(&self) -> usize { self.tasks.len() }
+    pub fn is_empty(&self) -> bool { self.tasks.is_empty() }
+
+    pub fn remove_task(&mut self, label: &str) -> bool {
+        if let Some(i) = self.tasks.iter().position(|(l, _)| l == label) { self.tasks.remove(i); true } else { false }
+    }
+}
+
+impl Default for WorkspaceTaskRunnerConfig { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// WorkspaceSearchScope
+// ---------------------------------------------------------------------------
+
+pub struct WorkspaceSearchScope {
+    include_patterns: Vec<String>,
+    exclude_patterns: Vec<String>,
+}
+
+impl WorkspaceSearchScope {
+    pub fn new() -> Self { Self { include_patterns: Vec::new(), exclude_patterns: Vec::new() } }
+
+    pub fn include(&mut self, pattern: impl Into<String>) { self.include_patterns.push(pattern.into()); }
+    pub fn exclude(&mut self, pattern: impl Into<String>) { self.exclude_patterns.push(pattern.into()); }
+
+    pub fn matches(&self, path: &str) -> bool {
+        let included = self.include_patterns.is_empty() ||
+            self.include_patterns.iter().any(|p| path.contains(p));
+        let excluded = self.exclude_patterns.iter().any(|p| path.contains(p));
+        included && !excluded
+    }
+
+    pub fn include_count(&self) -> usize { self.include_patterns.len() }
+    pub fn exclude_count(&self) -> usize { self.exclude_patterns.len() }
+}
+
+impl Default for WorkspaceSearchScope { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// WorkspaceRecentList
+// ---------------------------------------------------------------------------
+
+pub struct WorkspaceRecentList {
+    entries: Vec<(String, u64)>,
+    max_entries: usize,
+}
+
+impl WorkspaceRecentList {
+    pub fn new(max_entries: usize) -> Self { Self { entries: Vec::new(), max_entries } }
+
+    pub fn add(&mut self, path: impl Into<String>, timestamp: u64) {
+        let path = path.into();
+        self.entries.retain(|(p, _)| p != &path);
+        self.entries.insert(0, (path, timestamp));
+        if self.entries.len() > self.max_entries { self.entries.truncate(self.max_entries); }
+    }
+
+    pub fn recent(&self) -> Vec<&str> { self.entries.iter().map(|(p, _)| p.as_str()).collect() }
+
+    pub fn sorted_by_time(&self) -> Vec<String> {
+        let mut sorted = self.entries.clone();
+        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.into_iter().map(|(p, _)| p).collect()
+    }
+
+    pub fn sorted_by_name(&self) -> Vec<String> {
+        let mut sorted = self.entries.clone();
+        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        sorted.into_iter().map(|(p, _)| p).collect()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn remove(&mut self, path: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|(p, _)| p != path);
+        self.entries.len() < before
+    }
+}
+
+impl Default for WorkspaceRecentList { fn default() -> Self { Self::new(20) } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2105,4 +2263,104 @@ mod tests {
         assert_eq!(since_300.len(), 3);
         assert_eq!(since_300[0].timestamp, 300);
     }
+
+
+    #[test]
+    fn recommendations_basic() {
+        let mut recs = WorkspaceRecommendations::new();
+        recs.recommend_for_files(&["main.rs", "Cargo.toml"]);
+        assert!(!recs.is_empty());
+        assert!(recs.list().iter().any(|r| r.extension_id == "rust-analyzer"));
+    }
+
+    #[test]
+    fn recommendations_dedup() {
+        let mut recs = WorkspaceRecommendations::new();
+        recs.recommend_for_files(&["a.rs", "b.rs"]);
+        assert_eq!(recs.list().iter().filter(|r| r.extension_id == "rust-analyzer").count(), 1);
+    }
+
+    #[test]
+    fn task_runner_basic() {
+        let mut tr = WorkspaceTaskRunnerConfig::new();
+        tr.add_task("build", "cargo build");
+        tr.add_task("test", "cargo test");
+        assert_eq!(tr.get_command("build"), Some("cargo build"));
+        assert_eq!(tr.len(), 2);
+    }
+
+    #[test]
+    fn task_runner_remove() {
+        let mut tr = WorkspaceTaskRunnerConfig::new();
+        tr.add_task("build", "cargo build");
+        assert!(tr.remove_task("build"));
+        assert!(tr.is_empty());
+    }
+
+    #[test]
+    fn search_scope_basic() {
+        let mut scope = WorkspaceSearchScope::new();
+        scope.include("src");
+        scope.exclude("target");
+        assert!(scope.matches("src/main.rs"));
+        assert!(!scope.matches("target/debug"));
+    }
+
+    #[test]
+    fn search_scope_all() {
+        let scope = WorkspaceSearchScope::new();
+        assert!(scope.matches("anything"));
+    }
+
+    #[test]
+    fn recent_list_basic() {
+        let mut rl = WorkspaceRecentList::new(3);
+        rl.add("/project/a", 100);
+        rl.add("/project/b", 200);
+        rl.add("/project/c", 300);
+        assert_eq!(rl.len(), 3);
+        assert_eq!(rl.recent()[0], "/project/c");
+    }
+
+    #[test]
+    fn recent_list_max() {
+        let mut rl = WorkspaceRecentList::new(2);
+        rl.add("a", 1);
+        rl.add("b", 2);
+        rl.add("c", 3);
+        assert_eq!(rl.len(), 2);
+    }
+
+    #[test]
+    fn recent_list_dedup() {
+        let mut rl = WorkspaceRecentList::new(10);
+        rl.add("a", 1);
+        rl.add("b", 2);
+        rl.add("a", 3);
+        assert_eq!(rl.len(), 2);
+        assert_eq!(rl.recent()[0], "a");
+    }
+
+    #[test]
+    fn recent_list_sorted_by_name() {
+        let mut rl = WorkspaceRecentList::new(10);
+        rl.add("b", 1);
+        rl.add("a", 2);
+        assert_eq!(rl.sorted_by_name()[0], "a");
+    }
+
+    #[test]
+    fn recent_list_remove() {
+        let mut rl = WorkspaceRecentList::new(10);
+        rl.add("a", 1);
+        assert!(rl.remove("a"));
+        assert!(rl.is_empty());
+    }
+
+    #[test]
+    fn recommendation_display() {
+        let r = WorkspaceRecommendation::new("ext", "reason");
+        assert!(format!("{r}").contains("ext"));
+    }
+
 }

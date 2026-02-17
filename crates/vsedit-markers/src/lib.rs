@@ -1021,6 +1021,151 @@ impl MarkerService {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// MarkerQuickNavigation
+// ---------------------------------------------------------------------------
+
+pub struct MarkerQuickNavigation {
+    current_index: Option<usize>,
+    markers: Vec<(VsUri, u32)>,
+}
+
+impl MarkerQuickNavigation {
+    pub fn new() -> Self { Self { current_index: None, markers: Vec::new() } }
+
+    pub fn load_markers(&mut self, service: &MarkerService) {
+        let all = service.read(&MarkerFilter { owner: None, uri: None, severities: None, take: None });
+        self.markers = all.into_iter().map(|(uri, m)| (uri, m.start_line)).collect();
+        self.markers.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
+        self.current_index = None;
+    }
+
+    pub fn next(&mut self) -> Option<(&VsUri, u32)> {
+        if self.markers.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % self.markers.len(),
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        let (ref uri, line) = self.markers[idx];
+        Some((uri, line))
+    }
+
+    pub fn prev(&mut self) -> Option<(&VsUri, u32)> {
+        if self.markers.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(0) | None => self.markers.len() - 1,
+            Some(i) => i - 1,
+        };
+        self.current_index = Some(idx);
+        let (ref uri, line) = self.markers[idx];
+        Some((uri, line))
+    }
+
+    pub fn count(&self) -> usize { self.markers.len() }
+    pub fn current_index(&self) -> Option<usize> { self.current_index }
+}
+
+impl Default for MarkerQuickNavigation { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// MarkerCodeActionLink
+// ---------------------------------------------------------------------------
+
+pub struct MarkerCodeActionLink {
+    pub marker_owner: String,
+    pub action_title: String,
+    pub uri: VsUri,
+    pub line: u32,
+}
+
+impl MarkerCodeActionLink {
+    pub fn new(owner: impl Into<String>, title: impl Into<String>, uri: VsUri, line: u32) -> Self {
+        Self { marker_owner: owner.into(), action_title: title.into(), uri, line }
+    }
+}
+
+impl std::fmt::Display for MarkerCodeActionLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {} at L{}", self.marker_owner, self.action_title, self.line)
+    }
+}
+
+/// Collects code action links for markers.
+pub struct MarkerCodeActionLinker {
+    links: Vec<MarkerCodeActionLink>,
+}
+
+impl MarkerCodeActionLinker {
+    pub fn new() -> Self { Self { links: Vec::new() } }
+    pub fn add(&mut self, link: MarkerCodeActionLink) { self.links.push(link); }
+    pub fn links_for_uri(&self, uri: &VsUri) -> Vec<&MarkerCodeActionLink> {
+        self.links.iter().filter(|l| &l.uri == uri).collect()
+    }
+    pub fn len(&self) -> usize { self.links.len() }
+    pub fn is_empty(&self) -> bool { self.links.is_empty() }
+}
+
+impl Default for MarkerCodeActionLinker { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// MarkerBatchUpdater
+// ---------------------------------------------------------------------------
+
+pub struct MarkerBatchUpdate {
+    pub owner: String,
+    pub uri: VsUri,
+    pub markers: Vec<MarkerData>,
+}
+
+pub struct MarkerBatchUpdater {
+    updates: Vec<MarkerBatchUpdate>,
+}
+
+impl MarkerBatchUpdater {
+    pub fn new() -> Self { Self { updates: Vec::new() } }
+
+    pub fn queue(&mut self, owner: impl Into<String>, uri: VsUri, markers: Vec<MarkerData>) {
+        self.updates.push(MarkerBatchUpdate { owner: owner.into(), uri, markers });
+    }
+
+    pub fn apply(&mut self, service: &MarkerService) {
+        for update in self.updates.drain(..) {
+            service.change_one(&update.owner, &update.uri, update.markers);
+        }
+    }
+
+    pub fn pending_count(&self) -> usize { self.updates.len() }
+    pub fn is_empty(&self) -> bool { self.updates.is_empty() }
+    pub fn clear(&mut self) { self.updates.clear(); }
+}
+
+impl Default for MarkerBatchUpdater { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// MarkerOwnerTracker
+// ---------------------------------------------------------------------------
+
+pub struct MarkerOwnerTracker {
+    owners: std::collections::HashMap<String, u64>,
+}
+
+impl MarkerOwnerTracker {
+    pub fn new() -> Self { Self { owners: std::collections::HashMap::new() } }
+
+    pub fn record(&mut self, owner: &str) {
+        *self.owners.entry(owner.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn count_for(&self, owner: &str) -> u64 { self.owners.get(owner).copied().unwrap_or(0) }
+    pub fn unique_owners(&self) -> Vec<&str> { self.owners.keys().map(|k| k.as_str()).collect() }
+    pub fn total_markers(&self) -> u64 { self.owners.values().sum() }
+    pub fn clear(&mut self) { self.owners.clear(); }
+}
+
+impl Default for MarkerOwnerTracker { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2099,4 +2244,108 @@ mod tests {
         assert!(!s2.has_errors());
         assert_eq!(s2.worst_severity(), Some(MarkerSeverity::Info));
     }
+
+
+    #[test]
+    fn quick_nav_empty() {
+        let mut nav = MarkerQuickNavigation::new();
+        assert!(nav.next().is_none());
+        assert!(nav.prev().is_none());
+    }
+
+    #[test]
+    fn quick_nav_load() {
+        let service = MarkerService::new();
+        let uri = VsUri::parse("file:///test.rs");
+        service.change_one("test", &uri, vec![MarkerData {
+            severity: MarkerSeverity::Error,
+            message: "err".into(),
+            start_line: 10,
+            start_column: 1,
+            end_line: 10,
+            end_column: 5,
+            source: None,
+            code: None,
+            tags: vec![],
+            related_information: vec![],
+        }]);
+        let mut nav = MarkerQuickNavigation::new();
+        nav.load_markers(&service);
+        assert_eq!(nav.count(), 1);
+        let (_, line) = nav.next().unwrap();
+        assert_eq!(line, 10);
+    }
+
+    #[test]
+    fn code_action_link_display() {
+        let link = MarkerCodeActionLink::new("rust", "fix import", VsUri::parse("file:///a.rs"), 5);
+        assert!(format!("{link}").contains("fix import"));
+    }
+
+    #[test]
+    fn code_action_linker_basic() {
+        let mut linker = MarkerCodeActionLinker::new();
+        let uri = VsUri::parse("file:///a.rs");
+        linker.add(MarkerCodeActionLink::new("rust", "fix", uri.clone(), 1));
+        assert_eq!(linker.links_for_uri(&uri).len(), 1);
+    }
+
+    #[test]
+    fn batch_updater_basic() {
+        let mut updater = MarkerBatchUpdater::new();
+        let uri = VsUri::parse("file:///a.rs");
+        updater.queue("test", uri, vec![]);
+        assert_eq!(updater.pending_count(), 1);
+        let service = MarkerService::new();
+        updater.apply(&service);
+        assert!(updater.is_empty());
+    }
+
+    #[test]
+    fn batch_updater_clear() {
+        let mut updater = MarkerBatchUpdater::new();
+        updater.queue("test", VsUri::parse("file:///a.rs"), vec![]);
+        updater.clear();
+        assert!(updater.is_empty());
+    }
+
+    #[test]
+    fn owner_tracker_basic() {
+        let mut tracker = MarkerOwnerTracker::new();
+        tracker.record("rust-analyzer");
+        tracker.record("rust-analyzer");
+        tracker.record("eslint");
+        assert_eq!(tracker.count_for("rust-analyzer"), 2);
+        assert_eq!(tracker.total_markers(), 3);
+    }
+
+    #[test]
+    fn owner_tracker_unique() {
+        let mut tracker = MarkerOwnerTracker::new();
+        tracker.record("a");
+        tracker.record("b");
+        assert_eq!(tracker.unique_owners().len(), 2);
+    }
+
+    #[test]
+    fn owner_tracker_clear() {
+        let mut tracker = MarkerOwnerTracker::new();
+        tracker.record("a");
+        tracker.clear();
+        assert_eq!(tracker.total_markers(), 0);
+    }
+
+    #[test]
+    fn quick_nav_count() {
+        let nav = MarkerQuickNavigation::new();
+        assert_eq!(nav.count(), 0);
+        assert_eq!(nav.current_index(), None);
+    }
+
+    #[test]
+    fn code_action_linker_empty() {
+        let linker = MarkerCodeActionLinker::new();
+        assert!(linker.is_empty());
+    }
+
 }

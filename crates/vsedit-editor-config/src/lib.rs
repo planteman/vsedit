@@ -1,5 +1,6 @@
 //! Editor options and computed config
 
+use std::collections::HashMap;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -1310,6 +1311,282 @@ impl ConfigValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EditorConfig file parser
+// ---------------------------------------------------------------------------
+
+/// A single section from an `.editorconfig` file, with a glob pattern and
+/// associated key-value properties.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditorConfigSection {
+    pub glob_pattern: String,
+    pub properties: HashMap<String, String>,
+}
+
+impl Default for EditorConfigSection {
+    fn default() -> Self {
+        Self {
+            glob_pattern: String::from("*"),
+            properties: HashMap::new(),
+        }
+    }
+}
+
+impl fmt::Display for EditorConfigSection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.glob_pattern)?;
+        let mut keys: Vec<&String> = self.properties.keys().collect();
+        keys.sort();
+        for k in keys {
+            write!(f, " {}={}", k, self.properties[k])?;
+        }
+        Ok(())
+    }
+}
+
+/// Parses INI-style `.editorconfig` file content into sections.
+pub struct EditorConfigFileParser;
+
+impl EditorConfigFileParser {
+    /// Returns `true` if the content contains `root = true`.
+    pub fn is_root(content: &str) -> bool {
+        content.lines().any(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with('#') || trimmed.starts_with(';') {
+                return false;
+            }
+            let normalized: String = trimmed
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .collect();
+            normalized.eq_ignore_ascii_case("root=true")
+        })
+    }
+
+    /// Parse `.editorconfig` content into a list of sections.
+    pub fn parse(content: &str) -> Vec<EditorConfigSection> {
+        let mut sections: Vec<EditorConfigSection> = Vec::new();
+        let mut current: Option<EditorConfigSection> = None;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.is_empty()
+                || trimmed.starts_with('#')
+                || trimmed.starts_with(';')
+            {
+                continue;
+            }
+
+            // Skip root declaration at top level.
+            {
+                let normalized: String =
+                    trimmed.chars().filter(|c| !c.is_whitespace()).collect();
+                if normalized.eq_ignore_ascii_case("root=true") {
+                    continue;
+                }
+            }
+
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                if let Some(sec) = current.take() {
+                    sections.push(sec);
+                }
+                let pattern = trimmed[1..trimmed.len() - 1].trim().to_string();
+                current = Some(EditorConfigSection {
+                    glob_pattern: pattern,
+                    properties: HashMap::new(),
+                });
+            } else if let Some(ref mut sec) = current {
+                if let Some((key, value)) = trimmed.split_once('=') {
+                    sec.properties
+                        .insert(key.trim().to_lowercase(), value.trim().to_string());
+                }
+            }
+        }
+
+        if let Some(sec) = current {
+            sections.push(sec);
+        }
+
+        sections
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorConfig inheritance
+// ---------------------------------------------------------------------------
+
+/// Manages `.editorconfig` files across a directory hierarchy and resolves
+/// the effective properties for a given file path by merging from the
+/// root-most directory to the leaf.
+#[derive(Debug, Clone, Default)]
+pub struct EditorConfigInheritance {
+    configs: Vec<(String, Vec<EditorConfigSection>)>,
+}
+
+impl EditorConfigInheritance {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register sections found in `dir_path`.
+    pub fn add_config(&mut self, dir_path: &str, sections: Vec<EditorConfigSection>) {
+        let normalized = dir_path.trim_end_matches('/').to_string();
+        self.configs.push((normalized, sections));
+    }
+
+    /// Resolve the effective properties for `file_path` by merging configs
+    /// from the shortest (root-most) matching directory to the longest.
+    pub fn resolve(&self, file_path: &str) -> HashMap<String, String> {
+        let mut matching: Vec<&(String, Vec<EditorConfigSection>)> = self
+            .configs
+            .iter()
+            .filter(|(dir, _)| file_path.starts_with(dir.as_str()))
+            .collect();
+
+        // Sort by directory depth (shortest first = root-most).
+        matching.sort_by_key(|(dir, _)| dir.len());
+
+        let mut result = HashMap::new();
+        let file_name = file_path.rsplit('/').next().unwrap_or(file_path);
+
+        for (_, sections) in matching {
+            for sec in sections {
+                if Self::glob_matches(&sec.glob_pattern, file_name) {
+                    for (k, v) in &sec.properties {
+                        result.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    pub fn config_count(&self) -> usize {
+        self.configs.len()
+    }
+
+    /// Simplified glob matching: supports `*` as a prefix/suffix wildcard.
+    fn glob_matches(pattern: &str, file_name: &str) -> bool {
+        if pattern == "*" {
+            return true;
+        }
+        if let Some(suffix) = pattern.strip_prefix('*') {
+            return file_name.ends_with(suffix);
+        }
+        if let Some(prefix) = pattern.strip_suffix('*') {
+            return file_name.starts_with(prefix);
+        }
+        pattern == file_name
+    }
+}
+
+impl fmt::Display for EditorConfigInheritance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EditorConfigInheritance({} configs)", self.configs.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorConfig overrides
+// ---------------------------------------------------------------------------
+
+/// Workspace-level overrides that take precedence over `.editorconfig` values.
+#[derive(Debug, Clone, Default)]
+pub struct EditorConfigOverrides {
+    overrides: HashMap<String, String>,
+}
+
+impl EditorConfigOverrides {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_override(&mut self, key: &str, value: &str) {
+        self.overrides.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get_override(&self, key: &str) -> Option<&str> {
+        self.overrides.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove_override(&mut self, key: &str) -> bool {
+        self.overrides.remove(key).is_some()
+    }
+
+    pub fn overrides(&self) -> &HashMap<String, String> {
+        &self.overrides
+    }
+
+    /// Merge workspace overrides on top of a base property map.
+    pub fn merge_with(&self, base: &HashMap<String, String>) -> HashMap<String, String> {
+        let mut merged = base.clone();
+        for (k, v) in &self.overrides {
+            merged.insert(k.clone(), v.clone());
+        }
+        merged
+    }
+}
+
+impl fmt::Display for EditorConfigOverrides {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EditorConfigOverrides({} entries)", self.overrides.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorConfig status indicator
+// ---------------------------------------------------------------------------
+
+/// Tracks the active `.editorconfig` properties for the currently focused file.
+#[derive(Debug, Clone, Default)]
+pub struct EditorConfigStatusIndicator {
+    active_file: Option<String>,
+    properties: HashMap<String, String>,
+}
+
+impl EditorConfigStatusIndicator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_active_config(&mut self, file_path: &str, properties: HashMap<String, String>) {
+        self.active_file = Some(file_path.to_string());
+        self.properties = properties;
+    }
+
+    pub fn active_file(&self) -> Option<&str> {
+        self.active_file.as_deref()
+    }
+
+    pub fn get_property(&self, key: &str) -> Option<&str> {
+        self.properties.get(key).map(|s| s.as_str())
+    }
+
+    /// One-line summary such as `"indent_size=4, tab_width=4"`.
+    pub fn summary(&self) -> String {
+        if self.properties.is_empty() {
+            return String::from("no active config");
+        }
+        let mut keys: Vec<&String> = self.properties.keys().collect();
+        keys.sort();
+        keys.iter()
+            .map(|k| format!("{}={}", k, self.properties[*k]))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+impl fmt::Display for EditorConfigStatusIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.active_file {
+            Some(path) => write!(f, "Active: {} ({})", path, self.summary()),
+            None => write!(f, "No active config"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2151,6 +2428,176 @@ mod tests {
         reg.add(EditorConfigOverride::new("*.py"));
         let pats = reg.patterns();
         assert_eq!(pats, vec!["*.rs", "*.py"]);
+    }
+
+    // -------------------------------------------------------------------
+    // EditorConfigFileParser tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn parse_editorconfig_sections() {
+        let content = "\
+root = true
+
+[*.rs]
+indent_style = space
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+";
+        let sections = EditorConfigFileParser::parse(content);
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].glob_pattern, "*.rs");
+        assert_eq!(sections[0].properties.get("indent_style").unwrap(), "space");
+        assert_eq!(sections[0].properties.get("indent_size").unwrap(), "4");
+        assert_eq!(sections[1].glob_pattern, "Makefile");
+        assert_eq!(sections[1].properties.get("indent_style").unwrap(), "tab");
+    }
+
+    #[test]
+    fn parse_is_root() {
+        assert!(EditorConfigFileParser::is_root("root = true\n[*]\nindent_size=2"));
+        assert!(EditorConfigFileParser::is_root("  Root = True  "));
+        assert!(!EditorConfigFileParser::is_root("[*]\nindent_size=2"));
+        assert!(!EditorConfigFileParser::is_root("# root = true"));
+    }
+
+    #[test]
+    fn parse_skips_comments() {
+        let content = "\
+[*.py]
+# this is a comment
+; so is this
+indent_size = 2
+";
+        let sections = EditorConfigFileParser::parse(content);
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].properties.len(), 1);
+    }
+
+    #[test]
+    fn editorconfig_section_display() {
+        let mut sec = EditorConfigSection::default();
+        sec.glob_pattern = "*.rs".to_string();
+        sec.properties.insert("indent_size".to_string(), "4".to_string());
+        let display = format!("{}", sec);
+        assert!(display.starts_with("[*.rs]"));
+        assert!(display.contains("indent_size=4"));
+    }
+
+    // -------------------------------------------------------------------
+    // EditorConfigInheritance tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn inheritance_resolve_merges_root_to_leaf() {
+        let mut inh = EditorConfigInheritance::new();
+        inh.add_config(
+            "/project",
+            vec![EditorConfigSection {
+                glob_pattern: "*.rs".to_string(),
+                properties: HashMap::from([
+                    ("indent_size".to_string(), "4".to_string()),
+                    ("charset".to_string(), "utf-8".to_string()),
+                ]),
+            }],
+        );
+        inh.add_config(
+            "/project/src",
+            vec![EditorConfigSection {
+                glob_pattern: "*.rs".to_string(),
+                properties: HashMap::from([
+                    ("indent_size".to_string(), "2".to_string()),
+                ]),
+            }],
+        );
+        let resolved = inh.resolve("/project/src/main.rs");
+        // Leaf overrides root for indent_size.
+        assert_eq!(resolved.get("indent_size").unwrap(), "2");
+        // Root's charset is inherited.
+        assert_eq!(resolved.get("charset").unwrap(), "utf-8");
+    }
+
+    #[test]
+    fn inheritance_config_count() {
+        let mut inh = EditorConfigInheritance::new();
+        assert_eq!(inh.config_count(), 0);
+        inh.add_config("/a", vec![]);
+        inh.add_config("/b", vec![]);
+        assert_eq!(inh.config_count(), 2);
+    }
+
+    #[test]
+    fn inheritance_display() {
+        let inh = EditorConfigInheritance::new();
+        assert_eq!(format!("{}", inh), "EditorConfigInheritance(0 configs)");
+    }
+
+    // -------------------------------------------------------------------
+    // EditorConfigOverrides tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn overrides_set_get_remove() {
+        let mut ov = EditorConfigOverrides::new();
+        ov.set_override("indent_size", "2");
+        assert_eq!(ov.get_override("indent_size"), Some("2"));
+        assert!(ov.remove_override("indent_size"));
+        assert_eq!(ov.get_override("indent_size"), None);
+        assert!(!ov.remove_override("indent_size"));
+    }
+
+    #[test]
+    fn overrides_merge_with() {
+        let mut ov = EditorConfigOverrides::new();
+        ov.set_override("indent_size", "2");
+        ov.set_override("charset", "utf-16");
+
+        let mut base = HashMap::new();
+        base.insert("indent_size".to_string(), "4".to_string());
+        base.insert("tab_width".to_string(), "4".to_string());
+
+        let merged = ov.merge_with(&base);
+        assert_eq!(merged.get("indent_size").unwrap(), "2"); // overridden
+        assert_eq!(merged.get("tab_width").unwrap(), "4");   // from base
+        assert_eq!(merged.get("charset").unwrap(), "utf-16"); // from overrides
+    }
+
+    #[test]
+    fn overrides_display() {
+        let ov = EditorConfigOverrides::new();
+        assert_eq!(format!("{}", ov), "EditorConfigOverrides(0 entries)");
+    }
+
+    // -------------------------------------------------------------------
+    // EditorConfigStatusIndicator tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn status_indicator_summary() {
+        let mut si = EditorConfigStatusIndicator::new();
+        assert_eq!(si.summary(), "no active config");
+        assert_eq!(si.active_file(), None);
+
+        let mut props = HashMap::new();
+        props.insert("indent_size".to_string(), "4".to_string());
+        props.insert("tab_width".to_string(), "4".to_string());
+        si.set_active_config("src/main.rs", props);
+
+        assert_eq!(si.active_file(), Some("src/main.rs"));
+        assert_eq!(si.get_property("indent_size"), Some("4"));
+        assert_eq!(si.summary(), "indent_size=4, tab_width=4");
+    }
+
+    #[test]
+    fn status_indicator_display() {
+        let mut si = EditorConfigStatusIndicator::new();
+        assert_eq!(format!("{}", si), "No active config");
+        si.set_active_config("a.rs", HashMap::from([("k".to_string(), "v".to_string())]));
+        let display = format!("{}", si);
+        assert!(display.contains("a.rs"));
+        assert!(display.contains("k=v"));
     }
 
 }

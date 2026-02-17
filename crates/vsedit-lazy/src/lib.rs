@@ -1275,6 +1275,257 @@ impl<T: fmt::Debug> fmt::Debug for WriteOnceLazy<T> {
     }
 }
 
+// ── LazyMap ──
+
+/// A map whose values are lazily initialized on first access.
+///
+/// Each key is associated with an initializer closure. The closure runs at most
+/// once, on the first call to [`get`](LazyMap::get).
+pub struct LazyMap {
+    initializers: HashMap<String, Box<dyn Fn() -> String>>,
+    values: HashMap<String, String>,
+}
+
+impl LazyMap {
+    /// Create an empty `LazyMap`.
+    pub fn new() -> Self {
+        Self {
+            initializers: HashMap::new(),
+            values: HashMap::new(),
+        }
+    }
+
+    /// Register a key with its initializer closure.
+    pub fn insert(&mut self, key: String, initializer: Box<dyn Fn() -> String>) {
+        self.initializers.insert(key, initializer);
+    }
+
+    /// Get the value for `key`, initializing it on first access.
+    pub fn get(&mut self, key: &str) -> Option<&String> {
+        if !self.values.contains_key(key) {
+            if let Some(init) = self.initializers.get(key) {
+                let val = init();
+                self.values.insert(key.to_string(), val);
+            }
+        }
+        self.values.get(key)
+    }
+
+    /// Return `true` if the value for `key` has already been initialized.
+    pub fn is_initialized(&self, key: &str) -> bool {
+        self.values.contains_key(key)
+    }
+
+    /// Number of registered keys (initialized or not).
+    pub fn key_count(&self) -> usize {
+        self.initializers.len()
+    }
+
+    /// Number of keys whose values have been materialized.
+    pub fn initialized_count(&self) -> usize {
+        self.values.len()
+    }
+}
+
+impl Default for LazyMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for LazyMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LazyMap({}/{} initialized)",
+            self.initialized_count(),
+            self.key_count(),
+        )
+    }
+}
+
+// ── LazyPipeline ──
+
+/// A sequential chain of transformations applied to an initial `i64` value.
+///
+/// Steps are accumulated with [`then`](LazyPipeline::then) and executed lazily
+/// by [`evaluate`](LazyPipeline::evaluate).
+pub struct LazyPipeline {
+    initial: i64,
+    steps: Vec<Box<dyn Fn(i64) -> i64>>,
+}
+
+impl LazyPipeline {
+    /// Create a new pipeline starting from `initial`.
+    pub fn new(initial: i64) -> Self {
+        Self {
+            initial,
+            steps: Vec::new(),
+        }
+    }
+
+    /// Append a transformation step.
+    pub fn then(mut self, f: Box<dyn Fn(i64) -> i64>) -> Self {
+        self.steps.push(f);
+        self
+    }
+
+    /// Run all steps sequentially and return the final value.
+    pub fn evaluate(&self) -> i64 {
+        self.steps.iter().fold(self.initial, |acc, f| f(acc))
+    }
+
+    /// Number of registered steps.
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+}
+
+impl fmt::Display for LazyPipeline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LazyPipeline(initial={}, steps={})",
+            self.initial,
+            self.steps.len(),
+        )
+    }
+}
+
+// ── LazyProfile ──
+
+/// Tracks initialization durations for profiling lazy evaluations.
+pub struct LazyProfile {
+    records: Vec<(String, u64)>,
+}
+
+impl LazyProfile {
+    /// Create an empty profile.
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+        }
+    }
+
+    /// Record an initialization event with the given `name` and `duration_us`
+    /// (microseconds).
+    pub fn record_init(&mut self, name: &str, duration_us: u64) {
+        self.records.push((name.to_string(), duration_us));
+    }
+
+    /// Look up the duration recorded under `name`.
+    pub fn get_duration(&self, name: &str) -> Option<u64> {
+        self.records
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, d)| *d)
+    }
+
+    /// Sum of all recorded durations.
+    pub fn total_duration(&self) -> u64 {
+        self.records.iter().map(|(_, d)| *d).sum()
+    }
+
+    /// The entry with the longest duration.
+    pub fn slowest(&self) -> Option<(&str, u64)> {
+        self.records
+            .iter()
+            .max_by_key(|(_, d)| *d)
+            .map(|(n, d)| (n.as_str(), *d))
+    }
+
+    /// The entry with the shortest duration.
+    pub fn fastest(&self) -> Option<(&str, u64)> {
+        self.records
+            .iter()
+            .min_by_key(|(_, d)| *d)
+            .map(|(n, d)| (n.as_str(), *d))
+    }
+
+    /// Mean duration across all entries. Returns `0.0` when empty.
+    pub fn average_duration(&self) -> f64 {
+        if self.records.is_empty() {
+            return 0.0;
+        }
+        self.total_duration() as f64 / self.records.len() as f64
+    }
+
+    /// Number of recorded initializations.
+    pub fn init_count(&self) -> usize {
+        self.records.len()
+    }
+}
+
+impl Default for LazyProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for LazyProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LazyProfile({} inits, total={}µs)",
+            self.init_count(),
+            self.total_duration(),
+        )
+    }
+}
+
+// ── LazyFactory ──
+
+/// Registry of named factory closures that produce `String` values on demand.
+pub struct LazyFactory {
+    factories: HashMap<String, Box<dyn Fn() -> String>>,
+}
+
+impl LazyFactory {
+    /// Create an empty factory registry.
+    pub fn new() -> Self {
+        Self {
+            factories: HashMap::new(),
+        }
+    }
+
+    /// Register a factory under `type_name`.
+    pub fn register(&mut self, type_name: &str, factory: Box<dyn Fn() -> String>) {
+        self.factories.insert(type_name.to_string(), factory);
+    }
+
+    /// Invoke the factory registered under `type_name`, if any.
+    pub fn create(&self, type_name: &str) -> Option<String> {
+        self.factories.get(type_name).map(|f| f())
+    }
+
+    /// List all registered type names.
+    pub fn registered_types(&self) -> Vec<&str> {
+        self.factories.keys().map(|k| k.as_str()).collect()
+    }
+
+    /// Return `true` if `type_name` has been registered.
+    pub fn is_registered(&self, type_name: &str) -> bool {
+        self.factories.contains_key(type_name)
+    }
+
+    /// Number of registered factories.
+    pub fn type_count(&self) -> usize {
+        self.factories.len()
+    }
+}
+
+impl Default for LazyFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for LazyFactory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LazyFactory({} types)", self.type_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2186,6 +2437,132 @@ mod tests {
         assert_eq!(format!("{:?}", wol), "WriteOnceLazy(<empty>)");
         wol.set(7).unwrap();
         assert_eq!(format!("{:?}", wol), "WriteOnceLazy(7)");
+    }
+
+    // ── LazyMap tests ──
+
+    #[test]
+    fn lazy_map_initializes_on_first_access() {
+        let mut map = LazyMap::new();
+        let counter = Rc::new(Cell::new(0u32));
+        let c = counter.clone();
+        map.insert("key".to_string(), Box::new(move || {
+            c.set(c.get() + 1);
+            "value".to_string()
+        }));
+        assert!(!map.is_initialized("key"));
+        assert_eq!(map.get("key"), Some(&"value".to_string()));
+        assert!(map.is_initialized("key"));
+        // second access must not re-run the initializer
+        assert_eq!(map.get("key"), Some(&"value".to_string()));
+        assert_eq!(counter.get(), 1);
+    }
+
+    #[test]
+    fn lazy_map_missing_key_returns_none() {
+        let mut map = LazyMap::new();
+        assert_eq!(map.get("missing"), None);
+    }
+
+    #[test]
+    fn lazy_map_counts() {
+        let mut map = LazyMap::new();
+        map.insert("a".into(), Box::new(|| "1".into()));
+        map.insert("b".into(), Box::new(|| "2".into()));
+        assert_eq!(map.key_count(), 2);
+        assert_eq!(map.initialized_count(), 0);
+        map.get("a");
+        assert_eq!(map.initialized_count(), 1);
+        assert_eq!(format!("{map}"), "LazyMap(1/2 initialized)");
+    }
+
+    // ── LazyPipeline tests ──
+
+    #[test]
+    fn lazy_pipeline_no_steps() {
+        let chain = LazyPipeline::new(10);
+        assert_eq!(chain.evaluate(), 10);
+        assert_eq!(chain.step_count(), 0);
+    }
+
+    #[test]
+    fn lazy_pipeline_sequential_steps() {
+        let chain = LazyPipeline::new(2)
+            .then(Box::new(|x| x * 3))
+            .then(Box::new(|x| x + 10))
+            .then(Box::new(|x| x * 2));
+        assert_eq!(chain.step_count(), 3);
+        // (2 * 3 + 10) * 2 = 32
+        assert_eq!(chain.evaluate(), 32);
+    }
+
+    #[test]
+    fn lazy_pipeline_display() {
+        let chain = LazyPipeline::new(5).then(Box::new(|x| x + 1));
+        assert_eq!(format!("{chain}"), "LazyPipeline(initial=5, steps=1)");
+    }
+
+    // ── LazyProfile tests ──
+
+    #[test]
+    fn lazy_profile_records_and_queries() {
+        let mut profile = LazyProfile::new();
+        profile.record_init("alpha", 100);
+        profile.record_init("beta", 300);
+        profile.record_init("gamma", 200);
+
+        assert_eq!(profile.get_duration("alpha"), Some(100));
+        assert_eq!(profile.get_duration("missing"), None);
+        assert_eq!(profile.total_duration(), 600);
+        assert_eq!(profile.slowest(), Some(("beta", 300)));
+        assert_eq!(profile.fastest(), Some(("alpha", 100)));
+        assert!((profile.average_duration() - 200.0).abs() < f64::EPSILON);
+        assert_eq!(profile.init_count(), 3);
+    }
+
+    #[test]
+    fn lazy_profile_empty() {
+        let profile = LazyProfile::new();
+        assert_eq!(profile.total_duration(), 0);
+        assert_eq!(profile.slowest(), None);
+        assert_eq!(profile.fastest(), None);
+        assert!((profile.average_duration() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn lazy_profile_display() {
+        let mut p = LazyProfile::new();
+        p.record_init("x", 42);
+        assert_eq!(format!("{p}"), "LazyProfile(1 inits, total=42µs)");
+    }
+
+    // ── LazyFactory tests ──
+
+    #[test]
+    fn lazy_factory_create() {
+        let mut factory = LazyFactory::new();
+        factory.register("greeting", Box::new(|| "hello".to_string()));
+        assert!(factory.is_registered("greeting"));
+        assert!(!factory.is_registered("other"));
+        assert_eq!(factory.create("greeting"), Some("hello".to_string()));
+        assert_eq!(factory.create("missing"), None);
+    }
+
+    #[test]
+    fn lazy_factory_registered_types() {
+        let mut factory = LazyFactory::new();
+        factory.register("a", Box::new(|| "1".into()));
+        factory.register("b", Box::new(|| "2".into()));
+        assert_eq!(factory.type_count(), 2);
+        let mut types = factory.registered_types();
+        types.sort();
+        assert_eq!(types, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn lazy_factory_display() {
+        let factory = LazyFactory::new();
+        assert_eq!(format!("{factory}"), "LazyFactory(0 types)");
     }
 
     #[test]

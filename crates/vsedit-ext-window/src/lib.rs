@@ -1350,6 +1350,132 @@ impl WorkspaceSnapshot {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// WindowInputBoxWithValidation
+// ---------------------------------------------------------------------------
+
+pub struct WindowInputBoxWithValidation {
+    options: InputBoxOptions,
+    validator: Option<Box<dyn Fn(&str) -> Result<(), String>>>,
+}
+
+impl WindowInputBoxWithValidation {
+    pub fn new(options: InputBoxOptions) -> Self {
+        Self { options, validator: None }
+    }
+
+    pub fn with_validator<F: Fn(&str) -> Result<(), String> + 'static>(mut self, f: F) -> Self {
+        self.validator = Some(Box::new(f));
+        self
+    }
+
+    pub fn validate(&self, input: &str) -> Result<(), String> {
+        if let Some(ref v) = self.validator { v(input) } else { Ok(()) }
+    }
+
+    pub fn prompt(&self) -> Option<&str> { self.options.prompt.as_deref() }
+    pub fn is_password(&self) -> bool { self.options.password }
+}
+
+// ---------------------------------------------------------------------------
+// WindowStatusBarManager
+// ---------------------------------------------------------------------------
+
+pub struct WindowStatusBarManager {
+    items: Vec<(String, String, StatusBarAlignment)>,
+}
+
+impl WindowStatusBarManager {
+    pub fn new() -> Self { Self { items: Vec::new() } }
+
+    pub fn add_item(&mut self, id: impl Into<String>, text: impl Into<String>, alignment: StatusBarAlignment) {
+        self.items.push((id.into(), text.into(), alignment));
+    }
+
+    pub fn remove_item(&mut self, id: &str) -> bool {
+        if let Some(i) = self.items.iter().position(|(iid, _, _)| iid == id) {
+            self.items.remove(i);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn update_text(&mut self, id: &str, text: impl Into<String>) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|(iid, _, _)| iid == id) {
+            item.1 = text.into();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_text(&self, id: &str) -> Option<&str> {
+        self.items.iter().find(|(iid, _, _)| iid == id).map(|(_, t, _)| t.as_str())
+    }
+
+    pub fn len(&self) -> usize { self.items.len() }
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn left_items(&self) -> Vec<(&str, &str)> {
+        self.items.iter()
+            .filter(|(_, _, a)| matches!(a, StatusBarAlignment::Left))
+            .map(|(id, t, _)| (id.as_str(), t.as_str()))
+            .collect()
+    }
+}
+
+impl Default for WindowStatusBarManager { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// WindowOutputChannelFactory
+// ---------------------------------------------------------------------------
+
+pub struct WindowOutputChannelFactory {
+    channels: Vec<String>,
+}
+
+impl WindowOutputChannelFactory {
+    pub fn new() -> Self { Self { channels: Vec::new() } }
+
+    pub fn create(&mut self, name: impl Into<String>) -> String {
+        let name = name.into();
+        self.channels.push(name.clone());
+        name
+    }
+
+    pub fn has_channel(&self, name: &str) -> bool { self.channels.iter().any(|c| c == name) }
+    pub fn channel_count(&self) -> usize { self.channels.len() }
+    pub fn remove(&mut self, name: &str) -> bool {
+        if let Some(i) = self.channels.iter().position(|c| c == name) { self.channels.remove(i); true } else { false }
+    }
+}
+
+impl Default for WindowOutputChannelFactory { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// WindowActiveTheme
+// ---------------------------------------------------------------------------
+
+pub struct WindowActiveTheme {
+    pub name: String,
+    pub kind: String,
+}
+
+impl WindowActiveTheme {
+    pub fn dark(name: impl Into<String>) -> Self { Self { name: name.into(), kind: "dark".into() } }
+    pub fn light(name: impl Into<String>) -> Self { Self { name: name.into(), kind: "light".into() } }
+    pub fn is_dark(&self) -> bool { self.kind == "dark" }
+    pub fn is_light(&self) -> bool { self.kind == "light" }
+}
+
+impl std::fmt::Display for WindowActiveTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.name, self.kind)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2079,4 +2205,99 @@ mod tests {
         assert!((a.weight - 0.75).abs() < 1e-9);
         assert!((b.weight - 0.25).abs() < 1e-9);
     }
+
+
+    #[test]
+    fn input_box_validation_pass() {
+        let opts = InputBoxOptionsBuilder::new().build();
+        let ib = WindowInputBoxWithValidation::new(opts)
+            .with_validator(|s| if s.is_empty() { Err("empty".into()) } else { Ok(()) });
+        assert!(ib.validate("hello").is_ok());
+        assert!(ib.validate("").is_err());
+    }
+
+    #[test]
+    fn input_box_no_validator() {
+        let opts = InputBoxOptionsBuilder::new().build();
+        let ib = WindowInputBoxWithValidation::new(opts);
+        assert!(ib.validate("anything").is_ok());
+    }
+
+    #[test]
+    fn statusbar_manager_basic() {
+        let mut mgr = WindowStatusBarManager::new();
+        mgr.add_item("git", "main", StatusBarAlignment::Left);
+        mgr.add_item("line", "Ln 1", StatusBarAlignment::Right);
+        assert_eq!(mgr.len(), 2);
+        assert_eq!(mgr.get_text("git"), Some("main"));
+    }
+
+    #[test]
+    fn statusbar_manager_update() {
+        let mut mgr = WindowStatusBarManager::new();
+        mgr.add_item("git", "main", StatusBarAlignment::Left);
+        assert!(mgr.update_text("git", "develop"));
+        assert_eq!(mgr.get_text("git"), Some("develop"));
+    }
+
+    #[test]
+    fn statusbar_manager_remove() {
+        let mut mgr = WindowStatusBarManager::new();
+        mgr.add_item("git", "main", StatusBarAlignment::Left);
+        assert!(mgr.remove_item("git"));
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn statusbar_manager_left_items() {
+        let mut mgr = WindowStatusBarManager::new();
+        mgr.add_item("a", "A", StatusBarAlignment::Left);
+        mgr.add_item("b", "B", StatusBarAlignment::Right);
+        assert_eq!(mgr.left_items().len(), 1);
+    }
+
+    #[test]
+    fn output_channel_factory() {
+        let mut f = WindowOutputChannelFactory::new();
+        f.create("Output");
+        assert!(f.has_channel("Output"));
+        assert_eq!(f.channel_count(), 1);
+        assert!(f.remove("Output"));
+        assert!(!f.has_channel("Output"));
+    }
+
+    #[test]
+    fn active_theme_dark() {
+        let t = WindowActiveTheme::dark("One Dark Pro");
+        assert!(t.is_dark());
+        assert!(!t.is_light());
+    }
+
+    #[test]
+    fn active_theme_light() {
+        let t = WindowActiveTheme::light("Solarized");
+        assert!(t.is_light());
+    }
+
+    #[test]
+    fn active_theme_display() {
+        let t = WindowActiveTheme::dark("Monokai");
+        assert!(format!("{t}").contains("Monokai"));
+    }
+
+    #[test]
+    fn input_box_password() {
+        let opts = InputBoxOptionsBuilder::new().password(true).build();
+        let ib = WindowInputBoxWithValidation::new(opts);
+        assert!(ib.is_password());
+    }
+
+    #[test]
+    fn output_factory_no_dup() {
+        let mut f = WindowOutputChannelFactory::new();
+        f.create("ch1");
+        f.create("ch1");
+        assert_eq!(f.channel_count(), 2);
+    }
+
 }

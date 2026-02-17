@@ -1210,6 +1210,309 @@ impl HoverConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HoverContentRenderer – renders hover content to string representations
+// ---------------------------------------------------------------------------
+
+/// Renders `Hover` content blocks into displayable strings.
+pub struct HoverContentRenderer;
+
+impl HoverContentRenderer {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Render the first content block of a hover to a string.
+    pub fn render_to_string(hover: &Hover) -> String {
+        match hover.contents.first() {
+            Some(HoverContent::Markdown(md)) => md.clone(),
+            Some(HoverContent::Text(t)) => format!("[text] {t}"),
+            Some(HoverContent::Code { value, language }) => {
+                let lang = language.as_deref().unwrap_or("");
+                format!("```{lang}\n{value}\n```")
+            }
+            None => String::new(),
+        }
+    }
+
+    /// Render the first content block, truncating to `max_len` characters.
+    pub fn render_truncated(hover: &Hover, max_len: usize) -> String {
+        let full = Self::render_to_string(hover);
+        if full.len() <= max_len {
+            full
+        } else {
+            let mut s = full[..max_len].to_string();
+            s.push_str("...");
+            s
+        }
+    }
+
+    /// Count the words in the first content block.
+    pub fn word_count(hover: &Hover) -> usize {
+        let text = match hover.contents.first() {
+            Some(HoverContent::Markdown(md)) => md.as_str(),
+            Some(HoverContent::Text(t)) => t.as_str(),
+            Some(HoverContent::Code { value, .. }) => value.as_str(),
+            None => return 0,
+        };
+        text.split_whitespace().count()
+    }
+
+    /// Return a static label describing the content type.
+    pub fn content_type_label(hover: &Hover) -> &'static str {
+        match hover.contents.first() {
+            Some(HoverContent::Markdown(_)) => "markdown",
+            Some(HoverContent::Text(_)) => "plaintext",
+            Some(HoverContent::Code { .. }) => "code",
+            None => "empty",
+        }
+    }
+}
+
+impl Default for HoverContentRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VerbosityMode / HoverVerbosity – compact vs expanded display
+// ---------------------------------------------------------------------------
+
+/// Whether hover content is displayed in compact or expanded form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerbosityMode {
+    Compact,
+    Expanded,
+}
+
+impl std::fmt::Display for VerbosityMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VerbosityMode::Compact => write!(f, "compact"),
+            VerbosityMode::Expanded => write!(f, "expanded"),
+        }
+    }
+}
+
+/// Controls how many lines of hover content are shown.
+#[derive(Debug, Clone)]
+pub struct HoverVerbosity {
+    pub mode: VerbosityMode,
+    pub compact_max_lines: usize,
+    pub expanded_max_lines: usize,
+}
+
+impl HoverVerbosity {
+    pub fn new() -> Self {
+        Self {
+            mode: VerbosityMode::Compact,
+            compact_max_lines: 5,
+            expanded_max_lines: 50,
+        }
+    }
+
+    /// Toggle between compact and expanded mode.
+    pub fn toggle(&mut self) {
+        self.mode = match self.mode {
+            VerbosityMode::Compact => VerbosityMode::Expanded,
+            VerbosityMode::Expanded => VerbosityMode::Compact,
+        };
+    }
+
+    /// Maximum number of lines for the current mode.
+    pub fn current_max_lines(&self) -> usize {
+        match self.mode {
+            VerbosityMode::Compact => self.compact_max_lines,
+            VerbosityMode::Expanded => self.expanded_max_lines,
+        }
+    }
+
+    /// Truncate content to the current mode's line limit.
+    pub fn truncate_content(&self, content: &str) -> String {
+        let max = self.current_max_lines();
+        let lines: Vec<&str> = content.lines().collect();
+        if lines.len() <= max {
+            content.to_string()
+        } else {
+            let mut out: String = lines[..max].join("\n");
+            out.push_str("\n...");
+            out
+        }
+    }
+
+    pub fn is_compact(&self) -> bool {
+        self.mode == VerbosityMode::Compact
+    }
+}
+
+impl Default for HoverVerbosity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverCodeBlock – a parsed code block with metadata
+// ---------------------------------------------------------------------------
+
+/// A single code block extracted from hover content.
+#[derive(Debug, Clone)]
+pub struct HoverCodeBlock {
+    pub language: String,
+    pub code: String,
+    pub line_count: usize,
+}
+
+impl HoverCodeBlock {
+    pub fn new(language: &str, code: &str) -> Self {
+        let line_count = code.lines().count().max(1);
+        Self {
+            language: language.to_string(),
+            code: code.to_string(),
+            line_count,
+        }
+    }
+
+    /// Return the individual lines of the code block.
+    pub fn lines(&self) -> Vec<&str> {
+        self.code.lines().collect()
+    }
+
+    pub fn is_single_line(&self) -> bool {
+        self.line_count == 1
+    }
+
+    /// Render the code with 1-based line numbers prepended.
+    pub fn render_with_line_numbers(&self) -> String {
+        let width = self.line_count.to_string().len();
+        self.code
+            .lines()
+            .enumerate()
+            .map(|(i, line)| format!("{:>width$} | {line}", i + 1, width = width))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub fn language_label(&self) -> &str {
+        &self.language
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverLinkHandler – extract and categorise links from hover content
+// ---------------------------------------------------------------------------
+
+/// The kind of link found in hover content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HoverLinkType {
+    Url,
+    FileReference,
+    Definition,
+}
+
+impl std::fmt::Display for HoverLinkType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HoverLinkType::Url => write!(f, "url"),
+            HoverLinkType::FileReference => write!(f, "file"),
+            HoverLinkType::Definition => write!(f, "definition"),
+        }
+    }
+}
+
+/// A single link found inside hover content.
+#[derive(Debug, Clone)]
+pub struct HoverLink {
+    pub url: String,
+    pub label: Option<String>,
+    pub link_type: HoverLinkType,
+}
+
+/// Extracts and stores links found in hover content.
+#[derive(Debug, Clone)]
+pub struct HoverLinkHandler {
+    pub links: Vec<HoverLink>,
+}
+
+impl HoverLinkHandler {
+    pub fn new() -> Self {
+        Self { links: Vec::new() }
+    }
+
+    /// Scan `content` for markdown links `[label](url)` and bare `https://` URLs.
+    pub fn extract_links(content: &str) -> Vec<HoverLink> {
+        let mut links = Vec::new();
+
+        // Markdown-style links: [label](url)
+        let mut rest = content;
+        while let Some(open) = rest.find('[') {
+            let after_open = &rest[open + 1..];
+            if let Some(close) = after_open.find("](") {
+                let label = &after_open[..close];
+                let after_paren = &after_open[close + 2..];
+                if let Some(end) = after_paren.find(')') {
+                    let url = &after_paren[..end];
+                    let link_type = Self::classify_url(url);
+                    links.push(HoverLink {
+                        url: url.to_string(),
+                        label: Some(label.to_string()),
+                        link_type,
+                    });
+                    rest = &after_paren[end + 1..];
+                    continue;
+                }
+            }
+            rest = &rest[open + 1..];
+        }
+
+        // Bare https:// URLs (only those not already captured)
+        for word in content.split_whitespace() {
+            if word.starts_with("https://") || word.starts_with("http://") {
+                let url = word.trim_end_matches(|c: char| c == ')' || c == ',' || c == '.');
+                let already = links.iter().any(|l| l.url == url);
+                if !already {
+                    links.push(HoverLink {
+                        url: url.to_string(),
+                        label: None,
+                        link_type: HoverLinkType::Url,
+                    });
+                }
+            }
+        }
+
+        links
+    }
+
+    pub fn link_count(&self) -> usize {
+        self.links.len()
+    }
+
+    /// Return only file-reference links.
+    pub fn file_links(&self) -> Vec<&HoverLink> {
+        self.links
+            .iter()
+            .filter(|l| l.link_type == HoverLinkType::FileReference)
+            .collect()
+    }
+
+    fn classify_url(url: &str) -> HoverLinkType {
+        if url.starts_with("file://") || url.ends_with(".rs") || url.contains('/') && !url.starts_with("http") {
+            HoverLinkType::FileReference
+        } else if url.starts_with('#') {
+            HoverLinkType::Definition
+        } else {
+            HoverLinkType::Url
+        }
+    }
+}
+
+impl Default for HoverLinkHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2017,5 +2320,150 @@ mod tests {
         let cfg = HoverConfig::non_sticky();
         assert!(!cfg.sticky);
         assert!(cfg.enabled);
+    }
+
+    // -- HoverContentRenderer tests --
+
+    #[test]
+    fn renderer_markdown_passthrough() {
+        let h = Hover::markdown("**hello** world");
+        assert_eq!(HoverContentRenderer::render_to_string(&h), "**hello** world");
+        assert_eq!(HoverContentRenderer::content_type_label(&h), "markdown");
+    }
+
+    #[test]
+    fn renderer_plain_text_wrapping() {
+        let h = Hover::text("plain info");
+        assert_eq!(HoverContentRenderer::render_to_string(&h), "[text] plain info");
+        assert_eq!(HoverContentRenderer::content_type_label(&h), "plaintext");
+    }
+
+    #[test]
+    fn renderer_code_block() {
+        let h = Hover::code("fn main() {}", Some("rust"));
+        let rendered = HoverContentRenderer::render_to_string(&h);
+        assert!(rendered.starts_with("```rust\n"));
+        assert!(rendered.ends_with("\n```"));
+        assert_eq!(HoverContentRenderer::content_type_label(&h), "code");
+    }
+
+    #[test]
+    fn renderer_truncation() {
+        let h = Hover::markdown("abcdefghij");
+        let truncated = HoverContentRenderer::render_truncated(&h, 5);
+        assert_eq!(truncated, "abcde...");
+        let not_truncated = HoverContentRenderer::render_truncated(&h, 100);
+        assert_eq!(not_truncated, "abcdefghij");
+    }
+
+    #[test]
+    fn renderer_word_count() {
+        let h = Hover::markdown("one two three four");
+        assert_eq!(HoverContentRenderer::word_count(&h), 4);
+    }
+
+    // -- HoverVerbosity tests --
+
+    #[test]
+    fn verbosity_defaults_compact() {
+        let v = HoverVerbosity::new();
+        assert!(v.is_compact());
+        assert_eq!(v.current_max_lines(), 5);
+    }
+
+    #[test]
+    fn verbosity_toggle() {
+        let mut v = HoverVerbosity::new();
+        v.toggle();
+        assert!(!v.is_compact());
+        assert_eq!(v.current_max_lines(), 50);
+        assert_eq!(format!("{}", v.mode), "expanded");
+        v.toggle();
+        assert!(v.is_compact());
+        assert_eq!(format!("{}", v.mode), "compact");
+    }
+
+    #[test]
+    fn verbosity_truncate_content() {
+        let v = HoverVerbosity {
+            mode: VerbosityMode::Compact,
+            compact_max_lines: 2,
+            expanded_max_lines: 10,
+        };
+        let content = "line1\nline2\nline3\nline4";
+        let truncated = v.truncate_content(content);
+        assert_eq!(truncated, "line1\nline2\n...");
+    }
+
+    // -- HoverCodeBlock tests --
+
+    #[test]
+    fn code_block_basics() {
+        let cb = HoverCodeBlock::new("rust", "let x = 1;\nlet y = 2;");
+        assert_eq!(cb.line_count, 2);
+        assert!(!cb.is_single_line());
+        assert_eq!(cb.language_label(), "rust");
+        assert_eq!(cb.lines(), vec!["let x = 1;", "let y = 2;"]);
+    }
+
+    #[test]
+    fn code_block_line_numbers() {
+        let cb = HoverCodeBlock::new("py", "a = 1\nb = 2\nc = 3");
+        let numbered = cb.render_with_line_numbers();
+        assert!(numbered.contains("1 | a = 1"));
+        assert!(numbered.contains("3 | c = 3"));
+    }
+
+    #[test]
+    fn code_block_single_line() {
+        let cb = HoverCodeBlock::new("sh", "echo hi");
+        assert!(cb.is_single_line());
+    }
+
+    // -- HoverLinkHandler tests --
+
+    #[test]
+    fn link_handler_extract_markdown_links() {
+        let content = "See [docs](https://example.com) and [src](src/lib.rs).";
+        let links = HoverLinkHandler::extract_links(content);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].url, "https://example.com");
+        assert_eq!(links[0].label.as_deref(), Some("docs"));
+        assert_eq!(links[0].link_type, HoverLinkType::Url);
+        assert_eq!(links[1].url, "src/lib.rs");
+        assert_eq!(links[1].link_type, HoverLinkType::FileReference);
+    }
+
+    #[test]
+    fn link_handler_bare_urls() {
+        let content = "Visit https://rust-lang.org for more.";
+        let links = HoverLinkHandler::extract_links(content);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].url, "https://rust-lang.org");
+        assert!(links[0].label.is_none());
+    }
+
+    #[test]
+    fn link_handler_file_links_filter() {
+        let mut handler = HoverLinkHandler::new();
+        handler.links.push(HoverLink {
+            url: "https://example.com".into(),
+            label: None,
+            link_type: HoverLinkType::Url,
+        });
+        handler.links.push(HoverLink {
+            url: "file://path/to/file.rs".into(),
+            label: None,
+            link_type: HoverLinkType::FileReference,
+        });
+        assert_eq!(handler.link_count(), 2);
+        assert_eq!(handler.file_links().len(), 1);
+    }
+
+    #[test]
+    fn link_type_display() {
+        assert_eq!(format!("{}", HoverLinkType::Url), "url");
+        assert_eq!(format!("{}", HoverLinkType::FileReference), "file");
+        assert_eq!(format!("{}", HoverLinkType::Definition), "definition");
     }
 }

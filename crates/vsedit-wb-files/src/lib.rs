@@ -1229,6 +1229,163 @@ pub fn file_has_extension(path: &str, extensions: &[&str]) -> bool {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// FileSystemTreeDiff
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FileTreeChange {
+    Added(String),
+    Removed(String),
+    Renamed { old_path: String, new_path: String },
+    Modified(String),
+}
+
+impl fmt::Display for FileTreeChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileTreeChange::Added(p) => write!(f, "+ {p}"),
+            FileTreeChange::Removed(p) => write!(f, "- {p}"),
+            FileTreeChange::Renamed { old_path, new_path } => write!(f, "{old_path} -> {new_path}"),
+            FileTreeChange::Modified(p) => write!(f, "~ {p}"),
+        }
+    }
+}
+
+pub struct FileSystemTreeDiff;
+
+impl FileSystemTreeDiff {
+    pub fn diff(old: &[String], new: &[String]) -> Vec<FileTreeChange> {
+        let mut changes = Vec::new();
+        let old_set: std::collections::HashSet<&str> = old.iter().map(|s| s.as_str()).collect();
+        let new_set: std::collections::HashSet<&str> = new.iter().map(|s| s.as_str()).collect();
+        for path in old {
+            if !new_set.contains(path.as_str()) { changes.push(FileTreeChange::Removed(path.clone())); }
+        }
+        for path in new {
+            if !old_set.contains(path.as_str()) { changes.push(FileTreeChange::Added(path.clone())); }
+        }
+        changes
+    }
+
+    pub fn detect_renames(changes: &mut Vec<FileTreeChange>) {
+        let removed: Vec<String> = changes.iter().filter_map(|c| {
+            if let FileTreeChange::Removed(p) = c { Some(p.clone()) } else { None }
+        }).collect();
+        let added: Vec<String> = changes.iter().filter_map(|c| {
+            if let FileTreeChange::Added(p) = c { Some(p.clone()) } else { None }
+        }).collect();
+        let mut renames = Vec::new();
+        for r in &removed {
+            let r_name = FilePathUtils::file_name(r);
+            for a in &added {
+                if FilePathUtils::file_name(a) == r_name && r_name.is_some() {
+                    renames.push((r.clone(), a.clone()));
+                }
+            }
+        }
+        for (old, new) in &renames {
+            changes.retain(|c| !matches!(c, FileTreeChange::Removed(p) if p == old));
+            changes.retain(|c| !matches!(c, FileTreeChange::Added(p) if p == new));
+            changes.push(FileTreeChange::Renamed { old_path: old.clone(), new_path: new.clone() });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileIconResolver
+// ---------------------------------------------------------------------------
+
+pub struct FileIconResolver {
+    icon_map: std::collections::HashMap<String, String>,
+}
+
+impl FileIconResolver {
+    pub fn new() -> Self {
+        let mut icon_map = std::collections::HashMap::new();
+        for (ext, icon) in [("rs","rust"),("py","python"),("js","javascript"),("ts","typescript"),
+            ("html","html"),("css","css"),("json","json"),("toml","toml"),("yaml","yaml"),
+            ("yml","yaml"),("md","markdown"),("txt","text"),("sh","shell"),("go","go"),
+            ("c","c"),("cpp","cpp"),("java","java"),("rb","ruby")] {
+            icon_map.insert(ext.to_string(), icon.to_string());
+        }
+        Self { icon_map }
+    }
+
+    pub fn resolve(&self, path: &str) -> &str {
+        FilePathUtils::extension(path)
+            .and_then(|ext| self.icon_map.get(ext))
+            .map(|s| s.as_str())
+            .unwrap_or("file")
+    }
+
+    pub fn register(&mut self, ext: impl Into<String>, icon: impl Into<String>) {
+        self.icon_map.insert(ext.into(), icon.into());
+    }
+
+    pub fn len(&self) -> usize { self.icon_map.len() }
+    pub fn is_empty(&self) -> bool { self.icon_map.is_empty() }
+}
+
+impl Default for FileIconResolver { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// FileExcludePattern
+// ---------------------------------------------------------------------------
+
+pub struct FileExcludePattern {
+    patterns: Vec<String>,
+}
+
+impl FileExcludePattern {
+    pub fn new() -> Self { Self { patterns: Vec::new() } }
+
+    pub fn add_pattern(&mut self, pattern: impl Into<String>) { self.patterns.push(pattern.into()); }
+
+    pub fn is_excluded(&self, path: &str) -> bool {
+        self.patterns.iter().any(|p| {
+            if p.starts_with("*.") { path.ends_with(&p[1..]) } else { path.contains(p) }
+        })
+    }
+
+    pub fn len(&self) -> usize { self.patterns.len() }
+    pub fn is_empty(&self) -> bool { self.patterns.is_empty() }
+    pub fn clear(&mut self) { self.patterns.clear(); }
+
+    pub fn remove_pattern(&mut self, pattern: &str) -> bool {
+        if let Some(i) = self.patterns.iter().position(|p| p == pattern) { self.patterns.remove(i); true } else { false }
+    }
+}
+
+impl Default for FileExcludePattern { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// FileReadonlyIndicator
+// ---------------------------------------------------------------------------
+
+pub struct FileReadonlyIndicator {
+    readonly_paths: Vec<String>,
+}
+
+impl FileReadonlyIndicator {
+    pub fn new() -> Self { Self { readonly_paths: Vec::new() } }
+
+    pub fn mark_readonly(&mut self, path: impl Into<String>) {
+        let p = path.into();
+        if !self.readonly_paths.contains(&p) { self.readonly_paths.push(p); }
+    }
+
+    pub fn unmark_readonly(&mut self, path: &str) -> bool {
+        if let Some(i) = self.readonly_paths.iter().position(|p| p == path) { self.readonly_paths.remove(i); true } else { false }
+    }
+
+    pub fn is_readonly(&self, path: &str) -> bool { self.readonly_paths.iter().any(|p| p == path) }
+    pub fn readonly_count(&self) -> usize { self.readonly_paths.len() }
+}
+
+impl Default for FileReadonlyIndicator { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2063,4 +2220,98 @@ mod tests {
         assert!(!FilePathUtils::is_hidden("visible.txt"));
         assert!(!FilePathUtils::is_hidden("/path/to/normal"));
     }
+
+
+    #[test]
+    fn tree_diff_basic() {
+        let old = vec!["a.rs".into(), "b.rs".into()];
+        let new = vec!["b.rs".into(), "c.rs".into()];
+        let changes = FileSystemTreeDiff::diff(&old, &new);
+        assert!(changes.iter().any(|c| matches!(c, FileTreeChange::Removed(p) if p == "a.rs")));
+        assert!(changes.iter().any(|c| matches!(c, FileTreeChange::Added(p) if p == "c.rs")));
+    }
+
+    #[test]
+    fn tree_diff_renames() {
+        let old = vec!["/old/file.rs".into()];
+        let new = vec!["/new/file.rs".into()];
+        let mut changes = FileSystemTreeDiff::diff(&old, &new);
+        FileSystemTreeDiff::detect_renames(&mut changes);
+        assert!(changes.iter().any(|c| matches!(c, FileTreeChange::Renamed { .. })));
+    }
+
+    #[test]
+    fn tree_change_display() {
+        assert_eq!(format!("{}", FileTreeChange::Added("foo.rs".into())), "+ foo.rs");
+    }
+
+    #[test]
+    fn icon_resolver_defaults() {
+        let r = FileIconResolver::new();
+        assert_eq!(r.resolve("main.rs"), "rust");
+        assert_eq!(r.resolve("unknown"), "file");
+    }
+
+    #[test]
+    fn icon_resolver_custom() {
+        let mut r = FileIconResolver::new();
+        r.register("vue", "vue");
+        assert_eq!(r.resolve("app.vue"), "vue");
+    }
+
+    #[test]
+    fn exclude_pattern_basic() {
+        let mut e = FileExcludePattern::new();
+        e.add_pattern("*.tmp");
+        e.add_pattern("node_modules");
+        assert!(e.is_excluded("foo.tmp"));
+        assert!(!e.is_excluded("foo.rs"));
+    }
+
+    #[test]
+    fn exclude_pattern_remove() {
+        let mut e = FileExcludePattern::new();
+        e.add_pattern("*.log");
+        assert!(e.remove_pattern("*.log"));
+        assert!(e.is_empty());
+    }
+
+    #[test]
+    fn readonly_basic() {
+        let mut ri = FileReadonlyIndicator::new();
+        ri.mark_readonly("/etc/config");
+        assert!(ri.is_readonly("/etc/config"));
+        assert!(!ri.is_readonly("/tmp/data"));
+    }
+
+    #[test]
+    fn readonly_unmark() {
+        let mut ri = FileReadonlyIndicator::new();
+        ri.mark_readonly("a.txt");
+        assert!(ri.unmark_readonly("a.txt"));
+        assert!(!ri.is_readonly("a.txt"));
+    }
+
+    #[test]
+    fn readonly_no_duplicate() {
+        let mut ri = FileReadonlyIndicator::new();
+        ri.mark_readonly("a.txt");
+        ri.mark_readonly("a.txt");
+        assert_eq!(ri.readonly_count(), 1);
+    }
+
+    #[test]
+    fn icon_resolver_len() {
+        let r = FileIconResolver::new();
+        assert!(r.len() > 10);
+    }
+
+    #[test]
+    fn exclude_pattern_clear() {
+        let mut e = FileExcludePattern::new();
+        e.add_pattern("*.tmp");
+        e.clear();
+        assert!(e.is_empty());
+    }
+
 }

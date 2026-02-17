@@ -1091,6 +1091,314 @@ pub struct EntryComparison {
     pub content_diff: Option<DiffSummary>,
 }
 
+// ---------------------------------------------------------------------------
+// Diff – line-level comparison of two content strings
+// ---------------------------------------------------------------------------
+
+/// Line-level diff between two content strings.
+#[derive(Debug, Clone)]
+pub struct LocalHistoryDiff {
+    old_lines: Vec<String>,
+    new_lines: Vec<String>,
+}
+
+impl LocalHistoryDiff {
+    pub fn new(old: &str, new: &str) -> Self {
+        Self {
+            old_lines: old.lines().map(String::from).collect(),
+            new_lines: new.lines().map(String::from).collect(),
+        }
+    }
+
+    pub fn has_changes(&self) -> bool {
+        self.old_lines != self.new_lines
+    }
+
+    /// Number of lines present in `new` but not at the corresponding position
+    /// in `old` (pure additions beyond old length + changed lines).
+    pub fn added_lines(&self) -> usize {
+        let max = self.old_lines.len().max(self.new_lines.len());
+        let mut count = 0usize;
+        for i in 0..max {
+            let old = self.old_lines.get(i);
+            let new = self.new_lines.get(i);
+            match (old, new) {
+                (None, Some(_)) => count += 1,
+                (Some(o), Some(n)) if o != n => count += 1,
+                _ => {}
+            }
+        }
+        count
+    }
+
+    /// Number of lines present in `old` but missing or changed in `new`.
+    pub fn removed_lines(&self) -> usize {
+        let max = self.old_lines.len().max(self.new_lines.len());
+        let mut count = 0usize;
+        for i in 0..max {
+            let old = self.old_lines.get(i);
+            let new = self.new_lines.get(i);
+            match (old, new) {
+                (Some(_), None) => count += 1,
+                (Some(o), Some(n)) if o != n => count += 1,
+                _ => {}
+            }
+        }
+        count
+    }
+
+    /// Returns 1-based line numbers where the two texts differ.
+    pub fn changed_line_numbers(&self) -> Vec<usize> {
+        let max = self.old_lines.len().max(self.new_lines.len());
+        let mut nums = Vec::new();
+        for i in 0..max {
+            let old = self.old_lines.get(i);
+            let new = self.new_lines.get(i);
+            if old != new {
+                nums.push(i + 1);
+            }
+        }
+        nums
+    }
+
+    pub fn summary(&self) -> String {
+        let added = self.added_lines();
+        let removed = self.removed_lines();
+        if !self.has_changes() {
+            return "No changes".to_string();
+        }
+        format!(
+            "{} line(s) added, {} line(s) removed",
+            added, removed
+        )
+    }
+
+    /// Simple unified-diff-style output with `+`/`-` prefixes.
+    pub fn as_unified_diff(&self) -> String {
+        let max = self.old_lines.len().max(self.new_lines.len());
+        let mut out = String::new();
+        for i in 0..max {
+            let old = self.old_lines.get(i);
+            let new = self.new_lines.get(i);
+            match (old, new) {
+                (Some(o), Some(n)) if o == n => {
+                    out.push(' ');
+                    out.push_str(o);
+                    out.push('\n');
+                }
+                (Some(o), Some(n)) => {
+                    out.push('-');
+                    out.push_str(o);
+                    out.push('\n');
+                    out.push('+');
+                    out.push_str(n);
+                    out.push('\n');
+                }
+                (Some(o), None) => {
+                    out.push('-');
+                    out.push_str(o);
+                    out.push('\n');
+                }
+                (None, Some(n)) => {
+                    out.push('+');
+                    out.push_str(n);
+                    out.push('\n');
+                }
+                (None, None) => {}
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Prune – strategies for trimming history entries
+// ---------------------------------------------------------------------------
+
+/// Pruning strategies for history entries.
+pub struct LocalHistoryPrune;
+
+impl LocalHistoryPrune {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Returns indices of entries to *remove* so that at most `max_count`
+    /// remain.  Keeps the entries with the highest timestamps (newest).
+    pub fn prune_by_count(entries: &[HistoryEntry], max_count: usize) -> Vec<usize> {
+        if entries.len() <= max_count {
+            return Vec::new();
+        }
+        let mut indexed: Vec<(usize, u64)> =
+            entries.iter().enumerate().map(|(i, e)| (i, e.timestamp)).collect();
+        // Sort newest-first by timestamp.
+        indexed.sort_by(|a, b| b.1.cmp(&a.1));
+        // Indices beyond max_count are to be removed.
+        let mut remove: Vec<usize> = indexed[max_count..].iter().map(|(i, _)| *i).collect();
+        remove.sort();
+        remove
+    }
+
+    /// Returns indices of entries older than `max_age_secs` relative to `now`.
+    pub fn prune_by_age(entries: &[HistoryEntry], max_age_secs: u64, now: u64) -> Vec<usize> {
+        let cutoff = now.saturating_sub(max_age_secs);
+        entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.timestamp < cutoff)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Returns indices to remove (oldest first) until total size is within
+    /// `max_total_bytes`.
+    pub fn prune_by_size(entries: &[HistoryEntry], max_total_bytes: u64) -> Vec<usize> {
+        let total: u64 = entries.iter().map(|e| e.size_bytes).sum();
+        if total <= max_total_bytes {
+            return Vec::new();
+        }
+
+        // Sort by timestamp ascending (oldest first) to remove oldest.
+        let mut indexed: Vec<(usize, u64, u64)> = entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (i, e.timestamp, e.size_bytes))
+            .collect();
+        indexed.sort_by_key(|&(_, ts, _)| ts);
+
+        let mut excess = total - max_total_bytes;
+        let mut remove = Vec::new();
+        for (i, _, sz) in &indexed {
+            if excess == 0 {
+                break;
+            }
+            remove.push(*i);
+            excess = excess.saturating_sub(*sz);
+        }
+        remove.sort();
+        remove
+    }
+
+    /// Returns indices of entries to *keep* – the intersection of count and
+    /// age constraints.
+    pub fn entries_to_keep(
+        entries: &[HistoryEntry],
+        max_count: usize,
+        max_age_secs: u64,
+        now: u64,
+    ) -> Vec<usize> {
+        let remove_count: std::collections::HashSet<usize> =
+            Self::prune_by_count(entries, max_count).into_iter().collect();
+        let remove_age: std::collections::HashSet<usize> =
+            Self::prune_by_age(entries, max_age_secs, now).into_iter().collect();
+        (0..entries.len())
+            .filter(|i| !remove_count.contains(i) && !remove_age.contains(i))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Restore – helpers for locating entries to restore
+// ---------------------------------------------------------------------------
+
+/// Helpers for locating entries suitable for restore operations.
+pub struct LocalHistoryRestore;
+
+impl LocalHistoryRestore {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Find the entry whose timestamp is closest to `target_ts` without
+    /// exceeding it (at-or-before).
+    pub fn find_entry_at_timestamp(entries: &[HistoryEntry], target_ts: u64) -> Option<usize> {
+        entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.timestamp <= target_ts)
+            .max_by_key(|(_, e)| e.timestamp)
+            .map(|(i, _)| i)
+    }
+
+    /// Find the first entry whose `content_hash` matches `hash`.
+    pub fn find_entry_by_hash(entries: &[HistoryEntry], hash: &str) -> Option<usize> {
+        entries
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.content_hash == hash)
+            .map(|(i, _)| i)
+    }
+
+    /// Find the entry whose timestamp is absolutely closest to `target_ts`.
+    pub fn find_nearest(entries: &[HistoryEntry], target_ts: u64) -> Option<usize> {
+        entries
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, e)| {
+                if e.timestamp >= target_ts {
+                    e.timestamp - target_ts
+                } else {
+                    target_ts - e.timestamp
+                }
+            })
+            .map(|(i, _)| i)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Size tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks cumulative file sizes across the history store.
+pub struct HistorySizeTracker {
+    pub sizes: HashMap<String, u64>,
+}
+
+impl HistorySizeTracker {
+    pub fn new() -> Self {
+        Self {
+            sizes: HashMap::new(),
+        }
+    }
+
+    pub fn record(&mut self, uri: &str, size_bytes: u64) {
+        self.sizes.insert(uri.to_string(), size_bytes);
+    }
+
+    pub fn total_size(&self) -> u64 {
+        self.sizes.values().sum()
+    }
+
+    pub fn largest_file(&self) -> Option<(&str, u64)> {
+        self.sizes
+            .iter()
+            .max_by_key(|&(_, sz)| sz)
+            .map(|(k, &v)| (k.as_str(), v))
+    }
+
+    pub fn files_over_threshold(&self, threshold: u64) -> Vec<(&str, u64)> {
+        let mut result: Vec<(&str, u64)> = self
+            .sizes
+            .iter()
+            .filter(|&(_, &sz)| sz > threshold)
+            .map(|(k, &v)| (k.as_str(), v))
+            .collect();
+        result.sort_by(|a, b| b.1.cmp(&a.1));
+        result
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.sizes.len()
+    }
+
+    pub fn average_size(&self) -> u64 {
+        if self.sizes.is_empty() {
+            return 0;
+        }
+        self.total_size() / self.sizes.len() as u64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2024,5 +2332,151 @@ mod tests {
 
         // Missing entry returns None
         assert!(svc.compare_entries("file:///a.rs", 1, 99).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // LocalHistoryDiff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn diff_no_changes() {
+        let d = LocalHistoryDiff::new("hello\nworld", "hello\nworld");
+        assert!(!d.has_changes());
+        assert_eq!(d.added_lines(), 0);
+        assert_eq!(d.removed_lines(), 0);
+        assert!(d.changed_line_numbers().is_empty());
+        assert_eq!(d.summary(), "No changes");
+    }
+
+    #[test]
+    fn diff_with_additions_and_removals() {
+        let d = LocalHistoryDiff::new("aaa\nbbb\nccc", "aaa\nxxx\nccc\nddd");
+        assert!(d.has_changes());
+        assert_eq!(d.added_lines(), 2); // bbb→xxx, +ddd
+        assert_eq!(d.removed_lines(), 1); // bbb→xxx
+        assert_eq!(d.changed_line_numbers(), vec![2, 4]);
+    }
+
+    #[test]
+    fn diff_unified_output() {
+        let d = LocalHistoryDiff::new("a\nb", "a\nc");
+        let out = d.as_unified_diff();
+        assert!(out.contains("-b\n"));
+        assert!(out.contains("+c\n"));
+        assert!(out.contains(" a\n"));
+    }
+
+    // -----------------------------------------------------------------------
+    // LocalHistoryPrune tests
+    // -----------------------------------------------------------------------
+
+    fn make_entry(ts: u64, size: u64) -> HistoryEntry {
+        HistoryEntry {
+            uri: "file:///test".to_string(),
+            timestamp: ts,
+            content_hash: format!("h{}", ts),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: size,
+        }
+    }
+
+    #[test]
+    fn prune_by_count_keeps_newest() {
+        let entries = vec![make_entry(1, 10), make_entry(3, 10), make_entry(2, 10)];
+        let remove = LocalHistoryPrune::prune_by_count(&entries, 2);
+        assert_eq!(remove, vec![0]); // ts=1 is oldest
+    }
+
+    #[test]
+    fn prune_by_count_no_op_when_under() {
+        let entries = vec![make_entry(1, 10)];
+        assert!(LocalHistoryPrune::prune_by_count(&entries, 5).is_empty());
+    }
+
+    #[test]
+    fn prune_by_age_removes_old() {
+        let entries = vec![make_entry(10, 5), make_entry(50, 5), make_entry(90, 5)];
+        let remove = LocalHistoryPrune::prune_by_age(&entries, 50, 100);
+        // cutoff = 50, entries with ts < 50 are removed
+        assert_eq!(remove, vec![0]);
+    }
+
+    #[test]
+    fn prune_by_size_trims_oldest() {
+        let entries = vec![make_entry(1, 100), make_entry(2, 100), make_entry(3, 100)];
+        let remove = LocalHistoryPrune::prune_by_size(&entries, 200);
+        assert_eq!(remove, vec![0]); // oldest removed first
+    }
+
+    #[test]
+    fn entries_to_keep_intersection() {
+        let entries = vec![
+            make_entry(10, 5),
+            make_entry(50, 5),
+            make_entry(90, 5),
+            make_entry(95, 5),
+        ];
+        let keep = LocalHistoryPrune::entries_to_keep(&entries, 3, 50, 100);
+        // count keeps indices 1,2,3 (newest 3). age keeps 1,2,3 (ts>=50).
+        assert_eq!(keep, vec![1, 2, 3]);
+    }
+
+    // -----------------------------------------------------------------------
+    // LocalHistoryRestore tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn restore_find_at_timestamp() {
+        let entries = vec![make_entry(10, 0), make_entry(20, 0), make_entry(30, 0)];
+        assert_eq!(LocalHistoryRestore::find_entry_at_timestamp(&entries, 25), Some(1));
+        assert_eq!(LocalHistoryRestore::find_entry_at_timestamp(&entries, 30), Some(2));
+        assert_eq!(LocalHistoryRestore::find_entry_at_timestamp(&entries, 5), None);
+    }
+
+    #[test]
+    fn restore_find_by_hash() {
+        let entries = vec![make_entry(1, 0), make_entry(2, 0)];
+        assert_eq!(LocalHistoryRestore::find_entry_by_hash(&entries, "h2"), Some(1));
+        assert_eq!(LocalHistoryRestore::find_entry_by_hash(&entries, "missing"), None);
+    }
+
+    #[test]
+    fn restore_find_nearest() {
+        let entries = vec![make_entry(10, 0), make_entry(20, 0), make_entry(30, 0)];
+        assert_eq!(LocalHistoryRestore::find_nearest(&entries, 18), Some(1)); // 20 is closer
+        assert_eq!(LocalHistoryRestore::find_nearest(&entries, 26), Some(2)); // 30 is closer
+    }
+
+    // -----------------------------------------------------------------------
+    // HistorySizeTracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn size_tracker_basics() {
+        let mut t = HistorySizeTracker::new();
+        t.record("a.rs", 100);
+        t.record("b.rs", 300);
+        t.record("c.rs", 50);
+        assert_eq!(t.file_count(), 3);
+        assert_eq!(t.total_size(), 450);
+        assert_eq!(t.average_size(), 150);
+        let (name, sz) = t.largest_file().unwrap();
+        assert_eq!(name, "b.rs");
+        assert_eq!(sz, 300);
+    }
+
+    #[test]
+    fn size_tracker_files_over_threshold() {
+        let mut t = HistorySizeTracker::new();
+        t.record("small.rs", 10);
+        t.record("big.rs", 500);
+        t.record("med.rs", 200);
+        let over = t.files_over_threshold(100);
+        assert_eq!(over.len(), 2);
+        // Sorted descending by size.
+        assert_eq!(over[0].0, "big.rs");
+        assert_eq!(over[1].0, "med.rs");
     }
 }

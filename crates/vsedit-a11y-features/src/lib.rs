@@ -1204,6 +1204,266 @@ impl NavigationPath {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Screen-reader adapter
+// ---------------------------------------------------------------------------
+
+/// Identifies which screen-reader backend is in use.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScreenReaderBackend {
+    /// No screen reader detected.
+    None,
+    /// Orca (Linux/GNOME).
+    Orca,
+    /// NVDA (Windows).
+    Nvda,
+    /// VoiceOver (macOS / iOS).
+    VoiceOver,
+    /// A custom or third-party screen reader.
+    Custom(String),
+}
+
+impl fmt::Display for ScreenReaderBackend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => write!(f, "None"),
+            Self::Orca => write!(f, "Orca"),
+            Self::Nvda => write!(f, "NVDA"),
+            Self::VoiceOver => write!(f, "VoiceOver"),
+            Self::Custom(name) => write!(f, "{name}"),
+        }
+    }
+}
+
+/// Thin adapter that formats announcements for a specific screen-reader
+/// backend.
+#[derive(Debug, Clone)]
+pub struct ScreenReaderAdapter {
+    pub backend: ScreenReaderBackend,
+}
+
+impl ScreenReaderAdapter {
+    /// Create a new adapter targeting `backend`.
+    pub fn new(backend: ScreenReaderBackend) -> Self {
+        Self { backend }
+    }
+
+    /// Format `msg` as an announcement string suitable for the current backend.
+    pub fn announce(&self, msg: &str) -> String {
+        match &self.backend {
+            ScreenReaderBackend::None => String::new(),
+            ScreenReaderBackend::Orca => format!("[Orca] {msg}"),
+            ScreenReaderBackend::Nvda => format!("[NVDA] {msg}"),
+            ScreenReaderBackend::VoiceOver => format!("[VoiceOver] {msg}"),
+            ScreenReaderBackend::Custom(name) => format!("[{name}] {msg}"),
+        }
+    }
+
+    /// Returns `true` when a real screen reader is configured.
+    pub fn is_active(&self) -> bool {
+        self.backend != ScreenReaderBackend::None
+    }
+
+    /// Human-readable name of the backend.
+    pub fn backend_name(&self) -> &str {
+        match &self.backend {
+            ScreenReaderBackend::None => "None",
+            ScreenReaderBackend::Orca => "Orca",
+            ScreenReaderBackend::Nvda => "NVDA",
+            ScreenReaderBackend::VoiceOver => "VoiceOver",
+            ScreenReaderBackend::Custom(name) => name.as_str(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Focus ring
+// ---------------------------------------------------------------------------
+
+/// Visual focus-ring indicator used for keyboard-driven navigation.
+#[derive(Debug, Clone)]
+pub struct A11yFocusRing {
+    pub visible: bool,
+    pub x: u16,
+    pub y: u16,
+    pub width: u16,
+    pub height: u16,
+    pub thickness: u8,
+    pub color: String,
+}
+
+impl A11yFocusRing {
+    /// Create a focus ring at `(x, y)` with size `(w, h)` using sensible
+    /// defaults for thickness and color.
+    pub fn new(x: u16, y: u16, w: u16, h: u16) -> Self {
+        Self {
+            visible: true,
+            x,
+            y,
+            width: w,
+            height: h,
+            thickness: 2,
+            color: "#0078D4".to_string(),
+        }
+    }
+
+    /// Move the ring to a new origin without changing its size.
+    pub fn move_to(&mut self, x: u16, y: u16) {
+        self.x = x;
+        self.y = y;
+    }
+
+    /// Resize the ring without moving it.
+    pub fn resize(&mut self, w: u16, h: u16) {
+        self.width = w;
+        self.height = h;
+    }
+
+    /// Make the focus ring visible.
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+
+    /// Hide the focus ring.
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+
+    /// Returns `true` when the point `(px, py)` falls inside the ring
+    /// bounding box.
+    pub fn contains_point(&self, px: u16, py: u16) -> bool {
+        px >= self.x
+            && py >= self.y
+            && px < self.x.saturating_add(self.width)
+            && py < self.y.saturating_add(self.height)
+    }
+
+    /// Total area in pixels covered by the ring bounding box.
+    pub fn area(&self) -> u32 {
+        self.width as u32 * self.height as u32
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Motion reduction
+// ---------------------------------------------------------------------------
+
+/// Controls whether (and how much) animations and transitions are reduced.
+#[derive(Debug, Clone)]
+pub struct A11yMotionReduction {
+    pub enabled: bool,
+    pub animation_scale: f32,
+    pub transition_duration_ms: u32,
+}
+
+impl A11yMotionReduction {
+    /// Default instance – animations play normally.
+    pub fn new() -> Self {
+        Self {
+            enabled: false,
+            animation_scale: 1.0,
+            transition_duration_ms: 200,
+        }
+    }
+
+    /// Convenience constructor that returns a fully-reduced instance (no
+    /// animation, zero-duration transitions).
+    pub fn with_reduced() -> Self {
+        Self {
+            enabled: true,
+            animation_scale: 0.0,
+            transition_duration_ms: 0,
+        }
+    }
+
+    /// Returns `true` when animations should still play.
+    pub fn should_animate(&self) -> bool {
+        !self.enabled && self.animation_scale > 0.0
+    }
+
+    /// Compute the effective duration for a transition whose normal length is
+    /// `base_ms` milliseconds.
+    pub fn effective_duration(&self, base_ms: u32) -> u32 {
+        if self.enabled {
+            return 0;
+        }
+        (base_ms as f32 * self.animation_scale) as u32
+    }
+}
+
+impl Default for A11yMotionReduction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation mode
+// ---------------------------------------------------------------------------
+
+/// Manages keyboard-driven focus traversal through a set of focusable
+/// elements identified by string ids.
+#[derive(Debug, Clone)]
+pub struct KeyboardNavigationMode {
+    pub enabled: bool,
+    pub focus_visible: bool,
+    pub tab_index: Vec<String>,
+}
+
+impl KeyboardNavigationMode {
+    pub fn new() -> Self {
+        Self {
+            enabled: false,
+            focus_visible: true,
+            tab_index: Vec::new(),
+        }
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    /// Register an element as focusable.
+    pub fn add_focusable(&mut self, id: &str) {
+        self.tab_index.push(id.to_string());
+    }
+
+    /// Return the id of the element that follows `current` in tab order, or
+    /// `None` if `current` is not found or is the last element.
+    pub fn next_focus(&self, current: &str) -> Option<&str> {
+        self.tab_index
+            .iter()
+            .position(|id| id == current)
+            .and_then(|i| self.tab_index.get(i + 1))
+            .map(|s| s.as_str())
+    }
+
+    /// Return the id of the element that precedes `current` in tab order.
+    pub fn prev_focus(&self, current: &str) -> Option<&str> {
+        self.tab_index
+            .iter()
+            .position(|id| id == current)
+            .and_then(|i| i.checked_sub(1))
+            .and_then(|i| self.tab_index.get(i))
+            .map(|s| s.as_str())
+    }
+
+    /// Number of focusable elements registered.
+    pub fn focus_count(&self) -> usize {
+        self.tab_index.len()
+    }
+}
+
+impl Default for KeyboardNavigationMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1998,5 +2258,148 @@ mod tests {
 
         assert_eq!(nav.depth(), 3);
         assert_eq!(nav.breadcrumb(), "B > C > D");
+    }
+
+    // -----------------------------------------------------------------------
+    // ScreenReaderAdapter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn screen_reader_none_is_inactive() {
+        let adapter = ScreenReaderAdapter::new(ScreenReaderBackend::None);
+        assert!(!adapter.is_active());
+        assert_eq!(adapter.announce("hello"), "");
+        assert_eq!(adapter.backend_name(), "None");
+    }
+
+    #[test]
+    fn screen_reader_orca_announce() {
+        let adapter = ScreenReaderAdapter::new(ScreenReaderBackend::Orca);
+        assert!(adapter.is_active());
+        assert_eq!(adapter.announce("Save complete"), "[Orca] Save complete");
+        assert_eq!(adapter.backend_name(), "Orca");
+    }
+
+    #[test]
+    fn screen_reader_custom_backend() {
+        let adapter =
+            ScreenReaderAdapter::new(ScreenReaderBackend::Custom("JAWS".to_string()));
+        assert!(adapter.is_active());
+        assert_eq!(adapter.announce("hi"), "[JAWS] hi");
+        assert_eq!(adapter.backend_name(), "JAWS");
+        assert_eq!(format!("{}", adapter.backend), "JAWS");
+    }
+
+    #[test]
+    fn screen_reader_backend_display() {
+        assert_eq!(format!("{}", ScreenReaderBackend::Nvda), "NVDA");
+        assert_eq!(format!("{}", ScreenReaderBackend::VoiceOver), "VoiceOver");
+        assert_eq!(format!("{}", ScreenReaderBackend::None), "None");
+    }
+
+    // -----------------------------------------------------------------------
+    // A11yFocusRing tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn focus_ring_defaults() {
+        let ring = A11yFocusRing::new(10, 20, 100, 50);
+        assert!(ring.visible);
+        assert_eq!(ring.thickness, 2);
+        assert_eq!(ring.area(), 5000);
+    }
+
+    #[test]
+    fn focus_ring_move_and_resize() {
+        let mut ring = A11yFocusRing::new(0, 0, 10, 10);
+        ring.move_to(5, 5);
+        assert_eq!((ring.x, ring.y), (5, 5));
+        ring.resize(20, 30);
+        assert_eq!(ring.area(), 600);
+    }
+
+    #[test]
+    fn focus_ring_contains_point() {
+        let ring = A11yFocusRing::new(10, 10, 20, 20);
+        assert!(ring.contains_point(10, 10));
+        assert!(ring.contains_point(29, 29));
+        assert!(!ring.contains_point(30, 30));
+        assert!(!ring.contains_point(9, 10));
+    }
+
+    #[test]
+    fn focus_ring_show_hide() {
+        let mut ring = A11yFocusRing::new(0, 0, 1, 1);
+        ring.hide();
+        assert!(!ring.visible);
+        ring.show();
+        assert!(ring.visible);
+    }
+
+    // -----------------------------------------------------------------------
+    // A11yMotionReduction tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn motion_reduction_default_animates() {
+        let mr = A11yMotionReduction::new();
+        assert!(mr.should_animate());
+        assert_eq!(mr.effective_duration(300), 300);
+    }
+
+    #[test]
+    fn motion_reduction_with_reduced() {
+        let mr = A11yMotionReduction::with_reduced();
+        assert!(!mr.should_animate());
+        assert_eq!(mr.effective_duration(500), 0);
+    }
+
+    #[test]
+    fn motion_reduction_partial_scale() {
+        let mr = A11yMotionReduction {
+            enabled: false,
+            animation_scale: 0.5,
+            transition_duration_ms: 100,
+        };
+        // scale > 0.0 AND not enabled → should animate
+        assert!(mr.should_animate());
+        assert_eq!(mr.effective_duration(200), 100);
+    }
+
+    // -----------------------------------------------------------------------
+    // KeyboardNavigationMode tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn keyboard_nav_enable_disable() {
+        let mut nav = KeyboardNavigationMode::new();
+        assert!(!nav.enabled);
+        nav.enable();
+        assert!(nav.enabled);
+        nav.disable();
+        assert!(!nav.enabled);
+    }
+
+    #[test]
+    fn keyboard_nav_focus_traversal() {
+        let mut nav = KeyboardNavigationMode::new();
+        nav.add_focusable("btn-save");
+        nav.add_focusable("btn-cancel");
+        nav.add_focusable("input-name");
+        assert_eq!(nav.focus_count(), 3);
+
+        assert_eq!(nav.next_focus("btn-save"), Some("btn-cancel"));
+        assert_eq!(nav.next_focus("btn-cancel"), Some("input-name"));
+        assert_eq!(nav.next_focus("input-name"), None);
+
+        assert_eq!(nav.prev_focus("input-name"), Some("btn-cancel"));
+        assert_eq!(nav.prev_focus("btn-save"), None);
+    }
+
+    #[test]
+    fn keyboard_nav_unknown_element() {
+        let nav = KeyboardNavigationMode::new();
+        assert_eq!(nav.next_focus("nonexistent"), None);
+        assert_eq!(nav.prev_focus("nonexistent"), None);
     }
 }

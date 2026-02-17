@@ -1358,6 +1358,298 @@ impl Default for TimeoutConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Proxy selector – selects a proxy URL based on URL pattern rules
+// ---------------------------------------------------------------------------
+
+/// A rule mapping a URL pattern to a proxy URL.
+#[derive(Debug, Clone)]
+struct ProxyRule {
+    pattern: String,
+    proxy_url: String,
+}
+
+/// Selects a proxy based on URL pattern matching and bypass rules.
+#[derive(Debug, Clone)]
+pub struct NetworkProxySelector {
+    rules: Vec<ProxyRule>,
+    bypass_patterns: Vec<String>,
+}
+
+impl NetworkProxySelector {
+    /// Create an empty proxy selector.
+    pub fn new() -> Self {
+        Self {
+            rules: Vec::new(),
+            bypass_patterns: Vec::new(),
+        }
+    }
+
+    /// Add a rule: URLs containing `pattern` will use `proxy_url`.
+    pub fn add_rule(&mut self, pattern: &str, proxy_url: &str) {
+        self.rules.push(ProxyRule {
+            pattern: pattern.to_string(),
+            proxy_url: proxy_url.to_string(),
+        });
+    }
+
+    /// Select the first matching proxy for `url`, or `None`.
+    pub fn select_proxy(&self, url: &str) -> Option<&str> {
+        if self.should_bypass(url) {
+            return None;
+        }
+        self.rules
+            .iter()
+            .find(|r| url.contains(&r.pattern))
+            .map(|r| r.proxy_url.as_str())
+    }
+
+    /// Register a bypass pattern – URLs containing `pattern` skip the proxy.
+    pub fn add_bypass(&mut self, pattern: &str) {
+        self.bypass_patterns.push(pattern.to_string());
+    }
+
+    /// Return `true` if `url` matches any bypass pattern.
+    pub fn should_bypass(&self, url: &str) -> bool {
+        self.bypass_patterns.iter().any(|p| url.contains(p))
+    }
+
+    /// Number of configured rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl Default for NetworkProxySelector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for NetworkProxySelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NetworkProxySelector(rules={}, bypasses={})",
+            self.rules.len(),
+            self.bypass_patterns.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Retry strategy with circuit breaker
+// ---------------------------------------------------------------------------
+
+/// Configurable retry strategy with built-in circuit breaker.
+#[derive(Debug, Clone)]
+pub struct NetworkRetryStrategy {
+    max_retries: u32,
+    base_delay_ms: u64,
+    circuit_open: bool,
+}
+
+impl NetworkRetryStrategy {
+    /// Create a new retry strategy.
+    pub fn new(max_retries: u32, base_delay_ms: u64) -> Self {
+        Self {
+            max_retries,
+            base_delay_ms,
+            circuit_open: false,
+        }
+    }
+
+    /// Decide whether to retry the given attempt based on status code.
+    /// Returns `false` when the circuit is open, the attempt count is
+    /// exhausted, or the status code is not retryable.
+    pub fn should_retry(&mut self, attempt: u32, status_code: u16) -> bool {
+        if self.circuit_open {
+            return false;
+        }
+        if attempt >= self.max_retries {
+            return false;
+        }
+        // Retry on server errors (5xx) and 429 (Too Many Requests).
+        (500..600).contains(&status_code) || status_code == 429
+    }
+
+    /// Compute the delay for `attempt` using exponential backoff.
+    pub fn next_delay_ms(&self, attempt: u32) -> u64 {
+        self.base_delay_ms.saturating_mul(2u64.saturating_pow(attempt))
+    }
+
+    /// Open the circuit breaker – all subsequent retries are refused.
+    pub fn trip_circuit(&mut self) {
+        self.circuit_open = true;
+    }
+
+    /// Return `true` when the circuit breaker is open.
+    pub fn is_circuit_open(&self) -> bool {
+        self.circuit_open
+    }
+
+    /// Reset the strategy (closes the circuit breaker).
+    pub fn reset(&mut self) {
+        self.circuit_open = false;
+    }
+}
+
+impl fmt::Display for NetworkRetryStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NetworkRetryStrategy(max={}, base_ms={}, circuit={})",
+            self.max_retries,
+            self.base_delay_ms,
+            if self.circuit_open { "open" } else { "closed" }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ETag-aware response cache
+// ---------------------------------------------------------------------------
+
+/// A cached response with its ETag and body text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EtagCacheEntry {
+    pub etag: String,
+    pub body: String,
+}
+
+/// Cache that stores responses keyed by URL with ETag support.
+#[derive(Debug, Clone)]
+pub struct EtagResponseCache {
+    entries: HashMap<String, EtagCacheEntry>,
+}
+
+impl EtagResponseCache {
+    /// Create an empty cache.
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Insert or replace a cached response.
+    pub fn put(&mut self, url: &str, etag: &str, body: &str) {
+        self.entries.insert(
+            url.to_string(),
+            EtagCacheEntry {
+                etag: etag.to_string(),
+                body: body.to_string(),
+            },
+        );
+    }
+
+    /// Retrieve the cached entry for `url`.
+    pub fn get(&self, url: &str) -> Option<&EtagCacheEntry> {
+        self.entries.get(url)
+    }
+
+    /// Retrieve just the ETag for `url`.
+    pub fn get_etag(&self, url: &str) -> Option<&str> {
+        self.entries.get(url).map(|e| e.etag.as_str())
+    }
+
+    /// Remove the entry for `url`.
+    pub fn invalidate(&mut self, url: &str) {
+        self.entries.remove(url);
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` when the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for EtagResponseCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for EtagResponseCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EtagResponseCache(entries={})", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Throughput monitor
+// ---------------------------------------------------------------------------
+
+/// Tracks bytes transferred across network operations.
+#[derive(Debug, Clone)]
+pub struct NetworkThroughputMonitor {
+    transfers: Vec<u64>,
+}
+
+impl NetworkThroughputMonitor {
+    /// Create a new, empty monitor.
+    pub fn new() -> Self {
+        Self {
+            transfers: Vec::new(),
+        }
+    }
+
+    /// Record a single transfer of `bytes` bytes.
+    pub fn record_transfer(&mut self, bytes: u64) {
+        self.transfers.push(bytes);
+    }
+
+    /// Total bytes transferred across all recorded operations.
+    pub fn total_bytes(&self) -> u64 {
+        self.transfers.iter().sum()
+    }
+
+    /// Number of recorded transfers.
+    pub fn transfer_count(&self) -> usize {
+        self.transfers.len()
+    }
+
+    /// Average bytes per transfer (returns 0.0 when empty).
+    pub fn average_bytes(&self) -> f64 {
+        if self.transfers.is_empty() {
+            0.0
+        } else {
+            self.total_bytes() as f64 / self.transfers.len() as f64
+        }
+    }
+
+    /// Discard all recorded data.
+    pub fn reset(&mut self) {
+        self.transfers.clear();
+    }
+}
+
+impl Default for NetworkThroughputMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for NetworkThroughputMonitor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NetworkThroughputMonitor(transfers={}, total_bytes={})",
+            self.transfer_count(),
+            self.total_bytes()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2123,6 +2415,145 @@ mod tests {
 
     #[test]
     fn request_priority_values() {
+        assert!(RequestPriority::Critical.value() > RequestPriority::High.value());
+        assert!(RequestPriority::High.value() > RequestPriority::Normal.value());
+        assert!(RequestPriority::Normal.value() > RequestPriority::Low.value());
+    }
+
+    // --- NetworkProxySelector tests ---
+
+    #[test]
+    fn proxy_selector_matches_rule() {
+        let mut sel = NetworkProxySelector::new();
+        sel.add_rule("github.com", "http://proxy:8080");
+        assert_eq!(sel.select_proxy("https://github.com/repo"), Some("http://proxy:8080"));
+        assert!(sel.select_proxy("https://example.com").is_none());
+    }
+
+    #[test]
+    fn proxy_selector_bypass() {
+        let mut sel = NetworkProxySelector::new();
+        sel.add_rule("example.com", "http://proxy:3128");
+        sel.add_bypass("localhost");
+        sel.add_bypass("127.0.0.1");
+        assert!(sel.should_bypass("http://localhost:8080/path"));
+        assert!(!sel.should_bypass("https://example.com"));
+        // Bypass takes precedence even when a rule matches.
+        sel.add_bypass("example.com");
+        assert!(sel.select_proxy("https://example.com").is_none());
+    }
+
+    #[test]
+    fn proxy_selector_display() {
+        let mut sel = NetworkProxySelector::new();
+        sel.add_rule("a", "b");
+        sel.add_bypass("c");
+        let s = format!("{sel}");
+        assert!(s.contains("rules=1"));
+        assert!(s.contains("bypasses=1"));
+    }
+
+    // --- NetworkRetryStrategy tests ---
+
+    #[test]
+    fn retry_strategy_should_retry() {
+        let mut strat = NetworkRetryStrategy::new(3, 100);
+        assert!(strat.should_retry(0, 500));
+        assert!(strat.should_retry(0, 429));
+        assert!(!strat.should_retry(0, 200));
+        assert!(!strat.should_retry(3, 500));
+    }
+
+    #[test]
+    fn retry_strategy_exponential_backoff() {
+        let strat = NetworkRetryStrategy::new(5, 100);
+        assert_eq!(strat.next_delay_ms(0), 100);
+        assert_eq!(strat.next_delay_ms(1), 200);
+        assert_eq!(strat.next_delay_ms(2), 400);
+        assert_eq!(strat.next_delay_ms(3), 800);
+    }
+
+    #[test]
+    fn retry_strategy_circuit_breaker() {
+        let mut strat = NetworkRetryStrategy::new(3, 50);
+        assert!(!strat.is_circuit_open());
+        strat.trip_circuit();
+        assert!(strat.is_circuit_open());
+        assert!(!strat.should_retry(0, 500));
+        strat.reset();
+        assert!(!strat.is_circuit_open());
+        assert!(strat.should_retry(0, 503));
+    }
+
+    #[test]
+    fn retry_strategy_display() {
+        let strat = NetworkRetryStrategy::new(3, 100);
+        let s = format!("{strat}");
+        assert!(s.contains("max=3"));
+        assert!(s.contains("closed"));
+    }
+
+    // --- EtagResponseCache tests ---
+
+    #[test]
+    fn etag_cache_put_get() {
+        let mut cache = EtagResponseCache::new();
+        cache.put("https://api.example.com/v1", "\"abc123\"", "{\"ok\":true}");
+        assert_eq!(cache.len(), 1);
+        let entry = cache.get("https://api.example.com/v1").unwrap();
+        assert_eq!(entry.etag, "\"abc123\"");
+        assert_eq!(entry.body, "{\"ok\":true}");
+        assert_eq!(cache.get_etag("https://api.example.com/v1"), Some("\"abc123\""));
+    }
+
+    #[test]
+    fn etag_cache_invalidate_and_clear() {
+        let mut cache = EtagResponseCache::new();
+        cache.put("https://a.com", "e1", "b1");
+        cache.put("https://b.com", "e2", "b2");
+        assert_eq!(cache.len(), 2);
+        cache.invalidate("https://a.com");
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("https://a.com").is_none());
+        cache.clear();
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn etag_cache_display() {
+        let cache = EtagResponseCache::new();
+        let s = format!("{cache}");
+        assert!(s.contains("entries=0"));
+    }
+
+    // --- NetworkThroughputMonitor tests ---
+
+    #[test]
+    fn throughput_monitor_stats() {
+        let mut mon = NetworkThroughputMonitor::new();
+        assert_eq!(mon.total_bytes(), 0);
+        assert_eq!(mon.transfer_count(), 0);
+        assert_eq!(mon.average_bytes(), 0.0);
+        mon.record_transfer(1000);
+        mon.record_transfer(3000);
+        assert_eq!(mon.total_bytes(), 4000);
+        assert_eq!(mon.transfer_count(), 2);
+        assert!((mon.average_bytes() - 2000.0).abs() < f64::EPSILON);
+        mon.reset();
+        assert_eq!(mon.transfer_count(), 0);
+    }
+
+    #[test]
+    fn throughput_monitor_display() {
+        let mut mon = NetworkThroughputMonitor::new();
+        mon.record_transfer(512);
+        let s = format!("{mon}");
+        assert!(s.contains("transfers=1"));
+        assert!(s.contains("total_bytes=512"));
+    }
+
+    #[test]
+    fn request_priority_ordering() {
         assert!(RequestPriority::Critical.value() > RequestPriority::High.value());
         assert!(RequestPriority::High.value() > RequestPriority::Normal.value());
         assert!(RequestPriority::Normal.value() > RequestPriority::Low.value());

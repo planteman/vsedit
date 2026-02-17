@@ -1100,6 +1100,303 @@ impl WelcomeLayout {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Recent items tracking (with pinning support)
+// ---------------------------------------------------------------------------
+
+/// A recently opened file or folder with pinning support.
+#[derive(Debug, Clone)]
+pub struct PinnableRecentItem {
+    pub path: String,
+    pub label: String,
+    pub pinned: bool,
+    pub last_opened: u64,
+}
+
+/// Tracks recently opened items with pinning and eviction.
+#[derive(Debug, Clone)]
+pub struct WelcomePageRecent {
+    pub items: Vec<PinnableRecentItem>,
+    pub max_items: usize,
+}
+
+impl WelcomePageRecent {
+    pub fn new(max: usize) -> Self {
+        Self {
+            items: Vec::new(),
+            max_items: max,
+        }
+    }
+
+    /// Add or update an item. Deduplicates by path and evicts the oldest
+    /// unpinned item when at capacity.
+    pub fn add(&mut self, path: &str, label: &str, timestamp: u64) {
+        if let Some(existing) = self.items.iter_mut().find(|i| i.path == path) {
+            existing.label = label.to_string();
+            existing.last_opened = timestamp;
+            return;
+        }
+        if self.items.len() >= self.max_items {
+            if let Some(idx) = self
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| !i.pinned)
+                .min_by_key(|(_, i)| i.last_opened)
+                .map(|(idx, _)| idx)
+            {
+                self.items.remove(idx);
+            } else {
+                return;
+            }
+        }
+        self.items.push(PinnableRecentItem {
+            path: path.to_string(),
+            label: label.to_string(),
+            pinned: false,
+            last_opened: timestamp,
+        });
+    }
+
+    pub fn pin(&mut self, path: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|i| i.path == path) {
+            item.pinned = true;
+            return true;
+        }
+        false
+    }
+
+    pub fn unpin(&mut self, path: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|i| i.path == path) {
+            item.pinned = false;
+            return true;
+        }
+        false
+    }
+
+    pub fn pinned_items(&self) -> Vec<&PinnableRecentItem> {
+        self.items.iter().filter(|i| i.pinned).collect()
+    }
+
+    /// Returns items sorted with pinned first, then by timestamp descending.
+    pub fn recent_items(&self, limit: usize) -> Vec<&PinnableRecentItem> {
+        let mut refs: Vec<&PinnableRecentItem> = self.items.iter().collect();
+        refs.sort_by(|a, b| {
+            b.pinned
+                .cmp(&a.pinned)
+                .then(b.last_opened.cmp(&a.last_opened))
+        });
+        refs.truncate(limit);
+        refs
+    }
+
+    pub fn remove(&mut self, path: &str) -> bool {
+        let len = self.items.len();
+        self.items.retain(|i| i.path != path);
+        self.items.len() != len
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ordered walkthrough with progress tracking
+// ---------------------------------------------------------------------------
+
+/// A step in an ordered walkthrough.
+#[derive(Debug, Clone)]
+pub struct OrderedWalkthroughStep {
+    pub id: String,
+    pub title: String,
+    pub completed: bool,
+    pub order: u32,
+}
+
+/// An ordered, multi-step walkthrough with progress tracking.
+#[derive(Debug, Clone)]
+pub struct WelcomeWalkthroughTracker {
+    pub id: String,
+    pub title: String,
+    pub steps: Vec<OrderedWalkthroughStep>,
+}
+
+impl WelcomeWalkthroughTracker {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            title: title.to_string(),
+            steps: Vec::new(),
+        }
+    }
+
+    pub fn add_step(&mut self, step_id: &str, title: &str, order: u32) {
+        self.steps.push(OrderedWalkthroughStep {
+            id: step_id.to_string(),
+            title: title.to_string(),
+            completed: false,
+            order,
+        });
+        self.steps.sort_by_key(|s| s.order);
+    }
+
+    pub fn complete_step(&mut self, step_id: &str) -> bool {
+        if let Some(step) = self.steps.iter_mut().find(|s| s.id == step_id) {
+            step.completed = true;
+            return true;
+        }
+        false
+    }
+
+    /// Progress as a fraction from 0.0 to 1.0.
+    pub fn progress(&self) -> f32 {
+        if self.steps.is_empty() {
+            return 0.0;
+        }
+        self.completed_count() as f32 / self.steps.len() as f32
+    }
+
+    pub fn is_complete(&self) -> bool {
+        !self.steps.is_empty() && self.steps.iter().all(|s| s.completed)
+    }
+
+    pub fn next_incomplete_step(&self) -> Option<&OrderedWalkthroughStep> {
+        self.steps.iter().find(|s| !s.completed)
+    }
+
+    pub fn completed_count(&self) -> usize {
+        self.steps.iter().filter(|s| s.completed).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Key-binding hints
+// ---------------------------------------------------------------------------
+
+/// A single key-binding hint.
+#[derive(Debug, Clone)]
+pub struct KeyHint {
+    pub action: String,
+    pub keys: String,
+    pub category: String,
+}
+
+/// A collection of key-binding hints displayed on the welcome page.
+#[derive(Debug, Clone)]
+pub struct WelcomeKeyBindingHint {
+    pub hints: Vec<KeyHint>,
+}
+
+impl WelcomeKeyBindingHint {
+    pub fn new() -> Self {
+        Self { hints: Vec::new() }
+    }
+
+    pub fn add_hint(&mut self, action: &str, keys: &str, category: &str) {
+        self.hints.push(KeyHint {
+            action: action.to_string(),
+            keys: keys.to_string(),
+            category: category.to_string(),
+        });
+    }
+
+    pub fn hints_for_category(&self, cat: &str) -> Vec<&KeyHint> {
+        self.hints.iter().filter(|h| h.category == cat).collect()
+    }
+
+    /// Render a simple text table of action → keys.
+    pub fn render_table(&self) -> String {
+        if self.hints.is_empty() {
+            return String::new();
+        }
+        let max_action = self.hints.iter().map(|h| h.action.len()).max().unwrap_or(0);
+        let mut out = String::new();
+        for h in &self.hints {
+            out.push_str(&format!("{:<width$}  {}\n", h.action, h.keys, width = max_action));
+        }
+        out
+    }
+
+    pub fn categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self.hints.iter().map(|h| h.category.as_str()).collect();
+        cats.sort();
+        cats.dedup();
+        cats
+    }
+
+    pub fn len(&self) -> usize {
+        self.hints.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Welcome page customization
+// ---------------------------------------------------------------------------
+
+/// Controls which sections of the welcome page are visible.
+#[derive(Debug, Clone)]
+pub struct WelcomeCustomization {
+    pub show_recent: bool,
+    pub show_walkthroughs: bool,
+    pub show_keybindings: bool,
+    pub custom_logo: Option<String>,
+    pub greeting: Option<String>,
+    pub max_recent_items: usize,
+}
+
+impl WelcomeCustomization {
+    pub fn new() -> Self {
+        Self {
+            show_recent: true,
+            show_walkthroughs: true,
+            show_keybindings: true,
+            custom_logo: None,
+            greeting: None,
+            max_recent_items: 10,
+        }
+    }
+
+    /// A minimal configuration with everything disabled.
+    pub fn minimal() -> Self {
+        Self {
+            show_recent: false,
+            show_walkthroughs: false,
+            show_keybindings: false,
+            custom_logo: None,
+            greeting: None,
+            max_recent_items: 10,
+        }
+    }
+
+    pub fn with_greeting(mut self, msg: &str) -> Self {
+        self.greeting = Some(msg.to_string());
+        self
+    }
+
+    pub fn effective_greeting(&self) -> &str {
+        self.greeting.as_deref().unwrap_or("Welcome")
+    }
+
+    pub fn visible_section_count(&self) -> usize {
+        [self.show_recent, self.show_walkthroughs, self.show_keybindings]
+            .iter()
+            .filter(|&&v| v)
+            .count()
+    }
+}
+
+impl fmt::Display for WelcomeCustomization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "WelcomeCustomization(sections={}, greeting={:?})",
+            self.visible_section_count(),
+            self.effective_greeting(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2024,5 +2321,159 @@ mod tests {
         assert_eq!(left.height, right.height);
         assert!(right.x > left.x);
         assert_eq!(layout.viewport_area(), 600_000);
+    }
+
+    // -- Recent items tests --
+
+    #[test]
+    fn recent_add_and_dedup() {
+        let mut recent = WelcomePageRecent::new(5);
+        recent.add("/a", "A", 1);
+        recent.add("/b", "B", 2);
+        recent.add("/a", "A-updated", 3);
+        assert_eq!(recent.len(), 2);
+        let a = recent.items.iter().find(|i| i.path == "/a").unwrap();
+        assert_eq!(a.label, "A-updated");
+        assert_eq!(a.last_opened, 3);
+    }
+
+    #[test]
+    fn recent_eviction() {
+        let mut recent = WelcomePageRecent::new(2);
+        recent.add("/a", "A", 1);
+        recent.add("/b", "B", 2);
+        recent.add("/c", "C", 3);
+        assert_eq!(recent.len(), 2);
+        assert!(recent.items.iter().all(|i| i.path != "/a"));
+    }
+
+    #[test]
+    fn recent_pin_prevents_eviction() {
+        let mut recent = WelcomePageRecent::new(2);
+        recent.add("/a", "A", 1);
+        recent.pin("/a");
+        recent.add("/b", "B", 2);
+        recent.add("/c", "C", 3);
+        assert_eq!(recent.len(), 2);
+        assert!(recent.items.iter().any(|i| i.path == "/a"));
+        assert!(recent.items.iter().any(|i| i.path == "/c"));
+    }
+
+    #[test]
+    fn recent_items_sorted() {
+        let mut recent = WelcomePageRecent::new(5);
+        recent.add("/a", "A", 1);
+        recent.add("/b", "B", 3);
+        recent.add("/c", "C", 2);
+        recent.pin("/a");
+        let sorted = recent.recent_items(5);
+        assert_eq!(sorted[0].path, "/a"); // pinned first
+        assert_eq!(sorted[1].path, "/b"); // then newest
+    }
+
+    #[test]
+    fn recent_remove_and_unpin() {
+        let mut recent = WelcomePageRecent::new(5);
+        recent.add("/a", "A", 1);
+        recent.pin("/a");
+        assert_eq!(recent.pinned_items().len(), 1);
+        assert!(recent.unpin("/a"));
+        assert_eq!(recent.pinned_items().len(), 0);
+        assert!(recent.remove("/a"));
+        assert_eq!(recent.len(), 0);
+        assert!(!recent.remove("/nonexistent"));
+    }
+
+    // -- Walkthrough tests --
+
+    #[test]
+    fn walkthrough_progress() {
+        let mut wt = WelcomeWalkthroughTracker::new("setup", "Getting Started");
+        wt.add_step("install", "Install", 1);
+        wt.add_step("config", "Configure", 2);
+        wt.add_step("run", "Run", 3);
+        assert_eq!(wt.progress(), 0.0);
+        assert!(!wt.is_complete());
+        assert_eq!(wt.next_incomplete_step().unwrap().id, "install");
+
+        wt.complete_step("install");
+        assert_eq!(wt.completed_count(), 1);
+        assert!((wt.progress() - 1.0 / 3.0).abs() < 0.001);
+
+        wt.complete_step("config");
+        wt.complete_step("run");
+        assert!(wt.is_complete());
+        assert!((wt.progress() - 1.0).abs() < f32::EPSILON);
+        assert!(wt.next_incomplete_step().is_none());
+    }
+
+    #[test]
+    fn walkthrough_step_ordering() {
+        let mut wt = WelcomeWalkthroughTracker::new("wt", "WT");
+        wt.add_step("c", "C", 3);
+        wt.add_step("a", "A", 1);
+        wt.add_step("b", "B", 2);
+        assert_eq!(wt.steps[0].id, "a");
+        assert_eq!(wt.steps[1].id, "b");
+        assert_eq!(wt.steps[2].id, "c");
+    }
+
+    #[test]
+    fn walkthrough_complete_nonexistent() {
+        let mut wt = WelcomeWalkthroughTracker::new("wt", "WT");
+        assert!(!wt.complete_step("nope"));
+        assert_eq!(wt.progress(), 0.0);
+    }
+
+    // -- Key binding hints tests --
+
+    #[test]
+    fn keybinding_hints() {
+        let mut hints = WelcomeKeyBindingHint::new();
+        hints.add_hint("Open File", "Ctrl+O", "File");
+        hints.add_hint("Save File", "Ctrl+S", "File");
+        hints.add_hint("Find", "Ctrl+F", "Edit");
+        assert_eq!(hints.len(), 3);
+        assert_eq!(hints.hints_for_category("File").len(), 2);
+        assert_eq!(hints.hints_for_category("Edit").len(), 1);
+        let cats = hints.categories();
+        assert_eq!(cats, vec!["Edit", "File"]);
+    }
+
+    #[test]
+    fn keybinding_render_table() {
+        let mut hints = WelcomeKeyBindingHint::new();
+        hints.add_hint("Open", "Ctrl+O", "File");
+        hints.add_hint("Save", "Ctrl+S", "File");
+        let table = hints.render_table();
+        assert!(table.contains("Open"));
+        assert!(table.contains("Ctrl+O"));
+        assert!(table.contains("Save"));
+        let empty = WelcomeKeyBindingHint::new();
+        assert!(empty.render_table().is_empty());
+    }
+
+    // -- Customization tests --
+
+    #[test]
+    fn customization_defaults() {
+        let c = WelcomeCustomization::new();
+        assert!(c.show_recent);
+        assert!(c.show_walkthroughs);
+        assert!(c.show_keybindings);
+        assert_eq!(c.max_recent_items, 10);
+        assert_eq!(c.visible_section_count(), 3);
+        assert_eq!(c.effective_greeting(), "Welcome");
+    }
+
+    #[test]
+    fn customization_minimal_and_builder() {
+        let c = WelcomeCustomization::minimal().with_greeting("Hello!");
+        assert!(!c.show_recent);
+        assert_eq!(c.visible_section_count(), 0);
+        assert_eq!(c.effective_greeting(), "Hello!");
+        let display = format!("{}", c);
+        assert!(display.contains("sections=0"));
+        assert!(display.contains("Hello!"));
     }
 }

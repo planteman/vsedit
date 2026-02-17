@@ -1156,6 +1156,271 @@ impl AuthSession {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AuthTokenRefreshStore: manages token refresh with expiry
+// ---------------------------------------------------------------------------
+
+/// Manages token storage with expiry tracking for refresh workflows.
+pub struct AuthTokenRefreshStore {
+    tokens: HashMap<String, StoredToken>,
+}
+
+struct StoredToken {
+    value: String,
+    expires_at_ms: u64,
+}
+
+impl AuthTokenRefreshStore {
+    pub fn new() -> Self {
+        Self {
+            tokens: HashMap::new(),
+        }
+    }
+
+    /// Store a token for a provider with its expiry timestamp.
+    pub fn store_token(&mut self, provider: &str, token: &str, expires_at_ms: u64) {
+        self.tokens.insert(
+            provider.to_string(),
+            StoredToken {
+                value: token.to_string(),
+                expires_at_ms,
+            },
+        );
+    }
+
+    /// Retrieve the token for a provider, if it exists.
+    pub fn get_token(&self, provider: &str) -> Option<&str> {
+        self.tokens.get(provider).map(|t| t.value.as_str())
+    }
+
+    /// Returns `true` if the token for the provider has expired.
+    pub fn is_expired(&self, provider: &str, current_time_ms: u64) -> bool {
+        self.tokens
+            .get(provider)
+            .map(|t| current_time_ms >= t.expires_at_ms)
+            .unwrap_or(false)
+    }
+
+    /// Returns `true` if the token is within `buffer_ms` of expiry.
+    pub fn needs_refresh(&self, provider: &str, current_time_ms: u64, buffer_ms: u64) -> bool {
+        self.tokens
+            .get(provider)
+            .map(|t| current_time_ms + buffer_ms >= t.expires_at_ms)
+            .unwrap_or(false)
+    }
+
+    /// Remove a stored token.
+    pub fn remove_token(&mut self, provider: &str) {
+        self.tokens.remove(provider);
+    }
+
+    /// Returns the number of stored tokens.
+    pub fn token_count(&self) -> usize {
+        self.tokens.len()
+    }
+}
+
+impl Default for AuthTokenRefreshStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthScopeValidator: validates requested scopes against available
+// ---------------------------------------------------------------------------
+
+/// Result of validating requested scopes against available scopes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScopeValidationResult {
+    pub valid: bool,
+    pub granted: Vec<String>,
+    pub denied: Vec<String>,
+}
+
+/// Validates requested authentication scopes against a set of available scopes.
+pub struct AuthScopeValidator {
+    available: Vec<String>,
+}
+
+impl AuthScopeValidator {
+    pub fn new() -> Self {
+        Self {
+            available: Vec::new(),
+        }
+    }
+
+    /// Register a scope as available.
+    pub fn register_available_scope(&mut self, scope: &str) {
+        if !self.available.iter().any(|s| s == scope) {
+            self.available.push(scope.to_string());
+        }
+    }
+
+    /// Validate a set of requested scopes, splitting into granted and denied.
+    pub fn validate_scopes(&self, requested: &[&str]) -> ScopeValidationResult {
+        let mut granted = Vec::new();
+        let mut denied = Vec::new();
+
+        for &scope in requested {
+            if self.available.iter().any(|s| s == scope) {
+                granted.push(scope.to_string());
+            } else {
+                denied.push(scope.to_string());
+            }
+        }
+
+        ScopeValidationResult {
+            valid: denied.is_empty(),
+            granted,
+            denied,
+        }
+    }
+
+    /// Returns `true` if a specific scope is available.
+    pub fn is_scope_available(&self, scope: &str) -> bool {
+        self.available.iter().any(|s| s == scope)
+    }
+
+    /// Returns all available scopes.
+    pub fn available_scopes(&self) -> Vec<&str> {
+        self.available.iter().map(|s| s.as_str()).collect()
+    }
+}
+
+impl Default for AuthScopeValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthSessionDeduplicator: prevents duplicate auth sessions
+// ---------------------------------------------------------------------------
+
+/// Prevents duplicate authentication sessions per provider/account pair.
+pub struct AuthSessionDeduplicator {
+    registered: Vec<(String, String)>,
+}
+
+impl AuthSessionDeduplicator {
+    pub fn new() -> Self {
+        Self {
+            registered: Vec::new(),
+        }
+    }
+
+    /// Try to register a session. Returns `false` if already registered.
+    pub fn try_register(&mut self, provider: &str, account: &str) -> bool {
+        if self.is_registered(provider, account) {
+            return false;
+        }
+        self.registered
+            .push((provider.to_string(), account.to_string()));
+        true
+    }
+
+    /// Remove a registration.
+    pub fn unregister(&mut self, provider: &str, account: &str) {
+        self.registered.retain(|(p, a)| p != provider || a != account);
+    }
+
+    /// Check if a provider/account pair is registered.
+    pub fn is_registered(&self, provider: &str, account: &str) -> bool {
+        self.registered.iter().any(|(p, a)| p == provider && a == account)
+    }
+
+    /// Return all registered sessions as `(provider, account)` pairs.
+    pub fn sessions(&self) -> Vec<(&str, &str)> {
+        self.registered
+            .iter()
+            .map(|(p, a)| (p.as_str(), a.as_str()))
+            .collect()
+    }
+
+    /// Returns the number of registered sessions.
+    pub fn session_count(&self) -> usize {
+        self.registered.len()
+    }
+}
+
+impl Default for AuthSessionDeduplicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthProviderCapabilities: discovers provider capabilities
+// ---------------------------------------------------------------------------
+
+/// Describes the capabilities of an authentication provider.
+pub struct AuthProviderCapabilities {
+    provider_id: String,
+    multi_account: bool,
+    logout: bool,
+    token_refresh: bool,
+}
+
+impl AuthProviderCapabilities {
+    pub fn new(provider_id: &str) -> Self {
+        Self {
+            provider_id: provider_id.to_string(),
+            multi_account: false,
+            logout: false,
+            token_refresh: false,
+        }
+    }
+
+    pub fn set_supports_multi_account(&mut self, v: bool) {
+        self.multi_account = v;
+    }
+
+    pub fn set_supports_logout(&mut self, v: bool) {
+        self.logout = v;
+    }
+
+    pub fn set_supports_token_refresh(&mut self, v: bool) {
+        self.token_refresh = v;
+    }
+
+    pub fn supports_multi_account(&self) -> bool {
+        self.multi_account
+    }
+
+    pub fn supports_logout(&self) -> bool {
+        self.logout
+    }
+
+    pub fn supports_token_refresh(&self) -> bool {
+        self.token_refresh
+    }
+
+    pub fn provider_id(&self) -> &str {
+        &self.provider_id
+    }
+}
+
+impl fmt::Display for AuthProviderCapabilities {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut caps = Vec::new();
+        if self.multi_account {
+            caps.push("multi-account");
+        }
+        if self.logout {
+            caps.push("logout");
+        }
+        if self.token_refresh {
+            caps.push("token-refresh");
+        }
+        if caps.is_empty() {
+            write!(f, "{}: (none)", self.provider_id)
+        } else {
+            write!(f, "{}: {}", self.provider_id, caps.join(", "))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2163,6 +2428,191 @@ mod tests {
 
     #[test]
     fn session_with_token_creates_copy() {
+        let session = AuthSession {
+            id: "s1".into(), access_token: "old".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["read".into()],
+        };
+        let refreshed = session.with_token("new-tok");
+        assert_eq!(refreshed.access_token, "new-tok");
+        assert_eq!(refreshed.id, "s1");
+        assert_eq!(refreshed.scopes, vec!["read"]);
+        // original unchanged
+        assert_eq!(session.access_token, "old");
+    }
+
+    // ── AuthTokenRefreshStore tests ──
+
+    #[test]
+    fn token_refresh_store_lifecycle() {
+        let mut store = AuthTokenRefreshStore::new();
+        assert_eq!(store.token_count(), 0);
+        store.store_token("github", "ghp_abc", 5000);
+        assert_eq!(store.token_count(), 1);
+        assert_eq!(store.get_token("github"), Some("ghp_abc"));
+        assert!(!store.is_expired("github", 4999));
+        assert!(store.is_expired("github", 5000));
+        assert!(store.is_expired("github", 6000));
+        store.remove_token("github");
+        assert_eq!(store.token_count(), 0);
+        assert!(store.get_token("github").is_none());
+    }
+
+    #[test]
+    fn token_refresh_store_needs_refresh() {
+        let mut store = AuthTokenRefreshStore::new();
+        store.store_token("gh", "tok", 10000);
+        assert!(!store.needs_refresh("gh", 8000, 1000));
+        assert!(store.needs_refresh("gh", 9000, 1000));
+        assert!(store.needs_refresh("gh", 9500, 1000));
+        // unknown provider does not need refresh
+        assert!(!store.needs_refresh("unknown", 9000, 1000));
+    }
+
+    #[test]
+    fn token_refresh_store_multiple_providers() {
+        let mut store = AuthTokenRefreshStore::new();
+        store.store_token("gh", "tok1", 5000);
+        store.store_token("gl", "tok2", 8000);
+        assert_eq!(store.token_count(), 2);
+        assert_eq!(store.get_token("gh"), Some("tok1"));
+        assert_eq!(store.get_token("gl"), Some("tok2"));
+        assert!(store.is_expired("gh", 5000));
+        assert!(!store.is_expired("gl", 5000));
+    }
+
+    #[test]
+    fn token_refresh_store_overwrite() {
+        let mut store = AuthTokenRefreshStore::new();
+        store.store_token("gh", "old", 1000);
+        store.store_token("gh", "new", 2000);
+        assert_eq!(store.token_count(), 1);
+        assert_eq!(store.get_token("gh"), Some("new"));
+        assert!(!store.is_expired("gh", 1500));
+    }
+
+    // ── AuthScopeValidator tests ──
+
+    #[test]
+    fn scope_validator_all_granted() {
+        let mut v = AuthScopeValidator::new();
+        v.register_available_scope("read");
+        v.register_available_scope("write");
+        let result = v.validate_scopes(&["read", "write"]);
+        assert!(result.valid);
+        assert_eq!(result.granted, vec!["read", "write"]);
+        assert!(result.denied.is_empty());
+    }
+
+    #[test]
+    fn scope_validator_partial_denied() {
+        let mut v = AuthScopeValidator::new();
+        v.register_available_scope("read");
+        let result = v.validate_scopes(&["read", "admin"]);
+        assert!(!result.valid);
+        assert_eq!(result.granted, vec!["read"]);
+        assert_eq!(result.denied, vec!["admin"]);
+    }
+
+    #[test]
+    fn scope_validator_available_and_dedup() {
+        let mut v = AuthScopeValidator::new();
+        v.register_available_scope("read");
+        v.register_available_scope("read"); // duplicate ignored
+        assert!(v.is_scope_available("read"));
+        assert!(!v.is_scope_available("write"));
+        assert_eq!(v.available_scopes(), vec!["read"]);
+    }
+
+    // ── AuthSessionDeduplicator tests ──
+
+    #[test]
+    fn deduplicator_prevents_duplicates() {
+        let mut d = AuthSessionDeduplicator::new();
+        assert!(d.try_register("gh", "alice"));
+        assert!(!d.try_register("gh", "alice"));
+        assert_eq!(d.session_count(), 1);
+        assert!(d.is_registered("gh", "alice"));
+    }
+
+    #[test]
+    fn deduplicator_different_accounts() {
+        let mut d = AuthSessionDeduplicator::new();
+        assert!(d.try_register("gh", "alice"));
+        assert!(d.try_register("gh", "bob"));
+        assert!(d.try_register("gl", "alice"));
+        assert_eq!(d.session_count(), 3);
+        let sessions = d.sessions();
+        assert_eq!(sessions.len(), 3);
+    }
+
+    #[test]
+    fn deduplicator_unregister() {
+        let mut d = AuthSessionDeduplicator::new();
+        d.try_register("gh", "alice");
+        d.try_register("gh", "bob");
+        d.unregister("gh", "alice");
+        assert!(!d.is_registered("gh", "alice"));
+        assert!(d.is_registered("gh", "bob"));
+        assert_eq!(d.session_count(), 1);
+        // re-register succeeds after unregister
+        assert!(d.try_register("gh", "alice"));
+    }
+
+    // ── AuthProviderCapabilities tests ──
+
+    #[test]
+    fn provider_capabilities_defaults() {
+        let cap = AuthProviderCapabilities::new("github");
+        assert_eq!(cap.provider_id(), "github");
+        assert!(!cap.supports_multi_account());
+        assert!(!cap.supports_logout());
+        assert!(!cap.supports_token_refresh());
+    }
+
+    #[test]
+    fn provider_capabilities_setters() {
+        let mut cap = AuthProviderCapabilities::new("gh");
+        cap.set_supports_multi_account(true);
+        cap.set_supports_logout(true);
+        cap.set_supports_token_refresh(true);
+        assert!(cap.supports_multi_account());
+        assert!(cap.supports_logout());
+        assert!(cap.supports_token_refresh());
+    }
+
+    #[test]
+    fn provider_capabilities_display_none() {
+        let cap = AuthProviderCapabilities::new("gh");
+        assert_eq!(format!("{cap}"), "gh: (none)");
+    }
+
+    #[test]
+    fn provider_capabilities_display_all() {
+        let mut cap = AuthProviderCapabilities::new("gh");
+        cap.set_supports_multi_account(true);
+        cap.set_supports_logout(true);
+        cap.set_supports_token_refresh(true);
+        let s = format!("{cap}");
+        assert!(s.contains("multi-account"));
+        assert!(s.contains("logout"));
+        assert!(s.contains("token-refresh"));
+    }
+
+    #[test]
+    fn scope_validation_result_roundtrip() {
+        let result = ScopeValidationResult {
+            valid: false,
+            granted: vec!["read".into()],
+            denied: vec!["admin".into()],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: ScopeValidationResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(result, back);
+    }
+
+    #[test]
+    fn token_refresh_and_session_with_token() {
         let session = AuthSession {
             id: "s1".into(), access_token: "old".into(),
             account: AuthAccount { id: "a".into(), label: "A".into() },

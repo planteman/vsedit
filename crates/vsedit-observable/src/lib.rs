@@ -1263,6 +1263,354 @@ impl<T: Clone + PartialEq> Default for ObservableDebouncer<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MapChange
+// ---------------------------------------------------------------------------
+
+/// Describes a single change to an `ObservableTrackedMap`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MapChange {
+    /// A key was inserted with the given value.
+    Insert(String, String),
+    /// A key was updated from the old value to the new value.
+    Update(String, String, String),
+    /// A key was removed; the removed value is included.
+    Remove(String, String),
+}
+
+impl fmt::Display for MapChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MapChange::Insert(k, v) => write!(f, "Insert({k}, {v})"),
+            MapChange::Update(k, old, new) => write!(f, "Update({k}, {old} -> {new})"),
+            MapChange::Remove(k, v) => write!(f, "Remove({k}, {v})"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableTrackedMap
+// ---------------------------------------------------------------------------
+
+/// A key-value map that records per-key change history.
+pub struct ObservableTrackedMap {
+    entries: std::collections::HashMap<String, String>,
+    change_log: Vec<MapChange>,
+}
+
+impl ObservableTrackedMap {
+    /// Create a new empty tracked map.
+    pub fn new() -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            change_log: Vec::new(),
+        }
+    }
+
+    /// Insert or update a key-value pair, recording the change.
+    pub fn insert(&mut self, key: String, value: String) {
+        if let Some(old) = self.entries.insert(key.clone(), value.clone()) {
+            self.change_log
+                .push(MapChange::Update(key, old, value));
+        } else {
+            self.change_log
+                .push(MapChange::Insert(key, value));
+        }
+    }
+
+    /// Get a reference to the value for a key.
+    pub fn get(&self, key: &str) -> Option<&String> {
+        self.entries.get(key)
+    }
+
+    /// Remove a key, recording the removal. Returns the removed value.
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        if let Some(old) = self.entries.remove(key) {
+            self.change_log
+                .push(MapChange::Remove(key.to_string(), old.clone()));
+            Some(old)
+        } else {
+            None
+        }
+    }
+
+    /// Check whether the map contains a key.
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.entries.contains_key(key)
+    }
+
+    /// Return all keys.
+    pub fn keys(&self) -> Vec<&String> {
+        self.entries.keys().collect()
+    }
+
+    /// Return the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the recorded change log.
+    pub fn changes(&self) -> &[MapChange] {
+        &self.change_log
+    }
+}
+
+impl Default for ObservableTrackedMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ObservableTrackedMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ObservableTrackedMap(entries={}, changes={})",
+            self.entries.len(),
+            self.change_log.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CombinerKind / ObservableDerived
+// ---------------------------------------------------------------------------
+
+/// The combining strategy for an `ObservableDerived`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombinerKind {
+    Sum,
+    Product,
+    Min,
+    Max,
+}
+
+impl fmt::Display for CombinerKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CombinerKind::Sum => write!(f, "Sum"),
+            CombinerKind::Product => write!(f, "Product"),
+            CombinerKind::Min => write!(f, "Min"),
+            CombinerKind::Max => write!(f, "Max"),
+        }
+    }
+}
+
+/// A computed value derived from multiple `i64` sources using a combiner.
+pub struct ObservableDerived {
+    sources: Vec<i64>,
+    combiner: CombinerKind,
+}
+
+impl ObservableDerived {
+    /// Create a derived observable from source values and a combiner name.
+    ///
+    /// Recognised names: `"sum"`, `"product"`, `"min"`, `"max"`.
+    /// Defaults to `Sum` for unrecognised names.
+    pub fn from_values(values: Vec<i64>, combiner_name: &str) -> Self {
+        let combiner = match combiner_name {
+            "sum" => CombinerKind::Sum,
+            "product" => CombinerKind::Product,
+            "min" => CombinerKind::Min,
+            "max" => CombinerKind::Max,
+            _ => CombinerKind::Sum,
+        };
+        Self {
+            sources: values,
+            combiner,
+        }
+    }
+
+    /// Compute and return the derived value.
+    pub fn get(&self) -> i64 {
+        if self.sources.is_empty() {
+            return 0;
+        }
+        match self.combiner {
+            CombinerKind::Sum => self.sources.iter().sum(),
+            CombinerKind::Product => self.sources.iter().product(),
+            CombinerKind::Min => self.sources.iter().copied().min().unwrap_or(0),
+            CombinerKind::Max => self.sources.iter().copied().max().unwrap_or(0),
+        }
+    }
+
+    /// Update a single source value by index.
+    ///
+    /// # Panics
+    /// Panics if `index` is out of bounds.
+    pub fn update_source(&mut self, index: usize, value: i64) {
+        self.sources[index] = value;
+    }
+
+    /// Return the number of sources.
+    pub fn source_count(&self) -> usize {
+        self.sources.len()
+    }
+}
+
+impl fmt::Display for ObservableDerived {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ObservableDerived({}, sources={}, value={})",
+            self.combiner,
+            self.sources.len(),
+            self.get()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BatchedChange / ObservableBatch
+// ---------------------------------------------------------------------------
+
+/// A single change recorded during a batch operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchedChange {
+    pub key: String,
+    pub value: String,
+}
+
+impl fmt::Display for BatchedChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Collects multiple changes and delivers them as a single batch.
+pub struct ObservableBatch {
+    batching: bool,
+    pending: Vec<BatchedChange>,
+}
+
+impl ObservableBatch {
+    /// Create a new batch collector.
+    pub fn new() -> Self {
+        Self {
+            batching: false,
+            pending: Vec::new(),
+        }
+    }
+
+    /// Begin accumulating changes.
+    pub fn begin_batch(&mut self) {
+        self.batching = true;
+        self.pending.clear();
+    }
+
+    /// Record a change while batching is active.
+    pub fn add_change(&mut self, key: &str, value: &str) {
+        if self.batching {
+            self.pending.push(BatchedChange {
+                key: key.to_string(),
+                value: value.to_string(),
+            });
+        }
+    }
+
+    /// End the batch and return all accumulated changes.
+    pub fn end_batch(&mut self) -> Vec<BatchedChange> {
+        self.batching = false;
+        std::mem::take(&mut self.pending)
+    }
+
+    /// Return `true` if currently inside a batch.
+    pub fn is_batching(&self) -> bool {
+        self.batching
+    }
+
+    /// Return the number of pending changes.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+}
+
+impl Default for ObservableBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ObservableBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ObservableBatch(batching={}, pending={})",
+            self.batching,
+            self.pending.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableReplay
+// ---------------------------------------------------------------------------
+
+/// A bounded buffer that records emitted values for replay to late subscribers.
+pub struct ObservableReplay {
+    capacity: usize,
+    buffer: Vec<String>,
+}
+
+impl ObservableReplay {
+    /// Create a replay buffer with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            buffer: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Emit a value into the buffer, evicting the oldest if full.
+    pub fn emit(&mut self, value: String) {
+        if self.buffer.len() >= self.capacity {
+            self.buffer.remove(0);
+        }
+        self.buffer.push(value);
+    }
+
+    /// Replay all buffered values.
+    pub fn replay(&self) -> Vec<&str> {
+        self.buffer.iter().map(|s| s.as_str()).collect()
+    }
+
+    /// Return the most recently emitted value.
+    pub fn latest(&self) -> Option<&str> {
+        self.buffer.last().map(|s| s.as_str())
+    }
+
+    /// Return the number of buffered values.
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Return `true` if the buffer has reached capacity.
+    pub fn is_full(&self) -> bool {
+        self.buffer.len() >= self.capacity
+    }
+
+    /// Clear the buffer.
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+}
+
+impl fmt::Display for ObservableReplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ObservableReplay(len={}, capacity={})",
+            self.buffer.len(),
+            self.capacity
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2156,6 +2504,122 @@ mod tests {
         obs.set_if(|v| *v == 5, 10);
         obs.set_if(|v| *v == 999, 20); // predicate false, no fire
         assert_eq!(*received.lock().unwrap(), vec![10]);
+    }
+
+    #[test]
+    fn tracked_map_insert_and_get() {
+        let mut m = ObservableTrackedMap::new();
+        m.insert("a".into(), "1".into());
+        assert_eq!(m.get("a"), Some(&"1".to_string()));
+        assert!(m.contains_key("a"));
+        assert_eq!(m.len(), 1);
+        assert!(!m.is_empty());
+    }
+
+    #[test]
+    fn tracked_map_update_records_change() {
+        let mut m = ObservableTrackedMap::new();
+        m.insert("k".into(), "old".into());
+        m.insert("k".into(), "new".into());
+        assert_eq!(m.changes().len(), 2);
+        assert_eq!(
+            m.changes()[1],
+            MapChange::Update("k".into(), "old".into(), "new".into())
+        );
+    }
+
+    #[test]
+    fn tracked_map_remove() {
+        let mut m = ObservableTrackedMap::new();
+        m.insert("x".into(), "42".into());
+        let removed = m.remove("x");
+        assert_eq!(removed, Some("42".to_string()));
+        assert!(!m.contains_key("x"));
+        assert_eq!(
+            m.changes().last().unwrap(),
+            &MapChange::Remove("x".into(), "42".into())
+        );
+    }
+
+    #[test]
+    fn tracked_map_display() {
+        let m = ObservableTrackedMap::new();
+        assert_eq!(format!("{m}"), "ObservableTrackedMap(entries=0, changes=0)");
+    }
+
+    #[test]
+    fn derived_sum() {
+        let d = ObservableDerived::from_values(vec![1, 2, 3], "sum");
+        assert_eq!(d.get(), 6);
+        assert_eq!(d.source_count(), 3);
+    }
+
+    #[test]
+    fn derived_product() {
+        let d = ObservableDerived::from_values(vec![2, 3, 4], "product");
+        assert_eq!(d.get(), 24);
+    }
+
+    #[test]
+    fn derived_min_max() {
+        let d_min = ObservableDerived::from_values(vec![5, 1, 9], "min");
+        assert_eq!(d_min.get(), 1);
+        let d_max = ObservableDerived::from_values(vec![5, 1, 9], "max");
+        assert_eq!(d_max.get(), 9);
+    }
+
+    #[test]
+    fn derived_update_source() {
+        let mut d = ObservableDerived::from_values(vec![10, 20], "sum");
+        d.update_source(0, 100);
+        assert_eq!(d.get(), 120);
+    }
+
+    #[test]
+    fn batch_lifecycle() {
+        let mut b = ObservableBatch::new();
+        assert!(!b.is_batching());
+        b.begin_batch();
+        assert!(b.is_batching());
+        b.add_change("a", "1");
+        b.add_change("b", "2");
+        assert_eq!(b.pending_count(), 2);
+        let changes = b.end_batch();
+        assert!(!b.is_batching());
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0].key, "a");
+        assert_eq!(changes[1].value, "2");
+    }
+
+    #[test]
+    fn batch_ignores_outside_batch() {
+        let mut b = ObservableBatch::new();
+        b.add_change("ignored", "value");
+        assert_eq!(b.pending_count(), 0);
+    }
+
+    #[test]
+    fn replay_buffer() {
+        let mut r = ObservableReplay::new(3);
+        r.emit("a".into());
+        r.emit("b".into());
+        r.emit("c".into());
+        assert!(r.is_full());
+        assert_eq!(r.len(), 3);
+        assert_eq!(r.latest(), Some("c"));
+        assert_eq!(r.replay(), vec!["a", "b", "c"]);
+        r.emit("d".into());
+        assert_eq!(r.replay(), vec!["b", "c", "d"]);
+    }
+
+    #[test]
+    fn replay_clear() {
+        let mut r = ObservableReplay::new(5);
+        r.emit("x".into());
+        r.clear();
+        assert_eq!(r.len(), 0);
+        assert_eq!(r.latest(), None);
+        assert!(!r.is_full());
     }
 
     #[test]

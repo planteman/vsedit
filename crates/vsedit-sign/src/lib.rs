@@ -1246,6 +1246,311 @@ impl fmt::Display for SignatureMetadata {
     }
 }
 
+// ─── Package verification ─────────────────────────────────────────
+
+/// A key trusted for extension package verification.
+#[derive(Debug, Clone)]
+pub struct TrustedKey {
+    pub key_id: String,
+    pub public_key: Vec<u8>,
+    pub algorithm: SignatureAlgorithm,
+    pub trusted: bool,
+}
+
+/// Result of a package signature verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerifyResult {
+    Valid { key_id: String },
+    Invalid,
+    NoMatchingKey,
+    KeyNotTrusted(String),
+}
+
+impl VerifyResult {
+    pub fn is_valid(&self) -> bool {
+        matches!(self, VerifyResult::Valid { .. })
+    }
+}
+
+impl fmt::Display for VerifyResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerifyResult::Valid { key_id } => write!(f, "Valid(key={key_id})"),
+            VerifyResult::Invalid => write!(f, "Invalid"),
+            VerifyResult::NoMatchingKey => write!(f, "NoMatchingKey"),
+            VerifyResult::KeyNotTrusted(id) => write!(f, "KeyNotTrusted({id})"),
+        }
+    }
+}
+
+/// Verifier for extension package signatures.
+#[derive(Debug, Clone)]
+pub struct SignatureVerifier {
+    pub trusted_keys: Vec<TrustedKey>,
+}
+
+impl SignatureVerifier {
+    pub fn new() -> Self {
+        Self {
+            trusted_keys: Vec::new(),
+        }
+    }
+
+    pub fn add_key(&mut self, key_id: &str, key: &[u8], algorithm: SignatureAlgorithm) {
+        self.trusted_keys.push(TrustedKey {
+            key_id: key_id.to_string(),
+            public_key: key.to_vec(),
+            algorithm,
+            trusted: true,
+        });
+    }
+
+    pub fn verify_package(&self, content: &[u8], signature: &Signature) -> VerifyResult {
+        for tk in &self.trusted_keys {
+            if tk.algorithm == signature.algorithm {
+                if !tk.trusted {
+                    return VerifyResult::KeyNotTrusted(tk.key_id.clone());
+                }
+                if verify_signature(content, &tk.public_key, signature) {
+                    return VerifyResult::Valid {
+                        key_id: tk.key_id.clone(),
+                    };
+                }
+                return VerifyResult::Invalid;
+            }
+        }
+        VerifyResult::NoMatchingKey
+    }
+}
+
+// ─── Trust store ──────────────────────────────────────────────────
+
+/// Level of trust assigned to a key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrustLevel {
+    Full,
+    Partial,
+    Untrusted,
+}
+
+impl fmt::Display for TrustLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TrustLevel::Full => write!(f, "Full"),
+            TrustLevel::Partial => write!(f, "Partial"),
+            TrustLevel::Untrusted => write!(f, "Untrusted"),
+        }
+    }
+}
+
+/// An entry in the trust store.
+#[derive(Debug, Clone)]
+pub struct TrustEntry {
+    pub key_id: String,
+    pub trust_level: TrustLevel,
+    pub added_at: u64,
+    pub last_used: Option<u64>,
+}
+
+/// Persistent store of key trust information.
+#[derive(Debug, Clone)]
+pub struct SignatureTrustStore {
+    store: HashMap<String, TrustEntry>,
+}
+
+impl SignatureTrustStore {
+    pub fn new() -> Self {
+        Self {
+            store: HashMap::new(),
+        }
+    }
+
+    pub fn add_trusted(&mut self, key_id: &str, level: TrustLevel, timestamp: u64) {
+        self.store.insert(
+            key_id.to_string(),
+            TrustEntry {
+                key_id: key_id.to_string(),
+                trust_level: level,
+                added_at: timestamp,
+                last_used: None,
+            },
+        );
+    }
+
+    pub fn is_trusted(&self, key_id: &str) -> bool {
+        self.store
+            .get(key_id)
+            .map(|e| matches!(e.trust_level, TrustLevel::Full | TrustLevel::Partial))
+            .unwrap_or(false)
+    }
+
+    pub fn get_trust_level(&self, key_id: &str) -> Option<&TrustLevel> {
+        self.store.get(key_id).map(|e| &e.trust_level)
+    }
+
+    pub fn revoke(&mut self, key_id: &str) -> bool {
+        if let Some(entry) = self.store.get_mut(key_id) {
+            entry.trust_level = TrustLevel::Untrusted;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn mark_used(&mut self, key_id: &str, timestamp: u64) {
+        if let Some(entry) = self.store.get_mut(key_id) {
+            entry.last_used = Some(timestamp);
+        }
+    }
+
+    pub fn trusted_count(&self) -> usize {
+        self.store
+            .values()
+            .filter(|e| matches!(e.trust_level, TrustLevel::Full | TrustLevel::Partial))
+            .count()
+    }
+
+    pub fn all_entries(&self) -> Vec<&TrustEntry> {
+        self.store.values().collect()
+    }
+}
+
+// ─── Signature chain ──────────────────────────────────────────────
+
+/// A single link in a signature validation chain.
+#[derive(Debug, Clone)]
+pub struct ChainLink {
+    pub signer: String,
+    pub signature: Vec<u8>,
+    pub algorithm: SignatureAlgorithm,
+    pub valid: bool,
+}
+
+/// An ordered chain of signatures used for multi-party validation.
+#[derive(Debug, Clone)]
+pub struct SignatureChain {
+    chain: Vec<ChainLink>,
+}
+
+impl SignatureChain {
+    pub fn new() -> Self {
+        Self { chain: Vec::new() }
+    }
+
+    pub fn add_link(&mut self, signer: &str, sig: &[u8], algo: SignatureAlgorithm) {
+        self.chain.push(ChainLink {
+            signer: signer.to_string(),
+            signature: sig.to_vec(),
+            algorithm: algo,
+            valid: false,
+        });
+    }
+
+    /// Simplified chain validation: first link is always valid,
+    /// subsequent links are valid only if the previous link is valid.
+    pub fn validate_chain(&mut self) -> bool {
+        for i in 0..self.chain.len() {
+            if i == 0 {
+                self.chain[i].valid = true;
+            } else {
+                self.chain[i].valid = self.chain[i - 1].valid;
+            }
+        }
+        self.is_valid()
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.chain.is_empty() && self.chain.iter().all(|l| l.valid)
+    }
+
+    pub fn chain_length(&self) -> usize {
+        self.chain.len()
+    }
+
+    pub fn root_signer(&self) -> Option<&str> {
+        self.chain.first().map(|l| l.signer.as_str())
+    }
+
+    pub fn leaf_signer(&self) -> Option<&str> {
+        self.chain.last().map(|l| l.signer.as_str())
+    }
+
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for (i, link) in self.chain.iter().enumerate() {
+            let status = if link.valid { "✓" } else { "✗" };
+            let hex: String = link.signature.iter().map(|b| format!("{b:02x}")).collect();
+            out.push_str(&format!(
+                "[{i}] {status} {} ({:?}) {hex}\n",
+                link.signer, link.algorithm,
+            ));
+        }
+        out
+    }
+}
+
+// ─── Revocation checker ──────────────────────────────────────────
+
+/// Record of a revoked key.
+#[derive(Debug, Clone)]
+pub struct RevocationEntry {
+    pub key_id: String,
+    pub reason: String,
+    pub revoked_at: u64,
+}
+
+/// Checks whether keys have been revoked.
+#[derive(Debug, Clone)]
+pub struct RevocationChecker {
+    revoked: HashMap<String, RevocationEntry>,
+}
+
+impl RevocationChecker {
+    pub fn new() -> Self {
+        Self {
+            revoked: HashMap::new(),
+        }
+    }
+
+    pub fn revoke(&mut self, key_id: &str, reason: &str, timestamp: u64) {
+        self.revoked.insert(
+            key_id.to_string(),
+            RevocationEntry {
+                key_id: key_id.to_string(),
+                reason: reason.to_string(),
+                revoked_at: timestamp,
+            },
+        );
+    }
+
+    pub fn is_revoked(&self, key_id: &str) -> bool {
+        self.revoked.contains_key(key_id)
+    }
+
+    pub fn revocation_reason(&self, key_id: &str) -> Option<&str> {
+        self.revoked.get(key_id).map(|e| e.reason.as_str())
+    }
+
+    pub fn revoked_count(&self) -> usize {
+        self.revoked.len()
+    }
+
+    pub fn revoked_since(&self, since: u64) -> Vec<&RevocationEntry> {
+        self.revoked
+            .values()
+            .filter(|e| e.revoked_at >= since)
+            .collect()
+    }
+
+    /// Returns `true` if the signature's signer has not been revoked.
+    pub fn check_signature(&self, signature: &Signature) -> bool {
+        match &signature.signer {
+            Some(s) => !self.is_revoked(s),
+            None => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2037,5 +2342,153 @@ mod tests {
         let display = format!("{meta}");
         assert!(display.contains("Ed25519"));
         assert!(display.contains("bob"));
+    }
+
+    // ─── SignatureVerifier tests ──────────────────────────────────
+
+    #[test]
+    fn verifier_valid_package() {
+        let key = b"trusted-key";
+        let content = b"package data";
+        let sig = sign_content(content, key, SignatureAlgorithm::HmacSha256Stub);
+        let mut v = SignatureVerifier::new();
+        v.add_key("k1", key, SignatureAlgorithm::HmacSha256Stub);
+        let result = v.verify_package(content, &sig);
+        assert!(result.is_valid());
+        assert_eq!(format!("{result}"), "Valid(key=k1)");
+    }
+
+    #[test]
+    fn verifier_invalid_signature() {
+        let mut v = SignatureVerifier::new();
+        v.add_key("k1", b"wrong-key", SignatureAlgorithm::HmacSha256Stub);
+        let sig = sign_content(b"data", b"real-key", SignatureAlgorithm::HmacSha256Stub);
+        let result = v.verify_package(b"data", &sig);
+        assert_eq!(result, VerifyResult::Invalid);
+        assert!(!result.is_valid());
+    }
+
+    #[test]
+    fn verifier_no_matching_key() {
+        let v = SignatureVerifier::new();
+        let sig = sign_content(b"data", b"key", SignatureAlgorithm::HmacSha256Stub);
+        assert_eq!(v.verify_package(b"data", &sig), VerifyResult::NoMatchingKey);
+    }
+
+    #[test]
+    fn verifier_key_not_trusted() {
+        let mut v = SignatureVerifier::new();
+        v.add_key("k1", b"key", SignatureAlgorithm::HmacSha256Stub);
+        v.trusted_keys[0].trusted = false;
+        let sig = sign_content(b"data", b"key", SignatureAlgorithm::HmacSha256Stub);
+        let result = v.verify_package(b"data", &sig);
+        assert_eq!(result, VerifyResult::KeyNotTrusted("k1".into()));
+        assert!(format!("{result}").contains("k1"));
+    }
+
+    // ─── SignatureTrustStore tests ───────────────────────────────
+
+    #[test]
+    fn trust_store_operations() {
+        let mut ts = SignatureTrustStore::new();
+        ts.add_trusted("a", TrustLevel::Full, 100);
+        ts.add_trusted("b", TrustLevel::Partial, 200);
+        ts.add_trusted("c", TrustLevel::Untrusted, 300);
+        assert!(ts.is_trusted("a"));
+        assert!(ts.is_trusted("b"));
+        assert!(!ts.is_trusted("c"));
+        assert!(!ts.is_trusted("missing"));
+        assert_eq!(ts.trusted_count(), 2);
+        assert_eq!(*ts.get_trust_level("a").unwrap(), TrustLevel::Full);
+        assert!(ts.get_trust_level("missing").is_none());
+    }
+
+    #[test]
+    fn trust_store_revoke_and_mark_used() {
+        let mut ts = SignatureTrustStore::new();
+        ts.add_trusted("k", TrustLevel::Full, 10);
+        assert!(ts.is_trusted("k"));
+        assert!(ts.revoke("k"));
+        assert!(!ts.is_trusted("k"));
+        assert!(!ts.revoke("nonexistent"));
+        ts.add_trusted("k2", TrustLevel::Partial, 20);
+        ts.mark_used("k2", 50);
+        let entries = ts.all_entries();
+        let k2 = entries.iter().find(|e| e.key_id == "k2").unwrap();
+        assert_eq!(k2.last_used, Some(50));
+    }
+
+    #[test]
+    fn trust_level_display() {
+        assert_eq!(format!("{}", TrustLevel::Full), "Full");
+        assert_eq!(format!("{}", TrustLevel::Partial), "Partial");
+        assert_eq!(format!("{}", TrustLevel::Untrusted), "Untrusted");
+    }
+
+    // ─── SignatureChain tests ────────────────────────────────────
+
+    #[test]
+    fn chain_validate_and_render() {
+        let mut chain = SignatureChain::new();
+        chain.add_link("root-ca", &[0xAA], SignatureAlgorithm::Ed25519Stub);
+        chain.add_link("intermediate", &[0xBB], SignatureAlgorithm::Ed25519Stub);
+        chain.add_link("leaf", &[0xCC], SignatureAlgorithm::HmacSha256Stub);
+        assert!(!chain.is_valid());
+        assert!(chain.validate_chain());
+        assert!(chain.is_valid());
+        assert_eq!(chain.chain_length(), 3);
+        assert_eq!(chain.root_signer(), Some("root-ca"));
+        assert_eq!(chain.leaf_signer(), Some("leaf"));
+        let rendered = chain.render();
+        assert!(rendered.contains("root-ca"));
+        assert!(rendered.contains("leaf"));
+        assert!(rendered.contains("✓"));
+    }
+
+    #[test]
+    fn chain_empty_is_invalid() {
+        let chain = SignatureChain::new();
+        assert!(!chain.is_valid());
+        assert_eq!(chain.chain_length(), 0);
+        assert!(chain.root_signer().is_none());
+        assert!(chain.leaf_signer().is_none());
+    }
+
+    // ─── RevocationChecker tests ─────────────────────────────────
+
+    #[test]
+    fn revocation_basic_operations() {
+        let mut rc = RevocationChecker::new();
+        rc.revoke("bad-key", "compromised", 1000);
+        assert!(rc.is_revoked("bad-key"));
+        assert!(!rc.is_revoked("good-key"));
+        assert_eq!(rc.revocation_reason("bad-key"), Some("compromised"));
+        assert!(rc.revocation_reason("good-key").is_none());
+        assert_eq!(rc.revoked_count(), 1);
+    }
+
+    #[test]
+    fn revocation_since_filter() {
+        let mut rc = RevocationChecker::new();
+        rc.revoke("old", "expired", 100);
+        rc.revoke("new", "leaked", 500);
+        let since_300 = rc.revoked_since(300);
+        assert_eq!(since_300.len(), 1);
+        assert_eq!(since_300[0].key_id, "new");
+        assert_eq!(rc.revoked_since(0).len(), 2);
+    }
+
+    #[test]
+    fn revocation_check_signature() {
+        let mut rc = RevocationChecker::new();
+        rc.revoke("alice", "compromised", 1000);
+        let good_sig = sign_content(b"data", b"key", SignatureAlgorithm::HmacSha256Stub)
+            .with_signer("bob");
+        let bad_sig = sign_content(b"data", b"key", SignatureAlgorithm::HmacSha256Stub)
+            .with_signer("alice");
+        let anon_sig = sign_content(b"data", b"key", SignatureAlgorithm::HmacSha256Stub);
+        assert!(rc.check_signature(&good_sig));
+        assert!(!rc.check_signature(&bad_sig));
+        assert!(rc.check_signature(&anon_sig));
     }
 }

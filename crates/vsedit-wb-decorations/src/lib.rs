@@ -1148,6 +1148,130 @@ impl DecorationFilter {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// DecorationLayerOrder
+// ---------------------------------------------------------------------------
+
+pub struct DecorationLayerOrder;
+
+impl DecorationLayerOrder {
+    pub fn compare(a: DecorationPriority, b: DecorationPriority) -> std::cmp::Ordering {
+        let rank = |p: &DecorationPriority| match p {
+            DecorationPriority::Low => 0,
+            DecorationPriority::Normal => 1,
+            DecorationPriority::High => 2,
+            DecorationPriority::Critical => 3,
+        };
+        rank(&a).cmp(&rank(&b))
+    }
+
+    pub fn is_higher(a: DecorationPriority, b: DecorationPriority) -> bool {
+        Self::compare(a, b) == std::cmp::Ordering::Greater
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DecorationPerformanceTracker
+// ---------------------------------------------------------------------------
+
+pub struct DecorationPerformanceTracker {
+    update_times_ms: Vec<u64>,
+    total_updates: u64,
+}
+
+impl DecorationPerformanceTracker {
+    pub fn new() -> Self { Self { update_times_ms: Vec::new(), total_updates: 0 } }
+
+    pub fn record_update(&mut self, duration_ms: u64) {
+        self.update_times_ms.push(duration_ms);
+        self.total_updates += 1;
+    }
+
+    pub fn average_update_ms(&self) -> Option<u64> {
+        if self.update_times_ms.is_empty() { None }
+        else { Some(self.update_times_ms.iter().sum::<u64>() / self.update_times_ms.len() as u64) }
+    }
+
+    pub fn max_update_ms(&self) -> Option<u64> { self.update_times_ms.iter().copied().max() }
+    pub fn total_updates(&self) -> u64 { self.total_updates }
+    pub fn reset(&mut self) { self.update_times_ms.clear(); self.total_updates = 0; }
+
+    pub fn slow_updates(&self, threshold_ms: u64) -> usize {
+        self.update_times_ms.iter().filter(|&&t| t > threshold_ms).count()
+    }
+}
+
+impl Default for DecorationPerformanceTracker { fn default() -> Self { Self::new() } }
+
+impl fmt::Display for DecorationPerformanceTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PerfTracker({} updates)", self.total_updates)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DecorationBulkUpdater
+// ---------------------------------------------------------------------------
+
+pub struct DecorationBulkUpdater {
+    pending: Vec<(String, String, Vec<DecorationRange>)>,
+}
+
+impl DecorationBulkUpdater {
+    pub fn new() -> Self { Self { pending: Vec::new() } }
+
+    pub fn queue(&mut self, type_id: impl Into<String>, uri: impl Into<String>, ranges: Vec<DecorationRange>) {
+        self.pending.push((type_id.into(), uri.into(), ranges));
+    }
+
+    pub fn apply(&mut self, service: &mut DecorationService) {
+        for (type_id, uri, ranges) in self.pending.drain(..) {
+            service.set_decorations(type_id, uri, ranges);
+        }
+    }
+
+    pub fn pending_count(&self) -> usize { self.pending.len() }
+    pub fn is_empty(&self) -> bool { self.pending.is_empty() }
+    pub fn clear(&mut self) { self.pending.clear(); }
+}
+
+impl Default for DecorationBulkUpdater { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// DecorationColorTheme
+// ---------------------------------------------------------------------------
+
+pub struct DecorationColorTheme {
+    colors: std::collections::HashMap<String, String>,
+}
+
+impl DecorationColorTheme {
+    pub fn new() -> Self { Self { colors: std::collections::HashMap::new() } }
+
+    pub fn set_color(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.colors.insert(key.into(), value.into());
+    }
+
+    pub fn get_color(&self, key: &str) -> Option<&str> {
+        self.colors.get(key).map(|s| s.as_str())
+    }
+
+    pub fn with_defaults() -> Self {
+        let mut theme = Self::new();
+        theme.set_color("error", "#ff0000");
+        theme.set_color("warning", "#ffaa00");
+        theme.set_color("info", "#0088ff");
+        theme.set_color("hint", "#888888");
+        theme
+    }
+
+    pub fn len(&self) -> usize { self.colors.len() }
+    pub fn is_empty(&self) -> bool { self.colors.is_empty() }
+}
+
+impl Default for DecorationColorTheme { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2068,4 +2192,91 @@ mod tests {
         assert_eq!(DecorationSource::LanguageServer.to_string(), "language-server");
         assert_eq!(DecorationSource::Debugger.to_string(), "debugger");
     }
+
+
+    #[test]
+    fn layer_order_compare() {
+        assert!(DecorationLayerOrder::is_higher(DecorationPriority::High, DecorationPriority::Low));
+        assert!(!DecorationLayerOrder::is_higher(DecorationPriority::Low, DecorationPriority::High));
+    }
+
+    #[test]
+    fn perf_tracker_basic() {
+        let mut t = DecorationPerformanceTracker::new();
+        t.record_update(10);
+        t.record_update(20);
+        t.record_update(30);
+        assert_eq!(t.average_update_ms(), Some(20));
+        assert_eq!(t.max_update_ms(), Some(30));
+        assert_eq!(t.total_updates(), 3);
+    }
+
+    #[test]
+    fn perf_tracker_slow() {
+        let mut t = DecorationPerformanceTracker::new();
+        t.record_update(5);
+        t.record_update(50);
+        t.record_update(100);
+        assert_eq!(t.slow_updates(20), 2);
+    }
+
+    #[test]
+    fn perf_tracker_reset() {
+        let mut t = DecorationPerformanceTracker::new();
+        t.record_update(10);
+        t.reset();
+        assert_eq!(t.total_updates(), 0);
+        assert_eq!(t.average_update_ms(), None);
+    }
+
+    #[test]
+    fn bulk_updater_basic() {
+        let mut updater = DecorationBulkUpdater::new();
+        updater.queue("type1", "file://a.rs", vec![]);
+        assert_eq!(updater.pending_count(), 1);
+        let mut svc = DecorationService::new();
+        svc.register_type(sample_type("type1"));
+        updater.apply(&mut svc);
+        assert!(updater.is_empty());
+    }
+
+    #[test]
+    fn bulk_updater_clear() {
+        let mut u = DecorationBulkUpdater::new();
+        u.queue("t", "u", vec![]);
+        u.clear();
+        assert!(u.is_empty());
+    }
+
+    #[test]
+    fn color_theme_defaults() {
+        let theme = DecorationColorTheme::with_defaults();
+        assert_eq!(theme.get_color("error"), Some("#ff0000"));
+        assert!(theme.len() >= 4);
+    }
+
+    #[test]
+    fn color_theme_custom() {
+        let mut theme = DecorationColorTheme::new();
+        theme.set_color("custom", "#123456");
+        assert_eq!(theme.get_color("custom"), Some("#123456"));
+    }
+
+    #[test]
+    fn perf_tracker_display() {
+        let t = DecorationPerformanceTracker::new();
+        assert!(format!("{t}").contains("0 updates"));
+    }
+
+    #[test]
+    fn layer_order_equal() {
+        assert!(!DecorationLayerOrder::is_higher(DecorationPriority::Normal, DecorationPriority::Normal));
+    }
+
+    #[test]
+    fn color_theme_missing() {
+        let theme = DecorationColorTheme::new();
+        assert_eq!(theme.get_color("nonexistent"), None);
+    }
+
 }

@@ -2,6 +2,7 @@
 //!
 //! Equivalent to VS Code's `vs/base/common/strings.ts`.
 
+use std::collections::HashMap;
 use std::fmt;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -1428,6 +1429,326 @@ pub fn repeat_char(c: char, count: usize) -> String {
     std::iter::repeat(c).take(count).collect()
 }
 
+// ---------------------------------------------------------------------------
+// StringTemplate – `${var}` substitution
+// ---------------------------------------------------------------------------
+
+/// A compiled string template that supports `${variable}` substitution.
+///
+/// Variables are delimited by `${` and `}`. Unresolved variables are left
+/// verbatim in the output.
+///
+/// ```
+/// use std::collections::HashMap;
+/// use vsedit_strings::StringTemplate;
+///
+/// let tpl = StringTemplate::new("Hello, ${name}! You have ${count} items.");
+/// let mut vars = HashMap::new();
+/// vars.insert("name".into(), "Alice".into());
+/// vars.insert("count".into(), "3".into());
+/// assert_eq!(tpl.render(&vars), "Hello, Alice! You have 3 items.");
+/// ```
+pub struct StringTemplate {
+    template: String,
+}
+
+impl StringTemplate {
+    /// Create a new template from a format string.
+    pub fn new(template: &str) -> Self {
+        Self {
+            template: template.to_string(),
+        }
+    }
+
+    /// Render the template by replacing `${key}` with the corresponding value
+    /// from `vars`. Variables not present in `vars` are left as-is.
+    pub fn render(&self, vars: &HashMap<String, String>) -> String {
+        let mut result = String::with_capacity(self.template.len());
+        let bytes = self.template.as_bytes();
+        let len = bytes.len();
+        let mut i = 0;
+
+        while i < len {
+            if i + 1 < len && bytes[i] == b'$' && bytes[i + 1] == b'{' {
+                if let Some(end) = self.template[i + 2..].find('}') {
+                    let var_name = &self.template[i + 2..i + 2 + end];
+                    if let Some(val) = vars.get(var_name) {
+                        result.push_str(val);
+                    } else {
+                        // Leave unresolved variables verbatim.
+                        result.push_str(&self.template[i..i + 2 + end + 1]);
+                    }
+                    i += 2 + end + 1;
+                } else {
+                    result.push(bytes[i] as char);
+                    i += 1;
+                }
+            } else {
+                result.push(bytes[i] as char);
+                i += 1;
+            }
+        }
+
+        result
+    }
+
+    /// Extract the unique variable names referenced in the template, returned
+    /// in the order of first occurrence.
+    pub fn variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let bytes = self.template.as_bytes();
+        let len = bytes.len();
+        let mut i = 0;
+
+        while i < len {
+            if i + 1 < len && bytes[i] == b'$' && bytes[i + 1] == b'{' {
+                if let Some(end) = self.template[i + 2..].find('}') {
+                    let var_name = &self.template[i + 2..i + 2 + end];
+                    if seen.insert(var_name.to_string()) {
+                        vars.push(var_name.to_string());
+                    }
+                    i += 2 + end + 1;
+                } else {
+                    i += 1;
+                }
+            } else {
+                i += 1;
+            }
+        }
+
+        vars
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringTrimmer – configurable truncation
+// ---------------------------------------------------------------------------
+
+/// Where to apply truncation when a string exceeds the maximum length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrimPosition {
+    /// Remove characters from the start.
+    Start,
+    /// Remove characters from the middle.
+    Middle,
+    /// Remove characters from the end (default).
+    End,
+}
+
+/// Trims strings to a maximum *grapheme-cluster* length with a configurable
+/// marker and position.
+pub struct StringTrimmer {
+    max_length: usize,
+    trim_marker: String,
+    trim_position: TrimPosition,
+}
+
+impl StringTrimmer {
+    /// Create a new trimmer that truncates at `max_length` grapheme clusters.
+    pub fn new(max_length: usize) -> Self {
+        Self {
+            max_length,
+            trim_marker: "...".to_string(),
+            trim_position: TrimPosition::End,
+        }
+    }
+
+    /// Set the marker that indicates truncated content (default `"..."`).
+    pub fn with_marker(mut self, marker: &str) -> Self {
+        self.trim_marker = marker.to_string();
+        self
+    }
+
+    /// Set the position at which truncation occurs.
+    pub fn with_position(mut self, pos: TrimPosition) -> Self {
+        self.trim_position = pos;
+        self
+    }
+
+    /// Trim `input` according to the configured parameters. If the input is
+    /// already within `max_length` it is returned unchanged.
+    pub fn trim(&self, input: &str) -> String {
+        let graphemes: Vec<&str> = input.graphemes(true).collect();
+        let g_len = graphemes.len();
+
+        if g_len <= self.max_length {
+            return input.to_string();
+        }
+
+        let marker_graphemes: Vec<&str> = self.trim_marker.graphemes(true).collect();
+        let marker_len = marker_graphemes.len();
+
+        // If the marker alone fills the budget, return a truncated marker.
+        if marker_len >= self.max_length {
+            return marker_graphemes[..self.max_length].concat();
+        }
+
+        let budget = self.max_length - marker_len;
+
+        match self.trim_position {
+            TrimPosition::End => {
+                let mut out = graphemes[..budget].concat();
+                out.push_str(&self.trim_marker);
+                out
+            }
+            TrimPosition::Start => {
+                let mut out = self.trim_marker.clone();
+                out.push_str(&graphemes[g_len - budget..].concat());
+                out
+            }
+            TrimPosition::Middle => {
+                let left = (budget + 1) / 2;
+                let right = budget / 2;
+                let mut out = graphemes[..left].concat();
+                out.push_str(&self.trim_marker);
+                out.push_str(&graphemes[g_len - right..].concat());
+                out
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringEscaper – HTML and shell escaping
+// ---------------------------------------------------------------------------
+
+/// Provides static helper methods to escape strings for different contexts.
+pub struct StringEscaper;
+
+impl StringEscaper {
+    /// Escape the five XML/HTML special characters:
+    /// `&`, `<`, `>`, `"`, `'`.
+    pub fn escape_html(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        for c in s.chars() {
+            match c {
+                '&' => out.push_str("&amp;"),
+                '<' => out.push_str("&lt;"),
+                '>' => out.push_str("&gt;"),
+                '"' => out.push_str("&quot;"),
+                '\'' => out.push_str("&#39;"),
+                _ => out.push(c),
+            }
+        }
+        out
+    }
+
+    /// Escape shell meta-characters by prefixing each with a backslash.
+    ///
+    /// The set of characters escaped covers common POSIX shells:
+    /// `` \ ` $ " ! # & | ; ( ) { } [ ] < > * ? ~ ^ space tab newline ``
+    pub fn escape_shell(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        for c in s.chars() {
+            if matches!(
+                c,
+                '\\' | '`'
+                    | '$'
+                    | '"'
+                    | '!'
+                    | '#'
+                    | '&'
+                    | '|'
+                    | ';'
+                    | '('
+                    | ')'
+                    | '{'
+                    | '}'
+                    | '['
+                    | ']'
+                    | '<'
+                    | '>'
+                    | '*'
+                    | '?'
+                    | '~'
+                    | '^'
+                    | ' '
+                    | '\t'
+                    | '\n'
+                    | '\''
+            ) {
+                out.push('\\');
+            }
+            out.push(c);
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringFrequencyCounter – word / string frequency analysis
+// ---------------------------------------------------------------------------
+
+/// Counts occurrences of arbitrary strings.
+///
+/// ```
+/// use vsedit_strings::StringFrequencyCounter;
+///
+/// let mut counter = StringFrequencyCounter::new();
+/// counter.add("hello");
+/// counter.add("world");
+/// counter.add("hello");
+/// assert_eq!(counter.count("hello"), 2);
+/// assert_eq!(counter.unique_count(), 2);
+/// ```
+pub struct StringFrequencyCounter {
+    counts: HashMap<String, usize>,
+}
+
+impl StringFrequencyCounter {
+    /// Create an empty frequency counter.
+    pub fn new() -> Self {
+        Self {
+            counts: HashMap::new(),
+        }
+    }
+
+    /// Record one occurrence of `s`.
+    pub fn add(&mut self, s: &str) {
+        *self.counts.entry(s.to_string()).or_insert(0) += 1;
+    }
+
+    /// Return the number of times `s` has been recorded, or `0` if never seen.
+    pub fn count(&self, s: &str) -> usize {
+        self.counts.get(s).copied().unwrap_or(0)
+    }
+
+    /// Return the `n` most-common strings, ordered by descending frequency.
+    /// Ties are broken alphabetically.
+    pub fn most_common(&self, n: usize) -> Vec<(String, usize)> {
+        let mut entries: Vec<(String, usize)> = self
+            .counts
+            .iter()
+            .map(|(k, &v)| (k.clone(), v))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        entries.truncate(n);
+        entries
+    }
+
+    /// Return the number of distinct strings that have been recorded.
+    pub fn unique_count(&self) -> usize {
+        self.counts.len()
+    }
+
+    /// Return `true` if no strings have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.counts.is_empty()
+    }
+
+    /// Reset all counts to zero.
+    pub fn clear(&mut self) {
+        self.counts.clear();
+    }
+}
+
+impl Default for StringFrequencyCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2113,5 +2434,154 @@ mod tests {
         assert_eq!(repeat_char('x', 5), "xxxxx");
         assert_eq!(repeat_char('☆', 3), "☆☆☆");
         assert_eq!(repeat_char('a', 0), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // StringTemplate tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_template_basic_substitution() {
+        let tpl = StringTemplate::new("Hello, ${name}!");
+        let mut vars = HashMap::new();
+        vars.insert("name".into(), "World".into());
+        assert_eq!(tpl.render(&vars), "Hello, World!");
+    }
+
+    #[test]
+    fn test_template_multiple_variables() {
+        let tpl = StringTemplate::new("${greeting}, ${name}! You have ${n} items.");
+        let mut vars = HashMap::new();
+        vars.insert("greeting".into(), "Hi".into());
+        vars.insert("name".into(), "Bob".into());
+        vars.insert("n".into(), "42".into());
+        assert_eq!(tpl.render(&vars), "Hi, Bob! You have 42 items.");
+    }
+
+    #[test]
+    fn test_template_unresolved_variable() {
+        let tpl = StringTemplate::new("${known} and ${unknown}");
+        let mut vars = HashMap::new();
+        vars.insert("known".into(), "yes".into());
+        assert_eq!(tpl.render(&vars), "yes and ${unknown}");
+    }
+
+    #[test]
+    fn test_template_variables_extraction() {
+        let tpl = StringTemplate::new("${a} ${b} ${a} ${c}");
+        let vars = tpl.variables();
+        assert_eq!(vars, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_template_no_variables() {
+        let tpl = StringTemplate::new("plain text");
+        assert!(tpl.variables().is_empty());
+        let vars = HashMap::new();
+        assert_eq!(tpl.render(&vars), "plain text");
+    }
+
+    // -----------------------------------------------------------------------
+    // StringTrimmer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_trimmer_end() {
+        let trimmer = StringTrimmer::new(8);
+        assert_eq!(trimmer.trim("Hello, World!"), "Hello...");
+        assert_eq!(trimmer.trim("short"), "short");
+    }
+
+    #[test]
+    fn test_trimmer_start() {
+        let trimmer = StringTrimmer::new(8).with_position(TrimPosition::Start);
+        assert_eq!(trimmer.trim("Hello, World!"), "...orld!");
+    }
+
+    #[test]
+    fn test_trimmer_middle() {
+        let trimmer = StringTrimmer::new(10).with_position(TrimPosition::Middle);
+        assert_eq!(trimmer.trim("Hello, World!"), "Hell...ld!");
+    }
+
+    #[test]
+    fn test_trimmer_custom_marker() {
+        let trimmer = StringTrimmer::new(7).with_marker("…");
+        assert_eq!(trimmer.trim("abcdefghij"), "abcdef…");
+    }
+
+    // -----------------------------------------------------------------------
+    // StringEscaper tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_escape_html() {
+        assert_eq!(
+            StringEscaper::escape_html("<b>Hello & 'World'</b>"),
+            "&lt;b&gt;Hello &amp; &#39;World&#39;&lt;/b&gt;"
+        );
+        assert_eq!(
+            StringEscaper::escape_html("a < b && c > d"),
+            "a &lt; b &amp;&amp; c &gt; d"
+        );
+        assert_eq!(StringEscaper::escape_html("safe"), "safe");
+    }
+
+    #[test]
+    fn test_escape_shell() {
+        assert_eq!(StringEscaper::escape_shell("hello"), "hello");
+        assert_eq!(
+            StringEscaper::escape_shell("echo $HOME"),
+            "echo\\ \\$HOME"
+        );
+        assert_eq!(
+            StringEscaper::escape_shell("it's \"fine\""),
+            "it\\'s\\ \\\"fine\\\""
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // StringFrequencyCounter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_frequency_counter_basic() {
+        let mut counter = StringFrequencyCounter::new();
+        counter.add("apple");
+        counter.add("banana");
+        counter.add("apple");
+        counter.add("cherry");
+        counter.add("apple");
+        counter.add("banana");
+
+        assert_eq!(counter.count("apple"), 3);
+        assert_eq!(counter.count("banana"), 2);
+        assert_eq!(counter.count("cherry"), 1);
+        assert_eq!(counter.count("durian"), 0);
+        assert_eq!(counter.unique_count(), 3);
+    }
+
+    #[test]
+    fn test_frequency_counter_most_common() {
+        let mut counter = StringFrequencyCounter::new();
+        for _ in 0..5 {
+            counter.add("a");
+        }
+        for _ in 0..3 {
+            counter.add("b");
+        }
+        counter.add("c");
+
+        let top = counter.most_common(2);
+        assert_eq!(top, vec![("a".into(), 5), ("b".into(), 3)]);
+    }
+
+    #[test]
+    fn test_frequency_counter_empty() {
+        let counter = StringFrequencyCounter::new();
+        assert!(counter.is_empty());
+        assert_eq!(counter.unique_count(), 0);
+        assert_eq!(counter.count("anything"), 0);
+        assert!(counter.most_common(5).is_empty());
     }
 }

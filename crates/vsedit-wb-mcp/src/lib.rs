@@ -1135,6 +1135,348 @@ impl Default for McpRequestTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// McpToolValidator – input schema validation
+// ---------------------------------------------------------------------------
+
+/// The type of a field in a tool input schema.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SchemaFieldType {
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+}
+
+impl fmt::Display for SchemaFieldType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::String => write!(f, "string"),
+            Self::Number => write!(f, "number"),
+            Self::Boolean => write!(f, "boolean"),
+            Self::Array => write!(f, "array"),
+            Self::Object => write!(f, "object"),
+        }
+    }
+}
+
+/// Result of validating tool input against a schema.
+#[derive(Debug, Clone)]
+pub struct ValidationResult {
+    pub valid: bool,
+    pub errors: Vec<String>,
+}
+
+impl ValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.valid
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.errors.len()
+    }
+
+    pub fn summary(&self) -> String {
+        if self.valid {
+            "Validation passed".to_string()
+        } else {
+            format!(
+                "Validation failed with {} error(s): {}",
+                self.errors.len(),
+                self.errors.join("; ")
+            )
+        }
+    }
+}
+
+impl fmt::Display for ValidationResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+/// Validates tool input fields against a declared schema.
+#[derive(Debug, Clone)]
+pub struct McpToolValidator {
+    pub required_fields: Vec<String>,
+    pub field_types: std::collections::HashMap<String, SchemaFieldType>,
+}
+
+impl McpToolValidator {
+    pub fn new() -> Self {
+        Self {
+            required_fields: Vec::new(),
+            field_types: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register a required field with its expected type.
+    pub fn require_field(&mut self, name: &str, field_type: SchemaFieldType) {
+        let name = name.to_string();
+        if !self.required_fields.contains(&name) {
+            self.required_fields.push(name.clone());
+        }
+        self.field_types.insert(name, field_type);
+    }
+
+    /// Validate an input map against the schema.
+    pub fn validate(
+        &self,
+        input: &std::collections::HashMap<String, String>,
+    ) -> ValidationResult {
+        let mut errors = Vec::new();
+
+        for field in &self.required_fields {
+            if !input.contains_key(field) {
+                errors.push(format!("missing required field '{field}'"));
+            }
+        }
+
+        for (field, expected) in &self.field_types {
+            if let Some(value) = input.get(field) {
+                let ok = match expected {
+                    SchemaFieldType::String => true,
+                    SchemaFieldType::Number => value.parse::<f64>().is_ok(),
+                    SchemaFieldType::Boolean => {
+                        value == "true" || value == "false"
+                    }
+                    SchemaFieldType::Array => {
+                        value.starts_with('[') && value.ends_with(']')
+                    }
+                    SchemaFieldType::Object => {
+                        value.starts_with('{') && value.ends_with('}')
+                    }
+                };
+                if !ok {
+                    errors.push(format!(
+                        "field '{field}' expected type {expected}, got '{value}'"
+                    ));
+                }
+            }
+        }
+
+        ValidationResult {
+            valid: errors.is_empty(),
+            errors,
+        }
+    }
+}
+
+impl Default for McpToolValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// McpRetryPolicy – retry / back-off logic
+// ---------------------------------------------------------------------------
+
+/// Configurable retry policy with exponential back-off.
+#[derive(Debug, Clone)]
+pub struct McpRetryPolicy {
+    pub max_retries: u32,
+    pub base_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub backoff_factor: f64,
+}
+
+impl McpRetryPolicy {
+    pub fn new(max_retries: u32) -> Self {
+        Self {
+            max_retries,
+            base_delay_ms: 1000,
+            max_delay_ms: 30_000,
+            backoff_factor: 2.0,
+        }
+    }
+
+    pub fn with_exponential_backoff(max: u32, base_ms: u64, factor: f64) -> Self {
+        Self {
+            max_retries: max,
+            base_delay_ms: base_ms,
+            max_delay_ms: u64::MAX,
+            backoff_factor: factor,
+        }
+    }
+
+    /// Compute the delay (in ms) for the given zero-based attempt, capped at
+    /// `max_delay_ms`.
+    pub fn delay_for_attempt(&self, attempt: u32) -> u64 {
+        let delay =
+            (self.base_delay_ms as f64 * self.backoff_factor.powi(attempt as i32)) as u64;
+        delay.min(self.max_delay_ms)
+    }
+
+    pub fn should_retry(&self, attempt: u32) -> bool {
+        attempt < self.max_retries
+    }
+
+    /// Sum of delays across all retry attempts.
+    pub fn total_max_delay(&self) -> u64 {
+        (0..self.max_retries)
+            .map(|a| self.delay_for_attempt(a))
+            .sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// McpToolCatalog – searchable tool registry
+// ---------------------------------------------------------------------------
+
+/// A single entry in the tool catalog.
+#[derive(Debug, Clone)]
+pub struct CatalogEntry {
+    pub tool_name: String,
+    pub server_id: String,
+    pub description: String,
+    pub tags: Vec<String>,
+}
+
+/// Searchable catalog of tools across MCP servers.
+#[derive(Debug, Clone)]
+pub struct McpToolCatalog {
+    pub tools: Vec<CatalogEntry>,
+}
+
+impl McpToolCatalog {
+    pub fn new() -> Self {
+        Self { tools: Vec::new() }
+    }
+
+    pub fn register(&mut self, entry: CatalogEntry) {
+        self.tools.push(entry);
+    }
+
+    /// Case-insensitive search over tool name and description.
+    pub fn search(&self, query: &str) -> Vec<&CatalogEntry> {
+        let q = query.to_lowercase();
+        self.tools
+            .iter()
+            .filter(|e| {
+                e.tool_name.to_lowercase().contains(&q)
+                    || e.description.to_lowercase().contains(&q)
+            })
+            .collect()
+    }
+
+    pub fn by_tag(&self, tag: &str) -> Vec<&CatalogEntry> {
+        self.tools
+            .iter()
+            .filter(|e| e.tags.iter().any(|t| t == tag))
+            .collect()
+    }
+
+    pub fn by_server(&self, server_id: &str) -> Vec<&CatalogEntry> {
+        self.tools
+            .iter()
+            .filter(|e| e.server_id == server_id)
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.tools.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
+
+    /// Collect all unique tags present in the catalog.
+    pub fn all_tags(&self) -> Vec<&str> {
+        let mut tags: Vec<&str> =
+            self.tools.iter().flat_map(|e| e.tags.iter().map(|t| t.as_str())).collect();
+        tags.sort_unstable();
+        tags.dedup();
+        tags
+    }
+}
+
+impl Default for McpToolCatalog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// McpConnectionState – connection state machine
+// ---------------------------------------------------------------------------
+
+/// Phase of an MCP connection lifecycle.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConnectionPhase {
+    Disconnected,
+    Connecting,
+    Initializing,
+    Ready,
+    Error(String),
+}
+
+impl fmt::Display for ConnectionPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disconnected => write!(f, "disconnected"),
+            Self::Connecting => write!(f, "connecting"),
+            Self::Initializing => write!(f, "initializing"),
+            Self::Ready => write!(f, "ready"),
+            Self::Error(msg) => write!(f, "error: {msg}"),
+        }
+    }
+}
+
+/// Tracks the current connection phase and enforces valid transitions.
+#[derive(Debug, Clone)]
+pub struct McpConnectionState {
+    phase: ConnectionPhase,
+}
+
+impl McpConnectionState {
+    pub fn new() -> Self {
+        Self {
+            phase: ConnectionPhase::Disconnected,
+        }
+    }
+
+    /// Attempt a state transition. Returns `true` if the transition is valid.
+    pub fn transition(&mut self, to: ConnectionPhase) -> bool {
+        let valid = match (&self.phase, &to) {
+            (_, ConnectionPhase::Disconnected) => true,
+            (_, ConnectionPhase::Error(_)) => true,
+            (ConnectionPhase::Disconnected, ConnectionPhase::Connecting) => true,
+            (ConnectionPhase::Connecting, ConnectionPhase::Initializing) => true,
+            (ConnectionPhase::Initializing, ConnectionPhase::Ready) => true,
+            _ => false,
+        };
+        if valid {
+            self.phase = to;
+        }
+        valid
+    }
+
+    pub fn phase(&self) -> &ConnectionPhase {
+        &self.phase
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.phase == ConnectionPhase::Ready
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.phase, ConnectionPhase::Error(_))
+    }
+
+    pub fn can_send(&self) -> bool {
+        self.phase == ConnectionPhase::Ready
+    }
+}
+
+impl Default for McpConnectionState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2025,6 +2367,164 @@ mod tests {
         tracker.issue("resources/list", "srv2", 102);
         assert_eq!(tracker.cancel_for_server("srv1"), 2);
         assert_eq!(tracker.pending_count(), 1);
+    }
+
+    // --- McpToolValidator tests ---
+
+    #[test]
+    fn validator_accepts_valid_input() {
+        let mut v = McpToolValidator::new();
+        v.require_field("name", SchemaFieldType::String);
+        v.require_field("count", SchemaFieldType::Number);
+        let mut input = std::collections::HashMap::new();
+        input.insert("name".into(), "alice".into());
+        input.insert("count".into(), "42".into());
+        let res = v.validate(&input);
+        assert!(res.is_valid());
+        assert_eq!(res.error_count(), 0);
+    }
+
+    #[test]
+    fn validator_detects_missing_field() {
+        let mut v = McpToolValidator::new();
+        v.require_field("name", SchemaFieldType::String);
+        let input = std::collections::HashMap::new();
+        let res = v.validate(&input);
+        assert!(!res.is_valid());
+        assert_eq!(res.error_count(), 1);
+        assert!(res.summary().contains("missing"));
+    }
+
+    #[test]
+    fn validator_detects_wrong_type() {
+        let mut v = McpToolValidator::new();
+        v.require_field("flag", SchemaFieldType::Boolean);
+        let mut input = std::collections::HashMap::new();
+        input.insert("flag".into(), "notbool".into());
+        let res = v.validate(&input);
+        assert!(!res.is_valid());
+        assert!(res.errors[0].contains("expected type boolean"));
+    }
+
+    #[test]
+    fn schema_field_type_display() {
+        assert_eq!(format!("{}", SchemaFieldType::Array), "array");
+        assert_eq!(format!("{}", SchemaFieldType::Object), "object");
+    }
+
+    // --- McpRetryPolicy tests ---
+
+    #[test]
+    fn retry_policy_basic() {
+        let p = McpRetryPolicy::new(3);
+        assert!(p.should_retry(0));
+        assert!(p.should_retry(2));
+        assert!(!p.should_retry(3));
+    }
+
+    #[test]
+    fn retry_policy_exponential_delay() {
+        let p = McpRetryPolicy::with_exponential_backoff(5, 100, 2.0);
+        assert_eq!(p.delay_for_attempt(0), 100);
+        assert_eq!(p.delay_for_attempt(1), 200);
+        assert_eq!(p.delay_for_attempt(2), 400);
+    }
+
+    #[test]
+    fn retry_policy_cap_at_max_delay() {
+        let mut p = McpRetryPolicy::new(5);
+        p.max_delay_ms = 500;
+        p.base_delay_ms = 100;
+        p.backoff_factor = 10.0;
+        // attempt 2 => 100*100 = 10000, capped to 500
+        assert_eq!(p.delay_for_attempt(2), 500);
+    }
+
+    #[test]
+    fn retry_policy_total_max_delay() {
+        let p = McpRetryPolicy::with_exponential_backoff(3, 100, 2.0);
+        // attempts 0,1,2 => 100 + 200 + 400 = 700
+        assert_eq!(p.total_max_delay(), 700);
+    }
+
+    // --- McpToolCatalog tests ---
+
+    #[test]
+    fn catalog_search_case_insensitive() {
+        let mut cat = McpToolCatalog::new();
+        cat.register(CatalogEntry {
+            tool_name: "RunQuery".into(),
+            server_id: "s1".into(),
+            description: "Execute a database query".into(),
+            tags: vec!["db".into()],
+        });
+        assert_eq!(cat.search("runquery").len(), 1);
+        assert_eq!(cat.search("DATABASE").len(), 1);
+        assert_eq!(cat.search("missing").len(), 0);
+    }
+
+    #[test]
+    fn catalog_by_tag_and_server() {
+        let mut cat = McpToolCatalog::new();
+        cat.register(CatalogEntry {
+            tool_name: "t1".into(),
+            server_id: "s1".into(),
+            description: "".into(),
+            tags: vec!["a".into(), "b".into()],
+        });
+        cat.register(CatalogEntry {
+            tool_name: "t2".into(),
+            server_id: "s2".into(),
+            description: "".into(),
+            tags: vec!["b".into()],
+        });
+        assert_eq!(cat.by_tag("a").len(), 1);
+        assert_eq!(cat.by_tag("b").len(), 2);
+        assert_eq!(cat.by_server("s1").len(), 1);
+        assert_eq!(cat.len(), 2);
+        assert_eq!(cat.all_tags(), vec!["a", "b"]);
+    }
+
+    // --- McpConnectionState tests ---
+
+    #[test]
+    fn connection_state_valid_transitions() {
+        let mut s = McpConnectionState::new();
+        assert_eq!(*s.phase(), ConnectionPhase::Disconnected);
+        assert!(s.transition(ConnectionPhase::Connecting));
+        assert!(s.transition(ConnectionPhase::Initializing));
+        assert!(!s.can_send());
+        assert!(s.transition(ConnectionPhase::Ready));
+        assert!(s.is_ready());
+        assert!(s.can_send());
+    }
+
+    #[test]
+    fn connection_state_invalid_transition_rejected() {
+        let mut s = McpConnectionState::new();
+        // Disconnected -> Ready is invalid
+        assert!(!s.transition(ConnectionPhase::Ready));
+        assert_eq!(*s.phase(), ConnectionPhase::Disconnected);
+    }
+
+    #[test]
+    fn connection_state_error_from_any() {
+        let mut s = McpConnectionState::new();
+        assert!(s.transition(ConnectionPhase::Connecting));
+        assert!(s.transition(ConnectionPhase::Error("timeout".into())));
+        assert!(s.is_error());
+        assert!(!s.can_send());
+        // can go back to disconnected from error
+        assert!(s.transition(ConnectionPhase::Disconnected));
+    }
+
+    #[test]
+    fn connection_phase_display() {
+        assert_eq!(format!("{}", ConnectionPhase::Ready), "ready");
+        assert_eq!(
+            format!("{}", ConnectionPhase::Error("boom".into())),
+            "error: boom"
+        );
     }
 
 }

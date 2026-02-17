@@ -6,6 +6,8 @@
 //! Also re-exports file-system search, replace, fuzzy file name search, and
 //! symbol extraction from [`vsedit_wb_search`].
 
+use std::collections::BTreeMap;
+use std::fmt;
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -1280,6 +1282,415 @@ impl SearchView {
 }
 
 // ---------------------------------------------------------------------------
+// SearchResultDecorator — highlight match ranges in search results
+// ---------------------------------------------------------------------------
+
+/// A single decorated line split at a match boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecoratedLine {
+    pub before: String,
+    pub matched: String,
+    pub after: String,
+}
+
+impl fmt::Display for DecoratedLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}[{}]{}", self.before, self.matched, self.after)
+    }
+}
+
+/// A segment of text that may or may not be a match.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecoratedSegment {
+    pub text: String,
+    pub is_match: bool,
+}
+
+impl fmt::Display for DecoratedSegment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_match {
+            write!(f, "[{}]", self.text)
+        } else {
+            write!(f, "{}", self.text)
+        }
+    }
+}
+
+/// Highlights match ranges within search result lines.
+#[derive(Debug, Clone)]
+pub struct SearchResultDecorator;
+
+impl SearchResultDecorator {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Split `line` into before / matched / after at the given byte range.
+    pub fn decorate(&self, line: &str, match_start: usize, match_end: usize) -> DecoratedLine {
+        let start = match_start.min(line.len());
+        let end = match_end.min(line.len()).max(start);
+        DecoratedLine {
+            before: line[..start].to_string(),
+            matched: line[start..end].to_string(),
+            after: line[end..].to_string(),
+        }
+    }
+
+    /// Split `line` into alternating non-match / match segments for multiple
+    /// non-overlapping, sorted ranges.
+    pub fn decorate_all(&self, line: &str, ranges: &[(usize, usize)]) -> Vec<DecoratedSegment> {
+        let mut segments = Vec::new();
+        let mut cursor = 0usize;
+
+        for &(start, end) in ranges {
+            let s = start.min(line.len());
+            let e = end.min(line.len()).max(s);
+            if s < cursor {
+                continue; // skip overlapping / out-of-order ranges
+            }
+            if cursor < s {
+                segments.push(DecoratedSegment {
+                    text: line[cursor..s].to_string(),
+                    is_match: false,
+                });
+            }
+            if s < e {
+                segments.push(DecoratedSegment {
+                    text: line[s..e].to_string(),
+                    is_match: true,
+                });
+            }
+            cursor = e;
+        }
+
+        if cursor < line.len() {
+            segments.push(DecoratedSegment {
+                text: line[cursor..].to_string(),
+                is_match: false,
+            });
+        }
+
+        segments
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchFileGrouper — group results by directory
+// ---------------------------------------------------------------------------
+
+/// A single line match inside a file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineMatch {
+    pub line_num: usize,
+    pub line_text: String,
+}
+
+/// All matches within a single file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileResult {
+    pub file_name: String,
+    pub matches: Vec<LineMatch>,
+}
+
+/// A group of files within the same directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileGroup {
+    pub directory: String,
+    pub files: Vec<FileResult>,
+}
+
+impl fmt::Display for FileGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} ({} file{}, {} match{})",
+            self.directory,
+            self.files.len(),
+            if self.files.len() == 1 { "" } else { "s" },
+            self.files.iter().map(|fr| fr.matches.len()).sum::<usize>(),
+            if self.files.iter().map(|fr| fr.matches.len()).sum::<usize>() == 1 {
+                ""
+            } else {
+                "es"
+            },
+        )
+    }
+}
+
+/// Groups search results by their parent directory.
+#[derive(Debug, Clone)]
+pub struct SearchFileGrouper {
+    /// directory -> (file_name -> Vec<LineMatch>)
+    groups: BTreeMap<String, BTreeMap<String, Vec<LineMatch>>>,
+}
+
+impl SearchFileGrouper {
+    pub fn new() -> Self {
+        Self {
+            groups: BTreeMap::new(),
+        }
+    }
+
+    /// Record a match for the given file path.
+    pub fn add_result(&mut self, file_path: &str, line_num: usize, line_text: &str) {
+        let path = Path::new(file_path);
+        let directory = path
+            .parent()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let file_name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| file_path.to_string());
+
+        self.groups
+            .entry(directory)
+            .or_default()
+            .entry(file_name)
+            .or_default()
+            .push(LineMatch {
+                line_num,
+                line_text: line_text.to_string(),
+            });
+    }
+
+    /// Return all groups sorted by directory name.
+    pub fn groups(&self) -> Vec<FileGroup> {
+        self.groups
+            .iter()
+            .map(|(dir, files_map)| FileGroup {
+                directory: dir.clone(),
+                files: files_map
+                    .iter()
+                    .map(|(name, matches)| FileResult {
+                        file_name: name.clone(),
+                        matches: matches.clone(),
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
+    /// Total number of matches across all groups.
+    pub fn total_matches(&self) -> usize {
+        self.groups
+            .values()
+            .flat_map(|f| f.values())
+            .map(|m| m.len())
+            .sum()
+    }
+
+    /// Total number of distinct files.
+    pub fn file_count(&self) -> usize {
+        self.groups.values().map(|f| f.len()).sum()
+    }
+}
+
+impl fmt::Display for SearchFileGrouper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} match{} in {} file{}",
+            self.total_matches(),
+            if self.total_matches() == 1 { "" } else { "es" },
+            self.file_count(),
+            if self.file_count() == 1 { "" } else { "s" },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchBatchReplace — plan batch replacements across files
+// ---------------------------------------------------------------------------
+
+/// Preview of a single replacement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplacementPreview {
+    pub file_path: String,
+    pub line_num: usize,
+    pub original: String,
+    pub replaced: String,
+}
+
+impl fmt::Display for ReplacementPreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}: {} -> {}",
+            self.file_path, self.line_num, self.original, self.replaced
+        )
+    }
+}
+
+/// Planned match for batch replacement.
+#[derive(Debug, Clone)]
+struct PlannedMatch {
+    file_path: String,
+    line_num: usize,
+    original_line: String,
+}
+
+/// Plans batch find-and-replace across multiple files without touching the
+/// filesystem.
+#[derive(Debug, Clone)]
+pub struct SearchBatchReplace {
+    find: String,
+    replace: String,
+    matches: Vec<PlannedMatch>,
+}
+
+impl SearchBatchReplace {
+    pub fn new(find: &str, replace: &str) -> Self {
+        Self {
+            find: find.to_string(),
+            replace: replace.to_string(),
+            matches: Vec::new(),
+        }
+    }
+
+    /// Register a match to be replaced.
+    pub fn add_file_match(&mut self, file_path: &str, line_num: usize, original_line: &str) {
+        self.matches.push(PlannedMatch {
+            file_path: file_path.to_string(),
+            line_num,
+            original_line: original_line.to_string(),
+        });
+    }
+
+    /// Generate replacement previews by applying a literal find/replace on each
+    /// registered line.
+    pub fn preview(&self) -> Vec<ReplacementPreview> {
+        self.matches
+            .iter()
+            .map(|m| {
+                let replaced = m.original_line.replace(&self.find, &self.replace);
+                ReplacementPreview {
+                    file_path: m.file_path.clone(),
+                    line_num: m.line_num,
+                    original: m.original_line.clone(),
+                    replaced,
+                }
+            })
+            .collect()
+    }
+
+    /// Number of registered matches.
+    pub fn match_count(&self) -> usize {
+        self.matches.len()
+    }
+}
+
+impl fmt::Display for SearchBatchReplace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Replace '{}' -> '{}' ({} match{})",
+            self.find,
+            self.replace,
+            self.match_count(),
+            if self.match_count() == 1 { "" } else { "es" },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchResultPreview — context-aware preview of matches
+// ---------------------------------------------------------------------------
+
+/// A single line in a context-aware preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewLine {
+    pub line_num: usize,
+    pub text: String,
+    pub is_match: bool,
+}
+
+impl fmt::Display for PreviewLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let marker = if self.is_match { ">" } else { " " };
+        write!(f, "{} {:>4}: {}", marker, self.line_num, self.text)
+    }
+}
+
+/// Builds a context-aware preview of search matches, interleaving match lines
+/// with surrounding context lines.
+#[derive(Debug, Clone)]
+pub struct SearchResultPreview {
+    context_lines: usize,
+    entries: BTreeMap<usize, (String, bool)>,
+}
+
+impl SearchResultPreview {
+    pub fn new(context_lines: usize) -> Self {
+        Self {
+            context_lines,
+            entries: BTreeMap::new(),
+        }
+    }
+
+    /// Add a line that is a match. If a context line was already recorded at
+    /// this line number it will be promoted to a match.
+    pub fn add_match(&mut self, line_num: usize, line: &str) {
+        self.entries
+            .insert(line_num, (line.to_string(), true));
+    }
+
+    /// Add a context (non-match) line. Will not overwrite an existing match
+    /// line at the same number.
+    pub fn add_context(&mut self, line_num: usize, line: &str) {
+        self.entries
+            .entry(line_num)
+            .or_insert_with(|| (line.to_string(), false));
+    }
+
+    /// Render the preview, returning lines in line-number order.  Only context
+    /// lines within `context_lines` of a match line are included.
+    pub fn render(&self) -> Vec<PreviewLine> {
+        let match_nums: Vec<usize> = self
+            .entries
+            .iter()
+            .filter(|(_, (_, is_m))| *is_m)
+            .map(|(n, _)| *n)
+            .collect();
+
+        self.entries
+            .iter()
+            .filter(|(num, (_, is_match))| {
+                *is_match
+                    || match_nums.iter().any(|&mn| {
+                        let n = **num;
+                        let dist = if n > mn { n - mn } else { mn - n };
+                        dist <= self.context_lines
+                    })
+            })
+            .map(|(num, (text, is_match))| PreviewLine {
+                line_num: *num,
+                text: text.clone(),
+                is_match: *is_match,
+            })
+            .collect()
+    }
+
+    /// Number of match lines (not context lines).
+    pub fn match_count(&self) -> usize {
+        self.entries.values().filter(|(_, m)| *m).count()
+    }
+}
+
+impl fmt::Display for SearchResultPreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let lines = self.render();
+        for (i, line) in lines.iter().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+            }
+            write!(f, "{line}")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -2127,6 +2538,170 @@ mod tests {
 
     #[test]
     fn view_statistics_method() {
+        let mut v = SearchView::new();
+        v.results = SearchResults::new(vec![FileMatches::new(
+            PathBuf::from("z.rs"),
+            vec![
+                SearchMatch {
+                    file_path: PathBuf::from("z.rs"),
+                    line_number: 1,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                },
+                SearchMatch {
+                    file_path: PathBuf::from("z.rs"),
+                    line_number: 2,
+                    column: 1,
+                    line_content: "x".into(),
+                    match_range: 0..1,
+                    preview: "x".into(),
+                },
+            ],
+        )]);
+        let stats = v.statistics();
+        assert_eq!(stats.files_matched, 1);
+        assert_eq!(stats.total_matches, 2);
+        assert_eq!(stats.lines_with_matches, 2);
+    }
+
+    // -- SearchResultDecorator tests --
+
+    #[test]
+    fn decorator_single_match() {
+        let dec = SearchResultDecorator::new();
+        let line = "hello world";
+        let result = dec.decorate(line, 6, 11);
+        assert_eq!(result.before, "hello ");
+        assert_eq!(result.matched, "world");
+        assert_eq!(result.after, "");
+        assert_eq!(result.to_string(), "hello [world]");
+    }
+
+    #[test]
+    fn decorator_match_at_start() {
+        let dec = SearchResultDecorator::new();
+        let result = dec.decorate("foobar", 0, 3);
+        assert_eq!(result.before, "");
+        assert_eq!(result.matched, "foo");
+        assert_eq!(result.after, "bar");
+    }
+
+    #[test]
+    fn decorator_out_of_bounds_clamped() {
+        let dec = SearchResultDecorator::new();
+        let result = dec.decorate("abc", 1, 100);
+        assert_eq!(result.matched, "bc");
+        assert_eq!(result.after, "");
+    }
+
+    #[test]
+    fn decorator_all_multiple_ranges() {
+        let dec = SearchResultDecorator::new();
+        let segs = dec.decorate_all("abcdefgh", &[(0, 2), (4, 6)]);
+        assert_eq!(segs.len(), 4);
+        assert_eq!(segs[0], DecoratedSegment { text: "ab".into(), is_match: true });
+        assert_eq!(segs[1], DecoratedSegment { text: "cd".into(), is_match: false });
+        assert_eq!(segs[2], DecoratedSegment { text: "ef".into(), is_match: true });
+        assert_eq!(segs[3], DecoratedSegment { text: "gh".into(), is_match: false });
+    }
+
+    // -- SearchFileGrouper tests --
+
+    #[test]
+    fn grouper_groups_by_directory() {
+        let mut g = SearchFileGrouper::new();
+        g.add_result("src/main.rs", 10, "use std;");
+        g.add_result("src/lib.rs", 5, "mod foo;");
+        g.add_result("tests/test.rs", 1, "assert!");
+        let groups = g.groups();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(g.file_count(), 3);
+        assert_eq!(g.total_matches(), 3);
+    }
+
+    #[test]
+    fn grouper_multiple_matches_same_file() {
+        let mut g = SearchFileGrouper::new();
+        g.add_result("src/lib.rs", 1, "first");
+        g.add_result("src/lib.rs", 5, "second");
+        assert_eq!(g.total_matches(), 2);
+        assert_eq!(g.file_count(), 1);
+        let groups = g.groups();
+        assert_eq!(groups[0].files[0].matches.len(), 2);
+    }
+
+    #[test]
+    fn grouper_display() {
+        let mut g = SearchFileGrouper::new();
+        g.add_result("a/b.rs", 1, "x");
+        let display = format!("{g}");
+        assert!(display.contains("1 match"));
+    }
+
+    // -- SearchBatchReplace tests --
+
+    #[test]
+    fn batch_replace_preview() {
+        let mut br = SearchBatchReplace::new("foo", "bar");
+        br.add_file_match("src/main.rs", 10, "let foo = foo;");
+        br.add_file_match("src/lib.rs", 3, "fn foo()");
+        assert_eq!(br.match_count(), 2);
+        let previews = br.preview();
+        assert_eq!(previews[0].replaced, "let bar = bar;");
+        assert_eq!(previews[1].replaced, "fn bar()");
+        assert_eq!(previews[0].file_path, "src/main.rs");
+    }
+
+    #[test]
+    fn batch_replace_display() {
+        let br = SearchBatchReplace::new("old", "new");
+        let s = format!("{br}");
+        assert!(s.contains("'old' -> 'new'"));
+        assert!(s.contains("0 matches"));
+    }
+
+    // -- SearchResultPreview tests --
+
+    #[test]
+    fn preview_renders_with_context() {
+        let mut p = SearchResultPreview::new(1);
+        p.add_context(1, "line one");
+        p.add_match(2, "MATCH line two");
+        p.add_context(3, "line three");
+        p.add_context(4, "line four");
+        let lines = p.render();
+        assert_eq!(lines.len(), 3);
+        assert!(!lines[0].is_match);
+        assert!(lines[1].is_match);
+        assert!(!lines[2].is_match);
+        assert_eq!(p.match_count(), 1);
+    }
+
+    #[test]
+    fn preview_context_excludes_distant_lines() {
+        let mut p = SearchResultPreview::new(0);
+        p.add_context(1, "far away");
+        p.add_match(5, "match");
+        p.add_context(10, "also far");
+        let lines = p.render();
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].is_match);
+    }
+
+    #[test]
+    fn preview_display_format() {
+        let mut p = SearchResultPreview::new(0);
+        p.add_match(42, "found it");
+        let s = format!("{p}");
+        assert!(s.contains(">"));
+        assert!(s.contains("42"));
+        assert!(s.contains("found it"));
+    }
+
+    #[test]
+    fn view_statistics_after_new_structs() {
         let mut v = SearchView::new();
         v.results = SearchResults::new(vec![FileMatches::new(
             PathBuf::from("z.rs"),
