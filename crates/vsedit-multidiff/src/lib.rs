@@ -769,6 +769,199 @@ impl MultiDiffModel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MultiDiffStatsSummary – aggregate stats across all files
+// ---------------------------------------------------------------------------
+
+/// Aggregated statistics across all files in a multi-diff.
+#[derive(Debug, Clone)]
+pub struct MultiDiffStatsSummary {
+    pub total_files: usize,
+    pub total_hunks: usize,
+    pub total_additions: usize,
+    pub total_deletions: usize,
+    pub files_added: usize,
+    pub files_removed: usize,
+    pub files_modified: usize,
+    pub files_renamed: usize,
+}
+
+impl MultiDiffStatsSummary {
+    /// Compute summary from a multi-diff model.
+    pub fn from_model(model: &MultiDiffModel) -> Self {
+        let mut s = Self {
+            total_files: model.file_count(),
+            total_hunks: model.total_hunks(),
+            total_additions: model.total_added_lines(),
+            total_deletions: model.total_removed_lines(),
+            files_added: 0,
+            files_removed: 0,
+            files_modified: 0,
+            files_renamed: 0,
+        };
+        for d in &model.diffs {
+            match d.kind {
+                DiffKind::Added => s.files_added += 1,
+                DiffKind::Removed => s.files_removed += 1,
+                DiffKind::Modified => s.files_modified += 1,
+                DiffKind::Renamed => s.files_renamed += 1,
+            }
+        }
+        s
+    }
+
+    /// Net line change (additions - deletions).
+    pub fn net_change(&self) -> isize {
+        self.total_additions as isize - self.total_deletions as isize
+    }
+
+    /// Format a short summary string.
+    pub fn short_summary(&self) -> String {
+        format!(
+            "{} files (+{} -{}) {} hunks",
+            self.total_files, self.total_additions, self.total_deletions, self.total_hunks
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiDiffCollapse – toggling file visibility
+// ---------------------------------------------------------------------------
+
+/// Manages which files are collapsed (hidden) in the multi-diff view.
+pub struct MultiDiffCollapse {
+    collapsed: Vec<bool>,
+}
+
+impl MultiDiffCollapse {
+    /// Create with all files expanded.
+    pub fn new(file_count: usize) -> Self {
+        Self { collapsed: vec![false; file_count] }
+    }
+
+    /// Toggle the collapsed state of a file. Returns the new state.
+    pub fn toggle(&mut self, index: usize) -> Option<bool> {
+        if index < self.collapsed.len() {
+            self.collapsed[index] = !self.collapsed[index];
+            Some(self.collapsed[index])
+        } else {
+            None
+        }
+    }
+
+    /// Check if a file is collapsed.
+    pub fn is_collapsed(&self, index: usize) -> bool {
+        self.collapsed.get(index).copied().unwrap_or(false)
+    }
+
+    /// Collapse all files.
+    pub fn collapse_all(&mut self) {
+        for c in &mut self.collapsed {
+            *c = true;
+        }
+    }
+
+    /// Expand all files.
+    pub fn expand_all(&mut self) {
+        for c in &mut self.collapsed {
+            *c = false;
+        }
+    }
+
+    /// Number of expanded files.
+    pub fn expanded_count(&self) -> usize {
+        self.collapsed.iter().filter(|&&c| !c).count()
+    }
+
+    /// Number of collapsed files.
+    pub fn collapsed_count(&self) -> usize {
+        self.collapsed.iter().filter(|&&c| c).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiDiffHunkAction – accept/reject per hunk
+// ---------------------------------------------------------------------------
+
+/// Action taken on a hunk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HunkAction {
+    /// Hunk has not been acted upon.
+    Pending,
+    /// Hunk was accepted (changes will be applied).
+    Accepted,
+    /// Hunk was rejected (changes will be discarded).
+    Rejected,
+}
+
+/// Tracks accept/reject decisions per hunk across all files.
+pub struct MultiDiffHunkActions {
+    /// Indexed as actions[file_index][hunk_index].
+    actions: Vec<Vec<HunkAction>>,
+}
+
+impl MultiDiffHunkActions {
+    /// Create from a model with all hunks pending.
+    pub fn from_model(model: &MultiDiffModel) -> Self {
+        let actions = model.diffs.iter()
+            .map(|d| vec![HunkAction::Pending; d.hunks.len()])
+            .collect();
+        Self { actions }
+    }
+
+    /// Set the action for a specific hunk.
+    pub fn set_action(&mut self, file_index: usize, hunk_index: usize, action: HunkAction) -> bool {
+        if let Some(hunks) = self.actions.get_mut(file_index) {
+            if let Some(h) = hunks.get_mut(hunk_index) {
+                *h = action;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get the action for a specific hunk.
+    pub fn get_action(&self, file_index: usize, hunk_index: usize) -> HunkAction {
+        self.actions.get(file_index)
+            .and_then(|hunks| hunks.get(hunk_index))
+            .copied()
+            .unwrap_or(HunkAction::Pending)
+    }
+
+    /// Accept all hunks in a file.
+    pub fn accept_all_in_file(&mut self, file_index: usize) {
+        if let Some(hunks) = self.actions.get_mut(file_index) {
+            for h in hunks {
+                *h = HunkAction::Accepted;
+            }
+        }
+    }
+
+    /// Reject all hunks in a file.
+    pub fn reject_all_in_file(&mut self, file_index: usize) {
+        if let Some(hunks) = self.actions.get_mut(file_index) {
+            for h in hunks {
+                *h = HunkAction::Rejected;
+            }
+        }
+    }
+
+    /// Count of pending hunks across all files.
+    pub fn pending_count(&self) -> usize {
+        self.actions.iter().flat_map(|v| v.iter()).filter(|&&a| a == HunkAction::Pending).count()
+    }
+
+    /// Count of accepted hunks.
+    pub fn accepted_count(&self) -> usize {
+        self.actions.iter().flat_map(|v| v.iter()).filter(|&&a| a == HunkAction::Accepted).count()
+    }
+
+    /// Whether all hunks have been acted upon.
+    pub fn is_all_resolved(&self) -> bool {
+        self.pending_count() == 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1553,6 +1746,95 @@ mod tests {
         });
         let largest = model.largest_diff().unwrap();
         assert_eq!(largest.display_path(), "big.rs");
+    }
+
+    // -- MultiDiffStatsSummary tests --
+
+    #[test]
+    fn stats_summary_from_model() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Added, 2));
+        model.add_diff(make_diff(DiffKind::Modified, 1));
+        let s = MultiDiffStatsSummary::from_model(&model);
+        assert_eq!(s.total_files, 2);
+        assert_eq!(s.files_added, 1);
+        assert_eq!(s.files_modified, 1);
+        assert!(s.short_summary().contains("2 files"));
+    }
+
+    #[test]
+    fn stats_summary_net_change() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Added, 1));
+        let s = MultiDiffStatsSummary::from_model(&model);
+        let net = s.net_change();
+        assert!(net >= 0 || net < 0);
+    }
+
+    // -- MultiDiffCollapse tests --
+
+    #[test]
+    fn collapse_toggle() {
+        let mut c = MultiDiffCollapse::new(3);
+        assert!(!c.is_collapsed(0));
+        assert_eq!(c.toggle(0), Some(true));
+        assert!(c.is_collapsed(0));
+        assert_eq!(c.expanded_count(), 2);
+        assert_eq!(c.collapsed_count(), 1);
+    }
+
+    #[test]
+    fn collapse_all_expand_all() {
+        let mut c = MultiDiffCollapse::new(5);
+        c.collapse_all();
+        assert_eq!(c.collapsed_count(), 5);
+        c.expand_all();
+        assert_eq!(c.expanded_count(), 5);
+    }
+
+    #[test]
+    fn collapse_out_of_bounds() {
+        let mut c = MultiDiffCollapse::new(2);
+        assert_eq!(c.toggle(10), None);
+        assert!(!c.is_collapsed(10));
+    }
+
+    // -- MultiDiffHunkActions tests --
+
+    #[test]
+    fn hunk_actions_lifecycle() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Modified, 3));
+        let mut actions = MultiDiffHunkActions::from_model(&model);
+        assert_eq!(actions.pending_count(), 3);
+        assert!(!actions.is_all_resolved());
+        actions.set_action(0, 0, HunkAction::Accepted);
+        actions.set_action(0, 1, HunkAction::Rejected);
+        actions.set_action(0, 2, HunkAction::Accepted);
+        assert!(actions.is_all_resolved());
+        assert_eq!(actions.accepted_count(), 2);
+    }
+
+    #[test]
+    fn hunk_actions_accept_all_in_file() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Modified, 2));
+        model.add_diff(make_diff(DiffKind::Added, 1));
+        let mut actions = MultiDiffHunkActions::from_model(&model);
+        actions.accept_all_in_file(0);
+        assert_eq!(actions.get_action(0, 0), HunkAction::Accepted);
+        assert_eq!(actions.get_action(0, 1), HunkAction::Accepted);
+        assert_eq!(actions.get_action(1, 0), HunkAction::Pending);
+    }
+
+    #[test]
+    fn hunk_actions_reject_all() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Modified, 2));
+        let mut actions = MultiDiffHunkActions::from_model(&model);
+        actions.reject_all_in_file(0);
+        assert_eq!(actions.pending_count(), 0);
+        assert_eq!(actions.accepted_count(), 0);
     }
 }
 

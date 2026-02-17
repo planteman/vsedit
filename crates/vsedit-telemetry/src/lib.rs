@@ -1061,6 +1061,309 @@ pub fn events_with_property_key<'a>(events: &'a [TelemetryEvent], key: &str) -> 
     events.iter().filter(|e| e.properties.iter().any(|(k, _)| k == key)).collect()
 }
 
+// ---------------------------------------------------------------------------
+// TelemetryBatcher – batches events before sending
+// ---------------------------------------------------------------------------
+
+/// Batches telemetry events and flushes when the batch reaches capacity.
+pub struct TelemetryBatcher {
+    batch: Vec<TelemetryEvent>,
+    capacity: usize,
+    flushed_batches: Vec<Vec<TelemetryEvent>>,
+}
+
+impl TelemetryBatcher {
+    /// Create a new batcher with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            batch: Vec::new(),
+            capacity: capacity.max(1),
+            flushed_batches: Vec::new(),
+        }
+    }
+
+    /// Push an event. Returns `true` if a flush was triggered.
+    pub fn push(&mut self, event: TelemetryEvent) -> bool {
+        self.batch.push(event);
+        if self.batch.len() >= self.capacity {
+            self.flush();
+            return true;
+        }
+        false
+    }
+
+    /// Force-flush the current batch.
+    pub fn flush(&mut self) {
+        if !self.batch.is_empty() {
+            let batch = std::mem::take(&mut self.batch);
+            self.flushed_batches.push(batch);
+        }
+    }
+
+    /// Number of events in the current (unflushed) batch.
+    pub fn pending_count(&self) -> usize {
+        self.batch.len()
+    }
+
+    /// Number of batches that have been flushed so far.
+    pub fn flushed_batch_count(&self) -> usize {
+        self.flushed_batches.len()
+    }
+
+    /// Drain all flushed batches.
+    pub fn drain_flushed(&mut self) -> Vec<Vec<TelemetryEvent>> {
+        std::mem::take(&mut self.flushed_batches)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PiiScrubber – privacy-aware PII scrubbing
+// ---------------------------------------------------------------------------
+
+/// Rule describing a property key whose value should be redacted.
+#[derive(Debug, Clone)]
+pub struct PiiRule {
+    /// Property key to match (case-insensitive).
+    pub key_pattern: String,
+    /// Replacement text.
+    pub replacement: String,
+}
+
+/// Scrubs PII from telemetry event properties based on configurable rules.
+pub struct PiiScrubber {
+    rules: Vec<PiiRule>,
+}
+
+impl PiiScrubber {
+    /// Create a scrubber with default PII rules (email, password, token, secret).
+    pub fn with_defaults() -> Self {
+        let defaults = ["email", "password", "token", "secret", "api_key"];
+        let rules = defaults
+            .iter()
+            .map(|k| PiiRule {
+                key_pattern: k.to_string(),
+                replacement: "[REDACTED]".to_string(),
+            })
+            .collect();
+        Self { rules }
+    }
+
+    /// Create an empty scrubber (no rules).
+    pub fn empty() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Add a custom PII rule.
+    pub fn add_rule(&mut self, key_pattern: impl Into<String>, replacement: impl Into<String>) {
+        self.rules.push(PiiRule {
+            key_pattern: key_pattern.into(),
+            replacement: replacement.into(),
+        });
+    }
+
+    /// Scrub a single event, returning a new event with PII values replaced.
+    pub fn scrub(&self, event: &TelemetryEvent) -> TelemetryEvent {
+        let mut scrubbed = event.clone();
+        for (key, value) in scrubbed.properties.iter_mut() {
+            for rule in &self.rules {
+                if key.to_lowercase().contains(&rule.key_pattern.to_lowercase()) {
+                    *value = rule.replacement.clone();
+                }
+            }
+        }
+        scrubbed
+    }
+
+    /// Scrub a batch of events.
+    pub fn scrub_all(&self, events: &[TelemetryEvent]) -> Vec<TelemetryEvent> {
+        events.iter().map(|e| self.scrub(e)).collect()
+    }
+
+    /// Number of rules registered.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MetricStore – histogram, counter, gauge collection
+// ---------------------------------------------------------------------------
+
+/// A simple counter metric.
+#[derive(Debug, Clone)]
+pub struct MetricCounter {
+    pub name: String,
+    pub value: u64,
+}
+
+/// A gauge metric (can go up and down).
+#[derive(Debug, Clone)]
+pub struct MetricGauge {
+    pub name: String,
+    pub value: f64,
+}
+
+/// A histogram metric that collects sample values.
+#[derive(Debug, Clone)]
+pub struct MetricHistogram {
+    pub name: String,
+    pub samples: Vec<f64>,
+}
+
+impl MetricHistogram {
+    /// Create a new empty histogram.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), samples: Vec::new() }
+    }
+
+    /// Record a sample.
+    pub fn record(&mut self, value: f64) {
+        self.samples.push(value);
+    }
+
+    /// Compute the mean of all samples.
+    pub fn mean(&self) -> Option<f64> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        Some(self.samples.iter().sum::<f64>() / self.samples.len() as f64)
+    }
+
+    /// Compute a percentile of all samples.
+    pub fn percentile(&self, p: f64) -> Option<f64> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        let mut sorted = self.samples.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let idx = ((p / 100.0) * (sorted.len() - 1) as f64).round() as usize;
+        Some(sorted[idx.min(sorted.len() - 1)])
+    }
+
+    /// Minimum sample value.
+    pub fn min_value(&self) -> Option<f64> {
+        self.samples.iter().cloned().reduce(f64::min)
+    }
+
+    /// Maximum sample value.
+    pub fn max_value(&self) -> Option<f64> {
+        self.samples.iter().cloned().reduce(f64::max)
+    }
+}
+
+/// Collects counters, gauges, and histograms.
+pub struct MetricStore {
+    counters: HashMap<String, u64>,
+    gauges: HashMap<String, f64>,
+    histograms: HashMap<String, MetricHistogram>,
+}
+
+impl MetricStore {
+    /// Create a new empty metrics store.
+    pub fn new() -> Self {
+        Self {
+            counters: HashMap::new(),
+            gauges: HashMap::new(),
+            histograms: HashMap::new(),
+        }
+    }
+
+    /// Increment a counter by the given amount.
+    pub fn increment_counter(&mut self, name: &str, amount: u64) {
+        *self.counters.entry(name.to_string()).or_insert(0) += amount;
+    }
+
+    /// Get the current value of a counter.
+    pub fn counter_value(&self, name: &str) -> u64 {
+        self.counters.get(name).copied().unwrap_or(0)
+    }
+
+    /// Set a gauge to the given value.
+    pub fn set_gauge(&mut self, name: &str, value: f64) {
+        self.gauges.insert(name.to_string(), value);
+    }
+
+    /// Get the current value of a gauge.
+    pub fn gauge_value(&self, name: &str) -> Option<f64> {
+        self.gauges.get(name).copied()
+    }
+
+    /// Record a sample in a histogram.
+    pub fn record_histogram(&mut self, name: &str, value: f64) {
+        self.histograms
+            .entry(name.to_string())
+            .or_insert_with(|| MetricHistogram::new(name))
+            .record(value);
+    }
+
+    /// Get a histogram by name.
+    pub fn get_histogram(&self, name: &str) -> Option<&MetricHistogram> {
+        self.histograms.get(name)
+    }
+
+    /// Total number of distinct metric names across all types.
+    pub fn total_metric_count(&self) -> usize {
+        self.counters.len() + self.gauges.len() + self.histograms.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SessionDurationTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks session start/end times and computes durations.
+pub struct SessionDurationTracker {
+    sessions: HashMap<String, (u64, Option<u64>)>,
+}
+
+impl SessionDurationTracker {
+    /// Create a new tracker.
+    pub fn new() -> Self {
+        Self { sessions: HashMap::new() }
+    }
+
+    /// Start a session at the given timestamp (ms).
+    pub fn start_session(&mut self, id: impl Into<String>, start_ms: u64) {
+        self.sessions.insert(id.into(), (start_ms, None));
+    }
+
+    /// End a session at the given timestamp (ms).
+    pub fn end_session(&mut self, id: &str, end_ms: u64) -> Option<u64> {
+        if let Some(entry) = self.sessions.get_mut(id) {
+            entry.1 = Some(end_ms);
+            Some(end_ms.saturating_sub(entry.0))
+        } else {
+            None
+        }
+    }
+
+    /// Get the duration of a completed session.
+    pub fn duration_ms(&self, id: &str) -> Option<u64> {
+        self.sessions.get(id).and_then(|(start, end)| end.map(|e| e.saturating_sub(*start)))
+    }
+
+    /// Return the average duration of all completed sessions.
+    pub fn average_duration_ms(&self) -> Option<f64> {
+        let completed: Vec<u64> = self.sessions.values()
+            .filter_map(|(start, end)| end.map(|e| e.saturating_sub(*start)))
+            .collect();
+        if completed.is_empty() {
+            return None;
+        }
+        Some(completed.iter().sum::<u64>() as f64 / completed.len() as f64)
+    }
+
+    /// Number of active (not yet ended) sessions.
+    pub fn active_count(&self) -> usize {
+        self.sessions.values().filter(|(_, end)| end.is_none()).count()
+    }
+
+    /// Number of completed sessions.
+    pub fn completed_count(&self) -> usize {
+        self.sessions.values().filter(|(_, end)| end.is_some()).count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1887,5 +2190,151 @@ mod tests {
         let e2 = TelemetryEventBuilder::new().name("b").property("src", "ui").build().unwrap();
         let events = vec![e1, e2];
         assert_eq!(events_with_property_key(&events, "env").len(), 1);
+    }
+
+    // -- TelemetryBatcher tests --
+
+    #[test]
+    fn batcher_flushes_at_capacity() {
+        let mut batcher = TelemetryBatcher::new(2);
+        let e = TelemetryEventBuilder::new().name("a").build().unwrap();
+        assert!(!batcher.push(e.clone()));
+        assert!(batcher.push(e.clone()));
+        assert_eq!(batcher.flushed_batch_count(), 1);
+        assert_eq!(batcher.pending_count(), 0);
+    }
+
+    #[test]
+    fn batcher_manual_flush() {
+        let mut batcher = TelemetryBatcher::new(10);
+        let e = TelemetryEventBuilder::new().name("a").build().unwrap();
+        batcher.push(e);
+        assert_eq!(batcher.pending_count(), 1);
+        batcher.flush();
+        assert_eq!(batcher.pending_count(), 0);
+        assert_eq!(batcher.flushed_batch_count(), 1);
+    }
+
+    #[test]
+    fn batcher_drain_returns_batches() {
+        let mut batcher = TelemetryBatcher::new(1);
+        let e = TelemetryEventBuilder::new().name("a").build().unwrap();
+        batcher.push(e.clone());
+        batcher.push(e);
+        let batches = batcher.drain_flushed();
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batcher.flushed_batch_count(), 0);
+    }
+
+    // -- PiiScrubber tests --
+
+    #[test]
+    fn filter_scrubs_pii_keys() {
+        let filter = PiiScrubber::with_defaults();
+        let e = TelemetryEventBuilder::new()
+            .name("login")
+            .property("user_email", "alice@example.com")
+            .property("action", "click")
+            .build()
+            .unwrap();
+        let scrubbed = filter.scrub(&e);
+        let email_val = scrubbed.properties.iter().find(|(k, _)| k == "user_email").unwrap();
+        assert_eq!(email_val.1, "[REDACTED]");
+        let action_val = scrubbed.properties.iter().find(|(k, _)| k == "action").unwrap();
+        assert_eq!(action_val.1, "click");
+    }
+
+    #[test]
+    fn filter_empty_leaves_intact() {
+        let filter = PiiScrubber::empty();
+        let e = TelemetryEventBuilder::new().name("x").property("password", "hunter2").build().unwrap();
+        let scrubbed = filter.scrub(&e);
+        let pw = scrubbed.properties.iter().find(|(k, _)| k == "password").unwrap();
+        assert_eq!(pw.1, "hunter2");
+    }
+
+    #[test]
+    fn filter_custom_rule() {
+        let mut filter = PiiScrubber::empty();
+        filter.add_rule("ssn", "***");
+        assert_eq!(filter.rule_count(), 1);
+        let e = TelemetryEventBuilder::new().name("x").property("user_ssn", "123").build().unwrap();
+        let scrubbed = filter.scrub(&e);
+        let v = scrubbed.properties.iter().find(|(k, _)| k == "user_ssn").unwrap();
+        assert_eq!(v.1, "***");
+    }
+
+    // -- MetricStore tests --
+
+    #[test]
+    fn metrics_counter() {
+        let mut m = MetricStore::new();
+        m.increment_counter("requests", 5);
+        m.increment_counter("requests", 3);
+        assert_eq!(m.counter_value("requests"), 8);
+        assert_eq!(m.counter_value("missing"), 0);
+    }
+
+    #[test]
+    fn metrics_gauge() {
+        let mut m = MetricStore::new();
+        m.set_gauge("cpu", 0.75);
+        assert_eq!(m.gauge_value("cpu"), Some(0.75));
+        m.set_gauge("cpu", 0.50);
+        assert_eq!(m.gauge_value("cpu"), Some(0.50));
+    }
+
+    #[test]
+    fn metrics_histogram_stats() {
+        let mut m = MetricStore::new();
+        for v in [10.0, 20.0, 30.0, 40.0, 50.0] {
+            m.record_histogram("latency", v);
+        }
+        let h = m.get_histogram("latency").unwrap();
+        assert_eq!(h.mean(), Some(30.0));
+        assert_eq!(h.min_value(), Some(10.0));
+        assert_eq!(h.max_value(), Some(50.0));
+        assert_eq!(h.percentile(50.0), Some(30.0));
+    }
+
+    #[test]
+    fn metrics_total_count() {
+        let mut m = MetricStore::new();
+        m.increment_counter("a", 1);
+        m.set_gauge("b", 1.0);
+        m.record_histogram("c", 1.0);
+        assert_eq!(m.total_metric_count(), 3);
+    }
+
+    // -- SessionDurationTracker tests --
+
+    #[test]
+    fn session_tracker_basic() {
+        let mut t = SessionDurationTracker::new();
+        t.start_session("s1", 100);
+        assert_eq!(t.active_count(), 1);
+        assert_eq!(t.completed_count(), 0);
+        let dur = t.end_session("s1", 350);
+        assert_eq!(dur, Some(250));
+        assert_eq!(t.duration_ms("s1"), Some(250));
+        assert_eq!(t.active_count(), 0);
+        assert_eq!(t.completed_count(), 1);
+    }
+
+    #[test]
+    fn session_tracker_average() {
+        let mut t = SessionDurationTracker::new();
+        t.start_session("a", 0);
+        t.start_session("b", 0);
+        t.end_session("a", 100);
+        t.end_session("b", 200);
+        assert_eq!(t.average_duration_ms(), Some(150.0));
+    }
+
+    #[test]
+    fn session_tracker_end_unknown() {
+        let mut t = SessionDurationTracker::new();
+        assert_eq!(t.end_session("nope", 100), None);
+        assert_eq!(t.average_duration_ms(), None);
     }
 }

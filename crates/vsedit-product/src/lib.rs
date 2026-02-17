@@ -1223,6 +1223,184 @@ pub fn same_gallery_service(a: &ProductConfiguration, b: &ProductConfiguration) 
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProductFeatureFlagOverrides – override-based feature flag management
+// ---------------------------------------------------------------------------
+
+/// Manages overrides on top of the existing feature flag system.
+pub struct ProductFeatureFlagOverrides {
+    overrides: std::collections::HashMap<String, bool>,
+}
+
+impl ProductFeatureFlagOverrides {
+    /// Create with no overrides.
+    pub fn new() -> Self {
+        Self { overrides: std::collections::HashMap::new() }
+    }
+
+    /// Set an override for a feature flag.
+    pub fn set_override(&mut self, flag: impl Into<String>, enabled: bool) {
+        self.overrides.insert(flag.into(), enabled);
+    }
+
+    /// Remove an override. Returns the previous override value.
+    pub fn remove_override(&mut self, flag: &str) -> Option<bool> {
+        self.overrides.remove(flag)
+    }
+
+    /// Resolve the effective value: override wins, then base, else default.
+    pub fn resolve(&self, flag: &str, base: &ProductFeatureFlags) -> bool {
+        if let Some(&v) = self.overrides.get(flag) {
+            v
+        } else {
+            base.is_enabled(flag)
+        }
+    }
+
+    /// Toggle an override. If no override exists, creates one as the opposite of base.
+    pub fn toggle(&mut self, flag: &str, base: &ProductFeatureFlags) -> bool {
+        let current = self.resolve(flag, base);
+        let new_val = !current;
+        self.overrides.insert(flag.to_string(), new_val);
+        new_val
+    }
+
+    /// Number of active overrides.
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Clear all overrides.
+    pub fn clear(&mut self) {
+        self.overrides.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProductUpdateChecker – version comparison
+// ---------------------------------------------------------------------------
+
+/// Checks whether a product update is available.
+pub struct ProductUpdateChecker {
+    current_version: String,
+}
+
+impl ProductUpdateChecker {
+    /// Create a checker for the given current version.
+    pub fn new(current_version: impl Into<String>) -> Self {
+        Self { current_version: current_version.into() }
+    }
+
+    /// Parse a semver string into (major, minor, patch).
+    fn parse(v: &str) -> Option<(u32, u32, u32)> {
+        let parts: Vec<&str> = v.split('.').collect();
+        if parts.len() != 3 { return None; }
+        Some((parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?))
+    }
+
+    /// Check if the available version is newer than current.
+    pub fn is_update_available(&self, available: &str) -> bool {
+        match (Self::parse(&self.current_version), Self::parse(available)) {
+            (Some(cur), Some(avail)) => avail > cur,
+            _ => false,
+        }
+    }
+
+    /// Determine if the update is major, minor, or patch.
+    pub fn update_kind(&self, available: &str) -> Option<&'static str> {
+        let cur = Self::parse(&self.current_version)?;
+        let avail = Self::parse(available)?;
+        if avail.0 > cur.0 { Some("major") }
+        else if avail.1 > cur.1 { Some("minor") }
+        else if avail.2 > cur.2 { Some("patch") }
+        else { None }
+    }
+
+    /// Get the current version.
+    pub fn current_version(&self) -> &str {
+        &self.current_version
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProductLicenseValidator
+// ---------------------------------------------------------------------------
+
+/// Validates a product license key.
+pub struct ProductLicenseValidator {
+    prefix: String,
+    expected_length: usize,
+}
+
+impl ProductLicenseValidator {
+    /// Create a validator expecting keys like `"VSEDIT-XXXX-XXXX-XXXX"`.
+    pub fn new(prefix: impl Into<String>, expected_length: usize) -> Self {
+        Self { prefix: prefix.into(), expected_length }
+    }
+
+    /// Validate a license key format.
+    pub fn validate(&self, key: &str) -> Result<(), String> {
+        if !key.starts_with(&self.prefix) {
+            return Err(format!("key must start with '{}'", self.prefix));
+        }
+        if key.len() != self.expected_length {
+            return Err(format!("key must be {} characters", self.expected_length));
+        }
+        // Check that segments after prefix are alphanumeric
+        let rest = &key[self.prefix.len()..];
+        if !rest.chars().all(|c| c.is_alphanumeric() || c == '-') {
+            return Err("key contains invalid characters".into());
+        }
+        Ok(())
+    }
+
+    /// Check if a key is valid.
+    pub fn is_valid(&self, key: &str) -> bool {
+        self.validate(key).is_ok()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProductTelemetryKeyManager
+// ---------------------------------------------------------------------------
+
+/// Manages telemetry instrumentation keys for the product.
+pub struct ProductTelemetryKeyManager {
+    keys: std::collections::HashMap<String, String>,
+}
+
+impl ProductTelemetryKeyManager {
+    /// Create an empty key manager.
+    pub fn new() -> Self {
+        Self { keys: std::collections::HashMap::new() }
+    }
+
+    /// Register a telemetry key for a component.
+    pub fn register_key(&mut self, component: impl Into<String>, key: impl Into<String>) {
+        self.keys.insert(component.into(), key.into());
+    }
+
+    /// Get the key for a component.
+    pub fn get_key(&self, component: &str) -> Option<&str> {
+        self.keys.get(component).map(|s| s.as_str())
+    }
+
+    /// Remove a key.
+    pub fn remove_key(&mut self, component: &str) -> bool {
+        self.keys.remove(component).is_some()
+    }
+
+    /// Number of registered keys.
+    pub fn key_count(&self) -> usize {
+        self.keys.len()
+    }
+
+    /// List all component names.
+    pub fn components(&self) -> Vec<&str> {
+        self.keys.keys().map(|s| s.as_str()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1894,5 +2072,101 @@ mod tests {
         let mut c = ProductConfiguration::default_config();
         c.extensions_gallery = None;
         assert!(!same_gallery_service(&a, &c));
+    }
+
+    // -- ProductFeatureFlagOverrides tests --
+
+    #[test]
+    fn feature_flag_overrides_basic() {
+        let mut base = ProductFeatureFlags::new();
+        base.set("dark_mode", true);
+        base.set("beta", false);
+
+        let mut ov = ProductFeatureFlagOverrides::new();
+        assert!(ov.resolve("dark_mode", &base)); // base value
+        ov.set_override("dark_mode", false);
+        assert!(!ov.resolve("dark_mode", &base)); // overridden
+        assert_eq!(ov.override_count(), 1);
+    }
+
+    #[test]
+    fn feature_flag_overrides_toggle() {
+        let mut base = ProductFeatureFlags::new();
+        base.set("feature", true);
+        let mut ov = ProductFeatureFlagOverrides::new();
+        let new_val = ov.toggle("feature", &base);
+        assert!(!new_val);
+        assert!(!ov.resolve("feature", &base));
+    }
+
+    #[test]
+    fn feature_flag_overrides_clear() {
+        let base = ProductFeatureFlags::new();
+        let mut ov = ProductFeatureFlagOverrides::new();
+        ov.set_override("a", true);
+        ov.set_override("b", false);
+        ov.clear();
+        assert_eq!(ov.override_count(), 0);
+        assert!(!ov.resolve("a", &base)); // back to base default (false)
+    }
+
+    // -- ProductUpdateChecker tests --
+
+    #[test]
+    fn update_checker_newer() {
+        let checker = ProductUpdateChecker::new("1.0.0");
+        assert!(checker.is_update_available("1.1.0"));
+        assert!(checker.is_update_available("2.0.0"));
+        assert!(!checker.is_update_available("1.0.0"));
+        assert!(!checker.is_update_available("0.9.0"));
+    }
+
+    #[test]
+    fn update_checker_kind() {
+        let checker = ProductUpdateChecker::new("1.5.3");
+        assert_eq!(checker.update_kind("2.0.0"), Some("major"));
+        assert_eq!(checker.update_kind("1.6.0"), Some("minor"));
+        assert_eq!(checker.update_kind("1.5.4"), Some("patch"));
+        assert_eq!(checker.update_kind("1.5.3"), None);
+    }
+
+    // -- ProductLicenseValidator tests --
+
+    #[test]
+    fn license_valid() {
+        let v = ProductLicenseValidator::new("VSEDIT-", 21);
+        assert!(v.is_valid("VSEDIT-ABCD-1234-EFGH"));
+    }
+
+    #[test]
+    fn license_invalid_prefix() {
+        let v = ProductLicenseValidator::new("VSEDIT-", 21);
+        let result = v.validate("WRONG--ABCD-1234-EFGH");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn license_invalid_length() {
+        let v = ProductLicenseValidator::new("VSEDIT-", 21);
+        assert!(!v.is_valid("VSEDIT-SHORT"));
+    }
+
+    // -- ProductTelemetryKeyManager tests --
+
+    #[test]
+    fn telemetry_key_manager() {
+        let mut m = ProductTelemetryKeyManager::new();
+        m.register_key("editor", "key-123");
+        m.register_key("terminal", "key-456");
+        assert_eq!(m.get_key("editor"), Some("key-123"));
+        assert_eq!(m.key_count(), 2);
+        assert!(m.remove_key("editor"));
+        assert_eq!(m.key_count(), 1);
+    }
+
+    #[test]
+    fn telemetry_key_missing() {
+        let m = ProductTelemetryKeyManager::new();
+        assert_eq!(m.get_key("nope"), None);
     }
 }

@@ -1199,6 +1199,206 @@ impl EventCoalescer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WorkspaceFileWatcher – glob-based file watching
+// ---------------------------------------------------------------------------
+
+/// A file watcher that matches paths against glob patterns.
+pub struct GlobFileWatcher {
+    patterns: Vec<String>,
+    exclude_patterns: Vec<String>,
+    events: Vec<(String, FsEventKind)>,
+}
+
+impl GlobFileWatcher {
+    /// Create a new watcher with no patterns.
+    pub fn new() -> Self {
+        Self {
+            patterns: Vec::new(),
+            exclude_patterns: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
+    /// Add an include glob pattern (e.g. `"**/*.rs"`).
+    pub fn add_pattern(&mut self, pattern: impl Into<String>) {
+        self.patterns.push(pattern.into());
+    }
+
+    /// Add an exclude glob pattern (e.g. `"**/node_modules/**"`).
+    pub fn add_exclude(&mut self, pattern: impl Into<String>) {
+        self.exclude_patterns.push(pattern.into());
+    }
+
+    /// Check if a path matches any include pattern using simple glob matching.
+    pub fn matches(&self, path: &str) -> bool {
+        if self.patterns.is_empty() {
+            return false;
+        }
+        let included = self.patterns.iter().any(|p| simple_glob_match(p, path));
+        let excluded = self.exclude_patterns.iter().any(|p| simple_glob_match(p, path));
+        included && !excluded
+    }
+
+    /// Record an event for a path, only if it matches the patterns.
+    pub fn record_event(&mut self, path: &str, kind: FsEventKind) -> bool {
+        if self.matches(path) {
+            self.events.push((path.to_string(), kind));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Drain all recorded events.
+    pub fn drain_events(&mut self) -> Vec<(String, FsEventKind)> {
+        std::mem::take(&mut self.events)
+    }
+
+    /// Number of include patterns.
+    pub fn pattern_count(&self) -> usize {
+        self.patterns.len()
+    }
+}
+
+/// Simple glob match: supports `*` for single segment and `**` for recursive.
+fn simple_glob_match(pattern: &str, path: &str) -> bool {
+    if pattern == "**" {
+        return true;
+    }
+    if let Some(suffix) = pattern.strip_prefix("**/") {
+        return path.ends_with(suffix) || path.contains(&format!("/{}", suffix));
+    }
+    if let Some(prefix) = pattern.strip_suffix("/**") {
+        return path.starts_with(prefix) || path.contains(&format!("{}/", prefix));
+    }
+    if let Some(ext) = pattern.strip_prefix("*.") {
+        return path.ends_with(&format!(".{}", ext));
+    }
+    pattern == path
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceSearchScope – limit search to specific folders/patterns
+// ---------------------------------------------------------------------------
+
+/// Defines a search scope within the workspace.
+pub struct WorkspaceSearchScope {
+    include_folders: Vec<String>,
+    include_globs: Vec<String>,
+    exclude_globs: Vec<String>,
+    max_results: Option<u32>,
+}
+
+impl WorkspaceSearchScope {
+    /// Create a scope that searches everywhere.
+    pub fn all() -> Self {
+        Self {
+            include_folders: Vec::new(),
+            include_globs: Vec::new(),
+            exclude_globs: Vec::new(),
+            max_results: None,
+        }
+    }
+
+    /// Restrict search to specific folders.
+    pub fn with_folders(mut self, folders: Vec<String>) -> Self {
+        self.include_folders = folders;
+        self
+    }
+
+    /// Add include globs (e.g. `"*.rs"`).
+    pub fn with_include_globs(mut self, globs: Vec<String>) -> Self {
+        self.include_globs = globs;
+        self
+    }
+
+    /// Add exclude globs.
+    pub fn with_exclude_globs(mut self, globs: Vec<String>) -> Self {
+        self.exclude_globs = globs;
+        self
+    }
+
+    /// Set a maximum number of results.
+    pub fn with_max_results(mut self, max: u32) -> Self {
+        self.max_results = Some(max);
+        self
+    }
+
+    /// Check if a file path is within this scope.
+    pub fn includes(&self, path: &str) -> bool {
+        let folder_ok = self.include_folders.is_empty()
+            || self.include_folders.iter().any(|f| path.starts_with(f));
+        let glob_ok = self.include_globs.is_empty()
+            || self.include_globs.iter().any(|g| simple_glob_match(g, path));
+        let not_excluded = !self.exclude_globs.iter().any(|g| simple_glob_match(g, path));
+        folder_ok && glob_ok && not_excluded
+    }
+
+    /// Maximum results, if set.
+    pub fn max_results(&self) -> Option<u32> {
+        self.max_results
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-root workspace folder ordering
+// ---------------------------------------------------------------------------
+
+/// Manages ordering of workspace folders in a multi-root workspace.
+pub struct WorkspaceFolderOrdering {
+    folders: Vec<String>,
+}
+
+impl WorkspaceFolderOrdering {
+    /// Create from a list of folders in order.
+    pub fn new(folders: Vec<String>) -> Self {
+        Self { folders }
+    }
+
+    /// Move a folder to a specific position (0-indexed).
+    pub fn move_to(&mut self, folder_uri: &str, position: usize) -> bool {
+        if let Some(idx) = self.folders.iter().position(|f| f == folder_uri) {
+            let folder = self.folders.remove(idx);
+            let pos = position.min(self.folders.len());
+            self.folders.insert(pos, folder);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Swap two folders by index.
+    pub fn swap(&mut self, a: usize, b: usize) -> bool {
+        if a < self.folders.len() && b < self.folders.len() {
+            self.folders.swap(a, b);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the ordered list of folders.
+    pub fn ordered(&self) -> &[String] {
+        &self.folders
+    }
+
+    /// Find the index of a folder.
+    pub fn index_of(&self, folder_uri: &str) -> Option<usize> {
+        self.folders.iter().position(|f| f == folder_uri)
+    }
+
+    /// Number of folders.
+    pub fn len(&self) -> usize {
+        self.folders.len()
+    }
+
+    /// Whether there are no folders.
+    pub fn is_empty(&self) -> bool {
+        self.folders.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1889,5 +2089,103 @@ mod tests {
         let events = c.drain();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].kind, FsEventKind::Deleted);
+    }
+
+    // -- GlobFileWatcher tests --
+
+    #[test]
+    fn file_watcher_glob_match() {
+        let mut w = GlobFileWatcher::new();
+        w.add_pattern("*.rs");
+        assert!(w.matches("main.rs"));
+        assert!(!w.matches("main.py"));
+    }
+
+    #[test]
+    fn file_watcher_exclude() {
+        let mut w = GlobFileWatcher::new();
+        w.add_pattern("*.rs");
+        w.add_exclude("*.tmp");
+        assert!(w.matches("src/main.rs"));
+        assert!(!w.matches("cache.tmp"));
+    }
+
+    #[test]
+    fn file_watcher_record_event() {
+        let mut w = GlobFileWatcher::new();
+        w.add_pattern("*.rs");
+        assert!(w.record_event("lib.rs", FsEventKind::Changed));
+        assert!(!w.record_event("lib.py", FsEventKind::Changed));
+        assert_eq!(w.drain_events().len(), 1);
+    }
+
+    // -- WorkspaceTrustManager tests (existing type) --
+
+    #[test]
+    fn trust_manager_new_defaults_untrusted() {
+        let tm = WorkspaceTrustManager::new();
+        assert_eq!(tm.trust_level("file:///unknown"), TrustLevel::Untrusted);
+        assert!(!tm.is_trusted("file:///unknown"));
+    }
+
+    #[test]
+    fn trust_manager_set_and_check() {
+        let mut tm = WorkspaceTrustManager::new();
+        tm.set_trust("file:///proj", TrustLevel::Trusted);
+        assert!(tm.is_trusted("file:///proj"));
+        assert!(!tm.is_trusted("file:///other"));
+    }
+
+    #[test]
+    fn trust_manager_summary_counts() {
+        let mut tm = WorkspaceTrustManager::new();
+        tm.set_trust("file:///a", TrustLevel::Trusted);
+        tm.set_trust("file:///b", TrustLevel::Restricted);
+        let (u, r, t) = tm.summary();
+        assert_eq!((u, r, t), (0, 1, 1));
+    }
+
+    // -- WorkspaceSearchScope tests --
+
+    #[test]
+    fn search_scope_all() {
+        let scope = WorkspaceSearchScope::all();
+        assert!(scope.includes("anything/here.rs"));
+        assert_eq!(scope.max_results(), None);
+    }
+
+    #[test]
+    fn search_scope_with_folders() {
+        let scope = WorkspaceSearchScope::all()
+            .with_folders(vec!["src/".into()])
+            .with_max_results(100);
+        assert!(scope.includes("src/main.rs"));
+        assert!(!scope.includes("tests/test.rs"));
+        assert_eq!(scope.max_results(), Some(100));
+    }
+
+    // -- WorkspaceFolderOrdering tests --
+
+    #[test]
+    fn folder_ordering_move_to() {
+        let mut o = WorkspaceFolderOrdering::new(vec!["a".into(), "b".into(), "c".into()]);
+        assert!(o.move_to("c", 0));
+        assert_eq!(o.ordered(), &["c", "a", "b"]);
+    }
+
+    #[test]
+    fn folder_ordering_swap() {
+        let mut o = WorkspaceFolderOrdering::new(vec!["x".into(), "y".into()]);
+        assert!(o.swap(0, 1));
+        assert_eq!(o.ordered(), &["y", "x"]);
+        assert!(!o.swap(0, 5));
+    }
+
+    #[test]
+    fn folder_ordering_index_of() {
+        let o = WorkspaceFolderOrdering::new(vec!["a".into(), "b".into()]);
+        assert_eq!(o.index_of("b"), Some(1));
+        assert_eq!(o.index_of("z"), None);
+        assert_eq!(o.len(), 2);
     }
 }

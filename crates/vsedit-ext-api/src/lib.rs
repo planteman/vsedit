@@ -1251,6 +1251,218 @@ impl ExtensionCapabilityDeclaration {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ApiVersionNegotiator – select compatible API version
+// ---------------------------------------------------------------------------
+
+/// Negotiates the highest compatible API version between host and extension.
+pub struct ApiVersionNegotiator {
+    host_version: (u32, u32, u32),
+}
+
+impl ApiVersionNegotiator {
+    /// Create a negotiator from the host's current API version string.
+    pub fn new(host_version: &str) -> Option<Self> {
+        let parts: Vec<&str> = host_version.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        let major = parts[0].parse().ok()?;
+        let minor = parts[1].parse().ok()?;
+        let patch = parts[2].parse().ok()?;
+        Some(Self { host_version: (major, minor, patch) })
+    }
+
+    /// Check if an extension's minimum required version is compatible.
+    pub fn is_compatible(&self, min_version: &str) -> bool {
+        if let Some(req) = Self::parse_version(min_version) {
+            // Same major, host minor >= required minor
+            self.host_version.0 == req.0 && self.host_version.1 >= req.1
+        } else {
+            false
+        }
+    }
+
+    /// Select the best version from a list of supported versions.
+    pub fn select_best<'a>(&self, candidates: &[&'a str]) -> Option<&'a str> {
+        candidates
+            .iter()
+            .filter(|v| self.is_compatible(v))
+            .max_by(|a, b| {
+                let va = Self::parse_version(a).unwrap_or((0, 0, 0));
+                let vb = Self::parse_version(b).unwrap_or((0, 0, 0));
+                va.cmp(&vb)
+            })
+            .copied()
+    }
+
+    fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
+        let parts: Vec<&str> = v.split('.').collect();
+        if parts.len() != 3 { return None; }
+        Some((parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?))
+    }
+
+    /// Return the host version as a tuple.
+    pub fn host_version(&self) -> (u32, u32, u32) {
+        self.host_version
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ApiDeprecationWarner – tracks deprecated API calls
+// ---------------------------------------------------------------------------
+
+/// Record of a deprecated API call.
+#[derive(Debug, Clone)]
+pub struct DeprecationRecord {
+    pub api_name: String,
+    pub replacement: Option<String>,
+    pub call_count: u64,
+}
+
+/// Tracks deprecated API usage and emits warnings.
+pub struct ApiDeprecationWarner {
+    records: HashMap<String, DeprecationRecord>,
+}
+
+impl ApiDeprecationWarner {
+    /// Create a new empty warner.
+    pub fn new() -> Self {
+        Self { records: HashMap::new() }
+    }
+
+    /// Register a deprecated API and its replacement.
+    pub fn register(&mut self, api_name: impl Into<String>, replacement: Option<String>) {
+        let name = api_name.into();
+        self.records.entry(name.clone()).or_insert(DeprecationRecord {
+            api_name: name,
+            replacement,
+            call_count: 0,
+        });
+    }
+
+    /// Record a call to a deprecated API. Returns `true` if the API is deprecated.
+    pub fn record_call(&mut self, api_name: &str) -> bool {
+        if let Some(rec) = self.records.get_mut(api_name) {
+            rec.call_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if an API is deprecated.
+    pub fn is_deprecated(&self, api_name: &str) -> bool {
+        self.records.contains_key(api_name)
+    }
+
+    /// Get all deprecation records with at least one call.
+    pub fn active_warnings(&self) -> Vec<&DeprecationRecord> {
+        self.records.values().filter(|r| r.call_count > 0).collect()
+    }
+
+    /// Generate a warning message for a deprecated API.
+    pub fn warning_message(&self, api_name: &str) -> Option<String> {
+        self.records.get(api_name).map(|r| {
+            match &r.replacement {
+                Some(repl) => format!("'{}' is deprecated, use '{}' instead", r.api_name, repl),
+                None => format!("'{}' is deprecated with no replacement", r.api_name),
+            }
+        })
+    }
+
+    /// Number of registered deprecated APIs.
+    pub fn registered_count(&self) -> usize {
+        self.records.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ApiCallThrottler – rate limiting for API calls
+// ---------------------------------------------------------------------------
+
+/// Simple token-bucket style rate limiter for API calls.
+pub struct ApiCallThrottler {
+    calls: HashMap<String, Vec<u64>>,
+    max_calls_per_window: usize,
+    window_ms: u64,
+}
+
+impl ApiCallThrottler {
+    /// Create a throttler allowing `max_calls` within `window_ms` milliseconds.
+    pub fn new(max_calls: usize, window_ms: u64) -> Self {
+        Self {
+            calls: HashMap::new(),
+            max_calls_per_window: max_calls,
+            window_ms,
+        }
+    }
+
+    /// Try to record a call at the given timestamp. Returns `true` if allowed.
+    pub fn try_call(&mut self, api_name: &str, now_ms: u64) -> bool {
+        let entry = self.calls.entry(api_name.to_string()).or_default();
+        let cutoff = now_ms.saturating_sub(self.window_ms);
+        entry.retain(|&ts| ts > cutoff);
+        if entry.len() < self.max_calls_per_window {
+            entry.push(now_ms);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Number of calls remaining in the current window.
+    pub fn remaining(&self, api_name: &str, now_ms: u64) -> usize {
+        let cutoff = now_ms.saturating_sub(self.window_ms);
+        let used = self.calls.get(api_name)
+            .map(|ts| ts.iter().filter(|&&t| t > cutoff).count())
+            .unwrap_or(0);
+        self.max_calls_per_window.saturating_sub(used)
+    }
+
+    /// Check if an API is currently throttled.
+    pub fn is_throttled(&self, api_name: &str, now_ms: u64) -> bool {
+        self.remaining(api_name, now_ms) == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extension capability probing
+// ---------------------------------------------------------------------------
+
+/// Probes whether an extension has specific capabilities based on its declarations.
+pub struct ExtensionCapabilityProbe {
+    supported_namespaces: Vec<String>,
+    supported_events: Vec<String>,
+}
+
+impl ExtensionCapabilityProbe {
+    /// Create a probe from lists of supported namespaces and activation events.
+    pub fn new(namespaces: Vec<String>, events: Vec<String>) -> Self {
+        Self { supported_namespaces: namespaces, supported_events: events }
+    }
+
+    /// Check if the extension supports a given namespace.
+    pub fn supports_namespace(&self, ns: &str) -> bool {
+        self.supported_namespaces.iter().any(|n| n == ns)
+    }
+
+    /// Check if the extension responds to a given activation event.
+    pub fn responds_to_event(&self, event: &str) -> bool {
+        self.supported_events.iter().any(|e| e == event)
+    }
+
+    /// List all supported namespaces.
+    pub fn namespaces(&self) -> &[String] {
+        &self.supported_namespaces
+    }
+
+    /// Return the number of supported capabilities.
+    pub fn capability_count(&self) -> usize {
+        self.supported_namespaces.len() + self.supported_events.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1888,5 +2100,109 @@ mod tests {
         let issues = decl.validate_against(&reg);
         assert_eq!(issues.len(), 1);
         assert!(issues[0].contains("commands"));
+    }
+
+    // -- ApiVersionNegotiator tests --
+
+    #[test]
+    fn version_negotiator_compatible() {
+        let neg = ApiVersionNegotiator::new("1.110.0").unwrap();
+        assert!(neg.is_compatible("1.100.0"));
+        assert!(neg.is_compatible("1.110.0"));
+        assert!(!neg.is_compatible("1.111.0"));
+        assert!(!neg.is_compatible("2.0.0"));
+    }
+
+    #[test]
+    fn version_negotiator_select_best() {
+        let neg = ApiVersionNegotiator::new("1.110.0").unwrap();
+        let best = neg.select_best(&["1.90.0", "1.100.0", "1.110.0", "1.120.0"]);
+        assert_eq!(best, Some("1.110.0"));
+    }
+
+    #[test]
+    fn version_negotiator_invalid() {
+        assert!(ApiVersionNegotiator::new("bad").is_none());
+    }
+
+    // -- ApiDeprecationWarner tests --
+
+    #[test]
+    fn deprecation_warner_basic() {
+        let mut w = ApiDeprecationWarner::new();
+        w.register("window.showModal", Some("window.showDialog".into()));
+        assert!(w.is_deprecated("window.showModal"));
+        assert!(!w.is_deprecated("window.showInfo"));
+        assert!(w.record_call("window.showModal"));
+        assert!(!w.record_call("window.showInfo"));
+        assert_eq!(w.active_warnings().len(), 1);
+    }
+
+    #[test]
+    fn deprecation_warner_message() {
+        let mut w = ApiDeprecationWarner::new();
+        w.register("old_api", Some("new_api".into()));
+        let msg = w.warning_message("old_api").unwrap();
+        assert!(msg.contains("deprecated"));
+        assert!(msg.contains("new_api"));
+    }
+
+    #[test]
+    fn deprecation_warner_no_replacement() {
+        let mut w = ApiDeprecationWarner::new();
+        w.register("removed_api", None);
+        let msg = w.warning_message("removed_api").unwrap();
+        assert!(msg.contains("no replacement"));
+    }
+
+    // -- ApiCallThrottler tests --
+
+    #[test]
+    fn throttler_allows_within_limit() {
+        let mut t = ApiCallThrottler::new(3, 1000);
+        assert!(t.try_call("api", 100));
+        assert!(t.try_call("api", 200));
+        assert!(t.try_call("api", 300));
+        assert!(!t.try_call("api", 400));
+    }
+
+    #[test]
+    fn throttler_window_expires() {
+        let mut t = ApiCallThrottler::new(2, 1000);
+        assert!(t.try_call("api", 100));
+        assert!(t.try_call("api", 200));
+        assert!(!t.try_call("api", 300));
+        // After window expires
+        assert!(t.try_call("api", 1200));
+    }
+
+    #[test]
+    fn throttler_remaining() {
+        let mut t = ApiCallThrottler::new(5, 1000);
+        t.try_call("api", 100);
+        t.try_call("api", 200);
+        assert_eq!(t.remaining("api", 300), 3);
+        assert!(!t.is_throttled("api", 300));
+    }
+
+    // -- ExtensionCapabilityProbe tests --
+
+    #[test]
+    fn capability_probe_checks() {
+        let probe = ExtensionCapabilityProbe::new(
+            vec!["commands".into(), "workspace".into()],
+            vec!["onLanguage:rust".into()],
+        );
+        assert!(probe.supports_namespace("commands"));
+        assert!(!probe.supports_namespace("debug"));
+        assert!(probe.responds_to_event("onLanguage:rust"));
+        assert_eq!(probe.capability_count(), 3);
+    }
+
+    #[test]
+    fn capability_probe_empty() {
+        let probe = ExtensionCapabilityProbe::new(vec![], vec![]);
+        assert_eq!(probe.capability_count(), 0);
+        assert!(!probe.supports_namespace("anything"));
     }
 }

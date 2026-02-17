@@ -1274,6 +1274,231 @@ impl fmt::Display for ShutdownCoordinator {
 }
 
 // ---------------------------------------------------------------------------
+// LifecyclePhaseTracker – tracks phase with string-based timing
+// ---------------------------------------------------------------------------
+
+/// Tracks lifecycle phase transitions with u64-based timestamps (no Instant).
+pub struct LifecyclePhaseTracker {
+    transitions: Vec<(LifecyclePhase, u64)>,
+}
+
+impl LifecyclePhaseTracker {
+    /// Create a tracker starting in the given phase at timestamp 0.
+    pub fn new() -> Self {
+        Self { transitions: vec![(LifecyclePhase::Starting, 0)] }
+    }
+
+    /// Record a phase transition at the given timestamp (ms).
+    pub fn transition(&mut self, phase: LifecyclePhase, timestamp_ms: u64) {
+        self.transitions.push((phase, timestamp_ms));
+    }
+
+    /// Duration of a specific phase in ms (time between this phase and the next).
+    pub fn phase_duration_ms(&self, phase: LifecyclePhase) -> Option<u64> {
+        let idx = self.transitions.iter().position(|(p, _)| *p == phase)?;
+        if idx + 1 < self.transitions.len() {
+            Some(self.transitions[idx + 1].1.saturating_sub(self.transitions[idx].1))
+        } else {
+            None // still in this phase
+        }
+    }
+
+    /// Total elapsed time from first to last recorded transition.
+    pub fn total_elapsed_ms(&self) -> u64 {
+        if self.transitions.len() < 2 { return 0; }
+        self.transitions.last().unwrap().1.saturating_sub(self.transitions.first().unwrap().1)
+    }
+
+    /// Current (last recorded) phase.
+    pub fn current_phase(&self) -> LifecyclePhase {
+        self.transitions.last().map(|(p, _)| *p).unwrap_or(LifecyclePhase::Starting)
+    }
+
+    /// Number of transitions recorded.
+    pub fn transition_count(&self) -> usize {
+        self.transitions.len()
+    }
+
+    /// Generate a report of all phase timings.
+    pub fn report(&self) -> Vec<(LifecyclePhase, u64)> {
+        let mut result = Vec::new();
+        for i in 0..self.transitions.len().saturating_sub(1) {
+            let dur = self.transitions[i + 1].1.saturating_sub(self.transitions[i].1);
+            result.push((self.transitions[i].0, dur));
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShutdownBlocker – blocks shutdown for pending saves
+// ---------------------------------------------------------------------------
+
+/// Tracks pending operations that should block shutdown.
+pub struct ShutdownBlocker {
+    blockers: Vec<(String, String)>, // (id, reason)
+}
+
+impl ShutdownBlocker {
+    /// Create a new blocker tracker.
+    pub fn new() -> Self {
+        Self { blockers: Vec::new() }
+    }
+
+    /// Register a blocker with an id and reason.
+    pub fn add_blocker(&mut self, id: impl Into<String>, reason: impl Into<String>) {
+        self.blockers.push((id.into(), reason.into()));
+    }
+
+    /// Remove a blocker by id.
+    pub fn remove_blocker(&mut self, id: &str) -> bool {
+        let len = self.blockers.len();
+        self.blockers.retain(|(bid, _)| bid != id);
+        self.blockers.len() < len
+    }
+
+    /// Whether there are any active blockers.
+    pub fn is_blocked(&self) -> bool {
+        !self.blockers.is_empty()
+    }
+
+    /// Number of active blockers.
+    pub fn blocker_count(&self) -> usize {
+        self.blockers.len()
+    }
+
+    /// Get all blocker reasons.
+    pub fn reasons(&self) -> Vec<&str> {
+        self.blockers.iter().map(|(_, r)| r.as_str()).collect()
+    }
+
+    /// Check if a specific blocker exists.
+    pub fn has_blocker(&self, id: &str) -> bool {
+        self.blockers.iter().any(|(bid, _)| bid == id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleDiagnostics – reporting diagnostics
+// ---------------------------------------------------------------------------
+
+/// A single diagnostic entry.
+#[derive(Debug, Clone)]
+pub struct DiagnosticEntry {
+    pub subsystem: String,
+    pub message: String,
+    pub severity: DiagnosticSeverity,
+}
+
+/// Severity of a diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// Collects lifecycle diagnostics.
+pub struct LifecycleDiagnostics {
+    entries: Vec<DiagnosticEntry>,
+}
+
+impl LifecycleDiagnostics {
+    /// Create an empty diagnostics collector.
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Record a diagnostic.
+    pub fn record(&mut self, subsystem: impl Into<String>, message: impl Into<String>, severity: DiagnosticSeverity) {
+        self.entries.push(DiagnosticEntry {
+            subsystem: subsystem.into(),
+            message: message.into(),
+            severity,
+        });
+    }
+
+    /// Get entries by severity.
+    pub fn by_severity(&self, severity: DiagnosticSeverity) -> Vec<&DiagnosticEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    /// Whether there are any errors.
+    pub fn has_errors(&self) -> bool {
+        self.entries.iter().any(|e| e.severity == DiagnosticSeverity::Error)
+    }
+
+    /// Total entries.
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Generate a summary string.
+    pub fn summary(&self) -> String {
+        let errors = self.by_severity(DiagnosticSeverity::Error).len();
+        let warnings = self.by_severity(DiagnosticSeverity::Warning).len();
+        let infos = self.by_severity(DiagnosticSeverity::Info).len();
+        format!("{} errors, {} warnings, {} info", errors, warnings, infos)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RestartRequestHandler
+// ---------------------------------------------------------------------------
+
+/// Handles application restart requests.
+pub struct RestartRequestHandler {
+    pending_restart: bool,
+    restart_reason: Option<String>,
+    restart_count: u32,
+}
+
+impl RestartRequestHandler {
+    /// Create a new handler.
+    pub fn new() -> Self {
+        Self { pending_restart: false, restart_reason: None, restart_count: 0 }
+    }
+
+    /// Request a restart with a reason.
+    pub fn request_restart(&mut self, reason: impl Into<String>) {
+        self.pending_restart = true;
+        self.restart_reason = Some(reason.into());
+    }
+
+    /// Cancel a pending restart.
+    pub fn cancel_restart(&mut self) {
+        self.pending_restart = false;
+        self.restart_reason = None;
+    }
+
+    /// Whether a restart is pending.
+    pub fn is_restart_pending(&self) -> bool {
+        self.pending_restart
+    }
+
+    /// Get the restart reason.
+    pub fn restart_reason(&self) -> Option<&str> {
+        self.restart_reason.as_deref()
+    }
+
+    /// Acknowledge the restart (consume the request).
+    pub fn acknowledge_restart(&mut self) -> Option<String> {
+        if self.pending_restart {
+            self.pending_restart = false;
+            self.restart_count += 1;
+            self.restart_reason.take()
+        } else {
+            None
+        }
+    }
+
+    /// Number of restarts acknowledged so far.
+    pub fn restart_count(&self) -> u32 {
+        self.restart_count
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1900,5 +2125,105 @@ mod tests {
         assert!(!timeout.is_ready());
         timeout.dispose(); // force dispose
         assert!(timeout.is_disposed());
+    }
+
+    // -- LifecyclePhaseTracker tests --
+
+    #[test]
+    fn phase_tracker_transitions() {
+        let mut t = LifecyclePhaseTracker::new();
+        t.transition(LifecyclePhase::Ready, 100);
+        t.transition(LifecyclePhase::Restored, 250);
+        assert_eq!(t.current_phase(), LifecyclePhase::Restored);
+        assert_eq!(t.phase_duration_ms(LifecyclePhase::Starting), Some(100));
+        assert_eq!(t.phase_duration_ms(LifecyclePhase::Ready), Some(150));
+    }
+
+    #[test]
+    fn phase_tracker_total_elapsed() {
+        let mut t = LifecyclePhaseTracker::new();
+        t.transition(LifecyclePhase::Ready, 200);
+        t.transition(LifecyclePhase::Restored, 500);
+        assert_eq!(t.total_elapsed_ms(), 500);
+    }
+
+    #[test]
+    fn phase_tracker_report() {
+        let mut t = LifecyclePhaseTracker::new();
+        t.transition(LifecyclePhase::Ready, 100);
+        t.transition(LifecyclePhase::Restored, 300);
+        let r = t.report();
+        assert_eq!(r.len(), 2);
+        assert_eq!(r[0], (LifecyclePhase::Starting, 100));
+        assert_eq!(r[1], (LifecyclePhase::Ready, 200));
+    }
+
+    // -- ShutdownBlocker tests --
+
+    #[test]
+    fn shutdown_blocker_lifecycle() {
+        let mut b = ShutdownBlocker::new();
+        assert!(!b.is_blocked());
+        b.add_blocker("save", "unsaved files");
+        assert!(b.is_blocked());
+        assert_eq!(b.blocker_count(), 1);
+        assert!(b.has_blocker("save"));
+        assert!(b.remove_blocker("save"));
+        assert!(!b.is_blocked());
+    }
+
+    #[test]
+    fn shutdown_blocker_reasons() {
+        let mut b = ShutdownBlocker::new();
+        b.add_blocker("a", "reason1");
+        b.add_blocker("b", "reason2");
+        assert_eq!(b.reasons().len(), 2);
+    }
+
+    // -- LifecycleDiagnostics tests --
+
+    #[test]
+    fn diagnostics_basic() {
+        let mut d = LifecycleDiagnostics::new();
+        d.record("editor", "slow startup", DiagnosticSeverity::Warning);
+        d.record("fs", "disk full", DiagnosticSeverity::Error);
+        d.record("net", "connected", DiagnosticSeverity::Info);
+        assert!(d.has_errors());
+        assert_eq!(d.count(), 3);
+        assert_eq!(d.by_severity(DiagnosticSeverity::Error).len(), 1);
+    }
+
+    #[test]
+    fn diagnostics_summary() {
+        let mut d = LifecycleDiagnostics::new();
+        d.record("a", "msg", DiagnosticSeverity::Error);
+        d.record("b", "msg", DiagnosticSeverity::Warning);
+        let s = d.summary();
+        assert!(s.contains("1 errors"));
+        assert!(s.contains("1 warnings"));
+    }
+
+    // -- RestartRequestHandler tests --
+
+    #[test]
+    fn restart_request_lifecycle() {
+        let mut h = RestartRequestHandler::new();
+        assert!(!h.is_restart_pending());
+        h.request_restart("extension updated");
+        assert!(h.is_restart_pending());
+        assert_eq!(h.restart_reason(), Some("extension updated"));
+        let reason = h.acknowledge_restart();
+        assert_eq!(reason, Some("extension updated".into()));
+        assert!(!h.is_restart_pending());
+        assert_eq!(h.restart_count(), 1);
+    }
+
+    #[test]
+    fn restart_cancel() {
+        let mut h = RestartRequestHandler::new();
+        h.request_restart("update");
+        h.cancel_restart();
+        assert!(!h.is_restart_pending());
+        assert_eq!(h.acknowledge_restart(), None);
     }
 }

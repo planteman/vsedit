@@ -1148,6 +1148,213 @@ impl fmt::Display for ExtensionStatusSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ExtensionValidateScan – checking extension manifests
+// ---------------------------------------------------------------------------
+
+/// Result of scanning/validating an extension manifest.
+#[derive(Debug, Clone)]
+pub struct ManifestScanResult {
+    pub extension_id: String,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+impl ManifestScanResult {
+    /// Whether the manifest is valid (no errors).
+    pub fn is_valid(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    /// Total number of issues (errors + warnings).
+    pub fn issue_count(&self) -> usize {
+        self.errors.len() + self.warnings.len()
+    }
+}
+
+/// Scans and validates extension manifests against platform rules.
+pub struct ExtensionValidateScan {
+    required_fields: Vec<String>,
+    max_name_length: usize,
+}
+
+impl ExtensionValidateScan {
+    /// Create a scanner with default rules.
+    pub fn new() -> Self {
+        Self {
+            required_fields: vec![
+                "name".into(), "publisher".into(), "version".into(),
+            ],
+            max_name_length: 214,
+        }
+    }
+
+    /// Scan a manifest and return validation results.
+    pub fn scan(&self, manifest: &ExtensionManifest) -> ManifestScanResult {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        if manifest.name.is_empty() {
+            errors.push("name must not be empty".into());
+        }
+        if manifest.publisher.is_empty() {
+            errors.push("publisher must not be empty".into());
+        }
+        if manifest.identifier.version.is_empty() {
+            errors.push("version must not be empty".into());
+        }
+        if manifest.name.len() > self.max_name_length {
+            errors.push(format!("name exceeds max length of {}", self.max_name_length));
+        }
+        if !validate_semver(&manifest.identifier.version) {
+            warnings.push("version is not valid semver".into());
+        }
+        if manifest.activation_events.is_empty() {
+            warnings.push("no activation events declared".into());
+        }
+
+        ManifestScanResult {
+            extension_id: manifest.full_id(),
+            errors,
+            warnings,
+        }
+    }
+
+    /// Scan multiple manifests.
+    pub fn scan_all(&self, manifests: &[ExtensionManifest]) -> Vec<ManifestScanResult> {
+        manifests.iter().map(|m| self.scan(m)).collect()
+    }
+
+    /// Set max name length.
+    pub fn set_max_name_length(&mut self, max: usize) {
+        self.max_name_length = max;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionStorageQuota – per-extension storage management
+// ---------------------------------------------------------------------------
+
+/// Manages per-extension storage quotas.
+pub struct ExtensionStorageQuota {
+    quotas: std::collections::HashMap<String, (u64, u64)>, // (used, max)
+    default_max: u64,
+}
+
+impl ExtensionStorageQuota {
+    /// Create a quota manager with a default max per extension (in bytes).
+    pub fn new(default_max_bytes: u64) -> Self {
+        Self {
+            quotas: std::collections::HashMap::new(),
+            default_max: default_max_bytes,
+        }
+    }
+
+    /// Record storage usage for an extension.
+    pub fn set_usage(&mut self, ext_id: &str, used_bytes: u64) {
+        let entry = self.quotas.entry(ext_id.to_string()).or_insert((0, self.default_max));
+        entry.0 = used_bytes;
+    }
+
+    /// Set a custom quota for an extension.
+    pub fn set_quota(&mut self, ext_id: &str, max_bytes: u64) {
+        let entry = self.quotas.entry(ext_id.to_string()).or_insert((0, self.default_max));
+        entry.1 = max_bytes;
+    }
+
+    /// Check if an extension has exceeded its quota.
+    pub fn is_over_quota(&self, ext_id: &str) -> bool {
+        self.quotas.get(ext_id).map(|(used, max)| used > max).unwrap_or(false)
+    }
+
+    /// Get remaining bytes for an extension.
+    pub fn remaining_bytes(&self, ext_id: &str) -> u64 {
+        self.quotas.get(ext_id)
+            .map(|(used, max)| max.saturating_sub(*used))
+            .unwrap_or(self.default_max)
+    }
+
+    /// Get usage percentage for an extension.
+    pub fn usage_percent(&self, ext_id: &str) -> f64 {
+        self.quotas.get(ext_id)
+            .map(|(used, max)| if *max == 0 { 100.0 } else { (*used as f64 / *max as f64) * 100.0 })
+            .unwrap_or(0.0)
+    }
+
+    /// List extensions over a given usage percentage.
+    pub fn extensions_over_percent(&self, threshold: f64) -> Vec<&str> {
+        self.quotas.iter()
+            .filter(|(_, (used, max))| {
+                if *max == 0 { return true; }
+                (*used as f64 / *max as f64) * 100.0 > threshold
+            })
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionToggle – enable/disable toggle with reason tracking
+// ---------------------------------------------------------------------------
+
+/// Reason why an extension was disabled.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DisableReason {
+    /// User manually disabled.
+    User,
+    /// Disabled due to workspace trust.
+    WorkspaceTrust,
+    /// Disabled due to compatibility issue.
+    Compatibility,
+    /// Disabled due to dependency missing.
+    DependencyMissing,
+}
+
+/// Tracks enable/disable state with reason for each extension.
+pub struct ExtensionToggle {
+    disabled: std::collections::HashMap<String, DisableReason>,
+}
+
+impl ExtensionToggle {
+    /// Create a new toggle tracker.
+    pub fn new() -> Self {
+        Self { disabled: std::collections::HashMap::new() }
+    }
+
+    /// Disable an extension with a reason.
+    pub fn disable(&mut self, ext_id: impl Into<String>, reason: DisableReason) {
+        self.disabled.insert(ext_id.into(), reason);
+    }
+
+    /// Enable an extension (remove disable record).
+    pub fn enable(&mut self, ext_id: &str) -> bool {
+        self.disabled.remove(ext_id).is_some()
+    }
+
+    /// Check if an extension is disabled.
+    pub fn is_disabled(&self, ext_id: &str) -> bool {
+        self.disabled.contains_key(ext_id)
+    }
+
+    /// Get the disable reason for an extension.
+    pub fn disable_reason(&self, ext_id: &str) -> Option<&DisableReason> {
+        self.disabled.get(ext_id)
+    }
+
+    /// Count of disabled extensions.
+    pub fn disabled_count(&self) -> usize {
+        self.disabled.len()
+    }
+
+    /// List all extensions disabled for a specific reason.
+    pub fn disabled_by_reason(&self, reason: &DisableReason) -> Vec<&str> {
+        self.disabled.iter()
+            .filter(|(_, r)| *r == reason)
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1894,5 +2101,88 @@ mod tests {
         assert_eq!(ids, vec!["rust-analyzer"]);
         let ids_empty = recommender.recommended_ids(&["java"]);
         assert!(ids_empty.is_empty());
+    }
+
+    // -- ExtensionValidateScan tests --
+
+    #[test]
+    fn validate_scan_valid_manifest() {
+        let scanner = ExtensionValidateScan::new();
+        let m = make_manifest("test-ext");
+        let result = scanner.scan(&m);
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn validate_scan_empty_name() {
+        let scanner = ExtensionValidateScan::new();
+        let mut m = make_manifest("");
+        m.name = String::new();
+        let result = scanner.scan(&m);
+        assert!(!result.is_valid());
+        assert!(result.errors.iter().any(|e| e.contains("name")));
+    }
+
+    #[test]
+    fn validate_scan_multiple() {
+        let scanner = ExtensionValidateScan::new();
+        let manifests = vec![make_manifest("a"), make_manifest("b")];
+        let results = scanner.scan_all(&manifests);
+        assert_eq!(results.len(), 2);
+    }
+
+    // -- ExtensionStorageQuota tests --
+
+    #[test]
+    fn storage_quota_basic() {
+        let mut q = ExtensionStorageQuota::new(1_000_000);
+        q.set_usage("ext-a", 500_000);
+        assert!(!q.is_over_quota("ext-a"));
+        assert_eq!(q.remaining_bytes("ext-a"), 500_000);
+    }
+
+    #[test]
+    fn storage_quota_over() {
+        let mut q = ExtensionStorageQuota::new(1000);
+        q.set_usage("ext-a", 2000);
+        assert!(q.is_over_quota("ext-a"));
+        assert!(q.usage_percent("ext-a") > 100.0);
+    }
+
+    #[test]
+    fn storage_quota_custom() {
+        let mut q = ExtensionStorageQuota::new(1000);
+        q.set_quota("ext-a", 5000);
+        q.set_usage("ext-a", 3000);
+        assert!(!q.is_over_quota("ext-a"));
+        assert_eq!(q.remaining_bytes("ext-a"), 2000);
+    }
+
+    // -- ExtensionToggle tests --
+
+    #[test]
+    fn toggle_disable_enable() {
+        let mut t = ExtensionToggle::new();
+        t.disable("ext-a", DisableReason::User);
+        assert!(t.is_disabled("ext-a"));
+        assert_eq!(t.disable_reason("ext-a"), Some(&DisableReason::User));
+        assert!(t.enable("ext-a"));
+        assert!(!t.is_disabled("ext-a"));
+    }
+
+    #[test]
+    fn toggle_disabled_by_reason() {
+        let mut t = ExtensionToggle::new();
+        t.disable("a", DisableReason::User);
+        t.disable("b", DisableReason::WorkspaceTrust);
+        t.disable("c", DisableReason::User);
+        assert_eq!(t.disabled_by_reason(&DisableReason::User).len(), 2);
+        assert_eq!(t.disabled_count(), 3);
+    }
+
+    #[test]
+    fn toggle_enable_nonexistent() {
+        let mut t = ExtensionToggle::new();
+        assert!(!t.enable("missing"));
     }
 }

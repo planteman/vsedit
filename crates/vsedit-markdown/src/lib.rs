@@ -1298,6 +1298,214 @@ impl MarkdownStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MarkdownTableRenderer – render tables for terminal
+// ---------------------------------------------------------------------------
+
+/// Renders markdown tables as formatted terminal output.
+pub struct MarkdownTableRenderer {
+    /// Minimum column width.
+    pub min_col_width: usize,
+    /// Maximum column width.
+    pub max_col_width: usize,
+    /// Column separator character.
+    pub separator: char,
+}
+
+impl MarkdownTableRenderer {
+    /// Create a table renderer with defaults.
+    pub fn new() -> Self {
+        Self { min_col_width: 3, max_col_width: 40, separator: '|' }
+    }
+
+    /// Render a table given headers and rows.
+    pub fn render(&self, headers: &[&str], rows: &[Vec<String>]) -> String {
+        let col_count = headers.len();
+        let mut widths: Vec<usize> = headers.iter().map(|h| h.len().max(self.min_col_width).min(self.max_col_width)).collect();
+        for row in rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < col_count {
+                    widths[i] = widths[i].max(cell.len().min(self.max_col_width));
+                }
+            }
+        }
+
+        let mut out = String::new();
+        // Header
+        out.push(self.separator);
+        for (i, h) in headers.iter().enumerate() {
+            out.push_str(&format!(" {:width$} {}", h, self.separator, width = widths[i]));
+        }
+        out.push('\n');
+        // Separator line
+        out.push(self.separator);
+        for w in &widths {
+            out.push_str(&format!("{}{}", "-".repeat(*w + 2), self.separator));
+        }
+        out.push('\n');
+        // Rows
+        for row in rows {
+            out.push(self.separator);
+            for (i, cell) in row.iter().enumerate() {
+                let w = widths.get(i).copied().unwrap_or(self.min_col_width);
+                let truncated = if cell.len() > w { &cell[..w] } else { cell.as_str() };
+                out.push_str(&format!(" {:width$} {}", truncated, self.separator, width = w));
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Column count from a markdown table text.
+    pub fn column_count_from_text(text: &str) -> usize {
+        text.lines().next()
+            .map(|line| line.split('|').filter(|s| !s.trim().is_empty()).count())
+            .unwrap_or(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkdownChecklistRenderer – render checklists with toggle state
+// ---------------------------------------------------------------------------
+
+/// A single checklist item.
+#[derive(Debug, Clone)]
+pub struct ChecklistItem {
+    pub text: String,
+    pub checked: bool,
+}
+
+/// Parses and manages markdown checklists.
+pub struct MarkdownChecklistRenderer {
+    items: Vec<ChecklistItem>,
+}
+
+impl MarkdownChecklistRenderer {
+    /// Create an empty checklist.
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Parse checklist items from markdown text.
+    pub fn parse(text: &str) -> Self {
+        let items = text.lines().filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with("- [x] ") || trimmed.starts_with("- [X] ") {
+                Some(ChecklistItem { text: trimmed[6..].to_string(), checked: true })
+            } else if trimmed.starts_with("- [ ] ") {
+                Some(ChecklistItem { text: trimmed[6..].to_string(), checked: false })
+            } else {
+                None
+            }
+        }).collect();
+        Self { items }
+    }
+
+    /// Toggle an item by index.
+    pub fn toggle(&mut self, index: usize) -> Option<bool> {
+        if let Some(item) = self.items.get_mut(index) {
+            item.checked = !item.checked;
+            Some(item.checked)
+        } else {
+            None
+        }
+    }
+
+    /// Number of items.
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Number of checked items.
+    pub fn checked_count(&self) -> usize {
+        self.items.iter().filter(|i| i.checked).count()
+    }
+
+    /// Progress as a fraction (0.0 to 1.0).
+    pub fn progress(&self) -> f64 {
+        if self.items.is_empty() { return 0.0; }
+        self.checked_count() as f64 / self.items.len() as f64
+    }
+
+    /// Render the checklist back to markdown.
+    pub fn to_markdown(&self) -> String {
+        self.items.iter().map(|i| {
+            let mark = if i.checked { "x" } else { " " };
+            format!("- [{}] {}", mark, i.text)
+        }).collect::<Vec<_>>().join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkdownLinkResolver – resolve relative paths
+// ---------------------------------------------------------------------------
+
+/// Resolves relative links in markdown to absolute paths.
+pub struct MarkdownLinkResolver {
+    base_dir: String,
+}
+
+impl MarkdownLinkResolver {
+    /// Create a resolver with a base directory.
+    pub fn new(base_dir: impl Into<String>) -> Self {
+        Self { base_dir: base_dir.into() }
+    }
+
+    /// Resolve a relative path to absolute.
+    pub fn resolve(&self, relative_path: &str) -> String {
+        if relative_path.starts_with("http://") || relative_path.starts_with("https://") || relative_path.starts_with('/') {
+            return relative_path.to_string();
+        }
+        let base = self.base_dir.trim_end_matches('/');
+        format!("{}/{}", base, relative_path)
+    }
+
+    /// Resolve all links in a list of tokens.
+    pub fn resolve_all_links(&self, tokens: &[MarkdownToken]) -> Vec<MarkdownToken> {
+        tokens.iter().map(|t| match t {
+            MarkdownToken::Link(text, url) => {
+                MarkdownToken::Link(text.clone(), self.resolve(url))
+            }
+            other => other.clone(),
+        }).collect()
+    }
+
+    /// Get the base directory.
+    pub fn base_dir(&self) -> &str {
+        &self.base_dir
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Heading extraction for outline
+// ---------------------------------------------------------------------------
+
+/// Extract headings from markdown text for building an outline/TOC.
+pub fn extract_heading_outline(text: &str) -> Vec<(u8, String, usize)> {
+    let mut headings = Vec::new();
+    for (line_num, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') {
+            let level = trimmed.chars().take_while(|&c| c == '#').count() as u8;
+            if level <= 6 {
+                let title = trimmed[level as usize..].trim().to_string();
+                if !title.is_empty() {
+                    headings.push((level, title, line_num + 1));
+                }
+            }
+        }
+    }
+    headings
+}
+
+/// Build a hierarchical indent string for outline display.
+pub fn format_outline(headings: &[(u8, String, usize)]) -> String {
+    headings.iter().map(|(level, title, line)| {
+        let indent = "  ".repeat((*level as usize).saturating_sub(1));
+        format!("{}{}  (line {})", indent, title, line)
+    }).collect::<Vec<_>>().join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1901,5 +2109,98 @@ mod tests {
         let stats = MarkdownStats::default();
         assert!(stats.is_empty());
         assert_eq!(stats.structural_count(), 0);
+    }
+
+    // -- MarkdownTableRenderer tests --
+
+    #[test]
+    fn table_renderer_basic() {
+        let r = MarkdownTableRenderer::new();
+        let out = r.render(&["Name", "Age"], &[
+            vec!["Alice".into(), "30".into()],
+            vec!["Bob".into(), "25".into()],
+        ]);
+        assert!(out.contains("Alice"));
+        assert!(out.contains("Bob"));
+        assert!(out.contains("|"));
+    }
+
+    #[test]
+    fn table_renderer_empty() {
+        let r = MarkdownTableRenderer::new();
+        let out = r.render(&["A"], &[]);
+        assert!(out.contains("A"));
+    }
+
+    #[test]
+    fn table_column_count_from_text() {
+        let text = "| A | B | C |\n|---|---|---|";
+        assert_eq!(MarkdownTableRenderer::column_count_from_text(text), 3);
+    }
+
+    // -- MarkdownChecklistRenderer tests --
+
+    #[test]
+    fn checklist_parse_and_toggle() {
+        let text = "- [x] Done\n- [ ] Pending\n- [ ] Also pending";
+        let mut cl = MarkdownChecklistRenderer::parse(text);
+        assert_eq!(cl.item_count(), 3);
+        assert_eq!(cl.checked_count(), 1);
+        cl.toggle(1);
+        assert_eq!(cl.checked_count(), 2);
+    }
+
+    #[test]
+    fn checklist_progress() {
+        let text = "- [x] A\n- [x] B\n- [ ] C\n- [ ] D";
+        let cl = MarkdownChecklistRenderer::parse(text);
+        assert!((cl.progress() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn checklist_to_markdown() {
+        let text = "- [x] Done\n- [ ] Pending";
+        let cl = MarkdownChecklistRenderer::parse(text);
+        let md = cl.to_markdown();
+        assert!(md.contains("- [x] Done"));
+        assert!(md.contains("- [ ] Pending"));
+    }
+
+    // -- MarkdownLinkResolver tests --
+
+    #[test]
+    fn link_resolver_relative() {
+        let r = MarkdownLinkResolver::new("/docs");
+        assert_eq!(r.resolve("image.png"), "/docs/image.png");
+        assert_eq!(r.resolve("sub/page.md"), "/docs/sub/page.md");
+    }
+
+    #[test]
+    fn link_resolver_absolute_unchanged() {
+        let r = MarkdownLinkResolver::new("/docs");
+        assert_eq!(r.resolve("https://example.com"), "https://example.com");
+        assert_eq!(r.resolve("/root/file"), "/root/file");
+    }
+
+    // -- Heading outline tests --
+
+    #[test]
+    fn heading_outline_extraction() {
+        let text = "# Title\n\nSome text\n\n## Section 1\n\n### Subsection\n\n## Section 2";
+        let headings = extract_heading_outline(text);
+        assert_eq!(headings.len(), 4);
+        assert_eq!(headings[0], (1, "Title".into(), 1));
+        assert_eq!(headings[1], (2, "Section 1".into(), 5));
+    }
+
+    #[test]
+    fn heading_outline_format() {
+        let headings = vec![
+            (1, "Title".into(), 1),
+            (2, "Section".into(), 3),
+        ];
+        let formatted = format_outline(&headings);
+        assert!(formatted.contains("Title"));
+        assert!(formatted.contains("  Section")); // indented
     }
 }

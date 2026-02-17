@@ -1178,6 +1178,221 @@ pub fn multi_account_providers(providers: &[AuthProvider]) -> Vec<&AuthProvider>
     providers.iter().filter(|p| p.supports_multiple_accounts).collect()
 }
 
+// ---------------------------------------------------------------------------
+// AuthSessionManager – token refresh
+// ---------------------------------------------------------------------------
+
+/// Manages authentication sessions with token refresh tracking.
+pub struct AuthSessionManager {
+    sessions: HashMap<String, ManagedSession>,
+}
+
+/// A session with refresh metadata.
+#[derive(Debug, Clone)]
+pub struct ManagedSession {
+    pub session_id: String,
+    pub provider_id: String,
+    pub access_token: String,
+    pub expires_at_ms: Option<u64>,
+    pub refresh_count: u32,
+}
+
+impl AuthSessionManager {
+    /// Create a new session manager.
+    pub fn new() -> Self {
+        Self { sessions: HashMap::new() }
+    }
+
+    /// Store a session.
+    pub fn store(&mut self, session: ManagedSession) {
+        self.sessions.insert(session.session_id.clone(), session);
+    }
+
+    /// Check if a session's token has expired given the current time.
+    pub fn is_expired(&self, session_id: &str, now_ms: u64) -> bool {
+        self.sessions.get(session_id)
+            .and_then(|s| s.expires_at_ms)
+            .map(|exp| now_ms >= exp)
+            .unwrap_or(false)
+    }
+
+    /// Refresh a session's token. Returns the old token.
+    pub fn refresh_token(&mut self, session_id: &str, new_token: String, new_expires_at: Option<u64>) -> Option<String> {
+        if let Some(session) = self.sessions.get_mut(session_id) {
+            let old = std::mem::replace(&mut session.access_token, new_token);
+            session.expires_at_ms = new_expires_at;
+            session.refresh_count += 1;
+            Some(old)
+        } else {
+            None
+        }
+    }
+
+    /// Get the number of times a session has been refreshed.
+    pub fn refresh_count(&self, session_id: &str) -> u32 {
+        self.sessions.get(session_id).map(|s| s.refresh_count).unwrap_or(0)
+    }
+
+    /// List sessions that will expire before the given deadline.
+    pub fn expiring_before(&self, deadline_ms: u64) -> Vec<&ManagedSession> {
+        self.sessions.values()
+            .filter(|s| s.expires_at_ms.map(|e| e < deadline_ms).unwrap_or(false))
+            .collect()
+    }
+
+    /// Total number of managed sessions.
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OAuthFlowHandler – browser-based auth flow
+// ---------------------------------------------------------------------------
+
+/// State of an OAuth flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OAuthFlowState {
+    /// Waiting for user to open the browser.
+    Pending,
+    /// Browser opened, waiting for callback.
+    AwaitingCallback,
+    /// Flow completed successfully.
+    Completed,
+    /// Flow failed or was cancelled.
+    Failed,
+}
+
+/// Handles an OAuth browser-based authentication flow.
+pub struct OAuthFlowHandler {
+    pub client_id: String,
+    pub redirect_uri: String,
+    pub scopes: Vec<String>,
+    state: OAuthFlowState,
+    authorization_code: Option<String>,
+}
+
+impl OAuthFlowHandler {
+    /// Create a new OAuth flow handler.
+    pub fn new(client_id: impl Into<String>, redirect_uri: impl Into<String>, scopes: Vec<String>) -> Self {
+        Self {
+            client_id: client_id.into(),
+            redirect_uri: redirect_uri.into(),
+            scopes,
+            state: OAuthFlowState::Pending,
+            authorization_code: None,
+        }
+    }
+
+    /// Build the authorization URL.
+    pub fn authorization_url(&self) -> String {
+        let scopes = self.scopes.join(" ");
+        format!(
+            "https://auth.example.com/authorize?client_id={}&redirect_uri={}&scope={}&response_type=code",
+            self.client_id, self.redirect_uri, scopes
+        )
+    }
+
+    /// Mark the flow as awaiting callback (browser opened).
+    pub fn mark_browser_opened(&mut self) {
+        self.state = OAuthFlowState::AwaitingCallback;
+    }
+
+    /// Handle callback with authorization code.
+    pub fn handle_callback(&mut self, code: String) {
+        self.authorization_code = Some(code);
+        self.state = OAuthFlowState::Completed;
+    }
+
+    /// Mark the flow as failed.
+    pub fn fail(&mut self) {
+        self.state = OAuthFlowState::Failed;
+    }
+
+    /// Current flow state.
+    pub fn state(&self) -> OAuthFlowState {
+        self.state
+    }
+
+    /// Get the authorization code (only after completion).
+    pub fn authorization_code(&self) -> Option<&str> {
+        self.authorization_code.as_deref()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthProviderChain – fallback auth
+// ---------------------------------------------------------------------------
+
+/// Chains multiple auth providers for fallback authentication.
+pub struct AuthProviderChain {
+    provider_ids: Vec<String>,
+}
+
+impl AuthProviderChain {
+    /// Create a chain with providers in priority order.
+    pub fn new(provider_ids: Vec<String>) -> Self {
+        Self { provider_ids }
+    }
+
+    /// Find the first provider that has an active session in the service.
+    pub fn first_available<'a>(&self, service: &'a AuthenticationService) -> Option<&'a AuthProvider> {
+        for pid in &self.provider_ids {
+            if let Some(provider) = service.get_provider(pid) {
+                if provider.status.is_usable() {
+                    return Some(provider);
+                }
+            }
+        }
+        None
+    }
+
+    /// Get the number of providers in the chain.
+    pub fn len(&self) -> usize {
+        self.provider_ids.len()
+    }
+
+    /// Whether the chain is empty.
+    pub fn is_empty(&self) -> bool {
+        self.provider_ids.is_empty()
+    }
+
+    /// Get provider IDs.
+    pub fn provider_ids(&self) -> &[String] {
+        &self.provider_ids
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CredentialEncryptionWrapper – simple XOR-based obfuscation
+// ---------------------------------------------------------------------------
+
+/// Wraps credential strings with simple XOR obfuscation for in-memory storage.
+///
+/// NOTE: This is NOT cryptographic encryption, just obfuscation to prevent
+/// accidental exposure in memory dumps.
+pub struct CredentialEncryptionWrapper {
+    key: u8,
+}
+
+impl CredentialEncryptionWrapper {
+    /// Create a wrapper with the given XOR key.
+    pub fn new(key: u8) -> Self {
+        Self { key }
+    }
+
+    /// Obfuscate a credential string.
+    pub fn encrypt(&self, plaintext: &str) -> Vec<u8> {
+        plaintext.as_bytes().iter().map(|b| b ^ self.key).collect()
+    }
+
+    /// De-obfuscate a credential string.
+    pub fn decrypt(&self, ciphertext: &[u8]) -> String {
+        let bytes: Vec<u8> = ciphertext.iter().map(|b| b ^ self.key).collect();
+        String::from_utf8_lossy(&bytes).to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1889,5 +2104,118 @@ mod tests {
         let multi = multi_account_providers(&providers);
         assert_eq!(multi.len(), 1);
         assert_eq!(multi[0].id, "azure");
+    }
+
+    // -- AuthSessionManager tests --
+
+    #[test]
+    fn session_manager_store_and_expire() {
+        let mut mgr = AuthSessionManager::new();
+        mgr.store(ManagedSession {
+            session_id: "s1".into(),
+            provider_id: "github".into(),
+            access_token: "tok123".into(),
+            expires_at_ms: Some(5000),
+            refresh_count: 0,
+        });
+        assert!(!mgr.is_expired("s1", 4000));
+        assert!(mgr.is_expired("s1", 5000));
+        assert_eq!(mgr.session_count(), 1);
+    }
+
+    #[test]
+    fn session_manager_refresh() {
+        let mut mgr = AuthSessionManager::new();
+        mgr.store(ManagedSession {
+            session_id: "s1".into(),
+            provider_id: "gh".into(),
+            access_token: "old".into(),
+            expires_at_ms: Some(1000),
+            refresh_count: 0,
+        });
+        let old = mgr.refresh_token("s1", "new".into(), Some(2000));
+        assert_eq!(old, Some("old".into()));
+        assert_eq!(mgr.refresh_count("s1"), 1);
+        assert!(!mgr.is_expired("s1", 1500));
+    }
+
+    #[test]
+    fn session_manager_expiring_before() {
+        let mut mgr = AuthSessionManager::new();
+        mgr.store(ManagedSession {
+            session_id: "a".into(), provider_id: "gh".into(),
+            access_token: "t".into(), expires_at_ms: Some(100), refresh_count: 0,
+        });
+        mgr.store(ManagedSession {
+            session_id: "b".into(), provider_id: "gh".into(),
+            access_token: "t".into(), expires_at_ms: Some(500), refresh_count: 0,
+        });
+        assert_eq!(mgr.expiring_before(200).len(), 1);
+        assert_eq!(mgr.expiring_before(600).len(), 2);
+    }
+
+    // -- OAuthFlowHandler tests --
+
+    #[test]
+    fn oauth_flow_lifecycle() {
+        let mut flow = OAuthFlowHandler::new("client1", "http://localhost:8080", vec!["read".into()]);
+        assert_eq!(flow.state(), OAuthFlowState::Pending);
+        assert!(flow.authorization_url().contains("client1"));
+        flow.mark_browser_opened();
+        assert_eq!(flow.state(), OAuthFlowState::AwaitingCallback);
+        flow.handle_callback("code123".into());
+        assert_eq!(flow.state(), OAuthFlowState::Completed);
+        assert_eq!(flow.authorization_code(), Some("code123"));
+    }
+
+    #[test]
+    fn oauth_flow_fail() {
+        let mut flow = OAuthFlowHandler::new("c", "http://localhost", vec![]);
+        flow.fail();
+        assert_eq!(flow.state(), OAuthFlowState::Failed);
+        assert_eq!(flow.authorization_code(), None);
+    }
+
+    // -- AuthProviderChain tests --
+
+    #[test]
+    fn auth_chain_finds_first_available() {
+        let mut svc = AuthenticationService::new();
+        svc.register_provider(AuthProvider {
+            id: "gh".into(), label: "GitHub".into(),
+            supports_multiple_accounts: false, status: AuthProviderStatus::Active,
+        });
+        let chain = AuthProviderChain::new(vec!["missing".into(), "gh".into()]);
+        let found = chain.first_available(&svc);
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "gh");
+    }
+
+    #[test]
+    fn auth_chain_empty() {
+        let chain = AuthProviderChain::new(vec![]);
+        assert!(chain.is_empty());
+        assert_eq!(chain.len(), 0);
+    }
+
+    // -- CredentialEncryptionWrapper tests --
+
+    #[test]
+    fn credential_roundtrip() {
+        let wrapper = CredentialEncryptionWrapper::new(0xAB);
+        let encrypted = wrapper.encrypt("my_secret_token");
+        let decrypted = wrapper.decrypt(&encrypted);
+        assert_eq!(decrypted, "my_secret_token");
+        // Encrypted should differ from plaintext
+        assert_ne!(encrypted, b"my_secret_token");
+    }
+
+    #[test]
+    fn credential_different_keys() {
+        let w1 = CredentialEncryptionWrapper::new(0x11);
+        let w2 = CredentialEncryptionWrapper::new(0x22);
+        let e1 = w1.encrypt("test");
+        let e2 = w2.encrypt("test");
+        assert_ne!(e1, e2);
     }
 }

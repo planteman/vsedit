@@ -1047,6 +1047,220 @@ impl SuggestModel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SuggestWidgetSizer – calculate dropdown dimensions
+// ---------------------------------------------------------------------------
+
+/// Calculates the dimensions of the suggest widget dropdown.
+pub struct SuggestWidgetSizer {
+    pub max_width: u16,
+    pub max_height: u16,
+    pub item_height: u16,
+    pub padding: u16,
+}
+
+impl SuggestWidgetSizer {
+    /// Create a sizer with the given constraints.
+    pub fn new(max_width: u16, max_height: u16, item_height: u16) -> Self {
+        Self { max_width, max_height, item_height, padding: 2 }
+    }
+
+    /// Calculate the height needed for a given number of items.
+    pub fn height_for_items(&self, count: usize) -> u16 {
+        let content = (count as u16).saturating_mul(self.item_height);
+        (content + self.padding * 2).min(self.max_height)
+    }
+
+    /// Calculate the max number of visible items.
+    pub fn visible_item_count(&self) -> u16 {
+        let available = self.max_height.saturating_sub(self.padding * 2);
+        if self.item_height == 0 { return 0; }
+        available / self.item_height
+    }
+
+    /// Calculate the width needed for the longest label.
+    pub fn width_for_labels(&self, labels: &[&str]) -> u16 {
+        let max_label = labels.iter().map(|l| l.len() as u16).max().unwrap_or(0);
+        (max_label + self.padding * 2 + 4).min(self.max_width) // +4 for icon/kind
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestTabCompletion – handles tab completion
+// ---------------------------------------------------------------------------
+
+/// Handles tab completion behavior in the suggest widget.
+pub struct SuggestTabCompletion {
+    enabled: bool,
+    accept_on_tab: bool,
+    accept_on_enter: bool,
+}
+
+impl SuggestTabCompletion {
+    /// Create with default settings (tab accepts, enter accepts).
+    pub fn new() -> Self {
+        Self { enabled: true, accept_on_tab: true, accept_on_enter: true }
+    }
+
+    /// Enable or disable tab completion.
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    /// Whether tab should accept the current suggestion.
+    pub fn should_accept_on_tab(&self) -> bool {
+        self.enabled && self.accept_on_tab
+    }
+
+    /// Whether enter should accept the current suggestion.
+    pub fn should_accept_on_enter(&self) -> bool {
+        self.enabled && self.accept_on_enter
+    }
+
+    /// Set whether tab accepts.
+    pub fn set_accept_on_tab(&mut self, val: bool) {
+        self.accept_on_tab = val;
+    }
+
+    /// Set whether enter accepts.
+    pub fn set_accept_on_enter(&mut self, val: bool) {
+        self.accept_on_enter = val;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestSnippetResolver – expand snippet bodies
+// ---------------------------------------------------------------------------
+
+/// Resolves snippet placeholders in a completion item body.
+pub struct SuggestSnippetResolver {
+    variables: Vec<(String, String)>,
+}
+
+impl SuggestSnippetResolver {
+    /// Create a resolver with no variables.
+    pub fn new() -> Self {
+        Self { variables: Vec::new() }
+    }
+
+    /// Register a variable value (e.g. `"TM_FILENAME"` → `"main.rs"`).
+    pub fn set_variable(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        let name = name.into();
+        if let Some(entry) = self.variables.iter_mut().find(|(n, _)| n == &name) {
+            entry.1 = value.into();
+        } else {
+            self.variables.push((name, value.into()));
+        }
+    }
+
+    /// Expand a snippet body string, resolving `$VAR` and `${VAR}` references.
+    pub fn expand(&self, body: &str) -> String {
+        let mut result = body.to_string();
+        for (name, value) in &self.variables {
+            result = result.replace(&format!("${{{}}}", name), value);
+            result = result.replace(&format!("${}", name), value);
+        }
+        // Remove remaining tabstops like $1, $2, ${1:default}
+        let mut out = String::new();
+        let mut chars = result.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '$' {
+                if chars.peek() == Some(&'{') {
+                    chars.next(); // skip {
+                    let mut depth = 1;
+                    while let Some(c) = chars.next() {
+                        if c == '{' { depth += 1; }
+                        if c == '}' { depth -= 1; if depth == 0 { break; } }
+                    }
+                } else if chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    while chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        chars.next();
+                    }
+                } else {
+                    out.push(ch);
+                }
+            } else {
+                out.push(ch);
+            }
+        }
+        out
+    }
+
+    /// Number of registered variables.
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestKeyboardNav – keyboard navigation state
+// ---------------------------------------------------------------------------
+
+/// Manages keyboard navigation state for the suggest widget.
+pub struct SuggestKeyboardNav {
+    selected: usize,
+    total: usize,
+    page_size: usize,
+}
+
+impl SuggestKeyboardNav {
+    /// Create navigation for a list of items.
+    pub fn new(total: usize, page_size: usize) -> Self {
+        Self { selected: 0, total, page_size: page_size.max(1) }
+    }
+
+    /// Move selection down by one.
+    pub fn move_down(&mut self) {
+        if self.total > 0 {
+            self.selected = (self.selected + 1) % self.total;
+        }
+    }
+
+    /// Move selection up by one.
+    pub fn move_up(&mut self) {
+        if self.total > 0 {
+            self.selected = if self.selected == 0 { self.total - 1 } else { self.selected - 1 };
+        }
+    }
+
+    /// Page down.
+    pub fn page_down(&mut self) {
+        if self.total > 0 {
+            self.selected = (self.selected + self.page_size).min(self.total - 1);
+        }
+    }
+
+    /// Page up.
+    pub fn page_up(&mut self) {
+        self.selected = self.selected.saturating_sub(self.page_size);
+    }
+
+    /// Jump to first item.
+    pub fn home(&mut self) {
+        self.selected = 0;
+    }
+
+    /// Jump to last item.
+    pub fn end(&mut self) {
+        if self.total > 0 {
+            self.selected = self.total - 1;
+        }
+    }
+
+    /// Current selected index.
+    pub fn selected(&self) -> usize {
+        self.selected
+    }
+
+    /// Update total item count, clamping selection.
+    pub fn set_total(&mut self, total: usize) {
+        self.total = total;
+        if self.total > 0 && self.selected >= self.total {
+            self.selected = self.total - 1;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1893,5 +2107,108 @@ mod tests {
         assert_eq!(top.len(), 2);
         // both should start with "for"
         assert!(top.iter().all(|i| i.label.to_lowercase().starts_with("for")));
+    }
+
+    // -- SuggestWidgetSizer tests --
+
+    #[test]
+    fn sizer_height_for_items() {
+        let sizer = SuggestWidgetSizer::new(200, 100, 20);
+        assert_eq!(sizer.height_for_items(2), 44); // 2*20 + 2*2
+        assert_eq!(sizer.height_for_items(10), 100); // clamped to max
+    }
+
+    #[test]
+    fn sizer_visible_items() {
+        let sizer = SuggestWidgetSizer::new(200, 100, 20);
+        assert_eq!(sizer.visible_item_count(), 4); // (100 - 4) / 20
+    }
+
+    #[test]
+    fn sizer_width_for_labels() {
+        let sizer = SuggestWidgetSizer::new(80, 100, 20);
+        let w = sizer.width_for_labels(&["short", "much_longer_label"]);
+        assert!(w <= 80);
+        assert!(w > 0);
+    }
+
+    // -- SuggestTabCompletion tests --
+
+    #[test]
+    fn tab_completion_defaults() {
+        let tc = SuggestTabCompletion::new();
+        assert!(tc.should_accept_on_tab());
+        assert!(tc.should_accept_on_enter());
+    }
+
+    #[test]
+    fn tab_completion_disabled() {
+        let mut tc = SuggestTabCompletion::new();
+        tc.set_enabled(false);
+        assert!(!tc.should_accept_on_tab());
+        assert!(!tc.should_accept_on_enter());
+    }
+
+    // -- SuggestSnippetResolver tests --
+
+    #[test]
+    fn snippet_resolver_expands_vars() {
+        let mut r = SuggestSnippetResolver::new();
+        r.set_variable("TM_FILENAME", "main.rs");
+        let result = r.expand("// file: ${TM_FILENAME}");
+        assert_eq!(result, "// file: main.rs");
+    }
+
+    #[test]
+    fn snippet_resolver_strips_tabstops() {
+        let r = SuggestSnippetResolver::new();
+        let result = r.expand("fn $1() { $2 }");
+        assert_eq!(result, "fn () {  }");
+    }
+
+    #[test]
+    fn snippet_resolver_variable_count() {
+        let mut r = SuggestSnippetResolver::new();
+        r.set_variable("A", "1");
+        r.set_variable("B", "2");
+        assert_eq!(r.variable_count(), 2);
+    }
+
+    // -- SuggestKeyboardNav tests --
+
+    #[test]
+    fn keyboard_nav_wrap_around() {
+        let mut nav = SuggestKeyboardNav::new(3, 5);
+        assert_eq!(nav.selected(), 0);
+        nav.move_down();
+        assert_eq!(nav.selected(), 1);
+        nav.move_down();
+        nav.move_down();
+        assert_eq!(nav.selected(), 0); // wraps
+    }
+
+    #[test]
+    fn keyboard_nav_move_up_wrap() {
+        let mut nav = SuggestKeyboardNav::new(3, 5);
+        nav.move_up();
+        assert_eq!(nav.selected(), 2); // wraps to last
+    }
+
+    #[test]
+    fn keyboard_nav_page_down_clamps() {
+        let mut nav = SuggestKeyboardNav::new(10, 3);
+        nav.page_down();
+        assert_eq!(nav.selected(), 3);
+        nav.page_down();
+        assert_eq!(nav.selected(), 6);
+    }
+
+    #[test]
+    fn keyboard_nav_home_end() {
+        let mut nav = SuggestKeyboardNav::new(10, 3);
+        nav.end();
+        assert_eq!(nav.selected(), 9);
+        nav.home();
+        assert_eq!(nav.selected(), 0);
     }
 }

@@ -1119,6 +1119,188 @@ pub fn analyse_snippet_complexity(body: &[String]) -> SnippetComplexity {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SnippetTabStopLinker – connected tabstops
+// ---------------------------------------------------------------------------
+
+/// Links tabstops that share the same number so editing one updates all.
+pub struct SnippetTabStopLinker {
+    /// Map from tabstop number to list of (line_index, start, end) positions.
+    positions: HashMap<u32, Vec<(usize, usize, usize)>>,
+}
+
+impl SnippetTabStopLinker {
+    /// Parse tabstop positions from a snippet body.
+    pub fn from_body(body: &[String]) -> Self {
+        let mut positions: HashMap<u32, Vec<(usize, usize, usize)>> = HashMap::new();
+        for (line_idx, line) in body.iter().enumerate() {
+            let mut i = 0;
+            let chars: Vec<char> = line.chars().collect();
+            while i < chars.len() {
+                if chars[i] == '$' && i + 1 < chars.len() {
+                    let start = i;
+                    i += 1;
+                    if chars[i] == '{' {
+                        i += 1;
+                        let num_start = i;
+                        while i < chars.len() && chars[i].is_ascii_digit() { i += 1; }
+                        if i > num_start {
+                            if let Ok(num) = chars[num_start..i].iter().collect::<String>().parse::<u32>() {
+                                // Skip past the closing }
+                                while i < chars.len() && chars[i] != '}' { i += 1; }
+                                if i < chars.len() { i += 1; }
+                                positions.entry(num).or_default().push((line_idx, start, i));
+                            }
+                        }
+                    } else if chars[i].is_ascii_digit() {
+                        let num_start = i;
+                        while i < chars.len() && chars[i].is_ascii_digit() { i += 1; }
+                        if let Ok(num) = chars[num_start..i].iter().collect::<String>().parse::<u32>() {
+                            positions.entry(num).or_default().push((line_idx, start, i));
+                        }
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+        }
+        Self { positions }
+    }
+
+    /// Get all tabstop numbers found.
+    pub fn tabstop_numbers(&self) -> Vec<u32> {
+        let mut nums: Vec<u32> = self.positions.keys().copied().collect();
+        nums.sort();
+        nums
+    }
+
+    /// Get the positions linked to a tabstop number.
+    pub fn linked_positions(&self, tabstop: u32) -> &[(usize, usize, usize)] {
+        self.positions.get(&tabstop).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Whether a tabstop has multiple linked positions.
+    pub fn is_linked(&self, tabstop: u32) -> bool {
+        self.positions.get(&tabstop).map(|v| v.len() > 1).unwrap_or(false)
+    }
+
+    /// Total number of distinct tabstops.
+    pub fn tabstop_count(&self) -> usize {
+        self.positions.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetChoiceExpander – expand choice placeholders
+// ---------------------------------------------------------------------------
+
+/// A parsed choice placeholder like `${1|one,two,three|}`.
+#[derive(Debug, Clone)]
+pub struct SnippetChoice {
+    pub tabstop: u32,
+    pub options: Vec<String>,
+}
+
+/// Parses and expands choice placeholders in snippet bodies.
+pub struct SnippetChoiceExpander;
+
+impl SnippetChoiceExpander {
+    /// Extract all choice placeholders from a body line.
+    pub fn extract_choices(body: &str) -> Vec<SnippetChoice> {
+        let mut choices = Vec::new();
+        let mut chars = body.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '$' && chars.peek() == Some(&'{') {
+                chars.next(); // skip {
+                let mut num_str = String::new();
+                while chars.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    num_str.push(chars.next().unwrap());
+                }
+                if chars.peek() == Some(&'|') {
+                    chars.next(); // skip |
+                    if let Ok(tabstop) = num_str.parse::<u32>() {
+                        let mut options_str = String::new();
+                        while let Some(&c) = chars.peek() {
+                            if c == '|' { chars.next(); break; }
+                            options_str.push(chars.next().unwrap());
+                        }
+                        // skip closing }
+                        if chars.peek() == Some(&'}') { chars.next(); }
+                        let options: Vec<String> = options_str.split(',').map(|s| s.to_string()).collect();
+                        choices.push(SnippetChoice { tabstop, options });
+                    }
+                } else {
+                    // Not a choice, skip to }
+                    while chars.peek().is_some() && chars.peek() != Some(&'}') { chars.next(); }
+                    if chars.peek() == Some(&'}') { chars.next(); }
+                }
+            }
+        }
+        choices
+    }
+
+    /// Expand a body line by selecting the first option for each choice.
+    pub fn expand_with_defaults(body: &str) -> String {
+        let mut result = body.to_string();
+        let choices = Self::extract_choices(body);
+        for choice in choices.iter().rev() {
+            if let Some(first) = choice.options.first() {
+                let pattern = format!("${{{}|{}|{}", choice.tabstop, choice.options.join(","), "}");
+
+                result = result.replace(&pattern, first);
+            }
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetFormatConverter – import from VS Code format
+// ---------------------------------------------------------------------------
+
+/// Converts snippets between different format representations.
+pub struct SnippetFormatConverter;
+
+impl SnippetFormatConverter {
+    /// Convert a snippet body from single-string format (with \n) to lines.
+    pub fn body_string_to_lines(body: &str) -> Vec<String> {
+        body.split('\n').map(|s| s.to_string()).collect()
+    }
+
+    /// Convert snippet lines back to a single body string.
+    pub fn lines_to_body_string(lines: &[String]) -> String {
+        lines.join("\n")
+    }
+
+    /// Convert a VS Code snippet JSON to the internal format.
+    pub fn from_vscode_json(json: &str) -> Result<Vec<Snippet>, String> {
+        SnippetImporter::from_json(json, SnippetSource::Extension)
+    }
+
+    /// Export snippets to VS Code JSON format.
+    pub fn to_vscode_json(snippets: &[Snippet]) -> String {
+        let mut out = String::from("{\n");
+        for (i, s) in snippets.iter().enumerate() {
+            out.push_str(&format!("  \"{}\": {{\n", s.name));
+            let prefixes: Vec<String> = s.prefix.iter().map(|p| format!("\"{}\"", p)).collect();
+            out.push_str(&format!("    \"prefix\": [{}],\n", prefixes.join(", ")));
+            let body_lines: Vec<String> = s.body.iter().map(|l| format!("\"{}\"", l.replace('\\', "\\\\").replace('"', "\\\""))).collect();
+            out.push_str(&format!("    \"body\": [{}]", body_lines.join(", ")));
+            if let Some(desc) = &s.description {
+                out.push_str(&format!(",\n    \"description\": \"{}\"", desc));
+            }
+            if let Some(scope) = &s.scope {
+                out.push_str(&format!(",\n    \"scope\": \"{}\"", scope));
+            }
+            out.push_str("\n  }");
+            if i + 1 < snippets.len() { out.push(','); }
+            out.push('\n');
+        }
+        out.push('}');
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1901,5 +2083,99 @@ mod tests {
         let body = vec!["${1:outer ${2:inner}}".into()];
         let c = analyse_snippet_complexity(&body);
         assert!(c.nested_placeholders);
+    }
+
+    // -- SnippetTabStopLinker tests --
+
+    #[test]
+    fn tabstop_linker_basic() {
+        let body = vec!["let $1 = $2;".into(), "println!(\"{}\", $1);".into()];
+        let linker = SnippetTabStopLinker::from_body(&body);
+        assert_eq!(linker.tabstop_count(), 2);
+        assert!(linker.is_linked(1)); // appears on 2 lines
+        assert!(!linker.is_linked(2)); // appears once
+    }
+
+    #[test]
+    fn tabstop_linker_with_placeholders() {
+        let body = vec!["${1:name} ${2:value}".into(), "use ${1:name};".into()];
+        let linker = SnippetTabStopLinker::from_body(&body);
+        let nums = linker.tabstop_numbers();
+        assert!(nums.contains(&1));
+        assert!(nums.contains(&2));
+        assert!(linker.is_linked(1));
+    }
+
+    #[test]
+    fn tabstop_linker_empty() {
+        let body = vec!["no tabstops here".into()];
+        let linker = SnippetTabStopLinker::from_body(&body);
+        assert_eq!(linker.tabstop_count(), 0);
+    }
+
+    // -- SnippetChoiceExpander tests --
+
+    #[test]
+    fn choice_expander_extract() {
+        let line = "type: ${1|string,number,boolean|}";
+        let choices = SnippetChoiceExpander::extract_choices(line);
+        assert_eq!(choices.len(), 1);
+        assert_eq!(choices[0].tabstop, 1);
+        assert_eq!(choices[0].options, vec!["string", "number", "boolean"]);
+    }
+
+    #[test]
+    fn choice_expander_defaults() {
+        let line = "${1|pub,pub(crate),fn|} ${2:name}";
+        let expanded = SnippetChoiceExpander::expand_with_defaults(line);
+        assert!(expanded.contains("pub"));
+        assert!(!expanded.contains("|"));
+    }
+
+    #[test]
+    fn choice_expander_no_choices() {
+        let choices = SnippetChoiceExpander::extract_choices("plain text $1");
+        assert!(choices.is_empty());
+    }
+
+    // -- SnippetFormatConverter tests --
+
+    #[test]
+    fn format_converter_body_roundtrip() {
+        let lines = vec!["line 1".into(), "line 2".into()];
+        let body = SnippetFormatConverter::lines_to_body_string(&lines);
+        let back = SnippetFormatConverter::body_string_to_lines(&body);
+        assert_eq!(back, lines);
+    }
+
+    #[test]
+    fn format_converter_to_vscode_json() {
+        let snippets = vec![Snippet {
+            name: "test".into(),
+            prefix: vec!["tst".into()],
+            body: vec!["console.log($1);".into()],
+            description: Some("Test snippet".into()),
+            scope: Some("javascript".into()),
+            source: SnippetSource::User,
+        }];
+        let json = SnippetFormatConverter::to_vscode_json(&snippets);
+        assert!(json.contains("\"test\""));
+        assert!(json.contains("\"prefix\""));
+        assert!(json.contains("\"body\""));
+        assert!(json.contains("\"description\""));
+    }
+
+    #[test]
+    fn format_converter_from_vscode_json() {
+        let json = r#"{
+            "Print": {
+                "prefix": ["pr"],
+                "body": ["println!(\"$1\");"],
+                "description": "Print line"
+            }
+        }"#;
+        let snippets = SnippetFormatConverter::from_vscode_json(json).unwrap();
+        assert_eq!(snippets.len(), 1);
+        assert_eq!(snippets[0].name, "Print");
     }
 }

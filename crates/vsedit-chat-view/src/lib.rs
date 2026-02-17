@@ -1124,6 +1124,208 @@ pub fn session_duration(session: &ChatSession) -> u64 {
     msgs.last().map(|m| m.timestamp).unwrap_or(0).saturating_sub(msgs.first().map(|m| m.timestamp).unwrap_or(0))
 }
 
+// ---------------------------------------------------------------------------
+// ChatViewScrollManager – auto-scroll logic
+// ---------------------------------------------------------------------------
+
+/// Manages auto-scroll behavior for the chat view.
+pub struct ChatViewScrollManager {
+    auto_scroll: bool,
+    scroll_offset: usize,
+    total_lines: usize,
+    viewport_lines: usize,
+}
+
+impl ChatViewScrollManager {
+    /// Create a scroll manager with the given viewport size.
+    pub fn new(viewport_lines: usize) -> Self {
+        Self {
+            auto_scroll: true,
+            scroll_offset: 0,
+            total_lines: 0,
+            viewport_lines,
+        }
+    }
+
+    /// Update the total content lines and auto-scroll if enabled.
+    pub fn set_total_lines(&mut self, total: usize) {
+        self.total_lines = total;
+        if self.auto_scroll {
+            self.scroll_to_bottom();
+        }
+    }
+
+    /// Scroll to the bottom.
+    pub fn scroll_to_bottom(&mut self) {
+        self.scroll_offset = self.total_lines.saturating_sub(self.viewport_lines);
+    }
+
+    /// Scroll up by a number of lines.
+    pub fn scroll_up(&mut self, lines: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(lines);
+        self.auto_scroll = false;
+    }
+
+    /// Scroll down by a number of lines.
+    pub fn scroll_down(&mut self, lines: usize) {
+        self.scroll_offset = (self.scroll_offset + lines)
+            .min(self.total_lines.saturating_sub(self.viewport_lines));
+        if self.is_at_bottom() {
+            self.auto_scroll = true;
+        }
+    }
+
+    /// Whether the view is scrolled to the bottom.
+    pub fn is_at_bottom(&self) -> bool {
+        self.scroll_offset >= self.total_lines.saturating_sub(self.viewport_lines)
+    }
+
+    /// Whether auto-scroll is active.
+    pub fn is_auto_scroll(&self) -> bool {
+        self.auto_scroll
+    }
+
+    /// Current scroll offset.
+    pub fn offset(&self) -> usize {
+        self.scroll_offset
+    }
+
+    /// Re-enable auto-scroll.
+    pub fn enable_auto_scroll(&mut self) {
+        self.auto_scroll = true;
+        self.scroll_to_bottom();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatInputHistory – up/down navigation through past inputs
+// ---------------------------------------------------------------------------
+
+/// Stores chat input history for up/down arrow navigation.
+pub struct ChatInputHistory {
+    entries: Vec<String>,
+    cursor: Option<usize>,
+    max_entries: usize,
+}
+
+impl ChatInputHistory {
+    /// Create a history with a max number of entries.
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), cursor: None, max_entries }
+    }
+
+    /// Add an input to history.
+    pub fn push(&mut self, input: impl Into<String>) {
+        let s = input.into();
+        if s.is_empty() { return; }
+        // Remove duplicates
+        self.entries.retain(|e| e != &s);
+        self.entries.push(s);
+        if self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+        self.cursor = None;
+    }
+
+    /// Navigate up (older). Returns the entry if available.
+    pub fn up(&mut self) -> Option<&str> {
+        if self.entries.is_empty() { return None; }
+        let idx = match self.cursor {
+            None => self.entries.len() - 1,
+            Some(0) => 0,
+            Some(i) => i - 1,
+        };
+        self.cursor = Some(idx);
+        Some(&self.entries[idx])
+    }
+
+    /// Navigate down (newer). Returns the entry if available.
+    pub fn down(&mut self) -> Option<&str> {
+        if self.entries.is_empty() { return None; }
+        match self.cursor {
+            None => None,
+            Some(i) if i + 1 >= self.entries.len() => {
+                self.cursor = None;
+                None
+            }
+            Some(i) => {
+                self.cursor = Some(i + 1);
+                Some(&self.entries[i + 1])
+            }
+        }
+    }
+
+    /// Reset the cursor (after submitting a new input).
+    pub fn reset_cursor(&mut self) {
+        self.cursor = None;
+    }
+
+    /// Number of entries in history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatMentionPicker – participant mention picking (@user)
+// ---------------------------------------------------------------------------
+
+/// A participant that can be mentioned in chat.
+#[derive(Debug, Clone)]
+pub struct ChatParticipant {
+    pub id: String,
+    pub display_name: String,
+}
+
+/// Picks mentions from a list of participants.
+pub struct ChatMentionPicker {
+    participants: Vec<ChatParticipant>,
+}
+
+impl ChatMentionPicker {
+    /// Create a picker with no participants.
+    pub fn new() -> Self {
+        Self { participants: Vec::new() }
+    }
+
+    /// Register a participant.
+    pub fn add_participant(&mut self, id: impl Into<String>, display_name: impl Into<String>) {
+        self.participants.push(ChatParticipant {
+            id: id.into(),
+            display_name: display_name.into(),
+        });
+    }
+
+    /// Search for participants matching a query (case-insensitive prefix match).
+    pub fn search(&self, query: &str) -> Vec<&ChatParticipant> {
+        let q = query.to_lowercase();
+        self.participants.iter()
+            .filter(|p| {
+                p.display_name.to_lowercase().starts_with(&q)
+                    || p.id.to_lowercase().starts_with(&q)
+            })
+            .collect()
+    }
+
+    /// Extract mention triggers from text (words starting with @).
+    pub fn extract_mentions(text: &str) -> Vec<String> {
+        text.split_whitespace()
+            .filter(|w| w.starts_with('@') && w.len() > 1)
+            .map(|w| w[1..].to_string())
+            .collect()
+    }
+
+    /// Number of registered participants.
+    pub fn participant_count(&self) -> usize {
+        self.participants.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1897,5 +2099,97 @@ mod tests {
         session.add_message(ChatRole::Assistant, "hello", 500);
         assert_eq!(session_duration(&session), 400);
         assert_eq!(session_duration(&ChatSession::new("s2")), 0);
+    }
+
+    // -- ChatViewScrollManager tests --
+
+    #[test]
+    fn scroll_manager_auto_scroll() {
+        let mut sm = ChatViewScrollManager::new(10);
+        sm.set_total_lines(20);
+        assert!(sm.is_at_bottom());
+        assert_eq!(sm.offset(), 10);
+    }
+
+    #[test]
+    fn scroll_manager_scroll_up_disables_auto() {
+        let mut sm = ChatViewScrollManager::new(10);
+        sm.set_total_lines(30);
+        sm.scroll_up(5);
+        assert!(!sm.is_auto_scroll());
+        assert_eq!(sm.offset(), 15);
+    }
+
+    #[test]
+    fn scroll_manager_scroll_to_bottom_enables_auto() {
+        let mut sm = ChatViewScrollManager::new(10);
+        sm.set_total_lines(30);
+        sm.scroll_up(5);
+        sm.enable_auto_scroll();
+        assert!(sm.is_auto_scroll());
+        assert!(sm.is_at_bottom());
+    }
+
+    // -- ChatInputHistory tests --
+
+    #[test]
+    fn input_history_up_down() {
+        let mut h = ChatInputHistory::new(100);
+        h.push("hello");
+        h.push("world");
+        assert_eq!(h.up(), Some("world"));
+        assert_eq!(h.up(), Some("hello"));
+        assert_eq!(h.down(), Some("world"));
+    }
+
+    #[test]
+    fn input_history_deduplicates() {
+        let mut h = ChatInputHistory::new(100);
+        h.push("hello");
+        h.push("world");
+        h.push("hello"); // duplicate
+        assert_eq!(h.len(), 2);
+    }
+
+    #[test]
+    fn input_history_max_entries() {
+        let mut h = ChatInputHistory::new(2);
+        h.push("a");
+        h.push("b");
+        h.push("c");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.up(), Some("c"));
+    }
+
+    #[test]
+    fn input_history_empty_ignored() {
+        let mut h = ChatInputHistory::new(10);
+        h.push("");
+        assert!(h.is_empty());
+    }
+
+    // -- ChatMentionPicker tests --
+
+    #[test]
+    fn mention_picker_search() {
+        let mut p = ChatMentionPicker::new();
+        p.add_participant("alice", "Alice Smith");
+        p.add_participant("bob", "Bob Jones");
+        let results = p.search("ali");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "alice");
+    }
+
+    #[test]
+    fn mention_picker_extract() {
+        let mentions = ChatMentionPicker::extract_mentions("Hey @alice and @bob check this");
+        assert_eq!(mentions, vec!["alice", "bob"]);
+    }
+
+    #[test]
+    fn mention_picker_empty_search() {
+        let p = ChatMentionPicker::new();
+        assert_eq!(p.search("anything").len(), 0);
+        assert_eq!(p.participant_count(), 0);
     }
 }
