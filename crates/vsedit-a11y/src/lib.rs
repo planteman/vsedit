@@ -1672,6 +1672,201 @@ impl Default for ShortcutAnnouncer {
     fn default() -> Self { Self::new() }
 }
 
+// ---------------------------------------------------------------------------
+// AriaRole helpers
+// ---------------------------------------------------------------------------
+
+impl AriaRole {
+    /// Returns `true` if the role represents an interactive widget (v2).
+    pub fn is_interactive_v2(&self) -> bool {
+        matches!(
+            self,
+            AriaRole::Button
+                | AriaRole::Checkbox
+                | AriaRole::TextBox
+                | AriaRole::Tab
+                | AriaRole::MenuItem
+        )
+    }
+
+    /// Returns `true` if the role acts as a structural container (v2).
+    pub fn is_container_v2(&self) -> bool {
+        matches!(
+            self,
+            AriaRole::List
+                | AriaRole::Grid
+                | AriaRole::Tree
+                | AriaRole::TreeItem
+                | AriaRole::Menu
+                | AriaRole::Dialog
+        )
+    }
+
+    /// Returns a short label a screen reader might use for this role.
+    pub fn screen_reader_label(&self) -> &'static str {
+        match self {
+            AriaRole::Button => "button",
+            AriaRole::Checkbox => "check box",
+            AriaRole::TextBox => "edit",
+            AriaRole::Tab => "tab",
+            AriaRole::List => "list",
+            AriaRole::ListItem => "list item",
+            AriaRole::Grid => "grid",
+            AriaRole::Tree => "tree",
+            AriaRole::TreeItem => "tree item",
+            AriaRole::Menu => "menu",
+            AriaRole::MenuItem => "menu item",
+            AriaRole::TabPanel => "tab panel",
+            AriaRole::Dialog => "dialog",
+            AriaRole::Alert => "alert",
+            AriaRole::Status => "status",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccessibleDescriptionBuilder — fluent API for building accessible labels
+// ---------------------------------------------------------------------------
+
+/// Fluent builder for rich accessible descriptions.
+#[derive(Debug, Clone)]
+pub struct AccessibleDescriptionBuilder {
+    role: Option<AriaRole>,
+    label: Option<String>,
+    states: Vec<String>,
+    value: Option<String>,
+}
+
+impl AccessibleDescriptionBuilder {
+    pub fn new() -> Self {
+        Self { role: None, label: None, states: Vec::new(), value: None }
+    }
+
+    pub fn add_role(mut self, role: AriaRole) -> Self {
+        self.role = Some(role);
+        self
+    }
+
+    pub fn add_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn add_state(mut self, state: impl Into<String>) -> Self {
+        self.states.push(state.into());
+        self
+    }
+
+    pub fn add_value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+
+    /// Build the full description string.
+    pub fn build(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(ref label) = self.label {
+            parts.push(label.clone());
+        }
+        if let Some(role) = &self.role {
+            parts.push(role.screen_reader_label().to_string());
+        }
+        for s in &self.states {
+            parts.push(s.clone());
+        }
+        if let Some(ref v) = self.value {
+            parts.push(format!("value: {v}"));
+        }
+        parts.join(", ")
+    }
+}
+
+impl Default for AccessibleDescriptionBuilder {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// FocusOrderTracker — ordered focus ring for keyboard navigation
+// ---------------------------------------------------------------------------
+
+/// Tracks an ordered list of focusable element IDs and the current index.
+#[derive(Debug, Clone)]
+pub struct FocusOrderTracker {
+    ids: Vec<String>,
+    interactive_flags: Vec<bool>,
+    current_index: Option<usize>,
+}
+
+impl FocusOrderTracker {
+    pub fn new() -> Self {
+        Self { ids: Vec::new(), interactive_flags: Vec::new(), current_index: None }
+    }
+
+    /// Register an element as focusable. `interactive` marks it as a widget.
+    pub fn register(&mut self, id: impl Into<String>, interactive: bool) {
+        self.ids.push(id.into());
+        self.interactive_flags.push(interactive);
+    }
+
+    /// Unregister by id, adjusting current index.
+    pub fn unregister(&mut self, id: &str) {
+        if let Some(pos) = self.ids.iter().position(|s| s == id) {
+            self.ids.remove(pos);
+            self.interactive_flags.remove(pos);
+            match self.current_index {
+                Some(ci) if ci == pos => {
+                    self.current_index = if self.ids.is_empty() { None } else { Some(ci.min(self.ids.len() - 1)) };
+                }
+                Some(ci) if ci > pos => self.current_index = Some(ci - 1),
+                _ => {}
+            }
+        }
+    }
+
+    /// Move focus forward, wrapping around.
+    pub fn focus_next(&mut self) -> Option<&str> {
+        if self.ids.is_empty() { return None; }
+        let next = match self.current_index {
+            Some(i) => (i + 1) % self.ids.len(),
+            None => 0,
+        };
+        self.current_index = Some(next);
+        Some(&self.ids[next])
+    }
+
+    /// Move focus backward, wrapping around.
+    pub fn focus_prev(&mut self) -> Option<&str> {
+        if self.ids.is_empty() { return None; }
+        let prev = match self.current_index {
+            Some(0) => self.ids.len() - 1,
+            Some(i) => i - 1,
+            None => self.ids.len() - 1,
+        };
+        self.current_index = Some(prev);
+        Some(&self.ids[prev])
+    }
+
+    /// Currently focused element id.
+    pub fn current(&self) -> Option<&str> {
+        self.current_index.map(|i| self.ids[i].as_str())
+    }
+
+    /// Return all ids that are marked interactive.
+    pub fn interactive_elements(&self) -> Vec<&str> {
+        self.ids.iter().zip(self.interactive_flags.iter())
+            .filter_map(|(id, &f)| if f { Some(id.as_str()) } else { None })
+            .collect()
+    }
+
+    /// Total registered elements.
+    pub fn len(&self) -> usize { self.ids.len() }
+
+    pub fn is_empty(&self) -> bool { self.ids.is_empty() }
+}
+
+impl Default for FocusOrderTracker {
+    fn default() -> Self { Self::new() }
+}
 
 #[cfg(test)]
 mod tests {
@@ -2664,5 +2859,117 @@ mod tests {
         let f = AuditFinding::new(AuditSeverity::Error, "ARIA-01", "Missing label", "/input");
         let s = format!("{f}");
         assert!(s.contains("ARIA-01"));
+    }
+
+    // -- AriaRole helpers ---------------------------------------------------
+
+    #[test]
+    fn aria_role_button_is_interactive() {
+        assert!(AriaRole::Button.is_interactive_v2());
+        assert!(AriaRole::Checkbox.is_interactive_v2());
+        assert!(AriaRole::TextBox.is_interactive_v2());
+    }
+
+    #[test]
+    fn aria_role_list_is_not_interactive() {
+        assert!(!AriaRole::List.is_interactive_v2());
+        assert!(!AriaRole::Grid.is_interactive_v2());
+    }
+
+    #[test]
+    fn aria_role_container_check() {
+        assert!(AriaRole::List.is_container_v2());
+        assert!(AriaRole::Tree.is_container_v2());
+        assert!(!AriaRole::Button.is_container_v2());
+    }
+
+    #[test]
+    fn aria_role_screen_reader_labels() {
+        assert_eq!(AriaRole::Button.screen_reader_label(), "button");
+        assert_eq!(AriaRole::Status.screen_reader_label(), "status");
+        assert_eq!(AriaRole::Alert.screen_reader_label(), "alert");
+    }
+
+    // -- AccessibleDescriptionBuilder ----------------------------------------
+
+    #[test]
+    fn description_builder_empty() {
+        let desc = AccessibleDescriptionBuilder::new().build();
+        assert!(desc.is_empty());
+    }
+
+    #[test]
+    fn description_builder_full() {
+        let desc = AccessibleDescriptionBuilder::new()
+            .add_role(AriaRole::Button)
+            .add_label("Save")
+            .add_state("pressed")
+            .add_value("on")
+            .build();
+        assert!(desc.contains("Save"));
+        assert!(desc.contains("button"));
+        assert!(desc.contains("pressed"));
+        assert!(desc.contains("value: on"));
+    }
+
+    #[test]
+    fn description_builder_label_only() {
+        let desc = AccessibleDescriptionBuilder::new()
+            .add_label("Close")
+            .build();
+        assert_eq!(desc, "Close");
+    }
+
+    // -- FocusOrderTracker ---------------------------------------------------
+
+    #[test]
+    fn focus_order_empty() {
+        let mut t = FocusOrderTracker::new();
+        assert!(t.is_empty());
+        assert_eq!(t.focus_next(), None);
+        assert_eq!(t.focus_prev(), None);
+    }
+
+    #[test]
+    fn focus_order_next_wraps() {
+        let mut t = FocusOrderTracker::new();
+        t.register("a", true);
+        t.register("b", false);
+        assert_eq!(t.focus_next(), Some("a"));
+        assert_eq!(t.focus_next(), Some("b"));
+        assert_eq!(t.focus_next(), Some("a")); // wraps
+    }
+
+    #[test]
+    fn focus_order_prev_wraps() {
+        let mut t = FocusOrderTracker::new();
+        t.register("x", true);
+        t.register("y", true);
+        assert_eq!(t.focus_prev(), Some("y")); // starts at end
+        assert_eq!(t.focus_prev(), Some("x"));
+        assert_eq!(t.focus_prev(), Some("y"));
+    }
+
+    #[test]
+    fn focus_order_unregister_adjusts() {
+        let mut t = FocusOrderTracker::new();
+        t.register("a", true);
+        t.register("b", true);
+        t.register("c", true);
+        t.focus_next(); // a
+        t.focus_next(); // b
+        t.unregister("a"); // now ["b","c"], current was 1->0
+        assert_eq!(t.current(), Some("b"));
+        assert_eq!(t.len(), 2);
+    }
+
+    #[test]
+    fn focus_order_interactive_elements() {
+        let mut t = FocusOrderTracker::new();
+        t.register("btn", true);
+        t.register("label", false);
+        t.register("input", true);
+        let ie = t.interactive_elements();
+        assert_eq!(ie, vec!["btn", "input"]);
     }
 }

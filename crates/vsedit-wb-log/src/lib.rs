@@ -1418,6 +1418,175 @@ pub fn aggregate_levels_by_window(
     result
 }
 
+// ---------------------------------------------------------------------------
+// LogChannelManager
+// ---------------------------------------------------------------------------
+
+/// Manage named log channels.
+#[derive(Debug)]
+pub struct LogChannelManager {
+    channels: Vec<(String, LogLevel)>,
+}
+
+impl LogChannelManager {
+    pub fn new() -> Self {
+        Self {
+            channels: Vec::new(),
+        }
+    }
+
+    pub fn create_channel(&mut self, name: &str, level: LogLevel) {
+        if !self.channels.iter().any(|(n, _)| n == name) {
+            self.channels.push((name.to_string(), level));
+        }
+    }
+
+    pub fn get_channel_level(&self, name: &str) -> Option<&LogLevel> {
+        self.channels.iter().find(|(n, _)| n == name).map(|(_, l)| l)
+    }
+
+    pub fn set_channel_level(&mut self, name: &str, level: LogLevel) {
+        if let Some(ch) = self.channels.iter_mut().find(|(n, _)| n == name) {
+            ch.1 = level;
+        }
+    }
+
+    pub fn remove_channel(&mut self, name: &str) -> bool {
+        let len = self.channels.len();
+        self.channels.retain(|(n, _)| n != name);
+        self.channels.len() < len
+    }
+
+    pub fn channel_count(&self) -> usize {
+        self.channels.len()
+    }
+
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.channels.iter().map(|(n, _)| n.as_str()).collect()
+    }
+
+    pub fn list_channels(&self) -> &[(String, LogLevel)] {
+        &self.channels
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogOutputFormatter
+// ---------------------------------------------------------------------------
+
+/// Format log entries for display.
+pub struct LogOutputFormatter {
+    pub max_line_width: usize,
+    pub show_timestamp: bool,
+    pub show_line_number: bool,
+}
+
+impl LogOutputFormatter {
+    pub fn new(max_line_width: usize) -> Self {
+        Self {
+            max_line_width,
+            show_timestamp: true,
+            show_line_number: true,
+        }
+    }
+
+    pub fn format_line(&self, line_num: usize, timestamp: &str, level: &str, message: &str) -> String {
+        let mut parts = Vec::new();
+        if self.show_line_number {
+            parts.push(format!("{line_num:>4}"));
+        }
+        if self.show_timestamp {
+            parts.push(format!("[{timestamp}]"));
+        }
+        parts.push(format!("[{level}]"));
+        parts.push(message.to_string());
+        parts.join(" ")
+    }
+
+    pub fn truncate_long_message(message: &str, max_len: usize) -> String {
+        if message.len() <= max_len {
+            message.to_string()
+        } else {
+            format!("{}...", &message[..max_len.saturating_sub(3)])
+        }
+    }
+
+    pub fn word_wrap(text: &str, width: usize) -> Vec<String> {
+        if width == 0 || text.is_empty() {
+            return vec![text.to_string()];
+        }
+        let mut lines = Vec::new();
+        let mut current = String::new();
+        for word in text.split_whitespace() {
+            if !current.is_empty() && current.len() + 1 + word.len() > width {
+                lines.push(current);
+                current = String::new();
+            }
+            if !current.is_empty() {
+                current.push(' ');
+            }
+            current.push_str(word);
+        }
+        if !current.is_empty() {
+            lines.push(current);
+        }
+        lines
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogExportConfig
+// ---------------------------------------------------------------------------
+
+/// Configuration for exporting logs.
+#[derive(Debug, Clone)]
+pub struct LogExportConfig {
+    pub format: LogExportFormat,
+    pub include_levels: Vec<LogLevel>,
+    pub max_entries: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LogExportFormat {
+    Json,
+    Text,
+    Csv,
+}
+
+impl LogExportConfig {
+    pub fn new(format: LogExportFormat) -> Self {
+        Self {
+            format,
+            include_levels: Vec::new(),
+            max_entries: None,
+        }
+    }
+
+    pub fn with_levels(mut self, levels: Vec<LogLevel>) -> Self {
+        self.include_levels = levels;
+        self
+    }
+
+    pub fn with_max_entries(mut self, max: usize) -> Self {
+        self.max_entries = Some(max);
+        self
+    }
+
+    pub fn should_include(&self, level: &LogLevel) -> bool {
+        self.include_levels.is_empty() || self.include_levels.contains(level)
+    }
+
+    pub fn estimated_size(&self, entry_count: usize) -> usize {
+        let per_entry = match self.format {
+            LogExportFormat::Json => 200,
+            LogExportFormat::Text => 100,
+            LogExportFormat::Csv => 80,
+        };
+        let count = self.max_entries.unwrap_or(entry_count).min(entry_count);
+        count * per_entry
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2558,4 +2727,97 @@ mod tests {
         assert!(s.contains("0 entries"));
         assert!(s.contains("visible"));
     }
+
+    // -- LogChannelManager -------------------------------------------------
+
+    #[test]
+    fn channel_manager_create() {
+        let mut mgr = LogChannelManager::new();
+        mgr.create_channel("output", LogLevel::Info);
+        assert_eq!(mgr.channel_count(), 1);
+        assert_eq!(mgr.channel_names(), vec!["output"]);
+    }
+
+    #[test]
+    fn channel_manager_no_duplicates() {
+        let mut mgr = LogChannelManager::new();
+        mgr.create_channel("main", LogLevel::Info);
+        mgr.create_channel("main", LogLevel::Debug);
+        assert_eq!(mgr.channel_count(), 1);
+    }
+
+    #[test]
+    fn channel_manager_set_level() {
+        let mut mgr = LogChannelManager::new();
+        mgr.create_channel("ch", LogLevel::Info);
+        mgr.set_channel_level("ch", LogLevel::Debug);
+        assert_eq!(mgr.get_channel_level("ch"), Some(&LogLevel::Debug));
+    }
+
+    #[test]
+    fn channel_manager_remove() {
+        let mut mgr = LogChannelManager::new();
+        mgr.create_channel("tmp", LogLevel::Trace);
+        assert!(mgr.remove_channel("tmp"));
+        assert_eq!(mgr.channel_count(), 0);
+    }
+
+    // -- LogOutputFormatter ------------------------------------------------
+
+    #[test]
+    fn formatter_format_line() {
+        let fmt = LogOutputFormatter::new(120);
+        let line = fmt.format_line(1, "12:00:00", "INFO", "Hello world");
+        assert!(line.contains("[12:00:00]"));
+        assert!(line.contains("[INFO]"));
+        assert!(line.contains("Hello world"));
+    }
+
+    #[test]
+    fn formatter_truncate() {
+        let result = LogOutputFormatter::truncate_long_message("hello world this is long", 10);
+        assert!(result.len() <= 10);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn formatter_word_wrap() {
+        let lines = LogOutputFormatter::word_wrap("hello world foo bar", 11);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "hello world");
+    }
+
+    #[test]
+    fn formatter_no_truncate_short() {
+        assert_eq!(LogOutputFormatter::truncate_long_message("short", 100), "short");
+    }
+
+    // -- LogExportConfig ---------------------------------------------------
+
+    #[test]
+    fn export_config_should_include() {
+        let cfg = LogExportConfig::new(LogExportFormat::Json)
+            .with_levels(vec![LogLevel::Error, LogLevel::Warning]);
+        assert!(cfg.should_include(&LogLevel::Error));
+        assert!(!cfg.should_include(&LogLevel::Info));
+    }
+
+    #[test]
+    fn export_config_empty_levels_includes_all() {
+        let cfg = LogExportConfig::new(LogExportFormat::Text);
+        assert!(cfg.should_include(&LogLevel::Trace));
+    }
+
+    #[test]
+    fn export_config_estimated_size() {
+        let cfg = LogExportConfig::new(LogExportFormat::Csv).with_max_entries(10);
+        assert_eq!(cfg.estimated_size(100), 800);
+    }
+
+    #[test]
+    fn export_config_format() {
+        let cfg = LogExportConfig::new(LogExportFormat::Json);
+        assert_eq!(cfg.format, LogExportFormat::Json);
+    }
+
 }

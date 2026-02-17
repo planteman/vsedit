@@ -1773,6 +1773,147 @@ impl fmt::Display for AsyncTaskPoolConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BatchProgress — track progress of a batch operation
+// ---------------------------------------------------------------------------
+
+/// Tracks progress of a multi-item batch operation.
+#[derive(Debug, Clone)]
+pub struct BatchProgress {
+    pub total: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+}
+
+impl BatchProgress {
+    pub fn new(total: usize) -> Self {
+        Self { total, completed: 0, failed: 0, skipped: 0 }
+    }
+
+    pub fn mark_completed(&mut self) { self.completed += 1; }
+    pub fn mark_failed(&mut self) { self.failed += 1; }
+    pub fn mark_skipped(&mut self) { self.skipped += 1; }
+
+    /// Percentage of items processed (completed + failed + skipped) vs total.
+    pub fn percentage(&self) -> f64 {
+        if self.total == 0 { return 100.0; }
+        let processed = self.completed + self.failed + self.skipped;
+        (processed as f64 / self.total as f64) * 100.0
+    }
+
+    /// Returns true when all items are accounted for.
+    pub fn is_done(&self) -> bool {
+        self.completed + self.failed + self.skipped >= self.total
+    }
+
+    /// Fraction of completed items among processed items.
+    pub fn success_rate(&self) -> f64 {
+        let processed = self.completed + self.failed;
+        if processed == 0 { return 1.0; }
+        self.completed as f64 / processed as f64
+    }
+
+    /// How many items are still pending.
+    pub fn remaining(&self) -> usize {
+        self.total.saturating_sub(self.completed + self.failed + self.skipped)
+    }
+}
+
+impl fmt::Display for BatchProgress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}/{}] {:.1}% (ok={}, fail={}, skip={})",
+            self.completed + self.failed + self.skipped,
+            self.total,
+            self.percentage(),
+            self.completed,
+            self.failed,
+            self.skipped,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SlidingWindowLimiter — time-window rate limiting
+// ---------------------------------------------------------------------------
+
+/// Limits requests within a sliding time window.
+#[derive(Debug, Clone)]
+pub struct SlidingWindowLimiter {
+    window_ms: u64,
+    max_requests: usize,
+    timestamps: Vec<u64>,
+}
+
+impl SlidingWindowLimiter {
+    pub fn new(window_ms: u64, max_requests: usize) -> Self {
+        Self {
+            window_ms,
+            max_requests,
+            timestamps: Vec::new(),
+        }
+    }
+
+    fn prune(&mut self, now: u64) {
+        let cutoff = now.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&t| t >= cutoff);
+    }
+
+    /// Try to acquire a slot. Returns `true` if allowed.
+    pub fn try_acquire(&mut self, now_ms: u64) -> bool {
+        self.prune(now_ms);
+        if self.timestamps.len() < self.max_requests {
+            self.timestamps.push(now_ms);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// How many more requests can be made right now.
+    pub fn remaining_at(&mut self, now_ms: u64) -> usize {
+        self.prune(now_ms);
+        self.max_requests.saturating_sub(self.timestamps.len())
+    }
+
+    /// Milliseconds until the next slot becomes available (0 if one is free now).
+    pub fn next_available_in(&mut self, now_ms: u64) -> u64 {
+        self.prune(now_ms);
+        if self.timestamps.len() < self.max_requests {
+            return 0;
+        }
+        // oldest timestamp in window determines when a slot opens
+        if let Some(&oldest) = self.timestamps.first() {
+            let opens_at = oldest + self.window_ms;
+            opens_at.saturating_sub(now_ms)
+        } else {
+            0
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RetryPolicy extra helpers
+// ---------------------------------------------------------------------------
+
+impl RetryPolicy {
+    /// Whether another attempt should be made given current attempt index.
+    pub fn should_retry(&self, attempt: u32) -> bool {
+        attempt + 1 < self.max_attempts
+    }
+
+    /// Upper bound on the total wait across all retry delays.
+    pub fn total_max_wait(&self) -> Duration {
+        let mut total = Duration::ZERO;
+        for i in 0..self.max_attempts.saturating_sub(1) {
+            total += self.delay_for_attempt(i);
+        }
+        total
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2614,6 +2755,117 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- BatchProgress -------------------------------------------------------
+
+    #[test]
+    fn batch_progress_starts_at_zero() {
+        let bp = BatchProgress::new(10);
+        assert_eq!(bp.percentage(), 0.0);
+        assert!(!bp.is_done());
+        assert_eq!(bp.remaining(), 10);
+    }
+
+    #[test]
+    fn batch_progress_marks() {
+        let mut bp = BatchProgress::new(4);
+        bp.mark_completed();
+        bp.mark_completed();
+        bp.mark_failed();
+        bp.mark_skipped();
+        assert!(bp.is_done());
+        assert_eq!(bp.percentage(), 100.0);
+    }
+
+    #[test]
+    fn batch_progress_success_rate() {
+        let mut bp = BatchProgress::new(10);
+        bp.mark_completed();
+        bp.mark_completed();
+        bp.mark_failed();
+        assert!((bp.success_rate() - 2.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn batch_progress_display() {
+        let mut bp = BatchProgress::new(5);
+        bp.mark_completed();
+        let s = format!("{bp}");
+        assert!(s.contains("1/5"));
+    }
+
+    #[test]
+    fn batch_progress_zero_total() {
+        let bp = BatchProgress::new(0);
+        assert!(bp.is_done());
+        assert_eq!(bp.percentage(), 100.0);
+    }
+
+    // -- SlidingWindowLimiter ------------------------------------------------
+
+    #[test]
+    fn sliding_window_allows_within_limit() {
+        let mut lim = SlidingWindowLimiter::new(1000, 3);
+        assert!(lim.try_acquire(100));
+        assert!(lim.try_acquire(200));
+        assert!(lim.try_acquire(300));
+        assert!(!lim.try_acquire(400)); // over limit
+    }
+
+    #[test]
+    fn sliding_window_expires_old_entries() {
+        let mut lim = SlidingWindowLimiter::new(1000, 2);
+        assert!(lim.try_acquire(100));
+        assert!(lim.try_acquire(200));
+        assert!(!lim.try_acquire(500));
+        // after window expires
+        assert!(lim.try_acquire(1200));
+    }
+
+    #[test]
+    fn sliding_window_remaining() {
+        let mut lim = SlidingWindowLimiter::new(1000, 5);
+        lim.try_acquire(100);
+        lim.try_acquire(200);
+        assert_eq!(lim.remaining_at(300), 3);
+    }
+
+    #[test]
+    fn sliding_window_next_available() {
+        let mut lim = SlidingWindowLimiter::new(1000, 1);
+        lim.try_acquire(100);
+        assert_eq!(lim.next_available_in(100), 1000);
+        assert_eq!(lim.next_available_in(600), 500);
+    }
+
+    // -- RetryPolicy extra helpers -------------------------------------------
+
+    #[test]
+    fn retry_should_retry() {
+        let rp = RetryPolicy::new().with_max_attempts(3);
+        assert!(rp.should_retry(0));
+        assert!(rp.should_retry(1));
+        assert!(!rp.should_retry(2));
+    }
+
+    #[test]
+    fn retry_total_max_wait() {
+        let rp = RetryPolicy::new()
+            .with_max_attempts(3)
+            .with_initial_delay(Duration::from_millis(100))
+            .with_backoff_factor(2.0)
+            .with_max_delay(Duration::from_secs(10));
+        let total = rp.total_max_wait();
+        // attempt 0: 100ms, attempt 1: 200ms => total 300ms
+        assert!(total >= Duration::from_millis(300));
+    }
+
+    #[test]
+    fn retry_single_attempt_no_wait() {
+        let rp = RetryPolicy::new().with_max_attempts(1);
+        assert!(!rp.should_retry(0));
+        assert_eq!(rp.total_max_wait(), Duration::ZERO);
     }
 
 }

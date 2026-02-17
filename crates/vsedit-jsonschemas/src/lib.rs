@@ -1279,6 +1279,142 @@ impl<'a> SchemaRefResolver<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SchemaConstraintChecker
+// ---------------------------------------------------------------------------
+
+/// Validates values against schema constraints (required fields, types, ranges).
+pub struct SchemaConstraintChecker;
+
+impl SchemaConstraintChecker {
+    /// Check that all required properties are present in the given field names.
+    pub fn check_required(schema: &JsonSchema, present_fields: &[&str]) -> Vec<String> {
+        schema
+            .get_required_properties()
+            .iter()
+            .filter(|p| !present_fields.contains(&p.name.as_str()))
+            .map(|p| format!("missing required field: {}", p.name))
+            .collect()
+    }
+
+    /// Check that a value string matches the expected type name.
+    pub fn check_type(expected: SchemaType, actual: &str) -> bool {
+        let type_name = format!("{}", expected);
+        type_name == actual
+    }
+
+    /// Validate a numeric value against optional min/max bounds.
+    pub fn check_number_range(value: f64, min: Option<f64>, max: Option<f64>) -> Option<String> {
+        if let Some(m) = min {
+            if value < m {
+                return Some(format!("{} is below minimum {}", value, m));
+            }
+        }
+        if let Some(m) = max {
+            if value > m {
+                return Some(format!("{} exceeds maximum {}", value, m));
+            }
+        }
+        None
+    }
+
+    /// Check if a string value matches one of the allowed enum values.
+    pub fn check_enum(value: &str, allowed: &[&str]) -> bool {
+        allowed.contains(&value)
+    }
+
+    /// Check if a string matches a simple substring pattern.
+    pub fn check_pattern(value: &str, pattern: &str) -> bool {
+        value.contains(pattern)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SchemaComposer
+// ---------------------------------------------------------------------------
+
+/// Merges two schemas together.
+pub struct SchemaComposer;
+
+impl SchemaComposer {
+    /// Merge properties from `other` into `base`, keeping base properties on conflict.
+    pub fn merge_properties(base: &JsonSchema, other: &JsonSchema) -> Vec<SchemaProperty> {
+        let mut merged = base.properties.clone();
+        for prop in &other.properties {
+            if !merged.iter().any(|p| p.name == prop.name) {
+                merged.push(prop.clone());
+            }
+        }
+        merged
+    }
+
+    /// Combine required field lists from two schemas.
+    pub fn combine_required(base: &JsonSchema, other: &JsonSchema) -> Vec<String> {
+        let mut required: Vec<String> = base
+            .get_required_properties()
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+        for p in other.get_required_properties() {
+            if !required.contains(&p.name) {
+                required.push(p.name.clone());
+            }
+        }
+        required
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SchemaDocGenerator
+// ---------------------------------------------------------------------------
+
+/// Generates human-readable documentation from a schema.
+pub struct SchemaDocGenerator;
+
+impl SchemaDocGenerator {
+    /// Generate a property table as a vector of (name, type, required, default) rows.
+    pub fn property_table(schema: &JsonSchema) -> Vec<(String, String, bool, String)> {
+        schema
+            .properties
+            .iter()
+            .map(|p| {
+                (
+                    p.name.clone(),
+                    format!("{}", p.schema_type),
+                    p.required,
+                    p.default_value.clone().unwrap_or_default(),
+                )
+            })
+            .collect()
+    }
+
+    /// Generate a plain-text summary of the schema.
+    pub fn summary(schema: &JsonSchema) -> String {
+        let title = schema.title.as_deref().unwrap_or("Untitled");
+        let desc = schema.description.as_deref().unwrap_or("No description");
+        let props = schema.properties.len();
+        format!("{} — {} ({} properties)", title, desc, props)
+    }
+
+    /// Generate markdown documentation.
+    pub fn to_markdown(schema: &JsonSchema) -> String {
+        let mut md = String::new();
+        let title = schema.title.as_deref().unwrap_or("Schema");
+        md.push_str(&format!("# {}\n\n", title));
+        if let Some(ref d) = schema.description {
+            md.push_str(&format!("{}\n\n", d));
+        }
+        md.push_str("| Property | Type | Required | Default |\n");
+        md.push_str("|----------|------|----------|--------|\n");
+        for p in &schema.properties {
+            let req = if p.required { "yes" } else { "no" };
+            let def = p.default_value.as_deref().unwrap_or("-");
+            md.push_str(&format!("| {} | {} | {} | {} |\n", p.name, p.schema_type, req, def));
+        }
+        md
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2508,4 +2644,113 @@ mod tests {
         let unused = resolver.unreferenced_definitions(&["#/definitions/Used"]);
         assert_eq!(unused, vec!["Unused"]);
     }
+
+    // -- SchemaConstraintChecker tests --
+
+    #[test]
+    fn constraint_checker_required_missing() {
+        let schema = test_schema();
+        let errors = SchemaConstraintChecker::check_required(&schema, &[]);
+        assert!(errors.is_empty()); // compilerOptions is not required in test_schema
+    }
+
+    #[test]
+    fn constraint_checker_required_with_required_field() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![SchemaProperty {
+                name: "name".to_string(),
+                schema_type: SchemaType::String,
+                description: None,
+                required: true,
+                default_value: None,
+            }],
+            file_match: vec![],
+        };
+        let errors = SchemaConstraintChecker::check_required(&schema, &[]);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("name"));
+    }
+
+    #[test]
+    fn constraint_checker_check_type() {
+        assert!(SchemaConstraintChecker::check_type(SchemaType::String, "string"));
+        assert!(!SchemaConstraintChecker::check_type(SchemaType::Number, "string"));
+    }
+
+    #[test]
+    fn constraint_checker_check_number_range() {
+        assert!(SchemaConstraintChecker::check_number_range(5.0, Some(1.0), Some(10.0)).is_none());
+        assert!(SchemaConstraintChecker::check_number_range(0.5, Some(1.0), None).is_some());
+        assert!(SchemaConstraintChecker::check_number_range(15.0, None, Some(10.0)).is_some());
+    }
+
+    #[test]
+    fn constraint_checker_check_enum() {
+        assert!(SchemaConstraintChecker::check_enum("a", &["a", "b", "c"]));
+        assert!(!SchemaConstraintChecker::check_enum("d", &["a", "b"]));
+    }
+
+    #[test]
+    fn constraint_checker_check_pattern() {
+        assert!(SchemaConstraintChecker::check_pattern("hello world", "world"));
+        assert!(!SchemaConstraintChecker::check_pattern("hello", "xyz"));
+    }
+
+    // -- SchemaComposer tests --
+
+    #[test]
+    fn composer_merge_properties() {
+        let base = test_schema();
+        let other = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![SchemaProperty {
+                name: "extra".to_string(),
+                schema_type: SchemaType::Boolean,
+                description: None,
+                required: false,
+                default_value: None,
+            }],
+            file_match: vec![],
+        };
+        let merged = SchemaComposer::merge_properties(&base, &other);
+        assert!(merged.iter().any(|p| p.name == "extra"));
+        assert!(merged.iter().any(|p| p.name == "compilerOptions"));
+    }
+
+    #[test]
+    fn composer_no_duplicate_on_conflict() {
+        let base = test_schema();
+        let merged = SchemaComposer::merge_properties(&base, &base);
+        let count = merged.iter().filter(|p| p.name == "compilerOptions").count();
+        assert_eq!(count, 1);
+    }
+
+    // -- SchemaDocGenerator tests --
+
+    #[test]
+    fn doc_property_table() {
+        let schema = test_schema();
+        let table = SchemaDocGenerator::property_table(&schema);
+        assert!(!table.is_empty());
+        assert_eq!(table[0].0, "compilerOptions");
+    }
+
+    #[test]
+    fn doc_summary() {
+        let schema = test_schema();
+        let s = SchemaDocGenerator::summary(&schema);
+        assert!(s.contains("TypeScript Config"));
+    }
+
+    #[test]
+    fn doc_to_markdown() {
+        let schema = test_schema();
+        let md = SchemaDocGenerator::to_markdown(&schema);
+        assert!(md.contains("# TypeScript Config"));
+        assert!(md.contains("compilerOptions"));
+    }
+
 }

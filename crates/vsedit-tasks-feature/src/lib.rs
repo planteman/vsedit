@@ -1582,6 +1582,263 @@ impl fmt::Display for TaskAutoDetectorConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TaskDependencyGraph – task depends-on relationships
+// ---------------------------------------------------------------------------
+
+/// A directed graph of task dependencies.
+#[derive(Debug, Clone, Default)]
+pub struct TaskDependencyGraph {
+    edges: HashMap<String, Vec<String>>, // task -> [depends on]
+}
+
+impl TaskDependencyGraph {
+    pub fn new() -> Self { Self::default() }
+
+    /// Add a dependency: `task` depends on `dependency`.
+    pub fn add_dependency(&mut self, task: &str, dependency: &str) {
+        self.edges.entry(task.to_string()).or_default().push(dependency.to_string());
+    }
+
+    /// Get all direct dependencies of a task.
+    pub fn dependencies_of(&self, task: &str) -> Vec<&str> {
+        self.edges.get(task).map(|v| v.iter().map(|s| s.as_str()).collect()).unwrap_or_default()
+    }
+
+    /// Get all tasks that depend on the given task.
+    pub fn dependents_of(&self, task: &str) -> Vec<&str> {
+        self.edges
+            .iter()
+            .filter(|(_, deps)| deps.iter().any(|d| d == task))
+            .map(|(t, _)| t.as_str())
+            .collect()
+    }
+
+    /// Topological sort for execution order. Returns None if cyclic.
+    pub fn execution_order(&self) -> Option<Vec<String>> {
+        let mut all_tasks: Vec<String> = Vec::new();
+        for (task, deps) in &self.edges {
+            if !all_tasks.contains(task) { all_tasks.push(task.clone()); }
+            for d in deps {
+                if !all_tasks.contains(d) { all_tasks.push(d.clone()); }
+            }
+        }
+        let mut in_degree: HashMap<String, usize> = all_tasks.iter().map(|t| (t.clone(), 0)).collect();
+        for deps in self.edges.values() {
+            for _ in deps {
+                // in_degree for the task that has deps doesn't change;
+                // we track it differently for topo sort
+            }
+        }
+        // Kahn's algorithm
+        for (task, deps) in &self.edges {
+            let _ = task;
+            for _ in deps {}
+        }
+        // Simplified: DFS-based topological sort
+        let mut visited: HashMap<String, u8> = HashMap::new(); // 0=unvisited, 1=visiting, 2=done
+        let mut result = Vec::new();
+
+        fn visit(
+            node: &str,
+            edges: &HashMap<String, Vec<String>>,
+            visited: &mut HashMap<String, u8>,
+            result: &mut Vec<String>,
+        ) -> bool {
+            match visited.get(node).copied().unwrap_or(0) {
+                1 => return false, // cycle
+                2 => return true,
+                _ => {}
+            }
+            visited.insert(node.to_string(), 1);
+            if let Some(deps) = edges.get(node) {
+                for dep in deps {
+                    if !visit(dep, edges, visited, result) {
+                        return false;
+                    }
+                }
+            }
+            visited.insert(node.to_string(), 2);
+            result.push(node.to_string());
+            true
+        }
+
+        for task in &all_tasks {
+            if !visit(task, &self.edges, &mut visited, &mut result) {
+                return None;
+            }
+        }
+        Some(result)
+    }
+
+    /// Detect if the graph has a cycle.
+    pub fn has_cycle(&self) -> bool {
+        self.execution_order().is_none()
+    }
+
+    /// Find the critical path (longest dependency chain).
+    pub fn critical_path(&self) -> Vec<String> {
+        let order = match self.execution_order() {
+            Some(o) => o,
+            None => return Vec::new(),
+        };
+        let mut longest: HashMap<String, Vec<String>> = HashMap::new();
+        for task in &order {
+            let deps = self.dependencies_of(task);
+            let best_dep_path = deps
+                .iter()
+                .max_by_key(|d| longest.get(**d).map_or(0, |p| p.len()))
+                .and_then(|d| longest.get(*d).cloned())
+                .unwrap_or_default();
+            let mut path = best_dep_path;
+            path.push(task.clone());
+            longest.insert(task.clone(), path);
+        }
+        longest.into_values().max_by_key(|p| p.len()).unwrap_or_default()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskOutputParser – parse task output for problems
+// ---------------------------------------------------------------------------
+
+/// Parses task output lines to extract error/warning diagnostics.
+#[derive(Debug, Clone, Default)]
+pub struct TaskOutputParserV2 {
+    problems: Vec<TaskProblem>,
+}
+
+/// A parsed problem from task output.
+#[derive(Debug, Clone)]
+pub struct TaskProblem {
+    pub severity: ProblemSeverity,
+    pub file: Option<String>,
+    pub line: Option<u32>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProblemSeverity {
+    Error,
+    Warning,
+    Info,
+}
+
+impl TaskOutputParserV2 {
+    pub fn new() -> Self { Self::default() }
+
+    /// Parse a line of task output, detecting error/warning patterns.
+    pub fn parse_line(&mut self, line: &str) {
+        let lower = line.to_lowercase();
+        let severity = if lower.contains("error") {
+            ProblemSeverity::Error
+        } else if lower.contains("warning") || lower.contains("warn") {
+            ProblemSeverity::Warning
+        } else {
+            return;
+        };
+        // Try to extract file:line pattern
+        let (file, line_num) = Self::extract_file_line(line);
+        self.problems.push(TaskProblem {
+            severity,
+            file,
+            line: line_num,
+            message: line.to_string(),
+        });
+    }
+
+    fn extract_file_line(text: &str) -> (Option<String>, Option<u32>) {
+        // Pattern: "file.rs:42:" or "file.rs:42:10:"
+        for part in text.split_whitespace() {
+            let segments: Vec<&str> = part.split(':').collect();
+            if segments.len() >= 2 {
+                if let Ok(line) = segments[1].parse::<u32>() {
+                    return (Some(segments[0].to_string()), Some(line));
+                }
+            }
+        }
+        (None, None)
+    }
+
+    pub fn parsed_problems_count(&self) -> usize { self.problems.len() }
+    pub fn problems(&self) -> &[TaskProblem] { &self.problems }
+}
+
+// ---------------------------------------------------------------------------
+// TaskScheduler – schedule tasks
+// ---------------------------------------------------------------------------
+
+/// Schedules tasks to run at intervals or after delays.
+#[derive(Debug, Clone)]
+pub struct TaskScheduler {
+    schedules: Vec<ScheduledTask>,
+    next_id: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScheduledTask {
+    pub id: u64,
+    pub task_name: String,
+    pub interval_ms: u64,
+    pub next_run_ms: u64,
+    pub active: bool,
+}
+
+impl TaskScheduler {
+    pub fn new() -> Self {
+        Self { schedules: Vec::new(), next_id: 1 }
+    }
+
+    /// Schedule a task to run at a fixed interval.
+    pub fn at_interval(&mut self, task_name: &str, interval_ms: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.schedules.push(ScheduledTask {
+            id,
+            task_name: task_name.to_string(),
+            interval_ms,
+            next_run_ms: interval_ms,
+            active: true,
+        });
+        id
+    }
+
+    /// Schedule a task to run once after a delay.
+    pub fn after_delay(&mut self, task_name: &str, delay_ms: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.schedules.push(ScheduledTask {
+            id,
+            task_name: task_name.to_string(),
+            interval_ms: 0, // one-shot
+            next_run_ms: delay_ms,
+            active: true,
+        });
+        id
+    }
+
+    pub fn next_run_time(&self, id: u64) -> Option<u64> {
+        self.schedules.iter().find(|s| s.id == id && s.active).map(|s| s.next_run_ms)
+    }
+
+    pub fn cancel_schedule(&mut self, id: u64) -> bool {
+        if let Some(s) = self.schedules.iter_mut().find(|s| s.id == id) {
+            s.active = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn active_schedules(&self) -> Vec<&ScheduledTask> {
+        self.schedules.iter().filter(|s| s.active).collect()
+    }
+}
+
+impl Default for TaskScheduler {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2620,6 +2877,110 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- TaskDependencyGraph ------------------------------------------------
+
+    #[test]
+    fn dep_graph_basic() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("test", "build");
+        assert_eq!(g.dependencies_of("test"), vec!["build"]);
+        assert_eq!(g.dependents_of("build"), vec!["test"]);
+    }
+
+    #[test]
+    fn dep_graph_execution_order() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("test", "build");
+        g.add_dependency("deploy", "test");
+        let order = g.execution_order().unwrap();
+        let build_pos = order.iter().position(|t| t == "build").unwrap();
+        let test_pos = order.iter().position(|t| t == "test").unwrap();
+        assert!(build_pos < test_pos);
+    }
+
+    #[test]
+    fn dep_graph_cycle_detection() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        assert!(g.has_cycle());
+    }
+
+    #[test]
+    fn dep_graph_no_cycle() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("a", "b");
+        assert!(!g.has_cycle());
+    }
+
+    // -- TaskOutputParser ---------------------------------------------------
+
+    #[test]
+    fn output_parser_error() {
+        let mut p = TaskOutputParserV2::new();
+        p.parse_line("src/main.rs:10:5: error[E0308]: mismatched types");
+        assert_eq!(p.parsed_problems_count(), 1);
+        assert_eq!(p.problems()[0].severity, ProblemSeverity::Error);
+    }
+
+    #[test]
+    fn output_parser_warning() {
+        let mut p = TaskOutputParserV2::new();
+        p.parse_line("warning: unused variable `x`");
+        assert_eq!(p.parsed_problems_count(), 1);
+        assert_eq!(p.problems()[0].severity, ProblemSeverity::Warning);
+    }
+
+    #[test]
+    fn output_parser_no_problem() {
+        let mut p = TaskOutputParserV2::new();
+        p.parse_line("Compiling vsedit v0.1.0");
+        assert_eq!(p.parsed_problems_count(), 0);
+    }
+
+    #[test]
+    fn output_parser_file_line_extraction() {
+        let mut p = TaskOutputParserV2::new();
+        p.parse_line("lib.rs:42:10: error: something wrong");
+        let prob = &p.problems()[0];
+        assert_eq!(prob.file.as_deref(), Some("lib.rs"));
+        assert_eq!(prob.line, Some(42));
+    }
+
+    // -- TaskScheduler ------------------------------------------------------
+
+    #[test]
+    fn scheduler_at_interval() {
+        let mut s = TaskScheduler::new();
+        let id = s.at_interval("build", 5000);
+        assert_eq!(s.next_run_time(id), Some(5000));
+        assert_eq!(s.active_schedules().len(), 1);
+    }
+
+    #[test]
+    fn scheduler_cancel() {
+        let mut s = TaskScheduler::new();
+        let id = s.at_interval("build", 5000);
+        assert!(s.cancel_schedule(id));
+        assert!(s.active_schedules().is_empty());
+    }
+
+    #[test]
+    fn scheduler_after_delay() {
+        let mut s = TaskScheduler::new();
+        let id = s.after_delay("deploy", 10000);
+        assert_eq!(s.next_run_time(id), Some(10000));
+    }
+
+    #[test]
+    fn scheduler_multiple() {
+        let mut s = TaskScheduler::new();
+        s.at_interval("a", 1000);
+        s.at_interval("b", 2000);
+        s.after_delay("c", 500);
+        assert_eq!(s.active_schedules().len(), 3);
     }
 
 }

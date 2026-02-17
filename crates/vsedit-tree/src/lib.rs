@@ -1715,6 +1715,175 @@ impl TreeSiblingNavigator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TreeIndexPath – path from root to a node
+// ---------------------------------------------------------------------------
+
+/// Represents a path from the root of a tree to a specific node.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TreeIndexPath {
+    segments: Vec<usize>,
+}
+
+impl TreeIndexPath {
+    pub fn new(segments: Vec<usize>) -> Self {
+        Self { segments }
+    }
+
+    pub fn root() -> Self {
+        Self { segments: Vec::new() }
+    }
+
+    pub fn segments(&self) -> &[usize] { &self.segments }
+
+    pub fn depth(&self) -> usize { self.segments.len() }
+
+    /// Return the parent path (all but the last segment).
+    pub fn parent_path(&self) -> Option<TreeIndexPath> {
+        if self.segments.is_empty() {
+            None
+        } else {
+            let mut p = self.segments.clone();
+            p.pop();
+            Some(TreeIndexPath::new(p))
+        }
+    }
+
+    /// Check if this path is an ancestor of another.
+    pub fn is_ancestor_of(&self, other: &TreeIndexPath) -> bool {
+        if self.segments.len() >= other.segments.len() {
+            return false;
+        }
+        other.segments.starts_with(&self.segments)
+    }
+
+    /// Find the common ancestor path between this and another path.
+    pub fn common_ancestor_with(&self, other: &TreeIndexPath) -> TreeIndexPath {
+        let common: Vec<usize> = self
+            .segments
+            .iter()
+            .zip(other.segments.iter())
+            .take_while(|(a, b)| a == b)
+            .map(|(a, _)| *a)
+            .collect();
+        TreeIndexPath::new(common)
+    }
+
+    pub fn to_string_repr(&self) -> String {
+        self.segments.iter().map(|s| s.to_string()).collect::<Vec<_>>().join("/")
+    }
+
+    /// Append a child index to this path.
+    pub fn child(&self, index: usize) -> TreeIndexPath {
+        let mut segs = self.segments.clone();
+        segs.push(index);
+        TreeIndexPath::new(segs)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TreeExpansionState – track expanded/collapsed nodes
+// ---------------------------------------------------------------------------
+
+/// Tracks which tree nodes are expanded.
+#[derive(Debug, Clone, Default)]
+pub struct TreeExpansionState {
+    expanded: std::collections::HashSet<Vec<usize>>,
+}
+
+impl TreeExpansionState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn expand(&mut self, path: &TreeIndexPath) {
+        self.expanded.insert(path.segments().to_vec());
+    }
+
+    pub fn collapse(&mut self, path: &TreeIndexPath) {
+        self.expanded.remove(path.segments());
+    }
+
+    pub fn toggle(&mut self, path: &TreeIndexPath) {
+        if self.is_expanded(path) {
+            self.collapse(path);
+        } else {
+            self.expand(path);
+        }
+    }
+
+    pub fn is_expanded(&self, path: &TreeIndexPath) -> bool {
+        self.expanded.contains(path.segments())
+    }
+
+    pub fn expand_all(&mut self, paths: &[TreeIndexPath]) {
+        for p in paths {
+            self.expand(p);
+        }
+    }
+
+    pub fn collapse_all(&mut self) {
+        self.expanded.clear();
+    }
+
+    pub fn expanded_count(&self) -> usize {
+        self.expanded.len()
+    }
+
+    /// Snapshot the current expansion state.
+    pub fn expansion_snapshot(&self) -> Vec<Vec<usize>> {
+        self.expanded.iter().cloned().collect()
+    }
+
+    /// Restore from a snapshot.
+    pub fn restore(&mut self, snapshot: Vec<Vec<usize>>) {
+        self.expanded = snapshot.into_iter().collect();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TreeDragDropValidator – validate drag/drop operations
+// ---------------------------------------------------------------------------
+
+/// Validates drag and drop operations within a tree.
+pub struct TreeDragDropValidator;
+
+impl TreeDragDropValidator {
+    /// Check if a node can be dropped on (into) a target node.
+    pub fn can_drop_on(source: &TreeIndexPath, target: &TreeIndexPath) -> bool {
+        // Cannot drop a node onto itself or one of its descendants
+        source != target && !source.is_ancestor_of(target)
+    }
+
+    /// Check if a node can be dropped before a target node.
+    pub fn can_drop_before(source: &TreeIndexPath, target: &TreeIndexPath) -> bool {
+        source != target
+    }
+
+    /// Check if a node can be dropped after a target node.
+    pub fn can_drop_after(source: &TreeIndexPath, target: &TreeIndexPath) -> bool {
+        source != target
+    }
+
+    /// Check if reparenting would create a cycle.
+    pub fn prevents_cycle(source: &TreeIndexPath, new_parent: &TreeIndexPath) -> bool {
+        // A cycle would occur if the source is an ancestor of the new parent
+        source.is_ancestor_of(new_parent) || source == new_parent
+    }
+
+    /// Validate a reparent operation.
+    pub fn validate_reparent(source: &TreeIndexPath, new_parent: &TreeIndexPath) -> bool {
+        !Self::prevents_cycle(source, new_parent) && source != new_parent
+    }
+
+    /// Return allowed drop positions for a source onto a target.
+    pub fn allowed_drop_positions(source: &TreeIndexPath, target: &TreeIndexPath) -> Vec<&'static str> {
+        let mut positions = Vec::new();
+        if Self::can_drop_before(source, target) { positions.push("before"); }
+        if Self::can_drop_on(source, target) { positions.push("on"); }
+        if Self::can_drop_after(source, target) { positions.push("after"); }
+        positions
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2678,6 +2847,131 @@ mod tests {
         assert_eq!(TreeSiblingNavigator::next_sibling(src, &"lib"), None);
         assert_eq!(TreeSiblingNavigator::prev_sibling(src, &"lib"), Some(&"main.rs"));
         assert_eq!(TreeSiblingNavigator::prev_sibling(src, &"main.rs"), None);
+    }
+
+    // -- TreeIndexPath -------------------------------------------------------
+
+    #[test]
+    fn path_depth_v2() {
+        let p = TreeIndexPath::new(vec![0, 1, 2]);
+        assert_eq!(p.depth(), 3);
+        assert_eq!(TreeIndexPath::root().depth(), 0);
+    }
+
+    #[test]
+    fn path_parent_v2() {
+        let p = TreeIndexPath::new(vec![0, 1, 2]);
+        let parent = p.parent_path().unwrap();
+        assert_eq!(parent.segments(), &[0, 1]);
+        assert!(TreeIndexPath::root().parent_path().is_none());
+    }
+
+    #[test]
+    fn path_is_ancestor() {
+        let ancestor = TreeIndexPath::new(vec![0]);
+        let descendant = TreeIndexPath::new(vec![0, 1, 2]);
+        assert!(ancestor.is_ancestor_of(&descendant));
+        assert!(!descendant.is_ancestor_of(&ancestor));
+        assert!(!ancestor.is_ancestor_of(&ancestor));
+    }
+
+    #[test]
+    fn path_common_ancestor() {
+        let a = TreeIndexPath::new(vec![0, 1, 3]);
+        let b = TreeIndexPath::new(vec![0, 1, 5]);
+        let common = a.common_ancestor_with(&b);
+        assert_eq!(common.segments(), &[0, 1]);
+    }
+
+    #[test]
+    fn path_child() {
+        let p = TreeIndexPath::new(vec![0]);
+        let c = p.child(3);
+        assert_eq!(c.segments(), &[0, 3]);
+    }
+
+    #[test]
+    fn path_to_string() {
+        let p = TreeIndexPath::new(vec![0, 1, 2]);
+        assert_eq!(p.to_string_repr(), "0/1/2");
+    }
+
+    // -- TreeExpansionState -------------------------------------------------
+
+    #[test]
+    fn expansion_expand_collapse() {
+        let mut es = TreeExpansionState::new();
+        let p = TreeIndexPath::new(vec![0]);
+        es.expand(&p);
+        assert!(es.is_expanded(&p));
+        es.collapse(&p);
+        assert!(!es.is_expanded(&p));
+    }
+
+    #[test]
+    fn expansion_toggle() {
+        let mut es = TreeExpansionState::new();
+        let p = TreeIndexPath::new(vec![0]);
+        es.toggle(&p);
+        assert!(es.is_expanded(&p));
+        es.toggle(&p);
+        assert!(!es.is_expanded(&p));
+    }
+
+    #[test]
+    fn expansion_collapse_all() {
+        let mut es = TreeExpansionState::new();
+        es.expand(&TreeIndexPath::new(vec![0]));
+        es.expand(&TreeIndexPath::new(vec![1]));
+        assert_eq!(es.expanded_count(), 2);
+        es.collapse_all();
+        assert_eq!(es.expanded_count(), 0);
+    }
+
+    #[test]
+    fn expansion_snapshot_restore() {
+        let mut es = TreeExpansionState::new();
+        es.expand(&TreeIndexPath::new(vec![0]));
+        let snap = es.expansion_snapshot();
+        es.collapse_all();
+        assert_eq!(es.expanded_count(), 0);
+        es.restore(snap);
+        assert_eq!(es.expanded_count(), 1);
+    }
+
+    // -- TreeDragDropValidator ----------------------------------------------
+
+    #[test]
+    fn dragdrop_can_drop_on() {
+        let src = TreeIndexPath::new(vec![0]);
+        let tgt = TreeIndexPath::new(vec![1]);
+        assert!(TreeDragDropValidator::can_drop_on(&src, &tgt));
+        assert!(!TreeDragDropValidator::can_drop_on(&src, &src));
+    }
+
+    #[test]
+    fn dragdrop_prevents_cycle() {
+        let parent = TreeIndexPath::new(vec![0]);
+        let child = TreeIndexPath::new(vec![0, 1]);
+        assert!(TreeDragDropValidator::prevents_cycle(&parent, &child));
+        assert!(!TreeDragDropValidator::prevents_cycle(&child, &parent));
+    }
+
+    #[test]
+    fn dragdrop_validate_reparent() {
+        let src = TreeIndexPath::new(vec![0, 1]);
+        let new_parent = TreeIndexPath::new(vec![2]);
+        assert!(TreeDragDropValidator::validate_reparent(&src, &new_parent));
+    }
+
+    #[test]
+    fn dragdrop_allowed_positions() {
+        let src = TreeIndexPath::new(vec![0]);
+        let tgt = TreeIndexPath::new(vec![1]);
+        let pos = TreeDragDropValidator::allowed_drop_positions(&src, &tgt);
+        assert!(pos.contains(&"before"));
+        assert!(pos.contains(&"on"));
+        assert!(pos.contains(&"after"));
     }
 
 }

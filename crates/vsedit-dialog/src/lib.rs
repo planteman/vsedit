@@ -1752,6 +1752,204 @@ impl fmt::Display for DialogKeyboardShortcuts {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DialogLayoutCalculator — compute dialog position relative to parent
+// ---------------------------------------------------------------------------
+
+/// Computes dialog position and size relative to a parent rectangle.
+#[derive(Debug, Clone)]
+pub struct DialogLayoutCalculator {
+    pub parent_width: usize,
+    pub parent_height: usize,
+    pub margin: usize,
+}
+
+impl DialogLayoutCalculator {
+    pub fn new(parent_width: usize, parent_height: usize) -> Self {
+        Self { parent_width, parent_height, margin: 2 }
+    }
+
+    pub fn with_margin(mut self, margin: usize) -> Self {
+        self.margin = margin;
+        self
+    }
+
+    /// Center a dialog of given `(w, h)` inside the parent.
+    /// Returns `(x, y)`.
+    pub fn center(&self, dialog_width: usize, dialog_height: usize) -> (usize, usize) {
+        let x = self.parent_width.saturating_sub(dialog_width) / 2;
+        let y = self.parent_height.saturating_sub(dialog_height) / 2;
+        (x, y)
+    }
+
+    /// Clamp a dialog size to fit within the parent minus margins.
+    pub fn clamp_size(&self, desired_width: usize, desired_height: usize) -> (usize, usize) {
+        let max_w = self.parent_width.saturating_sub(self.margin * 2);
+        let max_h = self.parent_height.saturating_sub(self.margin * 2);
+        (desired_width.min(max_w), desired_height.min(max_h))
+    }
+
+    /// Compute the full rect (x, y, w, h) for a centred, clamped dialog.
+    pub fn compute_rect(&self, desired_width: usize, desired_height: usize) -> (usize, usize, usize, usize) {
+        let (w, h) = self.clamp_size(desired_width, desired_height);
+        let (x, y) = self.center(w, h);
+        (x, y, w, h)
+    }
+
+    /// Available width after margins.
+    pub fn available_width(&self) -> usize {
+        self.parent_width.saturating_sub(self.margin * 2)
+    }
+
+    /// Available height after margins.
+    pub fn available_height(&self) -> usize {
+        self.parent_height.saturating_sub(self.margin * 2)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogAnimationState — opening/closing transition tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks the animation state of a dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DialogAnimationPhase {
+    Opening,
+    Open,
+    Closing,
+    Closed,
+}
+
+#[derive(Debug, Clone)]
+pub struct DialogAnimationState {
+    phase: DialogAnimationPhase,
+    progress: f64,
+    duration_ms: u64,
+    elapsed_ms: u64,
+}
+
+impl DialogAnimationState {
+    pub fn new(duration_ms: u64) -> Self {
+        Self { phase: DialogAnimationPhase::Closed, progress: 0.0, duration_ms, elapsed_ms: 0 }
+    }
+
+    pub fn start_opening(&mut self) {
+        self.phase = DialogAnimationPhase::Opening;
+        self.elapsed_ms = 0;
+        self.progress = 0.0;
+    }
+
+    pub fn start_closing(&mut self) {
+        self.phase = DialogAnimationPhase::Closing;
+        self.elapsed_ms = 0;
+        self.progress = 1.0;
+    }
+
+    /// Advance the animation by `delta_ms`. Returns `true` if the phase just completed.
+    pub fn tick(&mut self, delta_ms: u64) -> bool {
+        self.elapsed_ms += delta_ms;
+        let frac = if self.duration_ms == 0 {
+            1.0
+        } else {
+            (self.elapsed_ms as f64 / self.duration_ms as f64).min(1.0)
+        };
+
+        match self.phase {
+            DialogAnimationPhase::Opening => {
+                self.progress = frac;
+                if frac >= 1.0 { self.phase = DialogAnimationPhase::Open; return true; }
+            }
+            DialogAnimationPhase::Closing => {
+                self.progress = 1.0 - frac;
+                if frac >= 1.0 { self.phase = DialogAnimationPhase::Closed; return true; }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    pub fn phase(&self) -> DialogAnimationPhase { self.phase }
+    pub fn progress(&self) -> f64 { self.progress }
+    pub fn is_visible(&self) -> bool { self.phase != DialogAnimationPhase::Closed }
+    pub fn is_animating(&self) -> bool {
+        matches!(self.phase, DialogAnimationPhase::Opening | DialogAnimationPhase::Closing)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogFocusTrap — trap focus within a dialog
+// ---------------------------------------------------------------------------
+
+/// Traps keyboard focus within a dialog, cycling through focusable elements.
+#[derive(Debug, Clone)]
+pub struct DialogFocusTrap {
+    elements: Vec<String>,
+    focused_index: Option<usize>,
+    previous_focus: Option<String>,
+}
+
+impl DialogFocusTrap {
+    pub fn new() -> Self {
+        Self { elements: Vec::new(), focused_index: None, previous_focus: None }
+    }
+
+    /// Set the element that was focused before the dialog opened.
+    pub fn set_previous_focus(&mut self, id: impl Into<String>) {
+        self.previous_focus = Some(id.into());
+    }
+
+    /// Register a focusable element.
+    pub fn add_element(&mut self, id: impl Into<String>) {
+        self.elements.push(id.into());
+    }
+
+    /// Focus the first element.
+    pub fn focus_first(&mut self) -> Option<&str> {
+        if self.elements.is_empty() { return None; }
+        self.focused_index = Some(0);
+        Some(&self.elements[0])
+    }
+
+    /// Cycle focus forward.
+    pub fn cycle_next(&mut self) -> Option<&str> {
+        if self.elements.is_empty() { return None; }
+        let next = match self.focused_index {
+            Some(i) => (i + 1) % self.elements.len(),
+            None => 0,
+        };
+        self.focused_index = Some(next);
+        Some(&self.elements[next])
+    }
+
+    /// Cycle focus backward.
+    pub fn cycle_prev(&mut self) -> Option<&str> {
+        if self.elements.is_empty() { return None; }
+        let prev = match self.focused_index {
+            Some(0) => self.elements.len() - 1,
+            Some(i) => i - 1,
+            None => self.elements.len() - 1,
+        };
+        self.focused_index = Some(prev);
+        Some(&self.elements[prev])
+    }
+
+    /// The element ID to restore focus to after dialog closes.
+    pub fn restore_target(&self) -> Option<&str> {
+        self.previous_focus.as_deref()
+    }
+
+    pub fn current(&self) -> Option<&str> {
+        self.focused_index.map(|i| self.elements[i].as_str())
+    }
+
+    pub fn len(&self) -> usize { self.elements.len() }
+    pub fn is_empty(&self) -> bool { self.elements.is_empty() }
+}
+
+impl Default for DialogFocusTrap {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2680,5 +2878,108 @@ mod tests {
         shortcuts.bind(KeyEvent::Char('y'), DialogAction::Confirm);
         let keys = shortcuts.keys_for_action(&DialogAction::Confirm);
         assert_eq!(keys.len(), 2);
+    }
+
+    // -- DialogLayoutCalculator -----------------------------------------------
+
+    #[test]
+    fn layout_calc_center() {
+        let calc = DialogLayoutCalculator::new(100, 50);
+        let (x, y) = calc.center(40, 20);
+        assert_eq!(x, 30);
+        assert_eq!(y, 15);
+    }
+
+    #[test]
+    fn layout_calc_clamp_size() {
+        let calc = DialogLayoutCalculator::new(80, 40).with_margin(5);
+        let (w, h) = calc.clamp_size(200, 100);
+        assert_eq!(w, 70);
+        assert_eq!(h, 30);
+    }
+
+    #[test]
+    fn layout_calc_compute_rect() {
+        let calc = DialogLayoutCalculator::new(100, 50).with_margin(0);
+        let (x, y, w, h) = calc.compute_rect(40, 20);
+        assert_eq!((x, y, w, h), (30, 15, 40, 20));
+    }
+
+    #[test]
+    fn layout_calc_available() {
+        let calc = DialogLayoutCalculator::new(100, 50).with_margin(10);
+        assert_eq!(calc.available_width(), 80);
+        assert_eq!(calc.available_height(), 30);
+    }
+
+    // -- DialogAnimationState -------------------------------------------------
+
+    #[test]
+    fn animation_open_close_lifecycle() {
+        let mut anim = DialogAnimationState::new(100);
+        assert!(!anim.is_visible());
+        anim.start_opening();
+        assert!(anim.is_animating());
+        assert!(!anim.tick(50));
+        assert!(anim.progress() > 0.0 && anim.progress() < 1.0);
+        assert!(anim.tick(60));
+        assert_eq!(anim.phase(), DialogAnimationPhase::Open);
+    }
+
+    #[test]
+    fn animation_closing() {
+        let mut anim = DialogAnimationState::new(100);
+        anim.start_opening();
+        anim.tick(200);
+        anim.start_closing();
+        assert!(anim.is_animating());
+        anim.tick(100);
+        assert_eq!(anim.phase(), DialogAnimationPhase::Closed);
+        assert!(!anim.is_visible());
+    }
+
+    #[test]
+    fn animation_zero_duration() {
+        let mut anim = DialogAnimationState::new(0);
+        anim.start_opening();
+        let completed = anim.tick(0);
+        assert!(completed);
+        assert_eq!(anim.phase(), DialogAnimationPhase::Open);
+    }
+
+    // -- DialogFocusTrap ------------------------------------------------------
+
+    #[test]
+    fn focus_trap_cycle() {
+        let mut trap = DialogFocusTrap::new();
+        trap.add_element("ok");
+        trap.add_element("cancel");
+        assert_eq!(trap.focus_first(), Some("ok"));
+        assert_eq!(trap.cycle_next(), Some("cancel"));
+        assert_eq!(trap.cycle_next(), Some("ok")); // wraps
+    }
+
+    #[test]
+    fn focus_trap_prev() {
+        let mut trap = DialogFocusTrap::new();
+        trap.add_element("a");
+        trap.add_element("b");
+        trap.focus_first();
+        assert_eq!(trap.cycle_prev(), Some("b")); // wraps back
+    }
+
+    #[test]
+    fn focus_trap_restore() {
+        let mut trap = DialogFocusTrap::new();
+        trap.set_previous_focus("editor");
+        assert_eq!(trap.restore_target(), Some("editor"));
+    }
+
+    #[test]
+    fn focus_trap_empty() {
+        let mut trap = DialogFocusTrap::new();
+        assert_eq!(trap.focus_first(), None);
+        assert_eq!(trap.cycle_next(), None);
+        assert!(trap.is_empty());
     }
 }

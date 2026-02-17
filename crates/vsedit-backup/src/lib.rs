@@ -1541,6 +1541,147 @@ impl fmt::Display for BackupRotationPolicyConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BackupRetentionPolicy — configurable retention rules
+// ---------------------------------------------------------------------------
+
+/// Configuration for how long / how many backups to keep.
+#[derive(Debug, Clone)]
+pub struct BackupRetentionPolicy {
+    pub max_backups: usize,
+    pub max_age_secs: u64,
+    pub max_total_bytes: u64,
+    pub compress_after_secs: u64,
+}
+
+impl BackupRetentionPolicy {
+    pub fn new() -> Self {
+        Self {
+            max_backups: 50,
+            max_age_secs: 30 * 24 * 3600, // 30 days
+            max_total_bytes: 500 * 1024 * 1024,
+            compress_after_secs: 7 * 24 * 3600,
+        }
+    }
+
+    pub fn with_max_backups(mut self, n: usize) -> Self { self.max_backups = n; self }
+    pub fn with_max_age_days(mut self, days: u64) -> Self { self.max_age_secs = days * 86400; self }
+    pub fn with_max_total_bytes(mut self, bytes: u64) -> Self { self.max_total_bytes = bytes; self }
+    pub fn with_compress_after_days(mut self, days: u64) -> Self { self.compress_after_secs = days * 86400; self }
+
+    pub fn max_age_days(&self) -> u64 { self.max_age_secs / 86400 }
+
+    pub fn should_compress(&self, age_secs: u64) -> bool {
+        age_secs >= self.compress_after_secs
+    }
+
+    pub fn is_expired(&self, age_secs: u64) -> bool {
+        age_secs >= self.max_age_secs
+    }
+}
+
+impl Default for BackupRetentionPolicy {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// BackupFileInfo — metadata for a single backup file
+// ---------------------------------------------------------------------------
+
+/// Metadata about one backup file for retention decisions.
+#[derive(Debug, Clone)]
+pub struct BackupFileInfo {
+    pub path: String,
+    pub size: u64,
+    pub created_ts: u64,
+    pub compressed: bool,
+    pub checksum: u64,
+}
+
+impl BackupFileInfo {
+    pub fn new(path: impl Into<String>, size: u64, created_ts: u64) -> Self {
+        Self { path: path.into(), size, created_ts, compressed: false, checksum: 0 }
+    }
+
+    pub fn with_checksum(mut self, cs: u64) -> Self { self.checksum = cs; self }
+    pub fn with_compressed(mut self, c: bool) -> Self { self.compressed = c; self }
+
+    pub fn age_seconds(&self, now: u64) -> u64 { now.saturating_sub(self.created_ts) }
+
+    pub fn filename(&self) -> &str {
+        self.path.rsplit('/').next().unwrap_or(&self.path)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BackupRetentionManager — prune / compress decisions
+// ---------------------------------------------------------------------------
+
+/// Applies a `BackupRetentionPolicy` to a set of `BackupFileInfo` entries.
+#[derive(Debug, Clone)]
+pub struct BackupRetentionManager {
+    entries: Vec<BackupFileInfo>,
+    policy: BackupRetentionPolicy,
+}
+
+impl BackupRetentionManager {
+    pub fn new(policy: BackupRetentionPolicy) -> Self {
+        Self { entries: Vec::new(), policy }
+    }
+
+    pub fn add_entry(&mut self, entry: BackupFileInfo) {
+        self.entries.push(entry);
+    }
+
+    /// Entries that should be removed — either expired or over the count limit.
+    pub fn entries_to_prune(&self, now: u64) -> Vec<&BackupFileInfo> {
+        let mut sorted: Vec<&BackupFileInfo> = self.entries.iter().collect();
+        sorted.sort_by_key(|e| std::cmp::Reverse(e.created_ts));
+
+        let mut prune = Vec::new();
+        let mut total_bytes = 0u64;
+
+        for (i, entry) in sorted.iter().enumerate() {
+            let expired = self.policy.is_expired(entry.age_seconds(now));
+            let over_count = i >= self.policy.max_backups;
+            total_bytes += entry.size;
+            let over_size = total_bytes > self.policy.max_total_bytes && i > 0;
+
+            if expired || over_count || over_size {
+                prune.push(*entry);
+            }
+        }
+        prune
+    }
+
+    /// Entries that should be compressed but aren't yet.
+    pub fn entries_to_compress(&self, now: u64) -> Vec<&BackupFileInfo> {
+        self.entries.iter()
+            .filter(|e| !e.compressed && self.policy.should_compress(e.age_seconds(now)))
+            .collect()
+    }
+
+    pub fn newest(&self) -> Option<&BackupFileInfo> {
+        self.entries.iter().max_by_key(|e| e.created_ts)
+    }
+
+    pub fn oldest(&self) -> Option<&BackupFileInfo> {
+        self.entries.iter().min_by_key(|e| e.created_ts)
+    }
+
+    /// Returns true if any entry shares the same checksum (duplicate content).
+    pub fn has_duplicate_checksum(&self, checksum: u64) -> bool {
+        self.entries.iter().filter(|e| e.checksum == checksum && checksum != 0).count() > 1
+    }
+
+    pub fn total_size(&self) -> u64 {
+        self.entries.iter().map(|e| e.size).sum()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2625,6 +2766,113 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- BackupRetentionPolicy -----------------------------------------------
+
+    #[test]
+    fn retention_policy_defaults() {
+        let p = BackupRetentionPolicy::new();
+        assert_eq!(p.max_backups, 50);
+        assert_eq!(p.max_age_days(), 30);
+    }
+
+    #[test]
+    fn retention_policy_builder() {
+        let p = BackupRetentionPolicy::new()
+            .with_max_backups(10)
+            .with_max_age_days(7)
+            .with_compress_after_days(1);
+        assert_eq!(p.max_backups, 10);
+        assert_eq!(p.max_age_days(), 7);
+        assert!(p.should_compress(2 * 86400));
+    }
+
+    #[test]
+    fn retention_should_compress() {
+        let p = BackupRetentionPolicy::new().with_compress_after_days(3);
+        assert!(!p.should_compress(86400));
+        assert!(p.should_compress(4 * 86400));
+    }
+
+    #[test]
+    fn retention_is_expired() {
+        let p = BackupRetentionPolicy::new().with_max_age_days(5);
+        assert!(!p.is_expired(3 * 86400));
+        assert!(p.is_expired(6 * 86400));
+    }
+
+    // -- BackupFileInfo -------------------------------------------------------
+
+    #[test]
+    fn backup_file_info_age() {
+        let info = BackupFileInfo::new("/tmp/bak", 1024, 1000);
+        assert_eq!(info.age_seconds(2000), 1000);
+    }
+
+    #[test]
+    fn backup_file_info_filename() {
+        let info = BackupFileInfo::new("/tmp/backups/file.bak", 512, 0);
+        assert_eq!(info.filename(), "file.bak");
+    }
+
+    // -- BackupRetentionManager -----------------------------------------------
+
+    #[test]
+    fn retention_manager_prune_by_count() {
+        let policy = BackupRetentionPolicy::new().with_max_backups(2).with_max_age_days(365);
+        let mut mgr = BackupRetentionManager::new(policy);
+        mgr.add_entry(BackupFileInfo::new("a", 100, 100));
+        mgr.add_entry(BackupFileInfo::new("b", 100, 200));
+        mgr.add_entry(BackupFileInfo::new("c", 100, 300));
+        let pruned = mgr.entries_to_prune(400);
+        assert!(!pruned.is_empty());
+    }
+
+    #[test]
+    fn retention_manager_prune_by_age() {
+        let policy = BackupRetentionPolicy::new().with_max_age_days(1);
+        let mut mgr = BackupRetentionManager::new(policy);
+        mgr.add_entry(BackupFileInfo::new("old", 100, 0));
+        let pruned = mgr.entries_to_prune(2 * 86400);
+        assert_eq!(pruned.len(), 1);
+    }
+
+    #[test]
+    fn retention_manager_compress() {
+        let policy = BackupRetentionPolicy::new().with_compress_after_days(1);
+        let mut mgr = BackupRetentionManager::new(policy);
+        mgr.add_entry(BackupFileInfo::new("f1", 100, 0).with_compressed(false));
+        mgr.add_entry(BackupFileInfo::new("f2", 100, 0).with_compressed(true));
+        let to_compress = mgr.entries_to_compress(2 * 86400);
+        assert_eq!(to_compress.len(), 1);
+        assert_eq!(to_compress[0].path, "f1");
+    }
+
+    #[test]
+    fn retention_manager_newest_oldest() {
+        let mut mgr = BackupRetentionManager::new(BackupRetentionPolicy::new());
+        mgr.add_entry(BackupFileInfo::new("a", 100, 10));
+        mgr.add_entry(BackupFileInfo::new("b", 100, 50));
+        assert_eq!(mgr.newest().unwrap().path, "b");
+        assert_eq!(mgr.oldest().unwrap().path, "a");
+    }
+
+    #[test]
+    fn retention_manager_duplicate_checksum() {
+        let mut mgr = BackupRetentionManager::new(BackupRetentionPolicy::new());
+        mgr.add_entry(BackupFileInfo::new("a", 100, 0).with_checksum(999));
+        mgr.add_entry(BackupFileInfo::new("b", 100, 1).with_checksum(999));
+        assert!(mgr.has_duplicate_checksum(999));
+        assert!(!mgr.has_duplicate_checksum(111));
+    }
+
+    #[test]
+    fn retention_manager_total_size() {
+        let mut mgr = BackupRetentionManager::new(BackupRetentionPolicy::new());
+        mgr.add_entry(BackupFileInfo::new("a", 100, 0));
+        mgr.add_entry(BackupFileInfo::new("b", 250, 0));
+        assert_eq!(mgr.total_size(), 350);
     }
 
 }

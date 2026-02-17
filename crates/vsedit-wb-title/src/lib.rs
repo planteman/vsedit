@@ -1550,6 +1550,175 @@ impl fmt::Display for TitleBreadcrumbModeConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TitleTemplateEngine
+// ---------------------------------------------------------------------------
+
+/// Format window title from a template with `${var}` substitution.
+#[derive(Debug, Clone)]
+pub struct TitleTemplateEngine {
+    variables: HashMap<String, String>,
+}
+
+impl TitleTemplateEngine {
+    pub fn new() -> Self {
+        Self {
+            variables: HashMap::new(),
+        }
+    }
+
+    pub fn register_variable(&mut self, name: &str, value: &str) {
+        self.variables.insert(name.to_string(), value.to_string());
+    }
+
+    pub fn expand_template(&self, template: &str) -> String {
+        let mut result = template.to_string();
+        for (key, val) in &self.variables {
+            result = result.replace(&format!("${{{key}}}"), val);
+        }
+        result
+    }
+
+    pub fn unresolved_variables(&self, template: &str) -> Vec<String> {
+        let mut vars = Vec::new();
+        let mut rest = template;
+        while let Some(start) = rest.find("${") {
+            if let Some(end) = rest[start + 2..].find('}') {
+                let name = &rest[start + 2..start + 2 + end];
+                if !self.variables.contains_key(name) && !vars.contains(&name.to_string()) {
+                    vars.push(name.to_string());
+                }
+                rest = &rest[start + 2 + end + 1..];
+            } else {
+                break;
+            }
+        }
+        vars
+    }
+
+    pub fn validate_template(template: &str) -> bool {
+        let mut depth = 0i32;
+        let bytes = template.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if i + 1 < bytes.len() && bytes[i] == b'$' && bytes[i + 1] == b'{' {
+                depth += 1;
+                i += 2;
+            } else if bytes[i] == b'}' && depth > 0 {
+                depth -= 1;
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+        depth == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleSegment
+// ---------------------------------------------------------------------------
+
+/// A segment of a window title with optional separator.
+#[derive(Debug, Clone)]
+pub struct TitleSegment {
+    pub text: String,
+    pub separator: String,
+    pub visible: bool,
+}
+
+impl TitleSegment {
+    pub fn new(text: &str, separator: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            separator: separator.to_string(),
+            visible: true,
+        }
+    }
+
+    pub fn join_visible(segments: &[TitleSegment]) -> String {
+        let visible: Vec<&str> = segments
+            .iter()
+            .filter(|s| s.visible && !s.text.is_empty())
+            .map(|s| s.text.as_str())
+            .collect();
+        if visible.is_empty() {
+            return String::new();
+        }
+        let sep = segments
+            .first()
+            .map(|s| s.separator.as_str())
+            .unwrap_or(" - ");
+        visible.join(sep)
+    }
+
+    pub fn toggle_segment(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn visible_count(segments: &[TitleSegment]) -> usize {
+        segments.iter().filter(|s| s.visible).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleDirtyIndicator
+// ---------------------------------------------------------------------------
+
+/// Track modified (dirty) file state for window title.
+#[derive(Debug, Clone)]
+pub struct TitleDirtyIndicator {
+    dirty_files: Vec<String>,
+    prefix: String,
+    suffix: String,
+}
+
+impl TitleDirtyIndicator {
+    pub fn new() -> Self {
+        Self {
+            dirty_files: Vec::new(),
+            prefix: "● ".to_string(),
+            suffix: String::new(),
+        }
+    }
+
+    pub fn with_prefix(mut self, prefix: &str) -> Self {
+        self.prefix = prefix.to_string();
+        self
+    }
+
+    pub fn with_suffix(mut self, suffix: &str) -> Self {
+        self.suffix = suffix.to_string();
+        self
+    }
+
+    pub fn set_dirty(&mut self, file: &str) {
+        if !self.dirty_files.contains(&file.to_string()) {
+            self.dirty_files.push(file.to_string());
+        }
+    }
+
+    pub fn clear_dirty(&mut self, file: &str) {
+        self.dirty_files.retain(|f| f != file);
+    }
+
+    pub fn is_dirty(&self, file: &str) -> bool {
+        self.dirty_files.iter().any(|f| f == file)
+    }
+
+    pub fn dirty_count(&self) -> usize {
+        self.dirty_files.len()
+    }
+
+    pub fn format_indicator(&self, title: &str) -> String {
+        if self.dirty_files.is_empty() {
+            title.to_string()
+        } else {
+            format!("{}{}{}", self.prefix, title, self.suffix)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2609,6 +2778,109 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- TitleTemplateEngine -----------------------------------------------
+
+    #[test]
+    fn template_engine_expand() {
+        let mut eng = TitleTemplateEngine::new();
+        eng.register_variable("activeFile", "main.rs");
+        eng.register_variable("rootFolder", "myproject");
+        assert_eq!(
+            eng.expand_template("${activeFile} - ${rootFolder}"),
+            "main.rs - myproject"
+        );
+    }
+
+    #[test]
+    fn template_engine_no_vars() {
+        let eng = TitleTemplateEngine::new();
+        assert_eq!(eng.expand_template("Static Title"), "Static Title");
+    }
+
+    #[test]
+    fn template_engine_unresolved() {
+        let eng = TitleTemplateEngine::new();
+        let unresolved = eng.unresolved_variables("${activeFile} - ${dirty}");
+        assert_eq!(unresolved, vec!["activeFile", "dirty"]);
+    }
+
+    #[test]
+    fn template_engine_validate_ok() {
+        assert!(TitleTemplateEngine::validate_template("${file} - ${folder}"));
+    }
+
+    #[test]
+    fn template_engine_validate_mismatch() {
+        assert!(!TitleTemplateEngine::validate_template("${file - ${folder}"));
+    }
+
+    // -- TitleSegment ------------------------------------------------------
+
+    #[test]
+    fn segment_join_visible() {
+        let segments = vec![
+            TitleSegment::new("main.rs", " - "),
+            TitleSegment::new("myproject", " - "),
+            TitleSegment::new("VSEdit", " - "),
+        ];
+        assert_eq!(TitleSegment::join_visible(&segments), "main.rs - myproject - VSEdit");
+    }
+
+    #[test]
+    fn segment_toggle() {
+        let mut seg = TitleSegment::new("text", " | ");
+        assert!(seg.visible);
+        seg.toggle_segment();
+        assert!(!seg.visible);
+    }
+
+    #[test]
+    fn segment_visible_count() {
+        let mut segments = vec![
+            TitleSegment::new("a", " - "),
+            TitleSegment::new("b", " - "),
+        ];
+        assert_eq!(TitleSegment::visible_count(&segments), 2);
+        segments[0].visible = false;
+        assert_eq!(TitleSegment::visible_count(&segments), 1);
+    }
+
+    #[test]
+    fn segment_join_hidden() {
+        let segments = vec![
+            TitleSegment { text: "a".into(), separator: " - ".into(), visible: false },
+            TitleSegment::new("b", " - "),
+        ];
+        assert_eq!(TitleSegment::join_visible(&segments), "b");
+    }
+
+    // -- TitleDirtyIndicator -----------------------------------------------
+
+    #[test]
+    fn dirty_indicator_basic() {
+        let mut ind = TitleDirtyIndicator::new();
+        ind.set_dirty("main.rs");
+        assert!(ind.is_dirty("main.rs"));
+        assert_eq!(ind.dirty_count(), 1);
+        assert_eq!(ind.format_indicator("main.rs"), "● main.rs");
+    }
+
+    #[test]
+    fn dirty_indicator_clear() {
+        let mut ind = TitleDirtyIndicator::new();
+        ind.set_dirty("f.rs");
+        ind.clear_dirty("f.rs");
+        assert!(!ind.is_dirty("f.rs"));
+        assert_eq!(ind.format_indicator("f.rs"), "f.rs");
+    }
+
+    #[test]
+    fn dirty_indicator_custom_prefix() {
+        let mut ind = TitleDirtyIndicator::new().with_prefix("[M] ").with_suffix(" *");
+        ind.set_dirty("x.rs");
+        assert_eq!(ind.format_indicator("x.rs"), "[M] x.rs *");
     }
 
 }

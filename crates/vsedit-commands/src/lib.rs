@@ -1599,6 +1599,195 @@ impl fmt::Display for CommandPaletteRankingConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandUndoRedoStack — simple undo/redo with generic string IDs
+// ---------------------------------------------------------------------------
+
+/// A stack-based undo/redo tracker for command IDs.
+#[derive(Debug, Clone)]
+pub struct CommandUndoRedoStack {
+    undo_stack: Vec<String>,
+    redo_stack: Vec<String>,
+    capacity: usize,
+}
+
+impl CommandUndoRedoStack {
+    pub fn new(capacity: usize) -> Self {
+        Self { undo_stack: Vec::new(), redo_stack: Vec::new(), capacity }
+    }
+
+    /// Push a new command, clearing the redo stack.
+    pub fn push(&mut self, command_id: impl Into<String>) {
+        self.redo_stack.clear();
+        if self.undo_stack.len() >= self.capacity {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(command_id.into());
+    }
+
+    /// Undo the last command, moving it to the redo stack.
+    pub fn undo(&mut self) -> Option<String> {
+        let cmd = self.undo_stack.pop()?;
+        self.redo_stack.push(cmd.clone());
+        Some(cmd)
+    }
+
+    /// Redo the last undone command.
+    pub fn redo(&mut self) -> Option<String> {
+        let cmd = self.redo_stack.pop()?;
+        self.undo_stack.push(cmd.clone());
+        Some(cmd)
+    }
+
+    pub fn can_undo(&self) -> bool { !self.undo_stack.is_empty() }
+    pub fn can_redo(&self) -> bool { !self.redo_stack.is_empty() }
+
+    pub fn clear(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+
+    pub fn undo_len(&self) -> usize { self.undo_stack.len() }
+    pub fn redo_len(&self) -> usize { self.redo_stack.len() }
+}
+
+impl fmt::Display for CommandUndoRedoStack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UndoRedo(undo={}, redo={})", self.undo_stack.len(), self.redo_stack.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandSequence — ordered chain of command IDs with rollback tracking
+// ---------------------------------------------------------------------------
+
+/// An ordered sequence of command IDs that should execute in order.
+/// Tracks which commands have completed for rollback purposes.
+#[derive(Debug, Clone)]
+pub struct CommandSequence {
+    steps: Vec<String>,
+    completed: usize,
+    failed: bool,
+}
+
+impl CommandSequence {
+    pub fn new() -> Self {
+        Self { steps: Vec::new(), completed: 0, failed: false }
+    }
+
+    pub fn add_step(&mut self, command_id: impl Into<String>) {
+        self.steps.push(command_id.into());
+    }
+
+    /// Mark the next step as completed. Returns the completed command ID.
+    pub fn mark_completed(&mut self) -> Option<&str> {
+        if self.completed < self.steps.len() && !self.failed {
+            let idx = self.completed;
+            self.completed += 1;
+            Some(&self.steps[idx])
+        } else {
+            None
+        }
+    }
+
+    /// Mark the sequence as failed at the current step.
+    pub fn mark_failed(&mut self) {
+        self.failed = true;
+    }
+
+    /// IDs of completed steps (for rollback).
+    pub fn completed_steps(&self) -> &[String] {
+        &self.steps[..self.completed]
+    }
+
+    /// The remaining steps that haven't executed.
+    pub fn remaining_steps(&self) -> &[String] {
+        &self.steps[self.completed..]
+    }
+
+    pub fn is_done(&self) -> bool { self.completed >= self.steps.len() }
+    pub fn has_failed(&self) -> bool { self.failed }
+    pub fn total_steps(&self) -> usize { self.steps.len() }
+    pub fn progress_fraction(&self) -> f64 {
+        if self.steps.is_empty() { 1.0 } else { self.completed as f64 / self.steps.len() as f64 }
+    }
+}
+
+impl Default for CommandSequence {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for CommandSequence {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Sequence({}/{}, failed={})", self.completed, self.steps.len(), self.failed)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandCooldownManager — per-command cooldown with different intervals
+// ---------------------------------------------------------------------------
+
+/// Manages per-command cooldowns where each command can have its own interval.
+#[derive(Debug, Clone)]
+pub struct CommandCooldownManager {
+    cooldowns: HashMap<String, u64>,
+    last_used: HashMap<String, u64>,
+}
+
+impl CommandCooldownManager {
+    pub fn new() -> Self {
+        Self { cooldowns: HashMap::new(), last_used: HashMap::new() }
+    }
+
+    /// Register a cooldown interval (in milliseconds) for a command.
+    pub fn set_cooldown(&mut self, command_id: impl Into<String>, cooldown_ms: u64) {
+        self.cooldowns.insert(command_id.into(), cooldown_ms);
+    }
+
+    /// Remove the cooldown for a command.
+    pub fn remove_cooldown(&mut self, command_id: &str) {
+        self.cooldowns.remove(command_id);
+        self.last_used.remove(command_id);
+    }
+
+    /// Try to use a command. Returns `true` if allowed, `false` if on cooldown.
+    pub fn try_use(&mut self, command_id: &str, now_ms: u64) -> bool {
+        let cooldown = self.cooldowns.get(command_id).copied().unwrap_or(0);
+        if let Some(&last) = self.last_used.get(command_id) {
+            if now_ms.saturating_sub(last) < cooldown {
+                return false;
+            }
+        }
+        self.last_used.insert(command_id.to_string(), now_ms);
+        true
+    }
+
+    /// Time remaining on cooldown (0 if ready).
+    pub fn remaining_ms(&self, command_id: &str, now_ms: u64) -> u64 {
+        let cooldown = self.cooldowns.get(command_id).copied().unwrap_or(0);
+        match self.last_used.get(command_id) {
+            Some(&last) => {
+                let elapsed = now_ms.saturating_sub(last);
+                if elapsed >= cooldown { 0 } else { cooldown - elapsed }
+            }
+            None => 0,
+        }
+    }
+
+    /// List all registered command IDs with cooldowns.
+    pub fn registered_commands(&self) -> Vec<&str> {
+        self.cooldowns.keys().map(|s| s.as_str()).collect()
+    }
+
+    pub fn clear_all(&mut self) {
+        self.last_used.clear();
+    }
+}
+
+impl Default for CommandCooldownManager {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2626,6 +2815,123 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- CommandUndoRedoStack ------------------------------------------------
+
+    #[test]
+    fn undo_redo_push_and_undo() {
+        let mut s = CommandUndoRedoStack::new(10);
+        s.push("cmd1");
+        s.push("cmd2");
+        assert!(s.can_undo());
+        assert_eq!(s.undo(), Some("cmd2".into()));
+        assert_eq!(s.undo(), Some("cmd1".into()));
+        assert!(!s.can_undo());
+    }
+
+    #[test]
+    fn undo_redo_redo_works() {
+        let mut s = CommandUndoRedoStack::new(10);
+        s.push("a");
+        s.undo();
+        assert!(s.can_redo());
+        assert_eq!(s.redo(), Some("a".into()));
+        assert!(!s.can_redo());
+    }
+
+    #[test]
+    fn undo_redo_push_clears_redo() {
+        let mut s = CommandUndoRedoStack::new(10);
+        s.push("a");
+        s.undo();
+        s.push("b");
+        assert!(!s.can_redo());
+    }
+
+    #[test]
+    fn undo_redo_capacity() {
+        let mut s = CommandUndoRedoStack::new(2);
+        s.push("a");
+        s.push("b");
+        s.push("c");
+        assert_eq!(s.undo_len(), 2);
+    }
+
+    // -- CommandSequence -----------------------------------------------------
+
+    #[test]
+    fn sequence_basic_flow() {
+        let mut seq = CommandSequence::new();
+        seq.add_step("step1");
+        seq.add_step("step2");
+        assert!(!seq.is_done());
+        assert_eq!(seq.mark_completed(), Some("step1"));
+        assert_eq!(seq.mark_completed(), Some("step2"));
+        assert!(seq.is_done());
+    }
+
+    #[test]
+    fn sequence_failure_stops() {
+        let mut seq = CommandSequence::new();
+        seq.add_step("a");
+        seq.add_step("b");
+        seq.mark_completed();
+        seq.mark_failed();
+        assert!(seq.has_failed());
+        assert_eq!(seq.mark_completed(), None);
+        assert_eq!(seq.completed_steps(), &["a".to_string()]);
+    }
+
+    #[test]
+    fn sequence_progress() {
+        let mut seq = CommandSequence::new();
+        seq.add_step("x");
+        seq.add_step("y");
+        seq.mark_completed();
+        assert!((seq.progress_fraction() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn sequence_empty_is_done() {
+        let seq = CommandSequence::new();
+        assert!(seq.is_done());
+        assert!((seq.progress_fraction() - 1.0).abs() < 0.01);
+    }
+
+    // -- CommandCooldownManager -----------------------------------------------
+
+    #[test]
+    fn cooldown_allows_first_use() {
+        let mut mgr = CommandCooldownManager::new();
+        mgr.set_cooldown("save", 1000);
+        assert!(mgr.try_use("save", 100));
+    }
+
+    #[test]
+    fn cooldown_blocks_rapid_use() {
+        let mut mgr = CommandCooldownManager::new();
+        mgr.set_cooldown("save", 1000);
+        assert!(mgr.try_use("save", 100));
+        assert!(!mgr.try_use("save", 500));
+        assert!(mgr.try_use("save", 1200));
+    }
+
+    #[test]
+    fn cooldown_remaining() {
+        let mut mgr = CommandCooldownManager::new();
+        mgr.set_cooldown("x", 500);
+        mgr.try_use("x", 100);
+        assert_eq!(mgr.remaining_ms("x", 300), 300);
+        assert_eq!(mgr.remaining_ms("x", 700), 0);
+    }
+
+    #[test]
+    fn cooldown_remove() {
+        let mut mgr = CommandCooldownManager::new();
+        mgr.set_cooldown("a", 1000);
+        mgr.remove_cooldown("a");
+        assert!(mgr.registered_commands().is_empty());
     }
 
 }

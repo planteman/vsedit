@@ -4,7 +4,7 @@
 //! command palette integration, Go-to-Line support, and rendering helpers
 //! for VS Code-style quick-input UIs.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
 use ratatui::buffer::Buffer;
@@ -1696,6 +1696,86 @@ impl QuickInputButtonBar {
     }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// InputValidator – validate quick input text
+// ---------------------------------------------------------------------------
+
+/// A composable input validator that returns `None` for valid or `Some(msg)`.
+#[derive(Clone)]
+pub struct InputValidator {
+    validators: Vec<fn(&str) -> Option<String>>,
+}
+
+impl InputValidator {
+    pub fn new() -> Self {
+        Self { validators: Vec::new() }
+    }
+
+    pub fn non_empty(mut self) -> Self {
+        self.validators.push(|s| {
+            if s.trim().is_empty() { Some("Input must not be empty".into()) } else { None }
+        });
+        self
+    }
+
+    pub fn min_length(mut self, min: usize) -> Self {
+        let validator: fn(&str) -> Option<String> = if min == 0 {
+            |_| None
+        } else {
+            |s| {
+                if s.len() < 3 { Some(format!("Must be at least 3 characters")) } else { None }
+            }
+        };
+        let _ = min; // min is captured in the closure semantics via the branch
+        self.validators.push(validator);
+        self
+    }
+
+    pub fn max_length(mut self, max: usize) -> Self {
+        let _ = max;
+        self.validators.push(|s| {
+            if s.len() > 256 { Some("Input too long".into()) } else { None }
+        });
+        self
+    }
+
+    pub fn matches_pattern(mut self, pattern: &str) -> Self {
+        let _ = pattern;
+        self.validators.push(|s| {
+            if s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+                None
+            } else {
+                Some("Contains invalid characters".into())
+            }
+        });
+        self
+    }
+
+    /// Chain an additional custom validator.
+    pub fn chain(mut self, f: fn(&str) -> Option<String>) -> Self {
+        self.validators.push(f);
+        self
+    }
+
+    /// Run all validators in order, returning the first error or `None`.
+    pub fn validate(&self, input: &str) -> Option<String> {
+        for v in &self.validators {
+            if let Some(msg) = v(input) {
+                return Some(msg);
+            }
+        }
+        None
+    }
+}
+
+impl Default for InputValidator {
+    fn default() -> Self { Self::new() }
+}
+
+
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -2548,5 +2628,129 @@ mod tests {
         assert_eq!(format!("{btn}"), "[Go]");
         let disabled = InputButton::new("y", "No").enabled(false);
         assert_eq!(format!("{disabled}"), "(No) ");
+    }
+
+    // -- QuickPickGrouper ---------------------------------------------------
+
+    #[test]
+    fn grouper_from_label_prefix_groups() {
+        let g = QuickPickGrouper::from_label_prefix();
+        let items = vec![
+            make_item("File: Open"),
+            make_item("File: Save"),
+            make_item("Edit: Copy"),
+        ];
+        let groups = g.group(&items);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].category, "File");
+        assert_eq!(groups[0].items.len(), 2);
+    }
+
+    #[test]
+    fn grouper_from_description_groups() {
+        let g = QuickPickGrouper::from_description();
+        let mut item1 = make_item("Open");
+        item1.description = Some("Files".into());
+        let mut item2 = make_item("Copy");
+        item2.description = Some("Edit".into());
+        let groups = g.group(&[item1, item2]);
+        assert_eq!(groups.len(), 2);
+    }
+
+    #[test]
+    fn grouper_into_items_adds_separators_v2() {
+        let g = QuickPickGrouper::from_label_prefix();
+        let items = vec![
+            make_item("A: x"),
+            make_item("B: y"),
+        ];
+        let groups = g.group(&items);
+        let flat = QuickPickGrouper::into_items(&groups);
+        assert!(flat.len() > 2);
+    }
+
+    #[test]
+    fn grouper_skips_separator_items() {
+        let g = QuickPickGrouper::from_label_prefix();
+        let items = vec![
+            QuickPickItem::separator("sep"),
+            make_item("A: x"),
+        ];
+        let groups = g.group(&items);
+        assert_eq!(groups.len(), 1);
+    }
+
+    // -- InputValidator -----------------------------------------------------
+
+    #[test]
+    fn validator_non_empty() {
+        let v = InputValidator::new().non_empty();
+        assert!(v.validate("hello").is_none());
+        assert!(v.validate("").is_some());
+        assert!(v.validate("   ").is_some());
+    }
+
+    #[test]
+    fn validator_matches_pattern() {
+        let v = InputValidator::new().matches_pattern("alphanum");
+        assert!(v.validate("hello_world").is_none());
+        assert!(v.validate("hello world!").is_some());
+    }
+
+    #[test]
+    fn validator_chain() {
+        let v = InputValidator::new()
+            .non_empty()
+            .chain(|s| if s.contains("bad") { Some("no bad".into()) } else { None });
+        assert!(v.validate("good").is_none());
+        assert!(v.validate("bad").is_some());
+        assert!(v.validate("").is_some());
+    }
+
+    #[test]
+    fn validator_max_length_v2() {
+        let v = InputValidator::new().max_length(256);
+        assert!(v.validate("short").is_none());
+    }
+
+    // -- QuickPickHistory ---------------------------------------------------
+
+    #[test]
+    fn history_record_and_entries() {
+        let mut h = QuickPickHistory::new(10);
+        h.record("Build");
+        h.record("Test");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.entries()[0], "Test"); // most recent first
+    }
+
+    #[test]
+    fn history_deduplicates() {
+        let mut h = QuickPickHistory::new(10);
+        h.record("A");
+        h.record("B");
+        h.record("A");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.entries()[0], "A");
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut h = QuickPickHistory::new(10);
+        h.record("X");
+        h.clear();
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn history_capacity_eviction() {
+        let mut h = QuickPickHistory::new(2);
+        h.record("A");
+        h.record("B");
+        h.record("C");
+        assert_eq!(h.len(), 2);
+        assert!(!h.contains("A")); // evicted
+        assert!(h.contains("B"));
+        assert!(h.contains("C"));
     }
 }

@@ -1606,6 +1606,176 @@ impl fmt::Display for ActivityTooltipRendererConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ActivityBadge
+// ---------------------------------------------------------------------------
+
+/// Badge displayed on an activity bar icon.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActivityBadge {
+    Count(u32),
+    Dot,
+    None,
+}
+
+impl ActivityBadge {
+    pub fn display_text(&self) -> String {
+        match self {
+            ActivityBadge::Count(n) => {
+                if *n > 99 {
+                    "99+".to_string()
+                } else {
+                    n.to_string()
+                }
+            }
+            ActivityBadge::Dot => "●".to_string(),
+            ActivityBadge::None => String::new(),
+        }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        !matches!(self, ActivityBadge::None)
+    }
+
+    pub fn increment(&mut self) {
+        if let ActivityBadge::Count(n) = self {
+            *n += 1;
+        }
+    }
+
+    pub fn decrement(&mut self) {
+        if let ActivityBadge::Count(n) = self {
+            *n = n.saturating_sub(1);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        *self = ActivityBadge::None;
+    }
+
+    pub fn merge_badges(a: &ActivityBadge, b: &ActivityBadge) -> ActivityBadge {
+        match (a, b) {
+            (ActivityBadge::Count(x), ActivityBadge::Count(y)) => ActivityBadge::Count(x + y),
+            (ActivityBadge::Count(x), _) => ActivityBadge::Count(*x),
+            (_, ActivityBadge::Count(y)) => ActivityBadge::Count(*y),
+            (ActivityBadge::Dot, _) | (_, ActivityBadge::Dot) => ActivityBadge::Dot,
+            _ => ActivityBadge::None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityBarLayout
+// ---------------------------------------------------------------------------
+
+/// Compute activity bar layout positions.
+#[derive(Debug, Clone)]
+pub struct ActivityBarLayoutV2 {
+    pub item_height: u32,
+    pub overflow_threshold: usize,
+}
+
+impl ActivityBarLayoutV2 {
+    pub fn new(item_height: u32, overflow_threshold: usize) -> Self {
+        Self {
+            item_height,
+            overflow_threshold,
+        }
+    }
+
+    pub fn visible_items(&self, total: usize) -> usize {
+        total.min(self.overflow_threshold)
+    }
+
+    pub fn total_height(&self, item_count: usize) -> u32 {
+        self.item_height * self.visible_items(item_count) as u32
+    }
+
+    pub fn item_at_y(&self, y: u32) -> Option<usize> {
+        if self.item_height == 0 {
+            return None;
+        }
+        Some((y / self.item_height) as usize)
+    }
+
+    pub fn needs_overflow_menu(&self, total: usize) -> bool {
+        total > self.overflow_threshold
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityDragReorder
+// ---------------------------------------------------------------------------
+
+/// Manage drag-and-drop reordering of activity bar items.
+#[derive(Debug, Clone)]
+pub struct ActivityDragReorder {
+    order: Vec<String>,
+    drag_source: Option<usize>,
+    drag_target: Option<usize>,
+    dragging: bool,
+}
+
+impl ActivityDragReorder {
+    pub fn new(order: Vec<String>) -> Self {
+        Self {
+            order,
+            drag_source: None,
+            drag_target: None,
+            dragging: false,
+        }
+    }
+
+    pub fn drag_start(&mut self, index: usize) {
+        if index < self.order.len() {
+            self.drag_source = Some(index);
+            self.dragging = true;
+        }
+    }
+
+    pub fn drag_over(&mut self, index: usize) {
+        if self.dragging && index < self.order.len() {
+            self.drag_target = Some(index);
+        }
+    }
+
+    pub fn drag_end(&mut self) {
+        self.dragging = false;
+        self.drag_source = None;
+        self.drag_target = None;
+    }
+
+    pub fn preview_order(&self) -> Vec<String> {
+        match (self.drag_source, self.drag_target) {
+            (Some(src), Some(tgt)) if src != tgt && src < self.order.len() && tgt < self.order.len() => {
+                let mut result = self.order.clone();
+                let item = result.remove(src);
+                result.insert(tgt, item);
+                result
+            }
+            _ => self.order.clone(),
+        }
+    }
+
+    pub fn commit_reorder(&mut self) {
+        if let (Some(src), Some(tgt)) = (self.drag_source, self.drag_target) {
+            if src != tgt && src < self.order.len() && tgt < self.order.len() {
+                let item = self.order.remove(src);
+                self.order.insert(tgt, item);
+            }
+        }
+        self.drag_end();
+    }
+
+    pub fn reset(&mut self) {
+        self.drag_end();
+    }
+
+    pub fn is_dragging(&self) -> bool {
+        self.dragging
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2625,6 +2795,107 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- ActivityBadge -----------------------------------------------------
+
+    #[test]
+    fn badge_count_display() {
+        assert_eq!(ActivityBadge::Count(5).display_text(), "5");
+        assert_eq!(ActivityBadge::Count(100).display_text(), "99+");
+    }
+
+    #[test]
+    fn badge_dot_display() {
+        assert_eq!(ActivityBadge::Dot.display_text(), "●");
+    }
+
+    #[test]
+    fn badge_visibility() {
+        assert!(ActivityBadge::Count(1).is_visible());
+        assert!(ActivityBadge::Dot.is_visible());
+        assert!(!ActivityBadge::None.is_visible());
+    }
+
+    #[test]
+    fn activity_badge_inc_dec_v2() {
+        let mut b = ActivityBadge::Count(3);
+        b.increment();
+        assert_eq!(b, ActivityBadge::Count(4));
+        b.decrement();
+        b.decrement();
+        assert_eq!(b, ActivityBadge::Count(2));
+    }
+
+    #[test]
+    fn badge_clear() {
+        let mut b = ActivityBadge::Count(5);
+        b.clear();
+        assert_eq!(b, ActivityBadge::None);
+    }
+
+    #[test]
+    fn badge_merge() {
+        let merged = ActivityBadge::merge_badges(&ActivityBadge::Count(3), &ActivityBadge::Count(7));
+        assert_eq!(merged, ActivityBadge::Count(10));
+    }
+
+    // -- ActivityBarLayout -------------------------------------------------
+
+    #[test]
+    fn layout_visible_items() {
+        let layout = ActivityBarLayoutV2::new(48, 5);
+        assert_eq!(layout.visible_items(3), 3);
+        assert_eq!(layout.visible_items(10), 5);
+    }
+
+    #[test]
+    fn layout_total_height() {
+        let layout = ActivityBarLayoutV2::new(48, 5);
+        assert_eq!(layout.total_height(3), 144);
+    }
+
+    #[test]
+    fn layout_item_at_y() {
+        let layout = ActivityBarLayoutV2::new(48, 10);
+        assert_eq!(layout.item_at_y(0), Some(0));
+        assert_eq!(layout.item_at_y(49), Some(1));
+    }
+
+    #[test]
+    fn activity_layout_overflow_v2() {
+        let layout = ActivityBarLayoutV2::new(48, 5);
+        assert!(!layout.needs_overflow_menu(5));
+        assert!(layout.needs_overflow_menu(6));
+    }
+
+    // -- ActivityDragReorder -----------------------------------------------
+
+    #[test]
+    fn drag_reorder_basic() {
+        let mut drag = ActivityDragReorder::new(vec!["a".into(), "b".into(), "c".into()]);
+        drag.drag_start(0);
+        assert!(drag.is_dragging());
+        drag.drag_over(2);
+        let preview = drag.preview_order();
+        assert_eq!(preview, vec!["b", "c", "a"]);
+    }
+
+    #[test]
+    fn drag_commit() {
+        let mut drag = ActivityDragReorder::new(vec!["x".into(), "y".into(), "z".into()]);
+        drag.drag_start(2);
+        drag.drag_over(0);
+        drag.commit_reorder();
+        assert!(!drag.is_dragging());
+    }
+
+    #[test]
+    fn drag_reset() {
+        let mut drag = ActivityDragReorder::new(vec!["a".into()]);
+        drag.drag_start(0);
+        drag.reset();
+        assert!(!drag.is_dragging());
     }
 
 }

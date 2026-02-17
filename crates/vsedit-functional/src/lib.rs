@@ -1662,6 +1662,156 @@ impl fmt::Display for PipelineChainConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ValuePipeline
+// ---------------------------------------------------------------------------
+
+/// A chainable transformation pipeline over a single value.
+pub struct ValuePipeline<T> {
+    value: Option<T>,
+    steps: usize,
+}
+
+impl<T: 'static> ValuePipeline<T> {
+    pub fn new(value: T) -> Self {
+        Self { value: Some(value), steps: 0 }
+    }
+
+    pub fn map<U: 'static>(self, f: impl FnOnce(T) -> U) -> ValuePipeline<U> {
+        ValuePipeline {
+            value: self.value.map(f),
+            steps: self.steps + 1,
+        }
+    }
+
+    pub fn then<U: 'static>(self, f: impl FnOnce(T) -> Option<U>) -> ValuePipeline<U> {
+        ValuePipeline {
+            value: self.value.and_then(f),
+            steps: self.steps + 1,
+        }
+    }
+
+    pub fn inspect(self, f: impl FnOnce(&T)) -> Self {
+        if let Some(ref v) = self.value {
+            f(v);
+        }
+        self
+    }
+
+    pub fn execute(self) -> Option<T> {
+        self.value
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.steps
+    }
+}
+
+/// Pipeline for filtering a Vec.
+pub struct FilterPipeline<T> {
+    items: Vec<T>,
+}
+
+impl<T: Clone + 'static> FilterPipeline<T> {
+    pub fn new(items: Vec<T>) -> Self {
+        Self { items }
+    }
+
+    pub fn filter(mut self, pred: impl Fn(&T) -> bool) -> Self {
+        self.items.retain(pred);
+        self
+    }
+
+    pub fn map<U: Clone + 'static>(self, f: impl Fn(T) -> U) -> FilterPipeline<U> {
+        FilterPipeline {
+            items: self.items.into_iter().map(f).collect(),
+        }
+    }
+
+    pub fn execute(self) -> Vec<T> {
+        self.items
+    }
+
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Memoizer
+// ---------------------------------------------------------------------------
+
+/// Caches function results by key.
+pub struct Memoizer<K: std::hash::Hash + Eq, V: Clone> {
+    cache: HashMap<K, V>,
+    hits: u64,
+    misses: u64,
+}
+
+impl<K: std::hash::Hash + Eq, V: Clone> Memoizer<K, V> {
+    pub fn new() -> Self {
+        Self { cache: HashMap::new(), hits: 0, misses: 0 }
+    }
+
+    pub fn get_or_compute(&mut self, key: K, compute: impl FnOnce() -> V) -> V
+    where
+        K: Clone,
+    {
+        if let Some(v) = self.cache.get(&key) {
+            self.hits += 1;
+            return v.clone();
+        }
+        self.misses += 1;
+        let v = compute();
+        self.cache.insert(key, v.clone());
+        v
+    }
+
+    pub fn invalidate(&mut self, key: &K) -> bool {
+        self.cache.remove(key).is_some()
+    }
+
+    pub fn cache_size(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+
+    pub fn clear(&mut self) {
+        self.cache.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compose
+// ---------------------------------------------------------------------------
+
+/// Compose two functions left-to-right: compose_fns(f, g)(x) == g(f(x)).
+pub fn compose_fns<A, B, C>(f: impl Fn(A) -> B, g: impl Fn(B) -> C) -> impl Fn(A) -> C {
+    move |a| g(f(a))
+}
+
+/// Bind the first argument of a two-argument function.
+pub fn partial_apply_first<A: Clone + 'static, B, R>(
+    f: impl Fn(A, B) -> R + 'static,
+    a: A,
+) -> impl Fn(B) -> R {
+    move |b| f(a.clone(), b)
+}
+
+/// Bind the second argument of a two-argument function.
+pub fn partial_apply_second<A, B: Clone + 'static, R>(
+    f: impl Fn(A, B) -> R + 'static,
+    b: B,
+) -> impl Fn(A) -> R {
+    move |a| f(a, b.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2598,6 +2748,118 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- ValuePipeline tests --
+
+    #[test]
+    fn value_pipeline_map_and_execute() {
+        let result = ValuePipeline::new(5).map(|x| x * 2).map(|x| x + 1).execute();
+        assert_eq!(result, Some(11));
+    }
+
+    #[test]
+    fn value_pipeline_then_none() {
+        let result = ValuePipeline::new(5)
+            .then(|x| if x > 10 { Some(x) } else { None })
+            .execute();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn value_pipeline_inspect() {
+        let mut seen = 0u32;
+        let result = ValuePipeline::new(42).inspect(|v| seen = *v).execute();
+        assert_eq!(result, Some(42));
+        assert_eq!(seen, 42);
+    }
+
+    #[test]
+    fn value_pipeline_step_count() {
+        let p = ValuePipeline::new(1).map(|x| x + 1).map(|x| x + 1);
+        assert_eq!(p.step_count(), 2);
+    }
+
+    #[test]
+    fn filter_pipeline_basic() {
+        let result = FilterPipeline::new(vec![1, 2, 3, 4, 5])
+            .filter(|x| x % 2 == 0)
+            .execute();
+        assert_eq!(result, vec![2, 4]);
+    }
+
+    #[test]
+    fn filter_pipeline_map() {
+        let result = FilterPipeline::new(vec![1, 2, 3])
+            .map(|x| x * 10)
+            .execute();
+        assert_eq!(result, vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn filter_pipeline_count() {
+        let p = FilterPipeline::new(vec![1, 2, 3]).filter(|x| *x > 1);
+        assert_eq!(p.count(), 2);
+    }
+
+    // -- Memoizer tests --
+
+    #[test]
+    fn memoizer_caches_value() {
+        let mut m: Memoizer<String, i32> = Memoizer::new();
+        let v1 = m.get_or_compute("a".into(), || 42);
+        let v2 = m.get_or_compute("a".into(), || 99);
+        assert_eq!(v1, 42);
+        assert_eq!(v2, 42);
+    }
+
+    #[test]
+    fn memoizer_hit_rate() {
+        let mut m: Memoizer<String, i32> = Memoizer::new();
+        m.get_or_compute("a".into(), || 1);
+        m.get_or_compute("a".into(), || 1);
+        assert!((m.hit_rate() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn memoizer_invalidate() {
+        let mut m: Memoizer<String, i32> = Memoizer::new();
+        m.get_or_compute("a".into(), || 1);
+        assert!(m.invalidate(&"a".into()));
+        assert_eq!(m.cache_size(), 0);
+    }
+
+    #[test]
+    fn memoizer_clear() {
+        let mut m: Memoizer<String, i32> = Memoizer::new();
+        m.get_or_compute("a".into(), || 1);
+        m.clear();
+        assert_eq!(m.cache_size(), 0);
+        assert!((m.hit_rate() - 0.0).abs() < 0.01);
+    }
+
+    // -- Compose tests --
+
+    #[test]
+    fn compose_fns_two_functions() {
+        let add1 = |x: i32| x + 1;
+        let double = |x: i32| x * 2;
+        let f = compose_fns(add1, double);
+        assert_eq!(f(3), 8);
+    }
+
+    #[test]
+    fn partial_apply_first_arg() {
+        let add = |a: i32, b: i32| a + b;
+        let add5 = partial_apply_first(add, 5);
+        assert_eq!(add5(3), 8);
+    }
+
+    #[test]
+    fn partial_apply_second_arg() {
+        let sub = |a: i32, b: i32| a - b;
+        let sub3 = partial_apply_second(sub, 3);
+        assert_eq!(sub3(10), 7);
     }
 
 }

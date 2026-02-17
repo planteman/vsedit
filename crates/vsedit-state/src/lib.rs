@@ -704,19 +704,19 @@ impl fmt::Display for GlobalState {
 
 /// A migration step that transforms state from one version to the next.
 #[derive(Debug, Clone)]
-pub struct StateMigration {
+pub struct StateMigrationEntry {
     pub from_version: u32,
     pub to_version: u32,
     pub description: String,
 }
 
-impl StateMigration {
+impl StateMigrationEntry {
     pub fn new(from: u32, to: u32, description: impl Into<String>) -> Self {
         Self { from_version: from, to_version: to, description: description.into() }
     }
 }
 
-impl fmt::Display for StateMigration {
+impl fmt::Display for StateMigrationEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Migration v{} -> v{}: {}", self.from_version, self.to_version, self.description)
     }
@@ -725,7 +725,7 @@ impl fmt::Display for StateMigration {
 /// Result of applying a migration chain.
 #[derive(Debug, Clone)]
 pub struct MigrationResult {
-    pub applied: Vec<StateMigration>,
+    pub applied: Vec<StateMigrationEntry>,
     pub final_version: u32,
     pub keys_renamed: usize,
     pub keys_removed: usize,
@@ -759,7 +759,7 @@ pub fn state_migration(
     state.version = target_version;
 
     MigrationResult {
-        applied: vec![StateMigration::new(from_version, target_version, "state migration")],
+        applied: vec![StateMigrationEntry::new(from_version, target_version, "state migration")],
         final_version: target_version,
         keys_renamed,
         keys_removed,
@@ -1577,6 +1577,161 @@ impl fmt::Display for StateSnapshotDiffConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StateMigration – migrate state between versions
+// ---------------------------------------------------------------------------
+
+/// A migration from one state version to another.
+pub struct StateMigration {
+    migrations: Vec<(u32, Box<dyn Fn(&mut HashMap<String, String>)>)>,
+}
+
+impl StateMigration {
+    pub fn new() -> Self {
+        Self { migrations: Vec::new() }
+    }
+
+    /// Register a migration for a specific version.
+    pub fn register_migration<F: Fn(&mut HashMap<String, String>) + 'static>(
+        &mut self,
+        version: u32,
+        migrator: F,
+    ) {
+        self.migrations.push((version, Box::new(migrator)));
+        self.migrations.sort_by_key(|(v, _)| *v);
+    }
+
+    /// Check if data at `current_version` needs migration.
+    pub fn needs_migration(&self, current_version: u32) -> bool {
+        self.migrations.iter().any(|(v, _)| *v > current_version)
+    }
+
+    /// Apply all migrations from `current_version` up to `target_version`.
+    pub fn apply_migrations_up_to(
+        &self,
+        data: &mut HashMap<String, String>,
+        current_version: u32,
+        target_version: u32,
+    ) -> u32 {
+        let mut applied_up_to = current_version;
+        for (v, migrator) in &self.migrations {
+            if *v > current_version && *v <= target_version {
+                migrator(data);
+                applied_up_to = *v;
+            }
+        }
+        applied_up_to
+    }
+
+    /// Return the highest registered migration version.
+    pub fn current_version(&self) -> u32 {
+        self.migrations.last().map(|(v, _)| *v).unwrap_or(0)
+    }
+
+    pub fn migration_count(&self) -> usize {
+        self.migrations.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StateSnapshotCapture – capture state at a point in time
+// ---------------------------------------------------------------------------
+
+/// A captured snapshot of state data.
+#[derive(Debug, Clone)]
+pub struct StateSnapshotCapture {
+    pub id: u64,
+    pub timestamp: u64,
+    pub data: HashMap<String, String>,
+}
+
+impl StateSnapshotCapture {
+    pub fn new(id: u64, timestamp: u64, data: HashMap<String, String>) -> Self {
+        Self { id, timestamp, data }
+    }
+
+    /// Restore state from this snapshot into the given map.
+    pub fn restore(&self, target: &mut HashMap<String, String>) {
+        target.clear();
+        for (k, v) in &self.data {
+            target.insert(k.clone(), v.clone());
+        }
+    }
+
+    /// Compute changed keys between this snapshot and a previous one.
+    pub fn diff_from(&self, previous: &StateSnapshotCapture) -> Vec<String> {
+        let mut changed = Vec::new();
+        for (k, v) in &self.data {
+            match previous.data.get(k) {
+                None => changed.push(k.clone()),
+                Some(old_v) if old_v != v => changed.push(k.clone()),
+                _ => {}
+            }
+        }
+        for k in previous.data.keys() {
+            if !self.data.contains_key(k) {
+                changed.push(k.clone());
+            }
+        }
+        changed
+    }
+
+    pub fn snapshot_size(&self) -> usize {
+        self.data.iter().map(|(k, v)| k.len() + v.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StateScopeHierarchy – hierarchical scoped state access
+// ---------------------------------------------------------------------------
+
+/// A hierarchical scope with inheritance for state lookups.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StateScopeLevel {
+    GlobalLevel,
+    WorkspaceLevel,
+    WindowLevel,
+    EditorLevel,
+}
+
+impl StateScopeLevel {
+    /// Return the parent scope, if any.
+    pub fn parent_scope(&self) -> Option<StateScopeLevel> {
+        match self {
+            StateScopeLevel::EditorLevel => Some(StateScopeLevel::WindowLevel),
+            StateScopeLevel::WindowLevel => Some(StateScopeLevel::WorkspaceLevel),
+            StateScopeLevel::WorkspaceLevel => Some(StateScopeLevel::GlobalLevel),
+            StateScopeLevel::GlobalLevel => None,
+        }
+    }
+
+    /// Look up a key, walking up the hierarchy.
+    pub fn inherit_from<'a>(
+        &self,
+        key: &str,
+        stores: &'a HashMap<StateScopeLevel, HashMap<String, String>>,
+    ) -> Option<&'a str> {
+        if let Some(store) = stores.get(self) {
+            if let Some(v) = store.get(key) {
+                return Some(v.as_str());
+            }
+        }
+        self.parent_scope().and_then(|p| p.inherit_from(key, stores))
+    }
+
+    /// Check if this scope is a descendant of another.
+    pub fn is_descendant(&self, ancestor: &StateScopeLevel) -> bool {
+        let mut current = self.parent_scope();
+        while let Some(scope) = current {
+            if scope == *ancestor {
+                return true;
+            }
+            current = scope.parent_scope();
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2124,7 +2279,7 @@ mod tests {
 
     #[test]
     fn state_migration_display() {
-        let m = StateMigration::new(1, 2, "rename theme keys");
+        let m = StateMigrationEntry::new(1, 2, "rename theme keys");
         let s = format!("{}", m);
         assert!(s.contains("v1"));
         assert!(s.contains("v2"));
@@ -2621,6 +2776,105 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- StateMigration -----------------------------------------------------
+
+    #[test]
+    fn migration_register_and_count() {
+        let mut m = StateMigration::new();
+        m.register_migration(1, |data| { data.insert("migrated".into(), "1".into()); });
+        m.register_migration(2, |data| { data.insert("v2".into(), "yes".into()); });
+        assert_eq!(m.migration_count(), 2);
+        assert_eq!(m.current_version(), 2);
+    }
+
+    #[test]
+    fn migration_needs_migration() {
+        let mut m = StateMigration::new();
+        m.register_migration(2, |_| {});
+        assert!(m.needs_migration(1));
+        assert!(!m.needs_migration(2));
+    }
+
+    #[test]
+    fn migration_apply() {
+        let mut m = StateMigration::new();
+        m.register_migration(1, |d| { d.insert("a".into(), "1".into()); });
+        m.register_migration(2, |d| { d.insert("b".into(), "2".into()); });
+        let mut data = HashMap::new();
+        let version = m.apply_migrations_up_to(&mut data, 0, 2);
+        assert_eq!(version, 2);
+        assert_eq!(data.get("a").unwrap(), "1");
+        assert_eq!(data.get("b").unwrap(), "2");
+    }
+
+    #[test]
+    fn migration_partial_apply() {
+        let mut m = StateMigration::new();
+        m.register_migration(1, |d| { d.insert("a".into(), "1".into()); });
+        m.register_migration(3, |d| { d.insert("c".into(), "3".into()); });
+        let mut data = HashMap::new();
+        let version = m.apply_migrations_up_to(&mut data, 0, 2);
+        assert_eq!(version, 1);
+        assert!(data.contains_key("a"));
+        assert!(!data.contains_key("c"));
+    }
+
+    // -- StateSnapshotCapture -----------------------------------------------
+
+    #[test]
+    fn snapshot_restore() {
+        let data: HashMap<String, String> = [("k".into(), "v".into())].into_iter().collect();
+        let snap = StateSnapshotCapture::new(1, 1000, data);
+        let mut target = HashMap::new();
+        target.insert("old".into(), "val".into());
+        snap.restore(&mut target);
+        assert_eq!(target.get("k").unwrap(), "v");
+        assert!(!target.contains_key("old"));
+    }
+
+    #[test]
+    fn snapshot_diff() {
+        let old_data: HashMap<String, String> = [("a".into(), "1".into()), ("b".into(), "2".into())].into_iter().collect();
+        let new_data: HashMap<String, String> = [("a".into(), "1".into()), ("b".into(), "3".into()), ("c".into(), "4".into())].into_iter().collect();
+        let old_snap = StateSnapshotCapture::new(1, 100, old_data);
+        let new_snap = StateSnapshotCapture::new(2, 200, new_data);
+        let diff = new_snap.diff_from(&old_snap);
+        assert!(diff.contains(&"b".to_string()));
+        assert!(diff.contains(&"c".to_string()));
+    }
+
+    #[test]
+    fn snapshot_size() {
+        let data: HashMap<String, String> = [("key".into(), "value".into())].into_iter().collect();
+        let snap = StateSnapshotCapture::new(1, 0, data);
+        assert_eq!(snap.snapshot_size(), 8); // "key" + "value" = 3 + 5
+    }
+
+    // -- StateScopeLevel ----------------------------------------------------
+
+    #[test]
+    fn scope_parent() {
+        assert_eq!(StateScopeLevel::EditorLevel.parent_scope(), Some(StateScopeLevel::WindowLevel));
+        assert_eq!(StateScopeLevel::GlobalLevel.parent_scope(), None);
+    }
+
+    #[test]
+    fn scope_is_descendant() {
+        assert!(StateScopeLevel::EditorLevel.is_descendant(&StateScopeLevel::GlobalLevel));
+        assert!(!StateScopeLevel::GlobalLevel.is_descendant(&StateScopeLevel::EditorLevel));
+    }
+
+    #[test]
+    fn scope_inherit_from() {
+        let mut stores = HashMap::new();
+        let mut global = HashMap::new();
+        global.insert("theme".to_string(), "dark".to_string());
+        stores.insert(StateScopeLevel::GlobalLevel, global);
+        stores.insert(StateScopeLevel::EditorLevel, HashMap::new());
+        let val = StateScopeLevel::EditorLevel.inherit_from("theme", &stores);
+        assert_eq!(val, Some("dark"));
     }
 
 }

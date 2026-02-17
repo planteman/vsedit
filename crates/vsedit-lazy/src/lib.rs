@@ -1526,6 +1526,131 @@ impl fmt::Display for LazyFactory {
     }
 }
 
+// --- LruCache: least-recently-used cache ---
+
+pub struct LruCache<K: Eq + std::hash::Hash + Clone, V: Clone> {
+    capacity: usize,
+    entries: Vec<(K, V)>,
+    hits: usize,
+    misses: usize,
+}
+
+impl<K: Eq + std::hash::Hash + Clone, V: Clone> LruCache<K, V> {
+    pub fn new(capacity: usize) -> Self {
+        Self { capacity: capacity.max(1), entries: Vec::new(), hits: 0, misses: 0 }
+    }
+
+    pub fn get(&mut self, key: &K) -> Option<&V> {
+        if let Some(idx) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(idx);
+            self.entries.push(entry);
+            self.hits += 1;
+            self.entries.last().map(|(_, v)| v)
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    pub fn insert(&mut self, key: K, value: V) {
+        if let Some(idx) = self.entries.iter().position(|(k, _)| *k == key) {
+            self.entries.remove(idx);
+        }
+        if self.entries.len() >= self.capacity {
+            self.evict_oldest();
+        }
+        self.entries.push((key, value));
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        if let Some(idx) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(idx).1)
+        } else {
+            None
+        }
+    }
+
+    pub fn evict_oldest(&mut self) -> Option<(K, V)> {
+        if self.entries.is_empty() { None } else { Some(self.entries.remove(0)) }
+    }
+
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn capacity(&self) -> usize { self.capacity }
+
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+}
+
+// --- ExpiringCacheEntry / ExpiringCache ---
+
+struct ExpiringEntry<V> {
+    value: V,
+    inserted_at: Instant,
+    ttl: Duration,
+}
+
+pub struct ExpiringCache<K: Eq + std::hash::Hash + Clone, V: Clone> {
+    entries: HashMap<K, ExpiringEntry<V>>,
+}
+
+impl<K: Eq + std::hash::Hash + Clone, V: Clone> ExpiringCache<K, V> {
+    pub fn new() -> Self {
+        Self { entries: HashMap::new() }
+    }
+
+    pub fn insert_with_ttl(&mut self, key: K, value: V, ttl: Duration) {
+        self.entries.insert(key, ExpiringEntry { value, inserted_at: Instant::now(), ttl });
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.entries.get(key).and_then(|e| {
+            if e.inserted_at.elapsed() < e.ttl { Some(&e.value) } else { None }
+        })
+    }
+
+    pub fn remove_expired(&mut self) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|_, e| e.inserted_at.elapsed() < e.ttl);
+        before - self.entries.len()
+    }
+
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+
+    pub fn expired_count(&self) -> usize {
+        self.entries.values().filter(|e| e.inserted_at.elapsed() >= e.ttl).count()
+    }
+}
+
+// --- ComputeOnce ---
+
+pub struct ComputeOnce<T> {
+    value: Option<T>,
+}
+
+impl<T> ComputeOnce<T> {
+    pub fn new() -> Self { Self { value: None } }
+
+    pub fn is_computed(&self) -> bool { self.value.is_some() }
+
+    pub fn reset(&mut self) { self.value = None; }
+
+    pub fn get_or_init<F: FnOnce() -> T>(&mut self, f: F) -> &T {
+        if self.value.is_none() {
+            self.value = Some(f());
+        }
+        self.value.as_ref().unwrap()
+    }
+
+    pub fn get(&self) -> Option<&T> { self.value.as_ref() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2569,5 +2694,111 @@ mod tests {
     fn write_once_lazy_default() {
         let wol: WriteOnceLazy<i32> = WriteOnceLazy::default();
         assert!(!wol.is_set());
+    }
+
+    #[test]
+    fn lru_cache_insert_and_get() {
+        let mut cache = LruCache::new(3);
+        cache.insert("a", 1);
+        cache.insert("b", 2);
+        assert_eq!(cache.get(&"a"), Some(&1));
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn lru_cache_evicts_oldest() {
+        let mut cache = LruCache::new(2);
+        cache.insert("a", 1);
+        cache.insert("b", 2);
+        cache.insert("c", 3);
+        assert!(!cache.contains_key(&"a"));
+        assert!(cache.contains_key(&"b"));
+        assert!(cache.contains_key(&"c"));
+    }
+
+    #[test]
+    fn lru_cache_get_updates_recency() {
+        let mut cache = LruCache::new(2);
+        cache.insert("a", 1);
+        cache.insert("b", 2);
+        cache.get(&"a"); // makes "a" most recent
+        cache.insert("c", 3); // should evict "b"
+        assert!(cache.contains_key(&"a"));
+        assert!(!cache.contains_key(&"b"));
+    }
+
+    #[test]
+    fn lru_cache_remove() {
+        let mut cache = LruCache::new(5);
+        cache.insert("x", 10);
+        assert_eq!(cache.remove(&"x"), Some(10));
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn lru_cache_hit_rate() {
+        let mut cache = LruCache::new(5);
+        cache.insert("a", 1);
+        cache.get(&"a"); // hit
+        cache.get(&"b"); // miss
+        assert!((cache.hit_rate() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn lru_cache_hit_rate_empty() {
+        let cache: LruCache<&str, i32> = LruCache::new(5);
+        assert_eq!(cache.hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn expiring_cache_basic() {
+        let mut cache = ExpiringCache::new();
+        cache.insert_with_ttl("key", 42, Duration::from_secs(60));
+        assert_eq!(cache.get(&"key"), Some(&42));
+        assert_eq!(cache.entry_count(), 1);
+    }
+
+    #[test]
+    fn expiring_cache_expired_count() {
+        let mut cache = ExpiringCache::new();
+        cache.insert_with_ttl("old", 1, Duration::from_nanos(1));
+        std::thread::sleep(Duration::from_millis(1));
+        assert!(cache.get(&"old").is_none());
+        assert_eq!(cache.expired_count(), 1);
+    }
+
+    #[test]
+    fn expiring_cache_remove_expired() {
+        let mut cache = ExpiringCache::new();
+        cache.insert_with_ttl("stale", 99, Duration::from_nanos(1));
+        std::thread::sleep(Duration::from_millis(1));
+        let removed = cache.remove_expired();
+        assert_eq!(removed, 1);
+        assert_eq!(cache.entry_count(), 0);
+    }
+
+    #[test]
+    fn compute_once_initial_state() {
+        let co: ComputeOnce<i32> = ComputeOnce::new();
+        assert!(!co.is_computed());
+        assert!(co.get().is_none());
+    }
+
+    #[test]
+    fn compute_once_computes_value() {
+        let mut co = ComputeOnce::new();
+        let val = co.get_or_init(|| 42);
+        assert_eq!(*val, 42);
+        assert!(co.is_computed());
+    }
+
+    #[test]
+    fn compute_once_reset() {
+        let mut co = ComputeOnce::new();
+        co.get_or_init(|| 10);
+        co.reset();
+        assert!(!co.is_computed());
+        let val = co.get_or_init(|| 20);
+        assert_eq!(*val, 20);
     }
 }

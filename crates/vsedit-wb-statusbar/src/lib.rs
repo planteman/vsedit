@@ -1553,6 +1553,225 @@ impl fmt::Display for StatusbarTooltipBuilderConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StatusBarLayoutEngine
+// ---------------------------------------------------------------------------
+
+/// Compute status bar item positions.
+#[derive(Debug, Clone)]
+pub struct StatusBarLayoutItem {
+    pub id: String,
+    pub alignment: StatusBarAlignment,
+    pub width: u32,
+    pub x: u32,
+    pub truncated: bool,
+}
+
+#[derive(Debug)]
+pub struct StatusBarLayoutEngine {
+    available_width: u32,
+}
+
+impl StatusBarLayoutEngine {
+    pub fn new(available_width: u32) -> Self {
+        Self { available_width }
+    }
+
+    pub fn available_width(&self) -> u32 {
+        self.available_width
+    }
+
+    pub fn reflow_items(
+        &self,
+        items: &[(String, StatusBarAlignment, u32)],
+    ) -> Vec<StatusBarLayoutItem> {
+        let mut result = Vec::new();
+        let mut left_x: u32 = 0;
+        let mut right_x: u32 = self.available_width;
+
+        for (id, align, width) in items {
+            match align {
+                StatusBarAlignment::Left => {
+                    let truncated = left_x + width > self.available_width;
+                    result.push(StatusBarLayoutItem {
+                        id: id.clone(),
+                        alignment: *align,
+                        width: *width,
+                        x: left_x,
+                        truncated,
+                    });
+                    left_x += width;
+                }
+                StatusBarAlignment::Right => {
+                    right_x = right_x.saturating_sub(*width);
+                    result.push(StatusBarLayoutItem {
+                        id: id.clone(),
+                        alignment: *align,
+                        width: *width,
+                        x: right_x,
+                        truncated: right_x < left_x,
+                    });
+                }
+                StatusBarAlignment::Center => {
+                    let cx = self.available_width / 2 - width / 2;
+                    result.push(StatusBarLayoutItem {
+                        id: id.clone(),
+                        alignment: *align,
+                        width: *width,
+                        x: cx,
+                        truncated: false,
+                    });
+                }
+            }
+        }
+        result
+    }
+
+    pub fn item_at_x<'a>(&self, items: &'a [StatusBarLayoutItem], x: u32) -> Option<&'a str> {
+        items
+            .iter()
+            .find(|item| x >= item.x && x < item.x + item.width)
+            .map(|item| item.id.as_str())
+    }
+
+    pub fn overflow_detected(&self, items: &[StatusBarLayoutItem]) -> bool {
+        items.iter().any(|i| i.truncated)
+    }
+
+    pub fn truncation_order(items: &mut [StatusBarLayoutItem]) {
+        items.sort_by(|a, b| b.width.cmp(&a.width));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarAnimation
+// ---------------------------------------------------------------------------
+
+/// Animate status bar transitions.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnimationState {
+    FadeIn,
+    FadeOut,
+    Pulse,
+    Idle,
+}
+
+#[derive(Debug, Clone)]
+pub struct StatusBarAnimation {
+    state: AnimationState,
+    progress: f64,
+}
+
+impl StatusBarAnimation {
+    pub fn new() -> Self {
+        Self {
+            state: AnimationState::Idle,
+            progress: 0.0,
+        }
+    }
+
+    pub fn fade_in(&mut self) {
+        self.state = AnimationState::FadeIn;
+        self.progress = 0.0;
+    }
+
+    pub fn fade_out(&mut self) {
+        self.state = AnimationState::FadeOut;
+        self.progress = 1.0;
+    }
+
+    pub fn pulse(&mut self) {
+        self.state = AnimationState::Pulse;
+        self.progress = 0.0;
+    }
+
+    pub fn progress(&self) -> f64 {
+        self.progress
+    }
+
+    pub fn is_animating(&self) -> bool {
+        self.state != AnimationState::Idle
+    }
+
+    pub fn tick_animation(&mut self, delta: f64) {
+        match self.state {
+            AnimationState::FadeIn => {
+                self.progress = (self.progress + delta).min(1.0);
+                if self.progress >= 1.0 {
+                    self.state = AnimationState::Idle;
+                }
+            }
+            AnimationState::FadeOut => {
+                self.progress = (self.progress - delta).max(0.0);
+                if self.progress <= 0.0 {
+                    self.state = AnimationState::Idle;
+                }
+            }
+            AnimationState::Pulse => {
+                self.progress = (self.progress + delta) % 1.0;
+            }
+            AnimationState::Idle => {}
+        }
+    }
+
+    pub fn animation_complete(&self) -> bool {
+        self.state == AnimationState::Idle
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarTooltip
+// ---------------------------------------------------------------------------
+
+/// Rich tooltip for a status bar item.
+#[derive(Debug, Clone)]
+pub struct StatusBarTooltip {
+    pub title: String,
+    pub body: Option<String>,
+    pub command: Option<String>,
+}
+
+impl StatusBarTooltip {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            body: None,
+            command: None,
+        }
+    }
+
+    pub fn with_body(mut self, body: &str) -> Self {
+        self.body = Some(body.to_string());
+        self
+    }
+
+    pub fn with_command(mut self, cmd: &str) -> Self {
+        self.command = Some(cmd.to_string());
+        self
+    }
+
+    pub fn has_command(&self) -> bool {
+        self.command.is_some()
+    }
+
+    pub fn format_tooltip(&self) -> String {
+        let mut result = self.title.clone();
+        if let Some(ref body) = self.body {
+            result.push_str("\n");
+            result.push_str(body);
+        }
+        result
+    }
+
+    pub fn truncated_text(&self, max_length: usize) -> String {
+        if self.title.len() <= max_length {
+            self.title.clone()
+        } else {
+            format!("{}...", &self.title[..max_length.saturating_sub(3)])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2618,6 +2837,115 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- StatusBarLayoutEngine ---------------------------------------------
+
+    #[test]
+    fn layout_engine_reflow() {
+        let engine = StatusBarLayoutEngine::new(1000);
+        let items = vec![
+            ("branch".into(), StatusBarAlignment::Left, 100),
+            ("errors".into(), StatusBarAlignment::Right, 80),
+        ];
+        let result = engine.reflow_items(&items);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].x, 0);
+    }
+
+    #[test]
+    fn layout_engine_item_at_x() {
+        let engine = StatusBarLayoutEngine::new(500);
+        let items = vec![StatusBarLayoutItem {
+            id: "test".into(),
+            alignment: StatusBarAlignment::Left,
+            width: 100,
+            x: 0,
+            truncated: false,
+        }];
+        assert_eq!(engine.item_at_x(&items, 50), Some("test"));
+        assert_eq!(engine.item_at_x(&items, 150), None);
+    }
+
+    #[test]
+    fn layout_engine_overflow() {
+        let engine = StatusBarLayoutEngine::new(50);
+        let items = vec![StatusBarLayoutItem {
+            id: "big".into(),
+            alignment: StatusBarAlignment::Left,
+            width: 100,
+            x: 0,
+            truncated: true,
+        }];
+        assert!(engine.overflow_detected(&items));
+    }
+
+    #[test]
+    fn layout_engine_available_width() {
+        let engine = StatusBarLayoutEngine::new(800);
+        assert_eq!(engine.available_width(), 800);
+    }
+
+    // -- StatusBarAnimation ------------------------------------------------
+
+    #[test]
+    fn animation_fade_in() {
+        let mut anim = StatusBarAnimation::new();
+        anim.fade_in();
+        assert!(anim.is_animating());
+        anim.tick_animation(0.5);
+        assert!((anim.progress() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn animation_fade_in_complete() {
+        let mut anim = StatusBarAnimation::new();
+        anim.fade_in();
+        anim.tick_animation(1.5);
+        assert!(anim.animation_complete());
+    }
+
+    #[test]
+    fn animation_fade_out() {
+        let mut anim = StatusBarAnimation::new();
+        anim.fade_out();
+        anim.tick_animation(0.5);
+        assert!((anim.progress() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn animation_idle_by_default() {
+        let anim = StatusBarAnimation::new();
+        assert!(!anim.is_animating());
+        assert!(anim.animation_complete());
+    }
+
+    // -- StatusBarTooltip --------------------------------------------------
+
+    #[test]
+    fn tooltip_basic() {
+        let tt = StatusBarTooltip::new("Git Branch").with_body("main");
+        assert_eq!(tt.format_tooltip(), "Git Branch\nmain");
+    }
+
+    #[test]
+    fn tooltip_has_command() {
+        let tt = StatusBarTooltip::new("Errors").with_command("workbench.showErrors");
+        assert!(tt.has_command());
+    }
+
+    #[test]
+    fn tooltip_truncated() {
+        let tt = StatusBarTooltip::new("This is a very long tooltip title text");
+        let truncated = tt.truncated_text(15);
+        assert!(truncated.len() <= 15);
+        assert!(truncated.ends_with("..."));
+    }
+
+    #[test]
+    fn tooltip_no_command() {
+        let tt = StatusBarTooltip::new("Info");
+        assert!(!tt.has_command());
     }
 
 }

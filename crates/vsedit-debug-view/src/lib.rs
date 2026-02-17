@@ -4,6 +4,8 @@
 //! and watch expressions — rendered via ratatui. Integrates with the
 //! `vsedit-debug` DAP client for real debugging data.
 
+use std::fmt;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -1722,6 +1724,220 @@ impl CallStackFormatter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BreakpointSummary — aggregate breakpoint info
+// ---------------------------------------------------------------------------
+
+/// Summarizes breakpoint state across files.
+#[derive(Debug, Clone)]
+pub struct BreakpointSummary {
+    pub total: usize,
+    pub enabled: usize,
+    pub disabled: usize,
+    pub with_condition: usize,
+    pub total_hits: u32,
+    pub files: Vec<String>,
+}
+
+impl BreakpointSummary {
+    /// Build a summary from a slice of breakpoints.
+    pub fn from_breakpoints(bps: &[Breakpoint]) -> Self {
+        let enabled = bps.iter().filter(|b| b.enabled).count();
+        let with_condition = bps.iter().filter(|b| b.condition.is_some()).count();
+        let total_hits: u32 = bps.iter().map(|b| b.hit_count).sum();
+        let mut files: Vec<String> = bps.iter().map(|b| b.file_path.clone()).collect();
+        files.sort();
+        files.dedup();
+        Self {
+            total: bps.len(),
+            enabled,
+            disabled: bps.len() - enabled,
+            with_condition,
+            total_hits,
+            files,
+        }
+    }
+
+    pub fn file_count(&self) -> usize { self.files.len() }
+
+    pub fn has_conditions(&self) -> bool { self.with_condition > 0 }
+
+    pub fn hit_rate(&self) -> f64 {
+        if self.total == 0 { 0.0 } else { self.total_hits as f64 / self.total as f64 }
+    }
+}
+
+impl fmt::Display for BreakpointSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} breakpoints ({} enabled) across {} files",
+            self.total, self.enabled, self.files.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallStackNavigator — navigate the call stack
+// ---------------------------------------------------------------------------
+
+/// Navigates up and down a call stack.
+#[derive(Debug, Clone)]
+pub struct CallStackNavigator {
+    frames: Vec<StackFrame>,
+    selected: Option<usize>,
+}
+
+impl CallStackNavigator {
+    pub fn new() -> Self {
+        Self { frames: Vec::new(), selected: None }
+    }
+
+    pub fn push_frame(&mut self, frame: StackFrame) {
+        self.frames.push(frame);
+        if self.selected.is_none() {
+            self.selected = Some(0);
+        }
+    }
+
+    pub fn pop_frame(&mut self) -> Option<StackFrame> {
+        let f = self.frames.pop();
+        if self.frames.is_empty() {
+            self.selected = None;
+        } else if let Some(sel) = self.selected {
+            if sel >= self.frames.len() {
+                self.selected = Some(self.frames.len() - 1);
+            }
+        }
+        f
+    }
+
+    /// Currently selected frame.
+    pub fn current(&self) -> Option<&StackFrame> {
+        self.selected.and_then(|i| self.frames.get(i))
+    }
+
+    /// Move selection up (toward caller).
+    pub fn select_up(&mut self) -> bool {
+        match self.selected {
+            Some(i) if i + 1 < self.frames.len() => { self.selected = Some(i + 1); true }
+            _ => false,
+        }
+    }
+
+    /// Move selection down (toward callee).
+    pub fn select_down(&mut self) -> bool {
+        match self.selected {
+            Some(i) if i > 0 => { self.selected = Some(i - 1); true }
+            _ => false,
+        }
+    }
+
+    pub fn depth(&self) -> usize { self.frames.len() }
+
+    /// Frames belonging to a specific source file.
+    pub fn frames_in_file(&self, path: &str) -> Vec<&StackFrame> {
+        self.frames.iter().filter(|f| f.source_path == path).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.frames.clear();
+        self.selected = None;
+    }
+}
+
+impl Default for CallStackNavigator {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// VariableWatchItem — watched variable with staleness tracking
+// ---------------------------------------------------------------------------
+
+/// A single watched variable or expression in the debug view.
+#[derive(Debug, Clone)]
+pub struct VariableWatchItem {
+    pub name: String,
+    pub expression: String,
+    pub value: String,
+    pub stale: bool,
+}
+
+impl VariableWatchItem {
+    pub fn new(name: impl Into<String>, expression: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            expression: expression.into(),
+            value: String::new(),
+            stale: true,
+        }
+    }
+
+    /// Update the watch with a new value and mark as fresh.
+    pub fn update_value(&mut self, value: impl Into<String>) {
+        self.value = value.into();
+        self.stale = false;
+    }
+
+    /// Mark the watch as stale (needs re-evaluation).
+    pub fn mark_stale(&mut self) {
+        self.stale = true;
+    }
+
+    /// Format for display: "name = value" or "name = <stale>".
+    pub fn format_display(&self) -> String {
+        if self.stale {
+            format!("{} = <stale>", self.name)
+        } else {
+            format!("{} = {}", self.name, self.value)
+        }
+    }
+}
+
+/// A list of watched variables.
+#[derive(Debug, Clone)]
+pub struct VariableWatchList {
+    watches: Vec<VariableWatchItem>,
+}
+
+impl VariableWatchList {
+    pub fn new() -> Self { Self { watches: Vec::new() } }
+
+    pub fn add(&mut self, item: VariableWatchItem) {
+        self.watches.push(item);
+    }
+
+    pub fn remove(&mut self, name: &str) {
+        self.watches.retain(|w| w.name != name);
+    }
+
+    /// Mark all watches stale (e.g., after a step).
+    pub fn mark_all_stale(&mut self) {
+        for w in &mut self.watches {
+            w.mark_stale();
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&VariableWatchItem> {
+        self.watches.iter().find(|w| w.name == name)
+    }
+
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut VariableWatchItem> {
+        self.watches.iter_mut().find(|w| w.name == name)
+    }
+
+    pub fn stale_count(&self) -> usize {
+        self.watches.iter().filter(|w| w.stale).count()
+    }
+
+    pub fn len(&self) -> usize { self.watches.len() }
+    pub fn is_empty(&self) -> bool { self.watches.is_empty() }
+}
+
+impl Default for VariableWatchList {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2568,5 +2784,119 @@ mod tests {
 
         assert_eq!(CallStackFormatter::depth_indicator(0), "→");
         assert!(CallStackFormatter::depth_indicator(2).starts_with("··"));
+    }
+
+    // -- BreakpointSummary ---------------------------------------------------
+
+    #[test]
+    fn breakpoint_summary_basic() {
+        let bps = vec![
+            Breakpoint::new(1, "main.rs", 10),
+            Breakpoint { id: 2, file_path: "main.rs".into(), line: 20, enabled: false, condition: None, hit_count: 0 },
+            Breakpoint { id: 3, file_path: "lib.rs".into(), line: 5, enabled: true, condition: Some("x > 0".into()), hit_count: 3 },
+        ];
+        let s = BreakpointSummary::from_breakpoints(&bps);
+        assert_eq!(s.total, 3);
+        assert_eq!(s.enabled, 2);
+        assert_eq!(s.disabled, 1);
+        assert_eq!(s.file_count(), 2);
+        assert!(s.has_conditions());
+    }
+
+    #[test]
+    fn breakpoint_summary_empty() {
+        let s = BreakpointSummary::from_breakpoints(&[]);
+        assert_eq!(s.total, 0);
+        assert!(!s.has_conditions());
+        assert_eq!(s.hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn breakpoint_summary_display() {
+        let bps = vec![Breakpoint::new(1, "a.rs", 1)];
+        let s = BreakpointSummary::from_breakpoints(&bps);
+        let d = format!("{s}");
+        assert!(d.contains("1 breakpoints"));
+    }
+
+    // -- CallStackNavigator ---------------------------------------------------
+
+    #[test]
+    fn navigator_push_and_current() {
+        let mut nav = CallStackNavigator::new();
+        nav.push_frame(StackFrame::new(1, "main", "main.rs", 10, 1));
+        assert_eq!(nav.depth(), 1);
+        assert_eq!(nav.current().unwrap().name, "main");
+    }
+
+    #[test]
+    fn navigator_up_down() {
+        let mut nav = CallStackNavigator::new();
+        nav.push_frame(StackFrame::new(1, "inner", "a.rs", 1, 1));
+        nav.push_frame(StackFrame::new(2, "outer", "b.rs", 1, 1));
+        assert!(nav.select_up());
+        assert_eq!(nav.current().unwrap().name, "outer");
+        assert!(nav.select_down());
+        assert_eq!(nav.current().unwrap().name, "inner");
+    }
+
+    #[test]
+    fn navigator_pop() {
+        let mut nav = CallStackNavigator::new();
+        nav.push_frame(StackFrame::new(1, "a", "x.rs", 1, 1));
+        nav.push_frame(StackFrame::new(2, "b", "y.rs", 1, 1));
+        let f = nav.pop_frame().unwrap();
+        assert_eq!(f.name, "b");
+        assert_eq!(nav.depth(), 1);
+    }
+
+    #[test]
+    fn navigator_frames_in_file() {
+        let mut nav = CallStackNavigator::new();
+        nav.push_frame(StackFrame::new(1, "a", "main.rs", 1, 1));
+        nav.push_frame(StackFrame::new(2, "b", "lib.rs", 1, 1));
+        nav.push_frame(StackFrame::new(3, "c", "main.rs", 5, 1));
+        assert_eq!(nav.frames_in_file("main.rs").len(), 2);
+    }
+
+    // -- VariableWatchItem / VariableWatchList ---------------------------------
+
+    #[test]
+    fn watch_item_update() {
+        let mut w = VariableWatchItem::new("x", "x + 1");
+        assert!(w.stale);
+        w.update_value("42");
+        assert!(!w.stale);
+        assert_eq!(w.format_display(), "x = 42");
+    }
+
+    #[test]
+    fn watch_item_stale_display() {
+        let w = VariableWatchItem::new("y", "y");
+        assert_eq!(w.format_display(), "y = <stale>");
+    }
+
+    #[test]
+    fn watch_list_operations() {
+        let mut list = VariableWatchList::new();
+        list.add(VariableWatchItem::new("a", "a"));
+        list.add(VariableWatchItem::new("b", "b"));
+        assert_eq!(list.len(), 2);
+        assert_eq!(list.stale_count(), 2);
+        list.get_mut("a").unwrap().update_value("1");
+        assert_eq!(list.stale_count(), 1);
+        list.remove("b");
+        assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn watch_list_mark_all_stale() {
+        let mut list = VariableWatchList::new();
+        let mut w = VariableWatchItem::new("x", "x");
+        w.update_value("5");
+        list.add(w);
+        assert_eq!(list.stale_count(), 0);
+        list.mark_all_stale();
+        assert_eq!(list.stale_count(), 1);
     }
 }

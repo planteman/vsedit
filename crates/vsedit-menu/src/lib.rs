@@ -1493,6 +1493,141 @@ impl MenuRegistry {
     }
 }
 
+// --- MenuSearchIndex ---
+
+pub struct MenuSearchIndex {
+    items: Vec<(String, String)>, // (id, label)
+}
+
+impl MenuSearchIndex {
+    pub fn new() -> Self { Self { items: Vec::new() } }
+
+    pub fn insert(&mut self, id: &str, label: &str) {
+        self.items.push((id.to_string(), label.to_string()));
+    }
+
+    pub fn search_prefix(&self, prefix: &str) -> Vec<&str> {
+        let lower = prefix.to_lowercase();
+        self.items.iter()
+            .filter(|(_, l)| l.to_lowercase().starts_with(&lower))
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    pub fn search_contains(&self, query: &str) -> Vec<&str> {
+        let lower = query.to_lowercase();
+        self.items.iter()
+            .filter(|(_, l)| l.to_lowercase().contains(&lower))
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    pub fn search_fuzzy(&self, query: &str) -> Vec<(&str, usize)> {
+        let lower = query.to_lowercase();
+        let mut results: Vec<(&str, usize)> = self.items.iter().filter_map(|(id, label)| {
+            let label_lower = label.to_lowercase();
+            let mut score = 0usize;
+            let mut qi = lower.chars().peekable();
+            for ch in label_lower.chars() {
+                if qi.peek() == Some(&ch) { qi.next(); score += 1; }
+            }
+            if qi.peek().is_none() { Some((id.as_str(), score)) } else { None }
+        }).collect();
+        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results
+    }
+
+    pub fn len(&self) -> usize { self.items.len() }
+}
+
+// --- MenuAccessKeyParser ---
+
+pub struct MenuAccessKeyParser;
+
+impl MenuAccessKeyParser {
+    pub fn extract_key(label: &str) -> Option<char> {
+        let mut chars = label.chars();
+        while let Some(ch) = chars.next() {
+            if ch == '&' {
+                if let Some(next) = chars.next() {
+                    if next != '&' { return Some(next); }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn has_access_key(label: &str) -> bool {
+        Self::extract_key(label).is_some()
+    }
+
+    pub fn strip_access_key(label: &str) -> String {
+        label.replace('&', "")
+    }
+
+    pub fn format_with_underline(label: &str) -> String {
+        let mut result = String::new();
+        let mut found = false;
+        let mut chars = label.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '&' && !found {
+                if let Some(&next) = chars.peek() {
+                    if next != '&' {
+                        result.push('[');
+                        result.push(chars.next().unwrap());
+                        result.push(']');
+                        found = true;
+                        continue;
+                    }
+                }
+            }
+            result.push(ch);
+        }
+        result
+    }
+}
+
+// --- MenuBarLayoutCalc ---
+
+pub struct MenuBarLayoutCalc {
+    item_widths: Vec<u16>,
+    overflow_threshold: u16,
+}
+
+impl MenuBarLayoutCalc {
+    pub fn new(widths: Vec<u16>, overflow_threshold: u16) -> Self {
+        Self { item_widths: widths, overflow_threshold }
+    }
+
+    pub fn total_width(&self) -> u16 { self.item_widths.iter().sum() }
+
+    pub fn item_at_x(&self, x: u16) -> Option<usize> {
+        let mut acc = 0u16;
+        for (i, &w) in self.item_widths.iter().enumerate() {
+            if x >= acc && x < acc + w { return Some(i); }
+            acc += w;
+        }
+        None
+    }
+
+    pub fn overflow_into_more_menu(&self) -> (Vec<u16>, Vec<u16>) {
+        let mut visible = Vec::new();
+        let mut overflow = Vec::new();
+        let mut total = 0u16;
+        for &w in &self.item_widths {
+            if total + w <= self.overflow_threshold {
+                visible.push(w);
+                total += w;
+            } else {
+                overflow.push(w);
+            }
+        }
+        (visible, overflow)
+    }
+
+    pub fn item_count(&self) -> usize { self.item_widths.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2500,5 +2635,94 @@ mod tests {
     fn menu_registry_build_empty_location() {
         let reg = MenuRegistry::new();
         assert!(reg.build_menu_for_location("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn menu_search_index_prefix() {
+        let mut idx = MenuSearchIndex::new();
+        idx.insert("open", "Open File");
+        idx.insert("save", "Save File");
+        idx.insert("options", "Options");
+        let results = idx.search_prefix("op");
+        assert!(results.contains(&"open"));
+        assert!(results.contains(&"options"));
+    }
+
+    #[test]
+    fn menu_search_index_contains() {
+        let mut idx = MenuSearchIndex::new();
+        idx.insert("save", "Save File");
+        idx.insert("saveas", "Save As...");
+        let results = idx.search_contains("save");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn menu_search_index_fuzzy() {
+        let mut idx = MenuSearchIndex::new();
+        idx.insert("open", "Open File");
+        idx.insert("opts", "Options");
+        let results = idx.search_fuzzy("opf");
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn menu_access_key_extract() {
+        assert_eq!(MenuAccessKeyParser::extract_key("&File"), Some('F'));
+        assert_eq!(MenuAccessKeyParser::extract_key("E&xit"), Some('x'));
+        assert_eq!(MenuAccessKeyParser::extract_key("Plain"), None);
+    }
+
+    #[test]
+    fn menu_access_key_has() {
+        assert!(MenuAccessKeyParser::has_access_key("&Edit"));
+        assert!(!MenuAccessKeyParser::has_access_key("View"));
+    }
+
+    #[test]
+    fn menu_access_key_strip() {
+        assert_eq!(MenuAccessKeyParser::strip_access_key("&File"), "File");
+    }
+
+    #[test]
+    fn menu_access_key_format_underline() {
+        assert_eq!(MenuAccessKeyParser::format_with_underline("&File"), "[F]ile");
+    }
+
+    #[test]
+    fn menu_bar_layout_total_width() {
+        let calc = MenuBarLayoutCalc::new(vec![50, 60, 70], 200);
+        assert_eq!(calc.total_width(), 180);
+    }
+
+    #[test]
+    fn menu_bar_layout_item_at_x() {
+        let calc = MenuBarLayoutCalc::new(vec![50, 60, 70], 200);
+        assert_eq!(calc.item_at_x(0), Some(0));
+        assert_eq!(calc.item_at_x(55), Some(1));
+        assert_eq!(calc.item_at_x(115), Some(2));
+        assert_eq!(calc.item_at_x(200), None);
+    }
+
+    #[test]
+    fn menu_bar_layout_overflow() {
+        let calc = MenuBarLayoutCalc::new(vec![50, 60, 70, 80], 130);
+        let (visible, overflow) = calc.overflow_into_more_menu();
+        assert_eq!(visible, vec![50, 60]);
+        assert_eq!(overflow, vec![70, 80]);
+    }
+
+    #[test]
+    fn menu_search_index_len() {
+        let mut idx = MenuSearchIndex::new();
+        idx.insert("a", "Alpha");
+        idx.insert("b", "Beta");
+        assert_eq!(idx.len(), 2);
+    }
+
+    #[test]
+    fn menu_bar_layout_item_count() {
+        let calc = MenuBarLayoutCalc::new(vec![10, 20, 30], 100);
+        assert_eq!(calc.item_count(), 3);
     }
 }

@@ -1647,6 +1647,186 @@ impl fmt::Display for SearchExcludePatternEditorConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SearchResultGrouper
+// ---------------------------------------------------------------------------
+
+/// Group search results by file.
+#[derive(Debug, Clone)]
+pub struct SearchResultGroup {
+    pub file: String,
+    pub matches: Vec<String>,
+    pub collapsed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchResultGrouper {
+    groups: Vec<SearchResultGroup>,
+    max_results_per_file: usize,
+}
+
+impl SearchResultGrouper {
+    pub fn new(max_results_per_file: usize) -> Self {
+        Self {
+            groups: Vec::new(),
+            max_results_per_file,
+        }
+    }
+
+    pub fn add_match(&mut self, file: &str, match_text: &str) {
+        if let Some(group) = self.groups.iter_mut().find(|g| g.file == file) {
+            if group.matches.len() < self.max_results_per_file {
+                group.matches.push(match_text.to_string());
+            }
+        } else {
+            self.groups.push(SearchResultGroup {
+                file: file.to_string(),
+                matches: vec![match_text.to_string()],
+                collapsed: false,
+            });
+        }
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn total_matches(&self) -> usize {
+        self.groups.iter().map(|g| g.matches.len()).sum()
+    }
+
+    pub fn files_with_matches(&self) -> Vec<&str> {
+        self.groups.iter().map(|g| g.file.as_str()).collect()
+    }
+
+    pub fn collapse_group(&mut self, file: &str) {
+        if let Some(g) = self.groups.iter_mut().find(|g| g.file == file) {
+            g.collapsed = true;
+        }
+    }
+
+    pub fn expand_group(&mut self, file: &str) {
+        if let Some(g) = self.groups.iter_mut().find(|g| g.file == file) {
+            g.collapsed = false;
+        }
+    }
+
+    pub fn file_groups(&self) -> &[SearchResultGroup] {
+        &self.groups
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchReplacePreview
+// ---------------------------------------------------------------------------
+
+/// Preview search-and-replace operations.
+#[derive(Debug, Clone)]
+pub struct ReplacePair {
+    pub original_line: String,
+    pub replaced_line: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchReplacePreview {
+    pairs: Vec<(String, ReplacePair)>,
+}
+
+impl SearchReplacePreview {
+    pub fn new() -> Self {
+        Self { pairs: Vec::new() }
+    }
+
+    pub fn add_replacement(&mut self, file: &str, original: &str, replaced: &str) {
+        self.pairs.push((
+            file.to_string(),
+            ReplacePair {
+                original_line: original.to_string(),
+                replaced_line: replaced.to_string(),
+            },
+        ));
+    }
+
+    pub fn total_replacements(&self) -> usize {
+        self.pairs.len()
+    }
+
+    pub fn files_affected(&self) -> Vec<String> {
+        let mut files: Vec<String> = self.pairs.iter().map(|(f, _)| f.clone()).collect();
+        files.sort();
+        files.dedup();
+        files
+    }
+
+    pub fn estimate_diff_size(&self) -> usize {
+        self.pairs
+            .iter()
+            .map(|(_, p)| p.original_line.len() + p.replaced_line.len() + 10)
+            .sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchExcludePattern
+// ---------------------------------------------------------------------------
+
+/// Manage exclude patterns for search.
+#[derive(Debug, Clone)]
+pub struct SearchExcludePatternManager {
+    patterns: Vec<(String, bool)>,
+}
+
+impl SearchExcludePatternManager {
+    pub fn new() -> Self {
+        Self {
+            patterns: Vec::new(),
+        }
+    }
+
+    pub fn with_defaults() -> Self {
+        let mut mgr = Self::new();
+        mgr.add_pattern("node_modules");
+        mgr.add_pattern(".git");
+        mgr.add_pattern("target");
+        mgr
+    }
+
+    pub fn add_pattern(&mut self, pattern: &str) {
+        if !self.patterns.iter().any(|(p, _)| p == pattern) {
+            self.patterns.push((pattern.to_string(), true));
+        }
+    }
+
+    pub fn remove_pattern(&mut self, pattern: &str) {
+        self.patterns.retain(|(p, _)| p != pattern);
+    }
+
+    pub fn toggle_pattern(&mut self, pattern: &str) {
+        if let Some(entry) = self.patterns.iter_mut().find(|(p, _)| p == pattern) {
+            entry.1 = !entry.1;
+        }
+    }
+
+    pub fn is_excluded(&self, path: &str) -> bool {
+        self.patterns
+            .iter()
+            .filter(|(_, active)| *active)
+            .any(|(p, _)| path.contains(p))
+    }
+
+    pub fn active_patterns(&self) -> Vec<&str> {
+        self.patterns
+            .iter()
+            .filter(|(_, active)| *active)
+            .map(|(p, _)| p.as_str())
+            .collect()
+    }
+
+    pub fn default_excludes() -> Vec<&'static str> {
+        vec!["node_modules", ".git", "target"]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2621,6 +2801,103 @@ mod submod;
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- SearchResultGrouper -----------------------------------------------
+
+    #[test]
+    fn grouper_add_match() {
+        let mut g = SearchResultGrouper::new(100);
+        g.add_match("src/main.rs", "fn main()");
+        g.add_match("src/main.rs", "fn helper()");
+        assert_eq!(g.group_count(), 1);
+        assert_eq!(g.total_matches(), 2);
+    }
+
+    #[test]
+    fn grouper_multiple_files() {
+        let mut g = SearchResultGrouper::new(100);
+        g.add_match("a.rs", "line1");
+        g.add_match("b.rs", "line2");
+        assert_eq!(g.group_count(), 2);
+        assert_eq!(g.files_with_matches(), vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn grouper_max_per_file() {
+        let mut g = SearchResultGrouper::new(2);
+        g.add_match("f.rs", "a");
+        g.add_match("f.rs", "b");
+        g.add_match("f.rs", "c");
+        assert_eq!(g.total_matches(), 2);
+    }
+
+    #[test]
+    fn grouper_collapse_expand() {
+        let mut g = SearchResultGrouper::new(100);
+        g.add_match("f.rs", "x");
+        g.collapse_group("f.rs");
+        assert!(g.file_groups()[0].collapsed);
+        g.expand_group("f.rs");
+        assert!(!g.file_groups()[0].collapsed);
+    }
+
+    // -- SearchReplacePreview ----------------------------------------------
+
+    #[test]
+    fn replace_preview_basic() {
+        let mut p = SearchReplacePreview::new();
+        p.add_replacement("f.rs", "old_fn()", "new_fn()");
+        assert_eq!(p.total_replacements(), 1);
+        assert_eq!(p.files_affected(), vec!["f.rs"]);
+    }
+
+    #[test]
+    fn replace_preview_multiple_files() {
+        let mut p = SearchReplacePreview::new();
+        p.add_replacement("a.rs", "x", "y");
+        p.add_replacement("b.rs", "x", "y");
+        assert_eq!(p.files_affected().len(), 2);
+    }
+
+    #[test]
+    fn replace_preview_diff_size() {
+        let mut p = SearchReplacePreview::new();
+        p.add_replacement("f.rs", "hello", "world");
+        assert!(p.estimate_diff_size() > 0);
+    }
+
+    // -- SearchExcludePatternManager ---------------------------------------
+
+    #[test]
+    fn exclude_pattern_basic() {
+        let mut mgr = SearchExcludePatternManager::new();
+        mgr.add_pattern("node_modules");
+        assert!(mgr.is_excluded("project/node_modules/pkg/index.js"));
+        assert!(!mgr.is_excluded("src/main.rs"));
+    }
+
+    #[test]
+    fn exclude_pattern_toggle() {
+        let mut mgr = SearchExcludePatternManager::new();
+        mgr.add_pattern(".git");
+        mgr.toggle_pattern(".git");
+        assert!(!mgr.is_excluded(".git/config"));
+    }
+
+    #[test]
+    fn exclude_pattern_defaults() {
+        let mgr = SearchExcludePatternManager::with_defaults();
+        assert!(mgr.is_excluded("node_modules/foo"));
+        assert!(mgr.is_excluded(".git/HEAD"));
+        assert!(mgr.is_excluded("target/debug/bin"));
+    }
+
+    #[test]
+    fn exclude_pattern_remove() {
+        let mut mgr = SearchExcludePatternManager::with_defaults();
+        mgr.remove_pattern("target");
+        assert!(!mgr.is_excluded("target/release/bin"));
     }
 
 }

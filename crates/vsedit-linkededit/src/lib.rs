@@ -1428,6 +1428,130 @@ impl fmt::Display for LinkedEditRangeValidatorConfig {
     }
 }
 
+// --- LinkedEditGroupV2: group of ranges that edit together ---
+
+pub struct LinkedEditGroupV2 {
+    ranges: Vec<(usize, usize)>, // (start, end) offsets
+}
+
+impl LinkedEditGroupV2 {
+    pub fn new() -> Self { Self { ranges: Vec::new() } }
+
+    pub fn add_range(&mut self, start: usize, end: usize) {
+        if start <= end {
+            self.ranges.push((start, end));
+        }
+    }
+
+    pub fn remove_range(&mut self, index: usize) -> bool {
+        if index < self.ranges.len() { self.ranges.remove(index); true } else { false }
+    }
+
+    pub fn apply_edit(&self, text: &str, old_fragment: &str, new_fragment: &str) -> String {
+        let mut result = text.to_string();
+        let mut sorted: Vec<(usize, usize)> = self.ranges.clone();
+        sorted.sort_by(|a, b| b.0.cmp(&a.0)); // reverse order to preserve offsets
+        for (start, end) in sorted {
+            if start <= result.len() && end <= result.len() {
+                let slice = &result[start..end];
+                if slice == old_fragment {
+                    result.replace_range(start..end, new_fragment);
+                }
+            }
+        }
+        result
+    }
+
+    pub fn validate_no_overlap(&self) -> bool {
+        let mut sorted = self.ranges.clone();
+        sorted.sort_by_key(|r| r.0);
+        for w in sorted.windows(2) {
+            if w[0].1 > w[1].0 { return false; }
+        }
+        true
+    }
+
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+
+    pub fn sort_ranges(&mut self) {
+        self.ranges.sort_by_key(|r| r.0);
+    }
+}
+
+// --- LinkedEditSessionV2: manage multiple groups ---
+
+pub struct LinkedEditSessionV2 {
+    groups: Vec<LinkedEditGroupV2>,
+    active: Option<usize>,
+}
+
+impl LinkedEditSessionV2 {
+    pub fn new() -> Self { Self { groups: Vec::new(), active: None } }
+
+    pub fn add_group(&mut self, group: LinkedEditGroupV2) -> usize {
+        let idx = self.groups.len();
+        self.groups.push(group);
+        idx
+    }
+
+    pub fn find_group_at_position(&self, pos: usize) -> Option<usize> {
+        self.groups.iter().position(|g| {
+            g.ranges.iter().any(|(s, e)| pos >= *s && pos <= *e)
+        })
+    }
+
+    pub fn active_group(&self) -> Option<&LinkedEditGroupV2> {
+        self.active.and_then(|i| self.groups.get(i))
+    }
+
+    pub fn set_active(&mut self, index: usize) -> bool {
+        if index < self.groups.len() { self.active = Some(index); true } else { false }
+    }
+
+    pub fn deactivate(&mut self) { self.active = None; }
+
+    pub fn group_count(&self) -> usize { self.groups.len() }
+}
+
+// --- LinkedEditDelta ---
+
+pub struct LinkedEditDelta {
+    pub old_text: String,
+    pub new_text: String,
+    pub offset_shift: isize,
+}
+
+impl LinkedEditDelta {
+    pub fn new(old_text: &str, new_text: &str) -> Self {
+        let shift = new_text.len() as isize - old_text.len() as isize;
+        Self { old_text: old_text.to_string(), new_text: new_text.to_string(), offset_shift: shift }
+    }
+
+    pub fn apply_to_position(&self, pos: usize) -> usize {
+        if self.offset_shift >= 0 {
+            pos + self.offset_shift as usize
+        } else {
+            pos.saturating_sub((-self.offset_shift) as usize)
+        }
+    }
+
+    pub fn chain_deltas(a: &LinkedEditDelta, b: &LinkedEditDelta) -> LinkedEditDelta {
+        LinkedEditDelta {
+            old_text: a.old_text.clone(),
+            new_text: b.new_text.clone(),
+            offset_shift: a.offset_shift + b.offset_shift,
+        }
+    }
+
+    pub fn inverted_delta(&self) -> LinkedEditDelta {
+        LinkedEditDelta {
+            old_text: self.new_text.clone(),
+            new_text: self.old_text.clone(),
+            offset_shift: -self.offset_shift,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2621,6 +2745,107 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    #[test]
+    fn linked_edit_group_v2_add_range() {
+        let mut g = LinkedEditGroupV2::new();
+        g.add_range(0, 3);
+        g.add_range(7, 10);
+        assert_eq!(g.range_count(), 2);
+    }
+
+    #[test]
+    fn linked_edit_group_v2_remove_range() {
+        let mut g = LinkedEditGroupV2::new();
+        g.add_range(0, 3);
+        assert!(g.remove_range(0));
+        assert_eq!(g.range_count(), 0);
+    }
+
+    #[test]
+    fn linked_edit_group_v2_no_overlap() {
+        let mut g = LinkedEditGroupV2::new();
+        g.add_range(0, 3);
+        g.add_range(5, 8);
+        assert!(g.validate_no_overlap());
+    }
+
+    #[test]
+    fn linked_edit_group_v2_has_overlap() {
+        let mut g = LinkedEditGroupV2::new();
+        g.add_range(0, 5);
+        g.add_range(3, 8);
+        assert!(!g.validate_no_overlap());
+    }
+
+    #[test]
+    fn linked_edit_group_v2_apply_edit() {
+        let mut g = LinkedEditGroupV2::new();
+        g.add_range(1, 4);
+        g.add_range(12, 15);
+        let result = g.apply_edit("<div>hello</div>", "div", "span");
+        assert_eq!(result, "<span>hello</span>");
+    }
+
+    #[test]
+    fn linked_edit_session_v2_add_group() {
+        let mut s = LinkedEditSessionV2::new();
+        let g = LinkedEditGroupV2::new();
+        s.add_group(g);
+        assert_eq!(s.group_count(), 1);
+    }
+
+    #[test]
+    fn linked_edit_session_v2_find_group() {
+        let mut s = LinkedEditSessionV2::new();
+        let mut g = LinkedEditGroupV2::new();
+        g.add_range(5, 10);
+        s.add_group(g);
+        assert_eq!(s.find_group_at_position(7), Some(0));
+        assert_eq!(s.find_group_at_position(20), None);
+    }
+
+    #[test]
+    fn linked_edit_session_v2_active() {
+        let mut s = LinkedEditSessionV2::new();
+        s.add_group(LinkedEditGroupV2::new());
+        assert!(s.active_group().is_none());
+        s.set_active(0);
+        assert!(s.active_group().is_some());
+        s.deactivate();
+        assert!(s.active_group().is_none());
+    }
+
+    #[test]
+    fn linked_edit_delta_offset_shift() {
+        let d = LinkedEditDelta::new("ab", "abcd");
+        assert_eq!(d.offset_shift, 2);
+    }
+
+    #[test]
+    fn linked_edit_delta_apply_to_position() {
+        let d = LinkedEditDelta::new("hi", "hello");
+        assert_eq!(d.apply_to_position(10), 13);
+    }
+
+    #[test]
+    fn linked_edit_delta_inverted() {
+        let d = LinkedEditDelta::new("old", "newer");
+        let inv = d.inverted_delta();
+        assert_eq!(inv.old_text, "newer");
+        assert_eq!(inv.new_text, "old");
+        assert_eq!(inv.offset_shift, -d.offset_shift);
+    }
+
+    #[test]
+    fn linked_edit_delta_chain() {
+        let a = LinkedEditDelta::new("a", "ab");
+        let b = LinkedEditDelta::new("ab", "abcd");
+        let chained = LinkedEditDelta::chain_deltas(&a, &b);
+        assert_eq!(chained.old_text, "a");
+        assert_eq!(chained.new_text, "abcd");
+        assert_eq!(chained.offset_shift, 3);
     }
 
 }

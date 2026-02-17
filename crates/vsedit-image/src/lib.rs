@@ -1610,6 +1610,162 @@ impl fmt::Display for ImageZoomControlsConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ImageTransform
+// ---------------------------------------------------------------------------
+
+/// Represents a chain of image transformations (metadata only, no pixel data).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransformOp {
+    FlipHorizontal,
+    FlipVertical,
+    Rotate90,
+    Rotate180,
+    Rotate270,
+}
+
+pub struct ImageTransformChain {
+    ops: Vec<TransformOp>,
+}
+
+impl ImageTransformChain {
+    pub fn new() -> Self {
+        Self { ops: Vec::new() }
+    }
+
+    pub fn flip_horizontal(mut self) -> Self {
+        self.ops.push(TransformOp::FlipHorizontal);
+        self
+    }
+
+    pub fn flip_vertical(mut self) -> Self {
+        self.ops.push(TransformOp::FlipVertical);
+        self
+    }
+
+    pub fn rotate_90(mut self) -> Self {
+        self.ops.push(TransformOp::Rotate90);
+        self
+    }
+
+    pub fn rotate_180(mut self) -> Self {
+        self.ops.push(TransformOp::Rotate180);
+        self
+    }
+
+    pub fn rotate_270(mut self) -> Self {
+        self.ops.push(TransformOp::Rotate270);
+        self
+    }
+
+    pub fn ops(&self) -> &[TransformOp] {
+        &self.ops
+    }
+
+    /// Compute the resulting dimensions after all transforms on an image of (w, h).
+    pub fn resulting_dimensions(&self, width: u32, height: u32) -> (u32, u32) {
+        let mut w = width;
+        let mut h = height;
+        for op in &self.ops {
+            match op {
+                TransformOp::Rotate90 | TransformOp::Rotate270 => std::mem::swap(&mut w, &mut h),
+                _ => {}
+            }
+        }
+        (w, h)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ImageCropRegion
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageCropRegion {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl ImageCropRegion {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self { x, y, width, height }
+    }
+
+    pub fn contains_point(&self, px: u32, py: u32) -> bool {
+        px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
+    }
+
+    pub fn intersects(&self, other: &ImageCropRegion) -> bool {
+        self.x < other.x + other.width
+            && self.x + self.width > other.x
+            && self.y < other.y + other.height
+            && self.y + self.height > other.y
+    }
+
+    pub fn union(&self, other: &ImageCropRegion) -> ImageCropRegion {
+        let x = self.x.min(other.x);
+        let y = self.y.min(other.y);
+        let right = (self.x + self.width).max(other.x + other.width);
+        let bottom = (self.y + self.height).max(other.y + other.height);
+        ImageCropRegion { x, y, width: right - x, height: bottom - y }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn aspect_ratio(&self) -> f64 {
+        if self.height == 0 { 0.0 } else { self.width as f64 / self.height as f64 }
+    }
+
+    pub fn center_in_bounds(&self, bound_w: u32, bound_h: u32) -> (u32, u32) {
+        let cx = bound_w.saturating_sub(self.width) / 2;
+        let cy = bound_h.saturating_sub(self.height) / 2;
+        (cx, cy)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ImageThumbnailSpec
+// ---------------------------------------------------------------------------
+
+pub struct ImageThumbnailSpec {
+    pub max_width: u32,
+    pub max_height: u32,
+}
+
+impl ImageThumbnailSpec {
+    pub fn new(max_width: u32, max_height: u32) -> Self {
+        Self { max_width, max_height }
+    }
+
+    /// Compute thumbnail dimensions preserving aspect ratio.
+    pub fn compute_dimensions(&self, src_w: u32, src_h: u32) -> (u32, u32) {
+        if src_w == 0 || src_h == 0 {
+            return (0, 0);
+        }
+        let scale_w = self.max_width as f64 / src_w as f64;
+        let scale_h = self.max_height as f64 / src_h as f64;
+        let scale = scale_w.min(scale_h).min(1.0);
+        ((src_w as f64 * scale) as u32, (src_h as f64 * scale) as u32)
+    }
+
+    pub fn scale_factor(&self, src_w: u32, src_h: u32) -> f64 {
+        if src_w == 0 || src_h == 0 {
+            return 1.0;
+        }
+        let scale_w = self.max_width as f64 / src_w as f64;
+        let scale_h = self.max_height as f64 / src_h as f64;
+        scale_w.min(scale_h).min(1.0)
+    }
+
+    pub fn fits_within(&self, w: u32, h: u32) -> bool {
+        w <= self.max_width && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2612,6 +2768,108 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- ImageTransformChain tests --
+
+    #[test]
+    fn transform_chain() {
+        let t = ImageTransformChain::new().flip_horizontal().rotate_90();
+        assert_eq!(t.ops().len(), 2);
+        assert_eq!(t.ops()[0], TransformOp::FlipHorizontal);
+        assert_eq!(t.ops()[1], TransformOp::Rotate90);
+    }
+
+    #[test]
+    fn transform_dimensions_rotate90() {
+        let t = ImageTransformChain::new().rotate_90();
+        assert_eq!(t.resulting_dimensions(800, 600), (600, 800));
+    }
+
+    #[test]
+    fn transform_dimensions_rotate180() {
+        let t = ImageTransformChain::new().rotate_180();
+        assert_eq!(t.resulting_dimensions(800, 600), (800, 600));
+    }
+
+    #[test]
+    fn transform_dimensions_flip() {
+        let t = ImageTransformChain::new().flip_horizontal().flip_vertical();
+        assert_eq!(t.resulting_dimensions(100, 200), (100, 200));
+    }
+
+    // -- ImageCropRegion tests --
+
+    #[test]
+    fn crop_contains_point() {
+        let r = ImageCropRegion::new(10, 10, 50, 50);
+        assert!(r.contains_point(20, 20));
+        assert!(!r.contains_point(5, 5));
+    }
+
+    #[test]
+    fn crop_intersects() {
+        let a = ImageCropRegion::new(0, 0, 50, 50);
+        let b = ImageCropRegion::new(25, 25, 50, 50);
+        assert!(a.intersects(&b));
+    }
+
+    #[test]
+    fn crop_no_intersect() {
+        let a = ImageCropRegion::new(0, 0, 10, 10);
+        let b = ImageCropRegion::new(20, 20, 10, 10);
+        assert!(!a.intersects(&b));
+    }
+
+    #[test]
+    fn crop_union() {
+        let a = ImageCropRegion::new(0, 0, 10, 10);
+        let b = ImageCropRegion::new(5, 5, 10, 10);
+        let u = a.union(&b);
+        assert_eq!(u.x, 0);
+        assert_eq!(u.y, 0);
+        assert_eq!(u.width, 15);
+        assert_eq!(u.height, 15);
+    }
+
+    #[test]
+    fn crop_area() {
+        let r = ImageCropRegion::new(0, 0, 100, 200);
+        assert_eq!(r.area(), 20000);
+    }
+
+    #[test]
+    fn crop_aspect_ratio() {
+        let r = ImageCropRegion::new(0, 0, 160, 90);
+        assert!((r.aspect_ratio() - 16.0 / 9.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn crop_center_in_bounds() {
+        let r = ImageCropRegion::new(0, 0, 100, 100);
+        assert_eq!(r.center_in_bounds(200, 200), (50, 50));
+    }
+
+    // -- ImageThumbnailSpec tests --
+
+    #[test]
+    fn thumbnail_smaller_image_no_upscale() {
+        let spec = ImageThumbnailSpec::new(200, 200);
+        assert_eq!(spec.compute_dimensions(100, 100), (100, 100));
+    }
+
+    #[test]
+    fn thumbnail_larger_image_downscale() {
+        let spec = ImageThumbnailSpec::new(100, 100);
+        let (w, h) = spec.compute_dimensions(200, 400);
+        assert!(w <= 100 && h <= 100);
+    }
+
+    #[test]
+    fn thumbnail_fits_within() {
+        let spec = ImageThumbnailSpec::new(100, 100);
+        assert!(spec.fits_within(50, 50));
+        assert!(!spec.fits_within(150, 50));
     }
 
 }

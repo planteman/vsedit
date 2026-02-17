@@ -1554,6 +1554,212 @@ pub fn indent_delta(current: &IndentInfo, next: &IndentInfo) -> i32 {
     next.level as i32 - current.level as i32
 }
 
+// ---------------------------------------------------------------------------
+// SyntaxTokenClassifier – classify syntax tokens
+// ---------------------------------------------------------------------------
+
+/// The classification of a syntax token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TokenKind {
+    Keyword,
+    String,
+    Comment,
+    Number,
+    Operator,
+    Punctuation,
+    Identifier,
+    Unknown,
+}
+
+impl TokenKind {
+    /// Whether this token kind carries semantic meaning.
+    pub fn is_semantic(&self) -> bool {
+        matches!(self, TokenKind::Keyword | TokenKind::Identifier | TokenKind::String | TokenKind::Number)
+    }
+
+    /// Priority for overlapping highlights (higher = more important).
+    pub fn token_priority(&self) -> u32 {
+        match self {
+            TokenKind::Comment => 10,
+            TokenKind::String => 9,
+            TokenKind::Keyword => 8,
+            TokenKind::Number => 7,
+            TokenKind::Operator => 5,
+            TokenKind::Punctuation => 3,
+            TokenKind::Identifier => 2,
+            TokenKind::Unknown => 0,
+        }
+    }
+}
+
+/// Classify a token string into a TokenKind based on simple heuristics.
+pub fn classify_token(token: &str) -> TokenKind {
+    if token.is_empty() {
+        return TokenKind::Unknown;
+    }
+    let keywords = ["fn", "let", "mut", "if", "else", "for", "while", "return", "match", "use", "pub", "struct", "enum", "impl", "trait", "mod", "const", "static", "type", "where", "async", "await"];
+    if keywords.contains(&token) {
+        return TokenKind::Keyword;
+    }
+    if token.starts_with('"') || token.starts_with('\'') {
+        return TokenKind::String;
+    }
+    if token.starts_with("//") || token.starts_with("/*") {
+        return TokenKind::Comment;
+    }
+    if token.chars().all(|c| c.is_ascii_digit() || c == '.') && token.chars().any(|c| c.is_ascii_digit()) {
+        return TokenKind::Number;
+    }
+    let ops = ["+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|"];
+    if ops.contains(&token) {
+        return TokenKind::Operator;
+    }
+    let puncts = ["(", ")", "{", "}", "[", "]", ";", ",", ".", "::", ":"];
+    if puncts.contains(&token) {
+        return TokenKind::Punctuation;
+    }
+    TokenKind::Identifier
+}
+
+// ---------------------------------------------------------------------------
+// SyntaxScope – scope hierarchy
+// ---------------------------------------------------------------------------
+
+/// A stack-based scope hierarchy (e.g., "source.rust > meta.function").
+#[derive(Debug, Clone, Default)]
+pub struct SyntaxScope {
+    stack: Vec<String>,
+}
+
+impl SyntaxScope {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn push(&mut self, scope: &str) {
+        self.stack.push(scope.to_string());
+    }
+
+    pub fn pop(&mut self) -> Option<String> {
+        self.stack.pop()
+    }
+
+    pub fn current(&self) -> Option<&str> {
+        self.stack.last().map(|s| s.as_str())
+    }
+
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Check if the current scope matches a selector pattern (simple prefix match).
+    pub fn matches_selector(&self, pattern: &str) -> bool {
+        self.stack.iter().any(|s| s.starts_with(pattern))
+    }
+
+    pub fn to_string_repr(&self) -> String {
+        self.stack.join(" > ")
+    }
+
+    pub fn parent_scope(&self) -> Option<&str> {
+        if self.stack.len() >= 2 {
+            Some(&self.stack[self.stack.len() - 2])
+        } else {
+            None
+        }
+    }
+
+    pub fn root_scope(&self) -> Option<&str> {
+        self.stack.first().map(|s| s.as_str())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SyntaxBracketMatcher – find matching brackets
+// ---------------------------------------------------------------------------
+
+/// Finds matching bracket pairs in source text.
+#[derive(Debug, Clone)]
+pub struct SyntaxBracketMatcher {
+    pairs: Vec<(char, char)>,
+}
+
+impl SyntaxBracketMatcher {
+    pub fn new() -> Self {
+        Self { pairs: vec![('(', ')'), ('[', ']'), ('{', '}')] }
+    }
+
+    /// Find the matching close bracket position for an open bracket at `pos`.
+    pub fn close_at(&self, text: &str, pos: usize) -> Option<usize> {
+        let chars: Vec<char> = text.chars().collect();
+        if pos >= chars.len() { return None; }
+        let open = chars[pos];
+        let close = self.pairs.iter().find(|(o, _)| *o == open)?.1;
+        let mut depth = 0i32;
+        for (i, ch) in chars.iter().enumerate().skip(pos) {
+            if *ch == open { depth += 1; }
+            if *ch == close { depth -= 1; }
+            if depth == 0 { return Some(i); }
+        }
+        None
+    }
+
+    /// Find the matching open bracket position for a close bracket at `pos`.
+    pub fn open_at(&self, text: &str, pos: usize) -> Option<usize> {
+        let chars: Vec<char> = text.chars().collect();
+        if pos >= chars.len() { return None; }
+        let close = chars[pos];
+        let open = self.pairs.iter().find(|(_, c)| *c == close)?.0;
+        let mut depth = 0i32;
+        for i in (0..=pos).rev() {
+            if chars[i] == close { depth += 1; }
+            if chars[i] == open { depth -= 1; }
+            if depth == 0 { return Some(i); }
+        }
+        None
+    }
+
+    /// Compute nesting depth at a given position.
+    pub fn nesting_depth(&self, text: &str, pos: usize) -> i32 {
+        let mut depth = 0i32;
+        for (i, ch) in text.chars().enumerate() {
+            if i >= pos { break; }
+            if self.pairs.iter().any(|(o, _)| *o == ch) { depth += 1; }
+            if self.pairs.iter().any(|(_, c)| *c == ch) { depth -= 1; }
+        }
+        depth
+    }
+
+    /// Return positions of all mismatched brackets.
+    pub fn mismatched_brackets(&self, text: &str) -> Vec<usize> {
+        let mut stack: Vec<(char, usize)> = Vec::new();
+        let mut mismatched = Vec::new();
+        for (i, ch) in text.chars().enumerate() {
+            if self.pairs.iter().any(|(o, _)| *o == ch) {
+                stack.push((ch, i));
+            } else if let Some((_, close)) = self.pairs.iter().find(|(_, c)| *c == ch) {
+                let _ = close;
+                if let Some((open_ch, _)) = stack.last() {
+                    if self.pairs.iter().any(|(o, c)| *o == *open_ch && *c == ch) {
+                        stack.pop();
+                    } else {
+                        mismatched.push(i);
+                    }
+                } else {
+                    mismatched.push(i);
+                }
+            }
+        }
+        for (_, pos) in stack {
+            mismatched.push(pos);
+        }
+        mismatched.sort();
+        mismatched
+    }
+}
+
+impl Default for SyntaxBracketMatcher {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2595,5 +2801,107 @@ mod tests {
         let lines = vec!["\t\tindented"];
         let info = compute_indent_info(&lines, 4);
         assert_eq!(info[0].level, 2);
+    }
+
+    // -- SyntaxTokenClassifier ----------------------------------------------
+
+    #[test]
+    fn classify_keyword() {
+        assert_eq!(classify_token("fn"), TokenKind::Keyword);
+        assert_eq!(classify_token("let"), TokenKind::Keyword);
+        assert_eq!(classify_token("return"), TokenKind::Keyword);
+    }
+
+    #[test]
+    fn classify_number() {
+        assert_eq!(classify_token("42"), TokenKind::Number);
+        assert_eq!(classify_token("3.14"), TokenKind::Number);
+    }
+
+    #[test]
+    fn classify_operator() {
+        assert_eq!(classify_token("+"), TokenKind::Operator);
+        assert_eq!(classify_token("=="), TokenKind::Operator);
+    }
+
+    #[test]
+    fn classify_identifier() {
+        assert_eq!(classify_token("my_var"), TokenKind::Identifier);
+    }
+
+    #[test]
+    fn token_priority_ordering() {
+        assert!(TokenKind::Comment.token_priority() > TokenKind::Identifier.token_priority());
+        assert!(TokenKind::Keyword.is_semantic());
+        assert!(!TokenKind::Punctuation.is_semantic());
+    }
+
+    // -- SyntaxScope --------------------------------------------------------
+
+    #[test]
+    fn scope_push_pop() {
+        let mut s = SyntaxScope::new();
+        s.push("source.rust");
+        s.push("meta.function");
+        assert_eq!(s.current(), Some("meta.function"));
+        assert_eq!(s.depth(), 2);
+        s.pop();
+        assert_eq!(s.current(), Some("source.rust"));
+    }
+
+    #[test]
+    fn scope_matches_selector() {
+        let mut s = SyntaxScope::new();
+        s.push("source.rust");
+        s.push("meta.function.definition");
+        assert!(s.matches_selector("meta.function"));
+        assert!(!s.matches_selector("source.python"));
+    }
+
+    #[test]
+    fn scope_parent_and_root() {
+        let mut s = SyntaxScope::new();
+        s.push("root");
+        s.push("child");
+        assert_eq!(s.parent_scope(), Some("root"));
+        assert_eq!(s.root_scope(), Some("root"));
+    }
+
+    #[test]
+    fn scope_to_string() {
+        let mut s = SyntaxScope::new();
+        s.push("a");
+        s.push("b");
+        assert_eq!(s.to_string_repr(), "a > b");
+    }
+
+    // -- SyntaxBracketMatcher -----------------------------------------------
+
+    #[test]
+    fn bracket_close_at() {
+        let m = SyntaxBracketMatcher::new();
+        assert_eq!(m.close_at("(hello)", 0), Some(6));
+        assert_eq!(m.close_at("((a))", 0), Some(4));
+    }
+
+    #[test]
+    fn bracket_open_at() {
+        let m = SyntaxBracketMatcher::new();
+        assert_eq!(m.open_at("(hello)", 6), Some(0));
+    }
+
+    #[test]
+    fn bracket_nesting_depth() {
+        let m = SyntaxBracketMatcher::new();
+        assert_eq!(m.nesting_depth("((a)b)", 3), 2);
+        assert_eq!(m.nesting_depth("((a)b)", 5), 1);
+    }
+
+    #[test]
+    fn bracket_mismatched() {
+        let m = SyntaxBracketMatcher::new();
+        assert!(m.mismatched_brackets("(a)").is_empty());
+        let mis = m.mismatched_brackets("(a");
+        assert_eq!(mis.len(), 1);
     }
 }

@@ -1473,6 +1473,175 @@ impl Default for ConfigImportValidator {
 }
 
 
+// ---------------------------------------------------------------------------
+// ConfigOverrideChain
+// ---------------------------------------------------------------------------
+
+/// Layered configuration with default/user/workspace/folder levels.
+#[derive(Debug, Clone)]
+pub struct ConfigOverrideChain {
+    layers: HashMap<ConfigurationScope, HashMap<String, String>>,
+}
+
+impl ConfigOverrideChain {
+    pub fn new() -> Self {
+        Self {
+            layers: HashMap::new(),
+        }
+    }
+
+    pub fn override_at_level(&mut self, level: ConfigurationScope, key: &str, value: &str) {
+        self.layers
+            .entry(level)
+            .or_default()
+            .insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get_effective_value(&self, key: &str) -> Option<&str> {
+        let order = [
+            ConfigurationScope::WorkspaceFolder,
+            ConfigurationScope::Workspace,
+            ConfigurationScope::User,
+            ConfigurationScope::Default,
+        ];
+        for scope in &order {
+            if let Some(map) = self.layers.get(scope) {
+                if let Some(val) = map.get(key) {
+                    return Some(val.as_str());
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_source_of(&self, key: &str) -> Option<ConfigurationScope> {
+        let order = [
+            ConfigurationScope::WorkspaceFolder,
+            ConfigurationScope::Workspace,
+            ConfigurationScope::User,
+            ConfigurationScope::Default,
+        ];
+        for scope in &order {
+            if let Some(map) = self.layers.get(scope) {
+                if map.contains_key(key) {
+                    return Some(*scope);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn levels_with_value(&self, key: &str) -> Vec<ConfigurationScope> {
+        let mut result = Vec::new();
+        for (scope, map) in &self.layers {
+            if map.contains_key(key) {
+                result.push(*scope);
+            }
+        }
+        result
+    }
+
+    pub fn reset_level(&mut self, level: ConfigurationScope) {
+        self.layers.remove(&level);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConfigChangeEvent
+// ---------------------------------------------------------------------------
+
+/// Represents a configuration change.
+#[derive(Debug, Clone)]
+pub struct ConfigChangeEvent {
+    pub key: String,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+    pub scope: ConfigurationScope,
+}
+
+impl ConfigChangeEvent {
+    pub fn new(key: &str, old: Option<&str>, new: Option<&str>, scope: ConfigurationScope) -> Self {
+        Self {
+            key: key.to_string(),
+            old_value: old.map(|s| s.to_string()),
+            new_value: new.map(|s| s.to_string()),
+            scope,
+        }
+    }
+
+    pub fn affects_key(&self, key: &str) -> bool {
+        self.key == key || self.key.starts_with(&format!("{key}."))
+    }
+
+    pub fn is_addition(&self) -> bool {
+        self.old_value.is_none() && self.new_value.is_some()
+    }
+
+    pub fn is_removal(&self) -> bool {
+        self.old_value.is_some() && self.new_value.is_none()
+    }
+
+    pub fn is_modification(&self) -> bool {
+        self.old_value.is_some() && self.new_value.is_some() && self.old_value != self.new_value
+    }
+
+    pub fn batch_changes(events: &[ConfigChangeEvent]) -> Vec<String> {
+        events.iter().map(|e| e.key.clone()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConfigSchemaEntry
+// ---------------------------------------------------------------------------
+
+/// Schema for a configuration key.
+#[derive(Debug, Clone)]
+pub struct ConfigSchemaEntry {
+    pub key: String,
+    pub value_type: String,
+    pub default: String,
+    pub description: String,
+    pub enum_values: Option<Vec<String>>,
+}
+
+impl ConfigSchemaEntry {
+    pub fn new(key: &str, value_type: &str, default: &str, description: &str) -> Self {
+        Self {
+            key: key.to_string(),
+            value_type: value_type.to_string(),
+            default: default.to_string(),
+            description: description.to_string(),
+            enum_values: None,
+        }
+    }
+
+    pub fn with_enum_values(mut self, values: Vec<String>) -> Self {
+        self.enum_values = Some(values);
+        self
+    }
+
+    pub fn validate_value(&self, value: &str) -> bool {
+        if let Some(ref enums) = self.enum_values {
+            return enums.iter().any(|e| e == value);
+        }
+        self.is_valid_type(value)
+    }
+
+    pub fn is_valid_type(&self, value: &str) -> bool {
+        match self.value_type.as_str() {
+            "boolean" => value == "true" || value == "false",
+            "integer" => value.parse::<i64>().is_ok(),
+            "number" => value.parse::<f64>().is_ok(),
+            "string" => true,
+            _ => true,
+        }
+    }
+
+    pub fn format_default(&self) -> String {
+        format!("{} (default: {})", self.key, self.default)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2504,6 +2673,100 @@ mod tests {
         };
         let errors = validator.validate_entry(&entry);
         assert!(errors.iter().any(|e| matches!(e, ConfigImportError::InvalidScope(_))));
+    }
+
+    // -- ConfigOverrideChain -----------------------------------------------
+
+    #[test]
+    fn override_chain_effective_value() {
+        let mut chain = ConfigOverrideChain::new();
+        chain.override_at_level(ConfigurationScope::Default, "editor.fontSize", "14");
+        chain.override_at_level(ConfigurationScope::User, "editor.fontSize", "16");
+        assert_eq!(chain.get_effective_value("editor.fontSize"), Some("16"));
+    }
+
+    #[test]
+    fn override_chain_source_of() {
+        let mut chain = ConfigOverrideChain::new();
+        chain.override_at_level(ConfigurationScope::Default, "k", "v");
+        assert_eq!(chain.get_source_of("k"), Some(ConfigurationScope::Default));
+    }
+
+    #[test]
+    fn override_chain_workspace_overrides_user() {
+        let mut chain = ConfigOverrideChain::new();
+        chain.override_at_level(ConfigurationScope::User, "k", "user");
+        chain.override_at_level(ConfigurationScope::Workspace, "k", "ws");
+        assert_eq!(chain.get_effective_value("k"), Some("ws"));
+    }
+
+    #[test]
+    fn override_chain_reset_level() {
+        let mut chain = ConfigOverrideChain::new();
+        chain.override_at_level(ConfigurationScope::User, "k", "v");
+        chain.reset_level(ConfigurationScope::User);
+        assert_eq!(chain.get_effective_value("k"), None);
+    }
+
+    // -- ConfigChangeEvent -------------------------------------------------
+
+    #[test]
+    fn change_event_is_addition() {
+        let ev = ConfigChangeEvent::new("k", None, Some("v"), ConfigurationScope::User);
+        assert!(ev.is_addition());
+        assert!(!ev.is_removal());
+        assert!(!ev.is_modification());
+    }
+
+    #[test]
+    fn change_event_is_removal() {
+        let ev = ConfigChangeEvent::new("k", Some("v"), None, ConfigurationScope::User);
+        assert!(ev.is_removal());
+    }
+
+    #[test]
+    fn change_event_is_modification() {
+        let ev = ConfigChangeEvent::new("k", Some("a"), Some("b"), ConfigurationScope::User);
+        assert!(ev.is_modification());
+    }
+
+    #[test]
+    fn change_event_affects_key() {
+        let ev = ConfigChangeEvent::new("editor.fontSize", None, Some("14"), ConfigurationScope::User);
+        assert!(ev.affects_key("editor.fontSize"));
+        assert!(ev.affects_key("editor"));
+        assert!(!ev.affects_key("terminal"));
+    }
+
+    // -- ConfigSchemaEntry -------------------------------------------------
+
+    #[test]
+    fn schema_validate_boolean() {
+        let entry = ConfigSchemaEntry::new("k", "boolean", "true", "desc");
+        assert!(entry.validate_value("true"));
+        assert!(entry.validate_value("false"));
+        assert!(!entry.validate_value("yes"));
+    }
+
+    #[test]
+    fn schema_validate_enum() {
+        let entry = ConfigSchemaEntry::new("k", "string", "a", "desc")
+            .with_enum_values(vec!["a".into(), "b".into()]);
+        assert!(entry.validate_value("a"));
+        assert!(!entry.validate_value("c"));
+    }
+
+    #[test]
+    fn schema_format_default() {
+        let entry = ConfigSchemaEntry::new("editor.tabSize", "integer", "4", "Tab size");
+        assert_eq!(entry.format_default(), "editor.tabSize (default: 4)");
+    }
+
+    #[test]
+    fn schema_validate_integer() {
+        let entry = ConfigSchemaEntry::new("k", "integer", "0", "desc");
+        assert!(entry.validate_value("42"));
+        assert!(!entry.validate_value("abc"));
     }
 
 }

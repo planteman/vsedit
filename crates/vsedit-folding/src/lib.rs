@@ -1529,6 +1529,151 @@ impl fmt::Display for FoldingRangeAnimationConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FoldingRangeOptimizer
+// ---------------------------------------------------------------------------
+
+/// Optimizes a set of folding ranges by merging, deduplicating, and sorting.
+pub struct FoldingRangeOptimizer;
+
+impl FoldingRangeOptimizer {
+    /// Merge ranges whose end_line + 1 == next start_line and share the same kind.
+    pub fn merge_adjacent(ranges: &[FoldingRange]) -> Vec<FoldingRange> {
+        if ranges.is_empty() {
+            return Vec::new();
+        }
+        let mut sorted: Vec<FoldingRange> = ranges.to_vec();
+        sorted.sort_by_key(|r| r.start_line);
+        let mut result: Vec<FoldingRange> = vec![sorted[0].clone()];
+        for r in &sorted[1..] {
+            let last = result.last_mut().unwrap();
+            if last.kind == r.kind && last.end_line + 1 >= r.start_line {
+                last.end_line = last.end_line.max(r.end_line);
+            } else {
+                result.push(r.clone());
+            }
+        }
+        result
+    }
+
+    /// Remove ranges that are completely nested inside another range of the same kind.
+    pub fn remove_nested_duplicates(ranges: &[FoldingRange]) -> Vec<FoldingRange> {
+        let mut sorted: Vec<FoldingRange> = ranges.to_vec();
+        sorted.sort_by_key(|r| (r.start_line, std::cmp::Reverse(r.end_line)));
+        let mut result: Vec<FoldingRange> = Vec::new();
+        for r in &sorted {
+            let dominated = result.iter().any(|outer| {
+                outer.start_line <= r.start_line
+                    && outer.end_line >= r.end_line
+                    && outer.kind == r.kind
+                    && (outer.start_line != r.start_line || outer.end_line != r.end_line)
+            });
+            if !dominated {
+                result.push(r.clone());
+            }
+        }
+        result
+    }
+
+    /// Sort ranges by start_line then end_line.
+    pub fn sort_by_line(ranges: &mut [FoldingRange]) {
+        ranges.sort_by_key(|r| (r.start_line, r.end_line));
+    }
+
+    /// Expand range boundaries to nearest block boundaries (multiples of block_size).
+    pub fn expand_to_block_boundaries(range: &FoldingRange, block_size: u32) -> FoldingRange {
+        let start = (range.start_line / block_size) * block_size;
+        let end = ((range.end_line + block_size - 1) / block_size) * block_size;
+        FoldingRange {
+            start_line: start,
+            end_line: end,
+            kind: range.kind,
+            is_collapsed: range.is_collapsed,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FoldingMemory
+// ---------------------------------------------------------------------------
+
+/// Remembers which ranges a user has folded per file.
+pub struct FoldingMemory {
+    folded: HashMap<String, Vec<(u32, u32)>>,
+}
+
+impl FoldingMemory {
+    pub fn new() -> Self {
+        Self { folded: HashMap::new() }
+    }
+
+    pub fn toggle_fold(&mut self, file: &str, start: u32, end: u32) {
+        let entry = self.folded.entry(file.to_string()).or_default();
+        if let Some(pos) = entry.iter().position(|&(s, e)| s == start && e == end) {
+            entry.remove(pos);
+        } else {
+            entry.push((start, end));
+        }
+    }
+
+    pub fn is_folded(&self, file: &str, start: u32, end: u32) -> bool {
+        self.folded
+            .get(file)
+            .map_or(false, |v| v.iter().any(|&(s, e)| s == start && e == end))
+    }
+
+    pub fn fold_count(&self, file: &str) -> usize {
+        self.folded.get(file).map_or(0, |v| v.len())
+    }
+
+    pub fn snapshot(&self) -> Vec<(String, Vec<(u32, u32)>)> {
+        self.folded.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FoldingLevelCalculator
+// ---------------------------------------------------------------------------
+
+/// Computes nesting levels for each line based on indentation.
+pub struct FoldingLevelCalculator {
+    levels: Vec<u32>,
+}
+
+impl FoldingLevelCalculator {
+    pub fn from_text(text: &str, indent_size: u32) -> Self {
+        let indent_size = indent_size.max(1);
+        let levels: Vec<u32> = text
+            .lines()
+            .map(|line| {
+                let spaces = line.len() - line.trim_start().len();
+                (spaces as u32) / indent_size
+            })
+            .collect();
+        Self { levels }
+    }
+
+    pub fn max_level(&self) -> u32 {
+        self.levels.iter().copied().max().unwrap_or(0)
+    }
+
+    pub fn lines_at_level(&self, level: u32) -> usize {
+        self.levels.iter().filter(|&&l| l == level).count()
+    }
+
+    pub fn average_level(&self) -> f64 {
+        if self.levels.is_empty() {
+            return 0.0;
+        }
+        let sum: u32 = self.levels.iter().sum();
+        sum as f64 / self.levels.len() as f64
+    }
+
+    pub fn level_for_line(&self, line: usize) -> Option<u32> {
+        self.levels.get(line).copied()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2625,6 +2770,128 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- FoldingRangeOptimizer tests --
+
+    #[test]
+    fn optimizer_merge_adjacent_same_kind() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 6, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        let merged = FoldingRangeOptimizer::merge_adjacent(&ranges);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_line, 1);
+        assert_eq!(merged[0].end_line, 10);
+    }
+
+    #[test]
+    fn optimizer_no_merge_different_kind() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 6, end_line: 10, kind: FoldingRangeKind::Comment, is_collapsed: false },
+        ];
+        let merged = FoldingRangeOptimizer::merge_adjacent(&ranges);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn optimizer_merge_empty() {
+        assert!(FoldingRangeOptimizer::merge_adjacent(&[]).is_empty());
+    }
+
+    #[test]
+    fn optimizer_remove_nested_duplicates() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 3, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        let result = FoldingRangeOptimizer::remove_nested_duplicates(&ranges);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].end_line, 20);
+    }
+
+    #[test]
+    fn optimizer_sort_by_line() {
+        let mut ranges = vec![
+            FoldingRange { start_line: 10, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        FoldingRangeOptimizer::sort_by_line(&mut ranges);
+        assert_eq!(ranges[0].start_line, 1);
+        assert_eq!(ranges[1].start_line, 10);
+    }
+
+    #[test]
+    fn optimizer_expand_to_block_boundaries() {
+        let r = FoldingRange { start_line: 3, end_line: 7, kind: FoldingRangeKind::Region, is_collapsed: false };
+        let expanded = FoldingRangeOptimizer::expand_to_block_boundaries(&r, 5);
+        assert_eq!(expanded.start_line, 0);
+        assert_eq!(expanded.end_line, 10);
+    }
+
+    // -- FoldingMemory tests --
+
+    #[test]
+    fn memory_toggle_and_is_folded() {
+        let mut mem = FoldingMemory::new();
+        mem.toggle_fold("a.rs", 1, 5);
+        assert!(mem.is_folded("a.rs", 1, 5));
+        mem.toggle_fold("a.rs", 1, 5);
+        assert!(!mem.is_folded("a.rs", 1, 5));
+    }
+
+    #[test]
+    fn memory_fold_count() {
+        let mut mem = FoldingMemory::new();
+        assert_eq!(mem.fold_count("x.rs"), 0);
+        mem.toggle_fold("x.rs", 1, 5);
+        mem.toggle_fold("x.rs", 10, 20);
+        assert_eq!(mem.fold_count("x.rs"), 2);
+    }
+
+    #[test]
+    fn memory_snapshot() {
+        let mut mem = FoldingMemory::new();
+        mem.toggle_fold("a.rs", 1, 5);
+        let snap = mem.snapshot();
+        assert_eq!(snap.len(), 1);
+    }
+
+    // -- FoldingLevelCalculator tests --
+
+    #[test]
+    fn level_calculator_basic() {
+        let text = "a\n  b\n    c\n";
+        let calc = FoldingLevelCalculator::from_text(text, 2);
+        assert_eq!(calc.level_for_line(0), Some(0));
+        assert_eq!(calc.level_for_line(1), Some(1));
+        assert_eq!(calc.level_for_line(2), Some(2));
+    }
+
+    #[test]
+    fn level_calculator_max_level() {
+        let text = "a\n    b\n        c\n";
+        let calc = FoldingLevelCalculator::from_text(text, 4);
+        assert_eq!(calc.max_level(), 2);
+    }
+
+    #[test]
+    fn level_calculator_lines_at_level() {
+        let text = "a\n  b\n  c\n    d\n";
+        let calc = FoldingLevelCalculator::from_text(text, 2);
+        assert_eq!(calc.lines_at_level(0), 1);
+        assert_eq!(calc.lines_at_level(1), 2);
+        assert_eq!(calc.lines_at_level(2), 1);
+    }
+
+    #[test]
+    fn level_calculator_average() {
+        let text = "a\n  b\n";
+        let calc = FoldingLevelCalculator::from_text(text, 2);
+        let avg = calc.average_level();
+        assert!((avg - 0.5).abs() < 0.01);
     }
 
 }

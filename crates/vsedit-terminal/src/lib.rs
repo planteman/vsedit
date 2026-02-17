@@ -1761,6 +1761,213 @@ impl TerminalBuffer {
 }
 
 // ---------------------------------------------------------------------------
+// TerminalScrollbackBuffer – ring buffer for scrollback
+// ---------------------------------------------------------------------------
+
+/// A ring buffer that stores terminal scrollback lines.
+#[derive(Debug, Clone)]
+pub struct TerminalScrollbackBuffer {
+    lines: Vec<String>,
+    max_lines: usize,
+    scroll_offset: usize,
+    visible_count: usize,
+}
+
+impl TerminalScrollbackBuffer {
+    pub fn new(max_lines: usize, visible_count: usize) -> Self {
+        Self {
+            lines: Vec::new(),
+            max_lines,
+            scroll_offset: 0,
+            visible_count,
+        }
+    }
+
+    /// Push a new line into the buffer.
+    pub fn push_line(&mut self, line: &str) {
+        self.lines.push(line.to_string());
+        self.trim_to_max();
+    }
+
+    /// Get a line at a specific index.
+    pub fn line_at(&self, index: usize) -> Option<&str> {
+        self.lines.get(index).map(|s| s.as_str())
+    }
+
+    pub fn total_lines(&self) -> usize { self.lines.len() }
+
+    /// Return visible lines from the current scroll offset.
+    pub fn visible_lines(&self) -> Vec<&str> {
+        self.lines
+            .iter()
+            .skip(self.scroll_offset)
+            .take(self.visible_count)
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Set the scroll offset.
+    pub fn scroll_to(&mut self, offset: usize) {
+        self.scroll_offset = offset.min(self.lines.len().saturating_sub(self.visible_count));
+    }
+
+    /// Search for lines containing a pattern, returning their indices.
+    pub fn search_lines(&self, pattern: &str) -> Vec<usize> {
+        self.lines
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| l.contains(pattern))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.lines.clear();
+        self.scroll_offset = 0;
+    }
+
+    pub fn max_lines(&self) -> usize { self.max_lines }
+
+    /// Trim buffer to max_lines capacity.
+    pub fn trim_to_max(&mut self) {
+        if self.lines.len() > self.max_lines {
+            let excess = self.lines.len() - self.max_lines;
+            self.lines.drain(0..excess);
+            self.scroll_offset = self.scroll_offset.saturating_sub(excess);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalColorMapper – map 256-color palette to RGB
+// ---------------------------------------------------------------------------
+
+/// Maps terminal 256-color indices to RGB values.
+#[derive(Debug, Clone)]
+pub struct TerminalColorMapper {
+    palette: [(u8, u8, u8); 16],
+}
+
+impl TerminalColorMapper {
+    pub fn default_palette() -> Self {
+        Self {
+            palette: [
+                (0, 0, 0),       // black
+                (170, 0, 0),     // red
+                (0, 170, 0),     // green
+                (170, 85, 0),    // yellow/brown
+                (0, 0, 170),     // blue
+                (170, 0, 170),   // magenta
+                (0, 170, 170),   // cyan
+                (170, 170, 170), // white
+                (85, 85, 85),    // bright black
+                (255, 85, 85),   // bright red
+                (85, 255, 85),   // bright green
+                (255, 255, 85),  // bright yellow
+                (85, 85, 255),   // bright blue
+                (255, 85, 255),  // bright magenta
+                (85, 255, 255),  // bright cyan
+                (255, 255, 255), // bright white
+            ],
+        }
+    }
+
+    /// Map a color index (0-255) to an RGB tuple.
+    pub fn color_index_to_rgb(&self, index: u8) -> (u8, u8, u8) {
+        if index < 16 {
+            self.palette[index as usize]
+        } else if index < 232 {
+            // 6x6x6 color cube
+            let i = index - 16;
+            let r = (i / 36) * 51;
+            let g = ((i % 36) / 6) * 51;
+            let b = (i % 6) * 51;
+            (r, g, b)
+        } else {
+            // grayscale ramp
+            let g = 8 + (index - 232) * 10;
+            (g, g, g)
+        }
+    }
+
+    /// Find the nearest 256-color index for an RGB value.
+    pub fn nearest_256_color(&self, r: u8, g: u8, b: u8) -> u8 {
+        let mut best_index = 0u8;
+        let mut best_dist = u32::MAX;
+        for i in 0..=255u8 {
+            let (cr, cg, cb) = self.color_index_to_rgb(i);
+            let dr = (r as i32 - cr as i32).unsigned_abs();
+            let dg = (g as i32 - cg as i32).unsigned_abs();
+            let db = (b as i32 - cb as i32).unsigned_abs();
+            let dist = dr * dr + dg * dg + db * db;
+            if dist < best_dist {
+                best_dist = dist;
+                best_index = i;
+            }
+        }
+        best_index
+    }
+
+    /// Check if a color index is a bright color (8-15).
+    pub fn is_bright(&self, index: u8) -> bool {
+        (8..16).contains(&index)
+    }
+
+    /// Get the bright variant of a base color (0-7 -> 8-15).
+    pub fn bright_variant(&self, index: u8) -> u8 {
+        if index < 8 { index + 8 } else { index }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AnsiSequenceParser – parse basic ANSI escape sequences
+// ---------------------------------------------------------------------------
+
+/// Parsed ANSI escape command.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnsiCommand {
+    CursorUp(u32),
+    CursorDown(u32),
+    CursorForward(u32),
+    CursorBack(u32),
+    ClearScreen,
+    SetColor(u8),
+    ResetAttributes,
+    Unknown(String),
+}
+
+/// Parse a CSI (Control Sequence Introducer) escape sequence.
+pub fn parse_csi_sequence(params: &str, command: char) -> AnsiCommand {
+    let n: u32 = params.parse().unwrap_or(1);
+    match command {
+        'A' => AnsiCommand::CursorUp(n),
+        'B' => AnsiCommand::CursorDown(n),
+        'C' => AnsiCommand::CursorForward(n),
+        'D' => AnsiCommand::CursorBack(n),
+        'J' => AnsiCommand::ClearScreen,
+        'm' => {
+            if params.is_empty() || params == "0" {
+                AnsiCommand::ResetAttributes
+            } else {
+                AnsiCommand::SetColor(n as u8)
+            }
+        }
+        _ => AnsiCommand::Unknown(format!("\\x1b[{}{}", params, command)),
+    }
+}
+
+/// Extract the params and command character from an escape sequence body.
+pub fn extract_csi_parts(seq: &str) -> Option<(&str, char)> {
+    if seq.len() < 2 { return None; }
+    let cmd = seq.chars().last()?;
+    if cmd.is_ascii_alphabetic() {
+        Some((&seq[..seq.len() - 1], cmd))
+    } else {
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -2694,5 +2901,118 @@ mod tests {
     fn buffer_word_at_out_of_bounds() {
         let buf = TerminalBuffer::new(80, 24);
         assert_eq!(buf.word_at(0, 999), None);
+    }
+
+    // -- TerminalScrollbackBuffer -------------------------------------------
+
+    #[test]
+    fn scrollback_push_and_get() {
+        let mut sb = TerminalScrollbackBuffer::new(100, 5);
+        sb.push_line("hello");
+        sb.push_line("world");
+        assert_eq!(sb.total_lines(), 2);
+        assert_eq!(sb.line_at(0), Some("hello"));
+        assert_eq!(sb.line_at(1), Some("world"));
+    }
+
+    #[test]
+    fn scrollback_visible_lines() {
+        let mut sb = TerminalScrollbackBuffer::new(100, 2);
+        sb.push_line("a");
+        sb.push_line("b");
+        sb.push_line("c");
+        let vis = sb.visible_lines();
+        assert_eq!(vis, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn scrollback_scroll_to() {
+        let mut sb = TerminalScrollbackBuffer::new(100, 2);
+        sb.push_line("a");
+        sb.push_line("b");
+        sb.push_line("c");
+        sb.scroll_to(1);
+        let vis = sb.visible_lines();
+        assert_eq!(vis, vec!["b", "c"]);
+    }
+
+    #[test]
+    fn scrollback_trim_to_max() {
+        let mut sb = TerminalScrollbackBuffer::new(3, 2);
+        for i in 0..5 {
+            sb.push_line(&format!("line{}", i));
+        }
+        assert_eq!(sb.total_lines(), 3);
+        assert_eq!(sb.line_at(0), Some("line2"));
+    }
+
+    #[test]
+    fn scrollback_search() {
+        let mut sb = TerminalScrollbackBuffer::new(100, 10);
+        sb.push_line("error: something failed");
+        sb.push_line("info: all good");
+        sb.push_line("error: another failure");
+        let results = sb.search_lines("error");
+        assert_eq!(results, vec![0, 2]);
+    }
+
+    #[test]
+    fn scrollback_clear() {
+        let mut sb = TerminalScrollbackBuffer::new(100, 10);
+        sb.push_line("data");
+        sb.clear();
+        assert_eq!(sb.total_lines(), 0);
+    }
+
+    // -- TerminalColorMapper ------------------------------------------------
+
+    #[test]
+    fn color_mapper_basic_colors() {
+        let cm = TerminalColorMapper::default_palette();
+        assert_eq!(cm.color_index_to_rgb(0), (0, 0, 0));
+        assert_eq!(cm.color_index_to_rgb(15), (255, 255, 255));
+    }
+
+    #[test]
+    fn color_mapper_is_bright() {
+        let cm = TerminalColorMapper::default_palette();
+        assert!(!cm.is_bright(0));
+        assert!(cm.is_bright(8));
+        assert!(cm.is_bright(15));
+        assert!(!cm.is_bright(16));
+    }
+
+    #[test]
+    fn color_mapper_bright_variant() {
+        let cm = TerminalColorMapper::default_palette();
+        assert_eq!(cm.bright_variant(1), 9);
+        assert_eq!(cm.bright_variant(10), 10);
+    }
+
+    #[test]
+    fn color_mapper_nearest() {
+        let cm = TerminalColorMapper::default_palette();
+        let idx = cm.nearest_256_color(0, 0, 0);
+        assert_eq!(idx, 0);
+    }
+
+    // -- AnsiSequenceParser -------------------------------------------------
+
+    #[test]
+    fn parse_csi_cursor_up() {
+        assert_eq!(parse_csi_sequence("3", 'A'), AnsiCommand::CursorUp(3));
+    }
+
+    #[test]
+    fn parse_csi_reset() {
+        assert_eq!(parse_csi_sequence("0", 'm'), AnsiCommand::ResetAttributes);
+        assert_eq!(parse_csi_sequence("", 'm'), AnsiCommand::ResetAttributes);
+    }
+
+    #[test]
+    fn extract_csi_parts_valid() {
+        let (params, cmd) = extract_csi_parts("3A").unwrap();
+        assert_eq!(params, "3");
+        assert_eq!(cmd, 'A');
     }
 }

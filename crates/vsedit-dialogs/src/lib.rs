@@ -1625,6 +1625,206 @@ impl fmt::Display for DialogHistoryServiceConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DialogPriorityQueue — queue with priority ordering
+// ---------------------------------------------------------------------------
+
+/// Priority level for queued dialogs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DialogPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
+}
+
+/// A dialog entry with priority for ordered dequeuing.
+#[derive(Debug, Clone)]
+pub struct PrioritizedDialog {
+    pub priority: DialogPriority,
+    pub title: String,
+    pub message: String,
+    pub severity: Severity,
+    pub enqueued_at: u64,
+}
+
+impl PrioritizedDialog {
+    pub fn new(priority: DialogPriority, title: impl Into<String>, message: impl Into<String>, severity: Severity) -> Self {
+        Self {
+            priority,
+            title: title.into(),
+            message: message.into(),
+            severity,
+            enqueued_at: 0,
+        }
+    }
+
+    pub fn with_timestamp(mut self, ts: u64) -> Self { self.enqueued_at = ts; self }
+}
+
+/// A priority-based dialog queue that dequeues highest priority first.
+#[derive(Debug, Clone)]
+pub struct DialogPriorityQueue {
+    entries: Vec<PrioritizedDialog>,
+}
+
+impl DialogPriorityQueue {
+    pub fn new() -> Self { Self { entries: Vec::new() } }
+
+    pub fn enqueue(&mut self, dialog: PrioritizedDialog) {
+        self.entries.push(dialog);
+    }
+
+    /// Dequeue the highest-priority dialog (FIFO within same priority).
+    pub fn dequeue(&mut self) -> Option<PrioritizedDialog> {
+        if self.entries.is_empty() { return None; }
+        let mut best_idx = 0;
+        for (i, entry) in self.entries.iter().enumerate() {
+            if entry.priority > self.entries[best_idx].priority {
+                best_idx = i;
+            }
+        }
+        Some(self.entries.remove(best_idx))
+    }
+
+    pub fn peek(&self) -> Option<&PrioritizedDialog> {
+        self.entries.iter().max_by_key(|e| e.priority)
+    }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize { self.entries.len() }
+
+    /// Count of dialogs at each priority level.
+    pub fn priority_counts(&self) -> (usize, usize, usize, usize) {
+        let mut low = 0; let mut normal = 0; let mut high = 0; let mut critical = 0;
+        for e in &self.entries {
+            match e.priority {
+                DialogPriority::Low => low += 1,
+                DialogPriority::Normal => normal += 1,
+                DialogPriority::High => high += 1,
+                DialogPriority::Critical => critical += 1,
+            }
+        }
+        (low, normal, high, critical)
+    }
+}
+
+impl Default for DialogPriorityQueue {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// DialogValidationChain — composable validation rules
+// ---------------------------------------------------------------------------
+
+/// A single validation rule.
+#[derive(Debug, Clone)]
+pub struct DialogValidationRule {
+    pub name: String,
+    pub message: String,
+    validator: DialogValidationFn,
+}
+
+#[derive(Clone)]
+enum DialogValidationFn {
+    NonEmpty,
+    MinLength(usize),
+    MaxLength(usize),
+    NoForbiddenChars(Vec<char>),
+}
+
+impl fmt::Debug for DialogValidationFn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NonEmpty => write!(f, "NonEmpty"),
+            Self::MinLength(n) => write!(f, "MinLength({n})"),
+            Self::MaxLength(n) => write!(f, "MaxLength({n})"),
+            Self::NoForbiddenChars(cs) => write!(f, "NoForbiddenChars({cs:?})"),
+        }
+    }
+}
+
+impl DialogValidationRule {
+    fn check(&self, input: &str) -> bool {
+        match &self.validator {
+            DialogValidationFn::NonEmpty => !input.is_empty(),
+            DialogValidationFn::MinLength(n) => input.len() >= *n,
+            DialogValidationFn::MaxLength(n) => input.len() <= *n,
+            DialogValidationFn::NoForbiddenChars(cs) => !cs.iter().any(|c| input.contains(*c)),
+        }
+    }
+}
+
+/// A chain of validation rules applied in order.
+#[derive(Debug, Clone)]
+pub struct DialogValidationChain {
+    rules: Vec<DialogValidationRule>,
+}
+
+impl DialogValidationChain {
+    pub fn new() -> Self { Self { rules: Vec::new() } }
+
+    pub fn non_empty(mut self) -> Self {
+        self.rules.push(DialogValidationRule {
+            name: "non_empty".into(),
+            message: "Input must not be empty".into(),
+            validator: DialogValidationFn::NonEmpty,
+        });
+        self
+    }
+
+    pub fn min_length(mut self, n: usize) -> Self {
+        self.rules.push(DialogValidationRule {
+            name: "min_length".into(),
+            message: format!("Input must be at least {n} characters"),
+            validator: DialogValidationFn::MinLength(n),
+        });
+        self
+    }
+
+    pub fn max_length(mut self, n: usize) -> Self {
+        self.rules.push(DialogValidationRule {
+            name: "max_length".into(),
+            message: format!("Input must be at most {n} characters"),
+            validator: DialogValidationFn::MaxLength(n),
+        });
+        self
+    }
+
+    pub fn no_chars(mut self, chars: Vec<char>) -> Self {
+        self.rules.push(DialogValidationRule {
+            name: "no_chars".into(),
+            message: format!("Input must not contain: {:?}", chars),
+            validator: DialogValidationFn::NoForbiddenChars(chars),
+        });
+        self
+    }
+
+    /// Validate input against all rules. Returns first error message, or Ok.
+    pub fn validate(&self, input: &str) -> Result<(), String> {
+        for rule in &self.rules {
+            if !rule.check(input) {
+                return Err(rule.message.clone());
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns all failing rule names.
+    pub fn failing_rules(&self, input: &str) -> Vec<&str> {
+        self.rules.iter()
+            .filter(|r| !r.check(input))
+            .map(|r| r.name.as_str())
+            .collect()
+    }
+
+    pub fn rule_count(&self) -> usize { self.rules.len() }
+}
+
+impl Default for DialogValidationChain {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2611,6 +2811,114 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- DialogPriorityQueue --------------------------------------------------
+
+    #[test]
+    fn priority_queue_dequeue_highest() {
+        let mut q = DialogPriorityQueue::new();
+        q.enqueue(PrioritizedDialog::new(DialogPriority::Low, "lo", "msg", Severity::Info));
+        q.enqueue(PrioritizedDialog::new(DialogPriority::Critical, "crit", "msg", Severity::Error));
+        q.enqueue(PrioritizedDialog::new(DialogPriority::Normal, "norm", "msg", Severity::Warning));
+        let d = q.dequeue().unwrap();
+        assert_eq!(d.title, "crit");
+    }
+
+    #[test]
+    fn priority_queue_empty() {
+        let mut q = DialogPriorityQueue::new();
+        assert!(q.dequeue().is_none());
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_peek() {
+        let mut q = DialogPriorityQueue::new();
+        q.enqueue(PrioritizedDialog::new(DialogPriority::High, "hi", "m", Severity::Info));
+        assert_eq!(q.peek().unwrap().title, "hi");
+        assert_eq!(q.len(), 1); // peek doesn't remove
+    }
+
+    #[test]
+    fn priority_queue_counts() {
+        let mut q = DialogPriorityQueue::new();
+        q.enqueue(PrioritizedDialog::new(DialogPriority::Low, "a", "m", Severity::Info));
+        q.enqueue(PrioritizedDialog::new(DialogPriority::Low, "b", "m", Severity::Info));
+        q.enqueue(PrioritizedDialog::new(DialogPriority::Critical, "c", "m", Severity::Error));
+        assert_eq!(q.priority_counts(), (2, 0, 0, 1));
+    }
+
+    // -- DialogValidationChain ------------------------------------------------
+
+    #[test]
+    fn validation_chain_non_empty() {
+        let chain = DialogValidationChain::new().non_empty();
+        assert!(chain.validate("hello").is_ok());
+        assert!(chain.validate("").is_err());
+    }
+
+    #[test]
+    fn validation_chain_min_max() {
+        let chain = DialogValidationChain::new()
+            .min_length(3)
+            .max_length(10);
+        assert!(chain.validate("ab").is_err());
+        assert!(chain.validate("abc").is_ok());
+        assert!(chain.validate("12345678901").is_err());
+    }
+
+    #[test]
+    fn validation_chain_no_chars() {
+        let chain = DialogValidationChain::new()
+            .no_chars(vec!['/', '\\']);
+        assert!(chain.validate("hello").is_ok());
+        assert!(chain.validate("path/to").is_err());
+    }
+
+    #[test]
+    fn validation_chain_failing_rules() {
+        let chain = DialogValidationChain::new()
+            .non_empty()
+            .min_length(5);
+        let fails = chain.failing_rules("ab");
+        assert_eq!(fails, vec!["min_length"]);
+    }
+
+    #[test]
+    fn validation_chain_all_pass() {
+        let chain = DialogValidationChain::new()
+            .non_empty()
+            .min_length(1)
+            .max_length(100);
+        assert!(chain.validate("ok").is_ok());
+        assert!(chain.failing_rules("ok").is_empty());
+    }
+
+    #[test]
+    fn validation_chain_multiple_fail() {
+        let chain = DialogValidationChain::new()
+            .non_empty()
+            .min_length(5);
+        let fails = chain.failing_rules("");
+        assert_eq!(fails.len(), 2);
+    }
+
+    #[test]
+    fn priority_dialog_with_timestamp() {
+        let d = PrioritizedDialog::new(DialogPriority::Normal, "t", "m", Severity::Info)
+            .with_timestamp(42);
+        assert_eq!(d.enqueued_at, 42);
+    }
+
+    #[test]
+    fn validation_chain_rule_count() {
+        let chain = DialogValidationChain::new()
+            .non_empty()
+            .min_length(3)
+            .max_length(100)
+            .no_chars(vec!['@']);
+        assert_eq!(chain.rule_count(), 4);
     }
 
 }

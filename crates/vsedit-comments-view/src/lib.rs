@@ -1403,6 +1403,173 @@ impl fmt::Display for CommentsTreeCollapserConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommentThreadGroup — group and query threads
+// ---------------------------------------------------------------------------
+
+/// Groups comment threads by file URI for efficient querying.
+#[derive(Debug, Clone)]
+pub struct CommentThreadGroup {
+    threads: Vec<CommentThread>,
+}
+
+impl CommentThreadGroup {
+    pub fn new() -> Self {
+        Self { threads: Vec::new() }
+    }
+
+    pub fn from_threads(threads: Vec<CommentThread>) -> Self {
+        Self { threads }
+    }
+
+    pub fn add(&mut self, thread: CommentThread) {
+        self.threads.push(thread);
+    }
+
+    /// Get all threads for a given file URI.
+    pub fn threads_for_file(&self, uri: &str) -> Vec<&CommentThread> {
+        self.threads.iter().filter(|t| t.uri == uri).collect()
+    }
+
+    /// Get unique file URIs that have threads.
+    pub fn files_with_threads(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.threads.iter().map(|t| t.uri.as_str()).collect();
+        uris.sort();
+        uris.dedup();
+        uris
+    }
+
+    /// Count of threads by resolved status.
+    pub fn resolved_count(&self) -> usize {
+        self.threads.iter().filter(|t| t.resolved).count()
+    }
+
+    pub fn unresolved_count(&self) -> usize {
+        self.threads.iter().filter(|t| !t.resolved).count()
+    }
+
+    /// Total number of comments across all threads.
+    pub fn total_comments(&self) -> usize {
+        self.threads.iter().map(|t| t.comments.len()).sum()
+    }
+
+    /// Unique authors across all comments.
+    pub fn unique_authors(&self) -> Vec<String> {
+        let mut authors: Vec<String> = self.threads.iter()
+            .flat_map(|t| t.comments.iter().map(|c| c.author.clone()))
+            .collect();
+        authors.sort();
+        authors.dedup();
+        authors
+    }
+
+    /// Threads sorted by most recent activity (latest comment timestamp).
+    pub fn by_recent_activity(&self) -> Vec<&CommentThread> {
+        let mut sorted: Vec<&CommentThread> = self.threads.iter().collect();
+        sorted.sort_by(|a, b| {
+            let a_ts = a.comments.last().map(|c| c.timestamp).unwrap_or(0);
+            let b_ts = b.comments.last().map(|c| c.timestamp).unwrap_or(0);
+            b_ts.cmp(&a_ts)
+        });
+        sorted
+    }
+
+    pub fn len(&self) -> usize { self.threads.len() }
+    pub fn is_empty(&self) -> bool { self.threads.is_empty() }
+}
+
+impl Default for CommentThreadGroup {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// CommentMentionExtractor — find @mentions in comment bodies
+// ---------------------------------------------------------------------------
+
+/// Extract @mentions from comment text.
+pub struct CommentMentionExtractor;
+
+impl CommentMentionExtractor {
+    /// Extract all @mentions from a body string.
+    pub fn extract_mentions(body: &str) -> Vec<String> {
+        let mut mentions = Vec::new();
+        let mut chars = body.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '@' {
+                let mut name = String::new();
+                while let Some(&nc) = chars.peek() {
+                    if nc.is_alphanumeric() || nc == '_' || nc == '-' {
+                        name.push(nc);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                if !name.is_empty() {
+                    mentions.push(name);
+                }
+            }
+        }
+        mentions
+    }
+
+    /// Extract mentions from all comments in a thread.
+    pub fn thread_mentions(thread: &CommentThread) -> Vec<String> {
+        let mut all: Vec<String> = thread.comments.iter()
+            .flat_map(|c| Self::extract_mentions(&c.body))
+            .collect();
+        all.sort();
+        all.dedup();
+        all
+    }
+
+    /// Check if a specific user is mentioned in a thread.
+    pub fn is_mentioned(thread: &CommentThread, username: &str) -> bool {
+        thread.comments.iter().any(|c| {
+            Self::extract_mentions(&c.body).iter().any(|m| m == username)
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommentActivityTracker — track comment activity over time
+// ---------------------------------------------------------------------------
+
+/// Tracks comment activity timestamps for rate/frequency analysis.
+#[derive(Debug, Clone)]
+pub struct CommentActivityTracker {
+    events: Vec<(String, u64)>,
+}
+
+impl CommentActivityTracker {
+    pub fn new() -> Self { Self { events: Vec::new() } }
+
+    pub fn record(&mut self, author: impl Into<String>, timestamp: u64) {
+        self.events.push((author.into(), timestamp));
+    }
+
+    /// Events within a time range.
+    pub fn events_in_range(&self, start: u64, end: u64) -> Vec<&(String, u64)> {
+        self.events.iter().filter(|(_, ts)| *ts >= start && *ts <= end).collect()
+    }
+
+    /// Most active author by event count.
+    pub fn most_active_author(&self) -> Option<String> {
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for (author, _) in &self.events {
+            *counts.entry(author.as_str()).or_insert(0) += 1;
+        }
+        counts.into_iter().max_by_key(|&(_, c)| c).map(|(a, _)| a.to_string())
+    }
+
+    /// Total number of tracked events.
+    pub fn total_events(&self) -> usize { self.events.len() }
+}
+
+impl Default for CommentActivityTracker {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2614,6 +2781,113 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- CommentThreadGroup --------------------------------------------------
+
+    #[test]
+    fn thread_group_add_and_query() {
+        let mut group = CommentThreadGroup::new();
+        group.add(make_thread("t1", "file:///a.rs", 10));
+        group.add(make_thread("t2", "file:///a.rs", 20));
+        group.add(make_thread("t3", "file:///b.rs", 5));
+        assert_eq!(group.len(), 3);
+        assert_eq!(group.threads_for_file("file:///a.rs").len(), 2);
+    }
+
+    #[test]
+    fn thread_group_files_with_threads() {
+        let mut group = CommentThreadGroup::new();
+        group.add(make_thread("t1", "file:///x.rs", 1));
+        group.add(make_thread("t2", "file:///y.rs", 1));
+        let files = group.files_with_threads();
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn thread_group_resolved_counts() {
+        let mut group = CommentThreadGroup::new();
+        let mut t = make_thread("t1", "f", 1);
+        t.resolved = true;
+        group.add(t);
+        group.add(make_thread("t2", "f", 2));
+        assert_eq!(group.resolved_count(), 1);
+        assert_eq!(group.unresolved_count(), 1);
+    }
+
+    #[test]
+    fn thread_group_total_comments() {
+        let mut t = make_thread("t1", "f", 1);
+        t.add_reply("alice", "hello", 100);
+        t.add_reply("bob", "world", 200);
+        let group = CommentThreadGroup::from_threads(vec![t]);
+        assert_eq!(group.total_comments(), 2);
+    }
+
+    #[test]
+    fn thread_group_unique_authors() {
+        let mut t = make_thread("t1", "f", 1);
+        t.add_reply("alice", "hi", 100);
+        t.add_reply("bob", "hey", 200);
+        t.add_reply("alice", "again", 300);
+        let group = CommentThreadGroup::from_threads(vec![t]);
+        assert_eq!(group.unique_authors().len(), 2);
+    }
+
+    // -- CommentMentionExtractor ----------------------------------------------
+
+    #[test]
+    fn mention_extraction_basic() {
+        let mentions = CommentMentionExtractor::extract_mentions("Hey @alice and @bob");
+        assert_eq!(mentions, vec!["alice", "bob"]);
+    }
+
+    #[test]
+    fn mention_extraction_no_mentions() {
+        let mentions = CommentMentionExtractor::extract_mentions("no mentions here");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn mention_extraction_at_sign_alone() {
+        let mentions = CommentMentionExtractor::extract_mentions("@ alone");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn mention_is_mentioned_in_thread() {
+        let mut t = make_thread("t1", "f", 1);
+        t.add_reply("admin", "cc @reviewer", 100);
+        assert!(CommentMentionExtractor::is_mentioned(&t, "reviewer"));
+        assert!(!CommentMentionExtractor::is_mentioned(&t, "nobody"));
+    }
+
+    // -- CommentActivityTracker -----------------------------------------------
+
+    #[test]
+    fn activity_tracker_records_and_queries() {
+        let mut at = CommentActivityTracker::new();
+        at.record("alice", 100);
+        at.record("bob", 200);
+        at.record("alice", 300);
+        assert_eq!(at.total_events(), 3);
+        assert_eq!(at.events_in_range(150, 250).len(), 1);
+    }
+
+    #[test]
+    fn activity_tracker_most_active() {
+        let mut at = CommentActivityTracker::new();
+        at.record("alice", 100);
+        at.record("alice", 200);
+        at.record("bob", 300);
+        assert_eq!(at.most_active_author(), Some("alice".into()));
+    }
+
+    #[test]
+    fn activity_tracker_empty() {
+        let at = CommentActivityTracker::new();
+        assert_eq!(at.most_active_author(), None);
+        assert_eq!(at.total_events(), 0);
     }
 
 }

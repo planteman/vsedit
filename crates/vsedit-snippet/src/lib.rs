@@ -1783,6 +1783,152 @@ impl fmt::Display for NestedTabstopResolverConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SnippetVariableResolver – resolve built-in and custom variables
+// ---------------------------------------------------------------------------
+
+/// Resolves snippet variables like TM_FILENAME, CURRENT_DATE, etc.
+#[derive(Debug, Clone, Default)]
+pub struct SnippetVariableResolver {
+    custom: HashMap<String, String>,
+    filename: Option<String>,
+    directory: Option<String>,
+}
+
+impl SnippetVariableResolver {
+    pub fn new() -> Self { Self::default() }
+
+    /// Set the current file context.
+    pub fn set_file_context(&mut self, filename: &str, directory: &str) {
+        self.filename = Some(filename.to_string());
+        self.directory = Some(directory.to_string());
+    }
+
+    /// Register a custom variable.
+    pub fn register_custom_variable(&mut self, name: &str, value: &str) {
+        self.custom.insert(name.to_string(), value.to_string());
+    }
+
+    /// Resolve a variable name to its value.
+    pub fn resolve(&self, name: &str) -> Option<String> {
+        match name {
+            "TM_FILENAME" => self.filename.clone(),
+            "TM_DIRECTORY" => self.directory.clone(),
+            "TM_FILENAME_BASE" => self.filename.as_ref().map(|f| {
+                f.rsplit('.').last().unwrap_or(f).to_string()
+            }),
+            "CURRENT_YEAR" => Some("2025".to_string()),
+            "CURRENT_MONTH" => Some("01".to_string()),
+            "CURRENT_DATE" => Some("01".to_string()),
+            "CURRENT_DAY_NAME" => Some("Monday".to_string()),
+            "CLIPBOARD" => Some(String::new()),
+            other => self.custom.get(other).cloned(),
+        }
+    }
+
+    /// Return names of variables that cannot be resolved.
+    pub fn unresolved_variables(&self, names: &[&str]) -> Vec<String> {
+        names.iter().filter(|n| self.resolve(n).is_none()).map(|n| n.to_string()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetChoice – tabstop with multiple choices
+// ---------------------------------------------------------------------------
+
+/// Represents a tabstop that offers a list of choices.
+#[derive(Debug, Clone)]
+pub struct SnippetChoice {
+    choices: Vec<String>,
+    current_index: usize,
+}
+
+impl SnippetChoice {
+    pub fn new(choices: Vec<String>) -> Self {
+        Self { choices, current_index: 0 }
+    }
+
+    pub fn choices(&self) -> &[String] { &self.choices }
+
+    pub fn current_index(&self) -> usize { self.current_index }
+
+    pub fn selected(&self) -> Option<&str> {
+        self.choices.get(self.current_index).map(|s| s.as_str())
+    }
+
+    pub fn next(&mut self) {
+        if !self.choices.is_empty() {
+            self.current_index = (self.current_index + 1) % self.choices.len();
+        }
+    }
+
+    pub fn prev(&mut self) {
+        if !self.choices.is_empty() {
+            self.current_index = if self.current_index == 0 {
+                self.choices.len() - 1
+            } else {
+                self.current_index - 1
+            };
+        }
+    }
+
+    /// Cycle through choices, wrapping around.
+    pub fn cycle(&mut self, forward: bool) {
+        if forward { self.next() } else { self.prev() }
+    }
+
+    pub fn display_string(&self) -> String {
+        format!("[{}]", self.choices.join("|"))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetMirrorTracker – track mirrored tabstops
+// ---------------------------------------------------------------------------
+
+/// Tracks mirrored tabstops: when a primary tabstop changes, mirrors update.
+#[derive(Debug, Clone, Default)]
+pub struct SnippetMirrorTracker {
+    /// Maps primary tabstop index to list of mirror positions.
+    mirrors: HashMap<usize, Vec<usize>>,
+    /// Current value of each primary tabstop.
+    values: HashMap<usize, String>,
+}
+
+impl SnippetMirrorTracker {
+    pub fn new() -> Self { Self::default() }
+
+    /// Register a mirror: `mirror_pos` mirrors the value at `primary`.
+    pub fn register_mirror(&mut self, primary: usize, mirror_pos: usize) {
+        self.mirrors.entry(primary).or_default().push(mirror_pos);
+    }
+
+    /// Get all mirror positions for a primary tabstop.
+    pub fn get_mirrors(&self, primary: usize) -> Vec<usize> {
+        self.mirrors.get(&primary).cloned().unwrap_or_default()
+    }
+
+    /// Update the primary tabstop value.
+    pub fn update_primary(&mut self, primary: usize, value: &str) {
+        self.values.insert(primary, value.to_string());
+    }
+
+    /// Get the current mirrored value for a primary tabstop.
+    pub fn mirrored_value(&self, primary: usize) -> Option<&str> {
+        self.values.get(&primary).map(|s| s.as_str())
+    }
+
+    /// Return all mirror values as a map of primary -> value.
+    pub fn mirrored_values(&self) -> &HashMap<usize, String> {
+        &self.values
+    }
+
+    /// Count total mirrors across all primaries.
+    pub fn mirror_count(&self) -> usize {
+        self.mirrors.values().map(|v| v.len()).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2605,6 +2751,105 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- SnippetVariableResolver -------------------------------------------
+
+    #[test]
+    fn resolve_builtin_tm_filename() {
+        let mut r = SnippetVariableResolver::new();
+        r.set_file_context("main.rs", "/src");
+        assert_eq!(r.resolve("TM_FILENAME"), Some("main.rs".to_string()));
+        assert_eq!(r.resolve("TM_DIRECTORY"), Some("/src".to_string()));
+    }
+
+    #[test]
+    fn resolve_custom_variable() {
+        let mut r = SnippetVariableResolver::new();
+        r.register_custom_variable("AUTHOR", "Alice");
+        assert_eq!(r.resolve("AUTHOR"), Some("Alice".to_string()));
+    }
+
+    #[test]
+    fn resolve_unresolved() {
+        let r = SnippetVariableResolver::new();
+        let unresolved = r.unresolved_variables(&["TM_FILENAME", "CURRENT_YEAR", "UNKNOWN"]);
+        assert!(unresolved.contains(&"TM_FILENAME".to_string()));
+        assert!(unresolved.contains(&"UNKNOWN".to_string()));
+        assert!(!unresolved.contains(&"CURRENT_YEAR".to_string()));
+    }
+
+    #[test]
+    fn resolve_current_year() {
+        let r = SnippetVariableResolver::new();
+        assert!(r.resolve("CURRENT_YEAR").is_some());
+    }
+
+    // -- SnippetChoice ------------------------------------------------------
+
+    #[test]
+    fn choice_basic() {
+        let c = SnippetChoice::new(vec!["a".into(), "b".into(), "c".into()]);
+        assert_eq!(c.selected(), Some("a"));
+        assert_eq!(c.current_index(), 0);
+    }
+
+    #[test]
+    fn choice_next_wraps() {
+        let mut c = SnippetChoice::new(vec!["x".into(), "y".into()]);
+        c.next();
+        assert_eq!(c.selected(), Some("y"));
+        c.next();
+        assert_eq!(c.selected(), Some("x"));
+    }
+
+    #[test]
+    fn choice_prev_wraps() {
+        let mut c = SnippetChoice::new(vec!["x".into(), "y".into()]);
+        c.prev();
+        assert_eq!(c.selected(), Some("y"));
+    }
+
+    #[test]
+    fn choice_display_string() {
+        let c = SnippetChoice::new(vec!["a".into(), "b".into()]);
+        assert_eq!(c.display_string(), "[a|b]");
+    }
+
+    // -- SnippetMirrorTracker -----------------------------------------------
+
+    #[test]
+    fn mirror_register_and_get() {
+        let mut m = SnippetMirrorTracker::new();
+        m.register_mirror(1, 10);
+        m.register_mirror(1, 20);
+        assert_eq!(m.get_mirrors(1), vec![10, 20]);
+        assert_eq!(m.get_mirrors(2), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn mirror_update_primary() {
+        let mut m = SnippetMirrorTracker::new();
+        m.register_mirror(1, 10);
+        m.update_primary(1, "hello");
+        assert_eq!(m.mirrored_value(1), Some("hello"));
+    }
+
+    #[test]
+    fn mirror_count() {
+        let mut m = SnippetMirrorTracker::new();
+        m.register_mirror(1, 10);
+        m.register_mirror(1, 20);
+        m.register_mirror(2, 30);
+        assert_eq!(m.mirror_count(), 3);
+    }
+
+    #[test]
+    fn mirror_values_map() {
+        let mut m = SnippetMirrorTracker::new();
+        m.update_primary(1, "a");
+        m.update_primary(2, "b");
+        assert_eq!(m.mirrored_values().len(), 2);
     }
 
 }

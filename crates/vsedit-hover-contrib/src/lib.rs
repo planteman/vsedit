@@ -1651,6 +1651,140 @@ impl fmt::Display for HoverDiagnosticsDisplayConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HoverContentBuilder
+// ---------------------------------------------------------------------------
+
+/// Builds multi-part hover content.
+pub struct HoverContentBuilder {
+    parts: Vec<String>,
+}
+
+impl HoverContentBuilder {
+    pub fn new() -> Self {
+        Self { parts: Vec::new() }
+    }
+
+    pub fn add_code_block(&mut self, code: &str, language: &str) -> &mut Self {
+        self.parts.push(format!("```{}\n{}\n```", language, code));
+        self
+    }
+
+    pub fn add_markdown(&mut self, md: &str) -> &mut Self {
+        self.parts.push(md.to_string());
+        self
+    }
+
+    pub fn add_separator(&mut self) -> &mut Self {
+        self.parts.push("---".to_string());
+        self
+    }
+
+    pub fn add_signature(&mut self, sig: &str) -> &mut Self {
+        self.parts.push(format!("`{}`", sig));
+        self
+    }
+
+    pub fn build(&self) -> String {
+        self.parts.join("\n\n")
+    }
+
+    pub fn part_count(&self) -> usize {
+        self.parts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.parts.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverPositionCalculator
+// ---------------------------------------------------------------------------
+
+/// Computes tooltip position relative to cursor, avoiding overflow.
+pub struct HoverTooltipPositioner {
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+}
+
+impl HoverTooltipPositioner {
+    pub fn new(viewport_width: u32, viewport_height: u32) -> Self {
+        Self { viewport_width, viewport_height }
+    }
+
+    /// Returns (x, y) position for the tooltip. Prefers placing above the cursor.
+    pub fn compute_position(
+        &self,
+        cursor_x: u32,
+        cursor_y: u32,
+        tooltip_width: u32,
+        tooltip_height: u32,
+    ) -> (u32, u32) {
+        let x = if cursor_x + tooltip_width > self.viewport_width {
+            self.viewport_width.saturating_sub(tooltip_width)
+        } else {
+            cursor_x
+        };
+        let y = if cursor_y >= tooltip_height + 2 {
+            cursor_y - tooltip_height - 2
+        } else {
+            cursor_y + 2
+        };
+        (x, y)
+    }
+
+    pub fn prefer_above(&self, cursor_y: u32, tooltip_height: u32) -> bool {
+        cursor_y >= tooltip_height + 2
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverDelayManager
+// ---------------------------------------------------------------------------
+
+/// Manages delay before showing hover tooltip.
+pub struct HoverDelayManager {
+    delay_ms: u64,
+    started_at: Option<std::time::Instant>,
+}
+
+impl HoverDelayManager {
+    pub fn new(delay_ms: u64) -> Self {
+        Self { delay_ms, started_at: None }
+    }
+
+    pub fn start(&mut self) {
+        self.started_at = Some(std::time::Instant::now());
+    }
+
+    pub fn cancel(&mut self) {
+        self.started_at = None;
+    }
+
+    pub fn reset(&mut self) {
+        self.started_at = None;
+    }
+
+    pub fn is_ready(&self) -> bool {
+        match self.started_at {
+            Some(t) => t.elapsed().as_millis() as u64 >= self.delay_ms,
+            None => false,
+        }
+    }
+
+    pub fn elapsed_ms(&self) -> u64 {
+        match self.started_at {
+            Some(t) => t.elapsed().as_millis() as u64,
+            None => 0,
+        }
+    }
+
+    pub fn delay(&self) -> u64 {
+        self.delay_ms
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2611,6 +2745,108 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- HoverContentBuilder tests --
+
+    #[test]
+    fn builder_empty() {
+        let b = HoverContentBuilder::new();
+        assert!(b.is_empty());
+        assert_eq!(b.build(), "");
+    }
+
+    #[test]
+    fn builder_add_code_block() {
+        let mut b = HoverContentBuilder::new();
+        b.add_code_block("let x = 1;", "rust");
+        assert!(b.build().contains("```rust"));
+        assert_eq!(b.part_count(), 1);
+    }
+
+    #[test]
+    fn builder_add_markdown() {
+        let mut b = HoverContentBuilder::new();
+        b.add_markdown("**bold**");
+        assert!(b.build().contains("**bold**"));
+    }
+
+    #[test]
+    fn builder_add_separator() {
+        let mut b = HoverContentBuilder::new();
+        b.add_markdown("a");
+        b.add_separator();
+        b.add_markdown("b");
+        assert!(b.build().contains("---"));
+        assert_eq!(b.part_count(), 3);
+    }
+
+    #[test]
+    fn builder_add_signature() {
+        let mut b = HoverContentBuilder::new();
+        b.add_signature("fn foo()");
+        assert!(b.build().contains("`fn foo()`"));
+    }
+
+    #[test]
+    fn builder_multi_part() {
+        let mut b = HoverContentBuilder::new();
+        b.add_code_block("x", "rs").add_markdown("doc").add_separator();
+        assert_eq!(b.part_count(), 3);
+    }
+
+    // -- HoverTooltipPositioner tests --
+
+    #[test]
+    fn position_no_overflow() {
+        let calc = HoverTooltipPositioner::new(800, 600);
+        let (x, y) = calc.compute_position(100, 200, 150, 50);
+        assert_eq!(x, 100);
+        assert_eq!(y, 148);
+    }
+
+    #[test]
+    fn position_overflow_x() {
+        let calc = HoverTooltipPositioner::new(800, 600);
+        let (x, _) = calc.compute_position(750, 200, 150, 50);
+        assert_eq!(x, 650);
+    }
+
+    #[test]
+    fn position_below_when_no_space_above() {
+        let calc = HoverTooltipPositioner::new(800, 600);
+        let (_, y) = calc.compute_position(100, 10, 150, 50);
+        assert_eq!(y, 12);
+    }
+
+    #[test]
+    fn prefer_above_check() {
+        let calc = HoverTooltipPositioner::new(800, 600);
+        assert!(calc.prefer_above(100, 50));
+        assert!(!calc.prefer_above(10, 50));
+    }
+
+    // -- HoverDelayManager tests --
+
+    #[test]
+    fn delay_manager_not_ready_without_start() {
+        let dm = HoverDelayManager::new(500);
+        assert!(!dm.is_ready());
+        assert_eq!(dm.elapsed_ms(), 0);
+    }
+
+    #[test]
+    fn delay_manager_cancel() {
+        let mut dm = HoverDelayManager::new(0);
+        dm.start();
+        dm.cancel();
+        assert!(!dm.is_ready());
+    }
+
+    #[test]
+    fn delay_manager_delay_value() {
+        let dm = HoverDelayManager::new(300);
+        assert_eq!(dm.delay(), 300);
     }
 
 }

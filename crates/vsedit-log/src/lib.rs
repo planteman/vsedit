@@ -1607,6 +1607,144 @@ impl LogLevelRuntimeAdjuster {
     }
 }
 
+// --- LogBufferRing: ring buffer for recent logs ---
+
+pub struct LogBufferRing {
+    entries: Vec<LogEntry>,
+    capacity: usize,
+}
+
+impl LogBufferRing {
+    pub fn new(capacity: usize) -> Self {
+        Self { entries: Vec::with_capacity(capacity), capacity: capacity.max(1) }
+    }
+
+    pub fn push(&mut self, entry: LogEntry) {
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    pub fn drain(&mut self) -> Vec<LogEntry> {
+        std::mem::take(&mut self.entries)
+    }
+
+    pub fn peek(&self) -> Option<&LogEntry> { self.entries.last() }
+    pub fn oldest(&self) -> Option<&LogEntry> { self.entries.first() }
+    pub fn newest(&self) -> Option<&LogEntry> { self.entries.last() }
+    pub fn capacity(&self) -> usize { self.capacity }
+    pub fn is_full(&self) -> bool { self.entries.len() >= self.capacity }
+    pub fn clear(&mut self) { self.entries.clear(); }
+    pub fn len(&self) -> usize { self.entries.len() }
+
+    pub fn count_by_level(&self, level: LogLevel) -> usize {
+        self.entries.iter().filter(|e| e.level == level).count()
+    }
+}
+
+// --- LogFilterV2 ---
+
+pub struct LogFilterV2 {
+    min_level: Option<LogLevel>,
+    module_pattern: Option<String>,
+    message_pattern: Option<String>,
+}
+
+impl LogFilterV2 {
+    pub fn new() -> Self {
+        Self { min_level: None, module_pattern: None, message_pattern: None }
+    }
+
+    pub fn with_level(mut self, level: LogLevel) -> Self { self.min_level = Some(level); self }
+    pub fn with_channel(mut self, pattern: &str) -> Self { self.module_pattern = Some(pattern.to_string()); self }
+    pub fn with_message(mut self, pattern: &str) -> Self { self.message_pattern = Some(pattern.to_string()); self }
+
+    pub fn matches(&self, entry: &LogEntry) -> bool {
+        if let Some(min) = self.min_level {
+            if entry.level < min { return false; }
+        }
+        if let Some(ref mod_pat) = self.module_pattern {
+            if !entry.channel.contains(mod_pat.as_str()) { return false; }
+        }
+        if let Some(ref msg_pat) = self.message_pattern {
+            if !entry.message.contains(msg_pat.as_str()) { return false; }
+        }
+        true
+    }
+
+    pub fn parse_filter_string(s: &str) -> Self {
+        let mut f = Self::new();
+        for part in s.split_whitespace() {
+            if let Some(lvl) = part.strip_prefix("level:") {
+                match lvl {
+                    "trace" => f.min_level = Some(LogLevel::Trace),
+                    "debug" => f.min_level = Some(LogLevel::Debug),
+                    "info" => f.min_level = Some(LogLevel::Info),
+                    "warn" => f.min_level = Some(LogLevel::Warning),
+                    "error" => f.min_level = Some(LogLevel::Error),
+                    _ => {}
+                }
+            } else if let Some(m) = part.strip_prefix("module:") {
+                f.module_pattern = Some(m.to_string());
+            } else if let Some(m) = part.strip_prefix("msg:") {
+                f.message_pattern = Some(m.to_string());
+            }
+        }
+        f
+    }
+}
+
+// --- LogFormatterV2 ---
+
+pub struct LogFormatterV2;
+
+impl LogFormatterV2 {
+    pub fn compact(entry: &LogEntry) -> String {
+        format!("[{}] {}: {}", Self::level_char(entry.level), entry.channel, entry.message)
+    }
+
+    pub fn json(entry: &LogEntry) -> String {
+        format!(
+            r#"{{"timestamp":{},"level":"{}","channel":"{}","message":"{}"}}"#,
+            entry.timestamp, Self::level_str(entry.level), entry.channel, entry.message
+        )
+    }
+
+    pub fn colored_indicator(level: LogLevel) -> &'static str {
+        match level {
+            LogLevel::Trace => "⚪",
+            LogLevel::Debug => "🔵",
+            LogLevel::Info => "🟢",
+            LogLevel::Warning => "🟡",
+            LogLevel::Error => "🔴",
+            LogLevel::Off => " ",
+        }
+    }
+
+    fn level_char(level: LogLevel) -> char {
+        match level {
+            LogLevel::Trace => 'T',
+            LogLevel::Debug => 'D',
+            LogLevel::Info => 'I',
+            LogLevel::Warning => 'W',
+            LogLevel::Error => 'E',
+            LogLevel::Off => '-',
+        }
+    }
+
+    fn level_str(level: LogLevel) -> &'static str {
+        match level {
+            LogLevel::Trace => "trace",
+            LogLevel::Debug => "debug",
+            LogLevel::Info => "info",
+            LogLevel::Warning => "warn",
+            LogLevel::Error => "error",
+            LogLevel::Off => "off",
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -2652,6 +2790,104 @@ mod tests {
     fn adjuster_off_never_logs() {
         let adj = LogLevelRuntimeAdjuster::new(LogLevel::Trace);
         assert!(!adj.should_log("ch", LogLevel::Off));
+    }
+
+    fn make_log_entry(level: LogLevel, channel: &str, message: &str) -> LogEntry {
+        LogEntry { timestamp: 0, level, channel: channel.into(), message: message.into(), source: None, data: None }
+    }
+
+    #[test]
+    fn log_buffer_ring_push_and_len() {
+        let mut buf = LogBufferRing::new(5);
+        buf.push(make_log_entry(LogLevel::Info, "mod", "msg"));
+        assert_eq!(buf.len(), 1);
+    }
+
+    #[test]
+    fn log_buffer_ring_capacity_eviction() {
+        let mut buf = LogBufferRing::new(2);
+        buf.push(make_log_entry(LogLevel::Info, "a", "first"));
+        buf.push(make_log_entry(LogLevel::Info, "b", "second"));
+        buf.push(make_log_entry(LogLevel::Info, "c", "third"));
+        assert_eq!(buf.len(), 2);
+        assert_eq!(buf.oldest().unwrap().channel, "b");
+    }
+
+    #[test]
+    fn log_buffer_ring_drain() {
+        let mut buf = LogBufferRing::new(10);
+        buf.push(make_log_entry(LogLevel::Debug, "m", "msg"));
+        let drained = buf.drain();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(buf.len(), 0);
+    }
+
+    #[test]
+    fn log_buffer_ring_count_by_level() {
+        let mut buf = LogBufferRing::new(10);
+        buf.push(make_log_entry(LogLevel::Info, "m", "a"));
+        buf.push(make_log_entry(LogLevel::Error, "m", "b"));
+        buf.push(make_log_entry(LogLevel::Info, "m", "c"));
+        assert_eq!(buf.count_by_level(LogLevel::Info), 2);
+        assert_eq!(buf.count_by_level(LogLevel::Error), 1);
+    }
+
+    #[test]
+    fn log_filter_v2_by_level() {
+        let f = LogFilterV2::new().with_level(LogLevel::Warning);
+        assert!(!f.matches(&make_log_entry(LogLevel::Info, "m", "msg")));
+        assert!(f.matches(&make_log_entry(LogLevel::Error, "m", "msg")));
+    }
+
+    #[test]
+    fn log_filter_v2_by_channel() {
+        let f = LogFilterV2::new().with_channel("auth");
+        assert!(f.matches(&make_log_entry(LogLevel::Info, "auth::login", "ok")));
+        assert!(!f.matches(&make_log_entry(LogLevel::Info, "db", "ok")));
+    }
+
+    #[test]
+    fn log_filter_v2_by_message() {
+        let f = LogFilterV2::new().with_message("fail");
+        assert!(f.matches(&make_log_entry(LogLevel::Error, "m", "connection failed")));
+        assert!(!f.matches(&make_log_entry(LogLevel::Error, "m", "success")));
+    }
+
+    #[test]
+    fn log_filter_v2_parse() {
+        let f = LogFilterV2::parse_filter_string("level:error module:auth");
+        assert_eq!(f.min_level, Some(LogLevel::Error));
+        assert_eq!(f.module_pattern, Some("auth".into()));
+    }
+
+    #[test]
+    fn log_formatter_v2_compact() {
+        let e = make_log_entry(LogLevel::Info, "app", "started");
+        let s = LogFormatterV2::compact(&e);
+        assert!(s.contains("[I]"));
+        assert!(s.contains("app"));
+    }
+
+    #[test]
+    fn log_formatter_v2_json() {
+        let e = make_log_entry(LogLevel::Error, "srv", "crash");
+        let s = LogFormatterV2::json(&e);
+        assert!(s.contains(r#""level":"error""#));
+        assert!(s.contains(r#""channel":"srv""#));
+    }
+
+    #[test]
+    fn log_formatter_v2_colored_indicator() {
+        assert_eq!(LogFormatterV2::colored_indicator(LogLevel::Error), "🔴");
+        assert_eq!(LogFormatterV2::colored_indicator(LogLevel::Info), "🟢");
+    }
+
+    #[test]
+    fn log_buffer_ring_is_full() {
+        let mut buf = LogBufferRing::new(1);
+        assert!(!buf.is_full());
+        buf.push(make_log_entry(LogLevel::Trace, "m", "x"));
+        assert!(buf.is_full());
     }
 
 }

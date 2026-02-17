@@ -1516,6 +1516,182 @@ impl fmt::Display for CommandInvocation {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandPaletteItem
+// ---------------------------------------------------------------------------
+
+/// An item for display in the command palette.
+#[derive(Debug, Clone)]
+pub struct CommandPaletteItemV2 {
+    pub label: String,
+    pub detail: Option<String>,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub keybinding: Option<String>,
+}
+
+impl CommandPaletteItemV2 {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            detail: None,
+            description: None,
+            category: None,
+            keybinding: None,
+        }
+    }
+
+    pub fn with_category(mut self, cat: &str) -> Self {
+        self.category = Some(cat.to_string());
+        self
+    }
+
+    pub fn with_keybinding(mut self, kb: &str) -> Self {
+        self.keybinding = Some(kb.to_string());
+        self
+    }
+
+    pub fn matches_query(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.label.to_lowercase().contains(&q)
+            || self.category.as_deref().unwrap_or("").to_lowercase().contains(&q)
+            || self.description.as_deref().unwrap_or("").to_lowercase().contains(&q)
+    }
+
+    pub fn display_string(&self) -> String {
+        match &self.category {
+            Some(cat) => format!("{}: {}", cat, self.label),
+            None => self.label.clone(),
+        }
+    }
+
+    pub fn sort_key(&self) -> String {
+        format!(
+            "{}:{}",
+            self.category.as_deref().unwrap_or(""),
+            self.label
+        )
+        .to_lowercase()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandContextGuard
+// ---------------------------------------------------------------------------
+
+/// Check context before command execution.
+#[derive(Debug, Clone)]
+pub struct CommandContextGuard {
+    required_keys: Vec<String>,
+    forbidden_keys: Vec<String>,
+}
+
+impl CommandContextGuard {
+    pub fn new() -> Self {
+        Self {
+            required_keys: Vec::new(),
+            forbidden_keys: Vec::new(),
+        }
+    }
+
+    pub fn require(mut self, key: &str) -> Self {
+        self.required_keys.push(key.to_string());
+        self
+    }
+
+    pub fn forbid(mut self, key: &str) -> Self {
+        self.forbidden_keys.push(key.to_string());
+        self
+    }
+
+    pub fn evaluate(&self, context: &std::collections::HashMap<String, String>) -> bool {
+        for key in &self.required_keys {
+            if !context.contains_key(key) {
+                return false;
+            }
+        }
+        for key in &self.forbidden_keys {
+            if context.contains_key(key) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn missing_requirements(&self, context: &std::collections::HashMap<String, String>) -> Vec<String> {
+        self.required_keys
+            .iter()
+            .filter(|k| !context.contains_key(k.as_str()))
+            .cloned()
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandUndoStack
+// ---------------------------------------------------------------------------
+
+/// Undo/redo stack with descriptions.
+#[derive(Debug, Clone)]
+pub struct CommandUndoStack {
+    undo_stack: Vec<String>,
+    redo_stack: Vec<String>,
+    max_size: usize,
+}
+
+impl CommandUndoStack {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_size,
+        }
+    }
+
+    pub fn push_undoable(&mut self, description: String) {
+        if self.undo_stack.len() >= self.max_size {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(description);
+        self.redo_stack.clear();
+    }
+
+    pub fn undo(&mut self) -> Option<String> {
+        if let Some(desc) = self.undo_stack.pop() {
+            self.redo_stack.push(desc.clone());
+            Some(desc)
+        } else {
+            None
+        }
+    }
+
+    pub fn redo(&mut self) -> Option<String> {
+        if let Some(desc) = self.redo_stack.pop() {
+            self.undo_stack.push(desc.clone());
+            Some(desc)
+        } else {
+            None
+        }
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    pub fn undo_description(&self) -> Option<&str> {
+        self.undo_stack.last().map(|s| s.as_str())
+    }
+
+    pub fn clear(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2516,4 +2692,113 @@ mod tests {
         let inv = CommandInvocation::new("editor.save", CommandSource::Keybinding);
         assert_eq!(inv.to_string(), "editor.save (via Keybinding)");
     }
+
+    // -- CommandPaletteItemV2 ------------------------------------------------
+
+    #[test]
+    fn palette_item_matches_query() {
+        let item = CommandPaletteItemV2::new("Format Document").with_category("Edit");
+        assert!(item.matches_query("format"));
+        assert!(item.matches_query("Edit"));
+        assert!(!item.matches_query("zzz"));
+    }
+
+    #[test]
+    fn palette_item_display_string() {
+        let item = CommandPaletteItemV2::new("Save").with_category("File");
+        assert_eq!(item.display_string(), "File: Save");
+    }
+
+    #[test]
+    fn palette_item_display_no_category() {
+        let item = CommandPaletteItemV2::new("Save");
+        assert_eq!(item.display_string(), "Save");
+    }
+
+    #[test]
+    fn palette_item_sort_key() {
+        let a = CommandPaletteItemV2::new("Zoom").with_category("View");
+        let b = CommandPaletteItemV2::new("Close").with_category("File");
+        assert!(b.sort_key() < a.sort_key());
+    }
+
+    // -- CommandContextGuard -----------------------------------------------
+
+    #[test]
+    fn context_guard_passes() {
+        let guard = CommandContextGuard::new().require("editorFocus");
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("editorFocus".into(), "true".into());
+        assert!(guard.evaluate(&ctx));
+    }
+
+    #[test]
+    fn context_guard_fails_missing() {
+        let guard = CommandContextGuard::new().require("editorFocus");
+        let ctx = std::collections::HashMap::new();
+        assert!(!guard.evaluate(&ctx));
+        assert_eq!(guard.missing_requirements(&ctx), vec!["editorFocus"]);
+    }
+
+    #[test]
+    fn context_guard_forbidden() {
+        let guard = CommandContextGuard::new().forbid("readOnly");
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("readOnly".into(), "true".into());
+        assert!(!guard.evaluate(&ctx));
+    }
+
+    // -- CommandUndoStack --------------------------------------------------
+
+    #[test]
+    fn undo_stack_basic() {
+        let mut stack = CommandUndoStack::new(10);
+        stack.push_undoable("type 'a'".into());
+        assert!(stack.can_undo());
+        assert_eq!(stack.undo_description(), Some("type 'a'"));
+        let desc = stack.undo();
+        assert_eq!(desc, Some("type 'a'".into()));
+        assert!(stack.can_redo());
+    }
+
+    #[test]
+    fn undo_redo_cycle() {
+        let mut stack = CommandUndoStack::new(10);
+        stack.push_undoable("action1".into());
+        stack.push_undoable("action2".into());
+        stack.undo();
+        assert!(stack.can_redo());
+        let redo = stack.redo();
+        assert_eq!(redo, Some("action2".into()));
+    }
+
+    #[test]
+    fn undo_clears_redo_on_new_action() {
+        let mut stack = CommandUndoStack::new(10);
+        stack.push_undoable("a".into());
+        stack.undo();
+        stack.push_undoable("b".into());
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_clear() {
+        let mut stack = CommandUndoStack::new(10);
+        stack.push_undoable("x".into());
+        stack.clear();
+        assert!(!stack.can_undo());
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_max_size() {
+        let mut stack = CommandUndoStack::new(2);
+        stack.push_undoable("a".into());
+        stack.push_undoable("b".into());
+        stack.push_undoable("c".into());
+        assert_eq!(stack.undo_description(), Some("c"));
+        stack.undo();
+        assert_eq!(stack.undo_description(), Some("b"));
+    }
+
 }

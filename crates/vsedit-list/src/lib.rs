@@ -1638,6 +1638,133 @@ impl fmt::Display for ListColumnSorterConfig {
     }
 }
 
+// --- VirtualScrollState ---
+
+pub struct VirtualScrollState {
+    total_items: usize,
+    visible_count: usize,
+    scroll_offset: usize,
+}
+
+impl VirtualScrollState {
+    pub fn new(total_items: usize, visible_count: usize) -> Self {
+        Self { total_items, visible_count, scroll_offset: 0 }
+    }
+
+    pub fn scroll_to(&mut self, index: usize) {
+        self.scroll_offset = index.min(self.total_items.saturating_sub(self.visible_count));
+    }
+
+    pub fn scroll_by(&mut self, delta: isize) {
+        if delta >= 0 {
+            self.scroll_offset = (self.scroll_offset + delta as usize)
+                .min(self.total_items.saturating_sub(self.visible_count));
+        } else {
+            self.scroll_offset = self.scroll_offset.saturating_sub((-delta) as usize);
+        }
+    }
+
+    pub fn page_up(&mut self) { self.scroll_by(-(self.visible_count as isize)); }
+    pub fn page_down(&mut self) { self.scroll_by(self.visible_count as isize); }
+
+    pub fn visible_range(&self) -> (usize, usize) {
+        let end = (self.scroll_offset + self.visible_count).min(self.total_items);
+        (self.scroll_offset, end)
+    }
+
+    pub fn is_at_top(&self) -> bool { self.scroll_offset == 0 }
+
+    pub fn is_at_bottom(&self) -> bool {
+        self.scroll_offset + self.visible_count >= self.total_items
+    }
+
+    pub fn ensure_visible(&mut self, index: usize) {
+        if index < self.scroll_offset {
+            self.scroll_offset = index;
+        } else if index >= self.scroll_offset + self.visible_count {
+            self.scroll_offset = index.saturating_sub(self.visible_count - 1);
+        }
+    }
+
+    pub fn total_items(&self) -> usize { self.total_items }
+    pub fn set_total_items(&mut self, n: usize) { self.total_items = n; }
+}
+
+// --- SelectionModel ---
+
+pub struct SelectionModel {
+    selected: Vec<bool>,
+    anchor: Option<usize>,
+}
+
+impl SelectionModel {
+    pub fn new(count: usize) -> Self {
+        Self { selected: vec![false; count], anchor: None }
+    }
+
+    pub fn select(&mut self, index: usize) {
+        if index < self.selected.len() { self.selected[index] = true; self.anchor = Some(index); }
+    }
+
+    pub fn deselect(&mut self, index: usize) {
+        if index < self.selected.len() { self.selected[index] = false; }
+    }
+
+    pub fn toggle(&mut self, index: usize) {
+        if index < self.selected.len() { self.selected[index] = !self.selected[index]; }
+    }
+
+    pub fn select_range(&mut self, from: usize, to: usize) {
+        let (lo, hi) = if from <= to { (from, to) } else { (to, from) };
+        for i in lo..=hi.min(self.selected.len() - 1) {
+            self.selected[i] = true;
+        }
+    }
+
+    pub fn select_all(&mut self) { self.selected.iter_mut().for_each(|s| *s = true); }
+    pub fn clear(&mut self) { self.selected.iter_mut().for_each(|s| *s = false); }
+
+    pub fn selected_indices(&self) -> Vec<usize> {
+        self.selected.iter().enumerate().filter(|&(_, &s)| s).map(|(i, _)| i).collect()
+    }
+
+    pub fn is_selected(&self, index: usize) -> bool {
+        self.selected.get(index).copied().unwrap_or(false)
+    }
+
+    pub fn selection_count(&self) -> usize { self.selected.iter().filter(|&&s| s).count() }
+}
+
+// --- ListFilterV2 ---
+
+pub struct ListFilterV2 {
+    filter_text: String,
+}
+
+impl ListFilterV2 {
+    pub fn new() -> Self { Self { filter_text: String::new() } }
+
+    pub fn set_filter(&mut self, text: &str) { self.filter_text = text.to_lowercase(); }
+    pub fn clear_filter(&mut self) { self.filter_text.clear(); }
+    pub fn is_active(&self) -> bool { !self.filter_text.is_empty() }
+
+    pub fn matches(&self, item_label: &str) -> bool {
+        if self.filter_text.is_empty() { return true; }
+        item_label.to_lowercase().contains(&self.filter_text)
+    }
+
+    pub fn filtered_indices(&self, items: &[&str]) -> Vec<usize> {
+        items.iter().enumerate()
+            .filter(|(_, label)| self.matches(label))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    pub fn match_count(&self, items: &[&str]) -> usize {
+        items.iter().filter(|l| self.matches(l)).count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2601,6 +2728,101 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    #[test]
+    fn virtual_scroll_visible_range() {
+        let s = VirtualScrollState::new(100, 10);
+        assert_eq!(s.visible_range(), (0, 10));
+    }
+
+    #[test]
+    fn virtual_scroll_scroll_to() {
+        let mut s = VirtualScrollState::new(100, 10);
+        s.scroll_to(50);
+        assert_eq!(s.visible_range(), (50, 60));
+    }
+
+    #[test]
+    fn virtual_scroll_scroll_to_clamps() {
+        let mut s = VirtualScrollState::new(20, 10);
+        s.scroll_to(999);
+        assert_eq!(s.visible_range(), (10, 20));
+    }
+
+    #[test]
+    fn virtual_scroll_page_up_down() {
+        let mut s = VirtualScrollState::new(100, 10);
+        s.page_down();
+        assert_eq!(s.visible_range(), (10, 20));
+        s.page_up();
+        assert!(s.is_at_top());
+    }
+
+    #[test]
+    fn virtual_scroll_is_at_bottom() {
+        let mut s = VirtualScrollState::new(20, 10);
+        s.scroll_to(10);
+        assert!(s.is_at_bottom());
+    }
+
+    #[test]
+    fn virtual_scroll_ensure_visible() {
+        let mut s = VirtualScrollState::new(100, 10);
+        s.ensure_visible(50);
+        assert!(s.visible_range().0 <= 50 && s.visible_range().1 > 50);
+    }
+
+    #[test]
+    fn selection_model_select_deselect() {
+        let mut m = SelectionModel::new(5);
+        m.select(2);
+        assert!(m.is_selected(2));
+        m.deselect(2);
+        assert!(!m.is_selected(2));
+    }
+
+    #[test]
+    fn selection_model_toggle() {
+        let mut m = SelectionModel::new(3);
+        m.toggle(1);
+        assert!(m.is_selected(1));
+        m.toggle(1);
+        assert!(!m.is_selected(1));
+    }
+
+    #[test]
+    fn selection_model_select_range() {
+        let mut m = SelectionModel::new(10);
+        m.select_range(3, 6);
+        assert_eq!(m.selected_indices(), vec![3, 4, 5, 6]);
+        assert_eq!(m.selection_count(), 4);
+    }
+
+    #[test]
+    fn selection_model_select_all_clear() {
+        let mut m = SelectionModel::new(5);
+        m.select_all();
+        assert_eq!(m.selection_count(), 5);
+        m.clear();
+        assert_eq!(m.selection_count(), 0);
+    }
+
+    #[test]
+    fn list_filter_v2_matches() {
+        let mut f = ListFilterV2::new();
+        f.set_filter("hel");
+        assert!(f.matches("Hello World"));
+        assert!(!f.matches("Goodbye"));
+    }
+
+    #[test]
+    fn list_filter_v2_filtered_indices() {
+        let mut f = ListFilterV2::new();
+        f.set_filter("a");
+        let items = vec!["apple", "banana", "cherry", "avocado"];
+        assert_eq!(f.filtered_indices(&items), vec![0, 1, 3]);
+        assert_eq!(f.match_count(&items), 3);
     }
 
 }

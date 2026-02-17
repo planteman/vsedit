@@ -1519,6 +1519,139 @@ impl fmt::Display for InlayHintAnimationEvent {
     }
 }
 
+// ---------------------------------------------------------------------------
+// InlayHintLayoutCalculator
+// ---------------------------------------------------------------------------
+
+/// Computes layout offsets for inlay hints on a line.
+pub struct InlayHintLayoutCalculator {
+    spacing: u32,
+}
+
+impl InlayHintLayoutCalculator {
+    pub fn new(spacing: u32) -> Self {
+        Self { spacing }
+    }
+
+    /// Compute the x offset for a new hint inserted at position `col` on a line
+    /// that already has `existing_hints` hints placed.
+    pub fn x_offset(&self, col: u32, existing_hints_width: u32) -> u32 {
+        col + existing_hints_width + self.spacing * if existing_hints_width > 0 { 1 } else { 0 }
+    }
+
+    /// Total display width consumed by hints on one line.
+    pub fn total_width_on_line(&self, hint_widths: &[u32]) -> u32 {
+        if hint_widths.is_empty() {
+            return 0;
+        }
+        let widths_sum: u32 = hint_widths.iter().sum();
+        widths_sum + self.spacing * (hint_widths.len() as u32 - 1)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintPredicateFilter
+// ---------------------------------------------------------------------------
+
+/// Filters inlay hints by various criteria using a builder pattern.
+pub struct InlayHintPredicateFilter {
+    kind: Option<InlayHintKind>,
+    line_range: Option<(u32, u32)>,
+    min_label_length: Option<usize>,
+}
+
+impl InlayHintPredicateFilter {
+    pub fn new() -> Self {
+        Self { kind: None, line_range: None, min_label_length: None }
+    }
+
+    pub fn with_kind(mut self, kind: InlayHintKind) -> Self {
+        self.kind = Some(kind);
+        self
+    }
+
+    pub fn with_line_range(mut self, start: u32, end: u32) -> Self {
+        self.line_range = Some((start, end));
+        self
+    }
+
+    pub fn with_min_label_length(mut self, len: usize) -> Self {
+        self.min_label_length = Some(len);
+        self
+    }
+
+    pub fn matches(&self, hint: &InlayHint) -> bool {
+        if let Some(k) = self.kind {
+            if hint.kind != k {
+                return false;
+            }
+        }
+        if let Some((start, end)) = self.line_range {
+            if hint.position_line < start || hint.position_line > end {
+                return false;
+            }
+        }
+        if let Some(min_len) = self.min_label_length {
+            let total_len: usize = hint.label.iter().map(|p| p.value.len()).sum();
+            if total_len < min_len {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn filter_hints<'a>(&self, hints: &'a [InlayHint]) -> Vec<&'a InlayHint> {
+        hints.iter().filter(|h| self.matches(h)).collect()
+    }
+
+    pub fn filtered_count(&self, hints: &[InlayHint]) -> usize {
+        hints.iter().filter(|h| self.matches(h)).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintVersionedCache
+// ---------------------------------------------------------------------------
+
+/// Stores inlay hints per file per version, with eviction support.
+pub struct InlayHintVersionedCache {
+    entries: HashMap<String, (u64, Vec<InlayHint>)>,
+}
+
+impl InlayHintVersionedCache {
+    pub fn new() -> Self {
+        Self { entries: HashMap::new() }
+    }
+
+    pub fn set(&mut self, file: &str, version: u64, hints: Vec<InlayHint>) {
+        self.entries.insert(file.to_string(), (version, hints));
+    }
+
+    pub fn get(&self, file: &str, version: u64) -> Option<&[InlayHint]> {
+        self.entries.get(file).and_then(|(v, h)| {
+            if *v == version { Some(h.as_slice()) } else { None }
+        })
+    }
+
+    pub fn invalidate(&mut self, file: &str) -> bool {
+        self.entries.remove(file).is_some()
+    }
+
+    pub fn invalidate_all(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn cache_size(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn evict_oldest(&mut self) {
+        if let Some(oldest) = self.entries.iter().min_by_key(|(_, (v, _))| *v).map(|(k, _)| k.clone()) {
+            self.entries.remove(&oldest);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2556,6 +2689,108 @@ mod tests {
     }
     #[test] fn inlayHintAnimation_event_kind_display() {
         assert_eq!(format!("{}", InlayHintAnimationEventKind::Refreshed), "refreshed");
+    }
+
+    // -- InlayHintLayoutCalculator tests --
+
+    #[test]
+    fn layout_x_offset_no_existing() {
+        let calc = InlayHintLayoutCalculator::new(2);
+        assert_eq!(calc.x_offset(10, 0), 10);
+    }
+
+    #[test]
+    fn layout_x_offset_with_existing() {
+        let calc = InlayHintLayoutCalculator::new(2);
+        assert_eq!(calc.x_offset(10, 5), 17);
+    }
+
+    #[test]
+    fn layout_total_width() {
+        let calc = InlayHintLayoutCalculator::new(2);
+        assert_eq!(calc.total_width_on_line(&[3, 4, 5]), 16);
+    }
+
+    #[test]
+    fn layout_total_width_empty() {
+        let calc = InlayHintLayoutCalculator::new(2);
+        assert_eq!(calc.total_width_on_line(&[]), 0);
+    }
+
+    // -- InlayHintPredicateFilter tests --
+
+    #[test]
+    fn predicate_filter_by_kind() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(2, 0, "name:", InlayHintKind::Parameter),
+        ];
+        let f = InlayHintPredicateFilter::new().with_kind(InlayHintKind::Type);
+        assert_eq!(f.filtered_count(&hints), 1);
+    }
+
+    #[test]
+    fn predicate_filter_by_line_range() {
+        let hints = vec![
+            InlayHint::simple(5, 0, "a", InlayHintKind::Type),
+            InlayHint::simple(15, 0, "b", InlayHintKind::Type),
+        ];
+        let f = InlayHintPredicateFilter::new().with_line_range(1, 10);
+        assert_eq!(f.filtered_count(&hints), 1);
+    }
+
+    #[test]
+    fn predicate_filter_by_min_label_length() {
+        let hints = vec![
+            InlayHint::simple(1, 0, "ab", InlayHintKind::Type),
+            InlayHint::simple(2, 0, "abcdef", InlayHintKind::Type),
+        ];
+        let f = InlayHintPredicateFilter::new().with_min_label_length(4);
+        assert_eq!(f.filtered_count(&hints), 1);
+    }
+
+    #[test]
+    fn predicate_filter_matches_all() {
+        let hint = InlayHint::simple(5, 0, ": i32", InlayHintKind::Type);
+        let f = InlayHintPredicateFilter::new();
+        assert!(f.matches(&hint));
+    }
+
+    // -- InlayHintVersionedCache tests --
+
+    #[test]
+    fn versioned_cache_set_and_get() {
+        let mut c = InlayHintVersionedCache::new();
+        c.set("a.rs", 1, vec![InlayHint::simple(1, 0, "x", InlayHintKind::Type)]);
+        assert!(c.get("a.rs", 1).is_some());
+        assert!(c.get("a.rs", 2).is_none());
+    }
+
+    #[test]
+    fn versioned_cache_invalidate() {
+        let mut c = InlayHintVersionedCache::new();
+        c.set("a.rs", 1, vec![]);
+        assert!(c.invalidate("a.rs"));
+        assert_eq!(c.cache_size(), 0);
+    }
+
+    #[test]
+    fn versioned_cache_evict_oldest() {
+        let mut c = InlayHintVersionedCache::new();
+        c.set("a.rs", 1, vec![]);
+        c.set("b.rs", 2, vec![]);
+        c.evict_oldest();
+        assert_eq!(c.cache_size(), 1);
+        assert!(c.get("b.rs", 2).is_some());
+    }
+
+    #[test]
+    fn versioned_cache_invalidate_all() {
+        let mut c = InlayHintVersionedCache::new();
+        c.set("a.rs", 1, vec![]);
+        c.set("b.rs", 2, vec![]);
+        c.invalidate_all();
+        assert_eq!(c.cache_size(), 0);
     }
 
 }

@@ -1063,6 +1063,178 @@ pub fn count_duplicates(bindings: &[(String, String)]) -> usize {
     dups
 }
 
+// ---------------------------------------------------------------------------
+// KeybindingScope
+// ---------------------------------------------------------------------------
+
+/// Scope-based resolution for keybindings.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum KeybindingScope {
+    Global,
+    Editor,
+    Panel,
+    Dialog,
+    Custom(String),
+}
+
+impl KeybindingScope {
+    pub fn parent_scope(&self) -> Option<KeybindingScope> {
+        match self {
+            KeybindingScope::Global => None,
+            KeybindingScope::Editor => Some(KeybindingScope::Global),
+            KeybindingScope::Panel => Some(KeybindingScope::Global),
+            KeybindingScope::Dialog => Some(KeybindingScope::Global),
+            KeybindingScope::Custom(_) => Some(KeybindingScope::Global),
+        }
+    }
+
+    pub fn is_descendant_of(&self, ancestor: &KeybindingScope) -> bool {
+        if self == ancestor {
+            return true;
+        }
+        match self.parent_scope() {
+            Some(parent) => parent.is_descendant_of(ancestor),
+            None => false,
+        }
+    }
+
+    pub fn matches_or_inherits(&self, target: &KeybindingScope) -> bool {
+        self == target || self.is_descendant_of(target)
+    }
+
+    pub fn depth(&self) -> u32 {
+        match self {
+            KeybindingScope::Global => 0,
+            _ => 1,
+        }
+    }
+}
+
+impl fmt::Display for KeybindingScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeybindingScope::Global => write!(f, "global"),
+            KeybindingScope::Editor => write!(f, "editor"),
+            KeybindingScope::Panel => write!(f, "panel"),
+            KeybindingScope::Dialog => write!(f, "dialog"),
+            KeybindingScope::Custom(s) => write!(f, "custom:{}", s),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingOverrideTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks user overrides vs default keybindings.
+pub struct KeybindingOverrideTracker {
+    overrides: std::collections::HashMap<String, (String, String)>,
+}
+
+impl KeybindingOverrideTracker {
+    pub fn new() -> Self {
+        Self {
+            overrides: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register an override: command -> (original_chord, new_chord).
+    pub fn add_override(&mut self, command: &str, original: &str, new_chord: &str) {
+        self.overrides.insert(
+            command.to_string(),
+            (original.to_string(), new_chord.to_string()),
+        );
+    }
+
+    pub fn is_overridden(&self, command: &str) -> bool {
+        self.overrides.contains_key(command)
+    }
+
+    pub fn original_binding(&self, command: &str) -> Option<&str> {
+        self.overrides.get(command).map(|(orig, _)| orig.as_str())
+    }
+
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    pub fn reset_to_default(&mut self, command: &str) -> bool {
+        self.overrides.remove(command).is_some()
+    }
+
+    pub fn list_overrides(&self) -> Vec<(&str, &str, &str)> {
+        self.overrides
+            .iter()
+            .map(|(cmd, (orig, new))| (cmd.as_str(), orig.as_str(), new.as_str()))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhenClauseEvaluator
+// ---------------------------------------------------------------------------
+
+/// Simple boolean expression evaluator for when clauses.
+/// Supports: identifiers, `&&`, `||`, `!`, parentheses.
+pub struct WhenClauseEvaluator;
+
+impl WhenClauseEvaluator {
+    /// Evaluate a simple when-clause expression against a context map.
+    /// Supports: `key`, `!key`, `key1 && key2`, `key1 || key2`.
+    pub fn evaluate(expr: &str, context: &std::collections::HashMap<String, bool>) -> bool {
+        let expr = expr.trim();
+        if expr.is_empty() {
+            return true;
+        }
+
+        // Split on || first (lowest precedence)
+        if let Some(pos) = Self::find_operator(expr, "||") {
+            let left = &expr[..pos];
+            let right = &expr[pos + 2..];
+            return Self::evaluate(left, context) || Self::evaluate(right, context);
+        }
+
+        // Split on && (higher precedence)
+        if let Some(pos) = Self::find_operator(expr, "&&") {
+            let left = &expr[..pos];
+            let right = &expr[pos + 2..];
+            return Self::evaluate(left, context) && Self::evaluate(right, context);
+        }
+
+        // Handle negation
+        let expr = expr.trim();
+        if let Some(rest) = expr.strip_prefix('!') {
+            return !Self::evaluate(rest.trim(), context);
+        }
+
+        // Lookup key in context
+        context.get(expr.trim()).copied().unwrap_or(false)
+    }
+
+    fn find_operator(expr: &str, op: &str) -> Option<usize> {
+        let bytes = expr.as_bytes();
+        let op_bytes = op.as_bytes();
+        let op_len = op_bytes.len();
+        if bytes.len() < op_len {
+            return None;
+        }
+        for i in (0..=bytes.len() - op_len).rev() {
+            if &bytes[i..i + op_len] == op_bytes {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// Parse and list the variable names referenced in an expression.
+    pub fn referenced_keys(expr: &str) -> Vec<String> {
+        expr.split(|c: char| c == '&' || c == '|' || c == '!' || c == '(' || c == ')')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2631,6 +2803,131 @@ mod tests {
     fn import_error_display() {
         assert_eq!(format!("{}", ImportError::EmptyKey), "key field is empty");
         assert!(format!("{}", ImportError::InvalidKeySequence("bad".into())).contains("bad"));
+    }
+
+    // -- KeybindingScope tests --
+
+    #[test]
+    fn scope_parent() {
+        assert_eq!(KeybindingScope::Editor.parent_scope(), Some(KeybindingScope::Global));
+        assert_eq!(KeybindingScope::Global.parent_scope(), None);
+    }
+
+    #[test]
+    fn scope_descendant() {
+        assert!(KeybindingScope::Editor.is_descendant_of(&KeybindingScope::Global));
+        assert!(!KeybindingScope::Global.is_descendant_of(&KeybindingScope::Editor));
+    }
+
+    #[test]
+    fn scope_matches_or_inherits() {
+        assert!(KeybindingScope::Panel.matches_or_inherits(&KeybindingScope::Global));
+        assert!(KeybindingScope::Panel.matches_or_inherits(&KeybindingScope::Panel));
+    }
+
+    #[test]
+    fn scope_display() {
+        assert_eq!(format!("{}", KeybindingScope::Editor), "editor");
+        assert_eq!(format!("{}", KeybindingScope::Custom("x".into())), "custom:x");
+    }
+
+    #[test]
+    fn scope_depth() {
+        assert_eq!(KeybindingScope::Global.depth(), 0);
+        assert_eq!(KeybindingScope::Dialog.depth(), 1);
+    }
+
+    // -- KeybindingOverrideTracker tests --
+
+    #[test]
+    fn override_tracker_add_and_check() {
+        let mut tracker = KeybindingOverrideTracker::new();
+        tracker.add_override("save", "Ctrl+S", "Ctrl+Shift+S");
+        assert!(tracker.is_overridden("save"));
+        assert!(!tracker.is_overridden("undo"));
+    }
+
+    #[test]
+    fn override_tracker_original_binding() {
+        let mut tracker = KeybindingOverrideTracker::new();
+        tracker.add_override("save", "Ctrl+S", "Ctrl+Shift+S");
+        assert_eq!(tracker.original_binding("save"), Some("Ctrl+S"));
+    }
+
+    #[test]
+    fn override_tracker_count() {
+        let mut tracker = KeybindingOverrideTracker::new();
+        tracker.add_override("save", "Ctrl+S", "Ctrl+Shift+S");
+        tracker.add_override("undo", "Ctrl+Z", "Ctrl+Shift+Z");
+        assert_eq!(tracker.override_count(), 2);
+    }
+
+    #[test]
+    fn override_tracker_reset() {
+        let mut tracker = KeybindingOverrideTracker::new();
+        tracker.add_override("save", "Ctrl+S", "Ctrl+Shift+S");
+        assert!(tracker.reset_to_default("save"));
+        assert!(!tracker.is_overridden("save"));
+    }
+
+    #[test]
+    fn override_tracker_list() {
+        let mut tracker = KeybindingOverrideTracker::new();
+        tracker.add_override("save", "Ctrl+S", "Ctrl+Shift+S");
+        let list = tracker.list_overrides();
+        assert_eq!(list.len(), 1);
+    }
+
+    // -- WhenClauseEvaluator tests --
+
+    #[test]
+    fn when_simple_true() {
+        let mut ctx = HashMap::new();
+        ctx.insert("editorFocus".to_string(), true);
+        assert!(WhenClauseEvaluator::evaluate("editorFocus", &ctx));
+    }
+
+    #[test]
+    fn when_simple_false() {
+        let ctx = HashMap::new();
+        assert!(!WhenClauseEvaluator::evaluate("editorFocus", &ctx));
+    }
+
+    #[test]
+    fn when_negation() {
+        let mut ctx = HashMap::new();
+        ctx.insert("editorReadonly".to_string(), false);
+        assert!(WhenClauseEvaluator::evaluate("!editorReadonly", &ctx));
+    }
+
+    #[test]
+    fn when_and() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), true);
+        ctx.insert("b".to_string(), true);
+        assert!(WhenClauseEvaluator::evaluate("a && b", &ctx));
+    }
+
+    #[test]
+    fn when_or() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), false);
+        ctx.insert("b".to_string(), true);
+        assert!(WhenClauseEvaluator::evaluate("a || b", &ctx));
+    }
+
+    #[test]
+    fn when_empty() {
+        let ctx = HashMap::new();
+        assert!(WhenClauseEvaluator::evaluate("", &ctx));
+    }
+
+    #[test]
+    fn when_referenced_keys() {
+        let keys = WhenClauseEvaluator::referenced_keys("a && !b || c");
+        assert!(keys.contains(&"a".to_string()));
+        assert!(keys.contains(&"b".to_string()));
+        assert!(keys.contains(&"c".to_string()));
     }
 
 }

@@ -1701,6 +1701,214 @@ impl fmt::Display for TextRenderDiffHighlight {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TextWrapCalculator – wrap text to width
+// ---------------------------------------------------------------------------
+
+/// Wraps text to a given display width, respecting grapheme clusters.
+pub struct TextWrapCalculator;
+
+impl TextWrapCalculator {
+    /// Wrap a single line at the given column width.
+    pub fn wrap_line(line: &str, width: usize) -> Vec<String> {
+        if width == 0 { return vec![line.to_string()]; }
+        let mut result = Vec::new();
+        let mut current = String::new();
+        let mut col = 0usize;
+        for ch in line.chars() {
+            let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if col + w > width && !current.is_empty() {
+                result.push(current.clone());
+                current.clear();
+                col = 0;
+            }
+            current.push(ch);
+            col += w;
+        }
+        if !current.is_empty() {
+            result.push(current);
+        }
+        if result.is_empty() {
+            result.push(String::new());
+        }
+        result
+    }
+
+    /// Wrap multiple lines.
+    pub fn wrapped_lines(lines: &[&str], width: usize) -> Vec<String> {
+        lines.iter().flat_map(|l| Self::wrap_line(l, width)).collect()
+    }
+
+    /// Wrap at word boundaries when possible.
+    pub fn wrap_at_word_boundary(line: &str, width: usize) -> Vec<String> {
+        if width == 0 { return vec![line.to_string()]; }
+        let words: Vec<&str> = line.split_whitespace().collect();
+        let mut result = Vec::new();
+        let mut current = String::new();
+        let mut col = 0usize;
+        for word in words {
+            let wlen = UnicodeWidthStr::width(word);
+            if col > 0 && col + 1 + wlen > width {
+                result.push(current.clone());
+                current.clear();
+                col = 0;
+            }
+            if col > 0 {
+                current.push(' ');
+                col += 1;
+            }
+            current.push_str(word);
+            col += wlen;
+        }
+        if !current.is_empty() {
+            result.push(current);
+        }
+        if result.is_empty() {
+            result.push(String::new());
+        }
+        result
+    }
+
+    /// Return an overflow indicator if text exceeds width.
+    pub fn overflow_indicator(line: &str, width: usize) -> Option<String> {
+        let w = UnicodeWidthStr::width(line);
+        if w > width {
+            let mut truncated = String::new();
+            let mut col = 0;
+            for ch in line.chars() {
+                let cw = UnicodeWidthChar::width(ch).unwrap_or(0);
+                if col + cw + 1 > width { break; }
+                truncated.push(ch);
+                col += cw;
+            }
+            truncated.push('…');
+            Some(truncated)
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TabExpander – expand tabs to spaces
+// ---------------------------------------------------------------------------
+
+/// Expands tab characters to spaces at configurable tab stops.
+pub struct TabExpander;
+
+impl TabExpander {
+    /// Expand tabs in a string to spaces with the given tab size.
+    pub fn expand_tabs(text: &str, tab_size: usize) -> String {
+        let tab_size = tab_size.max(1);
+        let mut result = String::new();
+        let mut col = 0usize;
+        for ch in text.chars() {
+            if ch == '\t' {
+                let spaces = tab_size - (col % tab_size);
+                for _ in 0..spaces {
+                    result.push(' ');
+                }
+                col += spaces;
+            } else {
+                result.push(ch);
+                col += UnicodeWidthChar::width(ch).unwrap_or(1);
+            }
+        }
+        result
+    }
+
+    /// Return tab stop column positions up to a given column.
+    pub fn tab_stop_positions(tab_size: usize, up_to: usize) -> Vec<usize> {
+        let tab_size = tab_size.max(1);
+        (0..up_to).filter(|c| c % tab_size == 0).collect()
+    }
+
+    /// Return the column after expanding all tabs up to a position.
+    pub fn column_after_expansion(text: &str, char_index: usize, tab_size: usize) -> usize {
+        let tab_size = tab_size.max(1);
+        let mut col = 0usize;
+        for (i, ch) in text.chars().enumerate() {
+            if i >= char_index { break; }
+            if ch == '\t' {
+                col += tab_size - (col % tab_size);
+            } else {
+                col += UnicodeWidthChar::width(ch).unwrap_or(1);
+            }
+        }
+        col
+    }
+
+    /// Effective display width of the string after tab expansion.
+    pub fn effective_width(text: &str, tab_size: usize) -> usize {
+        Self::expand_tabs(text, tab_size).chars().map(|c| UnicodeWidthChar::width(c).unwrap_or(0)).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineBreakDetector – detect line break style
+// ---------------------------------------------------------------------------
+
+/// Detected line break style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineBreakStyle {
+    LF,
+    CRLF,
+    CR,
+    Mixed,
+}
+
+/// Detects and converts line break styles.
+pub struct LineBreakDetector;
+
+impl LineBreakDetector {
+    /// Detect the line break style used in the text.
+    pub fn detect_from_text(text: &str) -> LineBreakStyle {
+        let crlf_count = text.matches("\r\n").count();
+        let text_no_crlf = text.replace("\r\n", "");
+        let cr_count = text_no_crlf.matches('\r').count();
+        let lf_count = text_no_crlf.matches('\n').count();
+
+        let styles_present = [crlf_count > 0, cr_count > 0, lf_count > 0]
+            .iter()
+            .filter(|&&b| b)
+            .count();
+
+        if styles_present > 1 {
+            LineBreakStyle::Mixed
+        } else if crlf_count > 0 {
+            LineBreakStyle::CRLF
+        } else if cr_count > 0 {
+            LineBreakStyle::CR
+        } else {
+            LineBreakStyle::LF
+        }
+    }
+
+    /// Normalize all line breaks to a specific style.
+    pub fn normalize_to(text: &str, style: LineBreakStyle) -> String {
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        match style {
+            LineBreakStyle::LF => normalized,
+            LineBreakStyle::CRLF => normalized.replace('\n', "\r\n"),
+            LineBreakStyle::CR => normalized.replace('\n', "\r"),
+            LineBreakStyle::Mixed => normalized,
+        }
+    }
+
+    /// Convert line breaks from one style to another.
+    pub fn convert_line_breaks(text: &str, from: LineBreakStyle, to: LineBreakStyle) -> String {
+        let _ = from;
+        Self::normalize_to(text, to)
+    }
+
+    /// Count lines in the text.
+    pub fn line_count(text: &str) -> usize {
+        if text.is_empty() { return 0; }
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        normalized.split('\n').count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2682,5 +2890,95 @@ mod tests {
         let output = format!("{}", diff);
         assert!(output.contains("+ added"));
         assert!(output.contains("- removed"));
+    }
+
+    // -- TextWrapCalculator -------------------------------------------------
+
+    #[test]
+    fn wrap_line_basic() {
+        let wrapped = TextWrapCalculator::wrap_line("hello world", 5);
+        assert!(wrapped.len() >= 1);
+    }
+
+    #[test]
+    fn wrap_line_no_wrap_needed() {
+        let wrapped = TextWrapCalculator::wrap_line("hi", 10);
+        assert_eq!(wrapped.len(), 1);
+        assert_eq!(wrapped[0], "hi");
+    }
+
+    #[test]
+    fn wrap_at_word_boundary() {
+        let wrapped = TextWrapCalculator::wrap_at_word_boundary("hello beautiful world", 14);
+        assert!(wrapped.len() >= 1);
+    }
+
+    #[test]
+    fn wrap_overflow_indicator() {
+        let ind = TextWrapCalculator::overflow_indicator("long text here", 8);
+        assert!(ind.is_some());
+        assert!(ind.unwrap().ends_with('…'));
+    }
+
+    #[test]
+    fn wrap_no_overflow() {
+        let ind = TextWrapCalculator::overflow_indicator("short", 10);
+        assert!(ind.is_none());
+    }
+
+    // -- TabExpander --------------------------------------------------------
+
+    #[test]
+    fn tab_expand_basic_v2() {
+        let expanded = TabExpander::expand_tabs("a\tb", 4);
+        assert_eq!(expanded, "a   b");
+    }
+
+    #[test]
+    fn tab_expand_multiple() {
+        let expanded = TabExpander::expand_tabs("\t\t", 4);
+        assert_eq!(expanded, "        ");
+    }
+
+    #[test]
+    fn tab_stop_positions() {
+        let stops = TabExpander::tab_stop_positions(4, 16);
+        assert_eq!(stops, vec![0, 4, 8, 12]);
+    }
+
+    #[test]
+    fn tab_effective_width() {
+        let w = TabExpander::effective_width("a\tb", 4);
+        assert_eq!(w, 5);
+    }
+
+    // -- LineBreakDetector --------------------------------------------------
+
+    #[test]
+    fn detect_lf() {
+        assert_eq!(LineBreakDetector::detect_from_text("a\nb\nc"), LineBreakStyle::LF);
+    }
+
+    #[test]
+    fn detect_crlf() {
+        assert_eq!(LineBreakDetector::detect_from_text("a\r\nb\r\nc"), LineBreakStyle::CRLF);
+    }
+
+    #[test]
+    fn detect_mixed_linebreak() {
+        assert_eq!(LineBreakDetector::detect_from_text("a\nb\r\nc"), LineBreakStyle::Mixed);
+    }
+
+    #[test]
+    fn normalize_to_crlf() {
+        let result = LineBreakDetector::normalize_to("a\nb\nc", LineBreakStyle::CRLF);
+        assert_eq!(result, "a\r\nb\r\nc");
+    }
+
+    #[test]
+    fn line_count_basic() {
+        assert_eq!(LineBreakDetector::line_count("a\nb\nc"), 3);
+        assert_eq!(LineBreakDetector::line_count("a\r\nb"), 2);
+        assert_eq!(LineBreakDetector::line_count(""), 0);
     }
 }

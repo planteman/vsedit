@@ -1524,6 +1524,139 @@ impl fmt::Display for QuickAccessKeyNavConfig {
     }
 }
 
+// --- QuickAccessScorer: score items against query ---
+
+pub struct QuickAccessScorer;
+
+impl QuickAccessScorer {
+    pub fn compute_score(query: &str, label: &str) -> usize {
+        if query.is_empty() { return 0; }
+        let q_lower = query.to_lowercase();
+        let l_lower = label.to_lowercase();
+        let mut score = 0usize;
+
+        // prefix bonus
+        if l_lower.starts_with(&q_lower) { score += 10; }
+
+        // consecutive chars bonus
+        let mut qi = q_lower.chars().peekable();
+        let mut consecutive = 0usize;
+        let mut matched = 0usize;
+        let mut prev_match = false;
+        for ch in l_lower.chars() {
+            if qi.peek() == Some(&ch) {
+                qi.next();
+                matched += 1;
+                if prev_match { consecutive += 1; }
+                prev_match = true;
+            } else {
+                prev_match = false;
+            }
+        }
+        if qi.peek().is_some() { return 0; } // not all chars matched
+
+        score += matched * 2 + consecutive * 3;
+
+        // case match bonus
+        let q_chars: Vec<char> = query.chars().collect();
+        let l_chars: Vec<char> = label.chars().collect();
+        let mut qi2 = 0;
+        for &lc in &l_chars {
+            if qi2 < q_chars.len() && lc == q_chars[qi2] { score += 1; qi2 += 1; }
+        }
+
+        score
+    }
+
+    pub fn sort_by_score(query: &str, items: &[&str]) -> Vec<(usize, usize)> {
+        let mut scored: Vec<(usize, usize)> = items.iter().enumerate()
+            .map(|(i, label)| (i, Self::compute_score(query, label)))
+            .filter(|(_, s)| *s > 0)
+            .collect();
+        scored.sort_by(|a, b| b.1.cmp(&a.1));
+        scored
+    }
+
+    pub fn highlight_positions(query: &str, label: &str) -> Vec<usize> {
+        let q_lower = query.to_lowercase();
+        let l_lower = label.to_lowercase();
+        let mut positions = Vec::new();
+        let mut qi = q_lower.chars().peekable();
+        for (i, ch) in l_lower.chars().enumerate() {
+            if qi.peek() == Some(&ch) { qi.next(); positions.push(i); }
+        }
+        positions
+    }
+}
+
+// --- RecentItemTrackerV2 ---
+
+pub struct RecentItemTrackerV2 {
+    items: Vec<(String, u64)>, // (id, timestamp)
+    max_items: usize,
+}
+
+impl RecentItemTrackerV2 {
+    pub fn new(max_items: usize) -> Self { Self { items: Vec::new(), max_items } }
+
+    pub fn record_access(&mut self, id: &str, timestamp: u64) {
+        self.items.retain(|(i, _)| i != id);
+        self.items.push((id.to_string(), timestamp));
+        self.cap_at_max();
+    }
+
+    pub fn recent_items(&self) -> Vec<String> {
+        let mut sorted = self.items.clone();
+        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.into_iter().map(|(id, _)| id).collect()
+    }
+
+    pub fn remove_item(&mut self, id: &str) { self.items.retain(|(i, _)| i != id); }
+
+    pub fn cap_at_max(&mut self) {
+        while self.items.len() > self.max_items {
+            self.items.remove(0);
+        }
+    }
+
+    pub fn contains(&self, id: &str) -> bool { self.items.iter().any(|(i, _)| i == id) }
+    pub fn access_count(&self) -> usize { self.items.len() }
+}
+
+// --- QuickAccessPrefixRouter ---
+
+pub struct PrefixRoute {
+    pub prefix: String,
+    pub description: String,
+}
+
+pub struct QuickAccessPrefixRouter {
+    routes: Vec<PrefixRoute>,
+}
+
+impl QuickAccessPrefixRouter {
+    pub fn new() -> Self { Self { routes: Vec::new() } }
+
+    pub fn register_prefix(&mut self, prefix: &str, description: &str) {
+        self.routes.push(PrefixRoute { prefix: prefix.to_string(), description: description.to_string() });
+    }
+
+    pub fn resolve_prefix(&self, query: &str) -> Option<&PrefixRoute> {
+        self.routes.iter().find(|r| query.starts_with(&r.prefix))
+    }
+
+    pub fn strip_prefix<'a>(&self, query: &'a str) -> &'a str {
+        for route in &self.routes {
+            if let Some(rest) = query.strip_prefix(&route.prefix) {
+                return rest;
+            }
+        }
+        query
+    }
+
+    pub fn route_count(&self) -> usize { self.routes.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2617,6 +2750,97 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    #[test]
+    fn scorer_prefix_bonus() {
+        let s1 = QuickAccessScorer::compute_score("open", "Open File");
+        let s2 = QuickAccessScorer::compute_score("open", "Reopen File");
+        assert!(s1 > s2);
+    }
+
+    #[test]
+    fn scorer_no_match_returns_zero() {
+        assert_eq!(QuickAccessScorer::compute_score("xyz", "Hello"), 0);
+    }
+
+    #[test]
+    fn scorer_empty_query() {
+        assert_eq!(QuickAccessScorer::compute_score("", "anything"), 0);
+    }
+
+    #[test]
+    fn scorer_sort_by_score() {
+        let items = vec!["Open File", "Options", "Close File"];
+        let sorted = QuickAccessScorer::sort_by_score("op", &items);
+        assert!(!sorted.is_empty());
+        // first result should have highest score
+        assert!(sorted[0].1 >= sorted.last().unwrap().1);
+    }
+
+    #[test]
+    fn scorer_highlight_positions() {
+        let positions = QuickAccessScorer::highlight_positions("of", "Open File");
+        assert_eq!(positions, vec![0, 5]);
+    }
+
+    #[test]
+    fn recent_tracker_v2_record_and_contains() {
+        let mut t = RecentItemTrackerV2::new(10);
+        t.record_access("file1.rs", 100);
+        assert!(t.contains("file1.rs"));
+        assert_eq!(t.access_count(), 1);
+    }
+
+    #[test]
+    fn recent_tracker_v2_recent_items_sorted() {
+        let mut t = RecentItemTrackerV2::new(10);
+        t.record_access("a", 100);
+        t.record_access("b", 300);
+        t.record_access("c", 200);
+        let recent = t.recent_items();
+        assert_eq!(recent[0], "b");
+    }
+
+    #[test]
+    fn recent_tracker_v2_cap_at_max() {
+        let mut t = RecentItemTrackerV2::new(2);
+        t.record_access("a", 1);
+        t.record_access("b", 2);
+        t.record_access("c", 3);
+        assert_eq!(t.access_count(), 2);
+        assert!(!t.contains("a"));
+    }
+
+    #[test]
+    fn recent_tracker_v2_remove() {
+        let mut t = RecentItemTrackerV2::new(10);
+        t.record_access("x", 1);
+        t.remove_item("x");
+        assert!(!t.contains("x"));
+    }
+
+    #[test]
+    fn prefix_router_register_and_resolve() {
+        let mut r = QuickAccessPrefixRouter::new();
+        r.register_prefix(">", "Commands");
+        r.register_prefix("@", "Symbols");
+        assert_eq!(r.resolve_prefix(">build").unwrap().description, "Commands");
+        assert_eq!(r.resolve_prefix("@main").unwrap().description, "Symbols");
+    }
+
+    #[test]
+    fn prefix_router_strip() {
+        let mut r = QuickAccessPrefixRouter::new();
+        r.register_prefix("#", "Workspace");
+        assert_eq!(r.strip_prefix("#search"), "search");
+        assert_eq!(r.strip_prefix("plain"), "plain");
+    }
+
+    #[test]
+    fn prefix_router_no_match() {
+        let r = QuickAccessPrefixRouter::new();
+        assert!(r.resolve_prefix("anything").is_none());
     }
 
 }

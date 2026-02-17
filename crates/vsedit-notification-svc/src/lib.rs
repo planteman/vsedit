@@ -1,6 +1,7 @@
 //! Notification model service.
 
 use std::fmt;
+use std::collections::HashMap;
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -1637,6 +1638,116 @@ impl fmt::Display for NotificationPersistence {
     }
 }
 
+// --- NotificationThrottlerV2: rate limit notifications per source ---
+
+pub struct NotificationThrottlerV2 {
+    cooldown_ms: u64,
+    last_shown: HashMap<String, u64>,
+    suppressed_count: usize,
+}
+
+impl NotificationThrottlerV2 {
+    pub fn new(cooldown_ms: u64) -> Self {
+        Self { cooldown_ms, last_shown: HashMap::new(), suppressed_count: 0 }
+    }
+
+    pub fn should_show(&self, source: &str, now_ms: u64) -> bool {
+        match self.last_shown.get(source) {
+            Some(&last) => now_ms.saturating_sub(last) >= self.cooldown_ms,
+            None => true,
+        }
+    }
+
+    pub fn record_shown(&mut self, source: &str, now_ms: u64) {
+        self.last_shown.insert(source.to_string(), now_ms);
+    }
+
+    pub fn try_show(&mut self, source: &str, now_ms: u64) -> bool {
+        if self.should_show(source, now_ms) {
+            self.record_shown(source, now_ms);
+            true
+        } else {
+            self.suppressed_count += 1;
+            false
+        }
+    }
+
+    pub fn suppressed_count(&self) -> usize { self.suppressed_count }
+    pub fn cooldown_ms(&self) -> u64 { self.cooldown_ms }
+}
+
+// --- NotificationStack: compute y positions ---
+
+pub struct NotificationStack {
+    max_visible: usize,
+    item_height: u16,
+    from_bottom: bool,
+    container_height: u16,
+}
+
+impl NotificationStack {
+    pub fn new(max_visible: usize, item_height: u16, container_height: u16, from_bottom: bool) -> Self {
+        Self { max_visible, item_height, from_bottom, container_height }
+    }
+
+    pub fn compute_y_offset(&self, index: usize) -> Option<u16> {
+        if index >= self.max_visible { return None; }
+        if self.from_bottom {
+            Some(self.container_height.saturating_sub((index as u16 + 1) * self.item_height))
+        } else {
+            Some(index as u16 * self.item_height)
+        }
+    }
+
+    pub fn max_visible(&self) -> usize { self.max_visible }
+
+    pub fn animate_shift(&self, positions: &[u16]) -> Vec<u16> {
+        positions.iter().enumerate().filter_map(|(i, _)| {
+            if i + 1 < positions.len() { self.compute_y_offset(i) } else { None }
+        }).collect()
+    }
+}
+
+// --- NotificationHistory ---
+
+pub struct NotificationHistoryEntry {
+    pub message: String,
+    pub severity: NotificationSeverity,
+    pub timestamp_ms: u64,
+}
+
+pub struct NotificationHistory {
+    entries: Vec<NotificationHistoryEntry>,
+}
+
+impl NotificationHistory {
+    pub fn new() -> Self { Self { entries: Vec::new() } }
+
+    pub fn add(&mut self, message: &str, severity: NotificationSeverity, timestamp_ms: u64) {
+        self.entries.push(NotificationHistoryEntry {
+            message: message.to_string(), severity, timestamp_ms,
+        });
+    }
+
+    pub fn query_by_time_range(&self, from_ms: u64, to_ms: u64) -> Vec<&NotificationHistoryEntry> {
+        self.entries.iter().filter(|e| e.timestamp_ms >= from_ms && e.timestamp_ms <= to_ms).collect()
+    }
+
+    pub fn query_by_severity(&self, severity: NotificationSeverity) -> Vec<&NotificationHistoryEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn clear_before(&mut self, timestamp_ms: u64) {
+        self.entries.retain(|e| e.timestamp_ms >= timestamp_ms);
+    }
+
+    pub fn total_count(&self) -> usize { self.entries.len() }
+
+    pub fn most_recent_n(&self, n: usize) -> Vec<&NotificationHistoryEntry> {
+        self.entries.iter().rev().take(n).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2588,5 +2699,98 @@ mod tests {
         assert_eq!(back.severity, NotificationSeverity::Warning);
         assert_eq!(back.source, Some("lsp".into()));
         assert!(back.sticky);
+    }
+
+    #[test]
+    fn throttler_v2_should_show_first_time() {
+        let t = NotificationThrottlerV2::new(1000);
+        assert!(t.should_show("src", 100));
+    }
+
+    #[test]
+    fn throttler_v2_suppresses_within_cooldown() {
+        let mut t = NotificationThrottlerV2::new(1000);
+        t.record_shown("src", 100);
+        assert!(!t.should_show("src", 500));
+    }
+
+    #[test]
+    fn throttler_v2_allows_after_cooldown() {
+        let mut t = NotificationThrottlerV2::new(1000);
+        t.record_shown("src", 100);
+        assert!(t.should_show("src", 1200));
+    }
+
+    #[test]
+    fn throttler_v2_try_show_suppresses() {
+        let mut t = NotificationThrottlerV2::new(1000);
+        assert!(t.try_show("s", 0));
+        assert!(!t.try_show("s", 500));
+        assert_eq!(t.suppressed_count(), 1);
+    }
+
+    #[test]
+    fn notification_stack_y_from_top() {
+        let s = NotificationStack::new(5, 30, 300, false);
+        assert_eq!(s.compute_y_offset(0), Some(0));
+        assert_eq!(s.compute_y_offset(1), Some(30));
+    }
+
+    #[test]
+    fn notification_stack_y_from_bottom() {
+        let s = NotificationStack::new(5, 30, 300, true);
+        assert_eq!(s.compute_y_offset(0), Some(270));
+        assert_eq!(s.compute_y_offset(1), Some(240));
+    }
+
+    #[test]
+    fn notification_stack_exceeds_max() {
+        let s = NotificationStack::new(2, 30, 300, false);
+        assert!(s.compute_y_offset(5).is_none());
+    }
+
+    #[test]
+    fn notification_history_add_and_count() {
+        let mut h = NotificationHistory::new();
+        h.add("msg1", NotificationSeverity::Info, 100);
+        h.add("msg2", NotificationSeverity::Error, 200);
+        assert_eq!(h.total_count(), 2);
+    }
+
+    #[test]
+    fn notification_history_by_time_range() {
+        let mut h = NotificationHistory::new();
+        h.add("a", NotificationSeverity::Info, 100);
+        h.add("b", NotificationSeverity::Info, 200);
+        h.add("c", NotificationSeverity::Info, 300);
+        assert_eq!(h.query_by_time_range(150, 250).len(), 1);
+    }
+
+    #[test]
+    fn notification_history_by_severity() {
+        let mut h = NotificationHistory::new();
+        h.add("a", NotificationSeverity::Info, 100);
+        h.add("b", NotificationSeverity::Error, 200);
+        assert_eq!(h.query_by_severity(NotificationSeverity::Error).len(), 1);
+    }
+
+    #[test]
+    fn notification_history_clear_before() {
+        let mut h = NotificationHistory::new();
+        h.add("a", NotificationSeverity::Info, 100);
+        h.add("b", NotificationSeverity::Info, 200);
+        h.clear_before(150);
+        assert_eq!(h.total_count(), 1);
+    }
+
+    #[test]
+    fn notification_history_most_recent() {
+        let mut h = NotificationHistory::new();
+        h.add("a", NotificationSeverity::Info, 100);
+        h.add("b", NotificationSeverity::Info, 200);
+        h.add("c", NotificationSeverity::Info, 300);
+        let recent = h.most_recent_n(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].message, "c");
     }
 }

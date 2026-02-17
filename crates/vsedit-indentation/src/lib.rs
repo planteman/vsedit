@@ -1771,6 +1771,184 @@ impl fmt::Display for IndentationGuideRendererConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// IndentationStatistics
+// ---------------------------------------------------------------------------
+
+/// Analyzes indentation statistics for a body of text.
+pub struct IndentationStatistics {
+    level_counts: HashMap<u32, usize>,
+    tab_lines: usize,
+    space_lines: usize,
+    total_lines: usize,
+}
+
+impl IndentationStatistics {
+    pub fn analyze(text: &str) -> Self {
+        let mut level_counts: HashMap<u32, usize> = HashMap::new();
+        let mut tab_lines = 0usize;
+        let mut space_lines = 0usize;
+        let mut total_lines = 0usize;
+
+        for line in text.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            total_lines += 1;
+            if line.starts_with('\t') {
+                tab_lines += 1;
+                let tabs = line.len() - line.trim_start_matches('\t').len();
+                *level_counts.entry(tabs as u32).or_insert(0) += 1;
+            } else {
+                let spaces = line.len() - line.trim_start_matches(' ').len();
+                if spaces > 0 {
+                    space_lines += 1;
+                }
+                *level_counts.entry(spaces as u32).or_insert(0) += 1;
+            }
+        }
+
+        Self { level_counts, tab_lines, space_lines, total_lines }
+    }
+
+    pub fn most_common_indent(&self) -> u32 {
+        self.level_counts
+            .iter()
+            .filter(|&(&k, _)| k > 0)
+            .max_by_key(|&(_, &v)| v)
+            .map(|(&k, _)| k)
+            .unwrap_or(0)
+    }
+
+    pub fn is_mixed(&self) -> bool {
+        self.tab_lines > 0 && self.space_lines > 0
+    }
+
+    pub fn tab_vs_space_ratio(&self) -> f64 {
+        if self.space_lines == 0 {
+            return if self.tab_lines > 0 { f64::INFINITY } else { 0.0 };
+        }
+        self.tab_lines as f64 / self.space_lines as f64
+    }
+
+    pub fn recommended_style(&self) -> IndentStyle {
+        if self.tab_lines > self.space_lines {
+            IndentStyle::Tabs
+        } else {
+            IndentStyle::Spaces(self.most_common_indent().max(2))
+        }
+    }
+
+    pub fn total_lines(&self) -> usize {
+        self.total_lines
+    }
+
+    pub fn lines_at_indent(&self, level: u32) -> usize {
+        self.level_counts.get(&level).copied().unwrap_or(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentGuideRenderer
+// ---------------------------------------------------------------------------
+
+/// Computes guide positions for indent levels.
+pub struct IndentGuideRenderer {
+    indent_size: u32,
+}
+
+impl IndentGuideRenderer {
+    pub fn new(indent_size: u32) -> Self {
+        Self { indent_size: indent_size.max(1) }
+    }
+
+    /// Return columns where guides should be drawn for a given nesting level.
+    pub fn guide_columns(&self, max_level: u32) -> Vec<u32> {
+        (1..=max_level).map(|l| l * self.indent_size).collect()
+    }
+
+    /// Return guides visible in a column range.
+    pub fn visible_guides_in_range(&self, max_level: u32, col_start: u32, col_end: u32) -> Vec<u32> {
+        self.guide_columns(max_level)
+            .into_iter()
+            .filter(|&c| c >= col_start && c <= col_end)
+            .collect()
+    }
+
+    /// Return the guide column at a given position, if any.
+    pub fn guide_at_column(&self, col: u32) -> bool {
+        col > 0 && col % self.indent_size == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentationFixer
+// ---------------------------------------------------------------------------
+
+/// Normalizes and fixes indentation issues.
+pub struct IndentationFixer;
+
+impl IndentationFixer {
+    /// Convert all leading tabs to spaces.
+    pub fn convert_all_to_spaces(text: &str, tab_size: u32) -> String {
+        let spaces: String = std::iter::repeat(' ').take(tab_size as usize).collect();
+        text.lines()
+            .map(|line| {
+                let leading_tabs = line.len() - line.trim_start_matches('\t').len();
+                if leading_tabs > 0 {
+                    let rest = &line[leading_tabs..];
+                    format!("{}{}", spaces.repeat(leading_tabs), rest)
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Convert all leading spaces to tabs.
+    pub fn convert_all_to_tabs(text: &str, tab_size: u32) -> String {
+        let ts = tab_size.max(1) as usize;
+        text.lines()
+            .map(|line| {
+                let leading_spaces = line.len() - line.trim_start_matches(' ').len();
+                if leading_spaces > 0 {
+                    let tabs = leading_spaces / ts;
+                    let remainder = leading_spaces % ts;
+                    let rest = &line[leading_spaces..];
+                    let mut s = "\t".repeat(tabs);
+                    for _ in 0..remainder {
+                        s.push(' ');
+                    }
+                    s.push_str(rest);
+                    s
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Remove trailing whitespace from each line.
+    pub fn fix_trailing_whitespace(text: &str) -> String {
+        text.lines()
+            .map(|line| line.trim_end())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Remove indentation from blank lines.
+    pub fn trim_blank_line_indent(text: &str) -> String {
+        text.lines()
+            .map(|line| {
+                if line.trim().is_empty() { "" } else { line }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2626,6 +2804,108 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- IndentationStatistics tests --
+
+    #[test]
+    fn stats_pure_spaces() {
+        let text = "fn main() {\n    let x = 1;\n    let y = 2;\n}\n";
+        let stats = IndentationStatistics::analyze(text);
+        assert!(!stats.is_mixed());
+        assert_eq!(stats.recommended_style(), IndentStyle::Spaces(4));
+    }
+
+    #[test]
+    fn stats_pure_tabs() {
+        let text = "fn main() {\n\tlet x = 1;\n\tlet y = 2;\n}\n";
+        let stats = IndentationStatistics::analyze(text);
+        assert!(!stats.is_mixed());
+        assert_eq!(stats.recommended_style(), IndentStyle::Tabs);
+    }
+
+    #[test]
+    fn stats_mixed() {
+        let text = "\tline1\n    line2\n";
+        let stats = IndentationStatistics::analyze(text);
+        assert!(stats.is_mixed());
+    }
+
+    #[test]
+    fn stats_most_common_indent() {
+        let text = "a\n  b\n  c\n    d\n";
+        let stats = IndentationStatistics::analyze(text);
+        assert_eq!(stats.most_common_indent(), 2);
+    }
+
+    #[test]
+    fn stats_total_lines() {
+        let text = "a\nb\n\nc\n";
+        let stats = IndentationStatistics::analyze(text);
+        assert_eq!(stats.total_lines(), 3);
+    }
+
+    #[test]
+    fn stats_lines_at_indent() {
+        let text = "a\n  b\n  c\n";
+        let stats = IndentationStatistics::analyze(text);
+        assert_eq!(stats.lines_at_indent(2), 2);
+        assert_eq!(stats.lines_at_indent(0), 1);
+    }
+
+    // -- IndentGuideRenderer tests --
+
+    #[test]
+    fn guide_columns() {
+        let r = IndentGuideRenderer::new(4);
+        assert_eq!(r.guide_columns(3), vec![4, 8, 12]);
+    }
+
+    #[test]
+    fn visible_guides_in_range() {
+        let r = IndentGuideRenderer::new(4);
+        let g = r.visible_guides_in_range(4, 5, 12);
+        assert_eq!(g, vec![8, 12]);
+    }
+
+    #[test]
+    fn guide_at_column() {
+        let r = IndentGuideRenderer::new(4);
+        assert!(r.guide_at_column(8));
+        assert!(!r.guide_at_column(5));
+        assert!(!r.guide_at_column(0));
+    }
+
+    // -- IndentationFixer tests --
+
+    #[test]
+    fn fixer_tabs_to_spaces() {
+        let text = "\tline1\n\t\tline2";
+        let result = IndentationFixer::convert_all_to_spaces(text, 4);
+        assert!(result.starts_with("    line1"));
+        assert!(result.contains("        line2"));
+    }
+
+    #[test]
+    fn fixer_spaces_to_tabs() {
+        let text = "    line1\n        line2";
+        let result = IndentationFixer::convert_all_to_tabs(text, 4);
+        assert!(result.starts_with("\tline1"));
+        assert!(result.contains("\t\tline2"));
+    }
+
+    #[test]
+    fn fixer_trailing_whitespace() {
+        let text = "hello   \nworld  ";
+        let result = IndentationFixer::fix_trailing_whitespace(text);
+        assert_eq!(result, "hello\nworld");
+    }
+
+    #[test]
+    fn fixer_trim_blank_lines() {
+        let text = "hello\n    \nworld";
+        let result = IndentationFixer::trim_blank_line_indent(text);
+        assert_eq!(result, "hello\n\nworld");
     }
 
 }

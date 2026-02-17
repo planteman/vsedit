@@ -1761,6 +1761,147 @@ impl LayoutSnapToEdgeHandler {
     }
 }
 
+// --- LayoutGridV2: 2D grid layout ---
+
+/// A 2D grid layout that assigns cells across rows and columns.
+pub struct LayoutGridV2 {
+    rows: usize,
+    cols: usize,
+    /// (row, col) -> (row_span, col_span)
+    spans: HashMap<(usize, usize), (usize, usize)>,
+}
+
+impl LayoutGridV2 {
+    pub fn new(rows: usize, cols: usize) -> Self {
+        Self { rows, cols, spans: HashMap::new() }
+    }
+
+    pub fn set_cell_span(&mut self, row: usize, col: usize, row_span: usize, col_span: usize) {
+        if row + row_span <= self.rows && col + col_span <= self.cols {
+            self.spans.insert((row, col), (row_span, col_span));
+        }
+    }
+
+    pub fn total_cells(&self) -> usize {
+        self.rows * self.cols
+    }
+
+    pub fn compute_cell_bounds(&self, area: Rect, row: usize, col: usize) -> Option<Rect> {
+        if row >= self.rows || col >= self.cols {
+            return None;
+        }
+        let cell_w = area.width / self.cols as u16;
+        let cell_h = area.height / self.rows as u16;
+        let (rs, cs) = self.spans.get(&(row, col)).copied().unwrap_or((1, 1));
+        Some(Rect::new(
+            area.x + col as u16 * cell_w,
+            area.y + row as u16 * cell_h,
+            cell_w * cs as u16,
+            cell_h * rs as u16,
+        ))
+    }
+
+    pub fn merge_cells(&mut self, row: usize, col: usize, row_span: usize, col_span: usize) -> bool {
+        if row + row_span <= self.rows && col + col_span <= self.cols {
+            self.spans.insert((row, col), (row_span, col_span));
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn rows(&self) -> usize { self.rows }
+    pub fn cols(&self) -> usize { self.cols }
+}
+
+// --- LayoutBreakpointSystem: responsive breakpoints ---
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Breakpoint {
+    Compact,
+    Normal,
+    Wide,
+    UltraWide,
+}
+
+pub struct LayoutBreakpointSystem {
+    compact_threshold: u16,
+    normal_threshold: u16,
+    wide_threshold: u16,
+    current: Breakpoint,
+}
+
+impl LayoutBreakpointSystem {
+    pub fn new(compact: u16, normal: u16, wide: u16) -> Self {
+        Self {
+            compact_threshold: compact,
+            normal_threshold: normal,
+            wide_threshold: wide,
+            current: Breakpoint::Normal,
+        }
+    }
+
+    pub fn current_breakpoint(&self) -> Breakpoint { self.current }
+
+    pub fn on_resize(&mut self, width: u16) {
+        self.current = if width < self.compact_threshold {
+            Breakpoint::Compact
+        } else if width < self.normal_threshold {
+            Breakpoint::Normal
+        } else if width < self.wide_threshold {
+            Breakpoint::Wide
+        } else {
+            Breakpoint::UltraWide
+        };
+    }
+
+    pub fn thresholds(&self) -> (u16, u16, u16) {
+        (self.compact_threshold, self.normal_threshold, self.wide_threshold)
+    }
+}
+
+// --- LayoutOverflowHandler ---
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverflowStrategy {
+    Clip,
+    Scroll,
+    Wrap,
+    Ellipsis,
+}
+
+pub struct LayoutOverflowHandler {
+    strategy: OverflowStrategy,
+    content_length: usize,
+    visible_length: usize,
+    scroll_offset: usize,
+}
+
+impl LayoutOverflowHandler {
+    pub fn new(strategy: OverflowStrategy, content_length: usize, visible_length: usize) -> Self {
+        Self { strategy, content_length, visible_length, scroll_offset: 0 }
+    }
+
+    pub fn strategy(&self) -> OverflowStrategy { self.strategy }
+
+    pub fn compute_visible_content_range(&self) -> (usize, usize) {
+        let start = self.scroll_offset.min(self.content_length);
+        let end = (start + self.visible_length).min(self.content_length);
+        (start, end)
+    }
+
+    pub fn needs_scrollbar(&self) -> bool {
+        self.content_length > self.visible_length
+    }
+
+    pub fn set_scroll_offset(&mut self, offset: usize) {
+        self.scroll_offset = offset.min(self.content_length.saturating_sub(self.visible_length));
+    }
+
+    pub fn content_length(&self) -> usize { self.content_length }
+    pub fn visible_length(&self) -> usize { self.visible_length }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -2655,4 +2796,94 @@ mod tests {
         assert_eq!(handler.threshold(), 7);
     }
 
+    #[test]
+    fn grid_v2_total_cells() {
+        let g = LayoutGridV2::new(3, 4);
+        assert_eq!(g.total_cells(), 12);
+    }
+
+    #[test]
+    fn grid_v2_cell_bounds_basic() {
+        let g = LayoutGridV2::new(2, 2);
+        let bounds = g.compute_cell_bounds(rect(0, 0, 100, 100), 0, 0).unwrap();
+        assert_eq!(bounds.x, 0);
+        assert_eq!(bounds.y, 0);
+        assert_eq!(bounds.width, 50);
+        assert_eq!(bounds.height, 50);
+    }
+
+    #[test]
+    fn grid_v2_cell_bounds_out_of_range() {
+        let g = LayoutGridV2::new(2, 2);
+        assert!(g.compute_cell_bounds(rect(0, 0, 100, 100), 5, 0).is_none());
+    }
+
+    #[test]
+    fn grid_v2_merge_cells() {
+        let mut g = LayoutGridV2::new(3, 3);
+        assert!(g.merge_cells(0, 0, 2, 2));
+        let bounds = g.compute_cell_bounds(rect(0, 0, 90, 90), 0, 0).unwrap();
+        assert_eq!(bounds.width, 60);
+        assert_eq!(bounds.height, 60);
+    }
+
+    #[test]
+    fn grid_v2_merge_cells_out_of_bounds() {
+        let mut g = LayoutGridV2::new(2, 2);
+        assert!(!g.merge_cells(1, 1, 3, 3));
+    }
+
+    #[test]
+    fn breakpoint_system_compact() {
+        let mut bs = LayoutBreakpointSystem::new(40, 80, 120);
+        bs.on_resize(30);
+        assert_eq!(bs.current_breakpoint(), Breakpoint::Compact);
+    }
+
+    #[test]
+    fn breakpoint_system_normal() {
+        let mut bs = LayoutBreakpointSystem::new(40, 80, 120);
+        bs.on_resize(50);
+        assert_eq!(bs.current_breakpoint(), Breakpoint::Normal);
+    }
+
+    #[test]
+    fn breakpoint_system_wide() {
+        let mut bs = LayoutBreakpointSystem::new(40, 80, 120);
+        bs.on_resize(100);
+        assert_eq!(bs.current_breakpoint(), Breakpoint::Wide);
+    }
+
+    #[test]
+    fn breakpoint_system_ultrawide() {
+        let mut bs = LayoutBreakpointSystem::new(40, 80, 120);
+        bs.on_resize(200);
+        assert_eq!(bs.current_breakpoint(), Breakpoint::UltraWide);
+    }
+
+    #[test]
+    fn overflow_handler_needs_scrollbar() {
+        let h = LayoutOverflowHandler::new(OverflowStrategy::Scroll, 100, 50);
+        assert!(h.needs_scrollbar());
+    }
+
+    #[test]
+    fn overflow_handler_no_scrollbar() {
+        let h = LayoutOverflowHandler::new(OverflowStrategy::Clip, 30, 50);
+        assert!(!h.needs_scrollbar());
+    }
+
+    #[test]
+    fn overflow_handler_visible_range() {
+        let mut h = LayoutOverflowHandler::new(OverflowStrategy::Scroll, 100, 20);
+        h.set_scroll_offset(10);
+        assert_eq!(h.compute_visible_content_range(), (10, 30));
+    }
+
+    #[test]
+    fn overflow_handler_clamp_offset() {
+        let mut h = LayoutOverflowHandler::new(OverflowStrategy::Scroll, 50, 20);
+        h.set_scroll_offset(999);
+        assert_eq!(h.compute_visible_content_range(), (30, 50));
+    }
 }

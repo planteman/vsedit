@@ -1448,6 +1448,216 @@ fn fuzzy_score(haystack: &str, query: &str) -> i32 {
     score + matched + consecutive
 }
 
+// ---------------------------------------------------------------------------
+// ActionPrecondition
+// ---------------------------------------------------------------------------
+
+/// Conditions that must be met before an action can execute.
+#[derive(Debug, Clone)]
+pub struct ActionPrecondition {
+    required_context_keys: Vec<String>,
+    forbidden_context_keys: Vec<String>,
+    needs_focus: bool,
+    needs_visible: bool,
+}
+
+impl ActionPrecondition {
+    pub fn new() -> Self {
+        Self {
+            required_context_keys: Vec::new(),
+            forbidden_context_keys: Vec::new(),
+            needs_focus: false,
+            needs_visible: false,
+        }
+    }
+
+    pub fn require_key(mut self, key: &str) -> Self {
+        self.required_context_keys.push(key.to_string());
+        self
+    }
+
+    pub fn forbid_key(mut self, key: &str) -> Self {
+        self.forbidden_context_keys.push(key.to_string());
+        self
+    }
+
+    pub fn has_focus(mut self) -> Self {
+        self.needs_focus = true;
+        self
+    }
+
+    pub fn is_visible(mut self) -> Self {
+        self.needs_visible = true;
+        self
+    }
+
+    pub fn all_met(&self, context: &[&str], focused: bool, visible: bool) -> bool {
+        if self.needs_focus && !focused {
+            return false;
+        }
+        if self.needs_visible && !visible {
+            return false;
+        }
+        for key in &self.required_context_keys {
+            if !context.contains(&key.as_str()) {
+                return false;
+            }
+        }
+        for key in &self.forbidden_context_keys {
+            if context.contains(&key.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn any_met(&self, context: &[&str], focused: bool, visible: bool) -> bool {
+        if self.needs_focus && focused {
+            return true;
+        }
+        if self.needs_visible && visible {
+            return true;
+        }
+        for key in &self.required_context_keys {
+            if context.contains(&key.as_str()) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn describe(&self) -> String {
+        let mut parts = Vec::new();
+        if self.needs_focus {
+            parts.push("focused".to_string());
+        }
+        if self.needs_visible {
+            parts.push("visible".to_string());
+        }
+        for k in &self.required_context_keys {
+            parts.push(format!("require({k})"));
+        }
+        for k in &self.forbidden_context_keys {
+            parts.push(format!("forbid({k})"));
+        }
+        parts.join(" && ")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionKeybindingHint
+// ---------------------------------------------------------------------------
+
+/// Format keybinding hints for display.
+#[derive(Debug, Clone)]
+pub struct ActionKeybindingHint {
+    modifiers: Vec<String>,
+    key: String,
+    is_mac: bool,
+}
+
+impl ActionKeybindingHint {
+    pub fn new(key: &str, is_mac: bool) -> Self {
+        Self {
+            modifiers: Vec::new(),
+            key: key.to_string(),
+            is_mac,
+        }
+    }
+
+    pub fn ctrl(mut self) -> Self {
+        self.modifiers.push(if self.is_mac { "⌘".into() } else { "Ctrl".into() });
+        self
+    }
+
+    pub fn shift(mut self) -> Self {
+        self.modifiers.push(if self.is_mac { "⇧".into() } else { "Shift".into() });
+        self
+    }
+
+    pub fn alt(mut self) -> Self {
+        self.modifiers.push(if self.is_mac { "⌥".into() } else { "Alt".into() });
+        self
+    }
+
+    pub fn format_shortcut(&self) -> String {
+        let sep = if self.is_mac { "" } else { "+" };
+        let mut parts = self.modifiers.clone();
+        parts.push(self.key.clone());
+        parts.join(sep)
+    }
+
+    pub fn format_chord(first: &ActionKeybindingHint, second: &ActionKeybindingHint) -> String {
+        format!("{} {}", first.format_shortcut(), second.format_shortcut())
+    }
+
+    pub fn human_readable(&self) -> String {
+        format!("Press {}", self.format_shortcut())
+    }
+
+    pub fn is_multi_chord(&self) -> bool {
+        self.modifiers.len() > 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionCooldown
+// ---------------------------------------------------------------------------
+
+/// Per-action cooldown tracking.
+#[derive(Debug, Clone)]
+pub struct ActionCooldown {
+    cooldown_ms: u64,
+    last_executed: Option<u64>,
+}
+
+impl ActionCooldown {
+    pub fn new(cooldown_ms: u64) -> Self {
+        Self {
+            cooldown_ms,
+            last_executed: None,
+        }
+    }
+
+    pub fn cooldown_ms(&self) -> u64 {
+        self.cooldown_ms
+    }
+
+    pub fn last_executed(&self) -> Option<u64> {
+        self.last_executed
+    }
+
+    pub fn can_execute_at(&self, now_ms: u64) -> bool {
+        match self.last_executed {
+            None => true,
+            Some(last) => now_ms.saturating_sub(last) >= self.cooldown_ms,
+        }
+    }
+
+    pub fn execute_at(&mut self, now_ms: u64) -> bool {
+        if self.can_execute_at(now_ms) {
+            self.last_executed = Some(now_ms);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn remaining_ms(&self, now_ms: u64) -> u64 {
+        match self.last_executed {
+            None => 0,
+            Some(last) => {
+                let elapsed = now_ms.saturating_sub(last);
+                self.cooldown_ms.saturating_sub(elapsed)
+            }
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.last_executed = None;
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -2531,6 +2741,104 @@ mod tests {
         let actions = vec![make_action("editor.format", ActionCategory::Edit)];
         let results = action_fuzzy_search(&actions, "zzz");
         assert!(results.is_empty());
+    }
+
+    // -- ActionPrecondition ------------------------------------------------
+
+    #[test]
+    fn precondition_all_met_simple() {
+        let pre = ActionPrecondition::new().require_key("editorFocus");
+        assert!(pre.all_met(&["editorFocus"], false, false));
+        assert!(!pre.all_met(&["terminalFocus"], false, false));
+    }
+
+    #[test]
+    fn precondition_forbidden_key() {
+        let pre = ActionPrecondition::new().forbid_key("readOnly");
+        assert!(pre.all_met(&["editorFocus"], false, false));
+        assert!(!pre.all_met(&["readOnly"], false, false));
+    }
+
+    #[test]
+    fn precondition_focus_required() {
+        let pre = ActionPrecondition::new().has_focus();
+        assert!(!pre.all_met(&[], false, false));
+        assert!(pre.all_met(&[], true, false));
+    }
+
+    #[test]
+    fn precondition_any_met() {
+        let pre = ActionPrecondition::new().require_key("a").require_key("b");
+        assert!(pre.any_met(&["b"], false, false));
+        assert!(!pre.any_met(&["c"], false, false));
+    }
+
+    #[test]
+    fn precondition_describe() {
+        let pre = ActionPrecondition::new().has_focus().require_key("editor");
+        let desc = pre.describe();
+        assert!(desc.contains("focused"));
+        assert!(desc.contains("require(editor)"));
+    }
+
+    // -- ActionKeybindingHint ----------------------------------------------
+
+    #[test]
+    fn keybinding_format_windows() {
+        let hint = ActionKeybindingHint::new("S", false).ctrl().shift();
+        assert_eq!(hint.format_shortcut(), "Ctrl+Shift+S");
+    }
+
+    #[test]
+    fn keybinding_format_mac() {
+        let hint = ActionKeybindingHint::new("S", true).ctrl().shift();
+        assert_eq!(hint.format_shortcut(), "⌘⇧S");
+    }
+
+    #[test]
+    fn keybinding_chord() {
+        let first = ActionKeybindingHint::new("K", false).ctrl();
+        let second = ActionKeybindingHint::new("C", false).ctrl();
+        assert_eq!(ActionKeybindingHint::format_chord(&first, &second), "Ctrl+K Ctrl+C");
+    }
+
+    #[test]
+    fn keybinding_human_readable() {
+        let hint = ActionKeybindingHint::new("Z", false).ctrl();
+        assert_eq!(hint.human_readable(), "Press Ctrl+Z");
+    }
+
+    // -- ActionCooldown ----------------------------------------------------
+
+    #[test]
+    fn cooldown_initial_can_execute() {
+        let cd = ActionCooldown::new(1000);
+        assert!(cd.can_execute_at(0));
+        assert_eq!(cd.remaining_ms(0), 0);
+    }
+
+    #[test]
+    fn cooldown_blocks_during_period() {
+        let mut cd = ActionCooldown::new(1000);
+        assert!(cd.execute_at(100));
+        assert!(!cd.can_execute_at(500));
+        assert_eq!(cd.remaining_ms(500), 600);
+    }
+
+    #[test]
+    fn cooldown_allows_after_period() {
+        let mut cd = ActionCooldown::new(1000);
+        cd.execute_at(100);
+        assert!(cd.can_execute_at(1200));
+    }
+
+    #[test]
+    fn cooldown_reset() {
+        let mut cd = ActionCooldown::new(1000);
+        cd.execute_at(100);
+        cd.reset();
+        assert!(cd.can_execute_at(100));
+        assert_eq!(cd.last_executed(), None);
     }
 
 }

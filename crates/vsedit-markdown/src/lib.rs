@@ -1792,7 +1792,170 @@ pub fn extract_fenced_code_blocks(source: &str) -> Vec<(Option<String>, String)>
     blocks
 }
 
+// --- MarkdownTableFormatterV2 ---
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColumnAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+pub struct MarkdownTableFormatterV2 {
+    rows: Vec<Vec<String>>,
+    alignments: Vec<ColumnAlignment>,
+}
+
+impl MarkdownTableFormatterV2 {
+    pub fn new() -> Self { Self { rows: Vec::new(), alignments: Vec::new() } }
+
+    pub fn parse_rows(text: &str) -> Vec<Vec<String>> {
+        text.lines()
+            .filter(|l| l.contains('|') && !l.trim().starts_with("|---") && !l.trim().starts_with("| ---"))
+            .map(|line| {
+                line.split('|')
+                    .map(|c| c.trim().to_string())
+                    .filter(|c| !c.is_empty())
+                    .collect()
+            })
+            .collect()
+    }
+
+    pub fn set_rows(&mut self, rows: Vec<Vec<String>>) { self.rows = rows; }
+
+    pub fn set_alignments(&mut self, aligns: Vec<ColumnAlignment>) { self.alignments = aligns; }
+
+    pub fn compute_column_widths(&self) -> Vec<usize> {
+        let cols = self.rows.iter().map(|r| r.len()).max().unwrap_or(0);
+        (0..cols).map(|c| {
+            self.rows.iter().map(|r| r.get(c).map(|s| s.len()).unwrap_or(0)).max().unwrap_or(0)
+        }).collect()
+    }
+
+    pub fn format_table(&self) -> String {
+        let widths = self.compute_column_widths();
+        let mut out = String::new();
+        for (i, row) in self.rows.iter().enumerate() {
+            out.push('|');
+            for (c, cell) in row.iter().enumerate() {
+                let w = widths.get(c).copied().unwrap_or(cell.len());
+                out.push_str(&format!(" {:width$} |", cell, width = w));
+            }
+            out.push('\n');
+            if i == 0 {
+                out.push('|');
+                for &w in &widths {
+                    out.push_str(&format!(" {} |", "-".repeat(w)));
+                }
+                out.push('\n');
+            }
+        }
+        out
+    }
+
+    pub fn validate_table(&self) -> bool {
+        if self.rows.is_empty() { return false; }
+        let expected = self.rows[0].len();
+        self.rows.iter().all(|r| r.len() == expected)
+    }
+}
+
+// --- MarkdownLinkExtractorV2 ---
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExtractedLink {
+    pub label: String,
+    pub url: String,
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkCategory {
+    Http,
+    Relative,
+    Anchor,
+}
+
+pub struct MarkdownLinkExtractorV2;
+
+impl MarkdownLinkExtractorV2 {
+    pub fn extract_links(text: &str) -> Vec<ExtractedLink> {
+        let mut links = Vec::new();
+        let mut chars = text.chars().peekable();
+        while let Some(&ch) = chars.peek() {
+            if ch == '[' {
+                chars.next();
+                let label: String = chars.by_ref().take_while(|&c| c != ']').collect();
+                if chars.peek() == Some(&'(') {
+                    chars.next();
+                    let url: String = chars.by_ref().take_while(|&c| c != ')').collect();
+                    links.push(ExtractedLink { label, url, title: None });
+                }
+            } else {
+                chars.next();
+            }
+        }
+        links
+    }
+
+    pub fn categorize(url: &str) -> LinkCategory {
+        if url.starts_with('#') { LinkCategory::Anchor }
+        else if url.starts_with("http://") || url.starts_with("https://") { LinkCategory::Http }
+        else { LinkCategory::Relative }
+    }
+
+    pub fn link_count(text: &str) -> usize { Self::extract_links(text).len() }
+
+    pub fn unique_urls(text: &str) -> Vec<String> {
+        let mut urls: Vec<String> = Self::extract_links(text).into_iter().map(|l| l.url).collect();
+        urls.sort();
+        urls.dedup();
+        urls
+    }
+}
+
+// --- MarkdownTocGeneratorV2 ---
+
+#[derive(Debug, Clone)]
+pub struct TocHeading {
+    pub level: usize,
+    pub text: String,
+    pub anchor: String,
+}
+
+pub struct MarkdownTocGeneratorV2;
+
+impl MarkdownTocGeneratorV2 {
+    pub fn extract_headings(text: &str) -> Vec<TocHeading> {
+        text.lines().filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with('#') {
+                let level = trimmed.chars().take_while(|&c| c == '#').count();
+                let text = trimmed[level..].trim().to_string();
+                let anchor = text.to_lowercase().replace(' ', "-");
+                Some(TocHeading { level, text, anchor })
+            } else {
+                None
+            }
+        }).collect()
+    }
+
+    pub fn toc_as_markdown(headings: &[TocHeading], max_depth: usize, numbered: bool) -> String {
+        let mut out = String::new();
+        let mut counter = 0usize;
+        for h in headings {
+            if h.level > max_depth { continue; }
+            let indent = "  ".repeat(h.level.saturating_sub(1));
+            counter += 1;
+            if numbered {
+                out.push_str(&format!("{}{}. [{}](#{})\n", indent, counter, h.text, h.anchor));
+            } else {
+                out.push_str(&format!("{}- [{}](#{})\n", indent, h.text, h.anchor));
+            }
+        }
+        out
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -2666,6 +2829,90 @@ mod tests {
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0].0, Some("python".into()));
         assert_eq!(blocks[1].0, None);
+    }
+
+    #[test]
+    fn table_formatter_v2_parse_rows() {
+        let rows = MarkdownTableFormatterV2::parse_rows("| A | B |\n|---|---|\n| 1 | 2 |");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], vec!["A", "B"]);
+    }
+
+    #[test]
+    fn table_formatter_v2_column_widths() {
+        let mut f = MarkdownTableFormatterV2::new();
+        f.set_rows(vec![
+            vec!["Name".into(), "Age".into()],
+            vec!["Alice".into(), "30".into()],
+        ]);
+        assert_eq!(f.compute_column_widths(), vec![5, 3]);
+    }
+
+    #[test]
+    fn table_formatter_v2_validate() {
+        let mut f = MarkdownTableFormatterV2::new();
+        f.set_rows(vec![vec!["A".into(), "B".into()], vec!["1".into(), "2".into()]]);
+        assert!(f.validate_table());
+    }
+
+    #[test]
+    fn table_formatter_v2_validate_fails() {
+        let mut f = MarkdownTableFormatterV2::new();
+        f.set_rows(vec![vec!["A".into(), "B".into()], vec!["1".into()]]);
+        assert!(!f.validate_table());
+    }
+
+    #[test]
+    fn table_formatter_v2_format() {
+        let mut f = MarkdownTableFormatterV2::new();
+        f.set_rows(vec![vec!["X".into()], vec!["Y".into()]]);
+        let out = f.format_table();
+        assert!(out.contains("| X |"));
+        assert!(out.contains("| - |"));
+    }
+
+    #[test]
+    fn link_extractor_v2_extract() {
+        let links = MarkdownLinkExtractorV2::extract_links("See [docs](https://example.com) and [home](/).");
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].label, "docs");
+    }
+
+    #[test]
+    fn link_extractor_v2_categorize_http() {
+        assert_eq!(MarkdownLinkExtractorV2::categorize("https://x.com"), LinkCategory::Http);
+    }
+
+    #[test]
+    fn link_extractor_v2_categorize_anchor() {
+        assert_eq!(MarkdownLinkExtractorV2::categorize("#section"), LinkCategory::Anchor);
+    }
+
+    #[test]
+    fn link_extractor_v2_categorize_relative() {
+        assert_eq!(MarkdownLinkExtractorV2::categorize("./file.md"), LinkCategory::Relative);
+    }
+
+    #[test]
+    fn link_extractor_v2_unique_urls() {
+        let urls = MarkdownLinkExtractorV2::unique_urls("[a](x) [b](y) [c](x)");
+        assert_eq!(urls, vec!["x", "y"]);
+    }
+
+    #[test]
+    fn toc_generator_v2_extract_headings() {
+        let headings = MarkdownTocGeneratorV2::extract_headings("# Title\n## Section\n### Sub");
+        assert_eq!(headings.len(), 3);
+        assert_eq!(headings[0].level, 1);
+        assert_eq!(headings[1].text, "Section");
+    }
+
+    #[test]
+    fn toc_generator_v2_as_markdown_bulleted() {
+        let headings = MarkdownTocGeneratorV2::extract_headings("# Intro\n## Details");
+        let toc = MarkdownTocGeneratorV2::toc_as_markdown(&headings, 3, false);
+        assert!(toc.contains("- [Intro](#intro)"));
+        assert!(toc.contains("- [Details](#details)"));
     }
 
 

@@ -1565,6 +1565,157 @@ impl fmt::Display for BufferPoolStatsConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BufferChunker — split buffers into chunks
+// ---------------------------------------------------------------------------
+
+/// Split a [`VsBuffer`] into fixed-size or line-delimited chunks.
+pub struct BufferChunker;
+
+impl BufferChunker {
+    /// Split `buf` into chunks of exactly `chunk_size` bytes
+    /// (the last chunk may be smaller).
+    pub fn fixed_size(buf: &VsBuffer, chunk_size: usize) -> Vec<VsBuffer> {
+        if chunk_size == 0 || buf.is_empty() {
+            return vec![];
+        }
+        let data = buf.as_bytes();
+        data.chunks(chunk_size)
+            .map(|c| VsBuffer::new(Bytes::copy_from_slice(c)))
+            .collect()
+    }
+
+    /// Split `buf` on newline boundaries (`\n`). Each chunk retains the
+    /// trailing newline if present. Empty input yields an empty vec.
+    pub fn by_lines(buf: &VsBuffer) -> Vec<VsBuffer> {
+        if buf.is_empty() {
+            return vec![];
+        }
+        let data = buf.as_bytes();
+        let mut chunks = Vec::new();
+        let mut start = 0;
+        for (i, &b) in data.iter().enumerate() {
+            if b == b'\n' {
+                chunks.push(VsBuffer::new(Bytes::copy_from_slice(&data[start..=i])));
+                start = i + 1;
+            }
+        }
+        if start < data.len() {
+            chunks.push(VsBuffer::new(Bytes::copy_from_slice(&data[start..])));
+        }
+        chunks
+    }
+
+    /// Number of fixed-size chunks that `len` bytes would produce.
+    pub fn chunk_count(len: usize, chunk_size: usize) -> usize {
+        if chunk_size == 0 { return 0; }
+        (len + chunk_size - 1) / chunk_size
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferEncoder — simple base-64-like encode/decode
+// ---------------------------------------------------------------------------
+
+/// Simple byte encoder using a 6-bit encoding (custom Base64-like alphabet).
+pub struct BufferEncoder;
+
+const B64_ALPHA: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+impl BufferEncoder {
+    /// Encode `buf` into a base64-like string.
+    pub fn encode(buf: &VsBuffer) -> String {
+        let data = buf.as_bytes();
+        let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+        for chunk in data.chunks(3) {
+            let b0 = chunk[0] as u32;
+            let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+            let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+            let triple = (b0 << 16) | (b1 << 8) | b2;
+            out.push(B64_ALPHA[((triple >> 18) & 0x3F) as usize] as char);
+            out.push(B64_ALPHA[((triple >> 12) & 0x3F) as usize] as char);
+            if chunk.len() > 1 {
+                out.push(B64_ALPHA[((triple >> 6) & 0x3F) as usize] as char);
+            } else {
+                out.push('=');
+            }
+            if chunk.len() > 2 {
+                out.push(B64_ALPHA[(triple & 0x3F) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+        out
+    }
+
+    fn decode_char(c: u8) -> Option<u8> {
+        match c {
+            b'A'..=b'Z' => Some(c - b'A'),
+            b'a'..=b'z' => Some(c - b'a' + 26),
+            b'0'..=b'9' => Some(c - b'0' + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            _ => None,
+        }
+    }
+
+    /// Decode a base64-like string back into a buffer.
+    pub fn decode(encoded: &str) -> Result<VsBuffer, String> {
+        let bytes = encoded.as_bytes();
+        if bytes.len() % 4 != 0 {
+            return Err("encoded length must be multiple of 4".into());
+        }
+        let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+        for chunk in bytes.chunks(4) {
+            let vals: Vec<Option<u8>> = chunk.iter().map(|&c| {
+                if c == b'=' { Some(0) } else { Self::decode_char(c) }
+            }).collect();
+            if vals.iter().any(|v| v.is_none()) {
+                return Err("invalid character in encoded data".into());
+            }
+            let v: Vec<u8> = vals.into_iter().map(|v| v.unwrap()).collect();
+            let triple = (v[0] as u32) << 18 | (v[1] as u32) << 12 | (v[2] as u32) << 6 | v[3] as u32;
+            out.push((triple >> 16) as u8);
+            if chunk[2] != b'=' { out.push((triple >> 8) as u8); }
+            if chunk[3] != b'=' { out.push(triple as u8); }
+        }
+        Ok(VsBuffer::new(Bytes::from(out)))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferSearch additional helpers
+// ---------------------------------------------------------------------------
+
+impl BufferSearch {
+    /// Returns `true` if `buf` contains the byte pattern.
+    pub fn contains_pattern(buf: &VsBuffer, needle: &[u8]) -> bool {
+        Self::find_first(buf, needle).is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferDiff additional helpers
+// ---------------------------------------------------------------------------
+
+impl BufferDiff {
+    /// Returns a list of (offset, old_byte, new_byte) tuples for byte-level changes.
+    pub fn byte_changes(a: &VsBuffer, b: &VsBuffer) -> Vec<(usize, u8, u8)> {
+        let ab = a.as_bytes();
+        let bb = b.as_bytes();
+        let max_len = ab.len().max(bb.len());
+        let mut changes = Vec::new();
+        for i in 0..max_len {
+            let va = if i < ab.len() { ab[i] } else { 0 };
+            let vb = if i < bb.len() { bb[i] } else { 0 };
+            if va != vb {
+                changes.push((i, va, vb));
+            }
+        }
+        changes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2610,6 +2761,103 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- BufferChunker -------------------------------------------------------
+
+    #[test]
+    fn chunker_fixed_size() {
+        let buf = VsBuffer::from_string("abcdefgh");
+        let chunks = BufferChunker::fixed_size(&buf, 3);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].to_string_lossy(), "abc");
+        assert_eq!(chunks[2].to_string_lossy(), "gh");
+    }
+
+    #[test]
+    fn chunker_fixed_empty() {
+        let buf = VsBuffer::from_string("");
+        assert!(BufferChunker::fixed_size(&buf, 4).is_empty());
+    }
+
+    #[test]
+    fn chunker_fixed_zero_size() {
+        let buf = VsBuffer::from_string("abc");
+        assert!(BufferChunker::fixed_size(&buf, 0).is_empty());
+    }
+
+    #[test]
+    fn chunker_by_lines() {
+        let buf = VsBuffer::from_string("line1\nline2\nline3");
+        let lines = BufferChunker::by_lines(&buf);
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].to_string_lossy(), "line1\n");
+        assert_eq!(lines[2].to_string_lossy(), "line3");
+    }
+
+    #[test]
+    fn chunker_chunk_count() {
+        assert_eq!(BufferChunker::chunk_count(10, 3), 4);
+        assert_eq!(BufferChunker::chunk_count(9, 3), 3);
+        assert_eq!(BufferChunker::chunk_count(0, 3), 0);
+    }
+
+    // -- BufferEncoder -------------------------------------------------------
+
+    #[test]
+    fn encoder_roundtrip() {
+        let buf = VsBuffer::from_string("Hello, world!");
+        let encoded = BufferEncoder::encode(&buf);
+        let decoded = BufferEncoder::decode(&encoded).unwrap();
+        assert_eq!(decoded.to_string_lossy(), "Hello, world!");
+    }
+
+    #[test]
+    fn encoder_empty() {
+        let buf = VsBuffer::from_string("");
+        let encoded = BufferEncoder::encode(&buf);
+        assert!(encoded.is_empty());
+    }
+
+    #[test]
+    fn encoder_invalid_length() {
+        let result = BufferEncoder::decode("ABC");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn encoder_padding() {
+        let buf = VsBuffer::new(Bytes::from_static(b"A"));
+        let encoded = BufferEncoder::encode(&buf);
+        assert!(encoded.ends_with("=="));
+        let decoded = BufferEncoder::decode(&encoded).unwrap();
+        assert_eq!(decoded.as_bytes(), b"A");
+    }
+
+    // -- BufferSearch contains_pattern + BufferDiff byte_changes -------------
+
+    #[test]
+    fn search_contains_pattern() {
+        let buf = VsBuffer::from_string("hello world");
+        assert!(BufferSearch::contains_pattern(&buf, b"world"));
+        assert!(!BufferSearch::contains_pattern(&buf, b"xyz"));
+    }
+
+    #[test]
+    fn diff_byte_changes() {
+        let a = VsBuffer::from_string("abc");
+        let b = VsBuffer::from_string("axc");
+        let changes = BufferDiff::byte_changes(&a, &b);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0], (1, b'b', b'x'));
+    }
+
+    #[test]
+    fn diff_byte_changes_different_lengths() {
+        let a = VsBuffer::from_string("ab");
+        let b = VsBuffer::from_string("abcd");
+        let changes = BufferDiff::byte_changes(&a, &b);
+        assert_eq!(changes.len(), 2);
     }
 
 }

@@ -1579,6 +1579,188 @@ impl ClipboardService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ClipboardHistory
+// ---------------------------------------------------------------------------
+
+/// Ring buffer of clipboard entries.
+#[derive(Debug, Clone)]
+pub struct ClipboardHistory {
+    entries: Vec<String>,
+    max_entries: usize,
+}
+
+impl ClipboardHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    pub fn push(&mut self, text: String) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(text);
+    }
+
+    pub fn get_at(&self, index: usize) -> Option<&str> {
+        self.entries.get(index).map(|s| s.as_str())
+    }
+
+    pub fn recent(&self, count: usize) -> Vec<&str> {
+        self.entries.iter().rev().take(count).map(|s| s.as_str()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn max_entries(&self) -> usize {
+        self.max_entries
+    }
+
+    pub fn contains(&self, text: &str) -> bool {
+        self.entries.iter().any(|e| e == text)
+    }
+
+    pub fn remove_at(&mut self, index: usize) -> Option<String> {
+        if index < self.entries.len() {
+            Some(self.entries.remove(index))
+        } else {
+            None
+        }
+    }
+
+    pub fn deduplicate(&mut self) {
+        let mut seen = Vec::new();
+        self.entries.retain(|e| {
+            if seen.contains(e) {
+                false
+            } else {
+                seen.push(e.clone());
+                true
+            }
+        });
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardTransformer
+// ---------------------------------------------------------------------------
+
+/// Transform clipboard text.
+pub struct ClipboardTransformer;
+
+impl ClipboardTransformer {
+    pub fn trim(text: &str) -> String {
+        text.trim().to_string()
+    }
+
+    pub fn collapse_whitespace(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut prev_ws = false;
+        for ch in text.chars() {
+            if ch.is_whitespace() {
+                if !prev_ws {
+                    result.push(' ');
+                }
+                prev_ws = true;
+            } else {
+                result.push(ch);
+                prev_ws = false;
+            }
+        }
+        result
+    }
+
+    pub fn escape_html(text: &str) -> String {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    }
+
+    pub fn unescape_html(text: &str) -> String {
+        text.replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+    }
+
+    pub fn to_single_line(text: &str) -> String {
+        text.lines().collect::<Vec<_>>().join(" ")
+    }
+
+    pub fn normalize_newlines(text: &str) -> String {
+        text.replace("\r\n", "\n").replace('\r', "\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardMetadata
+// ---------------------------------------------------------------------------
+
+/// Metadata attached to a clipboard entry.
+#[derive(Debug, Clone)]
+pub struct ClipboardMetadataV2 {
+    pub source_file: Option<String>,
+    pub line: Option<u32>,
+    pub timestamp: u64,
+    pub is_whole_line: bool,
+    pub language: Option<String>,
+}
+
+impl ClipboardMetadataV2 {
+    pub fn new(timestamp: u64) -> Self {
+        Self {
+            source_file: None,
+            line: None,
+            timestamp,
+            is_whole_line: false,
+            language: None,
+        }
+    }
+
+    pub fn with_source(mut self, file: &str, line: u32) -> Self {
+        self.source_file = Some(file.to_string());
+        self.line = Some(line);
+        self
+    }
+
+    pub fn with_language(mut self, lang: &str) -> Self {
+        self.language = Some(lang.to_string());
+        self
+    }
+
+    pub fn matches_filter(&self, language: Option<&str>, file_pattern: Option<&str>) -> bool {
+        if let Some(lang) = language {
+            if self.language.as_deref() != Some(lang) {
+                return false;
+            }
+        }
+        if let Some(pattern) = file_pattern {
+            if let Some(ref src) = self.source_file {
+                if !src.contains(pattern) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2516,4 +2698,103 @@ mod tests {
         assert_eq!(svc.merge_history(", "), "alpha, beta, gamma");
         assert_eq!(svc.merge_history("\n"), "alpha\nbeta\ngamma");
     }
+
+    // -- ClipboardHistory --------------------------------------------------
+
+    #[test]
+    fn history_push_and_get() {
+        let mut h = ClipboardHistory::new(5);
+        h.push("hello".into());
+        assert_eq!(h.get_at(0), Some("hello"));
+        assert_eq!(h.len(), 1);
+    }
+
+    #[test]
+    fn history_max_entries() {
+        let mut h = ClipboardHistory::new(2);
+        h.push("a".into());
+        h.push("b".into());
+        h.push("c".into());
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.get_at(0), Some("b"));
+    }
+
+    #[test]
+    fn history_recent() {
+        let mut h = ClipboardHistory::new(10);
+        h.push("a".into());
+        h.push("b".into());
+        h.push("c".into());
+        assert_eq!(h.recent(2), vec!["c", "b"]);
+    }
+
+    #[test]
+    fn history_deduplicate() {
+        let mut h = ClipboardHistory::new(10);
+        h.push("a".into());
+        h.push("b".into());
+        h.push("a".into());
+        h.deduplicate();
+        assert_eq!(h.len(), 2);
+    }
+
+    #[test]
+    fn history_remove_at() {
+        let mut h = ClipboardHistory::new(10);
+        h.push("x".into());
+        h.push("y".into());
+        assert_eq!(h.remove_at(0), Some("x".into()));
+        assert_eq!(h.len(), 1);
+    }
+
+    // -- ClipboardTransformer ----------------------------------------------
+
+    #[test]
+    fn transformer_trim() {
+        assert_eq!(ClipboardTransformer::trim("  hello  "), "hello");
+    }
+
+    #[test]
+    fn transformer_collapse_whitespace() {
+        assert_eq!(ClipboardTransformer::collapse_whitespace("a  b\t\tc"), "a b c");
+    }
+
+    #[test]
+    fn transformer_escape_html() {
+        assert_eq!(ClipboardTransformer::escape_html("<b>\"hi\"</b>"), "&lt;b&gt;&quot;hi&quot;&lt;/b&gt;");
+    }
+
+    #[test]
+    fn transformer_unescape_html() {
+        assert_eq!(ClipboardTransformer::unescape_html("&lt;b&gt;"), "<b>");
+    }
+
+    #[test]
+    fn transformer_to_single_line() {
+        assert_eq!(ClipboardTransformer::to_single_line("a\nb\nc"), "a b c");
+    }
+
+    #[test]
+    fn transformer_normalize_newlines() {
+        assert_eq!(ClipboardTransformer::normalize_newlines("a\r\nb\rc"), "a\nb\nc");
+    }
+
+    // -- ClipboardMetadataV2 -------------------------------------------------
+
+    #[test]
+    fn metadata_matches_filter() {
+        let meta = ClipboardMetadataV2::new(100)
+            .with_source("src/main.rs", 10)
+            .with_language("rust");
+        assert!(meta.matches_filter(Some("rust"), None));
+        assert!(!meta.matches_filter(Some("python"), None));
+        assert!(meta.matches_filter(None, Some("main.rs")));
+    }
+
+    #[test]
+    fn metadata_no_filter() {
+        let meta = ClipboardMetadataV2::new(0);
+        assert!(meta.matches_filter(None, None));
+    }
+
 }

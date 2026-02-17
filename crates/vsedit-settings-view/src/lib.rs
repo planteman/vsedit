@@ -1595,6 +1595,208 @@ impl fmt::Display for SettingsCategoryTreeConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SettingsSearchIndex – index settings for fast search
+// ---------------------------------------------------------------------------
+
+/// Index of settings for fast keyword search.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsSearchIndexV2 {
+    entries: Vec<(String, String, String, String)>, // (key, title, description, category)
+}
+
+impl SettingsSearchIndexV2 {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Add a setting to the search index.
+    pub fn add_setting(&mut self, key: &str, title: &str, description: &str, category: &str) {
+        self.entries.push((
+            key.to_lowercase(),
+            title.to_lowercase(),
+            description.to_lowercase(),
+            category.to_string(),
+        ));
+    }
+
+    /// Search for settings matching the query (case-insensitive substring).
+    pub fn search(&self, query: &str) -> Vec<usize> {
+        let q = query.to_lowercase();
+        self.entries
+            .iter()
+            .enumerate()
+            .filter(|(_, (key, title, desc, _))| {
+                key.contains(&q) || title.contains(&q) || desc.contains(&q)
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Return results ranked by relevance (key match > title match > desc match).
+    pub fn ranked_results(&self, query: &str) -> Vec<(usize, u32)> {
+        let q = query.to_lowercase();
+        let mut results: Vec<(usize, u32)> = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (key, title, desc, _))| {
+                let score = if key.contains(&q) {
+                    3
+                } else if title.contains(&q) {
+                    2
+                } else if desc.contains(&q) {
+                    1
+                } else {
+                    return None;
+                };
+                Some((i, score))
+            })
+            .collect();
+        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results
+    }
+
+    /// Suggest a correction for a typo using edit distance.
+    pub fn suggestion_for_typo(&self, query: &str) -> Option<String> {
+        let q = query.to_lowercase();
+        let mut best: Option<(String, usize)> = None;
+        for (key, title, _, _) in &self.entries {
+            for candidate in [key, title] {
+                let dist = edit_distance(&q, candidate);
+                if dist <= 3 {
+                    if best.as_ref().map_or(true, |(_, d)| dist < *d) {
+                        best = Some((candidate.clone(), dist));
+                    }
+                }
+            }
+        }
+        best.map(|(s, _)| s)
+    }
+}
+
+/// Simple edit distance (Levenshtein).
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut dp = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    for i in 0..=a.len() { dp[i][0] = i; }
+    for j in 0..=b.len() { dp[0][j] = j; }
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    dp[a.len()][b.len()]
+}
+
+// ---------------------------------------------------------------------------
+// SettingsDiffCalculator – diff two configs
+// ---------------------------------------------------------------------------
+
+/// Compute the difference between two configuration maps.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsDiffCalculator {
+    added: Vec<(String, String)>,
+    removed: Vec<String>,
+    changed: Vec<(String, String, String)>, // (key, old, new)
+}
+
+impl SettingsDiffCalculator {
+    /// Compute a diff between `old` and `new` config maps.
+    pub fn compute(old: &HashMap<String, String>, new: &HashMap<String, String>) -> Self {
+        let mut diff = Self::default();
+        for (k, v) in new {
+            match old.get(k) {
+                None => diff.added.push((k.clone(), v.clone())),
+                Some(old_v) if old_v != v => diff.changed.push((k.clone(), old_v.clone(), v.clone())),
+                _ => {}
+            }
+        }
+        for k in old.keys() {
+            if !new.contains_key(k) {
+                diff.removed.push(k.clone());
+            }
+        }
+        diff
+    }
+
+    pub fn added_entries(&self) -> &[(String, String)] { &self.added }
+    pub fn removed_keys(&self) -> &[String] { &self.removed }
+    pub fn changed_entries(&self) -> &[(String, String, String)] { &self.changed }
+
+    pub fn change_count(&self) -> usize {
+        self.added.len() + self.removed.len() + self.changed.len()
+    }
+
+    pub fn is_modified(&self) -> bool { self.change_count() > 0 }
+
+    pub fn changed_keys(&self) -> Vec<&str> {
+        self.changed.iter().map(|(k, _, _)| k.as_str()).collect()
+    }
+
+    /// Apply this diff to a base config, producing the new config.
+    pub fn apply_diff(&self, base: &HashMap<String, String>) -> HashMap<String, String> {
+        let mut result = base.clone();
+        for k in &self.removed {
+            result.remove(k);
+        }
+        for (k, v) in &self.added {
+            result.insert(k.clone(), v.clone());
+        }
+        for (k, _, new_v) in &self.changed {
+            result.insert(k.clone(), new_v.clone());
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsBreadcrumb – navigation breadcrumb
+// ---------------------------------------------------------------------------
+
+/// A breadcrumb trail for navigating settings categories.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsBreadcrumbV2 {
+    segments: Vec<String>,
+}
+
+impl SettingsBreadcrumbV2 {
+    pub fn new() -> Self { Self { segments: Vec::new() } }
+
+    pub fn push(&mut self, segment: &str) {
+        self.segments.push(segment.to_string());
+    }
+
+    pub fn pop(&mut self) -> Option<String> {
+        self.segments.pop()
+    }
+
+    pub fn current(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+
+    pub fn path_string(&self) -> String {
+        self.segments.join(" > ")
+    }
+
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Navigate to a specific depth, truncating deeper segments.
+    pub fn navigate_to_depth(&mut self, depth: usize) {
+        self.segments.truncate(depth);
+    }
+
+    pub fn root(&self) -> Option<&str> {
+        self.segments.first().map(|s| s.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2621,6 +2823,117 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- SettingsSearchIndexV2 ------------------------------------------------
+
+    #[test]
+    fn search_index_basic_v2() {
+        let mut idx = SettingsSearchIndexV2::new();
+        idx.add_setting("editor.fontSize", "Font Size", "Controls font size", "Editor");
+        idx.add_setting("editor.tabSize", "Tab Size", "Number of spaces for tab", "Editor");
+        let results = idx.search("font");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], 0);
+    }
+
+    #[test]
+    fn search_index_no_match() {
+        let mut idx = SettingsSearchIndexV2::new();
+        idx.add_setting("a", "b", "c", "d");
+        assert!(idx.search("xyz").is_empty());
+    }
+
+    #[test]
+    fn search_index_ranked() {
+        let mut idx = SettingsSearchIndexV2::new();
+        idx.add_setting("font", "Other", "desc", "Cat");
+        idx.add_setting("other", "font title", "desc", "Cat");
+        idx.add_setting("other", "Other", "font in desc", "Cat");
+        let ranked = idx.ranked_results("font");
+        assert_eq!(ranked.len(), 3);
+        assert!(ranked[0].1 >= ranked[1].1);
+    }
+
+    #[test]
+    fn search_index_typo_suggestion() {
+        let mut idx = SettingsSearchIndexV2::new();
+        idx.add_setting("editor.fontsize", "Font Size", "desc", "Editor");
+        let suggestion = idx.suggestion_for_typo("fontsze");
+        assert!(suggestion.is_some());
+    }
+
+    // -- SettingsDiffCalculator ---------------------------------------------
+
+    #[test]
+    fn diff_no_changes() {
+        let a: HashMap<String, String> = [("k".into(), "v".into())].into_iter().collect();
+        let diff = SettingsDiffCalculator::compute(&a, &a);
+        assert!(!diff.is_modified());
+        assert_eq!(diff.change_count(), 0);
+    }
+
+    #[test]
+    fn diff_added_removed_changed() {
+        let old: HashMap<String, String> = [("a".into(), "1".into()), ("b".into(), "2".into())].into_iter().collect();
+        let new: HashMap<String, String> = [("b".into(), "3".into()), ("c".into(), "4".into())].into_iter().collect();
+        let diff = SettingsDiffCalculator::compute(&old, &new);
+        assert_eq!(diff.added_entries().len(), 1);
+        assert_eq!(diff.removed_keys().len(), 1);
+        assert_eq!(diff.changed_keys(), vec!["b"]);
+        assert!(diff.is_modified());
+    }
+
+    #[test]
+    fn diff_apply() {
+        let old: HashMap<String, String> = [("a".into(), "1".into())].into_iter().collect();
+        let new: HashMap<String, String> = [("a".into(), "2".into()), ("b".into(), "3".into())].into_iter().collect();
+        let diff = SettingsDiffCalculator::compute(&old, &new);
+        let result = diff.apply_diff(&old);
+        assert_eq!(result.get("a").unwrap(), "2");
+        assert_eq!(result.get("b").unwrap(), "3");
+    }
+
+    // -- SettingsBreadcrumbV2 -------------------------------------------------
+
+    #[test]
+    fn breadcrumb_push_pop() {
+        let mut bc = SettingsBreadcrumbV2::new();
+        bc.push("Editor");
+        bc.push("Font");
+        assert_eq!(bc.current(), Some("Font"));
+        assert_eq!(bc.depth(), 2);
+        assert_eq!(bc.pop(), Some("Font".to_string()));
+        assert_eq!(bc.current(), Some("Editor"));
+    }
+
+    #[test]
+    fn breadcrumb_path_string() {
+        let mut bc = SettingsBreadcrumbV2::new();
+        bc.push("Settings");
+        bc.push("Editor");
+        bc.push("Font");
+        assert_eq!(bc.path_string(), "Settings > Editor > Font");
+    }
+
+    #[test]
+    fn breadcrumb_navigate_to_depth() {
+        let mut bc = SettingsBreadcrumbV2::new();
+        bc.push("A");
+        bc.push("B");
+        bc.push("C");
+        bc.navigate_to_depth(1);
+        assert_eq!(bc.depth(), 1);
+        assert_eq!(bc.current(), Some("A"));
+    }
+
+    #[test]
+    fn breadcrumb_root() {
+        let mut bc = SettingsBreadcrumbV2::new();
+        assert!(bc.root().is_none());
+        bc.push("Root");
+        bc.push("Child");
+        assert_eq!(bc.root(), Some("Root"));
     }
 
 }

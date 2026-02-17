@@ -1444,6 +1444,187 @@ fn validate_recursive(
     }
 }
 
+// ---------------------------------------------------------------------------
+// JsonDotPathQuery
+// ---------------------------------------------------------------------------
+
+/// Query nested JSON values by dot-notation path (e.g., "a.b.c" or "a[0].b").
+pub struct JsonDotPathQuery;
+
+impl JsonDotPathQuery {
+    /// Get a value at the given dot-notation path.
+    pub fn query_value<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
+        let mut current = value;
+        for segment in Self::parse_segments(path) {
+            match segment {
+                PathSegment::Key(k) => {
+                    current = current.get(&k)?;
+                }
+                PathSegment::Index(i) => {
+                    current = current.get(i)?;
+                }
+            }
+        }
+        Some(current)
+    }
+
+    /// Set a value at the given path, returning a new Value. Returns None if path is invalid.
+    pub fn set_value_at_path(value: &Value, path: &str, new_val: Value) -> Option<Value> {
+        let segments = Self::parse_segments(path);
+        if segments.is_empty() {
+            return Some(new_val);
+        }
+        let mut root = value.clone();
+        Self::set_recursive(&mut root, &segments, new_val)?;
+        Some(root)
+    }
+
+    fn set_recursive(current: &mut Value, segments: &[PathSegment], new_val: Value) -> Option<()> {
+        if segments.len() == 1 {
+            match &segments[0] {
+                PathSegment::Key(k) => {
+                    current.as_object_mut()?.insert(k.clone(), new_val);
+                }
+                PathSegment::Index(i) => {
+                    let arr = current.as_array_mut()?;
+                    if *i < arr.len() {
+                        arr[*i] = new_val;
+                    } else {
+                        return None;
+                    }
+                }
+            }
+            return Some(());
+        }
+        let next = match &segments[0] {
+            PathSegment::Key(k) => current.get_mut(k.as_str())?,
+            PathSegment::Index(i) => current.get_mut(*i)?,
+        };
+        Self::set_recursive(next, &segments[1..], new_val)
+    }
+
+    fn parse_segments(path: &str) -> Vec<PathSegment> {
+        let mut segments = Vec::new();
+        for part in path.split('.') {
+            if part.is_empty() {
+                continue;
+            }
+            if let Some(bracket_pos) = part.find('[') {
+                let key = &part[..bracket_pos];
+                if !key.is_empty() {
+                    segments.push(PathSegment::Key(key.to_string()));
+                }
+                let idx_str = &part[bracket_pos + 1..part.len() - 1];
+                if let Ok(idx) = idx_str.parse::<usize>() {
+                    segments.push(PathSegment::Index(idx));
+                }
+            } else {
+                segments.push(PathSegment::Key(part.to_string()));
+            }
+        }
+        segments
+    }
+}
+
+enum PathSegment {
+    Key(String),
+    Index(usize),
+}
+
+// ---------------------------------------------------------------------------
+// JsonPatchBuilder
+// ---------------------------------------------------------------------------
+
+/// Builds and applies JSON patches using the existing JsonPatchOp.
+pub struct JsonPatchApplier {
+    ops: Vec<JsonPatchOp>,
+}
+
+impl JsonPatchApplier {
+    pub fn new() -> Self {
+        Self { ops: Vec::new() }
+    }
+
+    pub fn add(mut self, path: &str, value: Value) -> Self {
+        self.ops.push(JsonPatchOp::Add { path: path.to_string(), value });
+        self
+    }
+
+    pub fn remove(mut self, path: &str) -> Self {
+        self.ops.push(JsonPatchOp::Remove { path: path.to_string() });
+        self
+    }
+
+    pub fn replace(mut self, path: &str, value: Value) -> Self {
+        self.ops.push(JsonPatchOp::Replace { path: path.to_string(), value });
+        self
+    }
+
+    pub fn op_count(&self) -> usize {
+        self.ops.len()
+    }
+
+    /// Apply all patches to a value, returning the modified value.
+    pub fn apply_all(&self, mut value: Value) -> Value {
+        for op in &self.ops {
+            match op {
+                JsonPatchOp::Add { path, value: v } => {
+                    if let Some(result) = JsonDotPathQuery::set_value_at_path(&value, path, v.clone()) {
+                        value = result;
+                    }
+                }
+                JsonPatchOp::Remove { path } => {
+                    let segments: Vec<&str> = path.rsplitn(2, '.').collect();
+                    if segments.len() == 2 {
+                        if let Some(parent) = JsonDotPathQuery::query_value(&value, segments[1]) {
+                            let mut parent = parent.clone();
+                            if let Some(obj) = parent.as_object_mut() {
+                                obj.remove(segments[0]);
+                                if let Some(result) = JsonDotPathQuery::set_value_at_path(&value, segments[1], parent) {
+                                    value = result;
+                                }
+                            }
+                        }
+                    } else if let Some(obj) = value.as_object_mut() {
+                        obj.remove(path.as_str());
+                    }
+                }
+                JsonPatchOp::Replace { path, value: v } | JsonPatchOp::Test { path, value: v } => {
+                    if let Some(result) = JsonDotPathQuery::set_value_at_path(&value, path, v.clone()) {
+                        value = result;
+                    }
+                }
+            }
+        }
+        value
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JsonMinifier
+// ---------------------------------------------------------------------------
+
+/// Minifies JSONC by stripping comments and whitespace.
+pub struct JsonMinifier;
+
+impl JsonMinifier {
+    /// Minify JSONC content to compact JSON.
+    pub fn minify(input: &str) -> Option<String> {
+        let stripped = strip_comments(input);
+        let parsed: Value = serde_json::from_str(&stripped).ok()?;
+        Some(serde_json::to_string(&parsed).unwrap_or_default())
+    }
+
+    /// Compute savings percentage from minification.
+    pub fn savings_percentage(original: &str, minified: &str) -> f64 {
+        if original.is_empty() {
+            return 0.0;
+        }
+        let saved = original.len() as f64 - minified.len() as f64;
+        (saved / original.len() as f64) * 100.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2595,4 +2776,91 @@ mod tests {
         assert!(paths.contains(&"items[0]".to_string()));
         assert!(paths.contains(&"items[1]".to_string()));
     }
+
+    // -- JsonDotPathQuery tests --
+
+    #[test]
+    fn path_query_simple() {
+        let v = json!({"a": {"b": 42}});
+        assert_eq!(JsonDotPathQuery::query_value(&v, "a.b"), Some(&json!(42)));
+    }
+
+    #[test]
+    fn path_query_array_index() {
+        let v = json!({"items": [10, 20, 30]});
+        assert_eq!(JsonDotPathQuery::query_value(&v, "items[1]"), Some(&json!(20)));
+    }
+
+    #[test]
+    fn path_query_missing() {
+        let v = json!({"a": 1});
+        assert!(JsonDotPathQuery::query_value(&v, "b.c").is_none());
+    }
+
+    #[test]
+    fn path_set_value() {
+        let v = json!({"a": {"b": 1}});
+        let result = JsonDotPathQuery::set_value_at_path(&v, "a.b", json!(99)).unwrap();
+        assert_eq!(result["a"]["b"], json!(99));
+    }
+
+    // -- JsonPatchApplier tests --
+
+    #[test]
+    fn patch_add() {
+        let v = json!({"a": 1});
+        let result = JsonPatchApplier::new().add("a", json!(2)).apply_all(v);
+        assert_eq!(result["a"], json!(2));
+    }
+
+    #[test]
+    fn patch_replace() {
+        let v = json!({"x": "old"});
+        let result = JsonPatchApplier::new().replace("x", json!("new")).apply_all(v);
+        assert_eq!(result["x"], json!("new"));
+    }
+
+    #[test]
+    fn patch_remove() {
+        let v = json!({"a": 1, "b": 2});
+        let result = JsonPatchApplier::new().remove("b").apply_all(v);
+        assert!(result.get("b").is_none());
+    }
+
+    #[test]
+    fn patch_op_count() {
+        let p = JsonPatchApplier::new().add("a", json!(1)).remove("b");
+        assert_eq!(p.op_count(), 2);
+    }
+
+    // -- JsonMinifier tests --
+
+    #[test]
+    fn minifier_basic() {
+        let input = "{\n  \"a\": 1,\n  \"b\": 2\n}";
+        let minified = JsonMinifier::minify(input).unwrap();
+        assert!(!minified.contains('\n'));
+        assert!(minified.contains("\"a\""));
+    }
+
+    #[test]
+    fn minifier_strips_comments() {
+        let input = "{\n  \"a\": 1 // comment\n}";
+        let minified = JsonMinifier::minify(input).unwrap();
+        assert!(!minified.contains("comment"));
+    }
+
+    #[test]
+    fn minifier_savings() {
+        let original = "{\n  \"a\": 1\n}";
+        let minified = "{\"a\":1}";
+        let pct = JsonMinifier::savings_percentage(original, minified);
+        assert!(pct > 0.0);
+    }
+
+    #[test]
+    fn minifier_savings_empty() {
+        assert!((JsonMinifier::savings_percentage("", "")).abs() < 0.01);
+    }
+
 }

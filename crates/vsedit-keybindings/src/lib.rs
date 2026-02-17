@@ -1538,6 +1538,100 @@ impl fmt::Display for KeybindingContextOverrideConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// KeybindingExporter
+// ---------------------------------------------------------------------------
+
+/// Export keybindings to displayable formats.
+pub struct KeybindingExporter;
+
+impl KeybindingExporter {
+    /// Convert bindings to table rows: (chord_label, command).
+    pub fn to_table_rows(
+        bindings: &[CategorizedKeybinding],
+        platform: Platform,
+    ) -> Vec<(String, String)> {
+        bindings
+            .iter()
+            .map(|cb| {
+                let resolved = SimpleResolvedKeybinding::new(cb.binding.clone(), platform);
+                (resolved.get_label(), cb.command.clone())
+            })
+            .collect()
+    }
+
+    /// Group bindings by category into a cheat-sheet-style map.
+    pub fn to_cheat_sheet_grouped(
+        bindings: &[CategorizedKeybinding],
+        platform: Platform,
+    ) -> HashMap<String, Vec<(String, String)>> {
+        let mut groups: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        for cb in bindings {
+            let resolved = SimpleResolvedKeybinding::new(cb.binding.clone(), platform);
+            let cat = format!("{}", cb.category);
+            groups
+                .entry(cat)
+                .or_default()
+                .push((resolved.get_label(), cb.command.clone()));
+        }
+        groups
+    }
+
+    /// Summary: total bindings, chord bindings, single bindings.
+    pub fn binding_summary(bindings: &[Keybinding]) -> (usize, usize, usize) {
+        let total = bindings.len();
+        let chord = bindings.iter().filter(|b| b.is_chord()).count();
+        (total, chord, total - chord)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChordNormalizer
+// ---------------------------------------------------------------------------
+
+/// Normalizes chord representation for consistent comparison.
+pub struct ChordNormalizer;
+
+impl ChordNormalizer {
+    /// Produce a canonical string form: modifiers in order ctrl+shift+alt+meta+key.
+    pub fn canonical_form(chord: &KeyCodeChord) -> String {
+        let mut parts = Vec::new();
+        if chord.ctrl {
+            parts.push("ctrl");
+        }
+        if chord.shift {
+            parts.push("shift");
+        }
+        if chord.alt {
+            parts.push("alt");
+        }
+        if chord.meta {
+            parts.push("meta");
+        }
+        parts.push(key_code_to_string(chord.key_code));
+        parts.join("+").to_lowercase()
+    }
+
+    /// Canonical form for a full keybinding (space-separated chords).
+    pub fn canonical_keybinding(binding: &Keybinding) -> String {
+        binding
+            .parts
+            .iter()
+            .map(|c| Self::canonical_form(c))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Check if two chords are equivalent after normalization.
+    pub fn chords_equal(a: &KeyCodeChord, b: &KeyCodeChord) -> bool {
+        a.ctrl == b.ctrl
+            && a.shift == b.shift
+            && a.alt == b.alt
+            && a.meta == b.meta
+            && a.key_code == b.key_code
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2624,6 +2718,114 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- KeybindingExporter tests --
+
+    #[test]
+    fn exporter_binding_summary() {
+        let bindings = vec![
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            Keybinding::two_chords(
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+            ),
+        ];
+        let (total, chord, single) = KeybindingExporter::binding_summary(&bindings);
+        assert_eq!(total, 2);
+        assert_eq!(chord, 1);
+        assert_eq!(single, 1);
+    }
+
+    #[test]
+    fn exporter_to_table_rows() {
+        let bindings = vec![CategorizedKeybinding {
+            binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            command: "save".to_string(),
+            category: KeybindingCategory::General,
+        }];
+        let rows = KeybindingExporter::to_table_rows(&bindings, Platform::Linux);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, "save");
+    }
+
+    #[test]
+    fn exporter_cheat_sheet_grouped() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+                command: "save".to_string(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyZ)),
+                command: "undo".to_string(),
+                category: KeybindingCategory::Editor,
+            },
+        ];
+        let groups = KeybindingExporter::to_cheat_sheet_grouped(&bindings, Platform::Linux);
+        assert!(groups.len() >= 2);
+    }
+
+    // -- ChordNormalizer tests --
+
+    #[test]
+    fn normalizer_canonical_form() {
+        let chord = KeyCodeChord::new(true, true, false, false, KeyCode::KeyS);
+        let form = ChordNormalizer::canonical_form(&chord);
+        assert!(form.contains("ctrl"));
+        assert!(form.contains("shift"));
+        assert!(form.contains("s"));
+    }
+
+    #[test]
+    fn normalizer_canonical_keybinding() {
+        let kb = Keybinding::two_chords(
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        );
+        let form = ChordNormalizer::canonical_keybinding(&kb);
+        assert!(form.contains(' '));
+    }
+
+    #[test]
+    fn normalizer_chords_equal() {
+        let a = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        let b = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        assert!(ChordNormalizer::chords_equal(&a, &b));
+    }
+
+    #[test]
+    fn normalizer_chords_not_equal() {
+        let a = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        let b = KeyCodeChord::new(false, true, false, false, KeyCode::KeyS);
+        assert!(!ChordNormalizer::chords_equal(&a, &b));
+    }
+
+    #[test]
+    fn normalizer_canonical_no_modifiers() {
+        let chord = KeyCodeChord::new(false, false, false, false, KeyCode::F1);
+        let form = ChordNormalizer::canonical_form(&chord);
+        assert!(!form.contains("ctrl"));
+        assert!(!form.contains("shift"));
+    }
+
+    #[test]
+    fn exporter_empty_bindings() {
+        let (total, chord, single) = KeybindingExporter::binding_summary(&[]);
+        assert_eq!(total, 0);
+        assert_eq!(chord, 0);
+        assert_eq!(single, 0);
+    }
+
+    #[test]
+    fn normalizer_all_modifiers() {
+        let chord = KeyCodeChord::new(true, true, true, true, KeyCode::KeyA);
+        let form = ChordNormalizer::canonical_form(&chord);
+        assert!(form.contains("ctrl"));
+        assert!(form.contains("shift"));
+        assert!(form.contains("alt"));
+        assert!(form.contains("meta"));
     }
 
 }

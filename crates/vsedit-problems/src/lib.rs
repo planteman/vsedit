@@ -1537,7 +1537,121 @@ impl ProblemSourceAggregator {
     }
 }
 
+// --- ProblemGrouperV2: group diagnostics by various criteria ---
 
+pub struct ProblemGrouperV2;
+
+impl ProblemGrouperV2 {
+    pub fn by_file(problems: &[Problem]) -> HashMap<String, Vec<&Problem>> {
+        let mut map: HashMap<String, Vec<&Problem>> = HashMap::new();
+        for p in problems { map.entry(p.file_path.clone()).or_default().push(p); }
+        map
+    }
+
+    pub fn by_severity(problems: &[Problem]) -> HashMap<String, Vec<&Problem>> {
+        let mut map: HashMap<String, Vec<&Problem>> = HashMap::new();
+        for p in problems {
+            let key = format!("{:?}", p.severity);
+            map.entry(key).or_default().push(p);
+        }
+        map
+    }
+
+    pub fn by_source(problems: &[Problem]) -> HashMap<String, Vec<&Problem>> {
+        let mut map: HashMap<String, Vec<&Problem>> = HashMap::new();
+        for p in problems { map.entry(p.source.clone()).or_default().push(p); }
+        map
+    }
+
+    pub fn by_code(problems: &[Problem]) -> HashMap<String, Vec<&Problem>> {
+        let mut map: HashMap<String, Vec<&Problem>> = HashMap::new();
+        for p in problems {
+            let key = p.code.clone().unwrap_or_else(|| "(none)".into());
+            map.entry(key).or_default().push(p);
+        }
+        map
+    }
+
+    pub fn group_counts(problems: &[Problem]) -> HashMap<String, usize> {
+        let by_file = Self::by_file(problems);
+        by_file.into_iter().map(|(k, v)| (k, v.len())).collect()
+    }
+
+    pub fn largest_group_file(problems: &[Problem]) -> Option<String> {
+        Self::group_counts(problems).into_iter().max_by_key(|(_, c)| *c).map(|(k, _)| k)
+    }
+}
+
+// --- ProblemQuickFixV2: suggested fix ---
+
+pub struct ProblemQuickFixV2 {
+    pub title: String,
+    pub replacement: String,
+    pub is_preferred: bool,
+}
+
+impl ProblemQuickFixV2 {
+    pub fn new(title: &str, replacement: &str, is_preferred: bool) -> Self {
+        Self { title: title.into(), replacement: replacement.into(), is_preferred }
+    }
+
+    pub fn apply(&self, text: &str, start: usize, end: usize) -> String {
+        if start > text.len() || end > text.len() || start > end { return text.to_string(); }
+        let mut result = text[..start].to_string();
+        result.push_str(&self.replacement);
+        result.push_str(&text[end..]);
+        result
+    }
+
+    pub fn matches_diagnostic(&self, message: &str) -> bool {
+        message.to_lowercase().contains(&self.title.to_lowercase())
+    }
+}
+
+// --- ProblemFilterV2: filter problems ---
+
+pub struct ProblemFilterV2 {
+    min_severity: Option<ProblemSeverity>,
+    file_contains: Option<String>,
+    message_contains: Option<String>,
+    source_filter: Option<String>,
+}
+
+impl ProblemFilterV2 {
+    pub fn new() -> Self {
+        Self { min_severity: None, file_contains: None, message_contains: None, source_filter: None }
+    }
+
+    pub fn with_severity(mut self, sev: ProblemSeverity) -> Self { self.min_severity = Some(sev); self }
+    pub fn with_file(mut self, pat: &str) -> Self { self.file_contains = Some(pat.to_string()); self }
+    pub fn with_message(mut self, pat: &str) -> Self { self.message_contains = Some(pat.to_string()); self }
+    pub fn with_source(mut self, src: &str) -> Self { self.source_filter = Some(src.to_string()); self }
+
+    pub fn matches(&self, problem: &Problem) -> bool {
+        if let Some(ref min) = self.min_severity {
+            if problem.severity > *min { return false; }
+        }
+        if let Some(ref pat) = self.file_contains {
+            if !problem.file_path.contains(pat.as_str()) { return false; }
+        }
+        if let Some(ref pat) = self.message_contains {
+            if !problem.message.contains(pat.as_str()) { return false; }
+        }
+        if let Some(ref src) = self.source_filter {
+            if problem.source != *src { return false; }
+        }
+        true
+    }
+
+    pub fn active_filter_count(&self) -> usize {
+        let mut c = 0;
+        if self.min_severity.is_some() { c += 1; }
+        if self.file_contains.is_some() { c += 1; }
+        if self.message_contains.is_some() { c += 1; }
+        if self.source_filter.is_some() { c += 1; }
+        c
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -2628,6 +2742,95 @@ src/b.rs:5:3: warning: msg2
         let table = agg.summary_table();
         assert!(table.contains("rustc:"));
         assert!(table.contains("clippy:"));
+    }
+
+    #[test]
+    fn problem_grouper_v2_by_file() {
+        let probs = sample_problems();
+        let grouped = ProblemGrouperV2::by_file(&probs);
+        assert!(grouped.contains_key("src/main.rs"));
+        assert!(grouped.contains_key("src/lib.rs"));
+    }
+
+    #[test]
+    fn problem_grouper_v2_by_severity() {
+        let probs = sample_problems();
+        let grouped = ProblemGrouperV2::by_severity(&probs);
+        assert!(grouped.contains_key("Error"));
+    }
+
+    #[test]
+    fn problem_grouper_v2_by_source() {
+        let probs = sample_problems();
+        let grouped = ProblemGrouperV2::by_source(&probs);
+        assert!(grouped.contains_key("rustc"));
+        assert!(grouped.contains_key("clippy"));
+    }
+
+    #[test]
+    fn problem_grouper_v2_largest_group() {
+        let probs = sample_problems();
+        let largest = ProblemGrouperV2::largest_group_file(&probs);
+        assert!(largest.is_some());
+    }
+
+    #[test]
+    fn problem_quick_fix_v2_apply() {
+        let fix = ProblemQuickFixV2::new("rename", "bar", true);
+        let result = fix.apply("let foo = 1;", 4, 7);
+        assert_eq!(result, "let bar = 1;");
+    }
+
+    #[test]
+    fn problem_quick_fix_v2_matches() {
+        let fix = ProblemQuickFixV2::new("unused", "_ ", false);
+        assert!(fix.matches_diagnostic("warning: unused variable"));
+        assert!(!fix.matches_diagnostic("error: type mismatch"));
+    }
+
+    #[test]
+    fn problem_quick_fix_v2_is_preferred() {
+        let fix = ProblemQuickFixV2::new("fix", "x", true);
+        assert!(fix.is_preferred);
+    }
+
+    #[test]
+    fn problem_filter_v2_no_filters() {
+        let f = ProblemFilterV2::new();
+        let p = Problem::new(ProblemSeverity::Error, "msg", "rustc", "file.rs", 1, 1);
+        assert!(f.matches(&p));
+        assert_eq!(f.active_filter_count(), 0);
+    }
+
+    #[test]
+    fn problem_filter_v2_by_source() {
+        let f = ProblemFilterV2::new().with_source("clippy");
+        let p1 = Problem::new(ProblemSeverity::Warning, "msg", "clippy", "f.rs", 1, 1);
+        let p2 = Problem::new(ProblemSeverity::Warning, "msg", "rustc", "f.rs", 1, 1);
+        assert!(f.matches(&p1));
+        assert!(!f.matches(&p2));
+    }
+
+    #[test]
+    fn problem_filter_v2_by_message() {
+        let f = ProblemFilterV2::new().with_message("unused");
+        let p = Problem::new(ProblemSeverity::Warning, "unused variable", "rustc", "f.rs", 1, 1);
+        assert!(f.matches(&p));
+    }
+
+    #[test]
+    fn problem_filter_v2_active_count() {
+        let f = ProblemFilterV2::new()
+            .with_source("rustc")
+            .with_message("err");
+        assert_eq!(f.active_filter_count(), 2);
+    }
+
+    #[test]
+    fn problem_grouper_v2_by_code() {
+        let probs = sample_problems();
+        let grouped = ProblemGrouperV2::by_code(&probs);
+        assert!(grouped.contains_key("E0001") || grouped.contains_key("(none)"));
     }
 
 

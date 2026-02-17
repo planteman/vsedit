@@ -1633,6 +1633,291 @@ impl fmt::Display for UriEncodeDecoderConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UriTemplateExpander – stateful URI template expansion
+// ---------------------------------------------------------------------------
+
+/// A stateful URI template expander that allows incremental variable
+/// registration and repeated expansion.
+#[derive(Debug, Clone)]
+pub struct UriTemplateExpander {
+    template: String,
+    variables: HashMap<String, String>,
+}
+
+impl UriTemplateExpander {
+    /// Create a new expander for the given template string.
+    pub fn new(template: impl Into<String>) -> Self {
+        Self {
+            template: template.into(),
+            variables: HashMap::new(),
+        }
+    }
+
+    /// Register a variable value for substitution.
+    pub fn register_variable(
+        &mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> &mut Self {
+        self.variables.insert(name.into(), value.into());
+        self
+    }
+
+    /// Register multiple variables at once.
+    pub fn register_all(&mut self, vars: &[(&str, &str)]) -> &mut Self {
+        for (k, v) in vars {
+            self.variables.insert((*k).to_string(), (*v).to_string());
+        }
+        self
+    }
+
+    /// Expand the template, replacing `{var}` placeholders with registered
+    /// values. Unresolved placeholders are left as-is.
+    pub fn expand(&self) -> String {
+        let mut result = self.template.clone();
+        for (name, value) in &self.variables {
+            let placeholder = format!("{{{name}}}");
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Return the names of variables found in the template that have not been
+    /// registered yet.
+    pub fn unresolved_vars(&self) -> Vec<String> {
+        let mut unresolved = Vec::new();
+        let mut rest = self.template.as_str();
+        while let Some(start) = rest.find('{') {
+            if let Some(end) = rest[start..].find('}') {
+                let name = &rest[start + 1..start + end];
+                if !name.is_empty() && !self.variables.contains_key(name) {
+                    unresolved.push(name.to_string());
+                }
+                rest = &rest[start + end + 1..];
+            } else {
+                break;
+            }
+        }
+        unresolved
+    }
+
+    /// Whether every placeholder in the template has a registered value.
+    pub fn is_fully_resolved(&self) -> bool {
+        self.unresolved_vars().is_empty()
+    }
+
+    /// Return the number of registered variables.
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    /// Remove a previously registered variable.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        self.variables.remove(name).is_some()
+    }
+
+    /// Clear all registered variables.
+    pub fn clear_variables(&mut self) {
+        self.variables.clear();
+    }
+
+    /// The raw template string.
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+}
+
+impl fmt::Display for UriTemplateExpander {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UriTemplateExpander({} vars, {} unresolved)",
+            self.variable_count(),
+            self.unresolved_vars().len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UriPathManipulator – path-level operations on VsUri
+// ---------------------------------------------------------------------------
+
+/// Utility for manipulating the path component of URIs.
+pub struct UriPathManipulator;
+
+impl UriPathManipulator {
+    /// Join a relative path onto a URI's existing path.
+    pub fn join(uri: &VsUri, relative: &str) -> VsUri {
+        let base = if uri.path.ends_with('/') {
+            uri.path.clone()
+        } else {
+            format!("{}/", uri.path)
+        };
+        let new_path = format!("{base}{relative}");
+        VsUri::from_components(&uri.scheme, &uri.authority, &new_path, &uri.query, &uri.fragment)
+    }
+
+    /// Remove dot segments (`.` and `..`) from a path string per RFC 3986 §5.2.4.
+    pub fn remove_dot_segments(path: &str) -> String {
+        let mut output_segments: Vec<&str> = Vec::new();
+        for segment in path.split('/') {
+            match segment {
+                "." => {}
+                ".." => {
+                    output_segments.pop();
+                }
+                s => output_segments.push(s),
+            }
+        }
+        let result = output_segments.join("/");
+        if path.starts_with('/') && !result.starts_with('/') {
+            format!("/{result}")
+        } else {
+            result
+        }
+    }
+
+    /// Return the depth (number of non-empty segments) of a URI path.
+    pub fn depth(uri: &VsUri) -> usize {
+        uri.path.split('/').filter(|s| !s.is_empty()).count()
+    }
+
+    /// Return true if `child`'s path is a descendant of `parent`'s path
+    /// (same scheme and authority assumed).
+    pub fn is_child_of(parent: &VsUri, child: &VsUri) -> bool {
+        if parent.scheme != child.scheme || parent.authority != child.authority {
+            return false;
+        }
+        let p = if parent.path.ends_with('/') {
+            parent.path.clone()
+        } else {
+            format!("{}/", parent.path)
+        };
+        child.path.starts_with(&p) && child.path.len() > p.len()
+    }
+
+    /// Return the common path prefix shared by two URIs.
+    pub fn common_prefix(a: &VsUri, b: &VsUri) -> String {
+        let segs_a: Vec<&str> = a.path.split('/').collect();
+        let segs_b: Vec<&str> = b.path.split('/').collect();
+        let mut common = Vec::new();
+        for (sa, sb) in segs_a.iter().zip(segs_b.iter()) {
+            if sa == sb {
+                common.push(*sa);
+            } else {
+                break;
+            }
+        }
+        common.join("/")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UriSchemeRegistry – dynamic scheme validation / metadata
+// ---------------------------------------------------------------------------
+
+/// A registry that tracks known URI schemes and their properties.
+#[derive(Debug, Clone)]
+pub struct UriSchemeRegistry {
+    schemes: HashMap<String, UriSchemeInfo>,
+}
+
+/// Metadata about a URI scheme.
+#[derive(Debug, Clone)]
+pub struct UriSchemeInfo {
+    pub name: String,
+    pub default_port: Option<u16>,
+    pub is_secure: bool,
+    pub description: String,
+}
+
+impl UriSchemeRegistry {
+    /// Create a registry pre-populated with common schemes.
+    pub fn with_defaults() -> Self {
+        let mut reg = Self {
+            schemes: HashMap::new(),
+        };
+        reg.register(UriSchemeInfo {
+            name: "http".into(),
+            default_port: Some(80),
+            is_secure: false,
+            description: "Hypertext Transfer Protocol".into(),
+        });
+        reg.register(UriSchemeInfo {
+            name: "https".into(),
+            default_port: Some(443),
+            is_secure: true,
+            description: "HTTP Secure".into(),
+        });
+        reg.register(UriSchemeInfo {
+            name: "ftp".into(),
+            default_port: Some(21),
+            is_secure: false,
+            description: "File Transfer Protocol".into(),
+        });
+        reg.register(UriSchemeInfo {
+            name: "ssh".into(),
+            default_port: Some(22),
+            is_secure: true,
+            description: "Secure Shell".into(),
+        });
+        reg.register(UriSchemeInfo {
+            name: "file".into(),
+            default_port: None,
+            is_secure: false,
+            description: "Local file system".into(),
+        });
+        reg
+    }
+
+    /// Register a new scheme (or update an existing one).
+    pub fn register(&mut self, info: UriSchemeInfo) {
+        self.schemes.insert(info.name.to_lowercase(), info);
+    }
+
+    /// Look up scheme info by name.
+    pub fn get(&self, scheme: &str) -> Option<&UriSchemeInfo> {
+        self.schemes.get(&scheme.to_lowercase())
+    }
+
+    /// Check whether a scheme is registered.
+    pub fn is_known(&self, scheme: &str) -> bool {
+        self.schemes.contains_key(&scheme.to_lowercase())
+    }
+
+    /// Return the default port for a scheme, if any.
+    pub fn default_port(&self, scheme: &str) -> Option<u16> {
+        self.get(scheme).and_then(|i| i.default_port)
+    }
+
+    /// Check whether a scheme is considered secure.
+    pub fn is_secure(&self, scheme: &str) -> bool {
+        self.get(scheme).is_some_and(|i| i.is_secure)
+    }
+
+    /// Return the number of registered schemes.
+    pub fn len(&self) -> usize {
+        self.schemes.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.schemes.is_empty()
+    }
+
+    /// List all registered scheme names.
+    pub fn scheme_names(&self) -> Vec<&str> {
+        self.schemes.keys().map(|s| s.as_str()).collect()
+    }
+}
+
+impl fmt::Display for UriSchemeRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UriSchemeRegistry({} schemes)", self.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2621,6 +2906,150 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- UriTemplateExpander ------------------------------------------------
+
+    #[test]
+    fn template_expander_basic_expansion() {
+        let mut exp = UriTemplateExpander::new("https://{host}/api/{version}/users");
+        exp.register_variable("host", "example.com");
+        exp.register_variable("version", "v2");
+        assert_eq!(exp.expand(), "https://example.com/api/v2/users");
+    }
+
+    #[test]
+    fn template_expander_unresolved_vars() {
+        let mut exp = UriTemplateExpander::new("{scheme}://{host}/{path}");
+        exp.register_variable("scheme", "https");
+        let unresolved = exp.unresolved_vars();
+        assert_eq!(unresolved.len(), 2);
+        assert!(unresolved.contains(&"host".to_string()));
+        assert!(unresolved.contains(&"path".to_string()));
+        assert!(!exp.is_fully_resolved());
+    }
+
+    #[test]
+    fn template_expander_fully_resolved() {
+        let mut exp = UriTemplateExpander::new("{a}/{b}");
+        exp.register_all(&[("a", "x"), ("b", "y")]);
+        assert!(exp.is_fully_resolved());
+        assert_eq!(exp.expand(), "x/y");
+    }
+
+    #[test]
+    fn template_expander_unregister_and_clear() {
+        let mut exp = UriTemplateExpander::new("{a}/{b}");
+        exp.register_all(&[("a", "1"), ("b", "2")]);
+        assert_eq!(exp.variable_count(), 2);
+        assert!(exp.unregister("a"));
+        assert!(!exp.unregister("nonexistent"));
+        assert_eq!(exp.variable_count(), 1);
+        exp.clear_variables();
+        assert_eq!(exp.variable_count(), 0);
+    }
+
+    #[test]
+    fn template_expander_display() {
+        let exp = UriTemplateExpander::new("{x}");
+        let display = format!("{exp}");
+        assert!(display.contains("0 vars"));
+        assert!(display.contains("1 unresolved"));
+    }
+
+    // -- UriPathManipulator -------------------------------------------------
+
+    #[test]
+    fn path_manipulator_join() {
+        let uri = VsUri::from_components("file", "", "/home/user", "", "");
+        let joined = UriPathManipulator::join(&uri, "docs/readme.md");
+        assert_eq!(joined.path, "/home/user/docs/readme.md");
+    }
+
+    #[test]
+    fn path_manipulator_remove_dot_segments() {
+        assert_eq!(
+            UriPathManipulator::remove_dot_segments("/a/b/../c/./d"),
+            "/a/c/d"
+        );
+        assert_eq!(UriPathManipulator::remove_dot_segments("/a/b/c"), "/a/b/c");
+    }
+
+    #[test]
+    fn path_manipulator_depth() {
+        let uri = VsUri::from_components("file", "", "/a/b/c", "", "");
+        assert_eq!(UriPathManipulator::depth(&uri), 3);
+        let root = VsUri::from_components("file", "", "/", "", "");
+        assert_eq!(UriPathManipulator::depth(&root), 0);
+    }
+
+    #[test]
+    fn path_manipulator_is_child_of() {
+        let parent = VsUri::from_components("file", "", "/workspace", "", "");
+        let child = VsUri::from_components("file", "", "/workspace/src/main.rs", "", "");
+        let sibling = VsUri::from_components("file", "", "/other/path", "", "");
+        assert!(UriPathManipulator::is_child_of(&parent, &child));
+        assert!(!UriPathManipulator::is_child_of(&parent, &sibling));
+    }
+
+    #[test]
+    fn path_manipulator_common_prefix() {
+        let a = VsUri::from_components("file", "", "/workspace/src/lib.rs", "", "");
+        let b = VsUri::from_components("file", "", "/workspace/src/main.rs", "", "");
+        assert_eq!(UriPathManipulator::common_prefix(&a, &b), "/workspace/src");
+    }
+
+    // -- UriSchemeRegistry --------------------------------------------------
+
+    #[test]
+    fn scheme_registry_defaults() {
+        let reg = UriSchemeRegistry::with_defaults();
+        assert!(reg.is_known("http"));
+        assert!(reg.is_known("https"));
+        assert!(reg.is_known("ftp"));
+        assert!(reg.is_known("ssh"));
+        assert!(reg.is_known("file"));
+        assert!(!reg.is_known("gopher"));
+    }
+
+    #[test]
+    fn scheme_registry_default_ports() {
+        let reg = UriSchemeRegistry::with_defaults();
+        assert_eq!(reg.default_port("http"), Some(80));
+        assert_eq!(reg.default_port("https"), Some(443));
+        assert_eq!(reg.default_port("file"), None);
+    }
+
+    #[test]
+    fn scheme_registry_is_secure() {
+        let reg = UriSchemeRegistry::with_defaults();
+        assert!(reg.is_secure("https"));
+        assert!(reg.is_secure("ssh"));
+        assert!(!reg.is_secure("http"));
+        assert!(!reg.is_secure("ftp"));
+    }
+
+    #[test]
+    fn scheme_registry_custom_registration() {
+        let mut reg = UriSchemeRegistry::with_defaults();
+        reg.register(UriSchemeInfo {
+            name: "wss".into(),
+            default_port: Some(443),
+            is_secure: true,
+            description: "WebSocket Secure".into(),
+        });
+        assert!(reg.is_known("wss"));
+        assert!(reg.is_secure("wss"));
+        assert_eq!(reg.default_port("wss"), Some(443));
+    }
+
+    #[test]
+    fn scheme_registry_display_and_len() {
+        let reg = UriSchemeRegistry::with_defaults();
+        assert_eq!(reg.len(), 5);
+        assert!(!reg.is_empty());
+        let display = format!("{reg}");
+        assert!(display.contains("5 schemes"));
     }
 
 }

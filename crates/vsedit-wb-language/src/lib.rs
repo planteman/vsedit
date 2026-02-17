@@ -1499,6 +1499,173 @@ impl fmt::Display for LangServerStatusDisplayConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LanguageMatcher
+// ---------------------------------------------------------------------------
+
+/// Match files to languages by extension, filename, or first line.
+#[derive(Debug, Clone)]
+pub struct LanguageMatcherEntry {
+    pub language_id: String,
+    pub extensions: Vec<String>,
+    pub filenames: Vec<String>,
+    pub first_line_pattern: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LanguageMatcher {
+    matchers: Vec<LanguageMatcherEntry>,
+}
+
+impl LanguageMatcher {
+    pub fn new() -> Self {
+        Self {
+            matchers: Vec::new(),
+        }
+    }
+
+    pub fn register_matcher(&mut self, entry: LanguageMatcherEntry) {
+        self.matchers.push(entry);
+    }
+
+    pub fn best_match_for_file(&self, filename: &str) -> Option<&str> {
+        for m in &self.matchers {
+            if m.filenames.iter().any(|f| f == filename) {
+                return Some(&m.language_id);
+            }
+        }
+        if let Some(ext) = filename.rsplit('.').next() {
+            let dot_ext = format!(".{ext}");
+            for m in &self.matchers {
+                if m.extensions.iter().any(|e| e == &dot_ext) {
+                    return Some(&m.language_id);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn all_matches(&self, filename: &str) -> Vec<&str> {
+        let mut matches = Vec::new();
+        let ext = filename.rsplit('.').next().map(|e| format!(".{e}"));
+        for m in &self.matchers {
+            if m.filenames.iter().any(|f| f == filename) {
+                matches.push(m.language_id.as_str());
+            } else if let Some(ref e) = ext {
+                if m.extensions.iter().any(|me| me == e) {
+                    matches.push(m.language_id.as_str());
+                }
+            }
+        }
+        matches
+    }
+
+    pub fn ambiguous_matches(&self, filename: &str) -> bool {
+        self.all_matches(filename).len() > 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageFeatureMatrixV2
+// ---------------------------------------------------------------------------
+
+/// Track which features a language supports.
+#[derive(Debug, Clone)]
+pub struct LanguageFeatureMatrixV2 {
+    features: HashMap<String, HashMap<String, bool>>,
+}
+
+impl LanguageFeatureMatrixV2 {
+    pub fn new() -> Self {
+        Self {
+            features: HashMap::new(),
+        }
+    }
+
+    pub fn set_support(&mut self, language_id: &str, feature: &str, supported: bool) {
+        self.features
+            .entry(language_id.to_string())
+            .or_default()
+            .insert(feature.to_string(), supported);
+    }
+
+    pub fn has_support(&self, language_id: &str, feature: &str) -> bool {
+        self.features
+            .get(language_id)
+            .and_then(|m| m.get(feature))
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub fn supported_features(&self, language_id: &str) -> Vec<String> {
+        self.features
+            .get(language_id)
+            .map(|m| {
+                m.iter()
+                    .filter(|&(_, &v)| v)
+                    .map(|(k, _)| k.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn feature_count(&self, language_id: &str) -> usize {
+        self.supported_features(language_id).len()
+    }
+
+    pub fn to_capability_string(&self, language_id: &str) -> String {
+        let mut feats = self.supported_features(language_id);
+        feats.sort();
+        feats.join(", ")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageAlias
+// ---------------------------------------------------------------------------
+
+/// Manage language aliases.
+#[derive(Debug, Clone)]
+pub struct LanguageAlias {
+    aliases: HashMap<String, String>,
+}
+
+impl LanguageAlias {
+    pub fn new() -> Self {
+        Self {
+            aliases: HashMap::new(),
+        }
+    }
+
+    pub fn register_alias(&mut self, alias: &str, canonical: &str) {
+        self.aliases.insert(alias.to_string(), canonical.to_string());
+    }
+
+    pub fn resolve_alias<'a>(&'a self, name: &'a str) -> &'a str {
+        self.aliases.get(name).map(|s| s.as_str()).unwrap_or(name)
+    }
+
+    pub fn canonical_id(&self, name: &str) -> String {
+        self.resolve_alias(name).to_string()
+    }
+
+    pub fn is_alias(&self, name: &str) -> bool {
+        self.aliases.contains_key(name)
+    }
+
+    pub fn aliases_for(&self, canonical: &str) -> Vec<String> {
+        self.aliases
+            .iter()
+            .filter(|(_, v)| v.as_str() == canonical)
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
+
+    pub fn all_aliases(&self) -> Vec<(&str, &str)> {
+        self.aliases.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2620,6 +2787,127 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- LanguageMatcher ---------------------------------------------------
+
+    #[test]
+    fn matcher_by_extension() {
+        let mut matcher = LanguageMatcher::new();
+        matcher.register_matcher(LanguageMatcherEntry {
+            language_id: "rust".into(),
+            extensions: vec![".rs".into()],
+            filenames: vec![],
+            first_line_pattern: None,
+        });
+        assert_eq!(matcher.best_match_for_file("main.rs"), Some("rust"));
+    }
+
+    #[test]
+    fn matcher_by_filename() {
+        let mut matcher = LanguageMatcher::new();
+        matcher.register_matcher(LanguageMatcherEntry {
+            language_id: "makefile".into(),
+            extensions: vec![],
+            filenames: vec!["Makefile".into()],
+            first_line_pattern: None,
+        });
+        assert_eq!(matcher.best_match_for_file("Makefile"), Some("makefile"));
+    }
+
+    #[test]
+    fn matcher_no_match() {
+        let matcher = LanguageMatcher::new();
+        assert_eq!(matcher.best_match_for_file("unknown.xyz"), None);
+    }
+
+    #[test]
+    fn matcher_ambiguous() {
+        let mut matcher = LanguageMatcher::new();
+        matcher.register_matcher(LanguageMatcherEntry {
+            language_id: "typescript".into(),
+            extensions: vec![".ts".into()],
+            filenames: vec![],
+            first_line_pattern: None,
+        });
+        matcher.register_matcher(LanguageMatcherEntry {
+            language_id: "xml".into(),
+            extensions: vec![".ts".into()],
+            filenames: vec![],
+            first_line_pattern: None,
+        });
+        assert!(matcher.ambiguous_matches("file.ts"));
+    }
+
+    // -- LanguageFeatureMatrixV2 ---------------------------------------------
+
+    #[test]
+    fn feature_matrix_set_and_get() {
+        let mut matrix = LanguageFeatureMatrixV2::new();
+        matrix.set_support("rust", "completion", true);
+        matrix.set_support("rust", "hover", true);
+        matrix.set_support("rust", "formatting", false);
+        assert!(matrix.has_support("rust", "completion"));
+        assert!(!matrix.has_support("rust", "formatting"));
+    }
+
+    #[test]
+    fn feature_matrix_count() {
+        let mut matrix = LanguageFeatureMatrixV2::new();
+        matrix.set_support("go", "completion", true);
+        matrix.set_support("go", "diagnostics", true);
+        assert_eq!(matrix.feature_count("go"), 2);
+    }
+
+    #[test]
+    fn feature_matrix_capability_string() {
+        let mut matrix = LanguageFeatureMatrixV2::new();
+        matrix.set_support("py", "hover", true);
+        matrix.set_support("py", "completion", true);
+        let caps = matrix.to_capability_string("py");
+        assert!(caps.contains("completion"));
+        assert!(caps.contains("hover"));
+    }
+
+    #[test]
+    fn feature_matrix_unknown_language() {
+        let matrix = LanguageFeatureMatrixV2::new();
+        assert!(!matrix.has_support("xxx", "completion"));
+        assert_eq!(matrix.feature_count("xxx"), 0);
+    }
+
+    // -- LanguageAlias -----------------------------------------------------
+
+    #[test]
+    fn alias_resolve() {
+        let mut aliases = LanguageAlias::new();
+        aliases.register_alias("rs", "rust");
+        assert_eq!(aliases.resolve_alias("rs"), "rust");
+        assert_eq!(aliases.resolve_alias("python"), "python");
+    }
+
+    #[test]
+    fn alias_is_alias() {
+        let mut aliases = LanguageAlias::new();
+        aliases.register_alias("js", "javascript");
+        assert!(aliases.is_alias("js"));
+        assert!(!aliases.is_alias("javascript"));
+    }
+
+    #[test]
+    fn alias_aliases_for() {
+        let mut aliases = LanguageAlias::new();
+        aliases.register_alias("rs", "rust");
+        aliases.register_alias("Rust", "rust");
+        let found = aliases.aliases_for("rust");
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn alias_canonical_id() {
+        let mut aliases = LanguageAlias::new();
+        aliases.register_alias("ts", "typescript");
+        assert_eq!(aliases.canonical_id("ts"), "typescript");
     }
 
 }

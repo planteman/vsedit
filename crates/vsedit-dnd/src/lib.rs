@@ -1577,6 +1577,208 @@ impl fmt::Display for DragPreviewRendererConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DragGhostPositioner — compute ghost image position
+// ---------------------------------------------------------------------------
+
+/// Computes the position for a drag ghost image with snapping and clamping.
+#[derive(Debug, Clone)]
+pub struct DragGhostPositioner {
+    offset_x: f64,
+    offset_y: f64,
+    grid_size: Option<f64>,
+    bounds: Option<Rect>,
+}
+
+impl DragGhostPositioner {
+    pub fn new(offset_x: f64, offset_y: f64) -> Self {
+        Self { offset_x, offset_y, grid_size: None, bounds: None }
+    }
+
+    pub fn with_snap_to_grid(mut self, grid_size: f64) -> Self {
+        self.grid_size = Some(grid_size);
+        self
+    }
+
+    pub fn with_bounds(mut self, bounds: Rect) -> Self {
+        self.bounds = Some(bounds);
+        self
+    }
+
+    fn snap(value: f64, grid: f64) -> f64 {
+        (value / grid).round() * grid
+    }
+
+    /// Compute the ghost position given cursor position.
+    pub fn compute(&self, cursor_x: f64, cursor_y: f64) -> (f64, f64) {
+        let mut x = cursor_x + self.offset_x;
+        let mut y = cursor_y + self.offset_y;
+
+        if let Some(grid) = self.grid_size {
+            x = Self::snap(x, grid);
+            y = Self::snap(y, grid);
+        }
+
+        if let Some(ref b) = self.bounds {
+            x = x.max(b.x).min(b.x + b.width);
+            y = y.max(b.y).min(b.y + b.height);
+        }
+
+        (x, y)
+    }
+
+    /// Convenience: compute ghost position with zero offset.
+    pub fn compute_centered(cursor_x: f64, cursor_y: f64, ghost_w: f64, ghost_h: f64) -> (f64, f64) {
+        (cursor_x - ghost_w / 2.0, cursor_y - ghost_h / 2.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DropTargetLookup — spatial lookup for drop targets
+// ---------------------------------------------------------------------------
+
+/// Spatial lookup of registered drop targets using their bounding rects.
+#[derive(Debug, Clone)]
+pub struct DropTargetLookup {
+    targets: Vec<(String, Rect)>,
+}
+
+impl DropTargetLookup {
+    pub fn new() -> Self { Self { targets: Vec::new() } }
+
+    pub fn register(&mut self, id: impl Into<String>, bounds: Rect) {
+        self.targets.push((id.into(), bounds));
+    }
+
+    pub fn unregister(&mut self, id: &str) {
+        self.targets.retain(|(tid, _)| tid != id);
+    }
+
+    /// Find the first target whose bounds contain the point.
+    pub fn hit_test(&self, x: f64, y: f64) -> Option<&str> {
+        self.targets.iter()
+            .find(|(_, rect)| rect.contains(x, y))
+            .map(|(id, _)| id.as_str())
+    }
+
+    /// Find the nearest target to a point (by center distance).
+    pub fn find_nearest(&self, x: f64, y: f64) -> Option<&str> {
+        self.targets.iter()
+            .min_by(|(_, a), (_, b)| {
+                let (ax, ay) = a.center();
+                let (bx, by) = b.center();
+                let da = (ax - x).powi(2) + (ay - y).powi(2);
+                let db = (bx - x).powi(2) + (by - y).powi(2);
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(id, _)| id.as_str())
+    }
+
+    /// All target IDs.
+    pub fn all_ids(&self) -> Vec<&str> {
+        self.targets.iter().map(|(id, _)| id.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize { self.targets.len() }
+    pub fn is_empty(&self) -> bool { self.targets.is_empty() }
+}
+
+impl Default for DropTargetLookup {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// DragDirection — direction of drag movement
+// ---------------------------------------------------------------------------
+
+/// Cardinal direction of a drag movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DragDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+    None,
+}
+
+// ---------------------------------------------------------------------------
+// DragSessionTracker — lifecycle tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks a drag session from start to end with distance and direction.
+#[derive(Debug, Clone)]
+pub struct DragSessionTracker {
+    start: Option<(f64, f64)>,
+    current: Option<(f64, f64)>,
+    threshold: f64,
+    ended: bool,
+}
+
+impl DragSessionTracker {
+    pub fn new(threshold: f64) -> Self {
+        Self { start: None, current: None, threshold, ended: false }
+    }
+
+    pub fn start(&mut self, x: f64, y: f64) {
+        self.start = Some((x, y));
+        self.current = Some((x, y));
+        self.ended = false;
+    }
+
+    pub fn update(&mut self, x: f64, y: f64) {
+        self.current = Some((x, y));
+    }
+
+    pub fn end(&mut self) {
+        self.ended = true;
+    }
+
+    pub fn is_active(&self) -> bool { self.start.is_some() && !self.ended }
+
+    pub fn current_position(&self) -> Option<(f64, f64)> { self.current }
+
+    /// Total distance dragged from start to current.
+    pub fn distance_dragged(&self) -> f64 {
+        match (self.start, self.current) {
+            (Some((sx, sy)), Some((cx, cy))) => {
+                ((cx - sx).powi(2) + (cy - sy).powi(2)).sqrt()
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// Whether the drag has exceeded the significance threshold.
+    pub fn is_significant(&self) -> bool {
+        self.distance_dragged() > self.threshold
+    }
+
+    /// Dominant direction of the drag.
+    pub fn direction(&self) -> DragDirection {
+        match (self.start, self.current) {
+            (Some((sx, sy)), Some((cx, cy))) => {
+                let dx = cx - sx;
+                let dy = cy - sy;
+                if dx.abs() < 1.0 && dy.abs() < 1.0 {
+                    DragDirection::None
+                } else if dx.abs() > dy.abs() {
+                    if dx > 0.0 { DragDirection::Right } else { DragDirection::Left }
+                } else {
+                    if dy > 0.0 { DragDirection::Down } else { DragDirection::Up }
+                }
+            }
+            _ => DragDirection::None,
+        }
+    }
+
+    /// Delta from start position.
+    pub fn delta(&self) -> (f64, f64) {
+        match (self.start, self.current) {
+            (Some((sx, sy)), Some((cx, cy))) => (cx - sx, cy - sy),
+            _ => (0.0, 0.0),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2599,6 +2801,125 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- DragGhostPositioner --------------------------------------------------
+
+    #[test]
+    fn ghost_basic_offset() {
+        let p = DragGhostPositioner::new(10.0, 5.0);
+        let (x, y) = p.compute(100.0, 200.0);
+        assert_eq!(x, 110.0);
+        assert_eq!(y, 205.0);
+    }
+
+    #[test]
+    fn ghost_snap_to_grid() {
+        let p = DragGhostPositioner::new(0.0, 0.0).with_snap_to_grid(10.0);
+        let (x, y) = p.compute(13.0, 27.0);
+        assert_eq!(x, 10.0);
+        assert_eq!(y, 30.0);
+    }
+
+    #[test]
+    fn ghost_clamp_to_bounds() {
+        let bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
+        let p = DragGhostPositioner::new(-200.0, -200.0).with_bounds(bounds);
+        let (x, y) = p.compute(50.0, 50.0);
+        assert_eq!(x, 0.0);
+        assert_eq!(y, 0.0);
+    }
+
+    #[test]
+    fn ghost_centered() {
+        let (x, y) = DragGhostPositioner::compute_centered(100.0, 100.0, 20.0, 10.0);
+        assert_eq!(x, 90.0);
+        assert_eq!(y, 95.0);
+    }
+
+    // -- DropTargetLookup -----------------------------------------------------
+
+    #[test]
+    fn lookup_hit_test() {
+        let mut lookup = DropTargetLookup::new();
+        lookup.register("a", Rect::new(0.0, 0.0, 50.0, 50.0));
+        lookup.register("b", Rect::new(60.0, 0.0, 50.0, 50.0));
+        assert_eq!(lookup.hit_test(25.0, 25.0), Some("a"));
+        assert_eq!(lookup.hit_test(80.0, 25.0), Some("b"));
+        assert_eq!(lookup.hit_test(55.0, 25.0), None);
+    }
+
+    #[test]
+    fn lookup_find_nearest() {
+        let mut lookup = DropTargetLookup::new();
+        lookup.register("a", Rect::new(0.0, 0.0, 10.0, 10.0));
+        lookup.register("b", Rect::new(100.0, 100.0, 10.0, 10.0));
+        assert_eq!(lookup.find_nearest(8.0, 8.0), Some("a"));
+        assert_eq!(lookup.find_nearest(95.0, 95.0), Some("b"));
+    }
+
+    #[test]
+    fn lookup_unregister() {
+        let mut lookup = DropTargetLookup::new();
+        lookup.register("a", Rect::new(0.0, 0.0, 10.0, 10.0));
+        lookup.unregister("a");
+        assert!(lookup.is_empty());
+    }
+
+    // -- DragSessionTracker ---------------------------------------------------
+
+    #[test]
+    fn session_lifecycle() {
+        let mut s = DragSessionTracker::new(5.0);
+        assert!(!s.is_active());
+        s.start(10.0, 10.0);
+        assert!(s.is_active());
+        s.update(20.0, 10.0);
+        assert!(s.is_significant());
+        s.end();
+        assert!(!s.is_active());
+    }
+
+    #[test]
+    fn session_distance() {
+        let mut s = DragSessionTracker::new(5.0);
+        s.start(0.0, 0.0);
+        s.update(3.0, 4.0);
+        assert!((s.distance_dragged() - 5.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn session_direction() {
+        let mut s = DragSessionTracker::new(1.0);
+        s.start(0.0, 0.0);
+        s.update(10.0, 2.0);
+        assert_eq!(s.direction(), DragDirection::Right);
+        s.update(-5.0, 0.0);
+        assert_eq!(s.direction(), DragDirection::Left);
+    }
+
+    #[test]
+    fn session_direction_vertical() {
+        let mut s = DragSessionTracker::new(1.0);
+        s.start(0.0, 0.0);
+        s.update(0.0, -10.0);
+        assert_eq!(s.direction(), DragDirection::Up);
+    }
+
+    #[test]
+    fn session_delta() {
+        let mut s = DragSessionTracker::new(1.0);
+        s.start(10.0, 20.0);
+        s.update(15.0, 25.0);
+        assert_eq!(s.delta(), (5.0, 5.0));
+    }
+
+    #[test]
+    fn session_not_significant_below_threshold() {
+        let mut s = DragSessionTracker::new(10.0);
+        s.start(0.0, 0.0);
+        s.update(3.0, 4.0);
+        assert!(!s.is_significant());
     }
 
 }

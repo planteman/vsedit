@@ -1695,6 +1695,166 @@ impl fmt::Display for StorageQuotaEnforcerConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StorageQuotaV2 – enforce storage limits
+// ---------------------------------------------------------------------------
+
+/// Enforces quotas on a key-value store.
+#[derive(Debug, Clone)]
+pub struct StorageQuotaV2 {
+    pub max_keys: usize,
+    pub max_value_bytes: usize,
+    pub max_total_bytes: usize,
+    current_keys: usize,
+    current_total_bytes: usize,
+}
+
+impl StorageQuotaV2 {
+    pub fn new(max_keys: usize, max_value_bytes: usize, max_total_bytes: usize) -> Self {
+        Self { max_keys, max_value_bytes, max_total_bytes, current_keys: 0, current_total_bytes: 0 }
+    }
+
+    pub fn check_key_quota(&self) -> bool {
+        self.current_keys < self.max_keys
+    }
+
+    pub fn check_value_size(&self, value: &str) -> bool {
+        value.len() <= self.max_value_bytes
+    }
+
+    pub fn check_total_size(&self, additional: usize) -> bool {
+        self.current_total_bytes + additional <= self.max_total_bytes
+    }
+
+    pub fn usage_percentage(&self) -> f64 {
+        if self.max_total_bytes == 0 { return 100.0; }
+        (self.current_total_bytes as f64 / self.max_total_bytes as f64) * 100.0
+    }
+
+    /// Record that a key-value pair was added.
+    pub fn record_add(&mut self, key_len: usize, value_len: usize) {
+        self.current_keys += 1;
+        self.current_total_bytes += key_len + value_len;
+    }
+
+    /// Record that a key-value pair was removed.
+    pub fn record_remove(&mut self, key_len: usize, value_len: usize) {
+        self.current_keys = self.current_keys.saturating_sub(1);
+        self.current_total_bytes = self.current_total_bytes.saturating_sub(key_len + value_len);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StorageMigrationHelper – rename/delete/transform stored keys
+// ---------------------------------------------------------------------------
+
+/// Helps migrate storage by renaming keys and transforming values.
+#[derive(Debug, Clone, Default)]
+pub struct StorageMigrationHelper {
+    log: Vec<String>,
+}
+
+impl StorageMigrationHelper {
+    pub fn new() -> Self { Self::default() }
+
+    /// Rename a key in the store.
+    pub fn rename_key(&mut self, store: &mut HashMap<String, String>, old: &str, new: &str) -> bool {
+        if let Some(val) = store.remove(old) {
+            store.insert(new.to_string(), val);
+            self.log.push(format!("renamed {} -> {}", old, new));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Delete all keys with the given prefix.
+    pub fn delete_by_prefix(&mut self, store: &mut HashMap<String, String>, prefix: &str) -> usize {
+        let keys: Vec<String> = store.keys().filter(|k| k.starts_with(prefix)).cloned().collect();
+        let count = keys.len();
+        for k in &keys {
+            store.remove(k);
+        }
+        if count > 0 {
+            self.log.push(format!("deleted {} keys with prefix {}", count, prefix));
+        }
+        count
+    }
+
+    /// Transform all values matching a key prefix.
+    pub fn transform_values<F: Fn(&str) -> String>(
+        &mut self,
+        store: &mut HashMap<String, String>,
+        prefix: &str,
+        transform: F,
+    ) -> usize {
+        let keys: Vec<String> = store.keys().filter(|k| k.starts_with(prefix)).cloned().collect();
+        let count = keys.len();
+        for k in &keys {
+            if let Some(v) = store.get(k) {
+                let new_v = transform(v);
+                store.insert(k.clone(), new_v);
+            }
+        }
+        count
+    }
+
+    pub fn migration_log(&self) -> &[String] { &self.log }
+}
+
+// ---------------------------------------------------------------------------
+// StorageNamespaceV2 – prefix-based namespacing
+// ---------------------------------------------------------------------------
+
+/// Provides prefix-based namespacing over a flat key-value store.
+#[derive(Debug, Clone)]
+pub struct StorageNamespaceV2 {
+    separator: String,
+}
+
+impl StorageNamespaceV2 {
+    pub fn new(separator: &str) -> Self {
+        Self { separator: separator.to_string() }
+    }
+
+    /// Create a namespaced key.
+    pub fn namespaced_key(&self, namespace: &str, key: &str) -> String {
+        format!("{}{}{}", namespace, self.separator, key)
+    }
+
+    /// Return all keys belonging to a namespace.
+    pub fn keys_in_namespace<'a>(&self, store: &'a HashMap<String, String>, namespace: &str) -> Vec<&'a str> {
+        let prefix = format!("{}{}", namespace, self.separator);
+        store.keys().filter(|k| k.starts_with(&prefix)).map(|k| k.as_str()).collect()
+    }
+
+    /// Delete all keys in a namespace.
+    pub fn delete_namespace(&self, store: &mut HashMap<String, String>, namespace: &str) -> usize {
+        let prefix = format!("{}{}", namespace, self.separator);
+        let keys: Vec<String> = store.keys().filter(|k| k.starts_with(&prefix)).cloned().collect();
+        let count = keys.len();
+        for k in keys { store.remove(&k); }
+        count
+    }
+
+    /// Count keys in a namespace.
+    pub fn namespace_size(&self, store: &HashMap<String, String>, namespace: &str) -> usize {
+        let prefix = format!("{}{}", namespace, self.separator);
+        store.keys().filter(|k| k.starts_with(&prefix)).count()
+    }
+
+    /// List all distinct namespaces in the store.
+    pub fn list_namespaces(&self, store: &HashMap<String, String>) -> Vec<String> {
+        let mut ns: Vec<String> = store
+            .keys()
+            .filter_map(|k| k.split(&self.separator).next().map(|s| s.to_string()))
+            .collect();
+        ns.sort();
+        ns.dedup();
+        ns
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2625,6 +2785,113 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+    // -- StorageQuotaV2 -------------------------------------------------------
+
+    #[test]
+    fn quota_check_key() {
+        let mut q = StorageQuotaV2::new(2, 1024, 4096);
+        assert!(q.check_key_quota());
+        q.record_add(3, 5);
+        q.record_add(3, 5);
+        assert!(!q.check_key_quota());
+    }
+
+    #[test]
+    fn quota_check_value_size() {
+        let q = StorageQuotaV2::new(100, 10, 1000);
+        assert!(q.check_value_size("short"));
+        assert!(!q.check_value_size("this is a really long value!"));
+    }
+
+    #[test]
+    fn quota_check_total_size() {
+        let mut q = StorageQuotaV2::new(100, 1024, 20);
+        q.record_add(5, 10);
+        assert!(q.check_total_size(3));
+        assert!(!q.check_total_size(10));
+    }
+
+    #[test]
+    fn quota_usage_percentage() {
+        let mut q = StorageQuotaV2::new(100, 1024, 100);
+        q.record_add(5, 45);
+        assert!((q.usage_percentage() - 50.0).abs() < 0.1);
+    }
+
+    // -- StorageMigrationHelper --------------------------------------------
+
+    #[test]
+    fn migration_rename_key() {
+        let mut store: HashMap<String, String> = [("old_key".into(), "val".into())].into_iter().collect();
+        let mut helper = StorageMigrationHelper::new();
+        assert!(helper.rename_key(&mut store, "old_key", "new_key"));
+        assert_eq!(store.get("new_key").unwrap(), "val");
+        assert!(!store.contains_key("old_key"));
+        assert_eq!(helper.migration_log().len(), 1);
+    }
+
+    #[test]
+    fn migration_delete_by_prefix() {
+        let mut store: HashMap<String, String> = [
+            ("cache.a".into(), "1".into()),
+            ("cache.b".into(), "2".into()),
+            ("data.c".into(), "3".into()),
+        ].into_iter().collect();
+        let mut helper = StorageMigrationHelper::new();
+        assert_eq!(helper.delete_by_prefix(&mut store, "cache."), 2);
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn migration_transform_values() {
+        let mut store: HashMap<String, String> = [("x.a".into(), "hello".into())].into_iter().collect();
+        let mut helper = StorageMigrationHelper::new();
+        helper.transform_values(&mut store, "x.", |v| v.to_uppercase());
+        assert_eq!(store.get("x.a").unwrap(), "HELLO");
+    }
+
+    // -- StorageNamespaceV2 ---------------------------------------------------
+
+    #[test]
+    fn namespace_key() {
+        let ns = StorageNamespaceV2::new(".");
+        assert_eq!(ns.namespaced_key("ext", "theme"), "ext.theme");
+    }
+
+    #[test]
+    fn namespace_keys_in() {
+        let ns = StorageNamespaceV2::new(".");
+        let store: HashMap<String, String> = [
+            ("ext.a".into(), "1".into()),
+            ("ext.b".into(), "2".into()),
+            ("other.c".into(), "3".into()),
+        ].into_iter().collect();
+        assert_eq!(ns.keys_in_namespace(&store, "ext").len(), 2);
+    }
+
+    #[test]
+    fn namespace_delete() {
+        let ns = StorageNamespaceV2::new(".");
+        let mut store: HashMap<String, String> = [
+            ("ext.a".into(), "1".into()),
+            ("other.b".into(), "2".into()),
+        ].into_iter().collect();
+        assert_eq!(ns.delete_namespace(&mut store, "ext"), 1);
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn namespace_list() {
+        let ns = StorageNamespaceV2::new(".");
+        let store: HashMap<String, String> = [
+            ("ext.a".into(), "1".into()),
+            ("core.b".into(), "2".into()),
+        ].into_iter().collect();
+        let namespaces = ns.list_namespaces(&store);
+        assert!(namespaces.contains(&"ext".to_string()));
+        assert!(namespaces.contains(&"core".to_string()));
     }
 
 }
