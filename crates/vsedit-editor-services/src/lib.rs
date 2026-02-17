@@ -1760,6 +1760,151 @@ impl SignatureInfo {
     }
 }
 
+// ── EditorSessionTracker ─────────────────────────────────────────────────
+
+/// Tracks open editor sessions with file association and modification state.
+#[derive(Debug, Clone)]
+pub struct EditorSession {
+    pub id: u64,
+    pub file: String,
+    pub modified: bool,
+    pub opened_at: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct EditorSessionTracker {
+    sessions: Vec<EditorSession>,
+    next_id: u64,
+}
+
+impl EditorSessionTracker {
+    pub fn new() -> Self { Self { sessions: Vec::new(), next_id: 1 } }
+
+    pub fn add(&mut self, file: &str, opened_at: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.sessions.push(EditorSession { id, file: file.to_string(), modified: false, opened_at });
+        id
+    }
+
+    pub fn remove(&mut self, id: u64) -> bool {
+        if let Some(pos) = self.sessions.iter().position(|s| s.id == id) {
+            self.sessions.remove(pos);
+            true
+        } else { false }
+    }
+
+    pub fn find_by_file(&self, file: &str) -> Option<&EditorSession> {
+        self.sessions.iter().find(|s| s.file == file)
+    }
+
+    pub fn set_modified(&mut self, id: u64, modified: bool) {
+        if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) { s.modified = modified; }
+    }
+
+    pub fn modified_count(&self) -> usize { self.sessions.iter().filter(|s| s.modified).count() }
+    pub fn session_count(&self) -> usize { self.sessions.len() }
+
+    /// Returns IDs of sessions opened before `threshold` timestamp.
+    pub fn stale_sessions(&self, threshold: u64) -> Vec<u64> {
+        self.sessions.iter().filter(|s| s.opened_at < threshold).map(|s| s.id).collect()
+    }
+}
+
+// ── EditorCapabilitySet ──────────────────────────────────────────────────
+
+/// A bitflag-like set of editor capabilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EditorCapabilitySet {
+    bits: u32,
+}
+
+impl EditorCapabilitySet {
+    pub const READONLY: u32 = 1 << 0;
+    pub const DIFF: u32 = 1 << 1;
+    pub const PREVIEW: u32 = 1 << 2;
+    pub const PINNED: u32 = 1 << 3;
+
+    pub fn empty() -> Self { Self { bits: 0 } }
+    pub fn all() -> Self { Self { bits: Self::READONLY | Self::DIFF | Self::PREVIEW | Self::PINNED } }
+    pub fn add(&mut self, flag: u32) { self.bits |= flag; }
+    pub fn remove(&mut self, flag: u32) { self.bits &= !flag; }
+    pub fn has(&self, flag: u32) -> bool { self.bits & flag != 0 }
+    pub fn toggle(&mut self, flag: u32) { self.bits ^= flag; }
+    pub fn is_empty(&self) -> bool { self.bits == 0 }
+    pub fn raw(&self) -> u32 { self.bits }
+
+    fn flag_name(flag: u32) -> &'static str {
+        match flag {
+            1 => "READONLY",
+            2 => "DIFF",
+            4 => "PREVIEW",
+            8 => "PINNED",
+            _ => "UNKNOWN",
+        }
+    }
+}
+
+impl fmt::Display for EditorCapabilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let flags = [Self::READONLY, Self::DIFF, Self::PREVIEW, Self::PINNED];
+        let names: Vec<&str> = flags.iter().filter(|&&fl| self.has(fl)).map(|&fl| Self::flag_name(fl)).collect();
+        if names.is_empty() { write!(f, "(none)") } else { write!(f, "{}", names.join("|")) }
+    }
+}
+
+// ── EditorLayoutPreference ───────────────────────────────────────────────
+
+/// Describes the preferred layout for editors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorLayoutPreference {
+    Single,
+    SplitHorizontal,
+    SplitVertical,
+    Grid { columns: usize, rows: usize },
+}
+
+impl EditorLayoutPreference {
+    pub fn column_count(&self) -> usize {
+        match self {
+            Self::Single => 1,
+            Self::SplitHorizontal => 1,
+            Self::SplitVertical => 2,
+            Self::Grid { columns, .. } => *columns,
+        }
+    }
+
+    pub fn row_count(&self) -> usize {
+        match self {
+            Self::Single => 1,
+            Self::SplitHorizontal => 2,
+            Self::SplitVertical => 1,
+            Self::Grid { rows, .. } => *rows,
+        }
+    }
+
+    pub fn is_split(&self) -> bool { !matches!(self, Self::Single) }
+
+    pub fn to_grid_dimensions(&self) -> (usize, usize) {
+        (self.column_count(), self.row_count())
+    }
+
+    pub fn total_panes(&self) -> usize {
+        self.column_count() * self.row_count()
+    }
+}
+
+impl fmt::Display for EditorLayoutPreference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Single => write!(f, "Single"),
+            Self::SplitHorizontal => write!(f, "Split Horizontal"),
+            Self::SplitVertical => write!(f, "Split Vertical"),
+            Self::Grid { columns, rows } => write!(f, "Grid {}x{}", columns, rows),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2615,5 +2760,111 @@ mod tests {
             Some("the name")
         );
         assert!(sig.active_parameter(5).is_none());
+    }
+
+    // ── EditorSessionTracker tests ──
+
+    #[test]
+    fn session_tracker_add_and_find() {
+        let mut tracker = EditorSessionTracker::new();
+        let id = tracker.add("main.rs", 1000);
+        assert_eq!(tracker.session_count(), 1);
+        assert_eq!(tracker.find_by_file("main.rs").unwrap().id, id);
+        assert!(tracker.find_by_file("other.rs").is_none());
+    }
+
+    #[test]
+    fn session_tracker_remove() {
+        let mut tracker = EditorSessionTracker::new();
+        let id = tracker.add("main.rs", 1000);
+        assert!(tracker.remove(id));
+        assert!(!tracker.remove(id));
+        assert_eq!(tracker.session_count(), 0);
+    }
+
+    #[test]
+    fn session_tracker_modified_count() {
+        let mut tracker = EditorSessionTracker::new();
+        let id1 = tracker.add("a.rs", 1000);
+        let _id2 = tracker.add("b.rs", 1000);
+        assert_eq!(tracker.modified_count(), 0);
+        tracker.set_modified(id1, true);
+        assert_eq!(tracker.modified_count(), 1);
+    }
+
+    #[test]
+    fn session_tracker_stale() {
+        let mut tracker = EditorSessionTracker::new();
+        tracker.add("old.rs", 100);
+        tracker.add("new.rs", 500);
+        let stale = tracker.stale_sessions(300);
+        assert_eq!(stale.len(), 1);
+    }
+
+    // ── EditorCapabilitySet tests ──
+
+    #[test]
+    fn capability_set_add_has() {
+        let mut caps = EditorCapabilitySet::empty();
+        assert!(!caps.has(EditorCapabilitySet::READONLY));
+        caps.add(EditorCapabilitySet::READONLY);
+        assert!(caps.has(EditorCapabilitySet::READONLY));
+    }
+
+    #[test]
+    fn capability_set_remove() {
+        let mut caps = EditorCapabilitySet::all();
+        caps.remove(EditorCapabilitySet::DIFF);
+        assert!(!caps.has(EditorCapabilitySet::DIFF));
+        assert!(caps.has(EditorCapabilitySet::READONLY));
+    }
+
+    #[test]
+    fn capability_set_toggle() {
+        let mut caps = EditorCapabilitySet::empty();
+        caps.toggle(EditorCapabilitySet::PREVIEW);
+        assert!(caps.has(EditorCapabilitySet::PREVIEW));
+        caps.toggle(EditorCapabilitySet::PREVIEW);
+        assert!(!caps.has(EditorCapabilitySet::PREVIEW));
+    }
+
+    #[test]
+    fn capability_set_display() {
+        let mut caps = EditorCapabilitySet::empty();
+        assert_eq!(format!("{}", caps), "(none)");
+        caps.add(EditorCapabilitySet::READONLY);
+        caps.add(EditorCapabilitySet::PINNED);
+        assert_eq!(format!("{}", caps), "READONLY|PINNED");
+    }
+
+    // ── EditorLayoutPreference tests ──
+
+    #[test]
+    fn layout_single() {
+        let l = EditorLayoutPreference::Single;
+        assert!(!l.is_split());
+        assert_eq!(l.to_grid_dimensions(), (1, 1));
+        assert_eq!(l.total_panes(), 1);
+    }
+
+    #[test]
+    fn layout_split_horizontal() {
+        let l = EditorLayoutPreference::SplitHorizontal;
+        assert!(l.is_split());
+        assert_eq!(l.column_count(), 1);
+        assert_eq!(l.row_count(), 2);
+    }
+
+    #[test]
+    fn layout_grid() {
+        let l = EditorLayoutPreference::Grid { columns: 3, rows: 2 };
+        assert_eq!(l.total_panes(), 6);
+        assert_eq!(format!("{}", l), "Grid 3x2");
+    }
+
+    #[test]
+    fn layout_display_variants() {
+        assert_eq!(format!("{}", EditorLayoutPreference::Single), "Single");
+        assert_eq!(format!("{}", EditorLayoutPreference::SplitVertical), "Split Vertical");
     }
 }

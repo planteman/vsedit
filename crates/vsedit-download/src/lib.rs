@@ -1533,6 +1533,170 @@ impl fmt::Display for DownloadProgressReporterConfig {
     }
 }
 
+// ── DownloadSpeedTracker ─────────────────────────────────────────────────
+
+/// Tracks progress of a single download with speed and ETA calculation.
+#[derive(Debug, Clone)]
+pub struct DownloadSpeedTracker {
+    pub bytes_downloaded: u64,
+    pub total_bytes: Option<u64>,
+    pub speed_bps: f64,
+}
+
+impl DownloadSpeedTracker {
+    pub fn new(bytes_downloaded: u64, total_bytes: Option<u64>, speed_bps: f64) -> Self {
+        Self { bytes_downloaded, total_bytes, speed_bps }
+    }
+
+    /// Returns the percentage completed (0.0–100.0), or `None` if total is unknown.
+    pub fn pct_complete(&self) -> Option<f64> {
+        self.total_bytes.map(|total| {
+            if total == 0 { 100.0 } else { (self.bytes_downloaded as f64 / total as f64) * 100.0 }
+        })
+    }
+
+    /// Returns estimated seconds remaining, or `None` if unknown.
+    pub fn eta_seconds(&self) -> Option<f64> {
+        if self.speed_bps <= 0.0 { return None; }
+        self.total_bytes.map(|total| {
+            let remaining = total.saturating_sub(self.bytes_downloaded) as f64;
+            remaining / self.speed_bps
+        })
+    }
+
+    /// Formats speed in human-readable units (B/s, KB/s, MB/s, GB/s).
+    pub fn human_readable_speed(&self) -> String {
+        let s = self.speed_bps;
+        if s >= 1_073_741_824.0 {
+            format!("{:.2} GB/s", s / 1_073_741_824.0)
+        } else if s >= 1_048_576.0 {
+            format!("{:.2} MB/s", s / 1_048_576.0)
+        } else if s >= 1024.0 {
+            format!("{:.2} KB/s", s / 1024.0)
+        } else {
+            format!("{:.0} B/s", s)
+        }
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.total_bytes.map_or(false, |t| self.bytes_downloaded >= t)
+    }
+}
+
+impl fmt::Display for DownloadSpeedTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.pct_complete() {
+            Some(pct) => write!(f, "{:.1}% @ {}", pct, self.human_readable_speed()),
+            None => write!(f, "{} bytes @ {}", self.bytes_downloaded, self.human_readable_speed()),
+        }
+    }
+}
+
+// ── DownloadQueue ────────────────────────────────────────────────────────
+
+/// A queue of download URLs with priority management.
+#[derive(Debug, Clone)]
+pub struct DownloadQueue {
+    pending: Vec<String>,
+    active: Vec<String>,
+    completed: Vec<String>,
+}
+
+impl DownloadQueue {
+    pub fn new() -> Self {
+        Self { pending: Vec::new(), active: Vec::new(), completed: Vec::new() }
+    }
+
+    pub fn add(&mut self, url: String) { self.pending.push(url); }
+
+    pub fn remove(&mut self, url: &str) -> bool {
+        if let Some(pos) = self.pending.iter().position(|u| u == url) {
+            self.pending.remove(pos);
+            return true;
+        }
+        false
+    }
+
+    /// Move a pending URL to the front of the queue (highest priority).
+    pub fn prioritize(&mut self, url: &str) -> bool {
+        if let Some(pos) = self.pending.iter().position(|u| u == url) {
+            let item = self.pending.remove(pos);
+            self.pending.insert(0, item);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn start_next(&mut self) -> Option<String> {
+        if self.pending.is_empty() { return None; }
+        let url = self.pending.remove(0);
+        self.active.push(url.clone());
+        Some(url)
+    }
+
+    pub fn complete(&mut self, url: &str) -> bool {
+        if let Some(pos) = self.active.iter().position(|u| u == url) {
+            let item = self.active.remove(pos);
+            self.completed.push(item);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn pending_count(&self) -> usize { self.pending.len() }
+    pub fn active_count(&self) -> usize { self.active.len() }
+    pub fn completed_count(&self) -> usize { self.completed.len() }
+
+    pub fn total_progress(&self) -> f64 {
+        let total = self.pending.len() + self.active.len() + self.completed.len();
+        if total == 0 { return 0.0; }
+        self.completed.len() as f64 / total as f64 * 100.0
+    }
+}
+
+// ── DownloadRetryTracker ─────────────────────────────────────────────────
+
+/// Tracks per-URL failure counts and retry decisions.
+#[derive(Debug, Clone)]
+pub struct DownloadRetryTracker {
+    attempts: HashMap<String, u32>,
+    max_retries: u32,
+}
+
+impl DownloadRetryTracker {
+    pub fn new(max_retries: u32) -> Self {
+        Self { attempts: HashMap::new(), max_retries }
+    }
+
+    pub fn record_attempt(&mut self, url: &str) {
+        *self.attempts.entry(url.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn attempt_count(&self, url: &str) -> u32 {
+        self.attempts.get(url).copied().unwrap_or(0)
+    }
+
+    pub fn should_retry(&self, url: &str) -> bool {
+        self.attempt_count(url) < self.max_retries
+    }
+
+    pub fn reset(&mut self, url: &str) { self.attempts.remove(url); }
+
+    pub fn reset_all(&mut self) { self.attempts.clear(); }
+
+    pub fn failed_urls(&self) -> Vec<&str> {
+        self.attempts
+            .iter()
+            .filter(|(_, count)| **count >= self.max_retries)
+            .map(|(url, _)| url.as_str())
+            .collect()
+    }
+
+    pub fn total_tracked(&self) -> usize { self.attempts.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2620,4 +2784,146 @@ mod tests {
         assert_eq!(st.peak_item_count, 25);
     }
 
+    // ── DownloadSpeedTracker tests ──
+
+    #[test]
+    fn speed_tracker_pct_known_total() {
+        let p = DownloadSpeedTracker::new(50, Some(200), 1000.0);
+        assert!((p.pct_complete().unwrap() - 25.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn speed_tracker_pct_unknown_total() {
+        let p = DownloadSpeedTracker::new(50, None, 1000.0);
+        assert!(p.pct_complete().is_none());
+    }
+
+    #[test]
+    fn speed_tracker_pct_zero_total() {
+        let p = DownloadSpeedTracker::new(0, Some(0), 0.0);
+        assert!((p.pct_complete().unwrap() - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn speed_tracker_eta_seconds() {
+        let p = DownloadSpeedTracker::new(100, Some(500), 100.0);
+        assert!((p.eta_seconds().unwrap() - 4.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn speed_tracker_eta_zero_speed() {
+        let p = DownloadSpeedTracker::new(100, Some(500), 0.0);
+        assert!(p.eta_seconds().is_none());
+    }
+
+    #[test]
+    fn speed_tracker_human_speed_bytes() {
+        let p = DownloadSpeedTracker::new(0, None, 512.0);
+        assert_eq!(p.human_readable_speed(), "512 B/s");
+    }
+
+    #[test]
+    fn speed_tracker_human_speed_mb() {
+        let p = DownloadSpeedTracker::new(0, None, 5_242_880.0);
+        assert_eq!(p.human_readable_speed(), "5.00 MB/s");
+    }
+
+    #[test]
+    fn speed_tracker_is_finished() {
+        assert!(DownloadSpeedTracker::new(100, Some(100), 0.0).is_finished());
+        assert!(!DownloadSpeedTracker::new(50, Some(100), 0.0).is_finished());
+        assert!(!DownloadSpeedTracker::new(50, None, 0.0).is_finished());
+    }
+
+    #[test]
+    fn speed_tracker_display() {
+        let p = DownloadSpeedTracker::new(50, Some(100), 1024.0);
+        let s = format!("{}", p);
+        assert!(s.contains("50.0%"));
+        assert!(s.contains("KB/s"));
+    }
+
+    // ── DownloadQueue tests ──
+
+    #[test]
+    fn queue_add_and_counts() {
+        let mut q = DownloadQueue::new();
+        q.add("http://a.com".into());
+        q.add("http://b.com".into());
+        assert_eq!(q.pending_count(), 2);
+        assert_eq!(q.active_count(), 0);
+        assert_eq!(q.completed_count(), 0);
+    }
+
+    #[test]
+    fn queue_start_and_complete() {
+        let mut q = DownloadQueue::new();
+        q.add("http://a.com".into());
+        let url = q.start_next().unwrap();
+        assert_eq!(url, "http://a.com");
+        assert_eq!(q.active_count(), 1);
+        assert!(q.complete("http://a.com"));
+        assert_eq!(q.completed_count(), 1);
+        assert_eq!(q.active_count(), 0);
+    }
+
+    #[test]
+    fn queue_prioritize() {
+        let mut q = DownloadQueue::new();
+        q.add("http://a.com".into());
+        q.add("http://b.com".into());
+        q.prioritize("http://b.com");
+        assert_eq!(q.start_next().unwrap(), "http://b.com");
+    }
+
+    #[test]
+    fn queue_remove() {
+        let mut q = DownloadQueue::new();
+        q.add("http://a.com".into());
+        assert!(q.remove("http://a.com"));
+        assert!(!q.remove("http://a.com"));
+        assert_eq!(q.pending_count(), 0);
+    }
+
+    #[test]
+    fn queue_total_progress() {
+        let mut q = DownloadQueue::new();
+        q.add("http://a.com".into());
+        q.add("http://b.com".into());
+        q.start_next();
+        q.complete("http://a.com");
+        assert!((q.total_progress() - 50.0).abs() < 0.01);
+    }
+
+    // ── DownloadRetryTracker tests ──
+
+    #[test]
+    fn retry_tracker_should_retry() {
+        let mut t = DownloadRetryTracker::new(3);
+        assert!(t.should_retry("http://a.com"));
+        t.record_attempt("http://a.com");
+        t.record_attempt("http://a.com");
+        assert!(t.should_retry("http://a.com"));
+        t.record_attempt("http://a.com");
+        assert!(!t.should_retry("http://a.com"));
+    }
+
+    #[test]
+    fn retry_tracker_reset() {
+        let mut t = DownloadRetryTracker::new(2);
+        t.record_attempt("http://a.com");
+        t.record_attempt("http://a.com");
+        t.reset("http://a.com");
+        assert!(t.should_retry("http://a.com"));
+        assert_eq!(t.attempt_count("http://a.com"), 0);
+    }
+
+    #[test]
+    fn retry_tracker_failed_urls() {
+        let mut t = DownloadRetryTracker::new(1);
+        t.record_attempt("http://a.com");
+        t.record_attempt("http://b.com");
+        let failed = t.failed_urls();
+        assert_eq!(failed.len(), 2);
+    }
 }

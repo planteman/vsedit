@@ -1599,6 +1599,175 @@ impl fmt::Display for PinnedTabManagerConfig {
     }
 }
 
+// ── TabOrderManager ─────────────────────────────────────────────────────
+
+/// Manages an ordered list of tab labels with an active index.
+#[derive(Debug, Clone)]
+pub struct TabOrderManager {
+    tabs: Vec<String>,
+    active: Option<usize>,
+}
+
+impl TabOrderManager {
+    pub fn new() -> Self { Self { tabs: Vec::new(), active: None } }
+
+    pub fn insert_tab(&mut self, index: usize, label: String) {
+        let idx = index.min(self.tabs.len());
+        self.tabs.insert(idx, label);
+        if self.active.is_none() { self.active = Some(idx); }
+    }
+
+    pub fn remove_tab(&mut self, index: usize) -> Option<String> {
+        if index >= self.tabs.len() { return None; }
+        let removed = self.tabs.remove(index);
+        if self.tabs.is_empty() {
+            self.active = None;
+        } else if let Some(a) = self.active {
+            if a >= self.tabs.len() { self.active = Some(self.tabs.len() - 1); }
+        }
+        Some(removed)
+    }
+
+    pub fn move_tab(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.tabs.len() || to >= self.tabs.len() { return false; }
+        let tab = self.tabs.remove(from);
+        self.tabs.insert(to, tab);
+        if self.active == Some(from) { self.active = Some(to); }
+        true
+    }
+
+    pub fn swap_tabs(&mut self, a: usize, b: usize) -> bool {
+        if a >= self.tabs.len() || b >= self.tabs.len() { return false; }
+        self.tabs.swap(a, b);
+        true
+    }
+
+    pub fn set_active(&mut self, index: usize) -> bool {
+        if index < self.tabs.len() { self.active = Some(index); true } else { false }
+    }
+
+    pub fn active_tab(&self) -> Option<&str> { self.active.and_then(|i| self.tabs.get(i).map(|s| s.as_str())) }
+    pub fn tab_at(&self, index: usize) -> Option<&str> { self.tabs.get(index).map(|s| s.as_str()) }
+    pub fn count(&self) -> usize { self.tabs.len() }
+
+    pub fn reorder(&mut self, new_order: &[usize]) -> bool {
+        if new_order.len() != self.tabs.len() { return false; }
+        let mut used = vec![false; self.tabs.len()];
+        for &i in new_order {
+            if i >= self.tabs.len() || used[i] { return false; }
+            used[i] = true;
+        }
+        let old = self.tabs.clone();
+        for (dst, &src) in new_order.iter().enumerate() {
+            self.tabs[dst] = old[src].clone();
+        }
+        true
+    }
+}
+
+// ── TabLabelFormatter ───────────────────────────────────────────────────
+
+/// Formats tab labels with truncation and status indicators.
+pub struct TabLabelFormatter;
+
+impl TabLabelFormatter {
+    /// Extract filename from a path string.
+    pub fn filename_from_path(path: &str) -> &str {
+        path.rsplit('/').next().unwrap_or(path)
+    }
+
+    /// Truncate a label to max_len, adding "…" if needed.
+    pub fn truncate(label: &str, max_len: usize) -> String {
+        if label.len() <= max_len { return label.to_string(); }
+        if max_len <= 1 { return "…".to_string(); }
+        let keep = max_len - 1;
+        let truncated: String = label.chars().take(keep).collect();
+        format!("{}…", truncated)
+    }
+
+    /// Add a modified indicator dot.
+    pub fn with_modified_indicator(label: &str, modified: bool) -> String {
+        if modified { format!("● {}", label) } else { label.to_string() }
+    }
+
+    /// Add a read-only icon.
+    pub fn with_readonly_icon(label: &str, readonly: bool) -> String {
+        if readonly { format!("🔒 {}", label) } else { label.to_string() }
+    }
+
+    /// Disambiguate duplicate filenames by prepending the parent directory.
+    pub fn disambiguate(paths: &[&str]) -> Vec<String> {
+        let filenames: Vec<&str> = paths.iter().map(|p| Self::filename_from_path(p)).collect();
+        paths.iter().enumerate().map(|(i, path)| {
+            let name = filenames[i];
+            let dups = filenames.iter().filter(|&&n| n == name).count();
+            if dups > 1 {
+                let parts: Vec<&str> = path.rsplitn(3, '/').collect();
+                if parts.len() >= 2 { format!("{}/{}", parts[1], name) } else { name.to_string() }
+            } else {
+                name.to_string()
+            }
+        }).collect()
+    }
+}
+
+// ── TabGroupSplitter ────────────────────────────────────────────────────
+
+/// Manages splitting and merging of tab groups.
+#[derive(Debug, Clone)]
+pub struct TabGroupSplitter {
+    groups: Vec<Vec<String>>,
+}
+
+impl TabGroupSplitter {
+    pub fn new() -> Self { Self { groups: vec![Vec::new()] }  }
+
+    pub fn split_horizontal(&mut self, group_idx: usize) -> bool {
+        if group_idx >= self.groups.len() { return false; }
+        self.groups.insert(group_idx + 1, Vec::new());
+        true
+    }
+
+    pub fn split_vertical(&mut self, group_idx: usize) -> bool {
+        self.split_horizontal(group_idx)
+    }
+
+    pub fn merge_groups(&mut self, a: usize, b: usize) -> bool {
+        if a >= self.groups.len() || b >= self.groups.len() || a == b { return false; }
+        let (keep, remove) = if a < b { (a, b) } else { (b, a) };
+        let taken = self.groups.remove(remove);
+        self.groups[keep].extend(taken);
+        true
+    }
+
+    pub fn redistribute_tabs(&mut self) {
+        let all: Vec<String> = self.groups.iter().flat_map(|g| g.clone()).collect();
+        let n = self.groups.len();
+        if n == 0 { return; }
+        let chunk_size = (all.len() + n - 1) / n;
+        for (i, group) in self.groups.iter_mut().enumerate() {
+            group.clear();
+            let start = i * chunk_size;
+            let end = (start + chunk_size).min(all.len());
+            if start < all.len() {
+                group.extend_from_slice(&all[start..end]);
+            }
+        }
+    }
+
+    pub fn group_count(&self) -> usize { self.groups.len() }
+
+    pub fn add_to_group(&mut self, group_idx: usize, tab: String) -> bool {
+        if group_idx >= self.groups.len() { return false; }
+        self.groups[group_idx].push(tab);
+        true
+    }
+
+    pub fn tabs_in_group(&self, group_idx: usize) -> &[String] {
+        self.groups.get(group_idx).map(|g| g.as_slice()).unwrap_or(&[])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2604,4 +2773,105 @@ mod tests {
         assert_eq!(st.peak_item_count, 25);
     }
 
+    // ── TabOrderManager tests ──
+
+    #[test]
+    fn tab_order_insert_and_active() {
+        let mut mgr = TabOrderManager::new();
+        mgr.insert_tab(0, "a.rs".into());
+        mgr.insert_tab(1, "b.rs".into());
+        assert_eq!(mgr.count(), 2);
+        assert_eq!(mgr.active_tab(), Some("a.rs"));
+        assert_eq!(mgr.tab_at(1), Some("b.rs"));
+    }
+
+    #[test]
+    fn tab_order_remove() {
+        let mut mgr = TabOrderManager::new();
+        mgr.insert_tab(0, "a.rs".into());
+        mgr.insert_tab(1, "b.rs".into());
+        assert_eq!(mgr.remove_tab(0), Some("a.rs".into()));
+        assert_eq!(mgr.count(), 1);
+    }
+
+    #[test]
+    fn tab_order_move() {
+        let mut mgr = TabOrderManager::new();
+        mgr.insert_tab(0, "a.rs".into());
+        mgr.insert_tab(1, "b.rs".into());
+        mgr.insert_tab(2, "c.rs".into());
+        assert!(mgr.move_tab(0, 2));
+        assert_eq!(mgr.tab_at(2), Some("a.rs"));
+    }
+
+    #[test]
+    fn tab_order_swap() {
+        let mut mgr = TabOrderManager::new();
+        mgr.insert_tab(0, "a.rs".into());
+        mgr.insert_tab(1, "b.rs".into());
+        assert!(mgr.swap_tabs(0, 1));
+        assert_eq!(mgr.tab_at(0), Some("b.rs"));
+        assert_eq!(mgr.tab_at(1), Some("a.rs"));
+    }
+
+    // ── TabLabelFormatter tests ──
+
+    #[test]
+    fn label_filename() {
+        assert_eq!(TabLabelFormatter::filename_from_path("/src/main.rs"), "main.rs");
+        assert_eq!(TabLabelFormatter::filename_from_path("file.txt"), "file.txt");
+    }
+
+    #[test]
+    fn label_truncate() {
+        assert_eq!(TabLabelFormatter::truncate("hello", 10), "hello");
+        assert_eq!(TabLabelFormatter::truncate("hello world long", 6), "hello…");
+    }
+
+    #[test]
+    fn label_modified_indicator() {
+        assert_eq!(TabLabelFormatter::with_modified_indicator("file.rs", true), "● file.rs");
+        assert_eq!(TabLabelFormatter::with_modified_indicator("file.rs", false), "file.rs");
+    }
+
+    #[test]
+    fn label_disambiguate() {
+        let paths = &["src/main.rs", "tests/main.rs", "lib.rs"];
+        let labels = TabLabelFormatter::disambiguate(paths);
+        assert_eq!(labels[0], "src/main.rs");
+        assert_eq!(labels[1], "tests/main.rs");
+        assert_eq!(labels[2], "lib.rs");
+    }
+
+    // ── TabGroupSplitter tests ──
+
+    #[test]
+    fn splitter_split_and_merge() {
+        let mut s = TabGroupSplitter::new();
+        assert_eq!(s.group_count(), 1);
+        s.split_horizontal(0);
+        assert_eq!(s.group_count(), 2);
+        assert!(s.merge_groups(0, 1));
+        assert_eq!(s.group_count(), 1);
+    }
+
+    #[test]
+    fn splitter_add_and_redistribute() {
+        let mut s = TabGroupSplitter::new();
+        s.split_horizontal(0);
+        s.add_to_group(0, "a.rs".into());
+        s.add_to_group(0, "b.rs".into());
+        s.add_to_group(0, "c.rs".into());
+        s.add_to_group(0, "d.rs".into());
+        s.redistribute_tabs();
+        assert_eq!(s.tabs_in_group(0).len(), 2);
+        assert_eq!(s.tabs_in_group(1).len(), 2);
+    }
+
+    #[test]
+    fn splitter_merge_invalid() {
+        let mut s = TabGroupSplitter::new();
+        assert!(!s.merge_groups(0, 0));
+        assert!(!s.merge_groups(0, 5));
+    }
 }

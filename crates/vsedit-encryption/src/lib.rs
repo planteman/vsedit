@@ -1663,6 +1663,132 @@ impl fmt::Display for KeyRotationManagerConfig {
     }
 }
 
+// ── KeyDerivationConfig ──────────────────────────────────────────────────
+
+/// Builder-pattern configuration for key derivation parameters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyDerivationConfig {
+    pub iterations: u32,
+    pub salt_len: usize,
+    pub key_len: usize,
+}
+
+impl KeyDerivationConfig {
+    pub fn new() -> Self {
+        Self { iterations: 100_000, salt_len: 16, key_len: 32 }
+    }
+
+    pub fn with_iterations(mut self, iterations: u32) -> Self { self.iterations = iterations; self }
+    pub fn with_salt_len(mut self, salt_len: usize) -> Self { self.salt_len = salt_len; self }
+    pub fn with_key_len(mut self, key_len: usize) -> Self { self.key_len = key_len; self }
+
+    pub fn is_strong(&self) -> bool {
+        self.iterations >= 100_000 && self.key_len >= 32 && self.salt_len >= 16
+    }
+
+    pub fn estimated_time_ms(&self) -> f64 {
+        self.iterations as f64 * 0.001
+    }
+}
+
+impl Default for KeyDerivationConfig {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for KeyDerivationConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "KDF(iter={}, salt={}B, key={}B)", self.iterations, self.salt_len, self.key_len)
+    }
+}
+
+// ── SecureStringMasker ──────────────────────────────────────────────────
+
+/// Masks sensitive strings for display/logging.
+pub struct SecureStringMasker;
+
+impl SecureStringMasker {
+    /// Mask all but the last `n` characters.
+    pub fn mask_except_last_n(s: &str, n: usize, mask_char: char) -> String {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() <= n { return s.to_string(); }
+        let masked_len = chars.len() - n;
+        let masked: String = std::iter::repeat(mask_char).take(masked_len).collect();
+        let visible: String = chars[masked_len..].iter().collect();
+        format!("{}{}", masked, visible)
+    }
+
+    /// Mask the middle portion, keeping first and last `keep` characters.
+    pub fn mask_middle(s: &str, keep: usize, mask_char: char) -> String {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() <= keep * 2 { return s.to_string(); }
+        let prefix: String = chars[..keep].iter().collect();
+        let suffix: String = chars[chars.len() - keep..].iter().collect();
+        let middle_len = chars.len() - keep * 2;
+        let middle: String = std::iter::repeat(mask_char).take(middle_len).collect();
+        format!("{}{}{}", prefix, middle, suffix)
+    }
+
+    /// Redact an email address: show first char + domain.
+    pub fn redact_email(email: &str) -> String {
+        if let Some(at_pos) = email.find('@') {
+            if at_pos > 0 {
+                let first_char = &email[..1];
+                let domain = &email[at_pos..];
+                let stars = "*".repeat(at_pos.saturating_sub(1));
+                return format!("{}{}{}", first_char, stars, domain);
+            }
+        }
+        "***".to_string()
+    }
+
+    /// Redact the entire string with a given character.
+    pub fn redact_with_char(s: &str, mask_char: char) -> String {
+        std::iter::repeat(mask_char).take(s.chars().count()).collect()
+    }
+}
+
+// ── CryptoAuditLog ──────────────────────────────────────────────────
+
+/// Records encryption/decryption operations for audit purposes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CryptoAuditKind { Encrypt, Decrypt }
+
+#[derive(Debug, Clone)]
+pub struct CryptoAuditRecord {
+    pub kind: CryptoAuditKind,
+    pub key_id: String,
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CryptoAuditLog {
+    entries: Vec<CryptoAuditRecord>,
+}
+
+impl CryptoAuditLog {
+    pub fn new() -> Self { Self { entries: Vec::new() } }
+
+    pub fn record(&mut self, kind: CryptoAuditKind, key_id: &str, timestamp: u64) {
+        self.entries.push(CryptoAuditRecord { kind, key_id: key_id.to_string(), timestamp });
+    }
+
+    pub fn query_by_time_range(&self, start: u64, end: u64) -> Vec<&CryptoAuditRecord> {
+        self.entries.iter().filter(|e| e.timestamp >= start && e.timestamp <= end).collect()
+    }
+
+    pub fn operation_count(&self, kind: &CryptoAuditKind) -> usize {
+        self.entries.iter().filter(|e| &e.kind == kind).count()
+    }
+
+    pub fn last_operation(&self) -> Option<&CryptoAuditRecord> { self.entries.last() }
+
+    pub fn total_entries(&self) -> usize { self.entries.len() }
+
+    pub fn entries_for_key(&self, key_id: &str) -> Vec<&CryptoAuditRecord> {
+        self.entries.iter().filter(|e| e.key_id == key_id).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2599,4 +2725,94 @@ mod tests {
         assert_eq!(st.peak_item_count, 25);
     }
 
+    // ── KeyDerivationConfig tests ──
+
+    #[test]
+    fn kdf_defaults_are_strong() {
+        let cfg = KeyDerivationConfig::new();
+        assert!(cfg.is_strong());
+        assert_eq!(cfg.iterations, 100_000);
+    }
+
+    #[test]
+    fn kdf_builder_chain() {
+        let cfg = KeyDerivationConfig::new().with_iterations(50_000).with_salt_len(8).with_key_len(16);
+        assert_eq!(cfg.iterations, 50_000);
+        assert_eq!(cfg.salt_len, 8);
+        assert_eq!(cfg.key_len, 16);
+        assert!(!cfg.is_strong());
+    }
+
+    #[test]
+    fn kdf_display() {
+        let cfg = KeyDerivationConfig::new();
+        let s = format!("{}", cfg);
+        assert!(s.contains("100000"));
+    }
+
+    #[test]
+    fn kdf_estimated_time() {
+        let cfg = KeyDerivationConfig::new();
+        assert!(cfg.estimated_time_ms() > 0.0);
+    }
+
+    // ── SecureStringMasker tests ──
+
+    #[test]
+    fn mask_except_last_n() {
+        assert_eq!(SecureStringMasker::mask_except_last_n("secret123", 3, '*'), "******123");
+    }
+
+    #[test]
+    fn mask_except_last_n_short() {
+        assert_eq!(SecureStringMasker::mask_except_last_n("ab", 5, '*'), "ab");
+    }
+
+    #[test]
+    fn mask_middle() {
+        assert_eq!(SecureStringMasker::mask_middle("abcdefgh", 2, '*'), "ab****gh");
+    }
+
+    #[test]
+    fn redact_email() {
+        assert_eq!(SecureStringMasker::redact_email("john@example.com"), "j***@example.com");
+    }
+
+    #[test]
+    fn redact_with_char() {
+        assert_eq!(SecureStringMasker::redact_with_char("hello", '#'), "#####");
+    }
+
+    // ── CryptoAuditLog tests ──
+
+    #[test]
+    fn crypto_audit_record_and_query() {
+        let mut log = CryptoAuditLog::new();
+        log.record(CryptoAuditKind::Encrypt, "key1", 100);
+        log.record(CryptoAuditKind::Decrypt, "key1", 200);
+        log.record(CryptoAuditKind::Encrypt, "key2", 300);
+        assert_eq!(log.total_entries(), 3);
+        assert_eq!(log.operation_count(&CryptoAuditKind::Encrypt), 2);
+        assert_eq!(log.operation_count(&CryptoAuditKind::Decrypt), 1);
+    }
+
+    #[test]
+    fn crypto_audit_time_range() {
+        let mut log = CryptoAuditLog::new();
+        log.record(CryptoAuditKind::Encrypt, "k", 100);
+        log.record(CryptoAuditKind::Encrypt, "k", 200);
+        log.record(CryptoAuditKind::Encrypt, "k", 300);
+        let range = log.query_by_time_range(150, 250);
+        assert_eq!(range.len(), 1);
+        assert_eq!(range[0].timestamp, 200);
+    }
+
+    #[test]
+    fn crypto_audit_last_and_by_key() {
+        let mut log = CryptoAuditLog::new();
+        log.record(CryptoAuditKind::Encrypt, "a", 10);
+        log.record(CryptoAuditKind::Decrypt, "b", 20);
+        assert_eq!(log.last_operation().unwrap().key_id, "b");
+        assert_eq!(log.entries_for_key("a").len(), 1);
+    }
 }

@@ -1459,6 +1459,113 @@ impl fmt::Display for ViewpartBracketGuidesConfig {
     }
 }
 
+// ── GlyphMarginCalculator ────────────────────────────────────────────────
+
+/// Computes glyph margin widths based on decorations and line count.
+pub struct GlyphMarginCalculator;
+
+impl GlyphMarginCalculator {
+    /// Compute the margin width in pixels from the number of decoration lanes.
+    pub fn margin_width(decoration_lanes: usize, lane_width: u32) -> u32 {
+        if decoration_lanes == 0 { return 0; }
+        decoration_lanes as u32 * lane_width
+    }
+
+    /// Return the maximum decoration count from a list of per-line decoration counts.
+    pub fn max_decoration_count(per_line_counts: &[usize]) -> usize {
+        per_line_counts.iter().copied().max().unwrap_or(0)
+    }
+
+    /// Compute the gutter width needed for line numbers of the given total lines.
+    pub fn gutter_width_for_line_count(total_lines: usize, char_width: u32) -> u32 {
+        if total_lines == 0 { return char_width; }
+        let digits = (total_lines as f64).log10().floor() as u32 + 1;
+        digits * char_width + char_width // extra padding
+    }
+
+    /// Total left margin = glyph margin + line number gutter.
+    pub fn total_left_margin(decoration_lanes: usize, lane_width: u32, total_lines: usize, char_width: u32) -> u32 {
+        Self::margin_width(decoration_lanes, lane_width) + Self::gutter_width_for_line_count(total_lines, char_width)
+    }
+}
+
+// ── LineNumberFormatter ─────────────────────────────────────────────────
+
+/// Formats line numbers with padding and optional relative numbering.
+pub struct LineNumberFormatter;
+
+impl LineNumberFormatter {
+    /// Format a line number with left-padding to the given width.
+    pub fn format_line_number(line: usize, width: usize) -> String {
+        format!("{:>width$}", line, width = width)
+    }
+
+    /// Format as a relative line number (distance from current line).
+    pub fn format_relative(line: usize, current_line: usize, width: usize) -> String {
+        if line == current_line {
+            Self::format_line_number(line, width)
+        } else {
+            let diff = if line > current_line { line - current_line } else { current_line - line };
+            format!("{:>width$}", diff, width = width)
+        }
+    }
+
+    /// Returns a fold indicator string: "▶" for collapsed, "▼" for expanded, " " for none.
+    pub fn fold_indicator(is_foldable: bool, is_collapsed: bool) -> &'static str {
+        if !is_foldable { " " }
+        else if is_collapsed { "▶" }
+        else { "▼" }
+    }
+
+    /// Compute the display width needed for line numbers.
+    pub fn required_width(max_line: usize) -> usize {
+        if max_line == 0 { return 1; }
+        (max_line as f64).log10().floor() as usize + 1
+    }
+}
+
+// ── RulerRenderer ───────────────────────────────────────────────────────
+
+/// Computes column ruler positions.
+#[derive(Debug, Clone)]
+pub struct RulerRenderer {
+    ruler_columns: Vec<usize>,
+}
+
+impl RulerRenderer {
+    pub fn new(ruler_columns: Vec<usize>) -> Self {
+        let mut cols = ruler_columns;
+        cols.sort_unstable();
+        cols.dedup();
+        Self { ruler_columns: cols }
+    }
+
+    pub fn ruler_count(&self) -> usize { self.ruler_columns.len() }
+
+    /// Returns the rulers visible within the given column range [start, end).
+    pub fn visible_rulers_in_range(&self, start_col: usize, end_col: usize) -> Vec<usize> {
+        self.ruler_columns.iter().copied().filter(|&c| c >= start_col && c < end_col).collect()
+    }
+
+    /// Check if there is a ruler at the given column.
+    pub fn ruler_at_column(&self, col: usize) -> bool {
+        self.ruler_columns.contains(&col)
+    }
+
+    pub fn columns(&self) -> &[usize] { &self.ruler_columns }
+
+    /// Maximum ruler column, if any.
+    pub fn max_column(&self) -> Option<usize> {
+        self.ruler_columns.last().copied()
+    }
+}
+
+impl fmt::Display for RulerRenderer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Rulers({:?})", self.ruler_columns)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2620,4 +2727,84 @@ mod tests {
         assert_eq!(st.peak_item_count, 25);
     }
 
+    // ── GlyphMarginCalculator tests ──
+
+    #[test]
+    fn margin_width_zero_lanes() {
+        assert_eq!(GlyphMarginCalculator::margin_width(0, 16), 0);
+    }
+
+    #[test]
+    fn margin_width_multiple_lanes() {
+        assert_eq!(GlyphMarginCalculator::margin_width(3, 16), 48);
+    }
+
+    #[test]
+    fn max_decoration_count() {
+        assert_eq!(GlyphMarginCalculator::max_decoration_count(&[1, 5, 3]), 5);
+        assert_eq!(GlyphMarginCalculator::max_decoration_count(&[]), 0);
+    }
+
+    #[test]
+    fn gutter_width_for_lines() {
+        let w = GlyphMarginCalculator::gutter_width_for_line_count(100, 8);
+        assert_eq!(w, 32); // 3 digits * 8 + 8 padding
+    }
+
+    // ── LineNumberFormatter tests ──
+
+    #[test]
+    fn format_line_number_padded() {
+        assert_eq!(LineNumberFormatter::format_line_number(5, 4), "   5");
+        assert_eq!(LineNumberFormatter::format_line_number(1234, 4), "1234");
+    }
+
+    #[test]
+    fn format_relative_current_line() {
+        let r = LineNumberFormatter::format_relative(10, 10, 3);
+        assert_eq!(r, " 10");
+    }
+
+    #[test]
+    fn format_relative_other_line() {
+        let r = LineNumberFormatter::format_relative(7, 10, 3);
+        assert_eq!(r, "  3");
+    }
+
+    #[test]
+    fn fold_indicator_variants() {
+        assert_eq!(LineNumberFormatter::fold_indicator(false, false), " ");
+        assert_eq!(LineNumberFormatter::fold_indicator(true, true), "▶");
+        assert_eq!(LineNumberFormatter::fold_indicator(true, false), "▼");
+    }
+
+    #[test]
+    fn required_width() {
+        assert_eq!(LineNumberFormatter::required_width(0), 1);
+        assert_eq!(LineNumberFormatter::required_width(9), 1);
+        assert_eq!(LineNumberFormatter::required_width(99), 2);
+        assert_eq!(LineNumberFormatter::required_width(1000), 4);
+    }
+
+    // ── RulerRenderer tests ──
+
+    #[test]
+    fn ruler_renderer_dedup() {
+        let r = RulerRenderer::new(vec![80, 120, 80]);
+        assert_eq!(r.ruler_count(), 2);
+    }
+
+    #[test]
+    fn ruler_visible_in_range() {
+        let r = RulerRenderer::new(vec![40, 80, 120]);
+        let vis = r.visible_rulers_in_range(50, 100);
+        assert_eq!(vis, vec![80]);
+    }
+
+    #[test]
+    fn ruler_at_column() {
+        let r = RulerRenderer::new(vec![80, 120]);
+        assert!(r.ruler_at_column(80));
+        assert!(!r.ruler_at_column(81));
+    }
 }

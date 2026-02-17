@@ -1664,6 +1664,144 @@ impl fmt::Display for CommandExecutionLogger {
     }
 }
 
+// ── TextTransformer ──────────────────────────────────────────────────────
+
+/// Utilities for transforming text case and formatting.
+pub struct TextTransformer;
+
+impl TextTransformer {
+    pub fn to_upper_case(s: &str) -> String { s.to_uppercase() }
+    pub fn to_lower_case(s: &str) -> String { s.to_lowercase() }
+
+    pub fn to_title_case(s: &str) -> String {
+        s.split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => {
+                        let upper: String = c.to_uppercase().collect();
+                        let rest: String = chars.as_str().to_lowercase();
+                        format!("{}{}", upper, rest)
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    pub fn to_snake_case(s: &str) -> String {
+        let mut result = String::with_capacity(s.len() + 4);
+        for (i, ch) in s.chars().enumerate() {
+            if ch.is_uppercase() {
+                if i > 0 { result.push('_'); }
+                for lower in ch.to_lowercase() { result.push(lower); }
+            } else if ch == ' ' || ch == '-' {
+                result.push('_');
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    }
+
+    pub fn to_camel_case(s: &str) -> String {
+        let parts: Vec<&str> = s.split(|c: char| c == '_' || c == '-' || c == ' ')
+            .filter(|p| !p.is_empty())
+            .collect();
+        let mut result = String::new();
+        for (i, part) in parts.iter().enumerate() {
+            if i == 0 {
+                result.push_str(&part.to_lowercase());
+            } else {
+                let mut chars = part.chars();
+                if let Some(c) = chars.next() {
+                    for upper in c.to_uppercase() { result.push(upper); }
+                    result.push_str(&chars.as_str().to_lowercase());
+                }
+            }
+        }
+        result
+    }
+}
+
+// ── LineManipulator ─────────────────────────────────────────────────────
+
+/// Operations on collections of lines.
+pub struct LineManipulator;
+
+impl LineManipulator {
+    pub fn sort_lines(text: &str) -> String {
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines.sort();
+        lines.join("\n")
+    }
+
+    pub fn reverse_lines(text: &str) -> String {
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines.reverse();
+        lines.join("\n")
+    }
+
+    pub fn deduplicate_lines(text: &str) -> String {
+        let mut seen = Vec::new();
+        for line in text.lines() {
+            if !seen.contains(&line) { seen.push(line); }
+        }
+        seen.join("\n")
+    }
+
+    pub fn join_lines(text: &str, separator: &str) -> String {
+        text.lines().collect::<Vec<_>>().join(separator)
+    }
+
+    pub fn split_line_at(line: &str, col: usize) -> (String, String) {
+        let left: String = line.chars().take(col).collect();
+        let right: String = line.chars().skip(col).collect();
+        (left, right)
+    }
+}
+
+// ── IndentManipulator ───────────────────────────────────────────────────
+
+/// Operations for managing indentation.
+pub struct IndentManipulator;
+
+impl IndentManipulator {
+    pub fn indent_lines(text: &str, prefix: &str) -> String {
+        text.lines().map(|l| format!("{}{}", prefix, l)).collect::<Vec<_>>().join("\n")
+    }
+
+    pub fn dedent_lines(text: &str, prefix: &str) -> String {
+        text.lines()
+            .map(|l| l.strip_prefix(prefix).unwrap_or(l).to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Detect the most common indentation string in the given text.
+    pub fn detect_indent_string(text: &str) -> String {
+        let mut tab_count = 0u32;
+        let mut space_count = 0u32;
+        for line in text.lines() {
+            if line.starts_with('\t') { tab_count += 1; }
+            else if line.starts_with("    ") { space_count += 1; }
+            else if line.starts_with("  ") { space_count += 1; }
+        }
+        if tab_count > space_count { "\t".to_string() } else { "    ".to_string() }
+    }
+
+    pub fn convert_tabs_to_spaces(text: &str, tab_size: usize) -> String {
+        let spaces: String = " ".repeat(tab_size);
+        text.replace('\t', &spaces)
+    }
+
+    pub fn convert_spaces_to_tabs(text: &str, tab_size: usize) -> String {
+        let spaces: String = " ".repeat(tab_size);
+        text.replace(&spaces, "\t")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2605,5 +2743,87 @@ mod tests {
     #[test]
     fn inverse_none_for_type() {
         assert!(CoreEditorCommand::Type.inverse().is_none());
+    }
+
+    // ── TextTransformer tests ──
+
+    #[test]
+    fn text_upper_case() {
+        assert_eq!(TextTransformer::to_upper_case("hello"), "HELLO");
+    }
+
+    #[test]
+    fn text_lower_case() {
+        assert_eq!(TextTransformer::to_lower_case("HELLO World"), "hello world");
+    }
+
+    #[test]
+    fn text_title_case() {
+        assert_eq!(TextTransformer::to_title_case("hello world"), "Hello World");
+        assert_eq!(TextTransformer::to_title_case("HELLO WORLD"), "Hello World");
+    }
+
+    #[test]
+    fn text_snake_case() {
+        assert_eq!(TextTransformer::to_snake_case("camelCase"), "camel_case");
+        assert_eq!(TextTransformer::to_snake_case("hello world"), "hello_world");
+    }
+
+    #[test]
+    fn text_camel_case() {
+        assert_eq!(TextTransformer::to_camel_case("hello_world"), "helloWorld");
+        assert_eq!(TextTransformer::to_camel_case("some-thing"), "someThing");
+    }
+
+    // ── LineManipulator tests ──
+
+    #[test]
+    fn manipulator_sort_lines() {
+        assert_eq!(LineManipulator::sort_lines("c\na\nb"), "a\nb\nc");
+    }
+
+    #[test]
+    fn manipulator_reverse_lines() {
+        assert_eq!(LineManipulator::reverse_lines("a\nb\nc"), "c\nb\na");
+    }
+
+    #[test]
+    fn manipulator_deduplicate_lines() {
+        assert_eq!(LineManipulator::deduplicate_lines("a\nb\na\nc"), "a\nb\nc");
+    }
+
+    #[test]
+    fn manipulator_join_lines() {
+        assert_eq!(LineManipulator::join_lines("a\nb\nc", ", "), "a, b, c");
+    }
+
+    #[test]
+    fn manipulator_split_line_at() {
+        let (l, r) = LineManipulator::split_line_at("hello world", 5);
+        assert_eq!(l, "hello");
+        assert_eq!(r, " world");
+    }
+
+    // ── IndentManipulator tests ──
+
+    #[test]
+    fn indent_and_dedent() {
+        let text = "a\nb";
+        let indented = IndentManipulator::indent_lines(text, "  ");
+        assert_eq!(indented, "  a\n  b");
+        let dedented = IndentManipulator::dedent_lines(&indented, "  ");
+        assert_eq!(dedented, "a\nb");
+    }
+
+    #[test]
+    fn detect_indent_tabs() {
+        let text = "\tfoo\n\tbar\n  baz";
+        assert_eq!(IndentManipulator::detect_indent_string(text), "\t");
+    }
+
+    #[test]
+    fn convert_tabs_spaces() {
+        assert_eq!(IndentManipulator::convert_tabs_to_spaces("\thello", 4), "    hello");
+        assert_eq!(IndentManipulator::convert_spaces_to_tabs("    hello", 4), "\thello");
     }
 }

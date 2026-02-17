@@ -1616,6 +1616,128 @@ impl ScmBridge {
     }
 }
 
+// ── ScmDiffStat ─────────────────────────────────────────────────────────
+
+/// Statistics about a set of source control changes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScmDiffStat {
+    pub files_changed: usize,
+    pub insertions: usize,
+    pub deletions: usize,
+}
+
+impl ScmDiffStat {
+    pub fn new(files_changed: usize, insertions: usize, deletions: usize) -> Self {
+        Self { files_changed, insertions, deletions }
+    }
+
+    pub fn total_changes(&self) -> usize { self.insertions + self.deletions }
+
+    /// Ratio of insertions to total changes.
+    pub fn change_ratio(&self) -> f64 {
+        let total = self.total_changes();
+        if total == 0 { return 0.0; }
+        self.insertions as f64 / total as f64
+    }
+
+    /// Returns true if total changes exceed the threshold.
+    pub fn is_large_diff(&self, threshold: usize) -> bool {
+        self.total_changes() > threshold
+    }
+
+    pub fn is_empty(&self) -> bool { self.files_changed == 0 && self.insertions == 0 && self.deletions == 0 }
+}
+
+impl fmt::Display for ScmDiffStat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} files, +{} -{}", self.files_changed, self.insertions, self.deletions)
+    }
+}
+
+// ── ScmBranchTracker ────────────────────────────────────────────────────
+
+/// Tracks the current branch and available branches.
+#[derive(Debug, Clone)]
+pub struct ScmBranchTracker {
+    current: String,
+    branches: Vec<String>,
+}
+
+impl ScmBranchTracker {
+    pub fn new(current: &str) -> Self {
+        Self { current: current.to_string(), branches: vec![current.to_string()] }
+    }
+
+    pub fn current_branch(&self) -> &str { &self.current }
+
+    pub fn switch_branch(&mut self, branch: &str) -> bool {
+        if self.branches.iter().any(|b| b == branch) {
+            self.current = branch.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn add_branch(&mut self, branch: &str) {
+        if !self.has_branch(branch) { self.branches.push(branch.to_string()); }
+    }
+
+    pub fn remove_branch(&mut self, branch: &str) -> bool {
+        if branch == self.current { return false; }
+        if let Some(pos) = self.branches.iter().position(|b| b == branch) {
+            self.branches.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn has_branch(&self, branch: &str) -> bool { self.branches.iter().any(|b| b == branch) }
+    pub fn branch_count(&self) -> usize { self.branches.len() }
+    pub fn all_branches(&self) -> &[String] { &self.branches }
+}
+
+// ── ScmConflictDetector ─────────────────────────────────────────────────
+
+/// Detects and manages merge conflict resolution.
+#[derive(Debug, Clone)]
+pub struct ScmConflictDetector {
+    conflicting: Vec<String>,
+    resolved: Vec<String>,
+}
+
+impl ScmConflictDetector {
+    pub fn new() -> Self { Self { conflicting: Vec::new(), resolved: Vec::new() } }
+
+    /// Detect conflicts from a list of (file, has_conflict) pairs.
+    pub fn detect_from_status(&mut self, statuses: &[(&str, bool)]) {
+        for &(file, conflict) in statuses {
+            if conflict && !self.conflicting.contains(&file.to_string()) {
+                self.conflicting.push(file.to_string());
+            }
+        }
+    }
+
+    pub fn conflict_count(&self) -> usize { self.conflicting.len() }
+
+    pub fn conflicting_files(&self) -> &[String] { &self.conflicting }
+
+    pub fn all_resolved(&self) -> bool { self.conflicting.is_empty() }
+
+    pub fn mark_resolved(&mut self, file: &str) -> bool {
+        if let Some(pos) = self.conflicting.iter().position(|f| f == file) {
+            let removed = self.conflicting.remove(pos);
+            self.resolved.push(removed);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn resolved_count(&self) -> usize { self.resolved.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2608,5 +2730,94 @@ their stuff
             ScmBridge::diff_provider_resources(&snap1, &snap2, "git");
         assert_eq!(added, vec!["file:///c.rs"]);
         assert_eq!(removed, vec!["file:///a.rs"]);
+    }
+
+    // ── ScmDiffStat tests ──
+
+    #[test]
+    fn diff_stat_total_changes() {
+        let s = ScmDiffStat::new(3, 20, 10);
+        assert_eq!(s.total_changes(), 30);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn diff_stat_change_ratio() {
+        let s = ScmDiffStat::new(1, 75, 25);
+        assert!((s.change_ratio() - 0.75).abs() < 0.01);
+    }
+
+    #[test]
+    fn diff_stat_is_large() {
+        let s = ScmDiffStat::new(1, 500, 500);
+        assert!(s.is_large_diff(999));
+        assert!(!s.is_large_diff(1000));
+    }
+
+    #[test]
+    fn diff_stat_display() {
+        let s = ScmDiffStat::new(2, 10, 5);
+        assert_eq!(format!("{}", s), "2 files, +10 -5");
+    }
+
+    // ── ScmBranchTracker tests ──
+
+    #[test]
+    fn branch_tracker_current() {
+        let t = ScmBranchTracker::new("main");
+        assert_eq!(t.current_branch(), "main");
+        assert_eq!(t.branch_count(), 1);
+    }
+
+    #[test]
+    fn branch_tracker_switch() {
+        let mut t = ScmBranchTracker::new("main");
+        t.add_branch("feature");
+        assert!(t.switch_branch("feature"));
+        assert_eq!(t.current_branch(), "feature");
+        assert!(!t.switch_branch("nonexist"));
+    }
+
+    #[test]
+    fn branch_tracker_remove() {
+        let mut t = ScmBranchTracker::new("main");
+        t.add_branch("feature");
+        assert!(t.remove_branch("feature"));
+        assert!(!t.remove_branch("main")); // can't remove current
+    }
+
+    #[test]
+    fn branch_tracker_add_dedup() {
+        let mut t = ScmBranchTracker::new("main");
+        t.add_branch("main");
+        assert_eq!(t.branch_count(), 1);
+    }
+
+    // ── ScmConflictDetector tests ──
+
+    #[test]
+    fn conflict_detect_and_resolve() {
+        let mut d = ScmConflictDetector::new();
+        d.detect_from_status(&[("a.rs", true), ("b.rs", false), ("c.rs", true)]);
+        assert_eq!(d.conflict_count(), 2);
+        assert!(!d.all_resolved());
+        assert!(d.mark_resolved("a.rs"));
+        assert!(d.mark_resolved("c.rs"));
+        assert!(d.all_resolved());
+        assert_eq!(d.resolved_count(), 2);
+    }
+
+    #[test]
+    fn conflict_mark_resolved_unknown() {
+        let mut d = ScmConflictDetector::new();
+        assert!(!d.mark_resolved("nonexist.rs"));
+    }
+
+    #[test]
+    fn conflict_detect_no_duplicates() {
+        let mut d = ScmConflictDetector::new();
+        d.detect_from_status(&[("a.rs", true)]);
+        d.detect_from_status(&[("a.rs", true)]);
+        assert_eq!(d.conflict_count(), 1);
     }
 }

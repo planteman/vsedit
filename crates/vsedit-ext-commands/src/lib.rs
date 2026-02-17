@@ -1512,6 +1512,152 @@ impl CommandEnablementEvaluator {
     }
 }
 
+// ── CommandMetrics ───────────────────────────────────────────────────────
+
+/// Tracks per-command execution metrics.
+#[derive(Debug, Clone)]
+struct CommandMetricEntry {
+    execution_count: u64,
+    total_duration_ms: u64,
+    error_count: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CommandMetrics {
+    metrics: HashMap<String, CommandMetricEntry>,
+}
+
+impl CommandMetrics {
+    pub fn new() -> Self { Self { metrics: HashMap::new() } }
+
+    pub fn record_execution(&mut self, command_id: &str, duration_ms: u64, is_error: bool) {
+        let entry = self.metrics.entry(command_id.to_string()).or_insert(CommandMetricEntry {
+            execution_count: 0, total_duration_ms: 0, error_count: 0,
+        });
+        entry.execution_count += 1;
+        entry.total_duration_ms += duration_ms;
+        if is_error { entry.error_count += 1; }
+    }
+
+    pub fn average_duration(&self, command_id: &str) -> Option<f64> {
+        self.metrics.get(command_id).map(|e| {
+            if e.execution_count == 0 { 0.0 } else { e.total_duration_ms as f64 / e.execution_count as f64 }
+        })
+    }
+
+    pub fn error_rate(&self, command_id: &str) -> Option<f64> {
+        self.metrics.get(command_id).map(|e| {
+            if e.execution_count == 0 { 0.0 } else { e.error_count as f64 / e.execution_count as f64 }
+        })
+    }
+
+    pub fn execution_count(&self, command_id: &str) -> u64 {
+        self.metrics.get(command_id).map_or(0, |e| e.execution_count)
+    }
+
+    /// Return top N commands by execution count.
+    pub fn top_by_count(&self, n: usize) -> Vec<(String, u64)> {
+        let mut entries: Vec<_> = self.metrics.iter().map(|(k, v)| (k.clone(), v.execution_count)).collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
+    }
+
+    /// Return top N commands by error count.
+    pub fn top_by_errors(&self, n: usize) -> Vec<(String, u64)> {
+        let mut entries: Vec<_> = self.metrics.iter().map(|(k, v)| (k.clone(), v.error_count)).collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
+    }
+
+    pub fn tracked_command_count(&self) -> usize { self.metrics.len() }
+}
+
+// ── CommandMiddleware ────────────────────────────────────────────────────
+
+/// A middleware hook that can run before/after command execution.
+#[derive(Debug, Clone)]
+pub struct MiddlewareResult {
+    pub proceed: bool,
+    pub message: Option<String>,
+}
+
+impl MiddlewareResult {
+    pub fn allow() -> Self { Self { proceed: true, message: None } }
+    pub fn deny(msg: &str) -> Self { Self { proceed: false, message: Some(msg.to_string()) } }
+}
+
+/// Validates that a command ID is non-empty.
+pub fn validation_middleware(command_id: &str) -> MiddlewareResult {
+    if command_id.is_empty() {
+        MiddlewareResult::deny("command ID must not be empty")
+    } else {
+        MiddlewareResult::allow()
+    }
+}
+
+/// Returns a logging message for a command execution.
+pub fn logging_middleware_message(command_id: &str, phase: &str) -> String {
+    format!("[{}] command: {}", phase, command_id)
+}
+
+// ── CommandBatcher ──────────────────────────────────────────────────────
+
+/// Batches multiple commands for sequential execution.
+#[derive(Debug, Clone)]
+pub struct CommandBatchEntry {
+    pub command_id: String,
+    pub args: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CommandBatchResult {
+    pub command_id: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CommandBatcher {
+    commands: Vec<CommandBatchEntry>,
+}
+
+impl CommandBatcher {
+    pub fn new() -> Self { Self { commands: Vec::new() } }
+
+    pub fn add(&mut self, command_id: &str, args: Option<Value>) {
+        self.commands.push(CommandBatchEntry { command_id: command_id.to_string(), args });
+    }
+
+    pub fn count(&self) -> usize { self.commands.len() }
+
+    pub fn clear(&mut self) { self.commands.clear(); }
+
+    pub fn commands(&self) -> &[CommandBatchEntry] { &self.commands }
+
+    /// Simulate execution: returns results for each command. Uses a validator function.
+    pub fn execute_all<F>(&self, mut executor: F) -> Vec<CommandBatchResult>
+    where
+        F: FnMut(&str, &Option<Value>) -> Result<(), String>,
+    {
+        self.commands.iter().map(|entry| {
+            match executor(&entry.command_id, &entry.args) {
+                Ok(()) => CommandBatchResult { command_id: entry.command_id.clone(), success: true, error: None },
+                Err(e) => CommandBatchResult { command_id: entry.command_id.clone(), success: false, error: Some(e) },
+            }
+        }).collect()
+    }
+
+    pub fn successful_count(results: &[CommandBatchResult]) -> usize {
+        results.iter().filter(|r| r.success).count()
+    }
+
+    pub fn failed_count(results: &[CommandBatchResult]) -> usize {
+        results.iter().filter(|r| !r.success).count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2508,5 +2654,104 @@ mod tests {
         assert!(eval.evaluate("key"));
         eval.remove_context("key");
         assert!(!eval.evaluate("key"));
+    }
+
+    // ── CommandMetrics tests ──
+
+    #[test]
+    fn metrics_record_and_query() {
+        let mut m = CommandMetrics::new();
+        m.record_execution("cmd.a", 10, false);
+        m.record_execution("cmd.a", 20, false);
+        m.record_execution("cmd.a", 30, true);
+        assert_eq!(m.execution_count("cmd.a"), 3);
+        assert!((m.average_duration("cmd.a").unwrap() - 20.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn metrics_error_rate() {
+        let mut m = CommandMetrics::new();
+        m.record_execution("cmd.b", 10, true);
+        m.record_execution("cmd.b", 10, false);
+        assert!((m.error_rate("cmd.b").unwrap() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn metrics_top_by_count() {
+        let mut m = CommandMetrics::new();
+        m.record_execution("a", 1, false);
+        m.record_execution("b", 1, false);
+        m.record_execution("b", 1, false);
+        let top = m.top_by_count(1);
+        assert_eq!(top[0].0, "b");
+    }
+
+    #[test]
+    fn metrics_unknown_command() {
+        let m = CommandMetrics::new();
+        assert!(m.average_duration("nope").is_none());
+        assert_eq!(m.execution_count("nope"), 0);
+    }
+
+    // ── CommandMiddleware tests ──
+
+    #[test]
+    fn validation_middleware_allows_valid() {
+        let r = validation_middleware("cmd.test");
+        assert!(r.proceed);
+    }
+
+    #[test]
+    fn validation_middleware_denies_empty() {
+        let r = validation_middleware("");
+        assert!(!r.proceed);
+        assert!(r.message.is_some());
+    }
+
+    #[test]
+    fn logging_middleware_msg() {
+        let msg = logging_middleware_message("cmd.run", "pre");
+        assert!(msg.contains("pre"));
+        assert!(msg.contains("cmd.run"));
+    }
+
+    // ── CommandBatcher tests ──
+
+    #[test]
+    fn batcher_add_and_count() {
+        let mut b = CommandBatcher::new();
+        b.add("cmd.a", None);
+        b.add("cmd.b", Some(serde_json::json!({"x": 1})));
+        assert_eq!(b.count(), 2);
+    }
+
+    #[test]
+    fn batcher_execute_all_success() {
+        let mut b = CommandBatcher::new();
+        b.add("cmd.a", None);
+        b.add("cmd.b", None);
+        let results = b.execute_all(|_, _| Ok(()));
+        assert_eq!(CommandBatcher::successful_count(&results), 2);
+        assert_eq!(CommandBatcher::failed_count(&results), 0);
+    }
+
+    #[test]
+    fn batcher_execute_partial_failure() {
+        let mut b = CommandBatcher::new();
+        b.add("cmd.a", None);
+        b.add("cmd.fail", None);
+        let results = b.execute_all(|id, _| {
+            if id == "cmd.fail" { Err("boom".into()) } else { Ok(()) }
+        });
+        assert_eq!(CommandBatcher::successful_count(&results), 1);
+        assert_eq!(CommandBatcher::failed_count(&results), 1);
+    }
+
+    #[test]
+    fn batcher_clear() {
+        let mut b = CommandBatcher::new();
+        b.add("cmd.a", None);
+        b.clear();
+        assert_eq!(b.count(), 0);
     }
 }

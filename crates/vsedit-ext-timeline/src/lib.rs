@@ -1490,6 +1490,112 @@ impl TimelineItemGrouper {
     }
 }
 
+// ── TimelineWindow ───────────────────────────────────────────────────────
+
+/// Represents a time window defined by epoch start and end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineWindow {
+    pub start_epoch: u64,
+    pub end_epoch: u64,
+}
+
+impl TimelineWindow {
+    pub fn new(start: u64, end: u64) -> Self {
+        let (s, e) = if start <= end { (start, end) } else { (end, start) };
+        Self { start_epoch: s, end_epoch: e }
+    }
+
+    pub fn duration(&self) -> u64 { self.end_epoch - self.start_epoch }
+
+    pub fn contains_timestamp(&self, ts: u64) -> bool {
+        ts >= self.start_epoch && ts <= self.end_epoch
+    }
+
+    pub fn overlaps_with(&self, other: &TimelineWindow) -> bool {
+        self.start_epoch <= other.end_epoch && other.start_epoch <= self.end_epoch
+    }
+
+    /// Extend the window to include the given timestamp.
+    pub fn extend_to(&mut self, ts: u64) {
+        if ts < self.start_epoch { self.start_epoch = ts; }
+        if ts > self.end_epoch { self.end_epoch = ts; }
+    }
+
+    /// Shrink to the intersection with another window. Returns false if no overlap.
+    pub fn shrink_to(&mut self, other: &TimelineWindow) -> bool {
+        if !self.overlaps_with(other) { return false; }
+        self.start_epoch = self.start_epoch.max(other.start_epoch);
+        self.end_epoch = self.end_epoch.min(other.end_epoch);
+        true
+    }
+
+    pub fn midpoint(&self) -> u64 { self.start_epoch + self.duration() / 2 }
+}
+
+impl fmt::Display for TimelineWindow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{} .. {}] ({}s)", self.start_epoch, self.end_epoch, self.duration())
+    }
+}
+
+// ── TimelinePageNav ─────────────────────────────────────────────────────
+
+/// Pagination helper for timeline items.
+#[derive(Debug, Clone)]
+pub struct TimelinePageNav {
+    page_size: usize,
+    total_items: usize,
+    current_page: usize,
+}
+
+impl TimelinePageNav {
+    pub fn new(page_size: usize, total_items: usize) -> Self {
+        Self { page_size: page_size.max(1), total_items, current_page: 0 }
+    }
+
+    pub fn total_pages(&self) -> usize {
+        if self.total_items == 0 { return 0; }
+        (self.total_items + self.page_size - 1) / self.page_size
+    }
+
+    /// Returns the (start_index, end_index) range for the given page (0-based).
+    pub fn items_for_page(&self, page: usize) -> Option<(usize, usize)> {
+        if page >= self.total_pages() { return None; }
+        let start = page * self.page_size;
+        let end = (start + self.page_size).min(self.total_items);
+        Some((start, end))
+    }
+
+    pub fn has_next(&self) -> bool { self.current_page + 1 < self.total_pages() }
+    pub fn has_prev(&self) -> bool { self.current_page > 0 }
+
+    pub fn next_page(&mut self) -> bool {
+        if self.has_next() { self.current_page += 1; true } else { false }
+    }
+
+    pub fn prev_page(&mut self) -> bool {
+        if self.has_prev() { self.current_page -= 1; true } else { false }
+    }
+
+    pub fn current_page(&self) -> usize { self.current_page }
+
+    pub fn current_page_range(&self) -> Option<(usize, usize)> {
+        self.items_for_page(self.current_page)
+    }
+
+    pub fn set_page(&mut self, page: usize) -> bool {
+        if page < self.total_pages() { self.current_page = page; true } else { false }
+    }
+
+    pub fn page_size(&self) -> usize { self.page_size }
+}
+
+impl fmt::Display for TimelinePageNav {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Page {}/{} ({} items)", self.current_page + 1, self.total_pages(), self.total_items)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2658,4 +2764,110 @@ mod tests {
         assert!(groups.is_empty());
     }
 
+    // ── TimelineWindow tests ──
+
+    #[test]
+    fn window_duration() {
+        let w = TimelineWindow::new(100, 300);
+        assert_eq!(w.duration(), 200);
+    }
+
+    #[test]
+    fn window_contains() {
+        let w = TimelineWindow::new(100, 300);
+        assert!(w.contains_timestamp(100));
+        assert!(w.contains_timestamp(200));
+        assert!(w.contains_timestamp(300));
+        assert!(!w.contains_timestamp(50));
+    }
+
+    #[test]
+    fn window_overlaps() {
+        let a = TimelineWindow::new(100, 300);
+        let b = TimelineWindow::new(200, 400);
+        assert!(a.overlaps_with(&b));
+        let c = TimelineWindow::new(400, 500);
+        assert!(!a.overlaps_with(&c));
+    }
+
+    #[test]
+    fn window_extend_to() {
+        let mut w = TimelineWindow::new(100, 300);
+        w.extend_to(50);
+        assert_eq!(w.start_epoch, 50);
+        w.extend_to(500);
+        assert_eq!(w.end_epoch, 500);
+    }
+
+    #[test]
+    fn window_shrink_to() {
+        let mut w = TimelineWindow::new(100, 400);
+        let other = TimelineWindow::new(200, 300);
+        assert!(w.shrink_to(&other));
+        assert_eq!(w.start_epoch, 200);
+        assert_eq!(w.end_epoch, 300);
+    }
+
+    #[test]
+    fn window_shrink_no_overlap() {
+        let mut w = TimelineWindow::new(100, 200);
+        let other = TimelineWindow::new(300, 400);
+        assert!(!w.shrink_to(&other));
+    }
+
+    #[test]
+    fn window_display() {
+        let w = TimelineWindow::new(0, 60);
+        let s = format!("{}", w);
+        assert!(s.contains("60s"));
+    }
+
+    #[test]
+    fn window_auto_swap() {
+        let w = TimelineWindow::new(500, 100);
+        assert_eq!(w.start_epoch, 100);
+        assert_eq!(w.end_epoch, 500);
+    }
+
+    // ── TimelinePageNav tests ──
+
+    #[test]
+    fn page_nav_total_pages() {
+        let p = TimelinePageNav::new(10, 25);
+        assert_eq!(p.total_pages(), 3);
+    }
+
+    #[test]
+    fn page_nav_items_for_page() {
+        let p = TimelinePageNav::new(10, 25);
+        assert_eq!(p.items_for_page(0), Some((0, 10)));
+        assert_eq!(p.items_for_page(2), Some((20, 25)));
+        assert_eq!(p.items_for_page(3), None);
+    }
+
+    #[test]
+    fn page_nav_navigation() {
+        let mut p = TimelinePageNav::new(10, 30);
+        assert!(!p.has_prev());
+        assert!(p.has_next());
+        assert!(p.next_page());
+        assert_eq!(p.current_page(), 1);
+        assert!(p.has_prev());
+        assert!(p.prev_page());
+        assert_eq!(p.current_page(), 0);
+    }
+
+    #[test]
+    fn page_nav_empty() {
+        let p = TimelinePageNav::new(10, 0);
+        assert_eq!(p.total_pages(), 0);
+        assert!(!p.has_next());
+    }
+
+    #[test]
+    fn page_nav_display() {
+        let p = TimelinePageNav::new(5, 20);
+        let s = format!("{}", p);
+        assert!(s.contains("Page 1/4"));
+    }
 }

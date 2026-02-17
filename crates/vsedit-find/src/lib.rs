@@ -1584,6 +1584,151 @@ impl fmt::Display for FindHighlightAllConfig {
     }
 }
 
+// ── FindHighlighter ─────────────────────────────────────────────────────
+
+/// Computes and manages highlight ranges for find matches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HighlightRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl HighlightRange {
+    pub fn new(start: usize, end: usize) -> Self { Self { start, end } }
+    pub fn len(&self) -> usize { self.end.saturating_sub(self.start) }
+    pub fn is_empty(&self) -> bool { self.start >= self.end }
+    pub fn overlaps(&self, other: &HighlightRange) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+}
+
+pub struct FindHighlighter;
+
+impl FindHighlighter {
+    /// Compute highlight ranges from a list of (start, length) match positions.
+    pub fn compute_ranges(matches: &[(usize, usize)]) -> Vec<HighlightRange> {
+        matches.iter().map(|&(s, l)| HighlightRange::new(s, s + l)).collect()
+    }
+
+    /// Merge overlapping ranges into non-overlapping sorted ranges.
+    pub fn merge_overlapping_ranges(ranges: &mut Vec<HighlightRange>) {
+        if ranges.len() <= 1 { return; }
+        ranges.sort_by_key(|r| r.start);
+        let mut merged: Vec<HighlightRange> = Vec::new();
+        for r in ranges.drain(..) {
+            if let Some(last) = merged.last_mut() {
+                if r.start <= last.end {
+                    last.end = last.end.max(r.end);
+                    continue;
+                }
+            }
+            merged.push(r);
+        }
+        *ranges = merged;
+    }
+
+    /// Filter ranges to only those visible within [view_start, view_end).
+    pub fn visible_range_filter(ranges: &[HighlightRange], view_start: usize, view_end: usize) -> Vec<&HighlightRange> {
+        ranges.iter().filter(|r| r.end > view_start && r.start < view_end).collect()
+    }
+}
+
+// ── SearchHistory ───────────────────────────────────────────────────────
+
+/// Maintains a history of search terms with deduplication and size limits.
+#[derive(Debug, Clone)]
+pub struct SearchHistory {
+    terms: Vec<String>,
+    max_size: usize,
+}
+
+impl SearchHistory {
+    pub fn new(max_size: usize) -> Self { Self { terms: Vec::new(), max_size: max_size.max(1) } }
+
+    pub fn push_term(&mut self, term: &str) {
+        // Remove existing duplicate first
+        self.terms.retain(|t| t != term);
+        self.terms.insert(0, term.to_string());
+        if self.terms.len() > self.max_size { self.terms.truncate(self.max_size); }
+    }
+
+    pub fn recent_terms(&self, n: usize) -> &[String] {
+        let end = n.min(self.terms.len());
+        &self.terms[..end]
+    }
+
+    pub fn remove_term(&mut self, term: &str) -> bool {
+        if let Some(pos) = self.terms.iter().position(|t| t == term) {
+            self.terms.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn clear(&mut self) { self.terms.clear(); }
+
+    pub fn contains(&self, term: &str) -> bool { self.terms.iter().any(|t| t == term) }
+    pub fn len(&self) -> usize { self.terms.len() }
+    pub fn is_empty(&self) -> bool { self.terms.is_empty() }
+    pub fn max_history_size(&self) -> usize { self.max_size }
+
+    /// Remove duplicates (should already be deduped, but defensive).
+    pub fn deduplicate(&mut self) {
+        let mut seen = Vec::new();
+        self.terms.retain(|t| {
+            if seen.contains(t) { false } else { seen.push(t.clone()); true }
+        });
+    }
+}
+
+// ── ReplacePreview ──────────────────────────────────────────────────────
+
+/// Computes a preview of replacements without modifying the text.
+#[derive(Debug, Clone)]
+pub struct ReplacePreviewLine {
+    pub line_number: usize,
+    pub original_line: String,
+    pub replaced_line: String,
+    pub change_count: usize,
+}
+
+impl ReplacePreviewLine {
+    pub fn has_changes(&self) -> bool { self.change_count > 0 }
+}
+
+pub struct ReplacePreviewBuilder;
+
+impl ReplacePreviewBuilder {
+    /// Compute preview of replacing `search` with `replacement` in each line.
+    pub fn compute(text: &str, search: &str, replacement: &str) -> Vec<ReplacePreviewLine> {
+        if search.is_empty() { return Vec::new(); }
+        text.lines().enumerate().filter_map(|(i, line)| {
+            let count = line.matches(search).count();
+            if count > 0 {
+                Some(ReplacePreviewLine {
+                    line_number: i + 1,
+                    original_line: line.to_string(),
+                    replaced_line: line.replace(search, replacement),
+                    change_count: count,
+                })
+            } else {
+                None
+            }
+        }).collect()
+    }
+
+    /// Total number of replacements across all preview lines.
+    pub fn total_changes(previews: &[ReplacePreviewLine]) -> usize {
+        previews.iter().map(|p| p.change_count).sum()
+    }
+
+    /// Check if any lines have changes.
+    pub fn has_any_changes(previews: &[ReplacePreviewLine]) -> bool {
+        previews.iter().any(|p| p.has_changes())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2598,4 +2743,124 @@ mod tests {
         assert_eq!(st.peak_item_count, 25);
     }
 
+    // ── FindHighlighter tests ──
+
+    #[test]
+    fn highlight_compute_ranges() {
+        let ranges = FindHighlighter::compute_ranges(&[(0, 5), (10, 3)]);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].start, 0);
+        assert_eq!(ranges[0].end, 5);
+    }
+
+    #[test]
+    fn highlight_merge_overlapping() {
+        let mut ranges = vec![
+            HighlightRange::new(0, 5),
+            HighlightRange::new(3, 8),
+            HighlightRange::new(10, 15),
+        ];
+        FindHighlighter::merge_overlapping_ranges(&mut ranges);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].end, 8);
+    }
+
+    #[test]
+    fn highlight_merge_no_overlap() {
+        let mut ranges = vec![HighlightRange::new(0, 3), HighlightRange::new(5, 8)];
+        FindHighlighter::merge_overlapping_ranges(&mut ranges);
+        assert_eq!(ranges.len(), 2);
+    }
+
+    #[test]
+    fn highlight_visible_filter() {
+        let ranges = vec![HighlightRange::new(0, 5), HighlightRange::new(10, 15), HighlightRange::new(20, 25)];
+        let visible = FindHighlighter::visible_range_filter(&ranges, 8, 18);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].start, 10);
+    }
+
+    #[test]
+    fn highlight_range_overlaps() {
+        let a = HighlightRange::new(0, 5);
+        let b = HighlightRange::new(3, 8);
+        assert!(a.overlaps(&b));
+        let c = HighlightRange::new(5, 10);
+        assert!(!a.overlaps(&c));
+    }
+
+    // ── SearchHistory tests ──
+
+    #[test]
+    fn history_push_and_recent() {
+        let mut h = SearchHistory::new(5);
+        h.push_term("hello");
+        h.push_term("world");
+        assert_eq!(h.recent_terms(2), &["world", "hello"]);
+    }
+
+    #[test]
+    fn history_dedup_on_push() {
+        let mut h = SearchHistory::new(5);
+        h.push_term("hello");
+        h.push_term("world");
+        h.push_term("hello");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.recent_terms(1), &["hello"]);
+    }
+
+    #[test]
+    fn history_max_size() {
+        let mut h = SearchHistory::new(2);
+        h.push_term("a");
+        h.push_term("b");
+        h.push_term("c");
+        assert_eq!(h.len(), 2);
+        assert!(!h.contains("a"));
+    }
+
+    #[test]
+    fn history_remove_and_clear() {
+        let mut h = SearchHistory::new(5);
+        h.push_term("hello");
+        assert!(h.remove_term("hello"));
+        assert!(!h.remove_term("hello"));
+        h.push_term("a");
+        h.clear();
+        assert!(h.is_empty());
+    }
+
+    // ── ReplacePreview tests ──
+
+    #[test]
+    fn replace_preview_builder_basic() {
+        let text = "hello world\nhello rust\ngoodbye";
+        let previews = ReplacePreviewBuilder::compute(text, "hello", "hi");
+        assert_eq!(previews.len(), 2);
+        assert_eq!(previews[0].replaced_line, "hi world");
+        assert_eq!(previews[0].change_count, 1);
+    }
+
+    #[test]
+    fn replace_preview_multiple_per_line() {
+        let text = "aa bb aa";
+        let previews = ReplacePreviewBuilder::compute(text, "aa", "cc");
+        assert_eq!(previews.len(), 1);
+        assert_eq!(previews[0].change_count, 2);
+        assert_eq!(previews[0].replaced_line, "cc bb cc");
+    }
+
+    #[test]
+    fn replace_preview_no_match() {
+        let previews = ReplacePreviewBuilder::compute("hello", "xyz", "abc");
+        assert!(previews.is_empty());
+        assert!(!ReplacePreviewBuilder::has_any_changes(&previews));
+    }
+
+    #[test]
+    fn replace_preview_total_changes() {
+        let text = "a a\na";
+        let previews = ReplacePreviewBuilder::compute(text, "a", "b");
+        assert_eq!(ReplacePreviewBuilder::total_changes(&previews), 3);
+    }
 }
