@@ -3,6 +3,7 @@
 //! Provides file-system-backed search, replace, fuzzy file name matching,
 //! and regex-based symbol extraction.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::io::Read;
@@ -1162,6 +1163,258 @@ pub fn group_symbols_by_kind(symbols: &[SymbolEntry]) -> Vec<(SymbolKind, Vec<&S
     groups
 }
 
+// ---------------------------------------------------------------------------
+// SearchHistoryTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks search frequency and recency for query suggestions.
+///
+/// Unlike [`SearchHistory`], this tracker records every invocation so it can
+/// report how often each query has been used and surface the most popular
+/// searches.
+#[derive(Debug, Clone)]
+pub struct SearchHistoryTracker {
+    /// Ordered log of every recorded search query.
+    log: Vec<String>,
+    /// Per-query invocation count.
+    frequencies: HashMap<String, usize>,
+}
+
+impl SearchHistoryTracker {
+    /// Create an empty tracker.
+    pub fn new() -> Self {
+        Self {
+            log: Vec::new(),
+            frequencies: HashMap::new(),
+        }
+    }
+
+    /// Record a search query, updating both the log and the frequency map.
+    pub fn record_search(&mut self, query: &str) {
+        self.log.push(query.to_string());
+        *self.frequencies.entry(query.to_string()).or_insert(0) += 1;
+    }
+
+    /// Return the number of times `query` has been recorded.
+    pub fn frequency(&self, query: &str) -> usize {
+        self.frequencies.get(query).copied().unwrap_or(0)
+    }
+
+    /// Return the top `n` most frequent queries sorted by count descending.
+    pub fn most_frequent(&self, n: usize) -> Vec<(&str, usize)> {
+        let mut pairs: Vec<(&str, usize)> = self
+            .frequencies
+            .iter()
+            .map(|(k, &v)| (k.as_str(), v))
+            .collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+        pairs.truncate(n);
+        pairs
+    }
+
+    /// Return the last `n` unique queries in reverse-chronological order.
+    pub fn recent_unique(&self, n: usize) -> Vec<&str> {
+        let mut seen = Vec::new();
+        for q in self.log.iter().rev() {
+            if !seen.contains(&q.as_str()) {
+                seen.push(q.as_str());
+                if seen.len() == n {
+                    break;
+                }
+            }
+        }
+        seen
+    }
+
+    /// Total number of recorded searches (including duplicates).
+    pub fn total_searches(&self) -> usize {
+        self.log.len()
+    }
+
+    /// Number of distinct queries recorded.
+    pub fn unique_count(&self) -> usize {
+        self.frequencies.len()
+    }
+}
+
+impl Default for SearchHistoryTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for SearchHistoryTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SearchHistoryTracker({} total, {} unique)",
+            self.log.len(),
+            self.frequencies.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchPreset / SearchPresetManager
+// ---------------------------------------------------------------------------
+
+/// A saved search configuration with a human-readable name.
+#[derive(Debug, Clone)]
+pub struct SearchPreset {
+    /// User-facing name for this preset.
+    pub name: String,
+    /// The query configuration to execute.
+    pub query: SearchQuery,
+    /// Monotonic counter used as a creation timestamp.
+    pub created_at: u64,
+}
+
+/// Global counter for assigning monotonically increasing preset ids.
+static PRESET_COUNTER: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+
+impl SearchPreset {
+    /// Create a new preset with the given name and query.
+    pub fn new(name: &str, query: SearchQuery) -> Self {
+        Self {
+            name: name.to_string(),
+            query,
+            created_at: PRESET_COUNTER
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        }
+    }
+}
+
+impl fmt::Display for SearchPreset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.name, self.query)
+    }
+}
+
+/// Manages a collection of named [`SearchPreset`]s.
+#[derive(Debug, Clone)]
+pub struct SearchPresetManager {
+    presets: Vec<SearchPreset>,
+}
+
+impl SearchPresetManager {
+    /// Create an empty manager.
+    pub fn new() -> Self {
+        Self {
+            presets: Vec::new(),
+        }
+    }
+
+    /// Add a new preset. If a preset with the same name already exists it is
+    /// replaced.
+    pub fn add_preset(&mut self, name: &str, query: SearchQuery) {
+        self.remove_preset(name);
+        self.presets.push(SearchPreset::new(name, query));
+    }
+
+    /// Look up a preset by name.
+    pub fn get_preset(&self, name: &str) -> Option<&SearchPreset> {
+        self.presets.iter().find(|p| p.name == name)
+    }
+
+    /// Remove a preset by name, returning `true` if it existed.
+    pub fn remove_preset(&mut self, name: &str) -> bool {
+        let before = self.presets.len();
+        self.presets.retain(|p| p.name != name);
+        self.presets.len() < before
+    }
+
+    /// List all stored presets ordered by creation time.
+    pub fn list_presets(&self) -> Vec<&SearchPreset> {
+        self.presets.iter().collect()
+    }
+
+    /// Number of stored presets.
+    pub fn count(&self) -> usize {
+        self.presets.len()
+    }
+}
+
+impl Default for SearchPresetManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for SearchPresetManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SearchPresetManager({} presets)", self.presets.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchResultRanker
+// ---------------------------------------------------------------------------
+
+/// A search result annotated with a relevance score.
+#[derive(Debug, Clone)]
+pub struct RankedResult {
+    /// Path (URI) of the file.
+    pub file_path: String,
+    /// Computed relevance score.
+    pub score: i64,
+    /// Number of matches in this file.
+    pub match_count: usize,
+}
+
+impl fmt::Display for RankedResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} (score={}, matches={})",
+            self.file_path, self.score, self.match_count
+        )
+    }
+}
+
+/// Ranks search results by a simple heuristic: more matches and shorter file
+/// paths score higher.
+pub struct SearchResultRanker;
+
+impl SearchResultRanker {
+    /// Rank a slice of [`SearchResult`]s, producing one [`RankedResult`] per
+    /// unique file URI.  Score = `match_count * 10 + (200 - file_path_len)`.
+    pub fn rank(results: &[SearchResult]) -> Vec<RankedResult> {
+        let mut file_counts: Vec<(String, usize)> = Vec::new();
+        for result in results {
+            for m in &result.matches {
+                if let Some(entry) = file_counts.iter_mut().find(|(u, _)| *u == m.uri) {
+                    entry.1 += 1;
+                } else {
+                    file_counts.push((m.uri.clone(), 1));
+                }
+            }
+        }
+
+        let mut ranked: Vec<RankedResult> = file_counts
+            .into_iter()
+            .map(|(path, count)| {
+                let length_penalty = 200_i64.saturating_sub(path.len() as i64);
+                RankedResult {
+                    file_path: path,
+                    score: (count as i64) * 10 + length_penalty,
+                    match_count: count,
+                }
+            })
+            .collect();
+
+        ranked.sort_by(|a, b| b.score.cmp(&a.score));
+        ranked
+    }
+
+    /// Return only the top `n` ranked results.
+    pub fn top_n(results: &[SearchResult], n: usize) -> Vec<RankedResult> {
+        let mut ranked = Self::rank(results);
+        ranked.truncate(n);
+        ranked
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1872,5 +2125,171 @@ mod submod;
         assert_eq!(groups.len(), 2);
         let fn_group = groups.iter().find(|(k, _)| *k == SymbolKind::Function).unwrap();
         assert_eq!(fn_group.1.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // SearchHistoryTracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tracker_records_frequency() {
+        let mut t = SearchHistoryTracker::new();
+        t.record_search("foo");
+        t.record_search("bar");
+        t.record_search("foo");
+        assert_eq!(t.frequency("foo"), 2);
+        assert_eq!(t.frequency("bar"), 1);
+        assert_eq!(t.frequency("baz"), 0);
+        assert_eq!(t.total_searches(), 3);
+        assert_eq!(t.unique_count(), 2);
+    }
+
+    #[test]
+    fn tracker_most_frequent() {
+        let mut t = SearchHistoryTracker::new();
+        t.record_search("a");
+        t.record_search("b");
+        t.record_search("a");
+        t.record_search("c");
+        t.record_search("b");
+        t.record_search("a");
+        let top = t.most_frequent(2);
+        assert_eq!(top[0], ("a", 3));
+        assert_eq!(top[1], ("b", 2));
+    }
+
+    #[test]
+    fn tracker_recent_unique() {
+        let mut t = SearchHistoryTracker::new();
+        t.record_search("x");
+        t.record_search("y");
+        t.record_search("x");
+        t.record_search("z");
+        let recent = t.recent_unique(3);
+        assert_eq!(recent, vec!["z", "x", "y"]);
+    }
+
+    #[test]
+    fn tracker_display() {
+        let mut t = SearchHistoryTracker::new();
+        t.record_search("hello");
+        let s = format!("{t}");
+        assert!(s.contains("1 total"));
+        assert!(s.contains("1 unique"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SearchPreset / SearchPresetManager tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn preset_display() {
+        let q = simple_query("TODO");
+        let p = SearchPreset::new("todos", q);
+        let s = format!("{p}");
+        assert!(s.contains("[todos]"));
+        assert!(s.contains("TODO"));
+        assert!(p.created_at > 0);
+    }
+
+    #[test]
+    fn preset_manager_add_get_remove() {
+        let mut mgr = SearchPresetManager::new();
+        mgr.add_preset("rust-only", SearchQueryBuilder::new("fn ")
+            .include("*.rs")
+            .build());
+        mgr.add_preset("todo", simple_query("TODO"));
+        assert_eq!(mgr.count(), 2);
+
+        let p = mgr.get_preset("rust-only").unwrap();
+        assert_eq!(p.query.pattern, "fn ");
+        assert!(mgr.get_preset("nope").is_none());
+
+        assert!(mgr.remove_preset("todo"));
+        assert_eq!(mgr.count(), 1);
+        assert!(!mgr.remove_preset("todo")); // already gone
+    }
+
+    #[test]
+    fn preset_manager_replace_duplicate_name() {
+        let mut mgr = SearchPresetManager::new();
+        mgr.add_preset("p", simple_query("old"));
+        mgr.add_preset("p", simple_query("new"));
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.get_preset("p").unwrap().query.pattern, "new");
+    }
+
+    #[test]
+    fn preset_manager_list_and_display() {
+        let mut mgr = SearchPresetManager::new();
+        mgr.add_preset("a", simple_query("alpha"));
+        mgr.add_preset("b", simple_query("beta"));
+        let list = mgr.list_presets();
+        assert_eq!(list.len(), 2);
+        let s = format!("{mgr}");
+        assert!(s.contains("2 presets"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SearchResultRanker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ranker_basic_scoring() {
+        let results = vec![
+            SearchResult {
+                matches: vec![
+                    SearchMatch::new("short.rs", 1, 0, 3, "foo"),
+                    SearchMatch::new("short.rs", 5, 0, 3, "foo"),
+                ],
+                is_complete: true,
+            },
+            SearchResult {
+                matches: vec![
+                    SearchMatch::new("very/long/path/to/file.rs", 1, 0, 3, "foo"),
+                ],
+                is_complete: true,
+            },
+        ];
+        let ranked = SearchResultRanker::rank(&results);
+        assert_eq!(ranked.len(), 2);
+        // short.rs has 2 matches => higher score
+        assert_eq!(ranked[0].file_path, "short.rs");
+        assert_eq!(ranked[0].match_count, 2);
+        assert!(ranked[0].score > ranked[1].score);
+    }
+
+    #[test]
+    fn ranker_top_n() {
+        let results = vec![SearchResult {
+            matches: vec![
+                SearchMatch::new("a.rs", 1, 0, 2, "hi"),
+                SearchMatch::new("b.rs", 1, 0, 2, "hi"),
+                SearchMatch::new("c.rs", 1, 0, 2, "hi"),
+            ],
+            is_complete: true,
+        }];
+        let top = SearchResultRanker::top_n(&results, 2);
+        assert_eq!(top.len(), 2);
+    }
+
+    #[test]
+    fn ranked_result_display() {
+        let r = RankedResult {
+            file_path: "src/lib.rs".into(),
+            score: 42,
+            match_count: 3,
+        };
+        let s = format!("{r}");
+        assert!(s.contains("score=42"));
+        assert!(s.contains("matches=3"));
+    }
+
+    #[test]
+    fn ranker_empty_input() {
+        let ranked = SearchResultRanker::rank(&[]);
+        assert!(ranked.is_empty());
+        let top = SearchResultRanker::top_n(&[], 5);
+        assert!(top.is_empty());
     }
 }

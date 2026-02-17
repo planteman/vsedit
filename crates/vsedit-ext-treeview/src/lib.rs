@@ -1044,9 +1044,249 @@ impl Default for LazyLoadTracker {
     }
 }
 
+// ── Checkbox ──
+
+/// The tri-state value of a tree-view checkbox.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TreeViewCheckboxState {
+    /// The checkbox is not checked.
+    Unchecked,
+    /// The checkbox is checked.
+    Checked,
+    /// The checkbox is in an indeterminate (partial) state.
+    Indeterminate,
+}
+
+impl fmt::Display for TreeViewCheckboxState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unchecked => write!(f, "☐"),
+            Self::Checked => write!(f, "☑"),
+            Self::Indeterminate => write!(f, "▣"),
+        }
+    }
+}
+
+/// Manages checkbox states for tree-view nodes.
+///
+/// Each node is identified by its string id. Nodes that have never been
+/// touched default to [`TreeViewCheckboxState::Unchecked`].
+#[derive(Debug, Clone)]
+pub struct TreeViewCheckboxManager {
+    states: HashMap<String, TreeViewCheckboxState>,
+}
+
+impl TreeViewCheckboxManager {
+    /// Create a new, empty checkbox manager.
+    pub fn new() -> Self {
+        Self {
+            states: HashMap::new(),
+        }
+    }
+
+    /// Set the checkbox state for the given node.
+    pub fn set_state(&mut self, id: &str, state: TreeViewCheckboxState) {
+        self.states.insert(id.to_string(), state);
+    }
+
+    /// Return the checkbox state for the given node, defaulting to
+    /// [`TreeViewCheckboxState::Unchecked`].
+    pub fn get_state(&self, id: &str) -> TreeViewCheckboxState {
+        self.states
+            .get(id)
+            .copied()
+            .unwrap_or(TreeViewCheckboxState::Unchecked)
+    }
+
+    /// Toggle a node between `Unchecked` and `Checked`.
+    ///
+    /// `Indeterminate` is treated as `Unchecked` for the purpose of toggling.
+    pub fn toggle(&mut self, id: &str) {
+        let next = match self.get_state(id) {
+            TreeViewCheckboxState::Checked => TreeViewCheckboxState::Unchecked,
+            _ => TreeViewCheckboxState::Checked,
+        };
+        self.set_state(id, next);
+    }
+
+    /// Return the ids of all nodes that are currently checked.
+    pub fn checked_ids(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self
+            .states
+            .iter()
+            .filter(|(_, s)| **s == TreeViewCheckboxState::Checked)
+            .map(|(k, _)| k.as_str())
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Return the number of checked nodes.
+    pub fn checked_count(&self) -> usize {
+        self.states
+            .values()
+            .filter(|&&s| s == TreeViewCheckboxState::Checked)
+            .count()
+    }
+
+    /// Bulk-set the checkbox state for several nodes at once.
+    pub fn set_all(&mut self, ids: &[&str], state: TreeViewCheckboxState) {
+        for id in ids {
+            self.set_state(id, state);
+        }
+    }
+}
+
+impl Default for TreeViewCheckboxManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Badge ──
+
+/// A small badge displayed alongside a tree node (e.g. a count or status tag).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeViewBadge {
+    /// The text shown inside the badge.
+    pub value: String,
+    /// An optional tooltip shown on hover.
+    pub tooltip: Option<String>,
+}
+
+impl TreeViewBadge {
+    /// Create a badge with the given display text and no tooltip.
+    pub fn new(text: &str) -> Self {
+        Self {
+            value: text.to_string(),
+            tooltip: None,
+        }
+    }
+
+    /// Attach a tooltip to this badge (builder pattern).
+    pub fn with_tooltip(mut self, tooltip: &str) -> Self {
+        self.tooltip = Some(tooltip.to_string());
+        self
+    }
+}
+
+impl fmt::Display for TreeViewBadge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.value)
+    }
+}
+
+/// Manages per-node badges for a tree view.
+#[derive(Debug, Clone)]
+pub struct TreeViewBadgeManager {
+    badges: HashMap<String, TreeViewBadge>,
+}
+
+impl TreeViewBadgeManager {
+    /// Create a new, empty badge manager.
+    pub fn new() -> Self {
+        Self {
+            badges: HashMap::new(),
+        }
+    }
+
+    /// Assign a badge to a tree node, replacing any previous badge.
+    pub fn set_badge(&mut self, node_id: &str, badge: TreeViewBadge) {
+        self.badges.insert(node_id.to_string(), badge);
+    }
+
+    /// Return the badge for the given node, if any.
+    pub fn get_badge(&self, node_id: &str) -> Option<&TreeViewBadge> {
+        self.badges.get(node_id)
+    }
+
+    /// Remove a node's badge and return it.
+    pub fn remove_badge(&mut self, node_id: &str) -> Option<TreeViewBadge> {
+        self.badges.remove(node_id)
+    }
+
+    /// Return the ids of all nodes that currently have a badge, sorted.
+    pub fn nodes_with_badges(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self.badges.keys().map(String::as_str).collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Return the total number of badges.
+    pub fn badge_count(&self) -> usize {
+        self.badges.len()
+    }
+}
+
+impl Default for TreeViewBadgeManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Paginator ──
+
+/// Paginator for lazily loaded tree-view children.
+///
+/// Given a fixed page size the paginator can slice a `&[TreeItem]` to the
+/// requested page and answer questions about total pages and whether more
+/// pages are available.
+#[derive(Debug, Clone)]
+pub struct TreeViewPaginator {
+    /// Number of items per page (must be ≥ 1).
+    page_size: usize,
+}
+
+impl TreeViewPaginator {
+    /// Create a paginator. `page_size` is clamped to a minimum of 1.
+    pub fn new(page_size: usize) -> Self {
+        Self {
+            page_size: page_size.max(1),
+        }
+    }
+
+    /// Return the sub-slice of `items` corresponding to the zero-based `page`.
+    ///
+    /// If `page` is beyond the last page an empty slice is returned.
+    pub fn paginate<'a>(&self, items: &'a [TreeItem], page: usize) -> &'a [TreeItem] {
+        let start = page * self.page_size;
+        if start >= items.len() {
+            return &[];
+        }
+        let end = (start + self.page_size).min(items.len());
+        &items[start..end]
+    }
+
+    /// Total number of pages needed for `item_count` items.
+    pub fn total_pages(&self, item_count: usize) -> usize {
+        (item_count + self.page_size - 1) / self.page_size
+    }
+
+    /// Whether there is a page after `current_page` (zero-based).
+    pub fn has_next_page(&self, item_count: usize, current_page: usize) -> bool {
+        current_page + 1 < self.total_pages(item_count)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_items(n: usize) -> Vec<TreeItem> {
+        (0..n)
+            .map(|i| TreeItem {
+                id: format!("item_{i}"),
+                label: format!("Item {i}"),
+                description: None,
+                tooltip: None,
+                icon_id: None,
+                collapsible_state: TreeItemCollapsibleState::None,
+                command: None,
+                context_value: None,
+                children: Vec::new(),
+            })
+            .collect()
+    }
 
     #[test]
     fn proxy_id() {
@@ -1875,5 +2115,122 @@ mod tests {
         let tracker = LazyLoadTracker::new();
         assert!(!tracker.is_loaded("unknown"));
         assert_eq!(tracker.tracked_count(), 0);
+    }
+
+    // ── Checkbox tests ──
+
+    #[test]
+    fn checkbox_default_is_unchecked() {
+        let mgr = TreeViewCheckboxManager::new();
+        assert_eq!(mgr.get_state("any"), TreeViewCheckboxState::Unchecked);
+    }
+
+    #[test]
+    fn checkbox_set_and_get() {
+        let mut mgr = TreeViewCheckboxManager::new();
+        mgr.set_state("a", TreeViewCheckboxState::Checked);
+        mgr.set_state("b", TreeViewCheckboxState::Indeterminate);
+        assert_eq!(mgr.get_state("a"), TreeViewCheckboxState::Checked);
+        assert_eq!(mgr.get_state("b"), TreeViewCheckboxState::Indeterminate);
+    }
+
+    #[test]
+    fn checkbox_toggle_cycle() {
+        let mut mgr = TreeViewCheckboxManager::new();
+        // unchecked -> checked
+        mgr.toggle("x");
+        assert_eq!(mgr.get_state("x"), TreeViewCheckboxState::Checked);
+        // checked -> unchecked
+        mgr.toggle("x");
+        assert_eq!(mgr.get_state("x"), TreeViewCheckboxState::Unchecked);
+    }
+
+    #[test]
+    fn checkbox_toggle_from_indeterminate() {
+        let mut mgr = TreeViewCheckboxManager::new();
+        mgr.set_state("x", TreeViewCheckboxState::Indeterminate);
+        mgr.toggle("x");
+        assert_eq!(mgr.get_state("x"), TreeViewCheckboxState::Checked);
+    }
+
+    #[test]
+    fn checkbox_checked_ids_and_count() {
+        let mut mgr = TreeViewCheckboxManager::new();
+        mgr.set_state("c", TreeViewCheckboxState::Checked);
+        mgr.set_state("a", TreeViewCheckboxState::Checked);
+        mgr.set_state("b", TreeViewCheckboxState::Unchecked);
+        assert_eq!(mgr.checked_ids(), vec!["a", "c"]);
+        assert_eq!(mgr.checked_count(), 2);
+    }
+
+    #[test]
+    fn checkbox_set_all() {
+        let mut mgr = TreeViewCheckboxManager::new();
+        mgr.set_all(&["a", "b", "c"], TreeViewCheckboxState::Checked);
+        assert_eq!(mgr.checked_count(), 3);
+        mgr.set_all(&["a", "c"], TreeViewCheckboxState::Unchecked);
+        assert_eq!(mgr.checked_count(), 1);
+        assert_eq!(mgr.checked_ids(), vec!["b"]);
+    }
+
+    #[test]
+    fn checkbox_display() {
+        assert_eq!(TreeViewCheckboxState::Unchecked.to_string(), "☐");
+        assert_eq!(TreeViewCheckboxState::Checked.to_string(), "☑");
+        assert_eq!(TreeViewCheckboxState::Indeterminate.to_string(), "▣");
+    }
+
+    // ── Badge tests ──
+
+    #[test]
+    fn badge_display_and_tooltip() {
+        let badge = TreeViewBadge::new("5").with_tooltip("5 errors");
+        assert_eq!(badge.to_string(), "[5]");
+        assert_eq!(badge.tooltip.as_deref(), Some("5 errors"));
+    }
+
+    #[test]
+    fn badge_manager_crud() {
+        let mut mgr = TreeViewBadgeManager::new();
+        assert_eq!(mgr.badge_count(), 0);
+
+        mgr.set_badge("node1", TreeViewBadge::new("3"));
+        mgr.set_badge("node2", TreeViewBadge::new("!"));
+        assert_eq!(mgr.badge_count(), 2);
+        assert_eq!(mgr.get_badge("node1").unwrap().value, "3");
+        assert_eq!(mgr.nodes_with_badges(), vec!["node1", "node2"]);
+
+        mgr.remove_badge("node1");
+        assert!(mgr.get_badge("node1").is_none());
+        assert_eq!(mgr.badge_count(), 1);
+    }
+
+    // ── Paginator tests ──
+
+    #[test]
+    fn paginator_basic_pagination() {
+        let items = make_items(5);
+        let pager = TreeViewPaginator::new(2);
+
+        assert_eq!(pager.total_pages(5), 3);
+        assert_eq!(pager.paginate(&items, 0).len(), 2);
+        assert_eq!(pager.paginate(&items, 1).len(), 2);
+        assert_eq!(pager.paginate(&items, 2).len(), 1);
+        assert_eq!(pager.paginate(&items, 3).len(), 0);
+    }
+
+    #[test]
+    fn paginator_has_next_page() {
+        let pager = TreeViewPaginator::new(3);
+        // 7 items => 3 pages (0, 1, 2)
+        assert!(pager.has_next_page(7, 0));
+        assert!(pager.has_next_page(7, 1));
+        assert!(!pager.has_next_page(7, 2));
+    }
+
+    #[test]
+    fn paginator_zero_page_size_clamped() {
+        let pager = TreeViewPaginator::new(0);
+        assert_eq!(pager.total_pages(5), 5); // page_size clamped to 1
     }
 }

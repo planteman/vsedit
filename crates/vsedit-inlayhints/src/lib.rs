@@ -1137,6 +1137,178 @@ pub fn multi_segment_hints<'a>(hints: &'a [InlayHint]) -> Vec<&'a InlayHint> {
     hints.iter().filter(|h| h.label.len() > 1).collect()
 }
 
+// ---------------------------------------------------------------------------
+// InlayHintInteraction – click/hover events
+// ---------------------------------------------------------------------------
+
+/// The kind of interaction on an inlay hint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InlayHintInteractionKind {
+    Click,
+    Hover,
+    DoubleClick,
+}
+
+/// An interaction event on an inlay hint.
+#[derive(Debug, Clone)]
+pub struct InlayHintInteraction {
+    pub kind: InlayHintInteractionKind,
+    pub hint_line: u32,
+    pub hint_col: u32,
+    pub label_part_index: usize,
+    pub command: Option<String>,
+}
+
+impl InlayHintInteraction {
+    pub fn click(hint: &InlayHint, label_part_index: usize) -> Self {
+        let cmd = hint.label.get(label_part_index).and_then(|p| p.command.clone());
+        Self {
+            kind: InlayHintInteractionKind::Click,
+            hint_line: hint.position_line,
+            hint_col: hint.position_col,
+            label_part_index,
+            command: cmd,
+        }
+    }
+
+    pub fn hover(hint: &InlayHint, label_part_index: usize) -> Self {
+        Self {
+            kind: InlayHintInteractionKind::Hover,
+            hint_line: hint.position_line,
+            hint_col: hint.position_col,
+            label_part_index,
+            command: None,
+        }
+    }
+
+    /// Whether this interaction should trigger a command.
+    pub fn has_command(&self) -> bool {
+        self.command.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintPadding – spacing rules
+// ---------------------------------------------------------------------------
+
+/// Padding rules for an inlay hint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InlayHintPadding {
+    pub left: u8,
+    pub right: u8,
+}
+
+impl InlayHintPadding {
+    pub const NONE: Self = Self { left: 0, right: 0 };
+    pub const TYPE_HINT: Self = Self { left: 1, right: 0 };
+    pub const PARAM_HINT: Self = Self { left: 0, right: 1 };
+    pub const BOTH: Self = Self { left: 1, right: 1 };
+
+    /// Derive padding from a hint's existing flags.
+    pub fn from_hint(hint: &InlayHint) -> Self {
+        Self {
+            left: if hint.padding_left { 1 } else { 0 },
+            right: if hint.padding_right { 1 } else { 0 },
+        }
+    }
+
+    /// Total padding width.
+    pub fn total(&self) -> u8 {
+        self.left + self.right
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintTheme – custom styling
+// ---------------------------------------------------------------------------
+
+/// Styling properties for inlay hints.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlayHintTheme {
+    pub foreground: String,
+    pub background: String,
+    pub font_size_factor: f32,
+    pub font_style: String,
+    pub border_radius: u8,
+}
+
+impl InlayHintTheme {
+    pub fn default_light() -> Self {
+        Self {
+            foreground: "#747474".into(),
+            background: "#e0e0e0".into(),
+            font_size_factor: 0.9,
+            font_style: "normal".into(),
+            border_radius: 3,
+        }
+    }
+
+    pub fn default_dark() -> Self {
+        Self {
+            foreground: "#969696".into(),
+            background: "#3a3a3a".into(),
+            font_size_factor: 0.9,
+            font_style: "normal".into(),
+            border_radius: 3,
+        }
+    }
+
+    /// Generate a simple CSS-like style string.
+    pub fn to_css(&self) -> String {
+        format!(
+            "color: {}; background: {}; font-size: {}em; font-style: {}; border-radius: {}px",
+            self.foreground, self.background, self.font_size_factor, self.font_style, self.border_radius
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Inlay hint toggle by kind
+// ---------------------------------------------------------------------------
+
+/// Visibility settings per hint kind.
+#[derive(Debug, Clone)]
+pub struct InlayHintVisibility {
+    pub show_types: bool,
+    pub show_parameters: bool,
+    pub show_other: bool,
+}
+
+impl InlayHintVisibility {
+    /// All hints visible.
+    pub fn all() -> Self {
+        Self { show_types: true, show_parameters: true, show_other: true }
+    }
+
+    /// No hints visible.
+    pub fn none() -> Self {
+        Self { show_types: false, show_parameters: false, show_other: false }
+    }
+
+    /// Check if a hint kind is visible.
+    pub fn is_visible(&self, kind: InlayHintKind) -> bool {
+        match kind {
+            InlayHintKind::Type => self.show_types,
+            InlayHintKind::Parameter => self.show_parameters,
+            InlayHintKind::Other => self.show_other,
+        }
+    }
+
+    /// Filter hints to only visible ones.
+    pub fn filter<'a>(&self, hints: &'a [InlayHint]) -> Vec<&'a InlayHint> {
+        hints.iter().filter(|h| self.is_visible(h.kind)).collect()
+    }
+
+    /// Toggle visibility for a specific kind.
+    pub fn toggle(&mut self, kind: InlayHintKind) {
+        match kind {
+            InlayHintKind::Type => self.show_types = !self.show_types,
+            InlayHintKind::Parameter => self.show_parameters = !self.show_parameters,
+            InlayHintKind::Other => self.show_other = !self.show_other,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1986,5 +2158,106 @@ mod tests {
         let hints = vec![h1, h2];
         let result = multi_segment_hints(&hints);
         assert_eq!(result.len(), 1);
+    }
+
+    // -- InlayHintInteraction tests --
+
+    #[test]
+    fn interaction_click_with_command() {
+        let mut hint = InlayHint::simple(5, 10, ": i32", InlayHintKind::Type);
+        hint.label[0].command = Some("goToDefinition".into());
+        let interaction = InlayHintInteraction::click(&hint, 0);
+        assert_eq!(interaction.kind, InlayHintInteractionKind::Click);
+        assert!(interaction.has_command());
+        assert_eq!(interaction.command.as_deref(), Some("goToDefinition"));
+    }
+
+    #[test]
+    fn interaction_hover_no_command() {
+        let hint = InlayHint::simple(1, 0, "param:", InlayHintKind::Parameter);
+        let interaction = InlayHintInteraction::hover(&hint, 0);
+        assert_eq!(interaction.kind, InlayHintInteractionKind::Hover);
+        assert!(!interaction.has_command());
+    }
+
+    // -- InlayHintPadding tests --
+
+    #[test]
+    fn padding_from_hint() {
+        let mut hint = InlayHint::simple(0, 0, "x", InlayHintKind::Type);
+        hint.padding_left = true;
+        hint.padding_right = false;
+        let pad = InlayHintPadding::from_hint(&hint);
+        assert_eq!(pad, InlayHintPadding::TYPE_HINT);
+        assert_eq!(pad.total(), 1);
+    }
+
+    #[test]
+    fn padding_constants() {
+        assert_eq!(InlayHintPadding::NONE.total(), 0);
+        assert_eq!(InlayHintPadding::BOTH.total(), 2);
+    }
+
+    // -- InlayHintTheme tests --
+
+    #[test]
+    fn theme_light_css() {
+        let theme = InlayHintTheme::default_light();
+        let css = theme.to_css();
+        assert!(css.contains("#747474"));
+        assert!(css.contains("0.9em"));
+    }
+
+    #[test]
+    fn theme_dark_css() {
+        let theme = InlayHintTheme::default_dark();
+        let css = theme.to_css();
+        assert!(css.contains("#969696"));
+        assert!(css.contains("#3a3a3a"));
+    }
+
+    // -- InlayHintVisibility tests --
+
+    #[test]
+    fn visibility_all() {
+        let vis = InlayHintVisibility::all();
+        assert!(vis.is_visible(InlayHintKind::Type));
+        assert!(vis.is_visible(InlayHintKind::Parameter));
+        assert!(vis.is_visible(InlayHintKind::Other));
+    }
+
+    #[test]
+    fn visibility_none() {
+        let vis = InlayHintVisibility::none();
+        assert!(!vis.is_visible(InlayHintKind::Type));
+    }
+
+    #[test]
+    fn visibility_toggle() {
+        let mut vis = InlayHintVisibility::all();
+        vis.toggle(InlayHintKind::Type);
+        assert!(!vis.show_types);
+        vis.toggle(InlayHintKind::Type);
+        assert!(vis.show_types);
+    }
+
+    #[test]
+    fn visibility_filter() {
+        let mut vis = InlayHintVisibility::all();
+        vis.show_parameters = false;
+        let hints = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(0, 5, "x:", InlayHintKind::Parameter),
+        ];
+        let filtered = vis.filter(&hints);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].kind, InlayHintKind::Type);
+    }
+
+    #[test]
+    fn interaction_click_out_of_bounds() {
+        let hint = InlayHint::simple(0, 0, "x", InlayHintKind::Type);
+        let interaction = InlayHintInteraction::click(&hint, 5);
+        assert!(!interaction.has_command());
     }
 }

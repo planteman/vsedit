@@ -1252,6 +1252,261 @@ pub struct ClipboardHistoryStats {
     pub multiline_entries: usize,
 }
 
+// ---------------------------------------------------------------------------
+// ClipboardContentKind – refined content classification
+// ---------------------------------------------------------------------------
+
+/// Fine-grained classification of clipboard text content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClipboardContentKind {
+    PlainText,
+    Json,
+    Url,
+    Email,
+    Code,
+    FilePath,
+    NumberList,
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardContentDetector
+// ---------------------------------------------------------------------------
+
+/// Heuristic detector for classifying clipboard text.
+pub struct ClipboardContentDetector;
+
+impl ClipboardContentDetector {
+    /// Return `true` if `text` looks like valid JSON.
+    pub fn is_json(text: &str) -> bool {
+        let t = text.trim();
+        (t.starts_with('{') && t.ends_with('}')) || (t.starts_with('[') && t.ends_with(']'))
+    }
+
+    /// Return `true` if `text` looks like a URL.
+    pub fn is_url(text: &str) -> bool {
+        let t = text.trim();
+        t.starts_with("http://") || t.starts_with("https://") || t.starts_with("ftp://")
+    }
+
+    /// Return `true` if `text` looks like an email address.
+    pub fn is_email(text: &str) -> bool {
+        let t = text.trim();
+        let parts: Vec<&str> = t.splitn(2, '@').collect();
+        parts.len() == 2 && !parts[0].is_empty() && parts[1].contains('.')
+    }
+
+    /// Count the number of lines in `text`.
+    pub fn count_lines(text: &str) -> usize {
+        if text.is_empty() {
+            0
+        } else {
+            text.lines().count()
+        }
+    }
+
+    /// Classify `text` into a [`ClipboardContentKind`].
+    pub fn detect(text: &str) -> ClipboardContentKind {
+        if Self::is_json(text) {
+            ClipboardContentKind::Json
+        } else if Self::is_url(text) {
+            ClipboardContentKind::Url
+        } else if Self::is_email(text) {
+            ClipboardContentKind::Email
+        } else if text.trim().starts_with('/') || text.trim().starts_with("C:\\") {
+            ClipboardContentKind::FilePath
+        } else if text.lines().all(|l| l.trim().parse::<f64>().is_ok()) && !text.trim().is_empty()
+        {
+            ClipboardContentKind::NumberList
+        } else if text.contains("fn ") || text.contains("let ") || text.contains("pub ") {
+            ClipboardContentKind::Code
+        } else {
+            ClipboardContentKind::PlainText
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardHistoryManager
+// ---------------------------------------------------------------------------
+
+/// Wraps [`ClipboardHistory`] with pinning support.
+pub struct ClipboardHistoryManager {
+    history: ClipboardHistory,
+    pinned: Vec<String>,
+}
+
+impl ClipboardHistoryManager {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            history: ClipboardHistory::new(max_entries),
+            pinned: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, text: &str, timestamp: u64) {
+        self.history
+            .push(ClipboardItem::new(text, timestamp, None));
+    }
+
+    pub fn pin(&mut self, text: &str) {
+        if !self.pinned.contains(&text.to_string()) {
+            self.pinned.push(text.to_string());
+        }
+    }
+
+    pub fn unpin(&mut self, text: &str) {
+        self.pinned.retain(|p| p != text);
+    }
+
+    pub fn is_pinned(&self, text: &str) -> bool {
+        self.pinned.contains(&text.to_string())
+    }
+
+    pub fn pinned_count(&self) -> usize {
+        self.pinned.len()
+    }
+
+    pub fn all_entries(&self) -> &[ClipboardItem] {
+        self.history.entries()
+    }
+
+    /// Clears history entries but preserves the pinned list.
+    pub fn clear_unpinned(&mut self) {
+        self.history.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardFormatConverter
+// ---------------------------------------------------------------------------
+
+/// Stateless helpers for text format conversions.
+pub struct ClipboardFormatConverter;
+
+impl ClipboardFormatConverter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn to_uppercase(text: &str) -> String {
+        text.to_uppercase()
+    }
+
+    pub fn to_lowercase(text: &str) -> String {
+        text.to_lowercase()
+    }
+
+    pub fn to_title_case(text: &str) -> String {
+        text.split_whitespace()
+            .map(|w| {
+                let mut chars = w.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => {
+                        let upper: String = c.to_uppercase().collect();
+                        let rest: String = chars.as_str().to_lowercase();
+                        format!("{upper}{rest}")
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Convert newline-separated text into a single CSV row.
+    pub fn lines_to_csv(text: &str) -> String {
+        text.lines().collect::<Vec<_>>().join(",")
+    }
+
+    /// Convert a single CSV row into newline-separated lines.
+    pub fn csv_to_lines(csv: &str) -> String {
+        csv.split(',')
+            .map(|s| s.trim())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub fn to_snake_case(text: &str) -> String {
+        let mut result = String::with_capacity(text.len() + 4);
+        for (i, ch) in text.chars().enumerate() {
+            if ch.is_uppercase() {
+                if i > 0 {
+                    result.push('_');
+                }
+                for lc in ch.to_lowercase() {
+                    result.push(lc);
+                }
+            } else if ch == ' ' || ch == '-' {
+                result.push('_');
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    }
+
+    pub fn to_camel_case(text: &str) -> String {
+        let mut capitalize_next = false;
+        let mut result = String::with_capacity(text.len());
+        for ch in text.chars() {
+            if ch == '_' || ch == ' ' || ch == '-' {
+                capitalize_next = true;
+            } else if capitalize_next {
+                for uc in ch.to_uppercase() {
+                    result.push(uc);
+                }
+                capitalize_next = false;
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardSyncState
+// ---------------------------------------------------------------------------
+
+/// Tracks synchronisation state for cross-session clipboard sharing.
+pub struct ClipboardSyncState {
+    pub session_id: String,
+    pub sequence: u64,
+    pub last_content: Option<String>,
+    pub dirty: bool,
+}
+
+impl ClipboardSyncState {
+    pub fn new(session_id: impl Into<String>) -> Self {
+        Self {
+            session_id: session_id.into(),
+            sequence: 0,
+            last_content: None,
+            dirty: false,
+        }
+    }
+
+    /// Update the content, increment the sequence counter, and mark dirty.
+    pub fn update(&mut self, content: &str) {
+        self.last_content = Some(content.to_string());
+        self.sequence += 1;
+        self.dirty = true;
+    }
+
+    /// Mark the state as synced (no longer dirty).
+    pub fn mark_synced(&mut self) {
+        self.dirty = false;
+    }
+
+    pub fn needs_sync(&self) -> bool {
+        self.dirty
+    }
+
+    pub fn sequence_number(&self) -> u64 {
+        self.sequence
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1948,5 +2203,134 @@ mod tests {
         assert_eq!(stats.average_bytes, 8);
         assert_eq!(stats.total_lines, 3); // 1 + 2
         assert_eq!(stats.multiline_entries, 1);
+    }
+
+    // -- ClipboardHistoryManager tests --
+
+    #[test]
+    fn test_history_manager_add_and_count() {
+        let mut mgr = ClipboardHistoryManager::new(5);
+        mgr.add("alpha", 1);
+        mgr.add("beta", 2);
+        assert_eq!(mgr.all_entries().len(), 2);
+    }
+
+    #[test]
+    fn test_history_manager_pin_unpin() {
+        let mut mgr = ClipboardHistoryManager::new(5);
+        mgr.pin("sticky");
+        assert!(mgr.is_pinned("sticky"));
+        assert_eq!(mgr.pinned_count(), 1);
+        mgr.unpin("sticky");
+        assert!(!mgr.is_pinned("sticky"));
+        assert_eq!(mgr.pinned_count(), 0);
+    }
+
+    #[test]
+    fn test_history_manager_clear_unpinned() {
+        let mut mgr = ClipboardHistoryManager::new(10);
+        mgr.add("one", 1);
+        mgr.add("two", 2);
+        mgr.pin("one");
+        mgr.clear_unpinned();
+        assert_eq!(mgr.all_entries().len(), 0);
+        assert!(mgr.is_pinned("one"));
+    }
+
+    // -- ClipboardFormatConverter tests --
+
+    #[test]
+    fn test_format_converter_title_case() {
+        assert_eq!(
+            ClipboardFormatConverter::to_title_case("hello world foo"),
+            "Hello World Foo"
+        );
+    }
+
+    #[test]
+    fn test_format_converter_lines_to_csv() {
+        assert_eq!(
+            ClipboardFormatConverter::lines_to_csv("a\nb\nc"),
+            "a,b,c"
+        );
+    }
+
+    #[test]
+    fn test_format_converter_csv_to_lines() {
+        assert_eq!(
+            ClipboardFormatConverter::csv_to_lines("x, y, z"),
+            "x\ny\nz"
+        );
+    }
+
+    #[test]
+    fn test_format_converter_snake_case() {
+        assert_eq!(
+            ClipboardFormatConverter::to_snake_case("clipboardHistory"),
+            "clipboard_history"
+        );
+    }
+
+    #[test]
+    fn test_format_converter_camel_case() {
+        assert_eq!(
+            ClipboardFormatConverter::to_camel_case("clipboard_history"),
+            "clipboardHistory"
+        );
+    }
+
+    // -- ClipboardSyncState tests --
+
+    #[test]
+    fn test_sync_state_update() {
+        let mut state = ClipboardSyncState::new("sess-1");
+        assert_eq!(state.sequence_number(), 0);
+        assert!(!state.needs_sync());
+        state.update("hello");
+        assert_eq!(state.sequence_number(), 1);
+        assert!(state.needs_sync());
+        assert_eq!(state.last_content.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn test_sync_state_mark_synced() {
+        let mut state = ClipboardSyncState::new("sess-2");
+        state.update("data");
+        assert!(state.needs_sync());
+        state.mark_synced();
+        assert!(!state.needs_sync());
+    }
+
+    // -- ClipboardContentDetector tests --
+
+    #[test]
+    fn test_content_detector_json() {
+        assert!(ClipboardContentDetector::is_json(r#"{"key":"val"}"#));
+        assert!(ClipboardContentDetector::is_json("[1,2,3]"));
+        assert!(!ClipboardContentDetector::is_json("just text"));
+        assert_eq!(
+            ClipboardContentDetector::detect(r#"{"a":1}"#),
+            ClipboardContentKind::Json
+        );
+    }
+
+    #[test]
+    fn test_content_detector_url() {
+        assert!(ClipboardContentDetector::is_url("https://example.com"));
+        assert!(!ClipboardContentDetector::is_url("not a url"));
+        assert_eq!(
+            ClipboardContentDetector::detect("https://example.com"),
+            ClipboardContentKind::Url
+        );
+    }
+
+    #[test]
+    fn test_content_detector_email() {
+        assert!(ClipboardContentDetector::is_email("user@example.com"));
+        assert!(!ClipboardContentDetector::is_email("noatsign"));
+        assert_eq!(
+            ClipboardContentDetector::detect("user@example.com"),
+            ClipboardContentKind::Email
+        );
     }
 }

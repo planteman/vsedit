@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for language model access.
 
+use std::collections::HashMap;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -1017,6 +1018,249 @@ pub fn total_message_tokens(messages: &[LanguageModelMessage]) -> u32 {
     messages.iter().map(|m| estimate_tokens(message_content(m))).sum()
 }
 
+// ---------------------------------------------------------------------------
+// Model selector
+// ---------------------------------------------------------------------------
+
+/// Selects the best model for a given set of requirements.
+#[derive(Debug, Clone, Default)]
+pub struct LanguageModelSelector {
+    pub models: Vec<LanguageModelChat>,
+    pub capabilities: HashMap<String, ModelCapabilities>,
+}
+
+impl LanguageModelSelector {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_model(&mut self, model: LanguageModelChat, caps: ModelCapabilities) {
+        self.capabilities.insert(model.id.clone(), caps);
+        self.models.push(model);
+    }
+
+    /// Return the smallest model whose `max_input_tokens` is at least `min_tokens`.
+    pub fn select_by_capacity(&self, min_tokens: u32) -> Option<&LanguageModelChat> {
+        self.models
+            .iter()
+            .filter(|m| m.max_input_tokens >= min_tokens)
+            .min_by_key(|m| m.max_input_tokens)
+    }
+
+    /// Return all models that support streaming.
+    pub fn select_with_streaming(&self) -> Vec<&LanguageModelChat> {
+        self.models
+            .iter()
+            .filter(|m| {
+                self.capabilities
+                    .get(&m.id)
+                    .map_or(false, |c| c.supports_streaming)
+            })
+            .collect()
+    }
+
+    /// Return all models that support vision.
+    pub fn select_with_vision(&self) -> Vec<&LanguageModelChat> {
+        self.models
+            .iter()
+            .filter(|m| {
+                self.capabilities
+                    .get(&m.id)
+                    .map_or(false, |c| c.supports_vision)
+            })
+            .collect()
+    }
+
+    pub fn model_count(&self) -> usize {
+        self.models.len()
+    }
+
+    /// Pick the best model that satisfies token capacity and optional streaming.
+    pub fn best_for_task(
+        &self,
+        required_tokens: u32,
+        needs_streaming: bool,
+    ) -> Option<&LanguageModelChat> {
+        self.models
+            .iter()
+            .filter(|m| m.max_input_tokens >= required_tokens)
+            .filter(|m| {
+                if needs_streaming {
+                    self.capabilities
+                        .get(&m.id)
+                        .map_or(false, |c| c.supports_streaming)
+                } else {
+                    true
+                }
+            })
+            .min_by_key(|m| m.max_input_tokens)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Enhanced token counter
+// ---------------------------------------------------------------------------
+
+/// Tracks token usage against a model's context window.
+#[derive(Debug, Clone)]
+pub struct LMTokenCounter {
+    pub model_id: String,
+    pub max_tokens: u32,
+    pub used_tokens: u32,
+}
+
+impl LMTokenCounter {
+    pub fn new(model_id: impl Into<String>, max_tokens: u32) -> Self {
+        Self {
+            model_id: model_id.into(),
+            max_tokens,
+            used_tokens: 0,
+        }
+    }
+
+    pub fn add(&mut self, text: &str) {
+        self.used_tokens += estimate_tokens(text);
+    }
+
+    pub fn add_messages(&mut self, messages: &[LanguageModelMessage]) {
+        self.used_tokens += total_message_tokens(messages);
+    }
+
+    pub fn remaining(&self) -> u32 {
+        self.max_tokens.saturating_sub(self.used_tokens)
+    }
+
+    pub fn usage_percent(&self) -> f64 {
+        if self.max_tokens == 0 {
+            return 100.0;
+        }
+        (self.used_tokens as f64 / self.max_tokens as f64) * 100.0
+    }
+
+    pub fn is_over_budget(&self) -> bool {
+        self.used_tokens > self.max_tokens
+    }
+
+    pub fn can_fit(&self, text: &str) -> bool {
+        self.used_tokens + estimate_tokens(text) <= self.max_tokens
+    }
+
+    pub fn reset(&mut self) {
+        self.used_tokens = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stream processor
+// ---------------------------------------------------------------------------
+
+/// Accumulates chunks from a streaming language-model response.
+#[derive(Debug, Clone, Default)]
+pub struct LMStreamProcessor {
+    pub chunks: Vec<String>,
+    pub is_complete: bool,
+    pub total_tokens: u32,
+}
+
+impl LMStreamProcessor {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push_chunk(&mut self, chunk: &str) {
+        self.chunks.push(chunk.to_owned());
+    }
+
+    pub fn complete(&mut self) {
+        self.is_complete = true;
+        self.total_tokens = estimate_tokens(&self.assembled_text());
+    }
+
+    pub fn assembled_text(&self) -> String {
+        self.chunks.join("")
+    }
+
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.is_complete
+    }
+
+    pub fn total_chars(&self) -> usize {
+        self.chunks.iter().map(|c| c.len()).sum()
+    }
+
+    pub fn estimated_tokens(&self) -> u32 {
+        estimate_tokens(&self.assembled_text())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cost estimator
+// ---------------------------------------------------------------------------
+
+/// Per-model pricing (price per 1 000 tokens).
+#[derive(Debug, Clone)]
+pub struct ModelPricing {
+    pub input_price_per_1k: f64,
+    pub output_price_per_1k: f64,
+}
+
+/// Estimates cost for model usage based on configurable pricing tables.
+#[derive(Debug, Clone, Default)]
+pub struct ModelCostEstimator {
+    pub prices: HashMap<String, ModelPricing>,
+}
+
+impl ModelCostEstimator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_pricing(&mut self, model_id: &str, input_price: f64, output_price: f64) {
+        self.prices.insert(
+            model_id.to_owned(),
+            ModelPricing {
+                input_price_per_1k: input_price,
+                output_price_per_1k: output_price,
+            },
+        );
+    }
+
+    pub fn estimate_input_cost(&self, model_id: &str, tokens: u32) -> Option<f64> {
+        self.prices
+            .get(model_id)
+            .map(|p| (tokens as f64 / 1000.0) * p.input_price_per_1k)
+    }
+
+    pub fn estimate_output_cost(&self, model_id: &str, tokens: u32) -> Option<f64> {
+        self.prices
+            .get(model_id)
+            .map(|p| (tokens as f64 / 1000.0) * p.output_price_per_1k)
+    }
+
+    pub fn estimate_total(
+        &self,
+        model_id: &str,
+        input_tokens: u32,
+        output_tokens: u32,
+    ) -> Option<f64> {
+        let input = self.estimate_input_cost(model_id, input_tokens)?;
+        let output = self.estimate_output_cost(model_id, output_tokens)?;
+        Some(input + output)
+    }
+
+    pub fn has_pricing(&self, model_id: &str) -> bool {
+        self.prices.contains_key(model_id)
+    }
+
+    pub fn format_cost(cost: f64) -> String {
+        format!("${:.4}", cost)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1957,5 +2201,161 @@ mod tests {
         let msgs = one_shot_messages("sys", "user query");
         let total = total_message_tokens(&msgs);
         assert!(total > 0);
+    }
+
+    // -- LanguageModelSelector ------------------------------------------------
+
+    fn make_selector() -> LanguageModelSelector {
+        let mut sel = LanguageModelSelector::new();
+        sel.add_model(
+            LanguageModelChat {
+                id: "small".into(),
+                name: "Small".into(),
+                vendor: "v".into(),
+                family: "f".into(),
+                version: "1".into(),
+                max_input_tokens: 4096,
+            },
+            ModelCapabilities {
+                supports_streaming: true,
+                supports_vision: false,
+                ..Default::default()
+            },
+        );
+        sel.add_model(
+            LanguageModelChat {
+                id: "large".into(),
+                name: "Large".into(),
+                vendor: "v".into(),
+                family: "f".into(),
+                version: "1".into(),
+                max_input_tokens: 128_000,
+            },
+            ModelCapabilities {
+                supports_streaming: true,
+                supports_vision: true,
+                ..Default::default()
+            },
+        );
+        sel
+    }
+
+    #[test]
+    fn test_selector_by_capacity() {
+        let sel = make_selector();
+        let m = sel.select_by_capacity(5000).unwrap();
+        assert_eq!(m.id, "large");
+        let m2 = sel.select_by_capacity(1000).unwrap();
+        assert_eq!(m2.id, "small");
+    }
+
+    #[test]
+    fn test_selector_with_streaming() {
+        let sel = make_selector();
+        let streaming = sel.select_with_streaming();
+        assert_eq!(streaming.len(), 2);
+    }
+
+    #[test]
+    fn test_selector_with_vision() {
+        let sel = make_selector();
+        let vision = sel.select_with_vision();
+        assert_eq!(vision.len(), 1);
+        assert_eq!(vision[0].id, "large");
+    }
+
+    #[test]
+    fn test_selector_best_for_task() {
+        let sel = make_selector();
+        let best = sel.best_for_task(2000, true).unwrap();
+        assert_eq!(best.id, "small");
+        let best_large = sel.best_for_task(5000, true).unwrap();
+        assert_eq!(best_large.id, "large");
+        assert!(sel.best_for_task(200_000, false).is_none());
+    }
+
+    // -- LMTokenCounter -------------------------------------------------------
+
+    #[test]
+    fn test_token_counter_add() {
+        let mut tc = LMTokenCounter::new("gpt-4", 8192);
+        tc.add("hello world");
+        assert!(tc.used_tokens > 0);
+    }
+
+    #[test]
+    fn test_token_counter_remaining() {
+        let mut tc = LMTokenCounter::new("gpt-4", 100);
+        tc.add("some text here");
+        assert!(tc.remaining() < 100);
+        assert!(tc.remaining() > 0);
+    }
+
+    #[test]
+    fn test_token_counter_over_budget() {
+        let mut tc = LMTokenCounter::new("gpt-4", 2);
+        tc.add("this is a long sentence that should exceed two tokens easily");
+        assert!(tc.is_over_budget());
+    }
+
+    #[test]
+    fn test_token_counter_can_fit() {
+        let mut tc = LMTokenCounter::new("gpt-4", 1000);
+        tc.add("short");
+        assert!(tc.can_fit("another short text"));
+        tc.reset();
+        assert_eq!(tc.used_tokens, 0);
+    }
+
+    // -- LMStreamProcessor ----------------------------------------------------
+
+    #[test]
+    fn test_stream_processor_chunks() {
+        let mut sp = LMStreamProcessor::new();
+        sp.push_chunk("Hello");
+        sp.push_chunk(", ");
+        sp.push_chunk("world!");
+        assert_eq!(sp.chunk_count(), 3);
+        assert!(!sp.is_complete());
+    }
+
+    #[test]
+    fn test_stream_processor_assembled() {
+        let mut sp = LMStreamProcessor::new();
+        sp.push_chunk("Hello");
+        sp.push_chunk(" world");
+        sp.complete();
+        assert_eq!(sp.assembled_text(), "Hello world");
+        assert!(sp.is_complete());
+        assert_eq!(sp.total_chars(), 11);
+        assert!(sp.estimated_tokens() > 0);
+    }
+
+    // -- ModelCostEstimator ---------------------------------------------------
+
+    #[test]
+    fn test_cost_estimator_input() {
+        let mut ce = ModelCostEstimator::new();
+        ce.set_pricing("gpt-4", 0.03, 0.06);
+        let cost = ce.estimate_input_cost("gpt-4", 1000).unwrap();
+        assert!((cost - 0.03).abs() < f64::EPSILON);
+        assert!(ce.has_pricing("gpt-4"));
+        assert!(!ce.has_pricing("other"));
+    }
+
+    #[test]
+    fn test_cost_estimator_total() {
+        let mut ce = ModelCostEstimator::new();
+        ce.set_pricing("gpt-4", 0.03, 0.06);
+        let total = ce.estimate_total("gpt-4", 1000, 500).unwrap();
+        let expected = 0.03 + 0.03; // 0.03 input + 500/1000*0.06 output
+        assert!((total - expected).abs() < f64::EPSILON);
+        assert!(ce.estimate_total("unknown", 1, 1).is_none());
+    }
+
+    #[test]
+    fn test_cost_estimator_format() {
+        assert_eq!(ModelCostEstimator::format_cost(0.0042), "$0.0042");
+        assert_eq!(ModelCostEstimator::format_cost(1.5), "$1.5000");
     }
 }

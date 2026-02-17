@@ -1099,6 +1099,225 @@ fn perceived_luminance(c: Rgba) -> u8 {
     lum.round() as u8
 }
 
+// ---------------------------------------------------------------------------
+// TitleBarVariableResolver
+// ---------------------------------------------------------------------------
+
+/// Resolves `${varName}` placeholders inside a template string.
+pub struct TitleBarVariableResolver {
+    variables: HashMap<String, String>,
+}
+
+impl TitleBarVariableResolver {
+    pub fn new() -> Self {
+        Self {
+            variables: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, var_name: &str, value: &str) {
+        self.variables.insert(var_name.to_string(), value.to_string());
+    }
+
+    /// Replace every `${key}` in `template` with the corresponding value.
+    pub fn resolve(&self, template: &str) -> String {
+        let mut result = template.to_string();
+        for (key, value) in &self.variables {
+            let pattern = format!("${{{}}}", key);
+            result = result.replace(&pattern, value);
+        }
+        result
+    }
+
+    /// Populate resolver variables from a `TitleBarContext`.
+    pub fn set_from_context(&mut self, ctx: &TitleBarContext) {
+        if let Some(ref v) = ctx.workspace_name {
+            self.set("workspaceName", v);
+        }
+        if let Some(ref v) = ctx.active_file {
+            self.set("activeFile", v);
+        }
+        if let Some(ref v) = ctx.root_folder {
+            self.set("rootFolder", v);
+        }
+        if let Some(ref v) = ctx.remote_host {
+            self.set("remoteHost", v);
+        }
+        if let Some(ref v) = ctx.git_branch {
+            self.set("gitBranch", v);
+        }
+        self.set("appName", &ctx.app_name);
+    }
+
+    /// Return a sorted list of `(name, value)` pairs.
+    pub fn list_variables(&self) -> Vec<(String, String)> {
+        let mut vars: Vec<(String, String)> = self
+            .variables
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        vars.sort_by(|a, b| a.0.cmp(&b.0));
+        vars
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleBarPathTruncator
+// ---------------------------------------------------------------------------
+
+/// Shortens long file-system paths for display in the title bar.
+pub struct TitleBarPathTruncator {
+    max_length: usize,
+}
+
+impl TitleBarPathTruncator {
+    pub fn new(max_length: usize) -> Self {
+        Self { max_length }
+    }
+
+    pub fn set_max_length(&mut self, max_length: usize) {
+        self.max_length = max_length;
+    }
+
+    /// If `path` exceeds `max_length`, keep only the last segment prefixed
+    /// with `…/`.
+    pub fn truncate(&self, path: &str) -> String {
+        if path.len() <= self.max_length {
+            return path.to_string();
+        }
+        match path.rsplit_once('/') {
+            Some((_, last)) => format!("…/{}", last),
+            None => path.to_string(),
+        }
+    }
+
+    /// Keep the first and last path segments with `…` in the middle.
+    pub fn truncate_middle(&self, path: &str) -> String {
+        if path.len() <= self.max_length {
+            return path.to_string();
+        }
+        let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        if segments.len() <= 2 {
+            return self.truncate(path);
+        }
+        let prefix = if path.starts_with('/') { "/" } else { "" };
+        format!("{}{}/…/{}", prefix, segments[0], segments[segments.len() - 1])
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleBarDirtyNotifier
+// ---------------------------------------------------------------------------
+
+/// Tracks which files have unsaved changes and provides a dirty indicator.
+pub struct TitleBarDirtyNotifier {
+    dirty_files: Vec<String>,
+    indicator: String,
+}
+
+impl TitleBarDirtyNotifier {
+    pub fn new() -> Self {
+        Self {
+            dirty_files: Vec::new(),
+            indicator: "●".to_string(),
+        }
+    }
+
+    pub fn add_dirty(&mut self, file: &str) {
+        if !self.dirty_files.contains(&file.to_string()) {
+            self.dirty_files.push(file.to_string());
+        }
+    }
+
+    pub fn remove_dirty(&mut self, file: &str) {
+        self.dirty_files.retain(|f| f != file);
+    }
+
+    pub fn is_any_dirty(&self) -> bool {
+        !self.dirty_files.is_empty()
+    }
+
+    pub fn dirty_count(&self) -> usize {
+        self.dirty_files.len()
+    }
+
+    /// Returns the indicator string if any file is dirty, otherwise empty.
+    pub fn indicator_text(&self) -> String {
+        if self.is_any_dirty() {
+            self.indicator.clone()
+        } else {
+            String::new()
+        }
+    }
+
+    pub fn set_indicator(&mut self, s: &str) {
+        self.indicator = s.to_string();
+    }
+
+    pub fn clear(&mut self) {
+        self.dirty_files.clear();
+    }
+}
+
+impl fmt::Display for TitleBarDirtyNotifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_any_dirty() {
+            write!(f, "{} ({} dirty)", self.indicator, self.dirty_count())
+        } else {
+            write!(f, "clean")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleBarUpdateDebouncer
+// ---------------------------------------------------------------------------
+
+/// Prevents excessively frequent title-bar repaints by debouncing updates.
+pub struct TitleBarUpdateDebouncer {
+    last_update_ms: u64,
+    debounce_ms: u64,
+    pending_title: Option<String>,
+}
+
+impl TitleBarUpdateDebouncer {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self {
+            last_update_ms: 0,
+            debounce_ms,
+            pending_title: None,
+        }
+    }
+
+    /// Queue a title update to be emitted after the debounce window elapses.
+    pub fn request_update(&mut self, title: &str, _now_ms: u64) {
+        self.pending_title = Some(title.to_string());
+    }
+
+    /// Returns `true` when the debounce interval has passed and there is a
+    /// pending title.
+    pub fn should_update(&self, now_ms: u64) -> bool {
+        self.pending_title.is_some() && now_ms >= self.last_update_ms + self.debounce_ms
+    }
+
+    /// Consume the pending title if the debounce window has elapsed.
+    pub fn flush(&mut self, now_ms: u64) -> Option<String> {
+        if self.should_update(now_ms) {
+            self.last_update_ms = now_ms;
+            self.pending_title.take()
+        } else {
+            None
+        }
+    }
+
+    /// Bypass debouncing: immediately return the given title and clear any
+    /// pending update.
+    pub fn force_update(&mut self, title: &str) -> String {
+        self.pending_title = None;
+        title.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1919,5 +2138,146 @@ mod tests {
     fn theme_with_border() {
         let t = TitleBarTheme::dark().with_border(Rgba::new(100, 100, 100, 255));
         assert_eq!(t.border, Some(Rgba::new(100, 100, 100, 255)));
+    }
+
+    // -- TitleBarVariableResolver tests --
+
+    #[test]
+    fn resolver_basic_substitution() {
+        let mut r = TitleBarVariableResolver::new();
+        r.set("name", "hello");
+        assert_eq!(r.resolve("${name} world"), "hello world");
+    }
+
+    #[test]
+    fn resolver_no_match_unchanged() {
+        let r = TitleBarVariableResolver::new();
+        assert_eq!(r.resolve("${missing}"), "${missing}");
+    }
+
+    #[test]
+    fn resolver_set_from_context() {
+        let mut ctx = TitleBarContext::new("vsedit");
+        ctx.active_file = Some("main.rs".into());
+        ctx.workspace_name = Some("ws".into());
+        let mut r = TitleBarVariableResolver::new();
+        r.set_from_context(&ctx);
+        assert_eq!(
+            r.resolve("${appName}: ${activeFile}"),
+            "vsedit: main.rs"
+        );
+    }
+
+    #[test]
+    fn resolver_list_variables_sorted() {
+        let mut r = TitleBarVariableResolver::new();
+        r.set("beta", "2");
+        r.set("alpha", "1");
+        let vars = r.list_variables();
+        assert_eq!(vars[0].0, "alpha");
+        assert_eq!(vars[1].0, "beta");
+    }
+
+    // -- TitleBarPathTruncator tests --
+
+    #[test]
+    fn truncator_short_path_unchanged() {
+        let t = TitleBarPathTruncator::new(50);
+        assert_eq!(t.truncate("/home/user"), "/home/user");
+    }
+
+    #[test]
+    fn truncator_long_path_truncated() {
+        let t = TitleBarPathTruncator::new(10);
+        assert_eq!(
+            t.truncate("/very/long/path/to/file.rs"),
+            "…/file.rs"
+        );
+    }
+
+    #[test]
+    fn truncator_middle_keeps_first_and_last() {
+        let t = TitleBarPathTruncator::new(8);
+        assert_eq!(
+            t.truncate_middle("/a/b/c/d/e"),
+            "/a/…/e"
+        );
+    }
+
+    #[test]
+    fn truncator_set_max_length() {
+        let mut t = TitleBarPathTruncator::new(100);
+        assert_eq!(t.truncate("/a/b/c/d/e"), "/a/b/c/d/e");
+        t.set_max_length(5);
+        assert_eq!(t.truncate("/a/b/c/d/e"), "…/e");
+    }
+
+    // -- TitleBarDirtyNotifier tests --
+
+    #[test]
+    fn dirty_notifier_initially_clean() {
+        let n = TitleBarDirtyNotifier::new();
+        assert!(!n.is_any_dirty());
+        assert_eq!(n.dirty_count(), 0);
+        assert_eq!(n.indicator_text(), "");
+    }
+
+    #[test]
+    fn dirty_notifier_add_remove() {
+        let mut n = TitleBarDirtyNotifier::new();
+        n.add_dirty("a.rs");
+        n.add_dirty("b.rs");
+        assert_eq!(n.dirty_count(), 2);
+        n.remove_dirty("a.rs");
+        assert_eq!(n.dirty_count(), 1);
+        assert!(n.is_any_dirty());
+        assert_eq!(n.indicator_text(), "●");
+    }
+
+    #[test]
+    fn dirty_notifier_no_duplicates() {
+        let mut n = TitleBarDirtyNotifier::new();
+        n.add_dirty("a.rs");
+        n.add_dirty("a.rs");
+        assert_eq!(n.dirty_count(), 1);
+    }
+
+    #[test]
+    fn dirty_notifier_display() {
+        let mut n = TitleBarDirtyNotifier::new();
+        assert_eq!(format!("{}", n), "clean");
+        n.add_dirty("x.rs");
+        n.set_indicator("*");
+        assert_eq!(format!("{}", n), "* (1 dirty)");
+    }
+
+    // -- TitleBarUpdateDebouncer tests --
+
+    #[test]
+    fn debouncer_does_not_fire_early() {
+        let mut d = TitleBarUpdateDebouncer::new(100);
+        d.request_update("title", 0);
+        assert!(!d.should_update(50));
+        assert!(d.flush(50).is_none());
+    }
+
+    #[test]
+    fn debouncer_fires_after_interval() {
+        let mut d = TitleBarUpdateDebouncer::new(100);
+        d.request_update("new title", 0);
+        assert!(d.should_update(100));
+        assert_eq!(d.flush(100), Some("new title".into()));
+        // consumed
+        assert!(d.flush(200).is_none());
+    }
+
+    #[test]
+    fn debouncer_force_update_bypasses() {
+        let mut d = TitleBarUpdateDebouncer::new(1000);
+        d.request_update("queued", 0);
+        let result = d.force_update("forced");
+        assert_eq!(result, "forced");
+        // pending cleared
+        assert!(!d.should_update(2000));
     }
 }

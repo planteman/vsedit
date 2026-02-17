@@ -1143,6 +1143,295 @@ impl TypeTree {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TypeHierarchySearch – query helpers for filtering items in a TypeTree
+// ---------------------------------------------------------------------------
+
+/// Provides search and filtering operations over a [`TypeTree`].
+pub struct TypeHierarchySearch;
+
+impl TypeHierarchySearch {
+    /// Return indices of items whose name contains `query` (case-insensitive).
+    pub fn search(tree: &TypeTree, query: &str) -> Vec<usize> {
+        let lower = query.to_lowercase();
+        tree.all_items()
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.name.to_lowercase().contains(&lower))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Return indices of items that match the given [`SymbolKind`].
+    pub fn search_by_kind(tree: &TypeTree, kind: SymbolKind) -> Vec<usize> {
+        tree.all_items()
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.kind == kind)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Return indices of items marked as deprecated.
+    pub fn search_deprecated(tree: &TypeTree) -> Vec<usize> {
+        tree.all_items()
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.is_deprecated())
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Return indices of items that have a `detail` value.
+    pub fn search_with_detail(tree: &TypeTree) -> Vec<usize> {
+        tree.all_items()
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.detail.is_some())
+            .map(|(i, _)| i)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeHierarchyBreadcrumb – navigation path tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks a navigation path through the type hierarchy as a stack of names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeHierarchyBreadcrumb {
+    path: Vec<String>,
+}
+
+impl TypeHierarchyBreadcrumb {
+    /// Create an empty breadcrumb trail.
+    pub fn new() -> Self {
+        Self { path: Vec::new() }
+    }
+
+    /// Push a name onto the breadcrumb trail.
+    pub fn push(&mut self, name: &str) {
+        self.path.push(name.to_string());
+    }
+
+    /// Pop the last name from the trail.
+    pub fn pop(&mut self) -> Option<String> {
+        self.path.pop()
+    }
+
+    /// Return the current (last) name in the trail.
+    pub fn current(&self) -> Option<&str> {
+        self.path.last().map(|s| s.as_str())
+    }
+
+    /// Return the depth of the breadcrumb trail.
+    pub fn depth(&self) -> usize {
+        self.path.len()
+    }
+
+    /// Return the full path joined with ` > `.
+    pub fn full_path(&self) -> String {
+        self.path.join(" > ")
+    }
+
+    /// Clear the breadcrumb trail.
+    pub fn clear(&mut self) {
+        self.path.clear();
+    }
+
+    /// Returns `true` if the breadcrumb trail is empty.
+    pub fn is_empty(&self) -> bool {
+        self.path.is_empty()
+    }
+}
+
+impl Default for TypeHierarchyBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for TypeHierarchyBreadcrumb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.full_path())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeHierarchyStatistics – aggregate metrics for a TypeTree
+// ---------------------------------------------------------------------------
+
+/// Aggregate metrics computed from a [`TypeTree`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeHierarchyStatsResult {
+    pub total_types: usize,
+    pub class_count: usize,
+    pub interface_count: usize,
+    pub enum_count: usize,
+    pub struct_count: usize,
+    pub max_depth: usize,
+    pub avg_children: f64,
+    pub leaf_count: usize,
+    pub root_count: usize,
+}
+
+/// Computes aggregate statistics for a [`TypeTree`].
+pub struct TypeHierarchyStatistics;
+
+impl TypeHierarchyStatistics {
+    /// Compute statistics over the given tree.
+    pub fn compute(tree: &TypeTree) -> TypeHierarchyStatsResult {
+        let items = tree.all_items();
+        let total_types = items.len();
+
+        let mut class_count: usize = 0;
+        let mut interface_count: usize = 0;
+        let mut enum_count: usize = 0;
+        let mut struct_count: usize = 0;
+
+        for item in &items {
+            match item.kind {
+                SymbolKind::Class => class_count += 1,
+                SymbolKind::Interface => interface_count += 1,
+                SymbolKind::Enum => enum_count += 1,
+                SymbolKind::Struct => struct_count += 1,
+                _ => {}
+            }
+        }
+
+        let mut max_depth: usize = 0;
+        let mut total_children: usize = 0;
+        let mut leaf_count: usize = 0;
+        let mut root_count: usize = 0;
+
+        for idx in 0..total_types {
+            let subtypes = tree.get_subtypes(idx);
+            let supertypes = tree.get_supertypes(idx);
+            total_children += subtypes.len();
+            if subtypes.is_empty() {
+                leaf_count += 1;
+            }
+            if supertypes.is_empty() {
+                root_count += 1;
+            }
+            let d = tree.depth(idx);
+            if d > max_depth {
+                max_depth = d;
+            }
+        }
+
+        let avg_children = if total_types == 0 {
+            0.0
+        } else {
+            total_children as f64 / total_types as f64
+        };
+
+        TypeHierarchyStatsResult {
+            total_types,
+            class_count,
+            interface_count,
+            enum_count,
+            struct_count,
+            max_depth,
+            avg_children,
+            leaf_count,
+            root_count,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeHierarchyExporter – render a TypeTree in various formats
+// ---------------------------------------------------------------------------
+
+/// Renders a [`TypeTree`] in various output formats.
+pub struct TypeHierarchyExporter;
+
+impl TypeHierarchyExporter {
+    /// Render the tree as indented plain text.
+    ///
+    /// Root types (no supertypes) are printed at indentation level 0 and their
+    /// subtypes are indented recursively.
+    pub fn to_text(tree: &TypeTree) -> String {
+        let items = tree.all_items();
+        let count = items.len();
+        if count == 0 {
+            return String::new();
+        }
+
+        // Find root indices (items with no supertypes).
+        let roots: Vec<usize> = (0..count)
+            .filter(|&i| tree.get_supertypes(i).is_empty())
+            .collect();
+
+        let mut out = String::new();
+        let mut visited = HashSet::new();
+        for root in roots {
+            Self::write_text_node(tree, root, 0, &mut visited, &mut out);
+        }
+        out
+    }
+
+    fn write_text_node(
+        tree: &TypeTree,
+        idx: usize,
+        indent: usize,
+        visited: &mut HashSet<usize>,
+        out: &mut String,
+    ) {
+        if !visited.insert(idx) {
+            return;
+        }
+        if let Some(item) = tree.get_item(idx) {
+            for _ in 0..indent {
+                out.push_str("  ");
+            }
+            out.push_str(&format!("{}: {}\n", item.kind, item.name));
+            let mut children: Vec<usize> = tree
+                .get_subtypes(idx)
+                .iter()
+                .filter_map(|child| tree.find_index(child))
+                .collect();
+            children.sort_unstable();
+            for child_idx in children {
+                Self::write_text_node(tree, child_idx, indent + 1, visited, out);
+            }
+        }
+    }
+
+    /// Render the tree as a Graphviz DOT digraph.
+    pub fn to_dot(tree: &TypeTree) -> String {
+        let items = tree.all_items();
+        let mut out = String::from("digraph TypeHierarchy {\n");
+        out.push_str("  rankdir=BT;\n");
+        out.push_str("  node [shape=box];\n");
+
+        for (i, item) in items.iter().enumerate() {
+            let label = format!("{} ({})", item.name, item.kind);
+            out.push_str(&format!("  n{i} [label=\"{label}\"];\n"));
+        }
+
+        for (i, _) in items.iter().enumerate() {
+            for sup in tree.get_supertypes(i) {
+                if let Some(si) = tree.find_index(sup) {
+                    out.push_str(&format!("  n{i} -> n{si};\n"));
+                }
+            }
+        }
+
+        out.push_str("}\n");
+        out
+    }
+
+    /// Return a flat list of `"Kind: Name"` strings for every item.
+    pub fn to_list(tree: &TypeTree) -> Vec<String> {
+        tree.all_items()
+            .iter()
+            .map(|item| format!("{}: {}", item.kind, item.name))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1910,5 +2199,173 @@ mod tests {
 
         let isolated = tree.isolated_types();
         assert_eq!(isolated, vec![c]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for TypeHierarchySearch
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn search_by_name_case_insensitive() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("FooBar", SymbolKind::Class));
+        tree.add_type(make_item("Baz", SymbolKind::Interface));
+        tree.add_type(make_item("fooQux", SymbolKind::Struct));
+
+        let results = TypeHierarchySearch::search(&tree, "foo");
+        assert_eq!(results, vec![0, 2]);
+    }
+
+    #[test]
+    fn search_by_kind() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("A", SymbolKind::Class));
+        tree.add_type(make_item("B", SymbolKind::Interface));
+        tree.add_type(make_item("C", SymbolKind::Class));
+
+        let classes = TypeHierarchySearch::search_by_kind(&tree, SymbolKind::Class);
+        assert_eq!(classes, vec![0, 2]);
+    }
+
+    #[test]
+    fn search_deprecated_items() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("Fresh", SymbolKind::Class));
+        tree.add_type(make_item("Old", SymbolKind::Class).with_tag(SymbolTag::Deprecated));
+
+        let deprecated = TypeHierarchySearch::search_deprecated(&tree);
+        assert_eq!(deprecated, vec![1]);
+    }
+
+    #[test]
+    fn search_with_detail() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("NoDetail", SymbolKind::Struct));
+        tree.add_type(make_item("HasDetail", SymbolKind::Struct).with_detail("some info"));
+
+        let detailed = TypeHierarchySearch::search_with_detail(&tree);
+        assert_eq!(detailed, vec![1]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for TypeHierarchyBreadcrumb
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn breadcrumb_push_pop_current() {
+        let mut bc = TypeHierarchyBreadcrumb::new();
+        assert!(bc.is_empty());
+        assert_eq!(bc.depth(), 0);
+        assert_eq!(bc.current(), None);
+
+        bc.push("Root");
+        bc.push("Child");
+        assert_eq!(bc.depth(), 2);
+        assert_eq!(bc.current(), Some("Child"));
+
+        assert_eq!(bc.pop(), Some("Child".to_string()));
+        assert_eq!(bc.current(), Some("Root"));
+    }
+
+    #[test]
+    fn breadcrumb_full_path_and_display() {
+        let mut bc = TypeHierarchyBreadcrumb::new();
+        bc.push("Object");
+        bc.push("Animal");
+        bc.push("Cat");
+
+        assert_eq!(bc.full_path(), "Object > Animal > Cat");
+        assert_eq!(format!("{bc}"), "Object > Animal > Cat");
+    }
+
+    #[test]
+    fn breadcrumb_clear() {
+        let mut bc = TypeHierarchyBreadcrumb::new();
+        bc.push("A");
+        bc.push("B");
+        bc.clear();
+        assert!(bc.is_empty());
+        assert_eq!(bc.full_path(), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for TypeHierarchyStatistics
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn statistics_empty_tree() {
+        let tree = TypeTree::new();
+        let stats = TypeHierarchyStatistics::compute(&tree);
+        assert_eq!(stats.total_types, 0);
+        assert_eq!(stats.leaf_count, 0);
+        assert_eq!(stats.root_count, 0);
+        assert!((stats.avg_children - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn statistics_mixed_tree() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("Base", SymbolKind::Class));
+        let b = tree.add_type(make_item("Iface", SymbolKind::Interface));
+        let c = tree.add_type(make_item("Leaf", SymbolKind::Enum));
+        tree.add_subtype_edge(a, b);
+        tree.add_subtype_edge(b, c);
+
+        let stats = TypeHierarchyStatistics::compute(&tree);
+        assert_eq!(stats.total_types, 3);
+        assert_eq!(stats.class_count, 1);
+        assert_eq!(stats.interface_count, 1);
+        assert_eq!(stats.enum_count, 1);
+        assert_eq!(stats.struct_count, 0);
+        assert_eq!(stats.max_depth, 2);
+        assert_eq!(stats.leaf_count, 1); // only "Leaf"
+        assert_eq!(stats.root_count, 1); // only "Base"
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for TypeHierarchyExporter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn exporter_to_list() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("Alpha", SymbolKind::Class));
+        tree.add_type(make_item("Beta", SymbolKind::Interface));
+
+        let list = TypeHierarchyExporter::to_list(&tree);
+        assert_eq!(list, vec!["Class: Alpha", "Interface: Beta"]);
+    }
+
+    #[test]
+    fn exporter_to_text() {
+        let mut tree = TypeTree::new();
+        let root = tree.add_type(make_item("Root", SymbolKind::Class));
+        let child = tree.add_type(make_item("Child", SymbolKind::Struct));
+        tree.add_subtype_edge(root, child);
+
+        let text = TypeHierarchyExporter::to_text(&tree);
+        assert!(text.contains("Class: Root"));
+        assert!(text.contains("  Struct: Child"));
+    }
+
+    #[test]
+    fn exporter_to_dot() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("A", SymbolKind::Class));
+        let b = tree.add_type(make_item("B", SymbolKind::Class));
+        tree.add_subtype_edge(a, b);
+
+        let dot = TypeHierarchyExporter::to_dot(&tree);
+        assert!(dot.starts_with("digraph TypeHierarchy {"));
+        assert!(dot.contains("n0 [label=\"A (Class)\"]"));
+        assert!(dot.contains("n1 -> n0;"));
+        assert!(dot.ends_with("}\n"));
+    }
+
+    #[test]
+    fn exporter_empty_tree() {
+        let tree = TypeTree::new();
+        assert_eq!(TypeHierarchyExporter::to_text(&tree), "");
+        assert!(TypeHierarchyExporter::to_list(&tree).is_empty());
     }
 }

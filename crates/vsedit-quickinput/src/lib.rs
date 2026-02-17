@@ -1297,6 +1297,406 @@ impl fmt::Debug for QuickPickValidator {
 }
 
 // ---------------------------------------------------------------------------
+// QuickInputMultiStep — wizard-style multi-step input flow
+// ---------------------------------------------------------------------------
+
+/// Navigation action within a multi-step flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepAction {
+    Next,
+    Back,
+    Cancel,
+}
+
+/// A single step in a multi-step wizard flow.
+#[derive(Debug, Clone)]
+pub struct WizardStep {
+    /// Unique name for this step.
+    pub name: String,
+    /// Prompt shown to the user.
+    pub prompt: String,
+    /// Optional placeholder text.
+    pub placeholder: Option<String>,
+}
+
+impl WizardStep {
+    pub fn new(name: impl Into<String>, prompt: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            prompt: prompt.into(),
+            placeholder: None,
+        }
+    }
+
+    pub fn placeholder(mut self, text: impl Into<String>) -> Self {
+        self.placeholder = Some(text.into());
+        self
+    }
+}
+
+/// Multi-step wizard flow with forward/back navigation and per-step results.
+#[derive(Debug, Clone)]
+pub struct QuickInputMultiStep {
+    steps: Vec<WizardStep>,
+    current: usize,
+    results: Vec<Option<String>>,
+    cancelled: bool,
+}
+
+impl QuickInputMultiStep {
+    pub fn new(steps: Vec<WizardStep>) -> Self {
+        let len = steps.len();
+        Self {
+            steps,
+            current: 0,
+            results: vec![None; len],
+            cancelled: false,
+        }
+    }
+
+    /// Total number of steps.
+    pub fn total_steps(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Current step index (0-based).
+    pub fn current_index(&self) -> usize {
+        self.current
+    }
+
+    /// Returns the current step, or `None` if the wizard is empty.
+    pub fn current_step(&self) -> Option<&WizardStep> {
+        self.steps.get(self.current)
+    }
+
+    /// Whether the wizard has been cancelled.
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled
+    }
+
+    /// Whether the wizard is on the last step.
+    pub fn is_last_step(&self) -> bool {
+        self.current + 1 >= self.steps.len()
+    }
+
+    /// Store the result for the current step and apply a navigation action.
+    /// Returns `true` if navigation succeeded.
+    pub fn navigate(&mut self, action: StepAction, value: Option<String>) -> bool {
+        if self.steps.is_empty() {
+            return false;
+        }
+        if action == StepAction::Cancel {
+            self.cancelled = true;
+            return true;
+        }
+        if let Some(v) = value {
+            self.results[self.current] = Some(v);
+        }
+        match action {
+            StepAction::Next => {
+                if self.current + 1 < self.steps.len() {
+                    self.current += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            StepAction::Back => {
+                if self.current > 0 {
+                    self.current -= 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            StepAction::Cancel => unreachable!(),
+        }
+    }
+
+    /// Get the result stored for a step by index.
+    pub fn result(&self, index: usize) -> Option<&str> {
+        self.results.get(index).and_then(|r| r.as_deref())
+    }
+
+    /// Collect all results as a Vec of optional strings.
+    pub fn all_results(&self) -> &[Option<String>] {
+        &self.results
+    }
+
+    /// A human-readable progress label, e.g. "Step 2 of 3".
+    pub fn progress_label(&self) -> String {
+        format!("Step {} of {}", self.current + 1, self.steps.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputValidation — validation state machine with debounce tracking
+// ---------------------------------------------------------------------------
+
+/// State of an asynchronous validation cycle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputValidationState {
+    Idle,
+    Validating,
+    Valid,
+    Invalid(String),
+}
+
+/// Tracks asynchronous validation for an input field, including debounce
+/// timing and validator closures.
+pub struct QuickInputValidation {
+    state: InputValidationState,
+    debounce_ms: u64,
+    pending_value: Option<String>,
+    validators: Vec<Box<dyn Fn(&str) -> ValidationResult>>,
+}
+
+impl QuickInputValidation {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self {
+            state: InputValidationState::Idle,
+            debounce_ms,
+            pending_value: None,
+            validators: Vec::new(),
+        }
+    }
+
+    /// Add a synchronous validator function.
+    pub fn add_validator(&mut self, f: impl Fn(&str) -> ValidationResult + 'static) {
+        self.validators.push(Box::new(f));
+    }
+
+    /// Current validation state.
+    pub fn state(&self) -> &InputValidationState {
+        &self.state
+    }
+
+    /// Configured debounce delay in milliseconds.
+    pub fn debounce_ms(&self) -> u64 {
+        self.debounce_ms
+    }
+
+    /// Signal that the input changed; transitions to `Validating`.
+    pub fn on_input_changed(&mut self, value: impl Into<String>) {
+        self.pending_value = Some(value.into());
+        self.state = InputValidationState::Validating;
+    }
+
+    /// Run all validators against the pending value (or a supplied value).
+    /// Updates state to `Valid` or `Invalid`.
+    pub fn run_validation(&mut self) -> &InputValidationState {
+        let value = match &self.pending_value {
+            Some(v) => v.clone(),
+            None => {
+                self.state = InputValidationState::Valid;
+                return &self.state;
+            }
+        };
+
+        for validator in &self.validators {
+            match validator(&value) {
+                ValidationResult::Ok => {}
+                ValidationResult::Error(msg) => {
+                    self.state = InputValidationState::Invalid(msg);
+                    return &self.state;
+                }
+            }
+        }
+        self.state = InputValidationState::Valid;
+        &self.state
+    }
+
+    /// Reset to idle state and clear pending value.
+    pub fn reset(&mut self) {
+        self.state = InputValidationState::Idle;
+        self.pending_value = None;
+    }
+}
+
+impl fmt::Debug for QuickInputValidation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QuickInputValidation")
+            .field("state", &self.state)
+            .field("debounce_ms", &self.debounce_ms)
+            .field("pending_value", &self.pending_value)
+            .field("validator_count", &self.validators.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputHistory — persistent input history with deduplication
+// ---------------------------------------------------------------------------
+
+/// Tracks free-text input history (as opposed to `QuickPickHistory` which
+/// tracks item selections). Provides deduplication and a configurable max size.
+#[derive(Debug, Clone)]
+pub struct QuickInputHistory {
+    entries: VecDeque<String>,
+    max_size: usize,
+}
+
+impl QuickInputHistory {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            entries: VecDeque::with_capacity(max_size),
+            max_size,
+        }
+    }
+
+    /// Push a value, moving it to the front if it already exists.
+    pub fn push(&mut self, value: impl Into<String>) {
+        let value = value.into();
+        if value.is_empty() {
+            return;
+        }
+        // Remove existing duplicate
+        self.entries.retain(|e| e != &value);
+        self.entries.push_front(value);
+        while self.entries.len() > self.max_size {
+            self.entries.pop_back();
+        }
+    }
+
+    /// Return entries matching `query` (case-insensitive substring match).
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        let q = query.to_ascii_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.to_ascii_lowercase().contains(&q))
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// All entries, most recent first.
+    pub fn entries(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(String::as_str)
+    }
+
+    /// Number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputButtonBar — row of action buttons for quick input
+// ---------------------------------------------------------------------------
+
+/// A single button in a quick-input button bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputButton {
+    /// Unique identifier for the button.
+    pub id: String,
+    /// Display label.
+    pub label: String,
+    /// Optional tooltip text.
+    pub tooltip: Option<String>,
+    /// Whether the button is currently enabled.
+    pub enabled: bool,
+}
+
+impl InputButton {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            tooltip: None,
+            enabled: true,
+        }
+    }
+
+    pub fn tooltip(mut self, text: impl Into<String>) -> Self {
+        self.tooltip = Some(text.into());
+        self
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+}
+
+impl fmt::Display for InputButton {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.enabled {
+            write!(f, "[{}]", self.label)
+        } else {
+            write!(f, "({}) ", self.label)
+        }
+    }
+}
+
+/// A row of action buttons rendered at the bottom of a quick-input widget.
+#[derive(Debug, Clone, Default)]
+pub struct QuickInputButtonBar {
+    buttons: Vec<InputButton>,
+}
+
+impl QuickInputButtonBar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a button to the bar.
+    pub fn add(&mut self, button: InputButton) {
+        self.buttons.push(button);
+    }
+
+    /// Remove a button by ID. Returns `true` if found.
+    pub fn remove(&mut self, id: &str) -> bool {
+        let before = self.buttons.len();
+        self.buttons.retain(|b| b.id != id);
+        self.buttons.len() < before
+    }
+
+    /// Find a button by ID.
+    pub fn get(&self, id: &str) -> Option<&InputButton> {
+        self.buttons.iter().find(|b| b.id == id)
+    }
+
+    /// Mutable reference to a button by ID.
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut InputButton> {
+        self.buttons.iter_mut().find(|b| b.id == id)
+    }
+
+    /// All buttons in order.
+    pub fn buttons(&self) -> &[InputButton] {
+        &self.buttons
+    }
+
+    /// Number of buttons.
+    pub fn len(&self) -> usize {
+        self.buttons.len()
+    }
+
+    /// Whether the bar has no buttons.
+    pub fn is_empty(&self) -> bool {
+        self.buttons.is_empty()
+    }
+
+    /// Concatenated display string of all enabled buttons.
+    pub fn render_label(&self) -> String {
+        self.buttons
+            .iter()
+            .filter(|b| b.enabled)
+            .map(|b| format!("[{}]", b.label))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1966,5 +2366,187 @@ mod tests {
         assert_eq!(format!("{}", ValidationResult::Ok), "OK");
         let err = ValidationResult::Error("bad".into());
         assert_eq!(format!("{err}"), "Error: bad");
+    }
+
+    // -- QuickInputMultiStep ------------------------------------------------
+
+    #[test]
+    fn multi_step_navigation_forward() {
+        let steps = vec![
+            WizardStep::new("name", "Enter name"),
+            WizardStep::new("email", "Enter email"),
+            WizardStep::new("confirm", "Confirm?"),
+        ];
+        let mut wiz = QuickInputMultiStep::new(steps);
+        assert_eq!(wiz.total_steps(), 3);
+        assert_eq!(wiz.current_index(), 0);
+        assert_eq!(wiz.progress_label(), "Step 1 of 3");
+        assert!(!wiz.is_last_step());
+
+        assert!(wiz.navigate(StepAction::Next, Some("Alice".into())));
+        assert_eq!(wiz.current_index(), 1);
+        assert_eq!(wiz.result(0), Some("Alice"));
+
+        assert!(wiz.navigate(StepAction::Next, Some("a@b.c".into())));
+        assert!(wiz.is_last_step());
+        assert!(!wiz.navigate(StepAction::Next, None)); // can't go past end
+    }
+
+    #[test]
+    fn multi_step_navigation_back() {
+        let steps = vec![
+            WizardStep::new("a", "A"),
+            WizardStep::new("b", "B"),
+        ];
+        let mut wiz = QuickInputMultiStep::new(steps);
+        assert!(!wiz.navigate(StepAction::Back, None)); // already at start
+        wiz.navigate(StepAction::Next, Some("val".into()));
+        assert!(wiz.navigate(StepAction::Back, None));
+        assert_eq!(wiz.current_index(), 0);
+    }
+
+    #[test]
+    fn multi_step_cancel() {
+        let steps = vec![WizardStep::new("x", "X")];
+        let mut wiz = QuickInputMultiStep::new(steps);
+        assert!(!wiz.is_cancelled());
+        wiz.navigate(StepAction::Cancel, None);
+        assert!(wiz.is_cancelled());
+    }
+
+    #[test]
+    fn multi_step_empty() {
+        let wiz = QuickInputMultiStep::new(vec![]);
+        assert_eq!(wiz.total_steps(), 0);
+        assert!(wiz.current_step().is_none());
+    }
+
+    #[test]
+    fn wizard_step_placeholder() {
+        let step = WizardStep::new("s", "prompt").placeholder("hint");
+        assert_eq!(step.placeholder.as_deref(), Some("hint"));
+    }
+
+    // -- QuickInputValidation -----------------------------------------------
+
+    #[test]
+    fn validation_idle_to_valid() {
+        let mut v = QuickInputValidation::new(200);
+        assert_eq!(*v.state(), InputValidationState::Idle);
+        assert_eq!(v.debounce_ms(), 200);
+
+        v.on_input_changed("hello");
+        assert_eq!(*v.state(), InputValidationState::Validating);
+        v.run_validation();
+        assert_eq!(*v.state(), InputValidationState::Valid);
+    }
+
+    #[test]
+    fn validation_with_failing_validator() {
+        let mut v = QuickInputValidation::new(100);
+        v.add_validator(|s| {
+            if s.contains(' ') {
+                ValidationResult::Error("No spaces".into())
+            } else {
+                ValidationResult::Ok
+            }
+        });
+        v.on_input_changed("has space");
+        v.run_validation();
+        assert_eq!(
+            *v.state(),
+            InputValidationState::Invalid("No spaces".into())
+        );
+    }
+
+    #[test]
+    fn validation_reset() {
+        let mut v = QuickInputValidation::new(50);
+        v.on_input_changed("x");
+        v.run_validation();
+        v.reset();
+        assert_eq!(*v.state(), InputValidationState::Idle);
+    }
+
+    // -- QuickInputHistory --------------------------------------------------
+
+    #[test]
+    fn history_push_and_dedup() {
+        let mut h = QuickInputHistory::new(5);
+        h.push("alpha");
+        h.push("beta");
+        h.push("alpha"); // moves to front
+        let entries: Vec<&str> = h.entries().collect();
+        assert_eq!(entries, vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn history_max_size() {
+        let mut h = QuickInputHistory::new(2);
+        h.push("a");
+        h.push("b");
+        h.push("c");
+        assert_eq!(h.len(), 2);
+        let entries: Vec<&str> = h.entries().collect();
+        assert_eq!(entries, vec!["c", "b"]);
+    }
+
+    #[test]
+    fn history_search() {
+        let mut h = QuickInputHistory::new(10);
+        h.push("cargo build");
+        h.push("cargo test");
+        h.push("git status");
+        let results = h.search("cargo");
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&"cargo build"));
+    }
+
+    #[test]
+    fn history_empty_push_ignored() {
+        let mut h = QuickInputHistory::new(5);
+        h.push("");
+        assert!(h.is_empty());
+    }
+
+    // -- QuickInputButtonBar ------------------------------------------------
+
+    #[test]
+    fn button_bar_add_remove() {
+        let mut bar = QuickInputButtonBar::new();
+        bar.add(InputButton::new("ok", "OK"));
+        bar.add(InputButton::new("cancel", "Cancel"));
+        assert_eq!(bar.len(), 2);
+
+        assert!(bar.remove("ok"));
+        assert_eq!(bar.len(), 1);
+        assert!(!bar.remove("nonexistent"));
+    }
+
+    #[test]
+    fn button_bar_get_and_mutate() {
+        let mut bar = QuickInputButtonBar::new();
+        bar.add(InputButton::new("save", "Save").tooltip("Save file"));
+        assert_eq!(bar.get("save").unwrap().tooltip.as_deref(), Some("Save file"));
+
+        bar.get_mut("save").unwrap().enabled = false;
+        assert!(!bar.get("save").unwrap().enabled);
+    }
+
+    #[test]
+    fn button_bar_render_label() {
+        let mut bar = QuickInputButtonBar::new();
+        bar.add(InputButton::new("a", "Apply"));
+        bar.add(InputButton::new("d", "Discard").enabled(false));
+        bar.add(InputButton::new("c", "Close"));
+        assert_eq!(bar.render_label(), "[Apply] [Close]");
+    }
+
+    #[test]
+    fn button_display() {
+        let btn = InputButton::new("x", "Go");
+        assert_eq!(format!("{btn}"), "[Go]");
+        let disabled = InputButton::new("y", "No").enabled(false);
+        assert_eq!(format!("{disabled}"), "(No) ");
     }
 }

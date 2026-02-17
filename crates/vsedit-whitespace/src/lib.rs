@@ -1273,6 +1273,140 @@ fn gcd_usize(mut a: usize, mut b: usize) -> usize {
     a
 }
 
+// -- WhitespaceDetector for mixed indentation --------------------------------
+
+/// Result of inspecting a line's indentation type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndentationType {
+    Tabs,
+    Spaces,
+    Mixed,
+    None,
+}
+
+impl fmt::Display for IndentationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IndentationType::Tabs => f.write_str("tabs"),
+            IndentationType::Spaces => f.write_str("spaces"),
+            IndentationType::Mixed => f.write_str("mixed"),
+            IndentationType::None => f.write_str("none"),
+        }
+    }
+}
+
+/// Detect the indentation type of a single line.
+pub fn detect_line_indentation(line: &str) -> IndentationType {
+    let mut has_tabs = false;
+    let mut has_spaces = false;
+    for ch in line.chars() {
+        match ch {
+            '\t' => has_tabs = true,
+            ' ' => has_spaces = true,
+            _ => break,
+        }
+    }
+    match (has_tabs, has_spaces) {
+        (true, true) => IndentationType::Mixed,
+        (true, false) => IndentationType::Tabs,
+        (false, true) => IndentationType::Spaces,
+        (false, false) => IndentationType::None,
+    }
+}
+
+/// Detect mixed indentation across all lines. Returns line numbers (1-based) with mixed indent.
+pub fn detect_mixed_indentation(text: &str) -> Vec<usize> {
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| detect_line_indentation(line) == IndentationType::Mixed)
+        .map(|(i, _)| i + 1)
+        .collect()
+}
+
+// -- WhitespaceNormalizer for trailing/leading cleanup -------------------------
+
+/// Remove trailing blank lines, keeping at most one final newline.
+pub fn trim_trailing_blank_lines(text: &str) -> String {
+    let trimmed = text.trim_end();
+    if text.ends_with('\n') && !trimmed.is_empty() {
+        format!("{trimmed}\n")
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Count the number of lines that have trailing whitespace.
+pub fn count_trailing_whitespace_lines(text: &str) -> usize {
+    text.lines().filter(|line| {
+        let trimmed = line.trim_end();
+        trimmed.len() < line.len()
+    }).count()
+}
+
+// -- Whitespace visualization toggle ------------------------------------------
+
+/// Configuration for whitespace visualization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WhitespaceVisualization {
+    pub mode: WhitespaceMode,
+    pub space_char: char,
+    pub tab_char: char,
+    pub newline_char: Option<char>,
+}
+
+impl Default for WhitespaceVisualization {
+    fn default() -> Self {
+        Self {
+            mode: WhitespaceMode::None,
+            space_char: '·',
+            tab_char: '→',
+            newline_char: None,
+        }
+    }
+}
+
+impl WhitespaceVisualization {
+    /// Render a line with visible whitespace markers.
+    pub fn render_line(&self, line: &str) -> String {
+        if self.mode == WhitespaceMode::None {
+            return line.to_string();
+        }
+        let mut result = String::with_capacity(line.len());
+        let trimmed_end = line.trim_end().len();
+        for (i, ch) in line.chars().enumerate() {
+            match ch {
+                ' ' => {
+                    let show = match self.mode {
+                        WhitespaceMode::All => true,
+                        WhitespaceMode::Trailing => i >= trimmed_end,
+                        WhitespaceMode::Boundary => {
+                            i == 0 || i >= trimmed_end
+                        }
+                        _ => false,
+                    };
+                    result.push(if show { self.space_char } else { ' ' });
+                }
+                '\t' => {
+                    let show = match self.mode {
+                        WhitespaceMode::All | WhitespaceMode::Boundary => true,
+                        WhitespaceMode::Trailing => i >= trimmed_end,
+                        _ => false,
+                    };
+                    result.push(if show { self.tab_char } else { '\t' });
+                }
+                other => result.push(other),
+            }
+        }
+        result
+    }
+}
+
+impl fmt::Display for WhitespaceVisualization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Visualization(mode={}, space='{}', tab='{}')", self.mode, self.space_char, self.tab_char)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1969,5 +2103,113 @@ mod tests {
     #[test]
     fn guess_indent_size_none() {
         assert_eq!(guess_indent_size("hello\nworld", 4), None);
+    }
+
+    // -- IndentationType tests ------------------------------------------------
+
+    #[test]
+    fn detect_line_indentation_tabs() {
+        assert_eq!(detect_line_indentation("\thello"), IndentationType::Tabs);
+    }
+
+    #[test]
+    fn detect_line_indentation_spaces() {
+        assert_eq!(detect_line_indentation("    hello"), IndentationType::Spaces);
+    }
+
+    #[test]
+    fn detect_line_indentation_mixed() {
+        assert_eq!(detect_line_indentation("\t hello"), IndentationType::Mixed);
+    }
+
+    #[test]
+    fn detect_line_indentation_none() {
+        assert_eq!(detect_line_indentation("hello"), IndentationType::None);
+    }
+
+    #[test]
+    fn detect_mixed_indentation_finds_lines() {
+        let text = "    a\n\t b\n\tc\n";
+        let mixed = detect_mixed_indentation(text);
+        assert_eq!(mixed, vec![2]);
+    }
+
+    // -- WhitespaceConverter tests --------------------------------------------
+
+    #[test]
+    fn tabs_to_spaces_basic() {
+        assert_eq!(tabs_to_spaces("\thello", 4), "    hello");
+    }
+
+    #[test]
+    fn tabs_to_spaces_nested() {
+        assert_eq!(tabs_to_spaces("\t\thello", 2), "    hello");
+    }
+
+    #[test]
+    fn spaces_to_tabs_basic() {
+        assert_eq!(spaces_to_tabs("    hello", 4), "\thello");
+    }
+
+    #[test]
+    fn spaces_to_tabs_remainder() {
+        let result = spaces_to_tabs("      hello", 4);
+        assert_eq!(result, "\t  hello");
+    }
+
+    // -- WhitespaceNormalizer tests --------------------------------------------
+
+    #[test]
+    fn trim_trailing_whitespace_removes() {
+        assert_eq!(trim_trailing_whitespace("hello   \nworld  "), "hello\nworld");
+    }
+
+    #[test]
+    fn trim_trailing_blank_lines_keeps_one() {
+        assert_eq!(trim_trailing_blank_lines("hello\n\n\n"), "hello\n");
+    }
+
+    #[test]
+    fn ensure_final_newline_adds() {
+        assert_eq!(ensure_final_newline("hello"), "hello\n");
+        assert_eq!(ensure_final_newline("hello\n"), "hello\n");
+    }
+
+    #[test]
+    fn count_trailing_whitespace_lines_counts() {
+        assert_eq!(count_trailing_whitespace_lines("hello  \nworld\nfoo \n"), 2);
+    }
+
+    // -- WhitespaceVisualization tests -----------------------------------------
+
+    #[test]
+    fn visualization_none_mode() {
+        let viz = WhitespaceVisualization::default();
+        assert_eq!(viz.render_line("  hello  "), "  hello  ");
+    }
+
+    #[test]
+    fn visualization_all_mode() {
+        let viz = WhitespaceVisualization { mode: WhitespaceMode::All, ..Default::default() };
+        assert_eq!(viz.render_line(" x "), "·x·");
+    }
+
+    #[test]
+    fn visualization_trailing_mode() {
+        let viz = WhitespaceVisualization { mode: WhitespaceMode::Trailing, ..Default::default() };
+        assert_eq!(viz.render_line("hello  "), "hello··");
+    }
+
+    #[test]
+    fn visualization_display() {
+        let viz = WhitespaceVisualization::default();
+        let s = viz.to_string();
+        assert!(s.contains("none"));
+    }
+
+    #[test]
+    fn indentation_type_display() {
+        assert_eq!(IndentationType::Mixed.to_string(), "mixed");
+        assert_eq!(IndentationType::Tabs.to_string(), "tabs");
     }
 }

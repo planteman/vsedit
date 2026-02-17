@@ -1146,6 +1146,303 @@ pub fn filter_by_max_nesting(lines: &[StickyScrollLine], max: u32) -> Vec<&Stick
     lines.iter().filter(|l| l.nesting_level <= max).collect()
 }
 
+// ---------------------------------------------------------------------------
+// StickyScrollNesting – tracks indentation levels for scope detection
+// ---------------------------------------------------------------------------
+
+/// Tracks indentation-based nesting levels for sticky scroll scope detection.
+#[derive(Debug, Clone)]
+pub struct StickyScrollNesting {
+    /// Stack of (line_number, indentation_level) pairs representing open scopes.
+    scope_stack: Vec<(u32, u32)>,
+    /// Number of spaces that constitute one indentation level.
+    indent_size: u32,
+}
+
+impl StickyScrollNesting {
+    pub fn new(indent_size: u32) -> Self {
+        Self {
+            scope_stack: Vec::new(),
+            indent_size: if indent_size == 0 { 4 } else { indent_size },
+        }
+    }
+
+    /// Compute the indentation level of a line based on leading whitespace.
+    pub fn indentation_level(&self, line: &str) -> u32 {
+        let spaces: u32 = line
+            .chars()
+            .take_while(|c| *c == ' ')
+            .count() as u32;
+        spaces / self.indent_size
+    }
+
+    /// Push a scope-opening line onto the stack.
+    pub fn push_scope(&mut self, line_number: u32, indent_level: u32) {
+        self.scope_stack.push((line_number, indent_level));
+    }
+
+    /// Pop scopes that are at the same or deeper indentation than `current_level`.
+    pub fn pop_to_level(&mut self, current_level: u32) -> Vec<(u32, u32)> {
+        let mut popped = Vec::new();
+        while let Some(&(_, lvl)) = self.scope_stack.last() {
+            if lvl >= current_level {
+                popped.push(self.scope_stack.pop().unwrap());
+            } else {
+                break;
+            }
+        }
+        popped
+    }
+
+    /// Return the current nesting depth.
+    pub fn depth(&self) -> usize {
+        self.scope_stack.len()
+    }
+
+    /// Return the active scope lines (line numbers of all open scopes).
+    pub fn active_scopes(&self) -> Vec<u32> {
+        self.scope_stack.iter().map(|(ln, _)| *ln).collect()
+    }
+
+    /// Clear all tracked scopes.
+    pub fn clear(&mut self) {
+        self.scope_stack.clear();
+    }
+
+    /// Return scope stack entries.
+    pub fn scope_entries(&self) -> &[(u32, u32)] {
+        &self.scope_stack
+    }
+}
+
+impl Default for StickyScrollNesting {
+    fn default() -> Self {
+        Self::new(4)
+    }
+}
+
+impl fmt::Display for StickyScrollNesting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StickyScrollNesting(depth={}, indent={})", self.depth(), self.indent_size)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StickyScrollAnimation – smooth transitions for sticky scroll area
+// ---------------------------------------------------------------------------
+
+/// Represents the animation state for sticky scroll transitions.
+#[derive(Debug, Clone)]
+pub struct StickyScrollAnimation {
+    /// Current scroll offset in pixels (fractional for smooth scrolling).
+    pub current_offset: f64,
+    /// Target scroll offset.
+    pub target_offset: f64,
+    /// Animation duration in milliseconds.
+    pub duration_ms: u32,
+    /// Elapsed time in milliseconds.
+    pub elapsed_ms: u32,
+    /// Whether the animation is currently running.
+    pub running: bool,
+}
+
+impl StickyScrollAnimation {
+    pub fn new(duration_ms: u32) -> Self {
+        Self {
+            current_offset: 0.0,
+            target_offset: 0.0,
+            duration_ms,
+            elapsed_ms: 0,
+            running: false,
+        }
+    }
+
+    /// Start an animation to the given target offset.
+    pub fn animate_to(&mut self, target: f64) {
+        if (self.current_offset - target).abs() < 0.001 {
+            return;
+        }
+        self.target_offset = target;
+        self.elapsed_ms = 0;
+        self.running = true;
+    }
+
+    /// Advance the animation by `delta_ms` milliseconds. Returns the new offset.
+    pub fn tick(&mut self, delta_ms: u32) -> f64 {
+        if !self.running {
+            return self.current_offset;
+        }
+        self.elapsed_ms += delta_ms;
+        if self.elapsed_ms >= self.duration_ms {
+            self.current_offset = self.target_offset;
+            self.running = false;
+        } else {
+            let t = self.elapsed_ms as f64 / self.duration_ms as f64;
+            // ease-out cubic: 1 - (1-t)^3
+            let eased = 1.0 - (1.0 - t).powi(3);
+            let start = self.current_offset;
+            self.current_offset = start + (self.target_offset - start) * eased;
+        }
+        self.current_offset
+    }
+
+    /// Whether the animation has completed.
+    pub fn is_complete(&self) -> bool {
+        !self.running
+    }
+
+    /// Reset animation state to zero.
+    pub fn reset(&mut self) {
+        self.current_offset = 0.0;
+        self.target_offset = 0.0;
+        self.elapsed_ms = 0;
+        self.running = false;
+    }
+
+    /// Progress as a fraction 0.0..=1.0.
+    pub fn progress(&self) -> f64 {
+        if !self.running {
+            return 1.0;
+        }
+        if self.duration_ms == 0 {
+            return 1.0;
+        }
+        (self.elapsed_ms as f64 / self.duration_ms as f64).min(1.0)
+    }
+}
+
+impl Default for StickyScrollAnimation {
+    fn default() -> Self {
+        Self::new(150)
+    }
+}
+
+impl fmt::Display for StickyScrollAnimation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Animation(offset={:.1}, target={:.1}, {})",
+            self.current_offset,
+            self.target_offset,
+            if self.running { "running" } else { "idle" }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Partial line display – shows a clipped portion of a sticky line
+// ---------------------------------------------------------------------------
+
+/// A partial view of a sticky scroll line for rendering.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StickyScrollPartialLine {
+    pub line_number: u32,
+    pub visible_text: String,
+    pub is_truncated: bool,
+    pub visible_fraction: f64,
+}
+
+impl StickyScrollPartialLine {
+    /// Create a partial line by clipping text to `max_chars`.
+    pub fn from_line(line: &StickyScrollLine, max_chars: usize) -> Self {
+        let text = &line.text;
+        if text.len() <= max_chars {
+            Self {
+                line_number: line.line_number,
+                visible_text: text.clone(),
+                is_truncated: false,
+                visible_fraction: 1.0,
+            }
+        } else {
+            Self {
+                line_number: line.line_number,
+                visible_text: format!("{}…", &text[..max_chars]),
+                is_truncated: true,
+                visible_fraction: max_chars as f64 / text.len() as f64,
+            }
+        }
+    }
+}
+
+impl fmt::Display for StickyScrollPartialLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "L{}: {}", self.line_number, self.visible_text)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Context-based scope detection
+// ---------------------------------------------------------------------------
+
+/// Detects scope boundaries in source code based on simple heuristics.
+#[derive(Debug, Clone)]
+pub struct ScopeDetector {
+    /// Keywords that open a new scope (e.g., "fn", "class", "if").
+    pub scope_keywords: Vec<String>,
+}
+
+impl ScopeDetector {
+    pub fn new(keywords: Vec<String>) -> Self {
+        Self { scope_keywords: keywords }
+    }
+
+    /// Default scope detector for Rust-like languages.
+    pub fn rust_default() -> Self {
+        Self::new(vec![
+            "fn".into(), "struct".into(), "enum".into(),
+            "impl".into(), "mod".into(), "trait".into(),
+            "if".into(), "for".into(), "while".into(), "loop".into(),
+        ])
+    }
+
+    /// Check if a line opens a new scope by containing a keyword followed by content.
+    pub fn is_scope_opener(&self, line: &str) -> bool {
+        let trimmed = line.trim();
+        self.scope_keywords.iter().any(|kw| {
+            trimmed.starts_with(kw.as_str())
+                && trimmed.len() > kw.len()
+                && trimmed.as_bytes().get(kw.len()).map_or(false, |b| *b == b' ' || *b == b'(')
+        })
+    }
+
+    /// Detect all scope-opening lines in a document and return their line numbers (1-based).
+    pub fn detect_scopes(&self, lines: &[&str]) -> Vec<u32> {
+        lines.iter().enumerate()
+            .filter(|(_, l)| self.is_scope_opener(l))
+            .map(|(i, _)| (i + 1) as u32)
+            .collect()
+    }
+
+    /// Build sticky scroll lines from detected scopes.
+    pub fn build_sticky_lines(&self, lines: &[&str], nesting: &StickyScrollNesting) -> Vec<StickyScrollLine> {
+        let mut result = Vec::new();
+        for (i, line) in lines.iter().enumerate() {
+            if self.is_scope_opener(line) {
+                let level = nesting.indentation_level(line);
+                result.push(StickyScrollLine {
+                    line_number: (i + 1) as u32,
+                    text: line.trim().to_string(),
+                    nesting_level: level,
+                    collapsed: false,
+                });
+            }
+        }
+        result
+    }
+}
+
+impl Default for ScopeDetector {
+    fn default() -> Self {
+        Self::rust_default()
+    }
+}
+
+impl fmt::Display for ScopeDetector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ScopeDetector({} keywords)", self.scope_keywords.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1923,5 +2220,171 @@ mod tests {
         let lines = vec![make_line(1, "a", 0), make_line(2, "b", 2), make_line(3, "c", 1)];
         let filtered = filter_by_max_nesting(&lines, 1);
         assert_eq!(filtered.len(), 2);
+    }
+
+    // -- StickyScrollNesting -----------------------------------------------
+
+    #[test]
+    fn nesting_indentation_level() {
+        let n = StickyScrollNesting::new(4);
+        assert_eq!(n.indentation_level("hello"), 0);
+        assert_eq!(n.indentation_level("    hello"), 1);
+        assert_eq!(n.indentation_level("        hello"), 2);
+        assert_eq!(n.indentation_level("  hello"), 0); // 2 spaces < 4
+    }
+
+    #[test]
+    fn nesting_push_and_pop_scopes() {
+        let mut n = StickyScrollNesting::new(4);
+        n.push_scope(1, 0);
+        n.push_scope(5, 1);
+        n.push_scope(10, 2);
+        assert_eq!(n.depth(), 3);
+
+        let popped = n.pop_to_level(1);
+        assert_eq!(popped.len(), 2);
+        assert_eq!(n.depth(), 1);
+    }
+
+    #[test]
+    fn nesting_active_scopes() {
+        let mut n = StickyScrollNesting::new(4);
+        n.push_scope(1, 0);
+        n.push_scope(5, 1);
+        assert_eq!(n.active_scopes(), vec![1, 5]);
+    }
+
+    #[test]
+    fn nesting_clear() {
+        let mut n = StickyScrollNesting::new(4);
+        n.push_scope(1, 0);
+        n.clear();
+        assert_eq!(n.depth(), 0);
+    }
+
+    #[test]
+    fn nesting_default_indent_size() {
+        let n = StickyScrollNesting::default();
+        assert_eq!(n.indentation_level("        x"), 2);
+        assert_eq!(format!("{n}"), "StickyScrollNesting(depth=0, indent=4)");
+    }
+
+    #[test]
+    fn nesting_zero_indent_uses_default() {
+        let n = StickyScrollNesting::new(0);
+        assert_eq!(n.indentation_level("    x"), 1);
+    }
+
+    // -- StickyScrollAnimation ---------------------------------------------
+
+    #[test]
+    fn animation_idle_by_default() {
+        let a = StickyScrollAnimation::default();
+        assert!(a.is_complete());
+        assert_eq!(a.progress(), 1.0);
+    }
+
+    #[test]
+    fn animation_animate_and_tick() {
+        let mut a = StickyScrollAnimation::new(100);
+        a.animate_to(50.0);
+        assert!(!a.is_complete());
+        a.tick(50);
+        assert!(a.current_offset > 0.0);
+        assert!(a.current_offset < 50.0);
+        a.tick(100);
+        assert!(a.is_complete());
+        assert!((a.current_offset - 50.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn animation_no_op_when_already_at_target() {
+        let mut a = StickyScrollAnimation::new(100);
+        a.animate_to(0.0);
+        assert!(a.is_complete());
+    }
+
+    #[test]
+    fn animation_reset() {
+        let mut a = StickyScrollAnimation::new(100);
+        a.animate_to(50.0);
+        a.tick(30);
+        a.reset();
+        assert!(a.is_complete());
+        assert_eq!(a.current_offset, 0.0);
+    }
+
+    #[test]
+    fn animation_display() {
+        let a = StickyScrollAnimation::new(100);
+        let s = format!("{a}");
+        assert!(s.contains("idle"));
+    }
+
+    // -- StickyScrollPartialLine -------------------------------------------
+
+    #[test]
+    fn partial_line_no_truncation() {
+        let line = make_line(1, "short", 0);
+        let partial = StickyScrollPartialLine::from_line(&line, 100);
+        assert!(!partial.is_truncated);
+        assert!((partial.visible_fraction - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn partial_line_truncated() {
+        let line = make_line(1, "a very long line of text here", 0);
+        let partial = StickyScrollPartialLine::from_line(&line, 10);
+        assert!(partial.is_truncated);
+        assert!(partial.visible_text.ends_with('…'));
+        assert!(partial.visible_fraction < 1.0);
+    }
+
+    // -- ScopeDetector -----------------------------------------------------
+
+    #[test]
+    fn scope_detector_rust_default() {
+        let det = ScopeDetector::rust_default();
+        assert!(det.is_scope_opener("fn main() {"));
+        assert!(det.is_scope_opener("struct Foo {"));
+        assert!(!det.is_scope_opener("let x = 5;"));
+        assert!(!det.is_scope_opener("// fn comment"));
+    }
+
+    #[test]
+    fn scope_detector_detect_scopes() {
+        let det = ScopeDetector::rust_default();
+        let lines = vec![
+            "fn main() {",
+            "    let x = 1;",
+            "    if x > 0 {",
+            "    }",
+            "}",
+        ];
+        let scopes = det.detect_scopes(&lines);
+        assert_eq!(scopes, vec![1, 3]);
+    }
+
+    #[test]
+    fn scope_detector_build_sticky_lines() {
+        let det = ScopeDetector::rust_default();
+        let n = StickyScrollNesting::new(4);
+        let lines = vec![
+            "fn outer() {",
+            "    fn inner() {",
+            "    }",
+            "}",
+        ];
+        let sticky = det.build_sticky_lines(&lines, &n);
+        assert_eq!(sticky.len(), 2);
+        assert_eq!(sticky[0].nesting_level, 0);
+        assert_eq!(sticky[1].nesting_level, 1);
+    }
+
+    #[test]
+    fn scope_detector_display() {
+        let det = ScopeDetector::default();
+        let s = format!("{det}");
+        assert!(s.contains("keywords"));
     }
 }

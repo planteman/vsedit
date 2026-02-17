@@ -1093,6 +1093,275 @@ impl fmt::Display for SessionSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AccountMergerService – merge two AccountInfo records
+// ---------------------------------------------------------------------------
+
+/// Service for merging duplicate accounts.
+pub struct AccountMergerService {
+    merge_log: Vec<(String, String)>,
+}
+
+impl AccountMergerService {
+    pub fn new() -> Self {
+        Self {
+            merge_log: Vec::new(),
+        }
+    }
+
+    /// Returns `true` if both `from_id` and `to_id` exist and are different.
+    pub fn can_merge(accounts: &[AccountInfo], from_id: &str, to_id: &str) -> bool {
+        if from_id == to_id {
+            return false;
+        }
+        let has_from = accounts.iter().any(|a| a.id == from_id);
+        let has_to = accounts.iter().any(|a| a.id == to_id);
+        has_from && has_to
+    }
+
+    /// Merge the account `from_id` into `to_id`.
+    ///
+    /// Copies email from `from` to `to` when `to` is missing it, then removes `from`.
+    pub fn merge(
+        &mut self,
+        accounts: &mut Vec<AccountInfo>,
+        from_id: &str,
+        to_id: &str,
+    ) -> Result<(), String> {
+        if from_id == to_id {
+            return Err("cannot merge an account into itself".to_string());
+        }
+        let from_idx = accounts
+            .iter()
+            .position(|a| a.id == from_id)
+            .ok_or_else(|| format!("source account '{from_id}' not found"))?;
+        let to_idx = accounts
+            .iter()
+            .position(|a| a.id == to_id)
+            .ok_or_else(|| format!("target account '{to_id}' not found"))?;
+
+        let from_email = accounts[from_idx].email.clone();
+
+        if accounts[to_idx].email.is_none() {
+            accounts[to_idx].email = from_email;
+        }
+
+        accounts.remove(from_idx);
+        self.merge_log
+            .push((from_id.to_string(), to_id.to_string()));
+        Ok(())
+    }
+
+    pub fn merge_count(&self) -> usize {
+        self.merge_log.len()
+    }
+
+    pub fn merge_history(&self) -> &[(String, String)] {
+        &self.merge_log
+    }
+}
+
+impl Default for AccountMergerService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccountSessionRefresher – retry-aware token refresh helper
+// ---------------------------------------------------------------------------
+
+/// Result of a refresh attempt.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RefreshResult {
+    Success,
+    Retry,
+    Exhausted,
+}
+
+/// Tracks retry state for session token refreshes.
+pub struct AccountSessionRefresher {
+    retry_count: u32,
+    max_retries: u32,
+    last_attempt_ms: Option<u64>,
+}
+
+impl AccountSessionRefresher {
+    pub fn new(max_retries: u32) -> Self {
+        Self {
+            retry_count: 0,
+            max_retries,
+            last_attempt_ms: None,
+        }
+    }
+
+    /// Attempt a refresh. Returns `Success` while under the limit, `Exhausted` once the
+    /// maximum number of retries has been reached.
+    pub fn attempt_refresh(&mut self, _session_id: &str, now_ms: u64) -> RefreshResult {
+        self.last_attempt_ms = Some(now_ms);
+        if self.retry_count < self.max_retries {
+            self.retry_count += 1;
+            RefreshResult::Success
+        } else {
+            RefreshResult::Exhausted
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.retry_count = 0;
+        self.last_attempt_ms = None;
+    }
+
+    pub fn attempts(&self) -> u32 {
+        self.retry_count
+    }
+
+    /// Returns `true` if the session has expired relative to `now_ms`.
+    pub fn needs_refresh(session: &AccountSession, now_ms: u64) -> bool {
+        match session.expires_at {
+            Some(exp) => now_ms >= exp,
+            None => false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccountProviderPriority – ordering providers by priority
+// ---------------------------------------------------------------------------
+
+/// Maps provider IDs to numeric priorities (lower = higher priority).
+pub struct AccountProviderPriority {
+    priorities: HashMap<String, u32>,
+}
+
+impl AccountProviderPriority {
+    pub fn new() -> Self {
+        Self {
+            priorities: HashMap::new(),
+        }
+    }
+
+    pub fn set_priority(&mut self, provider_id: impl Into<String>, priority: u32) {
+        self.priorities.insert(provider_id.into(), priority);
+    }
+
+    /// Returns the priority for a provider, defaulting to 100.
+    pub fn get_priority(&self, provider_id: &str) -> u32 {
+        self.priorities.get(provider_id).copied().unwrap_or(100)
+    }
+
+    /// Returns provider IDs sorted by ascending priority.
+    pub fn sorted_providers(&self) -> Vec<String> {
+        let mut entries: Vec<_> = self.priorities.iter().collect();
+        entries.sort_by_key(|(_, p)| **p);
+        entries.into_iter().map(|(id, _)| id.clone()).collect()
+    }
+
+    /// Returns the provider with the lowest (highest-priority) value.
+    pub fn highest_priority(&self) -> Option<String> {
+        self.priorities
+            .iter()
+            .min_by_key(|(_, p)| **p)
+            .map(|(id, _)| id.clone())
+    }
+
+    pub fn remove(&mut self, provider_id: &str) {
+        self.priorities.remove(provider_id);
+    }
+
+    pub fn count(&self) -> usize {
+        self.priorities.len()
+    }
+}
+
+impl Default for AccountProviderPriority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccountActivityLogger – activity log with summaries
+// ---------------------------------------------------------------------------
+
+/// A single logged activity.
+#[derive(Debug, Clone)]
+pub struct AccountActivity {
+    pub account_id: String,
+    pub action: String,
+    pub timestamp: u64,
+}
+
+impl fmt::Display for AccountActivity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {} @ {}",
+            self.account_id, self.action, self.timestamp
+        )
+    }
+}
+
+/// Logger that records account activities and provides query helpers.
+pub struct AccountActivityLogger {
+    log: Vec<AccountActivity>,
+}
+
+impl AccountActivityLogger {
+    pub fn new() -> Self {
+        Self { log: Vec::new() }
+    }
+
+    pub fn log_activity(
+        &mut self,
+        account_id: impl Into<String>,
+        action: impl Into<String>,
+        timestamp: u64,
+    ) {
+        self.log.push(AccountActivity {
+            account_id: account_id.into(),
+            action: action.into(),
+            timestamp,
+        });
+    }
+
+    pub fn activities_for(&self, account_id: &str) -> Vec<&AccountActivity> {
+        self.log
+            .iter()
+            .filter(|a| a.account_id == account_id)
+            .collect()
+    }
+
+    /// Returns a slice of the last `n` activities (or all if fewer exist).
+    pub fn recent(&self, n: usize) -> &[AccountActivity] {
+        let start = self.log.len().saturating_sub(n);
+        &self.log[start..]
+    }
+
+    pub fn count(&self) -> usize {
+        self.log.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.log.clear();
+    }
+
+    /// Returns a count of each distinct action string.
+    pub fn actions_summary(&self) -> HashMap<String, usize> {
+        let mut map = HashMap::new();
+        for entry in &self.log {
+            *map.entry(entry.action.clone()).or_insert(0) += 1;
+        }
+        map
+    }
+}
+
+impl Default for AccountActivityLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1922,5 +2191,178 @@ mod tests {
         assert!(display.contains("providers=2"));
         assert!(display.contains("scopes=3"));
         assert!(display.contains("emails=2"));
+    }
+
+    // -----------------------------------------------------------------------
+    // AccountMergerService tests
+    // -----------------------------------------------------------------------
+
+    fn make_account(id: &str, email: Option<&str>) -> AccountInfo {
+        AccountInfo {
+            id: id.to_string(),
+            label: format!("User {id}"),
+            provider_id: "github".to_string(),
+            email: email.map(|e| e.to_string()),
+        }
+    }
+
+    #[test]
+    fn merger_basic_merge() {
+        let mut merger = AccountMergerService::new();
+        let mut accounts = vec![
+            make_account("a1", Some("a1@x.com")),
+            make_account("a2", None),
+        ];
+        assert!(merger.merge(&mut accounts, "a1", "a2").is_ok());
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].email.as_deref(), Some("a1@x.com"));
+        assert_eq!(merger.merge_count(), 1);
+    }
+
+    #[test]
+    fn merger_does_not_overwrite_existing_email() {
+        let mut merger = AccountMergerService::new();
+        let mut accounts = vec![
+            make_account("a1", Some("old@x.com")),
+            make_account("a2", Some("keep@x.com")),
+        ];
+        assert!(merger.merge(&mut accounts, "a1", "a2").is_ok());
+        assert_eq!(accounts[0].email.as_deref(), Some("keep@x.com"));
+    }
+
+    #[test]
+    fn merger_rejects_same_id() {
+        let mut merger = AccountMergerService::new();
+        let mut accounts = vec![make_account("a1", None)];
+        assert!(merger.merge(&mut accounts, "a1", "a1").is_err());
+    }
+
+    #[test]
+    fn merger_can_merge_checks() {
+        let accounts = vec![make_account("a1", None), make_account("a2", None)];
+        assert!(AccountMergerService::can_merge(&accounts, "a1", "a2"));
+        assert!(!AccountMergerService::can_merge(&accounts, "a1", "a1"));
+        assert!(!AccountMergerService::can_merge(&accounts, "a1", "missing"));
+    }
+
+    #[test]
+    fn merger_history() {
+        let mut merger = AccountMergerService::new();
+        let mut accounts = vec![
+            make_account("a1", None),
+            make_account("a2", None),
+            make_account("a3", None),
+        ];
+        merger.merge(&mut accounts, "a1", "a2").unwrap();
+        merger.merge(&mut accounts, "a3", "a2").unwrap();
+        assert_eq!(merger.merge_history().len(), 2);
+        assert_eq!(merger.merge_history()[0], ("a1".to_string(), "a2".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // AccountSessionRefresher tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn refresher_success_then_exhausted() {
+        let mut r = AccountSessionRefresher::new(2);
+        assert_eq!(r.attempt_refresh("s1", 100), RefreshResult::Success);
+        assert_eq!(r.attempt_refresh("s1", 200), RefreshResult::Success);
+        assert_eq!(r.attempt_refresh("s1", 300), RefreshResult::Exhausted);
+        assert_eq!(r.attempts(), 2);
+    }
+
+    #[test]
+    fn refresher_reset() {
+        let mut r = AccountSessionRefresher::new(1);
+        r.attempt_refresh("s1", 10);
+        r.reset();
+        assert_eq!(r.attempts(), 0);
+        assert_eq!(r.attempt_refresh("s1", 20), RefreshResult::Success);
+    }
+
+    #[test]
+    fn refresher_needs_refresh() {
+        let sess = make_test_account_session(Some(1000));
+        assert!(AccountSessionRefresher::needs_refresh(&sess, 1000));
+        assert!(!AccountSessionRefresher::needs_refresh(&sess, 999));
+        let no_exp = make_test_account_session(None);
+        assert!(!AccountSessionRefresher::needs_refresh(&no_exp, 99999));
+    }
+
+    // -----------------------------------------------------------------------
+    // AccountProviderPriority tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn provider_priority_sorted() {
+        let mut pp = AccountProviderPriority::new();
+        pp.set_priority("azure", 30);
+        pp.set_priority("github", 10);
+        pp.set_priority("gitlab", 20);
+        let sorted = pp.sorted_providers();
+        assert_eq!(sorted, vec!["github", "gitlab", "azure"]);
+        assert_eq!(pp.highest_priority().as_deref(), Some("github"));
+    }
+
+    #[test]
+    fn provider_priority_default_and_remove() {
+        let mut pp = AccountProviderPriority::new();
+        assert_eq!(pp.get_priority("unknown"), 100);
+        pp.set_priority("github", 5);
+        assert_eq!(pp.count(), 1);
+        pp.remove("github");
+        assert_eq!(pp.count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // AccountActivityLogger tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn activity_logger_log_and_query() {
+        let mut logger = AccountActivityLogger::new();
+        logger.log_activity("a1", "login", 100);
+        logger.log_activity("a2", "login", 200);
+        logger.log_activity("a1", "logout", 300);
+        assert_eq!(logger.count(), 3);
+        assert_eq!(logger.activities_for("a1").len(), 2);
+        assert_eq!(logger.activities_for("a2").len(), 1);
+    }
+
+    #[test]
+    fn activity_logger_recent_and_clear() {
+        let mut logger = AccountActivityLogger::new();
+        for i in 0..5 {
+            logger.log_activity("a1", "action", i);
+        }
+        assert_eq!(logger.recent(3).len(), 3);
+        assert_eq!(logger.recent(10).len(), 5);
+        logger.clear();
+        assert_eq!(logger.count(), 0);
+    }
+
+    #[test]
+    fn activity_logger_actions_summary() {
+        let mut logger = AccountActivityLogger::new();
+        logger.log_activity("a1", "login", 1);
+        logger.log_activity("a2", "login", 2);
+        logger.log_activity("a1", "logout", 3);
+        let summary = logger.actions_summary();
+        assert_eq!(summary.get("login"), Some(&2));
+        assert_eq!(summary.get("logout"), Some(&1));
+    }
+
+    #[test]
+    fn activity_display() {
+        let a = AccountActivity {
+            account_id: "a1".to_string(),
+            action: "login".to_string(),
+            timestamp: 42,
+        };
+        let s = format!("{a}");
+        assert!(s.contains("a1"));
+        assert!(s.contains("login"));
+        assert!(s.contains("42"));
     }
 }

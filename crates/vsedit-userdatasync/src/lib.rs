@@ -1031,6 +1031,261 @@ impl SyncHistory {
     }
 }
 
+// -- Content conflict resolution with merge policies -------------------------
+
+/// Policy for resolving content-level sync conflicts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MergePolicy {
+    AcceptLocal,
+    AcceptRemote,
+    Manual,
+}
+
+impl fmt::Display for MergePolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MergePolicy::AcceptLocal => f.write_str("Accept Local"),
+            MergePolicy::AcceptRemote => f.write_str("Accept Remote"),
+            MergePolicy::Manual => f.write_str("Manual"),
+        }
+    }
+}
+
+/// A detected conflict between local and remote content payloads.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncContentConflict {
+    pub resource: SyncResource,
+    pub local_content: String,
+    pub remote_content: String,
+    pub detected_at: u64,
+}
+
+impl SyncContentConflict {
+    /// Resolve the conflict using the given policy.
+    pub fn resolve(&self, policy: MergePolicy) -> String {
+        match policy {
+            MergePolicy::AcceptLocal => self.local_content.clone(),
+            MergePolicy::AcceptRemote => self.remote_content.clone(),
+            MergePolicy::Manual => String::new(),
+        }
+    }
+
+    /// Check if local and remote are identical (false conflict).
+    pub fn is_false_conflict(&self) -> bool {
+        self.local_content == self.remote_content
+    }
+}
+
+impl fmt::Display for SyncContentConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Conflict({}, local={}B, remote={}B)",
+            self.resource, self.local_content.len(), self.remote_content.len())
+    }
+}
+
+/// Resolver that applies merge policies to content conflicts.
+#[derive(Debug)]
+pub struct ContentConflictResolver {
+    default_policy: MergePolicy,
+    resource_policies: HashMap<SyncResource, MergePolicy>,
+}
+
+impl ContentConflictResolver {
+    pub fn new(default: MergePolicy) -> Self {
+        Self {
+            default_policy: default,
+            resource_policies: HashMap::new(),
+        }
+    }
+
+    pub fn set_policy(&mut self, resource: SyncResource, policy: MergePolicy) {
+        self.resource_policies.insert(resource, policy);
+    }
+
+    pub fn policy_for(&self, resource: &SyncResource) -> MergePolicy {
+        self.resource_policies.get(resource).copied().unwrap_or(self.default_policy)
+    }
+
+    pub fn resolve(&self, conflict: &SyncContentConflict) -> String {
+        let policy = self.policy_for(&conflict.resource);
+        conflict.resolve(policy)
+    }
+}
+
+// -- SyncActivityLog with timestamps -----------------------------------------
+
+/// An entry in the sync activity log.
+#[derive(Debug, Clone)]
+pub struct SyncActivityEntry {
+    pub timestamp: u64,
+    pub resource: SyncResource,
+    pub action: String,
+    pub detail: Option<String>,
+}
+
+impl fmt::Display for SyncActivityEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {} {}", self.timestamp, self.action, self.resource)?;
+        if let Some(detail) = &self.detail {
+            write!(f, ": {detail}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Log of sync activities.
+#[derive(Debug, Default)]
+pub struct SyncActivityLog {
+    entries: Vec<SyncActivityEntry>,
+    max_entries: usize,
+}
+
+impl SyncActivityLog {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), max_entries }
+    }
+
+    pub fn log(&mut self, timestamp: u64, resource: SyncResource, action: &str, detail: Option<&str>) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(SyncActivityEntry {
+            timestamp,
+            resource,
+            action: action.to_string(),
+            detail: detail.map(|s| s.to_string()),
+        });
+    }
+
+    pub fn entries(&self) -> &[SyncActivityEntry] {
+        &self.entries
+    }
+
+    pub fn entries_for_resource(&self, resource: &SyncResource) -> Vec<&SyncActivityEntry> {
+        self.entries.iter().filter(|e| &e.resource == resource).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Get entries after a timestamp.
+    pub fn since(&self, timestamp: u64) -> Vec<&SyncActivityEntry> {
+        self.entries.iter().filter(|e| e.timestamp > timestamp).collect()
+    }
+}
+
+impl fmt::Display for SyncActivityLog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ActivityLog({} entries)", self.entries.len())
+    }
+}
+
+// -- SyncQuotaManager for storage limits ------------------------------------
+
+/// Manages storage quotas for sync.
+#[derive(Debug)]
+pub struct SyncQuotaManager {
+    max_bytes: u64,
+    used_bytes: HashMap<SyncResource, u64>,
+}
+
+impl SyncQuotaManager {
+    pub fn new(max_bytes: u64) -> Self {
+        Self { max_bytes, used_bytes: HashMap::new() }
+    }
+
+    pub fn record_usage(&mut self, resource: SyncResource, bytes: u64) {
+        self.used_bytes.insert(resource, bytes);
+    }
+
+    pub fn total_used(&self) -> u64 {
+        self.used_bytes.values().sum()
+    }
+
+    pub fn remaining(&self) -> u64 {
+        let used = self.total_used();
+        if used >= self.max_bytes { 0 } else { self.max_bytes - used }
+    }
+
+    pub fn is_over_quota(&self) -> bool {
+        self.total_used() > self.max_bytes
+    }
+
+    pub fn usage_percentage(&self) -> f64 {
+        if self.max_bytes == 0 { return 100.0; }
+        (self.total_used() as f64 / self.max_bytes as f64) * 100.0
+    }
+
+    pub fn usage_for(&self, resource: &SyncResource) -> u64 {
+        self.used_bytes.get(resource).copied().unwrap_or(0)
+    }
+
+    /// Check if adding bytes would exceed quota.
+    pub fn can_add(&self, bytes: u64) -> bool {
+        self.total_used() + bytes <= self.max_bytes
+    }
+}
+
+impl fmt::Display for SyncQuotaManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Quota({}/{}B, {:.1}%)", self.total_used(), self.max_bytes, self.usage_percentage())
+    }
+}
+
+// -- Sync profile switching --------------------------------------------------
+
+/// A sync profile with enabled/disabled resources.
+#[derive(Debug, Clone)]
+pub struct SyncProfile {
+    pub name: String,
+    pub enabled_resources: Vec<SyncResource>,
+    pub active: bool,
+}
+
+impl SyncProfile {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            enabled_resources: Vec::new(),
+            active: false,
+        }
+    }
+
+    pub fn enable_resource(&mut self, resource: SyncResource) {
+        if !self.enabled_resources.contains(&resource) {
+            self.enabled_resources.push(resource);
+        }
+    }
+
+    pub fn disable_resource(&mut self, resource: &SyncResource) {
+        self.enabled_resources.retain(|r| r != resource);
+    }
+
+    pub fn is_resource_enabled(&self, resource: &SyncResource) -> bool {
+        self.enabled_resources.contains(resource)
+    }
+
+    pub fn resource_count(&self) -> usize {
+        self.enabled_resources.len()
+    }
+}
+
+impl fmt::Display for SyncProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.active { "active" } else { "inactive" };
+        write!(f, "SyncProfile({}, {}, {} resources)", self.name, status, self.enabled_resources.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1978,5 +2233,170 @@ mod tests {
         assert_eq!(SyncOutcome::Success.to_string(), "Success");
         assert_eq!(SyncOutcome::PartialSuccess.to_string(), "Partial Success");
         assert_eq!(SyncOutcome::Failed.to_string(), "Failed");
+    }
+
+    // -- ContentConflictResolver tests ----------------------------------------
+
+    #[test]
+    fn content_conflict_resolve_accept_local() {
+        let conflict = SyncContentConflict {
+            resource: SyncResource::Settings,
+            local_content: "local".into(),
+            remote_content: "remote".into(),
+            detected_at: 100,
+        };
+        assert_eq!(conflict.resolve(MergePolicy::AcceptLocal), "local");
+    }
+
+    #[test]
+    fn content_conflict_resolve_accept_remote() {
+        let conflict = SyncContentConflict {
+            resource: SyncResource::Settings,
+            local_content: "local".into(),
+            remote_content: "remote".into(),
+            detected_at: 100,
+        };
+        assert_eq!(conflict.resolve(MergePolicy::AcceptRemote), "remote");
+    }
+
+    #[test]
+    fn content_conflict_false_conflict() {
+        let conflict = SyncContentConflict {
+            resource: SyncResource::Settings,
+            local_content: "same".into(),
+            remote_content: "same".into(),
+            detected_at: 100,
+        };
+        assert!(conflict.is_false_conflict());
+    }
+
+    #[test]
+    fn content_resolver_policy_per_resource() {
+        let mut resolver = ContentConflictResolver::new(MergePolicy::AcceptLocal);
+        resolver.set_policy(SyncResource::Settings, MergePolicy::AcceptRemote);
+
+        assert_eq!(resolver.policy_for(&SyncResource::Settings), MergePolicy::AcceptRemote);
+        assert_eq!(resolver.policy_for(&SyncResource::Keybindings), MergePolicy::AcceptLocal);
+    }
+
+    #[test]
+    fn content_conflict_display() {
+        let conflict = SyncContentConflict {
+            resource: SyncResource::Settings,
+            local_content: "abc".into(),
+            remote_content: "def".into(),
+            detected_at: 100,
+        };
+        let s = conflict.to_string();
+        assert!(s.contains("Settings"));
+    }
+
+    // -- SyncActivityLog tests ------------------------------------------------
+
+    #[test]
+    fn activity_log_record() {
+        let mut log = SyncActivityLog::new(100);
+        log.log(1000, SyncResource::Settings, "upload", Some("completed"));
+        log.log(1001, SyncResource::Keybindings, "download", None);
+        assert_eq!(log.len(), 2);
+    }
+
+    #[test]
+    fn activity_log_for_resource() {
+        let mut log = SyncActivityLog::new(100);
+        log.log(1, SyncResource::Settings, "upload", None);
+        log.log(2, SyncResource::Keybindings, "upload", None);
+        log.log(3, SyncResource::Settings, "download", None);
+        let settings = log.entries_for_resource(&SyncResource::Settings);
+        assert_eq!(settings.len(), 2);
+    }
+
+    #[test]
+    fn activity_log_since() {
+        let mut log = SyncActivityLog::new(100);
+        log.log(100, SyncResource::Settings, "upload", None);
+        log.log(200, SyncResource::Settings, "download", None);
+        let recent = log.since(150);
+        assert_eq!(recent.len(), 1);
+    }
+
+    #[test]
+    fn activity_log_evicts() {
+        let mut log = SyncActivityLog::new(2);
+        log.log(1, SyncResource::Settings, "a", None);
+        log.log(2, SyncResource::Settings, "b", None);
+        log.log(3, SyncResource::Settings, "c", None);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log.entries()[0].action, "b");
+    }
+
+    // -- SyncQuotaManager tests -----------------------------------------------
+
+    #[test]
+    fn quota_tracking() {
+        let mut quota = SyncQuotaManager::new(1000);
+        quota.record_usage(SyncResource::Settings, 300);
+        quota.record_usage(SyncResource::Keybindings, 200);
+        assert_eq!(quota.total_used(), 500);
+        assert_eq!(quota.remaining(), 500);
+        assert!(!quota.is_over_quota());
+    }
+
+    #[test]
+    fn quota_over_limit() {
+        let mut quota = SyncQuotaManager::new(100);
+        quota.record_usage(SyncResource::Settings, 200);
+        assert!(quota.is_over_quota());
+        assert_eq!(quota.remaining(), 0);
+    }
+
+    #[test]
+    fn quota_can_add() {
+        let mut quota = SyncQuotaManager::new(1000);
+        quota.record_usage(SyncResource::Settings, 900);
+        assert!(quota.can_add(100));
+        assert!(!quota.can_add(101));
+    }
+
+    #[test]
+    fn quota_display() {
+        let quota = SyncQuotaManager::new(1000);
+        let s = quota.to_string();
+        assert!(s.contains("0/1000B"));
+    }
+
+    // -- SyncProfile tests ----------------------------------------------------
+
+    #[test]
+    fn profile_enable_disable_resource() {
+        let mut profile = SyncProfile::new("work");
+        profile.enable_resource(SyncResource::Settings);
+        profile.enable_resource(SyncResource::Keybindings);
+        assert_eq!(profile.resource_count(), 2);
+        profile.disable_resource(&SyncResource::Settings);
+        assert_eq!(profile.resource_count(), 1);
+        assert!(!profile.is_resource_enabled(&SyncResource::Settings));
+    }
+
+    #[test]
+    fn profile_no_duplicates() {
+        let mut profile = SyncProfile::new("test");
+        profile.enable_resource(SyncResource::Settings);
+        profile.enable_resource(SyncResource::Settings);
+        assert_eq!(profile.resource_count(), 1);
+    }
+
+    #[test]
+    fn profile_display() {
+        let profile = SyncProfile::new("default");
+        let s = profile.to_string();
+        assert!(s.contains("default"));
+        assert!(s.contains("inactive"));
+    }
+
+    #[test]
+    fn merge_policy_display() {
+        assert_eq!(MergePolicy::AcceptLocal.to_string(), "Accept Local");
+        assert_eq!(MergePolicy::Manual.to_string(), "Manual");
     }
 }

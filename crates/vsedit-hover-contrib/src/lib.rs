@@ -1220,6 +1220,204 @@ impl HoverProviderChain {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HoverMultiSource – merging hover info from multiple providers
+// ---------------------------------------------------------------------------
+
+/// A collected hover result from multiple sources, with source attribution.
+#[derive(Debug, Clone)]
+pub struct HoverMultiSourceResult {
+    pub source_id: String,
+    pub hover: Hover,
+    pub priority: u32,
+}
+
+/// Collects hover results from multiple providers and merges them.
+pub struct HoverMultiSource {
+    results: Vec<HoverMultiSourceResult>,
+}
+
+impl HoverMultiSource {
+    pub fn new() -> Self {
+        Self { results: Vec::new() }
+    }
+
+    /// Add a hover result from a named source.
+    pub fn add(&mut self, source_id: impl Into<String>, hover: Hover, priority: u32) {
+        self.results.push(HoverMultiSourceResult {
+            source_id: source_id.into(),
+            hover,
+            priority,
+        });
+    }
+
+    /// Merge all results into a single hover, ordered by priority (highest first).
+    pub fn merge(&self) -> Option<Hover> {
+        if self.results.is_empty() {
+            return None;
+        }
+        let mut sorted: Vec<&HoverMultiSourceResult> = self.results.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        let mut contents = Vec::new();
+        let mut range = None;
+        for r in &sorted {
+            contents.extend(r.hover.contents.iter().cloned());
+            if range.is_none() {
+                range = r.hover.range;
+            }
+        }
+        Some(Hover { contents, range })
+    }
+
+    /// Number of sources contributing.
+    pub fn source_count(&self) -> usize {
+        self.results.len()
+    }
+
+    /// Check if any results were collected.
+    pub fn has_results(&self) -> bool {
+        !self.results.is_empty()
+    }
+}
+
+impl Default for HoverMultiSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverStickyDelay – persistent hover timing
+// ---------------------------------------------------------------------------
+
+/// Configuration for how long a hover tooltip stays visible.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HoverStickyDelay {
+    pub show_delay_ms: u32,
+    pub hide_delay_ms: u32,
+    pub sticky: bool,
+}
+
+impl HoverStickyDelay {
+    pub fn default_config() -> Self {
+        Self {
+            show_delay_ms: 300,
+            hide_delay_ms: 200,
+            sticky: false,
+        }
+    }
+
+    pub fn sticky_config() -> Self {
+        Self {
+            show_delay_ms: 300,
+            hide_delay_ms: 500,
+            sticky: true,
+        }
+    }
+
+    /// Whether the hover should remain visible (sticky mode or mouse over hover).
+    pub fn should_persist(&self, mouse_over_hover: bool) -> bool {
+        self.sticky || mouse_over_hover
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverAction – handler for buttons in hover
+// ---------------------------------------------------------------------------
+
+/// An action button embedded in a hover tooltip.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HoverAction {
+    pub label: String,
+    pub command: String,
+    pub tooltip: Option<String>,
+}
+
+impl HoverAction {
+    pub fn new(label: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            command: command.into(),
+            tooltip: None,
+        }
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+}
+
+impl std::fmt::Display for HoverAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}](command:{})", self.label, self.command)
+    }
+}
+
+/// A hover widget with optional action buttons.
+#[derive(Debug, Clone)]
+pub struct HoverWithActions {
+    pub hover: Hover,
+    pub actions: Vec<HoverAction>,
+}
+
+impl HoverWithActions {
+    pub fn new(hover: Hover) -> Self {
+        Self { hover, actions: Vec::new() }
+    }
+
+    pub fn add_action(&mut self, action: HoverAction) {
+        self.actions.push(action);
+    }
+
+    pub fn has_actions(&self) -> bool {
+        !self.actions.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hover positioning logic near cursor
+// ---------------------------------------------------------------------------
+
+/// Preferred position of the hover tooltip relative to the cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoverPosition {
+    Above,
+    Below,
+}
+
+/// Calculate hover positioning given available space.
+pub struct HoverPositionCalculator;
+
+impl HoverPositionCalculator {
+    /// Determine if the hover should appear above or below the cursor.
+    pub fn position(
+        cursor_line: u32,
+        total_lines: u32,
+        hover_height_lines: u32,
+    ) -> HoverPosition {
+        let space_above = cursor_line;
+        let space_below = total_lines.saturating_sub(cursor_line + 1);
+        if space_below >= hover_height_lines || space_below >= space_above {
+            HoverPosition::Below
+        } else {
+            HoverPosition::Above
+        }
+    }
+
+    /// Calculate the y-offset for the hover in character lines.
+    pub fn y_offset(
+        cursor_line: u32,
+        hover_height: u32,
+        position: HoverPosition,
+    ) -> u32 {
+        match position {
+            HoverPosition::Below => cursor_line + 1,
+            HoverPosition::Above => cursor_line.saturating_sub(hover_height),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1994,5 +2192,93 @@ mod tests {
 
         let merged = chain.hover_at("file:///x.rs", 0, 0).unwrap();
         assert_eq!(merged.contents.len(), 1);
+    }
+
+    // -- HoverMultiSource tests --
+
+    #[test]
+    fn multi_source_merge() {
+        let mut ms = HoverMultiSource::new();
+        ms.add("lsp", Hover::new(vec![MarkdownString::new("Type: i32")]), 10);
+        ms.add("docs", Hover::new(vec![MarkdownString::new("Docs: ...")]), 5);
+        let merged = ms.merge().unwrap();
+        assert_eq!(merged.contents.len(), 2);
+        // Higher priority first
+        assert_eq!(merged.contents[0].value, "Type: i32");
+        assert_eq!(ms.source_count(), 2);
+    }
+
+    #[test]
+    fn multi_source_empty() {
+        let ms = HoverMultiSource::default();
+        assert!(ms.merge().is_none());
+        assert!(!ms.has_results());
+    }
+
+    // -- HoverStickyDelay tests --
+
+    #[test]
+    fn sticky_delay_default() {
+        let d = HoverStickyDelay::default_config();
+        assert!(!d.sticky);
+        assert_eq!(d.show_delay_ms, 300);
+        assert!(!d.should_persist(false));
+        assert!(d.should_persist(true));
+    }
+
+    #[test]
+    fn sticky_delay_sticky() {
+        let d = HoverStickyDelay::sticky_config();
+        assert!(d.sticky);
+        assert!(d.should_persist(false));
+    }
+
+    // -- HoverAction tests --
+
+    #[test]
+    fn hover_action_display() {
+        let action = HoverAction::new("Go to Definition", "editor.goToDefinition");
+        assert_eq!(format!("{}", action), "[Go to Definition](command:editor.goToDefinition)");
+    }
+
+    #[test]
+    fn hover_action_with_tooltip() {
+        let action = HoverAction::new("Fix", "fix.apply").with_tooltip("Apply quick fix");
+        assert_eq!(action.tooltip.as_deref(), Some("Apply quick fix"));
+    }
+
+    #[test]
+    fn hover_with_actions() {
+        let hover = Hover::new(vec![MarkdownString::new("info")]);
+        let mut hwa = HoverWithActions::new(hover);
+        assert!(!hwa.has_actions());
+        hwa.add_action(HoverAction::new("Fix", "fix"));
+        assert!(hwa.has_actions());
+    }
+
+    // -- HoverPosition tests --
+
+    #[test]
+    fn position_below_when_space() {
+        let pos = HoverPositionCalculator::position(5, 100, 10);
+        assert_eq!(pos, HoverPosition::Below);
+    }
+
+    #[test]
+    fn position_above_when_near_bottom() {
+        let pos = HoverPositionCalculator::position(95, 100, 10);
+        assert_eq!(pos, HoverPosition::Above);
+    }
+
+    #[test]
+    fn y_offset_below() {
+        let y = HoverPositionCalculator::y_offset(10, 5, HoverPosition::Below);
+        assert_eq!(y, 11);
+    }
+
+    #[test]
+    fn y_offset_above() {
+        let y = HoverPositionCalculator::y_offset(10, 5, HoverPosition::Above);
+        assert_eq!(y, 5);
     }
 }

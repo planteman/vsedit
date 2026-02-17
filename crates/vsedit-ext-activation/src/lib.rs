@@ -1174,6 +1174,259 @@ impl fmt::Display for ActivationSummary {
     }
 }
 
+/// Parses and categorizes activation events with error collection.
+#[derive(Debug, Clone, Default)]
+pub struct ActivationEventParser;
+
+impl ActivationEventParser {
+    /// Parse all events, collecting errors for invalid ones.
+    pub fn validate_and_parse(events: &[&str]) -> Result<Vec<ActivationEvent>, Vec<String>> {
+        let mut parsed = Vec::new();
+        let mut errors = Vec::new();
+        for &e in events {
+            match validate_activation_event(e) {
+                Ok(ev) => parsed.push(ev),
+                Err(msg) => errors.push(msg),
+            }
+        }
+        if errors.is_empty() {
+            Ok(parsed)
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Group events by their type name.
+    pub fn categorize(events: &[ActivationEvent]) -> HashMap<String, Vec<ActivationEvent>> {
+        let mut map: HashMap<String, Vec<ActivationEvent>> = HashMap::new();
+        for ev in events {
+            let key = Self::event_type_name(ev);
+            map.entry(key).or_default().push(ev.clone());
+        }
+        map
+    }
+
+    /// Returns true if any event is `*`.
+    pub fn has_star(events: &[ActivationEvent]) -> bool {
+        events.iter().any(|e| matches!(e, ActivationEvent::Star))
+    }
+
+    /// Returns unique sorted type names present in the event list.
+    pub fn event_types(events: &[ActivationEvent]) -> Vec<String> {
+        let mut types: Vec<String> = events
+            .iter()
+            .map(|e| Self::event_type_name(e))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        types.sort();
+        types
+    }
+
+    fn event_type_name(event: &ActivationEvent) -> String {
+        match event {
+            ActivationEvent::Star => "star".into(),
+            ActivationEvent::OnLanguage(_) => "language".into(),
+            ActivationEvent::OnCommand(_) => "command".into(),
+            ActivationEvent::OnView(_) => "view".into(),
+            ActivationEvent::OnUri(_) => "uri".into(),
+            ActivationEvent::OnFileSystem(_) => "fileSystem".into(),
+            ActivationEvent::WorkspaceContains(_) => "workspaceContains".into(),
+            ActivationEvent::OnDebug => "debug".into(),
+            ActivationEvent::OnAuthenticationRequest(_) => "authenticationRequest".into(),
+            ActivationEvent::OnStartupFinished => "startupFinished".into(),
+        }
+    }
+}
+
+/// A single timing record for an extension activation.
+#[derive(Debug, Clone)]
+pub struct ActivationTimingRecord {
+    pub extension_id: String,
+    pub event: String,
+    pub duration_ms: u64,
+    pub timestamp: u64,
+}
+
+/// Profiles activation timing across extensions.
+#[derive(Debug, Clone, Default)]
+pub struct ActivationTimingProfiler {
+    records: Vec<ActivationTimingRecord>,
+}
+
+impl ActivationTimingProfiler {
+    pub fn new() -> Self {
+        Self { records: Vec::new() }
+    }
+
+    pub fn record(&mut self, ext_id: &str, event: &str, duration_ms: u64, timestamp: u64) {
+        self.records.push(ActivationTimingRecord {
+            extension_id: ext_id.to_string(),
+            event: event.to_string(),
+            duration_ms,
+            timestamp,
+        });
+    }
+
+    pub fn total_startup_time(&self) -> u64 {
+        self.records.iter().map(|r| r.duration_ms).sum()
+    }
+
+    pub fn slowest(&self) -> Option<&ActivationTimingRecord> {
+        self.records.iter().max_by_key(|r| r.duration_ms)
+    }
+
+    pub fn fastest(&self) -> Option<&ActivationTimingRecord> {
+        self.records.iter().min_by_key(|r| r.duration_ms)
+    }
+
+    pub fn average_ms(&self) -> f64 {
+        if self.records.is_empty() {
+            return 0.0;
+        }
+        self.total_startup_time() as f64 / self.records.len() as f64
+    }
+
+    pub fn by_extension(&self, ext_id: &str) -> Vec<&ActivationTimingRecord> {
+        self.records.iter().filter(|r| r.extension_id == ext_id).collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+
+    pub fn top_n_slowest(&self, n: usize) -> Vec<&ActivationTimingRecord> {
+        let mut sorted: Vec<&ActivationTimingRecord> = self.records.iter().collect();
+        sorted.sort_by(|a, b| b.duration_ms.cmp(&a.duration_ms));
+        sorted.truncate(n);
+        sorted
+    }
+}
+
+/// Schedules lazy activation of extensions, tracking pending vs activated state.
+#[derive(Debug, Clone, Default)]
+pub struct LazyActivationScheduler {
+    scheduled: HashMap<String, ActivationEvent>,
+    activated: HashSet<String>,
+}
+
+impl LazyActivationScheduler {
+    pub fn new() -> Self {
+        Self {
+            scheduled: HashMap::new(),
+            activated: HashSet::new(),
+        }
+    }
+
+    pub fn schedule(&mut self, ext_id: &str, event: ActivationEvent) {
+        if !self.activated.contains(ext_id) {
+            self.scheduled.insert(ext_id.to_string(), event);
+        }
+    }
+
+    /// Move an extension from scheduled to activated, returning its event.
+    pub fn activate(&mut self, ext_id: &str) -> Option<ActivationEvent> {
+        let event = self.scheduled.remove(ext_id)?;
+        self.activated.insert(ext_id.to_string());
+        Some(event)
+    }
+
+    pub fn is_scheduled(&self, ext_id: &str) -> bool {
+        self.scheduled.contains_key(ext_id)
+    }
+
+    pub fn is_activated(&self, ext_id: &str) -> bool {
+        self.activated.contains(ext_id)
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.scheduled.len()
+    }
+
+    pub fn activated_count(&self) -> usize {
+        self.activated.len()
+    }
+
+    pub fn cancel(&mut self, ext_id: &str) {
+        self.scheduled.remove(ext_id);
+    }
+}
+
+/// Resolves activation dependencies between extensions via topological ordering.
+#[derive(Debug, Clone, Default)]
+pub struct ActivationDependencyResolver {
+    deps: HashMap<String, Vec<String>>,
+}
+
+impl ActivationDependencyResolver {
+    pub fn new() -> Self {
+        Self { deps: HashMap::new() }
+    }
+
+    pub fn add_dependency(&mut self, ext_id: &str, depends_on: &str) {
+        self.deps
+            .entry(ext_id.to_string())
+            .or_default()
+            .push(depends_on.to_string());
+    }
+
+    /// Returns the topological activation order needed to activate `ext_id` (BFS).
+    /// The result lists dependencies first, ending with `ext_id` itself.
+    pub fn resolve_order(&self, ext_id: &str) -> Vec<String> {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut order = Vec::new();
+        queue.push_back(ext_id.to_string());
+        visited.insert(ext_id.to_string());
+        while let Some(current) = queue.pop_front() {
+            if let Some(dep_list) = self.deps.get(&current) {
+                for dep in dep_list {
+                    if visited.insert(dep.clone()) {
+                        queue.push_back(dep.clone());
+                    }
+                }
+            }
+            order.push(current);
+        }
+        order.reverse();
+        order
+    }
+
+    /// Detects whether activating `ext_id` would encounter a circular dependency.
+    pub fn has_circular(&self, ext_id: &str) -> bool {
+        let mut visited = HashSet::new();
+        let mut stack = vec![ext_id.to_string()];
+        while let Some(current) = stack.pop() {
+            if !visited.insert(current.clone()) {
+                return true;
+            }
+            if let Some(dep_list) = self.deps.get(&current) {
+                for dep in dep_list {
+                    stack.push(dep.clone());
+                }
+            }
+        }
+        false
+    }
+
+    pub fn direct_deps(&self, ext_id: &str) -> Vec<String> {
+        self.deps.get(ext_id).cloned().unwrap_or_default()
+    }
+
+    /// Returns all extension IDs that directly depend on `ext_id`.
+    pub fn all_dependents(&self, ext_id: &str) -> Vec<String> {
+        self.deps
+            .iter()
+            .filter(|(_, dep_list)| dep_list.contains(&ext_id.to_string()))
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1913,5 +2166,160 @@ mod tests {
         let group = ActivationGroup::new("empty");
         assert!(group.is_empty());
         assert_eq!(group.len(), 0);
+    }
+
+    #[test]
+    fn parser_validate_and_parse_ok() {
+        let events = vec!["*", "onLanguage:rust", "onCommand:doThing"];
+        let result = ActivationEventParser::validate_and_parse(&events);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0], ActivationEvent::Star);
+    }
+
+    #[test]
+    fn parser_validate_and_parse_errors() {
+        let events = vec!["*", "bogus:event", "alsoInvalid"];
+        let result = ActivationEventParser::validate_and_parse(&events);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn parser_categorize_events() {
+        let events = vec![
+            ActivationEvent::Star,
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::OnLanguage("python".into()),
+            ActivationEvent::OnCommand("save".into()),
+        ];
+        let cat = ActivationEventParser::categorize(&events);
+        assert_eq!(cat.get("language").unwrap().len(), 2);
+        assert_eq!(cat.get("command").unwrap().len(), 1);
+        assert_eq!(cat.get("star").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn parser_has_star_and_event_types() {
+        let events = vec![
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::Star,
+        ];
+        assert!(ActivationEventParser::has_star(&events));
+        assert!(!ActivationEventParser::has_star(&[ActivationEvent::OnDebug]));
+        let types = ActivationEventParser::event_types(&events);
+        assert_eq!(types, vec!["language", "star"]);
+    }
+
+    #[test]
+    fn timing_profiler_basic() {
+        let mut profiler = ActivationTimingProfiler::new();
+        profiler.record("ext-a", "onLanguage:rust", 50, 100);
+        profiler.record("ext-b", "onCommand:save", 120, 200);
+        profiler.record("ext-a", "*", 30, 300);
+        assert_eq!(profiler.count(), 3);
+        assert_eq!(profiler.total_startup_time(), 200);
+        assert!((profiler.average_ms() - 66.666).abs() < 1.0);
+    }
+
+    #[test]
+    fn timing_profiler_slowest_fastest() {
+        let mut profiler = ActivationTimingProfiler::new();
+        profiler.record("ext-a", "ev1", 10, 0);
+        profiler.record("ext-b", "ev2", 90, 1);
+        profiler.record("ext-c", "ev3", 50, 2);
+        assert_eq!(profiler.slowest().unwrap().extension_id, "ext-b");
+        assert_eq!(profiler.fastest().unwrap().extension_id, "ext-a");
+        let top2 = profiler.top_n_slowest(2);
+        assert_eq!(top2.len(), 2);
+        assert_eq!(top2[0].duration_ms, 90);
+        assert_eq!(top2[1].duration_ms, 50);
+    }
+
+    #[test]
+    fn timing_profiler_by_extension_and_clear() {
+        let mut profiler = ActivationTimingProfiler::new();
+        profiler.record("ext-a", "ev1", 10, 0);
+        profiler.record("ext-b", "ev2", 20, 1);
+        profiler.record("ext-a", "ev3", 30, 2);
+        assert_eq!(profiler.by_extension("ext-a").len(), 2);
+        assert_eq!(profiler.by_extension("ext-c").len(), 0);
+        profiler.clear();
+        assert_eq!(profiler.count(), 0);
+        assert_eq!(profiler.average_ms(), 0.0);
+    }
+
+    #[test]
+    fn lazy_scheduler_lifecycle() {
+        let mut sched = LazyActivationScheduler::new();
+        sched.schedule("ext-a", ActivationEvent::OnLanguage("rust".into()));
+        sched.schedule("ext-b", ActivationEvent::Star);
+        assert!(sched.is_scheduled("ext-a"));
+        assert!(!sched.is_activated("ext-a"));
+        assert_eq!(sched.pending_count(), 2);
+        let ev = sched.activate("ext-a");
+        assert_eq!(ev, Some(ActivationEvent::OnLanguage("rust".into())));
+        assert!(sched.is_activated("ext-a"));
+        assert!(!sched.is_scheduled("ext-a"));
+        assert_eq!(sched.activated_count(), 1);
+        assert_eq!(sched.pending_count(), 1);
+    }
+
+    #[test]
+    fn lazy_scheduler_cancel_and_no_double_schedule() {
+        let mut sched = LazyActivationScheduler::new();
+        sched.schedule("ext-a", ActivationEvent::Star);
+        sched.cancel("ext-a");
+        assert!(!sched.is_scheduled("ext-a"));
+        assert_eq!(sched.pending_count(), 0);
+        // already-activated extension cannot be re-scheduled
+        sched.schedule("ext-b", ActivationEvent::OnDebug);
+        sched.activate("ext-b");
+        sched.schedule("ext-b", ActivationEvent::Star);
+        assert!(!sched.is_scheduled("ext-b"));
+        assert!(sched.is_activated("ext-b"));
+    }
+
+    #[test]
+    fn dependency_resolver_order() {
+        let mut resolver = ActivationDependencyResolver::new();
+        resolver.add_dependency("app", "lib-a");
+        resolver.add_dependency("app", "lib-b");
+        resolver.add_dependency("lib-a", "core");
+        let order = resolver.resolve_order("app");
+        let app_pos = order.iter().position(|x| x == "app").unwrap();
+        let lib_a_pos = order.iter().position(|x| x == "lib-a").unwrap();
+        let core_pos = order.iter().position(|x| x == "core").unwrap();
+        assert!(core_pos < lib_a_pos);
+        assert!(lib_a_pos < app_pos);
+    }
+
+    #[test]
+    fn dependency_resolver_circular() {
+        let mut resolver = ActivationDependencyResolver::new();
+        resolver.add_dependency("a", "b");
+        resolver.add_dependency("b", "a");
+        assert!(resolver.has_circular("a"));
+        let mut resolver2 = ActivationDependencyResolver::new();
+        resolver2.add_dependency("x", "y");
+        assert!(!resolver2.has_circular("x"));
+    }
+
+    #[test]
+    fn dependency_resolver_direct_and_dependents() {
+        let mut resolver = ActivationDependencyResolver::new();
+        resolver.add_dependency("app", "lib-a");
+        resolver.add_dependency("app", "lib-b");
+        resolver.add_dependency("svc", "lib-a");
+        let direct = resolver.direct_deps("app");
+        assert_eq!(direct.len(), 2);
+        assert!(direct.contains(&"lib-a".to_string()));
+        let dependents = resolver.all_dependents("lib-a");
+        assert_eq!(dependents.len(), 2);
+        assert!(dependents.contains(&"app".to_string()));
+        assert!(dependents.contains(&"svc".to_string()));
+        assert!(resolver.direct_deps("unknown").is_empty());
     }
 }

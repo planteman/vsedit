@@ -990,6 +990,295 @@ pub fn compare_schemas(old: &JsonSchema, new: &JsonSchema) -> Vec<SchemaDiff> {
     diffs
 }
 
+// ---------------------------------------------------------------------------
+// Recursive JSON schema validation
+// ---------------------------------------------------------------------------
+
+/// Validates `JsonValue` instances against a `JsonSchema` recursively,
+/// descending into nested objects and checking required fields and types.
+/// Unlike `SchemaValidator` (a unit struct for flat validation), this struct
+/// carries a reference to `SchemaDefinitions` so that `$ref` pointers inside
+/// nested properties can be resolved during the walk.
+pub struct JsonSchemaValidator<'a> {
+    definitions: Option<&'a SchemaDefinitions>,
+}
+
+impl<'a> JsonSchemaValidator<'a> {
+    /// Create a validator without definition resolution.
+    pub fn new() -> Self {
+        Self { definitions: None }
+    }
+
+    /// Create a validator that can resolve `$ref` pointers.
+    pub fn with_definitions(defs: &'a SchemaDefinitions) -> Self {
+        Self { definitions: Some(defs) }
+    }
+
+    /// Validate `value` against `schema`, collecting all errors with JSON-pointer paths.
+    pub fn validate(&self, schema: &JsonSchema, value: &JsonValue) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+        self.validate_inner(schema, value, String::new(), &mut errors);
+        errors
+    }
+
+    fn validate_inner(
+        &self,
+        schema: &JsonSchema,
+        value: &JsonValue,
+        path: String,
+        errors: &mut Vec<ValidationError>,
+    ) {
+        if !SchemaValidator::validate_type(value, schema.schema_type) {
+            errors.push(ValidationError {
+                path: path.clone(),
+                message: format!(
+                    "expected type {}, got {}",
+                    schema.schema_type,
+                    Self::type_name(value),
+                ),
+                expected_type: Some(schema.schema_type),
+            });
+            return;
+        }
+
+        if let JsonValue::Object(fields) = value {
+            // Check required properties are present.
+            for prop in schema.get_required_properties() {
+                if !fields.iter().any(|(k, _)| k == &prop.name) {
+                    let field_path = join_path(&path, &prop.name);
+                    errors.push(ValidationError {
+                        path: field_path,
+                        message: format!("missing required property \"{}\"", prop.name),
+                        expected_type: Some(prop.schema_type),
+                    });
+                }
+            }
+
+            // Validate each present field.
+            for (key, val) in fields {
+                let field_path = join_path(&path, key);
+                if let Some(prop) = schema.get_property(key) {
+                    if !SchemaValidator::validate_type(val, prop.schema_type) {
+                        errors.push(ValidationError {
+                            path: field_path.clone(),
+                            message: format!(
+                                "expected type {}, got {}",
+                                prop.schema_type,
+                                Self::type_name(val),
+                            ),
+                            expected_type: Some(prop.schema_type),
+                        });
+                    }
+                    // Recurse into nested objects when a sub-schema is
+                    // available via definitions.
+                    if prop.schema_type == SchemaType::Object {
+                        if let Some(defs) = self.definitions {
+                            let ref_str = format!("#/definitions/{}", prop.name);
+                            let schema_ref = SchemaRef::parse(&ref_str);
+                            if let Some(sub_schema) = defs.resolve(&schema_ref) {
+                                self.validate_inner(sub_schema, val, field_path, errors);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if let JsonValue::Array(items) = value {
+            // When the schema type is Array and properties describe item schema,
+            // validate each item's type against the first property (convention).
+            if schema.schema_type == SchemaType::Array {
+                if let Some(item_prop) = schema.properties.first() {
+                    for (i, item) in items.iter().enumerate() {
+                        let item_path = format!("{}[{}]", path, i);
+                        if !SchemaValidator::validate_type(item, item_prop.schema_type) {
+                            errors.push(ValidationError {
+                                path: item_path,
+                                message: format!(
+                                    "expected item type {}, got {}",
+                                    item_prop.schema_type,
+                                    Self::type_name(item),
+                                ),
+                                expected_type: Some(item_prop.schema_type),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn type_name(value: &JsonValue) -> &'static str {
+        match value {
+            JsonValue::Null => "null",
+            JsonValue::Bool(_) => "boolean",
+            JsonValue::Number(_) => "number",
+            JsonValue::Str(_) => "string",
+            JsonValue::Array(_) => "array",
+            JsonValue::Object(_) => "object",
+        }
+    }
+}
+
+/// Join two JSON-pointer segments.
+fn join_path(base: &str, segment: &str) -> String {
+    if base.is_empty() {
+        segment.to_string()
+    } else {
+        format!("{}/{}", base, segment)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Default-value applicator
+// ---------------------------------------------------------------------------
+
+/// Fills in missing properties of a `JsonValue::Object` using the defaults
+/// declared in a `JsonSchema`. Existing values are never overwritten.
+pub struct JsonSchemaDefaultValues;
+
+impl JsonSchemaDefaultValues {
+    /// Apply defaults from `schema` to `value`, returning a new value.
+    /// Non-object values are returned unchanged.
+    pub fn apply(schema: &JsonSchema, value: &JsonValue) -> JsonValue {
+        match value {
+            JsonValue::Object(fields) => {
+                let mut result: Vec<(String, JsonValue)> = fields.clone();
+                for prop in &schema.properties {
+                    let already_present = result.iter().any(|(k, _)| k == &prop.name);
+                    if !already_present {
+                        if let Some(ref default) = prop.default_value {
+                            let val = default_str_to_value(default, prop.schema_type);
+                            result.push((prop.name.clone(), val));
+                        }
+                    }
+                }
+                JsonValue::Object(result)
+            }
+            other => other.clone(),
+        }
+    }
+
+    /// Returns the list of property names whose defaults were applied.
+    pub fn applied_keys(schema: &JsonSchema, value: &JsonValue) -> Vec<String> {
+        match value {
+            JsonValue::Object(fields) => {
+                schema
+                    .properties
+                    .iter()
+                    .filter(|p| {
+                        p.default_value.is_some()
+                            && !fields.iter().any(|(k, _)| k == &p.name)
+                    })
+                    .map(|p| p.name.clone())
+                    .collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion suggestion generator
+// ---------------------------------------------------------------------------
+
+/// Generates richer completion suggestions than `CompletionHint`, including
+/// sort priority and documentation strings suitable for an LSP-style editor.
+#[derive(Debug, Clone)]
+pub struct JsonSchemaCompletion {
+    pub label: String,
+    pub kind: SchemaType,
+    pub documentation: Option<String>,
+    pub sort_priority: u32,
+    pub snippet: String,
+}
+
+impl JsonSchemaCompletion {
+    /// Generate completion items for all properties in `schema` that are not
+    /// already present in `existing_keys`. Required properties sort first.
+    pub fn from_schema(schema: &JsonSchema, existing_keys: &[&str]) -> Vec<Self> {
+        let mut items: Vec<Self> = schema
+            .properties
+            .iter()
+            .filter(|p| !existing_keys.contains(&p.name.as_str()))
+            .map(|p| {
+                let priority = if p.required { 0 } else { 1 };
+                let placeholder = p
+                    .default_value
+                    .as_deref()
+                    .unwrap_or_else(|| type_placeholder(p.schema_type));
+                Self {
+                    label: p.name.clone(),
+                    kind: p.schema_type,
+                    documentation: p.description.clone(),
+                    sort_priority: priority,
+                    snippet: format!("\"{}\": {}", p.name, placeholder),
+                }
+            })
+            .collect();
+        items.sort_by_key(|c| (c.sort_priority, c.label.clone()));
+        items
+    }
+
+    /// Returns `true` if this is a required-property completion.
+    pub fn is_required(&self) -> bool {
+        self.sort_priority == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// $ref resolver
+// ---------------------------------------------------------------------------
+
+/// Resolves `$ref` references within a `SchemaDefinitions` map, returning
+/// the referenced `JsonSchema` or `None` if the reference is unresolvable.
+pub struct SchemaRefResolver<'a> {
+    definitions: &'a SchemaDefinitions,
+}
+
+impl<'a> SchemaRefResolver<'a> {
+    pub fn new(definitions: &'a SchemaDefinitions) -> Self {
+        Self { definitions }
+    }
+
+    /// Resolve a raw `$ref` string.
+    pub fn resolve_ref(&self, raw: &str) -> Option<&'a JsonSchema> {
+        let schema_ref = SchemaRef::parse(raw);
+        self.definitions.resolve(&schema_ref)
+    }
+
+    /// Resolve all internal refs from a list of raw strings, skipping any
+    /// that cannot be resolved. Returns `(raw_ref, &JsonSchema)` pairs.
+    pub fn resolve_all<'b>(&self, refs: &'b [&str]) -> Vec<(&'b str, &'a JsonSchema)> {
+        refs.iter()
+            .filter_map(|r| self.resolve_ref(r).map(|s| (*r, s)))
+            .collect()
+    }
+
+    /// Returns `true` if every reference in `refs` can be resolved.
+    pub fn all_resolvable(&self, refs: &[&str]) -> bool {
+        refs.iter().all(|r| self.resolve_ref(r).is_some())
+    }
+
+    /// Returns the names of definitions that are never referenced by any
+    /// entry in `refs`.
+    pub fn unreferenced_definitions(&self, refs: &[&str]) -> Vec<&'a str> {
+        let resolved_names: std::collections::HashSet<String> = refs
+            .iter()
+            .filter_map(|r| {
+                r.strip_prefix("#/definitions/")
+                    .or_else(|| r.strip_prefix("#/$defs/"))
+                    .map(|s| s.to_string())
+            })
+            .collect();
+        self.definitions
+            .names()
+            .into_iter()
+            .filter(|n| !resolved_names.contains(*n))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1958,5 +2247,265 @@ mod tests {
         // With no existing keys all properties are returned
         let all = completion_hints(&schema, &[]);
         assert_eq!(all.len(), 3);
+    }
+
+    // ── JsonSchemaValidator tests ─────────────────────────────────────
+
+    #[test]
+    fn json_schema_validator_type_mismatch_at_root() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![],
+            file_match: vec![],
+        };
+        let val = JsonValue::Str("not an object".into());
+        let v = JsonSchemaValidator::new();
+        let errs = v.validate(&schema, &val);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("expected type object"));
+    }
+
+    #[test]
+    fn json_schema_validator_missing_required() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("host", SchemaType::String, "Host"),
+                SchemaProperty::optional_prop("port", SchemaType::Integer, "80"),
+            ],
+            file_match: vec![],
+        };
+        let val = JsonValue::Object(vec![
+            ("port".into(), JsonValue::Number(443.0)),
+        ]);
+        let v = JsonSchemaValidator::new();
+        let errs = v.validate(&schema, &val);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("host"));
+    }
+
+    #[test]
+    fn json_schema_validator_valid_object() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+            ],
+            file_match: vec![],
+        };
+        let val = JsonValue::Object(vec![
+            ("name".into(), JsonValue::Str("Alice".into())),
+        ]);
+        let v = JsonSchemaValidator::new();
+        assert!(v.validate(&schema, &val).is_empty());
+    }
+
+    #[test]
+    fn json_schema_validator_nested_with_definitions() {
+        let mut defs = SchemaDefinitions::new();
+        defs.insert("address", JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("street", SchemaType::String, "Street"),
+            ],
+            file_match: vec![],
+        });
+
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty {
+                    name: "address".into(),
+                    schema_type: SchemaType::Object,
+                    description: None,
+                    required: true,
+                    default_value: None,
+                },
+            ],
+            file_match: vec![],
+        };
+
+        // Missing the required "street" inside nested address object.
+        let val = JsonValue::Object(vec![
+            ("address".into(), JsonValue::Object(vec![])),
+        ]);
+        let v = JsonSchemaValidator::with_definitions(&defs);
+        let errs = v.validate(&schema, &val);
+        assert!(errs.iter().any(|e| e.path == "address/street"));
+    }
+
+    #[test]
+    fn json_schema_validator_array_items() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Array,
+            properties: vec![
+                SchemaProperty::required_prop("item", SchemaType::Number, "Item"),
+            ],
+            file_match: vec![],
+        };
+        let val = JsonValue::Array(vec![
+            JsonValue::Number(1.0),
+            JsonValue::Str("oops".into()),
+            JsonValue::Number(3.0),
+        ]);
+        let v = JsonSchemaValidator::new();
+        let errs = v.validate(&schema, &val);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].path.contains("[1]"));
+    }
+
+    // ── JsonSchemaDefaultValues tests ─────────────────────────────────
+
+    #[test]
+    fn default_values_applied_to_missing_fields() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+                SchemaProperty::optional_prop("level", SchemaType::Integer, "5"),
+            ],
+            file_match: vec![],
+        };
+        let val = JsonValue::Object(vec![
+            ("name".into(), JsonValue::Str("Bob".into())),
+        ]);
+        let result = JsonSchemaDefaultValues::apply(&schema, &val);
+        if let JsonValue::Object(fields) = &result {
+            assert_eq!(fields.len(), 2);
+            assert!(fields.iter().any(|(k, v)| k == "level" && *v == JsonValue::Number(5.0)));
+        } else {
+            panic!("expected Object");
+        }
+    }
+
+    #[test]
+    fn default_values_does_not_overwrite_existing() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::optional_prop("color", SchemaType::String, "red"),
+            ],
+            file_match: vec![],
+        };
+        let val = JsonValue::Object(vec![
+            ("color".into(), JsonValue::Str("blue".into())),
+        ]);
+        let result = JsonSchemaDefaultValues::apply(&schema, &val);
+        if let JsonValue::Object(fields) = &result {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0].1, JsonValue::Str("blue".into()));
+        } else {
+            panic!("expected Object");
+        }
+    }
+
+    #[test]
+    fn default_values_applied_keys_list() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::optional_prop("a", SchemaType::String, "x"),
+                SchemaProperty::optional_prop("b", SchemaType::String, "y"),
+            ],
+            file_match: vec![],
+        };
+        let val = JsonValue::Object(vec![("a".into(), JsonValue::Str("z".into()))]);
+        let keys = JsonSchemaDefaultValues::applied_keys(&schema, &val);
+        assert_eq!(keys, vec!["b"]);
+    }
+
+    // ── JsonSchemaCompletion tests ────────────────────────────────────
+
+    #[test]
+    fn completion_required_sorted_first() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::optional_prop("z_opt", SchemaType::String, ""),
+                SchemaProperty::required_prop("a_req", SchemaType::String, "Required"),
+            ],
+            file_match: vec![],
+        };
+        let items = JsonSchemaCompletion::from_schema(&schema, &[]);
+        assert_eq!(items.len(), 2);
+        assert!(items[0].is_required());
+        assert_eq!(items[0].label, "a_req");
+    }
+
+    #[test]
+    fn completion_excludes_existing() {
+        let schema = JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("a", SchemaType::String, "A"),
+                SchemaProperty::required_prop("b", SchemaType::String, "B"),
+            ],
+            file_match: vec![],
+        };
+        let items = JsonSchemaCompletion::from_schema(&schema, &["a"]);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "b");
+    }
+
+    // ── SchemaRefResolver tests ──────────────────────────────────────
+
+    #[test]
+    fn ref_resolver_resolves_internal() {
+        let mut defs = SchemaDefinitions::new();
+        defs.insert("Foo", JsonSchema {
+            id: Some("foo".into()), title: None, description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![],
+            file_match: vec![],
+        });
+        let resolver = SchemaRefResolver::new(&defs);
+        assert!(resolver.resolve_ref("#/definitions/Foo").is_some());
+        assert!(resolver.resolve_ref("#/definitions/Bar").is_none());
+        assert!(resolver.resolve_ref("https://example.com/schema").is_none());
+    }
+
+    #[test]
+    fn ref_resolver_all_resolvable() {
+        let mut defs = SchemaDefinitions::new();
+        defs.insert("A", JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::String,
+            properties: vec![],
+            file_match: vec![],
+        });
+        let resolver = SchemaRefResolver::new(&defs);
+        assert!(resolver.all_resolvable(&["#/definitions/A"]));
+        assert!(!resolver.all_resolvable(&["#/definitions/A", "#/definitions/B"]));
+    }
+
+    #[test]
+    fn ref_resolver_unreferenced_definitions() {
+        let mut defs = SchemaDefinitions::new();
+        defs.insert("Used", JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::String,
+            properties: vec![],
+            file_match: vec![],
+        });
+        defs.insert("Unused", JsonSchema {
+            id: None, title: None, description: None,
+            schema_type: SchemaType::Number,
+            properties: vec![],
+            file_match: vec![],
+        });
+        let resolver = SchemaRefResolver::new(&defs);
+        let unused = resolver.unreferenced_definitions(&["#/definitions/Used"]);
+        assert_eq!(unused, vec!["Unused"]);
     }
 }

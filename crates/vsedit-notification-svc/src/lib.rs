@@ -1214,6 +1214,429 @@ impl NotificationService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// NotificationThrottle – prevent notification spam
+// ---------------------------------------------------------------------------
+
+/// Prevents notification spam by enforcing a cooldown between identical messages.
+///
+/// Tracks a hash of each message and the timestamp (as a `u64` tick counter)
+/// when it was last emitted. A duplicate message is suppressed if the elapsed
+/// time since the previous emission is less than `cooldown_ticks`.
+#[derive(Debug, Clone)]
+pub struct NotificationThrottle {
+    cooldown_ticks: u64,
+    last_seen: std::collections::HashMap<String, u64>,
+}
+
+impl NotificationThrottle {
+    /// Create a throttle with the given cooldown period (in abstract ticks).
+    pub fn new(cooldown_ticks: u64) -> Self {
+        Self {
+            cooldown_ticks,
+            last_seen: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Returns `true` if the message is allowed (not throttled) at `now`.
+    ///
+    /// If allowed, the internal timestamp for the message is updated.
+    pub fn allow(&mut self, message: &str, now: u64) -> bool {
+        if let Some(&last) = self.last_seen.get(message) {
+            if now.saturating_sub(last) < self.cooldown_ticks {
+                return false;
+            }
+        }
+        self.last_seen.insert(message.to_string(), now);
+        true
+    }
+
+    /// Returns `true` if the message would be throttled at `now` (without
+    /// updating internal state).
+    pub fn is_throttled(&self, message: &str, now: u64) -> bool {
+        if let Some(&last) = self.last_seen.get(message) {
+            now.saturating_sub(last) < self.cooldown_ticks
+        } else {
+            false
+        }
+    }
+
+    /// Remove all tracked messages, resetting the throttle.
+    pub fn reset(&mut self) {
+        self.last_seen.clear();
+    }
+
+    /// Number of distinct messages currently tracked.
+    pub fn tracked_count(&self) -> usize {
+        self.last_seen.len()
+    }
+
+    /// Evict entries older than `max_age` ticks relative to `now`.
+    pub fn evict_older_than(&mut self, now: u64, max_age: u64) {
+        self.last_seen
+            .retain(|_, &mut ts| now.saturating_sub(ts) <= max_age);
+    }
+}
+
+impl fmt::Display for NotificationThrottle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NotificationThrottle(cooldown={}, tracked={})",
+            self.cooldown_ticks,
+            self.last_seen.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationProgressTracker – step-based progress with elapsed time
+// ---------------------------------------------------------------------------
+
+/// Tracks step-based progress for a long-running operation, including elapsed
+/// time bookkeeping. Unlike [`NotificationProgress`] (which stores raw
+/// worked/total counters), this tracker records individual step completions
+/// and the tick at which the operation started.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationProgressTracker {
+    total_steps: u64,
+    completed_steps: u64,
+    start_tick: u64,
+    last_tick: u64,
+    label: String,
+}
+
+impl NotificationProgressTracker {
+    /// Create a tracker for an operation with `total_steps` steps, starting at
+    /// `start_tick`.
+    pub fn new(label: impl Into<String>, total_steps: u64, start_tick: u64) -> Self {
+        Self {
+            total_steps,
+            completed_steps: 0,
+            start_tick,
+            last_tick: start_tick,
+            label: label.into(),
+        }
+    }
+
+    /// Mark one step as completed at `tick`.
+    pub fn complete_step(&mut self, tick: u64) {
+        self.completed_steps = self.completed_steps.saturating_add(1);
+        self.last_tick = tick;
+    }
+
+    /// Mark `n` steps as completed at `tick`.
+    pub fn complete_steps(&mut self, n: u64, tick: u64) {
+        self.completed_steps = self.completed_steps.saturating_add(n);
+        self.last_tick = tick;
+    }
+
+    /// Returns `true` when all steps have been completed.
+    pub fn is_done(&self) -> bool {
+        self.completed_steps >= self.total_steps
+    }
+
+    /// Remaining steps.
+    pub fn remaining(&self) -> u64 {
+        self.total_steps.saturating_sub(self.completed_steps)
+    }
+
+    /// Elapsed ticks since the operation started.
+    pub fn elapsed(&self) -> u64 {
+        self.last_tick.saturating_sub(self.start_tick)
+    }
+
+    /// Completion ratio in `[0.0, 1.0]`.
+    pub fn ratio(&self) -> f64 {
+        if self.total_steps == 0 {
+            return 1.0;
+        }
+        (self.completed_steps as f64 / self.total_steps as f64).min(1.0)
+    }
+
+    /// Estimated remaining ticks based on average pace so far.
+    pub fn eta(&self) -> Option<u64> {
+        if self.completed_steps == 0 {
+            return None;
+        }
+        let elapsed = self.elapsed();
+        let per_step = elapsed / self.completed_steps;
+        Some(per_step * self.remaining())
+    }
+
+    /// The tracker label.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+}
+
+impl fmt::Display for NotificationProgressTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}/{} ({:.0}%)",
+            self.label,
+            self.completed_steps,
+            self.total_steps,
+            self.ratio() * 100.0,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationActionPipeline – chained actions with retry
+// ---------------------------------------------------------------------------
+
+/// Outcome of a single action execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionOutcome {
+    Success,
+    Failed(String),
+}
+
+/// Records the result of executing one step in the pipeline.
+#[derive(Debug, Clone)]
+pub struct PipelineStepResult {
+    pub action_id: String,
+    pub outcome: ActionOutcome,
+    pub attempts: u32,
+}
+
+/// Chains multiple [`NotificationAction`]s with per-step retry logic.
+///
+/// Actions are executed in order. Each action is retried up to `max_retries`
+/// times on failure. The pipeline records the outcome of every step so callers
+/// can inspect which actions succeeded and which failed.
+#[derive(Debug, Clone)]
+pub struct NotificationActionPipeline {
+    actions: Vec<NotificationAction>,
+    max_retries: u32,
+    results: Vec<PipelineStepResult>,
+}
+
+impl NotificationActionPipeline {
+    /// Create a new empty pipeline with the given retry limit per action.
+    pub fn new(max_retries: u32) -> Self {
+        Self {
+            actions: Vec::new(),
+            max_retries,
+            results: Vec::new(),
+        }
+    }
+
+    /// Append an action to the pipeline.
+    pub fn push(&mut self, action: NotificationAction) {
+        self.actions.push(action);
+    }
+
+    /// Number of actions in the pipeline.
+    pub fn len(&self) -> usize {
+        self.actions.len()
+    }
+
+    /// Returns `true` if the pipeline has no actions.
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
+    }
+
+    /// Run every action through the provided executor function. The executor
+    /// receives the action and returns `Ok(())` on success or `Err(msg)` on
+    /// failure.
+    pub fn execute<F>(&mut self, mut executor: F)
+    where
+        F: FnMut(&NotificationAction) -> Result<(), String>,
+    {
+        self.results.clear();
+        for action in &self.actions {
+            let mut last_err = String::new();
+            let mut succeeded = false;
+            for attempt in 0..=self.max_retries {
+                match executor(action) {
+                    Ok(()) => {
+                        self.results.push(PipelineStepResult {
+                            action_id: action.id.clone(),
+                            outcome: ActionOutcome::Success,
+                            attempts: attempt + 1,
+                        });
+                        succeeded = true;
+                        break;
+                    }
+                    Err(e) => {
+                        last_err = e;
+                    }
+                }
+            }
+            if !succeeded {
+                self.results.push(PipelineStepResult {
+                    action_id: action.id.clone(),
+                    outcome: ActionOutcome::Failed(last_err),
+                    attempts: self.max_retries + 1,
+                });
+            }
+        }
+    }
+
+    /// Returns the recorded results from the last `execute` call.
+    pub fn results(&self) -> &[PipelineStepResult] {
+        &self.results
+    }
+
+    /// Returns `true` if every action succeeded in the last execution.
+    pub fn all_succeeded(&self) -> bool {
+        !self.results.is_empty()
+            && self
+                .results
+                .iter()
+                .all(|r| r.outcome == ActionOutcome::Success)
+    }
+
+    /// Count of actions that failed in the last execution.
+    pub fn failure_count(&self) -> usize {
+        self.results
+            .iter()
+            .filter(|r| r.outcome != ActionOutcome::Success)
+            .count()
+    }
+}
+
+impl fmt::Display for NotificationActionPipeline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NotificationActionPipeline(actions={}, retries={})",
+            self.actions.len(),
+            self.max_retries
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationPersistence – serialize / deserialize notifications
+// ---------------------------------------------------------------------------
+
+/// A serializable snapshot of a [`Notification`] suitable for persistence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationRecord {
+    pub id: u64,
+    pub message: String,
+    pub severity: u8,
+    pub source: Option<String>,
+    pub dismissed: bool,
+    pub sticky: bool,
+}
+
+impl NotificationRecord {
+    /// Convert a [`Notification`] into a persistable record.
+    pub fn from_notification(n: &Notification) -> Self {
+        Self {
+            id: n.id,
+            message: n.message.clone(),
+            severity: u8::from(n.severity),
+            source: n.source.clone(),
+            dismissed: n.dismissed,
+            sticky: n.sticky,
+        }
+    }
+
+    /// Reconstruct a [`Notification`] from this record.
+    pub fn to_notification(&self) -> Notification {
+        let severity = match self.severity {
+            0 => NotificationSeverity::Info,
+            1 => NotificationSeverity::Warning,
+            _ => NotificationSeverity::Error,
+        };
+        Notification {
+            id: self.id,
+            message: self.message.clone(),
+            severity,
+            source: self.source.clone(),
+            actions: Vec::new(),
+            sticky: self.sticky,
+            dismissed: self.dismissed,
+            priority: None,
+        }
+    }
+}
+
+/// Stores a collection of [`NotificationRecord`]s for persistence across
+/// application restarts.
+#[derive(Debug, Clone)]
+pub struct NotificationPersistence {
+    records: Vec<NotificationRecord>,
+}
+
+impl NotificationPersistence {
+    /// Create an empty persistence store.
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+        }
+    }
+
+    /// Snapshot the current notifications from a service into records.
+    pub fn save(&mut self, service: &NotificationService) {
+        self.records = service
+            .get_active()
+            .iter()
+            .map(|n| NotificationRecord::from_notification(n))
+            .collect();
+    }
+
+    /// Restore saved records into a new `NotificationService`.
+    pub fn restore(&self) -> NotificationService {
+        let mut svc = NotificationService::new();
+        for rec in &self.records {
+            let n = rec.to_notification();
+            let id = svc.add(n.message.clone(), n.severity);
+            if n.sticky {
+                svc.set_sticky(id, true);
+            }
+            if let Some(ref src) = n.source {
+                if let Some(entry) = svc.notifications.iter_mut().find(|e| e.id == id) {
+                    entry.source = Some(src.clone());
+                }
+            }
+        }
+        svc
+    }
+
+    /// Number of stored records.
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Returns `true` if no records are stored.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    /// Clear all stored records.
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+
+    /// Access the raw records.
+    pub fn records(&self) -> &[NotificationRecord] {
+        &self.records
+    }
+}
+
+impl Default for NotificationPersistence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for NotificationPersistence {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NotificationPersistence(records={})",
+            self.records.len()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1963,5 +2386,207 @@ mod tests {
         let result = svc.query(&filter);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].message, "all good");
+    }
+
+    // -- NotificationThrottle tests ----------------------------------------
+
+    #[test]
+    fn throttle_allows_first_message() {
+        let mut t = NotificationThrottle::new(10);
+        assert!(t.allow("hello", 0));
+    }
+
+    #[test]
+    fn throttle_blocks_duplicate_within_cooldown() {
+        let mut t = NotificationThrottle::new(10);
+        assert!(t.allow("hello", 0));
+        assert!(!t.allow("hello", 5));
+    }
+
+    #[test]
+    fn throttle_allows_after_cooldown() {
+        let mut t = NotificationThrottle::new(10);
+        assert!(t.allow("hello", 0));
+        assert!(t.allow("hello", 10));
+    }
+
+    #[test]
+    fn throttle_is_throttled_does_not_mutate() {
+        let mut t = NotificationThrottle::new(10);
+        assert!(t.allow("msg", 0));
+        assert!(t.is_throttled("msg", 5));
+        assert!(!t.is_throttled("other", 5));
+    }
+
+    #[test]
+    fn throttle_evict_and_reset() {
+        let mut t = NotificationThrottle::new(10);
+        t.allow("a", 0);
+        t.allow("b", 5);
+        assert_eq!(t.tracked_count(), 2);
+        t.evict_older_than(20, 10);
+        assert_eq!(t.tracked_count(), 0);
+        t.allow("c", 30);
+        t.reset();
+        assert_eq!(t.tracked_count(), 0);
+    }
+
+    #[test]
+    fn throttle_display() {
+        let t = NotificationThrottle::new(42);
+        assert!(format!("{t}").contains("cooldown=42"));
+    }
+
+    // -- NotificationProgressTracker tests ---------------------------------
+
+    #[test]
+    fn progress_tracker_basic_flow() {
+        let mut pt = NotificationProgressTracker::new("build", 4, 100);
+        assert_eq!(pt.remaining(), 4);
+        assert!(!pt.is_done());
+        pt.complete_step(110);
+        pt.complete_steps(3, 140);
+        assert!(pt.is_done());
+        assert_eq!(pt.elapsed(), 40);
+        assert_eq!(pt.label(), "build");
+    }
+
+    #[test]
+    fn progress_tracker_ratio_and_eta() {
+        let mut pt = NotificationProgressTracker::new("index", 10, 0);
+        assert!((pt.ratio() - 0.0).abs() < f64::EPSILON);
+        assert!(pt.eta().is_none());
+        pt.complete_steps(5, 50);
+        assert!((pt.ratio() - 0.5).abs() < f64::EPSILON);
+        assert_eq!(pt.eta(), Some(50));
+    }
+
+    #[test]
+    fn progress_tracker_display() {
+        let mut pt = NotificationProgressTracker::new("scan", 2, 0);
+        pt.complete_step(1);
+        let s = format!("{pt}");
+        assert!(s.contains("scan"));
+        assert!(s.contains("1/2"));
+    }
+
+    // -- NotificationActionPipeline tests ----------------------------------
+
+    #[test]
+    fn pipeline_all_succeed() {
+        let mut p = NotificationActionPipeline::new(2);
+        p.push(NotificationAction {
+            label: "Save".into(),
+            id: "save".into(),
+        });
+        p.push(NotificationAction {
+            label: "Close".into(),
+            id: "close".into(),
+        });
+        p.execute(|_| Ok(()));
+        assert!(p.all_succeeded());
+        assert_eq!(p.failure_count(), 0);
+        assert_eq!(p.results().len(), 2);
+    }
+
+    #[test]
+    fn pipeline_retry_then_succeed() {
+        let mut p = NotificationActionPipeline::new(3);
+        p.push(NotificationAction {
+            label: "Flaky".into(),
+            id: "flaky".into(),
+        });
+        let mut call = 0u32;
+        p.execute(|_| {
+            call += 1;
+            if call < 3 {
+                Err("transient".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert!(p.all_succeeded());
+        assert_eq!(p.results()[0].attempts, 3);
+    }
+
+    #[test]
+    fn pipeline_permanent_failure() {
+        let mut p = NotificationActionPipeline::new(1);
+        p.push(NotificationAction {
+            label: "Bad".into(),
+            id: "bad".into(),
+        });
+        p.execute(|_| Err("nope".into()));
+        assert!(!p.all_succeeded());
+        assert_eq!(p.failure_count(), 1);
+        assert_eq!(
+            p.results()[0].outcome,
+            ActionOutcome::Failed("nope".into())
+        );
+    }
+
+    #[test]
+    fn pipeline_display() {
+        let p = NotificationActionPipeline::new(5);
+        assert!(format!("{p}").contains("retries=5"));
+    }
+
+    // -- NotificationPersistence tests -------------------------------------
+
+    #[test]
+    fn persistence_save_and_restore() {
+        let mut svc = NotificationService::new();
+        svc.info("one");
+        svc.warn("two");
+        let id3 = svc.error("three");
+        svc.dismiss(id3);
+
+        let mut store = NotificationPersistence::new();
+        store.save(&svc);
+        // Only active (non-dismissed) are saved
+        assert_eq!(store.len(), 2);
+
+        let restored = store.restore();
+        assert_eq!(restored.notification_count(), 2);
+        assert!(restored.find_by_message("one").is_some());
+        assert!(restored.find_by_message("two").is_some());
+    }
+
+    #[test]
+    fn persistence_clear() {
+        let mut store = NotificationPersistence::new();
+        let mut svc = NotificationService::new();
+        svc.info("x");
+        store.save(&svc);
+        assert!(!store.is_empty());
+        store.clear();
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn persistence_display() {
+        let store = NotificationPersistence::new();
+        assert!(format!("{store}").contains("records=0"));
+    }
+
+    #[test]
+    fn notification_record_roundtrip() {
+        let n = Notification {
+            id: 42,
+            message: "test".into(),
+            severity: NotificationSeverity::Warning,
+            source: Some("lsp".into()),
+            actions: vec![],
+            sticky: true,
+            dismissed: false,
+            priority: None,
+        };
+        let rec = NotificationRecord::from_notification(&n);
+        let back = rec.to_notification();
+        assert_eq!(back.id, 42);
+        assert_eq!(back.message, "test");
+        assert_eq!(back.severity, NotificationSeverity::Warning);
+        assert_eq!(back.source, Some("lsp".into()));
+        assert!(back.sticky);
     }
 }

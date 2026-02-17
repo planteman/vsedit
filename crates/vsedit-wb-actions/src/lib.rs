@@ -1085,6 +1085,370 @@ impl ActionRegistry {
 }
 
 
+// ---------------------------------------------------------------------------
+// Condition evaluation for action preconditions
+// ---------------------------------------------------------------------------
+
+/// Evaluates context-key conditions to determine whether an action should be
+/// enabled. Conditions are expressions like `"editorTextFocus && !inDebugMode"`
+/// where each token is a boolean context key optionally negated with `!`.
+/// Tokens are combined with `&&` (all must be true) or `||` (any must be true).
+/// Mixed operators are evaluated left-to-right (no precedence).
+pub struct ActionConditionEvaluator {
+    context: HashMap<String, bool>,
+}
+
+impl ActionConditionEvaluator {
+    /// Create an evaluator with an empty context.
+    pub fn new() -> Self {
+        Self {
+            context: HashMap::new(),
+        }
+    }
+
+    /// Create an evaluator pre-populated with context keys.
+    pub fn with_context(context: HashMap<String, bool>) -> Self {
+        Self { context }
+    }
+
+    /// Set a single context key.
+    pub fn set(&mut self, key: impl Into<String>, value: bool) {
+        self.context.insert(key.into(), value);
+    }
+
+    /// Remove a context key. Returns the previous value if present.
+    pub fn unset(&mut self, key: &str) -> Option<bool> {
+        self.context.remove(key)
+    }
+
+    /// Get the value of a context key. Missing keys are treated as `false`.
+    pub fn get(&self, key: &str) -> bool {
+        self.context.get(key).copied().unwrap_or(false)
+    }
+
+    /// Evaluate a single token, handling `!` negation.
+    fn eval_token(&self, token: &str) -> bool {
+        let trimmed = token.trim();
+        if let Some(rest) = trimmed.strip_prefix('!') {
+            !self.get(rest.trim())
+        } else {
+            self.get(trimmed)
+        }
+    }
+
+    /// Evaluate a full condition expression. Returns `true` for empty/blank
+    /// expressions. Supports `&&` and `||` evaluated left-to-right.
+    pub fn evaluate(&self, expression: &str) -> bool {
+        let expr = expression.trim();
+        if expr.is_empty() {
+            return true;
+        }
+
+        // Split on `||` first – each segment is an OR-branch.
+        if expr.contains("||") {
+            return expr.split("||").any(|segment| self.evaluate_and_chain(segment));
+        }
+
+        self.evaluate_and_chain(expr)
+    }
+
+    /// Evaluate a chain of `&&`-separated tokens.
+    fn evaluate_and_chain(&self, expr: &str) -> bool {
+        expr.split("&&").all(|token| self.eval_token(token))
+    }
+
+    /// Evaluate an action's precondition. If the action has no precondition the
+    /// result is `true`.
+    pub fn action_enabled(&self, action: &Action) -> bool {
+        match &action.precondition {
+            Some(expr) => self.evaluate(expr),
+            None => true,
+        }
+    }
+
+    /// Return all context keys currently set.
+    pub fn keys(&self) -> Vec<&str> {
+        self.context.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Return the number of context keys.
+    pub fn len(&self) -> usize {
+        self.context.len()
+    }
+
+    /// Return `true` if no context keys are set.
+    pub fn is_empty(&self) -> bool {
+        self.context.is_empty()
+    }
+}
+
+impl Default for ActionConditionEvaluator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Debug for ActionConditionEvaluator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ActionConditionEvaluator")
+            .field("keys", &self.context.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keybinding display label
+// ---------------------------------------------------------------------------
+
+/// Formats a keybinding string for platform-specific display.
+///
+/// Given a raw keybinding like `"Ctrl+Shift+P"`, this struct normalises
+/// modifier order (Ctrl → Shift → Alt → Meta → key) and can produce a
+/// compact display label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionKeybindingLabel {
+    raw: String,
+    parts: Vec<String>,
+}
+
+impl ActionKeybindingLabel {
+    /// Parse a keybinding string (e.g. `"Ctrl+Shift+P"`).
+    pub fn parse(raw: impl Into<String>) -> Self {
+        let raw = raw.into();
+        let parts: Vec<String> = raw.split('+').map(|s| s.trim().to_string()).collect();
+        Self { raw, parts }
+    }
+
+    /// Return the original raw keybinding string.
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+
+    /// Canonical modifier order index (lower = earlier).
+    fn modifier_order(part: &str) -> usize {
+        match part.to_lowercase().as_str() {
+            "ctrl" => 0,
+            "shift" => 1,
+            "alt" => 2,
+            "meta" | "cmd" | "super" => 3,
+            _ => 4,
+        }
+    }
+
+    /// Return a normalised label with modifiers in canonical order.
+    pub fn normalised(&self) -> String {
+        let mut sorted = self.parts.clone();
+        sorted.sort_by_key(|p| Self::modifier_order(p));
+        sorted.join("+")
+    }
+
+    /// Return a display label with platform-aware modifier symbols.
+    /// On macOS-style: Ctrl→⌃, Shift→⇧, Alt→⌥, Meta/Cmd→⌘.
+    pub fn display_mac(&self) -> String {
+        let mut sorted = self.parts.clone();
+        sorted.sort_by_key(|p| Self::modifier_order(p));
+        sorted
+            .iter()
+            .map(|p| match p.to_lowercase().as_str() {
+                "ctrl" => "⌃".to_string(),
+                "shift" => "⇧".to_string(),
+                "alt" => "⌥".to_string(),
+                "meta" | "cmd" | "super" => "⌘".to_string(),
+                other => other.to_uppercase(),
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    /// Return a display label for Linux/Windows (modifiers spelled out).
+    pub fn display_standard(&self) -> String {
+        self.normalised()
+    }
+
+    /// Return the number of parts (modifiers + key).
+    pub fn part_count(&self) -> usize {
+        self.parts.len()
+    }
+
+    /// Check whether the keybinding contains a specific modifier (case-insensitive).
+    pub fn has_modifier(&self, modifier: &str) -> bool {
+        let lower = modifier.to_lowercase();
+        self.parts.iter().any(|p| p.to_lowercase() == lower)
+    }
+}
+
+impl fmt::Display for ActionKeybindingLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.normalised())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Category grouper
+// ---------------------------------------------------------------------------
+
+/// Groups actions by category and returns them in sorted order.
+/// Supports filtering to only enabled actions.
+pub struct ActionCategoryGrouper<'a> {
+    actions: &'a [Action],
+}
+
+impl<'a> ActionCategoryGrouper<'a> {
+    /// Create a grouper over a slice of actions.
+    pub fn new(actions: &'a [Action]) -> Self {
+        Self { actions }
+    }
+
+    /// Group all actions by category, sorted by category name, then by label.
+    pub fn grouped(&self) -> Vec<(ActionCategory, Vec<&'a Action>)> {
+        self.grouped_filtered(false)
+    }
+
+    /// Group only enabled actions by category, sorted by category name, then label.
+    pub fn grouped_enabled(&self) -> Vec<(ActionCategory, Vec<&'a Action>)> {
+        self.grouped_filtered(true)
+    }
+
+    fn grouped_filtered(&self, enabled_only: bool) -> Vec<(ActionCategory, Vec<&'a Action>)> {
+        let mut map: HashMap<String, (ActionCategory, Vec<&'a Action>)> = HashMap::new();
+        for action in self.actions {
+            if enabled_only && !action.enabled {
+                continue;
+            }
+            let key = action.category.to_string();
+            map.entry(key)
+                .or_insert_with(|| (action.category, Vec::new()))
+                .1
+                .push(action);
+        }
+
+        let mut groups: Vec<(ActionCategory, Vec<&'a Action>)> = map.into_values().collect();
+        groups.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+        for (_, actions) in &mut groups {
+            actions.sort_by(|a, b| a.label.cmp(&b.label));
+        }
+        groups
+    }
+
+    /// Return a flat sorted list of unique categories present.
+    pub fn categories(&self) -> Vec<ActionCategory> {
+        let mut cats: Vec<ActionCategory> = self
+            .actions
+            .iter()
+            .map(|a| a.category)
+            .collect::<Vec<_>>();
+        cats.sort_by_key(|c| c.to_string());
+        cats.dedup();
+        cats
+    }
+
+    /// Return the number of non-empty groups.
+    pub fn group_count(&self) -> usize {
+        self.categories().len()
+    }
+
+    /// Return a formatted string showing categories and their action counts.
+    pub fn summary(&self) -> String {
+        let groups = self.grouped();
+        groups
+            .iter()
+            .map(|(cat, actions)| format!("{}: {}", cat, actions.len()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fuzzy search
+// ---------------------------------------------------------------------------
+
+/// A scored fuzzy-search result.
+#[derive(Debug, Clone)]
+pub struct FuzzyMatch<'a> {
+    /// The matched action.
+    pub action: &'a Action,
+    /// Higher is better.
+    pub score: i32,
+}
+
+/// Perform a fuzzy search over actions by matching `query` characters in order
+/// against both the action label and id. Returns results sorted by descending
+/// score. A score of 0 or below means no match.
+///
+/// Scoring:
+/// - Each matched character in sequence: +1
+/// - Consecutive matched characters bonus: +2
+/// - Prefix match (label or id starts with query): +5
+/// - Exact substring match: +10
+pub fn action_fuzzy_search<'a>(actions: &'a [Action], query: &str) -> Vec<FuzzyMatch<'a>> {
+    if query.is_empty() {
+        return Vec::new();
+    }
+
+    let query_lower = query.to_lowercase();
+    let mut results: Vec<FuzzyMatch<'a>> = Vec::new();
+
+    for action in actions {
+        let label_score = fuzzy_score(&action.label, &query_lower);
+        let id_score = fuzzy_score(&action.id, &query_lower);
+        let best = label_score.max(id_score);
+        if best > 0 {
+            results.push(FuzzyMatch {
+                action,
+                score: best,
+            });
+        }
+    }
+
+    results.sort_by(|a, b| b.score.cmp(&a.score));
+    results
+}
+
+/// Compute a fuzzy match score for `query` against `haystack`.
+fn fuzzy_score(haystack: &str, query: &str) -> i32 {
+    let hay_lower = haystack.to_lowercase();
+
+    // Exact substring bonus
+    let mut score: i32 = 0;
+    if hay_lower.contains(query) {
+        score += 10;
+    }
+
+    // Prefix bonus
+    if hay_lower.starts_with(query) {
+        score += 5;
+    }
+
+    // Sequential character matching
+    let mut hay_chars = hay_lower.chars().peekable();
+    let mut consecutive = 0i32;
+    let mut matched = 0i32;
+    let mut last_matched = false;
+
+    for qc in query.chars() {
+        let mut found = false;
+        for hc in hay_chars.by_ref() {
+            if hc == qc {
+                found = true;
+                matched += 1;
+                if last_matched {
+                    consecutive += 2;
+                }
+                last_matched = true;
+                break;
+            }
+            last_matched = false;
+        }
+        if !found {
+            // Query character not found – no match via sequential path.
+            return score;
+        }
+    }
+
+    score + matched + consecutive
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1964,6 +2328,209 @@ mod tests {
         let coverage = reg.keybinding_coverage();
         assert!(coverage.contains("1 with"));
         assert!(coverage.contains("1 without"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ActionConditionEvaluator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn condition_eval_empty_expression() {
+        let eval = ActionConditionEvaluator::new();
+        assert!(eval.evaluate(""));
+        assert!(eval.evaluate("   "));
+    }
+
+    #[test]
+    fn condition_eval_single_key() {
+        let mut eval = ActionConditionEvaluator::new();
+        eval.set("editorTextFocus", true);
+        assert!(eval.evaluate("editorTextFocus"));
+        assert!(!eval.evaluate("inDebugMode"));
+    }
+
+    #[test]
+    fn condition_eval_negation() {
+        let mut eval = ActionConditionEvaluator::new();
+        eval.set("inDebugMode", false);
+        assert!(eval.evaluate("!inDebugMode"));
+        eval.set("inDebugMode", true);
+        assert!(!eval.evaluate("!inDebugMode"));
+    }
+
+    #[test]
+    fn condition_eval_and_chain() {
+        let mut eval = ActionConditionEvaluator::new();
+        eval.set("editorTextFocus", true);
+        eval.set("inDebugMode", false);
+        assert!(eval.evaluate("editorTextFocus && !inDebugMode"));
+        eval.set("editorTextFocus", false);
+        assert!(!eval.evaluate("editorTextFocus && !inDebugMode"));
+    }
+
+    #[test]
+    fn condition_eval_or_chain() {
+        let mut eval = ActionConditionEvaluator::new();
+        eval.set("a", false);
+        eval.set("b", true);
+        assert!(eval.evaluate("a || b"));
+        eval.set("b", false);
+        assert!(!eval.evaluate("a || b"));
+    }
+
+    #[test]
+    fn condition_eval_action_no_precondition() {
+        let eval = ActionConditionEvaluator::new();
+        let action = make_action("test.nopre", ActionCategory::Edit);
+        assert!(eval.action_enabled(&action));
+    }
+
+    #[test]
+    fn condition_eval_action_with_precondition() {
+        let mut eval = ActionConditionEvaluator::new();
+        eval.set("editorTextFocus", true);
+        let action = Action::builder("test.pre", "Test", ActionCategory::Edit)
+            .precondition("editorTextFocus")
+            .build();
+        assert!(eval.action_enabled(&action));
+        eval.set("editorTextFocus", false);
+        assert!(!eval.action_enabled(&action));
+    }
+
+    #[test]
+    fn condition_eval_unset_and_len() {
+        let mut eval = ActionConditionEvaluator::new();
+        assert!(eval.is_empty());
+        eval.set("a", true);
+        eval.set("b", false);
+        assert_eq!(eval.len(), 2);
+        assert_eq!(eval.unset("a"), Some(true));
+        assert_eq!(eval.len(), 1);
+        assert_eq!(eval.unset("missing"), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // ActionKeybindingLabel tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn keybinding_label_normalised_order() {
+        let kb = ActionKeybindingLabel::parse("Shift+Ctrl+P");
+        assert_eq!(kb.normalised(), "Ctrl+Shift+P");
+        assert_eq!(kb.part_count(), 3);
+    }
+
+    #[test]
+    fn keybinding_label_mac_display() {
+        let kb = ActionKeybindingLabel::parse("Ctrl+Shift+Alt+P");
+        assert_eq!(kb.display_mac(), "⌃⇧⌥P");
+    }
+
+    #[test]
+    fn keybinding_label_has_modifier() {
+        let kb = ActionKeybindingLabel::parse("Ctrl+S");
+        assert!(kb.has_modifier("ctrl"));
+        assert!(kb.has_modifier("Ctrl"));
+        assert!(!kb.has_modifier("Shift"));
+    }
+
+    #[test]
+    fn keybinding_label_display_trait() {
+        let kb = ActionKeybindingLabel::parse("Alt+Ctrl+Z");
+        assert_eq!(format!("{kb}"), "Ctrl+Alt+Z");
+    }
+
+    // -----------------------------------------------------------------------
+    // ActionCategoryGrouper tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn category_grouper_basic() {
+        let actions = vec![
+            make_action("f1", ActionCategory::File),
+            make_action("e1", ActionCategory::Edit),
+            make_action("f2", ActionCategory::File),
+        ];
+        let grouper = ActionCategoryGrouper::new(&actions);
+        let groups = grouper.grouped();
+        assert_eq!(groups.len(), 2);
+        // Groups should be sorted: Edit before File
+        assert_eq!(groups[0].0, ActionCategory::Edit);
+        assert_eq!(groups[1].0, ActionCategory::File);
+        assert_eq!(groups[1].1.len(), 2);
+    }
+
+    #[test]
+    fn category_grouper_enabled_only() {
+        let actions = vec![
+            Action::builder("e1", "Edit One", ActionCategory::Edit)
+                .enabled(false)
+                .build(),
+            make_action("e2", ActionCategory::Edit),
+            make_action("f1", ActionCategory::File),
+        ];
+        let grouper = ActionCategoryGrouper::new(&actions);
+        let groups = grouper.grouped_enabled();
+        // Edit group should have only 1 (enabled) action
+        let edit_group = groups.iter().find(|(c, _)| *c == ActionCategory::Edit).unwrap();
+        assert_eq!(edit_group.1.len(), 1);
+        assert_eq!(edit_group.1[0].id, "e2");
+    }
+
+    #[test]
+    fn category_grouper_summary() {
+        let actions = vec![
+            make_action("f1", ActionCategory::File),
+            make_action("e1", ActionCategory::Edit),
+        ];
+        let grouper = ActionCategoryGrouper::new(&actions);
+        let summary = grouper.summary();
+        assert!(summary.contains("Edit: 1"));
+        assert!(summary.contains("File: 1"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Fuzzy search tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fuzzy_search_basic() {
+        let actions = vec![
+            make_action("editor.format", ActionCategory::Edit),
+            make_action("file.save", ActionCategory::File),
+            make_action("file.saveAll", ActionCategory::File),
+        ];
+        let results = action_fuzzy_search(&actions, "save");
+        assert_eq!(results.len(), 2);
+        // Both file.save and file.saveAll should match
+        assert!(results.iter().any(|r| r.action.id == "file.save"));
+        assert!(results.iter().any(|r| r.action.id == "file.saveAll"));
+    }
+
+    #[test]
+    fn fuzzy_search_empty_query() {
+        let actions = vec![make_action("a", ActionCategory::Edit)];
+        let results = action_fuzzy_search(&actions, "");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn fuzzy_search_prefix_bonus() {
+        let actions = vec![
+            Action::builder("other", "XsaveY", ActionCategory::File).build(),
+            Action::builder("file.save", "Save File", ActionCategory::File).build(),
+        ];
+        let results = action_fuzzy_search(&actions, "save");
+        // "Save File" should rank higher due to prefix match on label
+        assert_eq!(results[0].action.id, "file.save");
+        assert!(results[0].score > results[1].score);
+    }
+
+    #[test]
+    fn fuzzy_search_no_match() {
+        let actions = vec![make_action("editor.format", ActionCategory::Edit)];
+        let results = action_fuzzy_search(&actions, "zzz");
+        assert!(results.is_empty());
     }
 
 }

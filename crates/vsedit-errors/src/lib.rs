@@ -1197,6 +1197,264 @@ pub fn or_on_cancel(primary: VsError, fallback: VsError) -> VsError {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ErrorReporter – aggregates errors and produces reports
+// ---------------------------------------------------------------------------
+
+/// Aggregates [`ErrorRecord`]s and produces summary reports.
+pub struct ErrorReporter {
+    errors: Vec<ErrorRecord>,
+    max_errors: usize,
+}
+
+impl ErrorReporter {
+    /// Creates a new reporter that will hold at most `max_errors` records.
+    pub fn new(max_errors: usize) -> Self {
+        Self {
+            errors: Vec::new(),
+            max_errors,
+        }
+    }
+
+    /// Reports an error with the given severity.
+    pub fn report(&mut self, error: VsError, severity: ErrorSeverity) {
+        if self.errors.len() < self.max_errors {
+            let record = ErrorRecord::new(error).with_severity(severity);
+            self.errors.push(record);
+        }
+    }
+
+    /// Reports an error with severity and a context string as source location.
+    pub fn report_with_context(
+        &mut self,
+        error: VsError,
+        severity: ErrorSeverity,
+        context: &str,
+    ) {
+        if self.errors.len() < self.max_errors {
+            let record = ErrorRecord::new(error)
+                .with_severity(severity)
+                .with_source_location(context);
+            self.errors.push(record);
+        }
+    }
+
+    /// Number of records with [`ErrorSeverity::Error`].
+    pub fn error_count(&self) -> usize {
+        self.errors
+            .iter()
+            .filter(|r| r.severity() == ErrorSeverity::Error)
+            .count()
+    }
+
+    /// Number of records with [`ErrorSeverity::Warning`].
+    pub fn warning_count(&self) -> usize {
+        self.errors
+            .iter()
+            .filter(|r| r.severity() == ErrorSeverity::Warning)
+            .count()
+    }
+
+    /// Returns `true` if any record has [`ErrorSeverity::Error`].
+    pub fn has_errors(&self) -> bool {
+        self.error_count() > 0
+    }
+
+    /// Produces a human-readable summary like `"N errors, M warnings, K info"`.
+    pub fn summary(&self) -> String {
+        let errors = self.error_count();
+        let warnings = self.warning_count();
+        let info = self.errors.len() - errors - warnings;
+        format!("{errors} errors, {warnings} warnings, {info} info")
+    }
+
+    /// Removes all recorded errors.
+    pub fn clear(&mut self) {
+        self.errors.clear();
+    }
+
+    /// Returns `true` if the reporter has reached its capacity.
+    pub fn is_full(&self) -> bool {
+        self.errors.len() >= self.max_errors
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ErrorRecoveryStrategy – defines recovery strategies
+// ---------------------------------------------------------------------------
+
+/// Describes how to recover from a given error.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorRecoveryStrategy {
+    /// Retry the operation up to `max_attempts` times with `delay_ms` between.
+    Retry { max_attempts: u32, delay_ms: u64 },
+    /// Use a fallback value instead.
+    Fallback { fallback_value: String },
+    /// Silently ignore the error.
+    Ignore,
+    /// Abort the operation immediately.
+    Abort,
+}
+
+impl ErrorRecoveryStrategy {
+    /// Suggests a recovery strategy based on the error variant.
+    pub fn suggest_for(error: &VsError) -> Self {
+        match error {
+            VsError::Cancelled => Self::Ignore,
+            VsError::PermissionDenied(_) | VsError::ReadOnly(_) => Self::Abort,
+            VsError::NotFound(_) => Self::Fallback {
+                fallback_value: String::new(),
+            },
+            VsError::Io(_) | VsError::IllegalState(_) => Self::Retry {
+                max_attempts: 3,
+                delay_ms: 1000,
+            },
+            _ => Self::Retry {
+                max_attempts: 1,
+                delay_ms: 500,
+            },
+        }
+    }
+
+    /// Returns `true` if the strategy involves retrying.
+    pub fn is_retriable(&self) -> bool {
+        matches!(self, Self::Retry { .. })
+    }
+
+    /// Human-readable description of the strategy.
+    pub fn description(&self) -> String {
+        match self {
+            Self::Retry {
+                max_attempts,
+                delay_ms,
+            } => format!("Retry up to {max_attempts} times with {delay_ms}ms delay"),
+            Self::Fallback { fallback_value } => {
+                if fallback_value.is_empty() {
+                    "Use default fallback value".to_owned()
+                } else {
+                    format!("Fallback to: {fallback_value}")
+                }
+            }
+            Self::Ignore => "Ignore the error".to_owned(),
+            Self::Abort => "Abort the operation".to_owned(),
+        }
+    }
+
+    /// Number of retry attempts, or `0` for non-retry strategies.
+    pub fn max_attempts(&self) -> u32 {
+        match self {
+            Self::Retry { max_attempts, .. } => *max_attempts,
+            _ => 0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UserFacingErrorFormatter – formats errors for display to users
+// ---------------------------------------------------------------------------
+
+/// Formats errors into user-friendly messages without internal details.
+pub struct UserFacingErrorFormatter;
+
+impl UserFacingErrorFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Returns a user-friendly message for the given error.
+    pub fn format(&self, error: &VsError) -> String {
+        match error {
+            VsError::Cancelled => "The operation was cancelled.".to_owned(),
+            VsError::NotSupported(s) => format!("This feature is not supported: {s}"),
+            VsError::NotFound(s) => format!("Could not find: {s}"),
+            VsError::NotImplemented(s) => format!("Not yet available: {s}"),
+            VsError::IllegalArgument(s) => format!("Invalid input: {s}"),
+            VsError::IllegalState(s) => format!("Unexpected state: {s}"),
+            VsError::ReadOnly(s) => format!("Cannot modify read-only resource: {s}"),
+            VsError::PermissionDenied(s) => format!("Access denied: {s}"),
+            VsError::User(s) => s.clone(),
+            VsError::Io(_) => "A system I/O error occurred.".to_owned(),
+            VsError::Other(_) => "An unexpected error occurred.".to_owned(),
+        }
+    }
+
+    /// Returns a user-friendly message with a recovery suggestion appended.
+    pub fn format_with_suggestion(&self, error: &VsError) -> String {
+        let msg = self.format(error);
+        let suggestion = recovery_suggestion(error);
+        format!("{msg}\nSuggestion: {suggestion}")
+    }
+
+    /// Formats an [`ErrorChain`] as a numbered list.
+    pub fn format_chain(&self, chain: &ErrorChain) -> String {
+        let mut out = String::new();
+        for (i, (ctx, error)) in chain.errors.iter().enumerate() {
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            let msg = self.format(error);
+            if ctx.is_empty() {
+                out.push_str(&format!("{}. {msg}", i + 1));
+            } else {
+                out.push_str(&format!("{}. [{ctx}] {msg}", i + 1));
+            }
+        }
+        out
+    }
+
+    /// Returns an icon character for the given severity.
+    pub fn severity_icon(severity: ErrorSeverity) -> &'static str {
+        match severity {
+            ErrorSeverity::Error => "❌",
+            ErrorSeverity::Warning => "⚠️",
+            ErrorSeverity::Info => "ℹ️",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ErrorContextBuilder – builds error context chains
+// ---------------------------------------------------------------------------
+
+/// Builder for composing hierarchical error context strings.
+pub struct ErrorContextBuilder {
+    contexts: Vec<String>,
+}
+
+impl ErrorContextBuilder {
+    /// Creates an empty builder.
+    pub fn new() -> Self {
+        Self {
+            contexts: Vec::new(),
+        }
+    }
+
+    /// Appends a context and returns the builder (for chaining).
+    pub fn with(mut self, ctx: impl Into<String>) -> Self {
+        self.contexts.push(ctx.into());
+        self
+    }
+
+    /// Joins all contexts with `" -> "`.
+    pub fn build_message(&self) -> String {
+        self.contexts.join(" -> ")
+    }
+
+    /// Number of context segments.
+    pub fn depth(&self) -> usize {
+        self.contexts.len()
+    }
+
+    /// Appends a context in-place.
+    pub fn push(&mut self, ctx: impl Into<String>) {
+        self.contexts.push(ctx.into());
+    }
+
+    /// Returns `true` if no context has been added.
+    pub fn is_empty(&self) -> bool {
+        self.contexts.is_empty()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1955,6 +2213,135 @@ mod tests {
         let fallback2 = VsError::User("y".into());
         let result2 = or_on_cancel(primary2, fallback2);
         assert_eq!(result2.to_string(), "Not found: x");
+    }
+
+    #[test]
+    fn test_reporter_add_errors() {
+        let mut r = ErrorReporter::new(10);
+        r.report(VsError::NotFound("a".into()), ErrorSeverity::Error);
+        r.report(VsError::Cancelled, ErrorSeverity::Info);
+        assert_eq!(r.error_count(), 1);
+    }
+
+    #[test]
+    fn test_reporter_summary() {
+        let mut r = ErrorReporter::new(10);
+        r.report(VsError::NotFound("a".into()), ErrorSeverity::Error);
+        r.report(VsError::Cancelled, ErrorSeverity::Warning);
+        r.report(VsError::User("x".into()), ErrorSeverity::Info);
+        assert_eq!(r.summary(), "1 errors, 1 warnings, 1 info");
+    }
+
+    #[test]
+    fn test_reporter_max_errors() {
+        let mut r = ErrorReporter::new(2);
+        r.report(VsError::Cancelled, ErrorSeverity::Error);
+        r.report(VsError::Cancelled, ErrorSeverity::Error);
+        r.report(VsError::Cancelled, ErrorSeverity::Error);
+        assert!(r.is_full());
+        assert_eq!(r.error_count(), 2);
+    }
+
+    #[test]
+    fn test_reporter_clear() {
+        let mut r = ErrorReporter::new(10);
+        r.report(VsError::Cancelled, ErrorSeverity::Error);
+        assert!(r.has_errors());
+        r.clear();
+        assert!(!r.has_errors());
+        assert_eq!(r.summary(), "0 errors, 0 warnings, 0 info");
+    }
+
+    #[test]
+    fn test_recovery_suggest_cancelled() {
+        let strategy = ErrorRecoveryStrategy::suggest_for(&VsError::Cancelled);
+        assert_eq!(strategy, ErrorRecoveryStrategy::Ignore);
+    }
+
+    #[test]
+    fn test_recovery_suggest_timeout() {
+        let strategy =
+            ErrorRecoveryStrategy::suggest_for(&VsError::IllegalState("timeout".into()));
+        assert_eq!(
+            strategy,
+            ErrorRecoveryStrategy::Retry {
+                max_attempts: 3,
+                delay_ms: 1000,
+            }
+        );
+    }
+
+    #[test]
+    fn test_recovery_suggest_not_found() {
+        let strategy = ErrorRecoveryStrategy::suggest_for(&VsError::NotFound("x".into()));
+        assert_eq!(
+            strategy,
+            ErrorRecoveryStrategy::Fallback {
+                fallback_value: String::new()
+            }
+        );
+    }
+
+    #[test]
+    fn test_recovery_is_retriable() {
+        assert!(ErrorRecoveryStrategy::Retry {
+            max_attempts: 1,
+            delay_ms: 100,
+        }
+        .is_retriable());
+        assert!(!ErrorRecoveryStrategy::Abort.is_retriable());
+        assert!(!ErrorRecoveryStrategy::Ignore.is_retriable());
+    }
+
+    #[test]
+    fn test_recovery_description() {
+        let s = ErrorRecoveryStrategy::Retry {
+            max_attempts: 3,
+            delay_ms: 1000,
+        };
+        assert_eq!(s.description(), "Retry up to 3 times with 1000ms delay");
+        assert_eq!(ErrorRecoveryStrategy::Abort.description(), "Abort the operation");
+        assert_eq!(ErrorRecoveryStrategy::Abort.max_attempts(), 0);
+    }
+
+    #[test]
+    fn test_user_formatter_basic() {
+        let f = UserFacingErrorFormatter::new();
+        assert_eq!(f.format(&VsError::Cancelled), "The operation was cancelled.");
+        assert_eq!(
+            f.format(&VsError::NotFound("file.txt".into())),
+            "Could not find: file.txt"
+        );
+        assert_eq!(
+            UserFacingErrorFormatter::severity_icon(ErrorSeverity::Error),
+            "❌"
+        );
+    }
+
+    #[test]
+    fn test_user_formatter_with_suggestion() {
+        let f = UserFacingErrorFormatter::new();
+        let msg = f.format_with_suggestion(&VsError::Cancelled);
+        assert!(msg.contains("cancelled"));
+        assert!(msg.contains("Suggestion:"));
+    }
+
+    #[test]
+    fn test_context_builder_chain() {
+        let builder = ErrorContextBuilder::new()
+            .with("open file")
+            .with("parse header")
+            .with("validate checksum");
+        assert_eq!(builder.depth(), 3);
+        assert!(!builder.is_empty());
+        assert_eq!(
+            builder.build_message(),
+            "open file -> parse header -> validate checksum"
+        );
+
+        let empty = ErrorContextBuilder::new();
+        assert!(empty.is_empty());
+        assert_eq!(empty.build_message(), "");
     }
 
 }

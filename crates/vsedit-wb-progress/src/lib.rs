@@ -1087,6 +1087,330 @@ impl fmt::Display for WeightedStepProgress {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProgressAggregator
+// ---------------------------------------------------------------------------
+
+/// A single source contributing to an aggregated progress value.
+#[derive(Debug, Clone)]
+struct AggregatorSource {
+    weight: f64,
+    progress: f64,
+}
+
+/// Merges multiple weighted progress sources into a single overall progress.
+#[derive(Debug, Clone)]
+pub struct ProgressAggregator {
+    sources: Vec<(String, AggregatorSource)>,
+}
+
+impl ProgressAggregator {
+    /// Creates an empty aggregator with no sources.
+    pub fn new() -> Self {
+        Self {
+            sources: Vec::new(),
+        }
+    }
+
+    /// Adds a named source with the given weight.
+    ///
+    /// The weight is relative; it does not need to sum to any particular value.
+    pub fn add_source(&mut self, id: &str, weight: f64) {
+        let w = if weight < 0.0 { 0.0 } else { weight };
+        self.sources.push((
+            id.to_string(),
+            AggregatorSource {
+                weight: w,
+                progress: 0.0,
+            },
+        ));
+    }
+
+    /// Updates the progress (0–100) of the source identified by `id`.
+    ///
+    /// If the source does not exist the call is silently ignored.
+    pub fn update_source(&mut self, id: &str, progress: f64) {
+        let clamped = progress.clamp(0.0, 100.0);
+        if let Some((_name, src)) = self.sources.iter_mut().find(|(n, _)| n == id) {
+            src.progress = clamped;
+        }
+    }
+
+    /// Returns the weighted overall progress in the range 0–100.
+    ///
+    /// Returns 0.0 when there are no sources or when total weight is zero.
+    pub fn overall_progress(&self) -> f64 {
+        let total_weight: f64 = self.sources.iter().map(|(_, s)| s.weight).sum();
+        if total_weight <= 0.0 {
+            return 0.0;
+        }
+        let weighted_sum: f64 = self
+            .sources
+            .iter()
+            .map(|(_, s)| s.weight * s.progress)
+            .sum();
+        weighted_sum / total_weight
+    }
+
+    /// Returns `true` when every source has reached 100 %.
+    pub fn all_complete(&self) -> bool {
+        !self.sources.is_empty()
+            && self
+                .sources
+                .iter()
+                .all(|(_, s)| (s.progress - 100.0).abs() < f64::EPSILON)
+    }
+
+    /// Returns the number of sources whose progress is below 100 %.
+    pub fn active_source_count(&self) -> usize {
+        self.sources
+            .iter()
+            .filter(|(_, s)| (s.progress - 100.0).abs() >= f64::EPSILON)
+            .count()
+    }
+
+    /// Returns a human-readable summary of the aggregated progress.
+    pub fn summary(&self) -> String {
+        if self.sources.is_empty() {
+            return "No sources".to_string();
+        }
+        format!(
+            "{:.1}% ({} source(s), {} active)",
+            self.overall_progress(),
+            self.sources.len(),
+            self.active_source_count(),
+        )
+    }
+}
+
+impl Default for ProgressAggregator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ProgressAggregator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressRateEstimator
+// ---------------------------------------------------------------------------
+
+/// A single sample recording progress at a point in time.
+#[derive(Debug, Clone, Copy)]
+struct RateSample {
+    progress: f64,
+    elapsed_ms: u64,
+}
+
+/// Estimates the rate of progress and projected time to completion.
+#[derive(Debug, Clone)]
+pub struct ProgressRateEstimator {
+    samples: Vec<RateSample>,
+}
+
+impl ProgressRateEstimator {
+    /// Creates an estimator with no recorded samples.
+    pub fn new() -> Self {
+        Self {
+            samples: Vec::new(),
+        }
+    }
+
+    /// Records a progress sample at the given elapsed time (in milliseconds).
+    ///
+    /// Progress values are clamped to 0–100 and elapsed time must be
+    /// monotonically increasing; samples that violate this are ignored.
+    pub fn record_sample(&mut self, progress: f64, elapsed_ms: u64) {
+        let clamped = progress.clamp(0.0, 100.0);
+        if let Some(last) = self.samples.last() {
+            if elapsed_ms <= last.elapsed_ms {
+                return;
+            }
+        }
+        self.samples.push(RateSample {
+            progress: clamped,
+            elapsed_ms,
+        });
+    }
+
+    /// Returns the average rate of progress per second (progress‑units / s).
+    ///
+    /// Returns 0.0 when fewer than two samples are available.
+    pub fn rate_per_second(&self) -> f64 {
+        if self.samples.len() < 2 {
+            return 0.0;
+        }
+        let first = &self.samples[0];
+        let last = &self.samples[self.samples.len() - 1];
+        let dt_ms = last.elapsed_ms.saturating_sub(first.elapsed_ms);
+        if dt_ms == 0 {
+            return 0.0;
+        }
+        let dp = last.progress - first.progress;
+        (dp / dt_ms as f64) * 1000.0
+    }
+
+    /// Estimates the number of milliseconds remaining until progress reaches
+    /// 100 %, based on the current rate.  Returns `None` when an estimate
+    /// cannot be computed (e.g., rate is zero or progress already complete).
+    pub fn estimated_remaining_ms(&self) -> Option<u64> {
+        let rate = self.rate_per_second();
+        if rate <= 0.0 {
+            return None;
+        }
+        let last = self.samples.last()?;
+        let remaining = 100.0 - last.progress;
+        if remaining <= 0.0 {
+            return Some(0);
+        }
+        let secs = remaining / rate;
+        Some((secs * 1000.0) as u64)
+    }
+
+    /// Returns the number of samples recorded so far.
+    pub fn samples_count(&self) -> usize {
+        self.samples.len()
+    }
+}
+
+impl Default for ProgressRateEstimator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressHistory
+// ---------------------------------------------------------------------------
+
+/// Record of a single completed progress task.
+#[derive(Debug, Clone)]
+pub struct ProgressCompletionRecord {
+    /// Identifier of the completed task.
+    pub task_id: u64,
+    /// Human‑readable label describing the task.
+    pub label: String,
+    /// Wall‑clock duration in milliseconds.
+    pub duration_ms: u64,
+}
+
+/// Maintains a log of completed progress tasks for statistical queries.
+#[derive(Debug, Clone)]
+pub struct ProgressHistory {
+    records: Vec<ProgressCompletionRecord>,
+}
+
+impl ProgressHistory {
+    /// Creates an empty history.
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+        }
+    }
+
+    /// Records the completion of a task.
+    pub fn record_completion(&mut self, task_id: u64, label: &str, duration_ms: u64) {
+        self.records.push(ProgressCompletionRecord {
+            task_id,
+            label: label.to_string(),
+            duration_ms,
+        });
+    }
+
+    /// Returns the total number of completed tasks.
+    pub fn total_completed(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Returns the average duration across all recorded tasks, or `None` if
+    /// no tasks have been recorded.
+    pub fn average_duration_ms(&self) -> Option<u64> {
+        if self.records.is_empty() {
+            return None;
+        }
+        let total: u64 = self.records.iter().map(|r| r.duration_ms).sum();
+        Some(total / self.records.len() as u64)
+    }
+
+    /// Returns the label and duration of the longest‑running task, or `None`
+    /// if the history is empty.
+    pub fn longest_task(&self) -> Option<(&str, u64)> {
+        self.records
+            .iter()
+            .max_by_key(|r| r.duration_ms)
+            .map(|r| (r.label.as_str(), r.duration_ms))
+    }
+
+    /// Returns references to the `n` most recent completion records.
+    pub fn recent(&self, n: usize) -> Vec<&ProgressCompletionRecord> {
+        let start = self.records.len().saturating_sub(n);
+        self.records[start..].iter().collect()
+    }
+}
+
+impl Default for ProgressHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationChain
+// ---------------------------------------------------------------------------
+
+/// Propagates cancellation from a parent context to a set of child task ids.
+#[derive(Debug, Clone)]
+pub struct CancellationChain {
+    cancelled: bool,
+    children: Vec<u64>,
+}
+
+impl CancellationChain {
+    /// Creates a new, non‑cancelled chain with no children.
+    pub fn new() -> Self {
+        Self {
+            cancelled: false,
+            children: Vec::new(),
+        }
+    }
+
+    /// Registers a child task id to be notified on cancellation.
+    pub fn add_child(&mut self, child_id: u64) {
+        if !self.children.contains(&child_id) {
+            self.children.push(child_id);
+        }
+    }
+
+    /// Marks this chain (and all children) as cancelled.
+    pub fn cancel(&mut self) {
+        self.cancelled = true;
+    }
+
+    /// Returns `true` if `cancel` has been called.
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled
+    }
+
+    /// Returns the list of child task ids that are part of this chain.
+    pub fn cancelled_children(&self) -> &[u64] {
+        if self.cancelled {
+            &self.children
+        } else {
+            &[]
+        }
+    }
+}
+
+impl Default for CancellationChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1869,5 +2193,143 @@ mod tests {
         let s = format!("{wsp}");
         assert!(s.contains("25%"));
         assert!(s.contains("Step 1/2"));
+    }
+
+    // -- ProgressAggregator tests --
+
+    #[test]
+    fn aggregator_empty() {
+        let agg = ProgressAggregator::new();
+        assert!((agg.overall_progress() - 0.0).abs() < f64::EPSILON);
+        assert!(!agg.all_complete());
+        assert_eq!(agg.active_source_count(), 0);
+        assert_eq!(agg.summary(), "No sources");
+    }
+
+    #[test]
+    fn aggregator_equal_weights() {
+        let mut agg = ProgressAggregator::new();
+        agg.add_source("a", 1.0);
+        agg.add_source("b", 1.0);
+        agg.update_source("a", 50.0);
+        agg.update_source("b", 100.0);
+        assert!((agg.overall_progress() - 75.0).abs() < f64::EPSILON);
+        assert!(!agg.all_complete());
+        assert_eq!(agg.active_source_count(), 1);
+    }
+
+    #[test]
+    fn aggregator_all_complete() {
+        let mut agg = ProgressAggregator::new();
+        agg.add_source("x", 2.0);
+        agg.add_source("y", 3.0);
+        agg.update_source("x", 100.0);
+        agg.update_source("y", 100.0);
+        assert!(agg.all_complete());
+        assert_eq!(agg.active_source_count(), 0);
+    }
+
+    #[test]
+    fn aggregator_display() {
+        let mut agg = ProgressAggregator::new();
+        agg.add_source("s", 1.0);
+        agg.update_source("s", 40.0);
+        let s = format!("{agg}");
+        assert!(s.contains("40.0%"));
+        assert!(s.contains("1 active"));
+    }
+
+    // -- ProgressRateEstimator tests --
+
+    #[test]
+    fn rate_estimator_empty() {
+        let est = ProgressRateEstimator::new();
+        assert!((est.rate_per_second() - 0.0).abs() < f64::EPSILON);
+        assert!(est.estimated_remaining_ms().is_none());
+        assert_eq!(est.samples_count(), 0);
+    }
+
+    #[test]
+    fn rate_estimator_basic() {
+        let mut est = ProgressRateEstimator::new();
+        est.record_sample(0.0, 0);
+        est.record_sample(50.0, 1000);
+        // 50 units in 1 second = 50 units/s
+        assert!((est.rate_per_second() - 50.0).abs() < f64::EPSILON);
+        // 50 units remaining at 50/s = 1 second = 1000 ms
+        assert_eq!(est.estimated_remaining_ms(), Some(1000));
+        assert_eq!(est.samples_count(), 2);
+    }
+
+    #[test]
+    fn rate_estimator_ignores_non_monotonic() {
+        let mut est = ProgressRateEstimator::new();
+        est.record_sample(0.0, 100);
+        est.record_sample(10.0, 50); // earlier timestamp, should be ignored
+        assert_eq!(est.samples_count(), 1);
+    }
+
+    #[test]
+    fn rate_estimator_complete() {
+        let mut est = ProgressRateEstimator::new();
+        est.record_sample(0.0, 0);
+        est.record_sample(100.0, 2000);
+        assert_eq!(est.estimated_remaining_ms(), Some(0));
+    }
+
+    // -- ProgressHistory tests --
+
+    #[test]
+    fn history_empty() {
+        let hist = ProgressHistory::new();
+        assert_eq!(hist.total_completed(), 0);
+        assert!(hist.average_duration_ms().is_none());
+        assert!(hist.longest_task().is_none());
+        assert!(hist.recent(5).is_empty());
+    }
+
+    #[test]
+    fn history_records_and_queries() {
+        let mut hist = ProgressHistory::new();
+        hist.record_completion(1, "build", 300);
+        hist.record_completion(2, "test", 500);
+        hist.record_completion(3, "lint", 200);
+        assert_eq!(hist.total_completed(), 3);
+        assert_eq!(hist.average_duration_ms(), Some(333));
+        assert_eq!(hist.longest_task(), Some(("test", 500)));
+        let recent = hist.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].label, "test");
+        assert_eq!(recent[1].label, "lint");
+    }
+
+    // -- CancellationChain tests --
+
+    #[test]
+    fn cancellation_chain_not_cancelled() {
+        let mut chain = CancellationChain::new();
+        chain.add_child(10);
+        chain.add_child(20);
+        assert!(!chain.is_cancelled());
+        assert!(chain.cancelled_children().is_empty());
+    }
+
+    #[test]
+    fn cancellation_chain_cancel_propagates() {
+        let mut chain = CancellationChain::new();
+        chain.add_child(10);
+        chain.add_child(20);
+        chain.cancel();
+        assert!(chain.is_cancelled());
+        assert_eq!(chain.cancelled_children(), &[10, 20]);
+    }
+
+    #[test]
+    fn cancellation_chain_dedup_children() {
+        let mut chain = CancellationChain::new();
+        chain.add_child(5);
+        chain.add_child(5);
+        chain.cancel();
+        assert_eq!(chain.cancelled_children().len(), 1);
     }
 }

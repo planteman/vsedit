@@ -1,5 +1,6 @@
 //! Port forwarding service.
 
+use std::collections::HashMap;
 use std::fmt;
 /// Privacy level for a tunnel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1119,6 +1120,240 @@ impl BandwidthTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TunnelConnectionManager
+// ---------------------------------------------------------------------------
+
+/// Manages a set of tunnel connections with automatic reconnection tracking.
+#[derive(Debug)]
+pub struct TunnelConnectionManager {
+    connections: Vec<TunnelConnection>,
+    max_connections: usize,
+    reconnect_policy: TunnelReconnectPolicy,
+    total_reconnects: u32,
+}
+
+impl TunnelConnectionManager {
+    pub fn new(max_connections: usize) -> Self {
+        Self {
+            connections: Vec::new(),
+            max_connections,
+            reconnect_policy: TunnelReconnectPolicy::new(3, 1000),
+            total_reconnects: 0,
+        }
+    }
+
+    pub fn with_policy(mut self, policy: TunnelReconnectPolicy) -> Self {
+        self.reconnect_policy = policy;
+        self
+    }
+
+    /// Add a connection. Returns `false` if already at capacity.
+    pub fn add_connection(&mut self, conn: TunnelConnection) -> bool {
+        if self.connections.len() >= self.max_connections {
+            return false;
+        }
+        self.connections.push(conn);
+        true
+    }
+
+    pub fn remove_connection(&mut self, id: u64) -> Option<TunnelConnection> {
+        let pos = self.connections.iter().position(|c| c.tunnel_id == id)?;
+        Some(self.connections.remove(pos))
+    }
+
+    pub fn connection_count(&self) -> usize {
+        self.connections.len()
+    }
+
+    pub fn is_at_capacity(&self) -> bool {
+        self.connections.len() >= self.max_connections
+    }
+
+    pub fn find_by_port(&self, local_port: u16) -> Option<&TunnelConnection> {
+        self.connections.iter().find(|c| c.local_port == local_port)
+    }
+
+    pub fn record_reconnect(&mut self) {
+        self.total_reconnects += 1;
+    }
+
+    pub fn total_reconnects(&self) -> u32 {
+        self.total_reconnects
+    }
+
+    pub fn active_ports(&self) -> Vec<u16> {
+        self.connections.iter().map(|c| c.local_port).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TunnelPortMapper
+// ---------------------------------------------------------------------------
+
+/// A single port mapping entry.
+#[derive(Debug, Clone)]
+pub struct PortMapping {
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub remote_host: String,
+    pub protocol: TunnelProtocol,
+}
+
+/// Maps local ports to remote ports.
+#[derive(Debug, Clone)]
+pub struct TunnelPortMapper {
+    mappings: Vec<PortMapping>,
+}
+
+impl TunnelPortMapper {
+    pub fn new() -> Self {
+        Self {
+            mappings: Vec::new(),
+        }
+    }
+
+    pub fn add_mapping(
+        &mut self,
+        local: u16,
+        remote: u16,
+        host: impl Into<String>,
+        protocol: TunnelProtocol,
+    ) {
+        self.mappings.push(PortMapping {
+            local_port: local,
+            remote_port: remote,
+            remote_host: host.into(),
+            protocol,
+        });
+    }
+
+    pub fn remove_mapping(&mut self, local_port: u16) -> bool {
+        let before = self.mappings.len();
+        self.mappings.retain(|m| m.local_port != local_port);
+        self.mappings.len() < before
+    }
+
+    pub fn find_by_local(&self, local: u16) -> Option<&PortMapping> {
+        self.mappings.iter().find(|m| m.local_port == local)
+    }
+
+    pub fn find_by_remote(&self, remote: u16) -> Vec<&PortMapping> {
+        self.mappings.iter().filter(|m| m.remote_port == remote).collect()
+    }
+
+    pub fn mapping_count(&self) -> usize {
+        self.mappings.len()
+    }
+
+    pub fn is_local_port_used(&self, port: u16) -> bool {
+        self.mappings.iter().any(|m| m.local_port == port)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TunnelHeartbeat
+// ---------------------------------------------------------------------------
+
+/// Heartbeat monitor for tunnel liveness detection.
+#[derive(Debug, Clone)]
+pub struct TunnelHeartbeat {
+    interval_ms: u64,
+    last_beat_ms: Option<u64>,
+    missed_count: u32,
+    max_missed: u32,
+}
+
+impl TunnelHeartbeat {
+    pub fn new(interval_ms: u64, max_missed: u32) -> Self {
+        Self {
+            interval_ms,
+            last_beat_ms: None,
+            missed_count: 0,
+            max_missed,
+        }
+    }
+
+    pub fn beat(&mut self, now_ms: u64) {
+        self.last_beat_ms = Some(now_ms);
+        self.missed_count = 0;
+    }
+
+    /// Evaluate health based on the current time.
+    pub fn check(&self, now_ms: u64) -> HealthStatus {
+        let last = match self.last_beat_ms {
+            Some(t) => t,
+            None => return HealthStatus::Unhealthy("no heartbeat received".into()),
+        };
+        let elapsed = now_ms.saturating_sub(last);
+        let missed = elapsed / self.interval_ms.max(1);
+        if missed == 0 {
+            HealthStatus::Healthy
+        } else if missed < self.max_missed as u64 {
+            HealthStatus::Degraded(format!("{missed} heartbeats missed"))
+        } else {
+            HealthStatus::Unhealthy(format!("{missed} heartbeats missed"))
+        }
+    }
+
+    pub fn missed_count(&self) -> u32 {
+        self.missed_count
+    }
+
+    pub fn is_alive(&self, now_ms: u64) -> bool {
+        matches!(self.check(now_ms), HealthStatus::Healthy | HealthStatus::Degraded(_))
+    }
+
+    pub fn reset(&mut self) {
+        self.last_beat_ms = None;
+        self.missed_count = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TunnelBandwidthMonitor
+// ---------------------------------------------------------------------------
+
+/// Aggregates bandwidth tracking across multiple connections.
+#[derive(Debug)]
+pub struct TunnelBandwidthMonitor {
+    trackers: HashMap<u64, BandwidthTracker>,
+}
+
+impl TunnelBandwidthMonitor {
+    pub fn new() -> Self {
+        Self {
+            trackers: HashMap::new(),
+        }
+    }
+
+    pub fn add_tracker(&mut self, conn_id: u64, window_size: usize) {
+        self.trackers.insert(conn_id, BandwidthTracker::new(window_size));
+    }
+
+    pub fn record(&mut self, conn_id: u64, timestamp: u64, bytes: u64) {
+        if let Some(tracker) = self.trackers.get_mut(&conn_id) {
+            tracker.record(timestamp, bytes);
+        }
+    }
+
+    pub fn rate_for(&self, conn_id: u64) -> Option<f64> {
+        self.trackers.get(&conn_id)?.rate()
+    }
+
+    pub fn total_bytes(&self) -> u64 {
+        self.trackers.values().map(|t| t.window_bytes()).sum()
+    }
+
+    pub fn tracker_count(&self) -> usize {
+        self.trackers.len()
+    }
+
+    pub fn remove_tracker(&mut self, conn_id: u64) {
+        self.trackers.remove(&conn_id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1954,5 +2189,163 @@ mod tests {
         pool.add(c1);
         pool.add(c2);
         assert_eq!(pool.total_bytes(), 1000);
+    }
+
+    // -----------------------------------------------------------------------
+    // TunnelConnectionManager tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_conn_manager_add_remove() {
+        let mut mgr = TunnelConnectionManager::new(4);
+        let c = TunnelConnection::new(1, 3000, "host", 80, TunnelProtocol::Http);
+        assert!(mgr.add_connection(c));
+        assert_eq!(mgr.connection_count(), 1);
+        let removed = mgr.remove_connection(1);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().tunnel_id, 1);
+        assert_eq!(mgr.connection_count(), 0);
+        assert!(mgr.remove_connection(99).is_none());
+    }
+
+    #[test]
+    fn test_conn_manager_at_capacity() {
+        let mut mgr = TunnelConnectionManager::new(2);
+        assert!(mgr.add_connection(TunnelConnection::new(1, 3000, "h", 80, TunnelProtocol::Http)));
+        assert!(!mgr.is_at_capacity());
+        assert!(mgr.add_connection(TunnelConnection::new(2, 3001, "h", 80, TunnelProtocol::Http)));
+        assert!(mgr.is_at_capacity());
+        assert!(!mgr.add_connection(TunnelConnection::new(3, 3002, "h", 80, TunnelProtocol::Http)));
+        assert_eq!(mgr.connection_count(), 2);
+    }
+
+    #[test]
+    fn test_conn_manager_find_by_port() {
+        let mut mgr = TunnelConnectionManager::new(4);
+        mgr.add_connection(TunnelConnection::new(1, 3000, "a", 80, TunnelProtocol::Http));
+        mgr.add_connection(TunnelConnection::new(2, 4000, "b", 443, TunnelProtocol::Https));
+        assert_eq!(mgr.find_by_port(4000).unwrap().tunnel_id, 2);
+        assert!(mgr.find_by_port(9999).is_none());
+        assert_eq!(mgr.active_ports(), vec![3000, 4000]);
+    }
+
+    #[test]
+    fn test_conn_manager_reconnect_count() {
+        let mut mgr = TunnelConnectionManager::new(4);
+        assert_eq!(mgr.total_reconnects(), 0);
+        mgr.record_reconnect();
+        mgr.record_reconnect();
+        assert_eq!(mgr.total_reconnects(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // TunnelPortMapper tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_port_mapper_add_find() {
+        let mut mapper = TunnelPortMapper::new();
+        mapper.add_mapping(3000, 80, "example.com", TunnelProtocol::Http);
+        assert_eq!(mapper.mapping_count(), 1);
+        let m = mapper.find_by_local(3000).unwrap();
+        assert_eq!(m.remote_port, 80);
+        assert_eq!(m.remote_host, "example.com");
+        assert!(mapper.is_local_port_used(3000));
+        assert!(!mapper.is_local_port_used(4000));
+    }
+
+    #[test]
+    fn test_port_mapper_remove() {
+        let mut mapper = TunnelPortMapper::new();
+        mapper.add_mapping(3000, 80, "host", TunnelProtocol::Http);
+        mapper.add_mapping(4000, 443, "host", TunnelProtocol::Https);
+        assert!(mapper.remove_mapping(3000));
+        assert_eq!(mapper.mapping_count(), 1);
+        assert!(!mapper.remove_mapping(3000));
+        assert!(mapper.find_by_local(3000).is_none());
+    }
+
+    #[test]
+    fn test_port_mapper_find_by_remote() {
+        let mut mapper = TunnelPortMapper::new();
+        mapper.add_mapping(3000, 80, "a", TunnelProtocol::Http);
+        mapper.add_mapping(4000, 80, "b", TunnelProtocol::Http);
+        mapper.add_mapping(5000, 443, "c", TunnelProtocol::Https);
+        let results = mapper.find_by_remote(80);
+        assert_eq!(results.len(), 2);
+        assert!(mapper.find_by_remote(9999).is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // TunnelHeartbeat tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_heartbeat_healthy() {
+        let mut hb = TunnelHeartbeat::new(1000, 3);
+        hb.beat(5000);
+        assert!(matches!(hb.check(5500), HealthStatus::Healthy));
+        assert!(hb.is_alive(5500));
+    }
+
+    #[test]
+    fn test_heartbeat_degraded() {
+        let mut hb = TunnelHeartbeat::new(1000, 3);
+        hb.beat(5000);
+        // 2 intervals missed (elapsed=2500, missed=2, max_missed=3)
+        let status = hb.check(7500);
+        assert!(matches!(status, HealthStatus::Degraded(_)));
+        assert!(hb.is_alive(7500));
+    }
+
+    #[test]
+    fn test_heartbeat_unhealthy() {
+        let mut hb = TunnelHeartbeat::new(1000, 3);
+        hb.beat(5000);
+        // 4 intervals missed, exceeds max_missed=3
+        let status = hb.check(9500);
+        assert!(matches!(status, HealthStatus::Unhealthy(_)));
+        assert!(!hb.is_alive(9500));
+    }
+
+    #[test]
+    fn test_heartbeat_reset() {
+        let mut hb = TunnelHeartbeat::new(1000, 3);
+        hb.beat(5000);
+        hb.reset();
+        // No heartbeat received after reset => unhealthy
+        assert!(matches!(hb.check(6000), HealthStatus::Unhealthy(_)));
+    }
+
+    // -----------------------------------------------------------------------
+    // TunnelBandwidthMonitor tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_bandwidth_monitor_track() {
+        let mut mon = TunnelBandwidthMonitor::new();
+        mon.add_tracker(1, 10);
+        mon.add_tracker(2, 10);
+        assert_eq!(mon.tracker_count(), 2);
+
+        mon.record(1, 100, 500);
+        mon.record(1, 200, 300);
+        mon.record(2, 100, 200);
+        assert_eq!(mon.total_bytes(), 1000);
+
+        // rate for tracker 1: 800 bytes / 100 time-units = 8.0
+        let r = mon.rate_for(1).unwrap();
+        assert!((r - 8.0).abs() < f64::EPSILON);
+
+        // non-existent tracker
+        assert!(mon.rate_for(99).is_none());
+
+        mon.remove_tracker(2);
+        assert_eq!(mon.tracker_count(), 1);
+        assert_eq!(mon.total_bytes(), 800);
+
+        // recording to a removed tracker is a no-op
+        mon.record(2, 300, 100);
+        assert_eq!(mon.total_bytes(), 800);
     }
 }

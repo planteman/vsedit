@@ -1292,6 +1292,239 @@ impl CellDependencyGraph {
     }
 }
 
+// ---------------------------------------------------------------------------
+// NotebookCellToolbar – action buttons per cell
+// ---------------------------------------------------------------------------
+
+/// An action available in a cell's toolbar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CellToolbarAction {
+    pub id: String,
+    pub label: String,
+    pub icon: String,
+    pub tooltip: String,
+    pub enabled: bool,
+}
+
+impl CellToolbarAction {
+    pub fn new(id: impl Into<String>, label: impl Into<String>, icon: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            icon: icon.into(),
+            tooltip: String::new(),
+            enabled: true,
+        }
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = tooltip.into();
+        self
+    }
+
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+}
+
+/// A toolbar for a notebook cell.
+#[derive(Debug, Clone)]
+pub struct NotebookCellToolbar {
+    pub cell_index: usize,
+    pub actions: Vec<CellToolbarAction>,
+}
+
+impl NotebookCellToolbar {
+    pub fn new(cell_index: usize) -> Self {
+        Self { cell_index, actions: Vec::new() }
+    }
+
+    /// Build a default toolbar for a cell.
+    pub fn default_for(cell_index: usize, kind: NotebookCellKind) -> Self {
+        let mut tb = Self::new(cell_index);
+        match kind {
+            NotebookCellKind::Code => {
+                tb.actions.push(CellToolbarAction::new("run", "Run", "▶").with_tooltip("Run Cell"));
+                tb.actions.push(CellToolbarAction::new("clear", "Clear", "✕").with_tooltip("Clear Output"));
+            }
+            NotebookCellKind::Markup => {
+                tb.actions.push(CellToolbarAction::new("edit", "Edit", "✎").with_tooltip("Edit Cell"));
+            }
+        }
+        tb.actions.push(CellToolbarAction::new("delete", "Delete", "🗑").with_tooltip("Delete Cell"));
+        tb
+    }
+
+    pub fn len(&self) -> usize {
+        self.actions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
+    }
+
+    /// Find an action by ID.
+    pub fn find_action(&self, id: &str) -> Option<&CellToolbarAction> {
+        self.actions.iter().find(|a| a.id == id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookOutputCollapse – toggle collapse state
+// ---------------------------------------------------------------------------
+
+/// Tracks collapsed state for cell outputs.
+#[derive(Debug, Clone)]
+pub struct NotebookOutputCollapse {
+    collapsed: HashSet<usize>,
+}
+
+impl NotebookOutputCollapse {
+    pub fn new() -> Self {
+        Self { collapsed: HashSet::new() }
+    }
+
+    /// Toggle collapse for a cell's output.
+    pub fn toggle(&mut self, cell_index: usize) {
+        if !self.collapsed.remove(&cell_index) {
+            self.collapsed.insert(cell_index);
+        }
+    }
+
+    pub fn is_collapsed(&self, cell_index: usize) -> bool {
+        self.collapsed.contains(&cell_index)
+    }
+
+    /// Collapse all cells.
+    pub fn collapse_all(&mut self, cell_count: usize) {
+        for i in 0..cell_count {
+            self.collapsed.insert(i);
+        }
+    }
+
+    /// Expand all cells.
+    pub fn expand_all(&mut self) {
+        self.collapsed.clear();
+    }
+
+    pub fn collapsed_count(&self) -> usize {
+        self.collapsed.len()
+    }
+}
+
+impl Default for NotebookOutputCollapse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookCellStatusBar – status information per cell
+// ---------------------------------------------------------------------------
+
+/// Status bar information for a notebook cell.
+#[derive(Debug, Clone)]
+pub struct NotebookCellStatusBar {
+    pub cell_index: usize,
+    pub language: String,
+    pub execution_time_ms: Option<u64>,
+    pub status: CellStatus,
+}
+
+/// Execution status of a cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellStatus {
+    Idle,
+    Running,
+    Success,
+    Error,
+}
+
+impl fmt::Display for CellStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Success => write!(f, "✓"),
+            Self::Error => write!(f, "✗"),
+        }
+    }
+}
+
+impl NotebookCellStatusBar {
+    pub fn new(cell_index: usize, language: impl Into<String>) -> Self {
+        Self {
+            cell_index,
+            language: language.into(),
+            execution_time_ms: None,
+            status: CellStatus::Idle,
+        }
+    }
+
+    /// Format execution time as a human-readable string.
+    pub fn execution_time_label(&self) -> String {
+        match self.execution_time_ms {
+            Some(ms) if ms < 1000 => format!("{}ms", ms),
+            Some(ms) => format!("{:.1}s", ms as f64 / 1000.0),
+            None => String::new(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookScrollSync – keeps cells in view during execution
+// ---------------------------------------------------------------------------
+
+/// Manages scroll synchronization during cell execution.
+#[derive(Debug, Clone)]
+pub struct NotebookScrollSync {
+    pub enabled: bool,
+    pub follow_executing: bool,
+    viewport_start: usize,
+    viewport_end: usize,
+}
+
+impl NotebookScrollSync {
+    pub fn new() -> Self {
+        Self {
+            enabled: true,
+            follow_executing: true,
+            viewport_start: 0,
+            viewport_end: 0,
+        }
+    }
+
+    /// Update the visible viewport range.
+    pub fn set_viewport(&mut self, start: usize, end: usize) {
+        self.viewport_start = start;
+        self.viewport_end = end;
+    }
+
+    /// Check if a cell index is currently visible.
+    pub fn is_visible(&self, cell_index: usize) -> bool {
+        cell_index >= self.viewport_start && cell_index <= self.viewport_end
+    }
+
+    /// Return the cell index to scroll to when execution reaches a cell.
+    pub fn scroll_target(&self, executing_cell: usize) -> Option<usize> {
+        if !self.enabled || !self.follow_executing {
+            return None;
+        }
+        if self.is_visible(executing_cell) {
+            None
+        } else {
+            Some(executing_cell)
+        }
+    }
+}
+
+impl Default for NotebookScrollSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1987,5 +2220,108 @@ mod tests {
         assert_eq!(graph.transitive_dependencies(3), vec![0, 1]);
         assert_eq!(graph.transitive_dependencies(1), vec![0]);
         assert!(graph.transitive_dependencies(0).is_empty());
+    }
+
+    // -- NotebookCellToolbar tests --
+
+    #[test]
+    fn cell_toolbar_default_code() {
+        let tb = NotebookCellToolbar::default_for(0, NotebookCellKind::Code);
+        assert!(tb.find_action("run").is_some());
+        assert!(tb.find_action("clear").is_some());
+        assert!(tb.find_action("delete").is_some());
+        assert!(!tb.is_empty());
+    }
+
+    #[test]
+    fn cell_toolbar_default_markup() {
+        let tb = NotebookCellToolbar::default_for(1, NotebookCellKind::Markup);
+        assert!(tb.find_action("edit").is_some());
+        assert!(tb.find_action("run").is_none());
+    }
+
+    #[test]
+    fn cell_toolbar_action_with_tooltip() {
+        let action = CellToolbarAction::new("run", "Run", "▶").with_tooltip("Run Cell").with_enabled(false);
+        assert_eq!(action.tooltip, "Run Cell");
+        assert!(!action.enabled);
+    }
+
+    // -- NotebookOutputCollapse tests --
+
+    #[test]
+    fn output_collapse_toggle() {
+        let mut oc = NotebookOutputCollapse::new();
+        assert!(!oc.is_collapsed(0));
+        oc.toggle(0);
+        assert!(oc.is_collapsed(0));
+        oc.toggle(0);
+        assert!(!oc.is_collapsed(0));
+    }
+
+    #[test]
+    fn output_collapse_all() {
+        let mut oc = NotebookOutputCollapse::default();
+        oc.collapse_all(5);
+        assert_eq!(oc.collapsed_count(), 5);
+        assert!(oc.is_collapsed(3));
+        oc.expand_all();
+        assert_eq!(oc.collapsed_count(), 0);
+    }
+
+    // -- NotebookCellStatusBar tests --
+
+    #[test]
+    fn cell_status_bar_time_ms() {
+        let mut bar = NotebookCellStatusBar::new(0, "python");
+        bar.execution_time_ms = Some(500);
+        assert_eq!(bar.execution_time_label(), "500ms");
+    }
+
+    #[test]
+    fn cell_status_bar_time_seconds() {
+        let mut bar = NotebookCellStatusBar::new(0, "python");
+        bar.execution_time_ms = Some(2500);
+        assert_eq!(bar.execution_time_label(), "2.5s");
+    }
+
+    #[test]
+    fn cell_status_display() {
+        assert_eq!(format!("{}", CellStatus::Running), "Running");
+        assert_eq!(format!("{}", CellStatus::Success), "✓");
+    }
+
+    #[test]
+    fn cell_status_bar_no_time() {
+        let bar = NotebookCellStatusBar::new(0, "rust");
+        assert!(bar.execution_time_label().is_empty());
+        assert_eq!(bar.status, CellStatus::Idle);
+    }
+
+    // -- NotebookScrollSync tests --
+
+    #[test]
+    fn scroll_sync_visible() {
+        let mut ss = NotebookScrollSync::new();
+        ss.set_viewport(2, 5);
+        assert!(ss.is_visible(3));
+        assert!(!ss.is_visible(1));
+        assert!(!ss.is_visible(6));
+    }
+
+    #[test]
+    fn scroll_sync_target_when_not_visible() {
+        let mut ss = NotebookScrollSync::new();
+        ss.set_viewport(0, 3);
+        assert_eq!(ss.scroll_target(5), Some(5));
+        assert_eq!(ss.scroll_target(2), None); // already visible
+    }
+
+    #[test]
+    fn scroll_sync_disabled() {
+        let mut ss = NotebookScrollSync::default();
+        ss.enabled = false;
+        ss.set_viewport(0, 3);
+        assert_eq!(ss.scroll_target(5), None);
     }
 }

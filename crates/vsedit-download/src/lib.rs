@@ -1115,6 +1115,191 @@ impl From<DownloadPriority> for u8 {
     }
 }
 
+// -- DownloadIntegrityChecker with hash verification -------------------------
+
+/// Hash algorithm for integrity checking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HashAlgorithm {
+    Sha256,
+    Sha512,
+    Md5,
+}
+
+impl fmt::Display for HashAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HashAlgorithm::Sha256 => f.write_str("SHA-256"),
+            HashAlgorithm::Sha512 => f.write_str("SHA-512"),
+            HashAlgorithm::Md5 => f.write_str("MD5"),
+        }
+    }
+}
+
+/// Integrity check specification.
+#[derive(Debug, Clone)]
+pub struct IntegrityCheck {
+    pub algorithm: HashAlgorithm,
+    pub expected_hash: String,
+}
+
+impl IntegrityCheck {
+    pub fn sha256(hash: &str) -> Self {
+        Self { algorithm: HashAlgorithm::Sha256, expected_hash: hash.to_string() }
+    }
+
+    pub fn sha512(hash: &str) -> Self {
+        Self { algorithm: HashAlgorithm::Sha512, expected_hash: hash.to_string() }
+    }
+
+    /// Verify a computed hash against the expected value.
+    pub fn verify(&self, computed_hash: &str) -> bool {
+        self.expected_hash.eq_ignore_ascii_case(computed_hash)
+    }
+}
+
+impl fmt::Display for IntegrityCheck {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let short = if self.expected_hash.len() > 16 {
+            &self.expected_hash[..16]
+        } else {
+            &self.expected_hash
+        };
+        write!(f, "{}:{short}...", self.algorithm)
+    }
+}
+
+// -- DownloadBandwidthThrottle -----------------------------------------------
+
+/// Bandwidth throttle configuration.
+#[derive(Debug, Clone)]
+pub struct BandwidthThrottle {
+    pub max_bytes_per_second: u64,
+    pub enabled: bool,
+}
+
+impl BandwidthThrottle {
+    pub fn new(max_bps: u64) -> Self {
+        Self { max_bytes_per_second: max_bps, enabled: true }
+    }
+
+    pub fn unlimited() -> Self {
+        Self { max_bytes_per_second: 0, enabled: false }
+    }
+
+    /// Calculate how long to wait given bytes transferred.
+    pub fn delay_for_bytes(&self, bytes: u64, elapsed_ms: u64) -> u64 {
+        if !self.enabled || self.max_bytes_per_second == 0 {
+            return 0;
+        }
+        let expected_ms = (bytes * 1000) / self.max_bytes_per_second;
+        if expected_ms > elapsed_ms {
+            expected_ms - elapsed_ms
+        } else {
+            0
+        }
+    }
+
+    /// Current effective rate limit in human-readable form.
+    pub fn display_limit(&self) -> String {
+        if !self.enabled {
+            return "unlimited".to_string();
+        }
+        if self.max_bytes_per_second >= 1_048_576 {
+            format!("{:.1} MB/s", self.max_bytes_per_second as f64 / 1_048_576.0)
+        } else if self.max_bytes_per_second >= 1024 {
+            format!("{:.1} KB/s", self.max_bytes_per_second as f64 / 1024.0)
+        } else {
+            format!("{} B/s", self.max_bytes_per_second)
+        }
+    }
+}
+
+impl fmt::Display for BandwidthThrottle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Throttle({})", self.display_limit())
+    }
+}
+
+// -- Download proxy configuration --------------------------------------------
+
+/// Proxy configuration for downloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProxyConfig {
+    pub host: String,
+    pub port: u16,
+    pub protocol: ProxyProtocol,
+    pub auth: Option<ProxyAuth>,
+    pub bypass_list: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProxyProtocol {
+    Http,
+    Https,
+    Socks5,
+}
+
+impl fmt::Display for ProxyProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProxyProtocol::Http => f.write_str("http"),
+            ProxyProtocol::Https => f.write_str("https"),
+            ProxyProtocol::Socks5 => f.write_str("socks5"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProxyAuth {
+    pub username: String,
+    pub password_set: bool,
+}
+
+impl ProxyConfig {
+    pub fn new(host: &str, port: u16, protocol: ProxyProtocol) -> Self {
+        Self {
+            host: host.to_string(),
+            port,
+            protocol,
+            auth: None,
+            bypass_list: Vec::new(),
+        }
+    }
+
+    pub fn with_auth(mut self, username: &str) -> Self {
+        self.auth = Some(ProxyAuth { username: username.to_string(), password_set: false });
+        self
+    }
+
+    pub fn with_bypass(mut self, pattern: &str) -> Self {
+        self.bypass_list.push(pattern.to_string());
+        self
+    }
+
+    /// Check if a URL should bypass the proxy.
+    pub fn should_bypass(&self, url: &str) -> bool {
+        self.bypass_list.iter().any(|pattern| url.contains(pattern))
+    }
+
+    /// Format as a proxy URL.
+    pub fn to_url(&self) -> String {
+        format!("{}://{}:{}", self.protocol, self.host, self.port)
+    }
+}
+
+impl fmt::Display for ProxyConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Proxy({})", self.to_url())?;
+        if self.auth.is_some() {
+            write!(f, " [auth]")?;
+        }
+        if !self.bypass_list.is_empty() {
+            write!(f, " [{} bypass rules]", self.bypass_list.len())?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1976,5 +2161,131 @@ mod tests {
         assert_eq!(u8::from(DownloadPriority::Normal), 1);
         assert_eq!(u8::from(DownloadPriority::High), 2);
         assert_eq!(u8::from(DownloadPriority::Urgent), 3);
+    }
+
+    // -- DownloadRetryPolicy additional tests -----------------------------------
+
+    #[test]
+    fn retry_policy_exponential_backoff_delays() {
+        let policy = DownloadRetryPolicy::default();
+        // 1-based: attempt 1 => base_delay * 2^0 = 1.0
+        assert_eq!(policy.delay_for_attempt(1), Some(1.0));
+        // attempt 2 => base_delay * 2^1 = 2.0
+        assert_eq!(policy.delay_for_attempt(2), Some(2.0));
+        // attempt 3 => base_delay * 2^2 = 4.0
+        assert_eq!(policy.delay_for_attempt(3), Some(4.0));
+    }
+
+    #[test]
+    fn retry_policy_max_delay_capped() {
+        let policy = DownloadRetryPolicy {
+            max_retries: 10,
+            strategy: BackoffStrategy::Exponential,
+            base_delay_secs: 10.0,
+            max_delay_secs: 15.0,
+        };
+        // attempt 5 => 10 * 2^4 = 160, capped to 15
+        assert_eq!(policy.delay_for_attempt(5), Some(15.0));
+    }
+
+    #[test]
+    fn retry_policy_is_exhausted_check() {
+        let policy = DownloadRetryPolicy::default();
+        assert!(!policy.is_exhausted(0));
+        assert!(!policy.is_exhausted(2));
+        assert!(policy.is_exhausted(3));
+    }
+
+    #[test]
+    fn retry_policy_display_format() {
+        let policy = DownloadRetryPolicy::default();
+        let s = policy.to_string();
+        assert!(s.contains("max=3"));
+    }
+
+    // -- IntegrityCheck tests -------------------------------------------------
+
+    #[test]
+    fn integrity_check_verify_match() {
+        let check = IntegrityCheck::sha256("abc123");
+        assert!(check.verify("ABC123"));
+        assert!(!check.verify("xyz"));
+    }
+
+    #[test]
+    fn integrity_check_display() {
+        let check = IntegrityCheck::sha256("abcdef1234567890abcdef");
+        let s = check.to_string();
+        assert!(s.contains("SHA-256"));
+    }
+
+    #[test]
+    fn hash_algorithm_display() {
+        assert_eq!(HashAlgorithm::Sha256.to_string(), "SHA-256");
+        assert_eq!(HashAlgorithm::Md5.to_string(), "MD5");
+    }
+
+    // -- BandwidthThrottle tests ----------------------------------------------
+
+    #[test]
+    fn throttle_delay_calculation() {
+        let throttle = BandwidthThrottle::new(1000);
+        let delay = throttle.delay_for_bytes(2000, 1000);
+        assert_eq!(delay, 1000);
+    }
+
+    #[test]
+    fn throttle_unlimited_no_delay() {
+        let throttle = BandwidthThrottle::unlimited();
+        assert_eq!(throttle.delay_for_bytes(1_000_000, 0), 0);
+    }
+
+    #[test]
+    fn throttle_display_limit() {
+        let throttle = BandwidthThrottle::new(1_048_576);
+        assert!(throttle.display_limit().contains("MB/s"));
+        let small = BandwidthThrottle::new(512);
+        assert!(small.display_limit().contains("B/s"));
+    }
+
+    // -- ProxyConfig tests ----------------------------------------------------
+
+    #[test]
+    fn proxy_to_url() {
+        let proxy = ProxyConfig::new("proxy.example.com", 8080, ProxyProtocol::Http);
+        assert_eq!(proxy.to_url(), "http://proxy.example.com:8080");
+    }
+
+    #[test]
+    fn proxy_bypass() {
+        let proxy = ProxyConfig::new("proxy.example.com", 8080, ProxyProtocol::Http)
+            .with_bypass("localhost")
+            .with_bypass("internal.corp");
+        assert!(proxy.should_bypass("http://localhost:3000"));
+        assert!(!proxy.should_bypass("http://example.com"));
+    }
+
+    #[test]
+    fn proxy_with_auth() {
+        let proxy = ProxyConfig::new("proxy.example.com", 8080, ProxyProtocol::Https)
+            .with_auth("user");
+        assert!(proxy.auth.is_some());
+    }
+
+    #[test]
+    fn proxy_display() {
+        let proxy = ProxyConfig::new("host", 80, ProxyProtocol::Socks5)
+            .with_auth("user")
+            .with_bypass("localhost");
+        let s = proxy.to_string();
+        assert!(s.contains("socks5"));
+        assert!(s.contains("[auth]"));
+        assert!(s.contains("1 bypass"));
+    }
+
+    #[test]
+    fn proxy_protocol_display() {
+        assert_eq!(ProxyProtocol::Http.to_string(), "http");
+        assert_eq!(ProxyProtocol::Socks5.to_string(), "socks5");
     }
 }

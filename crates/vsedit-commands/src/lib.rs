@@ -1160,6 +1160,209 @@ pub fn normalize_keybinding(kb: &str) -> String {
     mods.join("+")
 }
 
+// -- AliasMapping for command shortcuts --------------------------------------
+
+/// Maps an alias to an actual command ID, with optional description.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasMapping {
+    pub alias: String,
+    pub target_command: String,
+    pub description: Option<String>,
+}
+
+impl AliasMapping {
+    pub fn new(alias: &str, target: &str) -> Self {
+        Self {
+            alias: alias.to_string(),
+            target_command: target.to_string(),
+            description: None,
+        }
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = Some(desc.to_string());
+        self
+    }
+}
+
+impl fmt::Display for AliasMapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} -> {}", self.alias, self.target_command)
+    }
+}
+
+/// Manages a set of alias mappings.
+#[derive(Debug, Default)]
+pub struct AliasMappingRegistry {
+    aliases: HashMap<String, AliasMapping>,
+}
+
+impl AliasMappingRegistry {
+    pub fn new() -> Self {
+        Self { aliases: HashMap::new() }
+    }
+
+    pub fn register(&mut self, alias: AliasMapping) {
+        self.aliases.insert(alias.alias.clone(), alias);
+    }
+
+    pub fn resolve(&self, name: &str) -> Option<&str> {
+        self.aliases.get(name).map(|a| a.target_command.as_str())
+    }
+
+    pub fn unregister(&mut self, alias: &str) {
+        self.aliases.remove(alias);
+    }
+
+    pub fn count(&self) -> usize {
+        self.aliases.len()
+    }
+
+    /// Find all aliases pointing to a command.
+    pub fn aliases_for(&self, target: &str) -> Vec<&str> {
+        self.aliases.values()
+            .filter(|a| a.target_command == target)
+            .map(|a| a.alias.as_str())
+            .collect()
+    }
+}
+
+// -- CommandThrottle preventing rapid re-execution ---------------------------
+
+/// Tracks last execution time to throttle rapid invocations.
+#[derive(Debug)]
+pub struct CommandThrottle {
+    last_execution: HashMap<String, u64>,
+    min_interval_ms: u64,
+}
+
+impl CommandThrottle {
+    pub fn new(min_interval_ms: u64) -> Self {
+        Self {
+            last_execution: HashMap::new(),
+            min_interval_ms,
+        }
+    }
+
+    /// Check if a command can be executed at the given timestamp.
+    pub fn can_execute(&self, command_id: &str, now_ms: u64) -> bool {
+        match self.last_execution.get(command_id) {
+            Some(&last) => now_ms.saturating_sub(last) >= self.min_interval_ms,
+            None => true,
+        }
+    }
+
+    /// Record that a command was executed.
+    pub fn record_execution(&mut self, command_id: &str, now_ms: u64) {
+        self.last_execution.insert(command_id.to_string(), now_ms);
+    }
+
+    /// Remaining wait time before a command can be executed again.
+    pub fn remaining_ms(&self, command_id: &str, now_ms: u64) -> u64 {
+        match self.last_execution.get(command_id) {
+            Some(&last) => {
+                let elapsed = now_ms.saturating_sub(last);
+                if elapsed >= self.min_interval_ms { 0 } else { self.min_interval_ms - elapsed }
+            }
+            None => 0,
+        }
+    }
+
+    /// Clear throttle state for a command.
+    pub fn clear(&mut self, command_id: &str) {
+        self.last_execution.remove(command_id);
+    }
+
+    pub fn clear_all(&mut self) {
+        self.last_execution.clear();
+    }
+}
+
+impl fmt::Display for CommandThrottle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Throttle(interval={}ms, {} tracked)", self.min_interval_ms, self.last_execution.len())
+    }
+}
+
+// -- Undoable command execution history --------------------------------------
+
+/// A record of an executed command with undo tracking.
+#[derive(Debug, Clone)]
+pub struct UndoableHistoryEntry {
+    pub command_id: String,
+    pub timestamp: u64,
+    pub undoable: bool,
+    pub undone: bool,
+}
+
+/// Tracks command execution history with undo support.
+#[derive(Debug)]
+pub struct UndoableCommandHistory {
+    entries: Vec<UndoableHistoryEntry>,
+    max_entries: usize,
+}
+
+impl UndoableCommandHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), max_entries }
+    }
+
+    pub fn record(&mut self, command_id: &str, timestamp: u64, undoable: bool) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(UndoableHistoryEntry {
+            command_id: command_id.to_string(),
+            timestamp,
+            undoable,
+            undone: false,
+        });
+    }
+
+    /// Mark the most recent undoable command as undone.
+    pub fn undo_last(&mut self) -> Option<String> {
+        for entry in self.entries.iter_mut().rev() {
+            if entry.undoable && !entry.undone {
+                entry.undone = true;
+                return Some(entry.command_id.clone());
+            }
+        }
+        None
+    }
+
+    pub fn entries(&self) -> &[UndoableHistoryEntry] {
+        &self.entries
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn undone_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.undone).count()
+    }
+
+    /// Get the last N commands executed.
+    pub fn last_n(&self, n: usize) -> &[UndoableHistoryEntry] {
+        let start = self.entries.len().saturating_sub(n);
+        &self.entries[start..]
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl fmt::Display for UndoableCommandHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "History({} entries, {} undone)", self.entries.len(), self.undone_count())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -1977,5 +2180,121 @@ mod tests {
         assert_eq!(normalize_keybinding("Shift+Ctrl+A"), "ctrl+shift+a");
         assert_eq!(normalize_keybinding("Alt+Shift+Z"), "alt+shift+z");
         assert_eq!(normalize_keybinding("Escape"), "escape");
+    }
+
+    // -- AliasMapping tests ---------------------------------------------------
+
+    #[test]
+    fn alias_resolve() {
+        let mut reg = AliasMappingRegistry::new();
+        reg.register(AliasMapping::new("copy", "editor.action.copy"));
+        assert_eq!(reg.resolve("copy"), Some("editor.action.copy"));
+        assert_eq!(reg.resolve("paste"), None);
+    }
+
+    #[test]
+    fn alias_unregister() {
+        let mut reg = AliasMappingRegistry::new();
+        reg.register(AliasMapping::new("x", "y.z"));
+        reg.unregister("x");
+        assert_eq!(reg.count(), 0);
+    }
+
+    #[test]
+    fn alias_for_target() {
+        let mut reg = AliasMappingRegistry::new();
+        reg.register(AliasMapping::new("cp", "editor.copy"));
+        reg.register(AliasMapping::new("copy", "editor.copy"));
+        let aliases = reg.aliases_for("editor.copy");
+        assert_eq!(aliases.len(), 2);
+    }
+
+    #[test]
+    fn alias_display() {
+        let alias = AliasMapping::new("cp", "editor.copy");
+        assert_eq!(alias.to_string(), "cp -> editor.copy");
+    }
+
+    // -- CommandThrottle tests ------------------------------------------------
+
+    #[test]
+    fn throttle_allows_first_execution() {
+        let throttle = CommandThrottle::new(1000);
+        assert!(throttle.can_execute("cmd.x", 0));
+    }
+
+    #[test]
+    fn throttle_blocks_rapid_execution() {
+        let mut throttle = CommandThrottle::new(1000);
+        throttle.record_execution("cmd.x", 100);
+        assert!(!throttle.can_execute("cmd.x", 500));
+        assert!(throttle.can_execute("cmd.x", 1100));
+    }
+
+    #[test]
+    fn throttle_remaining_ms() {
+        let mut throttle = CommandThrottle::new(1000);
+        throttle.record_execution("cmd.x", 100);
+        assert_eq!(throttle.remaining_ms("cmd.x", 500), 600);
+        assert_eq!(throttle.remaining_ms("cmd.x", 1100), 0);
+    }
+
+    #[test]
+    fn throttle_display() {
+        let throttle = CommandThrottle::new(500);
+        let s = throttle.to_string();
+        assert!(s.contains("500ms"));
+    }
+
+    // -- UndoableCommandHistory tests -----------------------------------------
+
+    #[test]
+    fn history_record_and_undo() {
+        let mut history = UndoableCommandHistory::new(10);
+        history.record("cmd.a", 1, true);
+        history.record("cmd.b", 2, false);
+        history.record("cmd.c", 3, true);
+
+        let undone = history.undo_last();
+        assert_eq!(undone, Some("cmd.c".to_string()));
+        assert_eq!(history.undone_count(), 1);
+    }
+
+    #[test]
+    fn history_undo_skips_non_undoable() {
+        let mut history = UndoableCommandHistory::new(10);
+        history.record("cmd.a", 1, true);
+        history.record("cmd.b", 2, false);
+
+        let undone = history.undo_last();
+        assert_eq!(undone, Some("cmd.a".to_string()));
+    }
+
+    #[test]
+    fn history_evicts_oldest() {
+        let mut history = UndoableCommandHistory::new(2);
+        history.record("a.x", 1, false);
+        history.record("b.x", 2, false);
+        history.record("c.x", 3, false);
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.entries()[0].command_id, "b.x");
+    }
+
+    #[test]
+    fn history_last_n() {
+        let mut history = UndoableCommandHistory::new(10);
+        history.record("a.x", 1, false);
+        history.record("b.x", 2, false);
+        history.record("c.x", 3, false);
+        let last2 = history.last_n(2);
+        assert_eq!(last2.len(), 2);
+        assert_eq!(last2[0].command_id, "b.x");
+    }
+
+    #[test]
+    fn history_display() {
+        let history = UndoableCommandHistory::new(10);
+        let s = history.to_string();
+        assert!(s.contains("0 entries"));
     }
 }

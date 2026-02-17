@@ -4,6 +4,7 @@
 //! including PTY output rendering through [`TerminalBuffer`].
 
 use std::collections::HashMap;
+use std::fmt;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -1276,6 +1277,295 @@ impl Default for SessionStateMachine {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TerminalTabGroup – organize terminals into groups
+// ---------------------------------------------------------------------------
+
+/// A named group of terminal tabs.
+#[derive(Debug, Clone)]
+pub struct TerminalTabGroup {
+    pub name: String,
+    pub terminal_ids: Vec<String>,
+    pub collapsed: bool,
+}
+
+impl TerminalTabGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            terminal_ids: Vec::new(),
+            collapsed: false,
+        }
+    }
+
+    /// Add a terminal to this group.
+    pub fn add(&mut self, terminal_id: impl Into<String>) {
+        self.terminal_ids.push(terminal_id.into());
+    }
+
+    /// Remove a terminal from this group. Returns true if found.
+    pub fn remove(&mut self, terminal_id: &str) -> bool {
+        let before = self.terminal_ids.len();
+        self.terminal_ids.retain(|id| id != terminal_id);
+        self.terminal_ids.len() < before
+    }
+
+    /// Toggle collapsed state.
+    pub fn toggle_collapsed(&mut self) {
+        self.collapsed = !self.collapsed;
+    }
+
+    pub fn len(&self) -> usize {
+        self.terminal_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.terminal_ids.is_empty()
+    }
+
+    /// Check if this group contains a specific terminal.
+    pub fn contains(&self, terminal_id: &str) -> bool {
+        self.terminal_ids.iter().any(|id| id == terminal_id)
+    }
+}
+
+impl fmt::Display for TerminalTabGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({} terminals)", self.name, self.terminal_ids.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalSplitView – side-by-side terminal layout
+// ---------------------------------------------------------------------------
+
+/// Orientation for a terminal split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitOrientation {
+    Horizontal,
+    Vertical,
+}
+
+/// A split view containing two terminal panes.
+#[derive(Debug, Clone)]
+pub struct TerminalSplitView {
+    pub left_id: String,
+    pub right_id: String,
+    pub orientation: SplitOrientation,
+    /// Ratio of left/top pane (0.0–1.0).
+    pub ratio: f32,
+    pub focused_pane: SplitPane,
+}
+
+/// Which pane is focused in a split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitPane {
+    Left,
+    Right,
+}
+
+impl TerminalSplitView {
+    pub fn new(left_id: impl Into<String>, right_id: impl Into<String>, orientation: SplitOrientation) -> Self {
+        Self {
+            left_id: left_id.into(),
+            right_id: right_id.into(),
+            orientation,
+            ratio: 0.5,
+            focused_pane: SplitPane::Left,
+        }
+    }
+
+    /// Set the split ratio (clamped to 0.1–0.9).
+    pub fn set_ratio(&mut self, ratio: f32) {
+        self.ratio = ratio.clamp(0.1, 0.9);
+    }
+
+    /// Toggle focus between left and right pane.
+    pub fn toggle_focus(&mut self) {
+        self.focused_pane = match self.focused_pane {
+            SplitPane::Left => SplitPane::Right,
+            SplitPane::Right => SplitPane::Left,
+        };
+    }
+
+    /// Get the ID of the currently focused terminal.
+    pub fn focused_terminal_id(&self) -> &str {
+        match self.focused_pane {
+            SplitPane::Left => &self.left_id,
+            SplitPane::Right => &self.right_id,
+        }
+    }
+
+    /// Check if a terminal ID is part of this split.
+    pub fn contains(&self, terminal_id: &str) -> bool {
+        self.left_id == terminal_id || self.right_id == terminal_id
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalSearchOverlay – in-terminal search
+// ---------------------------------------------------------------------------
+
+/// A search overlay displayed on top of a terminal.
+#[derive(Debug, Clone)]
+pub struct TerminalSearchOverlay {
+    pub query: String,
+    pub case_sensitive: bool,
+    pub regex_mode: bool,
+    pub match_positions: Vec<(u32, u32)>,
+    pub current_match: Option<usize>,
+    pub visible: bool,
+}
+
+impl TerminalSearchOverlay {
+    pub fn new() -> Self {
+        Self {
+            query: String::new(),
+            case_sensitive: false,
+            regex_mode: false,
+            match_positions: Vec::new(),
+            current_match: None,
+            visible: false,
+        }
+    }
+
+    /// Open the search overlay.
+    pub fn open(&mut self) {
+        self.visible = true;
+    }
+
+    /// Close and reset the search overlay.
+    pub fn close(&mut self) {
+        self.visible = false;
+        self.query.clear();
+        self.match_positions.clear();
+        self.current_match = None;
+    }
+
+    /// Update the query and perform a search in the given lines.
+    pub fn search(&mut self, query: &str, lines: &[&str]) {
+        self.query = query.to_string();
+        self.match_positions.clear();
+        if query.is_empty() {
+            self.current_match = None;
+            return;
+        }
+        let q = if self.case_sensitive {
+            query.to_string()
+        } else {
+            query.to_lowercase()
+        };
+        for (line_idx, line) in lines.iter().enumerate() {
+            let haystack = if self.case_sensitive {
+                line.to_string()
+            } else {
+                line.to_lowercase()
+            };
+            let mut start = 0;
+            while let Some(pos) = haystack[start..].find(&q) {
+                self.match_positions.push((line_idx as u32, (start + pos) as u32));
+                start += pos + 1;
+            }
+        }
+        self.current_match = if self.match_positions.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
+    }
+
+    /// Navigate to the next match.
+    pub fn next_match(&mut self) {
+        if let Some(ref mut idx) = self.current_match {
+            if !self.match_positions.is_empty() {
+                *idx = (*idx + 1) % self.match_positions.len();
+            }
+        }
+    }
+
+    /// Navigate to the previous match.
+    pub fn prev_match(&mut self) {
+        if let Some(ref mut idx) = self.current_match {
+            if !self.match_positions.is_empty() {
+                *idx = idx.checked_sub(1).unwrap_or(self.match_positions.len() - 1);
+            }
+        }
+    }
+
+    /// Total number of matches.
+    pub fn match_count(&self) -> usize {
+        self.match_positions.len()
+    }
+
+    /// Toggle case sensitivity.
+    pub fn toggle_case_sensitive(&mut self) {
+        self.case_sensitive = !self.case_sensitive;
+    }
+}
+
+impl Default for TerminalSearchOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalFocusTracker – tracks which terminal is focused
+// ---------------------------------------------------------------------------
+
+/// Tracks the currently focused terminal and focus history.
+pub struct TerminalFocusTracker {
+    history: Vec<String>,
+    max_history: usize,
+}
+
+impl TerminalFocusTracker {
+    pub fn new(max_history: usize) -> Self {
+        Self {
+            history: Vec::new(),
+            max_history,
+        }
+    }
+
+    /// Focus a terminal, pushing it to the front of history.
+    pub fn focus(&mut self, terminal_id: impl Into<String>) {
+        let id = terminal_id.into();
+        self.history.retain(|h| h != &id);
+        self.history.push(id);
+        if self.history.len() > self.max_history {
+            self.history.remove(0);
+        }
+    }
+
+    /// The currently focused terminal ID.
+    pub fn current(&self) -> Option<&str> {
+        self.history.last().map(|s| s.as_str())
+    }
+
+    /// The previously focused terminal ID.
+    pub fn previous(&self) -> Option<&str> {
+        if self.history.len() >= 2 {
+            Some(&self.history[self.history.len() - 2])
+        } else {
+            None
+        }
+    }
+
+    /// Remove a terminal from focus history.
+    pub fn remove(&mut self, terminal_id: &str) {
+        self.history.retain(|h| h != terminal_id);
+    }
+
+    /// Number of terminals in focus history.
+    pub fn len(&self) -> usize {
+        self.history.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.history.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1979,8 +2269,165 @@ mod tests {
     fn session_exit_from_starting() {
         let mut sm = SessionStateMachine::new();
         sm.start();
-        // Shell can exit before producing output (e.g. bad command).
         assert!(sm.exit(127));
         assert_eq!(sm.state(), SessionState::Exited(127));
+    }
+
+    // -- TerminalTabGroup tests --
+
+    #[test]
+    fn tab_group_add_remove() {
+        let mut g = TerminalTabGroup::new("build");
+        g.add("t1");
+        g.add("t2");
+        assert_eq!(g.len(), 2);
+        assert!(g.contains("t1"));
+        assert!(g.remove("t1"));
+        assert_eq!(g.len(), 1);
+        assert!(!g.contains("t1"));
+        assert!(!g.remove("t1")); // already removed
+    }
+
+    #[test]
+    fn tab_group_toggle_collapsed() {
+        let mut g = TerminalTabGroup::new("test");
+        assert!(!g.collapsed);
+        g.toggle_collapsed();
+        assert!(g.collapsed);
+        g.toggle_collapsed();
+        assert!(!g.collapsed);
+    }
+
+    #[test]
+    fn tab_group_display() {
+        let mut g = TerminalTabGroup::new("servers");
+        g.add("s1");
+        let s = format!("{}", g);
+        assert!(s.contains("servers"));
+        assert!(s.contains("1 terminal"));
+    }
+
+    // -- TerminalSplitView tests --
+
+    #[test]
+    fn split_view_creation() {
+        let sv = TerminalSplitView::new("a", "b", SplitOrientation::Horizontal);
+        assert_eq!(sv.focused_terminal_id(), "a");
+        assert!(sv.contains("a"));
+        assert!(sv.contains("b"));
+        assert!(!sv.contains("c"));
+    }
+
+    #[test]
+    fn split_view_toggle_focus() {
+        let mut sv = TerminalSplitView::new("a", "b", SplitOrientation::Vertical);
+        assert_eq!(sv.focused_pane, SplitPane::Left);
+        sv.toggle_focus();
+        assert_eq!(sv.focused_pane, SplitPane::Right);
+        assert_eq!(sv.focused_terminal_id(), "b");
+    }
+
+    #[test]
+    fn split_view_ratio_clamped() {
+        let mut sv = TerminalSplitView::new("a", "b", SplitOrientation::Horizontal);
+        sv.set_ratio(0.0);
+        assert!((sv.ratio - 0.1).abs() < f32::EPSILON);
+        sv.set_ratio(1.0);
+        assert!((sv.ratio - 0.9).abs() < f32::EPSILON);
+        sv.set_ratio(0.5);
+        assert!((sv.ratio - 0.5).abs() < f32::EPSILON);
+    }
+
+    // -- TerminalSearchOverlay tests --
+
+    #[test]
+    fn search_overlay_basic() {
+        let mut overlay = TerminalSearchOverlay::new();
+        overlay.open();
+        assert!(overlay.visible);
+        let lines = vec!["hello world", "hello rust", "goodbye"];
+        overlay.search("hello", &lines);
+        assert_eq!(overlay.match_count(), 2);
+        assert_eq!(overlay.current_match, Some(0));
+    }
+
+    #[test]
+    fn search_overlay_navigation() {
+        let mut overlay = TerminalSearchOverlay::new();
+        let lines = vec!["abc", "abd", "abe"];
+        overlay.search("ab", &lines);
+        assert_eq!(overlay.match_count(), 3);
+        overlay.next_match();
+        assert_eq!(overlay.current_match, Some(1));
+        overlay.next_match();
+        assert_eq!(overlay.current_match, Some(2));
+        overlay.next_match(); // wraps
+        assert_eq!(overlay.current_match, Some(0));
+        overlay.prev_match(); // wraps back
+        assert_eq!(overlay.current_match, Some(2));
+    }
+
+    #[test]
+    fn search_overlay_case_insensitive() {
+        let mut overlay = TerminalSearchOverlay::default();
+        let lines = vec!["Hello", "HELLO", "hello"];
+        overlay.search("hello", &lines);
+        assert_eq!(overlay.match_count(), 3);
+    }
+
+    #[test]
+    fn search_overlay_close_resets() {
+        let mut overlay = TerminalSearchOverlay::new();
+        overlay.open();
+        overlay.search("x", &["x", "y"]);
+        overlay.close();
+        assert!(!overlay.visible);
+        assert!(overlay.query.is_empty());
+        assert_eq!(overlay.match_count(), 0);
+    }
+
+    // -- TerminalFocusTracker tests --
+
+    #[test]
+    fn focus_tracker_basic() {
+        let mut ft = TerminalFocusTracker::new(5);
+        assert!(ft.is_empty());
+        ft.focus("t1");
+        ft.focus("t2");
+        assert_eq!(ft.current(), Some("t2"));
+        assert_eq!(ft.previous(), Some("t1"));
+        assert_eq!(ft.len(), 2);
+    }
+
+    #[test]
+    fn focus_tracker_removes_duplicate() {
+        let mut ft = TerminalFocusTracker::new(5);
+        ft.focus("t1");
+        ft.focus("t2");
+        ft.focus("t1"); // re-focus t1
+        assert_eq!(ft.current(), Some("t1"));
+        assert_eq!(ft.previous(), Some("t2"));
+        assert_eq!(ft.len(), 2);
+    }
+
+    #[test]
+    fn focus_tracker_max_history() {
+        let mut ft = TerminalFocusTracker::new(3);
+        ft.focus("t1");
+        ft.focus("t2");
+        ft.focus("t3");
+        ft.focus("t4");
+        assert_eq!(ft.len(), 3);
+        assert_eq!(ft.current(), Some("t4"));
+    }
+
+    #[test]
+    fn focus_tracker_remove() {
+        let mut ft = TerminalFocusTracker::new(5);
+        ft.focus("t1");
+        ft.focus("t2");
+        ft.remove("t1");
+        assert_eq!(ft.len(), 1);
+        assert_eq!(ft.current(), Some("t2"));
     }
 }

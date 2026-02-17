@@ -1128,6 +1128,246 @@ impl fmt::Display for GraphSummary {
         )
     }
 }
+// ---------------------------------------------------------------------------
+// CallHierarchyPath
+// ---------------------------------------------------------------------------
+
+/// Represents an ordered path through a call hierarchy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallHierarchyPath {
+    chain: Vec<String>,
+}
+
+impl CallHierarchyPath {
+    /// Create an empty path.
+    pub fn new() -> Self {
+        Self { chain: Vec::new() }
+    }
+
+    /// Append a name to the end of the path.
+    pub fn push(&mut self, name: &str) {
+        self.chain.push(name.to_string());
+    }
+
+    /// Return the full path joined with ` → `.
+    pub fn full_path(&self) -> String {
+        self.chain.join(" → ")
+    }
+
+    /// Return the depth (number of items) in the path.
+    pub fn depth(&self) -> usize {
+        self.chain.len()
+    }
+
+    /// Return `true` if the path contains the given name.
+    pub fn contains(&self, name: &str) -> bool {
+        self.chain.iter().any(|n| n == name)
+    }
+
+    /// Return `true` if the path starts with the given name.
+    pub fn starts_with(&self, name: &str) -> bool {
+        self.chain.first().map_or(false, |n| n == name)
+    }
+
+    /// Return `true` if the path ends with the given name.
+    pub fn ends_with(&self, name: &str) -> bool {
+        self.chain.last().map_or(false, |n| n == name)
+    }
+
+    /// Remove and return the last item, or `None` if empty.
+    pub fn pop(&mut self) -> Option<String> {
+        self.chain.pop()
+    }
+
+    /// Remove all items from the path.
+    pub fn clear(&mut self) {
+        self.chain.clear();
+    }
+
+    /// Return `true` if the path has no items.
+    pub fn is_empty(&self) -> bool {
+        self.chain.is_empty()
+    }
+}
+
+impl Default for CallHierarchyPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for CallHierarchyPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.full_path())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallHierarchySearcher
+// ---------------------------------------------------------------------------
+
+/// Search utilities for finding items in a `CallGraph`.
+pub struct CallHierarchySearcher;
+
+impl CallHierarchySearcher {
+    /// Return names of items whose name contains `query` (case-insensitive).
+    pub fn search(graph: &CallGraph, query: &str) -> Vec<String> {
+        let lower = query.to_lowercase();
+        let mut results: Vec<String> = graph
+            .items
+            .values()
+            .filter(|item| item.name.to_lowercase().contains(&lower))
+            .map(|item| item.name.clone())
+            .collect();
+        results.sort();
+        results.dedup();
+        results
+    }
+
+    /// Return names of items that match the given `SymbolKind`.
+    pub fn search_by_kind(graph: &CallGraph, kind: SymbolKind) -> Vec<String> {
+        let mut results: Vec<String> = graph
+            .items
+            .values()
+            .filter(|item| item.kind == kind)
+            .map(|item| item.name.clone())
+            .collect();
+        results.sort();
+        results.dedup();
+        results
+    }
+
+    /// Return names of items whose URI contains `uri` (substring match).
+    pub fn search_by_uri(graph: &CallGraph, uri: &str) -> Vec<String> {
+        let mut results: Vec<String> = graph
+            .items
+            .values()
+            .filter(|item| item.uri.contains(uri))
+            .map(|item| item.name.clone())
+            .collect();
+        results.sort();
+        results.dedup();
+        results
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallHierarchyMetrics / CallMetricsResult
+// ---------------------------------------------------------------------------
+
+/// Computed metrics for a `CallGraph`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallMetricsResult {
+    pub total_nodes: usize,
+    pub total_edges: usize,
+    pub avg_fan_out: f64,
+    pub avg_fan_in: f64,
+    pub max_fan_out: (String, usize),
+    pub max_fan_in: (String, usize),
+}
+
+impl fmt::Display for CallMetricsResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "nodes={} edges={} avg_fan_out={:.2} avg_fan_in={:.2} max_fan_out={}({}) max_fan_in={}({})",
+            self.total_nodes,
+            self.total_edges,
+            self.avg_fan_out,
+            self.avg_fan_in,
+            self.max_fan_out.0,
+            self.max_fan_out.1,
+            self.max_fan_in.0,
+            self.max_fan_in.1,
+        )
+    }
+}
+
+/// Compute fan-in / fan-out metrics for a `CallGraph`.
+pub struct CallHierarchyMetrics;
+
+impl CallHierarchyMetrics {
+    /// Analyze the graph and return aggregated metrics.
+    pub fn compute(graph: &CallGraph) -> CallMetricsResult {
+        let items = graph.all_items();
+        let n = items.len();
+        let total_edges = graph.edge_count();
+
+        let (mut max_out_name, mut max_out_val) = (String::new(), 0usize);
+        let (mut max_in_name, mut max_in_val) = (String::new(), 0usize);
+        let mut sum_out: usize = 0;
+        let mut sum_in: usize = 0;
+
+        for item in &items {
+            let out = graph.out_degree(item);
+            let ind = graph.in_degree(item);
+            sum_out += out;
+            sum_in += ind;
+            if out > max_out_val {
+                max_out_val = out;
+                max_out_name = item.name.clone();
+            }
+            if ind > max_in_val {
+                max_in_val = ind;
+                max_in_name = item.name.clone();
+            }
+        }
+
+        let avg_fan_out = if n == 0 { 0.0 } else { sum_out as f64 / n as f64 };
+        let avg_fan_in = if n == 0 { 0.0 } else { sum_in as f64 / n as f64 };
+
+        CallMetricsResult {
+            total_nodes: n,
+            total_edges,
+            avg_fan_out,
+            avg_fan_in,
+            max_fan_out: (max_out_name, max_out_val),
+            max_fan_in: (max_in_name, max_in_val),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallDepthLimiter
+// ---------------------------------------------------------------------------
+
+/// Enforces a maximum call-chain depth.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallDepthLimiter {
+    max_depth: usize,
+}
+
+impl CallDepthLimiter {
+    /// Create a limiter with the given maximum depth.
+    pub fn new(max_depth: usize) -> Self {
+        Self { max_depth }
+    }
+
+    /// Return `true` if `depth` is within the configured limit.
+    pub fn is_within_limit(&self, depth: usize) -> bool {
+        depth <= self.max_depth
+    }
+
+    /// Clamp `depth` to at most `max_depth`.
+    pub fn clamp(&self, depth: usize) -> usize {
+        depth.min(self.max_depth)
+    }
+
+    /// Truncate `chain` to at most `max_depth` elements.
+    pub fn limited_chain(&self, chain: &[String]) -> Vec<String> {
+        chain.iter().take(self.max_depth).cloned().collect()
+    }
+
+    /// Update the depth limit.
+    pub fn set_limit(&mut self, new: usize) {
+        self.max_depth = new;
+    }
+
+    /// Return the current depth limit.
+    pub fn limit(&self) -> usize {
+        self.max_depth
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1913,5 +2153,159 @@ mod tests {
         assert_eq!(fns.len(), 2);
         let methods = graph.items_by_kind(SymbolKind::Method);
         assert_eq!(methods.len(), 1);
+    }
+
+    // ── CallHierarchyPath tests ──
+
+    #[test]
+    fn path_push_and_full_path() {
+        let mut p = CallHierarchyPath::new();
+        p.push("main");
+        p.push("init");
+        p.push("run");
+        assert_eq!(p.full_path(), "main → init → run");
+        assert_eq!(p.depth(), 3);
+    }
+
+    #[test]
+    fn path_contains_and_endpoints() {
+        let mut p = CallHierarchyPath::new();
+        p.push("a");
+        p.push("b");
+        p.push("c");
+        assert!(p.contains("b"));
+        assert!(!p.contains("z"));
+        assert!(p.starts_with("a"));
+        assert!(!p.starts_with("b"));
+        assert!(p.ends_with("c"));
+    }
+
+    #[test]
+    fn path_pop_clear_empty() {
+        let mut p = CallHierarchyPath::new();
+        assert!(p.is_empty());
+        p.push("x");
+        p.push("y");
+        assert_eq!(p.pop(), Some("y".to_string()));
+        assert_eq!(p.depth(), 1);
+        p.clear();
+        assert!(p.is_empty());
+        assert_eq!(p.pop(), None);
+    }
+
+    #[test]
+    fn path_display() {
+        let mut p = CallHierarchyPath::new();
+        p.push("foo");
+        p.push("bar");
+        assert_eq!(format!("{}", p), "foo → bar");
+    }
+
+    // ── CallHierarchySearcher tests ──
+
+    #[test]
+    fn searcher_case_insensitive() {
+        let mut graph = CallGraph::new();
+        graph.add_item(sample_item("FooBar", SymbolKind::Function));
+        graph.add_item(sample_item("baz", SymbolKind::Method));
+        let results = CallHierarchySearcher::search(&graph, "foo");
+        assert_eq!(results, vec!["FooBar"]);
+    }
+
+    #[test]
+    fn searcher_no_match() {
+        let mut graph = CallGraph::new();
+        graph.add_item(sample_item("alpha", SymbolKind::Function));
+        let results = CallHierarchySearcher::search(&graph, "zzz");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn searcher_by_kind() {
+        let mut graph = CallGraph::new();
+        graph.add_item(sample_item("f1", SymbolKind::Function));
+        graph.add_item(sample_item("m1", SymbolKind::Method));
+        graph.add_item(sample_item("f2", SymbolKind::Function));
+        let fns = CallHierarchySearcher::search_by_kind(&graph, SymbolKind::Function);
+        assert_eq!(fns.len(), 2);
+        assert!(fns.contains(&"f1".to_string()));
+    }
+
+    #[test]
+    fn searcher_by_uri() {
+        let mut graph = CallGraph::new();
+        graph.add_item(sample_item("x", SymbolKind::Function));
+        let results = CallHierarchySearcher::search_by_uri(&graph, "main.rs");
+        assert_eq!(results, vec!["x"]);
+        let empty = CallHierarchySearcher::search_by_uri(&graph, "other.rs");
+        assert!(empty.is_empty());
+    }
+
+    // ── CallHierarchyMetrics tests ──
+
+    #[test]
+    fn metrics_empty_graph() {
+        let graph = CallGraph::new();
+        let m = CallHierarchyMetrics::compute(&graph);
+        assert_eq!(m.total_nodes, 0);
+        assert_eq!(m.total_edges, 0);
+        assert_eq!(m.avg_fan_out, 0.0);
+    }
+
+    #[test]
+    fn metrics_with_edges() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&a, &c);
+        let m = CallHierarchyMetrics::compute(&graph);
+        assert_eq!(m.total_nodes, 3);
+        assert_eq!(m.total_edges, 2);
+        assert_eq!(m.max_fan_out.0, "a");
+        assert_eq!(m.max_fan_out.1, 2);
+    }
+
+    #[test]
+    fn metrics_display() {
+        let graph = CallGraph::new();
+        let m = CallHierarchyMetrics::compute(&graph);
+        let s = format!("{}", m);
+        assert!(s.contains("nodes=0"));
+        assert!(s.contains("edges=0"));
+    }
+
+    // ── CallDepthLimiter tests ──
+
+    #[test]
+    fn limiter_within_and_clamp() {
+        let lim = CallDepthLimiter::new(5);
+        assert!(lim.is_within_limit(3));
+        assert!(lim.is_within_limit(5));
+        assert!(!lim.is_within_limit(6));
+        assert_eq!(lim.clamp(10), 5);
+        assert_eq!(lim.clamp(2), 2);
+    }
+
+    #[test]
+    fn limiter_limited_chain() {
+        let lim = CallDepthLimiter::new(2);
+        let chain: Vec<String> = vec!["a", "b", "c", "d"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let limited = lim.limited_chain(&chain);
+        assert_eq!(limited, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn limiter_set_and_get() {
+        let mut lim = CallDepthLimiter::new(3);
+        assert_eq!(lim.limit(), 3);
+        lim.set_limit(10);
+        assert_eq!(lim.limit(), 10);
+        assert!(lim.is_within_limit(10));
+        assert!(!lim.is_within_limit(11));
     }
 }

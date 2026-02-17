@@ -1069,6 +1069,219 @@ impl MenuId {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MenuBarSubmenuBuilder – nested menu construction
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing nested submenu hierarchies.
+#[derive(Debug, Clone)]
+pub struct MenuBarSubmenuBuilder {
+    label: String,
+    entries: Vec<SubmenuItem>,
+}
+
+/// An item in a submenu – either a command or a nested submenu.
+#[derive(Debug, Clone)]
+pub enum SubmenuItem {
+    Entry(MenuEntry),
+    Separator,
+    Submenu(MenuBarSubmenuBuilder),
+}
+
+impl MenuBarSubmenuBuilder {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add a command entry to the submenu.
+    pub fn add_entry(mut self, entry: MenuEntry) -> Self {
+        self.entries.push(SubmenuItem::Entry(entry));
+        self
+    }
+
+    /// Add a separator.
+    pub fn add_separator(mut self) -> Self {
+        self.entries.push(SubmenuItem::Separator);
+        self
+    }
+
+    /// Add a nested submenu.
+    pub fn add_submenu(mut self, submenu: MenuBarSubmenuBuilder) -> Self {
+        self.entries.push(SubmenuItem::Submenu(submenu));
+        self
+    }
+
+    /// Total items including separators.
+    pub fn item_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Count of command entries (not separators or submenus).
+    pub fn command_count(&self) -> usize {
+        self.entries.iter().filter(|e| matches!(e, SubmenuItem::Entry(_))).count()
+    }
+
+    /// The submenu label.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// Depth of the deepest nested submenu.
+    pub fn max_depth(&self) -> usize {
+        let mut max = 0;
+        for item in &self.entries {
+            if let SubmenuItem::Submenu(sub) = item {
+                let d = sub.max_depth() + 1;
+                if d > max { max = d; }
+            }
+        }
+        max
+    }
+}
+
+impl fmt::Display for MenuBarSubmenuBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Submenu({}, {} items)", self.label, self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuBarMnemonics – Alt+key shortcut navigation
+// ---------------------------------------------------------------------------
+
+/// Manages mnemonic (Alt+key) shortcuts for menu items.
+#[derive(Debug, Clone)]
+pub struct MenuBarMnemonics {
+    /// Map from character to menu ID key.
+    mappings: HashMap<char, String>,
+}
+
+impl MenuBarMnemonics {
+    pub fn new() -> Self {
+        Self { mappings: HashMap::new() }
+    }
+
+    /// Register a mnemonic for a menu.
+    pub fn register(&mut self, key: char, menu_key: impl Into<String>) {
+        self.mappings.insert(key.to_ascii_lowercase(), menu_key.into());
+    }
+
+    /// Look up which menu corresponds to a given key.
+    pub fn lookup(&self, key: char) -> Option<&str> {
+        self.mappings.get(&key.to_ascii_lowercase()).map(|s| s.as_str())
+    }
+
+    /// Auto-assign mnemonics from menu labels (first unused letter).
+    pub fn auto_assign(&mut self, labels: &[(&str, &str)]) {
+        for (menu_key, label) in labels {
+            for ch in label.chars() {
+                if ch.is_alphabetic() && !self.mappings.contains_key(&ch.to_ascii_lowercase()) {
+                    self.register(ch, *menu_key);
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Number of registered mnemonics.
+    pub fn count(&self) -> usize {
+        self.mappings.len()
+    }
+
+    /// All registered keys.
+    pub fn keys(&self) -> Vec<char> {
+        self.mappings.keys().copied().collect()
+    }
+}
+
+impl Default for MenuBarMnemonics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for MenuBarMnemonics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MenuBarMnemonics({} keys)", self.mappings.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Menu item separator logic
+// ---------------------------------------------------------------------------
+
+/// Remove duplicate or leading/trailing separators from a list of submenu items.
+pub fn clean_separators(items: &[SubmenuItem]) -> Vec<SubmenuItem> {
+    let mut result = Vec::new();
+    let mut last_was_separator = true; // true to strip leading separators
+
+    for item in items {
+        match item {
+            SubmenuItem::Separator => {
+                if !last_was_separator {
+                    result.push(SubmenuItem::Separator);
+                    last_was_separator = true;
+                }
+            }
+            other => {
+                result.push(other.clone());
+                last_was_separator = false;
+            }
+        }
+    }
+
+    // Remove trailing separator
+    if let Some(SubmenuItem::Separator) = result.last() {
+        result.pop();
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Menu bar overflow handling
+// ---------------------------------------------------------------------------
+
+/// Computes which menus overflow when the bar is too narrow.
+#[derive(Debug, Clone)]
+pub struct MenuBarOverflow {
+    /// Maximum number of visible top-level menus.
+    pub max_visible: usize,
+}
+
+impl MenuBarOverflow {
+    pub fn new(max_visible: usize) -> Self {
+        Self { max_visible }
+    }
+
+    /// Split menu IDs into visible and overflow groups.
+    pub fn partition<'a>(&self, menu_ids: &'a [String]) -> (&'a [String], &'a [String]) {
+        if menu_ids.len() <= self.max_visible {
+            (menu_ids, &[])
+        } else {
+            menu_ids.split_at(self.max_visible)
+        }
+    }
+
+    /// Whether there are overflowing menus.
+    pub fn has_overflow(&self, total_menus: usize) -> bool {
+        total_menus > self.max_visible
+    }
+
+    /// Number of overflowing menus.
+    pub fn overflow_count(&self, total_menus: usize) -> usize {
+        total_menus.saturating_sub(self.max_visible)
+    }
+}
+
+impl fmt::Display for MenuBarOverflow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MenuBarOverflow(max={})", self.max_visible)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1936,5 +2149,110 @@ mod tests {
     fn menu_id_sort_order() {
         assert!(MenuId::File.sort_order() < MenuId::Edit.sort_order());
         assert!(MenuId::Help.sort_order() < MenuId::Custom("x".into()).sort_order());
+    }
+
+    // -- MenuBarSubmenuBuilder ---------------------------------------------
+
+    #[test]
+    fn submenu_builder_basic() {
+        let sub = MenuBarSubmenuBuilder::new("File")
+            .add_entry(entry("open", 1))
+            .add_separator()
+            .add_entry(entry("save", 2));
+        assert_eq!(sub.item_count(), 3);
+        assert_eq!(sub.command_count(), 2);
+        assert_eq!(sub.label(), "File");
+    }
+
+    #[test]
+    fn submenu_builder_nested_depth() {
+        let inner = MenuBarSubmenuBuilder::new("Inner");
+        let outer = MenuBarSubmenuBuilder::new("Outer").add_submenu(inner);
+        assert_eq!(outer.max_depth(), 1);
+    }
+
+    #[test]
+    fn submenu_builder_display() {
+        let sub = MenuBarSubmenuBuilder::new("Edit");
+        assert!(format!("{sub}").contains("Edit"));
+    }
+
+    // -- MenuBarMnemonics --------------------------------------------------
+
+    #[test]
+    fn mnemonics_register_and_lookup() {
+        let mut mn = MenuBarMnemonics::new();
+        mn.register('f', "file");
+        assert_eq!(mn.lookup('f'), Some("file"));
+        assert_eq!(mn.lookup('F'), Some("file"));
+        assert_eq!(mn.lookup('x'), None);
+    }
+
+    #[test]
+    fn mnemonics_auto_assign() {
+        let mut mn = MenuBarMnemonics::new();
+        mn.auto_assign(&[("file", "File"), ("edit", "Edit")]);
+        assert_eq!(mn.count(), 2);
+        assert_eq!(mn.lookup('f'), Some("file"));
+        assert_eq!(mn.lookup('e'), Some("edit"));
+    }
+
+    #[test]
+    fn mnemonics_display() {
+        let mn = MenuBarMnemonics::default();
+        assert!(format!("{mn}").contains("0 keys"));
+    }
+
+    // -- clean_separators --------------------------------------------------
+
+    #[test]
+    fn clean_separators_removes_duplicates() {
+        let items = vec![
+            SubmenuItem::Entry(entry("a", 1)),
+            SubmenuItem::Separator,
+            SubmenuItem::Separator,
+            SubmenuItem::Entry(entry("b", 2)),
+        ];
+        let cleaned = clean_separators(&items);
+        assert_eq!(cleaned.len(), 3);
+    }
+
+    #[test]
+    fn clean_separators_removes_leading_trailing() {
+        let items = vec![
+            SubmenuItem::Separator,
+            SubmenuItem::Entry(entry("a", 1)),
+            SubmenuItem::Separator,
+        ];
+        let cleaned = clean_separators(&items);
+        assert_eq!(cleaned.len(), 1);
+    }
+
+    // -- MenuBarOverflow ---------------------------------------------------
+
+    #[test]
+    fn overflow_no_overflow() {
+        let ov = MenuBarOverflow::new(8);
+        let menus = vec!["file".to_string(), "edit".to_string()];
+        let (visible, overflow) = ov.partition(&menus);
+        assert_eq!(visible.len(), 2);
+        assert!(overflow.is_empty());
+        assert!(!ov.has_overflow(2));
+    }
+
+    #[test]
+    fn overflow_with_overflow() {
+        let ov = MenuBarOverflow::new(2);
+        let menus = vec!["file".to_string(), "edit".to_string(), "view".to_string(), "help".to_string()];
+        let (visible, overflow) = ov.partition(&menus);
+        assert_eq!(visible.len(), 2);
+        assert_eq!(overflow.len(), 2);
+        assert_eq!(ov.overflow_count(4), 2);
+    }
+
+    #[test]
+    fn overflow_display() {
+        let ov = MenuBarOverflow::new(5);
+        assert!(format!("{ov}").contains("max=5"));
     }
 }

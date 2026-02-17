@@ -1219,6 +1219,308 @@ impl From<TaskEnvironment> for HashMap<String, String> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TaskDependencyGraph – execution ordering
+// ---------------------------------------------------------------------------
+
+/// A directed acyclic graph for task dependencies and execution ordering.
+#[derive(Debug, Clone)]
+pub struct TaskDependencyGraph {
+    /// Map from task name to list of task names it depends on.
+    dependencies: HashMap<String, Vec<String>>,
+}
+
+impl TaskDependencyGraph {
+    pub fn new() -> Self {
+        Self { dependencies: HashMap::new() }
+    }
+
+    /// Add a task with no dependencies.
+    pub fn add_task(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        self.dependencies.entry(name).or_default();
+    }
+
+    /// Add a dependency: `task` depends on `depends_on`.
+    pub fn add_dependency(&mut self, task: impl Into<String>, depends_on: impl Into<String>) {
+        let task = task.into();
+        let dep = depends_on.into();
+        self.dependencies.entry(dep.clone()).or_default();
+        self.dependencies.entry(task).or_default().push(dep);
+    }
+
+    /// Return tasks in topological order (dependencies first).
+    pub fn execution_order(&self) -> Result<Vec<String>, String> {
+        let mut visited = HashMap::new();
+        let mut order = Vec::new();
+
+        for task in self.dependencies.keys() {
+            if !visited.contains_key(task.as_str()) {
+                self.topo_visit(task, &mut visited, &mut order)?;
+            }
+        }
+
+        Ok(order)
+    }
+
+    fn topo_visit(
+        &self,
+        task: &str,
+        visited: &mut HashMap<String, bool>,
+        order: &mut Vec<String>,
+    ) -> Result<(), String> {
+        if let Some(&in_progress) = visited.get(task) {
+            if in_progress {
+                return Err(format!("circular dependency detected at: {task}"));
+            }
+            return Ok(());
+        }
+        visited.insert(task.to_string(), true);
+
+        if let Some(deps) = self.dependencies.get(task) {
+            for dep in deps {
+                self.topo_visit(dep, visited, order)?;
+            }
+        }
+
+        visited.insert(task.to_string(), false);
+        order.push(task.to_string());
+        Ok(())
+    }
+
+    /// Get direct dependencies of a task.
+    pub fn dependencies_of(&self, task: &str) -> Vec<&str> {
+        self.dependencies
+            .get(task)
+            .map(|deps| deps.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Tasks with no dependencies (roots).
+    pub fn root_tasks(&self) -> Vec<&str> {
+        self.dependencies
+            .iter()
+            .filter(|(_, deps)| deps.is_empty())
+            .map(|(name, _)| name.as_str())
+            .collect()
+    }
+
+    pub fn task_count(&self) -> usize {
+        self.dependencies.len()
+    }
+}
+
+impl Default for TaskDependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for TaskDependencyGraph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TaskDependencyGraph({} tasks)", self.dependencies.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskVariableSubstitution – ${workspaceFolder} etc
+// ---------------------------------------------------------------------------
+
+/// Substitutes predefined variables in task command strings.
+#[derive(Debug, Clone)]
+pub struct TaskVariableSubstitution {
+    vars: HashMap<String, String>,
+}
+
+impl TaskVariableSubstitution {
+    pub fn new() -> Self {
+        Self { vars: HashMap::new() }
+    }
+
+    /// Set a variable value.
+    pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        self.vars.insert(name.into(), value.into());
+    }
+
+    /// Set common VS Code task variables.
+    pub fn set_workspace(&mut self, folder: &str, name: &str) {
+        self.set("workspaceFolder", folder);
+        self.set("workspaceFolderBasename", name);
+    }
+
+    /// Set file-related variables.
+    pub fn set_file(&mut self, path: &str, dir: &str, basename: &str, ext: &str) {
+        self.set("file", path);
+        self.set("fileDirname", dir);
+        self.set("fileBasename", basename);
+        self.set("fileExtname", ext);
+    }
+
+    /// Substitute all `${variable}` references in the input string.
+    pub fn substitute(&self, input: &str) -> String {
+        let mut result = input.to_string();
+        for (name, value) in &self.vars {
+            let placeholder = format!("${{{name}}}");
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Count unresolved variables in the string.
+    pub fn unresolved_count(&self, input: &str) -> usize {
+        let substituted = self.substitute(input);
+        substituted.matches("${").count()
+    }
+
+    pub fn variable_count(&self) -> usize {
+        self.vars.len()
+    }
+}
+
+impl Default for TaskVariableSubstitution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for TaskVariableSubstitution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TaskVariableSubstitution({} vars)", self.vars.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskProblemMatcher – regex-based output parsing
+// ---------------------------------------------------------------------------
+
+/// Matches task output lines to extract problem (error/warning) information.
+#[derive(Debug, Clone)]
+pub struct TaskProblemMatcher {
+    pub name: String,
+    pub pattern: String,
+    pub file_group: usize,
+    pub line_group: usize,
+    pub message_group: usize,
+}
+
+impl TaskProblemMatcher {
+    pub fn new(name: impl Into<String>, pattern: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            pattern: pattern.into(),
+            file_group: 1,
+            line_group: 2,
+            message_group: 3,
+        }
+    }
+
+    /// Create a default problem matcher for Rust compiler output.
+    pub fn rust_default() -> Self {
+        Self::new("rustc", r"^error\[?\w*\]?:?\s*(.+)")
+    }
+
+    /// Create a default problem matcher for GCC-style output.
+    pub fn gcc_default() -> Self {
+        Self::new("gcc", r"^(.+):(\d+):\d+:\s*(error|warning):\s*(.+)")
+    }
+
+    /// Try to match a line and extract a problem.
+    pub fn match_line(&self, line: &str) -> Option<TaskProblem> {
+        let re = regex::Regex::new(&self.pattern).ok()?;
+        let caps = re.captures(line)?;
+        Some(TaskProblem {
+            file: caps.get(self.file_group).map(|m| m.as_str().to_string()),
+            line: caps.get(self.line_group).and_then(|m| m.as_str().parse().ok()),
+            message: caps.get(self.message_group).map(|m| m.as_str().to_string())
+                .unwrap_or_else(|| caps.get(0).map(|m| m.as_str().to_string()).unwrap_or_default()),
+        })
+    }
+}
+
+/// A problem extracted from task output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskProblem {
+    pub file: Option<String>,
+    pub line: Option<u32>,
+    pub message: String,
+}
+
+impl fmt::Display for TaskProblem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (&self.file, self.line) {
+            (Some(file), Some(line)) => write!(f, "{}:{}: {}", file, line, self.message),
+            (Some(file), None) => write!(f, "{}: {}", file, self.message),
+            _ => write!(f, "{}", self.message),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task terminal assignment
+// ---------------------------------------------------------------------------
+
+/// Determines how a task uses terminal panels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskTerminalKind {
+    /// Reuse an existing integrated terminal.
+    Integrated,
+    /// Create a new dedicated terminal.
+    Dedicated,
+    /// Run in the background without a visible terminal.
+    Background,
+}
+
+impl fmt::Display for TaskTerminalKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Integrated => write!(f, "Integrated"),
+            Self::Dedicated => write!(f, "Dedicated"),
+            Self::Background => write!(f, "Background"),
+        }
+    }
+}
+
+/// Assignment of a task to a terminal panel.
+#[derive(Debug, Clone)]
+pub struct TaskTerminalAssignment {
+    pub task_name: String,
+    pub terminal_kind: TaskTerminalKind,
+    pub panel_name: Option<String>,
+    pub clear_before_run: bool,
+}
+
+impl TaskTerminalAssignment {
+    pub fn new(task_name: impl Into<String>, kind: TaskTerminalKind) -> Self {
+        Self {
+            task_name: task_name.into(),
+            terminal_kind: kind,
+            panel_name: None,
+            clear_before_run: false,
+        }
+    }
+
+    pub fn with_panel(mut self, panel: impl Into<String>) -> Self {
+        self.panel_name = Some(panel.into());
+        self
+    }
+
+    pub fn with_clear(mut self) -> Self {
+        self.clear_before_run = true;
+        self
+    }
+
+    /// Generate a display label for the terminal tab.
+    pub fn terminal_label(&self) -> String {
+        self.panel_name.clone().unwrap_or_else(|| format!("Task - {}", self.task_name))
+    }
+}
+
+impl fmt::Display for TaskTerminalAssignment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Terminal({}, {})", self.task_name, self.terminal_kind)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1930,5 +2232,121 @@ mod tests {
         env.set("A", "1");
         env.set("B", "2");
         assert_eq!(format!("{env}"), "TaskEnvironment(2 vars)");
+    }
+
+    // -- TaskDependencyGraph -----------------------------------------------
+
+    #[test]
+    fn dependency_graph_execution_order() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("test", "build");
+        g.add_dependency("build", "compile");
+        g.add_task("compile");
+        let order = g.execution_order().unwrap();
+        let compile_pos = order.iter().position(|x| x == "compile").unwrap();
+        let build_pos = order.iter().position(|x| x == "build").unwrap();
+        let test_pos = order.iter().position(|x| x == "test").unwrap();
+        assert!(compile_pos < build_pos);
+        assert!(build_pos < test_pos);
+    }
+
+    #[test]
+    fn dependency_graph_circular_detection() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        assert!(g.execution_order().is_err());
+    }
+
+    #[test]
+    fn dependency_graph_root_tasks() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("root1");
+        g.add_dependency("child", "root1");
+        let roots = g.root_tasks();
+        assert!(roots.contains(&"root1"));
+    }
+
+    #[test]
+    fn dependency_graph_display() {
+        let g = TaskDependencyGraph::new();
+        assert!(format!("{g}").contains("0 tasks"));
+    }
+
+    // -- TaskVariableSubstitution ------------------------------------------
+
+    #[test]
+    fn variable_substitution_basic() {
+        let mut sub = TaskVariableSubstitution::new();
+        sub.set("workspaceFolder", "/home/user/project");
+        let result = sub.substitute("cd ${workspaceFolder} && make");
+        assert_eq!(result, "cd /home/user/project && make");
+    }
+
+    #[test]
+    fn variable_substitution_workspace() {
+        let mut sub = TaskVariableSubstitution::new();
+        sub.set_workspace("/home/user/proj", "proj");
+        assert_eq!(sub.substitute("${workspaceFolder}"), "/home/user/proj");
+        assert_eq!(sub.substitute("${workspaceFolderBasename}"), "proj");
+    }
+
+    #[test]
+    fn variable_substitution_unresolved() {
+        let sub = TaskVariableSubstitution::new();
+        assert_eq!(sub.unresolved_count("${a} ${b}"), 2);
+    }
+
+    #[test]
+    fn variable_substitution_display() {
+        let sub = TaskVariableSubstitution::default();
+        assert!(format!("{sub}").contains("0 vars"));
+    }
+
+    // -- TaskProblemMatcher ------------------------------------------------
+
+    #[test]
+    fn problem_matcher_rustc() {
+        let m = TaskProblemMatcher::rust_default();
+        let problem = m.match_line("error[E0308]: mismatched types");
+        assert!(problem.is_some());
+    }
+
+    #[test]
+    fn problem_display_with_file_and_line() {
+        let p = TaskProblem {
+            file: Some("main.rs".into()),
+            line: Some(42),
+            message: "type mismatch".into(),
+        };
+        let s = format!("{p}");
+        assert!(s.contains("main.rs:42"));
+    }
+
+    // -- TaskTerminalAssignment --------------------------------------------
+
+    #[test]
+    fn terminal_assignment_label() {
+        let a = TaskTerminalAssignment::new("build", TaskTerminalKind::Integrated);
+        assert_eq!(a.terminal_label(), "Task - build");
+    }
+
+    #[test]
+    fn terminal_assignment_with_panel() {
+        let a = TaskTerminalAssignment::new("test", TaskTerminalKind::Dedicated)
+            .with_panel("My Panel");
+        assert_eq!(a.terminal_label(), "My Panel");
+    }
+
+    #[test]
+    fn terminal_kind_display() {
+        assert_eq!(format!("{}", TaskTerminalKind::Background), "Background");
+    }
+
+    #[test]
+    fn terminal_assignment_display() {
+        let a = TaskTerminalAssignment::new("lint", TaskTerminalKind::Integrated);
+        let s = format!("{a}");
+        assert!(s.contains("lint"));
     }
 }

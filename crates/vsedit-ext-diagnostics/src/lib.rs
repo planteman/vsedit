@@ -1163,6 +1163,217 @@ impl From<SeverityAggregation> for DiagnosticSeverityCounter {
     }
 }
 
+// -- DiagnosticSeverityFilter ------------------------------------------------
+
+/// Filter diagnostics by severity levels.
+#[derive(Debug, Clone)]
+pub struct DiagnosticSeverityFilter {
+    pub show_errors: bool,
+    pub show_warnings: bool,
+    pub show_info: bool,
+    pub show_hints: bool,
+}
+
+impl Default for DiagnosticSeverityFilter {
+    fn default() -> Self {
+        Self {
+            show_errors: true,
+            show_warnings: true,
+            show_info: true,
+            show_hints: true,
+        }
+    }
+}
+
+impl DiagnosticSeverityFilter {
+    /// Create a filter that shows all severities.
+    pub fn all() -> Self {
+        Self::default()
+    }
+
+    /// Create a filter that shows only errors.
+    pub fn errors_only() -> Self {
+        Self {
+            show_errors: true,
+            show_warnings: false,
+            show_info: false,
+            show_hints: false,
+        }
+    }
+
+    /// Check if a severity passes this filter.
+    pub fn matches(&self, severity: &DiagnosticSeverity) -> bool {
+        match severity {
+            DiagnosticSeverity::Error => self.show_errors,
+            DiagnosticSeverity::Warning => self.show_warnings,
+            DiagnosticSeverity::Information => self.show_info,
+            DiagnosticSeverity::Hint => self.show_hints,
+        }
+    }
+
+    /// Filter a list of diagnostics, returning only those matching.
+    pub fn apply<'a>(&self, diagnostics: &'a [Diagnostic]) -> Vec<&'a Diagnostic> {
+        diagnostics.iter().filter(|d| self.matches(&d.severity)).collect()
+    }
+
+    /// Count of enabled severity levels.
+    pub fn enabled_count(&self) -> usize {
+        [self.show_errors, self.show_warnings, self.show_info, self.show_hints]
+            .iter()
+            .filter(|&&v| v)
+            .count()
+    }
+}
+
+impl fmt::Display for DiagnosticSeverityFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut enabled = Vec::new();
+        if self.show_errors { enabled.push("errors"); }
+        if self.show_warnings { enabled.push("warnings"); }
+        if self.show_info { enabled.push("info"); }
+        if self.show_hints { enabled.push("hints"); }
+        write!(f, "Filter[{}]", enabled.join(", "))
+    }
+}
+
+// -- DiagnosticCodeAction resolver -------------------------------------------
+
+/// A code action suggested for resolving a diagnostic.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticCodeAction {
+    pub title: String,
+    pub diagnostic_message: String,
+    pub edit_description: Option<String>,
+    pub is_preferred: bool,
+}
+
+impl fmt::Display for DiagnosticCodeAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CodeAction({})", self.title)?;
+        if self.is_preferred {
+            write!(f, " [preferred]")?;
+        }
+        Ok(())
+    }
+}
+
+/// Resolve code actions for a diagnostic by checking its code.
+pub fn resolve_code_actions(diag: &Diagnostic) -> Vec<DiagnosticCodeAction> {
+    let mut actions = Vec::new();
+    if let Some(code) = &diag.code {
+        actions.push(DiagnosticCodeAction {
+            title: format!("Fix: {}", diag.message),
+            diagnostic_message: diag.message.clone(),
+            edit_description: Some(format!("Resolve {code}")),
+            is_preferred: true,
+        });
+    }
+    if diag.tags.contains(&DiagnosticTag::Unnecessary) {
+        actions.push(DiagnosticCodeAction {
+            title: "Remove unused code".to_string(),
+            diagnostic_message: diag.message.clone(),
+            edit_description: Some("Remove unnecessary code".to_string()),
+            is_preferred: false,
+        });
+    }
+    if diag.tags.contains(&DiagnosticTag::Deprecated) {
+        actions.push(DiagnosticCodeAction {
+            title: "Update deprecated usage".to_string(),
+            diagnostic_message: diag.message.clone(),
+            edit_description: None,
+            is_preferred: false,
+        });
+    }
+    actions
+}
+
+// -- Diagnostic change delta computation ------------------------------------
+
+/// Represents a change in diagnostics for a URI.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiagnosticDelta {
+    pub uri: String,
+    pub added: Vec<Diagnostic>,
+    pub removed: Vec<Diagnostic>,
+    pub unchanged: usize,
+}
+
+impl DiagnosticDelta {
+    pub fn has_changes(&self) -> bool {
+        !self.added.is_empty() || !self.removed.is_empty()
+    }
+
+    pub fn added_count(&self) -> usize {
+        self.added.len()
+    }
+
+    pub fn removed_count(&self) -> usize {
+        self.removed.len()
+    }
+}
+
+impl fmt::Display for DiagnosticDelta {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Delta({}): +{} -{} ={} unchanged",
+            self.uri,
+            self.added.len(),
+            self.removed.len(),
+            self.unchanged,
+        )
+    }
+}
+
+/// Compute the delta between old and new diagnostics for a URI.
+pub fn compute_diagnostic_delta(
+    uri: &str,
+    old: &[Diagnostic],
+    new: &[Diagnostic],
+) -> DiagnosticDelta {
+    let mut added = Vec::new();
+    let mut unchanged = 0usize;
+
+    for n in new {
+        if old.contains(n) {
+            unchanged += 1;
+        } else {
+            added.push(n.clone());
+        }
+    }
+
+    let removed: Vec<Diagnostic> = old.iter().filter(|o| !new.contains(o)).cloned().collect();
+
+    DiagnosticDelta {
+        uri: uri.to_string(),
+        added,
+        removed,
+        unchanged,
+    }
+}
+
+/// Compute deltas for an entire collection compared to another.
+pub fn compute_collection_deltas(
+    old: &DiagnosticCollection,
+    new: &DiagnosticCollection,
+) -> Vec<DiagnosticDelta> {
+    let mut all_uris: Vec<&String> = old.entries.keys().chain(new.entries.keys()).collect();
+    all_uris.sort();
+    all_uris.dedup();
+
+    all_uris
+        .into_iter()
+        .map(|uri| {
+            let empty = Vec::new();
+            let old_diags = old.entries.get(uri).unwrap_or(&empty);
+            let new_diags = new.entries.get(uri).unwrap_or(&empty);
+            compute_diagnostic_delta(uri, old_diags, new_diags)
+        })
+        .filter(|d| d.has_changes())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1968,5 +2179,122 @@ mod tests {
 
         let back: DiagnosticSeverityCounter = agg.into();
         assert_eq!(back, counter);
+    }
+
+    // -- DiagnosticSeverityFilter tests ---------------------------------------
+
+    #[test]
+    fn filter_all_passes_everything() {
+        let filter = DiagnosticSeverityFilter::all();
+        assert!(filter.matches(&DiagnosticSeverity::Error));
+        assert!(filter.matches(&DiagnosticSeverity::Hint));
+        assert_eq!(filter.enabled_count(), 4);
+    }
+
+    #[test]
+    fn filter_errors_only() {
+        let filter = DiagnosticSeverityFilter::errors_only();
+        assert!(filter.matches(&DiagnosticSeverity::Error));
+        assert!(!filter.matches(&DiagnosticSeverity::Warning));
+        assert_eq!(filter.enabled_count(), 1);
+    }
+
+    #[test]
+    fn filter_apply_diagnostics() {
+        let filter = DiagnosticSeverityFilter::errors_only();
+        let diags = vec![
+            make_diag("err", DiagnosticSeverity::Error),
+            make_diag("warn", DiagnosticSeverity::Warning),
+        ];
+        let filtered = filter.apply(&diags);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].message, "err");
+    }
+
+    #[test]
+    fn severity_filter_display() {
+        let filter = DiagnosticSeverityFilter::errors_only();
+        let s = format!("{filter}");
+        assert!(s.contains("errors"));
+        assert!(!s.contains("warnings"));
+    }
+
+    // -- DiagnosticCodeAction tests -------------------------------------------
+
+    #[test]
+    fn code_action_with_code() {
+        let mut diag = make_diag("test error", DiagnosticSeverity::Error);
+        diag.code = Some("E001".to_string());
+        let actions = resolve_code_actions(&diag);
+        assert_eq!(actions.len(), 1);
+        assert!(actions[0].is_preferred);
+        assert!(actions[0].title.contains("Fix"));
+    }
+
+    #[test]
+    fn code_action_with_unnecessary_tag() {
+        let mut diag = make_diag("unused var", DiagnosticSeverity::Warning);
+        diag.tags = vec![DiagnosticTag::Unnecessary];
+        let actions = resolve_code_actions(&diag);
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].title, "Remove unused code");
+    }
+
+    #[test]
+    fn code_action_display() {
+        let action = DiagnosticCodeAction {
+            title: "Fix it".into(),
+            diagnostic_message: "msg".into(),
+            edit_description: None,
+            is_preferred: true,
+        };
+        let s = format!("{action}");
+        assert!(s.contains("Fix it"));
+        assert!(s.contains("[preferred]"));
+    }
+
+    // -- DiagnosticDelta tests ------------------------------------------------
+
+    #[test]
+    fn delta_no_changes() {
+        let diags = vec![make_diag("same", DiagnosticSeverity::Error)];
+        let delta = compute_diagnostic_delta("file:///a.rs", &diags, &diags);
+        assert!(!delta.has_changes());
+        assert_eq!(delta.unchanged, 1);
+    }
+
+    #[test]
+    fn delta_added_and_removed() {
+        let old = vec![make_diag("old", DiagnosticSeverity::Error)];
+        let new = vec![make_diag("new", DiagnosticSeverity::Warning)];
+        let delta = compute_diagnostic_delta("file:///a.rs", &old, &new);
+        assert!(delta.has_changes());
+        assert_eq!(delta.added_count(), 1);
+        assert_eq!(delta.removed_count(), 1);
+    }
+
+    #[test]
+    fn delta_display() {
+        let delta = DiagnosticDelta {
+            uri: "file:///a.rs".to_string(),
+            added: vec![make_diag("new", DiagnosticSeverity::Error)],
+            removed: vec![],
+            unchanged: 2,
+        };
+        let s = format!("{delta}");
+        assert!(s.contains("+1"));
+        assert!(s.contains("-0"));
+        assert!(s.contains("2 unchanged"));
+    }
+
+    #[test]
+    fn collection_deltas_filters_unchanged() {
+        let mut old = DiagnosticCollection { name: "old".into(), entries: HashMap::new() };
+        let mut new_col = DiagnosticCollection { name: "new".into(), entries: HashMap::new() };
+        let d = make_diag("same", DiagnosticSeverity::Error);
+        old.entries.insert("file:///a.rs".into(), vec![d.clone()]);
+        new_col.entries.insert("file:///a.rs".into(), vec![d]);
+        let deltas = compute_collection_deltas(&old, &new_col);
+        assert!(deltas.is_empty());
     }
 }

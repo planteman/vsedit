@@ -1150,6 +1150,195 @@ pub fn validate_profile_id(id: &str) -> Result<(), UserDataError> {
     }
     Ok(())
 }
+// -- UserDataSync with conflict resolution -----------------------------------
+
+/// Conflict resolution strategy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictStrategy {
+    LocalWins,
+    RemoteWins,
+    MostRecent,
+}
+
+impl fmt::Display for ConflictStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConflictStrategy::LocalWins => f.write_str("local-wins"),
+            ConflictStrategy::RemoteWins => f.write_str("remote-wins"),
+            ConflictStrategy::MostRecent => f.write_str("most-recent"),
+        }
+    }
+}
+
+/// Represents a sync conflict between local and remote data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncConflict {
+    pub key: String,
+    pub local_value: String,
+    pub remote_value: String,
+    pub local_timestamp: u64,
+    pub remote_timestamp: u64,
+}
+
+impl SyncConflict {
+    /// Resolve using the given strategy.
+    pub fn resolve(&self, strategy: ConflictStrategy) -> &str {
+        match strategy {
+            ConflictStrategy::LocalWins => &self.local_value,
+            ConflictStrategy::RemoteWins => &self.remote_value,
+            ConflictStrategy::MostRecent => {
+                if self.local_timestamp >= self.remote_timestamp {
+                    &self.local_value
+                } else {
+                    &self.remote_value
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for SyncConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Conflict(key={}, local_ts={}, remote_ts={})", self.key, self.local_timestamp, self.remote_timestamp)
+    }
+}
+
+// -- UserDataExport to archive format ----------------------------------------
+
+/// Represents a single file entry for export.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExportEntry {
+    pub relative_path: String,
+    pub content: String,
+    pub size_bytes: usize,
+}
+
+/// An export manifest describing what was exported.
+#[derive(Debug, Clone)]
+pub struct ExportManifest {
+    pub profile_id: String,
+    pub entries: Vec<ExportEntry>,
+    pub total_size: usize,
+}
+
+impl ExportManifest {
+    pub fn new(profile_id: &str) -> Self {
+        Self {
+            profile_id: profile_id.to_string(),
+            entries: Vec::new(),
+            total_size: 0,
+        }
+    }
+
+    pub fn add_entry(&mut self, path: &str, content: &str) {
+        let size = content.len();
+        self.entries.push(ExportEntry {
+            relative_path: path.to_string(),
+            content: content.to_string(),
+            size_bytes: size,
+        });
+        self.total_size += size;
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl fmt::Display for ExportManifest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Export(profile={}, {} files, {} bytes)", self.profile_id, self.entries.len(), self.total_size)
+    }
+}
+
+// -- UserDataImport with validation ------------------------------------------
+
+/// Validation result for an import entry.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportValidation {
+    Valid,
+    InvalidPath(String),
+    TooLarge { path: String, size: usize, max: usize },
+    DuplicatePath(String),
+}
+
+impl fmt::Display for ImportValidation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImportValidation::Valid => f.write_str("valid"),
+            ImportValidation::InvalidPath(p) => write!(f, "invalid path: {p}"),
+            ImportValidation::TooLarge { path, size, max } => {
+                write!(f, "{path}: {size} bytes exceeds limit of {max}")
+            }
+            ImportValidation::DuplicatePath(p) => write!(f, "duplicate path: {p}"),
+        }
+    }
+}
+
+/// Validate import entries.
+pub fn validate_import(entries: &[ExportEntry], max_size: usize) -> Vec<ImportValidation> {
+    let mut results = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for entry in entries {
+        if entry.relative_path.is_empty() || entry.relative_path.contains("..") {
+            results.push(ImportValidation::InvalidPath(entry.relative_path.clone()));
+        } else if entry.size_bytes > max_size {
+            results.push(ImportValidation::TooLarge {
+                path: entry.relative_path.clone(),
+                size: entry.size_bytes,
+                max: max_size,
+            });
+        } else if !seen.insert(&entry.relative_path) {
+            results.push(ImportValidation::DuplicatePath(entry.relative_path.clone()));
+        }
+    }
+    results
+}
+
+// -- User data size tracking -------------------------------------------------
+
+/// Track cumulative size of user data items.
+#[derive(Debug, Default)]
+pub struct UserDataSizeTracker {
+    items: HashMap<String, usize>,
+}
+
+impl UserDataSizeTracker {
+    pub fn new() -> Self {
+        Self { items: HashMap::new() }
+    }
+
+    pub fn record(&mut self, key: &str, size: usize) {
+        self.items.insert(key.to_string(), size);
+    }
+
+    pub fn remove(&mut self, key: &str) {
+        self.items.remove(key);
+    }
+
+    pub fn total_size(&self) -> usize {
+        self.items.values().sum()
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn largest_item(&self) -> Option<(&str, usize)> {
+        self.items.iter().max_by_key(|&(_, &v)| v).map(|(k, &v)| (k.as_str(), v))
+    }
+
+    /// Return keys exceeding the given size limit.
+    pub fn items_exceeding(&self, limit: usize) -> Vec<&str> {
+        self.items.iter().filter(|&(_, &v)| v > limit).map(|(k, _)| k.as_str()).collect()
+    }
+}
+
+impl fmt::Display for UserDataSizeTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SizeTracker({} items, {} bytes total)", self.item_count(), self.total_size())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1970,5 +2159,143 @@ mod tests {
     fn validate_profile_id_bad_chars() {
         assert!(validate_profile_id("has spaces").is_err());
         assert!(validate_profile_id("has/slash").is_err());
+    }
+
+    // -- SyncConflict tests ---------------------------------------------------
+
+    #[test]
+    fn conflict_local_wins() {
+        let conflict = SyncConflict {
+            key: "k".into(),
+            local_value: "local".into(),
+            remote_value: "remote".into(),
+            local_timestamp: 100,
+            remote_timestamp: 200,
+        };
+        assert_eq!(conflict.resolve(ConflictStrategy::LocalWins), "local");
+    }
+
+    #[test]
+    fn conflict_remote_wins() {
+        let conflict = SyncConflict {
+            key: "k".into(),
+            local_value: "local".into(),
+            remote_value: "remote".into(),
+            local_timestamp: 100,
+            remote_timestamp: 200,
+        };
+        assert_eq!(conflict.resolve(ConflictStrategy::RemoteWins), "remote");
+    }
+
+    #[test]
+    fn conflict_most_recent() {
+        let conflict = SyncConflict {
+            key: "k".into(),
+            local_value: "local".into(),
+            remote_value: "remote".into(),
+            local_timestamp: 300,
+            remote_timestamp: 200,
+        };
+        assert_eq!(conflict.resolve(ConflictStrategy::MostRecent), "local");
+    }
+
+    #[test]
+    fn conflict_display() {
+        let conflict = SyncConflict {
+            key: "setting".into(),
+            local_value: "a".into(),
+            remote_value: "b".into(),
+            local_timestamp: 1,
+            remote_timestamp: 2,
+        };
+        let s = conflict.to_string();
+        assert!(s.contains("setting"));
+    }
+
+    // -- ExportManifest tests -------------------------------------------------
+
+    #[test]
+    fn export_manifest_tracks_size() {
+        let mut manifest = ExportManifest::new("default");
+        manifest.add_entry("settings.json", "{\"a\":1}");
+        manifest.add_entry("keybindings.json", "[]");
+        assert_eq!(manifest.entry_count(), 2);
+        assert_eq!(manifest.total_size, 7 + 2);
+    }
+
+    #[test]
+    fn export_manifest_display() {
+        let manifest = ExportManifest::new("test");
+        let s = manifest.to_string();
+        assert!(s.contains("test"));
+        assert!(s.contains("0 files"));
+    }
+
+    // -- ImportValidation tests -----------------------------------------------
+
+    #[test]
+    fn validate_import_valid() {
+        let entries = vec![ExportEntry { relative_path: "settings.json".into(), content: "{}".into(), size_bytes: 2 }];
+        let results = validate_import(&entries, 1000);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn validate_import_invalid_path() {
+        let entries = vec![ExportEntry { relative_path: "../escape".into(), content: "x".into(), size_bytes: 1 }];
+        let results = validate_import(&entries, 1000);
+        assert_eq!(results.len(), 1);
+        assert!(matches!(&results[0], ImportValidation::InvalidPath(_)));
+    }
+
+    #[test]
+    fn validate_import_too_large() {
+        let entries = vec![ExportEntry { relative_path: "big.json".into(), content: "x".into(), size_bytes: 2000 }];
+        let results = validate_import(&entries, 1000);
+        assert_eq!(results.len(), 1);
+        assert!(matches!(&results[0], ImportValidation::TooLarge { .. }));
+    }
+
+    // -- UserDataSizeTracker tests --------------------------------------------
+
+    #[test]
+    fn size_tracker_total() {
+        let mut tracker = UserDataSizeTracker::new();
+        tracker.record("a", 100);
+        tracker.record("b", 200);
+        assert_eq!(tracker.total_size(), 300);
+        assert_eq!(tracker.item_count(), 2);
+    }
+
+    #[test]
+    fn size_tracker_largest() {
+        let mut tracker = UserDataSizeTracker::new();
+        tracker.record("small", 10);
+        tracker.record("big", 500);
+        let (key, size) = tracker.largest_item().unwrap();
+        assert_eq!(key, "big");
+        assert_eq!(size, 500);
+    }
+
+    #[test]
+    fn size_tracker_exceeding() {
+        let mut tracker = UserDataSizeTracker::new();
+        tracker.record("small", 10);
+        tracker.record("big", 500);
+        let exceeding = tracker.items_exceeding(100);
+        assert_eq!(exceeding, vec!["big"]);
+    }
+
+    #[test]
+    fn size_tracker_display() {
+        let tracker = UserDataSizeTracker::new();
+        let s = tracker.to_string();
+        assert!(s.contains("0 items"));
+    }
+
+    #[test]
+    fn conflict_strategy_display() {
+        assert_eq!(ConflictStrategy::LocalWins.to_string(), "local-wins");
+        assert_eq!(ConflictStrategy::MostRecent.to_string(), "most-recent");
     }
 }

@@ -1277,6 +1277,157 @@ pub fn is_rotation(a: &str, b: &str) -> bool {
     doubled.contains(b)
 }
 
+/// A configurable string tokenizer that splits input by any character in a
+/// delimiter set, filtering out empty tokens.
+///
+/// # Examples
+/// ```
+/// # use vsedit_strings::StringTokenizer;
+/// let tok = StringTokenizer::new(",; ");
+/// assert_eq!(tok.tokenize("a, b; c"), vec!["a", "b", "c"]);
+/// ```
+pub struct StringTokenizer {
+    delimiters: Vec<char>,
+}
+
+impl StringTokenizer {
+    /// Create a new tokenizer whose delimiters are the characters in `delimiters`.
+    pub fn new(delimiters: &str) -> Self {
+        Self {
+            delimiters: delimiters.chars().collect(),
+        }
+    }
+
+    /// Split `input` on any delimiter character, discarding empty segments.
+    pub fn tokenize<'a>(&self, input: &'a str) -> Vec<&'a str> {
+        input
+            .split(|c: char| self.delimiters.contains(&c))
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    /// Return the number of non-empty tokens in `input`.
+    pub fn token_count(&self, input: &str) -> usize {
+        self.tokenize(input).len()
+    }
+}
+
+/// Simple English pluralization.
+///
+/// Rules applied (in order):
+/// 1. Words ending in `s`, `x`, `z`, `ch`, or `sh` → append `"es"`.
+/// 2. Words ending in `y` preceded by a consonant → replace `y` with `"ies"`.
+/// 3. Otherwise → append `"s"`.
+///
+/// Empty input is returned unchanged.
+pub fn pluralize(word: &str) -> String {
+    if word.is_empty() {
+        return String::new();
+    }
+    if word.ends_with("ch")
+        || word.ends_with("sh")
+        || word.ends_with('s')
+        || word.ends_with('x')
+        || word.ends_with('z')
+    {
+        return format!("{word}es");
+    }
+    if word.ends_with('y') {
+        if let Some(before_y) = word[..word.len() - 1].chars().last() {
+            if !"aeiouAEIOU".contains(before_y) {
+                return format!("{}ies", &word[..word.len() - 1]);
+            }
+        }
+    }
+    format!("{word}s")
+}
+
+/// Simple English singularization (reverse of [`pluralize`]).
+///
+/// Rules applied (in order):
+/// 1. Words ending in `"ies"` (preceded by a consonant) → replace with `"y"`.
+/// 2. Words ending in `"ches"`, `"shes"`, `"ses"`, `"xes"`, `"zes"` → remove `"es"`.
+/// 3. Words ending in `"s"` (but not `"ss"`) → remove trailing `"s"`.
+/// 4. Otherwise → return unchanged.
+pub fn singularize(word: &str) -> String {
+    if word.is_empty() {
+        return String::new();
+    }
+    // "ies" → "y" when preceded by a consonant
+    if word.ends_with("ies") && word.len() > 3 {
+        let before = word[..word.len() - 3].chars().last().unwrap();
+        if !"aeiouAEIOU".contains(before) {
+            return format!("{}y", &word[..word.len() - 3]);
+        }
+    }
+    // "ches" / "shes" / "ses" / "xes" / "zes" → drop "es"
+    if word.ends_with("ches")
+        || word.ends_with("shes")
+        || word.ends_with("ses")
+        || word.ends_with("xes")
+        || word.ends_with("zes")
+    {
+        return word[..word.len() - 2].to_string();
+    }
+    // trailing "s" but not "ss"
+    if word.ends_with('s') && !word.ends_with("ss") {
+        return word[..word.len() - 1].to_string();
+    }
+    word.to_string()
+}
+
+/// Split `s` into byte-oriented chunks of at most `chunk_size` bytes each,
+/// respecting UTF-8 character boundaries so that no character is split.
+///
+/// Returns an empty `Vec` when `chunk_size` is zero.
+pub fn string_chunks(s: &str, chunk_size: usize) -> Vec<&str> {
+    if chunk_size == 0 {
+        return Vec::new();
+    }
+    let mut result = Vec::new();
+    let bytes = s.as_bytes();
+    let mut start = 0;
+    while start < bytes.len() {
+        let mut end = (start + chunk_size).min(bytes.len());
+        // Walk backwards to a char boundary
+        while end > start && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        if end == start {
+            // chunk_size is smaller than next char; skip to next boundary
+            end = start + 1;
+            while end < bytes.len() && !s.is_char_boundary(end) {
+                end += 1;
+            }
+        }
+        result.push(&s[start..end]);
+        start = end;
+    }
+    result
+}
+
+/// Return `true` if `haystack` contains any of the strings in `needles`.
+pub fn contains_any(haystack: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|n| haystack.contains(n))
+}
+
+/// Strip `prefix` from the beginning of `s` if present; otherwise return `s`
+/// unchanged.
+pub fn remove_prefix<'a>(s: &'a str, prefix: &str) -> &'a str {
+    s.strip_prefix(prefix).unwrap_or(s)
+}
+
+/// Strip `suffix` from the end of `s` if present; otherwise return `s`
+/// unchanged.
+pub fn remove_suffix<'a>(s: &'a str, suffix: &str) -> &'a str {
+    s.strip_suffix(suffix).unwrap_or(s)
+}
+
+/// Create a `String` consisting of `count` repetitions of the character `c`.
+pub fn repeat_char(c: char, count: usize) -> String {
+    std::iter::repeat(c).take(count).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1873,5 +2024,94 @@ mod tests {
         assert!(!is_rotation("abc", "cab1"));
         assert!(!is_rotation("abc", "bca1"));
         assert!(is_rotation("abc", "bca"));
+    }
+
+    #[test]
+    fn test_string_tokenizer_basic() {
+        let tok = StringTokenizer::new(",; ");
+        assert_eq!(tok.tokenize("hello, world; foo bar"), vec!["hello", "world", "foo", "bar"]);
+    }
+
+    #[test]
+    fn test_string_tokenizer_empty_input() {
+        let tok = StringTokenizer::new(",");
+        assert_eq!(tok.tokenize(""), Vec::<&str>::new());
+        assert_eq!(tok.token_count(",,,"), 0);
+    }
+
+    #[test]
+    fn test_string_tokenizer_count() {
+        let tok = StringTokenizer::new(" ");
+        assert_eq!(tok.token_count("a b c d"), 4);
+        assert_eq!(tok.token_count("  leading  "), 1);
+    }
+
+    #[test]
+    fn test_pluralize() {
+        assert_eq!(pluralize("cat"), "cats");
+        assert_eq!(pluralize("bus"), "buses");
+        assert_eq!(pluralize("box"), "boxes");
+        assert_eq!(pluralize("buzz"), "buzzes");
+        assert_eq!(pluralize("church"), "churches");
+        assert_eq!(pluralize("wish"), "wishes");
+        assert_eq!(pluralize("baby"), "babies");
+        assert_eq!(pluralize("day"), "days"); // vowel before y
+        assert_eq!(pluralize(""), "");
+    }
+
+    #[test]
+    fn test_singularize() {
+        assert_eq!(singularize("cats"), "cat");
+        assert_eq!(singularize("buses"), "bus");
+        assert_eq!(singularize("boxes"), "box");
+        assert_eq!(singularize("buzzes"), "buzz");
+        assert_eq!(singularize("churches"), "church");
+        assert_eq!(singularize("wishes"), "wish");
+        assert_eq!(singularize("babies"), "baby");
+        assert_eq!(singularize(""), "");
+    }
+
+    #[test]
+    fn test_pluralize_singularize_roundtrip() {
+        for word in &["cat", "bus", "box", "church", "wish", "baby"] {
+            assert_eq!(singularize(&pluralize(word)), *word);
+        }
+    }
+
+    #[test]
+    fn test_string_chunks_ascii() {
+        assert_eq!(string_chunks("abcdefg", 3), vec!["abc", "def", "g"]);
+        assert_eq!(string_chunks("abc", 10), vec!["abc"]);
+        assert_eq!(string_chunks("", 5), Vec::<&str>::new());
+        assert_eq!(string_chunks("abc", 0), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn test_string_chunks_unicode() {
+        // 'é' is 2 bytes in UTF-8; chunk_size=3 must not split it
+        let chunks = string_chunks("aéb", 3);
+        assert_eq!(chunks, vec!["a\u{e9}", "b"]);
+    }
+
+    #[test]
+    fn test_contains_any() {
+        assert!(contains_any("hello world", &["world", "xyz"]));
+        assert!(!contains_any("hello", &["xyz", "abc"]));
+        assert!(!contains_any("hello", &[]));
+    }
+
+    #[test]
+    fn test_remove_prefix_and_suffix() {
+        assert_eq!(remove_prefix("hello world", "hello "), "world");
+        assert_eq!(remove_prefix("hello", "xyz"), "hello");
+        assert_eq!(remove_suffix("hello world", " world"), "hello");
+        assert_eq!(remove_suffix("hello", "xyz"), "hello");
+    }
+
+    #[test]
+    fn test_repeat_char() {
+        assert_eq!(repeat_char('x', 5), "xxxxx");
+        assert_eq!(repeat_char('☆', 3), "☆☆☆");
+        assert_eq!(repeat_char('a', 0), "");
     }
 }

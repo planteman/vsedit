@@ -1131,6 +1131,347 @@ pub fn config_summary(model: &ConfigurationModel) -> String {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Configuration migrator
+// ---------------------------------------------------------------------------
+
+/// Applies a set of [`ConfigMigrationRule`]s to a model, tracking which rules
+/// were applied and which keys were skipped because they were already absent.
+pub struct ConfigMigrator {
+    rules: Vec<ConfigMigrationRule>,
+}
+
+impl ConfigMigrator {
+    /// Create a migrator from a pre-built [`ConfigMigration`].
+    pub fn from_migration(migration: &ConfigMigration) -> Self {
+        Self {
+            rules: migration.rules.clone(),
+        }
+    }
+
+    /// Create a migrator from a raw set of rules.
+    pub fn from_rules(rules: Vec<ConfigMigrationRule>) -> Self {
+        Self { rules }
+    }
+
+    /// Apply all rules, returning a report of what happened.
+    pub fn apply(&self, model: &mut ConfigurationModel) -> ConfigMigratorReport {
+        let mut applied = Vec::new();
+        let mut skipped = Vec::new();
+        for rule in &self.rules {
+            if let Some((value, scope)) = model
+                .get_with_scope(&rule.old_key)
+                .map(|(v, s)| (v.to_string(), *s))
+            {
+                let new_value = match rule.transform_value {
+                    Some(f) => f(&value),
+                    None => value,
+                };
+                model.set(rule.new_key.clone(), new_value, scope);
+                model.remove(&rule.old_key);
+                applied.push(rule.old_key.clone());
+            } else {
+                skipped.push(rule.old_key.clone());
+            }
+        }
+        ConfigMigratorReport { applied, skipped }
+    }
+
+    /// Number of registered rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+/// Report produced by [`ConfigMigrator::apply`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConfigMigratorReport {
+    /// Old keys that were found and migrated.
+    pub applied: Vec<String>,
+    /// Old keys that were not present in the model.
+    pub skipped: Vec<String>,
+}
+
+impl ConfigMigratorReport {
+    pub fn applied_count(&self) -> usize {
+        self.applied.len()
+    }
+
+    pub fn skipped_count(&self) -> usize {
+        self.skipped.len()
+    }
+
+    pub fn total(&self) -> usize {
+        self.applied.len() + self.skipped.len()
+    }
+}
+
+impl fmt::Display for ConfigMigratorReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "migrated {} keys, skipped {}",
+            self.applied.len(),
+            self.skipped.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Configuration profile manager
+// ---------------------------------------------------------------------------
+
+/// Manages named configuration profiles backed by [`ConfigSnapshot`]s.
+pub struct ConfigProfileManager {
+    profiles: HashMap<String, ConfigSnapshot>,
+    active_profile: Option<String>,
+}
+
+impl ConfigProfileManager {
+    pub fn new() -> Self {
+        Self {
+            profiles: HashMap::new(),
+            active_profile: None,
+        }
+    }
+
+    /// Save a snapshot of `model` under `name`.
+    pub fn save(&mut self, name: &str, model: &ConfigurationModel, timestamp_ms: u64) {
+        let snapshot = ConfigSnapshot::capture(model, name, timestamp_ms);
+        self.profiles.insert(name.to_string(), snapshot);
+    }
+
+    /// Load a previously saved profile into a fresh model.
+    pub fn load(&self, name: &str) -> Option<ConfigurationModel> {
+        self.profiles.get(name).map(|s| s.restore())
+    }
+
+    /// Set the active profile name. Returns `false` if the profile does not exist.
+    pub fn switch(&mut self, name: &str) -> bool {
+        if self.profiles.contains_key(name) {
+            self.active_profile = Some(name.to_string());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// The currently active profile name.
+    pub fn active(&self) -> Option<&str> {
+        self.active_profile.as_deref()
+    }
+
+    /// Remove a profile by name. Returns `true` if it existed.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let removed = self.profiles.remove(name).is_some();
+        if self.active_profile.as_deref() == Some(name) {
+            self.active_profile = None;
+        }
+        removed
+    }
+
+    /// List all profile names in sorted order.
+    pub fn names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.profiles.keys().map(|s| s.as_str()).collect();
+        names.sort();
+        names
+    }
+
+    /// Number of stored profiles.
+    pub fn count(&self) -> usize {
+        self.profiles.len()
+    }
+}
+
+impl Default for ConfigProfileManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Detailed configuration diff with old/new values
+// ---------------------------------------------------------------------------
+
+/// A single changed entry in a [`ConfigProfileDiff`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConfigChangedEntry {
+    pub key: String,
+    pub old_value: String,
+    pub new_value: String,
+}
+
+/// Detailed diff between two [`ConfigurationModel`]s, including old/new values
+/// for changed keys.  (Note: [`ConfigurationDiff`] already provides a simpler
+/// key-only diff.)
+pub struct ConfigProfileDiff {
+    pub added: Vec<(String, String)>,
+    pub removed: Vec<(String, String)>,
+    pub changed: Vec<ConfigChangedEntry>,
+}
+
+impl ConfigProfileDiff {
+    /// Compute a detailed diff between `old` and `new`.
+    pub fn compute(old: &ConfigurationModel, new: &ConfigurationModel) -> Self {
+        let old_keys: std::collections::HashSet<String> =
+            old.keys().into_iter().map(|k| k.to_string()).collect();
+        let new_keys: std::collections::HashSet<String> =
+            new.keys().into_iter().map(|k| k.to_string()).collect();
+
+        let mut added: Vec<(String, String)> = new_keys
+            .difference(&old_keys)
+            .map(|k| (k.clone(), new.get(k).unwrap_or("").to_string()))
+            .collect();
+        added.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut removed: Vec<(String, String)> = old_keys
+            .difference(&new_keys)
+            .map(|k| (k.clone(), old.get(k).unwrap_or("").to_string()))
+            .collect();
+        removed.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut changed: Vec<ConfigChangedEntry> = old_keys
+            .intersection(&new_keys)
+            .filter_map(|k| {
+                let ov = old.get(k).unwrap_or("");
+                let nv = new.get(k).unwrap_or("");
+                if ov != nv {
+                    Some(ConfigChangedEntry {
+                        key: k.clone(),
+                        old_value: ov.to_string(),
+                        new_value: nv.to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        changed.sort_by(|a, b| a.key.cmp(&b.key));
+
+        Self { added, removed, changed }
+    }
+
+    /// Whether there are no differences.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.changed.is_empty()
+    }
+
+    /// Total number of differences.
+    pub fn total(&self) -> usize {
+        self.added.len() + self.removed.len() + self.changed.len()
+    }
+}
+
+impl fmt::Display for ConfigProfileDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "diff: +{} -{} ~{}",
+            self.added.len(),
+            self.removed.len(),
+            self.changed.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Configuration import validator
+// ---------------------------------------------------------------------------
+
+/// Error produced when validating imported configuration data.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConfigImportError {
+    InvalidKey(String),
+    InvalidValue { key: String, reason: String },
+    InvalidScope(String),
+}
+
+impl fmt::Display for ConfigImportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigImportError::InvalidKey(k) => write!(f, "invalid key: {}", k),
+            ConfigImportError::InvalidValue { key, reason } => {
+                write!(f, "invalid value for '{}': {}", key, reason)
+            }
+            ConfigImportError::InvalidScope(s) => write!(f, "invalid scope: {}", s),
+        }
+    }
+}
+
+/// Validates imported configuration data before it is applied to a model.
+pub struct ConfigImportValidator {
+    max_value_len: usize,
+    allowed_scopes: Vec<ConfigurationScope>,
+}
+
+impl ConfigImportValidator {
+    pub fn new() -> Self {
+        Self {
+            max_value_len: 4096,
+            allowed_scopes: vec![
+                ConfigurationScope::Default,
+                ConfigurationScope::User,
+                ConfigurationScope::Workspace,
+                ConfigurationScope::WorkspaceFolder,
+                ConfigurationScope::Memory,
+            ],
+        }
+    }
+
+    /// Set the maximum allowed value length.
+    pub fn max_value_len(mut self, max: usize) -> Self {
+        self.max_value_len = max;
+        self
+    }
+
+    /// Restrict the set of allowed scopes.
+    pub fn allowed_scopes(mut self, scopes: Vec<ConfigurationScope>) -> Self {
+        self.allowed_scopes = scopes;
+        self
+    }
+
+    /// Validate a single entry, returning all errors found.
+    pub fn validate_entry(&self, entry: &ConfigurationEntry) -> Vec<ConfigImportError> {
+        let mut errors = Vec::new();
+        if ConfigurationValidator::validate_key(&entry.key).is_err() {
+            errors.push(ConfigImportError::InvalidKey(entry.key.clone()));
+        }
+        if entry.value.len() > self.max_value_len {
+            errors.push(ConfigImportError::InvalidValue {
+                key: entry.key.clone(),
+                reason: format!(
+                    "length {} exceeds max {}",
+                    entry.value.len(),
+                    self.max_value_len
+                ),
+            });
+        }
+        if !self.allowed_scopes.contains(&entry.scope) {
+            errors.push(ConfigImportError::InvalidScope(format!("{}", entry.scope)));
+        }
+        errors
+    }
+
+    /// Validate a batch of entries, returning a combined list of errors.
+    pub fn validate_all(&self, entries: &[ConfigurationEntry]) -> Vec<ConfigImportError> {
+        entries
+            .iter()
+            .flat_map(|e| self.validate_entry(e))
+            .collect()
+    }
+
+    /// Returns `true` when every entry passes validation.
+    pub fn is_valid(&self, entries: &[ConfigurationEntry]) -> bool {
+        self.validate_all(entries).is_empty()
+    }
+}
+
+impl Default for ConfigImportValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -1957,6 +2298,212 @@ mod tests {
         let s = config_summary(&model);
         assert!(s.contains("2 entries"));
         assert!(s.contains("2 namespaces"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ConfigMigrator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn migrator_applies_rename_rules() {
+        let mut model = ConfigurationModel::new();
+        model.set("old.key".into(), "val".into(), ConfigurationScope::User);
+        let migration = ConfigMigration::new().rename("old.key", "new.key");
+        let migrator = ConfigMigrator::from_migration(&migration);
+        let report = migrator.apply(&mut model);
+        assert_eq!(report.applied_count(), 1);
+        assert_eq!(report.skipped_count(), 0);
+        assert_eq!(model.get("new.key"), Some("val"));
+        assert!(!model.has("old.key"));
+    }
+
+    #[test]
+    fn migrator_skips_absent_keys() {
+        let mut model = ConfigurationModel::new();
+        model.set("other.key".into(), "x".into(), ConfigurationScope::Default);
+        let migration = ConfigMigration::new().rename("missing.key", "new.key");
+        let migrator = ConfigMigrator::from_migration(&migration);
+        let report = migrator.apply(&mut model);
+        assert_eq!(report.applied_count(), 0);
+        assert_eq!(report.skipped_count(), 1);
+        assert!(report.skipped.contains(&"missing.key".to_string()));
+    }
+
+    #[test]
+    fn migrator_applies_value_transform() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        let migration = ConfigMigration::new()
+            .rename_with_transform("editor.tabSize", "editor.indentSize", |v| {
+                format!("{}px", v)
+            });
+        let migrator = ConfigMigrator::from_migration(&migration);
+        let report = migrator.apply(&mut model);
+        assert_eq!(report.applied_count(), 1);
+        assert_eq!(model.get("editor.indentSize"), Some("4px"));
+    }
+
+    #[test]
+    fn migrator_report_display() {
+        let report = ConfigMigratorReport {
+            applied: vec!["a.b".into()],
+            skipped: vec!["c.d".into(), "e.f".into()],
+        };
+        let s = format!("{}", report);
+        assert!(s.contains("migrated 1"));
+        assert!(s.contains("skipped 2"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ConfigProfileManager tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn profile_manager_save_and_load() {
+        let mut pm = ConfigProfileManager::new();
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        pm.save("default", &model, 1000);
+        let loaded = pm.load("default").unwrap();
+        assert_eq!(loaded.get("editor.fontSize"), Some("14"));
+    }
+
+    #[test]
+    fn profile_manager_switch_and_active() {
+        let mut pm = ConfigProfileManager::new();
+        let model = ConfigurationModel::new();
+        pm.save("profile-a", &model, 1);
+        pm.save("profile-b", &model, 2);
+        assert!(pm.switch("profile-a"));
+        assert_eq!(pm.active(), Some("profile-a"));
+        assert!(!pm.switch("nonexistent"));
+        assert_eq!(pm.active(), Some("profile-a"));
+    }
+
+    #[test]
+    fn profile_manager_remove_clears_active() {
+        let mut pm = ConfigProfileManager::new();
+        let model = ConfigurationModel::new();
+        pm.save("temp", &model, 1);
+        pm.switch("temp");
+        assert!(pm.remove("temp"));
+        assert_eq!(pm.active(), None);
+        assert_eq!(pm.count(), 0);
+    }
+
+    #[test]
+    fn profile_manager_names_sorted() {
+        let mut pm = ConfigProfileManager::new();
+        let model = ConfigurationModel::new();
+        pm.save("zeta", &model, 1);
+        pm.save("alpha", &model, 2);
+        pm.save("mid", &model, 3);
+        assert_eq!(pm.names(), vec!["alpha", "mid", "zeta"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // ConfigProfileDiff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn profile_diff_detects_added_removed_changed() {
+        let mut old = ConfigurationModel::new();
+        old.set("keep.same".into(), "1".into(), ConfigurationScope::User);
+        old.set("will.change".into(), "old".into(), ConfigurationScope::User);
+        old.set("will.remove".into(), "gone".into(), ConfigurationScope::User);
+
+        let mut new = ConfigurationModel::new();
+        new.set("keep.same".into(), "1".into(), ConfigurationScope::User);
+        new.set("will.change".into(), "new".into(), ConfigurationScope::User);
+        new.set("will.add".into(), "fresh".into(), ConfigurationScope::User);
+
+        let diff = ConfigProfileDiff::compute(&old, &new);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.added[0].0, "will.add");
+        assert_eq!(diff.removed.len(), 1);
+        assert_eq!(diff.removed[0].0, "will.remove");
+        assert_eq!(diff.changed.len(), 1);
+        assert_eq!(diff.changed[0].old_value, "old");
+        assert_eq!(diff.changed[0].new_value, "new");
+        assert_eq!(diff.total(), 3);
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn profile_diff_empty_for_identical_models() {
+        let mut m = ConfigurationModel::new();
+        m.set("a.b".into(), "1".into(), ConfigurationScope::Default);
+        let diff = ConfigProfileDiff::compute(&m, &m);
+        assert!(diff.is_empty());
+        assert_eq!(diff.total(), 0);
+    }
+
+    #[test]
+    fn profile_diff_display() {
+        let old = ConfigurationModel::new();
+        let mut new = ConfigurationModel::new();
+        new.set("x.y".into(), "1".into(), ConfigurationScope::User);
+        let diff = ConfigProfileDiff::compute(&old, &new);
+        let s = format!("{}", diff);
+        assert!(s.contains("+1"));
+        assert!(s.contains("-0"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ConfigImportValidator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn import_validator_accepts_valid_entries() {
+        let validator = ConfigImportValidator::new();
+        let entry = ConfigurationEntry {
+            key: "editor.fontSize".into(),
+            value: "14".into(),
+            scope: ConfigurationScope::User,
+            description: None,
+        };
+        assert!(validator.is_valid(&[entry]));
+    }
+
+    #[test]
+    fn import_validator_rejects_bad_key() {
+        let validator = ConfigImportValidator::new();
+        let entry = ConfigurationEntry {
+            key: "".into(),
+            value: "v".into(),
+            scope: ConfigurationScope::User,
+            description: None,
+        };
+        let errors = validator.validate_entry(&entry);
+        assert!(!errors.is_empty());
+        assert!(matches!(errors[0], ConfigImportError::InvalidKey(_)));
+    }
+
+    #[test]
+    fn import_validator_rejects_long_value() {
+        let validator = ConfigImportValidator::new().max_value_len(5);
+        let entry = ConfigurationEntry {
+            key: "a.b".into(),
+            value: "toolong".into(),
+            scope: ConfigurationScope::User,
+            description: None,
+        };
+        let errors = validator.validate_entry(&entry);
+        assert!(errors.iter().any(|e| matches!(e, ConfigImportError::InvalidValue { .. })));
+    }
+
+    #[test]
+    fn import_validator_rejects_disallowed_scope() {
+        let validator = ConfigImportValidator::new()
+            .allowed_scopes(vec![ConfigurationScope::User]);
+        let entry = ConfigurationEntry {
+            key: "a.b".into(),
+            value: "v".into(),
+            scope: ConfigurationScope::Memory,
+            description: None,
+        };
+        let errors = validator.validate_entry(&entry);
+        assert!(errors.iter().any(|e| matches!(e, ConfigImportError::InvalidScope(_))));
     }
 
 }

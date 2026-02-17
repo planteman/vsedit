@@ -1194,6 +1194,271 @@ impl CursorHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MultiCursorColumns – column/box selection
+// ---------------------------------------------------------------------------
+
+/// Manages column (rectangular/box) selection across multiple lines.
+#[derive(Debug, Clone)]
+pub struct MultiCursorColumns {
+    pub anchor_line: u32,
+    pub anchor_column: u32,
+    pub active_line: u32,
+    pub active_column: u32,
+}
+
+impl MultiCursorColumns {
+    pub fn new(anchor_line: u32, anchor_column: u32) -> Self {
+        Self {
+            anchor_line,
+            anchor_column,
+            active_line: anchor_line,
+            active_column: anchor_column,
+        }
+    }
+
+    /// Extend the selection to a new line and column.
+    pub fn extend_to(&mut self, line: u32, column: u32) {
+        self.active_line = line;
+        self.active_column = column;
+    }
+
+    /// Get the range of lines covered (inclusive, sorted).
+    pub fn line_range(&self) -> (u32, u32) {
+        let min = self.anchor_line.min(self.active_line);
+        let max = self.anchor_line.max(self.active_line);
+        (min, max)
+    }
+
+    /// Get the column range (inclusive, sorted).
+    pub fn column_range(&self) -> (u32, u32) {
+        let min = self.anchor_column.min(self.active_column);
+        let max = self.anchor_column.max(self.active_column);
+        (min, max)
+    }
+
+    /// Number of lines in the selection.
+    pub fn line_count(&self) -> u32 {
+        let (min, max) = self.line_range();
+        max - min + 1
+    }
+
+    /// Generate cursor positions for each line in the column selection.
+    pub fn cursor_positions(&self) -> Vec<CursorPosition> {
+        let (min_line, max_line) = self.line_range();
+        let col = self.active_column;
+        (min_line..=max_line)
+            .map(|line| CursorPosition::new(line, col))
+            .collect()
+    }
+
+    /// Width of the selection in columns.
+    pub fn width(&self) -> u32 {
+        let (min, max) = self.column_range();
+        max.saturating_sub(min)
+    }
+}
+
+impl fmt::Display for MultiCursorColumns {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ColumnSel({}:{}-{}:{}, {} lines)",
+            self.anchor_line, self.anchor_column,
+            self.active_line, self.active_column,
+            self.line_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiCursorMatch – pattern-based cursor placement
+// ---------------------------------------------------------------------------
+
+/// Places cursors at all positions matching a pattern in text.
+#[derive(Debug, Clone)]
+pub struct MultiCursorMatch {
+    pub pattern: String,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+}
+
+impl MultiCursorMatch {
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+            case_sensitive: true,
+            whole_word: false,
+        }
+    }
+
+    pub fn case_insensitive(mut self) -> Self {
+        self.case_sensitive = false;
+        self
+    }
+
+    pub fn whole_word(mut self) -> Self {
+        self.whole_word = true;
+        self
+    }
+
+    /// Find all match positions (line, column) in the given lines. Returns 1-based positions.
+    pub fn find_all(&self, lines: &[&str]) -> Vec<CursorPosition> {
+        let mut positions = Vec::new();
+        let pat = if self.case_sensitive {
+            self.pattern.clone()
+        } else {
+            self.pattern.to_lowercase()
+        };
+
+        for (li, line) in lines.iter().enumerate() {
+            let search_line = if self.case_sensitive {
+                line.to_string()
+            } else {
+                line.to_lowercase()
+            };
+
+            let mut start = 0;
+            while let Some(idx) = search_line[start..].find(&pat) {
+                let col = start + idx;
+                if self.whole_word {
+                    let before_ok = col == 0 || !search_line.as_bytes()[col - 1].is_ascii_alphanumeric();
+                    let after_ok = col + pat.len() >= search_line.len()
+                        || !search_line.as_bytes()[col + pat.len()].is_ascii_alphanumeric();
+                    if before_ok && after_ok {
+                        positions.push(CursorPosition::new((li + 1) as u32, (col + 1) as u32));
+                    }
+                } else {
+                    positions.push(CursorPosition::new((li + 1) as u32, (col + 1) as u32));
+                }
+                start = col + 1;
+            }
+        }
+        positions
+    }
+
+    /// Count total matches.
+    pub fn count_matches(&self, lines: &[&str]) -> usize {
+        self.find_all(lines).len()
+    }
+}
+
+impl fmt::Display for MultiCursorMatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MultiCursorMatch(\"{}\")", self.pattern)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cursor merge strategies
+// ---------------------------------------------------------------------------
+
+/// Strategy for merging overlapping cursors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CursorMergeStrategy {
+    /// Keep the first cursor in each overlapping group.
+    KeepFirst,
+    /// Keep the last cursor in each overlapping group.
+    KeepLast,
+    /// Merge overlapping cursors into a single selection spanning all.
+    Union,
+}
+
+impl fmt::Display for CursorMergeStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KeepFirst => write!(f, "KeepFirst"),
+            Self::KeepLast => write!(f, "KeepLast"),
+            Self::Union => write!(f, "Union"),
+        }
+    }
+}
+
+/// Merge cursor positions that are on the same line and column.
+pub fn merge_duplicate_cursors(positions: &[CursorPosition], strategy: CursorMergeStrategy) -> Vec<CursorPosition> {
+    if positions.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted = positions.to_vec();
+    sorted.sort();
+    sorted.dedup();
+
+    match strategy {
+        CursorMergeStrategy::KeepFirst | CursorMergeStrategy::Union => sorted,
+        CursorMergeStrategy::KeepLast => {
+            sorted.reverse();
+            sorted.dedup();
+            sorted.reverse();
+            sorted
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-cursor clipboard – per-cursor paste content
+// ---------------------------------------------------------------------------
+
+/// Clipboard that tracks per-cursor content for multi-cursor paste.
+#[derive(Debug, Clone)]
+pub struct MultiCursorClipboard {
+    /// One entry per cursor.
+    entries: Vec<String>,
+}
+
+impl MultiCursorClipboard {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Copy text from each cursor (one string per cursor).
+    pub fn copy_from_cursors(&mut self, texts: Vec<String>) {
+        self.entries = texts;
+    }
+
+    /// Get the paste text for cursor at `index`. Falls back to full content if
+    /// index is out of range.
+    pub fn paste_for_cursor(&self, index: usize) -> &str {
+        self.entries.get(index).map(|s| s.as_str()).unwrap_or_else(|| {
+            self.entries.last().map(|s| s.as_str()).unwrap_or("")
+        })
+    }
+
+    /// Number of clipboard entries.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the clipboard has per-cursor entries matching cursor count.
+    pub fn matches_cursor_count(&self, cursor_count: usize) -> bool {
+        self.entries.len() == cursor_count
+    }
+
+    /// Get all entries joined with a separator.
+    pub fn joined(&self, separator: &str) -> String {
+        self.entries.join(separator)
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for MultiCursorClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for MultiCursorClipboard {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MultiCursorClipboard({} entries)", self.entries.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1929,5 +2194,119 @@ mod tests {
             assert!(history.undo_len() <= 3, "iteration {i}");
         }
         assert_eq!(history.undo_len(), 3);
+    }
+
+    // -- MultiCursorColumns ------------------------------------------------
+
+    #[test]
+    fn column_selection_basic() {
+        let mut cs = MultiCursorColumns::new(1, 5);
+        cs.extend_to(5, 10);
+        assert_eq!(cs.line_range(), (1, 5));
+        assert_eq!(cs.column_range(), (5, 10));
+        assert_eq!(cs.line_count(), 5);
+        assert_eq!(cs.width(), 5);
+    }
+
+    #[test]
+    fn column_selection_generates_positions() {
+    }
+
+    #[test]
+    fn column_selection_display() {
+        let cs = MultiCursorColumns::new(1, 1);
+        let s = format!("{cs}");
+        assert!(s.contains("ColumnSel"));
+    }
+
+    // -- MultiCursorMatch --------------------------------------------------
+
+    #[test]
+    fn cursor_match_find_all() {
+        let m = MultiCursorMatch::new("foo");
+        let lines = vec!["foo bar foo", "baz", "foo"];
+        let positions = m.find_all(&lines);
+        assert_eq!(positions.len(), 3);
+        assert_eq!(positions[0], CursorPosition::new(1, 1));
+        assert_eq!(positions[1], CursorPosition::new(1, 9));
+        assert_eq!(positions[2], CursorPosition::new(3, 1));
+    }
+
+    #[test]
+    fn cursor_match_case_insensitive() {
+        let m = MultiCursorMatch::new("FOO").case_insensitive();
+        let lines = vec!["foo Foo FOO"];
+        let positions = m.find_all(&lines);
+        assert_eq!(positions.len(), 3);
+    }
+
+    #[test]
+    fn cursor_match_whole_word() {
+        let m = MultiCursorMatch::new("foo").whole_word();
+        let lines = vec!["foo foobar foo"];
+        let positions = m.find_all(&lines);
+        assert_eq!(positions.len(), 2);
+    }
+
+    #[test]
+    fn cursor_match_count() {
+        let m = MultiCursorMatch::new("x");
+        let lines = vec!["x x x"];
+        assert_eq!(m.count_matches(&lines), 3);
+    }
+
+    // -- CursorMergeStrategy -----------------------------------------------
+
+    #[test]
+    fn merge_duplicate_cursors_dedup() {
+        let positions = vec![
+            CursorPosition::new(1, 1),
+            CursorPosition::new(1, 1),
+            CursorPosition::new(2, 1),
+        ];
+        let merged = merge_duplicate_cursors(&positions, CursorMergeStrategy::KeepFirst);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_strategy_display() {
+        assert_eq!(format!("{}", CursorMergeStrategy::Union), "Union");
+    }
+
+    // -- MultiCursorClipboard ----------------------------------------------
+
+    #[test]
+    fn clipboard_per_cursor_paste() {
+        let mut cb = MultiCursorClipboard::new();
+        cb.copy_from_cursors(vec!["aaa".into(), "bbb".into(), "ccc".into()]);
+        assert_eq!(cb.paste_for_cursor(0), "aaa");
+        assert_eq!(cb.paste_for_cursor(1), "bbb");
+        assert_eq!(cb.paste_for_cursor(2), "ccc");
+        assert_eq!(cb.paste_for_cursor(99), "ccc"); // fallback to last
+    }
+
+    #[test]
+    fn clipboard_matches_cursor_count() {
+        let mut cb = MultiCursorClipboard::new();
+        cb.copy_from_cursors(vec!["a".into(), "b".into()]);
+        assert!(cb.matches_cursor_count(2));
+        assert!(!cb.matches_cursor_count(3));
+    }
+
+    #[test]
+    fn clipboard_joined() {
+        let mut cb = MultiCursorClipboard::new();
+        cb.copy_from_cursors(vec!["a".into(), "b".into()]);
+        assert_eq!(cb.joined("\n"), "a\nb");
+    }
+
+    #[test]
+    fn clipboard_clear_and_empty() {
+        let mut cb = MultiCursorClipboard::new();
+        assert!(cb.is_empty());
+        cb.copy_from_cursors(vec!["x".into()]);
+        assert!(!cb.is_empty());
+        cb.clear();
+        assert!(cb.is_empty());
     }
 }

@@ -1141,6 +1141,210 @@ pub fn detect_auto_scroll_edges(
     edges
 }
 
+// ---------------------------------------------------------------------------
+// DndThreshold – drag activation threshold based on distance and time
+// ---------------------------------------------------------------------------
+
+/// Controls how far and how long a pointer must move before a drag begins.
+pub struct DndThreshold {
+    pub min_distance: f64,
+    pub min_time_ms: u64,
+}
+
+impl DndThreshold {
+    pub fn new(min_distance: f64, min_time_ms: u64) -> Self {
+        Self {
+            min_distance,
+            min_time_ms,
+        }
+    }
+
+    pub fn default() -> Self {
+        Self::new(5.0, 150)
+    }
+
+    /// Returns `true` when both the Euclidean distance **and** elapsed time
+    /// exceed the configured thresholds.
+    pub fn is_exceeded(
+        &self,
+        start_x: f64,
+        start_y: f64,
+        current_x: f64,
+        current_y: f64,
+        elapsed_ms: u64,
+    ) -> bool {
+        self.distance_only(start_x, start_y, current_x, current_y)
+            && elapsed_ms >= self.min_time_ms
+    }
+
+    pub fn distance_only(
+        &self,
+        start_x: f64,
+        start_y: f64,
+        current_x: f64,
+        current_y: f64,
+    ) -> bool {
+        let dx = current_x - start_x;
+        let dy = current_y - start_y;
+        (dx * dx + dy * dy).sqrt() >= self.min_distance
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DndAutoScroll – edge-proximity auto-scrolling
+// ---------------------------------------------------------------------------
+
+/// Computes scroll deltas when the cursor is near a viewport edge.
+pub struct DndAutoScroll {
+    pub margin: f64,
+    pub speed: f64,
+    pub active: bool,
+}
+
+impl DndAutoScroll {
+    pub fn new(margin: f64, speed: f64) -> Self {
+        Self {
+            margin,
+            speed,
+            active: true,
+        }
+    }
+
+    /// Returns `(dx, dy)` scroll deltas. Positive values scroll right / down.
+    pub fn compute_scroll(
+        &self,
+        cursor_x: f64,
+        cursor_y: f64,
+        viewport: &Rect,
+    ) -> (f64, f64) {
+        if !self.active {
+            return (0.0, 0.0);
+        }
+
+        let mut dx = 0.0;
+        let mut dy = 0.0;
+
+        // left edge
+        if cursor_x < viewport.x + self.margin && cursor_x >= viewport.x {
+            let ratio = 1.0 - (cursor_x - viewport.x) / self.margin;
+            dx = -self.speed * ratio;
+        }
+        // right edge
+        let right = viewport.x + viewport.width;
+        if cursor_x > right - self.margin && cursor_x <= right {
+            let ratio = 1.0 - (right - cursor_x) / self.margin;
+            dx = self.speed * ratio;
+        }
+        // top edge
+        if cursor_y < viewport.y + self.margin && cursor_y >= viewport.y {
+            let ratio = 1.0 - (cursor_y - viewport.y) / self.margin;
+            dy = -self.speed * ratio;
+        }
+        // bottom edge
+        let bottom = viewport.y + viewport.height;
+        if cursor_y > bottom - self.margin && cursor_y <= bottom {
+            let ratio = 1.0 - (bottom - cursor_y) / self.margin;
+            dy = self.speed * ratio;
+        }
+
+        (dx, dy)
+    }
+
+    pub fn is_near_edge(
+        &self,
+        cursor_x: f64,
+        cursor_y: f64,
+        viewport: &Rect,
+    ) -> bool {
+        let (dx, dy) = self.compute_scroll(cursor_x, cursor_y, viewport);
+        dx.abs() > 0.0 || dy.abs() > 0.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DndGhostRenderer – visual feedback positioning for drag ghosts
+// ---------------------------------------------------------------------------
+
+pub struct DndGhostRenderer {
+    pub offset_x: f64,
+    pub offset_y: f64,
+    pub opacity: f64,
+    pub label: String,
+}
+
+impl DndGhostRenderer {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            offset_x: 0.0,
+            offset_y: 0.0,
+            opacity: 0.7,
+            label: label.into(),
+        }
+    }
+
+    pub fn with_offset(mut self, x: f64, y: f64) -> Self {
+        self.offset_x = x;
+        self.offset_y = y;
+        self
+    }
+
+    pub fn with_opacity(mut self, opacity: f64) -> Self {
+        self.opacity = opacity;
+        self
+    }
+
+    /// Computes the rendered position of the ghost relative to the cursor.
+    pub fn render_position(&self, cursor_x: f64, cursor_y: f64) -> (f64, f64) {
+        (cursor_x + self.offset_x, cursor_y + self.offset_y)
+    }
+
+    pub fn render_info(&self) -> String {
+        format!(
+            "Ghost '{}' offset=({}, {}) opacity={}",
+            self.label, self.offset_x, self.offset_y, self.opacity
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragCancellation – tracks cancelled drag state
+// ---------------------------------------------------------------------------
+
+pub struct DragCancellation {
+    pub cancelled: bool,
+    pub reason: Option<String>,
+    pub cancel_count: u32,
+}
+
+impl DragCancellation {
+    pub fn new() -> Self {
+        Self {
+            cancelled: false,
+            reason: None,
+            cancel_count: 0,
+        }
+    }
+
+    pub fn cancel(&mut self, reason: impl Into<String>) {
+        self.cancelled = true;
+        self.reason = Some(reason.into());
+        self.cancel_count += 1;
+    }
+
+    pub fn reset(&mut self) {
+        self.cancelled = false;
+        self.reason = None;
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled
+    }
+
+    pub fn total_cancellations(&self) -> u32 {
+        self.cancel_count
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1947,5 +2151,123 @@ mod tests {
         // right edge
         let edges = detect_auto_scroll_edges(790.0, 300.0, &viewport, margin);
         assert!(edges.contains(&ScrollEdge::Right));
+    }
+
+    // ------- DndThreshold tests -------
+
+    #[test]
+    fn test_threshold_not_exceeded() {
+        let t = DndThreshold::new(10.0, 200);
+        // moved only 3 pixels, not enough
+        assert!(!t.is_exceeded(0.0, 0.0, 2.0, 2.0, 300));
+    }
+
+    #[test]
+    fn test_threshold_exceeded() {
+        let t = DndThreshold::new(5.0, 100);
+        // distance ~14.1, time 150 – both exceed
+        assert!(t.is_exceeded(0.0, 0.0, 10.0, 10.0, 150));
+    }
+
+    #[test]
+    fn test_threshold_default() {
+        let t = DndThreshold::default();
+        assert_eq!(t.min_distance, 5.0);
+        assert_eq!(t.min_time_ms, 150);
+    }
+
+    #[test]
+    fn test_threshold_distance_only() {
+        let t = DndThreshold::new(5.0, 500);
+        // distance exceeded, time irrelevant for this method
+        assert!(t.distance_only(0.0, 0.0, 10.0, 0.0));
+        // distance NOT exceeded
+        assert!(!t.distance_only(0.0, 0.0, 2.0, 0.0));
+    }
+
+    // ------- DndAutoScroll tests -------
+
+    #[test]
+    fn test_auto_scroll_center_no_scroll() {
+        let scroller = DndAutoScroll::new(30.0, 10.0);
+        let vp = Rect::new(0.0, 0.0, 800.0, 600.0);
+        let (dx, dy) = scroller.compute_scroll(400.0, 300.0, &vp);
+        assert_eq!(dx, 0.0);
+        assert_eq!(dy, 0.0);
+    }
+
+    #[test]
+    fn test_auto_scroll_near_left_edge() {
+        let scroller = DndAutoScroll::new(30.0, 10.0);
+        let vp = Rect::new(0.0, 0.0, 800.0, 600.0);
+        let (dx, _dy) = scroller.compute_scroll(10.0, 300.0, &vp);
+        // should scroll left (negative dx)
+        assert!(dx < 0.0);
+    }
+
+    #[test]
+    fn test_auto_scroll_near_bottom() {
+        let scroller = DndAutoScroll::new(30.0, 10.0);
+        let vp = Rect::new(0.0, 0.0, 800.0, 600.0);
+        let (_dx, dy) = scroller.compute_scroll(400.0, 590.0, &vp);
+        assert!(dy > 0.0);
+    }
+
+    #[test]
+    fn test_auto_scroll_is_near_edge() {
+        let scroller = DndAutoScroll::new(30.0, 10.0);
+        let vp = Rect::new(0.0, 0.0, 800.0, 600.0);
+        assert!(scroller.is_near_edge(5.0, 300.0, &vp));
+        assert!(!scroller.is_near_edge(400.0, 300.0, &vp));
+    }
+
+    // ------- DndGhostRenderer tests -------
+
+    #[test]
+    fn test_ghost_renderer_default() {
+        let g = DndGhostRenderer::new("item");
+        assert_eq!(g.offset_x, 0.0);
+        assert_eq!(g.offset_y, 0.0);
+        assert_eq!(g.opacity, 0.7);
+        assert_eq!(g.label, "item");
+    }
+
+    #[test]
+    fn test_ghost_renderer_position() {
+        let g = DndGhostRenderer::new("x").with_offset(5.0, -3.0);
+        let (px, py) = g.render_position(100.0, 200.0);
+        assert_eq!(px, 105.0);
+        assert_eq!(py, 197.0);
+    }
+
+    #[test]
+    fn test_ghost_renderer_info() {
+        let g = DndGhostRenderer::new("drag-label")
+            .with_offset(2.0, 4.0)
+            .with_opacity(0.5);
+        let info = g.render_info();
+        assert!(info.contains("drag-label"));
+        assert!(info.contains("0.5"));
+    }
+
+    // ------- DragCancellation tests -------
+
+    #[test]
+    fn test_cancellation_lifecycle() {
+        let mut c = DragCancellation::new();
+        assert!(!c.is_cancelled());
+        assert_eq!(c.total_cancellations(), 0);
+
+        c.cancel("escape pressed");
+        assert!(c.is_cancelled());
+        assert_eq!(c.reason.as_deref(), Some("escape pressed"));
+        assert_eq!(c.total_cancellations(), 1);
+
+        c.reset();
+        assert!(!c.is_cancelled());
+        assert!(c.reason.is_none());
+
+        c.cancel("second cancel");
+        assert_eq!(c.total_cancellations(), 2);
     }
 }

@@ -1173,6 +1173,267 @@ pub fn line_bracket_balances(lines: &[&str], pairs: &[BracketPair]) -> Vec<LineB
     results
 }
 
+// ---------------------------------------------------------------------------
+// BracketPairGuide – vertical guide lines for bracket pairs
+// ---------------------------------------------------------------------------
+
+/// A vertical guide line drawn between matching bracket pairs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketPairGuide {
+    /// Column where the guide is drawn.
+    pub column: u32,
+    /// Start line (1-based) where the opening bracket is.
+    pub start_line: u32,
+    /// End line (1-based) where the closing bracket is.
+    pub end_line: u32,
+    /// Nesting depth of this bracket pair.
+    pub depth: u32,
+    /// Color index for rainbow coloring.
+    pub color_index: u32,
+}
+
+impl BracketPairGuide {
+    pub fn new(column: u32, start_line: u32, end_line: u32, depth: u32, num_colors: u32) -> Self {
+        Self {
+            column,
+            start_line,
+            end_line,
+            depth,
+            color_index: bracket_color_index(depth, num_colors),
+        }
+    }
+
+    /// Number of lines this guide spans.
+    pub fn line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line)
+    }
+
+    /// Whether a given line falls within this guide's range.
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+}
+
+impl fmt::Display for BracketPairGuide {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Guide(col={}, lines={}..{}, depth={})",
+            self.column, self.start_line, self.end_line, self.depth
+        )
+    }
+}
+
+/// Build bracket pair guides from matched bracket positions.
+pub fn build_bracket_guides(matches: &[BracketMatch], num_colors: u32) -> Vec<BracketPairGuide> {
+    matches
+        .iter()
+        .filter(|m| m.open_line != m.close_line)
+        .map(|m| BracketPairGuide::new(m.open_col, m.open_line, m.close_line, m.depth, num_colors))
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// BracketScopeHighlighter – rainbow bracket scope highlighting
+// ---------------------------------------------------------------------------
+
+/// Assigns colors to bracket pairs based on nesting depth for rainbow brackets.
+#[derive(Debug, Clone)]
+pub struct BracketScopeHighlighter {
+    pub colors: Vec<String>,
+}
+
+impl BracketScopeHighlighter {
+    pub fn new(colors: Vec<String>) -> Self {
+        Self {
+            colors: if colors.is_empty() {
+                vec![
+                    "#FFD700".into(), "#DA70D6".into(), "#87CEEB".into(),
+                    "#98FB98".into(), "#FFA07A".into(), "#DDA0DD".into(),
+                ]
+            } else {
+                colors
+            },
+        }
+    }
+
+    /// Get the color for a bracket at a given depth.
+    pub fn color_for_depth(&self, depth: u32) -> &str {
+        &self.colors[depth as usize % self.colors.len()]
+    }
+
+    /// Highlight all brackets in a line, returning (char_index, color) pairs.
+    pub fn highlight_line(&self, line: &str, base_depth: u32, pairs: &[BracketPair]) -> Vec<(usize, String)> {
+        let mut result = Vec::new();
+        let mut depth = base_depth;
+        for (i, ch) in line.chars().enumerate() {
+            if pairs.iter().any(|p| p.open == ch) {
+                result.push((i, self.color_for_depth(depth).to_string()));
+                depth += 1;
+            } else if pairs.iter().any(|p| p.close == ch) {
+                depth = depth.saturating_sub(1);
+                result.push((i, self.color_for_depth(depth).to_string()));
+            }
+        }
+        result
+    }
+
+    pub fn color_count(&self) -> usize {
+        self.colors.len()
+    }
+}
+
+impl Default for BracketScopeHighlighter {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
+impl fmt::Display for BracketScopeHighlighter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BracketScopeHighlighter({} colors)", self.colors.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-close configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for bracket auto-close behavior.
+#[derive(Debug, Clone)]
+pub struct AutoCloseConfig {
+    pub enabled: bool,
+    pub pairs: Vec<(char, char)>,
+    /// Characters before which auto-close is suppressed.
+    pub suppress_before: Vec<char>,
+}
+
+impl AutoCloseConfig {
+    pub fn new() -> Self {
+        Self {
+            enabled: true,
+            pairs: vec![('(', ')'), ('[', ']'), ('{', '}'), ('"', '"'), ('\'', '\'')],
+            suppress_before: Vec::new(),
+        }
+    }
+
+    /// Whether auto-close should be applied for a given opening character.
+    pub fn should_auto_close(&self, open_char: char, next_char: Option<char>) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        if !self.pairs.iter().any(|(o, _)| *o == open_char) {
+            return false;
+        }
+        if let Some(nc) = next_char {
+            if self.suppress_before.contains(&nc) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Get the closing character for a given opener.
+    pub fn close_char(&self, open_char: char) -> Option<char> {
+        self.pairs.iter().find(|(o, _)| *o == open_char).map(|(_, c)| *c)
+    }
+
+    /// Add a custom bracket pair.
+    pub fn add_pair(&mut self, open: char, close: char) {
+        self.pairs.push((open, close));
+    }
+
+    /// Add a suppress-before character.
+    pub fn suppress_before_char(&mut self, ch: char) {
+        self.suppress_before.push(ch);
+    }
+}
+
+impl Default for AutoCloseConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for AutoCloseConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AutoCloseConfig(enabled={}, {} pairs)",
+            self.enabled,
+            self.pairs.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bracket pair counting across document
+// ---------------------------------------------------------------------------
+
+/// Document-wide bracket pair count summary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentBracketCount {
+    pub total_pairs: usize,
+    pub unmatched_opens: usize,
+    pub unmatched_closes: usize,
+    pub max_depth: u32,
+    pub is_balanced: bool,
+}
+
+impl DocumentBracketCount {
+    /// Count all bracket pairs across the entire document.
+    pub fn count(lines: &[&str], pairs: &[BracketPair]) -> Self {
+        let mut depth: i32 = 0;
+        let mut max_depth: i32 = 0;
+        let mut total_opens: usize = 0;
+        let mut total_closes: usize = 0;
+        let mut matched_pairs: usize = 0;
+
+        for line in lines {
+            for ch in line.chars() {
+                if pairs.iter().any(|p| p.open == ch) {
+                    total_opens += 1;
+                    depth += 1;
+                    if depth > max_depth {
+                        max_depth = depth;
+                    }
+                    matched_pairs += 1;
+                } else if pairs.iter().any(|p| p.close == ch) {
+                    total_closes += 1;
+                    if depth > 0 {
+                        depth -= 1;
+                    } else {
+                        // Unmatched close; don't count as matched pair
+                        matched_pairs = matched_pairs.saturating_sub(1);
+                    }
+                }
+            }
+        }
+
+        let unmatched_opens = total_opens.saturating_sub(total_closes.min(total_opens));
+        let unmatched_closes = total_closes.saturating_sub(total_opens.min(total_closes));
+        let is_balanced = unmatched_opens == 0 && unmatched_closes == 0;
+
+        Self {
+            total_pairs: total_opens.min(total_closes),
+            unmatched_opens,
+            unmatched_closes,
+            max_depth: max_depth as u32,
+            is_balanced,
+        }
+    }
+}
+
+impl fmt::Display for DocumentBracketCount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BracketCount(pairs={}, unmatched_open={}, unmatched_close={}, balanced={})",
+            self.total_pairs, self.unmatched_opens, self.unmatched_closes, self.is_balanced
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1924,5 +2185,132 @@ mod tests {
         let pairs = default_bracket_pairs();
         let balances = line_bracket_balances(&lines, &pairs);
         assert!(balances.is_empty());
+    }
+
+    // -- BracketPairGuide --------------------------------------------------
+
+    #[test]
+    fn bracket_pair_guide_creation() {
+        let g = BracketPairGuide::new(5, 1, 10, 0, 6);
+        assert_eq!(g.line_span(), 9);
+        assert!(g.contains_line(5));
+        assert!(!g.contains_line(11));
+        assert_eq!(g.color_index, 0);
+    }
+
+    #[test]
+    fn bracket_pair_guide_display() {
+        let g = BracketPairGuide::new(3, 1, 5, 1, 6);
+        let s = format!("{g}");
+        assert!(s.contains("col=3"));
+        assert!(s.contains("depth=1"));
+    }
+
+    #[test]
+    fn build_bracket_guides_filters_same_line() {
+        let matches = vec![
+            BracketMatch { open_line: 1, open_col: 1, close_line: 1, close_col: 5, depth: 0 },
+            BracketMatch { open_line: 1, open_col: 1, close_line: 5, close_col: 1, depth: 0 },
+        ];
+        let guides = build_bracket_guides(&matches, 6);
+        assert_eq!(guides.len(), 1);
+    }
+
+    // -- BracketScopeHighlighter -------------------------------------------
+
+    #[test]
+    fn scope_highlighter_color_for_depth() {
+        let h = BracketScopeHighlighter::default();
+        assert!(!h.color_for_depth(0).is_empty());
+        assert_eq!(h.color_for_depth(0), h.color_for_depth(h.color_count() as u32));
+    }
+
+    #[test]
+    fn scope_highlighter_highlight_line() {
+        let h = BracketScopeHighlighter::default();
+        let pairs = default_bracket_pairs();
+        let highlights = h.highlight_line("(a[b]c)", 0, &pairs);
+        assert_eq!(highlights.len(), 4); // ( [ ] )
+    }
+
+    #[test]
+    fn scope_highlighter_display() {
+        let h = BracketScopeHighlighter::default();
+        let s = format!("{h}");
+        assert!(s.contains("colors"));
+    }
+
+    // -- AutoCloseConfig ---------------------------------------------------
+
+    #[test]
+    fn auto_close_config_defaults() {
+        let cfg = AutoCloseConfig::default();
+        assert!(cfg.should_auto_close('(', None));
+        assert!(cfg.should_auto_close('{', None));
+        assert!(!cfg.should_auto_close('x', None));
+    }
+
+    #[test]
+    fn auto_close_config_suppress() {
+        let mut cfg = AutoCloseConfig::new();
+        cfg.suppress_before_char('a');
+        assert!(!cfg.should_auto_close('(', Some('a')));
+        assert!(cfg.should_auto_close('(', Some('b')));
+    }
+
+    #[test]
+    fn auto_close_config_disabled() {
+        let mut cfg = AutoCloseConfig::new();
+        cfg.enabled = false;
+        assert!(!cfg.should_auto_close('(', None));
+    }
+
+    #[test]
+    fn auto_close_config_close_char() {
+        let cfg = AutoCloseConfig::new();
+        assert_eq!(cfg.close_char('('), Some(')'));
+        assert_eq!(cfg.close_char('{'), Some('}'));
+        assert_eq!(cfg.close_char('x'), None);
+    }
+
+    #[test]
+    fn auto_close_config_display() {
+        let cfg = AutoCloseConfig::new();
+        let s = format!("{cfg}");
+        assert!(s.contains("enabled=true"));
+    }
+
+    // -- DocumentBracketCount ----------------------------------------------
+
+    #[test]
+    fn document_bracket_count_balanced() {
+        let lines = vec!["fn main() {", "  let x = (1 + 2);", "}"];
+        let pairs = default_bracket_pairs();
+        let count = DocumentBracketCount::count(&lines, &pairs);
+        assert!(count.is_balanced);
+        assert_eq!(count.unmatched_opens, 0);
+        assert_eq!(count.unmatched_closes, 0);
+        assert_eq!(count.max_depth, 2);
+    }
+
+    #[test]
+    fn document_bracket_count_unbalanced() {
+        let lines = vec!["(()", "}{"];
+        let pairs = default_bracket_pairs();
+        let count = DocumentBracketCount::count(&lines, &pairs);
+        assert!(!count.is_balanced);
+    }
+
+    #[test]
+    fn document_bracket_count_display() {
+        let count = DocumentBracketCount {
+            total_pairs: 3,
+            unmatched_opens: 0,
+            unmatched_closes: 0,
+            max_depth: 2,
+            is_balanced: true,
+        };
+        let s = format!("{count}");
+        assert!(s.contains("balanced=true"));
     }
 }

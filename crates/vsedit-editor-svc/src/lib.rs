@@ -4,6 +4,7 @@
 //! Manages editor instances within groups (tab strips) and exposes events for
 //! active-editor changes.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -1148,6 +1149,221 @@ impl fmt::Display for EditorTab {
 }
 
 // ---------------------------------------------------------------------------
+// EditorGroupLayoutSerializer
+// ---------------------------------------------------------------------------
+
+/// Serializes and deserializes [`EditorGroupLayout`] to/from a string tag.
+pub struct EditorGroupLayoutSerializer;
+
+impl EditorGroupLayoutSerializer {
+    /// Encode a layout as a short string identifier.
+    pub fn serialize(layout: &EditorGroupLayout) -> String {
+        match layout {
+            EditorGroupLayout::Single => "single".to_string(),
+            EditorGroupLayout::Horizontal => "horizontal".to_string(),
+            EditorGroupLayout::Vertical => "vertical".to_string(),
+        }
+    }
+
+    /// Parse a string identifier back into a layout.
+    pub fn deserialize(s: &str) -> Option<EditorGroupLayout> {
+        match s {
+            "single" => Some(EditorGroupLayout::Single),
+            "horizontal" => Some(EditorGroupLayout::Horizontal),
+            "vertical" => Some(EditorGroupLayout::Vertical),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabHistory
+// ---------------------------------------------------------------------------
+
+/// Most-recently-used history of editor URIs with timestamps.
+#[derive(Debug, Clone)]
+pub struct EditorTabHistory {
+    entries: Vec<(String, u64)>,
+    capacity: usize,
+}
+
+impl EditorTabHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Push a URI to the front of the history (MRU ordering).
+    ///
+    /// If the URI already exists it is moved to the front with the new
+    /// timestamp. The history is truncated to `capacity` afterwards.
+    pub fn push(&mut self, uri: impl Into<String>, timestamp: u64) {
+        let uri = uri.into();
+        self.entries.retain(|(u, _)| u != &uri);
+        self.entries.insert(0, (uri, timestamp));
+        self.entries.truncate(self.capacity);
+    }
+
+    /// Return up to `n` most-recent entries.
+    pub fn recent(&self, n: usize) -> &[(String, u64)] {
+        let end = n.min(self.entries.len());
+        &self.entries[..end]
+    }
+
+    /// Check whether the history contains the given URI.
+    pub fn contains(&self, uri: &str) -> bool {
+        self.entries.iter().any(|(u, _)| u == uri)
+    }
+
+    /// Return the most recently pushed entry, if any.
+    pub fn most_recent(&self) -> Option<&(String, u64)> {
+        self.entries.first()
+    }
+
+    /// Number of entries currently stored.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorAutoSaveScheduler
+// ---------------------------------------------------------------------------
+
+/// Tracks pending auto-save deadlines for editor URIs.
+#[derive(Debug, Clone)]
+pub struct EditorAutoSaveScheduler {
+    delay_ms: u64,
+    pending: HashMap<String, u64>,
+    enabled: bool,
+}
+
+impl EditorAutoSaveScheduler {
+    /// Create a new scheduler with the given delay in milliseconds.
+    pub fn new(delay_ms: u64) -> Self {
+        Self {
+            delay_ms,
+            pending: HashMap::new(),
+            enabled: true,
+        }
+    }
+
+    /// Schedule an auto-save for the given URI at `now + delay_ms`.
+    ///
+    /// If the scheduler is disabled this is a no-op.
+    pub fn schedule(&mut self, uri: impl Into<String>, now: u64) {
+        if !self.enabled {
+            return;
+        }
+        self.pending.insert(uri.into(), now + self.delay_ms);
+    }
+
+    /// Return and remove all URIs whose deadline is at or before `now`.
+    pub fn due_entries(&mut self, now: u64) -> Vec<String> {
+        let due: Vec<String> = self
+            .pending
+            .iter()
+            .filter(|(_, scheduled)| **scheduled <= now)
+            .map(|(uri, _)| uri.clone())
+            .collect();
+        for uri in &due {
+            self.pending.remove(uri);
+        }
+        due
+    }
+
+    /// Cancel a pending auto-save for the given URI.
+    pub fn cancel(&mut self, uri: &str) {
+        self.pending.remove(uri);
+    }
+
+    /// Number of URIs currently pending.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Enable auto-save scheduling.
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    /// Disable auto-save scheduling; no new entries will be accepted.
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    /// Whether the scheduler is currently enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorDiffMode
+// ---------------------------------------------------------------------------
+
+/// Represents a side-by-side (or inline) diff between two editor resources.
+#[derive(Debug, Clone)]
+pub struct EditorDiffMode {
+    pub left_uri: String,
+    pub right_uri: String,
+    pub is_inline: bool,
+    pub ignore_whitespace: bool,
+}
+
+impl EditorDiffMode {
+    /// Create a diff between two URIs with default settings.
+    pub fn new(left: impl Into<String>, right: impl Into<String>) -> Self {
+        Self {
+            left_uri: left.into(),
+            right_uri: right.into(),
+            is_inline: false,
+            ignore_whitespace: false,
+        }
+    }
+
+    /// Toggle between inline and side-by-side diff views.
+    pub fn toggle_inline(&mut self) {
+        self.is_inline = !self.is_inline;
+    }
+
+    /// Toggle whether whitespace differences are ignored.
+    pub fn toggle_whitespace(&mut self) {
+        self.ignore_whitespace = !self.ignore_whitespace;
+    }
+
+    /// A short label describing the diff.
+    pub fn label(&self) -> String {
+        format!("{} ↔ {}", self.left_uri, self.right_uri)
+    }
+}
+
+impl fmt::Display for EditorDiffMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let style = if self.is_inline { "inline" } else { "side-by-side" };
+        let ws = if self.ignore_whitespace {
+            ", ignore whitespace"
+        } else {
+            ""
+        };
+        write!(f, "{} ({style}{ws})", self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1903,5 +2119,158 @@ mod tests {
 
         let path_match = EditorFilter::by_path_contains(&editors, "/c");
         assert_eq!(path_match.len(), 1);
+    }
+
+    // -- EditorGroupLayoutSerializer ----------------------------------------
+
+    #[test]
+    fn layout_serializer_roundtrip() {
+        let layouts = [
+            EditorGroupLayout::Single,
+            EditorGroupLayout::Horizontal,
+            EditorGroupLayout::Vertical,
+        ];
+        for layout in &layouts {
+            let s = EditorGroupLayoutSerializer::serialize(layout);
+            let parsed = EditorGroupLayoutSerializer::deserialize(&s).unwrap();
+            assert_eq!(
+                EditorGroupLayoutSerializer::serialize(&parsed),
+                s,
+            );
+        }
+    }
+
+    #[test]
+    fn layout_serializer_unknown_returns_none() {
+        assert!(EditorGroupLayoutSerializer::deserialize("diagonal").is_none());
+        assert!(EditorGroupLayoutSerializer::deserialize("").is_none());
+    }
+
+    // -- EditorTabHistory ---------------------------------------------------
+
+    #[test]
+    fn tab_history_push_and_recent() {
+        let mut hist = EditorTabHistory::new(5);
+        hist.push("file:///a.rs", 1);
+        hist.push("file:///b.rs", 2);
+        hist.push("file:///c.rs", 3);
+        assert_eq!(hist.len(), 3);
+        assert_eq!(hist.recent(2).len(), 2);
+        assert_eq!(hist.recent(2)[0].0, "file:///c.rs");
+        assert_eq!(hist.recent(2)[1].0, "file:///b.rs");
+    }
+
+    #[test]
+    fn tab_history_deduplicates() {
+        let mut hist = EditorTabHistory::new(5);
+        hist.push("file:///a.rs", 1);
+        hist.push("file:///b.rs", 2);
+        hist.push("file:///a.rs", 3);
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist.most_recent().unwrap().0, "file:///a.rs");
+        assert_eq!(hist.most_recent().unwrap().1, 3);
+    }
+
+    #[test]
+    fn tab_history_truncates_to_capacity() {
+        let mut hist = EditorTabHistory::new(3);
+        for i in 0..10 {
+            hist.push(format!("file:///{i}.rs"), i as u64);
+        }
+        assert_eq!(hist.len(), 3);
+        assert_eq!(hist.most_recent().unwrap().0, "file:///9.rs");
+    }
+
+    #[test]
+    fn tab_history_contains_and_clear() {
+        let mut hist = EditorTabHistory::new(5);
+        hist.push("file:///x.rs", 1);
+        assert!(hist.contains("file:///x.rs"));
+        assert!(!hist.contains("file:///y.rs"));
+        hist.clear();
+        assert!(hist.is_empty());
+        assert!(hist.most_recent().is_none());
+    }
+
+    // -- EditorAutoSaveScheduler --------------------------------------------
+
+    #[test]
+    fn autosave_schedule_and_due() {
+        let mut sched = EditorAutoSaveScheduler::new(100);
+        sched.schedule("file:///a.rs", 1000);
+        sched.schedule("file:///b.rs", 1050);
+        assert_eq!(sched.pending_count(), 2);
+
+        let due = sched.due_entries(1100);
+        assert_eq!(due.len(), 1);
+        assert!(due.contains(&"file:///a.rs".to_string()));
+
+        let due2 = sched.due_entries(1200);
+        assert_eq!(due2.len(), 1);
+        assert!(due2.contains(&"file:///b.rs".to_string()));
+        assert_eq!(sched.pending_count(), 0);
+    }
+
+    #[test]
+    fn autosave_cancel() {
+        let mut sched = EditorAutoSaveScheduler::new(50);
+        sched.schedule("file:///a.rs", 0);
+        sched.cancel("file:///a.rs");
+        assert_eq!(sched.pending_count(), 0);
+        assert!(sched.due_entries(100).is_empty());
+    }
+
+    #[test]
+    fn autosave_disable_prevents_schedule() {
+        let mut sched = EditorAutoSaveScheduler::new(50);
+        sched.disable();
+        assert!(!sched.is_enabled());
+        sched.schedule("file:///a.rs", 0);
+        assert_eq!(sched.pending_count(), 0);
+        sched.enable();
+        sched.schedule("file:///a.rs", 0);
+        assert_eq!(sched.pending_count(), 1);
+    }
+
+    // -- EditorDiffMode -----------------------------------------------------
+
+    #[test]
+    fn diff_mode_label() {
+        let diff = EditorDiffMode::new("a.rs", "b.rs");
+        assert_eq!(diff.label(), "a.rs ↔ b.rs");
+    }
+
+    #[test]
+    fn diff_mode_toggles() {
+        let mut diff = EditorDiffMode::new("a.rs", "b.rs");
+        assert!(!diff.is_inline);
+        assert!(!diff.ignore_whitespace);
+        diff.toggle_inline();
+        assert!(diff.is_inline);
+        diff.toggle_whitespace();
+        assert!(diff.ignore_whitespace);
+        diff.toggle_inline();
+        assert!(!diff.is_inline);
+    }
+
+    #[test]
+    fn diff_mode_display() {
+        let mut diff = EditorDiffMode::new("left.rs", "right.rs");
+        let s = format!("{diff}");
+        assert!(s.contains("side-by-side"));
+        assert!(!s.contains("ignore whitespace"));
+
+        diff.toggle_inline();
+        diff.toggle_whitespace();
+        let s2 = format!("{diff}");
+        assert!(s2.contains("inline"));
+        assert!(s2.contains("ignore whitespace"));
+    }
+
+    #[test]
+    fn diff_mode_display_no_whitespace_flag() {
+        let diff = EditorDiffMode::new("x", "y");
+        let s = format!("{diff}");
+        assert_eq!(s, "x ↔ y (side-by-side)");
     }
 }

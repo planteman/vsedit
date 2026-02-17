@@ -1094,6 +1094,204 @@ pub fn generate_preview(item: &QuickAccessItem) -> ResultPreview {
     ResultPreview::plain(text, 120)
 }
 
+// -- QuickAccessScorer with match highlighting -------------------------------
+
+/// A scored match with highlight positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScoredMatch {
+    pub item: QuickAccessItem,
+    pub score: i32,
+    pub highlight_positions: Vec<usize>,
+}
+
+/// Score items against a query and return sorted results with highlights.
+pub fn score_items(items: &[QuickAccessItem], query: &str) -> Vec<ScoredMatch> {
+    if query.is_empty() {
+        return items.iter().map(|item| ScoredMatch {
+            item: item.clone(),
+            score: 0,
+            highlight_positions: Vec::new(),
+        }).collect();
+    }
+
+    let mut scored: Vec<ScoredMatch> = items.iter().filter_map(|item| {
+        let (score, positions) = fuzzy_match_with_positions(query, &item.label)?;
+        Some(ScoredMatch {
+            item: item.clone(),
+            score,
+            highlight_positions: positions,
+        })
+    }).collect();
+
+    scored.sort_by(|a, b| b.score.cmp(&a.score));
+    scored
+}
+
+/// Fuzzy match returning both score and match positions.
+fn fuzzy_match_with_positions(query: &str, target: &str) -> Option<(i32, Vec<usize>)> {
+    let query_lower: Vec<char> = query.chars().flat_map(|c| c.to_lowercase()).collect();
+    let target_lower: Vec<char> = target.chars().flat_map(|c| c.to_lowercase()).collect();
+
+    let mut score: i32 = 0;
+    let mut qi = 0;
+    let mut positions = Vec::new();
+    let mut last_match: Option<usize> = None;
+
+    for (ti, tc) in target_lower.iter().enumerate() {
+        if qi < query_lower.len() && *tc == query_lower[qi] {
+            score += 1;
+            if ti > 0 && last_match == Some(ti - 1) {
+                score += 2;
+            }
+            if ti == 0 {
+                score += 3;
+            }
+            positions.push(ti);
+            last_match = Some(ti);
+            qi += 1;
+        }
+    }
+
+    if qi == query_lower.len() {
+        Some((score, positions))
+    } else {
+        None
+    }
+}
+
+// -- QuickAccessRecent with usage frequency ----------------------------------
+
+/// Tracks recently accessed items with frequency counts.
+#[derive(Debug, Default)]
+pub struct QuickAccessRecent {
+    entries: Vec<RecentEntry>,
+    max_entries: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecentEntry {
+    pub id: String,
+    pub label: String,
+    pub access_count: u32,
+    pub last_access: u64,
+}
+
+impl QuickAccessRecent {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), max_entries }
+    }
+
+    /// Record an access, updating frequency and recency.
+    pub fn record_access(&mut self, id: &str, label: &str, timestamp: u64) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            entry.access_count += 1;
+            entry.last_access = timestamp;
+        } else {
+            if self.entries.len() >= self.max_entries {
+                // Remove least recently used
+                if let Some(min_idx) = self.entries.iter().enumerate()
+                    .min_by_key(|(_, e)| e.last_access)
+                    .map(|(i, _)| i)
+                {
+                    self.entries.remove(min_idx);
+                }
+            }
+            self.entries.push(RecentEntry {
+                id: id.to_string(),
+                label: label.to_string(),
+                access_count: 1,
+                last_access: timestamp,
+            });
+        }
+    }
+
+    /// Get entries sorted by frequency (descending).
+    pub fn by_frequency(&self) -> Vec<&RecentEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.access_count.cmp(&a.access_count));
+        sorted
+    }
+
+    /// Get entries sorted by recency (most recent first).
+    pub fn by_recency(&self) -> Vec<&RecentEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.last_access.cmp(&a.last_access));
+        sorted
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl fmt::Display for QuickAccessRecent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Recent({} entries, max {})", self.entries.len(), self.max_entries)
+    }
+}
+
+// -- QuickAccessProviderChain for fallback -----------------------------------
+
+/// Chains multiple providers, trying each in order until items are found.
+pub fn provider_chain_query(
+    providers: &[&dyn QuickAccessProvider],
+    query: &str,
+) -> Vec<QuickAccessItem> {
+    for provider in providers {
+        let items = provider.provide_items(query);
+        if !items.is_empty() {
+            return items;
+        }
+    }
+    Vec::new()
+}
+
+// -- Quick access result grouping --------------------------------------------
+
+/// Group items by their `group` field.
+pub fn group_items(items: &[QuickAccessItem]) -> HashMap<String, Vec<&QuickAccessItem>> {
+    let mut groups: HashMap<String, Vec<&QuickAccessItem>> = HashMap::new();
+    for item in items {
+        let key = item.group.as_deref().unwrap_or("Other").to_string();
+        groups.entry(key).or_default().push(item);
+    }
+    groups
+}
+
+/// Count how many distinct groups exist.
+pub fn group_count(items: &[QuickAccessItem]) -> usize {
+    let mut groups = std::collections::HashSet::new();
+    for item in items {
+        groups.insert(item.group.as_deref().unwrap_or("Other"));
+    }
+    groups.len()
+}
+
+/// Flatten grouped items into a list with group headers.
+pub fn flatten_with_headers(items: &[QuickAccessItem]) -> Vec<String> {
+    let groups = group_items(items);
+    let mut keys: Vec<_> = groups.keys().cloned().collect();
+    keys.sort();
+    let mut result = Vec::new();
+    for key in keys {
+        result.push(format!("── {} ──", key));
+        if let Some(group_items) = groups.get(&key) {
+            for item in group_items {
+                result.push(item.label.clone());
+            }
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1972,5 +2170,122 @@ mod tests {
         let preview = generate_preview(&item);
         assert_eq!(preview.kind, PreviewKind::PlainText);
         assert_eq!(preview.content, "A useful command");
+    }
+
+    // -- QuickAccessScorer tests ----------------------------------------------
+
+    #[test]
+    fn score_items_empty_query() {
+        let items = vec![QuickAccessItem {
+            id: "a".into(), label: "Alpha".into(), description: None, detail: None, icon: None, group: None,
+        }];
+        let results = score_items(&items, "");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].score, 0);
+    }
+
+    #[test]
+    fn score_items_filters_non_matching() {
+        let items = vec![
+            QuickAccessItem { id: "a".into(), label: "Alpha".into(), description: None, detail: None, icon: None, group: None },
+            QuickAccessItem { id: "b".into(), label: "Beta".into(), description: None, detail: None, icon: None, group: None },
+        ];
+        let results = score_items(&items, "alp");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].item.id, "a");
+        assert!(!results[0].highlight_positions.is_empty());
+    }
+
+    #[test]
+    fn score_items_ranks_by_score() {
+        let items = vec![
+            QuickAccessItem { id: "ab".into(), label: "a_b_c".into(), description: None, detail: None, icon: None, group: None },
+            QuickAccessItem { id: "abc".into(), label: "abc".into(), description: None, detail: None, icon: None, group: None },
+        ];
+        let results = score_items(&items, "abc");
+        assert!(results[0].score >= results.last().unwrap().score);
+    }
+
+    // -- QuickAccessRecent tests ----------------------------------------------
+
+    #[test]
+    fn recent_record_and_frequency() {
+        let mut recent = QuickAccessRecent::new(10);
+        recent.record_access("a", "Alpha", 1);
+        recent.record_access("b", "Beta", 2);
+        recent.record_access("a", "Alpha", 3);
+        assert_eq!(recent.len(), 2);
+        let by_freq = recent.by_frequency();
+        assert_eq!(by_freq[0].id, "a");
+        assert_eq!(by_freq[0].access_count, 2);
+    }
+
+    #[test]
+    fn recent_evicts_lru() {
+        let mut recent = QuickAccessRecent::new(2);
+        recent.record_access("a", "A", 1);
+        recent.record_access("b", "B", 2);
+        recent.record_access("c", "C", 3);
+        assert_eq!(recent.len(), 2);
+        assert!(recent.by_recency().iter().all(|e| e.id != "a"));
+    }
+
+    #[test]
+    fn recent_by_recency() {
+        let mut recent = QuickAccessRecent::new(10);
+        recent.record_access("a", "A", 10);
+        recent.record_access("b", "B", 20);
+        let by_recency = recent.by_recency();
+        assert_eq!(by_recency[0].id, "b");
+    }
+
+    #[test]
+    fn recent_display() {
+        let recent = QuickAccessRecent::new(5);
+        let s = recent.to_string();
+        assert!(s.contains("0 entries"));
+    }
+
+    // -- Grouping tests -------------------------------------------------------
+
+    #[test]
+    fn group_items_groups_correctly() {
+        let items = vec![
+            QuickAccessItem { id: "a".into(), label: "A".into(), description: None, detail: None, icon: None, group: Some("Files".into()) },
+            QuickAccessItem { id: "b".into(), label: "B".into(), description: None, detail: None, icon: None, group: Some("Files".into()) },
+            QuickAccessItem { id: "c".into(), label: "C".into(), description: None, detail: None, icon: None, group: Some("Commands".into()) },
+        ];
+        let groups = group_items(&items);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups["Files"].len(), 2);
+    }
+
+    #[test]
+    fn group_count_with_none_group() {
+        let items = vec![
+            QuickAccessItem { id: "a".into(), label: "A".into(), description: None, detail: None, icon: None, group: None },
+            QuickAccessItem { id: "b".into(), label: "B".into(), description: None, detail: None, icon: None, group: Some("X".into()) },
+        ];
+        assert_eq!(group_count(&items), 2);
+    }
+
+    #[test]
+    fn flatten_with_headers_creates_sections() {
+        let items = vec![
+            QuickAccessItem { id: "a".into(), label: "Alpha".into(), description: None, detail: None, icon: None, group: Some("A".into()) },
+            QuickAccessItem { id: "b".into(), label: "Beta".into(), description: None, detail: None, icon: None, group: Some("B".into()) },
+        ];
+        let flat = flatten_with_headers(&items);
+        assert_eq!(flat.len(), 4);
+        assert!(flat[0].contains("A"));
+        assert_eq!(flat[1], "Alpha");
+    }
+
+    #[test]
+    fn recent_clear() {
+        let mut recent = QuickAccessRecent::new(10);
+        recent.record_access("a", "A", 1);
+        recent.clear();
+        assert!(recent.is_empty());
     }
 }

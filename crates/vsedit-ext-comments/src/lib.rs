@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for code comments.
 
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -1274,6 +1275,222 @@ pub fn collapse_empty_threads(threads: &mut [CommentThread]) {
     }
 }
 
+// ── Thread Filtering ──
+
+/// Utility for filtering collections of `CommentThread`.
+pub struct CommentThreadFilter;
+
+impl CommentThreadFilter {
+    /// Return threads that are collapsed (resolved).
+    pub fn by_collapsed(threads: &[CommentThread]) -> Vec<&CommentThread> {
+        threads.iter().filter(|t| t.is_collapsed).collect()
+    }
+
+    /// Return threads that are not collapsed (unresolved).
+    pub fn by_uncollapsed(threads: &[CommentThread]) -> Vec<&CommentThread> {
+        threads.iter().filter(|t| !t.is_collapsed).collect()
+    }
+
+    /// Return threads matching the given URI.
+    pub fn by_uri<'a>(threads: &'a [CommentThread], uri: &str) -> Vec<&'a CommentThread> {
+        threads.iter().filter(|t| t.uri == uri).collect()
+    }
+
+    /// Return threads whose first comment was written by `author`.
+    pub fn by_author<'a>(threads: &'a [CommentThread], author: &str) -> Vec<&'a CommentThread> {
+        threads
+            .iter()
+            .filter(|t| {
+                t.comments
+                    .first()
+                    .map_or(false, |c| c.author.name == author)
+            })
+            .collect()
+    }
+
+    /// Return threads with at least `min` comments.
+    pub fn with_min_comments(threads: &[CommentThread], min: usize) -> Vec<&CommentThread> {
+        threads
+            .iter()
+            .filter(|t| t.comments.len() >= min)
+            .collect()
+    }
+}
+
+// ── Reaction Aggregation ──
+
+/// Aggregates reaction counts by label.
+#[derive(Debug, Clone)]
+pub struct CommentReactionAggregator {
+    reactions_map: HashMap<String, u32>,
+}
+
+impl CommentReactionAggregator {
+    pub fn new() -> Self {
+        Self {
+            reactions_map: HashMap::new(),
+        }
+    }
+
+    /// Add `count` occurrences of the given reaction label.
+    pub fn add_reaction(&mut self, kind_label: &str, count: u32) {
+        *self.reactions_map.entry(kind_label.to_string()).or_insert(0) += count;
+    }
+
+    /// Total number of reactions across all labels.
+    pub fn total(&self) -> u32 {
+        self.reactions_map.values().sum()
+    }
+
+    /// Return the label with the highest count, if any.
+    pub fn most_popular(&self) -> Option<(String, u32)> {
+        self.reactions_map
+            .iter()
+            .max_by_key(|(_, v)| **v)
+            .map(|(k, v)| (k.clone(), *v))
+    }
+
+    /// Merge counts from another aggregator into this one.
+    pub fn merge(&mut self, other: &Self) {
+        for (k, v) in &other.reactions_map {
+            *self.reactions_map.entry(k.clone()).or_insert(0) += *v;
+        }
+    }
+
+    /// Remove all tracked reactions.
+    pub fn clear(&mut self) {
+        self.reactions_map.clear();
+    }
+}
+
+impl Default for CommentReactionAggregator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for CommentReactionAggregator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} reactions", self.total())
+    }
+}
+
+// ── Draft Management ──
+
+/// Manages in-progress comment drafts keyed by thread id.
+#[derive(Debug, Clone)]
+pub struct CommentDraftManager {
+    drafts: HashMap<String, CommentDraft>,
+}
+
+impl CommentDraftManager {
+    pub fn new() -> Self {
+        Self {
+            drafts: HashMap::new(),
+        }
+    }
+
+    /// Save or overwrite a draft for the given thread.
+    pub fn save_draft(&mut self, thread_id: impl Into<String>, body: impl Into<String>, timestamp: u64) {
+        let tid = thread_id.into();
+        let draft = CommentDraft {
+            thread_id: Some(tid.clone()),
+            body: body.into(),
+            author: String::new(),
+            uri: None,
+            line: None,
+            created_at: timestamp,
+        };
+        self.drafts.insert(tid, draft);
+    }
+
+    pub fn get_draft(&self, thread_id: &str) -> Option<&CommentDraft> {
+        self.drafts.get(thread_id)
+    }
+
+    pub fn remove_draft(&mut self, thread_id: &str) -> Option<CommentDraft> {
+        self.drafts.remove(thread_id)
+    }
+
+    pub fn has_draft(&self, thread_id: &str) -> bool {
+        self.drafts.contains_key(thread_id)
+    }
+
+    pub fn draft_count(&self) -> usize {
+        self.drafts.len()
+    }
+
+    /// Return all drafts sorted by `created_at` ascending.
+    pub fn all_drafts(&self) -> Vec<&CommentDraft> {
+        let mut v: Vec<_> = self.drafts.values().collect();
+        v.sort_by_key(|d| d.created_at);
+        v
+    }
+
+    pub fn clear_all(&mut self) {
+        self.drafts.clear();
+    }
+}
+
+impl Default for CommentDraftManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Range Highlight Tracking ──
+
+/// Tracks which line ranges are highlighted for comment threads.
+#[derive(Debug, Clone)]
+pub struct CommentRangeHighlightTracker {
+    highlights: HashMap<String, (u32, u32)>,
+}
+
+impl CommentRangeHighlightTracker {
+    pub fn new() -> Self {
+        Self {
+            highlights: HashMap::new(),
+        }
+    }
+
+    /// Start tracking a highlight range for the given thread.
+    pub fn track(&mut self, thread_id: impl Into<String>, start: u32, end: u32) {
+        self.highlights.insert(thread_id.into(), (start, end));
+    }
+
+    /// Stop tracking highlights for the given thread.
+    pub fn untrack(&mut self, thread_id: &str) -> bool {
+        self.highlights.remove(thread_id).is_some()
+    }
+
+    pub fn is_tracked(&self, thread_id: &str) -> bool {
+        self.highlights.contains_key(thread_id)
+    }
+
+    pub fn lines_for(&self, thread_id: &str) -> Option<(u32, u32)> {
+        self.highlights.get(thread_id).copied()
+    }
+
+    /// Return thread ids whose tracked range contains the given line.
+    pub fn overlapping(&self, line: u32) -> Vec<String> {
+        self.highlights
+            .iter()
+            .filter(|(_, (s, e))| *s <= line && line <= *e)
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.highlights.len()
+    }
+}
+
+impl Default for CommentRangeHighlightTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1905,5 +2122,155 @@ mod tests {
         collapse_empty_threads(&mut threads);
         assert!(!threads[0].is_collapsed);
         assert!(threads[1].is_collapsed);
+    }
+
+    // ── CommentThreadFilter tests ──
+
+    #[test]
+    fn filter_by_collapsed_and_uncollapsed() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: true },
+            CommentThread { id: "t2".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: false },
+            CommentThread { id: "t3".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: true },
+        ];
+        assert_eq!(CommentThreadFilter::by_collapsed(&threads).len(), 2);
+        assert_eq!(CommentThreadFilter::by_uncollapsed(&threads).len(), 1);
+    }
+
+    #[test]
+    fn filter_by_uri() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "file:///b.rs".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: false },
+        ];
+        assert_eq!(CommentThreadFilter::by_uri(&threads, "file:///a.rs").len(), 1);
+        assert!(CommentThreadFilter::by_uri(&threads, "file:///c.rs").is_empty());
+    }
+
+    #[test]
+    fn filter_by_author() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![Comment::new("c1", "hi", "alice")], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![Comment::new("c2", "yo", "bob")], is_collapsed: false },
+            CommentThread { id: "t3".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: false },
+        ];
+        assert_eq!(CommentThreadFilter::by_author(&threads, "alice").len(), 1);
+        assert_eq!(CommentThreadFilter::by_author(&threads, "charlie").len(), 0);
+    }
+
+    #[test]
+    fn filter_with_min_comments() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![Comment::new("c1", "a", "x"), Comment::new("c2", "b", "y")], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "u".into(), range_start_line: 1, range_end_line: 2, comments: vec![Comment::new("c3", "c", "z")], is_collapsed: false },
+        ];
+        assert_eq!(CommentThreadFilter::with_min_comments(&threads, 2).len(), 1);
+        assert_eq!(CommentThreadFilter::with_min_comments(&threads, 1).len(), 2);
+    }
+
+    // ── CommentReactionAggregator tests ──
+
+    #[test]
+    fn reaction_aggregator_add_and_total() {
+        let mut agg = CommentReactionAggregator::new();
+        agg.add_reaction("thumbsup", 3);
+        agg.add_reaction("heart", 2);
+        agg.add_reaction("thumbsup", 1);
+        assert_eq!(agg.total(), 6);
+    }
+
+    #[test]
+    fn reaction_aggregator_most_popular() {
+        let mut agg = CommentReactionAggregator::new();
+        agg.add_reaction("heart", 5);
+        agg.add_reaction("laugh", 2);
+        let (label, count) = agg.most_popular().unwrap();
+        assert_eq!(label, "heart");
+        assert_eq!(count, 5);
+    }
+
+    #[test]
+    fn reaction_aggregator_merge_and_clear() {
+        let mut a = CommentReactionAggregator::new();
+        a.add_reaction("rocket", 1);
+        let mut b = CommentReactionAggregator::new();
+        b.add_reaction("rocket", 4);
+        b.add_reaction("eyes", 2);
+        a.merge(&b);
+        assert_eq!(a.total(), 7);
+        a.clear();
+        assert_eq!(a.total(), 0);
+        assert!(a.most_popular().is_none());
+    }
+
+    #[test]
+    fn reaction_aggregator_display() {
+        let mut agg = CommentReactionAggregator::new();
+        agg.add_reaction("x", 3);
+        assert_eq!(format!("{agg}"), "3 reactions");
+    }
+
+    // ── CommentDraftManager tests ──
+
+    #[test]
+    fn draft_manager_save_get_remove() {
+        let mut mgr = CommentDraftManager::new();
+        mgr.save_draft("t1", "wip text", 100);
+        assert!(mgr.has_draft("t1"));
+        assert_eq!(mgr.draft_count(), 1);
+        let d = mgr.get_draft("t1").unwrap();
+        assert_eq!(d.body, "wip text");
+        assert_eq!(d.created_at, 100);
+        let removed = mgr.remove_draft("t1").unwrap();
+        assert_eq!(removed.body, "wip text");
+        assert!(!mgr.has_draft("t1"));
+    }
+
+    #[test]
+    fn draft_manager_all_drafts_sorted() {
+        let mut mgr = CommentDraftManager::new();
+        mgr.save_draft("t2", "second", 200);
+        mgr.save_draft("t1", "first", 100);
+        mgr.save_draft("t3", "third", 300);
+        let all = mgr.all_drafts();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0].created_at, 100);
+        assert_eq!(all[2].created_at, 300);
+        mgr.clear_all();
+        assert_eq!(mgr.draft_count(), 0);
+    }
+
+    // ── CommentRangeHighlightTracker tests ──
+
+    #[test]
+    fn highlight_tracker_track_and_query() {
+        let mut tracker = CommentRangeHighlightTracker::new();
+        tracker.track("t1", 10, 20);
+        tracker.track("t2", 15, 25);
+        assert!(tracker.is_tracked("t1"));
+        assert!(!tracker.is_tracked("t3"));
+        assert_eq!(tracker.lines_for("t1"), Some((10, 20)));
+        assert_eq!(tracker.count(), 2);
+    }
+
+    #[test]
+    fn highlight_tracker_overlapping() {
+        let mut tracker = CommentRangeHighlightTracker::new();
+        tracker.track("t1", 10, 20);
+        tracker.track("t2", 15, 25);
+        tracker.track("t3", 30, 40);
+        let mut ids = tracker.overlapping(17);
+        ids.sort();
+        assert_eq!(ids, vec!["t1", "t2"]);
+        assert!(tracker.overlapping(28).is_empty());
+    }
+
+    #[test]
+    fn highlight_tracker_untrack() {
+        let mut tracker = CommentRangeHighlightTracker::new();
+        tracker.track("t1", 1, 5);
+        assert!(tracker.untrack("t1"));
+        assert!(!tracker.untrack("t1"));
+        assert_eq!(tracker.count(), 0);
     }
 }

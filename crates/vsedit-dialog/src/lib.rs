@@ -1245,6 +1245,513 @@ pub fn history_filter_by_kind(history: &DialogHistory, kind: DialogKind) -> Vec<
     history.entries().iter().filter(|e| e.kind == kind).collect()
 }
 
+// ---------------------------------------------------------------------------
+// DialogButtonLayout
+// ---------------------------------------------------------------------------
+
+/// Horizontal alignment for buttons within a dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ButtonAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+impl fmt::Display for ButtonAlignment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ButtonAlignment::Left => write!(f, "left"),
+            ButtonAlignment::Center => write!(f, "center"),
+            ButtonAlignment::Right => write!(f, "right"),
+        }
+    }
+}
+
+/// Manages button positioning within a dialog: alignment, spacing, and
+/// primary-button emphasis.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DialogButtonLayout {
+    pub alignment: ButtonAlignment,
+    /// Spacing between adjacent buttons (in columns).
+    pub spacing: usize,
+    /// When `true`, the primary button is rendered wider to draw attention.
+    pub emphasize_primary: bool,
+    buttons: Vec<DialogButton>,
+}
+
+impl DialogButtonLayout {
+    pub fn new(alignment: ButtonAlignment) -> Self {
+        Self {
+            alignment,
+            spacing: 2,
+            emphasize_primary: true,
+            buttons: Vec::new(),
+        }
+    }
+
+    pub fn with_spacing(mut self, spacing: usize) -> Self {
+        self.spacing = spacing;
+        self
+    }
+
+    pub fn with_emphasis(mut self, emphasize: bool) -> Self {
+        self.emphasize_primary = emphasize;
+        self
+    }
+
+    pub fn add_button(&mut self, button: DialogButton) {
+        self.buttons.push(button);
+    }
+
+    pub fn buttons(&self) -> &[DialogButton] {
+        &self.buttons
+    }
+
+    pub fn primary_index(&self) -> Option<usize> {
+        self.buttons.iter().position(|b| b.is_primary)
+    }
+
+    /// Compute the total width consumed by all buttons including spacing.
+    pub fn total_width(&self) -> usize {
+        if self.buttons.is_empty() {
+            return 0;
+        }
+        let label_widths: usize = self.buttons.iter().map(|b| {
+            let base = b.label.len() + 4; // padding around label
+            if self.emphasize_primary && b.is_primary {
+                base + 2 // extra emphasis width
+            } else {
+                base
+            }
+        }).sum();
+        label_widths + self.spacing * self.buttons.len().saturating_sub(1)
+    }
+
+    /// Compute the left offset to apply given a container `width`.
+    pub fn left_offset(&self, container_width: usize) -> usize {
+        let tw = self.total_width();
+        match self.alignment {
+            ButtonAlignment::Left => 0,
+            ButtonAlignment::Center => container_width.saturating_sub(tw) / 2,
+            ButtonAlignment::Right => container_width.saturating_sub(tw),
+        }
+    }
+}
+
+impl fmt::Display for DialogButtonLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ButtonLayout({}, {} buttons, spacing={})",
+            self.alignment,
+            self.buttons.len(),
+            self.spacing,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogFormFields
+// ---------------------------------------------------------------------------
+
+/// The kind of input a form field expects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormFieldKind {
+    Text,
+    Checkbox,
+    Dropdown(Vec<String>),
+}
+
+/// A single field within a [`DialogFormFields`] form.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FormField {
+    pub name: String,
+    pub label: String,
+    pub kind: FormFieldKind,
+    pub required: bool,
+    pub value: String,
+}
+
+impl FormField {
+    pub fn text(name: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            label: label.into(),
+            kind: FormFieldKind::Text,
+            required: false,
+            value: String::new(),
+        }
+    }
+
+    pub fn checkbox(name: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            label: label.into(),
+            kind: FormFieldKind::Checkbox,
+            required: false,
+            value: "false".to_string(),
+        }
+    }
+
+    pub fn dropdown(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        options: Vec<String>,
+    ) -> Self {
+        let initial = options.first().cloned().unwrap_or_default();
+        Self {
+            name: name.into(),
+            label: label.into(),
+            kind: FormFieldKind::Dropdown(options),
+            required: false,
+            value: initial,
+        }
+    }
+
+    pub fn required(mut self) -> Self {
+        self.required = true;
+        self
+    }
+
+    pub fn is_checked(&self) -> bool {
+        matches!(self.kind, FormFieldKind::Checkbox) && self.value == "true"
+    }
+
+    pub fn set_checked(&mut self, checked: bool) {
+        if matches!(self.kind, FormFieldKind::Checkbox) {
+            self.value = if checked { "true" } else { "false" }.to_string();
+        }
+    }
+}
+
+/// Multi-field form within a dialog with per-field validation.
+#[derive(Debug, Clone)]
+pub struct DialogFormFields {
+    fields: Vec<FormField>,
+    /// Index of the currently focused field.
+    focus_index: usize,
+}
+
+impl DialogFormFields {
+    pub fn new() -> Self {
+        Self {
+            fields: Vec::new(),
+            focus_index: 0,
+        }
+    }
+
+    pub fn add_field(&mut self, field: FormField) {
+        self.fields.push(field);
+    }
+
+    pub fn fields(&self) -> &[FormField] {
+        &self.fields
+    }
+
+    pub fn fields_mut(&mut self) -> &mut [FormField] {
+        &mut self.fields
+    }
+
+    pub fn field_by_name(&self, name: &str) -> Option<&FormField> {
+        self.fields.iter().find(|f| f.name == name)
+    }
+
+    pub fn field_by_name_mut(&mut self, name: &str) -> Option<&mut FormField> {
+        self.fields.iter_mut().find(|f| f.name == name)
+    }
+
+    pub fn set_value(&mut self, name: &str, value: impl Into<String>) -> bool {
+        if let Some(field) = self.field_by_name_mut(name) {
+            field.value = value.into();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn focus_index(&self) -> usize {
+        self.focus_index
+    }
+
+    pub fn focus_next(&mut self) {
+        if !self.fields.is_empty() {
+            self.focus_index = (self.focus_index + 1) % self.fields.len();
+        }
+    }
+
+    pub fn focus_prev(&mut self) {
+        if !self.fields.is_empty() {
+            self.focus_index = if self.focus_index == 0 {
+                self.fields.len() - 1
+            } else {
+                self.focus_index - 1
+            };
+        }
+    }
+
+    /// Validate all fields. Returns a map of field name → error message for
+    /// each field that fails validation.
+    pub fn validate(&self) -> HashMap<String, String> {
+        let mut errors = HashMap::new();
+        for field in &self.fields {
+            if field.required && field.value.is_empty() {
+                errors.insert(
+                    field.name.clone(),
+                    format!("{} is required", field.label),
+                );
+            }
+            if let FormFieldKind::Dropdown(ref opts) = field.kind {
+                if !field.value.is_empty() && !opts.contains(&field.value) {
+                    errors.insert(
+                        field.name.clone(),
+                        format!("'{}' is not a valid option", field.value),
+                    );
+                }
+            }
+        }
+        errors
+    }
+
+    /// Returns `true` when all fields pass validation.
+    pub fn is_valid(&self) -> bool {
+        self.validate().is_empty()
+    }
+
+    /// Collect all field values into a `HashMap`.
+    pub fn values(&self) -> HashMap<String, String> {
+        self.fields.iter().map(|f| (f.name.clone(), f.value.clone())).collect()
+    }
+}
+
+impl Default for DialogFormFields {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for DialogFormFields {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Form({} fields, focus={})", self.fields.len(), self.focus_index)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogProgressIndicator
+// ---------------------------------------------------------------------------
+
+/// Mode of the progress indicator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProgressMode {
+    /// A known percentage (0–100).
+    Determinate,
+    /// An unknown amount of work; show a spinner instead of a bar.
+    Indeterminate,
+}
+
+/// Shows progress within a dialog for async operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DialogProgressIndicator {
+    pub mode: ProgressMode,
+    /// Current percentage (0–100). Only meaningful in `Determinate` mode.
+    percentage: u8,
+    pub message: String,
+    pub completed: bool,
+}
+
+impl DialogProgressIndicator {
+    pub fn determinate(message: impl Into<String>) -> Self {
+        Self {
+            mode: ProgressMode::Determinate,
+            percentage: 0,
+            message: message.into(),
+            completed: false,
+        }
+    }
+
+    pub fn indeterminate(message: impl Into<String>) -> Self {
+        Self {
+            mode: ProgressMode::Indeterminate,
+            percentage: 0,
+            message: message.into(),
+            completed: false,
+        }
+    }
+
+    pub fn percentage(&self) -> u8 {
+        self.percentage
+    }
+
+    pub fn set_percentage(&mut self, pct: u8) {
+        self.percentage = pct.min(100);
+        if self.percentage == 100 {
+            self.completed = true;
+        }
+    }
+
+    pub fn set_message(&mut self, msg: impl Into<String>) {
+        self.message = msg.into();
+    }
+
+    pub fn finish(&mut self) {
+        self.percentage = 100;
+        self.completed = true;
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.completed
+    }
+
+    /// Render a simple text progress bar, e.g. `[████░░░░░░] 40%`.
+    pub fn render_bar(&self, width: usize) -> String {
+        match self.mode {
+            ProgressMode::Indeterminate => {
+                format!("[{}] ...", "~".repeat(width))
+            }
+            ProgressMode::Determinate => {
+                let filled = (self.percentage as usize * width) / 100;
+                let empty = width.saturating_sub(filled);
+                format!(
+                    "[{}{}] {}%",
+                    "█".repeat(filled),
+                    "░".repeat(empty),
+                    self.percentage,
+                )
+            }
+        }
+    }
+}
+
+impl fmt::Display for DialogProgressIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} – {}", self.render_bar(20), self.message)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogKeyboardShortcuts
+// ---------------------------------------------------------------------------
+
+/// An action that a keyboard shortcut can trigger within a dialog.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DialogAction {
+    Confirm,
+    Cancel,
+    NextField,
+    PrevField,
+    /// Activate button at this index.
+    SelectButton(usize),
+    /// A custom named action.
+    Custom(String),
+}
+
+impl fmt::Display for DialogAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DialogAction::Confirm => write!(f, "Confirm"),
+            DialogAction::Cancel => write!(f, "Cancel"),
+            DialogAction::NextField => write!(f, "Next Field"),
+            DialogAction::PrevField => write!(f, "Previous Field"),
+            DialogAction::SelectButton(i) => write!(f, "Select Button {i}"),
+            DialogAction::Custom(name) => write!(f, "Custom({name})"),
+        }
+    }
+}
+
+/// A keyboard event identifier (simplified).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum KeyEvent {
+    Char(char),
+    Enter,
+    Escape,
+    Tab,
+    BackTab,
+    F(u8),
+}
+
+impl fmt::Display for KeyEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyEvent::Char(c) => write!(f, "'{c}'"),
+            KeyEvent::Enter => write!(f, "Enter"),
+            KeyEvent::Escape => write!(f, "Escape"),
+            KeyEvent::Tab => write!(f, "Tab"),
+            KeyEvent::BackTab => write!(f, "Shift+Tab"),
+            KeyEvent::F(n) => write!(f, "F{n}"),
+        }
+    }
+}
+
+/// Maps keyboard events to dialog actions.
+#[derive(Debug, Clone)]
+pub struct DialogKeyboardShortcuts {
+    bindings: Vec<(KeyEvent, DialogAction)>,
+}
+
+impl DialogKeyboardShortcuts {
+    pub fn new() -> Self {
+        Self {
+            bindings: Vec::new(),
+        }
+    }
+
+    /// Create a shortcut map with sensible defaults:
+    /// Enter → Confirm, Escape → Cancel, Tab → NextField, BackTab → PrevField.
+    pub fn with_defaults() -> Self {
+        let mut s = Self::new();
+        s.bind(KeyEvent::Enter, DialogAction::Confirm);
+        s.bind(KeyEvent::Escape, DialogAction::Cancel);
+        s.bind(KeyEvent::Tab, DialogAction::NextField);
+        s.bind(KeyEvent::BackTab, DialogAction::PrevField);
+        s
+    }
+
+    pub fn bind(&mut self, key: KeyEvent, action: DialogAction) {
+        // Replace existing binding for the same key.
+        if let Some(existing) = self.bindings.iter_mut().find(|(k, _)| *k == key) {
+            existing.1 = action;
+        } else {
+            self.bindings.push((key, action));
+        }
+    }
+
+    pub fn unbind(&mut self, key: &KeyEvent) {
+        self.bindings.retain(|(k, _)| k != key);
+    }
+
+    pub fn lookup(&self, key: &KeyEvent) -> Option<&DialogAction> {
+        self.bindings.iter().find(|(k, _)| k == key).map(|(_, a)| a)
+    }
+
+    pub fn bindings(&self) -> &[(KeyEvent, DialogAction)] {
+        &self.bindings
+    }
+
+    pub fn binding_count(&self) -> usize {
+        self.bindings.len()
+    }
+
+    /// Return all keys that map to a given action.
+    pub fn keys_for_action(&self, action: &DialogAction) -> Vec<&KeyEvent> {
+        self.bindings
+            .iter()
+            .filter(|(_, a)| a == action)
+            .map(|(k, _)| k)
+            .collect()
+    }
+}
+
+impl Default for DialogKeyboardShortcuts {
+    fn default() -> Self {
+        Self::with_defaults()
+    }
+}
+
+impl fmt::Display for DialogKeyboardShortcuts {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Shortcuts({} bindings)", self.bindings.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1960,5 +2467,218 @@ mod tests {
         h.record("c", DialogKind::Info, DialogResult::selected("ok"));
         let infos = history_filter_by_kind(&h, DialogKind::Info);
         assert_eq!(infos.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // DialogButtonLayout tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn button_layout_total_width_empty() {
+        let layout = DialogButtonLayout::new(ButtonAlignment::Center);
+        assert_eq!(layout.total_width(), 0);
+    }
+
+    #[test]
+    fn button_layout_total_width_with_buttons() {
+        let mut layout = DialogButtonLayout::new(ButtonAlignment::Right).with_spacing(3);
+        layout.add_button(DialogButton::ok());       // label "OK" → 2 + 4 + 2 emphasis = 8
+        layout.add_button(DialogButton::cancel());   // label "Cancel" → 6 + 4 = 10
+        // 8 + 10 + 3 (one gap) = 21
+        assert_eq!(layout.total_width(), 21);
+    }
+
+    #[test]
+    fn button_layout_left_offset_left() {
+        let mut layout = DialogButtonLayout::new(ButtonAlignment::Left);
+        layout.add_button(DialogButton::ok());
+        assert_eq!(layout.left_offset(80), 0);
+    }
+
+    #[test]
+    fn button_layout_left_offset_center() {
+        let mut layout = DialogButtonLayout::new(ButtonAlignment::Center).with_emphasis(false);
+        layout.add_button(DialogButton::new("A", "a")); // 1+4=5
+        // total_width = 5, container=20, offset = (20-5)/2 = 7
+        assert_eq!(layout.left_offset(20), 7);
+    }
+
+    #[test]
+    fn button_layout_primary_index() {
+        let mut layout = DialogButtonLayout::new(ButtonAlignment::Right);
+        layout.add_button(DialogButton::cancel());
+        layout.add_button(DialogButton::ok());
+        assert_eq!(layout.primary_index(), Some(1));
+    }
+
+    #[test]
+    fn button_layout_display() {
+        let layout = DialogButtonLayout::new(ButtonAlignment::Left);
+        let s = format!("{layout}");
+        assert!(s.contains("left"));
+        assert!(s.contains("0 buttons"));
+    }
+
+    // -----------------------------------------------------------------------
+    // DialogFormFields tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn form_fields_validate_required_empty() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::text("name", "Name").required());
+        let errors = form.validate();
+        assert!(errors.contains_key("name"));
+    }
+
+    #[test]
+    fn form_fields_validate_passes_when_filled() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::text("name", "Name").required());
+        form.set_value("name", "Alice");
+        assert!(form.is_valid());
+    }
+
+    #[test]
+    fn form_fields_dropdown_invalid_option() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::dropdown(
+            "color",
+            "Colour",
+            vec!["red".into(), "blue".into()],
+        ));
+        form.set_value("color", "green");
+        let errors = form.validate();
+        assert!(errors.contains_key("color"));
+    }
+
+    #[test]
+    fn form_fields_focus_wraps() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::text("a", "A"));
+        form.add_field(FormField::text("b", "B"));
+        assert_eq!(form.focus_index(), 0);
+        form.focus_next();
+        assert_eq!(form.focus_index(), 1);
+        form.focus_next();
+        assert_eq!(form.focus_index(), 0); // wraps
+    }
+
+    #[test]
+    fn form_fields_focus_prev_wraps() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::text("a", "A"));
+        form.add_field(FormField::text("b", "B"));
+        form.focus_prev(); // wraps from 0 → 1
+        assert_eq!(form.focus_index(), 1);
+    }
+
+    #[test]
+    fn form_fields_checkbox_toggle() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::checkbox("agree", "I agree"));
+        let field = form.field_by_name_mut("agree").unwrap();
+        assert!(!field.is_checked());
+        field.set_checked(true);
+        assert!(field.is_checked());
+    }
+
+    #[test]
+    fn form_fields_values_map() {
+        let mut form = DialogFormFields::new();
+        form.add_field(FormField::text("x", "X"));
+        form.set_value("x", "hello");
+        let vals = form.values();
+        assert_eq!(vals.get("x").unwrap(), "hello");
+    }
+
+    // -----------------------------------------------------------------------
+    // DialogProgressIndicator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn progress_determinate_lifecycle() {
+        let mut p = DialogProgressIndicator::determinate("Loading");
+        assert_eq!(p.percentage(), 0);
+        assert!(!p.is_complete());
+        p.set_percentage(50);
+        assert_eq!(p.percentage(), 50);
+        p.finish();
+        assert!(p.is_complete());
+        assert_eq!(p.percentage(), 100);
+    }
+
+    #[test]
+    fn progress_clamps_at_100() {
+        let mut p = DialogProgressIndicator::determinate("test");
+        p.set_percentage(200);
+        assert_eq!(p.percentage(), 100);
+        assert!(p.is_complete());
+    }
+
+    #[test]
+    fn progress_indeterminate_render() {
+        let p = DialogProgressIndicator::indeterminate("Searching");
+        let bar = p.render_bar(10);
+        assert!(bar.contains("~~~~~~~~~~"));
+        assert!(bar.contains("..."));
+    }
+
+    #[test]
+    fn progress_determinate_render_bar() {
+        let mut p = DialogProgressIndicator::determinate("test");
+        p.set_percentage(50);
+        let bar = p.render_bar(10);
+        assert!(bar.contains("50%"));
+    }
+
+    // -----------------------------------------------------------------------
+    // DialogKeyboardShortcuts tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn shortcuts_defaults_enter_confirm() {
+        let shortcuts = DialogKeyboardShortcuts::with_defaults();
+        assert_eq!(
+            shortcuts.lookup(&KeyEvent::Enter),
+            Some(&DialogAction::Confirm),
+        );
+        assert_eq!(
+            shortcuts.lookup(&KeyEvent::Escape),
+            Some(&DialogAction::Cancel),
+        );
+    }
+
+    #[test]
+    fn shortcuts_bind_and_unbind() {
+        let mut shortcuts = DialogKeyboardShortcuts::new();
+        shortcuts.bind(KeyEvent::F(1), DialogAction::Custom("help".into()));
+        assert_eq!(
+            shortcuts.lookup(&KeyEvent::F(1)),
+            Some(&DialogAction::Custom("help".into())),
+        );
+        shortcuts.unbind(&KeyEvent::F(1));
+        assert!(shortcuts.lookup(&KeyEvent::F(1)).is_none());
+    }
+
+    #[test]
+    fn shortcuts_rebind_replaces() {
+        let mut shortcuts = DialogKeyboardShortcuts::new();
+        shortcuts.bind(KeyEvent::Enter, DialogAction::Confirm);
+        shortcuts.bind(KeyEvent::Enter, DialogAction::Cancel);
+        assert_eq!(
+            shortcuts.lookup(&KeyEvent::Enter),
+            Some(&DialogAction::Cancel),
+        );
+        assert_eq!(shortcuts.binding_count(), 1);
+    }
+
+    #[test]
+    fn shortcuts_keys_for_action() {
+        let mut shortcuts = DialogKeyboardShortcuts::new();
+        shortcuts.bind(KeyEvent::Enter, DialogAction::Confirm);
+        shortcuts.bind(KeyEvent::Char('y'), DialogAction::Confirm);
+        let keys = shortcuts.keys_for_action(&DialogAction::Confirm);
+        assert_eq!(keys.len(), 2);
     }
 }

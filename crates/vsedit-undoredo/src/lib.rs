@@ -1128,6 +1128,296 @@ impl fmt::Display for UndoStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UndoRedoSizeLimit – memory-aware undo management
+// ---------------------------------------------------------------------------
+
+/// Tracks memory usage of the undo/redo stack and enforces limits.
+#[derive(Debug, Clone)]
+pub struct UndoRedoSizeLimit {
+    /// Maximum memory budget in bytes.
+    pub max_bytes: usize,
+    /// Current estimated memory usage in bytes.
+    pub current_bytes: usize,
+    /// Number of entries evicted due to memory pressure.
+    pub eviction_count: usize,
+}
+
+impl UndoRedoSizeLimit {
+    pub fn new(max_bytes: usize) -> Self {
+        Self {
+            max_bytes,
+            current_bytes: 0,
+            eviction_count: 0,
+        }
+    }
+
+    /// Record that `size` bytes have been added.
+    pub fn record_add(&mut self, size: usize) {
+        self.current_bytes += size;
+    }
+
+    /// Record that `size` bytes have been removed.
+    pub fn record_remove(&mut self, size: usize) {
+        self.current_bytes = self.current_bytes.saturating_sub(size);
+    }
+
+    /// Whether the limit has been exceeded.
+    pub fn is_exceeded(&self) -> bool {
+        self.current_bytes > self.max_bytes
+    }
+
+    /// How many bytes remain before the limit is reached.
+    pub fn remaining(&self) -> usize {
+        self.max_bytes.saturating_sub(self.current_bytes)
+    }
+
+    /// Usage as a percentage 0.0..=100.0+.
+    pub fn usage_pct(&self) -> f64 {
+        if self.max_bytes == 0 {
+            return 100.0;
+        }
+        (self.current_bytes as f64 / self.max_bytes as f64) * 100.0
+    }
+
+    /// Record an eviction.
+    pub fn record_eviction(&mut self, freed_bytes: usize) {
+        self.record_remove(freed_bytes);
+        self.eviction_count += 1;
+    }
+}
+
+impl fmt::Display for UndoRedoSizeLimit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SizeLimit({}/{} bytes, {:.1}%, {} evictions)",
+            self.current_bytes, self.max_bytes, self.usage_pct(), self.eviction_count
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UndoRedoHistory – serializable undo history
+// ---------------------------------------------------------------------------
+
+/// A serializable snapshot of the undo/redo history.
+#[derive(Debug, Clone)]
+pub struct UndoRedoHistory {
+    /// Descriptions of undo entries (oldest first).
+    pub undo_descriptions: Vec<String>,
+    /// Descriptions of redo entries (oldest first).
+    pub redo_descriptions: Vec<String>,
+    /// Timestamp (epoch seconds) when the snapshot was taken.
+    pub snapshot_time: u64,
+}
+
+impl UndoRedoHistory {
+    pub fn new() -> Self {
+        Self {
+            undo_descriptions: Vec::new(),
+            redo_descriptions: Vec::new(),
+            snapshot_time: 0,
+        }
+    }
+
+    /// Total number of entries in the history.
+    pub fn total_entries(&self) -> usize {
+        self.undo_descriptions.len() + self.redo_descriptions.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.undo_descriptions.is_empty() && self.redo_descriptions.is_empty()
+    }
+
+    /// Serialize to a simple text format: one description per line, section-separated.
+    pub fn serialize(&self) -> String {
+        let mut out = String::new();
+        out.push_str("[undo]\n");
+        for d in &self.undo_descriptions {
+            out.push_str(d);
+            out.push('\n');
+        }
+        out.push_str("[redo]\n");
+        for d in &self.redo_descriptions {
+            out.push_str(d);
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Deserialize from the text format produced by `serialize`.
+    pub fn deserialize(input: &str) -> Self {
+        let mut history = Self::new();
+        let mut in_redo = false;
+        for line in input.lines() {
+            let trimmed = line.trim();
+            if trimmed == "[undo]" {
+                in_redo = false;
+            } else if trimmed == "[redo]" {
+                in_redo = true;
+            } else if !trimmed.is_empty() {
+                if in_redo {
+                    history.redo_descriptions.push(trimmed.to_string());
+                } else {
+                    history.undo_descriptions.push(trimmed.to_string());
+                }
+            }
+        }
+        history
+    }
+}
+
+impl Default for UndoRedoHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for UndoRedoHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UndoRedoHistory(undo={}, redo={})",
+            self.undo_descriptions.len(),
+            self.redo_descriptions.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Undo branch navigation
+// ---------------------------------------------------------------------------
+
+/// A branch in the undo tree. Each branch has a parent index and a list of entries.
+#[derive(Debug, Clone)]
+pub struct UndoBranch {
+    pub id: u32,
+    pub parent_id: Option<u32>,
+    pub entries: Vec<String>,
+}
+
+impl UndoBranch {
+    pub fn new(id: u32, parent_id: Option<u32>) -> Self {
+        Self {
+            id,
+            parent_id,
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, entry: String) {
+        self.entries.push(entry);
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+/// Navigator for undo branches (tree-structured undo).
+#[derive(Debug, Clone)]
+pub struct UndoBranchNavigator {
+    branches: Vec<UndoBranch>,
+    active_branch: u32,
+    next_id: u32,
+}
+
+impl UndoBranchNavigator {
+    pub fn new() -> Self {
+        let root = UndoBranch::new(0, None);
+        Self {
+            branches: vec![root],
+            active_branch: 0,
+            next_id: 1,
+        }
+    }
+
+    /// Create a new branch from the current active branch.
+    pub fn fork(&mut self) -> u32 {
+        let id = self.next_id;
+        self.next_id += 1;
+        let branch = UndoBranch::new(id, Some(self.active_branch));
+        self.branches.push(branch);
+        self.active_branch = id;
+        id
+    }
+
+    /// Switch to a different branch by ID.
+    pub fn switch_to(&mut self, branch_id: u32) -> bool {
+        if self.branches.iter().any(|b| b.id == branch_id) {
+            self.active_branch = branch_id;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Push an entry onto the active branch.
+    pub fn push_entry(&mut self, entry: String) {
+        if let Some(b) = self.branches.iter_mut().find(|b| b.id == self.active_branch) {
+            b.push(entry);
+        }
+    }
+
+    /// Get the active branch.
+    pub fn active(&self) -> Option<&UndoBranch> {
+        self.branches.iter().find(|b| b.id == self.active_branch)
+    }
+
+    /// Total number of branches.
+    pub fn branch_count(&self) -> usize {
+        self.branches.len()
+    }
+
+    /// List all branch IDs.
+    pub fn branch_ids(&self) -> Vec<u32> {
+        self.branches.iter().map(|b| b.id).collect()
+    }
+
+    /// Get the parent chain of the active branch.
+    pub fn ancestry(&self) -> Vec<u32> {
+        let mut chain = Vec::new();
+        let mut current = self.active_branch;
+        loop {
+            chain.push(current);
+            if let Some(b) = self.branches.iter().find(|b| b.id == current) {
+                if let Some(parent) = b.parent_id {
+                    current = parent;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        chain.reverse();
+        chain
+    }
+}
+
+impl Default for UndoBranchNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for UndoBranchNavigator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UndoBranchNavigator(branches={}, active={})",
+            self.branches.len(),
+            self.active_branch
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1924,5 +2214,123 @@ mod tests {
 
         let capped: UndoRedoStack<i32> = UndoRedoStack::with_capacity(5);
         assert!(capped.stats().has_capacity_limit);
+    }
+
+    // -- UndoRedoSizeLimit -------------------------------------------------
+
+    #[test]
+    fn size_limit_basic() {
+        let mut sl = UndoRedoSizeLimit::new(1024);
+        assert!(!sl.is_exceeded());
+        assert_eq!(sl.remaining(), 1024);
+        sl.record_add(512);
+        assert_eq!(sl.remaining(), 512);
+        assert!(!sl.is_exceeded());
+        assert!((sl.usage_pct() - 50.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn size_limit_exceeded() {
+        let mut sl = UndoRedoSizeLimit::new(100);
+        sl.record_add(150);
+        assert!(sl.is_exceeded());
+    }
+
+    #[test]
+    fn size_limit_eviction() {
+        let mut sl = UndoRedoSizeLimit::new(100);
+        sl.record_add(80);
+        sl.record_eviction(50);
+        assert_eq!(sl.current_bytes, 30);
+        assert_eq!(sl.eviction_count, 1);
+    }
+
+    #[test]
+    fn size_limit_display() {
+        let sl = UndoRedoSizeLimit::new(1000);
+        let s = format!("{sl}");
+        assert!(s.contains("1000"));
+        assert!(s.contains("evictions"));
+    }
+
+    // -- UndoRedoHistory ---------------------------------------------------
+
+    #[test]
+    fn history_serialize_deserialize() {
+        let mut h = UndoRedoHistory::new();
+        h.undo_descriptions.push("insert text".into());
+        h.undo_descriptions.push("delete line".into());
+        h.redo_descriptions.push("paste".into());
+
+        let serialized = h.serialize();
+        let restored = UndoRedoHistory::deserialize(&serialized);
+        assert_eq!(restored.undo_descriptions, h.undo_descriptions);
+        assert_eq!(restored.redo_descriptions, h.redo_descriptions);
+    }
+
+    #[test]
+    fn history_total_and_empty() {
+        let h = UndoRedoHistory::new();
+        assert!(h.is_empty());
+        assert_eq!(h.total_entries(), 0);
+    }
+
+    #[test]
+    fn history_display() {
+        let h = UndoRedoHistory::default();
+        let s = format!("{h}");
+        assert!(s.contains("undo=0"));
+    }
+
+    // -- UndoBranchNavigator -----------------------------------------------
+
+    #[test]
+    fn branch_navigator_new_has_root() {
+        let nav = UndoBranchNavigator::new();
+        assert_eq!(nav.branch_count(), 1);
+        assert_eq!(nav.active().unwrap().id, 0);
+    }
+
+    #[test]
+    fn branch_navigator_fork() {
+        let mut nav = UndoBranchNavigator::new();
+        nav.push_entry("edit1".into());
+        let branch_id = nav.fork();
+        assert_eq!(nav.branch_count(), 2);
+        assert_eq!(nav.active().unwrap().id, branch_id);
+        nav.push_entry("edit2".into());
+        assert_eq!(nav.active().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn branch_navigator_switch() {
+        let mut nav = UndoBranchNavigator::new();
+        let _b1 = nav.fork();
+        assert!(nav.switch_to(0));
+        assert_eq!(nav.active().unwrap().id, 0);
+        assert!(!nav.switch_to(999));
+    }
+
+    #[test]
+    fn branch_navigator_ancestry() {
+        let mut nav = UndoBranchNavigator::new();
+        let b1 = nav.fork();
+        let _b2 = nav.fork();
+        let ancestry = nav.ancestry();
+        assert_eq!(ancestry, vec![0, b1, _b2]);
+    }
+
+    #[test]
+    fn branch_navigator_display() {
+        let nav = UndoBranchNavigator::default();
+        let s = format!("{nav}");
+        assert!(s.contains("branches=1"));
+    }
+
+    #[test]
+    fn branch_is_empty() {
+        let b = UndoBranch::new(0, None);
+        assert!(b.is_empty());
+        assert_eq!(b.len(), 0);
     }
 }

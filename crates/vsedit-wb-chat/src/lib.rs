@@ -1249,6 +1249,213 @@ impl<'a> ChatSessionExporter<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatWelcomeView – quick start actions for new sessions
+// ---------------------------------------------------------------------------
+
+/// An action displayed on the chat welcome screen.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatWelcomeAction {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub icon: String,
+}
+
+impl ChatWelcomeAction {
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        description: impl Into<String>,
+        icon: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            description: description.into(),
+            icon: icon.into(),
+        }
+    }
+}
+
+impl fmt::Display for ChatWelcomeAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.icon, self.label)
+    }
+}
+
+/// The welcome view displayed when no chat session is active.
+#[derive(Debug, Clone)]
+pub struct ChatWelcomeView {
+    pub title: String,
+    pub subtitle: String,
+    pub actions: Vec<ChatWelcomeAction>,
+}
+
+impl ChatWelcomeView {
+    pub fn new(title: impl Into<String>, subtitle: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            subtitle: subtitle.into(),
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn add_action(&mut self, action: ChatWelcomeAction) {
+        self.actions.push(action);
+    }
+
+    /// Build a default welcome view.
+    pub fn default_view() -> Self {
+        let mut v = Self::new("Welcome to Chat", "How can I help you today?");
+        v.add_action(ChatWelcomeAction::new("explain", "Explain Code", "Get an explanation of selected code", "💡"));
+        v.add_action(ChatWelcomeAction::new("generate", "Generate Code", "Generate code from a description", "⚡"));
+        v.add_action(ChatWelcomeAction::new("fix", "Fix Issues", "Find and fix problems in code", "🔧"));
+        v
+    }
+
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatCodeBlock – syntax highlighted code in chat
+// ---------------------------------------------------------------------------
+
+/// A code block displayed in a chat message.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatCodeBlock {
+    pub code: String,
+    pub language: String,
+    pub line_count: usize,
+    pub copyable: bool,
+    pub insertable: bool,
+}
+
+impl ChatCodeBlock {
+    pub fn new(code: impl Into<String>, language: impl Into<String>) -> Self {
+        let code = code.into();
+        let line_count = code.lines().count().max(1);
+        Self {
+            code,
+            language: language.into(),
+            line_count,
+            copyable: true,
+            insertable: true,
+        }
+    }
+
+    /// Format as a markdown fenced code block.
+    pub fn to_markdown(&self) -> String {
+        format!("```{}\n{}\n```", self.language, self.code)
+    }
+
+    /// Extract from a markdown code block string.
+    pub fn from_markdown(markdown: &str) -> Option<Self> {
+        let trimmed = markdown.trim();
+        if !trimmed.starts_with("```") || !trimmed.ends_with("```") {
+            return None;
+        }
+        let inner = &trimmed[3..trimmed.len() - 3];
+        let (lang, code) = match inner.find('\n') {
+            Some(pos) => (inner[..pos].trim(), inner[pos + 1..].trim()),
+            None => ("", inner),
+        };
+        Some(Self::new(code, lang))
+    }
+}
+
+impl fmt::Display for ChatCodeBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_markdown())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatUserInputHandler – slash command parsing
+// ---------------------------------------------------------------------------
+
+/// A parsed user input with optional slash command.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParsedChatInput {
+    pub command: Option<String>,
+    pub argument: String,
+    pub mentions: Vec<String>,
+}
+
+/// Parses user input text, extracting slash commands and @mentions.
+pub struct ChatUserInputHandler;
+
+impl ChatUserInputHandler {
+    /// Parse user input text.
+    pub fn parse(input: &str) -> ParsedChatInput {
+        let trimmed = input.trim();
+        let (command, rest) = if trimmed.starts_with('/') {
+            match trimmed.find(' ') {
+                Some(pos) => (Some(trimmed[1..pos].to_string()), trimmed[pos + 1..].trim()),
+                None => (Some(trimmed[1..].to_string()), ""),
+            }
+        } else {
+            (None, trimmed)
+        };
+
+        let mentions: Vec<String> = rest
+            .split_whitespace()
+            .filter(|w| w.starts_with('@'))
+            .map(|w| w[1..].to_string())
+            .collect();
+
+        ParsedChatInput {
+            command,
+            argument: rest.to_string(),
+            mentions,
+        }
+    }
+
+    /// Check if input starts with a slash command.
+    pub fn is_command(input: &str) -> bool {
+        input.trim().starts_with('/')
+    }
+
+    /// Extract just the command name from input, if present.
+    pub fn command_name(input: &str) -> Option<String> {
+        let parsed = Self::parse(input);
+        parsed.command
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatSessionExportFormat – session export in multiple formats
+// ---------------------------------------------------------------------------
+
+/// Format for exporting a chat session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChatExportFormat {
+    Markdown,
+    JsonLines,
+    PlainText,
+}
+
+impl fmt::Display for ChatExportFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Markdown => write!(f, "Markdown"),
+            Self::JsonLines => write!(f, "JSON Lines"),
+            Self::PlainText => write!(f, "Plain Text"),
+        }
+    }
+}
+
+/// Export chat messages in plain text format.
+pub fn export_plain_text(messages: &[ChatMessage]) -> String {
+    let mut buf = String::new();
+    for msg in messages {
+        buf.push_str(&format!("[{}] {}\n", msg.role, msg.content));
+    }
+    buf
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1994,5 +2201,119 @@ mod tests {
         let jl = ChatSessionExporter::new("t", &messages, &[]).to_json_lines();
         assert!(jl.contains(r#"\"hi\""#));
         assert!(jl.contains("\"timestamp\":5"));
+    }
+
+    // -- ChatWelcomeView tests --
+
+    #[test]
+    fn welcome_view_default() {
+        let wv = ChatWelcomeView::default_view();
+        assert_eq!(wv.title, "Welcome to Chat");
+        assert!(wv.action_count() >= 3);
+    }
+
+    #[test]
+    fn welcome_action_display() {
+        let action = ChatWelcomeAction::new("fix", "Fix", "Fix stuff", "🔧");
+        assert_eq!(format!("{}", action), "🔧 Fix");
+    }
+
+    #[test]
+    fn welcome_view_custom() {
+        let mut wv = ChatWelcomeView::new("Hello", "Start chatting");
+        wv.add_action(ChatWelcomeAction::new("a", "Action", "Do stuff", "⚡"));
+        assert_eq!(wv.action_count(), 1);
+    }
+
+    // -- ChatCodeBlock tests --
+
+    #[test]
+    fn code_block_to_markdown() {
+        let cb = ChatCodeBlock::new("let x = 42;", "rust");
+        let md = cb.to_markdown();
+        assert!(md.starts_with("```rust"));
+        assert!(md.contains("let x = 42;"));
+        assert!(md.ends_with("```"));
+    }
+
+    #[test]
+    fn code_block_from_markdown() {
+        let md = "```python\nprint('hello')\n```";
+        let cb = ChatCodeBlock::from_markdown(md).unwrap();
+        assert_eq!(cb.language, "python");
+        assert!(cb.code.contains("print"));
+    }
+
+    #[test]
+    fn code_block_from_markdown_invalid() {
+        assert!(ChatCodeBlock::from_markdown("not a code block").is_none());
+    }
+
+    #[test]
+    fn code_block_line_count() {
+        let cb = ChatCodeBlock::new("a\nb\nc", "txt");
+        assert_eq!(cb.line_count, 3);
+    }
+
+    #[test]
+    fn code_block_display() {
+        let cb = ChatCodeBlock::new("x", "js");
+        let s = format!("{}", cb);
+        assert!(s.contains("```js"));
+    }
+
+    // -- ChatUserInputHandler tests --
+
+    #[test]
+    fn parse_slash_command() {
+        let parsed = ChatUserInputHandler::parse("/explain this code");
+        assert_eq!(parsed.command, Some("explain".into()));
+        assert_eq!(parsed.argument, "this code");
+    }
+
+    #[test]
+    fn parse_no_command() {
+        let parsed = ChatUserInputHandler::parse("just a question");
+        assert!(parsed.command.is_none());
+        assert_eq!(parsed.argument, "just a question");
+    }
+
+    #[test]
+    fn parse_mentions() {
+        let parsed = ChatUserInputHandler::parse("@copilot what does @workspace do?");
+        assert_eq!(parsed.mentions, vec!["copilot", "workspace"]);
+    }
+
+    #[test]
+    fn is_command_check() {
+        assert!(ChatUserInputHandler::is_command("/fix"));
+        assert!(!ChatUserInputHandler::is_command("hello"));
+    }
+
+    #[test]
+    fn command_name_extraction() {
+        assert_eq!(ChatUserInputHandler::command_name("/help"), Some("help".into()));
+        assert_eq!(ChatUserInputHandler::command_name("no command"), None);
+    }
+
+    // -- Export tests --
+
+    #[test]
+    fn export_format_display() {
+        assert_eq!(format!("{}", ChatExportFormat::Markdown), "Markdown");
+        assert_eq!(format!("{}", ChatExportFormat::PlainText), "Plain Text");
+    }
+
+    #[test]
+    fn export_plain_text_format() {
+        let messages = vec![
+            ChatMessage { role: MessageRole::User, content: "hello".into(), timestamp: 1 },
+            ChatMessage { role: MessageRole::Assistant, content: "hi!".into(), timestamp: 2 },
+        ];
+        let text = export_plain_text(&messages);
+        assert!(text.contains("[user]"));
+        assert!(text.contains("[assistant]"));
+        assert!(text.contains("hello"));
+        assert!(text.contains("hi!"));
     }
 }

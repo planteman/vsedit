@@ -1100,6 +1100,268 @@ fn collect_outline_chain(entries: &[OutlineEntry], line: u32, path: &mut Breadcr
     }
 }
 
+// ---------------------------------------------------------------------------
+// BreadcrumbPicker – dropdown selection at a breadcrumb segment
+// ---------------------------------------------------------------------------
+
+/// An item in the breadcrumb picker dropdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreadcrumbPickerItem {
+    pub label: String,
+    pub kind: BreadcrumbKind,
+    pub is_selected: bool,
+}
+
+/// Dropdown picker for selecting among siblings at a breadcrumb segment.
+#[derive(Debug, Clone)]
+pub struct BreadcrumbPicker {
+    items: Vec<BreadcrumbPickerItem>,
+    active_index: Option<usize>,
+    filter_text: String,
+}
+
+impl BreadcrumbPicker {
+    pub fn new(items: Vec<BreadcrumbPickerItem>) -> Self {
+        Self {
+            items,
+            active_index: None,
+            filter_text: String::new(),
+        }
+    }
+
+    /// Set the filter text and return filtered indices.
+    pub fn set_filter(&mut self, text: &str) -> usize {
+        self.filter_text = text.to_lowercase();
+        self.active_index = None;
+        self.filtered_items().len()
+    }
+
+    /// Get items matching the current filter.
+    pub fn filtered_items(&self) -> Vec<&BreadcrumbPickerItem> {
+        if self.filter_text.is_empty() {
+            self.items.iter().collect()
+        } else {
+            self.items.iter()
+                .filter(|item| item.label.to_lowercase().contains(&self.filter_text))
+                .collect()
+        }
+    }
+
+    /// Move selection down.
+    pub fn select_next(&mut self) {
+        let count = self.filtered_items().len();
+        if count == 0 { return; }
+        self.active_index = Some(match self.active_index {
+            Some(i) => (i + 1) % count,
+            None => 0,
+        });
+    }
+
+    /// Move selection up.
+    pub fn select_previous(&mut self) {
+        let count = self.filtered_items().len();
+        if count == 0 { return; }
+        self.active_index = Some(match self.active_index {
+            Some(0) | None => count.saturating_sub(1),
+            Some(i) => i - 1,
+        });
+    }
+
+    /// Get the currently selected item.
+    pub fn selected(&self) -> Option<&BreadcrumbPickerItem> {
+        let filtered = self.filtered_items();
+        self.active_index.and_then(|i| filtered.get(i).copied())
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl fmt::Display for BreadcrumbPicker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BreadcrumbPicker({} items)", self.items.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BreadcrumbSymbolResolver – resolves symbols for breadcrumb display
+// ---------------------------------------------------------------------------
+
+/// Resolves document symbols into breadcrumb elements.
+#[derive(Debug, Clone)]
+pub struct BreadcrumbSymbolResolver {
+    /// Map from kind to icon character.
+    icons: Vec<(BreadcrumbKind, char)>,
+}
+
+impl BreadcrumbSymbolResolver {
+    pub fn new() -> Self {
+        Self {
+            icons: vec![
+                (BreadcrumbKind::Function, 'ƒ'),
+                (BreadcrumbKind::Class, '◆'),
+                (BreadcrumbKind::Method, '▸'),
+                (BreadcrumbKind::Module, '◇'),
+                (BreadcrumbKind::Enum, '◈'),
+                (BreadcrumbKind::Interface, '○'),
+                (BreadcrumbKind::Property, '◻'),
+            ],
+        }
+    }
+
+    /// Get the icon for a given kind.
+    pub fn icon_for(&self, kind: &BreadcrumbKind) -> char {
+        self.icons.iter()
+            .find(|(k, _)| k == kind)
+            .map(|(_, icon)| *icon)
+            .unwrap_or('·')
+    }
+
+    /// Resolve a symbol name and kind into a breadcrumb element.
+    pub fn resolve(&self, name: &str, kind: BreadcrumbKind, line: Option<u32>) -> BreadcrumbElement {
+        BreadcrumbElement {
+            label: name.to_string(),
+            kind,
+            uri: None,
+            range_start_line: line,
+        }
+    }
+
+    /// Format a breadcrumb element with its icon.
+    pub fn format_with_icon(&self, element: &BreadcrumbElement) -> String {
+        let icon = self.icon_for(&element.kind);
+        format!("{icon} {}", element.label)
+    }
+}
+
+impl Default for BreadcrumbSymbolResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for BreadcrumbSymbolResolver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BreadcrumbSymbolResolver({} icons)", self.icons.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb path truncation with ellipsis
+// ---------------------------------------------------------------------------
+
+/// Truncate a breadcrumb path to fit within `max_segments`, adding ellipsis element.
+pub fn truncate_breadcrumb_elements(path: &BreadcrumbPath, max_segments: usize) -> BreadcrumbPath {
+    if path.elements.len() <= max_segments || max_segments < 2 {
+        return path.clone();
+    }
+    let mut result = BreadcrumbPath::new();
+    // Keep first element
+    result.push(path.elements[0].clone());
+    // Add ellipsis element
+    result.push(BreadcrumbElement {
+        label: "…".to_string(),
+        kind: BreadcrumbKind::File,
+        uri: None,
+        range_start_line: None,
+    });
+    // Keep last (max_segments - 2) elements
+    let keep_from = path.elements.len() - (max_segments - 2);
+    for elem in &path.elements[keep_from..] {
+        result.push(elem.clone());
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb focus/keyboard navigation
+// ---------------------------------------------------------------------------
+
+/// Manages focus state for breadcrumb keyboard navigation.
+#[derive(Debug, Clone)]
+pub struct BreadcrumbFocusNavigator {
+    segment_count: usize,
+    focused_index: Option<usize>,
+    is_picker_open: bool,
+}
+
+impl BreadcrumbFocusNavigator {
+    pub fn new(segment_count: usize) -> Self {
+        Self {
+            segment_count,
+            focused_index: None,
+            is_picker_open: false,
+        }
+    }
+
+    /// Focus the next segment (right arrow).
+    pub fn focus_next(&mut self) {
+        if self.segment_count == 0 { return; }
+        self.focused_index = Some(match self.focused_index {
+            Some(i) if i + 1 < self.segment_count => i + 1,
+            _ => 0,
+        });
+    }
+
+    /// Focus the previous segment (left arrow).
+    pub fn focus_previous(&mut self) {
+        if self.segment_count == 0 { return; }
+        self.focused_index = Some(match self.focused_index {
+            Some(0) | None => self.segment_count.saturating_sub(1),
+            Some(i) => i - 1,
+        });
+    }
+
+    /// Toggle the picker for the focused segment.
+    pub fn toggle_picker(&mut self) {
+        self.is_picker_open = !self.is_picker_open;
+    }
+
+    pub fn focused_index(&self) -> Option<usize> {
+        self.focused_index
+    }
+
+    pub fn is_picker_open(&self) -> bool {
+        self.is_picker_open
+    }
+
+    /// Blur (unfocus) the breadcrumb bar.
+    pub fn blur(&mut self) {
+        self.focused_index = None;
+        self.is_picker_open = false;
+    }
+
+    /// Whether any segment is focused.
+    pub fn is_focused(&self) -> bool {
+        self.focused_index.is_some()
+    }
+
+    /// Update the segment count (e.g., when path changes).
+    pub fn update_count(&mut self, count: usize) {
+        self.segment_count = count;
+        if let Some(idx) = self.focused_index {
+            if idx >= count {
+                self.focused_index = if count > 0 { Some(count - 1) } else { None };
+            }
+        }
+    }
+}
+
+impl fmt::Display for BreadcrumbFocusNavigator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BreadcrumbFocus(segments={}, focused={:?})",
+            self.segment_count, self.focused_index
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1938,5 +2200,130 @@ mod tests {
         // Cursor outside any symbol
         let empty = breadcrumbs_from_outline(&outline, 200);
         assert!(empty.is_empty());
+    }
+
+    // -- BreadcrumbPicker --------------------------------------------------
+
+    #[test]
+    fn picker_filter() {
+        let items = vec![
+            BreadcrumbPickerItem { label: "main.rs".into(), kind: BreadcrumbKind::File, is_selected: false },
+            BreadcrumbPickerItem { label: "lib.rs".into(), kind: BreadcrumbKind::File, is_selected: false },
+            BreadcrumbPickerItem { label: "mod.rs".into(), kind: BreadcrumbKind::File, is_selected: false },
+        ];
+        let mut picker = BreadcrumbPicker::new(items);
+        let count = picker.set_filter("main");
+        assert_eq!(count, 1);
+        assert_eq!(picker.filtered_items()[0].label, "main.rs");
+    }
+
+    #[test]
+    fn picker_navigation() {
+        let items = vec![
+            BreadcrumbPickerItem { label: "a".into(), kind: BreadcrumbKind::File, is_selected: false },
+            BreadcrumbPickerItem { label: "b".into(), kind: BreadcrumbKind::File, is_selected: false },
+        ];
+        let mut picker = BreadcrumbPicker::new(items);
+        picker.select_next();
+        assert_eq!(picker.selected().unwrap().label, "a");
+        picker.select_next();
+        assert_eq!(picker.selected().unwrap().label, "b");
+    }
+
+    #[test]
+    fn picker_display() {
+        let picker = BreadcrumbPicker::new(Vec::new());
+        assert!(format!("{picker}").contains("0 items"));
+    }
+
+    // -- BreadcrumbSymbolResolver ------------------------------------------
+
+    #[test]
+    fn symbol_resolver_icon() {
+        let r = BreadcrumbSymbolResolver::new();
+        assert_eq!(r.icon_for(&BreadcrumbKind::Function), 'ƒ');
+        assert_eq!(r.icon_for(&BreadcrumbKind::File), '·'); // fallback
+    }
+
+    #[test]
+    fn symbol_resolver_format() {
+        let r = BreadcrumbSymbolResolver::new();
+        let elem = r.resolve("main", BreadcrumbKind::Function, Some(1));
+        let formatted = r.format_with_icon(&elem);
+        assert!(formatted.contains("ƒ"));
+        assert!(formatted.contains("main"));
+    }
+
+    #[test]
+    fn symbol_resolver_display() {
+        let r = BreadcrumbSymbolResolver::default();
+        assert!(format!("{r}").contains("icons"));
+    }
+
+    // -- truncate_breadcrumb_elements --------------------------------------
+
+    #[test]
+    fn truncate_elements_short_enough() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("a", BreadcrumbKind::Folder));
+        path.push(sample_element("b", BreadcrumbKind::File));
+        let truncated = truncate_breadcrumb_elements(&path, 5);
+        assert_eq!(truncated.len(), 2);
+    }
+
+    #[test]
+    fn truncate_elements_with_ellipsis() {
+        let mut path = BreadcrumbPath::new();
+        for i in 0..6 {
+            path.push(sample_element(&format!("seg{i}"), BreadcrumbKind::Folder));
+        }
+        let truncated = truncate_breadcrumb_elements(&path, 4);
+        assert_eq!(truncated.elements[1].label, "…");
+        assert_eq!(truncated.len(), 4);
+    }
+
+    // -- BreadcrumbFocusNavigator ------------------------------------------
+
+    #[test]
+    fn focus_navigator_next_previous() {
+        let mut nav = BreadcrumbFocusNavigator::new(3);
+        nav.focus_next();
+        assert_eq!(nav.focused_index(), Some(0));
+        nav.focus_next();
+        assert_eq!(nav.focused_index(), Some(1));
+        nav.focus_previous();
+        assert_eq!(nav.focused_index(), Some(0));
+    }
+
+    #[test]
+    fn focus_navigator_blur() {
+        let mut nav = BreadcrumbFocusNavigator::new(3);
+        nav.focus_next();
+        nav.blur();
+        assert!(!nav.is_focused());
+    }
+
+    #[test]
+    fn focus_navigator_toggle_picker() {
+        let mut nav = BreadcrumbFocusNavigator::new(3);
+        assert!(!nav.is_picker_open());
+        nav.toggle_picker();
+        assert!(nav.is_picker_open());
+    }
+
+    #[test]
+    fn focus_navigator_update_count() {
+        let mut nav = BreadcrumbFocusNavigator::new(5);
+        nav.focus_next();
+        nav.focus_next();
+        nav.focus_next();
+        nav.update_count(2);
+        assert_eq!(nav.focused_index(), Some(1));
+    }
+
+    #[test]
+    fn focus_navigator_display() {
+        let nav = BreadcrumbFocusNavigator::new(3);
+        assert!(format!("{nav}").contains("segments=3"));
     }
 }

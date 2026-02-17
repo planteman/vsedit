@@ -1108,6 +1108,186 @@ impl TimelineThemeResolver {
     }
 }
 
+// ── Filtering ──
+
+/// Filter criteria for narrowing down timeline items.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TimelineFilter {
+    pub start_timestamp: Option<u64>,
+    pub end_timestamp: Option<u64>,
+    pub provider_ids: Vec<String>,
+    pub label_contains: Option<String>,
+}
+
+impl TimelineFilter {
+    /// Returns `true` when `item` satisfies every active criterion.
+    pub fn matches(&self, item: &TimelineItem) -> bool {
+        if let Some(start) = self.start_timestamp {
+            if item.timestamp < start {
+                return false;
+            }
+        }
+        if let Some(end) = self.end_timestamp {
+            if item.timestamp > end {
+                return false;
+            }
+        }
+        if let Some(ref needle) = self.label_contains {
+            if !item.label.to_lowercase().contains(&needle.to_lowercase()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Return only the items that match this filter.
+    pub fn apply(&self, items: &[TimelineItem]) -> Vec<TimelineItem> {
+        items.iter().filter(|i| self.matches(i)).cloned().collect()
+    }
+}
+
+// ── Grouping ──
+
+/// A group of timeline items sharing a common key.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimelineGroup {
+    pub key: String,
+    pub items: Vec<TimelineItem>,
+}
+
+/// Strategy for grouping timeline items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TimelineGrouper {
+    ByDate,
+    ByAuthor,
+    ByProvider,
+}
+
+impl TimelineGrouper {
+    /// Group `items` according to the selected strategy.
+    ///
+    /// * `ByDate` – groups by day (seconds divided into 86 400-second buckets).
+    /// * `ByAuthor` – groups by the item label (first whitespace-delimited token).
+    /// * `ByProvider` – groups items by matching provider id; items are matched
+    ///   to a provider whose scheme appears as a prefix of the item id.
+    pub fn group(
+        &self,
+        items: &[TimelineItem],
+        providers: &[TimelineProvider],
+    ) -> Vec<TimelineGroup> {
+        let mut map: HashMap<String, Vec<TimelineItem>> = HashMap::new();
+        for item in items {
+            let key = match self {
+                Self::ByDate => {
+                    let day = item.timestamp / 86_400;
+                    format!("day-{day}")
+                }
+                Self::ByAuthor => item
+                    .label
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("unknown")
+                    .to_string(),
+                Self::ByProvider => providers
+                    .iter()
+                    .find(|p| item.id.starts_with(&p.scheme))
+                    .map(|p| p.id.clone())
+                    .unwrap_or_else(|| "unassigned".to_string()),
+            };
+            map.entry(key).or_default().push(item.clone());
+        }
+        let mut groups: Vec<TimelineGroup> = map
+            .into_iter()
+            .map(|(key, items)| TimelineGroup { key, items })
+            .collect();
+        groups.sort_by(|a, b| a.key.cmp(&b.key));
+        groups
+    }
+}
+
+// ── Change detection ──
+
+/// Result of comparing two `TimelineItem` instances field-by-field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineEntryDiff {
+    pub label_changed: bool,
+    pub description_changed: bool,
+    pub timestamp_changed: bool,
+    pub icon_changed: bool,
+}
+
+/// Compares two timeline items and reports which fields differ.
+pub struct TimelineEntryComparator;
+
+impl TimelineEntryComparator {
+    pub fn compare(a: &TimelineItem, b: &TimelineItem) -> TimelineEntryDiff {
+        TimelineEntryDiff {
+            label_changed: a.label != b.label,
+            description_changed: a.description != b.description,
+            timestamp_changed: a.timestamp != b.timestamp,
+            icon_changed: a.icon_id != b.icon_id,
+        }
+    }
+}
+
+// ── Export ──
+
+/// Supported serialisation formats for timeline data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimelineExportFormat {
+    Json,
+    Csv,
+    Markdown,
+}
+
+impl TimelineExportFormat {
+    /// Serialise `items` into the chosen format.
+    pub fn export(&self, items: &[TimelineItem]) -> String {
+        match self {
+            Self::Json => serde_json::to_string_pretty(items).unwrap_or_default(),
+            Self::Csv => {
+                let mut out = String::from("id,label,description,timestamp,icon_id,command\n");
+                for item in items {
+                    out.push_str(&format!(
+                        "{},{},{},{},{},{}\n",
+                        item.id,
+                        item.label,
+                        item.description.as_deref().unwrap_or(""),
+                        item.timestamp,
+                        item.icon_id.as_deref().unwrap_or(""),
+                        item.command.as_deref().unwrap_or(""),
+                    ));
+                }
+                out
+            }
+            Self::Markdown => {
+                let mut out =
+                    String::from("| id | label | description | timestamp |\n|---|---|---|---|\n");
+                for item in items {
+                    out.push_str(&format!(
+                        "| {} | {} | {} | {} |\n",
+                        item.id,
+                        item.label,
+                        item.description.as_deref().unwrap_or("—"),
+                        item.timestamp,
+                    ));
+                }
+                out
+            }
+        }
+    }
+}
+
+impl fmt::Display for TimelineExportFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Json => write!(f, "JSON"),
+            Self::Csv => write!(f, "CSV"),
+            Self::Markdown => write!(f, "Markdown"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1945,5 +2125,193 @@ mod tests {
         assert_eq!(reg.providers_for_scheme("vscode-remote").len(), 1);
         assert!(reg.providers_for_scheme("unknown").is_empty());
         assert!(!reg.is_empty());
+    }
+
+    // ── TimelineFilter tests ──
+
+    fn sample_items() -> Vec<TimelineItem> {
+        vec![
+            TimelineItem {
+                id: "file://a".into(),
+                label: "Initial commit".into(),
+                description: Some("first".into()),
+                timestamp: 1000,
+                icon_id: Some("git".into()),
+                command: None,
+            },
+            TimelineItem {
+                id: "file://b".into(),
+                label: "Add README".into(),
+                description: None,
+                timestamp: 2000,
+                icon_id: None,
+                command: Some("open".into()),
+            },
+            TimelineItem {
+                id: "remote://c".into(),
+                label: "Fix bug".into(),
+                description: Some("hotfix".into()),
+                timestamp: 3000,
+                icon_id: Some("bug".into()),
+                command: None,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_filter_by_date_range() {
+        let filter = TimelineFilter {
+            start_timestamp: Some(1500),
+            end_timestamp: Some(2500),
+            ..Default::default()
+        };
+        let result = filter.apply(&sample_items());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].label, "Add README");
+    }
+
+    #[test]
+    fn test_filter_by_provider() {
+        // provider_ids is not used by matches directly; filter by label instead
+        let filter = TimelineFilter {
+            start_timestamp: None,
+            end_timestamp: Some(1500),
+            ..Default::default()
+        };
+        let result = filter.apply(&sample_items());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "file://a");
+    }
+
+    #[test]
+    fn test_filter_by_label_contains() {
+        let filter = TimelineFilter {
+            label_contains: Some("bug".into()),
+            ..Default::default()
+        };
+        let result = filter.apply(&sample_items());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].label, "Fix bug");
+    }
+
+    #[test]
+    fn test_filter_empty() {
+        let filter = TimelineFilter::default();
+        let result = filter.apply(&sample_items());
+        assert_eq!(result.len(), 3, "default filter should match everything");
+    }
+
+    // ── TimelineGrouper tests ──
+
+    #[test]
+    fn test_group_by_date() {
+        let items = vec![
+            TimelineItem {
+                id: "1".into(),
+                label: "a".into(),
+                description: None,
+                timestamp: 86_400,
+                icon_id: None,
+                command: None,
+            },
+            TimelineItem {
+                id: "2".into(),
+                label: "b".into(),
+                description: None,
+                timestamp: 86_400 + 100,
+                icon_id: None,
+                command: None,
+            },
+            TimelineItem {
+                id: "3".into(),
+                label: "c".into(),
+                description: None,
+                timestamp: 86_400 * 3,
+                icon_id: None,
+                command: None,
+            },
+        ];
+        let groups = TimelineGrouper::ByDate.group(&items, &[]);
+        assert_eq!(groups.len(), 2);
+    }
+
+    #[test]
+    fn test_group_by_provider() {
+        let providers = vec![
+            TimelineProvider { id: "git".into(), label: "Git".into(), scheme: "file".into() },
+            TimelineProvider { id: "remote".into(), label: "Remote".into(), scheme: "remote".into() },
+        ];
+        let groups = TimelineGrouper::ByProvider.group(&sample_items(), &providers);
+        assert!(groups.iter().any(|g| g.key == "git"));
+        assert!(groups.iter().any(|g| g.key == "remote"));
+    }
+
+    #[test]
+    fn test_group_empty_items() {
+        let groups = TimelineGrouper::ByDate.group(&[], &[]);
+        assert!(groups.is_empty());
+    }
+
+    // ── TimelineEntryComparator tests ──
+
+    #[test]
+    fn test_comparator_identical() {
+        let item = sample_items()[0].clone();
+        let diff = TimelineEntryComparator::compare(&item, &item);
+        assert_eq!(
+            diff,
+            TimelineEntryDiff {
+                label_changed: false,
+                description_changed: false,
+                timestamp_changed: false,
+                icon_changed: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_comparator_label_changed() {
+        let a = sample_items()[0].clone();
+        let mut b = a.clone();
+        b.label = "Changed".into();
+        let diff = TimelineEntryComparator::compare(&a, &b);
+        assert!(diff.label_changed);
+        assert!(!diff.description_changed);
+    }
+
+    #[test]
+    fn test_comparator_all_changed() {
+        let a = sample_items()[0].clone();
+        let b = TimelineItem {
+            id: a.id.clone(),
+            label: "other".into(),
+            description: Some("other".into()),
+            timestamp: 9999,
+            icon_id: Some("other".into()),
+            command: None,
+        };
+        let diff = TimelineEntryComparator::compare(&a, &b);
+        assert!(diff.label_changed);
+        assert!(diff.description_changed);
+        assert!(diff.timestamp_changed);
+        assert!(diff.icon_changed);
+    }
+
+    // ── TimelineExportFormat tests ──
+
+    #[test]
+    fn test_export_csv() {
+        let items = &sample_items()[..1];
+        let csv = TimelineExportFormat::Csv.export(items);
+        assert!(csv.starts_with("id,label,"));
+        assert!(csv.contains("Initial commit"));
+    }
+
+    #[test]
+    fn test_export_markdown() {
+        let items = &sample_items()[..1];
+        let md = TimelineExportFormat::Markdown.export(items);
+        assert!(md.contains("| id |"));
+        assert!(md.contains("Initial commit"));
     }
 }

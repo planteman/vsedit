@@ -1061,6 +1061,268 @@ pub fn merge_registries(
     added
 }
 
+// ---------------------------------------------------------------------------
+// RegistryBulkOps – batch register/unregister
+// ---------------------------------------------------------------------------
+
+/// Batch operations on the registry.
+pub struct RegistryBulkOps;
+
+impl RegistryBulkOps {
+    /// Register multiple extension points at once, returning how many were newly added.
+    pub fn register_many(registry: &mut ExtensionPointRegistry, ids: &[&str]) -> usize {
+        let mut added = 0;
+        for id in ids {
+            let before = registry.len();
+            registry.register_point(id);
+            if registry.len() > before {
+                added += 1;
+            }
+        }
+        added
+    }
+
+    /// Unregister multiple extension points, returning how many were removed.
+    pub fn unregister_many(registry: &mut ExtensionPointRegistry, ids: &[&str]) -> usize {
+        let mut removed = 0;
+        for id in ids {
+            if registry.unregister_point(id).is_ok() {
+                removed += 1;
+            }
+        }
+        removed
+    }
+
+    /// Register points only if all IDs pass validation. Returns error on first failure.
+    pub fn register_validated(
+        registry: &mut ExtensionPointRegistry,
+        ids: &[&str],
+    ) -> Result<usize, RegistryError> {
+        for id in ids {
+            ExtensionPointRegistry::validate_id(id)?;
+        }
+        Ok(Self::register_many(registry, ids))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RegistryDepGraph – dependency tracking between providers
+// ---------------------------------------------------------------------------
+
+/// Tracks dependencies between extension point providers.
+#[derive(Debug, Clone, Default)]
+pub struct RegistryDepGraph {
+    /// Maps a provider to the set of providers it depends on.
+    edges: HashMap<String, HashSet<String>>,
+}
+
+impl RegistryDepGraph {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Declare that `provider` depends on `dependency`.
+    pub fn add_dependency(&mut self, provider: &str, dependency: &str) {
+        self.edges
+            .entry(provider.to_string())
+            .or_default()
+            .insert(dependency.to_string());
+    }
+
+    /// Return direct dependencies of `provider`.
+    pub fn dependencies_of(&self, provider: &str) -> Vec<&str> {
+        self.edges
+            .get(provider)
+            .map(|s| s.iter().map(|d| d.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Return providers that directly depend on `dependency`.
+    pub fn dependents_of(&self, dependency: &str) -> Vec<&str> {
+        self.edges
+            .iter()
+            .filter(|(_, deps)| deps.contains(dependency))
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Check if adding `provider -> dependency` would create a cycle.
+    pub fn would_cycle(&self, provider: &str, dependency: &str) -> bool {
+        if provider == dependency {
+            return true;
+        }
+        let mut visited = HashSet::new();
+        let mut stack = vec![dependency.to_string()];
+        while let Some(current) = stack.pop() {
+            if current == provider {
+                return true;
+            }
+            if visited.insert(current.clone()) {
+                if let Some(deps) = self.edges.get(&current) {
+                    for dep in deps {
+                        stack.push(dep.clone());
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Return a topological order if the graph is acyclic, or `None` if cyclic.
+    pub fn topological_order(&self) -> Option<Vec<String>> {
+        let mut all_nodes: HashSet<&str> = HashSet::new();
+        for (k, deps) in &self.edges {
+            all_nodes.insert(k.as_str());
+            for d in deps {
+                all_nodes.insert(d.as_str());
+            }
+        }
+        // Use Kahn's algorithm on the reversed graph
+        // edge: provider -> dependency means dependency must come before provider
+        let mut in_deg: HashMap<&str, usize> = HashMap::new();
+        for &node in &all_nodes {
+            in_deg.insert(node, 0);
+        }
+        for (provider, _deps) in &self.edges {
+            // provider depends on deps, so provider has in_degree = deps.len()
+            *in_deg.entry(provider.as_str()).or_insert(0) += _deps.len();
+        }
+        let mut queue: Vec<&str> = in_deg.iter().filter(|(_, d)| **d == 0).map(|(k, _)| *k).collect();
+        queue.sort(); // deterministic
+        let mut result = Vec::new();
+        while let Some(node) = queue.pop() {
+            result.push(node.to_string());
+            // For each provider that depends on `node`, decrement in_degree
+            for (provider, deps) in &self.edges {
+                if deps.contains(node) {
+                    if let Some(deg) = in_deg.get_mut(provider.as_str()) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push(provider.as_str());
+                            queue.sort();
+                        }
+                    }
+                }
+            }
+        }
+        if result.len() == all_nodes.len() {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    /// Number of providers in the graph.
+    pub fn provider_count(&self) -> usize {
+        self.edges.len()
+    }
+}
+
+impl fmt::Display for RegistryDepGraph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegistryDepGraph({} providers)", self.edges.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RegistryChangeBatch – notification batching
+// ---------------------------------------------------------------------------
+
+/// A single change event in the registry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryChange {
+    Added(String),
+    Removed(String),
+    MetadataUpdated(String),
+}
+
+impl fmt::Display for RegistryChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RegistryChange::Added(id) => write!(f, "+{id}"),
+            RegistryChange::Removed(id) => write!(f, "-{id}"),
+            RegistryChange::MetadataUpdated(id) => write!(f, "~{id}"),
+        }
+    }
+}
+
+/// Batches registry changes for deferred notification.
+#[derive(Debug, Clone, Default)]
+pub struct RegistryChangeBatch {
+    changes: Vec<RegistryChange>,
+}
+
+impl RegistryChangeBatch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record an addition.
+    pub fn record_add(&mut self, id: &str) {
+        self.changes.push(RegistryChange::Added(id.to_string()));
+    }
+
+    /// Record a removal.
+    pub fn record_remove(&mut self, id: &str) {
+        self.changes.push(RegistryChange::Removed(id.to_string()));
+    }
+
+    /// Record a metadata update.
+    pub fn record_metadata_update(&mut self, id: &str) {
+        self.changes.push(RegistryChange::MetadataUpdated(id.to_string()));
+    }
+
+    /// How many changes are batched.
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Whether the batch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Drain all changes and return them, leaving the batch empty.
+    pub fn drain(&mut self) -> Vec<RegistryChange> {
+        std::mem::take(&mut self.changes)
+    }
+
+    /// Return only the additions.
+    pub fn additions(&self) -> Vec<&str> {
+        self.changes.iter().filter_map(|c| match c {
+            RegistryChange::Added(id) => Some(id.as_str()),
+            _ => None,
+        }).collect()
+    }
+
+    /// Return only the removals.
+    pub fn removals(&self) -> Vec<&str> {
+        self.changes.iter().filter_map(|c| match c {
+            RegistryChange::Removed(id) => Some(id.as_str()),
+            _ => None,
+        }).collect()
+    }
+
+    /// Compact: remove redundant add+remove pairs for the same ID.
+    pub fn compact(&mut self) {
+        let added: HashSet<String> = self.additions().iter().map(|s| s.to_string()).collect();
+        let removed: HashSet<String> = self.removals().iter().map(|s| s.to_string()).collect();
+        let cancelled: HashSet<&String> = added.intersection(&removed).collect();
+        self.changes.retain(|c| {
+            let id = match c {
+                RegistryChange::Added(id) | RegistryChange::Removed(id) | RegistryChange::MetadataUpdated(id) => id,
+            };
+            !cancelled.contains(id)
+        });
+    }
+}
+
+impl fmt::Display for RegistryChangeBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegistryChangeBatch({} changes)", self.changes.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1957,5 +2219,175 @@ mod tests {
         let meta = target.get_metadata("vsedit.keybindings").unwrap();
         assert_eq!(meta.description, "Key bindings");
         assert_eq!(meta.version.as_deref(), Some("2.0"));
+    }
+
+    // -- RegistrySnapshot tests --
+
+    #[test]
+    fn snapshot_capture_empty() {
+        let reg = ExtensionPointRegistry::new();
+        let snap = RegistrySnapshot::from_registry(&reg, 0);
+        assert!(snap.is_empty());
+        assert_eq!(snap.len(), 0);
+        assert!(!snap.contains("x"));
+    }
+
+    #[test]
+    fn snapshot_capture_with_points() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("vsedit.a");
+        reg.register_point("vsedit.b");
+        let snap = RegistrySnapshot::from_registry(&reg, 1);
+        assert_eq!(snap.len(), 2);
+        assert!(snap.contains("vsedit.a"));
+        assert!(snap.contains("vsedit.b"));
+    }
+
+    #[test]
+    fn snapshot_diff_added_removed() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("a");
+        reg.register_point("b");
+        let snap1 = RegistrySnapshot::from_registry(&reg, 1);
+
+        reg.unregister_point("a").unwrap();
+        reg.register_point("c");
+        let snap2 = RegistrySnapshot::from_registry(&reg, 2);
+
+        let diff = registry_diff(&snap1, &snap2);
+        assert!(diff.added.contains(&"c".to_string()));
+        assert!(diff.removed.contains(&"a".to_string()));
+    }
+
+    #[test]
+    fn snapshot_display() {
+        let reg = ExtensionPointRegistry::new();
+        let snap = RegistrySnapshot::from_registry(&reg, 0);
+        let s = format!("{snap}");
+        assert!(s.contains("RegistrySnapshot"));
+    }
+
+    // -- RegistryBulkOps tests --
+
+    #[test]
+    fn bulk_register_many() {
+        let mut reg = ExtensionPointRegistry::new();
+        let added = RegistryBulkOps::register_many(&mut reg, &["a", "b", "c"]);
+        assert_eq!(added, 3);
+        assert_eq!(reg.len(), 3);
+    }
+
+    #[test]
+    fn bulk_register_deduplicates() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("a");
+        let added = RegistryBulkOps::register_many(&mut reg, &["a", "b"]);
+        assert_eq!(added, 1);
+    }
+
+    #[test]
+    fn bulk_unregister_many() {
+        let mut reg = ExtensionPointRegistry::new();
+        RegistryBulkOps::register_many(&mut reg, &["a", "b", "c"]);
+        let removed = RegistryBulkOps::unregister_many(&mut reg, &["a", "c", "missing"]);
+        assert_eq!(removed, 2);
+        assert_eq!(reg.len(), 1);
+    }
+
+    // -- RegistryDepGraph tests --
+
+    #[test]
+    fn dep_graph_basic() {
+        let mut g = RegistryDepGraph::new();
+        g.add_dependency("editor", "buffer");
+        g.add_dependency("editor", "cursor");
+        let deps = g.dependencies_of("editor");
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&"buffer"));
+        assert!(deps.contains(&"cursor"));
+    }
+
+    #[test]
+    fn dep_graph_dependents_of() {
+        let mut g = RegistryDepGraph::new();
+        g.add_dependency("editor", "buffer");
+        g.add_dependency("minimap", "buffer");
+        let dependents = g.dependents_of("buffer");
+        assert!(dependents.contains(&"editor"));
+        assert!(dependents.contains(&"minimap"));
+    }
+
+    #[test]
+    fn dep_graph_cycle_detection() {
+        let mut g = RegistryDepGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "c");
+        assert!(g.would_cycle("c", "a"));
+        assert!(!g.would_cycle("a", "c"));
+        assert!(g.would_cycle("a", "a"));
+    }
+
+    #[test]
+    fn dep_graph_topological_order() {
+        let mut g = RegistryDepGraph::new();
+        g.add_dependency("editor", "buffer");
+        g.add_dependency("editor", "cursor");
+        g.add_dependency("cursor", "buffer");
+        let order = g.topological_order().unwrap();
+        let buf_idx = order.iter().position(|s| s == "buffer").unwrap();
+        let cur_idx = order.iter().position(|s| s == "cursor").unwrap();
+        let ed_idx = order.iter().position(|s| s == "editor").unwrap();
+        assert!(buf_idx < cur_idx);
+        assert!(cur_idx < ed_idx);
+    }
+
+    #[test]
+    fn dep_graph_cyclic_returns_none() {
+        let mut g = RegistryDepGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        assert!(g.topological_order().is_none());
+    }
+
+    // -- RegistryChangeBatch tests --
+
+    #[test]
+    fn change_batch_record_and_drain() {
+        let mut batch = RegistryChangeBatch::new();
+        batch.record_add("a");
+        batch.record_remove("b");
+        batch.record_metadata_update("c");
+        assert_eq!(batch.len(), 3);
+        let drained = batch.drain();
+        assert_eq!(drained.len(), 3);
+        assert!(batch.is_empty());
+    }
+
+    #[test]
+    fn change_batch_additions_removals() {
+        let mut batch = RegistryChangeBatch::new();
+        batch.record_add("x");
+        batch.record_add("y");
+        batch.record_remove("z");
+        assert_eq!(batch.additions().len(), 2);
+        assert_eq!(batch.removals().len(), 1);
+    }
+
+    #[test]
+    fn change_batch_compact() {
+        let mut batch = RegistryChangeBatch::new();
+        batch.record_add("temp");
+        batch.record_remove("temp");
+        batch.record_add("keep");
+        batch.compact();
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch.additions(), vec!["keep"]);
+    }
+
+    #[test]
+    fn change_display() {
+        assert_eq!(format!("{}", RegistryChange::Added("x".into())), "+x");
+        assert_eq!(format!("{}", RegistryChange::Removed("x".into())), "-x");
+        assert_eq!(format!("{}", RegistryChange::MetadataUpdated("x".into())), "~x");
     }
 }

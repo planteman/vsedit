@@ -1061,6 +1061,292 @@ pub fn format_line_lenses(lenses: &[&CodeLens], style: &CodeLensStyle) -> String
         .join(&style.separator)
 }
 
+// ---------------------------------------------------------------------------
+// CodeLensResolveQueue – priority-based resolve ordering
+// ---------------------------------------------------------------------------
+
+/// A priority queue entry for lens resolution scheduling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolveEntry {
+    priority: u32,
+    lens_index: usize,
+}
+
+/// Priority queue that schedules code lens resolution by priority.
+///
+/// Higher-priority lenses (e.g. those currently in the viewport) are resolved
+/// first. Internally maintains a sorted list of `(priority, lens_index)` pairs.
+#[derive(Debug, Clone)]
+pub struct CodeLensResolveQueue {
+    entries: Vec<ResolveEntry>,
+}
+
+impl CodeLensResolveQueue {
+    /// Create an empty resolve queue.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Enqueue a lens index with the given priority. Higher values are
+    /// dequeued first.
+    pub fn push(&mut self, priority: u32, lens_index: usize) {
+        self.entries.push(ResolveEntry {
+            priority,
+            lens_index,
+        });
+        // Keep sorted in descending priority order.
+        self.entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    /// Remove and return the lens index with the highest priority.
+    pub fn pop(&mut self) -> Option<usize> {
+        if self.entries.is_empty() {
+            None
+        } else {
+            Some(self.entries.remove(0).lens_index)
+        }
+    }
+
+    /// Peek at the highest-priority lens index without removing it.
+    pub fn peek(&self) -> Option<usize> {
+        self.entries.first().map(|e| e.lens_index)
+    }
+
+    /// Return the number of pending entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all entries for a specific lens index.
+    pub fn remove_index(&mut self, lens_index: usize) {
+        self.entries.retain(|e| e.lens_index != lens_index);
+    }
+
+    /// Clear all pending entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Drain all entries in priority order, returning lens indices.
+    pub fn drain_all(&mut self) -> Vec<usize> {
+        let indices: Vec<usize> = self.entries.iter().map(|e| e.lens_index).collect();
+        self.entries.clear();
+        indices
+    }
+}
+
+impl Default for CodeLensResolveQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CodeLensCommandExecutor – execute commands with undo support
+// ---------------------------------------------------------------------------
+
+/// Record of a single command execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionRecord {
+    pub command: Command,
+    pub line: u32,
+}
+
+/// Executes code lens commands and keeps a history for undo support.
+#[derive(Debug, Clone)]
+pub struct CodeLensCommandExecutor {
+    history: Vec<ExecutionRecord>,
+}
+
+impl CodeLensCommandExecutor {
+    /// Create a new executor with empty history.
+    pub fn new() -> Self {
+        Self {
+            history: Vec::new(),
+        }
+    }
+
+    /// Execute a command from a code lens on a given line, recording it in
+    /// history.  Returns the command that was executed.
+    pub fn execute(&mut self, lens: &CodeLens) -> Result<&Command, CodeLensError> {
+        let cmd = lens
+            .command
+            .as_ref()
+            .ok_or(CodeLensError::UnresolvedLens {
+                data: lens.data.clone(),
+            })?;
+        self.history.push(ExecutionRecord {
+            command: cmd.clone(),
+            line: lens.start_line,
+        });
+        Ok(&self.history.last().unwrap().command)
+    }
+
+    /// Undo the most recent command execution, returning the record that was
+    /// undone, or `None` if history is empty.
+    pub fn undo(&mut self) -> Option<ExecutionRecord> {
+        self.history.pop()
+    }
+
+    /// Return a reference to the most recently executed record.
+    pub fn last_execution(&self) -> Option<&ExecutionRecord> {
+        self.history.last()
+    }
+
+    /// Return the number of commands in the history.
+    pub fn history_len(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Return `true` if no commands have been executed.
+    pub fn is_empty(&self) -> bool {
+        self.history.is_empty()
+    }
+
+    /// Clear the entire execution history.
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    /// Return all execution records in chronological order.
+    pub fn history(&self) -> &[ExecutionRecord] {
+        &self.history
+    }
+}
+
+impl Default for CodeLensCommandExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CodeLensDisplayFilter – filter lenses for display
+// ---------------------------------------------------------------------------
+
+/// Filter that determines which code lenses to display based on multiple
+/// criteria: type name, provider name, and resolved status.
+#[derive(Debug, Clone)]
+pub struct CodeLensDisplayFilter {
+    /// If set, only show lenses whose `data` field starts with one of these.
+    pub type_prefixes: Vec<String>,
+    /// If `true`, only resolved lenses are shown.
+    pub resolved_only: bool,
+    /// If set, hide lenses on these specific lines.
+    pub excluded_lines: Vec<u32>,
+}
+
+impl CodeLensDisplayFilter {
+    /// Create a permissive filter that shows everything.
+    pub fn new() -> Self {
+        Self {
+            type_prefixes: Vec::new(),
+            resolved_only: false,
+            excluded_lines: Vec::new(),
+        }
+    }
+
+    /// Restrict display to lenses whose `data` starts with one of the given
+    /// prefixes.
+    pub fn with_type_prefixes(mut self, prefixes: Vec<String>) -> Self {
+        self.type_prefixes = prefixes;
+        self
+    }
+
+    /// Only display resolved lenses.
+    pub fn only_resolved(mut self) -> Self {
+        self.resolved_only = true;
+        self
+    }
+
+    /// Exclude lenses on specific lines from display.
+    pub fn exclude_lines(mut self, lines: Vec<u32>) -> Self {
+        self.excluded_lines = lines;
+        self
+    }
+
+    /// Test whether a single lens passes this filter.
+    pub fn matches(&self, lens: &CodeLens) -> bool {
+        if self.resolved_only && !lens.is_resolved() {
+            return false;
+        }
+        if self.excluded_lines.contains(&lens.start_line) {
+            return false;
+        }
+        if !self.type_prefixes.is_empty() {
+            return self
+                .type_prefixes
+                .iter()
+                .any(|p| lens.data.starts_with(p));
+        }
+        true
+    }
+
+    /// Apply the filter to a slice, returning only matching lenses.
+    pub fn apply<'a>(&self, lenses: &'a [CodeLens]) -> Vec<&'a CodeLens> {
+        lenses.iter().filter(|l| self.matches(l)).collect()
+    }
+}
+
+impl Default for CodeLensDisplayFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// merge_adjacent_lenses – combine same-line lenses into display units
+// ---------------------------------------------------------------------------
+
+/// A merged display unit combining all lenses that share the same start line.
+#[derive(Debug, Clone)]
+pub struct MergedLensGroup {
+    /// The common start line for every lens in this group.
+    pub line: u32,
+    /// The lenses that were merged into this group.
+    pub lenses: Vec<CodeLens>,
+}
+
+impl MergedLensGroup {
+    /// Return the number of lenses in this group.
+    pub fn count(&self) -> usize {
+        self.lenses.len()
+    }
+
+    /// Return `true` if every lens in the group is resolved.
+    pub fn all_resolved(&self) -> bool {
+        self.lenses.iter().all(|l| l.is_resolved())
+    }
+
+    /// Collect all command titles from resolved lenses.
+    pub fn titles(&self) -> Vec<&str> {
+        self.lenses
+            .iter()
+            .filter_map(|l| l.command.as_ref().map(|c| c.title.as_str()))
+            .collect()
+    }
+}
+
+/// Merge code lenses that share the same start line into
+/// [`MergedLensGroup`]s, sorted by line number.
+pub fn merge_adjacent_lenses(lenses: &[CodeLens]) -> Vec<MergedLensGroup> {
+    let mut map: std::collections::BTreeMap<u32, Vec<CodeLens>> =
+        std::collections::BTreeMap::new();
+    for lens in lenses {
+        map.entry(lens.start_line).or_default().push(lens.clone());
+    }
+    map.into_iter()
+        .map(|(line, lenses)| MergedLensGroup { line, lenses })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1964,5 +2250,198 @@ mod tests {
         let lens = CodeLens::new(1, 0, 1, 10);
         let style = CodeLensStyle { prefix: "".into(), suffix: "".into(), separator: " | ".into() };
         assert_eq!(format_lens(&lens, &style), "(unresolved)");
+    }
+
+    // -- CodeLensResolveQueue tests -----------------------------------------
+
+    #[test]
+    fn resolve_queue_pop_highest_priority_first() {
+        let mut q = CodeLensResolveQueue::new();
+        q.push(1, 10);
+        q.push(5, 20);
+        q.push(3, 30);
+        assert_eq!(q.pop(), Some(20));
+        assert_eq!(q.pop(), Some(30));
+        assert_eq!(q.pop(), Some(10));
+        assert_eq!(q.pop(), None);
+    }
+
+    #[test]
+    fn resolve_queue_peek_does_not_remove() {
+        let mut q = CodeLensResolveQueue::new();
+        q.push(10, 42);
+        assert_eq!(q.peek(), Some(42));
+        assert_eq!(q.len(), 1);
+    }
+
+    #[test]
+    fn resolve_queue_remove_index() {
+        let mut q = CodeLensResolveQueue::new();
+        q.push(1, 0);
+        q.push(2, 1);
+        q.push(3, 2);
+        q.remove_index(1);
+        assert_eq!(q.len(), 2);
+        assert_eq!(q.pop(), Some(2));
+        assert_eq!(q.pop(), Some(0));
+    }
+
+    #[test]
+    fn resolve_queue_drain_all() {
+        let mut q = CodeLensResolveQueue::new();
+        q.push(1, 100);
+        q.push(3, 200);
+        q.push(2, 300);
+        let all = q.drain_all();
+        assert_eq!(all, vec![200, 300, 100]);
+        assert!(q.is_empty());
+    }
+
+    // -- CodeLensCommandExecutor tests --------------------------------------
+
+    #[test]
+    fn executor_execute_resolved_lens() {
+        let mut exec = CodeLensCommandExecutor::new();
+        let lens = CodeLens::new(5, 0, 5, 10).with_command(Command {
+            title: "Run".into(),
+            command_id: "run".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        });
+        let cmd = exec.execute(&lens).unwrap();
+        assert_eq!(cmd.command_id, "run");
+        assert_eq!(exec.history_len(), 1);
+    }
+
+    #[test]
+    fn executor_execute_unresolved_fails() {
+        let mut exec = CodeLensCommandExecutor::new();
+        let lens = CodeLens::new(1, 0, 1, 5).with_data("some_data");
+        let result = exec.execute(&lens);
+        assert!(result.is_err());
+        assert_eq!(exec.history_len(), 0);
+    }
+
+    #[test]
+    fn executor_undo_returns_last() {
+        let mut exec = CodeLensCommandExecutor::new();
+        let lens_a = CodeLens::new(1, 0, 1, 5).with_command(Command {
+            title: "A".into(),
+            command_id: "a".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        });
+        let lens_b = CodeLens::new(2, 0, 2, 5).with_command(Command {
+            title: "B".into(),
+            command_id: "b".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        });
+        exec.execute(&lens_a).unwrap();
+        exec.execute(&lens_b).unwrap();
+        let undone = exec.undo().unwrap();
+        assert_eq!(undone.command.command_id, "b");
+        assert_eq!(undone.line, 2);
+        assert_eq!(exec.history_len(), 1);
+    }
+
+    #[test]
+    fn executor_undo_empty_returns_none() {
+        let mut exec = CodeLensCommandExecutor::new();
+        assert!(exec.undo().is_none());
+    }
+
+    // -- CodeLensDisplayFilter tests ----------------------------------------
+
+    #[test]
+    fn display_filter_shows_all_by_default() {
+        let filter = CodeLensDisplayFilter::new();
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10).with_data("ref"),
+            CodeLens::new(2, 0, 2, 10),
+        ];
+        assert_eq!(filter.apply(&lenses).len(), 2);
+    }
+
+    #[test]
+    fn display_filter_resolved_only() {
+        let filter = CodeLensDisplayFilter::new().only_resolved();
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10).with_command(Command {
+                title: "T".into(),
+                command_id: "c".into(),
+                tooltip: String::new(),
+                arguments: vec![],
+            }),
+            CodeLens::new(2, 0, 2, 10),
+        ];
+        let result = filter.apply(&lenses);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].start_line, 1);
+    }
+
+    #[test]
+    fn display_filter_type_prefix() {
+        let filter = CodeLensDisplayFilter::new()
+            .with_type_prefixes(vec!["ref".into()]);
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10).with_data("ref_count"),
+            CodeLens::new(2, 0, 2, 10).with_data("test_run"),
+        ];
+        let result = filter.apply(&lenses);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].data, "ref_count");
+    }
+
+    #[test]
+    fn display_filter_exclude_lines() {
+        let filter = CodeLensDisplayFilter::new().exclude_lines(vec![3, 5]);
+        let lenses = vec![
+            CodeLens::new(3, 0, 3, 10),
+            CodeLens::new(4, 0, 4, 10),
+            CodeLens::new(5, 0, 5, 10),
+        ];
+        let result = filter.apply(&lenses);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].start_line, 4);
+    }
+
+    // -- merge_adjacent_lenses tests ----------------------------------------
+
+    #[test]
+    fn merge_adjacent_groups_by_line() {
+        let lenses = vec![
+            CodeLens::new(10, 0, 10, 5).with_data("a"),
+            CodeLens::new(10, 6, 10, 12).with_data("b"),
+            CodeLens::new(20, 0, 20, 8).with_data("c"),
+        ];
+        let groups = merge_adjacent_lenses(&lenses);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].line, 10);
+        assert_eq!(groups[0].count(), 2);
+        assert_eq!(groups[1].line, 20);
+        assert_eq!(groups[1].count(), 1);
+    }
+
+    #[test]
+    fn merge_adjacent_empty_input() {
+        let groups = merge_adjacent_lenses(&[]);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn merged_group_titles() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5).with_command(Command {
+                title: "3 references".into(),
+                command_id: "ref".into(),
+                tooltip: String::new(),
+                arguments: vec![],
+            }),
+            CodeLens::new(1, 6, 1, 12), // unresolved
+        ];
+        let groups = merge_adjacent_lenses(&lenses);
+        assert_eq!(groups[0].titles(), vec!["3 references"]);
+        assert!(!groups[0].all_resolved());
     }
 }

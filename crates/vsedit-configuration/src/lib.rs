@@ -1109,6 +1109,246 @@ fn merge_values(base: &Value, overlay: &Value) -> Value {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// ConfigurationOverrideScope – workspace→folder→language overrides
+// ---------------------------------------------------------------------------
+
+/// Scope levels for configuration overrides, ordered from broadest to narrowest.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ConfigurationOverrideScope {
+    Workspace,
+    Folder(String),
+    Language(String),
+}
+
+impl ConfigurationOverrideScope {
+    /// Returns a numeric priority (higher = more specific).
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::Workspace => 0,
+            Self::Folder(_) => 1,
+            Self::Language(_) => 2,
+        }
+    }
+
+    /// Check if this scope is more specific than `other`.
+    pub fn overrides(&self, other: &Self) -> bool {
+        self.priority() > other.priority()
+    }
+}
+
+impl fmt::Display for ConfigurationOverrideScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Workspace => write!(f, "workspace"),
+            Self::Folder(p) => write!(f, "folder:{}", p),
+            Self::Language(l) => write!(f, "[{}]", l),
+        }
+    }
+}
+
+/// An override entry: a scope plus the value to apply.
+#[derive(Debug, Clone)]
+pub struct ConfigurationOverride {
+    pub scope: ConfigurationOverrideScope,
+    pub key: String,
+    pub value: Value,
+}
+
+/// Resolve a configuration key through a chain of overrides. The most specific
+/// scope wins. Returns the resolved value, or `None` if no override matches.
+pub fn resolve_override(overrides: &[ConfigurationOverride], key: &str) -> Option<Value> {
+    let mut best: Option<&ConfigurationOverride> = None;
+    for ov in overrides {
+        if ov.key == key {
+            match &best {
+                Some(b) if ov.scope.overrides(&b.scope) => best = Some(ov),
+                None => best = Some(ov),
+                _ => {}
+            }
+        }
+    }
+    best.map(|o| o.value.clone())
+}
+
+// ---------------------------------------------------------------------------
+// ConfigurationLock – concurrent access wrapper
+// ---------------------------------------------------------------------------
+
+/// A configuration store protected by a read-write lock for concurrent access.
+pub struct ConfigurationLock {
+    inner: RwLock<HashMap<String, Value>>,
+}
+
+impl ConfigurationLock {
+    pub fn new() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Read a configuration value.
+    pub fn get(&self, key: &str) -> Option<Value> {
+        let guard = self.inner.read().ok()?;
+        guard.get(key).cloned()
+    }
+
+    /// Write a configuration value.
+    pub fn set(&self, key: impl Into<String>, value: Value) -> bool {
+        match self.inner.write() {
+            Ok(mut guard) => {
+                guard.insert(key.into(), value);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// Remove a configuration value.
+    pub fn remove(&self, key: &str) -> Option<Value> {
+        let mut guard = self.inner.write().ok()?;
+        guard.remove(key)
+    }
+
+    /// Snapshot all keys.
+    pub fn keys(&self) -> Vec<String> {
+        match self.inner.read() {
+            Ok(guard) => guard.keys().cloned().collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+}
+
+impl Default for ConfigurationLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConfigurationChangeDebouncer
+// ---------------------------------------------------------------------------
+
+/// Batches configuration changes so that listeners are not notified on every
+/// keystroke. Collects changed keys and provides a `flush` method.
+#[derive(Debug, Clone)]
+pub struct ConfigurationChangeDebouncer {
+    pending_keys: Vec<String>,
+    debounce_ms: u64,
+}
+
+impl ConfigurationChangeDebouncer {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self {
+            pending_keys: Vec::new(),
+            debounce_ms,
+        }
+    }
+
+    /// Record a changed key.
+    pub fn record(&mut self, key: impl Into<String>) {
+        let k = key.into();
+        if !self.pending_keys.contains(&k) {
+            self.pending_keys.push(k);
+        }
+    }
+
+    /// Flush all pending keys, returning them and clearing the buffer.
+    pub fn flush(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.pending_keys)
+    }
+
+    /// True if there are pending changes.
+    pub fn has_pending(&self) -> bool {
+        !self.pending_keys.is_empty()
+    }
+
+    /// Current debounce delay.
+    pub fn debounce_ms(&self) -> u64 {
+        self.debounce_ms
+    }
+
+    /// Number of pending keys.
+    pub fn pending_count(&self) -> usize {
+        self.pending_keys.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Configuration inheritance chain builder
+// ---------------------------------------------------------------------------
+
+/// An entry in the inheritance chain with a label and its values.
+#[derive(Debug, Clone)]
+pub struct InheritanceLayer {
+    pub label: String,
+    pub values: HashMap<String, Value>,
+}
+
+/// Builds a merged configuration by applying layers in order (later layers override earlier ones).
+pub struct InheritanceChainBuilder {
+    layers: Vec<InheritanceLayer>,
+}
+
+impl InheritanceChainBuilder {
+    pub fn new() -> Self {
+        Self { layers: Vec::new() }
+    }
+
+    /// Add a layer to the end of the chain (highest priority).
+    pub fn add_layer(&mut self, label: impl Into<String>, values: HashMap<String, Value>) {
+        self.layers.push(InheritanceLayer {
+            label: label.into(),
+            values,
+        });
+    }
+
+    /// Resolve a single key through the chain (last layer wins).
+    pub fn resolve(&self, key: &str) -> Option<Value> {
+        for layer in self.layers.iter().rev() {
+            if let Some(v) = layer.values.get(key) {
+                return Some(v.clone());
+            }
+        }
+        None
+    }
+
+    /// Build a merged configuration from all layers.
+    pub fn build(&self) -> HashMap<String, Value> {
+        let mut result = HashMap::new();
+        for layer in &self.layers {
+            for (k, v) in &layer.values {
+                result.insert(k.clone(), v.clone());
+            }
+        }
+        result
+    }
+
+    /// The labels of all layers in order.
+    pub fn layer_names(&self) -> Vec<&str> {
+        self.layers.iter().map(|l| l.label.as_str()).collect()
+    }
+
+    /// Number of layers.
+    pub fn len(&self) -> usize {
+        self.layers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.layers.is_empty()
+    }
+}
+
+impl Default for InheritanceChainBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1983,5 +2223,138 @@ mod tests {
         let mut keys = collect_leaf_keys(&val, "");
         keys.sort();
         assert_eq!(keys, vec!["editor.fontSize", "editor.tabSize", "files.autoSave"]);
+    }
+
+    // -- ConfigurationOverrideScope tests --
+
+    #[test]
+    fn override_scope_priority() {
+        let ws = ConfigurationOverrideScope::Workspace;
+        let folder = ConfigurationOverrideScope::Folder("src".into());
+        let lang = ConfigurationOverrideScope::Language("rust".into());
+        assert!(folder.overrides(&ws));
+        assert!(lang.overrides(&folder));
+        assert!(!ws.overrides(&lang));
+    }
+
+    #[test]
+    fn override_scope_display() {
+        assert_eq!(format!("{}", ConfigurationOverrideScope::Workspace), "workspace");
+        assert_eq!(format!("{}", ConfigurationOverrideScope::Folder("src".into())), "folder:src");
+        assert_eq!(format!("{}", ConfigurationOverrideScope::Language("rust".into())), "[rust]");
+    }
+
+    #[test]
+    fn resolve_override_most_specific_wins() {
+        let overrides = vec![
+            ConfigurationOverride {
+                scope: ConfigurationOverrideScope::Workspace,
+                key: "editor.tabSize".into(),
+                value: json!(4),
+            },
+            ConfigurationOverride {
+                scope: ConfigurationOverrideScope::Language("rust".into()),
+                key: "editor.tabSize".into(),
+                value: json!(2),
+            },
+        ];
+        assert_eq!(resolve_override(&overrides, "editor.tabSize"), Some(json!(2)));
+    }
+
+    #[test]
+    fn resolve_override_not_found() {
+        assert_eq!(resolve_override(&[], "missing"), None);
+    }
+
+    // -- ConfigurationLock tests --
+
+    #[test]
+    fn config_lock_get_set() {
+        let lock = ConfigurationLock::new();
+        assert!(lock.get("key").is_none());
+        assert!(lock.set("key", json!(42)));
+        assert_eq!(lock.get("key"), Some(json!(42)));
+    }
+
+    #[test]
+    fn config_lock_remove() {
+        let lock = ConfigurationLock::default();
+        lock.set("a", json!(1));
+        assert_eq!(lock.remove("a"), Some(json!(1)));
+        assert!(lock.get("a").is_none());
+    }
+
+    #[test]
+    fn config_lock_keys() {
+        let lock = ConfigurationLock::new();
+        lock.set("x", json!(1));
+        lock.set("y", json!(2));
+        let mut keys = lock.keys();
+        keys.sort();
+        assert_eq!(keys, vec!["x", "y"]);
+    }
+
+    // -- ConfigurationChangeDebouncer tests --
+
+    #[test]
+    fn debouncer_record_and_flush() {
+        let mut d = ConfigurationChangeDebouncer::new(100);
+        d.record("editor.fontSize");
+        d.record("editor.tabSize");
+        d.record("editor.fontSize"); // duplicate ignored
+        assert_eq!(d.pending_count(), 2);
+        assert!(d.has_pending());
+        let flushed = d.flush();
+        assert_eq!(flushed.len(), 2);
+        assert!(!d.has_pending());
+    }
+
+    #[test]
+    fn debouncer_ms() {
+        let d = ConfigurationChangeDebouncer::new(250);
+        assert_eq!(d.debounce_ms(), 250);
+    }
+
+    // -- InheritanceChainBuilder tests --
+
+    #[test]
+    fn inheritance_chain_resolve_last_wins() {
+        let mut builder = InheritanceChainBuilder::new();
+        let mut defaults = HashMap::new();
+        defaults.insert("tabSize".into(), json!(4));
+        defaults.insert("fontSize".into(), json!(12));
+        builder.add_layer("defaults", defaults);
+
+        let mut user = HashMap::new();
+        user.insert("tabSize".into(), json!(2));
+        builder.add_layer("user", user);
+
+        assert_eq!(builder.resolve("tabSize"), Some(json!(2)));
+        assert_eq!(builder.resolve("fontSize"), Some(json!(12)));
+        assert_eq!(builder.resolve("missing"), None);
+    }
+
+    #[test]
+    fn inheritance_chain_build_merges() {
+        let mut builder = InheritanceChainBuilder::default();
+        let mut l1 = HashMap::new();
+        l1.insert("a".into(), json!(1));
+        builder.add_layer("base", l1);
+        let mut l2 = HashMap::new();
+        l2.insert("b".into(), json!(2));
+        builder.add_layer("overlay", l2);
+        let merged = builder.build();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged["a"], json!(1));
+        assert_eq!(merged["b"], json!(2));
+    }
+
+    #[test]
+    fn inheritance_chain_layer_names() {
+        let mut builder = InheritanceChainBuilder::new();
+        builder.add_layer("defaults", HashMap::new());
+        builder.add_layer("user", HashMap::new());
+        assert_eq!(builder.layer_names(), vec!["defaults", "user"]);
+        assert_eq!(builder.len(), 2);
     }
 }

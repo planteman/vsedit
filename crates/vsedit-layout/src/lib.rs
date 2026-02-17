@@ -1,4 +1,5 @@
 //! Flexbox-like terminal layout engine.
+use std::collections::HashMap;
 use std::fmt;
 
 use vsedit_tui::Rect;
@@ -1299,6 +1300,268 @@ pub fn distribute_evenly(total: u16, count: u16) -> Vec<u16> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Constraint solver
+// ---------------------------------------------------------------------------
+
+/// Enforces minimum and maximum size constraints on rectangles.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutConstraintSolver {
+    pub min_width: u16,
+    pub max_width: u16,
+    pub min_height: u16,
+    pub max_height: u16,
+}
+
+impl LayoutConstraintSolver {
+    pub fn new(min_width: u16, max_width: u16, min_height: u16, max_height: u16) -> Self {
+        Self {
+            min_width,
+            max_width,
+            min_height,
+            max_height,
+        }
+    }
+
+    /// Clamp a width value to the configured bounds.
+    pub fn clamp_width(&self, w: u16) -> u16 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to the configured bounds.
+    pub fn clamp_height(&self, h: u16) -> u16 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Return a new `Rect` whose width and height are clamped to the bounds.
+    pub fn clamp_rect(&self, r: &Rect) -> Rect {
+        Rect::new(
+            r.x,
+            r.y,
+            self.clamp_width(r.width),
+            self.clamp_height(r.height),
+        )
+    }
+
+    /// Check whether a rectangle already satisfies all constraints.
+    pub fn is_satisfied(&self, r: &Rect) -> bool {
+        r.width >= self.min_width
+            && r.width <= self.max_width
+            && r.height >= self.min_height
+            && r.height <= self.max_height
+    }
+
+    /// Return a list of human-readable constraint violations for `r`.
+    pub fn violations(&self, r: &Rect) -> Vec<String> {
+        let mut out = Vec::new();
+        if r.width < self.min_width {
+            out.push(format!(
+                "width {} below minimum {}",
+                r.width, self.min_width
+            ));
+        }
+        if r.width > self.max_width {
+            out.push(format!(
+                "width {} above maximum {}",
+                r.width, self.max_width
+            ));
+        }
+        if r.height < self.min_height {
+            out.push(format!(
+                "height {} below minimum {}",
+                r.height, self.min_height
+            ));
+        }
+        if r.height > self.max_height {
+            out.push(format!(
+                "height {} above maximum {}",
+                r.height, self.max_height
+            ));
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Zone management
+// ---------------------------------------------------------------------------
+
+/// A named rectangular region in the layout.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutZone {
+    pub name: String,
+    pub rect: Rect,
+    pub draggable: bool,
+    pub visible: bool,
+}
+
+/// Manages a collection of named rectangular zones.
+#[derive(Debug, Clone)]
+pub struct LayoutZoneManager {
+    zones: HashMap<String, LayoutZone>,
+}
+
+impl LayoutZoneManager {
+    pub fn new() -> Self {
+        Self {
+            zones: HashMap::new(),
+        }
+    }
+
+    /// Add a zone. New zones default to visible.
+    pub fn add_zone(&mut self, name: &str, rect: Rect, draggable: bool) -> &mut Self {
+        self.zones.insert(
+            name.to_string(),
+            LayoutZone {
+                name: name.to_string(),
+                rect,
+                draggable,
+                visible: true,
+            },
+        );
+        self
+    }
+
+    /// Remove a zone by name, returning it if it existed.
+    pub fn remove_zone(&mut self, name: &str) -> Option<LayoutZone> {
+        self.zones.remove(name)
+    }
+
+    /// Find the first zone whose rectangle contains the point `(x, y)`.
+    pub fn zone_at_point(&self, x: u16, y: u16) -> Option<&LayoutZone> {
+        self.zones.values().find(|z| {
+            z.visible
+                && x >= z.rect.x
+                && x < z.rect.x.saturating_add(z.rect.width)
+                && y >= z.rect.y
+                && y < z.rect.y.saturating_add(z.rect.height)
+        })
+    }
+
+    /// Return all zones that are draggable.
+    pub fn draggable_zones(&self) -> Vec<&LayoutZone> {
+        self.zones
+            .values()
+            .filter(|z| z.draggable)
+            .collect()
+    }
+
+    /// Return all zones that are visible.
+    pub fn visible_zones(&self) -> Vec<&LayoutZone> {
+        self.zones
+            .values()
+            .filter(|z| z.visible)
+            .collect()
+    }
+
+    /// Total number of zones (visible or not).
+    pub fn zone_count(&self) -> usize {
+        self.zones.len()
+    }
+}
+
+impl Default for LayoutZoneManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Resize handles
+// ---------------------------------------------------------------------------
+
+/// One of eight positions around a rectangle where a resize handle can sit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HandlePosition {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+/// A resize handle attached to a zone edge or corner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LayoutResizeHandle {
+    pub position: HandlePosition,
+    pub size: u16,
+}
+
+impl LayoutResizeHandle {
+    pub fn new(position: HandlePosition, size: u16) -> Self {
+        Self { position, size }
+    }
+
+    /// Test whether the point `(x, y)` falls within this handle's hit area
+    /// relative to `zone_rect`.
+    pub fn hit_test(&self, zone_rect: &Rect, x: u16, y: u16) -> bool {
+        let s = self.size;
+        let zx = zone_rect.x;
+        let zy = zone_rect.y;
+        let zw = zone_rect.width;
+        let zh = zone_rect.height;
+
+        let (hx, hy, hw, hh) = match self.position {
+            HandlePosition::Top => (zx, zy, zw, s),
+            HandlePosition::Bottom => (zx, zy.saturating_add(zh).saturating_sub(s), zw, s),
+            HandlePosition::Left => (zx, zy, s, zh),
+            HandlePosition::Right => (zx.saturating_add(zw).saturating_sub(s), zy, s, zh),
+            HandlePosition::TopLeft => (zx, zy, s, s),
+            HandlePosition::TopRight => (zx.saturating_add(zw).saturating_sub(s), zy, s, s),
+            HandlePosition::BottomLeft => (zx, zy.saturating_add(zh).saturating_sub(s), s, s),
+            HandlePosition::BottomRight => (
+                zx.saturating_add(zw).saturating_sub(s),
+                zy.saturating_add(zh).saturating_sub(s),
+                s,
+                s,
+            ),
+        };
+
+        x >= hx && x < hx.saturating_add(hw) && y >= hy && y < hy.saturating_add(hh)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Grid snapping
+// ---------------------------------------------------------------------------
+
+/// Snaps coordinate values to the nearest grid line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LayoutSnapper {
+    pub grid_size: u16,
+}
+
+impl LayoutSnapper {
+    pub fn new(grid_size: u16) -> Self {
+        assert!(grid_size > 0, "grid_size must be > 0");
+        Self { grid_size }
+    }
+
+    /// Snap a single value to the nearest multiple of `grid_size`.
+    pub fn snap(&self, value: u16) -> u16 {
+        let g = self.grid_size;
+        let remainder = value % g;
+        if remainder >= g / 2 + g % 2 {
+            value.saturating_add(g - remainder)
+        } else {
+            value - remainder
+        }
+    }
+
+    /// Snap all four fields of a `Rect` to the grid.
+    pub fn snap_rect(&self, r: &Rect) -> Rect {
+        Rect::new(
+            self.snap(r.x),
+            self.snap(r.y),
+            self.snap(r.width),
+            self.snap(r.height),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1944,6 +2207,142 @@ mod tests {
         let sizes = distribute_evenly(10, 3);
         assert_eq!(sizes, vec![4, 3, 3]);
         assert_eq!(sizes.iter().sum::<u16>(), 10);
+    }
+
+    // -- LayoutConstraintSolver tests --
+
+    #[test]
+    fn test_constraint_solver_clamp_width() {
+        let solver = LayoutConstraintSolver::new(10, 100, 5, 50);
+        assert_eq!(solver.clamp_width(5), 10);
+        assert_eq!(solver.clamp_width(50), 50);
+        assert_eq!(solver.clamp_width(200), 100);
+    }
+
+    #[test]
+    fn test_constraint_solver_clamp_height() {
+        let solver = LayoutConstraintSolver::new(10, 100, 5, 50);
+        assert_eq!(solver.clamp_height(2), 5);
+        assert_eq!(solver.clamp_height(30), 30);
+        assert_eq!(solver.clamp_height(80), 50);
+    }
+
+    #[test]
+    fn test_constraint_solver_clamp_rect() {
+        let solver = LayoutConstraintSolver::new(10, 100, 5, 50);
+        let r = rect(1, 2, 200, 1);
+        let clamped = solver.clamp_rect(&r);
+        assert_eq!(clamped.x, 1);
+        assert_eq!(clamped.y, 2);
+        assert_eq!(clamped.width, 100);
+        assert_eq!(clamped.height, 5);
+    }
+
+    #[test]
+    fn test_constraint_solver_is_satisfied() {
+        let solver = LayoutConstraintSolver::new(10, 100, 5, 50);
+        assert!(solver.is_satisfied(&rect(0, 0, 50, 25)));
+        assert!(!solver.is_satisfied(&rect(0, 0, 5, 25)));
+        assert!(!solver.is_satisfied(&rect(0, 0, 50, 60)));
+    }
+
+    #[test]
+    fn test_constraint_solver_violations() {
+        let solver = LayoutConstraintSolver::new(10, 100, 5, 50);
+        let v = solver.violations(&rect(0, 0, 50, 25));
+        assert!(v.is_empty());
+        let v = solver.violations(&rect(0, 0, 3, 80));
+        assert_eq!(v.len(), 2);
+        assert!(v[0].contains("width"));
+        assert!(v[1].contains("height"));
+    }
+
+    // -- LayoutZoneManager tests --
+
+    #[test]
+    fn test_zone_manager_add_remove() {
+        let mut mgr = LayoutZoneManager::new();
+        mgr.add_zone("a", rect(0, 0, 10, 10), false);
+        mgr.add_zone("b", rect(20, 0, 10, 10), true);
+        assert_eq!(mgr.zone_count(), 2);
+        let removed = mgr.remove_zone("a");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().name, "a");
+        assert_eq!(mgr.zone_count(), 1);
+        assert!(mgr.remove_zone("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_zone_manager_zone_at_point() {
+        let mut mgr = LayoutZoneManager::new();
+        mgr.add_zone("panel", rect(5, 5, 20, 10), false);
+        assert!(mgr.zone_at_point(10, 8).is_some());
+        assert_eq!(mgr.zone_at_point(10, 8).unwrap().name, "panel");
+        assert!(mgr.zone_at_point(0, 0).is_none());
+        assert!(mgr.zone_at_point(25, 15).is_none());
+    }
+
+    #[test]
+    fn test_zone_manager_draggable_zones() {
+        let mut mgr = LayoutZoneManager::new();
+        mgr.add_zone("fixed", rect(0, 0, 10, 10), false);
+        mgr.add_zone("drag1", rect(10, 0, 10, 10), true);
+        mgr.add_zone("drag2", rect(20, 0, 10, 10), true);
+        let draggable = mgr.draggable_zones();
+        assert_eq!(draggable.len(), 2);
+        assert!(draggable.iter().all(|z| z.draggable));
+    }
+
+    #[test]
+    fn test_zone_manager_visible_zones() {
+        let mut mgr = LayoutZoneManager::new();
+        mgr.add_zone("vis", rect(0, 0, 10, 10), false);
+        mgr.add_zone("also_vis", rect(10, 0, 10, 10), false);
+        // All zones start visible
+        assert_eq!(mgr.visible_zones().len(), 2);
+    }
+
+    // -- LayoutResizeHandle tests --
+
+    #[test]
+    fn test_resize_handle_hit_test() {
+        let zone = rect(10, 10, 40, 30);
+        let top = LayoutResizeHandle::new(HandlePosition::Top, 3);
+        assert!(top.hit_test(&zone, 20, 10));
+        assert!(top.hit_test(&zone, 20, 12));
+        assert!(!top.hit_test(&zone, 20, 13));
+
+        let br = LayoutResizeHandle::new(HandlePosition::BottomRight, 4);
+        assert!(br.hit_test(&zone, 49, 39));
+        assert!(!br.hit_test(&zone, 10, 10));
+
+        let left = LayoutResizeHandle::new(HandlePosition::Left, 2);
+        assert!(left.hit_test(&zone, 10, 20));
+        assert!(!left.hit_test(&zone, 12, 20));
+    }
+
+    // -- LayoutSnapper tests --
+
+    #[test]
+    fn test_snapper_snap_value() {
+        let snapper = LayoutSnapper::new(8);
+        assert_eq!(snapper.snap(0), 0);
+        assert_eq!(snapper.snap(3), 0);
+        assert_eq!(snapper.snap(4), 8);
+        assert_eq!(snapper.snap(7), 8);
+        assert_eq!(snapper.snap(8), 8);
+        assert_eq!(snapper.snap(12), 16);
+    }
+
+    #[test]
+    fn test_snapper_snap_rect() {
+        let snapper = LayoutSnapper::new(10);
+        let r = rect(3, 7, 14, 26);
+        let snapped = snapper.snap_rect(&r);
+        assert_eq!(snapped.x, 0);
+        assert_eq!(snapped.y, 10);
+        assert_eq!(snapped.width, 10);
+        assert_eq!(snapped.height, 30);
     }
 
 }

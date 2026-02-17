@@ -1147,6 +1147,208 @@ pub fn extract_selected_text(range: &SelectionRange, lines: &[&str]) -> String {
     result
 }
 
+// ---------------------------------------------------------------------------
+// SmartSelectExpander – wraps expansion chain with strategy lookup
+// ---------------------------------------------------------------------------
+
+/// A strategy entry pairing an expansion level with a range.
+#[derive(Debug, Clone)]
+pub struct SmartSelectStrategy {
+    pub level: ExpansionLevel,
+    pub range: SelectionRange,
+}
+
+/// Builds and queries a chain of expansion strategies.
+pub struct SmartSelectExpander {
+    strategies: Vec<SmartSelectStrategy>,
+}
+
+impl SmartSelectExpander {
+    /// Create from a list of `(level, range)` pairs; sorted by level.
+    pub fn new(mut entries: Vec<(ExpansionLevel, SelectionRange)>) -> Self {
+        entries.sort_by_key(|(lvl, _)| *lvl);
+        let strategies = entries
+            .into_iter()
+            .map(|(level, range)| SmartSelectStrategy { level, range })
+            .collect();
+        Self { strategies }
+    }
+
+    /// Get the range for a specific level.
+    pub fn range_for(&self, level: ExpansionLevel) -> Option<&SelectionRange> {
+        self.strategies.iter().find(|s| s.level == level).map(|s| &s.range)
+    }
+
+    /// Expand from `current` to the next broader level available in strategies.
+    pub fn expand_from(&self, current: ExpansionLevel) -> Option<&SmartSelectStrategy> {
+        self.strategies.iter().find(|s| s.level > current)
+    }
+
+    /// Shrink from `current` to the next narrower level available.
+    pub fn shrink_from(&self, current: ExpansionLevel) -> Option<&SmartSelectStrategy> {
+        self.strategies.iter().rev().find(|s| s.level < current)
+    }
+
+    pub fn len(&self) -> usize {
+        self.strategies.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.strategies.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SmartSelectHistory – tracks expansion / shrink steps
+// ---------------------------------------------------------------------------
+
+/// Records the history of expand/shrink operations for undo support.
+#[derive(Debug, Clone)]
+pub struct SmartSelectHistory {
+    stack: Vec<(ExpansionLevel, SelectionRange)>,
+}
+
+impl SmartSelectHistory {
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
+
+    /// Record an expansion step.
+    pub fn push(&mut self, level: ExpansionLevel, range: SelectionRange) {
+        self.stack.push((level, range));
+    }
+
+    /// Undo the most recent expansion.
+    pub fn pop(&mut self) -> Option<(ExpansionLevel, SelectionRange)> {
+        self.stack.pop()
+    }
+
+    /// Current (top) level.
+    pub fn current_level(&self) -> Option<ExpansionLevel> {
+        self.stack.last().map(|(l, _)| *l)
+    }
+
+    /// Peek at the current entry.
+    pub fn current(&self) -> Option<&(ExpansionLevel, SelectionRange)> {
+        self.stack.last()
+    }
+
+    pub fn clear(&mut self) {
+        self.stack.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+}
+
+impl Default for SmartSelectHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SmartSelectHint – UI hint for the next expansion
+// ---------------------------------------------------------------------------
+
+/// A hint showing the user what the next expand/shrink will select.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SmartSelectHint {
+    pub current_level: ExpansionLevel,
+    pub next_level: Option<ExpansionLevel>,
+    pub label: String,
+}
+
+impl SmartSelectHint {
+    /// Build a hint from the current level.
+    pub fn from_level(level: ExpansionLevel) -> Self {
+        let next = match level {
+            ExpansionLevel::Word => Some(ExpansionLevel::Line),
+            ExpansionLevel::Line => Some(ExpansionLevel::Block),
+            ExpansionLevel::Block => Some(ExpansionLevel::Function),
+            ExpansionLevel::Function => Some(ExpansionLevel::File),
+            ExpansionLevel::File => None,
+        };
+        let label = match next {
+            Some(n) => format!("Expand to {}", n),
+            None => "Already at broadest selection".to_string(),
+        };
+        Self { current_level: level, next_level: next, label }
+    }
+
+    /// Whether further expansion is possible.
+    pub fn can_expand(&self) -> bool {
+        self.next_level.is_some()
+    }
+}
+
+impl fmt::Display for SmartSelectHint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bracket-aware selection helpers
+// ---------------------------------------------------------------------------
+
+/// A bracket pair for selection matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BracketPair {
+    pub open: char,
+    pub close: char,
+}
+
+impl BracketPair {
+    pub const PARENS: Self = Self { open: '(', close: ')' };
+    pub const BRACKETS: Self = Self { open: '[', close: ']' };
+    pub const BRACES: Self = Self { open: '{', close: '}' };
+    pub const ANGLES: Self = Self { open: '<', close: '>' };
+
+    /// All common bracket pairs.
+    pub fn all() -> &'static [BracketPair] {
+        &[Self::PARENS, Self::BRACKETS, Self::BRACES, Self::ANGLES]
+    }
+}
+
+/// Find the matching bracket range in a single line from a given offset.
+/// Returns `(open_offset, close_offset)` inclusive, or `None`.
+pub fn find_bracket_range(text: &str, offset: usize, pair: BracketPair) -> Option<(usize, usize)> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut depth = 0i32;
+    let mut open_pos = None;
+    let start = offset.min(chars.len().saturating_sub(1));
+    for i in (0..=start).rev() {
+        if chars[i] == pair.close {
+            depth += 1;
+        } else if chars[i] == pair.open {
+            if depth == 0 {
+                open_pos = Some(i);
+                break;
+            }
+            depth -= 1;
+        }
+    }
+    let open_pos = open_pos?;
+    depth = 0;
+    for i in (open_pos + 1)..chars.len() {
+        if chars[i] == pair.open {
+            depth += 1;
+        } else if chars[i] == pair.close {
+            if depth == 0 {
+                return Some((open_pos, i));
+            }
+            depth -= 1;
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1980,5 +2182,125 @@ mod tests {
     fn merge_empty_returns_empty() {
         let merged = merge_overlapping_selections(&[]);
         assert!(merged.is_empty());
+    }
+
+    // -- SmartSelectExpander tests --
+
+    #[test]
+    fn expander_range_for_level() {
+        let entries = vec![
+            (ExpansionLevel::Word, SelectionRange::new(1, 1, 1, 5)),
+            (ExpansionLevel::Block, SelectionRange::new(1, 1, 5, 20)),
+        ];
+        let exp = SmartSelectExpander::new(entries);
+        assert!(exp.range_for(ExpansionLevel::Word).is_some());
+        assert!(exp.range_for(ExpansionLevel::Line).is_none());
+        assert!(exp.range_for(ExpansionLevel::Block).is_some());
+        assert_eq!(exp.len(), 2);
+    }
+
+    #[test]
+    fn expander_expand_and_shrink() {
+        let entries = vec![
+            (ExpansionLevel::Word, SelectionRange::new(1, 1, 1, 5)),
+            (ExpansionLevel::Line, SelectionRange::new(1, 1, 1, 30)),
+            (ExpansionLevel::Function, SelectionRange::new(1, 1, 20, 1)),
+        ];
+        let exp = SmartSelectExpander::new(entries);
+        let expanded = exp.expand_from(ExpansionLevel::Word).unwrap();
+        assert_eq!(expanded.level, ExpansionLevel::Line);
+        let shrunk = exp.shrink_from(ExpansionLevel::Line).unwrap();
+        assert_eq!(shrunk.level, ExpansionLevel::Word);
+    }
+
+    #[test]
+    fn expander_no_expand_from_file() {
+        let entries = vec![
+            (ExpansionLevel::File, SelectionRange::new(1, 1, 100, 1)),
+        ];
+        let exp = SmartSelectExpander::new(entries);
+        assert!(exp.expand_from(ExpansionLevel::File).is_none());
+    }
+
+    // -- SmartSelectHistory tests --
+
+    #[test]
+    fn history_push_pop() {
+        let mut hist = SmartSelectHistory::new();
+        assert!(hist.is_empty());
+        hist.push(ExpansionLevel::Word, SelectionRange::new(1, 1, 1, 5));
+        hist.push(ExpansionLevel::Block, SelectionRange::new(1, 1, 5, 1));
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist.current_level(), Some(ExpansionLevel::Block));
+        let (lvl, _) = hist.pop().unwrap();
+        assert_eq!(lvl, ExpansionLevel::Block);
+        assert_eq!(hist.current_level(), Some(ExpansionLevel::Word));
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut hist = SmartSelectHistory::default();
+        hist.push(ExpansionLevel::Word, SelectionRange::new(1, 1, 1, 5));
+        hist.clear();
+        assert!(hist.is_empty());
+        assert!(hist.pop().is_none());
+    }
+
+    // -- SmartSelectHint tests --
+
+    #[test]
+    fn hint_from_word_can_expand() {
+        let hint = SmartSelectHint::from_level(ExpansionLevel::Word);
+        assert!(hint.can_expand());
+        assert_eq!(hint.next_level, Some(ExpansionLevel::Line));
+        assert!(hint.label.contains("Line"));
+    }
+
+    #[test]
+    fn hint_from_file_cannot_expand() {
+        let hint = SmartSelectHint::from_level(ExpansionLevel::File);
+        assert!(!hint.can_expand());
+        assert!(hint.label.contains("broadest"));
+    }
+
+    #[test]
+    fn hint_display() {
+        let hint = SmartSelectHint::from_level(ExpansionLevel::Block);
+        let s = format!("{}", hint);
+        assert!(s.contains("Function"));
+    }
+
+    // -- Bracket-aware selection tests --
+
+    #[test]
+    fn bracket_pair_all() {
+        assert_eq!(BracketPair::all().len(), 4);
+    }
+
+    #[test]
+    fn find_bracket_range_parens() {
+        let text = "foo(bar(baz))end";
+        let result = find_bracket_range(text, 5, BracketPair::PARENS);
+        assert_eq!(result, Some((3, 12)));
+    }
+
+    #[test]
+    fn find_bracket_range_nested() {
+        let text = "[a, [b, c], d]";
+        let result = find_bracket_range(text, 6, BracketPair::BRACKETS);
+        assert_eq!(result, Some((4, 9)));
+    }
+
+    #[test]
+    fn find_bracket_range_unmatched() {
+        let text = "no brackets here";
+        assert!(find_bracket_range(text, 5, BracketPair::PARENS).is_none());
+    }
+
+    #[test]
+    fn find_bracket_range_braces() {
+        let text = "fn main() { x }";
+        let result = find_bracket_range(text, 13, BracketPair::BRACES);
+        assert_eq!(result, Some((10, 14)));
     }
 }

@@ -1056,6 +1056,282 @@ impl VsBuffer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BufferDiff – compare two buffers
+// ---------------------------------------------------------------------------
+
+/// Result of comparing two buffers byte-by-byte.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BufferDiffResult {
+    /// Whether the two buffers are byte-identical.
+    pub identical: bool,
+    /// Byte offset of the first difference, if any.
+    pub first_diff_offset: Option<usize>,
+    /// Length of the longest common prefix.
+    pub common_prefix_len: usize,
+    /// Length of the longest common suffix (non-overlapping with the prefix).
+    pub common_suffix_len: usize,
+}
+
+/// Utilities for comparing two [`VsBuffer`] instances.
+pub struct BufferDiff;
+
+impl BufferDiff {
+    /// Compare two buffers and return a detailed [`BufferDiffResult`].
+    pub fn compare(a: &VsBuffer, b: &VsBuffer) -> BufferDiffResult {
+        let a_bytes = a.as_bytes();
+        let b_bytes = b.as_bytes();
+
+        let min_len = a_bytes.len().min(b_bytes.len());
+
+        // Common prefix length.
+        let mut prefix_len = 0;
+        for i in 0..min_len {
+            if a_bytes[i] == b_bytes[i] {
+                prefix_len += 1;
+            } else {
+                break;
+            }
+        }
+
+        let identical = a_bytes.len() == b_bytes.len() && prefix_len == a_bytes.len();
+
+        let first_diff_offset = if identical {
+            None
+        } else if prefix_len < min_len {
+            Some(prefix_len)
+        } else {
+            // One buffer is a prefix of the other.
+            Some(min_len)
+        };
+
+        // Common suffix length (must not overlap with the prefix region).
+        let mut suffix_len = 0;
+        let remaining = min_len - prefix_len;
+        for i in 0..remaining {
+            let ai = a_bytes.len() - 1 - i;
+            let bi = b_bytes.len() - 1 - i;
+            if a_bytes[ai] == b_bytes[bi] {
+                suffix_len += 1;
+            } else {
+                break;
+            }
+        }
+
+        BufferDiffResult {
+            identical,
+            first_diff_offset,
+            common_prefix_len: prefix_len,
+            common_suffix_len: suffix_len,
+        }
+    }
+
+    /// Convenience check for byte-equality of two buffers.
+    pub fn are_equal(a: &VsBuffer, b: &VsBuffer) -> bool {
+        a.as_bytes() == b.as_bytes()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferCompression – simple RLE encoding / decoding
+// ---------------------------------------------------------------------------
+
+/// Simple run-length encoding helpers for byte slices.
+pub struct BufferCompression;
+
+impl BufferCompression {
+    /// Encode `data` using run-length encoding.
+    ///
+    /// Each run of identical bytes is encoded as `(count, byte)` where count
+    /// is stored as a single `u8` (maximum run length 255). Longer runs are
+    /// split into multiple pairs.
+    pub fn rle_encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        if data.is_empty() {
+            return out;
+        }
+
+        let mut i = 0;
+        while i < data.len() {
+            let byte = data[i];
+            let mut count: u8 = 1;
+            while i + (count as usize) < data.len()
+                && data[i + (count as usize)] == byte
+                && count < 255
+            {
+                count += 1;
+            }
+            out.push(count);
+            out.push(byte);
+            i += count as usize;
+        }
+        out
+    }
+
+    /// Decode run-length encoded data produced by [`rle_encode`](Self::rle_encode).
+    ///
+    /// The input must contain an even number of bytes (count/byte pairs).
+    pub fn rle_decode(encoded: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i + 1 < encoded.len() {
+            let count = encoded[i] as usize;
+            let byte = encoded[i + 1];
+            out.extend(std::iter::repeat(byte).take(count));
+            i += 2;
+        }
+        out
+    }
+
+    /// Compute the compression ratio `compressed_len / original_len`.
+    ///
+    /// Returns `f64::INFINITY` when `original` is empty and `compressed` is
+    /// not, or `1.0` when both are empty.
+    pub fn compression_ratio(original: &[u8], compressed: &[u8]) -> f64 {
+        if original.is_empty() {
+            if compressed.is_empty() {
+                return 1.0;
+            }
+            return f64::INFINITY;
+        }
+        compressed.len() as f64 / original.len() as f64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CircularBuffer – fixed-capacity ring buffer
+// ---------------------------------------------------------------------------
+
+/// A fixed-capacity circular (ring) buffer of bytes.
+///
+/// When the buffer is full, the oldest byte is silently overwritten by
+/// [`push`](Self::push).
+#[derive(Debug, Clone)]
+pub struct CircularBuffer {
+    buf: Vec<u8>,
+    capacity: usize,
+    head: usize,
+    len: usize,
+}
+
+impl CircularBuffer {
+    /// Create a new circular buffer with the given capacity.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "CircularBuffer capacity must be > 0");
+        Self {
+            buf: vec![0u8; capacity],
+            capacity,
+            head: 0,
+            len: 0,
+        }
+    }
+
+    /// Push a byte into the buffer, overwriting the oldest byte if full.
+    pub fn push(&mut self, byte: u8) {
+        let write_pos = (self.head + self.len) % self.capacity;
+        if self.len == self.capacity {
+            // Overwrite oldest – advance head.
+            self.buf[write_pos] = byte;
+            self.head = (self.head + 1) % self.capacity;
+        } else {
+            self.buf[write_pos] = byte;
+            self.len += 1;
+        }
+    }
+
+    /// Number of bytes currently stored.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Whether the buffer has reached its capacity.
+    pub fn is_full(&self) -> bool {
+        self.len == self.capacity
+    }
+
+    /// Whether the buffer contains no bytes.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Get the byte at logical `index` (0 = oldest).
+    pub fn get(&self, index: usize) -> Option<u8> {
+        if index >= self.len {
+            return None;
+        }
+        Some(self.buf[(self.head + index) % self.capacity])
+    }
+
+    /// Return all stored bytes in order (oldest first).
+    pub fn to_vec(&self) -> Vec<u8> {
+        (0..self.len)
+            .map(|i| self.buf[(self.head + i) % self.capacity])
+            .collect()
+    }
+
+    /// Remove all stored bytes without changing the capacity.
+    pub fn clear(&mut self) {
+        self.head = 0;
+        self.len = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferSearch – pattern search inside a VsBuffer
+// ---------------------------------------------------------------------------
+
+/// Byte-pattern search utilities for [`VsBuffer`].
+pub struct BufferSearch;
+
+impl BufferSearch {
+    /// Return the offset of the first occurrence of `needle` in `buf`, or
+    /// `None` if not found.
+    pub fn find_first(buf: &VsBuffer, needle: &[u8]) -> Option<usize> {
+        if needle.is_empty() {
+            return Some(0);
+        }
+        let haystack = buf.as_bytes();
+        if needle.len() > haystack.len() {
+            return None;
+        }
+        haystack
+            .windows(needle.len())
+            .position(|w| w == needle)
+    }
+
+    /// Return the starting offsets of every (non-overlapping) occurrence of
+    /// `needle` in `buf`.
+    pub fn find_all(buf: &VsBuffer, needle: &[u8]) -> Vec<usize> {
+        if needle.is_empty() {
+            return vec![];
+        }
+        let haystack = buf.as_bytes();
+        if needle.len() > haystack.len() {
+            return vec![];
+        }
+        let mut positions = Vec::new();
+        let mut start = 0;
+        while start + needle.len() <= haystack.len() {
+            if &haystack[start..start + needle.len()] == needle {
+                positions.push(start);
+                start += needle.len(); // non-overlapping
+            } else {
+                start += 1;
+            }
+        }
+        positions
+    }
+
+    /// Count the number of non-overlapping occurrences of `needle` in `buf`.
+    pub fn count_occurrences(buf: &VsBuffer, needle: &[u8]) -> usize {
+        Self::find_all(buf, needle).len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1872,5 +2148,136 @@ mod tests {
         let buf = VsBuffer::from_string("hello");
         let result = buf.replace_byte(b'l', b'r');
         assert_eq!(result.to_string_lossy(), "herro");
+    }
+
+    // -----------------------------------------------------------------------
+    // BufferDiff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn diff_identical_buffers() {
+        let a = VsBuffer::from_string("hello");
+        let b = VsBuffer::from_string("hello");
+        let result = BufferDiff::compare(&a, &b);
+        assert!(result.identical);
+        assert_eq!(result.first_diff_offset, None);
+        assert_eq!(result.common_prefix_len, 5);
+        assert_eq!(result.common_suffix_len, 0);
+        assert!(BufferDiff::are_equal(&a, &b));
+    }
+
+    #[test]
+    fn diff_different_buffers() {
+        let a = VsBuffer::from_string("hello");
+        let b = VsBuffer::from_string("hxllo");
+        let result = BufferDiff::compare(&a, &b);
+        assert!(!result.identical);
+        assert_eq!(result.first_diff_offset, Some(1));
+        assert_eq!(result.common_prefix_len, 1);
+        assert_eq!(result.common_suffix_len, 3); // "llo"
+    }
+
+    #[test]
+    fn diff_different_lengths() {
+        let a = VsBuffer::from_string("abc");
+        let b = VsBuffer::from_string("abcdef");
+        let result = BufferDiff::compare(&a, &b);
+        assert!(!result.identical);
+        assert_eq!(result.first_diff_offset, Some(3));
+        assert_eq!(result.common_prefix_len, 3);
+    }
+
+    // -----------------------------------------------------------------------
+    // BufferCompression tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rle_encode_decode_roundtrip() {
+        let data = b"aaabbbcccdddd";
+        let encoded = BufferCompression::rle_encode(data);
+        let decoded = BufferCompression::rle_decode(&encoded);
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn rle_encode_empty() {
+        let encoded = BufferCompression::rle_encode(b"");
+        assert!(encoded.is_empty());
+        let decoded = BufferCompression::rle_decode(&encoded);
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn rle_compression_ratio() {
+        let data = b"aaaaaaaaaa"; // 10 identical bytes
+        let encoded = BufferCompression::rle_encode(data);
+        let ratio = BufferCompression::compression_ratio(data, &encoded);
+        assert!(ratio < 1.0, "ratio should be < 1.0 for repeated data");
+    }
+
+    // -----------------------------------------------------------------------
+    // CircularBuffer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn circular_buffer_basic() {
+        let mut cb = CircularBuffer::new(3);
+        assert!(cb.is_empty());
+        cb.push(1);
+        cb.push(2);
+        cb.push(3);
+        assert!(cb.is_full());
+        assert_eq!(cb.len(), 3);
+        assert_eq!(cb.to_vec(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn circular_buffer_overwrite() {
+        let mut cb = CircularBuffer::new(3);
+        cb.push(1);
+        cb.push(2);
+        cb.push(3);
+        cb.push(4); // overwrites 1
+        assert_eq!(cb.to_vec(), vec![2, 3, 4]);
+        assert_eq!(cb.get(0), Some(2));
+        assert_eq!(cb.get(2), Some(4));
+        assert_eq!(cb.get(3), None);
+    }
+
+    #[test]
+    fn circular_buffer_clear() {
+        let mut cb = CircularBuffer::new(4);
+        cb.push(10);
+        cb.push(20);
+        cb.clear();
+        assert!(cb.is_empty());
+        assert_eq!(cb.to_vec(), vec![]);
+    }
+
+    // -----------------------------------------------------------------------
+    // BufferSearch tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn search_find_first() {
+        let buf = VsBuffer::from_string("hello world hello");
+        assert_eq!(BufferSearch::find_first(&buf, b"world"), Some(6));
+        assert_eq!(BufferSearch::find_first(&buf, b"xyz"), None);
+        assert_eq!(BufferSearch::find_first(&buf, b""), Some(0));
+    }
+
+    #[test]
+    fn search_find_all_non_overlapping() {
+        let buf = VsBuffer::from_string("abcabcabc");
+        let positions = BufferSearch::find_all(&buf, b"abc");
+        assert_eq!(positions, vec![0, 3, 6]);
+    }
+
+    #[test]
+    fn search_count_occurrences() {
+        let buf = VsBuffer::from_string("aaa");
+        assert_eq!(BufferSearch::count_occurrences(&buf, b"a"), 3);
+        assert_eq!(BufferSearch::count_occurrences(&buf, b"aa"), 1); // non-overlapping
+        assert_eq!(BufferSearch::count_occurrences(&buf, b"b"), 0);
     }
 }

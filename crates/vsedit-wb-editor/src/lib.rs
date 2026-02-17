@@ -1,5 +1,6 @@
 //! Editor group and tab management.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Errors that can occur during editor group operations.
@@ -1275,6 +1276,250 @@ impl EditorGroupService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EditorGridResize – tracks per-group width/height percentages for grid layout
+// ---------------------------------------------------------------------------
+
+/// Stores the percentage-based size of each editor group in a grid layout.
+#[derive(Debug, Clone)]
+pub struct EditorGridResize {
+    group_sizes: HashMap<u64, (u32, u32)>,
+}
+
+impl EditorGridResize {
+    /// Creates an empty resize map.
+    pub fn new() -> Self {
+        Self {
+            group_sizes: HashMap::new(),
+        }
+    }
+
+    /// Sets the `(width_pct, height_pct)` for the given group.
+    pub fn set_size(&mut self, group_id: u64, width_pct: u32, height_pct: u32) {
+        self.group_sizes.insert(group_id, (width_pct, height_pct));
+    }
+
+    /// Returns the stored size for the given group, if any.
+    pub fn get_size(&self, group_id: u64) -> Option<(u32, u32)> {
+        self.group_sizes.get(&group_id).copied()
+    }
+
+    /// Removes a group from the map, returning whether it was present.
+    pub fn remove(&mut self, group_id: u64) -> bool {
+        self.group_sizes.remove(&group_id).is_some()
+    }
+
+    /// Normalizes all width percentages so they sum to exactly 100.
+    /// Heights are left untouched. Does nothing when the map is empty.
+    pub fn normalize(&mut self) {
+        let total_w: u32 = self.group_sizes.values().map(|(w, _)| *w).sum();
+        if total_w == 0 || self.group_sizes.is_empty() {
+            return;
+        }
+        for (_id, (w, _h)) in self.group_sizes.iter_mut() {
+            *w = (*w * 100) / total_w;
+        }
+        // Distribute any rounding remainder to the first entry.
+        let new_total: u32 = self.group_sizes.values().map(|(w, _)| *w).sum();
+        if new_total < 100 {
+            if let Some((w, _)) = self.group_sizes.values_mut().next() {
+                *w += 100 - new_total;
+            }
+        }
+    }
+
+    /// Returns `true` when every percentage is in `1..=100`.
+    pub fn is_valid(&self) -> bool {
+        self.group_sizes
+            .values()
+            .all(|(w, h)| (1..=100).contains(w) && (1..=100).contains(h))
+    }
+
+    /// Number of groups being tracked.
+    pub fn group_count(&self) -> usize {
+        self.group_sizes.len()
+    }
+
+    /// Clears all stored sizes.
+    pub fn reset(&mut self) {
+        self.group_sizes.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabDecorations – visual decorations (icons / badges) for tabs
+// ---------------------------------------------------------------------------
+
+/// A single tab decoration with optional icon, badge text, and badge colour.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabDecoration {
+    pub icon: Option<String>,
+    pub badge: Option<String>,
+    pub badge_color: Option<String>,
+}
+
+/// Manages decorations keyed by tab URI.
+#[derive(Debug, Clone)]
+pub struct EditorTabDecorations {
+    decorations: HashMap<String, TabDecoration>,
+}
+
+impl EditorTabDecorations {
+    pub fn new() -> Self {
+        Self {
+            decorations: HashMap::new(),
+        }
+    }
+
+    pub fn set_decoration(&mut self, uri: &str, decoration: TabDecoration) {
+        self.decorations.insert(uri.to_string(), decoration);
+    }
+
+    pub fn get_decoration(&self, uri: &str) -> Option<&TabDecoration> {
+        self.decorations.get(uri)
+    }
+
+    pub fn remove_decoration(&mut self, uri: &str) -> bool {
+        self.decorations.remove(uri).is_some()
+    }
+
+    pub fn clear(&mut self) {
+        self.decorations.clear();
+    }
+
+    pub fn has_decoration(&self, uri: &str) -> bool {
+        self.decorations.contains_key(uri)
+    }
+
+    pub fn count(&self) -> usize {
+        self.decorations.len()
+    }
+
+    /// Returns sorted list of URIs that have a non-`None` badge.
+    pub fn uris_with_badges(&self) -> Vec<String> {
+        let mut uris: Vec<String> = self
+            .decorations
+            .iter()
+            .filter(|(_, d)| d.badge.is_some())
+            .map(|(uri, _)| uri.clone())
+            .collect();
+        uris.sort();
+        uris
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorUntitledSequencer – generates sequential "Untitled-N" names
+// ---------------------------------------------------------------------------
+
+/// Produces sequentially numbered untitled document names.
+#[derive(Debug, Clone)]
+pub struct EditorUntitledSequencer {
+    counter: u32,
+    prefix: String,
+}
+
+impl EditorUntitledSequencer {
+    pub fn new(prefix: &str) -> Self {
+        Self {
+            counter: 0,
+            prefix: prefix.to_string(),
+        }
+    }
+
+    /// Returns the next name, e.g. `"Untitled-1"`, `"Untitled-2"`, …
+    pub fn next(&mut self) -> String {
+        self.counter += 1;
+        format!("{}-{}", self.prefix, self.counter)
+    }
+
+    pub fn current_count(&self) -> u32 {
+        self.counter
+    }
+
+    pub fn reset(&mut self) {
+        self.counter = 0;
+    }
+}
+
+impl fmt::Display for EditorUntitledSequencer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(count={})", self.prefix, self.counter)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorCloseConfirmation – tracks dirty files that need save-confirmation
+// ---------------------------------------------------------------------------
+
+/// Collects dirty file URIs and records whether the user has confirmed close.
+#[derive(Debug, Clone)]
+pub struct EditorCloseConfirmation {
+    dirty_uris: Vec<String>,
+    confirmed: bool,
+}
+
+impl EditorCloseConfirmation {
+    pub fn new() -> Self {
+        Self {
+            dirty_uris: Vec::new(),
+            confirmed: false,
+        }
+    }
+
+    pub fn add_dirty(&mut self, uri: &str) {
+        if !self.dirty_uris.contains(&uri.to_string()) {
+            self.dirty_uris.push(uri.to_string());
+        }
+    }
+
+    /// Returns `true` when there is at least one dirty URI requiring confirmation.
+    pub fn needs_confirmation(&self) -> bool {
+        !self.dirty_uris.is_empty()
+    }
+
+    pub fn confirm(&mut self) {
+        self.confirmed = true;
+    }
+
+    pub fn cancel(&mut self) {
+        self.confirmed = false;
+    }
+
+    pub fn dirty_count(&self) -> usize {
+        self.dirty_uris.len()
+    }
+
+    pub fn dirty_list(&self) -> &[String] {
+        &self.dirty_uris
+    }
+
+    /// Human-readable confirmation message.
+    pub fn message(&self) -> String {
+        let n = self.dirty_uris.len();
+        if n == 0 {
+            "No unsaved changes.".to_string()
+        } else {
+            format!("Save changes to {} file{}?", n, if n == 1 { "" } else { "s" })
+        }
+    }
+
+    pub fn is_confirmed(&self) -> bool {
+        self.confirmed
+    }
+}
+
+impl fmt::Display for EditorCloseConfirmation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CloseConfirmation({} dirty, confirmed={})",
+            self.dirty_uris.len(),
+            self.confirmed
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1910,5 +2155,155 @@ mod tests {
         assert!(display.contains("42"));
         assert!(display.contains("2 tab(s)"));
         assert!(display.contains("1 dirty"));
+    }
+
+    // ------- EditorGridResize tests -------
+
+    #[test]
+    fn grid_resize_set_and_get() {
+        let mut gr = EditorGridResize::new();
+        assert_eq!(gr.group_count(), 0);
+        gr.set_size(1, 50, 100);
+        gr.set_size(2, 50, 100);
+        assert_eq!(gr.get_size(1), Some((50, 100)));
+        assert_eq!(gr.get_size(2), Some((50, 100)));
+        assert_eq!(gr.get_size(99), None);
+        assert_eq!(gr.group_count(), 2);
+    }
+
+    #[test]
+    fn grid_resize_remove_and_reset() {
+        let mut gr = EditorGridResize::new();
+        gr.set_size(1, 50, 50);
+        gr.set_size(2, 50, 50);
+        assert!(gr.remove(1));
+        assert!(!gr.remove(1));
+        assert_eq!(gr.group_count(), 1);
+        gr.reset();
+        assert_eq!(gr.group_count(), 0);
+    }
+
+    #[test]
+    fn grid_resize_normalize() {
+        let mut gr = EditorGridResize::new();
+        gr.set_size(1, 30, 100);
+        gr.set_size(2, 70, 100);
+        gr.normalize();
+        let total: u32 = [gr.get_size(1).unwrap().0, gr.get_size(2).unwrap().0]
+            .iter()
+            .sum();
+        assert_eq!(total, 100);
+    }
+
+    #[test]
+    fn grid_resize_is_valid() {
+        let mut gr = EditorGridResize::new();
+        gr.set_size(1, 50, 50);
+        assert!(gr.is_valid());
+        gr.set_size(2, 0, 50);
+        assert!(!gr.is_valid());
+        gr.set_size(2, 50, 101);
+        assert!(!gr.is_valid());
+    }
+
+    // ------- EditorTabDecorations tests -------
+
+    #[test]
+    fn tab_decorations_crud() {
+        let mut dec = EditorTabDecorations::new();
+        assert_eq!(dec.count(), 0);
+        dec.set_decoration(
+            "file:///a.rs",
+            TabDecoration { icon: Some("⚡".into()), badge: Some("3".into()), badge_color: None },
+        );
+        assert!(dec.has_decoration("file:///a.rs"));
+        assert!(!dec.has_decoration("file:///b.rs"));
+        assert_eq!(dec.count(), 1);
+        assert!(dec.remove_decoration("file:///a.rs"));
+        assert!(!dec.has_decoration("file:///a.rs"));
+    }
+
+    #[test]
+    fn tab_decorations_uris_with_badges() {
+        let mut dec = EditorTabDecorations::new();
+        dec.set_decoration("z.rs", TabDecoration { icon: None, badge: Some("!".into()), badge_color: None });
+        dec.set_decoration("a.rs", TabDecoration { icon: None, badge: Some("2".into()), badge_color: None });
+        dec.set_decoration("m.rs", TabDecoration { icon: Some("i".into()), badge: None, badge_color: None });
+        let badged = dec.uris_with_badges();
+        assert_eq!(badged, vec!["a.rs".to_string(), "z.rs".to_string()]);
+    }
+
+    #[test]
+    fn tab_decorations_clear() {
+        let mut dec = EditorTabDecorations::new();
+        dec.set_decoration("x.rs", TabDecoration { icon: None, badge: None, badge_color: None });
+        dec.clear();
+        assert_eq!(dec.count(), 0);
+    }
+
+    // ------- EditorUntitledSequencer tests -------
+
+    #[test]
+    fn untitled_sequencer_names() {
+        let mut seq = EditorUntitledSequencer::new("Untitled");
+        assert_eq!(seq.current_count(), 0);
+        assert_eq!(seq.next(), "Untitled-1");
+        assert_eq!(seq.next(), "Untitled-2");
+        assert_eq!(seq.current_count(), 2);
+    }
+
+    #[test]
+    fn untitled_sequencer_reset_and_display() {
+        let mut seq = EditorUntitledSequencer::new("New");
+        seq.next();
+        seq.next();
+        seq.reset();
+        assert_eq!(seq.current_count(), 0);
+        assert_eq!(seq.next(), "New-1");
+        let display = format!("{}", seq);
+        assert!(display.contains("New"));
+        assert!(display.contains("1"));
+    }
+
+    // ------- EditorCloseConfirmation tests -------
+
+    #[test]
+    fn close_confirmation_basic() {
+        let mut cc = EditorCloseConfirmation::new();
+        assert!(!cc.needs_confirmation());
+        assert_eq!(cc.message(), "No unsaved changes.");
+        cc.add_dirty("a.rs");
+        cc.add_dirty("b.rs");
+        assert!(cc.needs_confirmation());
+        assert_eq!(cc.dirty_count(), 2);
+        assert_eq!(cc.message(), "Save changes to 2 files?");
+    }
+
+    #[test]
+    fn close_confirmation_confirm_cancel() {
+        let mut cc = EditorCloseConfirmation::new();
+        cc.add_dirty("x.rs");
+        cc.confirm();
+        assert!(cc.is_confirmed());
+        cc.cancel();
+        assert!(!cc.is_confirmed());
+    }
+
+    #[test]
+    fn close_confirmation_dedup_and_display() {
+        let mut cc = EditorCloseConfirmation::new();
+        cc.add_dirty("a.rs");
+        cc.add_dirty("a.rs");
+        assert_eq!(cc.dirty_count(), 1);
+        assert_eq!(cc.dirty_list(), &["a.rs".to_string()]);
+        let display = format!("{}", cc);
+        assert!(display.contains("1 dirty"));
+    }
+
+    #[test]
+    fn close_confirmation_single_file_message() {
+        let mut cc = EditorCloseConfirmation::new();
+        cc.add_dirty("only.rs");
+        assert_eq!(cc.message(), "Save changes to 1 file?");
     }
 }

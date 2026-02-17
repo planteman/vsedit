@@ -1195,6 +1195,220 @@ pub fn uri_strip_query_fragment(uri: &ResourceUri) -> ResourceUri {
     }
 }
 
+/// Canonicalizes URIs for identity comparison by lowercasing scheme/authority,
+/// decoding unnecessary percent-encoding, normalizing path separators, and
+/// removing trailing slashes.
+pub struct UriCanonicalizer {
+    normalize_case: bool,
+    strip_trailing_slash: bool,
+    decode_unreserved: bool,
+}
+
+impl UriCanonicalizer {
+    /// Create a canonicalizer with all normalizations enabled.
+    pub fn new() -> Self {
+        Self {
+            normalize_case: true,
+            strip_trailing_slash: true,
+            decode_unreserved: true,
+        }
+    }
+
+    /// Control whether scheme and authority are lowercased.
+    pub fn set_normalize_case(&mut self, enabled: bool) {
+        self.normalize_case = enabled;
+    }
+
+    /// Control whether trailing slashes are removed from paths.
+    pub fn set_strip_trailing_slash(&mut self, enabled: bool) {
+        self.strip_trailing_slash = enabled;
+    }
+
+    /// Canonicalize a URI, returning a new normalized copy.
+    pub fn canonicalize(&self, uri: &ResourceUri) -> ResourceUri {
+        let scheme = if self.normalize_case {
+            uri.scheme.to_ascii_lowercase()
+        } else {
+            uri.scheme.clone()
+        };
+        let authority = if self.normalize_case {
+            uri.authority.to_ascii_lowercase()
+        } else {
+            uri.authority.clone()
+        };
+
+        let mut path = uri.path.replace('\\', "/");
+        // Collapse consecutive slashes into one.
+        while path.contains("//") {
+            path = path.replace("//", "/");
+        }
+        if self.decode_unreserved {
+            path = decode_unreserved_chars(&path);
+        }
+        if self.strip_trailing_slash && path.len() > 1 && path.ends_with('/') {
+            path.pop();
+        }
+
+        ResourceUri {
+            scheme,
+            authority,
+            path,
+            query: uri.query.clone(),
+            fragment: uri.fragment.clone(),
+        }
+    }
+}
+
+impl Default for UriCanonicalizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decode percent-encoded characters that are in the unreserved set
+/// (A-Z, a-z, 0-9, '-', '.', '_', '~') back to their literal form.
+fn decode_unreserved_chars(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(hi), Some(lo)) = (from_hex(bytes[i + 1]), from_hex(bytes[i + 2])) {
+                let decoded = (hi << 4) | lo;
+                if is_unreserved(decoded) {
+                    out.push(decoded);
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn is_unreserved(b: u8) -> bool {
+    matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~')
+}
+
+/// An LRU eviction cache for URI lookups. Stores resolved URIs up to a
+/// capacity limit and evicts the least-recently-used entry when full.
+pub struct UriIdentityCache {
+    capacity: usize,
+    /// Entries in access order (most-recently-used at the end).
+    entries: Vec<(String, ResourceUri)>,
+}
+
+impl UriIdentityCache {
+    /// Create a cache with the given maximum capacity. Capacity is clamped to
+    /// a minimum of 1.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Look up a key, promoting it to most-recently-used if found.
+    pub fn get(&mut self, key: &str) -> Option<&ResourceUri> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(pos);
+            self.entries.push(entry);
+            Some(&self.entries.last().unwrap().1)
+        } else {
+            None
+        }
+    }
+
+    /// Insert or update a key. If the cache is at capacity, the
+    /// least-recently-used entry is evicted first.
+    pub fn insert(&mut self, key: impl Into<String>, uri: ResourceUri) {
+        let key = key.into();
+        // Remove existing entry for this key if present.
+        if let Some(pos) = self.entries.iter().position(|(k, _)| *k == key) {
+            self.entries.remove(pos);
+        }
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0); // evict LRU
+        }
+        self.entries.push((key, uri));
+    }
+
+    /// Returns the number of entries currently in the cache.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the cache contains no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove all entries from the cache.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Returns true if the cache contains an entry for the given key (without
+    /// changing access order).
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+}
+
+/// Bulk lookup and resolution of URIs against a `UriIdentityService`.
+pub struct UriIdentityBatch<'a> {
+    service: &'a UriIdentityService,
+}
+
+impl<'a> UriIdentityBatch<'a> {
+    /// Create a batch resolver backed by the given identity service.
+    pub fn new(service: &'a UriIdentityService) -> Self {
+        Self { service }
+    }
+
+    /// Resolve a slice of keys, returning results in the same order.
+    /// Unresolvable keys map to `None`.
+    pub fn resolve_all(&self, keys: &[&str]) -> Vec<Option<ResourceUri>> {
+        keys.iter()
+            .map(|k| self.service.resolve_or_parse(k))
+            .collect()
+    }
+
+    /// Resolve only keys that match a given predicate.
+    pub fn resolve_filtered<F>(&self, keys: &[&str], predicate: F) -> Vec<(String, ResourceUri)>
+    where
+        F: Fn(&str) -> bool,
+    {
+        keys.iter()
+            .filter(|k| predicate(k))
+            .filter_map(|k| {
+                self.service
+                    .resolve_or_parse(k)
+                    .map(|uri| (k.to_string(), uri))
+            })
+            .collect()
+    }
+
+    /// Count how many of the given keys successfully resolve.
+    pub fn count_resolvable(&self, keys: &[&str]) -> usize {
+        keys.iter()
+            .filter(|k| self.service.resolve_or_parse(k).is_some())
+            .count()
+    }
+}
+
+/// Compare two URIs with case-insensitive scheme and authority but
+/// case-sensitive path, query, and fragment.
+pub fn uri_compare_case_insensitive(a: &ResourceUri, b: &ResourceUri) -> bool {
+    a.scheme.eq_ignore_ascii_case(&b.scheme)
+        && a.authority.eq_ignore_ascii_case(&b.authority)
+        && a.path == b.path
+        && a.query == b.query
+        && a.fragment == b.fragment
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1962,5 +2176,157 @@ mod tests {
         assert!(clean.query.is_none());
         assert!(clean.fragment.is_none());
         assert_eq!(clean.path, "/path");
+    }
+
+    // --- UriCanonicalizer tests ---
+
+    #[test]
+    fn canonicalizer_lowercases_scheme_and_authority() {
+        let c = UriCanonicalizer::new();
+        let uri = ResourceUri {
+            scheme: "HTTP".into(),
+            authority: "Example.COM".into(),
+            path: "/Path".into(),
+            query: None,
+            fragment: None,
+        };
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.scheme, "http");
+        assert_eq!(norm.authority, "example.com");
+        assert_eq!(norm.path, "/Path"); // path case preserved
+    }
+
+    #[test]
+    fn canonicalizer_strips_trailing_slash() {
+        let c = UriCanonicalizer::new();
+        let uri = ResourceUri::new("file", "/home/user/");
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.path, "/home/user");
+    }
+
+    #[test]
+    fn canonicalizer_preserves_root_slash() {
+        let c = UriCanonicalizer::new();
+        let uri = ResourceUri::new("file", "/");
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.path, "/");
+    }
+
+    #[test]
+    fn canonicalizer_normalizes_backslashes() {
+        let c = UriCanonicalizer::new();
+        let uri = ResourceUri::new("file", "\\home\\user\\file.rs");
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.path, "/home/user/file.rs");
+    }
+
+    #[test]
+    fn canonicalizer_collapses_double_slashes() {
+        let c = UriCanonicalizer::new();
+        let uri = ResourceUri::new("file", "/home//user///file.rs");
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.path, "/home/user/file.rs");
+    }
+
+    #[test]
+    fn canonicalizer_decodes_unreserved_percent() {
+        let c = UriCanonicalizer::new();
+        // %61 = 'a', %7E = '~'
+        let uri = ResourceUri::new("file", "/p%61th/%7Efile");
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.path, "/path/~file");
+    }
+
+    #[test]
+    fn canonicalizer_keeps_reserved_percent() {
+        let c = UriCanonicalizer::new();
+        // %2F = '/' (reserved), should stay encoded
+        let uri = ResourceUri::new("file", "/path%2Fencoded");
+        let norm = c.canonicalize(&uri);
+        assert_eq!(norm.path, "/path%2Fencoded");
+    }
+
+    // --- UriIdentityCache tests ---
+
+    #[test]
+    fn cache_insert_and_get() {
+        let mut cache = UriIdentityCache::new(4);
+        cache.insert("a", ResourceUri::file("/a"));
+        assert!(cache.get("a").is_some());
+        assert_eq!(cache.get("a").unwrap().path, "/a");
+        assert!(cache.get("missing").is_none());
+    }
+
+    #[test]
+    fn cache_evicts_lru() {
+        let mut cache = UriIdentityCache::new(2);
+        cache.insert("a", ResourceUri::file("/a"));
+        cache.insert("b", ResourceUri::file("/b"));
+        // "a" is LRU
+        cache.insert("c", ResourceUri::file("/c"));
+        assert!(cache.get("a").is_none(), "a should have been evicted");
+        assert!(cache.get("b").is_some());
+        assert!(cache.get("c").is_some());
+    }
+
+    #[test]
+    fn cache_get_promotes_to_mru() {
+        let mut cache = UriIdentityCache::new(2);
+        cache.insert("a", ResourceUri::file("/a"));
+        cache.insert("b", ResourceUri::file("/b"));
+        // access "a" to promote it; now "b" is LRU
+        let _ = cache.get("a");
+        cache.insert("c", ResourceUri::file("/c"));
+        assert!(cache.get("b").is_none(), "b should have been evicted");
+        assert!(cache.get("a").is_some());
+    }
+
+    // --- UriIdentityBatch tests ---
+
+    #[test]
+    fn batch_resolve_all() {
+        let mut svc = UriIdentityService::new();
+        svc.register("editor", ResourceUri::file("/editor"));
+        let batch = UriIdentityBatch::new(&svc);
+        let results = batch.resolve_all(&["editor", "missing"]);
+        assert!(results[0].is_some());
+        assert!(results[1].is_none());
+    }
+
+    #[test]
+    fn batch_count_resolvable() {
+        let mut svc = UriIdentityService::new();
+        svc.register("x", ResourceUri::file("/x"));
+        svc.register("y", ResourceUri::file("/y"));
+        let batch = UriIdentityBatch::new(&svc);
+        assert_eq!(batch.count_resolvable(&["x", "y", "z"]), 2);
+    }
+
+    // --- uri_compare_case_insensitive tests ---
+
+    #[test]
+    fn case_insensitive_compare_scheme_authority() {
+        let a = ResourceUri {
+            scheme: "HTTP".into(),
+            authority: "Example.COM".into(),
+            path: "/path".into(),
+            query: None,
+            fragment: None,
+        };
+        let b = ResourceUri {
+            scheme: "http".into(),
+            authority: "example.com".into(),
+            path: "/path".into(),
+            query: None,
+            fragment: None,
+        };
+        assert!(uri_compare_case_insensitive(&a, &b));
+    }
+
+    #[test]
+    fn case_insensitive_compare_path_sensitive() {
+        let a = ResourceUri::new("http", "/Path");
+        let b = ResourceUri::new("http", "/path");
+        assert!(!uri_compare_case_insensitive(&a, &b));
     }
 }

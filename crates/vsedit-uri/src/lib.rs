@@ -1146,6 +1146,257 @@ pub fn pct_decode(input: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// UriTemplate – RFC 6570-inspired URI templates
+// ---------------------------------------------------------------------------
+
+/// Simple URI template expansion (subset of RFC 6570 Level 1).
+#[derive(Debug, Clone)]
+pub struct UriTemplate {
+    template: String,
+}
+
+impl UriTemplate {
+    pub fn new(template: impl Into<String>) -> Self {
+        Self { template: template.into() }
+    }
+
+    /// Expand the template, replacing `{name}` placeholders with values.
+    pub fn expand(&self, vars: &[(&str, &str)]) -> String {
+        let mut result = self.template.clone();
+        for (name, value) in vars {
+            let placeholder = format!("{{{name}}}");
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// List variable names found in the template.
+    pub fn variable_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        let mut rest = self.template.as_str();
+        while let Some(start) = rest.find('{') {
+            if let Some(end) = rest[start..].find('}') {
+                let name = &rest[start + 1..start + end];
+                if !name.is_empty() {
+                    names.push(name.to_string());
+                }
+                rest = &rest[start + end + 1..];
+            } else {
+                break;
+            }
+        }
+        names
+    }
+
+    /// Whether all variables have been provided.
+    pub fn is_fully_expanded(&self, vars: &[(&str, &str)]) -> bool {
+        self.variable_names().iter().all(|n| vars.iter().any(|(k, _)| k == n))
+    }
+
+    /// The raw template string.
+    pub fn as_str(&self) -> &str {
+        &self.template
+    }
+}
+
+impl fmt::Display for UriTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UriTemplate(\"{}\")", self.template)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UriNormalizer – canonical form normalization
+// ---------------------------------------------------------------------------
+
+/// Normalizes URIs to canonical form.
+pub struct UriNormalizer;
+
+impl UriNormalizer {
+    /// Normalize a URI string to canonical form:
+    /// - lowercase scheme and host
+    /// - remove default ports (80 for http, 443 for https)
+    /// - remove trailing slash from path (unless it's the root)
+    /// - remove empty fragment
+    pub fn normalize(uri: &VsUri) -> VsUri {
+        let scheme = uri.scheme.to_lowercase();
+        let authority = uri.authority.to_lowercase();
+
+        // Remove default port from authority
+        let authority = Self::strip_default_port(&scheme, &authority);
+
+        // Normalize path: remove trailing slash unless root
+        let path = if uri.path.len() > 1 && uri.path.ends_with('/') {
+            uri.path.trim_end_matches('/').to_string()
+        } else {
+            uri.path.clone()
+        };
+
+        // Remove empty fragment
+        let fragment = if uri.fragment.is_empty() {
+            String::new()
+        } else {
+            uri.fragment.clone()
+        };
+
+        VsUri::from_components(&scheme, &authority, &path, &uri.query, &fragment)
+    }
+
+    fn strip_default_port(scheme: &str, authority: &str) -> String {
+        match scheme {
+            "http" => authority.strip_suffix(":80").unwrap_or(authority).to_string(),
+            "https" => authority.strip_suffix(":443").unwrap_or(authority).to_string(),
+            _ => authority.to_string(),
+        }
+    }
+
+    /// Check if two URIs are equivalent after normalization.
+    pub fn are_equivalent(a: &VsUri, b: &VsUri) -> bool {
+        let na = Self::normalize(a);
+        let nb = Self::normalize(b);
+        na.to_uri_string() == nb.to_uri_string()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UriQueryBuilder – query string construction
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing URI query strings with proper encoding.
+#[derive(Debug, Clone)]
+pub struct UriQueryBuilder {
+    params: Vec<(String, String)>,
+}
+
+impl UriQueryBuilder {
+    pub fn new() -> Self {
+        Self { params: Vec::new() }
+    }
+
+    /// Add a key-value parameter.
+    pub fn param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.params.push((key.into(), value.into()));
+        self
+    }
+
+    /// Build the query string (without leading '?').
+    pub fn build(&self) -> String {
+        self.params
+            .iter()
+            .map(|(k, v)| format!("{}={}", Self::encode(k), Self::encode(v)))
+            .collect::<Vec<_>>()
+            .join("&")
+    }
+
+    /// Simple percent-encoding for query parameters.
+    fn encode(input: &str) -> String {
+        let mut out = String::with_capacity(input.len());
+        for &b in input.as_bytes() {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                out.push(b as char);
+            } else if b == b' ' {
+                out.push('+');
+            } else {
+                out.push('%');
+                out.push(char::from(b"0123456789ABCDEF"[(b >> 4) as usize]));
+                out.push(char::from(b"0123456789ABCDEF"[(b & 0xF) as usize]));
+            }
+        }
+        out
+    }
+
+    /// Number of parameters.
+    pub fn len(&self) -> usize {
+        self.params.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.params.is_empty()
+    }
+}
+
+impl Default for UriQueryBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for UriQueryBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "?{}", self.build())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URI authority parser with userinfo
+// ---------------------------------------------------------------------------
+
+/// Parsed URI authority component.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UriAuthority {
+    pub userinfo: Option<String>,
+    pub host: String,
+    pub port: Option<u16>,
+}
+
+impl UriAuthority {
+    /// Parse an authority string like "user:pass@host:port".
+    pub fn parse(authority: &str) -> Self {
+        let (userinfo, host_port) = if let Some(at_pos) = authority.find('@') {
+            (Some(authority[..at_pos].to_string()), &authority[at_pos + 1..])
+        } else {
+            (None, authority)
+        };
+
+        // Check for IPv6 bracket notation
+        let (host, port) = if host_port.starts_with('[') {
+            if let Some(bracket_end) = host_port.find(']') {
+                let host = &host_port[1..bracket_end];
+                let rest = &host_port[bracket_end + 1..];
+                let port = rest.strip_prefix(':').and_then(|p| p.parse().ok());
+                (host.to_string(), port)
+            } else {
+                (host_port.to_string(), None)
+            }
+        } else if let Some(colon) = host_port.rfind(':') {
+            let host = &host_port[..colon];
+            let port = host_port[colon + 1..].parse().ok();
+            (host.to_string(), port)
+        } else {
+            (host_port.to_string(), None)
+        };
+
+        Self { userinfo, host, port }
+    }
+
+    /// Reconstruct the authority string.
+    pub fn to_string_repr(&self) -> String {
+        let mut s = String::new();
+        if let Some(ref ui) = self.userinfo {
+            s.push_str(ui);
+            s.push('@');
+        }
+        s.push_str(&self.host);
+        if let Some(p) = self.port {
+            s.push(':');
+            s.push_str(&p.to_string());
+        }
+        s
+    }
+
+    /// Whether the authority has user information.
+    pub fn has_userinfo(&self) -> bool {
+        self.userinfo.is_some()
+    }
+}
+
+impl fmt::Display for UriAuthority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string_repr())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1929,5 +2180,115 @@ mod tests {
     #[test]
     fn pct_decode_plain() {
         assert_eq!(pct_decode("abc"), "abc");
+    }
+
+    // -- UriTemplate -------------------------------------------------------
+
+    #[test]
+    fn uri_template_expand() {
+        let t = UriTemplate::new("https://{host}/api/{version}");
+        let result = t.expand(&[("host", "example.com"), ("version", "v2")]);
+        assert_eq!(result, "https://example.com/api/v2");
+    }
+
+    #[test]
+    fn uri_template_variable_names() {
+        let t = UriTemplate::new("{scheme}://{host}/{path}");
+        let names = t.variable_names();
+        assert_eq!(names, vec!["scheme", "host", "path"]);
+    }
+
+    #[test]
+    fn uri_template_fully_expanded() {
+        let t = UriTemplate::new("{a}/{b}");
+        assert!(!t.is_fully_expanded(&[("a", "1")]));
+        assert!(t.is_fully_expanded(&[("a", "1"), ("b", "2")]));
+    }
+
+    #[test]
+    fn uri_template_display() {
+        let t = UriTemplate::new("http://{host}");
+        let s = format!("{t}");
+        assert!(s.contains("UriTemplate"));
+    }
+
+    // -- UriNormalizer -----------------------------------------------------
+
+    #[test]
+    fn uri_normalizer_lowercase() {
+        let uri = VsUri::from_components("HTTPS", "Example.COM", "/path/", "", "");
+        let normalized = UriNormalizer::normalize(&uri);
+        assert_eq!(normalized.scheme, "https");
+        assert_eq!(normalized.authority, "example.com");
+    }
+
+    #[test]
+    fn uri_normalizer_strip_default_port() {
+        let uri = VsUri::from_components("http", "example.com:80", "/", "", "");
+        let normalized = UriNormalizer::normalize(&uri);
+        assert_eq!(normalized.authority, "example.com");
+    }
+
+    #[test]
+    fn uri_normalizer_equivalence() {
+        let a = VsUri::from_components("HTTP", "Example.com:80", "/path", "", "");
+        let b = VsUri::from_components("http", "example.com", "/path", "", "");
+        assert!(UriNormalizer::are_equivalent(&a, &b));
+    }
+
+    // -- UriQueryBuilder ---------------------------------------------------
+
+    #[test]
+    fn query_builder_basic() {
+        let q = UriQueryBuilder::new()
+            .param("key", "value")
+            .param("foo", "bar");
+        assert_eq!(q.build(), "key=value&foo=bar");
+        assert_eq!(q.len(), 2);
+    }
+
+    #[test]
+    fn query_builder_encoding() {
+        let q = UriQueryBuilder::new().param("q", "hello world");
+        assert_eq!(q.build(), "q=hello+world");
+    }
+
+    #[test]
+    fn query_builder_display() {
+        let q = UriQueryBuilder::new().param("a", "1");
+        let s = format!("{q}");
+        assert!(s.starts_with('?'));
+    }
+
+    // -- UriAuthority ------------------------------------------------------
+
+    #[test]
+    fn authority_parse_simple() {
+        let a = UriAuthority::parse("example.com:8080");
+        assert_eq!(a.host, "example.com");
+        assert_eq!(a.port, Some(8080));
+        assert!(!a.has_userinfo());
+    }
+
+    #[test]
+    fn authority_parse_with_userinfo() {
+        let a = UriAuthority::parse("user:pass@example.com:443");
+        assert_eq!(a.userinfo, Some("user:pass".to_string()));
+        assert_eq!(a.host, "example.com");
+        assert_eq!(a.port, Some(443));
+    }
+
+    #[test]
+    fn authority_parse_no_port() {
+        let a = UriAuthority::parse("example.com");
+        assert_eq!(a.host, "example.com");
+        assert_eq!(a.port, None);
+    }
+
+    #[test]
+    fn authority_display() {
+        let a = UriAuthority::parse("user@host:80");
+        let s = format!("{a}");
+        assert_eq!(s, "user@host:80");
     }
 }

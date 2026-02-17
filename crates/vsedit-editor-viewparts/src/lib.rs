@@ -1,6 +1,8 @@
 //! Editor view parts: view zones, overlay widgets, content widgets, glyph margins,
 //! minimap configuration, and breadcrumb navigation.
 
+use std::fmt;
+
 /// Line number rendering mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineNumberMode {
@@ -1034,6 +1036,196 @@ pub fn total_gutter_width(glyph: &GlyphMarginConfig, line_number_chars: u32) -> 
     glyph_width + line_number_chars
 }
 
+// -- ViewPartOverlap detection -----------------------------------------------
+
+/// Represents a decoration with a line range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecorationRange {
+    pub id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub priority: i32,
+}
+
+/// Detected overlap between two decorations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewPartOverlap {
+    pub first_id: String,
+    pub second_id: String,
+    pub overlap_start: u32,
+    pub overlap_end: u32,
+}
+
+/// Find all overlapping decoration pairs.
+pub fn detect_overlaps(ranges: &[DecorationRange]) -> Vec<ViewPartOverlap> {
+    let mut overlaps = Vec::new();
+    for i in 0..ranges.len() {
+        for j in (i + 1)..ranges.len() {
+            let a = &ranges[i];
+            let b = &ranges[j];
+            let start = a.start_line.max(b.start_line);
+            let end = a.end_line.min(b.end_line);
+            if start <= end {
+                overlaps.push(ViewPartOverlap {
+                    first_id: a.id.clone(),
+                    second_id: b.id.clone(),
+                    overlap_start: start,
+                    overlap_end: end,
+                });
+            }
+        }
+    }
+    overlaps
+}
+
+// -- ViewPartGutterIcons with priority ordering ------------------------------
+
+/// A gutter icon with a priority for ordering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GutterIcon {
+    pub line: u32,
+    pub icon_id: String,
+    pub priority: i32,
+    pub tooltip: Option<String>,
+}
+
+/// Sort gutter icons by line, then by priority (descending).
+pub fn sort_gutter_icons(icons: &mut [GutterIcon]) {
+    icons.sort_by(|a, b| a.line.cmp(&b.line).then(b.priority.cmp(&a.priority)));
+}
+
+/// Return the highest priority icon per line.
+pub fn top_icons_per_line(icons: &[GutterIcon]) -> Vec<&GutterIcon> {
+    let mut sorted: Vec<&GutterIcon> = icons.iter().collect();
+    sorted.sort_by(|a, b| a.line.cmp(&b.line).then(b.priority.cmp(&a.priority)));
+    let mut result: Vec<&GutterIcon> = Vec::new();
+    let mut last_line = None;
+    for icon in sorted {
+        if last_line != Some(icon.line) {
+            result.push(icon);
+            last_line = Some(icon.line);
+        }
+    }
+    result
+}
+
+// -- ViewPartContentWidget positioning ---------------------------------------
+
+/// Preferred position of a content widget relative to a cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WidgetPosition {
+    Above,
+    Below,
+    Exact,
+}
+
+impl fmt::Display for WidgetPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WidgetPosition::Above => f.write_str("above"),
+            WidgetPosition::Below => f.write_str("below"),
+            WidgetPosition::Exact => f.write_str("exact"),
+        }
+    }
+}
+
+/// Resolve widget position considering viewport bounds.
+pub fn resolve_widget_position(
+    widget_height: u32,
+    cursor_line: u32,
+    viewport_start: u32,
+    viewport_end: u32,
+) -> WidgetPosition {
+    if cursor_line <= viewport_start + widget_height {
+        WidgetPosition::Below
+    } else if cursor_line + widget_height > viewport_end {
+        WidgetPosition::Above
+    } else {
+        WidgetPosition::Below
+    }
+}
+
+// -- Viewpart damage tracking ------------------------------------------------
+
+/// A dirty region that needs re-rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DamageRegion {
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
+/// Tracks dirty regions for partial re-render.
+#[derive(Debug, Default)]
+pub struct DamageTracker {
+    regions: Vec<DamageRegion>,
+}
+
+impl DamageTracker {
+    pub fn new() -> Self {
+        Self { regions: Vec::new() }
+    }
+
+    /// Mark a range of lines as dirty.
+    pub fn mark_dirty(&mut self, start: u32, end: u32) {
+        if start > end {
+            return;
+        }
+        self.regions.push(DamageRegion {
+            start_line: start,
+            end_line: end,
+        });
+        self.merge_regions();
+    }
+
+    /// Clear all damage.
+    pub fn clear(&mut self) {
+        self.regions.clear();
+    }
+
+    /// Check if any region is dirty.
+    pub fn is_dirty(&self) -> bool {
+        !self.regions.is_empty()
+    }
+
+    /// Return the merged dirty regions.
+    pub fn regions(&self) -> &[DamageRegion] {
+        &self.regions
+    }
+
+    /// Check if a specific line is in a dirty region.
+    pub fn is_line_dirty(&self, line: u32) -> bool {
+        self.regions.iter().any(|r| line >= r.start_line && line <= r.end_line)
+    }
+
+    /// Total number of dirty lines.
+    pub fn dirty_line_count(&self) -> u32 {
+        self.regions.iter().map(|r| r.end_line - r.start_line + 1).sum()
+    }
+
+    fn merge_regions(&mut self) {
+        if self.regions.len() < 2 {
+            return;
+        }
+        self.regions.sort_by_key(|r| r.start_line);
+        let mut merged = vec![self.regions[0].clone()];
+        for r in &self.regions[1..] {
+            let last = merged.last_mut().unwrap();
+            if r.start_line <= last.end_line + 1 {
+                last.end_line = last.end_line.max(r.end_line);
+            } else {
+                merged.push(r.clone());
+            }
+        }
+        self.regions = merged;
+    }
+}
+
+impl fmt::Display for DamageTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DamageTracker({} regions, {} dirty lines)", self.regions.len(), self.dirty_line_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1967,5 +2159,133 @@ mod tests {
     fn total_gutter_width_disabled() {
         let config = GlyphMarginConfig { enabled: false, width_chars: 2, decorations_enabled: false };
         assert_eq!(total_gutter_width(&config, 4), 4);
+    }
+
+    // -- ViewPartOverlap tests ------------------------------------------------
+
+    #[test]
+    fn detect_overlaps_none() {
+        let ranges = vec![
+            DecorationRange { id: "a".into(), start_line: 1, end_line: 5, priority: 0 },
+            DecorationRange { id: "b".into(), start_line: 6, end_line: 10, priority: 0 },
+        ];
+        assert!(detect_overlaps(&ranges).is_empty());
+    }
+
+    #[test]
+    fn detect_overlaps_found() {
+        let ranges = vec![
+            DecorationRange { id: "a".into(), start_line: 1, end_line: 8, priority: 0 },
+            DecorationRange { id: "b".into(), start_line: 5, end_line: 12, priority: 0 },
+        ];
+        let overlaps = detect_overlaps(&ranges);
+        assert_eq!(overlaps.len(), 1);
+        assert_eq!(overlaps[0].overlap_start, 5);
+        assert_eq!(overlaps[0].overlap_end, 8);
+    }
+
+    #[test]
+    fn detect_overlaps_multiple() {
+        let ranges = vec![
+            DecorationRange { id: "a".into(), start_line: 1, end_line: 10, priority: 0 },
+            DecorationRange { id: "b".into(), start_line: 5, end_line: 15, priority: 0 },
+            DecorationRange { id: "c".into(), start_line: 8, end_line: 20, priority: 0 },
+        ];
+        let overlaps = detect_overlaps(&ranges);
+        assert_eq!(overlaps.len(), 3);
+    }
+
+    // -- GutterIcon tests -----------------------------------------------------
+
+    #[test]
+    fn sort_gutter_icons_by_line_and_priority() {
+        let mut icons = vec![
+            GutterIcon { line: 2, icon_id: "low".into(), priority: 1, tooltip: None },
+            GutterIcon { line: 1, icon_id: "high".into(), priority: 10, tooltip: None },
+            GutterIcon { line: 2, icon_id: "high".into(), priority: 5, tooltip: None },
+        ];
+        sort_gutter_icons(&mut icons);
+        assert_eq!(icons[0].line, 1);
+        assert_eq!(icons[1].icon_id, "high");
+        assert_eq!(icons[1].priority, 5);
+    }
+
+    #[test]
+    fn top_icons_per_line_picks_highest() {
+        let icons = vec![
+            GutterIcon { line: 1, icon_id: "low".into(), priority: 1, tooltip: None },
+            GutterIcon { line: 1, icon_id: "high".into(), priority: 10, tooltip: None },
+            GutterIcon { line: 2, icon_id: "only".into(), priority: 5, tooltip: None },
+        ];
+        let tops = top_icons_per_line(&icons);
+        assert_eq!(tops.len(), 2);
+        assert_eq!(tops[0].icon_id, "high");
+        assert_eq!(tops[1].icon_id, "only");
+    }
+
+    // -- WidgetPosition tests -------------------------------------------------
+
+    #[test]
+    fn widget_position_display() {
+        assert_eq!(WidgetPosition::Above.to_string(), "above");
+        assert_eq!(WidgetPosition::Below.to_string(), "below");
+        assert_eq!(WidgetPosition::Exact.to_string(), "exact");
+    }
+
+    #[test]
+    fn resolve_widget_position_below() {
+        assert_eq!(resolve_widget_position(5, 3, 1, 50), WidgetPosition::Below);
+    }
+
+    #[test]
+    fn resolve_widget_position_above() {
+        assert_eq!(resolve_widget_position(5, 48, 1, 50), WidgetPosition::Above);
+    }
+
+    // -- DamageTracker tests --------------------------------------------------
+
+    #[test]
+    fn damage_tracker_mark_and_query() {
+        let mut tracker = DamageTracker::new();
+        assert!(!tracker.is_dirty());
+        tracker.mark_dirty(5, 10);
+        assert!(tracker.is_dirty());
+        assert!(tracker.is_line_dirty(7));
+        assert!(!tracker.is_line_dirty(11));
+    }
+
+    #[test]
+    fn damage_tracker_merge_adjacent() {
+        let mut tracker = DamageTracker::new();
+        tracker.mark_dirty(1, 5);
+        tracker.mark_dirty(6, 10);
+        assert_eq!(tracker.regions().len(), 1);
+        assert_eq!(tracker.regions()[0].start_line, 1);
+        assert_eq!(tracker.regions()[0].end_line, 10);
+    }
+
+    #[test]
+    fn damage_tracker_dirty_line_count() {
+        let mut tracker = DamageTracker::new();
+        tracker.mark_dirty(1, 5);
+        tracker.mark_dirty(10, 12);
+        assert_eq!(tracker.dirty_line_count(), 8); // 5 + 3
+    }
+
+    #[test]
+    fn damage_tracker_clear() {
+        let mut tracker = DamageTracker::new();
+        tracker.mark_dirty(1, 10);
+        tracker.clear();
+        assert!(!tracker.is_dirty());
+    }
+
+    #[test]
+    fn damage_tracker_display() {
+        let mut tracker = DamageTracker::new();
+        tracker.mark_dirty(1, 5);
+        let s = tracker.to_string();
+        assert!(s.contains("1 regions"));
+        assert!(s.contains("5 dirty lines"));
     }
 }

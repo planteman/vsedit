@@ -1118,6 +1118,182 @@ pub fn fold_header_lines(model: &FoldingModel) -> Vec<u32> {
     model.get_ranges().iter().map(|r| r.start_line).collect()
 }
 
+// -- FoldingImport for collapsing import blocks ------------------------------
+
+/// Detect import block ranges. Lines starting with common import keywords
+/// that form contiguous blocks are grouped as import folding ranges.
+pub fn detect_import_ranges(lines: &[&str]) -> Vec<FoldingRange> {
+    let import_prefixes = ["use ", "import ", "from ", "#include ", "require("];
+    let mut ranges = Vec::new();
+    let mut block_start: Option<u32> = None;
+
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        let is_import = import_prefixes.iter().any(|p| trimmed.starts_with(p));
+        let line_num = (i + 1) as u32;
+
+        match (is_import, block_start) {
+            (true, None) => block_start = Some(line_num),
+            (false, Some(start)) => {
+                if line_num - 1 > start {
+                    ranges.push(FoldingRange {
+                        start_line: start,
+                        end_line: line_num - 1,
+                        kind: FoldingRangeKind::Imports,
+                        is_collapsed: false,
+                    });
+                }
+                block_start = None;
+            }
+            _ => {}
+        }
+    }
+
+    // Close any trailing block
+    if let Some(start) = block_start {
+        let end = lines.len() as u32;
+        if end > start {
+            ranges.push(FoldingRange {
+                start_line: start,
+                end_line: end,
+                kind: FoldingRangeKind::Imports,
+                is_collapsed: false,
+            });
+        }
+    }
+
+    ranges
+}
+
+// -- FoldingRegionMerge for adjacent folding ----------------------------------
+
+/// Merge adjacent folding ranges of the same kind.
+pub fn merge_adjacent_ranges(ranges: &[FoldingRange]) -> Vec<FoldingRange> {
+    if ranges.is_empty() {
+        return Vec::new();
+    }
+
+    let mut sorted: Vec<FoldingRange> = ranges.to_vec();
+    sorted.sort_by_key(|r| r.start_line);
+
+    let mut merged = vec![sorted[0].clone()];
+
+    for range in &sorted[1..] {
+        let last = merged.last_mut().unwrap();
+        if range.kind == last.kind && range.start_line <= last.end_line + 2 {
+            last.end_line = last.end_line.max(range.end_line);
+        } else {
+            merged.push(range.clone());
+        }
+    }
+
+    merged
+}
+
+/// Count the total number of foldable lines across all ranges.
+pub fn total_foldable_lines(ranges: &[FoldingRange]) -> u32 {
+    ranges.iter().map(|r| {
+        if r.end_line > r.start_line { r.end_line - r.start_line } else { 0 }
+    }).sum()
+}
+
+// -- FoldingPersistence saving fold state -------------------------------------
+
+/// Serializable fold state for persistence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldState {
+    pub collapsed_lines: Vec<u32>,
+}
+
+impl FoldState {
+    /// Capture the current fold state from a model.
+    pub fn capture(model: &FoldingModel) -> Self {
+        let collapsed_lines = model.get_ranges()
+            .iter()
+            .filter(|r| r.is_collapsed)
+            .map(|r| r.start_line)
+            .collect();
+        Self { collapsed_lines }
+    }
+
+    /// Restore fold state to a model.
+    pub fn restore(&self, model: &mut FoldingModel) {
+        model.unfold_all();
+        for &line in &self.collapsed_lines {
+            model.toggle(line);
+        }
+    }
+
+    /// Check if any lines are collapsed.
+    pub fn has_collapsed(&self) -> bool {
+        !self.collapsed_lines.is_empty()
+    }
+
+    /// Number of collapsed regions.
+    pub fn collapsed_count(&self) -> usize {
+        self.collapsed_lines.len()
+    }
+}
+
+// -- Manual folding range management -----------------------------------------
+
+/// Add a manual folding range to a model.
+pub fn add_manual_range(model: &mut FoldingModel, start: u32, end: u32) {
+    if start >= end {
+        return;
+    }
+    let mut ranges = model.get_ranges().to_vec();
+    ranges.push(FoldingRange {
+        start_line: start,
+        end_line: end,
+        kind: FoldingRangeKind::Region,
+        is_collapsed: false,
+    });
+    model.set_ranges(ranges);
+}
+
+/// Remove a folding range by start line.
+pub fn remove_range_at(model: &mut FoldingModel, start_line: u32) {
+    let ranges: Vec<FoldingRange> = model.get_ranges()
+        .iter()
+        .filter(|r| r.start_line != start_line)
+        .cloned()
+        .collect();
+    model.set_ranges(ranges);
+}
+
+/// Filter ranges by kind.
+pub fn ranges_of_kind(model: &FoldingModel, kind: FoldingRangeKind) -> Vec<&FoldingRange> {
+    model.get_ranges().iter().filter(|r| r.kind == kind).collect()
+}
+
+/// Toggle all ranges of a specific kind.
+pub fn toggle_all_of_kind(model: &mut FoldingModel, kind: FoldingRangeKind, collapse: bool) {
+    let mut ranges = model.get_ranges().to_vec();
+    for range in &mut ranges {
+        if range.kind == kind {
+            range.is_collapsed = collapse;
+        }
+    }
+    model.set_ranges(ranges);
+}
+
+/// Count collapsed ranges.
+pub fn collapsed_count(model: &FoldingModel) -> usize {
+    model.get_ranges().iter().filter(|r| r.is_collapsed).count()
+}
+
+/// Fold ranges containing a specific line.
+pub fn fold_containing_line(model: &mut FoldingModel, line: u32) {
+    let mut ranges = model.get_ranges().to_vec();
+    for range in &mut ranges {
+        if line > range.start_line && line <= range.end_line {
+            range.is_collapsed = true;
+        }
+    }
+    model.set_ranges(ranges);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1975,5 +2151,146 @@ mod tests {
         ]);
         let headers = fold_header_lines(&model);
         assert_eq!(headers, vec![1, 10]);
+    }
+
+    // -- detect_import_ranges tests -------------------------------------------
+
+    #[test]
+    fn detect_imports_rust() {
+        let lines = vec!["use std::fmt;", "use std::io;", "", "fn main() {}"];
+        let ranges = detect_import_ranges(&lines);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start_line, 1);
+        assert_eq!(ranges[0].end_line, 2);
+        assert_eq!(ranges[0].kind, FoldingRangeKind::Imports);
+    }
+
+    #[test]
+    fn detect_imports_none() {
+        let lines = vec!["fn main() {}", "  println!();", "}"];
+        let ranges = detect_import_ranges(&lines);
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn detect_imports_trailing() {
+        let lines = vec!["use a;", "use b;", "use c;"];
+        let ranges = detect_import_ranges(&lines);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].end_line, 3);
+    }
+
+    // -- merge_adjacent_ranges tests ------------------------------------------
+
+    #[test]
+    fn merge_adjacent_same_kind() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 6, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        let merged = merge_adjacent_ranges(&ranges);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].end_line, 10);
+    }
+
+    #[test]
+    fn merge_different_kinds_not_merged() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            FoldingRange { start_line: 6, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        let merged = merge_adjacent_ranges(&ranges);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn total_foldable_lines_counts() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        assert_eq!(total_foldable_lines(&ranges), 9);
+    }
+
+    // -- FoldState tests ------------------------------------------------------
+
+    #[test]
+    fn fold_state_capture_and_restore() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let state = FoldState::capture(&model);
+        assert_eq!(state.collapsed_count(), 1);
+        assert!(state.has_collapsed());
+
+        model.unfold_all();
+        assert_eq!(collapsed_count(&model), 0);
+
+        state.restore(&mut model);
+        assert_eq!(collapsed_count(&model), 1);
+    }
+
+    // -- Manual range management tests ----------------------------------------
+
+    #[test]
+    fn add_manual_range_works() {
+        let mut model = FoldingModel::new();
+        add_manual_range(&mut model, 5, 10);
+        assert_eq!(model.get_ranges().len(), 1);
+        assert_eq!(model.get_ranges()[0].start_line, 5);
+    }
+
+    #[test]
+    fn add_manual_range_invalid_ignored() {
+        let mut model = FoldingModel::new();
+        add_manual_range(&mut model, 10, 5);
+        assert!(model.get_ranges().is_empty());
+    }
+
+    #[test]
+    fn remove_range_at_works() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        remove_range_at(&mut model, 1);
+        assert_eq!(model.get_ranges().len(), 1);
+        assert_eq!(model.get_ranges()[0].start_line, 10);
+    }
+
+    #[test]
+    fn ranges_of_kind_filters() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let comments = ranges_of_kind(&model, FoldingRangeKind::Comment);
+        assert_eq!(comments.len(), 1);
+    }
+
+    #[test]
+    fn toggle_all_of_kind_works() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Comment, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        toggle_all_of_kind(&mut model, FoldingRangeKind::Comment, true);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert!(!model.get_range_at(10).unwrap().is_collapsed);
+    }
+
+    #[test]
+    fn fold_containing_line_folds() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        fold_containing_line(&mut model, 5);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
     }
 }

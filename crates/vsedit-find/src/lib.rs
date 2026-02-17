@@ -1179,6 +1179,178 @@ impl FindHistory {
     }
 }
 
+// -- FindInSelection for scoped search ---------------------------------------
+
+/// A text range for selection-scoped search.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextRange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+impl TextRange {
+    pub fn new(start_line: usize, start_col: usize, end_line: usize, end_col: usize) -> Self {
+        Self { start_line, start_col, end_line, end_col }
+    }
+
+    pub fn contains_line(&self, line: usize) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    pub fn line_count(&self) -> usize {
+        if self.end_line >= self.start_line {
+            self.end_line - self.start_line + 1
+        } else {
+            0
+        }
+    }
+}
+
+impl fmt::Display for TextRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}:{}-{}:{}]", self.start_line, self.start_col, self.end_line, self.end_col)
+    }
+}
+
+/// Find matches only within a selection range.
+pub fn find_in_selection(text: &str, pattern: &str, selection: &TextRange) -> Vec<(usize, usize)> {
+    let mut results = Vec::new();
+    for (line_idx, line) in text.lines().enumerate() {
+        if !selection.contains_line(line_idx) {
+            continue;
+        }
+        let mut start = 0;
+        while let Some(pos) = line[start..].find(pattern) {
+            let abs_pos = start + pos;
+            // Check column bounds for first/last lines
+            if line_idx == selection.start_line && abs_pos < selection.start_col {
+                start = abs_pos + 1;
+                continue;
+            }
+            if line_idx == selection.end_line && abs_pos + pattern.len() > selection.end_col {
+                break;
+            }
+            results.push((line_idx, abs_pos));
+            start = abs_pos + pattern.len().max(1);
+        }
+    }
+    results
+}
+
+// -- FindPreserveCase for smart replacement ----------------------------------
+
+/// Perform a case-preserving replacement.
+pub fn preserve_case_replace(original: &str, replacement: &str) -> String {
+    if original.is_empty() || replacement.is_empty() {
+        return replacement.to_string();
+    }
+
+    // All upper
+    if original.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) {
+        return replacement.to_uppercase();
+    }
+
+    // All lower
+    if original.chars().all(|c| c.is_lowercase() || !c.is_alphabetic()) {
+        return replacement.to_lowercase();
+    }
+
+    // Title case (first char upper, rest lower)
+    if original.chars().next().is_some_and(|c| c.is_uppercase())
+        && original.chars().skip(1).all(|c| c.is_lowercase() || !c.is_alphabetic())
+    {
+        let mut chars = replacement.chars();
+        if let Some(first) = chars.next() {
+            let rest: String = chars.collect();
+            return format!("{}{}", first.to_uppercase(), rest.to_lowercase());
+        }
+    }
+
+    replacement.to_string()
+}
+
+// -- FindRegexGroupReplace with capture references ---------------------------
+
+/// Replace using regex with capture group references ($1, $2, etc.).
+pub fn regex_group_replace(text: &str, pattern: &str, replacement: &str) -> Result<String, FindError> {
+    let re = Regex::new(pattern).map_err(|e| FindError::InvalidRegex(e.to_string()))?;
+    Ok(re.replace_all(text, replacement).into_owned())
+}
+
+/// Count regex matches in text.
+pub fn regex_match_count(text: &str, pattern: &str) -> Result<usize, FindError> {
+    let re = Regex::new(pattern).map_err(|e| FindError::InvalidRegex(e.to_string()))?;
+    Ok(re.find_iter(text).count())
+}
+
+// -- Find result count badge -------------------------------------------------
+
+/// Format a match count as a badge string.
+pub fn format_match_badge(count: usize, has_more: bool) -> String {
+    if count == 0 {
+        return "No results".to_string();
+    }
+    if has_more {
+        format!("{count}+ results")
+    } else if count == 1 {
+        "1 result".to_string()
+    } else {
+        format!("{count} results")
+    }
+}
+
+/// Match position with line and column information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchPosition {
+    pub line: usize,
+    pub column: usize,
+    pub length: usize,
+}
+
+impl fmt::Display for MatchPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{} (len {})", self.line + 1, self.column + 1, self.length)
+    }
+}
+
+/// Find all match positions in text.
+pub fn find_all_positions(text: &str, pattern: &str, case_sensitive: bool) -> Vec<MatchPosition> {
+    let mut positions = Vec::new();
+    let search_text;
+    let search_pattern;
+
+    if case_sensitive {
+        search_text = text.to_string();
+        search_pattern = pattern.to_string();
+    } else {
+        search_text = text.to_lowercase();
+        search_pattern = pattern.to_lowercase();
+    }
+
+    for (line_idx, line) in search_text.lines().enumerate() {
+        let mut start = 0;
+        while let Some(pos) = line[start..].find(&search_pattern) {
+            positions.push(MatchPosition {
+                line: line_idx,
+                column: start + pos,
+                length: pattern.len(),
+            });
+            start += pos + pattern.len().max(1);
+        }
+    }
+    positions
+}
+
+/// Navigate to the Nth match (0-based), wrapping around.
+pub fn navigate_match(positions: &[MatchPosition], current_index: usize) -> Option<&MatchPosition> {
+    if positions.is_empty() {
+        return None;
+    }
+    Some(&positions[current_index % positions.len()])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1978,5 +2150,120 @@ mod tests {
         let mut h = FindHistory::new(5);
         h.push("");
         assert!(h.is_empty());
+    }
+
+    // -- FindInSelection tests ------------------------------------------------
+
+    #[test]
+    fn find_in_selection_basic() {
+        let text = "hello world\nfoo bar\nhello again";
+        let sel = TextRange::new(0, 0, 2, 30);
+        let matches = find_in_selection(text, "hello", &sel);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn find_in_selection_restricts_lines() {
+        let text = "hello\nhello\nhello";
+        let sel = TextRange::new(1, 0, 1, 10);
+        let matches = find_in_selection(text, "hello", &sel);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].0, 1);
+    }
+
+    #[test]
+    fn text_range_contains_line() {
+        let range = TextRange::new(5, 0, 10, 0);
+        assert!(range.contains_line(5));
+        assert!(range.contains_line(10));
+        assert!(!range.contains_line(11));
+    }
+
+    #[test]
+    fn text_range_display() {
+        let range = TextRange::new(1, 5, 3, 10);
+        assert_eq!(range.to_string(), "[1:5-3:10]");
+    }
+
+    // -- FindPreserveCase tests -----------------------------------------------
+
+    #[test]
+    fn preserve_case_all_upper() {
+        assert_eq!(preserve_case_replace("HELLO", "world"), "WORLD");
+    }
+
+    #[test]
+    fn preserve_case_all_lower() {
+        assert_eq!(preserve_case_replace("hello", "World"), "world");
+    }
+
+    #[test]
+    fn preserve_case_title_case() {
+        assert_eq!(preserve_case_replace("Hello", "world"), "World");
+    }
+
+    #[test]
+    fn preserve_case_mixed_returns_as_is() {
+        assert_eq!(preserve_case_replace("hElLo", "world"), "world");
+    }
+
+    // -- RegexGroupReplace tests ----------------------------------------------
+
+    #[test]
+    fn regex_group_replace_basic() {
+        let result = regex_group_replace("hello world", r"(\w+) (\w+)", "$2 $1").unwrap();
+        assert_eq!(result, "world hello");
+    }
+
+    #[test]
+    fn regex_group_replace_invalid_pattern() {
+        assert!(regex_group_replace("text", r"[invalid", "x").is_err());
+    }
+
+    #[test]
+    fn regex_match_count_basic() {
+        let count = regex_match_count("aaa bbb aaa", r"aaa").unwrap();
+        assert_eq!(count, 2);
+    }
+
+    // -- Badge tests ----------------------------------------------------------
+
+    #[test]
+    fn format_match_badge_variants() {
+        assert_eq!(format_match_badge(0, false), "No results");
+        assert_eq!(format_match_badge(1, false), "1 result");
+        assert_eq!(format_match_badge(5, false), "5 results");
+        assert_eq!(format_match_badge(100, true), "100+ results");
+    }
+
+    // -- find_all_positions tests ---------------------------------------------
+
+    #[test]
+    fn find_all_positions_case_sensitive() {
+        let positions = find_all_positions("Hello hello HELLO", "hello", true);
+        assert_eq!(positions.len(), 1);
+        assert_eq!(positions[0].column, 6);
+    }
+
+    #[test]
+    fn find_all_positions_case_insensitive() {
+        let positions = find_all_positions("Hello hello HELLO", "hello", false);
+        assert_eq!(positions.len(), 3);
+    }
+
+    #[test]
+    fn match_position_display() {
+        let pos = MatchPosition { line: 0, column: 5, length: 3 };
+        assert_eq!(pos.to_string(), "1:6 (len 3)");
+    }
+
+    #[test]
+    fn navigate_match_wraps() {
+        let positions = vec![
+            MatchPosition { line: 0, column: 0, length: 3 },
+            MatchPosition { line: 1, column: 5, length: 3 },
+        ];
+        let m = navigate_match(&positions, 3).unwrap();
+        assert_eq!(m.line, 1);
     }
 }

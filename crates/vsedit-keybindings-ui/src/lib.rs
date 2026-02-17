@@ -1165,6 +1165,166 @@ pub fn customisation_summary(registry: &KeybindingRegistry) -> CustomisationSumm
     CustomisationSummary { total, default_count, user_count, extension_count, overridden_defaults }
 }
 
+// ---------------------------------------------------------------------------
+// KeybindingSourceIndicator – identifies binding origin
+// ---------------------------------------------------------------------------
+
+/// Indicator showing where a keybinding came from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeybindingSourceIndicator {
+    pub source: KeybindingSource,
+    pub label: String,
+    pub icon: String,
+}
+
+impl KeybindingSourceIndicator {
+    pub fn from_source(source: &KeybindingSource) -> Self {
+        let (label, icon) = match source {
+            KeybindingSource::Default => ("Default", "$(gear)"),
+            KeybindingSource::User => ("User", "$(account)"),
+            KeybindingSource::Extension => ("Extension", "$(extensions)"),
+        };
+        Self {
+            source: source.clone(),
+            label: label.to_string(),
+            icon: icon.to_string(),
+        }
+    }
+
+    /// A short summary string for display.
+    pub fn summary(&self) -> String {
+        format!("{} {}", self.icon, self.label)
+    }
+}
+
+impl fmt::Display for KeybindingSourceIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingWhenClauseEditor – parse and validate when clauses
+// ---------------------------------------------------------------------------
+
+/// A parsed when-clause condition token.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WhenClauseToken {
+    Key(String),
+    Not,
+    And,
+    Or,
+    Equals(String, String),
+}
+
+/// Editor for when-clause strings with validation.
+#[derive(Debug, Clone)]
+pub struct KeybindingWhenClauseEditor {
+    raw: String,
+    tokens: Vec<WhenClauseToken>,
+    valid: bool,
+}
+
+impl KeybindingWhenClauseEditor {
+    /// Parse a raw when-clause string.
+    pub fn parse(raw: &str) -> Self {
+        let mut tokens = Vec::new();
+        let mut valid = true;
+        for part in raw.split_whitespace() {
+            if part == "&&" {
+                tokens.push(WhenClauseToken::And);
+            } else if part == "||" {
+                tokens.push(WhenClauseToken::Or);
+            } else if part == "!" || part.starts_with('!') {
+                let key = part.trim_start_matches('!');
+                if key.is_empty() {
+                    tokens.push(WhenClauseToken::Not);
+                } else {
+                    tokens.push(WhenClauseToken::Not);
+                    tokens.push(WhenClauseToken::Key(key.to_string()));
+                }
+            } else if let Some((k, v)) = part.split_once("==") {
+                tokens.push(WhenClauseToken::Equals(k.to_string(), v.to_string()));
+            } else if part.is_empty() {
+                valid = false;
+            } else {
+                tokens.push(WhenClauseToken::Key(part.to_string()));
+            }
+        }
+        if tokens.is_empty() && !raw.trim().is_empty() {
+            valid = false;
+        }
+        Self { raw: raw.to_string(), tokens, valid }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.valid
+    }
+
+    pub fn tokens(&self) -> &[WhenClauseToken] {
+        &self.tokens
+    }
+
+    /// Extract all context keys referenced in the when clause.
+    pub fn context_keys(&self) -> Vec<&str> {
+        self.tokens.iter().filter_map(|t| match t {
+            WhenClauseToken::Key(k) => Some(k.as_str()),
+            WhenClauseToken::Equals(k, _) => Some(k.as_str()),
+            _ => None,
+        }).collect()
+    }
+
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keybinding profile diff (builds on existing diff_keymaps)
+// ---------------------------------------------------------------------------
+
+/// Classifies a diff entry from `diff_keymaps` for UI display.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiffClassification {
+    Added,
+    Removed,
+    Modified,
+}
+
+impl fmt::Display for DiffClassification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Added => write!(f, "+"),
+            Self::Removed => write!(f, "-"),
+            Self::Modified => write!(f, "~"),
+        }
+    }
+}
+
+/// Classify a `KeymapDiffEntry` for UI rendering.
+pub fn classify_diff(entry: &KeymapDiffEntry) -> DiffClassification {
+    match entry {
+        KeymapDiffEntry::OnlyInFirst { .. } => DiffClassification::Removed,
+        KeymapDiffEntry::OnlyInSecond { .. } => DiffClassification::Added,
+        KeymapDiffEntry::Changed { .. } => DiffClassification::Modified,
+    }
+}
+
+/// Summarize diffs from `diff_keymaps` into counts.
+pub fn summarize_diffs(diffs: &[KeymapDiffEntry]) -> (usize, usize, usize) {
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    let mut modified = 0usize;
+    for d in diffs {
+        match classify_diff(d) {
+            DiffClassification::Added => added += 1,
+            DiffClassification::Removed => removed += 1,
+            DiffClassification::Modified => modified += 1,
+        }
+    }
+    (added, removed, modified)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1985,5 +2145,104 @@ mod tests {
         let mut b = KeybindingRegistry::new();
         b.add(kb(KeyCode::Char('s'), true, "save"));
         assert!(diff_keymaps(&a, &b).is_empty());
+    }
+
+    // -- KeybindingRecorder tests (using existing) --
+
+    #[test]
+    fn recorder_basic() {
+        let mut rec = KeybindingRecorder::new();
+        assert!(!rec.is_recording());
+        rec.start();
+        assert!(rec.is_recording());
+        rec.record_key(KeyCode::Char('s'), Modifiers { ctrl: true, shift: false, alt: false, meta: false });
+        assert_eq!(rec.recorded_keys().len(), 1);
+        rec.stop();
+        assert!(!rec.is_recording());
+    }
+
+    #[test]
+    fn recorder_clear() {
+        let mut rec = KeybindingRecorder::new();
+        rec.start();
+        rec.record_key(KeyCode::Char('x'), Modifiers::none());
+        rec.clear();
+        assert!(rec.recorded_keys().is_empty());
+    }
+
+    // -- KeybindingSourceIndicator tests --
+
+    #[test]
+    fn source_indicator_default() {
+        let ind = KeybindingSourceIndicator::from_source(&KeybindingSource::Default);
+        assert_eq!(ind.label, "Default");
+        assert!(ind.summary().contains("Default"));
+        assert_eq!(format!("{}", ind), "Default");
+    }
+
+    #[test]
+    fn source_indicator_user() {
+        let ind = KeybindingSourceIndicator::from_source(&KeybindingSource::User);
+        assert_eq!(ind.label, "User");
+    }
+
+    #[test]
+    fn source_indicator_extension() {
+        let ind = KeybindingSourceIndicator::from_source(&KeybindingSource::Extension);
+        assert_eq!(ind.label, "Extension");
+    }
+
+    // -- KeybindingWhenClauseEditor tests --
+
+    #[test]
+    fn when_clause_simple() {
+        let editor = KeybindingWhenClauseEditor::parse("editorTextFocus");
+        assert!(editor.is_valid());
+        assert_eq!(editor.context_keys(), vec!["editorTextFocus"]);
+    }
+
+    #[test]
+    fn when_clause_negation() {
+        let editor = KeybindingWhenClauseEditor::parse("!inDebugMode");
+        assert!(editor.is_valid());
+        assert_eq!(editor.context_keys(), vec!["inDebugMode"]);
+    }
+
+    #[test]
+    fn when_clause_and() {
+        let editor = KeybindingWhenClauseEditor::parse("editorTextFocus && !inDebugMode");
+        assert!(editor.is_valid());
+        let keys = editor.context_keys();
+        assert!(keys.contains(&"editorTextFocus"));
+        assert!(keys.contains(&"inDebugMode"));
+    }
+
+    #[test]
+    fn when_clause_equals() {
+        let editor = KeybindingWhenClauseEditor::parse("resourceScheme==file");
+        assert!(editor.is_valid());
+        assert_eq!(editor.context_keys(), vec!["resourceScheme"]);
+    }
+
+    // -- classify_diff / summarize_diffs tests --
+
+    #[test]
+    fn classify_diff_added() {
+        let entry = KeymapDiffEntry::OnlyInSecond { command: "x".into(), key_label: "y".into() };
+        assert_eq!(classify_diff(&entry), DiffClassification::Added);
+        assert_eq!(format!("{}", DiffClassification::Added), "+");
+    }
+
+    #[test]
+    fn summarize_diffs_counts() {
+        let diffs = vec![
+            KeymapDiffEntry::OnlyInFirst { command: "a".into(), key_label: "k".into() },
+            KeymapDiffEntry::OnlyInSecond { command: "b".into(), key_label: "k".into() },
+            KeymapDiffEntry::Changed { command: "c".into(), first_key: "x".into(), second_key: "y".into() },
+        ];
+        let (added, removed, modified) = summarize_diffs(&diffs);
+        assert_eq!(added, 1);
+        assert_eq!(removed, 1);
+        assert_eq!(modified, 1);
     }
 }

@@ -1098,6 +1098,178 @@ impl ProblemsPanel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Grouping
+// ---------------------------------------------------------------------------
+
+/// Groups problems by file path, severity, or source for organized display.
+pub struct ProblemGrouper;
+
+impl ProblemGrouper {
+    /// Group problems by their file path, returning a sorted map.
+    pub fn group_by_file<'a>(problems: &'a [Problem]) -> BTreeMap<String, Vec<&'a Problem>> {
+        let mut map: BTreeMap<String, Vec<&Problem>> = BTreeMap::new();
+        for p in problems {
+            map.entry(p.file_path.clone()).or_default().push(p);
+        }
+        map
+    }
+
+    /// Group problems by their severity level.
+    pub fn group_by_severity<'a>(
+        problems: &'a [Problem],
+    ) -> HashMap<ProblemSeverity, Vec<&'a Problem>> {
+        let mut map: HashMap<ProblemSeverity, Vec<&Problem>> = HashMap::new();
+        for p in problems {
+            map.entry(p.severity).or_default().push(p);
+        }
+        map
+    }
+
+    /// Group problems by their source tool (e.g. "rustc", "clippy").
+    pub fn group_by_source<'a>(problems: &'a [Problem]) -> HashMap<String, Vec<&'a Problem>> {
+        let mut map: HashMap<String, Vec<&Problem>> = HashMap::new();
+        for p in problems {
+            map.entry(p.source.clone()).or_default().push(p);
+        }
+        map
+    }
+
+    /// Group problems first by file path, then by severity within each file.
+    pub fn group_by_file_and_severity<'a>(
+        problems: &'a [Problem],
+    ) -> BTreeMap<String, HashMap<ProblemSeverity, Vec<&'a Problem>>> {
+        let mut map: BTreeMap<String, HashMap<ProblemSeverity, Vec<&Problem>>> = BTreeMap::new();
+        for p in problems {
+            map.entry(p.file_path.clone())
+                .or_default()
+                .entry(p.severity)
+                .or_default()
+                .push(p);
+        }
+        map
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Aggregation
+// ---------------------------------------------------------------------------
+
+/// Aggregates diagnostic statistics across multiple files and problem sets.
+pub struct ProblemAggregator {
+    /// Problems stored per file path.
+    file_problems: BTreeMap<String, Vec<Problem>>,
+}
+
+impl ProblemAggregator {
+    /// Create an empty aggregator.
+    pub fn new() -> Self {
+        Self {
+            file_problems: BTreeMap::new(),
+        }
+    }
+
+    /// Add a set of problems associated with a file path.
+    pub fn add_problems(&mut self, file: &str, problems: &[Problem]) {
+        self.file_problems
+            .entry(file.to_string())
+            .or_default()
+            .extend(problems.iter().cloned());
+    }
+
+    /// Total number of problems across all files.
+    pub fn total_count(&self) -> usize {
+        self.file_problems.values().map(|v| v.len()).sum()
+    }
+
+    /// Number of distinct files with at least one problem.
+    pub fn file_count(&self) -> usize {
+        self.file_problems.keys().len()
+    }
+
+    /// Count of problems broken down by severity.
+    pub fn severity_counts(&self) -> HashMap<ProblemSeverity, usize> {
+        let mut counts: HashMap<ProblemSeverity, usize> = HashMap::new();
+        for problems in self.file_problems.values() {
+            for p in problems {
+                *counts.entry(p.severity).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
+    /// Return the file with the most problems, along with its count.
+    pub fn most_problematic_file(&self) -> Option<(&str, usize)> {
+        self.file_problems
+            .iter()
+            .max_by_key(|(_, v)| v.len())
+            .map(|(k, v)| (k.as_str(), v.len()))
+    }
+
+    /// Count of problems broken down by source tool.
+    pub fn source_summary(&self) -> HashMap<String, usize> {
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for problems in self.file_problems.values() {
+            for p in problems {
+                *counts.entry(p.source.clone()).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+}
+
+impl Default for ProblemAggregator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch removal helpers
+// ---------------------------------------------------------------------------
+
+/// Remove all problems originating from the given `source`, returning the
+/// number of problems removed.
+pub fn batch_remove_by_source(problems: &mut Vec<Problem>, source: &str) -> usize {
+    let before = problems.len();
+    problems.retain(|p| p.source != source);
+    before - problems.len()
+}
+
+/// Remove all problems associated with the given `file_path`, returning the
+/// number of problems removed.
+pub fn batch_remove_by_file(problems: &mut Vec<Problem>, file_path: &str) -> usize {
+    let before = problems.len();
+    problems.retain(|p| p.file_path != file_path);
+    before - problems.len()
+}
+
+// ---------------------------------------------------------------------------
+// Deduplication
+// ---------------------------------------------------------------------------
+
+/// Deduplicates problems that share the same file, line, column, and message.
+pub struct ProblemDeduplicator;
+
+impl ProblemDeduplicator {
+    /// Return a deduplicated list of problem references.
+    ///
+    /// Two problems are considered duplicates when their `file_path`, `line`,
+    /// `column`, and `message` fields are all equal.  The first occurrence in
+    /// the input slice is kept; subsequent duplicates are discarded.
+    pub fn deduplicate<'a>(problems: &'a [Problem]) -> Vec<&'a Problem> {
+        let mut seen = HashSet::new();
+        let mut result = Vec::new();
+        for p in problems {
+            let key = (&p.file_path, p.line, p.column, &p.message);
+            if seen.insert(key) {
+                result.push(p);
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1868,5 +2040,167 @@ src/b.rs:5:3: warning: msg2
         assert_eq!(panel.count_for_file("a.rs"), 2);
         assert_eq!(panel.count_for_file("b.rs"), 1);
         assert_eq!(panel.count_for_file("c.rs"), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // ProblemGrouper tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn grouper_group_by_file() {
+        let problems = sample_problems();
+        let grouped = ProblemGrouper::group_by_file(&problems);
+        assert_eq!(grouped.len(), 3);
+        assert_eq!(grouped["src/main.rs"].len(), 2);
+        assert_eq!(grouped["src/lib.rs"].len(), 2);
+        assert_eq!(grouped["src/util.rs"].len(), 1);
+    }
+
+    #[test]
+    fn grouper_group_by_severity() {
+        let problems = sample_problems();
+        let grouped = ProblemGrouper::group_by_severity(&problems);
+        assert_eq!(grouped[&ProblemSeverity::Error].len(), 2);
+        assert_eq!(grouped[&ProblemSeverity::Warning].len(), 1);
+        assert_eq!(grouped[&ProblemSeverity::Info].len(), 1);
+        assert_eq!(grouped[&ProblemSeverity::Hint].len(), 1);
+    }
+
+    #[test]
+    fn grouper_group_by_source() {
+        let problems = sample_problems();
+        let grouped = ProblemGrouper::group_by_source(&problems);
+        assert_eq!(grouped["rustc"].len(), 3);
+        assert_eq!(grouped["clippy"].len(), 2);
+    }
+
+    #[test]
+    fn grouper_group_by_file_and_severity() {
+        let problems = sample_problems();
+        let grouped = ProblemGrouper::group_by_file_and_severity(&problems);
+        assert_eq!(grouped.len(), 3);
+        let lib_groups = &grouped["src/lib.rs"];
+        assert_eq!(lib_groups[&ProblemSeverity::Warning].len(), 1);
+        assert_eq!(lib_groups[&ProblemSeverity::Info].len(), 1);
+        let main_groups = &grouped["src/main.rs"];
+        assert_eq!(main_groups[&ProblemSeverity::Error].len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // ProblemAggregator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn aggregator_basic_counts() {
+        let mut agg = ProblemAggregator::new();
+        let p1 = vec![
+            Problem::new(ProblemSeverity::Error, "e1", "rustc", "a.rs", 1, 1),
+            Problem::new(ProblemSeverity::Warning, "w1", "clippy", "a.rs", 2, 1),
+        ];
+        let p2 = vec![
+            Problem::new(ProblemSeverity::Error, "e2", "rustc", "b.rs", 1, 1),
+        ];
+        agg.add_problems("a.rs", &p1);
+        agg.add_problems("b.rs", &p2);
+        assert_eq!(agg.total_count(), 3);
+        assert_eq!(agg.file_count(), 2);
+    }
+
+    #[test]
+    fn aggregator_severity_counts() {
+        let mut agg = ProblemAggregator::new();
+        agg.add_problems("x.rs", &[
+            Problem::new(ProblemSeverity::Error, "e", "s", "x.rs", 1, 1),
+            Problem::new(ProblemSeverity::Error, "e2", "s", "x.rs", 2, 1),
+            Problem::new(ProblemSeverity::Warning, "w", "s", "x.rs", 3, 1),
+        ]);
+        let counts = agg.severity_counts();
+        assert_eq!(counts[&ProblemSeverity::Error], 2);
+        assert_eq!(counts[&ProblemSeverity::Warning], 1);
+    }
+
+    #[test]
+    fn aggregator_most_problematic_file() {
+        let mut agg = ProblemAggregator::new();
+        agg.add_problems("small.rs", &[
+            Problem::new(ProblemSeverity::Info, "i", "s", "small.rs", 1, 1),
+        ]);
+        agg.add_problems("big.rs", &[
+            Problem::new(ProblemSeverity::Error, "e1", "s", "big.rs", 1, 1),
+            Problem::new(ProblemSeverity::Error, "e2", "s", "big.rs", 2, 1),
+            Problem::new(ProblemSeverity::Warning, "w", "s", "big.rs", 3, 1),
+        ]);
+        let (file, count) = agg.most_problematic_file().unwrap();
+        assert_eq!(file, "big.rs");
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn aggregator_source_summary() {
+        let mut agg = ProblemAggregator::new();
+        agg.add_problems("f.rs", &[
+            Problem::new(ProblemSeverity::Error, "e", "rustc", "f.rs", 1, 1),
+            Problem::new(ProblemSeverity::Warning, "w", "clippy", "f.rs", 2, 1),
+            Problem::new(ProblemSeverity::Info, "i", "clippy", "f.rs", 3, 1),
+        ]);
+        let summary = agg.source_summary();
+        assert_eq!(summary["rustc"], 1);
+        assert_eq!(summary["clippy"], 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch removal tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn batch_remove_by_source_removes_matching() {
+        let mut problems = vec![
+            Problem::new(ProblemSeverity::Error, "e", "rustc", "a.rs", 1, 1),
+            Problem::new(ProblemSeverity::Warning, "w", "clippy", "a.rs", 2, 1),
+            Problem::new(ProblemSeverity::Info, "i", "rustc", "b.rs", 3, 1),
+        ];
+        let removed = batch_remove_by_source(&mut problems, "rustc");
+        assert_eq!(removed, 2);
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].source, "clippy");
+    }
+
+    #[test]
+    fn batch_remove_by_file_removes_matching() {
+        let mut problems = vec![
+            Problem::new(ProblemSeverity::Error, "e1", "s", "a.rs", 1, 1),
+            Problem::new(ProblemSeverity::Error, "e2", "s", "a.rs", 5, 1),
+            Problem::new(ProblemSeverity::Warning, "w", "s", "b.rs", 1, 1),
+        ];
+        let removed = batch_remove_by_file(&mut problems, "a.rs");
+        assert_eq!(removed, 2);
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].file_path, "b.rs");
+    }
+
+    // -----------------------------------------------------------------------
+    // ProblemDeduplicator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn deduplicator_removes_exact_duplicates() {
+        let problems = vec![
+            Problem::new(ProblemSeverity::Error, "unused var", "rustc", "a.rs", 10, 5),
+            Problem::new(ProblemSeverity::Error, "unused var", "rustc", "a.rs", 10, 5),
+            Problem::new(ProblemSeverity::Error, "unused var", "clippy", "a.rs", 10, 5),
+        ];
+        let deduped = ProblemDeduplicator::deduplicate(&problems);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].message, "unused var");
+    }
+
+    #[test]
+    fn deduplicator_keeps_different_lines() {
+        let problems = vec![
+            Problem::new(ProblemSeverity::Error, "same msg", "s", "a.rs", 1, 1),
+            Problem::new(ProblemSeverity::Error, "same msg", "s", "a.rs", 2, 1),
+        ];
+        let deduped = ProblemDeduplicator::deduplicate(&problems);
+        assert_eq!(deduped.len(), 2);
     }
 }

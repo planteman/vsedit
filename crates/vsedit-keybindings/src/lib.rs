@@ -1059,6 +1059,249 @@ pub fn is_prefix_of(prefix: &Keybinding, full: &Keybinding) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// KeybindingConflictDetector – advanced conflict detection
+// ---------------------------------------------------------------------------
+
+/// Advanced conflict detector that operates on a stored set of keybindings.
+///
+/// Provides both exact-match and prefix-based conflict detection in a single
+/// pass-friendly structure.
+#[derive(Debug, Clone)]
+pub struct KeybindingConflictDetector {
+    bindings: Vec<Keybinding>,
+}
+
+impl KeybindingConflictDetector {
+    /// Create a new detector from a list of keybindings.
+    pub fn new(bindings: Vec<Keybinding>) -> Self {
+        Self { bindings }
+    }
+
+    /// Find bindings with identical chord sequences.
+    pub fn find_exact_conflicts(&self) -> Vec<KeybindingConflict> {
+        let mut conflicts = Vec::new();
+        for i in 0..self.bindings.len() {
+            for j in (i + 1)..self.bindings.len() {
+                if self.bindings[i].parts == self.bindings[j].parts {
+                    conflicts.push(KeybindingConflict {
+                        binding_a: self.bindings[i].clone(),
+                        binding_b: self.bindings[j].clone(),
+                    });
+                }
+            }
+        }
+        conflicts
+    }
+
+    /// Find bindings where one is a strict prefix of another.
+    pub fn find_prefix_conflicts(&self) -> Vec<KeybindingConflict> {
+        let mut conflicts = Vec::new();
+        for i in 0..self.bindings.len() {
+            for j in (i + 1)..self.bindings.len() {
+                if is_prefix_of(&self.bindings[i], &self.bindings[j])
+                    || is_prefix_of(&self.bindings[j], &self.bindings[i])
+                {
+                    conflicts.push(KeybindingConflict {
+                        binding_a: self.bindings[i].clone(),
+                        binding_b: self.bindings[j].clone(),
+                    });
+                }
+            }
+        }
+        conflicts
+    }
+
+    /// Total number of conflicts (exact + prefix).
+    pub fn conflict_count(&self) -> usize {
+        self.find_exact_conflicts().len() + self.find_prefix_conflicts().len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingFuzzySearch – fuzzy matching for keybinding search
+// ---------------------------------------------------------------------------
+
+/// Indicates whether a fuzzy-search match was on the command name or key label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FuzzyMatchField {
+    /// The query matched inside the command name.
+    Command,
+    /// The query matched inside the serialized key string.
+    Key,
+}
+
+/// A single result from a fuzzy keybinding search.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingSearchResult {
+    /// Index of the matching binding in the original slice.
+    pub binding_index: usize,
+    /// Relevance score (higher is better).
+    pub score: u32,
+    /// Which field the query matched against.
+    pub matched_on: FuzzyMatchField,
+}
+
+/// Fuzzy search across keybindings by command name or serialized key.
+pub struct KeybindingFuzzySearch;
+
+impl KeybindingFuzzySearch {
+    /// Search categorized keybindings for `query`.
+    ///
+    /// Returns results sorted by descending score. A case-insensitive
+    /// substring match is performed against the command name and the
+    /// serialized chord string. An exact-start match scores higher than
+    /// a mid-string match.
+    pub fn search(
+        bindings: &[CategorizedKeybinding],
+        query: &str,
+    ) -> Vec<KeybindingSearchResult> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let query_lower = query.to_lowercase();
+        let mut results = Vec::new();
+
+        for (i, kb) in bindings.iter().enumerate() {
+            let cmd_lower = kb.command.to_lowercase();
+            let key_str = serialize_keybinding(&kb.binding).to_lowercase();
+
+            let cmd_score = Self::substring_score(&cmd_lower, &query_lower);
+            let key_score = Self::substring_score(&key_str, &query_lower);
+
+            if cmd_score > 0 || key_score > 0 {
+                let (score, matched_on) = if cmd_score >= key_score {
+                    (cmd_score, FuzzyMatchField::Command)
+                } else {
+                    (key_score, FuzzyMatchField::Key)
+                };
+                results.push(KeybindingSearchResult {
+                    binding_index: i,
+                    score,
+                    matched_on,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results
+    }
+
+    /// Score a `haystack` against a `needle`.
+    ///
+    /// Returns 0 for no match, 2 for a prefix match, and 1 for a mid-string match.
+    fn substring_score(haystack: &str, needle: &str) -> u32 {
+        if haystack.starts_with(needle) {
+            2
+        } else if haystack.contains(needle) {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingRecordingSession – interactive chord recording
+// ---------------------------------------------------------------------------
+
+/// Records individual key chords and converts them into a [`Keybinding`].
+///
+/// At most two chords are kept; additional chords are silently dropped.
+#[derive(Debug, Clone)]
+pub struct KeybindingRecordingSession {
+    chords: Vec<KeyCodeChord>,
+}
+
+impl KeybindingRecordingSession {
+    /// Create a new, empty recording session.
+    pub fn new() -> Self {
+        Self {
+            chords: Vec::new(),
+        }
+    }
+
+    /// Record a chord. Only the first two chords are stored.
+    pub fn record_chord(&mut self, chord: KeyCodeChord) {
+        if self.chords.len() < 2 {
+            self.chords.push(chord);
+        }
+    }
+
+    /// Convert the recorded chords into a [`Keybinding`].
+    ///
+    /// Returns `None` if no chords have been recorded.
+    pub fn to_keybinding(&self) -> Option<Keybinding> {
+        match self.chords.len() {
+            0 => None,
+            1 => Some(Keybinding::new(self.chords[0].clone())),
+            _ => Some(Keybinding::two_chords(
+                self.chords[0].clone(),
+                self.chords[1].clone(),
+            )),
+        }
+    }
+
+    /// Number of chords recorded so far.
+    pub fn recorded_count(&self) -> usize {
+        self.chords.len()
+    }
+
+    /// Discard all recorded chords.
+    pub fn clear(&mut self) {
+        self.chords.clear();
+    }
+}
+
+impl Default for KeybindingRecordingSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PlatformKeybindingVariant – per-platform keybinding alternatives
+// ---------------------------------------------------------------------------
+
+/// Stores platform-specific keybinding variants for a single command.
+///
+/// For example, `Ctrl+C` on Linux/Windows but `⌘C` on macOS.
+#[derive(Debug, Clone)]
+pub struct PlatformKeybindingVariant {
+    command: String,
+    variants: std::collections::HashMap<Platform, Keybinding>,
+}
+
+impl PlatformKeybindingVariant {
+    /// Create a new variant set for `command` with no platform bindings.
+    pub fn new(command: &str) -> Self {
+        Self {
+            command: command.to_string(),
+            variants: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Set (or replace) the keybinding for a given platform.
+    pub fn set_variant(&mut self, platform: Platform, binding: Keybinding) {
+        self.variants.insert(platform, binding);
+    }
+
+    /// Get the keybinding for a platform, if one has been set.
+    pub fn get_variant(&self, platform: Platform) -> Option<&Keybinding> {
+        self.variants.get(&platform)
+    }
+
+    /// Return all platforms that have a binding set, in arbitrary order.
+    pub fn platforms_with_bindings(&self) -> Vec<Platform> {
+        self.variants.keys().copied().collect()
+    }
+
+    /// The command name this variant set is associated with.
+    pub fn command(&self) -> &str {
+        &self.command
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1874,5 +2117,181 @@ mod tests {
         assert!(is_prefix_of(&prefix, &full));
         assert!(!is_prefix_of(&full, &prefix));
         assert!(!is_prefix_of(&prefix, &prefix));
+    }
+
+    // -- KeybindingConflictDetector --
+
+    #[test]
+    fn conflict_detector_exact() {
+        let a = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let b = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let c = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyD));
+        let det = KeybindingConflictDetector::new(vec![a, b, c]);
+        assert_eq!(det.find_exact_conflicts().len(), 1);
+    }
+
+    #[test]
+    fn conflict_detector_prefix() {
+        let short = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK));
+        let long = Keybinding::two_chords(
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        );
+        let det = KeybindingConflictDetector::new(vec![short, long]);
+        assert_eq!(det.find_prefix_conflicts().len(), 1);
+        assert_eq!(det.find_exact_conflicts().len(), 0);
+    }
+
+    #[test]
+    fn conflict_detector_count() {
+        let a = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let b = a.clone();
+        let short = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK));
+        let long = Keybinding::two_chords(
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        );
+        let det = KeybindingConflictDetector::new(vec![a, b, short, long]);
+        assert_eq!(det.conflict_count(), 2); // 1 exact + 1 prefix
+    }
+
+    // -- KeybindingFuzzySearch --
+
+    #[test]
+    fn fuzzy_search_by_command() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+                command: "editor.action.save".into(),
+                category: KeybindingCategory::Editor,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyF)),
+                command: "editor.action.find".into(),
+                category: KeybindingCategory::Editor,
+            },
+        ];
+        let results = KeybindingFuzzySearch::search(&bindings, "save");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].binding_index, 0);
+        assert_eq!(results[0].matched_on, FuzzyMatchField::Command);
+    }
+
+    #[test]
+    fn fuzzy_search_by_key() {
+        let bindings = vec![CategorizedKeybinding {
+            binding: Keybinding::new(KeyCodeChord::new(true, true, false, false, KeyCode::KeyP)),
+            command: "workbench.openCommandPalette".into(),
+            category: KeybindingCategory::General,
+        }];
+        let results = KeybindingFuzzySearch::search(&bindings, "shift");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].matched_on, FuzzyMatchField::Key);
+    }
+
+    #[test]
+    fn fuzzy_search_empty_query() {
+        let bindings = vec![CategorizedKeybinding {
+            binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            command: "save".into(),
+            category: KeybindingCategory::General,
+        }];
+        assert!(KeybindingFuzzySearch::search(&bindings, "").is_empty());
+    }
+
+    #[test]
+    fn fuzzy_search_prefix_scores_higher() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyA)),
+                command: "go.to.line".into(),
+                category: KeybindingCategory::Navigation,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyB)),
+                command: "editor.goto".into(),
+                category: KeybindingCategory::Editor,
+            },
+        ];
+        let results = KeybindingFuzzySearch::search(&bindings, "go");
+        assert_eq!(results.len(), 2);
+        // "go.to.line" starts with "go" so should rank first
+        assert_eq!(results[0].binding_index, 0);
+        assert!(results[0].score > results[1].score);
+    }
+
+    // -- KeybindingRecordingSession --
+
+    #[test]
+    fn recording_session_basic() {
+        let mut session = KeybindingRecordingSession::new();
+        assert_eq!(session.recorded_count(), 0);
+        assert!(session.to_keybinding().is_none());
+
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK));
+        assert_eq!(session.recorded_count(), 1);
+
+        let kb = session.to_keybinding().unwrap();
+        assert_eq!(kb.chord_count(), 1);
+    }
+
+    #[test]
+    fn recording_session_two_chords() {
+        let mut session = KeybindingRecordingSession::new();
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK));
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyC));
+        let kb = session.to_keybinding().unwrap();
+        assert_eq!(kb.chord_count(), 2);
+    }
+
+    #[test]
+    fn recording_session_drops_extra_chords() {
+        let mut session = KeybindingRecordingSession::new();
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK));
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyC));
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyD));
+        assert_eq!(session.recorded_count(), 2);
+    }
+
+    #[test]
+    fn recording_session_clear() {
+        let mut session = KeybindingRecordingSession::new();
+        session.record_chord(KeyCodeChord::new(true, false, false, false, KeyCode::KeyA));
+        session.clear();
+        assert_eq!(session.recorded_count(), 0);
+        assert!(session.to_keybinding().is_none());
+    }
+
+    // -- PlatformKeybindingVariant --
+
+    #[test]
+    fn platform_variant_set_and_get() {
+        let mut variant = PlatformKeybindingVariant::new("editor.copy");
+        let linux_kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyC));
+        let mac_kb = Keybinding::new(KeyCodeChord::new(false, false, false, true, KeyCode::KeyC));
+        variant.set_variant(Platform::Linux, linux_kb.clone());
+        variant.set_variant(Platform::MacOS, mac_kb.clone());
+
+        assert_eq!(variant.get_variant(Platform::Linux), Some(&linux_kb));
+        assert_eq!(variant.get_variant(Platform::MacOS), Some(&mac_kb));
+        assert_eq!(variant.get_variant(Platform::Windows), None);
+        assert_eq!(variant.command(), "editor.copy");
+    }
+
+    #[test]
+    fn platform_variant_platforms_list() {
+        let mut variant = PlatformKeybindingVariant::new("test");
+        variant.set_variant(
+            Platform::Linux,
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyA)),
+        );
+        variant.set_variant(
+            Platform::Windows,
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyA)),
+        );
+        let platforms = variant.platforms_with_bindings();
+        assert_eq!(platforms.len(), 2);
+        assert!(platforms.contains(&Platform::Linux));
+        assert!(platforms.contains(&Platform::Windows));
     }
 }

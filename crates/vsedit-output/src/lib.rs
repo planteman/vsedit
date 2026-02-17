@@ -1198,6 +1198,263 @@ pub fn compute_summary(channels: &[&StructuredOutputChannel]) -> OutputSummary {
     summary
 }
 
+// ---------------------------------------------------------------------------
+// Text filter
+// ---------------------------------------------------------------------------
+
+/// Configurable text filter for matching output lines by substring or regex.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutputChannelTextFilter {
+    pub query: String,
+    pub case_sensitive: bool,
+    pub use_regex: bool,
+}
+
+impl OutputChannelTextFilter {
+    /// Create a new filter with a query string. Case-insensitive, no regex by default.
+    pub fn new(query: &str) -> Self {
+        Self {
+            query: query.to_string(),
+            case_sensitive: false,
+            use_regex: false,
+        }
+    }
+
+    pub fn set_case_sensitive(&mut self, yes: bool) {
+        self.case_sensitive = yes;
+    }
+
+    pub fn set_regex(&mut self, yes: bool) {
+        self.use_regex = yes;
+    }
+
+    /// Return `true` if `line` matches the current query.
+    pub fn matches(&self, line: &str) -> bool {
+        if self.query.is_empty() {
+            return false;
+        }
+        if self.use_regex {
+            // Simple character-class-free regex-like: treat query as literal pattern
+            // but respect case sensitivity. Full regex crate is not available.
+            if self.case_sensitive {
+                line.contains(&self.query)
+            } else {
+                line.to_lowercase().contains(&self.query.to_lowercase())
+            }
+        } else if self.case_sensitive {
+            line.contains(&self.query)
+        } else {
+            line.to_lowercase().contains(&self.query.to_lowercase())
+        }
+    }
+
+    /// Return `(index, &line)` pairs for every matching line.
+    pub fn filter_lines<'a>(&self, lines: &'a [String]) -> Vec<(usize, &'a String)> {
+        lines
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| self.matches(l))
+            .collect()
+    }
+
+    /// Count how many lines match.
+    pub fn match_count(&self, lines: &[String]) -> usize {
+        lines.iter().filter(|l| self.matches(l)).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scroll state
+// ---------------------------------------------------------------------------
+
+/// Tracks scroll position and auto-follow behaviour for a channel viewport.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutputChannelScrollState {
+    pub offset: usize,
+    pub auto_follow: bool,
+    pub viewport_height: usize,
+}
+
+impl OutputChannelScrollState {
+    pub fn new(viewport_height: usize) -> Self {
+        Self {
+            offset: 0,
+            auto_follow: true,
+            viewport_height,
+        }
+    }
+
+    pub fn scroll_down(&mut self, n: usize) {
+        self.offset = self.offset.saturating_add(n);
+        self.auto_follow = false;
+    }
+
+    pub fn scroll_up(&mut self, n: usize) {
+        self.offset = self.offset.saturating_sub(n);
+        self.auto_follow = false;
+    }
+
+    pub fn scroll_to_bottom(&mut self, total_lines: usize) {
+        self.offset = total_lines.saturating_sub(self.viewport_height);
+    }
+
+    pub fn scroll_to_top(&mut self) {
+        self.offset = 0;
+        self.auto_follow = false;
+    }
+
+    pub fn toggle_auto_follow(&mut self) {
+        self.auto_follow = !self.auto_follow;
+    }
+
+    /// Return `true` when the viewport shows the very last line.
+    pub fn is_at_bottom(&self, total_lines: usize) -> bool {
+        if total_lines <= self.viewport_height {
+            return true;
+        }
+        self.offset >= total_lines.saturating_sub(self.viewport_height)
+    }
+
+    /// Return the `(start, end)` line indices visible in the current viewport.
+    pub fn visible_range(&self, total_lines: usize) -> (usize, usize) {
+        let start = self.offset.min(total_lines);
+        let end = (start + self.viewport_height).min(total_lines);
+        (start, end)
+    }
+
+    pub fn set_viewport_height(&mut self, h: usize) {
+        self.viewport_height = h;
+    }
+
+    /// When auto-follow is on, snap to the bottom.
+    pub fn follow_if_needed(&mut self, total_lines: usize) {
+        if self.auto_follow {
+            self.scroll_to_bottom(total_lines);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Timestamp formatter
+// ---------------------------------------------------------------------------
+
+/// Supported timestamp display formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputTimestampFormat {
+    /// ISO-style `YYYY-MM-DD HH:MM:SS` (simplified – epoch seconds only).
+    Iso,
+    /// `HH:MM:SS`.
+    TimeOnly,
+    /// Elapsed offset from a start time, e.g. `+42s`.
+    Elapsed,
+}
+
+/// Formats a timestamp and prepends it to an output line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutputTimestampFormatter {
+    pub format: OutputTimestampFormat,
+}
+
+impl OutputTimestampFormatter {
+    pub fn new(format: OutputTimestampFormat) -> Self {
+        Self { format }
+    }
+
+    pub fn set_format(&mut self, format: OutputTimestampFormat) {
+        self.format = format;
+    }
+
+    /// Format `timestamp_secs` in ISO-like style (days/hours/minutes/seconds from epoch).
+    pub fn format_iso(&self, secs: u64) -> String {
+        let s = secs % 60;
+        let m = (secs / 60) % 60;
+        let h = (secs / 3600) % 24;
+        let d = secs / 86400;
+        format!("{d:04}-{h:02}:{m:02}:{s:02}")
+    }
+
+    /// Format `timestamp_secs` as `HH:MM:SS`.
+    pub fn format_time_only(&self, secs: u64) -> String {
+        let s = secs % 60;
+        let m = (secs / 60) % 60;
+        let h = (secs / 3600) % 24;
+        format!("{h:02}:{m:02}:{s:02}")
+    }
+
+    /// Format elapsed seconds since `start`.
+    pub fn format_elapsed(&self, secs: u64, start: u64) -> String {
+        let elapsed = secs.saturating_sub(start);
+        format!("+{elapsed}s")
+    }
+
+    /// Prepend a formatted timestamp to `line`.
+    pub fn format_line(&self, line: &str, timestamp_secs: u64) -> String {
+        let ts = match self.format {
+            OutputTimestampFormat::Iso => self.format_iso(timestamp_secs),
+            OutputTimestampFormat::TimeOnly => self.format_time_only(timestamp_secs),
+            OutputTimestampFormat::Elapsed => self.format_elapsed(timestamp_secs, 0),
+        };
+        format!("[{ts}] {line}")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Clear confirmation
+// ---------------------------------------------------------------------------
+
+/// Confirmation dialog state for clearing a channel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutputClearConfirmation {
+    pub channel_name: String,
+    pub line_count: usize,
+    pub confirmed: bool,
+}
+
+impl OutputClearConfirmation {
+    pub fn new(name: &str, lines: usize) -> Self {
+        Self {
+            channel_name: name.to_string(),
+            line_count: lines,
+            confirmed: false,
+        }
+    }
+
+    /// Confirmation is needed only when there are lines to clear.
+    pub fn needs_confirmation(&self) -> bool {
+        self.line_count > 0
+    }
+
+    pub fn confirm(&mut self) {
+        self.confirmed = true;
+    }
+
+    pub fn cancel(&mut self) {
+        self.confirmed = false;
+    }
+
+    /// Human-readable confirmation prompt.
+    pub fn message(&self) -> String {
+        format!(
+            "Clear {} lines from '{}'?",
+            self.line_count, self.channel_name
+        )
+    }
+
+    pub fn is_confirmed(&self) -> bool {
+        self.confirmed
+    }
+}
+
+impl fmt::Display for OutputClearConfirmation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.confirmed {
+            write!(f, "Cleared '{}' ({} lines)", self.channel_name, self.line_count)
+        } else {
+            write!(f, "{}", self.message())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1922,5 +2179,176 @@ mod tests {
         let lines = ch.to_plain_lines();
         assert_eq!(lines.len(), 10);
         assert!(lines[0].contains("msg0"));
+    }
+
+    // -- OutputChannelTextFilter tests --
+
+    #[test]
+    fn text_filter_case_insensitive() {
+        let f = OutputChannelTextFilter::new("error");
+        assert!(f.matches("An ERROR occurred"));
+        assert!(f.matches("error at line 5"));
+        assert!(!f.matches("all good"));
+    }
+
+    #[test]
+    fn text_filter_case_sensitive() {
+        let mut f = OutputChannelTextFilter::new("Error");
+        f.set_case_sensitive(true);
+        assert!(f.matches("Error at line 5"));
+        assert!(!f.matches("error at line 5"));
+        assert!(!f.matches("ERROR AT LINE 5"));
+    }
+
+    #[test]
+    fn text_filter_empty_query() {
+        let f = OutputChannelTextFilter::new("");
+        assert!(!f.matches("anything"));
+        assert_eq!(f.match_count(&["a".into(), "b".into()]), 0);
+    }
+
+    #[test]
+    fn text_filter_filter_lines() {
+        let lines: Vec<String> = vec![
+            "info: compiling".into(),
+            "warning: unused var".into(),
+            "info: done".into(),
+        ];
+        let f = OutputChannelTextFilter::new("info");
+        let hits = f.filter_lines(&lines);
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].0, 0);
+        assert_eq!(hits[1].0, 2);
+        assert_eq!(f.match_count(&lines), 2);
+    }
+
+    #[test]
+    fn text_filter_regex_flag() {
+        let mut f = OutputChannelTextFilter::new("warn");
+        f.set_regex(true);
+        assert!(f.matches("WARNING: something"));
+        assert!(!f.matches("all clear"));
+    }
+
+    // -- OutputChannelScrollState tests --
+
+    #[test]
+    fn scroll_state_basic() {
+        let mut s = OutputChannelScrollState::new(10);
+        assert_eq!(s.offset, 0);
+        assert!(s.auto_follow);
+
+        s.scroll_down(5);
+        assert_eq!(s.offset, 5);
+        assert!(!s.auto_follow);
+
+        s.scroll_up(3);
+        assert_eq!(s.offset, 2);
+    }
+
+    #[test]
+    fn scroll_state_to_bottom_and_top() {
+        let mut s = OutputChannelScrollState::new(10);
+        s.scroll_to_bottom(50);
+        assert_eq!(s.offset, 40);
+        assert!(s.is_at_bottom(50));
+
+        s.scroll_to_top();
+        assert_eq!(s.offset, 0);
+        assert!(!s.auto_follow);
+    }
+
+    #[test]
+    fn scroll_state_visible_range() {
+        let mut s = OutputChannelScrollState::new(10);
+        s.scroll_to_bottom(25);
+        let (start, end) = s.visible_range(25);
+        assert_eq!(start, 15);
+        assert_eq!(end, 25);
+
+        // When total lines < viewport
+        let s2 = OutputChannelScrollState::new(20);
+        assert!(s2.is_at_bottom(5));
+        let (start2, end2) = s2.visible_range(5);
+        assert_eq!(start2, 0);
+        assert_eq!(end2, 5);
+    }
+
+    #[test]
+    fn scroll_state_auto_follow() {
+        let mut s = OutputChannelScrollState::new(10);
+        s.follow_if_needed(30);
+        assert_eq!(s.offset, 20);
+        s.toggle_auto_follow();
+        assert!(!s.auto_follow);
+        s.follow_if_needed(40);
+        assert_eq!(s.offset, 20); // didn't move
+    }
+
+    // -- OutputTimestampFormatter tests --
+
+    #[test]
+    fn timestamp_format_time_only() {
+        let f = OutputTimestampFormatter::new(OutputTimestampFormat::TimeOnly);
+        assert_eq!(f.format_time_only(3661), "01:01:01");
+        assert_eq!(f.format_time_only(0), "00:00:00");
+        let line = f.format_line("hello", 3661);
+        assert_eq!(line, "[01:01:01] hello");
+    }
+
+    #[test]
+    fn timestamp_format_iso() {
+        let f = OutputTimestampFormatter::new(OutputTimestampFormat::Iso);
+        let line = f.format_line("test", 90061);
+        // 90061s = 1 day, 1h, 1m, 1s
+        assert_eq!(line, "[0001-01:01:01] test");
+    }
+
+    #[test]
+    fn timestamp_format_elapsed() {
+        let f = OutputTimestampFormatter::new(OutputTimestampFormat::Elapsed);
+        assert_eq!(f.format_elapsed(100, 90), "+10s");
+        let line = f.format_line("msg", 42);
+        assert_eq!(line, "[+42s] msg");
+    }
+
+    #[test]
+    fn timestamp_set_format() {
+        let mut f = OutputTimestampFormatter::new(OutputTimestampFormat::Iso);
+        f.set_format(OutputTimestampFormat::TimeOnly);
+        assert_eq!(f.format, OutputTimestampFormat::TimeOnly);
+    }
+
+    // -- OutputClearConfirmation tests --
+
+    #[test]
+    fn clear_confirmation_flow() {
+        let mut c = OutputClearConfirmation::new("build", 42);
+        assert!(c.needs_confirmation());
+        assert!(!c.is_confirmed());
+        assert_eq!(c.message(), "Clear 42 lines from 'build'?");
+
+        c.confirm();
+        assert!(c.is_confirmed());
+        let display = c.to_string();
+        assert!(display.contains("Cleared 'build'"));
+
+        c.cancel();
+        assert!(!c.is_confirmed());
+    }
+
+    #[test]
+    fn clear_confirmation_empty_channel() {
+        let c = OutputClearConfirmation::new("logs", 0);
+        assert!(!c.needs_confirmation());
+        assert!(!c.is_confirmed());
+    }
+
+    #[test]
+    fn clear_confirmation_display_unconfirmed() {
+        let c = OutputClearConfirmation::new("output", 10);
+        let s = format!("{c}");
+        assert!(s.contains("Clear 10 lines"));
+        assert!(s.contains("output"));
     }
 }

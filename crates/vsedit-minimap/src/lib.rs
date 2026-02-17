@@ -1150,6 +1150,340 @@ impl GitChangeLayer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Slider drag interaction
+// ---------------------------------------------------------------------------
+
+/// Tracks the state of a click-and-drag interaction on the minimap slider.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapSliderDrag {
+    /// Whether a drag is currently active.
+    pub active: bool,
+    /// Pixel-y where the drag started.
+    start_pixel_y: u32,
+    /// The editor start-line when the drag began.
+    anchor_line: u32,
+    /// Current pixel-y of the pointer.
+    current_pixel_y: u32,
+}
+
+impl MinimapSliderDrag {
+    /// Begin a new drag at `pixel_y` with the editor anchored at `editor_start`.
+    pub fn begin(pixel_y: u32, editor_start: u32) -> Self {
+        Self {
+            active: true,
+            start_pixel_y: pixel_y,
+            anchor_line: editor_start,
+            current_pixel_y: pixel_y,
+        }
+    }
+
+    /// Create an inactive (idle) drag state.
+    pub fn idle() -> Self {
+        Self {
+            active: false,
+            start_pixel_y: 0,
+            anchor_line: 0,
+            current_pixel_y: 0,
+        }
+    }
+
+    /// Update the pointer position during a drag.
+    pub fn update(&mut self, pixel_y: u32) {
+        if self.active {
+            self.current_pixel_y = pixel_y;
+        }
+    }
+
+    /// End the drag, returning the final scroll target line.
+    pub fn end(&mut self, scale: &MinimapScaleFactor) -> u32 {
+        self.active = false;
+        self.target_line(scale)
+    }
+
+    /// Signed pixel delta from the start of the drag.
+    pub fn pixel_delta(&self) -> i32 {
+        self.current_pixel_y as i32 - self.start_pixel_y as i32
+    }
+
+    /// Compute the document line the editor should scroll to, based on the
+    /// current drag offset translated through the scale factor.
+    pub fn target_line(&self, scale: &MinimapScaleFactor) -> u32 {
+        let delta_lines = (self.pixel_delta() as f64 * scale.lines_per_pixel()) as i32;
+        let target = self.anchor_line as i32 + delta_lines;
+        let clamped = target
+            .max(0)
+            .min(scale.document_lines.saturating_sub(1) as i32);
+        clamped as u32
+    }
+}
+
+impl fmt::Display for MinimapSliderDrag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.active {
+            write!(
+                f,
+                "Drag(active, delta={}px, anchor=L{})",
+                self.pixel_delta(),
+                self.anchor_line,
+            )
+        } else {
+            write!(f, "Drag(idle)")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Aggregated highlight layer
+// ---------------------------------------------------------------------------
+
+/// Priority-ordered highlight kind. Lower discriminant = higher priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HighlightKind {
+    Error,
+    SearchMatch,
+    Selection,
+}
+
+/// A single highlight entry on a pixel row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HighlightEntry {
+    pub pixel_row: u32,
+    pub kind: HighlightKind,
+}
+
+/// Aggregated highlight layer that merges search matches, selections, and
+/// error markers with priority-based rendering.
+#[derive(Debug, Clone)]
+pub struct MinimapHighlights {
+    entries: Vec<HighlightEntry>,
+}
+
+impl MinimapHighlights {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add search-match highlights from a `SearchHighlightOverlay`.
+    pub fn add_search_highlights(&mut self, overlay: &SearchHighlightOverlay) {
+        for &px in overlay.iter() {
+            self.entries.push(HighlightEntry {
+                pixel_row: px,
+                kind: HighlightKind::SearchMatch,
+            });
+        }
+    }
+
+    /// Add selection highlights from a `MinimapSelection` projected through `scale`.
+    pub fn add_selection(&mut self, sel: &MinimapSelection, scale: &MinimapScaleFactor) {
+        let px_start = scale.line_to_pixel(sel.start_line);
+        let px_end = scale.line_to_pixel(sel.end_line);
+        for px in px_start..=px_end {
+            self.entries.push(HighlightEntry {
+                pixel_row: px,
+                kind: HighlightKind::Selection,
+            });
+        }
+    }
+
+    /// Add error markers from a decoration layer projected through `scale`.
+    pub fn add_errors(&mut self, layer: &MinimapDecorationLayer, scale: &MinimapScaleFactor) {
+        for dec in layer.iter() {
+            if dec.is_error() {
+                let px = scale.line_to_pixel(dec.line_number);
+                self.entries.push(HighlightEntry {
+                    pixel_row: px,
+                    kind: HighlightKind::Error,
+                });
+            }
+        }
+    }
+
+    /// Return the highest-priority highlight kind for a given pixel row, or
+    /// `None` if the row has no highlights.
+    pub fn dominant_at(&self, pixel_row: u32) -> Option<HighlightKind> {
+        self.entries
+            .iter()
+            .filter(|e| e.pixel_row == pixel_row)
+            .map(|e| e.kind)
+            .min() // HighlightKind::Error < SearchMatch < Selection
+    }
+
+    /// Total number of highlight entries (before deduplication).
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Deduplicate entries, keeping only the highest-priority kind per row.
+    pub fn compact(&mut self) {
+        self.entries.sort_by(|a, b| {
+            a.pixel_row.cmp(&b.pixel_row).then(a.kind.cmp(&b.kind))
+        });
+        self.entries.dedup_by(|a, b| a.pixel_row == b.pixel_row);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Character-level scale calculations
+// ---------------------------------------------------------------------------
+
+/// Maps character dimensions to minimap pixel dimensions using a scale factor
+/// and font metrics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapScale {
+    /// Width of a single character cell in editor pixels.
+    pub char_width: f64,
+    /// Height of a single character cell in editor pixels.
+    pub char_height: f64,
+    /// Scale denominator (e.g. 1 = full size, 2 = half, 6 = typical minimap).
+    pub divisor: u32,
+}
+
+impl MinimapScale {
+    pub fn new(char_width: f64, char_height: f64, divisor: u32) -> Self {
+        Self {
+            char_width,
+            char_height,
+            divisor: divisor.max(1),
+        }
+    }
+
+    /// Scaled width of a single character in minimap pixels.
+    pub fn scaled_char_width(&self) -> f64 {
+        self.char_width / self.divisor as f64
+    }
+
+    /// Scaled height of a single character in minimap pixels.
+    pub fn scaled_char_height(&self) -> f64 {
+        self.char_height / self.divisor as f64
+    }
+
+    /// Width of `cols` columns in minimap pixels.
+    pub fn columns_to_px(&self, cols: u32) -> f64 {
+        cols as f64 * self.scaled_char_width()
+    }
+
+    /// Height of `rows` lines in minimap pixels.
+    pub fn lines_to_px(&self, rows: u32) -> f64 {
+        rows as f64 * self.scaled_char_height()
+    }
+
+    /// How many columns fit within `width_px` minimap pixels.
+    pub fn px_to_columns(&self, width_px: f64) -> u32 {
+        let cw = self.scaled_char_width();
+        if cw <= 0.0 {
+            return 0;
+        }
+        (width_px / cw) as u32
+    }
+
+    /// How many lines fit within `height_px` minimap pixels.
+    pub fn px_to_lines(&self, height_px: f64) -> u32 {
+        let ch = self.scaled_char_height();
+        if ch <= 0.0 {
+            return 0;
+        }
+        (height_px / ch) as u32
+    }
+}
+
+impl fmt::Display for MinimapScale {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Scale(1/{}, char={:.1}x{:.1} -> {:.2}x{:.2})",
+            self.divisor,
+            self.char_width,
+            self.char_height,
+            self.scaled_char_width(),
+            self.scaled_char_height(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Viewport indicator overlay
+// ---------------------------------------------------------------------------
+
+/// Style for rendering the viewport indicator rectangle on the minimap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndicatorStyle {
+    /// Semi-transparent filled rectangle.
+    Fill,
+    /// Outline only (border).
+    Border,
+}
+
+/// Describes the rendered viewport indicator ("current view" rectangle) that
+/// is drawn on top of the minimap to show which portion of the document is
+/// visible in the editor.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapViewportIndicator {
+    /// Top pixel row of the indicator.
+    pub top_px: u32,
+    /// Height of the indicator in pixels (≥ 1).
+    pub height_px: u32,
+    /// Width of the indicator in pixels.
+    pub width_px: u32,
+    /// Visual style.
+    pub style: IndicatorStyle,
+}
+
+impl MinimapViewportIndicator {
+    /// Build the indicator from a `ViewportMapping` and a minimap width.
+    pub fn from_mapping(mapping: &ViewportMapping, width_px: u32, style: IndicatorStyle) -> Self {
+        let (top, bottom) = mapping.slider_pixel_range();
+        Self {
+            top_px: top,
+            height_px: bottom.saturating_sub(top).max(1),
+            width_px,
+            style,
+        }
+    }
+
+    /// Bottom pixel row (exclusive).
+    pub fn bottom_px(&self) -> u32 {
+        self.top_px + self.height_px
+    }
+
+    /// Whether a pixel coordinate (x, y) falls within the indicator rectangle.
+    pub fn contains(&self, x: u32, y: u32) -> bool {
+        x < self.width_px && y >= self.top_px && y < self.bottom_px()
+    }
+
+    /// Centre pixel-row of the indicator.
+    pub fn center_y(&self) -> u32 {
+        self.top_px + self.height_px / 2
+    }
+
+    /// Fraction of the minimap height occupied by this indicator.
+    pub fn coverage(&self, minimap_height_px: u32) -> f64 {
+        if minimap_height_px == 0 {
+            return 0.0;
+        }
+        self.height_px as f64 / minimap_height_px as f64
+    }
+}
+
+impl fmt::Display for MinimapViewportIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Indicator(y={}..{}, w={}, {:?})",
+            self.top_px,
+            self.bottom_px(),
+            self.width_px,
+            self.style,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1961,5 +2295,196 @@ mod tests {
         layer.clear();
         assert_eq!(layer.count(), 0);
         assert!(layer.changes_in_range(0, 100).is_empty());
+    }
+
+    // --- MinimapSliderDrag tests ---
+
+    #[test]
+    fn slider_drag_idle() {
+        let drag = MinimapSliderDrag::idle();
+        assert!(!drag.active);
+        assert_eq!(drag.pixel_delta(), 0);
+        assert_eq!(drag.to_string(), "Drag(idle)");
+    }
+
+    #[test]
+    fn slider_drag_begin_and_update() {
+        let mut drag = MinimapSliderDrag::begin(100, 50);
+        assert!(drag.active);
+        assert_eq!(drag.pixel_delta(), 0);
+
+        drag.update(130);
+        assert_eq!(drag.pixel_delta(), 30);
+    }
+
+    #[test]
+    fn slider_drag_target_line() {
+        let mut drag = MinimapSliderDrag::begin(50, 100);
+        drag.update(70); // +20 pixels
+        let scale = MinimapScaleFactor::new(1000, 200);
+        // 20 pixels * (1000/200) = 100 lines offset
+        let target = drag.target_line(&scale);
+        assert_eq!(target, 200); // 100 + 100
+    }
+
+    #[test]
+    fn slider_drag_clamps_to_bounds() {
+        let mut drag = MinimapSliderDrag::begin(100, 0);
+        drag.update(10); // -90 pixels → negative target
+        let scale = MinimapScaleFactor::new(500, 200);
+        assert_eq!(drag.target_line(&scale), 0);
+    }
+
+    #[test]
+    fn slider_drag_end_returns_target() {
+        let mut drag = MinimapSliderDrag::begin(0, 0);
+        drag.update(10);
+        let scale = MinimapScaleFactor::new(100, 100);
+        let target = drag.end(&scale);
+        assert_eq!(target, 10);
+        assert!(!drag.active);
+    }
+
+    // --- MinimapHighlights tests ---
+
+    #[test]
+    fn highlights_empty() {
+        let hl = MinimapHighlights::new();
+        assert!(hl.is_empty());
+        assert_eq!(hl.len(), 0);
+        assert_eq!(hl.dominant_at(0), None);
+    }
+
+    #[test]
+    fn highlights_search_and_error_priority() {
+        let scale = MinimapScaleFactor::new(100, 100);
+        let overlay = SearchHighlightOverlay::from_matches(&[10], &scale);
+
+        let mut layer = MinimapDecorationLayer::new();
+        layer.add(MinimapDecoration {
+            line_number: 10,
+            color_id: 0,
+            decoration_type: DecorationType::Error,
+        });
+
+        let mut hl = MinimapHighlights::new();
+        hl.add_search_highlights(&overlay);
+        hl.add_errors(&layer, &scale);
+
+        // Error has higher priority than SearchMatch
+        assert_eq!(hl.dominant_at(10), Some(HighlightKind::Error));
+    }
+
+    #[test]
+    fn highlights_add_selection() {
+        let scale = MinimapScaleFactor::new(200, 200);
+        let sel = MinimapSelection::new(5, 8, 0, 10);
+        let mut hl = MinimapHighlights::new();
+        hl.add_selection(&sel, &scale);
+
+        assert!(!hl.is_empty());
+        assert_eq!(hl.dominant_at(5), Some(HighlightKind::Selection));
+        assert_eq!(hl.dominant_at(8), Some(HighlightKind::Selection));
+        assert_eq!(hl.dominant_at(50), None);
+    }
+
+    #[test]
+    fn highlights_compact_deduplicates() {
+        let scale = MinimapScaleFactor::new(100, 100);
+        let overlay = SearchHighlightOverlay::from_matches(&[10, 10], &scale);
+        let mut hl = MinimapHighlights::new();
+        hl.add_search_highlights(&overlay);
+
+        let before = hl.len();
+        hl.compact();
+        assert!(hl.len() <= before);
+        assert_eq!(hl.dominant_at(10), Some(HighlightKind::SearchMatch));
+    }
+
+    // --- MinimapScale tests ---
+
+    #[test]
+    fn scale_basic_calculations() {
+        let sc = MinimapScale::new(8.0, 16.0, 4);
+        assert!((sc.scaled_char_width() - 2.0).abs() < f64::EPSILON);
+        assert!((sc.scaled_char_height() - 4.0).abs() < f64::EPSILON);
+        assert!((sc.columns_to_px(10) - 20.0).abs() < f64::EPSILON);
+        assert!((sc.lines_to_px(5) - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scale_px_to_columns_and_lines() {
+        let sc = MinimapScale::new(10.0, 20.0, 2);
+        // scaled char_width=5, char_height=10
+        assert_eq!(sc.px_to_columns(50.0), 10);
+        assert_eq!(sc.px_to_lines(100.0), 10);
+    }
+
+    #[test]
+    fn scale_divisor_clamped_to_one() {
+        let sc = MinimapScale::new(8.0, 16.0, 0);
+        assert_eq!(sc.divisor, 1);
+        assert!((sc.scaled_char_width() - 8.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scale_display() {
+        let sc = MinimapScale::new(8.0, 16.0, 4);
+        let s = sc.to_string();
+        assert!(s.contains("1/4"));
+    }
+
+    // --- MinimapViewportIndicator tests ---
+
+    #[test]
+    fn viewport_indicator_from_mapping() {
+        let mapping = ViewportMapping::new(100, 150, 1000, 500);
+        let ind = MinimapViewportIndicator::from_mapping(&mapping, 60, IndicatorStyle::Fill);
+
+        assert!(ind.height_px >= 1);
+        assert_eq!(ind.width_px, 60);
+        assert_eq!(ind.style, IndicatorStyle::Fill);
+        assert_eq!(ind.bottom_px(), ind.top_px + ind.height_px);
+    }
+
+    #[test]
+    fn viewport_indicator_contains() {
+        let ind = MinimapViewportIndicator {
+            top_px: 10,
+            height_px: 20,
+            width_px: 50,
+            style: IndicatorStyle::Border,
+        };
+        assert!(ind.contains(0, 10));
+        assert!(ind.contains(49, 29));
+        assert!(!ind.contains(50, 10)); // x out of bounds
+        assert!(!ind.contains(0, 30));  // y out of bounds
+        assert!(!ind.contains(0, 9));   // above
+    }
+
+    #[test]
+    fn viewport_indicator_coverage() {
+        let ind = MinimapViewportIndicator {
+            top_px: 0,
+            height_px: 25,
+            width_px: 50,
+            style: IndicatorStyle::Fill,
+        };
+        let cov = ind.coverage(100);
+        assert!((cov - 0.25).abs() < f64::EPSILON);
+        assert!((ind.coverage(0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn viewport_indicator_display() {
+        let ind = MinimapViewportIndicator {
+            top_px: 5,
+            height_px: 10,
+            width_px: 40,
+            style: IndicatorStyle::Fill,
+        };
+        let s = ind.to_string();
+        assert!(s.contains("5..15"));
+        assert!(s.contains("w=40"));
     }
 }

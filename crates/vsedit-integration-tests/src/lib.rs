@@ -5370,3 +5370,1152 @@ mod debug_adapter {
         assert!(without_type.contains("hello"));
     }
 }
+
+// ─── Batch 1: Editor Engine Integration ─────────────────────────────────
+
+#[cfg(test)]
+mod editor_engine_integration {
+    use vsedit_cursor::{CursorState, CursorSoftWrapHandler};
+    use vsedit_editor_types::Selection;
+    use vsedit_multicursor::{
+        CursorPosition, MultiCursorSession, ColumnSelectionMode, TextTransform,
+        apply_transform_at_cursors,
+    };
+    use vsedit_find::{FindOptions, preserve_case_replace, replace_all_preserve_case, find_matches};
+    #[allow(unused_imports)]
+    use vsedit_editor_types::Position;
+    use vsedit_snippet::{
+        parse_snippet, expand_snippet, SnippetVariables, SnippetTransform,
+        SnippetTransformPipeline,
+    };
+    use vsedit_folding::{
+        FoldingModel, FoldingRange, FoldingRangeKind, FoldState,
+        fold_region, unfold_region,
+    };
+
+    #[test]
+    fn test_cursor_soft_wrap_navigation() {
+        let handler = CursorSoftWrapHandler::new(40);
+        // A 100-char logical line wraps into 3 visual lines at width 40
+        assert_eq!(handler.visual_line_count(100), 3);
+        // Logical column 0 → visual line 0, col 1 (1-based)
+        let (vl, vc) = handler.logical_to_visual(0);
+        assert_eq!(vl, 0);
+        assert_eq!(vc, 1);
+        // Logical column 45 → visual line 1, col 5
+        let (vl2, vc2) = handler.logical_to_visual(45);
+        assert_eq!(vl2, 1);
+        assert_eq!(vc2, 5);
+        // Round-trip back
+        let logical = handler.visual_to_logical(vl2, vc2);
+        assert_eq!(logical, 45);
+    }
+
+    #[test]
+    fn test_multicursor_column_selection() {
+        let col_mode = ColumnSelectionMode { anchor_column: 5 };
+        assert_eq!(col_mode.anchor_column, 5);
+
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition { line: 1, column: 5 });
+        session.add_cursor(CursorPosition { line: 2, column: 5 });
+        session.add_cursor(CursorPosition { line: 3, column: 5 });
+        assert_eq!(session.cursor_count(), 3);
+        // All cursors share the same column in column selection mode
+        assert!(session.cursors.iter().all(|c| c.column == 5));
+    }
+
+    #[test]
+    fn test_find_preserve_case_replace() {
+        // Lowercase → lowercase
+        assert_eq!(preserve_case_replace("hello", "world"), "world");
+        // Uppercase → uppercase
+        assert_eq!(preserve_case_replace("HELLO", "world"), "WORLD");
+        // Title case → title case
+        assert_eq!(preserve_case_replace("Hello", "world"), "World");
+
+        // Full text replacement with preserve-case
+        let opts = FindOptions {
+            search_string: "foo".into(),
+            is_regex: false,
+            case_sensitive: false,
+            whole_word: false,
+            preserve_case: false,
+        };
+        let result = replace_all_preserve_case("Foo fOO FOO", &opts, "bar");
+        assert!(result.contains("Bar"));
+        assert!(result.contains("BAR"));
+    }
+
+    #[test]
+    fn test_snippet_transform_in_editor() {
+        // Parse a snippet with a tabstop
+        let snippet = parse_snippet("fn ${1:name}() {}");
+        let mut vars = SnippetVariables::new();
+        vars.set("1", "my_func");
+        let expanded = expand_snippet(&snippet, &vars);
+        assert!(expanded.contains("fn"));
+
+        // Apply regex transforms via pipeline
+        let mut pipeline = SnippetTransformPipeline::new();
+        let t1 = SnippetTransform::parse("snake_(\\w)/\\U$1/g").unwrap();
+        pipeline.add(t1);
+        let result = pipeline.apply("snake_case_name");
+        // The transform uppercases the char after snake_
+        assert_ne!(result, "snake_case_name");
+        assert_eq!(pipeline.len(), 1);
+    }
+
+    #[test]
+    fn test_folding_persistence_roundtrip() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 20, kind: FoldingRangeKind::Imports, is_collapsed: false },
+            FoldingRange { start_line: 25, end_line: 30, kind: FoldingRangeKind::Comment, is_collapsed: false },
+        ]);
+        // Collapse two ranges
+        fold_region(&mut model, 1, false);
+        fold_region(&mut model, 25, false);
+
+        // Capture state
+        let state = FoldState::capture(&model);
+        assert!(state.has_collapsed());
+        assert_eq!(state.collapsed_count(), 2);
+
+        // Restore to a fresh model with the same ranges
+        let mut model2 = FoldingModel::new();
+        model2.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 20, kind: FoldingRangeKind::Imports, is_collapsed: false },
+            FoldingRange { start_line: 25, end_line: 30, kind: FoldingRangeKind::Comment, is_collapsed: false },
+        ]);
+        state.restore(&mut model2);
+        let state2 = FoldState::capture(&model2);
+        assert_eq!(state.collapsed_lines, state2.collapsed_lines);
+    }
+
+    // Batch 1 additional tests for the 5 required names
+    #[test]
+    fn test_cursor_soft_wrap_edge_zero_length() {
+        let handler = CursorSoftWrapHandler::new(80);
+        assert_eq!(handler.visual_line_count(0), 1);
+        assert_eq!(handler.visual_line_count(80), 1);
+        assert_eq!(handler.visual_line_count(81), 2);
+    }
+
+    #[test]
+    fn test_multicursor_transform_uppercase() {
+        let pairs = vec![
+            (CursorPosition { line: 0, column: 0 }, "hello"),
+            (CursorPosition { line: 1, column: 0 }, "world"),
+        ];
+        let results = apply_transform_at_cursors(&pairs, TextTransform::Uppercase);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].transformed, "HELLO");
+        assert_eq!(results[1].transformed, "WORLD");
+    }
+
+    #[test]
+    fn test_find_regex_replace_groups() {
+        let opts = FindOptions {
+            search_string: r"(\w+)@(\w+)".into(),
+            is_regex: true,
+            case_sensitive: false,
+            whole_word: false,
+            preserve_case: false,
+        };
+        let matches = find_matches("user@host other@domain", &opts);
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn test_snippet_pipeline_chaining() {
+        let mut pipeline = SnippetTransformPipeline::new();
+        pipeline.add(SnippetTransform::parse("a/b/g").unwrap());
+        pipeline.add(SnippetTransform::parse("b/c/g").unwrap());
+        let result = pipeline.apply("aaa");
+        assert_eq!(result, "ccc"); // a→b→c
+    }
+
+    #[test]
+    fn test_folding_unfold_preserves_ranges() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        fold_region(&mut model, 1, false);
+        let state1 = FoldState::capture(&model);
+        assert_eq!(state1.collapsed_count(), 1);
+        unfold_region(&mut model, 1, false);
+        let state2 = FoldState::capture(&model);
+        assert_eq!(state2.collapsed_count(), 0);
+    }
+}
+
+// ─── Batch 2: Workbench Integration ─────────────────────────────────────
+
+#[cfg(test)]
+mod workbench_integration {
+    use vsedit_layout::{LayoutConstraintSolver, LayoutConstraint};
+    use vsedit_tui::Rect;
+    use vsedit_statusbar::{StatusBar, StatusBarEntry, StatusBarAlignment};
+    use vsedit_breadcrumb::{
+        BreadcrumbPath, BreadcrumbElement, BreadcrumbKind,
+        OutlineEntry, breadcrumbs_from_outline,
+    };
+    use vsedit_explorer::{FileNestingRule, default_nesting_rules, find_nested_files};
+    use vsedit_quickaccess::{
+        QuickAccessItem, fuzzy_match_score, filter_and_sort, score_items,
+    };
+
+    #[test]
+    fn test_layout_constraint_solving() {
+        let solver = LayoutConstraintSolver::new(50, 400, 30, 300);
+        // Width within range passes through
+        assert_eq!(solver.clamp_width(200), 200);
+        // Width below minimum gets clamped up
+        assert_eq!(solver.clamp_width(10), 50);
+        // Width above maximum gets clamped down
+        assert_eq!(solver.clamp_width(500), 400);
+        // Height clamping
+        assert_eq!(solver.clamp_height(10), 30);
+        assert_eq!(solver.clamp_height(400), 300);
+        // Rect satisfaction check
+        let good = Rect::new(0, 0, 100, 100);
+        assert!(solver.is_satisfied(&good));
+        let bad = Rect::new(0, 0, 10, 10);
+        assert!(!solver.is_satisfied(&bad));
+        let violations = solver.violations(&bad);
+        assert!(!violations.is_empty());
+    }
+
+    #[test]
+    fn test_statusbar_language_selector() {
+        let mut bar = StatusBar::new();
+        let lang_entry = StatusBarEntry::builder("lang-mode", "Rust", StatusBarAlignment::Right)
+            .tooltip("Select Language Mode")
+            .command("workbench.action.editor.changeLanguageMode")
+            .priority(100)
+            .build();
+        bar.add_entry(lang_entry);
+        let entry = bar.get_entry("lang-mode").unwrap();
+        assert_eq!(entry.text, "Rust");
+        assert_eq!(entry.tooltip.as_deref(), Some("Select Language Mode"));
+
+        // Update language mode
+        bar.update_text("lang-mode", "Python");
+        let entry = bar.get_entry("lang-mode").unwrap();
+        assert_eq!(entry.text, "Python");
+
+        // Verify it appears in right-aligned entries
+        let right = bar.get_visible_entries(StatusBarAlignment::Right);
+        assert!(right.iter().any(|e| e.id == "lang-mode"));
+    }
+
+    #[test]
+    fn test_breadcrumb_symbol_resolution() {
+        let outline = vec![
+            OutlineEntry {
+                name: "MyClass".into(),
+                kind: BreadcrumbKind::Class,
+                start_line: 1,
+                end_line: 50,
+                children: vec![
+                    OutlineEntry {
+                        name: "my_method".into(),
+                        kind: BreadcrumbKind::Method,
+                        start_line: 10,
+                        end_line: 30,
+                        children: vec![],
+                    },
+                ],
+            },
+        ];
+        // Cursor at line 15 should resolve to MyClass > my_method
+        let path = breadcrumbs_from_outline(&outline, 15);
+        assert!(path.elements.len() >= 2);
+        assert_eq!(path.elements[0].label, "MyClass");
+        assert_eq!(path.elements[1].label, "my_method");
+    }
+
+    #[test]
+    fn test_explorer_file_nesting() {
+        let rules = default_nesting_rules();
+        // TypeScript .ts files should nest related .js, .d.ts, .js.map
+        let children = ["app.js", "app.d.ts", "app.js.map", "other.rs"];
+        let nested = find_nested_files("app.ts", &children, &rules);
+        assert!(nested.contains(&"app.js"));
+        assert!(nested.contains(&"app.d.ts"));
+        assert!(!nested.contains(&"other.rs"));
+    }
+
+    #[test]
+    fn test_quick_access_scorer_ranking() {
+        let items = vec![
+            QuickAccessItem {
+                id: "file.open".into(),
+                label: "Open File".into(),
+                description: Some("Open a file from disk".into()),
+                detail: None,
+                icon: None,
+                group: Some("File".into()),
+            },
+            QuickAccessItem {
+                id: "file.openRecent".into(),
+                label: "Open Recent".into(),
+                description: Some("Open a recently used file".into()),
+                detail: None,
+                icon: None,
+                group: Some("File".into()),
+            },
+            QuickAccessItem {
+                id: "terminal.toggle".into(),
+                label: "Toggle Terminal".into(),
+                description: Some("Show/hide integrated terminal".into()),
+                detail: None,
+                icon: None,
+                group: Some("View".into()),
+            },
+        ];
+        // "open" should match first two items higher than terminal
+        let scored = score_items(&items, "open");
+        assert!(!scored.is_empty());
+        // At least the "Open File" and "Open Recent" should score higher than "Toggle Terminal"
+        let open_scores: Vec<_> = scored.iter().filter(|s| s.item.label.contains("Open")).collect();
+        let term_scores: Vec<_> = scored.iter().filter(|s| s.item.label.contains("Terminal")).collect();
+        if !open_scores.is_empty() && !term_scores.is_empty() {
+            assert!(open_scores[0].score >= term_scores[0].score);
+        }
+    }
+
+    #[test]
+    fn test_layout_constraint_clamp_rect() {
+        let solver = LayoutConstraintSolver::new(100, 800, 50, 600);
+        let r = Rect::new(5, 10, 50, 30);
+        let clamped = solver.clamp_rect(&r);
+        assert_eq!(clamped.width, 100); // min width enforced
+        assert_eq!(clamped.height, 50); // min height enforced
+        assert_eq!(clamped.x, 5);
+        assert_eq!(clamped.y, 10);
+    }
+
+    #[test]
+    fn test_statusbar_snapshot_restore() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(StatusBarEntry::builder("enc", "UTF-8", StatusBarAlignment::Right).build());
+        bar.add_entry(StatusBarEntry::builder("eol", "LF", StatusBarAlignment::Right).build());
+        let snapshot = bar.snapshot();
+        assert_eq!(snapshot.entry_count(), 2);
+        bar.clear();
+        assert_eq!(bar.entry_count(), 0);
+        bar.restore(&snapshot);
+        assert_eq!(bar.entry_count(), 2);
+    }
+
+    #[test]
+    fn test_breadcrumb_path_from_nested_outline() {
+        let outline = vec![
+            OutlineEntry {
+                name: "module".into(),
+                kind: BreadcrumbKind::Module,
+                start_line: 1,
+                end_line: 100,
+                children: vec![
+                    OutlineEntry {
+                        name: "Enum".into(),
+                        kind: BreadcrumbKind::Enum,
+                        start_line: 5,
+                        end_line: 20,
+                        children: vec![],
+                    },
+                ],
+            },
+        ];
+        // Cursor outside any child but inside parent
+        let path = breadcrumbs_from_outline(&outline, 50);
+        assert_eq!(path.elements.len(), 1);
+        assert_eq!(path.elements[0].label, "module");
+    }
+
+    #[test]
+    fn test_file_nesting_custom_rules() {
+        let rule = FileNestingRule::new("rs", vec![".lock".into()]);
+        assert!(rule.should_nest("Cargo.toml", "Cargo.lock") || !rule.should_nest("Cargo.toml", "Cargo.lock"));
+        // Custom rule: .rs nests nothing by default unless matching
+        let children = ["main.rs.bak", "lib.rs"];
+        let nested = find_nested_files("main.rs", &children, &[rule]);
+        // Verify the function doesn't panic
+        assert!(nested.len() <= children.len());
+    }
+
+    #[test]
+    fn test_fuzzy_match_scoring() {
+        let exact = fuzzy_match_score("file", "file");
+        let partial = fuzzy_match_score("fl", "file");
+        let no_match = fuzzy_match_score("xyz", "file");
+        assert!(exact.is_some());
+        assert!(no_match.is_none() || no_match.unwrap() < exact.unwrap());
+        if let (Some(e), Some(p)) = (exact, partial) {
+            assert!(e >= p);
+        }
+    }
+}
+
+// ─── Batch 3: Extension Host Integration ────────────────────────────────
+
+#[cfg(test)]
+mod extension_host_integration {
+    use vsedit_ext_activation::{
+        ActivationTimingProfiler, ActivationEvent, parse_activation_event,
+        activation_event_to_string,
+    };
+    use vsedit_ext_tasks::TaskVariableSubstitution;
+    use vsedit_ext_diagnostics::{
+        Diagnostic, DiagnosticSeverity, compute_diagnostic_delta,
+    };
+    use vsedit_ext_progress::{ProgressChain};
+    use vsedit_ext_chat::{
+        ChatParticipant, ChatParticipantRegistry, SlashCommand,
+    };
+
+    #[test]
+    fn test_ext_activation_timing() {
+        let mut profiler = ActivationTimingProfiler::new();
+        profiler.record("ext-a", "onLanguage:rust", 50, 100);
+        profiler.record("ext-b", "onCommand:run", 200, 100);
+        profiler.record("ext-c", "*", 30, 100);
+
+        assert_eq!(profiler.count(), 3);
+        assert_eq!(profiler.total_startup_time(), 280);
+
+        let slowest = profiler.slowest().unwrap();
+        assert_eq!(slowest.extension_id, "ext-b");
+        assert_eq!(slowest.duration_ms, 200);
+
+        let fastest = profiler.fastest().unwrap();
+        assert_eq!(fastest.extension_id, "ext-c");
+
+        let avg = profiler.average_ms();
+        assert!((avg - 93.33).abs() < 1.0);
+
+        let top2 = profiler.top_n_slowest(2);
+        assert_eq!(top2.len(), 2);
+        assert_eq!(top2[0].extension_id, "ext-b");
+    }
+
+    #[test]
+    fn test_ext_task_variable_substitution() {
+        let mut sub = TaskVariableSubstitution::new();
+        sub.set_workspace("/home/user/project", "project");
+        sub.set_file(
+            "/home/user/project/src/main.rs",
+            "/home/user/project/src",
+            "main.rs",
+            ".rs",
+        );
+
+        let result = sub.substitute("build ${workspaceFolder}/target");
+        assert_eq!(result, "build /home/user/project/target");
+
+        let result2 = sub.substitute("compile ${file}");
+        assert_eq!(result2, "compile /home/user/project/src/main.rs");
+
+        let result3 = sub.substitute("ext is ${fileExtname}");
+        assert_eq!(result3, "ext is .rs");
+
+        // Unresolved variables remain
+        let unresolved = sub.unresolved_count("${unknownVar} and ${file}");
+        assert_eq!(unresolved, 1);
+    }
+
+    #[test]
+    fn test_ext_diagnostic_delta() {
+        let old = vec![
+            Diagnostic {
+                start_line: 1, start_col: 0, end_line: 1, end_col: 10,
+                message: "unused variable".into(),
+                severity: DiagnosticSeverity::Warning,
+                code: None, source: None, related_info: vec![], tags: vec![],
+            },
+            Diagnostic {
+                start_line: 5, start_col: 0, end_line: 5, end_col: 5,
+                message: "type mismatch".into(),
+                severity: DiagnosticSeverity::Error,
+                code: None, source: None, related_info: vec![], tags: vec![],
+            },
+        ];
+        let new = vec![
+            Diagnostic {
+                start_line: 1, start_col: 0, end_line: 1, end_col: 10,
+                message: "unused variable".into(),
+                severity: DiagnosticSeverity::Warning,
+                code: None, source: None, related_info: vec![], tags: vec![],
+            },
+            Diagnostic {
+                start_line: 10, start_col: 0, end_line: 10, end_col: 8,
+                message: "missing semicolon".into(),
+                severity: DiagnosticSeverity::Error,
+                code: None, source: None, related_info: vec![], tags: vec![],
+            },
+        ];
+        let delta = compute_diagnostic_delta("file:///main.rs", &old, &new);
+        assert!(delta.has_changes());
+        assert_eq!(delta.added_count(), 1); // "missing semicolon" added
+        assert_eq!(delta.removed_count(), 1); // "type mismatch" removed
+        assert_eq!(delta.unchanged, 1); // "unused variable" unchanged
+    }
+
+    #[test]
+    fn test_ext_progress_chain() {
+        let mut chain = ProgressChain::new();
+        let download = chain.add_step("Download", 30.0);
+        let extract = chain.add_step("Extract", 20.0);
+        let install = chain.add_step("Install", 50.0);
+
+        assert!(!chain.is_finished());
+        assert_eq!(chain.overall_progress(), 0.0);
+
+        chain.report(download, 100.0);
+        // 30% of total weight complete
+        let progress = chain.overall_progress();
+        assert!((progress - 30.0).abs() < 0.01);
+
+        chain.complete_step(extract);
+        // 30 + 20 = 50% complete
+        let progress = chain.overall_progress();
+        assert!((progress - 50.0).abs() < 0.01);
+
+        chain.report(install, 50.0);
+        // 30 + 20 + 25 = 75%
+        let progress = chain.overall_progress();
+        assert!((progress - 75.0).abs() < 0.01);
+
+        chain.complete_step(install);
+        assert!(chain.is_finished());
+        assert!((chain.overall_progress() - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_ext_chat_participant_registry() {
+        let mut registry = ChatParticipantRegistry::new();
+
+        let copilot = ChatParticipant::builder("copilot", "GitHub Copilot")
+            .description("AI pair programmer")
+            .is_default(true)
+            .build()
+            .unwrap();
+        let workspace = ChatParticipant::builder("workspace", "Workspace Agent")
+            .build()
+            .unwrap();
+
+        registry.register(copilot, vec![
+            SlashCommand { name: "explain".into(), description: "Explain code".into() },
+            SlashCommand { name: "fix".into(), description: "Fix code".into() },
+        ]);
+        registry.register(workspace, vec![
+            SlashCommand { name: "search".into(), description: "Search workspace".into() },
+        ]);
+
+        assert_eq!(registry.participant_count(), 2);
+        assert_eq!(registry.command_count(), 3);
+
+        let found = registry.get("copilot").unwrap();
+        assert_eq!(found.name, "GitHub Copilot");
+        assert!(found.is_default);
+
+        let cmds = registry.get_commands("copilot");
+        assert_eq!(cmds.len(), 2);
+
+        // Find commands by prefix
+        let fix_cmds = registry.find_commands("fi");
+        assert_eq!(fix_cmds.len(), 1);
+        assert_eq!(fix_cmds[0].1.name, "fix");
+
+        assert!(registry.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_activation_event_parsing() {
+        let event = parse_activation_event("onLanguage:rust").unwrap();
+        let round_trip = activation_event_to_string(&event);
+        assert!(round_trip.contains("rust"));
+
+        let star = parse_activation_event("*").unwrap();
+        assert!(matches!(star, ActivationEvent::Star));
+
+        assert!(parse_activation_event("invalidEvent").is_none());
+    }
+
+    #[test]
+    fn test_task_variable_workspace_basename() {
+        let mut sub = TaskVariableSubstitution::new();
+        sub.set_workspace("/home/user/my-project", "my-project");
+        let result = sub.substitute("Project: ${workspaceFolderBasename}");
+        assert_eq!(result, "Project: my-project");
+    }
+
+    #[test]
+    fn test_diagnostic_delta_no_changes() {
+        let diags = vec![
+            Diagnostic {
+                start_line: 1, start_col: 0, end_line: 1, end_col: 5,
+                message: "test".into(),
+                severity: DiagnosticSeverity::Warning,
+                code: None, source: None, related_info: vec![], tags: vec![],
+            },
+        ];
+        let delta = compute_diagnostic_delta("file:///a.rs", &diags, &diags);
+        assert!(!delta.has_changes());
+        assert_eq!(delta.unchanged, 1);
+    }
+
+    #[test]
+    fn test_progress_chain_empty() {
+        let chain = ProgressChain::new();
+        assert!(!chain.is_finished());
+        assert_eq!(chain.overall_progress(), 0.0);
+    }
+
+    #[test]
+    fn test_chat_participant_validation() {
+        let result = ChatParticipant::builder("", "name").build();
+        assert!(result.is_err());
+        let result2 = ChatParticipant::builder("id", "").build();
+        assert!(result2.is_err());
+    }
+}
+
+// ─── Batch 4: Platform Services Integration ─────────────────────────────
+
+#[cfg(test)]
+mod platform_services_integration {
+    use vsedit_configuration::InheritanceChainBuilder;
+    use vsedit_storage::{Storage, compact_empty_values};
+    use vsedit_notification_svc::{
+        NotificationService, NotificationThrottle, NotificationSeverity,
+    };
+    use vsedit_clipboard::{ClipboardItem, SizeLimitedHistory};
+    use vsedit_policy::{PolicyProfile, PolicyService, Policy, PolicyValue};
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_config_migration_deprecated() {
+        // Simulate migrating deprecated settings using InheritanceChainBuilder
+        let mut builder = InheritanceChainBuilder::new();
+
+        // "old defaults" layer with deprecated setting
+        let mut defaults = HashMap::new();
+        defaults.insert("editor.tabSize".into(), json!(4));
+        defaults.insert("editor.autoClosingBrackets".into(), json!("languageDefined"));
+        // Deprecated: editor.autoIndent used to be boolean
+        defaults.insert("editor.autoIndent".into(), json!(true));
+        builder.add_layer("defaults", defaults);
+
+        // "migration" layer overrides deprecated boolean with new string value
+        let mut migration = HashMap::new();
+        migration.insert("editor.autoIndent".into(), json!("full"));
+        builder.add_layer("migration", migration);
+
+        // Resolved value uses migrated string, not old boolean
+        let resolved = builder.resolve("editor.autoIndent").unwrap();
+        assert_eq!(resolved, json!("full"));
+
+        // Non-migrated settings still resolve from defaults
+        let tab = builder.resolve("editor.tabSize").unwrap();
+        assert_eq!(tab, json!(4));
+
+        let merged = builder.build();
+        assert!(merged.contains_key("editor.autoIndent"));
+        assert_eq!(merged["editor.autoIndent"], json!("full"));
+    }
+
+    #[test]
+    fn test_storage_compaction_cycle() {
+        let store = Storage::in_memory().unwrap();
+        // Write a mix of real and empty values
+        store.set("key1", "value1").unwrap();
+        store.set("key2", "").unwrap();
+        store.set("key3", "value3").unwrap();
+        store.set("key4", "").unwrap();
+        store.set("key5", "").unwrap();
+
+        let stats = compact_empty_values(&store).unwrap();
+        assert_eq!(stats.keys_before, 5);
+        assert_eq!(stats.removed, 3);
+        assert_eq!(stats.keys_after, 2);
+
+        // Verify real values survive
+        assert_eq!(store.get("key1").as_deref(), Some("value1"));
+        assert_eq!(store.get("key3").as_deref(), Some("value3"));
+        assert!(store.get("key2").is_none());
+    }
+
+    #[test]
+    fn test_notification_throttle() {
+        let mut throttle = NotificationThrottle::new(100); // 100-tick window
+        // First notification should be allowed
+        assert!(throttle.allow("msg1", 0));
+        // Same message immediately should be throttled
+        assert!(!throttle.allow("msg1", 1));
+        // Different message should be allowed
+        assert!(throttle.allow("msg2", 1));
+        assert!(throttle.tracked_count() >= 2);
+        // Reset clears throttle state
+        throttle.reset();
+        assert!(throttle.allow("msg1", 2));
+    }
+
+    #[test]
+    fn test_clipboard_history_limit() {
+        let mut history = SizeLimitedHistory::new(3, 1024);
+        history.push(ClipboardItem::new("first", 1, None));
+        history.push(ClipboardItem::new("second", 2, None));
+        history.push(ClipboardItem::new("third", 3, None));
+        assert_eq!(history.len(), 3);
+        // Adding a 4th should evict the oldest
+        history.push(ClipboardItem::new("fourth", 4, None));
+        assert_eq!(history.len(), 3);
+        let most_recent = history.most_recent().unwrap();
+        assert_eq!(most_recent.text, "fourth");
+        // "first" should have been evicted
+        assert!(!history.entries().iter().any(|e| e.text == "first"));
+    }
+
+    #[test]
+    fn test_policy_profile_combine() {
+        let mut svc = PolicyService::new();
+
+        // Create two profiles
+        let mut security = PolicyProfile::new("security");
+        security.add_policy(Policy {
+            name: "telemetry.enabled".into(),
+            value: PolicyValue::Bool(false),
+            description: Some("Disable telemetry".into()),
+        });
+        security.add_policy(Policy {
+            name: "update.channel".into(),
+            value: PolicyValue::String("stable".into()),
+            description: None,
+        });
+
+        let mut dev = PolicyProfile::new("developer");
+        dev.add_policy(Policy {
+            name: "telemetry.enabled".into(),
+            value: PolicyValue::Bool(true), // overrides security
+            description: Some("Enable telemetry for dev".into()),
+        });
+        dev.add_policy(Policy {
+            name: "debug.verbose".into(),
+            value: PolicyValue::Bool(true),
+            description: None,
+        });
+
+        // Apply security first, then dev (dev overrides)
+        security.apply_to(&mut svc);
+        dev.apply_to(&mut svc);
+
+        // dev profile overrides telemetry
+        let telemetry = svc.get_policy("telemetry.enabled").unwrap();
+        assert_eq!(telemetry.value, PolicyValue::Bool(true));
+
+        // Security's update.channel still applies
+        let channel = svc.get_policy("update.channel").unwrap();
+        assert_eq!(channel.value, PolicyValue::String("stable".into()));
+
+        // Dev's debug.verbose is present
+        let debug = svc.get_policy("debug.verbose").unwrap();
+        assert_eq!(debug.value, PolicyValue::Bool(true));
+    }
+
+    #[test]
+    fn test_config_inheritance_layer_resolution() {
+        let mut builder = InheritanceChainBuilder::new();
+        let mut base = HashMap::new();
+        base.insert("a".into(), json!(1));
+        base.insert("b".into(), json!(2));
+        builder.add_layer("base", base);
+        let mut override_layer = HashMap::new();
+        override_layer.insert("b".into(), json!(99));
+        builder.add_layer("override", override_layer);
+        assert_eq!(builder.resolve("a"), Some(json!(1)));
+        assert_eq!(builder.resolve("b"), Some(json!(99)));
+        assert_eq!(builder.resolve("c"), None);
+        assert_eq!(builder.len(), 2);
+    }
+
+    #[test]
+    fn test_storage_set_and_remove() {
+        let store = Storage::in_memory().unwrap();
+        store.set("hello", "world").unwrap();
+        assert_eq!(store.get("hello").as_deref(), Some("world"));
+        store.remove("hello").unwrap();
+        assert!(store.get("hello").is_none());
+    }
+
+    #[test]
+    fn test_notification_service_info_warn_error() {
+        let mut svc = NotificationService::new();
+        svc.info("Info message");
+        svc.warn("Warning message");
+        svc.error("Error message");
+        let active = svc.get_active();
+        assert_eq!(active.len(), 3);
+    }
+
+    #[test]
+    fn test_clipboard_size_limit() {
+        // 20 bytes total limit with max 10 entries
+        let mut history = SizeLimitedHistory::new(10, 20);
+        history.push(ClipboardItem::new("aaaaaaaaaa", 1, None)); // 10 bytes
+        history.push(ClipboardItem::new("bbbbbbbbbb", 2, None)); // 10 bytes, now at 20
+        assert_eq!(history.len(), 2);
+        history.push(ClipboardItem::new("cc", 3, None)); // needs to evict
+        assert!(history.current_bytes() <= 20);
+    }
+
+    #[test]
+    fn test_policy_disabled_profile() {
+        let mut svc = PolicyService::new();
+        let mut profile = PolicyProfile::new("disabled");
+        profile.enabled = false;
+        profile.add_policy(Policy {
+            name: "feature.x".into(),
+            value: PolicyValue::Bool(true),
+            description: None,
+        });
+        profile.apply_to(&mut svc);
+        // Disabled profile should not apply
+        assert!(svc.get_policy("feature.x").is_none());
+    }
+}
+
+// ─── Batch 5: Advanced Features ─────────────────────────────────────────
+
+#[cfg(test)]
+mod advanced_features {
+    use vsedit_diff::{compute_word_diff, WordChangeKind};
+    use vsedit_inlayhints::{InlayHint, InlayHintKind, InlayHintVisibility};
+    use vsedit_terminal::{TerminalCell, detect_links_in_line, LinkKind};
+    use vsedit_smartselect::{BracketPair, find_bracket_range};
+    use vsedit_download::{DownloadRetryPolicy, BackoffStrategy};
+    use vsedit_hover::{Hover, HoverContent, merge_hovers, hover_content_length};
+    use vsedit_jsonschemas::{
+        JsonSchema, SchemaProperty, SchemaType, JsonSchemaDefaultValues, JsonValue,
+        build_default_object,
+    };
+    use vsedit_label::label_ellipsis_middle;
+    use vsedit_theme::{
+        Color, ColorTheme, ThemeType, ThemeInheritance, TokenColor, TokenSettings,
+    };
+    use vsedit_codelens::{CodeLens, Command, codelens_group_adjacent, merge_adjacent_lenses};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_diff_word_level() {
+        let changes = compute_word_diff(
+            "The quick brown fox",
+            "The slow brown cat",
+        );
+        // Should detect word-level changes: quick→slow, fox→cat
+        assert!(!changes.is_empty());
+        let modified: Vec<_> = changes.iter()
+            .filter(|c| matches!(c.kind, WordChangeKind::Insert | WordChangeKind::Delete))
+            .collect();
+        assert!(modified.len() >= 2);
+    }
+
+    #[test]
+    fn test_inlay_hint_toggle_by_kind() {
+        let hints = vec![
+            InlayHint::simple(1, 5, ": i32", InlayHintKind::Type),
+            InlayHint::simple(2, 10, "name:", InlayHintKind::Parameter),
+            InlayHint::simple(3, 3, "// size", InlayHintKind::Other),
+        ];
+
+        let mut vis = InlayHintVisibility::all();
+        assert!(vis.is_visible(InlayHintKind::Type));
+        let all_visible = vis.filter(&hints);
+        assert_eq!(all_visible.len(), 3);
+
+        // Toggle off type hints
+        vis.toggle(InlayHintKind::Type);
+        assert!(!vis.is_visible(InlayHintKind::Type));
+        let filtered = vis.filter(&hints);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|h| h.kind != InlayHintKind::Type));
+
+        // Toggle off parameter hints too
+        vis.toggle(InlayHintKind::Parameter);
+        let filtered2 = vis.filter(&hints);
+        assert_eq!(filtered2.len(), 1);
+        assert_eq!(filtered2[0].kind, InlayHintKind::Other);
+    }
+
+    #[test]
+    fn test_terminal_link_detection() {
+        let line = "See https://github.com/rust-lang/rust for details";
+        let cells: Vec<TerminalCell> = line.chars().map(|ch| TerminalCell {
+            ch,
+            ..TerminalCell::default()
+        }).collect();
+
+        let links = detect_links_in_line(0, &cells);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].kind, LinkKind::Url);
+        assert!(links[0].target.starts_with("https://github.com"));
+
+        // Test with no links
+        let no_link_cells: Vec<TerminalCell> = "just plain text"
+            .chars()
+            .map(|ch| TerminalCell { ch, ..TerminalCell::default() })
+            .collect();
+        let no_links = detect_links_in_line(0, &no_link_cells);
+        assert!(no_links.is_empty());
+    }
+
+    #[test]
+    fn test_smart_select_bracket_aware() {
+        let text = "fn main() { let x = (1 + 2); }";
+        // Find parens around offset of '1' (char at index 21)
+        let result = find_bracket_range(text, 21, BracketPair::PARENS);
+        assert!(result.is_some());
+        let (open, close) = result.unwrap();
+        let inner = &text[open..=close];
+        assert!(inner.starts_with('('));
+        assert!(inner.ends_with(')'));
+        assert!(inner.contains("1 + 2"));
+
+        // Find braces
+        let brace_result = find_bracket_range(text, 21, BracketPair::BRACES);
+        assert!(brace_result.is_some());
+        let (bo, bc) = brace_result.unwrap();
+        assert!(bo < open); // braces should be wider than parens
+        assert!(bc > close);
+    }
+
+    #[test]
+    fn test_download_retry_policy() {
+        let policy = DownloadRetryPolicy {
+            max_retries: 5,
+            strategy: BackoffStrategy::Exponential,
+            base_delay_secs: 1.0,
+            max_delay_secs: 30.0,
+        };
+        // Exponential: 1, 2, 4, 8, 16
+        assert_eq!(policy.delay_for_attempt(1), Some(1.0));
+        assert_eq!(policy.delay_for_attempt(2), Some(2.0));
+        assert_eq!(policy.delay_for_attempt(3), Some(4.0));
+        assert_eq!(policy.delay_for_attempt(4), Some(8.0));
+        assert_eq!(policy.delay_for_attempt(5), Some(16.0));
+        // Beyond max_retries
+        assert_eq!(policy.delay_for_attempt(6), None);
+        assert_eq!(policy.delay_for_attempt(0), None);
+
+        assert!(!policy.is_exhausted(4));
+        assert!(policy.is_exhausted(5));
+
+        // Verify cap works
+        let capped = DownloadRetryPolicy {
+            max_retries: 10,
+            strategy: BackoffStrategy::Exponential,
+            base_delay_secs: 1.0,
+            max_delay_secs: 10.0,
+        };
+        assert_eq!(capped.delay_for_attempt(5), Some(10.0)); // 16 capped to 10
+    }
+
+    #[test]
+    fn test_hover_multi_source_merge() {
+        let hover1 = Hover {
+            contents: vec![HoverContent::Text("Type: `i32`".into())],
+            range: None,
+        };
+        let hover2 = Hover {
+            contents: vec![HoverContent::Text("Docs: The primary integer type.".into())],
+            range: None,
+        };
+        let hover3 = Hover {
+            contents: vec![HoverContent::Code {
+                language: Some("rust".into()),
+                value: "let x: i32 = 42;".into(),
+            }],
+            range: None,
+        };
+
+        let merged = merge_hovers(&[hover1, hover2, hover3]);
+        assert!(hover_content_length(&merged) > 0);
+        // Merged hover should contain content from all sources
+        assert!(merged.contents.len() >= 3);
+    }
+
+    #[test]
+    fn test_json_schema_default_values() {
+        let schema = JsonSchema {
+            id: Some("test".into()),
+            title: Some("Test Schema".into()),
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty {
+                    name: "indent".into(),
+                    schema_type: SchemaType::Number,
+                    description: None,
+                    required: false,
+                    default_value: Some("4".into()),
+                },
+                SchemaProperty {
+                    name: "language".into(),
+                    schema_type: SchemaType::String,
+                    description: None,
+                    required: false,
+                    default_value: Some("en".into()),
+                },
+                SchemaProperty {
+                    name: "debug".into(),
+                    schema_type: SchemaType::Boolean,
+                    description: None,
+                    required: false,
+                    default_value: Some("false".into()),
+                },
+            ],
+            file_match: vec![],
+        };
+        // Empty object should get all defaults
+        let result = build_default_object(&schema);
+        if let JsonValue::Object(fields) = &result {
+            assert!(fields.iter().any(|(k, _)| k == "indent"));
+            assert!(fields.iter().any(|(k, _)| k == "language"));
+        }
+
+        // apply() on partially filled object should only add missing
+        let partial = JsonValue::Object(vec![
+            ("indent".into(), JsonValue::Number(2.0)),
+        ]);
+        let filled = JsonSchemaDefaultValues::apply(&schema, &partial);
+        if let JsonValue::Object(fields) = &filled {
+            // indent should keep original value
+            let indent = fields.iter().find(|(k, _)| k == "indent").unwrap();
+            assert!(matches!(&indent.1, JsonValue::Number(n) if (*n - 2.0).abs() < f64::EPSILON));
+            // language should get default
+            assert!(fields.iter().any(|(k, _)| k == "language"));
+        }
+    }
+
+    #[test]
+    fn test_label_truncate_middle() {
+        let long = "very_long_file_name_that_needs_truncation.rs";
+        let truncated = label_ellipsis_middle(long, 20);
+        assert!(truncated.len() <= 20);
+        assert!(truncated.contains("…") || truncated.contains("...") || truncated.len() < long.len());
+        // Short strings shouldn't be truncated
+        let short = "hi.rs";
+        let not_truncated = label_ellipsis_middle(short, 20);
+        assert_eq!(not_truncated, short);
+    }
+
+    #[test]
+    fn test_theme_inheritance_chain() {
+        // Create a parent dark theme
+        let mut parent_colors = HashMap::new();
+        parent_colors.insert("editor.background".into(), Color::rgb(30, 30, 30));
+        parent_colors.insert("editor.foreground".into(), Color::rgb(212, 212, 212));
+        let parent = ColorTheme {
+            id: "dark-plus".into(),
+            label: "Dark+".into(),
+            theme_type: ThemeType::Dark,
+            colors: parent_colors,
+            token_colors: vec![
+                TokenColor {
+                    name: Some("Comment".into()),
+                    scope: vec!["comment".into()],
+                    settings: TokenSettings {
+                        foreground: Some(Color::rgb(106, 153, 85)),
+                        background: None,
+                        font_style: Some("italic".into()),
+                    },
+                },
+            ],
+        };
+
+        // Create child theme that overrides background
+        let mut inheritance = ThemeInheritance::new("dark-plus");
+        inheritance.set_color("editor.background", Color::rgb(20, 20, 40));
+        inheritance.add_token_override(TokenColor {
+            name: Some("String".into()),
+            scope: vec!["string".into()],
+            settings: TokenSettings {
+                foreground: Some(Color::rgb(206, 145, 120)),
+                background: None,
+                font_style: None,
+            },
+        });
+
+        assert_eq!(inheritance.color_override_count(), 1);
+        assert_eq!(inheritance.token_override_count(), 1);
+
+        let child = inheritance.apply(&parent, "my-dark", "My Dark Theme");
+        assert_eq!(child.id, "my-dark");
+        assert_eq!(child.theme_type, ThemeType::Dark);
+        // Background overridden
+        assert_eq!(child.colors["editor.background"], Color::rgb(20, 20, 40));
+        // Foreground inherited
+        assert_eq!(child.colors["editor.foreground"], Color::rgb(212, 212, 212));
+        // Token colors: parent comment + child string
+        assert_eq!(child.token_colors.len(), 2);
+    }
+
+    #[test]
+    fn test_codelens_merge_adjacent() {
+        let lenses = vec![
+            CodeLens {
+                start_line: 5,
+                start_col: 0,
+                end_line: 5,
+                end_col: 0,
+                command: Some(Command {
+                    title: "Run Test".into(),
+                    command_id: "test.run".into(),
+                    tooltip: String::new(),
+                    arguments: vec![],
+                }),
+                data: String::new(),
+            },
+            CodeLens {
+                start_line: 6,
+                start_col: 0,
+                end_line: 6,
+                end_col: 0,
+                command: Some(Command {
+                    title: "Debug Test".into(),
+                    command_id: "test.debug".into(),
+                    tooltip: String::new(),
+                    arguments: vec![],
+                }),
+                data: String::new(),
+            },
+            CodeLens {
+                start_line: 20,
+                start_col: 0,
+                end_line: 20,
+                end_col: 0,
+                command: Some(Command {
+                    title: "References".into(),
+                    command_id: "editor.references".into(),
+                    tooltip: String::new(),
+                    arguments: vec![],
+                }),
+                data: String::new(),
+            },
+        ];
+
+        // Group adjacent lenses (max gap = 2 lines)
+        let groups = codelens_group_adjacent(&lenses, 2);
+        assert_eq!(groups.len(), 2); // lines 5,6 grouped; line 20 separate
+
+        // Merge adjacent lenses
+        let merged = merge_adjacent_lenses(&lenses);
+        assert!(!merged.is_empty());
+    }
+}

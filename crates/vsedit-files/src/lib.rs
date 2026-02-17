@@ -1168,6 +1168,261 @@ pub fn file_similarity(old: &[u8], new: &[u8]) -> f64 {
     summary.equal as f64 / summary.total_lines as f64
 }
 
+// ---------------------------------------------------------------------------
+// FileWatchFilter
+// ---------------------------------------------------------------------------
+
+/// Filters file watch events using simple glob-like patterns.
+///
+/// Include patterns specify which paths should be accepted. Exclude patterns
+/// reject paths even when they match an include pattern. An empty include list
+/// means "accept everything".
+pub struct FileWatchFilter {
+    includes: Vec<String>,
+    excludes: Vec<String>,
+}
+
+impl FileWatchFilter {
+    /// Create an empty filter that accepts all paths.
+    pub fn new() -> Self {
+        Self {
+            includes: Vec::new(),
+            excludes: Vec::new(),
+        }
+    }
+
+    /// Add an include pattern. Supports `*` (any chars) and `?` (single char).
+    pub fn add_include(&mut self, pattern: &str) {
+        self.includes.push(pattern.to_string());
+    }
+
+    /// Add an exclude pattern. Supports `*` (any chars) and `?` (single char).
+    pub fn add_exclude(&mut self, pattern: &str) {
+        self.excludes.push(pattern.to_string());
+    }
+
+    /// Number of include patterns.
+    pub fn include_count(&self) -> usize {
+        self.includes.len()
+    }
+
+    /// Number of exclude patterns.
+    pub fn exclude_count(&self) -> usize {
+        self.excludes.len()
+    }
+
+    /// Test whether `path` passes the filter.
+    ///
+    /// A path passes when it matches at least one include pattern (or there
+    /// are no include patterns) and does not match any exclude pattern.
+    pub fn matches(&self, path: &str) -> bool {
+        let dominated = !self.includes.is_empty()
+            && !self.includes.iter().any(|p| glob_match(p, path));
+        if dominated {
+            return false;
+        }
+        !self.excludes.iter().any(|p| glob_match(p, path))
+    }
+}
+
+/// Minimal glob matcher supporting `*` and `?`.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let t: Vec<char> = text.chars().collect();
+    let (plen, tlen) = (p.len(), t.len());
+    // dp[i][j] = pattern[..i] matches text[..j]
+    let mut dp = vec![vec![false; tlen + 1]; plen + 1];
+    dp[0][0] = true;
+    for i in 1..=plen {
+        if p[i - 1] == '*' {
+            dp[i][0] = dp[i - 1][0];
+        }
+    }
+    for i in 1..=plen {
+        for j in 1..=tlen {
+            match p[i - 1] {
+                '*' => dp[i][j] = dp[i - 1][j] || dp[i][j - 1],
+                '?' => dp[i][j] = dp[i - 1][j - 1],
+                c => dp[i][j] = dp[i - 1][j - 1] && c == t[j - 1],
+            }
+        }
+    }
+    dp[plen][tlen]
+}
+
+// ---------------------------------------------------------------------------
+// FileContentHash
+// ---------------------------------------------------------------------------
+
+/// A simple content hash for detecting file changes without storing the
+/// full contents. Uses a FNV-1a–inspired algorithm so no external
+/// dependencies are needed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileContentHash {
+    hash: u64,
+}
+
+impl FileContentHash {
+    /// Hash a byte slice.
+    pub fn from_bytes(data: &[u8]) -> Self {
+        const BASIS: u64 = 0xcbf29ce484222325;
+        const PRIME: u64 = 0x00000100000001b3;
+        let mut h = BASIS;
+        for &b in data {
+            h ^= b as u64;
+            h = h.wrapping_mul(PRIME);
+        }
+        Self { hash: h }
+    }
+
+    /// Hash a string.
+    pub fn from_str(s: &str) -> Self {
+        Self::from_bytes(s.as_bytes())
+    }
+
+    /// Return the raw 64-bit hash value.
+    pub fn value(&self) -> u64 {
+        self.hash
+    }
+
+    /// Check whether two hashes are equal.
+    pub fn matches(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+impl fmt::Display for FileContentHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:016x}", self.hash)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DirectoryDiff
+// ---------------------------------------------------------------------------
+
+/// Compares two directory listings (represented as sorted name lists) and
+/// identifies entries that only appear on one side or both.
+pub struct DirectoryDiff {
+    left: Vec<String>,
+    right: Vec<String>,
+}
+
+impl DirectoryDiff {
+    /// Create a new diff from two directory listings.
+    pub fn new(left: Vec<String>, right: Vec<String>) -> Self {
+        Self { left, right }
+    }
+
+    /// Entries present only in the left listing.
+    pub fn only_left(&self) -> Vec<&str> {
+        self.left
+            .iter()
+            .filter(|e| !self.right.contains(e))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Entries present only in the right listing.
+    pub fn only_right(&self) -> Vec<&str> {
+        self.right
+            .iter()
+            .filter(|e| !self.left.contains(e))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Entries present in both listings.
+    pub fn common(&self) -> Vec<&str> {
+        self.left
+            .iter()
+            .filter(|e| self.right.contains(e))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// A human-readable summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "left_only: {}, right_only: {}, common: {}",
+            self.only_left().len(),
+            self.only_right().len(),
+            self.common().len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileMetadataCache
+// ---------------------------------------------------------------------------
+
+/// Cached metadata for a single file.
+#[derive(Debug, Clone)]
+pub struct CachedMetadata {
+    /// Approximate file size in bytes.
+    pub size: u64,
+    /// Last-modified timestamp in milliseconds since the epoch.
+    pub modified_ms: u64,
+}
+
+/// A simple in-memory cache for file metadata, useful for avoiding repeated
+/// filesystem round-trips when checking sizes and modification times.
+pub struct FileMetadataCache {
+    entries: HashMap<String, CachedMetadata>,
+}
+
+impl FileMetadataCache {
+    /// Create an empty cache.
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Insert or update metadata for `path`.
+    pub fn insert(&mut self, path: &str, size: u64, modified_ms: u64) {
+        self.entries.insert(
+            path.to_string(),
+            CachedMetadata { size, modified_ms },
+        );
+    }
+
+    /// Look up cached metadata.
+    pub fn get(&self, path: &str) -> Option<&CachedMetadata> {
+        self.entries.get(path)
+    }
+
+    /// Remove a path from the cache.
+    pub fn invalidate(&mut self, path: &str) {
+        self.entries.remove(path);
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Check whether the cached entry for `path` is older than `max_age_ms`
+    /// relative to `current_ms`. Returns `true` when the entry is missing or
+    /// stale.
+    pub fn is_stale(&self, path: &str, max_age_ms: u64, current_ms: u64) -> bool {
+        match self.entries.get(path) {
+            None => true,
+            Some(meta) => {
+                if current_ms < meta.modified_ms {
+                    return false;
+                }
+                current_ms - meta.modified_ms > max_age_ms
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1870,5 +2125,126 @@ mod tests {
         let sim = file_similarity(b"a\nb\nc\n", b"a\nb\nd\n");
         assert!(sim >= 0.5);
         assert!(sim < 1.0);
+    }
+
+    // --- FileWatchFilter tests ---
+
+    #[test]
+    fn watch_filter_no_patterns_matches_all() {
+        let f = FileWatchFilter::new();
+        assert!(f.matches("anything.rs"));
+        assert!(f.matches(""));
+    }
+
+    #[test]
+    fn watch_filter_include_star() {
+        let mut f = FileWatchFilter::new();
+        f.add_include("*.rs");
+        assert!(f.matches("main.rs"));
+        assert!(!f.matches("main.py"));
+        assert_eq!(f.include_count(), 1);
+    }
+
+    #[test]
+    fn watch_filter_exclude_overrides_include() {
+        let mut f = FileWatchFilter::new();
+        f.add_include("*.rs");
+        f.add_exclude("test_*");
+        assert!(f.matches("main.rs"));
+        assert!(!f.matches("test_main.rs"));
+        assert_eq!(f.exclude_count(), 1);
+    }
+
+    #[test]
+    fn watch_filter_question_mark() {
+        let mut f = FileWatchFilter::new();
+        f.add_include("a?c");
+        assert!(f.matches("abc"));
+        assert!(f.matches("axc"));
+        assert!(!f.matches("ac"));
+        assert!(!f.matches("abbc"));
+    }
+
+    // --- FileContentHash tests ---
+
+    #[test]
+    fn content_hash_deterministic() {
+        let a = FileContentHash::from_bytes(b"hello world");
+        let b = FileContentHash::from_bytes(b"hello world");
+        assert!(a.matches(&b));
+        assert_eq!(a.value(), b.value());
+    }
+
+    #[test]
+    fn content_hash_different_inputs() {
+        let a = FileContentHash::from_str("alpha");
+        let b = FileContentHash::from_str("beta");
+        assert!(!a.matches(&b));
+    }
+
+    #[test]
+    fn content_hash_display() {
+        let h = FileContentHash::from_str("test");
+        let s = format!("{}", h);
+        assert_eq!(s.len(), 16); // 64-bit hex = 16 chars
+    }
+
+    // --- DirectoryDiff tests ---
+
+    #[test]
+    fn directory_diff_common_and_unique() {
+        let d = DirectoryDiff::new(
+            vec!["a.rs".into(), "b.rs".into(), "c.rs".into()],
+            vec!["b.rs".into(), "c.rs".into(), "d.rs".into()],
+        );
+        assert_eq!(d.only_left(), vec!["a.rs"]);
+        assert_eq!(d.only_right(), vec!["d.rs"]);
+        assert_eq!(d.common(), vec!["b.rs", "c.rs"]);
+    }
+
+    #[test]
+    fn directory_diff_summary() {
+        let d = DirectoryDiff::new(
+            vec!["x".into()],
+            vec!["y".into()],
+        );
+        let s = d.summary();
+        assert!(s.contains("left_only: 1"));
+        assert!(s.contains("right_only: 1"));
+        assert!(s.contains("common: 0"));
+    }
+
+    // --- FileMetadataCache tests ---
+
+    #[test]
+    fn metadata_cache_insert_get() {
+        let mut cache = FileMetadataCache::new();
+        assert!(cache.is_empty());
+        cache.insert("foo.rs", 1024, 5000);
+        assert_eq!(cache.len(), 1);
+        let m = cache.get("foo.rs").unwrap();
+        assert_eq!(m.size, 1024);
+        assert_eq!(m.modified_ms, 5000);
+    }
+
+    #[test]
+    fn metadata_cache_invalidate() {
+        let mut cache = FileMetadataCache::new();
+        cache.insert("bar.rs", 512, 1000);
+        cache.invalidate("bar.rs");
+        assert!(cache.get("bar.rs").is_none());
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn metadata_cache_is_stale() {
+        let mut cache = FileMetadataCache::new();
+        cache.insert("a.rs", 100, 1000);
+        // Not stale: current 1500, max_age 1000 => age=500 <= 1000
+        assert!(!cache.is_stale("a.rs", 1000, 1500));
+        // Stale: current 3000, max_age 1000 => age=2000 > 1000
+        assert!(cache.is_stale("a.rs", 1000, 3000));
+        // Missing entry is always stale
+        assert!(cache.is_stale("missing.rs", 1000, 1000));
     }
 }

@@ -1207,6 +1207,278 @@ impl From<&ProgressState> for ProgressSummary {
     }
 }
 
+// ── Progress Chain ──
+
+/// A single step within a [`ProgressChain`].
+#[derive(Debug, Clone)]
+pub struct ProgressChainStep {
+    pub label: String,
+    pub weight: f64,
+    pub progress: f64,
+    pub is_complete: bool,
+}
+
+/// Links sequential progress operations where each step has a weight.
+///
+/// Overall progress is computed as the weighted sum of individual step
+/// percentages, making it easy to represent multi-phase workflows like
+/// "download 30%, extract 20%, install 50%".
+#[derive(Debug)]
+pub struct ProgressChain {
+    steps: Vec<ProgressChainStep>,
+}
+
+impl ProgressChain {
+    pub fn new() -> Self {
+        Self { steps: Vec::new() }
+    }
+
+    /// Add a step with the given label and relative weight.
+    pub fn add_step(&mut self, label: &str, weight: f64) -> usize {
+        let idx = self.steps.len();
+        self.steps.push(ProgressChainStep {
+            label: label.to_string(),
+            weight: weight.max(0.0),
+            progress: 0.0,
+            is_complete: false,
+        });
+        idx
+    }
+
+    /// Report progress for a specific step (0–100).
+    pub fn report(&mut self, index: usize, progress: f64) {
+        if let Some(step) = self.steps.get_mut(index) {
+            step.progress = progress.clamp(0.0, 100.0);
+            step.is_complete = step.progress >= 100.0;
+        }
+    }
+
+    /// Mark a step as complete.
+    pub fn complete_step(&mut self, index: usize) {
+        self.report(index, 100.0);
+    }
+
+    /// The weighted overall progress across all steps (0–100).
+    pub fn overall_progress(&self) -> f64 {
+        let total_weight: f64 = self.steps.iter().map(|s| s.weight).sum();
+        if total_weight <= 0.0 {
+            return 0.0;
+        }
+        let weighted_sum: f64 = self
+            .steps
+            .iter()
+            .map(|s| s.progress * s.weight)
+            .sum();
+        (weighted_sum / total_weight).clamp(0.0, 100.0)
+    }
+
+    /// True when every step is complete.
+    pub fn is_finished(&self) -> bool {
+        !self.steps.is_empty() && self.steps.iter().all(|s| s.is_complete)
+    }
+
+    /// The index of the first incomplete step, if any.
+    pub fn current_step(&self) -> Option<usize> {
+        self.steps.iter().position(|s| !s.is_complete)
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    pub fn get_step(&self, index: usize) -> Option<&ProgressChainStep> {
+        self.steps.get(index)
+    }
+}
+
+// ── Progress Estimator ──
+
+/// Adaptive ETA estimation using an exponential moving average of recent
+/// progress rates. More recent samples are weighted more heavily so the
+/// estimate adapts quickly when throughput changes.
+#[derive(Debug)]
+pub struct ProgressEstimator {
+    smoothed_rate: Option<f64>,
+    alpha: f64,
+    last_percentage: f64,
+    last_time: Instant,
+}
+
+impl ProgressEstimator {
+    /// Create a new estimator. `alpha` controls smoothing: values closer to
+    /// 1.0 react faster to changes, values closer to 0.0 smooth more.
+    pub fn new(alpha: f64) -> Self {
+        Self {
+            smoothed_rate: None,
+            alpha: alpha.clamp(0.01, 1.0),
+            last_percentage: 0.0,
+            last_time: Instant::now(),
+        }
+    }
+
+    /// Record a new percentage observation and update the rate estimate.
+    pub fn record(&mut self, percentage: f64) {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_time).as_secs_f64();
+        if elapsed > 0.0 {
+            let delta = percentage - self.last_percentage;
+            if delta > 0.0 {
+                let rate = delta / elapsed;
+                self.smoothed_rate = Some(match self.smoothed_rate {
+                    Some(prev) => self.alpha * rate + (1.0 - self.alpha) * prev,
+                    None => rate,
+                });
+            }
+        }
+        self.last_percentage = percentage;
+        self.last_time = now;
+    }
+
+    /// Record a percentage with an explicit timestamp (useful for testing).
+    pub fn record_at(&mut self, percentage: f64, at: Instant) {
+        let elapsed = at.duration_since(self.last_time).as_secs_f64();
+        if elapsed > 0.0 {
+            let delta = percentage - self.last_percentage;
+            if delta > 0.0 {
+                let rate = delta / elapsed;
+                self.smoothed_rate = Some(match self.smoothed_rate {
+                    Some(prev) => self.alpha * rate + (1.0 - self.alpha) * prev,
+                    None => rate,
+                });
+            }
+        }
+        self.last_percentage = percentage;
+        self.last_time = at;
+    }
+
+    /// Estimated time remaining to reach 100%, or `None` if no rate data.
+    pub fn eta(&self) -> Option<Duration> {
+        self.smoothed_rate.and_then(|r| {
+            if r <= 0.0 {
+                return None;
+            }
+            let remaining = 100.0 - self.last_percentage;
+            if remaining <= 0.0 {
+                return Some(Duration::ZERO);
+            }
+            Some(Duration::from_secs_f64(remaining / r))
+        })
+    }
+
+    /// The current smoothed rate in percentage-points per second.
+    pub fn rate(&self) -> Option<f64> {
+        self.smoothed_rate
+    }
+}
+
+// ── Progress Notification Link ──
+
+/// Maps progress handles to notification IDs so that UI layers can pair a
+/// running progress operation with the notification widget displaying it.
+#[derive(Debug)]
+pub struct ProgressNotificationLink {
+    links: Vec<(u64, String)>,
+}
+
+impl ProgressNotificationLink {
+    pub fn new() -> Self {
+        Self { links: Vec::new() }
+    }
+
+    /// Associate a progress handle with a notification ID.
+    pub fn link(&mut self, handle: u64, notification_id: &str) {
+        if !self.links.iter().any(|(h, _)| *h == handle) {
+            self.links.push((handle, notification_id.to_string()));
+        }
+    }
+
+    /// Remove the link for a handle (e.g. when progress completes).
+    pub fn unlink(&mut self, handle: u64) {
+        self.links.retain(|(h, _)| *h != handle);
+    }
+
+    /// Look up the notification ID for a handle.
+    pub fn notification_for(&self, handle: u64) -> Option<&str> {
+        self.links
+            .iter()
+            .find(|(h, _)| *h == handle)
+            .map(|(_, id)| id.as_str())
+    }
+
+    /// Look up the handle for a notification ID.
+    pub fn handle_for(&self, notification_id: &str) -> Option<u64> {
+        self.links
+            .iter()
+            .find(|(_, id)| id == notification_id)
+            .map(|(h, _)| *h)
+    }
+
+    pub fn count(&self) -> usize {
+        self.links.len()
+    }
+}
+
+// ── Progress Cancellation Cascade ──
+
+/// Tracks parent→child relationships between progress handles so that
+/// cancelling a parent automatically cancels all descendants.
+#[derive(Debug)]
+pub struct ProgressCancellationCascade {
+    edges: Vec<(u64, u64)>,
+    cancelled: Vec<u64>,
+}
+
+impl ProgressCancellationCascade {
+    pub fn new() -> Self {
+        Self {
+            edges: Vec::new(),
+            cancelled: Vec::new(),
+        }
+    }
+
+    /// Register `child` as a dependent of `parent`.
+    pub fn add_child(&mut self, parent: u64, child: u64) {
+        if !self.edges.iter().any(|&(p, c)| p == parent && c == child) {
+            self.edges.push((parent, child));
+        }
+    }
+
+    /// Cancel a handle and all of its transitive children.
+    pub fn cancel(&mut self, handle: u64) {
+        if self.cancelled.contains(&handle) {
+            return;
+        }
+        self.cancelled.push(handle);
+        let children: Vec<u64> = self
+            .edges
+            .iter()
+            .filter(|(p, _)| *p == handle)
+            .map(|(_, c)| *c)
+            .collect();
+        for child in children {
+            self.cancel(child);
+        }
+    }
+
+    pub fn is_cancelled(&self, handle: u64) -> bool {
+        self.cancelled.contains(&handle)
+    }
+
+    /// All handles that are currently cancelled.
+    pub fn cancelled_handles(&self) -> &[u64] {
+        &self.cancelled
+    }
+
+    /// Direct children of a handle.
+    pub fn children_of(&self, handle: u64) -> Vec<u64> {
+        self.edges
+            .iter()
+            .filter(|(p, _)| *p == handle)
+            .map(|(_, c)| *c)
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1958,5 +2230,163 @@ mod tests {
         let summary = ProgressSummary::from(&done_state);
         assert_eq!(summary.active, 0);
         assert_eq!(summary.completed, 1);
+    }
+
+    // ── ProgressChain tests ──
+
+    #[test]
+    fn chain_empty_progress() {
+        let chain = ProgressChain::new();
+        assert!((chain.overall_progress()).abs() < f64::EPSILON);
+        assert!(!chain.is_finished());
+        assert_eq!(chain.step_count(), 0);
+    }
+
+    #[test]
+    fn chain_weighted_progress() {
+        let mut chain = ProgressChain::new();
+        let dl = chain.add_step("download", 3.0);
+        let inst = chain.add_step("install", 7.0);
+        chain.report(dl, 50.0);
+        chain.report(inst, 0.0);
+        // weighted: (50*3 + 0*7) / 10 = 15
+        assert!((chain.overall_progress() - 15.0).abs() < f64::EPSILON);
+        assert_eq!(chain.current_step(), Some(0));
+    }
+
+    #[test]
+    fn chain_complete_all_steps() {
+        let mut chain = ProgressChain::new();
+        let a = chain.add_step("a", 1.0);
+        let b = chain.add_step("b", 1.0);
+        chain.complete_step(a);
+        assert!(!chain.is_finished());
+        assert_eq!(chain.current_step(), Some(1));
+        chain.complete_step(b);
+        assert!(chain.is_finished());
+        assert!((chain.overall_progress() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn chain_get_step() {
+        let mut chain = ProgressChain::new();
+        chain.add_step("fetch", 2.0);
+        let step = chain.get_step(0).unwrap();
+        assert_eq!(step.label, "fetch");
+        assert!(!step.is_complete);
+        assert!(chain.get_step(99).is_none());
+    }
+
+    // ── ProgressEstimator tests ──
+
+    #[test]
+    fn estimator_initial_state() {
+        let est = ProgressEstimator::new(0.5);
+        assert!(est.eta().is_none());
+        assert!(est.rate().is_none());
+    }
+
+    #[test]
+    fn estimator_eta_calculation() {
+        let start = Instant::now();
+        let mut est = ProgressEstimator::new(1.0);
+        // record_at: 0% at t=0, 50% at t=5s → rate=10 %/s → ETA=5s
+        est.record_at(0.0, start);
+        est.record_at(50.0, start + Duration::from_secs(5));
+        let eta = est.eta().unwrap();
+        assert!((eta.as_secs_f64() - 5.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn estimator_smoothing() {
+        let start = Instant::now();
+        let mut est = ProgressEstimator::new(0.5);
+        est.record_at(0.0, start);
+        est.record_at(20.0, start + Duration::from_secs(2)); // rate = 10
+        est.record_at(30.0, start + Duration::from_secs(4)); // rate = 5, smoothed = 0.5*5 + 0.5*10 = 7.5
+        let rate = est.rate().unwrap();
+        assert!((rate - 7.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn estimator_done_returns_zero_eta() {
+        let start = Instant::now();
+        let mut est = ProgressEstimator::new(1.0);
+        est.record_at(0.0, start);
+        est.record_at(100.0, start + Duration::from_secs(10));
+        let eta = est.eta().unwrap();
+        assert!(eta.as_secs_f64() < 0.01);
+    }
+
+    // ── ProgressNotificationLink tests ──
+
+    #[test]
+    fn notification_link_and_lookup() {
+        let mut link = ProgressNotificationLink::new();
+        link.link(1, "notif-abc");
+        link.link(2, "notif-def");
+        assert_eq!(link.notification_for(1), Some("notif-abc"));
+        assert_eq!(link.handle_for("notif-def"), Some(2));
+        assert_eq!(link.count(), 2);
+    }
+
+    #[test]
+    fn notification_unlink() {
+        let mut link = ProgressNotificationLink::new();
+        link.link(10, "n1");
+        link.unlink(10);
+        assert!(link.notification_for(10).is_none());
+        assert_eq!(link.count(), 0);
+    }
+
+    #[test]
+    fn notification_no_duplicate_link() {
+        let mut link = ProgressNotificationLink::new();
+        link.link(5, "n");
+        link.link(5, "n2"); // duplicate handle ignored
+        assert_eq!(link.count(), 1);
+        assert_eq!(link.notification_for(5), Some("n"));
+    }
+
+    // ── ProgressCancellationCascade tests ──
+
+    #[test]
+    fn cascade_cancel_parent_cancels_children() {
+        let mut cascade = ProgressCancellationCascade::new();
+        cascade.add_child(1, 2);
+        cascade.add_child(1, 3);
+        cascade.add_child(3, 4);
+        cascade.cancel(1);
+        assert!(cascade.is_cancelled(1));
+        assert!(cascade.is_cancelled(2));
+        assert!(cascade.is_cancelled(3));
+        assert!(cascade.is_cancelled(4));
+    }
+
+    #[test]
+    fn cascade_cancel_leaf_only() {
+        let mut cascade = ProgressCancellationCascade::new();
+        cascade.add_child(1, 2);
+        cascade.cancel(2);
+        assert!(cascade.is_cancelled(2));
+        assert!(!cascade.is_cancelled(1));
+    }
+
+    #[test]
+    fn cascade_children_of() {
+        let mut cascade = ProgressCancellationCascade::new();
+        cascade.add_child(10, 20);
+        cascade.add_child(10, 30);
+        let children = cascade.children_of(10);
+        assert_eq!(children, vec![20, 30]);
+        assert!(cascade.children_of(20).is_empty());
+    }
+
+    #[test]
+    fn cascade_no_duplicate_edges() {
+        let mut cascade = ProgressCancellationCascade::new();
+        cascade.add_child(1, 2);
+        cascade.add_child(1, 2);
+        assert_eq!(cascade.children_of(1).len(), 1);
     }
 }

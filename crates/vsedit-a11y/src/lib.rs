@@ -1178,6 +1178,287 @@ impl FocusHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// A11yAnnouncer – priority-queue announcement system
+// ---------------------------------------------------------------------------
+
+/// An announcer that queues announcements by priority and delivers them in order.
+#[derive(Debug, Clone)]
+pub struct A11yAnnouncer {
+    queue: Vec<Announcement>,
+    max_queue: usize,
+}
+
+impl A11yAnnouncer {
+    pub fn new(max_queue: usize) -> Self {
+        Self {
+            queue: Vec::new(),
+            max_queue,
+        }
+    }
+
+    /// Enqueue an announcement. Assertive announcements go to the front.
+    pub fn enqueue(&mut self, announcement: Announcement) {
+        if self.queue.len() >= self.max_queue {
+            // Drop oldest polite announcement
+            if let Some(pos) = self.queue.iter().position(|a| a.priority == AnnouncementPriority::Polite) {
+                self.queue.remove(pos);
+            } else {
+                self.queue.remove(0);
+            }
+        }
+        match announcement.priority {
+            AnnouncementPriority::Assertive => self.queue.insert(0, announcement),
+            AnnouncementPriority::Polite => self.queue.push(announcement),
+        }
+    }
+
+    /// Dequeue the next announcement (highest priority first).
+    pub fn dequeue(&mut self) -> Option<Announcement> {
+        if self.queue.is_empty() {
+            None
+        } else {
+            Some(self.queue.remove(0))
+        }
+    }
+
+    /// Peek at the next announcement without removing it.
+    pub fn peek(&self) -> Option<&Announcement> {
+        self.queue.first()
+    }
+
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
+
+    /// Count of assertive announcements in the queue.
+    pub fn assertive_count(&self) -> usize {
+        self.queue.iter().filter(|a| a.priority == AnnouncementPriority::Assertive).count()
+    }
+}
+
+impl Default for A11yAnnouncer {
+    fn default() -> Self {
+        Self::new(50)
+    }
+}
+
+impl fmt::Display for A11yAnnouncer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "A11yAnnouncer({} queued, {} assertive)", self.len(), self.assertive_count())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// A11yNavigator – landmark navigation
+// ---------------------------------------------------------------------------
+
+/// A landmark region for accessibility navigation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct A11yLandmark {
+    pub role: AriaRole,
+    pub label: String,
+    pub id: String,
+}
+
+impl fmt::Display for A11yLandmark {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Landmark({}: {})", self.role, self.label)
+    }
+}
+
+/// Navigates between landmarks in the UI.
+#[derive(Debug, Clone)]
+pub struct A11yNavigator {
+    landmarks: Vec<A11yLandmark>,
+    current: Option<usize>,
+}
+
+impl A11yNavigator {
+    pub fn new() -> Self {
+        Self { landmarks: Vec::new(), current: None }
+    }
+
+    pub fn add_landmark(&mut self, landmark: A11yLandmark) {
+        self.landmarks.push(landmark);
+    }
+
+    /// Navigate to the next landmark.
+    pub fn next(&mut self) -> Option<&A11yLandmark> {
+        if self.landmarks.is_empty() {
+            return None;
+        }
+        let idx = match self.current {
+            Some(i) => (i + 1) % self.landmarks.len(),
+            None => 0,
+        };
+        self.current = Some(idx);
+        Some(&self.landmarks[idx])
+    }
+
+    /// Navigate to the previous landmark.
+    pub fn previous(&mut self) -> Option<&A11yLandmark> {
+        if self.landmarks.is_empty() {
+            return None;
+        }
+        let idx = match self.current {
+            Some(0) | None => self.landmarks.len() - 1,
+            Some(i) => i - 1,
+        };
+        self.current = Some(idx);
+        Some(&self.landmarks[idx])
+    }
+
+    /// Current landmark.
+    pub fn current(&self) -> Option<&A11yLandmark> {
+        self.current.and_then(|i| self.landmarks.get(i))
+    }
+
+    /// Find landmarks by role.
+    pub fn find_by_role(&self, role: &AriaRole) -> Vec<&A11yLandmark> {
+        self.landmarks.iter().filter(|l| l.role == *role).collect()
+    }
+
+    pub fn landmark_count(&self) -> usize {
+        self.landmarks.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.landmarks.clear();
+        self.current = None;
+    }
+}
+
+impl Default for A11yNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for A11yNavigator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "A11yNavigator({} landmarks)", self.landmarks.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// A11yContrastChecker – WCAG contrast ratio calculation
+// ---------------------------------------------------------------------------
+
+/// Checks color contrast ratios per WCAG 2.1 guidelines.
+pub struct A11yContrastChecker;
+
+impl A11yContrastChecker {
+    /// Compute the relative luminance of an sRGB color (0-255 per channel).
+    pub fn relative_luminance(r: u8, g: u8, b: u8) -> f64 {
+        fn linearize(c: u8) -> f64 {
+            let s = c as f64 / 255.0;
+            if s <= 0.03928 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) }
+        }
+        0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+    }
+
+    /// Compute the contrast ratio between two colors.
+    pub fn contrast_ratio(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> f64 {
+        let l1 = Self::relative_luminance(r1, g1, b1);
+        let l2 = Self::relative_luminance(r2, g2, b2);
+        let lighter = l1.max(l2);
+        let darker = l1.min(l2);
+        (lighter + 0.05) / (darker + 0.05)
+    }
+
+    /// Whether the contrast ratio meets WCAG AA for normal text (>= 4.5:1).
+    pub fn meets_aa(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> bool {
+        Self::contrast_ratio(r1, g1, b1, r2, g2, b2) >= 4.5
+    }
+
+    /// Whether the contrast ratio meets WCAG AAA for normal text (>= 7.0:1).
+    pub fn meets_aaa(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> bool {
+        Self::contrast_ratio(r1, g1, b1, r2, g2, b2) >= 7.0
+    }
+
+    /// Whether the contrast ratio meets WCAG AA for large text (>= 3.0:1).
+    pub fn meets_aa_large(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> bool {
+        Self::contrast_ratio(r1, g1, b1, r2, g2, b2) >= 3.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Screen reader text builder
+// ---------------------------------------------------------------------------
+
+/// Builds descriptive text for screen reader consumption.
+#[derive(Debug, Clone)]
+pub struct ScreenReaderTextBuilder {
+    parts: Vec<String>,
+    separator: String,
+}
+
+impl ScreenReaderTextBuilder {
+    pub fn new() -> Self {
+        Self { parts: Vec::new(), separator: ", ".into() }
+    }
+
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self {
+        self.separator = sep.into();
+        self
+    }
+
+    /// Add a text segment.
+    pub fn add(&mut self, text: impl Into<String>) -> &mut Self {
+        let t = text.into();
+        if !t.is_empty() {
+            self.parts.push(t);
+        }
+        self
+    }
+
+    /// Add a labeled value: "Label: value".
+    pub fn add_labeled(&mut self, label: &str, value: &str) -> &mut Self {
+        if !value.is_empty() {
+            self.parts.push(format!("{label}: {value}"));
+        }
+        self
+    }
+
+    /// Build the final text.
+    pub fn build(&self) -> String {
+        self.parts.join(&self.separator)
+    }
+
+    pub fn part_count(&self) -> usize {
+        self.parts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.parts.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.parts.clear();
+    }
+}
+
+impl Default for ScreenReaderTextBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ScreenReaderTextBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.build())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1932,5 +2213,137 @@ mod tests {
         fh.record("editor");
         assert_eq!(fh.entries().len(), 3);
         assert_eq!(fh.unique_count(), 2);
+    }
+
+    // -- A11yAnnouncer -----------------------------------------------------
+
+    #[test]
+    fn announcer_enqueue_dequeue() {
+        let mut ann = A11yAnnouncer::new(10);
+        ann.enqueue(Announcement::polite("hello"));
+        ann.enqueue(Announcement::assertive("urgent"));
+        assert_eq!(ann.len(), 2);
+        // Assertive should come first
+        let first = ann.dequeue().unwrap();
+        assert_eq!(first.priority, AnnouncementPriority::Assertive);
+    }
+
+    #[test]
+    fn announcer_max_queue() {
+        let mut ann = A11yAnnouncer::new(2);
+        ann.enqueue(Announcement::polite("a"));
+        ann.enqueue(Announcement::polite("b"));
+        ann.enqueue(Announcement::polite("c"));
+        assert_eq!(ann.len(), 2);
+    }
+
+    #[test]
+    fn announcer_assertive_count() {
+        let mut ann = A11yAnnouncer::new(10);
+        ann.enqueue(Announcement::polite("x"));
+        ann.enqueue(Announcement::assertive("y"));
+        assert_eq!(ann.assertive_count(), 1);
+    }
+
+    #[test]
+    fn announcer_display() {
+        let ann = A11yAnnouncer::default();
+        let s = format!("{ann}");
+        assert!(s.contains("0 queued"));
+    }
+
+    // -- A11yNavigator -----------------------------------------------------
+
+    #[test]
+    fn navigator_next_previous() {
+        let mut nav = A11yNavigator::new();
+        nav.add_landmark(A11yLandmark { role: AriaRole::Grid, label: "Main".into(), id: "main".into() });
+        nav.add_landmark(A11yLandmark { role: AriaRole::Menu, label: "Nav".into(), id: "nav".into() });
+
+        let first = nav.next().unwrap();
+        assert_eq!(first.label, "Main");
+        let second = nav.next().unwrap();
+        assert_eq!(second.label, "Nav");
+        let wrap = nav.next().unwrap();
+        assert_eq!(wrap.label, "Main");
+    }
+
+    #[test]
+    fn navigator_previous() {
+        let mut nav = A11yNavigator::new();
+        nav.add_landmark(A11yLandmark { role: AriaRole::Grid, label: "A".into(), id: "a".into() });
+        nav.add_landmark(A11yLandmark { role: AriaRole::Status, label: "B".into(), id: "b".into() });
+        let last = nav.previous().unwrap();
+        assert_eq!(last.label, "B");
+    }
+
+    #[test]
+    fn navigator_find_by_role() {
+        let mut nav = A11yNavigator::new();
+        nav.add_landmark(A11yLandmark { role: AriaRole::Grid, label: "M".into(), id: "m".into() });
+        nav.add_landmark(A11yLandmark { role: AriaRole::Menu, label: "N".into(), id: "n".into() });
+        let grids = nav.find_by_role(&AriaRole::Grid);
+        assert_eq!(grids.len(), 1);
+    }
+
+    #[test]
+    fn navigator_display() {
+        let nav = A11yNavigator::default();
+        assert!(format!("{nav}").contains("0 landmarks"));
+    }
+
+    // -- A11yContrastChecker -----------------------------------------------
+
+    #[test]
+    fn contrast_black_white() {
+        let ratio = A11yContrastChecker::contrast_ratio(0, 0, 0, 255, 255, 255);
+        assert!(ratio >= 21.0);
+        assert!(A11yContrastChecker::meets_aa(0, 0, 0, 255, 255, 255));
+        assert!(A11yContrastChecker::meets_aaa(0, 0, 0, 255, 255, 255));
+    }
+
+    #[test]
+    fn contrast_same_color_is_one() {
+        let ratio = A11yContrastChecker::contrast_ratio(128, 128, 128, 128, 128, 128);
+        assert!((ratio - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn contrast_aa_large() {
+        assert!(A11yContrastChecker::meets_aa_large(0, 0, 0, 255, 255, 255));
+    }
+
+    // -- ScreenReaderTextBuilder -------------------------------------------
+
+    #[test]
+    fn sr_text_builder_basic() {
+        let mut b = ScreenReaderTextBuilder::new();
+        b.add("Line 5");
+        b.add_labeled("Column", "10");
+        assert_eq!(b.build(), "Line 5, Column: 10");
+    }
+
+    #[test]
+    fn sr_text_builder_empty_skipped() {
+        let mut b = ScreenReaderTextBuilder::new();
+        b.add("");
+        b.add("hello");
+        assert_eq!(b.part_count(), 1);
+    }
+
+    #[test]
+    fn sr_text_builder_custom_separator() {
+        let mut b = ScreenReaderTextBuilder::new().with_separator(" | ");
+        b.add("a");
+        b.add("b");
+        assert_eq!(b.build(), "a | b");
+    }
+
+    #[test]
+    fn sr_text_builder_display() {
+        let mut b = ScreenReaderTextBuilder::new();
+        b.add("test");
+        let s = format!("{b}");
+        assert_eq!(s, "test");
     }
 }

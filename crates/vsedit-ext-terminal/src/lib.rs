@@ -1276,6 +1276,251 @@ impl ParsedCommand {
 }
 
 
+// ---------------------------------------------------------------------------
+// TerminalLinkProvider – clickable URL detection
+// ---------------------------------------------------------------------------
+
+/// A detected link in terminal output.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DetectedTerminalLink {
+    pub url: String,
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub link_type: TerminalLinkType,
+}
+
+/// Type of link detected in terminal output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TerminalLinkType {
+    Url,
+    FilePath,
+    Search,
+}
+
+impl fmt::Display for TerminalLinkType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Url => write!(f, "URL"),
+            Self::FilePath => write!(f, "File"),
+            Self::Search => write!(f, "Search"),
+        }
+    }
+}
+
+/// Provides link detection for terminal output lines.
+pub struct TerminalLinkProvider {
+    patterns: Vec<(String, TerminalLinkType)>,
+}
+
+impl TerminalLinkProvider {
+    pub fn new() -> Self {
+        Self {
+            patterns: vec![
+                (r"https?://[^\s]+".into(), TerminalLinkType::Url),
+                (r"[/\w.-]+\.\w+:\d+".into(), TerminalLinkType::FilePath),
+            ],
+        }
+    }
+
+    /// Detect links in a single line of terminal output.
+    pub fn detect_links(&self, line: &str, line_number: u32) -> Vec<DetectedTerminalLink> {
+        let mut results = Vec::new();
+        for (pattern, link_type) in &self.patterns {
+            if let Ok(re) = regex::Regex::new(pattern) {
+                for m in re.find_iter(line) {
+                    results.push(DetectedTerminalLink {
+                        url: m.as_str().to_string(),
+                        line: line_number,
+                        start_col: m.start() as u32,
+                        end_col: m.end() as u32,
+                        link_type: *link_type,
+                    });
+                }
+            }
+        }
+        results
+    }
+
+    /// Add a custom pattern.
+    pub fn add_pattern(&mut self, pattern: impl Into<String>, link_type: TerminalLinkType) {
+        self.patterns.push((pattern.into(), link_type));
+    }
+}
+
+impl Default for TerminalLinkProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalEnvironmentProvider – variable injection
+// ---------------------------------------------------------------------------
+
+/// Provides environment variables to inject into terminal processes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalEnvironmentProvider {
+    pub id: String,
+    pub variables: HashMap<String, String>,
+}
+
+impl TerminalEnvironmentProvider {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            variables: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.variables.insert(key.into(), value.into());
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.variables.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        self.variables.remove(key)
+    }
+
+    /// Merge variables from another provider (other overwrites self on conflict).
+    pub fn merge_from(&mut self, other: &TerminalEnvironmentProvider) {
+        for (k, v) in &other.variables {
+            self.variables.insert(k.clone(), v.clone());
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.variables.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalQuickFix – pattern-matched suggestions
+// ---------------------------------------------------------------------------
+
+/// A quick fix suggestion triggered by matching a pattern in terminal output.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TerminalQuickFix {
+    pub pattern: String,
+    pub message: String,
+    pub command: String,
+}
+
+impl TerminalQuickFix {
+    pub fn new(
+        pattern: impl Into<String>,
+        message: impl Into<String>,
+        command: impl Into<String>,
+    ) -> Self {
+        Self {
+            pattern: pattern.into(),
+            message: message.into(),
+            command: command.into(),
+        }
+    }
+
+    /// Check if a line of output matches this quick fix pattern.
+    pub fn matches(&self, line: &str) -> bool {
+        line.contains(&self.pattern)
+    }
+}
+
+impl fmt::Display for TerminalQuickFix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.message, self.command)
+    }
+}
+
+/// Registry of terminal quick fixes.
+#[derive(Debug, Clone, Default)]
+pub struct TerminalQuickFixRegistry {
+    fixes: Vec<TerminalQuickFix>,
+}
+
+impl TerminalQuickFixRegistry {
+    pub fn new() -> Self {
+        Self { fixes: Vec::new() }
+    }
+
+    pub fn add(&mut self, fix: TerminalQuickFix) {
+        self.fixes.push(fix);
+    }
+
+    /// Find all quick fixes that match the given output line.
+    pub fn find_matches(&self, line: &str) -> Vec<&TerminalQuickFix> {
+        self.fixes.iter().filter(|f| f.matches(line)).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.fixes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fixes.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal profile contribution point
+// ---------------------------------------------------------------------------
+
+/// A contributed terminal profile from an extension.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtTerminalProfile {
+    pub id: String,
+    pub title: String,
+    pub shell_path: String,
+    pub shell_args: Vec<String>,
+    pub icon: Option<String>,
+}
+
+impl ExtTerminalProfile {
+    pub fn new(id: impl Into<String>, title: impl Into<String>, shell_path: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            shell_path: shell_path.into(),
+            shell_args: Vec::new(),
+            icon: None,
+        }
+    }
+
+    pub fn with_args(mut self, args: Vec<String>) -> Self {
+        self.shell_args = args;
+        self
+    }
+
+    pub fn with_icon(mut self, icon: impl Into<String>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+
+    /// Build TerminalOptions from this profile.
+    pub fn to_options(&self) -> TerminalOptions {
+        TerminalOptions {
+            name: Some(self.title.clone()),
+            shell_path: Some(self.shell_path.clone()),
+            shell_args: self.shell_args.clone(),
+            cwd: None,
+            env: Vec::new(),
+            hide_from_user: false,
+        }
+    }
+}
+
+impl fmt::Display for ExtTerminalProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.title, self.shell_path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1995,4 +2240,101 @@ mod tests {
         assert_eq!(simple.to_command_string(), "ls");
     }
 
+    // -- TerminalLinkProvider tests --
+
+    #[test]
+    fn detect_url_links() {
+        let provider = TerminalLinkProvider::new();
+        let links = provider.detect_links("Visit https://example.com for info", 0);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].url, "https://example.com");
+        assert_eq!(links[0].link_type, TerminalLinkType::Url);
+    }
+
+    #[test]
+    fn detect_file_links() {
+        let provider = TerminalLinkProvider::new();
+        let links = provider.detect_links("error at src/main.rs:42", 1);
+        assert!(links.iter().any(|l| l.link_type == TerminalLinkType::FilePath));
+    }
+
+    #[test]
+    fn detect_no_links() {
+        let provider = TerminalLinkProvider::default();
+        let links = provider.detect_links("just plain text", 0);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn link_type_display() {
+        assert_eq!(format!("{}", TerminalLinkType::Url), "URL");
+        assert_eq!(format!("{}", TerminalLinkType::FilePath), "File");
+    }
+
+    // -- TerminalEnvironmentProvider tests --
+
+    #[test]
+    fn env_provider_basic() {
+        let mut prov = TerminalEnvironmentProvider::new("test");
+        prov.set("PATH", "/usr/bin");
+        prov.set("HOME", "/home/user");
+        assert_eq!(prov.get("PATH"), Some("/usr/bin"));
+        assert_eq!(prov.len(), 2);
+        prov.remove("HOME");
+        assert_eq!(prov.len(), 1);
+    }
+
+    #[test]
+    fn env_provider_merge() {
+        let mut a = TerminalEnvironmentProvider::new("a");
+        a.set("X", "1");
+        a.set("Y", "2");
+        let mut b = TerminalEnvironmentProvider::new("b");
+        b.set("X", "override");
+        b.set("Z", "3");
+        a.merge_from(&b);
+        assert_eq!(a.get("X"), Some("override"));
+        assert_eq!(a.get("Z"), Some("3"));
+        assert_eq!(a.len(), 3);
+    }
+
+    // -- TerminalQuickFix tests --
+
+    #[test]
+    fn quick_fix_matches() {
+        let fix = TerminalQuickFix::new("command not found", "Install missing command", "apt install");
+        assert!(fix.matches("bash: foo: command not found"));
+        assert!(!fix.matches("everything is fine"));
+        assert_eq!(format!("{}", fix), "Install missing command: apt install");
+    }
+
+    #[test]
+    fn quick_fix_registry() {
+        let mut reg = TerminalQuickFixRegistry::new();
+        reg.add(TerminalQuickFix::new("not found", "Install", "apt install"));
+        reg.add(TerminalQuickFix::new("permission denied", "Use sudo", "sudo !!"));
+        let matches = reg.find_matches("command not found: foo");
+        assert_eq!(matches.len(), 1);
+        assert!(reg.find_matches("all good").is_empty());
+    }
+
+    // -- ExtTerminalProfile tests --
+
+    #[test]
+    fn ext_profile_to_options() {
+        let profile = ExtTerminalProfile::new("bash", "Bash", "/bin/bash")
+            .with_args(vec!["-l".into()])
+            .with_icon("terminal-bash");
+        let opts = profile.to_options();
+        assert_eq!(opts.shell_path, Some("/bin/bash".into()));
+        assert_eq!(opts.shell_args, vec!["-l"]);
+        assert_eq!(opts.name, Some("Bash".into()));
+        assert_eq!(format!("{}", profile), "Bash (/bin/bash)");
+    }
+
+    #[test]
+    fn ext_profile_display() {
+        let profile = ExtTerminalProfile::new("zsh", "Zsh", "/bin/zsh");
+        assert!(format!("{}", profile).contains("Zsh"));
+    }
 }

@@ -1173,6 +1173,337 @@ impl From<PathBuf> for BreadcrumbPath {
 }
 
 // ---------------------------------------------------------------------------
+// ExplorerDragDrop – file move/copy via drag-and-drop
+// ---------------------------------------------------------------------------
+
+/// Represents a drag-and-drop operation in the explorer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DragDropEffect {
+    Move,
+    Copy,
+}
+
+impl fmt::Display for DragDropEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Move => write!(f, "Move"),
+            Self::Copy => write!(f, "Copy"),
+        }
+    }
+}
+
+/// Manages drag-and-drop state for the file explorer.
+#[derive(Debug, Clone)]
+pub struct ExplorerDragDrop {
+    /// Source path being dragged.
+    pub source: Option<PathBuf>,
+    /// Current drop target directory.
+    pub target: Option<PathBuf>,
+    /// The effect (move or copy).
+    pub effect: DragDropEffect,
+    /// Whether a drag is in progress.
+    pub active: bool,
+}
+
+impl ExplorerDragDrop {
+    pub fn new() -> Self {
+        Self {
+            source: None,
+            target: None,
+            effect: DragDropEffect::Move,
+            active: false,
+        }
+    }
+
+    /// Start a drag from a source path.
+    pub fn start_drag(&mut self, source: PathBuf) {
+        self.source = Some(source);
+        self.active = true;
+    }
+
+    /// Update the drop target.
+    pub fn set_target(&mut self, target: PathBuf) {
+        self.target = Some(target);
+    }
+
+    /// Set to copy mode (e.g., when Ctrl is held).
+    pub fn set_copy(&mut self) {
+        self.effect = DragDropEffect::Copy;
+    }
+
+    /// Cancel the drag operation.
+    pub fn cancel(&mut self) {
+        self.source = None;
+        self.target = None;
+        self.active = false;
+        self.effect = DragDropEffect::Move;
+    }
+
+    /// Check if a drop is valid (source and target are set, target is a directory,
+    /// target is not the source or a child of source).
+    pub fn can_drop(&self) -> bool {
+        match (&self.source, &self.target) {
+            (Some(src), Some(tgt)) => {
+                src != tgt && !tgt.starts_with(src)
+            }
+            _ => false,
+        }
+    }
+
+    /// Compute the destination path after drop.
+    pub fn destination_path(&self) -> Option<PathBuf> {
+        let src = self.source.as_ref()?;
+        let tgt = self.target.as_ref()?;
+        let name = src.file_name()?;
+        Some(tgt.join(name))
+    }
+}
+
+impl Default for ExplorerDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ExplorerDragDrop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.active {
+            write!(f, "DragDrop({}, active)", self.effect)
+        } else {
+            write!(f, "DragDrop(idle)")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExplorerInlineRename – in-place file rename handler
+// ---------------------------------------------------------------------------
+
+/// State for an in-place rename operation in the explorer.
+#[derive(Debug, Clone)]
+pub struct ExplorerInlineRename {
+    pub original_path: PathBuf,
+    pub new_name: String,
+    pub cursor_pos: usize,
+    pub is_active: bool,
+}
+
+impl ExplorerInlineRename {
+    /// Start a rename operation.
+    pub fn start(path: PathBuf) -> Self {
+        let name = path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let cursor_pos = name.len();
+        Self {
+            original_path: path,
+            new_name: name,
+            cursor_pos,
+            is_active: true,
+        }
+    }
+
+    /// Set the new name.
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.new_name = name.into();
+        self.cursor_pos = self.new_name.len();
+    }
+
+    /// Validate the new name (non-empty, no path separators).
+    pub fn validate(&self) -> Result<(), String> {
+        if self.new_name.trim().is_empty() {
+            return Err("Name cannot be empty".to_string());
+        }
+        if self.new_name.contains('/') || self.new_name.contains('\\') {
+            return Err("Name cannot contain path separators".to_string());
+        }
+        Ok(())
+    }
+
+    /// Compute the new full path.
+    pub fn new_path(&self) -> PathBuf {
+        if let Some(parent) = self.original_path.parent() {
+            parent.join(&self.new_name)
+        } else {
+            PathBuf::from(&self.new_name)
+        }
+    }
+
+    /// Whether the name actually changed.
+    pub fn has_changed(&self) -> bool {
+        let original_name = self.original_path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        self.new_name != original_name
+    }
+
+    /// Cancel the rename.
+    pub fn cancel(&mut self) {
+        self.is_active = false;
+    }
+}
+
+impl fmt::Display for ExplorerInlineRename {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Rename({} -> {})", self.original_path.display(), self.new_name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExplorerDecorationsAggregator – combines decorations from multiple sources
+// ---------------------------------------------------------------------------
+
+/// A decoration applied to a file in the explorer (e.g., git status, errors).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileDecoration {
+    pub badge: Option<String>,
+    pub color: Option<String>,
+    pub tooltip: Option<String>,
+    pub priority: i32,
+}
+
+impl FileDecoration {
+    pub fn new() -> Self {
+        Self { badge: None, color: None, tooltip: None, priority: 0 }
+    }
+
+    pub fn with_badge(mut self, badge: impl Into<String>) -> Self {
+        self.badge = Some(badge.into());
+        self
+    }
+
+    pub fn with_color(mut self, color: impl Into<String>) -> Self {
+        self.color = Some(color.into());
+        self
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    pub fn with_priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
+        self
+    }
+}
+
+impl Default for FileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Aggregates decorations from multiple sources for a single file.
+#[derive(Debug, Clone)]
+pub struct ExplorerDecorationsAggregator {
+    decorations: Vec<(PathBuf, FileDecoration)>,
+}
+
+impl ExplorerDecorationsAggregator {
+    pub fn new() -> Self {
+        Self { decorations: Vec::new() }
+    }
+
+    pub fn add_decoration(&mut self, path: PathBuf, decoration: FileDecoration) {
+        self.decorations.push((path, decoration));
+    }
+
+    /// Get all decorations for a given path, sorted by priority (highest first).
+    pub fn get_decorations(&self, path: &Path) -> Vec<&FileDecoration> {
+        let mut result: Vec<_> = self.decorations.iter()
+            .filter(|(p, _)| p == path)
+            .map(|(_, d)| d)
+            .collect();
+        result.sort_by(|a, b| b.priority.cmp(&a.priority));
+        result
+    }
+
+    /// Get the primary (highest priority) decoration for a path.
+    pub fn primary_decoration(&self, path: &Path) -> Option<&FileDecoration> {
+        self.get_decorations(path).into_iter().next()
+    }
+
+    /// Total number of decorations.
+    pub fn total_count(&self) -> usize {
+        self.decorations.len()
+    }
+
+    /// Clear all decorations.
+    pub fn clear(&mut self) {
+        self.decorations.clear();
+    }
+}
+
+impl Default for ExplorerDecorationsAggregator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ExplorerDecorationsAggregator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DecorationsAggregator({} decorations)", self.decorations.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Explorer file nesting rules
+// ---------------------------------------------------------------------------
+
+/// A rule that determines how files are nested in the explorer tree.
+#[derive(Debug, Clone)]
+pub struct FileNestingRule {
+    /// Parent file extension pattern (e.g., ".ts").
+    pub parent_ext: String,
+    /// Nested file suffixes (e.g., [".d.ts", ".js", ".js.map"]).
+    pub nested_suffixes: Vec<String>,
+}
+
+impl FileNestingRule {
+    pub fn new(parent_ext: impl Into<String>, nested: Vec<String>) -> Self {
+        Self {
+            parent_ext: parent_ext.into(),
+            nested_suffixes: nested,
+        }
+    }
+
+    /// Check if a filename should be nested under a parent.
+    pub fn should_nest(&self, parent_name: &str, child_name: &str) -> bool {
+        if !parent_name.ends_with(&self.parent_ext) {
+            return false;
+        }
+        let stem = &parent_name[..parent_name.len() - self.parent_ext.len()];
+        self.nested_suffixes.iter().any(|suffix| {
+            child_name == format!("{stem}{suffix}")
+        })
+    }
+}
+
+impl fmt::Display for FileNestingRule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NestingRule({} -> {} suffixes)", self.parent_ext, self.nested_suffixes.len())
+    }
+}
+
+/// Default file nesting rules (TypeScript/JavaScript ecosystem).
+pub fn default_nesting_rules() -> Vec<FileNestingRule> {
+    vec![
+        FileNestingRule::new(".ts", vec![".js".into(), ".d.ts".into(), ".js.map".into()]),
+        FileNestingRule::new(".rs", vec![]),
+        FileNestingRule::new(".toml", vec![".lock".into()]),
+    ]
+}
+
+/// Find which children should be nested under a parent based on rules.
+pub fn find_nested_files<'a>(parent_name: &str, children: &'a [&str], rules: &[FileNestingRule]) -> Vec<&'a str> {
+    children.iter()
+        .filter(|child| rules.iter().any(|r| r.should_nest(parent_name, child)))
+        .copied()
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1943,5 +2274,155 @@ mod tests {
         assert!(bc.is_empty());
         assert!(bc.leaf().is_none());
         assert_eq!(format!("{bc}"), "");
+    }
+
+    // -- ExplorerDragDrop --------------------------------------------------
+
+    #[test]
+    fn drag_drop_start_and_cancel() {
+        let mut dd = ExplorerDragDrop::new();
+        dd.start_drag(PathBuf::from("/src/main.rs"));
+        assert!(dd.active);
+        dd.cancel();
+        assert!(!dd.active);
+        assert!(dd.source.is_none());
+    }
+
+    #[test]
+    fn drag_drop_can_drop() {
+        let mut dd = ExplorerDragDrop::new();
+        dd.start_drag(PathBuf::from("/src/main.rs"));
+        dd.set_target(PathBuf::from("/dest"));
+        assert!(dd.can_drop());
+    }
+
+    #[test]
+    fn drag_drop_cannot_drop_on_self() {
+        let mut dd = ExplorerDragDrop::new();
+        dd.start_drag(PathBuf::from("/src"));
+        dd.set_target(PathBuf::from("/src/child"));
+        assert!(!dd.can_drop());
+    }
+
+    #[test]
+    fn drag_drop_destination_path() {
+        let mut dd = ExplorerDragDrop::new();
+        dd.start_drag(PathBuf::from("/src/main.rs"));
+        dd.set_target(PathBuf::from("/dest"));
+        assert_eq!(dd.destination_path(), Some(PathBuf::from("/dest/main.rs")));
+    }
+
+    #[test]
+    fn drag_drop_display() {
+        let dd = ExplorerDragDrop::default();
+        assert!(format!("{dd}").contains("idle"));
+    }
+
+    // -- ExplorerInlineRename ----------------------------------------------
+
+    #[test]
+    fn inline_rename_start() {
+        let rename = ExplorerInlineRename::start(PathBuf::from("/src/main.rs"));
+        assert_eq!(rename.new_name, "main.rs");
+        assert!(rename.is_active);
+    }
+
+    #[test]
+    fn inline_rename_validate() {
+        let mut rename = ExplorerInlineRename::start(PathBuf::from("/src/main.rs"));
+        assert!(rename.validate().is_ok());
+        rename.set_name("");
+        assert!(rename.validate().is_err());
+        rename.set_name("bad/name");
+        assert!(rename.validate().is_err());
+    }
+
+    #[test]
+    fn inline_rename_new_path() {
+        let mut rename = ExplorerInlineRename::start(PathBuf::from("/src/main.rs"));
+        rename.set_name("lib.rs");
+        assert_eq!(rename.new_path(), PathBuf::from("/src/lib.rs"));
+    }
+
+    #[test]
+    fn inline_rename_has_changed() {
+        let rename = ExplorerInlineRename::start(PathBuf::from("/src/main.rs"));
+        assert!(!rename.has_changed());
+        let mut rename2 = ExplorerInlineRename::start(PathBuf::from("/src/main.rs"));
+        rename2.set_name("other.rs");
+        assert!(rename2.has_changed());
+    }
+
+    #[test]
+    fn inline_rename_display() {
+        let rename = ExplorerInlineRename::start(PathBuf::from("/src/main.rs"));
+        let s = format!("{rename}");
+        assert!(s.contains("main.rs"));
+    }
+
+    // -- ExplorerDecorationsAggregator ------------------------------------
+
+    #[test]
+    fn decorations_add_and_get() {
+        let mut agg = ExplorerDecorationsAggregator::new();
+        agg.add_decoration(
+            PathBuf::from("/src/main.rs"),
+            FileDecoration::new().with_badge("M").with_priority(10),
+        );
+        agg.add_decoration(
+            PathBuf::from("/src/main.rs"),
+            FileDecoration::new().with_badge("E").with_priority(20),
+        );
+        let decorations = agg.get_decorations(Path::new("/src/main.rs"));
+        assert_eq!(decorations.len(), 2);
+        assert_eq!(decorations[0].badge.as_deref(), Some("E")); // higher priority first
+    }
+
+    #[test]
+    fn decorations_primary() {
+        let mut agg = ExplorerDecorationsAggregator::new();
+        agg.add_decoration(
+            PathBuf::from("/file"),
+            FileDecoration::new().with_badge("X").with_priority(5),
+        );
+        let primary = agg.primary_decoration(Path::new("/file")).unwrap();
+        assert_eq!(primary.badge.as_deref(), Some("X"));
+    }
+
+    #[test]
+    fn decorations_display() {
+        let agg = ExplorerDecorationsAggregator::default();
+        assert!(format!("{agg}").contains("0 decorations"));
+    }
+
+    // -- File nesting rules ------------------------------------------------
+
+    #[test]
+    fn nesting_rule_should_nest() {
+        let rule = FileNestingRule::new(".ts", vec![".js".into(), ".d.ts".into()]);
+        assert!(rule.should_nest("app.ts", "app.js"));
+        assert!(rule.should_nest("app.ts", "app.d.ts"));
+        assert!(!rule.should_nest("app.ts", "other.js"));
+        assert!(!rule.should_nest("app.rs", "app.js"));
+    }
+
+    #[test]
+    fn nesting_rule_display() {
+        let rule = FileNestingRule::new(".ts", vec![".js".into()]);
+        assert!(format!("{rule}").contains(".ts"));
+    }
+
+    #[test]
+    fn find_nested_files_basic() {
+        let rules = vec![FileNestingRule::new(".ts", vec![".js".into(), ".js.map".into()])];
+        let children = vec!["app.js", "app.js.map", "styles.css"];
+        let nested = find_nested_files("app.ts", &children, &rules);
+        assert_eq!(nested, vec!["app.js", "app.js.map"]);
+    }
+
+    #[test]
+    fn default_nesting_rules_exist() {
+        let rules = default_nesting_rules();
+        assert!(!rules.is_empty());
     }
 }

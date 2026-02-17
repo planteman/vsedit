@@ -1269,6 +1269,289 @@ impl ColorTheme {
 }
 
 // ---------------------------------------------------------------------------
+// ThemeInheritance — structured theme extension
+// ---------------------------------------------------------------------------
+
+/// Describes how a child theme extends a base (parent) theme.
+///
+/// Colors and token rules from the child override matching entries in the
+/// parent.  Unmatched parent entries are inherited as-is.
+#[derive(Debug, Clone)]
+pub struct ThemeInheritance {
+    /// Identifier of the parent theme.
+    pub parent_id: String,
+    /// Color overrides supplied by the child.
+    pub color_overrides: HashMap<String, Color>,
+    /// Token-color overrides supplied by the child.
+    pub token_overrides: Vec<TokenColor>,
+}
+
+impl ThemeInheritance {
+    /// Build a new inheritance descriptor.
+    pub fn new(parent_id: &str) -> Self {
+        Self {
+            parent_id: parent_id.to_string(),
+            color_overrides: HashMap::new(),
+            token_overrides: Vec::new(),
+        }
+    }
+
+    /// Add a workbench color override.
+    pub fn set_color(&mut self, key: &str, color: Color) -> &mut Self {
+        self.color_overrides.insert(key.to_string(), color);
+        self
+    }
+
+    /// Add a token-color override.
+    pub fn add_token_override(&mut self, rule: TokenColor) -> &mut Self {
+        self.token_overrides.push(rule);
+        self
+    }
+
+    /// Apply this inheritance to a parent theme, producing the merged child.
+    pub fn apply(&self, parent: &ColorTheme, child_id: &str, child_label: &str) -> ColorTheme {
+        let mut colors = parent.colors.clone();
+        colors.extend(self.color_overrides.iter().map(|(k, v)| (k.clone(), *v)));
+
+        let mut token_colors = parent.token_colors.clone();
+        token_colors.extend(self.token_overrides.iter().cloned());
+
+        ColorTheme {
+            id: child_id.to_string(),
+            label: child_label.to_string(),
+            theme_type: parent.theme_type,
+            colors,
+            token_colors,
+        }
+    }
+
+    /// Returns the number of color overrides.
+    pub fn color_override_count(&self) -> usize {
+        self.color_overrides.len()
+    }
+
+    /// Returns the number of token-color overrides.
+    pub fn token_override_count(&self) -> usize {
+        self.token_overrides.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeTokenColorCustomization — user-level scope overrides
+// ---------------------------------------------------------------------------
+
+/// User-provided overrides for specific TextMate scopes.
+///
+/// This mirrors VS Code's `editor.tokenColorCustomizations.textMateRules`
+/// setting, allowing end-users to tweak individual token colors without
+/// creating an entirely new theme file.
+#[derive(Debug, Clone)]
+pub struct ThemeTokenColorCustomization {
+    rules: Vec<TokenColor>,
+}
+
+impl ThemeTokenColorCustomization {
+    /// Create an empty customization set.
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Add a customization rule for the given scopes.
+    pub fn add_rule(
+        &mut self,
+        scopes: &[&str],
+        foreground: Option<Color>,
+        font_style: Option<&str>,
+    ) -> &mut Self {
+        self.rules.push(TokenColor {
+            name: None,
+            scope: scopes.iter().map(|s| (*s).to_string()).collect(),
+            settings: TokenSettings {
+                foreground,
+                background: None,
+                font_style: font_style.map(String::from),
+            },
+        });
+        self
+    }
+
+    /// Apply these customizations on top of an existing theme, returning a
+    /// new theme with the user rules appended (highest priority).
+    pub fn apply(&self, theme: &ColorTheme) -> ColorTheme {
+        let mut token_colors = theme.token_colors.clone();
+        token_colors.extend(self.rules.iter().cloned());
+        ColorTheme {
+            id: theme.id.clone(),
+            label: theme.label.clone(),
+            theme_type: theme.theme_type,
+            colors: theme.colors.clone(),
+            token_colors,
+        }
+    }
+
+    /// Number of customization rules.
+    pub fn len(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// Whether there are no customization rules.
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeContrastCalculator — batch WCAG checking
+// ---------------------------------------------------------------------------
+
+/// Result of a single contrast check between two theme color keys.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContrastViolation {
+    /// The foreground color key.
+    pub fg_key: String,
+    /// The background color key.
+    pub bg_key: String,
+    /// The computed contrast ratio.
+    pub ratio: f64,
+    /// The WCAG level achieved.
+    pub achieved: WcagLevel,
+    /// The minimum level that was required.
+    pub required: WcagLevel,
+}
+
+/// Well-known foreground/background pairs that should be checked together.
+const CONTRAST_PAIRS: &[(&str, &str)] = &[
+    ("editor.foreground", "editor.background"),
+    ("editorLineNumber.foreground", "editor.background"),
+    ("statusBar.foreground", "statusBar.background"),
+    ("sideBar.foreground", "sideBar.background"),
+    ("activityBar.foreground", "activityBar.background"),
+    ("tab.activeForeground", "tab.activeBackground"),
+    ("tab.inactiveForeground", "tab.inactiveBackground"),
+    ("titleBar.activeForeground", "titleBar.activeBackground"),
+];
+
+/// Batch accessibility checker for a theme's color pairs.
+///
+/// Iterates over well-known foreground/background pairs and reports any that
+/// fail to meet the requested [`WcagLevel`].
+pub struct ThemeContrastCalculator;
+
+impl ThemeContrastCalculator {
+    /// Check all well-known pairs against the given minimum WCAG level.
+    pub fn check(theme: &ColorTheme, minimum: WcagLevel) -> Vec<ContrastViolation> {
+        let mut violations = Vec::new();
+        for &(fg_key, bg_key) in CONTRAST_PAIRS {
+            if let (Some(fg), Some(bg)) = (theme.colors.get(fg_key), theme.colors.get(bg_key)) {
+                let ratio = contrast_ratio(fg, bg);
+                let achieved = WcagLevel::from_ratio(ratio);
+                if !validate_contrast(fg, bg, minimum) {
+                    violations.push(ContrastViolation {
+                        fg_key: fg_key.to_string(),
+                        bg_key: bg_key.to_string(),
+                        ratio,
+                        achieved,
+                        required: minimum,
+                    });
+                }
+            }
+        }
+        violations
+    }
+
+    /// Check a custom list of (foreground_key, background_key) pairs.
+    pub fn check_pairs(
+        theme: &ColorTheme,
+        pairs: &[(&str, &str)],
+        minimum: WcagLevel,
+    ) -> Vec<ContrastViolation> {
+        let mut violations = Vec::new();
+        for &(fg_key, bg_key) in pairs {
+            if let (Some(fg), Some(bg)) = (theme.colors.get(fg_key), theme.colors.get(bg_key)) {
+                let ratio = contrast_ratio(fg, bg);
+                let achieved = WcagLevel::from_ratio(ratio);
+                if !validate_contrast(fg, bg, minimum) {
+                    violations.push(ContrastViolation {
+                        fg_key: fg_key.to_string(),
+                        bg_key: bg_key.to_string(),
+                        ratio,
+                        achieved,
+                        required: minimum,
+                    });
+                }
+            }
+        }
+        violations
+    }
+
+    /// Returns the number of well-known pairs that will be checked.
+    pub fn pair_count() -> usize {
+        CONTRAST_PAIRS.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// parse_color_string — multi-format color parsing
+// ---------------------------------------------------------------------------
+
+/// Parse a color from various string formats:
+///
+/// - `#RGB`         (shorthand hex, e.g. `#F00` → red)
+/// - `#RRGGBB`      (standard hex)
+/// - `#RRGGBBAA`    (hex with alpha)
+/// - `rgb(r, g, b)` (CSS-style, values 0–255)
+/// - `rgba(r, g, b, a)` (CSS-style, `a` is 0.0–1.0)
+pub fn parse_color_string(input: &str) -> Option<Color> {
+    let s = input.trim();
+
+    // Hex formats
+    if let Some(hex) = s.strip_prefix('#') {
+        return match hex.len() {
+            3 => {
+                // Expand #RGB → #RRGGBB
+                let mut expanded = String::with_capacity(7);
+                expanded.push('#');
+                for ch in hex.chars() {
+                    expanded.push(ch);
+                    expanded.push(ch);
+                }
+                Color::from_hex(&expanded)
+            }
+            6 | 8 => Color::from_hex(s),
+            _ => None,
+        };
+    }
+
+    // rgb(r, g, b)
+    if let Some(inner) = s.strip_prefix("rgb(").and_then(|s| s.strip_suffix(')')) {
+        let parts: Vec<&str> = inner.split(',').collect();
+        if parts.len() == 3 {
+            let r = parts[0].trim().parse::<u8>().ok()?;
+            let g = parts[1].trim().parse::<u8>().ok()?;
+            let b = parts[2].trim().parse::<u8>().ok()?;
+            return Some(Color::rgb(r, g, b));
+        }
+        return None;
+    }
+
+    // rgba(r, g, b, a)
+    if let Some(inner) = s.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+        let parts: Vec<&str> = inner.split(',').collect();
+        if parts.len() == 4 {
+            let r = parts[0].trim().parse::<u8>().ok()?;
+            let g = parts[1].trim().parse::<u8>().ok()?;
+            let b = parts[2].trim().parse::<u8>().ok()?;
+            let a_f: f64 = parts[3].trim().parse().ok()?;
+            let a = (a_f.clamp(0.0, 1.0) * 255.0).round() as u8;
+            return Some(Color::rgba(r, g, b, a));
+        }
+        return None;
+    }
+
+    None
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1958,5 +2241,137 @@ mod tests {
         let mut sorted = keys.clone();
         sorted.sort();
         assert_eq!(keys, sorted);
+    }
+
+    // -- parse_color_string --------------------------------------------------
+
+    #[test]
+    fn parse_color_string_hex_rgb_short() {
+        let c = parse_color_string("#F00").unwrap();
+        assert_eq!(c, Color::rgb(255, 0, 0));
+    }
+
+    #[test]
+    fn parse_color_string_hex_rrggbb() {
+        let c = parse_color_string("#1E1E1E").unwrap();
+        assert_eq!(c, Color::rgb(0x1E, 0x1E, 0x1E));
+    }
+
+    #[test]
+    fn parse_color_string_hex_rrggbbaa() {
+        let c = parse_color_string("#FF000080").unwrap();
+        assert_eq!(c, Color::rgba(255, 0, 0, 128));
+    }
+
+    #[test]
+    fn parse_color_string_rgb_func() {
+        let c = parse_color_string("rgb(10, 20, 30)").unwrap();
+        assert_eq!(c, Color::rgb(10, 20, 30));
+    }
+
+    #[test]
+    fn parse_color_string_rgba_func() {
+        let c = parse_color_string("rgba(10, 20, 30, 0.5)").unwrap();
+        assert_eq!(c, Color::rgba(10, 20, 30, 128));
+    }
+
+    #[test]
+    fn parse_color_string_invalid_returns_none() {
+        assert!(parse_color_string("not-a-color").is_none());
+        assert!(parse_color_string("#GG0000").is_none());
+        assert!(parse_color_string("rgb(256, 0, 0)").is_none());
+        assert!(parse_color_string("#12345").is_none());
+    }
+
+    #[test]
+    fn parse_color_string_whitespace_trimmed() {
+        let c = parse_color_string("  #FF0000  ").unwrap();
+        assert_eq!(c, Color::rgb(255, 0, 0));
+    }
+
+    // -- ThemeInheritance ----------------------------------------------------
+
+    #[test]
+    fn theme_inheritance_apply() {
+        let parent = dark_plus();
+        let mut inh = ThemeInheritance::new("vs-dark-plus");
+        inh.set_color("editor.background", Color::rgb(0, 0, 0));
+        inh.set_color("custom.new", Color::rgb(1, 2, 3));
+        let child = inh.apply(&parent, "my-child", "My Child");
+        assert_eq!(child.get_color("editor.background"), Some(&Color::rgb(0, 0, 0)));
+        assert_eq!(child.get_color("editor.foreground"), parent.get_color("editor.foreground"));
+        assert_eq!(child.get_color("custom.new"), Some(&Color::rgb(1, 2, 3)));
+        assert_eq!(child.id, "my-child");
+    }
+
+    #[test]
+    fn theme_inheritance_counts() {
+        let mut inh = ThemeInheritance::new("parent");
+        assert_eq!(inh.color_override_count(), 0);
+        assert_eq!(inh.token_override_count(), 0);
+        inh.set_color("a", Color::rgb(0, 0, 0));
+        inh.set_color("b", Color::rgb(1, 1, 1));
+        assert_eq!(inh.color_override_count(), 2);
+    }
+
+    // -- ThemeTokenColorCustomization ----------------------------------------
+
+    #[test]
+    fn token_color_customization_apply() {
+        let theme = dark_plus();
+        let original_count = theme.token_color_count();
+        let mut cust = ThemeTokenColorCustomization::new();
+        // Use a more specific scope so the customization wins by longest-prefix.
+        cust.add_rule(&["comment.line"], Some(Color::rgb(255, 0, 0)), Some("bold"));
+        assert_eq!(cust.len(), 1);
+        assert!(!cust.is_empty());
+        let custom = cust.apply(&theme);
+        assert_eq!(custom.token_color_count(), original_count + 1);
+        let style = custom.get_token_style(&["comment.line.double-slash"]).unwrap();
+        assert_eq!(style.foreground, Some(Color::rgb(255, 0, 0)));
+        assert!(style.bold);
+    }
+
+    // -- ThemeContrastCalculator ---------------------------------------------
+
+    #[test]
+    fn contrast_calculator_high_contrast_passes_aaa() {
+        let hc = high_contrast();
+        let violations = ThemeContrastCalculator::check(&hc, WcagLevel::AAA);
+        // High contrast theme should pass AAA for editor fg/bg
+        assert!(
+            !violations.iter().any(|v| v.fg_key == "editor.foreground"),
+            "high contrast editor fg/bg should pass AAA"
+        );
+    }
+
+    #[test]
+    fn contrast_calculator_pair_count() {
+        assert!(ThemeContrastCalculator::pair_count() > 0);
+    }
+
+    #[test]
+    fn contrast_calculator_custom_pairs() {
+        let theme = dark_plus();
+        let pairs = &[("editor.foreground", "editor.background")];
+        let violations = ThemeContrastCalculator::check_pairs(&theme, pairs, WcagLevel::AA);
+        // Dark+ editor fg/bg should pass AA
+        assert!(violations.is_empty(), "Dark+ editor should pass AA: {:?}", violations);
+    }
+
+    #[test]
+    fn contrast_calculator_low_contrast_detected() {
+        let mut colors = HashMap::new();
+        colors.insert("editor.foreground".into(), Color::rgb(128, 128, 128));
+        colors.insert("editor.background".into(), Color::rgb(130, 130, 130));
+        let theme = ColorTheme {
+            id: "low".into(),
+            label: "Low".into(),
+            theme_type: ThemeType::Dark,
+            colors,
+            token_colors: Vec::new(),
+        };
+        let violations = ThemeContrastCalculator::check(&theme, WcagLevel::AA);
+        assert!(violations.iter().any(|v| v.fg_key == "editor.foreground"));
     }
 }

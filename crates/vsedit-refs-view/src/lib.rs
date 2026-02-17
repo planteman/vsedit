@@ -1,5 +1,6 @@
 //! References view.
 
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 /// A source location in a file.
@@ -153,7 +154,7 @@ impl ReferencesModel {
 }
 
 /// The kind of reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReferenceKind {
     Declaration,
     Definition,
@@ -1103,6 +1104,216 @@ impl<'a> ReferenceNavigator<'a> {
     }
 }
 
+/// Groups references by file path or by kind.
+pub struct ReferencesGrouper;
+
+impl ReferencesGrouper {
+    /// Group kinded references by their file URI, sorted alphabetically.
+    pub fn group_by_file<'a>(
+        refs: &'a [KindedReferenceItem],
+    ) -> Vec<(String, Vec<&'a KindedReferenceItem>)> {
+        let mut map: HashMap<&str, Vec<&'a KindedReferenceItem>> = HashMap::new();
+        for r in refs {
+            map.entry(r.item.location.uri.as_str())
+                .or_default()
+                .push(r);
+        }
+        let mut groups: Vec<(String, Vec<&'a KindedReferenceItem>)> = map
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+        groups.sort_by(|a, b| a.0.cmp(&b.0));
+        groups
+    }
+
+    /// Group kinded references by their `ReferenceKind`.
+    pub fn group_by_kind<'a>(
+        refs: &'a [KindedReferenceItem],
+    ) -> Vec<(ReferenceKind, Vec<&'a KindedReferenceItem>)> {
+        let mut map: HashMap<ReferenceKind, Vec<&'a KindedReferenceItem>> = HashMap::new();
+        for r in refs {
+            map.entry(r.kind).or_default().push(r);
+        }
+        let mut groups: Vec<(ReferenceKind, Vec<&'a KindedReferenceItem>)> =
+            map.into_iter().collect();
+        groups.sort_by_key(|(k, _)| format!("{k:?}"));
+        groups
+    }
+
+    /// Count the number of distinct files across kinded references.
+    pub fn file_count(refs: &[KindedReferenceItem]) -> usize {
+        let files: HashSet<&str> = refs.iter().map(|r| r.item.location.uri.as_str()).collect();
+        files.len()
+    }
+}
+
+/// Filters references by included or excluded kinds.
+#[derive(Debug, Clone)]
+pub struct ReferencesFilter {
+    included: HashSet<ReferenceKind>,
+    excluded: HashSet<ReferenceKind>,
+}
+
+impl ReferencesFilter {
+    /// Create a new filter with no constraints.
+    pub fn new() -> Self {
+        Self {
+            included: HashSet::new(),
+            excluded: HashSet::new(),
+        }
+    }
+
+    /// Add a kind to the inclusion set.
+    pub fn include_kind(&mut self, kind: ReferenceKind) {
+        self.included.insert(kind);
+        self.excluded.remove(&kind);
+    }
+
+    /// Add a kind to the exclusion set.
+    pub fn exclude_kind(&mut self, kind: ReferenceKind) {
+        self.excluded.insert(kind);
+        self.included.remove(&kind);
+    }
+
+    /// Apply the filter to a slice of kinded references.
+    ///
+    /// If inclusions are set, only matching kinds are kept.
+    /// Exclusions are then removed from the result.
+    pub fn apply<'a>(&self, refs: &'a [KindedReferenceItem]) -> Vec<&'a KindedReferenceItem> {
+        refs.iter()
+            .filter(|r| {
+                if !self.included.is_empty() && !self.included.contains(&r.kind) {
+                    return false;
+                }
+                if self.excluded.contains(&r.kind) {
+                    return false;
+                }
+                true
+            })
+            .collect()
+    }
+
+    /// Returns true when no include or exclude constraints have been set.
+    pub fn is_empty(&self) -> bool {
+        self.included.is_empty() && self.excluded.is_empty()
+    }
+}
+
+impl Default for ReferencesFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A single line in a peek preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewLine {
+    /// 1-based line number in the original file.
+    pub line_number: u32,
+    /// Text content of the line.
+    pub text: String,
+    /// Whether this line is the target reference line.
+    pub is_target: bool,
+}
+
+/// Generates peek preview context for a reference location.
+#[derive(Debug, Clone)]
+pub struct ReferencePeekPreview {
+    context_lines: usize,
+}
+
+impl ReferencePeekPreview {
+    /// Create a new peek preview generator with the given number of context lines
+    /// above and below the target line.
+    pub fn new(context_lines: usize) -> Self {
+        Self { context_lines }
+    }
+
+    /// Extract surrounding lines from `content` around the 0-based `line` index,
+    /// returning them as a single string.
+    pub fn generate(&self, content: &str, line: u32) -> String {
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = line as usize;
+        if line_idx >= lines.len() {
+            return String::new();
+        }
+        let start = line_idx.saturating_sub(self.context_lines);
+        let end = (line_idx + self.context_lines + 1).min(lines.len());
+        lines[start..end].join("\n")
+    }
+
+    /// Extract surrounding lines with highlight metadata, returning a vec of
+    /// `PreviewLine` values. The target line is marked with `is_target = true`.
+    pub fn generate_with_highlight(&self, content: &str, line: u32) -> Vec<PreviewLine> {
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = line as usize;
+        if line_idx >= lines.len() {
+            return Vec::new();
+        }
+        let start = line_idx.saturating_sub(self.context_lines);
+        let end = (line_idx + self.context_lines + 1).min(lines.len());
+        (start..end)
+            .map(|i| PreviewLine {
+                line_number: (i + 1) as u32,
+                text: lines[i].to_string(),
+                is_target: i == line_idx,
+            })
+            .collect()
+    }
+}
+
+/// Tracks which reference locations have been visited during navigation.
+#[derive(Debug, Clone)]
+pub struct ReferenceNavigationHistory {
+    visits: Vec<(String, u32)>,
+    visited_set: HashSet<(String, u32)>,
+}
+
+impl ReferenceNavigationHistory {
+    /// Create a new empty navigation history.
+    pub fn new() -> Self {
+        Self {
+            visits: Vec::new(),
+            visited_set: HashSet::new(),
+        }
+    }
+
+    /// Record a visit to the given URI and line.
+    pub fn visit(&mut self, uri: &str, line: u32) {
+        let key = (uri.to_string(), line);
+        if self.visited_set.insert(key.clone()) {
+            self.visits.push(key);
+        }
+    }
+
+    /// Check whether a specific location has been visited.
+    pub fn is_visited(&self, uri: &str, line: u32) -> bool {
+        self.visited_set.contains(&(uri.to_string(), line))
+    }
+
+    /// Return the total number of unique visited locations.
+    pub fn visited_count(&self) -> usize {
+        self.visited_set.len()
+    }
+
+    /// Clear all visit history.
+    pub fn clear(&mut self) {
+        self.visits.clear();
+        self.visited_set.clear();
+    }
+
+    /// Return the most recent `n` visits in reverse chronological order.
+    pub fn recent_visits(&self, n: usize) -> Vec<(String, u32)> {
+        self.visits.iter().rev().take(n).cloned().collect()
+    }
+}
+
+impl Default for ReferenceNavigationHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1872,5 +2083,168 @@ mod tests {
         assert!(nav.is_empty());
         assert!(nav.next().is_none());
         assert!(nav.previous().is_none());
+    }
+
+    fn kinded(uri: &str, line: u32, col: u32, kind: ReferenceKind) -> KindedReferenceItem {
+        KindedReferenceItem {
+            item: ref_item(uri, line, col),
+            kind,
+        }
+    }
+
+    #[test]
+    fn grouper_group_by_file() {
+        let refs = vec![
+            kinded("a.rs", 1, 0, ReferenceKind::Read),
+            kinded("b.rs", 2, 0, ReferenceKind::Write),
+            kinded("a.rs", 5, 0, ReferenceKind::Call),
+        ];
+        let groups = ReferencesGrouper::group_by_file(&refs);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].0, "a.rs");
+        assert_eq!(groups[0].1.len(), 2);
+        assert_eq!(groups[1].0, "b.rs");
+        assert_eq!(groups[1].1.len(), 1);
+    }
+
+    #[test]
+    fn grouper_group_by_kind() {
+        let refs = vec![
+            kinded("a.rs", 1, 0, ReferenceKind::Read),
+            kinded("b.rs", 2, 0, ReferenceKind::Read),
+            kinded("a.rs", 3, 0, ReferenceKind::Write),
+        ];
+        let groups = ReferencesGrouper::group_by_kind(&refs);
+        assert_eq!(groups.len(), 2);
+        let read_group = groups.iter().find(|(k, _)| *k == ReferenceKind::Read).unwrap();
+        assert_eq!(read_group.1.len(), 2);
+    }
+
+    #[test]
+    fn grouper_file_count() {
+        let refs = vec![
+            kinded("a.rs", 1, 0, ReferenceKind::Read),
+            kinded("b.rs", 2, 0, ReferenceKind::Read),
+            kinded("a.rs", 3, 0, ReferenceKind::Write),
+        ];
+        assert_eq!(ReferencesGrouper::file_count(&refs), 2);
+    }
+
+    #[test]
+    fn filter_include_kind() {
+        let refs = vec![
+            kinded("a.rs", 1, 0, ReferenceKind::Read),
+            kinded("b.rs", 2, 0, ReferenceKind::Write),
+            kinded("c.rs", 3, 0, ReferenceKind::Call),
+        ];
+        let mut filter = ReferencesFilter::new();
+        assert!(filter.is_empty());
+        filter.include_kind(ReferenceKind::Read);
+        let result = filter.apply(&refs);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].kind, ReferenceKind::Read);
+    }
+
+    #[test]
+    fn filter_exclude_kind() {
+        let refs = vec![
+            kinded("a.rs", 1, 0, ReferenceKind::Read),
+            kinded("b.rs", 2, 0, ReferenceKind::Write),
+            kinded("c.rs", 3, 0, ReferenceKind::Call),
+        ];
+        let mut filter = ReferencesFilter::new();
+        filter.exclude_kind(ReferenceKind::Write);
+        let result = filter.apply(&refs);
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().all(|r| r.kind != ReferenceKind::Write));
+    }
+
+    #[test]
+    fn filter_include_and_exclude() {
+        let refs = vec![
+            kinded("a.rs", 1, 0, ReferenceKind::Read),
+            kinded("b.rs", 2, 0, ReferenceKind::Write),
+            kinded("c.rs", 3, 0, ReferenceKind::Call),
+        ];
+        let mut filter = ReferencesFilter::new();
+        filter.include_kind(ReferenceKind::Read);
+        filter.include_kind(ReferenceKind::Write);
+        filter.exclude_kind(ReferenceKind::Write);
+        let result = filter.apply(&refs);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].kind, ReferenceKind::Read);
+    }
+
+    #[test]
+    fn peek_preview_generate() {
+        let content = "line0\nline1\nline2\nline3\nline4\nline5";
+        let preview = ReferencePeekPreview::new(1);
+        let result = preview.generate(content, 2);
+        assert_eq!(result, "line1\nline2\nline3");
+    }
+
+    #[test]
+    fn peek_preview_at_start() {
+        let content = "first\nsecond\nthird";
+        let preview = ReferencePeekPreview::new(2);
+        let result = preview.generate(content, 0);
+        assert_eq!(result, "first\nsecond\nthird");
+    }
+
+    #[test]
+    fn peek_preview_highlight() {
+        let content = "aaa\nbbb\nccc\nddd\neee";
+        let preview = ReferencePeekPreview::new(1);
+        let lines = preview.generate_with_highlight(content, 2);
+        assert_eq!(lines.len(), 3);
+        assert!(!lines[0].is_target);
+        assert!(lines[1].is_target);
+        assert_eq!(lines[1].text, "ccc");
+        assert_eq!(lines[1].line_number, 3);
+        assert!(!lines[2].is_target);
+    }
+
+    #[test]
+    fn peek_preview_out_of_bounds() {
+        let content = "only";
+        let preview = ReferencePeekPreview::new(2);
+        let result = preview.generate(content, 99);
+        assert!(result.is_empty());
+        let lines = preview.generate_with_highlight(content, 99);
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn navigation_history_basic() {
+        let mut history = ReferenceNavigationHistory::new();
+        assert_eq!(history.visited_count(), 0);
+        history.visit("a.rs", 10);
+        history.visit("b.rs", 20);
+        assert_eq!(history.visited_count(), 2);
+        assert!(history.is_visited("a.rs", 10));
+        assert!(!history.is_visited("a.rs", 11));
+    }
+
+    #[test]
+    fn navigation_history_dedup() {
+        let mut history = ReferenceNavigationHistory::new();
+        history.visit("a.rs", 10);
+        history.visit("a.rs", 10);
+        assert_eq!(history.visited_count(), 1);
+    }
+
+    #[test]
+    fn navigation_history_recent_and_clear() {
+        let mut history = ReferenceNavigationHistory::new();
+        history.visit("a.rs", 1);
+        history.visit("b.rs", 2);
+        history.visit("c.rs", 3);
+        let recent = history.recent_visits(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0], ("c.rs".to_string(), 3));
+        assert_eq!(recent[1], ("b.rs".to_string(), 2));
+        history.clear();
+        assert_eq!(history.visited_count(), 0);
+        assert!(history.recent_visits(5).is_empty());
     }
 }

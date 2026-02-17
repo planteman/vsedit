@@ -1160,6 +1160,241 @@ impl TerminalEnvironment {
 }
 
 // ---------------------------------------------------------------------------
+// MergeStrategy
+// ---------------------------------------------------------------------------
+
+/// Strategy for resolving conflicts when merging environment variable sets.
+#[derive(Debug, Clone)]
+pub enum MergeStrategy {
+    /// Shell value wins on conflict.
+    ShellWins,
+    /// Editor value wins on conflict.
+    EditorWins,
+    /// Concatenate both values with the given separator.
+    Concatenate(String),
+}
+
+// ---------------------------------------------------------------------------
+// TerminalProfileDiscovery
+// ---------------------------------------------------------------------------
+
+/// Discovers available shell profiles on the system.
+pub struct TerminalProfileDiscovery {
+    profiles: Vec<TerminalProfile>,
+    scanned: bool,
+}
+
+impl TerminalProfileDiscovery {
+    /// Create a new discovery instance (not yet scanned).
+    pub fn new() -> Self {
+        Self {
+            profiles: Vec::new(),
+            scanned: false,
+        }
+    }
+
+    /// Scan common shell paths and populate the profiles list.
+    pub fn scan(&mut self) {
+        self.profiles.clear();
+        let candidates: &[(&str, &str)] = &[
+            ("/bin/bash", "Bash"),
+            ("/bin/zsh", "Zsh"),
+            ("/usr/bin/fish", "Fish"),
+            ("/bin/sh", "POSIX Shell"),
+            ("/usr/bin/bash", "Bash"),
+            ("/usr/bin/zsh", "Zsh"),
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for &(path, name) in candidates {
+            if std::path::Path::new(path).exists() && seen.insert(name.to_string()) {
+                self.profiles.push(TerminalProfile::new(path, name));
+            }
+        }
+        self.scanned = true;
+    }
+
+    /// Return the discovered profiles.
+    pub fn profiles(&self) -> &[TerminalProfile] {
+        &self.profiles
+    }
+
+    /// Find a profile by its human-readable name (case-insensitive).
+    pub fn find_by_name(&self, name: &str) -> Option<&TerminalProfile> {
+        let lower = name.to_lowercase();
+        self.profiles.iter().find(|p| p.name.to_lowercase() == lower)
+    }
+
+    /// Return the first profile that looks like a sensible default.
+    pub fn default_profile(&self) -> Option<&TerminalProfile> {
+        // Prefer bash, then zsh, then the first available.
+        self.find_by_name("Bash")
+            .or_else(|| self.find_by_name("Zsh"))
+            .or_else(|| self.profiles.first())
+    }
+
+    /// Number of discovered profiles.
+    pub fn profile_count(&self) -> usize {
+        self.profiles.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalEnvMerger
+// ---------------------------------------------------------------------------
+
+/// Merges two sets of environment variables with a configurable conflict
+/// resolution strategy.
+pub struct TerminalEnvMerger {
+    strategy: MergeStrategy,
+}
+
+impl TerminalEnvMerger {
+    pub fn new(strategy: MergeStrategy) -> Self {
+        Self { strategy }
+    }
+
+    /// Merge `shell` and `editor` maps according to the configured strategy.
+    pub fn merge(
+        &self,
+        shell: &HashMap<String, String>,
+        editor: &HashMap<String, String>,
+    ) -> HashMap<String, String> {
+        let mut keys: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for k in shell.keys().chain(editor.keys()) {
+            keys.insert(k.as_str());
+        }
+        let mut out = HashMap::new();
+        for key in keys {
+            if let Some(val) =
+                self.merge_single(key, shell.get(key).map(|s| s.as_str()), editor.get(key).map(|s| s.as_str()))
+            {
+                out.insert(key.to_string(), val);
+            }
+        }
+        out
+    }
+
+    /// Resolve a single key given optional values from each source.
+    pub fn merge_single(
+        &self,
+        _key: &str,
+        shell_val: Option<&str>,
+        editor_val: Option<&str>,
+    ) -> Option<String> {
+        match (&self.strategy, shell_val, editor_val) {
+            (_, Some(s), None) => Some(s.to_string()),
+            (_, None, Some(e)) => Some(e.to_string()),
+            (_, None, None) => None,
+            (MergeStrategy::ShellWins, Some(s), Some(_)) => Some(s.to_string()),
+            (MergeStrategy::EditorWins, _, Some(e)) => Some(e.to_string()),
+            (MergeStrategy::Concatenate(sep), Some(s), Some(e)) => {
+                Some(format!("{}{}{}", s, sep, e))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShellIntegrationHandler
+// ---------------------------------------------------------------------------
+
+/// Handles shell-integration OSC sequences emitted by the shell.
+pub struct ShellIntegrationHandler {
+    pub prompt_mark: Option<String>,
+    pub command_start: Option<String>,
+    pub command_end: Option<String>,
+    pub cwd: Option<PathBuf>,
+}
+
+impl ShellIntegrationHandler {
+    pub fn new() -> Self {
+        Self {
+            prompt_mark: None,
+            command_start: None,
+            command_end: None,
+            cwd: None,
+        }
+    }
+
+    /// Parse an OSC-like sequence string and update internal state.
+    pub fn handle_sequence(&mut self, seq: &str) {
+        if seq.contains("PromptMark") {
+            self.prompt_mark = Some(seq.to_string());
+        }
+        if seq.contains("CommandStart") {
+            self.command_start = Some(seq.to_string());
+        }
+        if seq.contains("CommandEnd") {
+            self.command_end = Some(seq.to_string());
+        }
+        if let Some(idx) = seq.find("CWD=") {
+            let path_str = &seq[idx + 4..];
+            // Take until the next ';' or end of string.
+            let end = path_str.find(';').unwrap_or(path_str.len());
+            self.cwd = Some(PathBuf::from(&path_str[..end]));
+        }
+    }
+
+    /// Return the current working directory if one has been reported.
+    pub fn current_directory(&self) -> Option<&PathBuf> {
+        self.cwd.as_ref()
+    }
+
+    /// Whether a prompt mark has been received.
+    pub fn has_prompt(&self) -> bool {
+        self.prompt_mark.is_some()
+    }
+
+    /// Reset all tracked state.
+    pub fn reset(&mut self) {
+        self.prompt_mark = None;
+        self.command_start = None;
+        self.command_end = None;
+        self.cwd = None;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalFontResolver
+// ---------------------------------------------------------------------------
+
+/// Resolves a [`TerminalFontConfig`] for a given profile, falling back to a
+/// default when no override exists.
+pub struct TerminalFontResolver {
+    default_config: TerminalFontConfig,
+    overrides: HashMap<String, TerminalFontConfig>,
+}
+
+impl TerminalFontResolver {
+    pub fn new(default: TerminalFontConfig) -> Self {
+        Self {
+            default_config: default,
+            overrides: HashMap::new(),
+        }
+    }
+
+    /// Register a font-config override for a specific profile name.
+    pub fn add_override(&mut self, profile_name: &str, config: TerminalFontConfig) {
+        self.overrides.insert(profile_name.to_string(), config);
+    }
+
+    /// Resolve the font config for the given profile name.
+    pub fn resolve(&self, profile_name: &str) -> &TerminalFontConfig {
+        self.overrides.get(profile_name).unwrap_or(&self.default_config)
+    }
+
+    /// Number of registered overrides.
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Check whether an override exists for the given profile.
+    pub fn has_override(&self, profile_name: &str) -> bool {
+        self.overrides.contains_key(profile_name)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1950,5 +2185,134 @@ mod tests {
         assert_eq!(f.family, "monospace");
         assert!((f.size - 14.0).abs() < 0.1);
         assert_eq!(f.weight, 400);
+    }
+
+    // -- TerminalProfileDiscovery tests ------------------------------------
+
+    #[test]
+    fn test_profile_discovery_scan() {
+        let mut disc = TerminalProfileDiscovery::new();
+        assert!(!disc.scanned);
+        assert_eq!(disc.profile_count(), 0);
+        disc.scan();
+        assert!(disc.scanned);
+        // On most Linux systems at least /bin/sh exists.
+        assert!(disc.profile_count() > 0);
+    }
+
+    #[test]
+    fn test_profile_discovery_find_by_name() {
+        let mut disc = TerminalProfileDiscovery::new();
+        disc.scan();
+        // /bin/sh should always exist as "POSIX Shell".
+        let profile = disc.find_by_name("POSIX Shell");
+        assert!(profile.is_some());
+        assert_eq!(profile.unwrap().shell_path, "/bin/sh");
+    }
+
+    #[test]
+    fn test_profile_discovery_default() {
+        let mut disc = TerminalProfileDiscovery::new();
+        disc.scan();
+        let def = disc.default_profile();
+        assert!(def.is_some(), "should always find at least one default");
+    }
+
+    // -- TerminalEnvMerger tests -------------------------------------------
+
+    #[test]
+    fn test_env_merger_shell_wins() {
+        let merger = TerminalEnvMerger::new(MergeStrategy::ShellWins);
+        let shell: HashMap<String, String> =
+            [("PATH".into(), "/shell/bin".into())].into();
+        let editor: HashMap<String, String> =
+            [("PATH".into(), "/editor/bin".into()), ("EDITOR".into(), "vsedit".into())].into();
+        let merged = merger.merge(&shell, &editor);
+        assert_eq!(merged["PATH"], "/shell/bin");
+        assert_eq!(merged["EDITOR"], "vsedit");
+    }
+
+    #[test]
+    fn test_env_merger_editor_wins() {
+        let merger = TerminalEnvMerger::new(MergeStrategy::EditorWins);
+        let shell: HashMap<String, String> =
+            [("PATH".into(), "/shell/bin".into())].into();
+        let editor: HashMap<String, String> =
+            [("PATH".into(), "/editor/bin".into())].into();
+        let merged = merger.merge(&shell, &editor);
+        assert_eq!(merged["PATH"], "/editor/bin");
+    }
+
+    #[test]
+    fn test_env_merger_concatenate() {
+        let merger = TerminalEnvMerger::new(MergeStrategy::Concatenate(":".into()));
+        let shell: HashMap<String, String> =
+            [("PATH".into(), "/shell/bin".into())].into();
+        let editor: HashMap<String, String> =
+            [("PATH".into(), "/editor/bin".into())].into();
+        let merged = merger.merge(&shell, &editor);
+        assert_eq!(merged["PATH"], "/shell/bin:/editor/bin");
+    }
+
+    // -- ShellIntegrationHandler tests -------------------------------------
+
+    #[test]
+    fn test_shell_integration_prompt() {
+        let mut handler = ShellIntegrationHandler::new();
+        assert!(!handler.has_prompt());
+        handler.handle_sequence("OSC;PromptMark;A");
+        assert!(handler.has_prompt());
+    }
+
+    #[test]
+    fn test_shell_integration_cwd() {
+        let mut handler = ShellIntegrationHandler::new();
+        handler.handle_sequence("OSC;CWD=/home/user/project;end");
+        let dir = handler.current_directory().unwrap();
+        assert_eq!(dir, &PathBuf::from("/home/user/project"));
+    }
+
+    #[test]
+    fn test_shell_integration_reset() {
+        let mut handler = ShellIntegrationHandler::new();
+        handler.handle_sequence("OSC;PromptMark;CommandStart;CWD=/tmp");
+        assert!(handler.has_prompt());
+        assert!(handler.current_directory().is_some());
+        handler.reset();
+        assert!(!handler.has_prompt());
+        assert!(handler.current_directory().is_none());
+    }
+
+    // -- TerminalFontResolver tests ----------------------------------------
+
+    #[test]
+    fn test_font_resolver_default() {
+        let resolver = TerminalFontResolver::new(TerminalFontConfig::default());
+        let cfg = resolver.resolve("anything");
+        assert_eq!(cfg.family, "monospace");
+        assert_eq!(resolver.override_count(), 0);
+    }
+
+    #[test]
+    fn test_font_resolver_override() {
+        let mut resolver = TerminalFontResolver::new(TerminalFontConfig::default());
+        let custom = TerminalFontConfig::new().with_family("Fira Code").with_size(16.0);
+        resolver.add_override("Bash", custom);
+        let cfg = resolver.resolve("Bash");
+        assert_eq!(cfg.family, "Fira Code");
+        assert!((cfg.size - 16.0).abs() < 0.1);
+        // Default still returned for other profiles.
+        let def = resolver.resolve("Zsh");
+        assert_eq!(def.family, "monospace");
+    }
+
+    #[test]
+    fn test_font_resolver_has_override() {
+        let mut resolver = TerminalFontResolver::new(TerminalFontConfig::default());
+        assert!(!resolver.has_override("Bash"));
+        resolver.add_override("Bash", TerminalFontConfig::default());
+        assert!(resolver.has_override("Bash"));
+        assert!(!resolver.has_override("Fish"));
+        assert_eq!(resolver.override_count(), 1);
     }
 }

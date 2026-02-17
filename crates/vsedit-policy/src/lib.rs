@@ -1127,6 +1127,223 @@ impl PolicyService {
     }
 }
 
+// -- PolicyProfile combining multiple policies -------------------------------
+
+/// A named profile grouping policies together.
+#[derive(Debug, Clone)]
+pub struct PolicyProfile {
+    pub name: String,
+    pub policies: Vec<Policy>,
+    pub enabled: bool,
+}
+
+impl PolicyProfile {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            policies: Vec::new(),
+            enabled: true,
+        }
+    }
+
+    pub fn add_policy(&mut self, policy: Policy) {
+        self.policies.push(policy);
+    }
+
+    pub fn policy_count(&self) -> usize {
+        self.policies.len()
+    }
+
+    pub fn get_policy(&self, name: &str) -> Option<&Policy> {
+        self.policies.iter().find(|p| p.name == name)
+    }
+
+    /// Apply this profile to a PolicyService, overwriting existing policies.
+    pub fn apply_to(&self, service: &mut PolicyService) {
+        if !self.enabled {
+            return;
+        }
+        for policy in &self.policies {
+            service.set_policy(&policy.name, policy.value.clone(), policy.description.clone());
+        }
+    }
+}
+
+impl fmt::Display for PolicyProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.enabled { "enabled" } else { "disabled" };
+        write!(f, "Profile({}, {} policies, {})", self.name, self.policies.len(), status)
+    }
+}
+
+// -- PolicyCheckLog tracking policy checks -----------------------------------
+
+/// A record of a policy check.
+#[derive(Debug, Clone)]
+pub struct PolicyCheckEntry {
+    pub policy_name: String,
+    pub action: String,
+    pub result: bool,
+    pub timestamp: u64,
+}
+
+impl fmt::Display for PolicyCheckEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let outcome = if self.result { "allowed" } else { "denied" };
+        write!(f, "[{}] {} '{}': {}", self.timestamp, self.action, self.policy_name, outcome)
+    }
+}
+
+/// Check log for policy evaluations (distinct from the mutation audit log).
+#[derive(Debug, Default)]
+pub struct PolicyCheckLog {
+    entries: Vec<PolicyCheckEntry>,
+    max_entries: usize,
+}
+
+impl PolicyCheckLog {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), max_entries }
+    }
+
+    pub fn record(&mut self, policy_name: &str, action: &str, result: bool, timestamp: u64) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(PolicyCheckEntry {
+            policy_name: policy_name.to_string(),
+            action: action.to_string(),
+            result,
+            timestamp,
+        });
+    }
+
+    pub fn entries(&self) -> &[PolicyCheckEntry] {
+        &self.entries
+    }
+
+    pub fn denied_entries(&self) -> Vec<&PolicyCheckEntry> {
+        self.entries.iter().filter(|e| !e.result).collect()
+    }
+
+    pub fn entries_for_policy(&self, name: &str) -> Vec<&PolicyCheckEntry> {
+        self.entries.iter().filter(|e| e.policy_name == name).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl fmt::Display for PolicyCheckLog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let denied = self.denied_entries().len();
+        write!(f, "CheckLog({} entries, {} denied)", self.entries.len(), denied)
+    }
+}
+
+// -- PolicyOverride for admin bypass -----------------------------------------
+
+/// An override that bypasses a policy for a specific scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyOverride {
+    pub policy_name: String,
+    pub override_value: PolicyValue,
+    pub reason: String,
+    pub admin_id: String,
+}
+
+impl fmt::Display for PolicyOverride {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Override({}={}, by {})", self.policy_name, self.override_value, self.admin_id)
+    }
+}
+
+/// Manage policy overrides.
+#[derive(Debug, Default)]
+pub struct PolicyOverrideManager {
+    overrides: Vec<PolicyOverride>,
+}
+
+impl PolicyOverrideManager {
+    pub fn new() -> Self {
+        Self { overrides: Vec::new() }
+    }
+
+    pub fn add_override(&mut self, over: PolicyOverride) {
+        self.overrides.retain(|o| o.policy_name != over.policy_name);
+        self.overrides.push(over);
+    }
+
+    pub fn remove_override(&mut self, policy_name: &str) {
+        self.overrides.retain(|o| o.policy_name != policy_name);
+    }
+
+    pub fn get_override(&self, policy_name: &str) -> Option<&PolicyOverride> {
+        self.overrides.iter().find(|o| o.policy_name == policy_name)
+    }
+
+    pub fn has_override(&self, policy_name: &str) -> bool {
+        self.overrides.iter().any(|o| o.policy_name == policy_name)
+    }
+
+    pub fn count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Resolve a policy value, checking overrides first then the service.
+    pub fn resolve(&self, policy_name: &str, service: &PolicyService) -> Option<PolicyValue> {
+        if let Some(over) = self.get_override(policy_name) {
+            return Some(over.override_value.clone());
+        }
+        service.get_policy(policy_name).map(|p| p.value.clone())
+    }
+}
+
+// -- Policy expiration with TTL ----------------------------------------------
+
+/// A policy with an expiration timestamp.
+#[derive(Debug, Clone)]
+pub struct ExpiringPolicy {
+    pub policy: Policy,
+    pub expires_at: u64,
+}
+
+impl ExpiringPolicy {
+    pub fn new(policy: Policy, expires_at: u64) -> Self {
+        Self { policy, expires_at }
+    }
+
+    pub fn is_expired(&self, now: u64) -> bool {
+        now >= self.expires_at
+    }
+
+    pub fn remaining(&self, now: u64) -> u64 {
+        if now >= self.expires_at { 0 } else { self.expires_at - now }
+    }
+}
+
+impl fmt::Display for ExpiringPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ExpiringPolicy({}, expires_at={})", self.policy.name, self.expires_at)
+    }
+}
+
+/// Remove expired policies from a list.
+pub fn remove_expired(policies: &mut Vec<ExpiringPolicy>, now: u64) -> usize {
+    let before = policies.len();
+    policies.retain(|p| !p.is_expired(now));
+    before - policies.len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1975,5 +2192,158 @@ mod tests {
         assert!(bools.contains(&"flag".to_string()));
         let strings = svc.str_policy_names();
         assert_eq!(strings.len(), 1);
+    }
+
+    // -- PolicyProfile tests --------------------------------------------------
+
+    #[test]
+    fn profile_apply_to_service() {
+        let mut profile = PolicyProfile::new("strict");
+        profile.add_policy(Policy { name: "telemetry".into(), value: PolicyValue::Bool(false), description: None });
+        profile.add_policy(Policy { name: "update.mode".into(), value: PolicyValue::String("manual".into()), description: None });
+
+        let mut service = PolicyService::new();
+        profile.apply_to(&mut service);
+        assert_eq!(service.get_policy("telemetry").unwrap().value, PolicyValue::Bool(false));
+        assert_eq!(profile.policy_count(), 2);
+    }
+
+    #[test]
+    fn profile_disabled_not_applied() {
+        let mut profile = PolicyProfile::new("disabled");
+        profile.enabled = false;
+        profile.add_policy(Policy { name: "x".into(), value: PolicyValue::Bool(true), description: None });
+
+        let mut service = PolicyService::new();
+        profile.apply_to(&mut service);
+        assert!(service.get_policy("x").is_none());
+    }
+
+    #[test]
+    fn profile_display() {
+        let profile = PolicyProfile::new("test");
+        let s = profile.to_string();
+        assert!(s.contains("test"));
+        assert!(s.contains("enabled"));
+    }
+
+    // -- PolicyCheckLog tests -------------------------------------------------
+
+    #[test]
+    fn check_log_record_and_query() {
+        let mut log = PolicyCheckLog::new(100);
+        log.record("telemetry", "check", true, 1000);
+        log.record("update", "check", false, 1001);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log.denied_entries().len(), 1);
+    }
+
+    #[test]
+    fn check_log_evicts_oldest() {
+        let mut log = PolicyCheckLog::new(2);
+        log.record("a", "check", true, 1);
+        log.record("b", "check", true, 2);
+        log.record("c", "check", true, 3);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log.entries()[0].policy_name, "b");
+    }
+
+    #[test]
+    fn check_log_for_policy() {
+        let mut log = PolicyCheckLog::new(100);
+        log.record("x", "check", true, 1);
+        log.record("y", "check", false, 2);
+        log.record("x", "update", true, 3);
+        let x_entries = log.entries_for_policy("x");
+        assert_eq!(x_entries.len(), 2);
+    }
+
+    #[test]
+    fn check_log_display() {
+        let log = PolicyCheckLog::new(100);
+        let s = log.to_string();
+        assert!(s.contains("0 entries"));
+    }
+
+    // -- PolicyOverride tests -------------------------------------------------
+
+    #[test]
+    fn override_manager_resolve() {
+        let mut service = PolicyService::new();
+        service.set_policy("flag", PolicyValue::Bool(false), None);
+
+        let mut mgr = PolicyOverrideManager::new();
+        mgr.add_override(PolicyOverride {
+            policy_name: "flag".into(),
+            override_value: PolicyValue::Bool(true),
+            reason: "admin bypass".into(),
+            admin_id: "admin1".into(),
+        });
+
+        let resolved = mgr.resolve("flag", &service);
+        assert_eq!(resolved, Some(PolicyValue::Bool(true)));
+    }
+
+    #[test]
+    fn override_manager_fallback_to_service() {
+        let mut service = PolicyService::new();
+        service.set_policy("flag", PolicyValue::Bool(false), None);
+        let mgr = PolicyOverrideManager::new();
+        let resolved = mgr.resolve("flag", &service);
+        assert_eq!(resolved, Some(PolicyValue::Bool(false)));
+    }
+
+    #[test]
+    fn override_replaces_existing() {
+        let mut mgr = PolicyOverrideManager::new();
+        mgr.add_override(PolicyOverride {
+            policy_name: "x".into(), override_value: PolicyValue::Bool(true),
+            reason: "r".into(), admin_id: "a".into(),
+        });
+        mgr.add_override(PolicyOverride {
+            policy_name: "x".into(), override_value: PolicyValue::Bool(false),
+            reason: "r2".into(), admin_id: "b".into(),
+        });
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.get_override("x").unwrap().admin_id, "b");
+    }
+
+    // -- ExpiringPolicy tests -------------------------------------------------
+
+    #[test]
+    fn expiring_policy_check() {
+        let ep = ExpiringPolicy::new(
+            Policy { name: "temp".into(), value: PolicyValue::Bool(true), description: None },
+            1000,
+        );
+        assert!(!ep.is_expired(500));
+        assert!(ep.is_expired(1000));
+        assert_eq!(ep.remaining(500), 500);
+        assert_eq!(ep.remaining(1500), 0);
+    }
+
+    #[test]
+    fn remove_expired_policies() {
+        let mut policies = vec![
+            ExpiringPolicy::new(Policy { name: "a".into(), value: PolicyValue::Bool(true), description: None }, 100),
+            ExpiringPolicy::new(Policy { name: "b".into(), value: PolicyValue::Bool(true), description: None }, 200),
+        ];
+        let removed = remove_expired(&mut policies, 150);
+        assert_eq!(removed, 1);
+        assert_eq!(policies.len(), 1);
+        assert_eq!(policies[0].policy.name, "b");
+    }
+
+    #[test]
+    fn override_display() {
+        let o = PolicyOverride {
+            policy_name: "x".into(),
+            override_value: PolicyValue::Bool(true),
+            reason: "test".into(),
+            admin_id: "admin".into(),
+        };
+        let s = o.to_string();
+        assert!(s.contains("x"));
+        assert!(s.contains("admin"));
     }
 }

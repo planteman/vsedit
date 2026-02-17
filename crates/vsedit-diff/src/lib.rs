@@ -1120,6 +1120,267 @@ pub fn similarity_ratio(original: &str, modified: &str) -> f64 {
     diff.ratio() as f64
 }
 
+// ---------------------------------------------------------------------------
+// DiffHunkStatistics — per-hunk statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics for a single [`DiffHunk`], counting additions, deletions, and
+/// modifications within that hunk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunkStatistics {
+    /// Number of lines added in this hunk.
+    pub additions: u32,
+    /// Number of lines deleted in this hunk.
+    pub deletions: u32,
+    /// Number of lines considered modified (min of added and deleted).
+    pub modifications: u32,
+}
+
+impl DiffHunkStatistics {
+    /// Compute statistics from a [`DiffHunk`].
+    pub fn from_hunk(hunk: &DiffHunk) -> Self {
+        let added = hunk.modified_lines.len() as u32;
+        let deleted = hunk.original_lines.len() as u32;
+        let modifications = added.min(deleted);
+        Self {
+            additions: added.saturating_sub(modifications),
+            deletions: deleted.saturating_sub(modifications),
+            modifications,
+        }
+    }
+
+    /// Total number of changed lines (additions + deletions + modifications).
+    pub fn total_changes(&self) -> u32 {
+        self.additions + self.deletions + self.modifications
+    }
+
+    /// Returns `true` if the hunk contains only additions.
+    pub fn is_pure_addition(&self) -> bool {
+        self.additions > 0 && self.deletions == 0 && self.modifications == 0
+    }
+
+    /// Returns `true` if the hunk contains only deletions.
+    pub fn is_pure_deletion(&self) -> bool {
+        self.deletions > 0 && self.additions == 0 && self.modifications == 0
+    }
+}
+
+impl fmt::Display for DiffHunkStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "+{} -{} ~{}",
+            self.additions, self.deletions, self.modifications
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SemanticDiffGroup — groups adjacent changes into logical blocks
+// ---------------------------------------------------------------------------
+
+/// A group of adjacent [`DiffChange`]s that form a logical unit.
+///
+/// Changes whose line numbers are within `max_gap` of each other are grouped
+/// together.
+#[derive(Debug, Clone)]
+pub struct SemanticDiffGroup {
+    /// The changes belonging to this group.
+    pub changes: Vec<DiffChange>,
+    /// First affected original line in the group (1-based).
+    pub start_line: u32,
+    /// Last affected original line in the group (1-based, inclusive).
+    pub end_line: u32,
+}
+
+impl SemanticDiffGroup {
+    /// Group a slice of [`DiffChange`]s into semantic blocks.
+    ///
+    /// Two consecutive changes are placed in the same group when the gap
+    /// between the end of one change and the start of the next is at most
+    /// `max_gap` lines.
+    pub fn group_changes(changes: &[DiffChange], max_gap: u32) -> Vec<SemanticDiffGroup> {
+        if changes.is_empty() {
+            return Vec::new();
+        }
+
+        let mut groups: Vec<SemanticDiffGroup> = Vec::new();
+        let mut current_changes = vec![changes[0].clone()];
+        let mut start_line = changes[0].original_start;
+        let mut end_line = changes[0].original_start + changes[0].original_length.max(1) - 1;
+
+        for change in &changes[1..] {
+            let change_start = change.original_start;
+            let gap = change_start.saturating_sub(end_line + 1);
+
+            if gap <= max_gap {
+                current_changes.push(change.clone());
+                let change_end = change.original_start + change.original_length.max(1) - 1;
+                end_line = end_line.max(change_end);
+            } else {
+                groups.push(SemanticDiffGroup {
+                    changes: std::mem::take(&mut current_changes),
+                    start_line,
+                    end_line,
+                });
+                current_changes.push(change.clone());
+                start_line = change.original_start;
+                end_line = change.original_start + change.original_length.max(1) - 1;
+            }
+        }
+
+        groups.push(SemanticDiffGroup {
+            changes: current_changes,
+            start_line,
+            end_line,
+        });
+
+        groups
+    }
+
+    /// Number of original lines spanned by this group (inclusive).
+    pub fn line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+
+    /// Number of individual changes in this group.
+    pub fn change_count(&self) -> usize {
+        self.changes.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiffSummaryReport — comprehensive diff summary
+// ---------------------------------------------------------------------------
+
+/// A comprehensive summary report of a diff between two texts.
+#[derive(Debug, Clone)]
+pub struct DiffSummaryReport {
+    /// Total lines added.
+    pub additions: u32,
+    /// Total lines deleted.
+    pub deletions: u32,
+    /// Total modification hunks (replace operations).
+    pub modifications: u32,
+    /// Line count of the original text.
+    pub original_lines: u32,
+    /// Line count of the modified text.
+    pub modified_lines: u32,
+}
+
+impl DiffSummaryReport {
+    /// Build a summary report by diffing `original` and `modified`.
+    pub fn from_diff(original: &str, modified: &str) -> Self {
+        let diff = compute_line_diff(original, modified);
+        let stats = compute_stats(&diff);
+        Self {
+            additions: stats.insertions,
+            deletions: stats.deletions,
+            modifications: stats.changes,
+            original_lines: diff.original_line_count,
+            modified_lines: diff.modified_line_count,
+        }
+    }
+
+    /// Total number of lines affected (additions + deletions + modifications).
+    pub fn total_lines_changed(&self) -> usize {
+        (self.additions + self.deletions + self.modifications) as usize
+    }
+
+    /// Ratio of changed lines to total lines in the larger of the two texts.
+    ///
+    /// Returns `0.0` when both texts are empty.
+    pub fn change_ratio(&self) -> f64 {
+        let max_lines = self.original_lines.max(self.modified_lines);
+        if max_lines == 0 {
+            return 0.0;
+        }
+        self.total_lines_changed() as f64 / max_lines as f64
+    }
+
+    /// Returns `true` if the diff contains at least one addition.
+    pub fn has_additions(&self) -> bool {
+        self.additions > 0
+    }
+
+    /// Returns `true` if the diff contains at least one deletion.
+    pub fn has_deletions(&self) -> bool {
+        self.deletions > 0
+    }
+}
+
+impl fmt::Display for DiffSummaryReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "DiffSummary(+{} -{} ~{}, {}/{} lines, {:.1}% changed)",
+            self.additions,
+            self.deletions,
+            self.modifications,
+            self.original_lines,
+            self.modified_lines,
+            self.change_ratio() * 100.0,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CharLevelDiff — character-level diff within a single line
+// ---------------------------------------------------------------------------
+
+/// A single character-level change within a line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CharChange {
+    /// Whether this fragment was inserted, deleted, or unchanged.
+    pub kind: DiffChangeKind,
+    /// The text fragment.
+    pub text: String,
+}
+
+/// Character-level diff engine for fine-grained intra-line comparison.
+pub struct CharLevelDiff;
+
+impl CharLevelDiff {
+    /// Compute character-level differences between two strings.
+    ///
+    /// Characters are compared individually using the `similar` crate.  Runs
+    /// of consecutive characters with the same change tag are coalesced into a
+    /// single [`CharChange`].
+    pub fn compute(original: &str, modified: &str) -> Vec<CharChange> {
+        let orig_chars: Vec<char> = original.chars().collect();
+        let mod_chars: Vec<char> = modified.chars().collect();
+
+        let orig_strs: Vec<String> = orig_chars.iter().map(|c| c.to_string()).collect();
+        let mod_strs: Vec<String> = mod_chars.iter().map(|c| c.to_string()).collect();
+
+        let orig_refs: Vec<&str> = orig_strs.iter().map(|s| s.as_str()).collect();
+        let mod_refs: Vec<&str> = mod_strs.iter().map(|s| s.as_str()).collect();
+
+        let diff = TextDiff::from_slices(&orig_refs, &mod_refs);
+        let mut result: Vec<CharChange> = Vec::new();
+
+        for change in diff.iter_all_changes() {
+            let kind = match change.tag() {
+                ChangeTag::Equal => DiffChangeKind::Change, // reuse as "equal"
+                ChangeTag::Insert => DiffChangeKind::Insert,
+                ChangeTag::Delete => DiffChangeKind::Delete,
+            };
+            let text = change.value().to_string();
+
+            // Coalesce consecutive changes of the same kind.
+            if let Some(last) = result.last_mut() {
+                if last.kind == kind {
+                    last.text.push_str(&text);
+                    continue;
+                }
+            }
+            result.push(CharChange { kind, text });
+        }
+
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1871,5 +2132,176 @@ mod tests {
     fn similarity_completely_different() {
         let r = similarity_ratio("aaa\n", "zzz\n");
         assert!(r < 0.5, "completely different texts should have low ratio");
+    }
+
+    // ---- DiffHunkStatistics tests ----
+
+    #[test]
+    fn hunk_statistics_pure_addition() {
+        let hunk = DiffHunk {
+            change_type: DiffHunkType::Add,
+            original_lines: vec![],
+            modified_lines: vec!["a\n".to_string(), "b\n".to_string()],
+            original_start: 1,
+            modified_start: 1,
+        };
+        let stats = DiffHunkStatistics::from_hunk(&hunk);
+        assert!(stats.is_pure_addition());
+        assert!(!stats.is_pure_deletion());
+        assert_eq!(stats.additions, 2);
+        assert_eq!(stats.deletions, 0);
+        assert_eq!(stats.modifications, 0);
+        assert_eq!(stats.total_changes(), 2);
+    }
+
+    #[test]
+    fn hunk_statistics_pure_deletion() {
+        let hunk = DiffHunk {
+            change_type: DiffHunkType::Delete,
+            original_lines: vec!["x\n".to_string(), "y\n".to_string(), "z\n".to_string()],
+            modified_lines: vec![],
+            original_start: 1,
+            modified_start: 1,
+        };
+        let stats = DiffHunkStatistics::from_hunk(&hunk);
+        assert!(stats.is_pure_deletion());
+        assert!(!stats.is_pure_addition());
+        assert_eq!(stats.deletions, 3);
+        assert_eq!(stats.total_changes(), 3);
+    }
+
+    #[test]
+    fn hunk_statistics_modification() {
+        let hunk = DiffHunk {
+            change_type: DiffHunkType::Modify,
+            original_lines: vec!["old1\n".to_string(), "old2\n".to_string()],
+            modified_lines: vec!["new1\n".to_string(), "new2\n".to_string(), "new3\n".to_string()],
+            original_start: 1,
+            modified_start: 1,
+        };
+        let stats = DiffHunkStatistics::from_hunk(&hunk);
+        assert_eq!(stats.modifications, 2);
+        assert_eq!(stats.additions, 1);
+        assert_eq!(stats.deletions, 0);
+        assert!(!stats.is_pure_addition());
+        assert!(!stats.is_pure_deletion());
+    }
+
+    #[test]
+    fn hunk_statistics_display() {
+        let hunk = DiffHunk {
+            change_type: DiffHunkType::Modify,
+            original_lines: vec!["a\n".to_string()],
+            modified_lines: vec!["b\n".to_string(), "c\n".to_string()],
+            original_start: 1,
+            modified_start: 1,
+        };
+        let stats = DiffHunkStatistics::from_hunk(&hunk);
+        let s = format!("{stats}");
+        assert!(s.contains('+'));
+        assert!(s.contains('-'));
+        assert!(s.contains('~'));
+    }
+
+    // ---- SemanticDiffGroup tests ----
+
+    #[test]
+    fn semantic_group_empty_input() {
+        let groups = SemanticDiffGroup::group_changes(&[], 3);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn semantic_group_single_change() {
+        let changes = vec![DiffChange {
+            kind: DiffChangeKind::Insert,
+            original_start: 5,
+            original_length: 0,
+            modified_start: 5,
+            modified_length: 2,
+        }];
+        let groups = SemanticDiffGroup::group_changes(&changes, 3);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].change_count(), 1);
+        assert_eq!(groups[0].start_line, 5);
+    }
+
+    #[test]
+    fn semantic_group_merges_adjacent() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Delete, original_start: 2, original_length: 1, modified_start: 2, modified_length: 0 },
+            DiffChange { kind: DiffChangeKind::Insert, original_start: 5, original_length: 0, modified_start: 4, modified_length: 1 },
+        ];
+        let groups = SemanticDiffGroup::group_changes(&changes, 3);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].change_count(), 2);
+        assert!(groups[0].line_span() >= 1);
+    }
+
+    #[test]
+    fn semantic_group_splits_distant() {
+        let changes = vec![
+            DiffChange { kind: DiffChangeKind::Delete, original_start: 1, original_length: 1, modified_start: 1, modified_length: 0 },
+            DiffChange { kind: DiffChangeKind::Insert, original_start: 50, original_length: 0, modified_start: 49, modified_length: 1 },
+        ];
+        let groups = SemanticDiffGroup::group_changes(&changes, 2);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].start_line, 1);
+        assert_eq!(groups[1].start_line, 50);
+    }
+
+    // ---- DiffSummaryReport tests ----
+
+    #[test]
+    fn summary_report_identical() {
+        let report = DiffSummaryReport::from_diff("hello\nworld\n", "hello\nworld\n");
+        assert_eq!(report.total_lines_changed(), 0);
+        assert!(!report.has_additions());
+        assert!(!report.has_deletions());
+        assert!((report.change_ratio()).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn summary_report_with_changes() {
+        let report = DiffSummaryReport::from_diff("a\nb\nc\n", "a\nx\ny\nc\n");
+        assert!(report.total_lines_changed() > 0);
+        assert!(report.change_ratio() > 0.0);
+        let s = format!("{report}");
+        assert!(s.contains("DiffSummary"));
+        assert!(s.contains("changed"));
+    }
+
+    #[test]
+    fn summary_report_empty_texts() {
+        let report = DiffSummaryReport::from_diff("", "");
+        assert_eq!(report.total_lines_changed(), 0);
+        assert!((report.change_ratio()).abs() < f64::EPSILON);
+    }
+
+    // ---- CharLevelDiff tests ----
+
+    #[test]
+    fn char_diff_identical() {
+        let result = CharLevelDiff::compute("hello", "hello");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].text, "hello");
+    }
+
+    #[test]
+    fn char_diff_single_char_change() {
+        let result = CharLevelDiff::compute("cat", "car");
+        assert!(result.len() >= 2);
+        let has_delete = result.iter().any(|c| c.kind == DiffChangeKind::Delete);
+        let has_insert = result.iter().any(|c| c.kind == DiffChangeKind::Insert);
+        assert!(has_delete, "should detect deleted char");
+        assert!(has_insert, "should detect inserted char");
+    }
+
+    #[test]
+    fn char_diff_empty_to_text() {
+        let result = CharLevelDiff::compute("", "abc");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].kind, DiffChangeKind::Insert);
+        assert_eq!(result[0].text, "abc");
     }
 }

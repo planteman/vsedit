@@ -1071,6 +1071,252 @@ impl StatusBarNotification {
 }
 
 // ---------------------------------------------------------------------------
+// StatusBarLanguageSelector
+// ---------------------------------------------------------------------------
+
+/// Manages the language mode selector in the status bar.
+#[derive(Debug, Clone)]
+pub struct StatusBarLanguageSelector {
+    pub current_language: String,
+    pub available_languages: Vec<String>,
+}
+
+impl StatusBarLanguageSelector {
+    pub fn new(current: impl Into<String>) -> Self {
+        Self {
+            current_language: current.into(),
+            available_languages: Vec::new(),
+        }
+    }
+
+    /// Set available languages for the picker.
+    pub fn set_available(&mut self, languages: Vec<String>) {
+        self.available_languages = languages;
+        self.available_languages.sort();
+    }
+
+    /// Select a language by name. Returns true if it was in the available list.
+    pub fn select(&mut self, language: &str) -> bool {
+        if self.available_languages.contains(&language.to_string()) || self.available_languages.is_empty() {
+            self.current_language = language.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Filter available languages by prefix.
+    pub fn filter(&self, prefix: &str) -> Vec<&str> {
+        let lower = prefix.to_lowercase();
+        self.available_languages.iter()
+            .filter(|l| l.to_lowercase().starts_with(&lower))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Build a status bar item for this selector.
+    pub fn to_status_item(&self, id: &str) -> StatusBarItem {
+        StatusBarItemBuilder::new(id)
+            .text(&self.current_language)
+            .tooltip("Select Language Mode")
+            .command("workbench.action.editor.changeLanguageMode")
+            .alignment(StatusBarAlignment::Right)
+            .priority(100)
+            .build()
+    }
+}
+
+impl std::fmt::Display for StatusBarLanguageSelector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Language: {}", self.current_language)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarEncodingSelector
+// ---------------------------------------------------------------------------
+
+/// Manages the file encoding selector in the status bar.
+#[derive(Debug, Clone)]
+pub struct StatusBarEncodingSelector {
+    pub current_encoding: String,
+    pub available_encodings: Vec<String>,
+}
+
+impl StatusBarEncodingSelector {
+    pub fn new(encoding: impl Into<String>) -> Self {
+        Self {
+            current_encoding: encoding.into(),
+            available_encodings: vec![
+                "UTF-8".into(), "UTF-16 LE".into(), "UTF-16 BE".into(),
+                "ASCII".into(), "ISO-8859-1".into(), "Windows-1252".into(),
+            ],
+        }
+    }
+
+    pub fn select(&mut self, encoding: &str) -> bool {
+        if self.available_encodings.iter().any(|e| e == encoding) {
+            self.current_encoding = encoding.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn to_status_item(&self, id: &str) -> StatusBarItem {
+        StatusBarItemBuilder::new(id)
+            .text(&self.current_encoding)
+            .tooltip("Select Encoding")
+            .command("workbench.action.editor.changeEncoding")
+            .alignment(StatusBarAlignment::Right)
+            .priority(90)
+            .build()
+    }
+}
+
+impl std::fmt::Display for StatusBarEncodingSelector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Encoding: {}", self.current_encoding)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarLineEndingSelector
+// ---------------------------------------------------------------------------
+
+/// Line ending mode for the file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineEnding {
+    LF,
+    CRLF,
+}
+
+impl std::fmt::Display for LineEnding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LF => write!(f, "LF"),
+            Self::CRLF => write!(f, "CRLF"),
+        }
+    }
+}
+
+/// Manages the line ending selector in the status bar.
+#[derive(Debug, Clone)]
+pub struct StatusBarLineEndingSelector {
+    pub current: LineEnding,
+}
+
+impl StatusBarLineEndingSelector {
+    pub fn new(ending: LineEnding) -> Self {
+        Self { current: ending }
+    }
+
+    pub fn toggle(&mut self) -> LineEnding {
+        self.current = match self.current {
+            LineEnding::LF => LineEnding::CRLF,
+            LineEnding::CRLF => LineEnding::LF,
+        };
+        self.current
+    }
+
+    pub fn set(&mut self, ending: LineEnding) {
+        self.current = ending;
+    }
+
+    pub fn to_status_item(&self, id: &str) -> StatusBarItem {
+        StatusBarItemBuilder::new(id)
+            .text(&format!("{}", self.current))
+            .tooltip("Select End of Line Sequence")
+            .command("workbench.action.editor.changeEOL")
+            .alignment(StatusBarAlignment::Right)
+            .priority(80)
+            .build()
+    }
+}
+
+impl std::fmt::Display for StatusBarLineEndingSelector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EOL: {}", self.current)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Status bar click action dispatcher
+// ---------------------------------------------------------------------------
+
+/// Action triggered when a status bar item is clicked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarClickAction {
+    pub item_id: String,
+    pub command: String,
+    pub args: Vec<String>,
+}
+
+impl StatusBarClickAction {
+    pub fn new(item_id: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            item_id: item_id.into(),
+            command: command.into(),
+            args: Vec::new(),
+        }
+    }
+
+    pub fn with_args(mut self, args: Vec<String>) -> Self {
+        self.args = args;
+        self
+    }
+}
+
+impl std::fmt::Display for StatusBarClickAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClickAction({} -> {})", self.item_id, self.command)
+    }
+}
+
+/// Dispatcher that resolves click actions for status bar items.
+#[derive(Debug, Clone)]
+pub struct StatusBarActionDispatcher {
+    actions: Vec<StatusBarClickAction>,
+}
+
+impl StatusBarActionDispatcher {
+    pub fn new() -> Self {
+        Self { actions: Vec::new() }
+    }
+
+    pub fn register(&mut self, action: StatusBarClickAction) {
+        // Replace existing action for same item_id
+        self.actions.retain(|a| a.item_id != action.item_id);
+        self.actions.push(action);
+    }
+
+    /// Dispatch a click on the given item_id, returning the action if found.
+    pub fn dispatch(&self, item_id: &str) -> Option<&StatusBarClickAction> {
+        self.actions.iter().find(|a| a.item_id == item_id)
+    }
+
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+
+    pub fn has_action(&self, item_id: &str) -> bool {
+        self.actions.iter().any(|a| a.item_id == item_id)
+    }
+}
+
+impl Default for StatusBarActionDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for StatusBarActionDispatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StatusBarActionDispatcher({} actions)", self.actions.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1939,5 +2185,107 @@ mod tests {
     fn notification_remaining_pct() {
         let n = StatusBarNotification::new("n1", "hello", 5000);
         assert!((n.remaining_pct() - 100.0).abs() < 0.1);
+    }
+
+    // -- StatusBarLanguageSelector -----------------------------------------
+
+    #[test]
+    fn language_selector_select() {
+        let mut sel = StatusBarLanguageSelector::new("Rust");
+        sel.set_available(vec!["Rust".into(), "Python".into(), "Go".into()]);
+        assert!(sel.select("Python"));
+        assert_eq!(sel.current_language, "Python");
+        assert!(!sel.select("Unknown"));
+    }
+
+    #[test]
+    fn language_selector_filter() {
+        let mut sel = StatusBarLanguageSelector::new("Rust");
+        sel.set_available(vec!["Rust".into(), "Ruby".into(), "Python".into()]);
+        let filtered = sel.filter("Ru");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn language_selector_to_item() {
+        let sel = StatusBarLanguageSelector::new("Rust");
+        let item = sel.to_status_item("lang");
+        assert_eq!(item.text, "Rust");
+    }
+
+    #[test]
+    fn language_selector_display() {
+        let sel = StatusBarLanguageSelector::new("Rust");
+        assert_eq!(format!("{sel}"), "Language: Rust");
+    }
+
+    // -- StatusBarEncodingSelector -----------------------------------------
+
+    #[test]
+    fn encoding_selector_select() {
+        let mut sel = StatusBarEncodingSelector::new("UTF-8");
+        assert!(sel.select("ASCII"));
+        assert_eq!(sel.current_encoding, "ASCII");
+        assert!(!sel.select("Unknown-Encoding"));
+    }
+
+    #[test]
+    fn encoding_selector_display() {
+        let sel = StatusBarEncodingSelector::new("UTF-8");
+        assert_eq!(format!("{sel}"), "Encoding: UTF-8");
+    }
+
+    // -- StatusBarLineEndingSelector ---------------------------------------
+
+    #[test]
+    fn line_ending_toggle() {
+        let mut sel = StatusBarLineEndingSelector::new(LineEnding::LF);
+        assert_eq!(sel.toggle(), LineEnding::CRLF);
+        assert_eq!(sel.toggle(), LineEnding::LF);
+    }
+
+    #[test]
+    fn line_ending_display() {
+        let sel = StatusBarLineEndingSelector::new(LineEnding::CRLF);
+        assert_eq!(format!("{sel}"), "EOL: CRLF");
+    }
+
+    #[test]
+    fn line_ending_to_item() {
+        let sel = StatusBarLineEndingSelector::new(LineEnding::LF);
+        let item = sel.to_status_item("eol");
+        assert_eq!(item.text, "LF");
+    }
+
+    // -- StatusBarActionDispatcher -----------------------------------------
+
+    #[test]
+    fn action_dispatcher_register_and_dispatch() {
+        let mut disp = StatusBarActionDispatcher::new();
+        disp.register(StatusBarClickAction::new("lang", "changeLanguage"));
+        assert!(disp.has_action("lang"));
+        let action = disp.dispatch("lang").unwrap();
+        assert_eq!(action.command, "changeLanguage");
+    }
+
+    #[test]
+    fn action_dispatcher_replace_existing() {
+        let mut disp = StatusBarActionDispatcher::new();
+        disp.register(StatusBarClickAction::new("lang", "old"));
+        disp.register(StatusBarClickAction::new("lang", "new"));
+        assert_eq!(disp.action_count(), 1);
+        assert_eq!(disp.dispatch("lang").unwrap().command, "new");
+    }
+
+    #[test]
+    fn action_dispatcher_display() {
+        let disp = StatusBarActionDispatcher::default();
+        assert!(format!("{disp}").contains("0 actions"));
+    }
+
+    #[test]
+    fn click_action_display() {
+        let a = StatusBarClickAction::new("id", "cmd");
+        assert!(format!("{a}").contains("id"));
     }
 }

@@ -1200,6 +1200,250 @@ pub fn token_at_offset(lt: &LineTokens, offset: u32) -> Option<usize> {
     Some(result)
 }
 
+// ---------------------------------------------------------------------------
+// TokenThemeMapper – scope-to-color mapping
+// ---------------------------------------------------------------------------
+
+/// Maps scope names to hex color strings for theme-based token coloring.
+#[derive(Debug, Clone, Default)]
+pub struct TokenThemeMapper {
+    scope_colors: std::collections::HashMap<String, String>,
+}
+
+impl TokenThemeMapper {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_scope(&mut self, scope: &str, color: &str) {
+        self.scope_colors
+            .insert(scope.to_string(), color.to_string());
+    }
+
+    pub fn color_for_scope(&self, scope: &str) -> Option<&str> {
+        self.scope_colors.get(scope).map(|s| s.as_str())
+    }
+
+    /// Look up a color using the token type's name as the scope key.
+    pub fn color_for_token_type(&self, tt: StandardTokenType) -> Option<&str> {
+        self.color_for_scope(token_type_name(tt))
+    }
+
+    pub fn remove_scope(&mut self, scope: &str) -> bool {
+        self.scope_colors.remove(scope).is_some()
+    }
+
+    pub fn scope_count(&self) -> usize {
+        self.scope_colors.len()
+    }
+
+    /// Return all scope/color pairs sorted by scope name.
+    pub fn all_scopes(&self) -> Vec<(&str, &str)> {
+        let mut pairs: Vec<(&str, &str)> = self
+            .scope_colors
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        pairs.sort_by_key(|(scope, _)| *scope);
+        pairs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SemanticTokenDelta – incremental token edits
+// ---------------------------------------------------------------------------
+
+/// A single edit operation on a flat `Vec<u32>` semantic-token stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticTokenEdit {
+    pub start: u32,
+    pub delete_count: u32,
+    pub data: Vec<u32>,
+}
+
+/// Accumulates edits and applies them to a semantic-token data array.
+#[derive(Debug, Clone, Default)]
+pub struct SemanticTokenDelta {
+    pub edits: Vec<SemanticTokenEdit>,
+}
+
+impl SemanticTokenDelta {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_edit(&mut self, start: u32, delete_count: u32, data: Vec<u32>) {
+        self.edits.push(SemanticTokenEdit {
+            start,
+            delete_count,
+            data,
+        });
+    }
+
+    /// Apply all edits in reverse order so earlier indices stay valid.
+    pub fn apply(&self, tokens: &mut Vec<u32>) {
+        let mut sorted: Vec<&SemanticTokenEdit> = self.edits.iter().collect();
+        sorted.sort_by(|a, b| b.start.cmp(&a.start));
+        for edit in sorted {
+            let start = edit.start as usize;
+            let end = start + edit.delete_count as usize;
+            let end = end.min(tokens.len());
+            tokens.splice(start..end, edit.data.iter().copied());
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn total_insertions(&self) -> u32 {
+        self.edits.iter().map(|e| e.data.len() as u32).sum()
+    }
+
+    pub fn total_deletions(&self) -> u32 {
+        self.edits.iter().map(|e| e.delete_count).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenInspector – detailed per-token inspection
+// ---------------------------------------------------------------------------
+
+/// Detailed information about a single token extracted from its line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenDetail {
+    pub text: String,
+    pub token_type: StandardTokenType,
+    pub start: u32,
+    pub end: u32,
+    pub length: u32,
+}
+
+/// Inspects tokens against the source line to produce `TokenDetail`s.
+#[derive(Debug, Clone, Default)]
+pub struct TokenInspector;
+
+impl TokenInspector {
+    /// Inspect a single token within `line`, computing its end from `line_len`.
+    pub fn inspect_token(&self, token: &Token, next_offset: u32, line: &str) -> TokenDetail {
+        let start = token.start_offset;
+        let end = next_offset;
+        let s = start as usize;
+        let e = (end as usize).min(line.len());
+        let text = if s <= e && s <= line.len() {
+            line[s..e].to_string()
+        } else {
+            String::new()
+        };
+        TokenDetail {
+            text,
+            token_type: token.metadata.token_type(),
+            start,
+            end,
+            length: end.saturating_sub(start),
+        }
+    }
+
+    /// Inspect every token in a `LineTokens` against the source line.
+    pub fn inspect_line(&self, tokens: &LineTokens, line: &str) -> Vec<TokenDetail> {
+        let line_len = line.len() as u32;
+        tokens
+            .tokens
+            .iter()
+            .enumerate()
+            .map(|(i, tok)| {
+                let next = tokens
+                    .tokens
+                    .get(i + 1)
+                    .map(|t| t.start_offset)
+                    .unwrap_or(line_len);
+                self.inspect_token(tok, next, line)
+            })
+            .collect()
+    }
+
+    /// Produce a one-line summary of a set of token details.
+    pub fn summary(details: &[TokenDetail]) -> String {
+        if details.is_empty() {
+            return "no tokens".to_string();
+        }
+        let total = details.len();
+        let total_len: u32 = details.iter().map(|d| d.length).sum();
+        format!("{total} token(s), {total_len} char(s)")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenPerformanceProfiler – simple timing profiler
+// ---------------------------------------------------------------------------
+
+/// Collects labelled duration measurements for tokenization performance analysis.
+#[derive(Debug, Clone, Default)]
+pub struct TokenPerformanceProfiler {
+    timings: Vec<(String, u64)>,
+}
+
+impl TokenPerformanceProfiler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, label: &str, duration_us: u64) {
+        self.timings.push((label.to_string(), duration_us));
+    }
+
+    pub fn average(&self) -> f64 {
+        if self.timings.is_empty() {
+            return 0.0;
+        }
+        self.total() as f64 / self.timings.len() as f64
+    }
+
+    pub fn max_timing(&self) -> Option<(&str, u64)> {
+        self.timings
+            .iter()
+            .max_by_key(|(_, d)| *d)
+            .map(|(l, d)| (l.as_str(), *d))
+    }
+
+    pub fn min_timing(&self) -> Option<(&str, u64)> {
+        self.timings
+            .iter()
+            .min_by_key(|(_, d)| *d)
+            .map(|(l, d)| (l.as_str(), *d))
+    }
+
+    pub fn total(&self) -> u64 {
+        self.timings.iter().map(|(_, d)| *d).sum()
+    }
+
+    pub fn count(&self) -> usize {
+        self.timings.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.timings.clear();
+    }
+
+    /// Produce a multi-line human-readable report.
+    pub fn report(&self) -> String {
+        if self.timings.is_empty() {
+            return "no timings recorded".to_string();
+        }
+        let mut lines = Vec::with_capacity(self.timings.len() + 3);
+        lines.push(format!("Profiler report ({} entries):", self.count()));
+        for (label, us) in &self.timings {
+            lines.push(format!("  {label}: {us}µs"));
+        }
+        lines.push(format!("  total: {}µs, avg: {:.1}µs", self.total(), self.average()));
+        lines.join("\n")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1910,5 +2154,151 @@ mod tests {
         assert_eq!(token_at_offset(&lt, 7), Some(1));
         assert_eq!(token_at_offset(&lt, 10), Some(2));
         assert_eq!(token_at_offset(&lt, 15), Some(2));
+    }
+
+    // -----------------------------------------------------------------------
+    // TokenThemeMapper tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn theme_mapper_add_and_lookup() {
+        let mut mapper = TokenThemeMapper::new();
+        mapper.add_scope("Comment", "#00ff00");
+        mapper.add_scope("String", "#ff0000");
+        assert_eq!(mapper.color_for_scope("Comment"), Some("#00ff00"));
+        assert_eq!(mapper.color_for_scope("String"), Some("#ff0000"));
+        assert_eq!(mapper.color_for_scope("Other"), None);
+        assert_eq!(mapper.scope_count(), 2);
+    }
+
+    #[test]
+    fn theme_mapper_color_for_token_type() {
+        let mut mapper = TokenThemeMapper::new();
+        mapper.add_scope("Comment", "#aabbcc");
+        assert_eq!(
+            mapper.color_for_token_type(StandardTokenType::Comment),
+            Some("#aabbcc")
+        );
+        assert_eq!(mapper.color_for_token_type(StandardTokenType::Other), None);
+    }
+
+    #[test]
+    fn theme_mapper_remove_and_all_scopes() {
+        let mut mapper = TokenThemeMapper::new();
+        mapper.add_scope("B", "#222");
+        mapper.add_scope("A", "#111");
+        mapper.add_scope("C", "#333");
+        let scopes = mapper.all_scopes();
+        assert_eq!(scopes, vec![("A", "#111"), ("B", "#222"), ("C", "#333")]);
+        assert!(mapper.remove_scope("B"));
+        assert!(!mapper.remove_scope("B"));
+        assert_eq!(mapper.scope_count(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // SemanticTokenDelta tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn semantic_delta_apply_insert() {
+        let mut delta = SemanticTokenDelta::new();
+        delta.add_edit(2, 0, vec![99, 100]);
+        let mut tokens = vec![1, 2, 3, 4];
+        delta.apply(&mut tokens);
+        assert_eq!(tokens, vec![1, 2, 99, 100, 3, 4]);
+    }
+
+    #[test]
+    fn semantic_delta_apply_delete() {
+        let mut delta = SemanticTokenDelta::new();
+        delta.add_edit(1, 2, vec![]);
+        let mut tokens = vec![10, 20, 30, 40];
+        delta.apply(&mut tokens);
+        assert_eq!(tokens, vec![10, 40]);
+    }
+
+    #[test]
+    fn semantic_delta_apply_replace_reverse_order() {
+        let mut delta = SemanticTokenDelta::new();
+        delta.add_edit(0, 1, vec![55]);
+        delta.add_edit(3, 1, vec![66]);
+        let mut tokens = vec![1, 2, 3, 4, 5];
+        delta.apply(&mut tokens);
+        assert_eq!(tokens, vec![55, 2, 3, 66, 5]);
+    }
+
+    #[test]
+    fn semantic_delta_counts() {
+        let mut delta = SemanticTokenDelta::new();
+        assert!(delta.is_empty());
+        delta.add_edit(0, 3, vec![1, 2]);
+        delta.add_edit(5, 1, vec![9, 8, 7]);
+        assert_eq!(delta.edit_count(), 2);
+        assert_eq!(delta.total_deletions(), 4);
+        assert_eq!(delta.total_insertions(), 5);
+    }
+
+    // -----------------------------------------------------------------------
+    // TokenInspector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn inspector_inspect_line() {
+        let meta_c = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let meta_o = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta_o },
+            Token { start_offset: 5, metadata: meta_c },
+        ]);
+        let inspector = TokenInspector;
+        let details = inspector.inspect_line(&lt, "hello// hi");
+        assert_eq!(details.len(), 2);
+        assert_eq!(details[0].text, "hello");
+        assert_eq!(details[0].token_type, StandardTokenType::Other);
+        assert_eq!(details[0].length, 5);
+        assert_eq!(details[1].text, "// hi");
+        assert_eq!(details[1].token_type, StandardTokenType::Comment);
+    }
+
+    #[test]
+    fn inspector_summary() {
+        let details = vec![
+            TokenDetail { text: "fn".into(), token_type: StandardTokenType::Other, start: 0, end: 2, length: 2 },
+            TokenDetail { text: "main".into(), token_type: StandardTokenType::Other, start: 3, end: 7, length: 4 },
+        ];
+        let s = TokenInspector::summary(&details);
+        assert_eq!(s, "2 token(s), 6 char(s)");
+        assert_eq!(TokenInspector::summary(&[]), "no tokens");
+    }
+
+    // -----------------------------------------------------------------------
+    // TokenPerformanceProfiler tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn profiler_basic_stats() {
+        let mut profiler = TokenPerformanceProfiler::new();
+        profiler.record("tokenize_line_1", 100);
+        profiler.record("tokenize_line_2", 200);
+        profiler.record("tokenize_line_3", 300);
+        assert_eq!(profiler.count(), 3);
+        assert_eq!(profiler.total(), 600);
+        assert!((profiler.average() - 200.0).abs() < f64::EPSILON);
+        assert_eq!(profiler.max_timing(), Some(("tokenize_line_3", 300)));
+        assert_eq!(profiler.min_timing(), Some(("tokenize_line_1", 100)));
+    }
+
+    #[test]
+    fn profiler_clear_and_report() {
+        let mut profiler = TokenPerformanceProfiler::new();
+        assert_eq!(profiler.report(), "no timings recorded");
+        profiler.record("a", 50);
+        profiler.record("b", 150);
+        let report = profiler.report();
+        assert!(report.contains("a: 50µs"));
+        assert!(report.contains("total: 200µs"));
+        profiler.clear();
+        assert_eq!(profiler.count(), 0);
+        assert_eq!(profiler.total(), 0);
     }
 }

@@ -1075,6 +1075,197 @@ pub fn parse_shebang(line: &str) -> Option<&str> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LanguageModeSelector – UI logic for language mode selection
+// ---------------------------------------------------------------------------
+
+/// An entry in the language mode picker.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageModeEntry {
+    pub id: String,
+    pub name: String,
+    pub aliases: Vec<String>,
+    pub is_configured: bool,
+}
+
+impl LanguageModeEntry {
+    pub fn from_info(info: &LanguageInfo, is_configured: bool) -> Self {
+        Self {
+            id: info.id.clone(),
+            name: info.name.clone(),
+            aliases: info.aliases.clone(),
+            is_configured,
+        }
+    }
+
+    /// Match against a query string (case-insensitive, matches id, name, or aliases).
+    pub fn matches_query(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.id.to_lowercase().contains(&q)
+            || self.name.to_lowercase().contains(&q)
+            || self.aliases.iter().any(|a| a.to_lowercase().contains(&q))
+    }
+}
+
+/// UI logic for filtering and ranking language mode entries.
+pub struct LanguageModeSelector {
+    entries: Vec<LanguageModeEntry>,
+}
+
+impl LanguageModeSelector {
+    pub fn new(entries: Vec<LanguageModeEntry>) -> Self {
+        Self { entries }
+    }
+
+    /// Filter entries by a query string.
+    pub fn filter(&self, query: &str) -> Vec<&LanguageModeEntry> {
+        if query.is_empty() {
+            return self.entries.iter().collect();
+        }
+        self.entries.iter().filter(|e| e.matches_query(query)).collect()
+    }
+
+    /// Total number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageFilenameAssociation – filename-pattern to language mapping
+// ---------------------------------------------------------------------------
+
+/// Associates filename patterns (globs) with a language.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageFilenameAssociation {
+    pub pattern: String,
+    pub language_id: String,
+}
+
+impl LanguageFilenameAssociation {
+    pub fn new(pattern: impl Into<String>, language_id: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+            language_id: language_id.into(),
+        }
+    }
+
+    /// Check if a filename matches this association pattern.
+    pub fn matches(&self, filename: &str) -> bool {
+        if self.pattern.starts_with("*.") {
+            let ext = &self.pattern[1..];
+            filename.ends_with(ext)
+        } else {
+            filename == self.pattern
+        }
+    }
+}
+
+/// Resolve a filename to a language ID using filename associations.
+pub fn resolve_language_by_filename(associations: &[LanguageFilenameAssociation], filename: &str) -> Option<String> {
+    associations.iter().find(|a| a.matches(filename)).map(|a| a.language_id.clone())
+}
+
+// ---------------------------------------------------------------------------
+// LanguageConfigApplicator – applies language-specific settings
+// ---------------------------------------------------------------------------
+
+/// A language-specific setting override.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageSettingOverride {
+    pub language_id: String,
+    pub key: String,
+    pub value: String,
+}
+
+/// Collects and applies language-specific setting overrides.
+pub struct LanguageConfigApplicator {
+    overrides: Vec<LanguageSettingOverride>,
+}
+
+impl LanguageConfigApplicator {
+    pub fn new() -> Self {
+        Self { overrides: Vec::new() }
+    }
+
+    pub fn add(&mut self, language_id: impl Into<String>, key: impl Into<String>, value: impl Into<String>) {
+        self.overrides.push(LanguageSettingOverride {
+            language_id: language_id.into(),
+            key: key.into(),
+            value: value.into(),
+        });
+    }
+
+    /// Get all overrides for a given language.
+    pub fn get_overrides(&self, language_id: &str) -> Vec<&LanguageSettingOverride> {
+        self.overrides.iter().filter(|o| o.language_id == language_id).collect()
+    }
+
+    /// Get the value of a specific key for a language.
+    pub fn get_value(&self, language_id: &str, key: &str) -> Option<&str> {
+        self.overrides
+            .iter()
+            .find(|o| o.language_id == language_id && o.key == key)
+            .map(|o| o.value.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.overrides.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.overrides.is_empty()
+    }
+}
+
+impl Default for LanguageConfigApplicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language detection priority ordering
+// ---------------------------------------------------------------------------
+
+/// Source of a language detection match, ordered by priority (highest first).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DetectionPriority {
+    UserAssociation = 4,
+    Extension = 3,
+    Shebang = 2,
+    FirstLinePattern = 1,
+    MimeType = 0,
+}
+
+impl fmt::Display for DetectionPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UserAssociation => write!(f, "User Association"),
+            Self::Extension => write!(f, "Extension"),
+            Self::Shebang => write!(f, "Shebang"),
+            Self::FirstLinePattern => write!(f, "First Line Pattern"),
+            Self::MimeType => write!(f, "MIME Type"),
+        }
+    }
+}
+
+/// A detection result with its source priority.
+#[derive(Debug, Clone)]
+pub struct DetectionResult {
+    pub language_id: String,
+    pub priority: DetectionPriority,
+}
+
+/// Select the best detection result (highest priority wins).
+pub fn best_detection(results: &[DetectionResult]) -> Option<&DetectionResult> {
+    results.iter().max_by_key(|r| r.priority)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1985,5 +2176,118 @@ mod tests {
         assert_eq!(parse_shebang("  #!/usr/bin/env perl  "), Some("perl"));
         assert_eq!(parse_shebang("no shebang here"), None);
         assert_eq!(parse_shebang(""), None);
+    }
+
+    // -- LanguageModeSelector tests --
+
+    #[test]
+    fn mode_entry_matches_query() {
+        let entry = LanguageModeEntry {
+            id: "rust".into(),
+            name: "Rust".into(),
+            aliases: vec!["rs".into()],
+            is_configured: false,
+        };
+        assert!(entry.matches_query("rust"));
+        assert!(entry.matches_query("Ru"));
+        assert!(entry.matches_query("rs"));
+        assert!(!entry.matches_query("python"));
+    }
+
+    #[test]
+    fn mode_selector_filter() {
+        let entries = vec![
+            LanguageModeEntry { id: "rust".into(), name: "Rust".into(), aliases: vec![], is_configured: true },
+            LanguageModeEntry { id: "python".into(), name: "Python".into(), aliases: vec!["py".into()], is_configured: false },
+        ];
+        let selector = LanguageModeSelector::new(entries);
+        assert_eq!(selector.len(), 2);
+        let filtered = selector.filter("py");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].id, "python");
+    }
+
+    #[test]
+    fn mode_selector_empty_query() {
+        let selector = LanguageModeSelector::new(vec![
+            LanguageModeEntry { id: "a".into(), name: "A".into(), aliases: vec![], is_configured: false },
+        ]);
+        assert_eq!(selector.filter("").len(), 1);
+    }
+
+    // -- LanguageFilenameAssociation tests --
+
+    #[test]
+    fn association_matches_extension() {
+        let assoc = LanguageFilenameAssociation::new("*.rs", "rust");
+        assert!(assoc.matches("main.rs"));
+        assert!(!assoc.matches("main.py"));
+    }
+
+    #[test]
+    fn association_matches_filename() {
+        let assoc = LanguageFilenameAssociation::new("Makefile", "makefile");
+        assert!(assoc.matches("Makefile"));
+        assert!(!assoc.matches("makefile"));
+    }
+
+    #[test]
+    fn resolve_language_from_filename_associations() {
+        let assocs = vec![
+            LanguageFilenameAssociation::new("*.rs", "rust"),
+            LanguageFilenameAssociation::new("*.py", "python"),
+        ];
+        assert_eq!(resolve_language_by_filename(&assocs, "lib.rs"), Some("rust".into()));
+        assert_eq!(resolve_language_by_filename(&assocs, "unknown.txt"), None);
+    }
+
+    // -- LanguageConfigApplicator tests --
+
+    #[test]
+    fn config_applicator_basic() {
+        let mut app = LanguageConfigApplicator::new();
+        app.add("rust", "editor.tabSize", "4");
+        app.add("rust", "editor.formatOnSave", "true");
+        app.add("python", "editor.tabSize", "2");
+        let overrides = app.get_overrides("rust");
+        assert_eq!(overrides.len(), 2);
+        assert_eq!(app.get_value("rust", "editor.tabSize"), Some("4"));
+        assert_eq!(app.get_value("python", "editor.tabSize"), Some("2"));
+        assert_eq!(app.get_value("go", "editor.tabSize"), None);
+    }
+
+    #[test]
+    fn config_applicator_empty() {
+        let app = LanguageConfigApplicator::default();
+        assert!(app.is_empty());
+    }
+
+    // -- Detection priority tests --
+
+    #[test]
+    fn detection_priority_ordering() {
+        assert!(DetectionPriority::UserAssociation > DetectionPriority::Extension);
+        assert!(DetectionPriority::Extension > DetectionPriority::Shebang);
+        assert!(DetectionPriority::Shebang > DetectionPriority::FirstLinePattern);
+    }
+
+    #[test]
+    fn best_detection_highest_wins() {
+        let results = vec![
+            DetectionResult { language_id: "python".into(), priority: DetectionPriority::Shebang },
+            DetectionResult { language_id: "bash".into(), priority: DetectionPriority::Extension },
+        ];
+        let best = best_detection(&results).unwrap();
+        assert_eq!(best.language_id, "bash");
+    }
+
+    #[test]
+    fn best_detection_empty() {
+        assert!(best_detection(&[]).is_none());
+    }
+
+    #[test]
+    fn detection_priority_display() {
+        assert_eq!(format!("{}", DetectionPriority::Shebang), "Shebang");
     }
 }

@@ -1125,6 +1125,343 @@ impl fmt::Display for EmmetSnippetLibrary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EmmetBalanceTag – find matching open/close tag pairs in HTML
+// ---------------------------------------------------------------------------
+
+/// Utilities for finding matching HTML tag pairs (balance inward/outward).
+pub struct EmmetBalanceTag;
+
+impl EmmetBalanceTag {
+    /// Extracts the tag name starting at `pos` in `html`.
+    ///
+    /// `pos` must point to the `<` character of an opening or closing tag.
+    /// Returns `None` if the position is out of range or not a valid tag start.
+    pub fn extract_tag_name(html: &str, pos: usize) -> Option<String> {
+        let bytes = html.as_bytes();
+        if pos >= bytes.len() || bytes[pos] != b'<' {
+            return None;
+        }
+        let mut start = pos + 1;
+        // Skip `/` for closing tags
+        if start < bytes.len() && bytes[start] == b'/' {
+            start += 1;
+        }
+        let mut end = start;
+        while end < bytes.len() {
+            let ch = bytes[end];
+            if ch == b' ' || ch == b'>' || ch == b'/' || ch == b'\n' || ch == b'\r' {
+                break;
+            }
+            end += 1;
+        }
+        if end == start {
+            return None;
+        }
+        let name = &html[start..end];
+        if name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            Some(name.to_ascii_lowercase())
+        } else {
+            None
+        }
+    }
+
+    /// Finds the byte position of the matching closing tag for an opening tag
+    /// at `open_pos`.
+    ///
+    /// The search handles nested tags of the same name and returns the position
+    /// of the `<` in the closing tag, or `None` if no match is found.
+    pub fn find_matching_close(html: &str, open_pos: usize) -> Option<usize> {
+        let tag_name = Self::extract_tag_name(html, open_pos)?;
+
+        // Check if this is a self-closing tag
+        if self_closing_tags().contains(&tag_name.as_str()) {
+            return None;
+        }
+
+        let search_start = open_pos + 1;
+        let mut depth: usize = 1;
+        let mut i = search_start;
+        let bytes = html.as_bytes();
+
+        while i < bytes.len() {
+            if bytes[i] == b'<' {
+                if let Some(name) = Self::extract_tag_name(html, i) {
+                    if name == tag_name {
+                        if i + 1 < bytes.len() && bytes[i + 1] == b'/' {
+                            depth -= 1;
+                            if depth == 0 {
+                                return Some(i);
+                            }
+                        } else {
+                            depth += 1;
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+        None
+    }
+
+    /// Finds the byte position of the matching opening tag for a closing tag
+    /// at `close_pos`.
+    ///
+    /// `close_pos` must point to the `<` of a `</tag>` sequence. Returns the
+    /// position of the `<` in the corresponding opening tag, or `None`.
+    pub fn find_matching_open(html: &str, close_pos: usize) -> Option<usize> {
+        let bytes = html.as_bytes();
+        if close_pos >= bytes.len() || bytes[close_pos] != b'<' {
+            return None;
+        }
+        if close_pos + 1 >= bytes.len() || bytes[close_pos + 1] != b'/' {
+            return None;
+        }
+        let tag_name = Self::extract_tag_name(html, close_pos)?;
+
+        let mut depth: usize = 1;
+        let mut i = close_pos;
+
+        while i > 0 {
+            i -= 1;
+            if bytes[i] == b'<' {
+                if let Some(name) = Self::extract_tag_name(html, i) {
+                    if name == tag_name {
+                        if i + 1 < bytes.len() && bytes[i + 1] == b'/' {
+                            depth += 1;
+                        } else {
+                            depth -= 1;
+                            if depth == 0 {
+                                return Some(i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+impl fmt::Display for EmmetBalanceTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EmmetBalanceTag")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EmmetMergeLines – merge multiple lines into a single line
+// ---------------------------------------------------------------------------
+
+/// Merges multiple text lines into a single string, trimming surrounding
+/// whitespace from each line.
+pub struct EmmetMergeLines;
+
+impl EmmetMergeLines {
+    /// Merges `lines` into one string separated by a single space, trimming
+    /// leading/trailing whitespace from each line and skipping empty entries.
+    pub fn merge(lines: &[&str]) -> String {
+        Self::merge_with_separator(lines, " ")
+    }
+
+    /// Merges `lines` into one string using the given `sep`arator, trimming
+    /// leading/trailing whitespace from each line and skipping empty entries.
+    pub fn merge_with_separator(lines: &[&str], sep: &str) -> String {
+        lines
+            .iter()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<&str>>()
+            .join(sep)
+    }
+}
+
+impl fmt::Display for EmmetMergeLines {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EmmetMergeLines")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EmmetUpdateImageSize – update width/height on <img> tags
+// ---------------------------------------------------------------------------
+
+/// Parses `<img>` tags and updates or extracts `width` / `height` attributes.
+pub struct EmmetUpdateImageSize;
+
+impl EmmetUpdateImageSize {
+    /// Returns the `<img>` tag with `width` and `height` attributes set to the
+    /// given values. Existing `width`/`height` attributes are replaced;
+    /// missing ones are inserted before the closing `>` or `/>`.
+    pub fn update_dimensions(img_tag: &str, width: u32, height: u32) -> String {
+        let mut result = img_tag.to_string();
+        result = Self::set_attr(&result, "width", &width.to_string());
+        result = Self::set_attr(&result, "height", &height.to_string());
+        result
+    }
+
+    /// Extracts the current `width` and `height` attribute values from an
+    /// `<img>` tag, returning `None` if either attribute is missing or
+    /// non-numeric.
+    pub fn extract_dimensions(img_tag: &str) -> Option<(u32, u32)> {
+        let w = Self::get_attr(img_tag, "width")?;
+        let h = Self::get_attr(img_tag, "height")?;
+        let w: u32 = w.parse().ok()?;
+        let h: u32 = h.parse().ok()?;
+        Some((w, h))
+    }
+
+    fn get_attr(tag: &str, attr_name: &str) -> Option<String> {
+        let search = format!("{}=\"", attr_name);
+        let start = tag.find(&search)?;
+        let val_start = start + search.len();
+        let val_end = tag[val_start..].find('"')? + val_start;
+        Some(tag[val_start..val_end].to_string())
+    }
+
+    fn set_attr(tag: &str, attr_name: &str, value: &str) -> String {
+        let search = format!("{}=\"", attr_name);
+        if let Some(start) = tag.find(&search) {
+            let val_start = start + search.len();
+            if let Some(rel_end) = tag[val_start..].find('"') {
+                let val_end = val_start + rel_end;
+                let mut result = String::with_capacity(tag.len());
+                result.push_str(&tag[..val_start]);
+                result.push_str(value);
+                result.push_str(&tag[val_end..]);
+                return result;
+            }
+        }
+        // Attribute not present – insert before closing > or />
+        let new_attr = format!(" {}=\"{}\"", attr_name, value);
+        if let Some(pos) = tag.rfind("/>") {
+            let mut result = String::with_capacity(tag.len() + new_attr.len());
+            result.push_str(&tag[..pos]);
+            result.push_str(&new_attr);
+            result.push_str(&tag[pos..]);
+            result
+        } else if let Some(pos) = tag.rfind('>') {
+            let mut result = String::with_capacity(tag.len() + new_attr.len());
+            result.push_str(&tag[..pos]);
+            result.push_str(&new_attr);
+            result.push_str(&tag[pos..]);
+            result
+        } else {
+            format!("{}{}", tag, new_attr)
+        }
+    }
+}
+
+impl fmt::Display for EmmetUpdateImageSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EmmetUpdateImageSize")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EmmetMathExpression – multiplier expressions (tag*N) and numbering
+// ---------------------------------------------------------------------------
+
+/// Evaluates simple multiplier expressions found in Emmet abbreviations
+/// (e.g. `li*5`) and expands tags with sequential numbering.
+pub struct EmmetMathExpression;
+
+impl EmmetMathExpression {
+    /// Parses an input of the form `"tag*N"` and returns the tag name together
+    /// with the repetition count. Returns `None` when the input does not
+    /// contain a valid multiplier expression.
+    pub fn evaluate_multiplier(input: &str) -> Option<(String, usize)> {
+        let parts: Vec<&str> = input.splitn(2, '*').collect();
+        if parts.len() != 2 {
+            return None;
+        }
+        let tag = parts[0].trim();
+        let count_str = parts[1].trim();
+        if tag.is_empty() || count_str.is_empty() {
+            return None;
+        }
+        let count: usize = count_str.parse().ok()?;
+        if count == 0 {
+            return None;
+        }
+        Some((tag.to_string(), count))
+    }
+
+    /// Expands a tag abbreviation into `count` numbered HTML elements.
+    ///
+    /// If the tag abbreviation contains `$`, each `$` is replaced with the
+    /// 1-based item number. Otherwise the number is appended to the tag name
+    /// as a class.
+    pub fn expand_with_numbering(tag: &str, count: usize) -> Vec<String> {
+        let mut result = Vec::with_capacity(count);
+        let has_placeholder = tag.contains('$');
+
+        for i in 1..=count {
+            if has_placeholder {
+                let expanded = tag.replace('$', &i.to_string());
+                if let Some(html) = expand_abbreviation(&expanded) {
+                    result.push(html);
+                } else {
+                    result.push(format!("<{0}></{0}>", expanded));
+                }
+            } else {
+                let class_tag = format!("{}.item{}", tag, i);
+                if let Some(html) = expand_abbreviation(&class_tag) {
+                    result.push(html);
+                } else {
+                    result.push(format!("<{0} class=\"item{1}\"></{0}>", tag, i));
+                }
+            }
+        }
+        result
+    }
+}
+
+impl fmt::Display for EmmetMathExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EmmetMathExpression")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// expand_lorem – generate lorem ipsum placeholder text
+// ---------------------------------------------------------------------------
+
+/// The canonical lorem ipsum word pool used for placeholder text generation.
+const LOREM_WORDS: &[&str] = &[
+    "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing",
+    "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore",
+    "et", "dolore", "magna", "aliqua", "enim", "ad", "minim", "veniam",
+    "quis", "nostrud", "exercitation", "ullamco", "laboris", "nisi",
+    "aliquip", "ex", "ea", "commodo", "consequat", "duis", "aute", "irure",
+    "in", "reprehenderit", "voluptate", "velit", "esse", "cillum",
+    "fugiat", "nulla", "pariatur", "excepteur", "sint", "occaecat",
+    "cupidatat", "non", "proident", "sunt", "culpa", "qui", "officia",
+    "deserunt", "mollit", "anim", "id", "est", "laborum",
+];
+
+/// Generates lorem ipsum placeholder text containing exactly `word_count`
+/// words, cycling through the canonical word pool as needed.
+///
+/// Returns an empty string when `word_count` is zero.
+pub fn expand_lorem(word_count: usize) -> String {
+    if word_count == 0 {
+        return String::new();
+    }
+    let pool_len = LOREM_WORDS.len();
+    let mut words: Vec<&str> = Vec::with_capacity(word_count);
+    for i in 0..word_count {
+        words.push(LOREM_WORDS[i % pool_len]);
+    }
+    // Capitalise the first word and append a period at the end.
+    let mut text = words.join(" ");
+    if let Some(first) = text.get_mut(..1) {
+        first.make_ascii_uppercase();
+    }
+    text.push('.');
+    text
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1871,5 +2208,161 @@ mod tests {
         assert!(text.contains("test"));
         assert!(text.contains("html"));
         assert!(text.contains("div>p"));
+    }
+
+    // -----------------------------------------------------------------------
+    // EmmetBalanceTag tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn balance_extract_tag_name_open() {
+        let html = "<div class=\"x\">";
+        assert_eq!(
+            EmmetBalanceTag::extract_tag_name(html, 0),
+            Some("div".to_string()),
+        );
+    }
+
+    #[test]
+    fn balance_extract_tag_name_close() {
+        let html = "</span>";
+        assert_eq!(
+            EmmetBalanceTag::extract_tag_name(html, 0),
+            Some("span".to_string()),
+        );
+    }
+
+    #[test]
+    fn balance_find_matching_close_simple() {
+        let html = "<div><p>hello</p></div>";
+        assert_eq!(EmmetBalanceTag::find_matching_close(html, 0), Some(17));
+    }
+
+    #[test]
+    fn balance_find_matching_close_nested() {
+        let html = "<div><div>inner</div></div>";
+        // The outermost <div> at 0 should match the last </div>
+        assert_eq!(EmmetBalanceTag::find_matching_close(html, 0), Some(21));
+    }
+
+    #[test]
+    fn balance_find_matching_open_simple() {
+        let html = "<div><p>hello</p></div>";
+        // </div> starts at position 17
+        assert_eq!(EmmetBalanceTag::find_matching_open(html, 17), Some(0));
+    }
+
+    #[test]
+    fn balance_self_closing_returns_none() {
+        let html = "<img src=\"a.png\">";
+        assert_eq!(EmmetBalanceTag::find_matching_close(html, 0), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // EmmetMergeLines tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn merge_lines_basic() {
+        let lines = vec!["  hello  ", "  world  "];
+        assert_eq!(EmmetMergeLines::merge(&lines), "hello world");
+    }
+
+    #[test]
+    fn merge_lines_with_separator() {
+        let lines = vec!["a", " b ", "c"];
+        assert_eq!(EmmetMergeLines::merge_with_separator(&lines, ", "), "a, b, c");
+    }
+
+    #[test]
+    fn merge_lines_skips_empty() {
+        let lines = vec!["a", "  ", "", "b"];
+        assert_eq!(EmmetMergeLines::merge(&lines), "a b");
+    }
+
+    // -----------------------------------------------------------------------
+    // EmmetUpdateImageSize tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn update_image_dimensions_existing() {
+        let tag = r#"<img src="a.png" width="10" height="20" />"#;
+        let updated = EmmetUpdateImageSize::update_dimensions(tag, 100, 200);
+        assert!(updated.contains("width=\"100\""));
+        assert!(updated.contains("height=\"200\""));
+    }
+
+    #[test]
+    fn update_image_dimensions_missing() {
+        let tag = r#"<img src="a.png" />"#;
+        let updated = EmmetUpdateImageSize::update_dimensions(tag, 50, 75);
+        assert!(updated.contains("width=\"50\""));
+        assert!(updated.contains("height=\"75\""));
+    }
+
+    #[test]
+    fn extract_image_dimensions() {
+        let tag = r#"<img src="a.png" width="320" height="240" />"#;
+        assert_eq!(
+            EmmetUpdateImageSize::extract_dimensions(tag),
+            Some((320, 240)),
+        );
+    }
+
+    #[test]
+    fn extract_image_dimensions_missing() {
+        let tag = r#"<img src="a.png" />"#;
+        assert_eq!(EmmetUpdateImageSize::extract_dimensions(tag), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // EmmetMathExpression tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn math_evaluate_multiplier() {
+        assert_eq!(
+            EmmetMathExpression::evaluate_multiplier("li*5"),
+            Some(("li".to_string(), 5)),
+        );
+    }
+
+    #[test]
+    fn math_evaluate_multiplier_invalid() {
+        assert_eq!(EmmetMathExpression::evaluate_multiplier("li"), None);
+        assert_eq!(EmmetMathExpression::evaluate_multiplier("*5"), None);
+        assert_eq!(EmmetMathExpression::evaluate_multiplier("li*0"), None);
+    }
+
+    #[test]
+    fn math_expand_with_numbering() {
+        let items = EmmetMathExpression::expand_with_numbering("li", 3);
+        assert_eq!(items.len(), 3);
+        assert!(items[0].contains("item1"));
+        assert!(items[2].contains("item3"));
+    }
+
+    // -----------------------------------------------------------------------
+    // expand_lorem tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn lorem_word_count() {
+        let text = expand_lorem(10);
+        // The output ends with a period; split on whitespace to count words
+        let count = text.trim_end_matches('.').split_whitespace().count();
+        assert_eq!(count, 10);
+    }
+
+    #[test]
+    fn lorem_zero_words() {
+        assert_eq!(expand_lorem(0), "");
+    }
+
+    #[test]
+    fn lorem_starts_capitalised() {
+        let text = expand_lorem(5);
+        assert!(text.starts_with('L'));
+        assert!(text.ends_with('.'));
     }
 }

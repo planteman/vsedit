@@ -1108,6 +1108,318 @@ pub fn all_features_enabled(svc: &RemoteFeaturesService, required: &[RemoteFeatu
     required.iter().all(|f| svc.is_enabled(f))
 }
 
+// ---------------------------------------------------------------------------
+// RemoteExecProxy – proxy for running commands on a remote machine
+// ---------------------------------------------------------------------------
+
+/// Proxy for executing commands on a remote host.
+#[derive(Debug, Clone)]
+pub struct RemoteExecProxy {
+    pub host: String,
+    pub working_directory: Option<String>,
+    pub environment: Vec<(String, String)>,
+    pub timeout_ms: u64,
+}
+
+impl RemoteExecProxy {
+    pub fn new(host: impl Into<String>) -> Self {
+        Self {
+            host: host.into(),
+            working_directory: None,
+            environment: Vec::new(),
+            timeout_ms: 30_000,
+        }
+    }
+
+    pub fn with_cwd(mut self, cwd: impl Into<String>) -> Self {
+        self.working_directory = Some(cwd.into());
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
+    }
+
+    pub fn add_env(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.environment.push((key.into(), value.into()));
+    }
+
+    /// Build the command representation that would be sent to the remote host.
+    pub fn build_command(&self, program: &str, args: &[&str]) -> RemoteCommand {
+        RemoteCommand {
+            host: self.host.clone(),
+            program: program.to_string(),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            cwd: self.working_directory.clone(),
+            env: self.environment.clone(),
+            timeout_ms: self.timeout_ms,
+        }
+    }
+}
+
+impl fmt::Display for RemoteExecProxy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoteExecProxy({})", self.host)
+    }
+}
+
+/// Represents a command to be executed remotely.
+#[derive(Debug, Clone)]
+pub struct RemoteCommand {
+    pub host: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub cwd: Option<String>,
+    pub env: Vec<(String, String)>,
+    pub timeout_ms: u64,
+}
+
+impl RemoteCommand {
+    /// Build the full command string.
+    pub fn command_line(&self) -> String {
+        if self.args.is_empty() {
+            self.program.clone()
+        } else {
+            format!("{} {}", self.program, self.args.join(" "))
+        }
+    }
+}
+
+impl fmt::Display for RemoteCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{}: {}", self.program, self.host, self.command_line())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteExtensionInstaller
+// ---------------------------------------------------------------------------
+
+/// Manages extension installation on remote hosts.
+#[derive(Debug, Clone)]
+pub struct RemoteExtensionInstaller {
+    installed: Vec<RemoteExtension>,
+}
+
+/// An extension installed on a remote host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteExtension {
+    pub id: String,
+    pub version: String,
+    pub enabled: bool,
+}
+
+impl RemoteExtensionInstaller {
+    pub fn new() -> Self {
+        Self { installed: Vec::new() }
+    }
+
+    pub fn install(&mut self, id: impl Into<String>, version: impl Into<String>) {
+        let ext = RemoteExtension {
+            id: id.into(),
+            version: version.into(),
+            enabled: true,
+        };
+        // Replace existing version
+        self.installed.retain(|e| e.id != ext.id);
+        self.installed.push(ext);
+    }
+
+    pub fn uninstall(&mut self, id: &str) -> bool {
+        let before = self.installed.len();
+        self.installed.retain(|e| e.id != id);
+        self.installed.len() < before
+    }
+
+    pub fn is_installed(&self, id: &str) -> bool {
+        self.installed.iter().any(|e| e.id == id)
+    }
+
+    pub fn get_version(&self, id: &str) -> Option<&str> {
+        self.installed.iter().find(|e| e.id == id).map(|e| e.version.as_str())
+    }
+
+    pub fn set_enabled(&mut self, id: &str, enabled: bool) -> bool {
+        if let Some(ext) = self.installed.iter_mut().find(|e| e.id == id) {
+            ext.enabled = enabled;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn installed_count(&self) -> usize {
+        self.installed.len()
+    }
+
+    pub fn enabled_count(&self) -> usize {
+        self.installed.iter().filter(|e| e.enabled).count()
+    }
+}
+
+impl Default for RemoteExtensionInstaller {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for RemoteExtensionInstaller {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoteExtensionInstaller({} installed)", self.installed.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemotePortScanner – scans for available ports
+// ---------------------------------------------------------------------------
+
+/// Scans a port range for available (unused) ports.
+#[derive(Debug, Clone)]
+pub struct RemotePortScanner {
+    pub range: PortRange,
+    pub used_ports: Vec<u16>,
+}
+
+impl RemotePortScanner {
+    pub fn new(range: PortRange) -> Self {
+        Self { range, used_ports: Vec::new() }
+    }
+
+    /// Mark a port as used.
+    pub fn mark_used(&mut self, port: u16) {
+        if !self.used_ports.contains(&port) {
+            self.used_ports.push(port);
+        }
+    }
+
+    /// Find the first available port in the range.
+    pub fn find_available(&self) -> Option<u16> {
+        (self.range.start..=self.range.end)
+            .find(|p| !self.used_ports.contains(p))
+    }
+
+    /// Find N available ports.
+    pub fn find_n_available(&self, n: usize) -> Vec<u16> {
+        (self.range.start..=self.range.end)
+            .filter(|p| !self.used_ports.contains(p))
+            .take(n)
+            .collect()
+    }
+
+    /// Number of available ports in the range.
+    pub fn available_count(&self) -> usize {
+        (self.range.start..=self.range.end)
+            .filter(|p| !self.used_ports.contains(p))
+            .count()
+    }
+
+    /// Whether a specific port is available.
+    pub fn is_available(&self, port: u16) -> bool {
+        self.range.contains(port) && !self.used_ports.contains(&port)
+    }
+}
+
+impl fmt::Display for RemotePortScanner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PortScanner({}-{}, {} used)",
+            self.range.start, self.range.end, self.used_ports.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Remote connection diagnostics
+// ---------------------------------------------------------------------------
+
+/// Diagnostic check result for remote connections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiagnosticStatus {
+    Ok,
+    Warning(String),
+    Error(String),
+}
+
+impl fmt::Display for DiagnosticStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ok => write!(f, "OK"),
+            Self::Warning(msg) => write!(f, "Warning: {msg}"),
+            Self::Error(msg) => write!(f, "Error: {msg}"),
+        }
+    }
+}
+
+/// A single diagnostic check for remote connection health.
+#[derive(Debug, Clone)]
+pub struct RemoteDiagnosticCheck {
+    pub name: String,
+    pub status: DiagnosticStatus,
+}
+
+/// Runs a series of diagnostic checks on a remote connection.
+#[derive(Debug, Clone)]
+pub struct RemoteConnectionDiagnostics {
+    checks: Vec<RemoteDiagnosticCheck>,
+}
+
+impl RemoteConnectionDiagnostics {
+    pub fn new() -> Self {
+        Self { checks: Vec::new() }
+    }
+
+    pub fn add_check(&mut self, name: impl Into<String>, status: DiagnosticStatus) {
+        self.checks.push(RemoteDiagnosticCheck {
+            name: name.into(),
+            status,
+        });
+    }
+
+    /// Whether all checks passed.
+    pub fn all_ok(&self) -> bool {
+        self.checks.iter().all(|c| c.status == DiagnosticStatus::Ok)
+    }
+
+    /// Count of errors.
+    pub fn error_count(&self) -> usize {
+        self.checks.iter().filter(|c| matches!(c.status, DiagnosticStatus::Error(_))).count()
+    }
+
+    /// Count of warnings.
+    pub fn warning_count(&self) -> usize {
+        self.checks.iter().filter(|c| matches!(c.status, DiagnosticStatus::Warning(_))).count()
+    }
+
+    pub fn check_count(&self) -> usize {
+        self.checks.len()
+    }
+
+    /// Get a summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} checks: {} ok, {} warnings, {} errors",
+            self.checks.len(),
+            self.checks.iter().filter(|c| c.status == DiagnosticStatus::Ok).count(),
+            self.warning_count(),
+            self.error_count()
+        )
+    }
+}
+
+impl Default for RemoteConnectionDiagnostics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for RemoteConnectionDiagnostics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1940,5 +2252,136 @@ mod tests {
         ];
         let set = remote_port_set(&ports);
         assert_eq!(set, vec![80, 443]);
+    }
+
+    // -- RemoteExecProxy ---------------------------------------------------
+
+    #[test]
+    fn exec_proxy_build_command() {
+        let proxy = RemoteExecProxy::new("remote-host")
+            .with_cwd("/home/user")
+            .with_timeout(5000);
+        let cmd = proxy.build_command("cargo", &["build", "--release"]);
+        assert_eq!(cmd.command_line(), "cargo build --release");
+        assert_eq!(cmd.host, "remote-host");
+        assert_eq!(cmd.timeout_ms, 5000);
+    }
+
+    #[test]
+    fn exec_proxy_display() {
+        let proxy = RemoteExecProxy::new("host");
+        assert!(format!("{proxy}").contains("host"));
+    }
+
+    #[test]
+    fn remote_command_no_args() {
+        let proxy = RemoteExecProxy::new("h");
+        let cmd = proxy.build_command("ls", &[]);
+        assert_eq!(cmd.command_line(), "ls");
+    }
+
+    // -- RemoteExtensionInstaller ------------------------------------------
+
+    #[test]
+    fn extension_installer_install_uninstall() {
+        let mut inst = RemoteExtensionInstaller::new();
+        inst.install("ext.rust", "1.0.0");
+        assert!(inst.is_installed("ext.rust"));
+        assert_eq!(inst.get_version("ext.rust"), Some("1.0.0"));
+        assert!(inst.uninstall("ext.rust"));
+        assert!(!inst.is_installed("ext.rust"));
+    }
+
+    #[test]
+    fn extension_installer_upgrade() {
+        let mut inst = RemoteExtensionInstaller::new();
+        inst.install("ext.rust", "1.0.0");
+        inst.install("ext.rust", "2.0.0");
+        assert_eq!(inst.installed_count(), 1);
+        assert_eq!(inst.get_version("ext.rust"), Some("2.0.0"));
+    }
+
+    #[test]
+    fn extension_installer_enable_disable() {
+        let mut inst = RemoteExtensionInstaller::new();
+        inst.install("ext.rust", "1.0.0");
+        inst.set_enabled("ext.rust", false);
+        assert_eq!(inst.enabled_count(), 0);
+    }
+
+    #[test]
+    fn extension_installer_display() {
+        let inst = RemoteExtensionInstaller::default();
+        assert!(format!("{inst}").contains("0 installed"));
+    }
+
+    // -- RemotePortScanner -------------------------------------------------
+
+    #[test]
+    fn port_scanner_find_available() {
+        let mut scanner = RemotePortScanner::new(PortRange::new(8080, 8085));
+        scanner.mark_used(8080);
+        scanner.mark_used(8081);
+        assert_eq!(scanner.find_available(), Some(8082));
+        assert_eq!(scanner.available_count(), 4);
+    }
+
+    #[test]
+    fn port_scanner_find_n() {
+        let scanner = RemotePortScanner::new(PortRange::new(3000, 3010));
+        let ports = scanner.find_n_available(3);
+        assert_eq!(ports.len(), 3);
+        assert_eq!(ports[0], 3000);
+    }
+
+    #[test]
+    fn port_scanner_is_available() {
+        let mut scanner = RemotePortScanner::new(PortRange::new(80, 90));
+        scanner.mark_used(80);
+        assert!(!scanner.is_available(80));
+        assert!(scanner.is_available(81));
+        assert!(!scanner.is_available(100)); // out of range
+    }
+
+    #[test]
+    fn port_scanner_display() {
+        let scanner = RemotePortScanner::new(PortRange::new(80, 90));
+        assert!(format!("{scanner}").contains("80-90"));
+    }
+
+    // -- RemoteConnectionDiagnostics ---------------------------------------
+
+    #[test]
+    fn diagnostics_all_ok() {
+        let mut diag = RemoteConnectionDiagnostics::new();
+        diag.add_check("connectivity", DiagnosticStatus::Ok);
+        diag.add_check("auth", DiagnosticStatus::Ok);
+        assert!(diag.all_ok());
+        assert_eq!(diag.error_count(), 0);
+    }
+
+    #[test]
+    fn diagnostics_with_errors() {
+        let mut diag = RemoteConnectionDiagnostics::new();
+        diag.add_check("connectivity", DiagnosticStatus::Ok);
+        diag.add_check("auth", DiagnosticStatus::Error("timeout".into()));
+        diag.add_check("fs", DiagnosticStatus::Warning("slow".into()));
+        assert!(!diag.all_ok());
+        assert_eq!(diag.error_count(), 1);
+        assert_eq!(diag.warning_count(), 1);
+    }
+
+    #[test]
+    fn diagnostics_summary() {
+        let diag = RemoteConnectionDiagnostics::new();
+        let s = diag.summary();
+        assert!(s.contains("0 checks"));
+    }
+
+    #[test]
+    fn diagnostics_display() {
+        let diag = RemoteConnectionDiagnostics::default();
+        let s = format!("{diag}");
+        assert!(s.contains("checks"));
     }
 }

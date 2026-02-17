@@ -990,6 +990,254 @@ impl NavigationHistoryService {
     }
 }
 
+/// A parallel timeline branch of navigation history.
+///
+/// Each branch maintains its own ordered list of navigation entries,
+/// allowing users to explore multiple code paths without losing context.
+#[derive(Debug, Clone)]
+pub struct HistoryBranch {
+    /// Unique identifier for this branch.
+    pub id: String,
+    /// Human-readable name for this branch.
+    pub name: String,
+    /// Navigation entries recorded on this branch.
+    pub entries: Vec<NavigationEntry>,
+    /// Monotonic counter representing when this branch was created.
+    pub created_at: u64,
+}
+
+impl HistoryBranch {
+    /// Create a new empty branch with the given id and name.
+    pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            entries: Vec::new(),
+            created_at: 0,
+        }
+    }
+
+    /// Push a navigation entry onto this branch.
+    pub fn push(&mut self, entry: NavigationEntry) {
+        self.entries.push(entry);
+    }
+
+    /// Return the number of entries on this branch.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if this branch has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return a reference to the most recent entry, if any.
+    pub fn latest(&self) -> Option<&NavigationEntry> {
+        self.entries.last()
+    }
+}
+
+impl fmt::Display for HistoryBranch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Branch({}, \"{}\", {} entries)",
+            self.id,
+            self.name,
+            self.entries.len()
+        )
+    }
+}
+
+/// Manages multiple [`HistoryBranch`] instances and supports switching and merging.
+#[derive(Debug)]
+pub struct HistoryBranchManager {
+    branches: HashMap<String, HistoryBranch>,
+    active_branch_id: Option<String>,
+    next_id: u64,
+}
+
+impl HistoryBranchManager {
+    /// Create a new branch manager with no branches.
+    pub fn new() -> Self {
+        Self {
+            branches: HashMap::new(),
+            active_branch_id: None,
+            next_id: 0,
+        }
+    }
+
+    /// Create a new branch with the given name and return its id.
+    ///
+    /// The first branch created automatically becomes the active branch.
+    pub fn create_branch(&mut self, name: impl Into<String>) -> String {
+        let id = format!("branch-{}", self.next_id);
+        self.next_id += 1;
+        let mut branch = HistoryBranch::new(id.clone(), name);
+        branch.created_at = self.next_id;
+        self.branches.insert(id.clone(), branch);
+        if self.active_branch_id.is_none() {
+            self.active_branch_id = Some(id.clone());
+        }
+        id
+    }
+
+    /// Switch to the branch identified by `id`.
+    ///
+    /// Returns `Err(HistoryError::InvalidIndex)` if the branch does not exist.
+    pub fn switch_branch(&mut self, id: &str) -> Result<(), HistoryError> {
+        if !self.branches.contains_key(id) {
+            return Err(HistoryError::InvalidIndex(0));
+        }
+        self.active_branch_id = Some(id.to_string());
+        Ok(())
+    }
+
+    /// Return a reference to the currently active branch, if any.
+    pub fn current_branch(&self) -> Option<&HistoryBranch> {
+        self.active_branch_id
+            .as_ref()
+            .and_then(|id| self.branches.get(id))
+    }
+
+    /// Return a mutable reference to the currently active branch, if any.
+    pub fn current_branch_mut(&mut self) -> Option<&mut HistoryBranch> {
+        let id = self.active_branch_id.clone()?;
+        self.branches.get_mut(&id)
+    }
+
+    /// List all branches in arbitrary order.
+    pub fn list_branches(&self) -> Vec<&HistoryBranch> {
+        self.branches.values().collect()
+    }
+
+    /// Merge all entries from `source_id` into `target_id`.
+    ///
+    /// Returns the number of entries merged or an error if either branch does
+    /// not exist.
+    pub fn merge_branch(
+        &mut self,
+        source_id: &str,
+        target_id: &str,
+    ) -> Result<usize, HistoryError> {
+        let source = self
+            .branches
+            .get(source_id)
+            .ok_or(HistoryError::InvalidIndex(0))?
+            .clone();
+        let count = source.entries.len();
+        let target = self
+            .branches
+            .get_mut(target_id)
+            .ok_or(HistoryError::InvalidIndex(0))?;
+        target.entries.extend(source.entries);
+        Ok(count)
+    }
+}
+
+/// Serialises and deserialises [`NavigationEntry`] slices to a simple text
+/// format.
+///
+/// Each entry is encoded as a single line: `uri:line:column`.
+pub struct HistoryExporter;
+
+impl HistoryExporter {
+    /// Export a slice of entries to a newline-delimited string.
+    ///
+    /// Format: one entry per line as `uri:line:column`.
+    pub fn export_entries(entries: &[NavigationEntry]) -> String {
+        let mut out = String::new();
+        for (i, e) in entries.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            out.push_str(&format!("{}:{}:{}", e.uri, e.line, e.column));
+        }
+        out
+    }
+
+    /// Import entries from a text string produced by [`Self::export_entries`].
+    ///
+    /// Lines that cannot be parsed are silently skipped.
+    pub fn import_entries(text: &str) -> Vec<NavigationEntry> {
+        let mut entries = Vec::new();
+        for line in text.lines() {
+            let parts: Vec<&str> = line.splitn(3, ':').collect();
+            if parts.len() == 3 {
+                if let (Ok(line_num), Ok(col)) =
+                    (parts[1].parse::<u32>(), parts[2].parse::<u32>())
+                {
+                    entries.push(NavigationEntry::new(parts[0], line_num, col));
+                }
+            }
+        }
+        entries
+    }
+}
+
+/// Compresses navigation history by removing redundant entries.
+pub struct HistoryCompression;
+
+impl HistoryCompression {
+    /// Remove consecutive entries that refer to the same URI.
+    ///
+    /// When duplicates are found the *last* entry in each run is kept so that
+    /// the final cursor position is preserved.
+    pub fn compress(entries: &[NavigationEntry]) -> Vec<NavigationEntry> {
+        if entries.is_empty() {
+            return Vec::new();
+        }
+        let mut result: Vec<NavigationEntry> = Vec::new();
+        for entry in entries {
+            if let Some(last) = result.last() {
+                if last.uri == entry.uri {
+                    // Replace with the newer entry.
+                    let len = result.len();
+                    result[len - 1] = entry.clone();
+                    continue;
+                }
+            }
+            result.push(entry.clone());
+        }
+        result
+    }
+
+    /// Remove consecutive entries with the same URI where the line difference
+    /// is within `max_line_gap`.
+    ///
+    /// Entries that are farther apart than `max_line_gap` lines are kept even
+    /// if they share a URI, because the user likely navigated to a
+    /// meaningfully different location in the same file.
+    pub fn compress_within_distance(
+        entries: &[NavigationEntry],
+        max_line_gap: u32,
+    ) -> Vec<NavigationEntry> {
+        if entries.is_empty() {
+            return Vec::new();
+        }
+        let mut result: Vec<NavigationEntry> = Vec::new();
+        for entry in entries {
+            if let Some(last) = result.last() {
+                if last.uri == entry.uri {
+                    let diff = if entry.line >= last.line {
+                        entry.line - last.line
+                    } else {
+                        last.line - entry.line
+                    };
+                    if diff <= max_line_gap {
+                        let len = result.len();
+                        result[len - 1] = entry.clone();
+                        continue;
+                    }
+                }
+            }
+            result.push(entry.clone());
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1869,5 +2117,151 @@ mod tests {
         assert_eq!(svc.total_entries(), 2);
         svc.navigate_back();
         assert_eq!(svc.total_entries(), 2);
+    }
+
+    // ---- HistoryBranch tests ----
+
+    #[test]
+    fn branch_new_is_empty() {
+        let b = HistoryBranch::new("b0", "main");
+        assert!(b.is_empty());
+        assert_eq!(b.len(), 0);
+        assert!(b.latest().is_none());
+    }
+
+    #[test]
+    fn branch_push_and_latest() {
+        let mut b = HistoryBranch::new("b1", "feature");
+        b.push(NavigationEntry::new("foo.rs", 10, 5));
+        b.push(NavigationEntry::new("bar.rs", 20, 0));
+        assert_eq!(b.len(), 2);
+        assert!(!b.is_empty());
+        let latest = b.latest().unwrap();
+        assert_eq!(latest.uri, "bar.rs");
+        assert_eq!(latest.line, 20);
+    }
+
+    #[test]
+    fn branch_display() {
+        let mut b = HistoryBranch::new("b2", "refactor");
+        b.push(NavigationEntry::new("a.rs", 1, 0));
+        let s = format!("{b}");
+        assert!(s.contains("refactor"));
+        assert!(s.contains("1 entries"));
+    }
+
+    // ---- HistoryBranchManager tests ----
+
+    #[test]
+    fn branch_manager_create_and_list() {
+        let mut mgr = HistoryBranchManager::new();
+        let id1 = mgr.create_branch("main");
+        let id2 = mgr.create_branch("feature");
+        assert_ne!(id1, id2);
+        assert_eq!(mgr.list_branches().len(), 2);
+    }
+
+    #[test]
+    fn branch_manager_switch() {
+        let mut mgr = HistoryBranchManager::new();
+        let id1 = mgr.create_branch("main");
+        let id2 = mgr.create_branch("feature");
+        assert_eq!(mgr.current_branch().unwrap().id, id1);
+        mgr.switch_branch(&id2).unwrap();
+        assert_eq!(mgr.current_branch().unwrap().id, id2);
+    }
+
+    #[test]
+    fn branch_manager_switch_invalid() {
+        let mut mgr = HistoryBranchManager::new();
+        mgr.create_branch("main");
+        assert!(mgr.switch_branch("nonexistent").is_err());
+    }
+
+    #[test]
+    fn branch_manager_merge() {
+        let mut mgr = HistoryBranchManager::new();
+        let id1 = mgr.create_branch("main");
+        let id2 = mgr.create_branch("feature");
+        mgr.switch_branch(&id2).unwrap();
+        mgr.current_branch_mut()
+            .unwrap()
+            .push(NavigationEntry::new("x.rs", 1, 0));
+        mgr.current_branch_mut()
+            .unwrap()
+            .push(NavigationEntry::new("y.rs", 2, 0));
+        let count = mgr.merge_branch(&id2, &id1).unwrap();
+        assert_eq!(count, 2);
+        mgr.switch_branch(&id1).unwrap();
+        assert_eq!(mgr.current_branch().unwrap().len(), 2);
+    }
+
+    // ---- HistoryExporter tests ----
+
+    #[test]
+    fn exporter_roundtrip() {
+        let entries = vec![
+            NavigationEntry::new("a.rs", 10, 3),
+            NavigationEntry::new("b.rs", 20, 7),
+        ];
+        let text = HistoryExporter::export_entries(&entries);
+        assert_eq!(text, "a.rs:10:3\nb.rs:20:7");
+        let imported = HistoryExporter::import_entries(&text);
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].uri, "a.rs");
+        assert_eq!(imported[0].line, 10);
+        assert_eq!(imported[1].column, 7);
+    }
+
+    #[test]
+    fn exporter_import_skips_bad_lines() {
+        let text = "good.rs:1:0\nbadline\nalso:bad\nok.rs:5:2";
+        let imported = HistoryExporter::import_entries(text);
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].uri, "good.rs");
+        assert_eq!(imported[1].uri, "ok.rs");
+    }
+
+    // ---- HistoryCompression tests ----
+
+    #[test]
+    fn compress_removes_consecutive_same_uri() {
+        let entries = vec![
+            NavigationEntry::new("a.rs", 1, 0),
+            NavigationEntry::new("a.rs", 5, 0),
+            NavigationEntry::new("b.rs", 10, 0),
+            NavigationEntry::new("b.rs", 12, 0),
+            NavigationEntry::new("a.rs", 3, 0),
+        ];
+        let compressed = HistoryCompression::compress(&entries);
+        assert_eq!(compressed.len(), 3);
+        assert_eq!(compressed[0].uri, "a.rs");
+        assert_eq!(compressed[0].line, 5); // kept the last in the run
+        assert_eq!(compressed[1].uri, "b.rs");
+        assert_eq!(compressed[1].line, 12);
+        assert_eq!(compressed[2].uri, "a.rs");
+    }
+
+    #[test]
+    fn compress_within_distance_keeps_far_entries() {
+        let entries = vec![
+            NavigationEntry::new("a.rs", 1, 0),
+            NavigationEntry::new("a.rs", 3, 0),  // within gap of 5
+            NavigationEntry::new("a.rs", 50, 0), // far away, keep
+            NavigationEntry::new("b.rs", 1, 0),
+        ];
+        let compressed = HistoryCompression::compress_within_distance(&entries, 5);
+        assert_eq!(compressed.len(), 3);
+        assert_eq!(compressed[0].line, 3); // merged run of 1,3
+        assert_eq!(compressed[1].line, 50); // kept because gap > 5
+        assert_eq!(compressed[2].uri, "b.rs");
+    }
+
+    #[test]
+    fn compress_empty_input() {
+        let compressed = HistoryCompression::compress(&[]);
+        assert!(compressed.is_empty());
+        let compressed2 = HistoryCompression::compress_within_distance(&[], 10);
+        assert!(compressed2.is_empty());
     }
 }

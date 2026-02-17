@@ -59,5 +59,24 @@ vsedit-typehier = { path = "../vsedit-typehier" }
 vsedit-policy = { path = "../vsedit-policy" }
 vsedit-emmet = { path = "../vsedit-emmet" }
 vsedit-outline-view = { path = "../vsedit-outline-view" }
+vsedit-multicursor = { path = "../vsedit-multicursor" }
+vsedit-find = { path = "../vsedit-find" }
+vsedit-breadcrumb = { path = "../vsedit-breadcrumb" }
+vsedit-quickaccess = { path = "../vsedit-quickaccess" }
+vsedit-ext-activation = { path = "../vsedit-ext-activation" }
+vsedit-ext-tasks = { path = "../vsedit-ext-tasks" }
+vsedit-ext-diagnostics = { path = "../vsedit-ext-diagnostics" }
+vsedit-ext-progress = { path = "../vsedit-ext-progress" }
+vsedit-ext-chat = { path = "../vsedit-ext-chat" }
+vsedit-clipboard = { path = "../vsedit-clipboard" }
+vsedit-inlayhints = { path = "../vsedit-inlayhints" }
+vsedit-terminal = { path = "../vsedit-terminal" }
+vsedit-download = { path = "../vsedit-download" }
+vsedit-hover = { path = "../vsedit-hover" }
+vsedit-jsonschemas = { path = "../vsedit-jsonschemas" }
+vsedit-theme = { path = "../vsedit-theme" }
+vsedit-statusbar = { path = "../vsedit-statusbar" }
+vsedit-tui = { path = "../vsedit-tui" }
+vsedit-layout = { path = "../vsedit-layout" }
 serde_json.workspace = true
 tempfile.workspace = true

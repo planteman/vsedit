@@ -1,5 +1,6 @@
 //! Inline ghost text completions.
 
+use std::collections::HashMap;
 use std::fmt;
 /// A single inline completion suggestion.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1079,6 +1080,265 @@ impl Default for CompletionFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// InlineCompletionPrefixCache
+// ---------------------------------------------------------------------------
+
+/// Caches completions keyed by the typed prefix string.
+#[derive(Debug, Clone)]
+pub struct InlineCompletionPrefixCache {
+    entries: HashMap<String, Vec<InlineCompletionItem>>,
+    max_entries: usize,
+}
+
+impl InlineCompletionPrefixCache {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: HashMap::new(),
+            max_entries,
+        }
+    }
+
+    pub fn insert(&mut self, prefix: &str, items: Vec<InlineCompletionItem>) {
+        if self.entries.len() >= self.max_entries && !self.entries.contains_key(prefix) {
+            // Evict an arbitrary entry to make room.
+            if let Some(key) = self.entries.keys().next().cloned() {
+                self.entries.remove(&key);
+            }
+        }
+        self.entries.insert(prefix.to_string(), items);
+    }
+
+    pub fn lookup(&self, prefix: &str) -> Option<&[InlineCompletionItem]> {
+        self.entries.get(prefix).map(|v| v.as_slice())
+    }
+
+    /// Returns references to all items whose cache key starts with `prefix`.
+    pub fn lookup_by_prefix(&self, prefix: &str) -> Vec<&InlineCompletionItem> {
+        self.entries
+            .iter()
+            .filter(|(k, _)| k.starts_with(prefix))
+            .flat_map(|(_, v)| v.iter())
+            .collect()
+    }
+
+    pub fn contains(&self, prefix: &str) -> bool {
+        self.entries.contains_key(prefix)
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.entries.len() >= self.max_entries
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlineGhostRenderer + RenderedGhostText
+// ---------------------------------------------------------------------------
+
+/// Result of rendering ghost text through [`InlineGhostRenderer`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedGhostText {
+    pub visible_text: String,
+    pub truncated: bool,
+    pub fade_region: Option<(usize, usize)>,
+}
+
+/// Renders ghost text with optional truncation and fade region.
+#[derive(Debug, Clone)]
+pub struct InlineGhostRenderer {
+    max_visible_chars: usize,
+    fade_chars: usize,
+    show_cursor: bool,
+}
+
+impl InlineGhostRenderer {
+    pub fn new(max_visible: usize) -> Self {
+        Self {
+            max_visible_chars: max_visible,
+            fade_chars: 0,
+            show_cursor: false,
+        }
+    }
+
+    pub fn with_fade(mut self, chars: usize) -> Self {
+        self.fade_chars = chars;
+        self
+    }
+
+    pub fn with_cursor(mut self, show: bool) -> Self {
+        self.show_cursor = show;
+        self
+    }
+
+    pub fn render(&self, text: &str) -> RenderedGhostText {
+        let char_count = text.chars().count();
+        let truncated = char_count > self.max_visible_chars;
+        let visible: String = text.chars().take(self.max_visible_chars).collect();
+
+        let fade_region = if truncated && self.fade_chars > 0 {
+            let visible_len = visible.chars().count();
+            let fade_start = visible_len.saturating_sub(self.fade_chars);
+            Some((fade_start, visible_len))
+        } else {
+            None
+        };
+
+        RenderedGhostText {
+            visible_text: visible,
+            truncated,
+            fade_region,
+        }
+    }
+
+    pub fn visible_length(&self, text: &str) -> usize {
+        text.chars().count().min(self.max_visible_chars)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlineCompletionCycler
+// ---------------------------------------------------------------------------
+
+/// Cycles through a list of inline completion suggestions.
+#[derive(Debug, Clone)]
+pub struct InlineCompletionCycler {
+    items: Vec<InlineCompletionItem>,
+    current: usize,
+}
+
+impl InlineCompletionCycler {
+    pub fn new(items: Vec<InlineCompletionItem>) -> Self {
+        Self { items, current: 0 }
+    }
+
+    /// Advance to the next item, wrapping around to the beginning.
+    pub fn next(&mut self) -> Option<&InlineCompletionItem> {
+        if self.items.is_empty() {
+            return None;
+        }
+        self.current = (self.current + 1) % self.items.len();
+        Some(&self.items[self.current])
+    }
+
+    /// Move to the previous item, wrapping around to the end.
+    pub fn previous(&mut self) -> Option<&InlineCompletionItem> {
+        if self.items.is_empty() {
+            return None;
+        }
+        self.current = if self.current == 0 {
+            self.items.len() - 1
+        } else {
+            self.current - 1
+        };
+        Some(&self.items[self.current])
+    }
+
+    pub fn current(&self) -> Option<&InlineCompletionItem> {
+        self.items.get(self.current)
+    }
+
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Human-readable label such as "2 of 5".
+    pub fn position_label(&self) -> String {
+        if self.items.is_empty() {
+            return String::from("0 of 0");
+        }
+        format!("{} of {}", self.current + 1, self.items.len())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompletionAcceptRejectTracker + CompletionAction
+// ---------------------------------------------------------------------------
+
+/// Describes a single accept/reject action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompletionAction {
+    Accept(usize),
+    Reject,
+}
+
+/// Tracks how often completions are accepted or rejected and the total
+/// character count of accepted text.
+#[derive(Debug, Clone)]
+pub struct CompletionAcceptRejectTracker {
+    accepted: u32,
+    rejected: u32,
+    total_chars_accepted: usize,
+    last_action: Option<CompletionAction>,
+}
+
+impl CompletionAcceptRejectTracker {
+    pub fn new() -> Self {
+        Self {
+            accepted: 0,
+            rejected: 0,
+            total_chars_accepted: 0,
+            last_action: None,
+        }
+    }
+
+    pub fn record_accept(&mut self, char_count: usize) {
+        self.accepted += 1;
+        self.total_chars_accepted += char_count;
+        self.last_action = Some(CompletionAction::Accept(char_count));
+    }
+
+    pub fn record_reject(&mut self) {
+        self.rejected += 1;
+        self.last_action = Some(CompletionAction::Reject);
+    }
+
+    /// Returns the fraction of actions that were accepts (0.0 when no actions).
+    pub fn accept_rate(&self) -> f64 {
+        let total = self.total_actions();
+        if total == 0 {
+            return 0.0;
+        }
+        self.accepted as f64 / total as f64
+    }
+
+    pub fn total_actions(&self) -> u32 {
+        self.accepted + self.rejected
+    }
+
+    /// Average character length of accepted completions (0.0 when none).
+    pub fn average_accepted_length(&self) -> f64 {
+        if self.accepted == 0 {
+            return 0.0;
+        }
+        self.total_chars_accepted as f64 / self.accepted as f64
+    }
+
+    pub fn reset(&mut self) {
+        self.accepted = 0;
+        self.rejected = 0;
+        self.total_chars_accepted = 0;
+        self.last_action = None;
+    }
+}
+
+impl Default for CompletionAcceptRejectTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1956,5 +2216,161 @@ mod tests {
         let matched = filter.apply(&items);
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].insert_text, "fn main");
+    }
+
+    // -- InlineCompletionPrefixCache tests --
+
+    fn sample_item(text: &str) -> InlineCompletionItem {
+        InlineCompletionItem {
+            insert_text: text.into(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            filter_text: None,
+            command: None,
+        }
+    }
+
+    #[test]
+    fn test_prefix_cache_insert_lookup() {
+        let mut cache = InlineCompletionPrefixCache::new(10);
+        let items = vec![sample_item("foo"), sample_item("foobar")];
+        cache.insert("fo", items.clone());
+        assert!(cache.contains("fo"));
+        let found = cache.lookup("fo").unwrap();
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].insert_text, "foo");
+        assert!(cache.lookup("bar").is_none());
+    }
+
+    #[test]
+    fn test_prefix_cache_lookup_by_prefix() {
+        let mut cache = InlineCompletionPrefixCache::new(10);
+        cache.insert("foo", vec![sample_item("foo1")]);
+        cache.insert("foobar", vec![sample_item("foobar1")]);
+        cache.insert("baz", vec![sample_item("baz1")]);
+        let results = cache.lookup_by_prefix("foo");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_prefix_cache_full() {
+        let mut cache = InlineCompletionPrefixCache::new(2);
+        cache.insert("a", vec![sample_item("a1")]);
+        cache.insert("b", vec![sample_item("b1")]);
+        assert!(cache.is_full());
+        assert_eq!(cache.entry_count(), 2);
+        // Inserting a third should evict one to stay at max.
+        cache.insert("c", vec![sample_item("c1")]);
+        assert_eq!(cache.entry_count(), 2);
+    }
+
+    #[test]
+    fn test_prefix_cache_clear() {
+        let mut cache = InlineCompletionPrefixCache::new(5);
+        cache.insert("x", vec![sample_item("x1")]);
+        cache.insert("y", vec![sample_item("y1")]);
+        assert_eq!(cache.entry_count(), 2);
+        cache.clear();
+        assert_eq!(cache.entry_count(), 0);
+        assert!(!cache.is_full());
+    }
+
+    // -- InlineGhostRenderer tests --
+
+    #[test]
+    fn test_ghost_renderer_short_text() {
+        let renderer = InlineGhostRenderer::new(20);
+        let result = renderer.render("hello");
+        assert_eq!(result.visible_text, "hello");
+        assert!(!result.truncated);
+        assert_eq!(result.fade_region, None);
+    }
+
+    #[test]
+    fn test_ghost_renderer_truncated() {
+        let renderer = InlineGhostRenderer::new(5);
+        let result = renderer.render("hello world");
+        assert_eq!(result.visible_text, "hello");
+        assert!(result.truncated);
+    }
+
+    #[test]
+    fn test_ghost_renderer_fade() {
+        let renderer = InlineGhostRenderer::new(10).with_fade(3);
+        let result = renderer.render("abcdefghijklmnop");
+        assert!(result.truncated);
+        assert_eq!(result.fade_region, Some((7, 10)));
+        assert_eq!(renderer.visible_length("abcdefghijklmnop"), 10);
+    }
+
+    // -- InlineCompletionCycler tests --
+
+    #[test]
+    fn test_cycler_next_wraps() {
+        let items = vec![sample_item("a"), sample_item("b"), sample_item("c")];
+        let mut cycler = InlineCompletionCycler::new(items);
+        assert_eq!(cycler.current().unwrap().insert_text, "a");
+        assert_eq!(cycler.next().unwrap().insert_text, "b");
+        assert_eq!(cycler.next().unwrap().insert_text, "c");
+        // Wraps back to start.
+        assert_eq!(cycler.next().unwrap().insert_text, "a");
+    }
+
+    #[test]
+    fn test_cycler_previous_wraps() {
+        let items = vec![sample_item("a"), sample_item("b"), sample_item("c")];
+        let mut cycler = InlineCompletionCycler::new(items);
+        // From index 0, previous wraps to last.
+        assert_eq!(cycler.previous().unwrap().insert_text, "c");
+        assert_eq!(cycler.previous().unwrap().insert_text, "b");
+    }
+
+    #[test]
+    fn test_cycler_position_label() {
+        let items = vec![sample_item("a"), sample_item("b")];
+        let mut cycler = InlineCompletionCycler::new(items);
+        assert_eq!(cycler.position_label(), "1 of 2");
+        cycler.next();
+        assert_eq!(cycler.position_label(), "2 of 2");
+    }
+
+    #[test]
+    fn test_cycler_empty() {
+        let mut cycler = InlineCompletionCycler::new(vec![]);
+        assert!(cycler.is_empty());
+        assert!(cycler.next().is_none());
+        assert!(cycler.previous().is_none());
+        assert!(cycler.current().is_none());
+        assert_eq!(cycler.position_label(), "0 of 0");
+    }
+
+    // -- CompletionAcceptRejectTracker tests --
+
+    #[test]
+    fn test_tracker_accept_reject() {
+        let mut tracker = CompletionAcceptRejectTracker::new();
+        tracker.record_accept(10);
+        tracker.record_accept(20);
+        tracker.record_reject();
+        assert_eq!(tracker.total_actions(), 3);
+        assert_eq!(tracker.average_accepted_length(), 15.0);
+        assert_eq!(tracker.last_action, Some(CompletionAction::Reject));
+        tracker.reset();
+        assert_eq!(tracker.total_actions(), 0);
+        assert_eq!(tracker.accept_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_tracker_accept_rate() {
+        let mut tracker = CompletionAcceptRejectTracker::new();
+        assert_eq!(tracker.accept_rate(), 0.0);
+        tracker.record_accept(5);
+        tracker.record_accept(5);
+        tracker.record_reject();
+        // 2 accepts out of 3 total.
+        let rate = tracker.accept_rate();
+        assert!((rate - 2.0 / 3.0).abs() < 1e-9);
     }
 }

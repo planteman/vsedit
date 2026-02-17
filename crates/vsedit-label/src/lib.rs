@@ -1185,6 +1185,240 @@ pub fn normalize_path_separators(path: &str) -> String {
     result
 }
 
+// ---------------------------------------------------------------------------
+// LabelFormatter – template variable substitution
+// ---------------------------------------------------------------------------
+
+/// Position of the ellipsis when truncating.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EllipsisPosition {
+    Start,
+    Middle,
+    End,
+}
+
+/// Simple template formatter that replaces `${key}` placeholders with values.
+#[derive(Debug, Clone)]
+pub struct LabelFormatter {
+    template: String,
+    variables: std::collections::HashMap<String, String>,
+}
+
+impl LabelFormatter {
+    pub fn new(template: impl Into<String>) -> Self {
+        Self {
+            template: template.into(),
+            variables: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.variables.insert(key.into(), value.into());
+        self
+    }
+
+    /// Replaces every `${key}` occurrence in the template with its value.
+    /// Unresolved placeholders are left as-is.
+    pub fn format(&self) -> String {
+        let mut out = self.template.clone();
+        for (k, v) in &self.variables {
+            let placeholder = format!("${{{}}}", k);
+            out = out.replace(&placeholder, v);
+        }
+        out
+    }
+
+    pub fn has_variable(&self, key: &str) -> bool {
+        self.variables.contains_key(key)
+    }
+
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.variables.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelTruncator – configurable ellipsis position
+// ---------------------------------------------------------------------------
+
+/// Truncates text to a maximum character count with a configurable ellipsis
+/// position.
+#[derive(Debug, Clone)]
+pub struct LabelTruncator {
+    max_chars: usize,
+    position: EllipsisPosition,
+}
+
+impl LabelTruncator {
+    pub fn new(max_chars: usize, position: EllipsisPosition) -> Self {
+        Self { max_chars, position }
+    }
+
+    pub fn needs_truncation(&self, text: &str) -> bool {
+        text.chars().count() > self.max_chars
+    }
+
+    pub fn truncate(&self, text: &str) -> String {
+        let chars: Vec<char> = text.chars().collect();
+        if chars.len() <= self.max_chars {
+            return text.to_string();
+        }
+        match self.position {
+            EllipsisPosition::End => {
+                let keep = self.max_chars.saturating_sub(1);
+                let mut s: String = chars[..keep].iter().collect();
+                s.push('…');
+                s
+            }
+            EllipsisPosition::Start => {
+                let keep = self.max_chars.saturating_sub(1);
+                let start = chars.len() - keep;
+                let mut s = String::from('…');
+                s.extend(&chars[start..]);
+                s
+            }
+            EllipsisPosition::Middle => {
+                let half = self.max_chars.saturating_sub(1) / 2;
+                let tail = self.max_chars.saturating_sub(1) - half;
+                let mut s: String = chars[..half].iter().collect();
+                s.push('…');
+                s.extend(&chars[chars.len() - tail..]);
+                s
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelHighlighter – highlight matching portions of text
+// ---------------------------------------------------------------------------
+
+/// A span within highlighted text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HighlightSpan {
+    pub start: usize,
+    pub end: usize,
+    pub matched: bool,
+}
+
+/// Finds and highlights all occurrences of a query within text.
+#[derive(Debug, Clone)]
+pub struct LabelHighlighter {
+    case_sensitive: bool,
+}
+
+impl LabelHighlighter {
+    pub fn new(case_sensitive: bool) -> Self {
+        Self { case_sensitive }
+    }
+
+    pub fn has_match(&self, text: &str, query: &str) -> bool {
+        if query.is_empty() {
+            return false;
+        }
+        if self.case_sensitive {
+            text.contains(query)
+        } else {
+            text.to_lowercase().contains(&query.to_lowercase())
+        }
+    }
+
+    pub fn match_count(&self, text: &str, query: &str) -> usize {
+        if query.is_empty() {
+            return 0;
+        }
+        if self.case_sensitive {
+            text.matches(query).count()
+        } else {
+            text.to_lowercase().matches(&query.to_lowercase()).count()
+        }
+    }
+
+    /// Returns a list of spans covering the entire text, with `matched` set to
+    /// `true` for portions that match `query`.
+    pub fn highlight(&self, text: &str, query: &str) -> Vec<HighlightSpan> {
+        let mut spans = Vec::new();
+        if query.is_empty() {
+            if !text.is_empty() {
+                spans.push(HighlightSpan { start: 0, end: text.len(), matched: false });
+            }
+            return spans;
+        }
+        let (haystack, needle);
+        let (h, n);
+        if self.case_sensitive {
+            haystack = text;
+            needle = query;
+        } else {
+            h = text.to_lowercase();
+            n = query.to_lowercase();
+            haystack = &h;
+            needle = &n;
+        }
+        let mut cursor = 0usize;
+        for (idx, _) in haystack.match_indices(needle) {
+            if idx > cursor {
+                spans.push(HighlightSpan { start: cursor, end: idx, matched: false });
+            }
+            spans.push(HighlightSpan { start: idx, end: idx + query.len(), matched: true });
+            cursor = idx + query.len();
+        }
+        if cursor < text.len() {
+            spans.push(HighlightSpan { start: cursor, end: text.len(), matched: false });
+        }
+        spans
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelIconResolver – map file extension to icon name
+// ---------------------------------------------------------------------------
+
+/// Resolves a file extension to an icon identifier.
+#[derive(Debug, Clone)]
+pub struct LabelIconResolver {
+    icon_map: std::collections::HashMap<String, String>,
+    default_icon: String,
+}
+
+impl LabelIconResolver {
+    pub fn new(default_icon: impl Into<String>) -> Self {
+        Self {
+            icon_map: std::collections::HashMap::new(),
+            default_icon: default_icon.into(),
+        }
+    }
+
+    pub fn register(&mut self, extension: &str, icon: &str) -> &mut Self {
+        self.icon_map.insert(extension.to_lowercase(), icon.to_string());
+        self
+    }
+
+    /// Returns the icon for the extension extracted from `filename`, or the
+    /// default icon when no mapping exists.
+    pub fn resolve(&self, filename: &str) -> &str {
+        if let Some(dot) = filename.rfind('.') {
+            let ext = &filename[dot + 1..];
+            if let Some(icon) = self.icon_map.get(&ext.to_lowercase()) {
+                return icon.as_str();
+            }
+        }
+        &self.default_icon
+    }
+
+    pub fn icon_count(&self) -> usize {
+        self.icon_map.len()
+    }
+
+    pub fn has_icon(&self, extension: &str) -> bool {
+        self.icon_map.contains_key(&extension.to_lowercase())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1952,5 +2186,115 @@ mod tests {
         ];
         assert_eq!(join_label_names(&labels, ", "), "a.rs, b.rs");
         assert_eq!(join_label_names(&[], "; "), "");
+    }
+
+    // -- LabelFormatter tests -----------------------------------------------
+
+    #[test]
+    fn test_formatter_basic() {
+        let mut f = LabelFormatter::new("Hello, ${name}!");
+        f.set("name", "World");
+        assert_eq!(f.format(), "Hello, World!");
+        assert!(f.has_variable("name"));
+        assert_eq!(f.variable_count(), 1);
+    }
+
+    #[test]
+    fn test_formatter_missing_var() {
+        let f = LabelFormatter::new("${greeting}, ${name}!");
+        assert_eq!(f.format(), "${greeting}, ${name}!");
+    }
+
+    #[test]
+    fn test_formatter_clear() {
+        let mut f = LabelFormatter::new("${a}");
+        f.set("a", "1");
+        assert_eq!(f.variable_count(), 1);
+        f.clear();
+        assert_eq!(f.variable_count(), 0);
+        assert_eq!(f.format(), "${a}");
+    }
+
+    // -- LabelTruncator tests -----------------------------------------------
+
+    #[test]
+    fn test_truncator_end() {
+        let t = LabelTruncator::new(5, EllipsisPosition::End);
+        assert_eq!(t.truncate("abcdefgh"), "abcd…");
+    }
+
+    #[test]
+    fn test_truncator_start() {
+        let t = LabelTruncator::new(5, EllipsisPosition::Start);
+        assert_eq!(t.truncate("abcdefgh"), "…efgh");
+    }
+
+    #[test]
+    fn test_truncator_middle() {
+        let t = LabelTruncator::new(5, EllipsisPosition::Middle);
+        let result = t.truncate("abcdefgh");
+        assert!(result.contains('…'));
+        assert_eq!(result.chars().count(), 5);
+    }
+
+    #[test]
+    fn test_truncator_no_truncation() {
+        let t = LabelTruncator::new(10, EllipsisPosition::End);
+        assert_eq!(t.truncate("short"), "short");
+        assert!(!t.needs_truncation("short"));
+    }
+
+    // -- LabelHighlighter tests ---------------------------------------------
+
+    #[test]
+    fn test_highlighter_case_sensitive() {
+        let h = LabelHighlighter::new(true);
+        assert!(h.has_match("Hello World", "World"));
+        assert!(!h.has_match("Hello World", "world"));
+        assert_eq!(h.match_count("aaa", "a"), 3);
+    }
+
+    #[test]
+    fn test_highlighter_case_insensitive() {
+        let h = LabelHighlighter::new(false);
+        assert!(h.has_match("Hello World", "world"));
+        let spans = h.highlight("Hello World", "world");
+        assert_eq!(spans.len(), 2);
+        assert!(!spans[0].matched);
+        assert!(spans[1].matched);
+    }
+
+    #[test]
+    fn test_highlighter_no_match() {
+        let h = LabelHighlighter::new(true);
+        assert!(!h.has_match("abc", "xyz"));
+        let spans = h.highlight("abc", "xyz");
+        assert_eq!(spans.len(), 1);
+        assert!(!spans[0].matched);
+    }
+
+    // -- LabelIconResolver tests --------------------------------------------
+
+    #[test]
+    fn test_icon_resolver_known() {
+        let mut r = LabelIconResolver::new("file");
+        r.register("rs", "rust-icon");
+        assert_eq!(r.resolve("main.rs"), "rust-icon");
+    }
+
+    #[test]
+    fn test_icon_resolver_default() {
+        let r = LabelIconResolver::new("file");
+        assert_eq!(r.resolve("readme"), "file");
+        assert_eq!(r.resolve("data.xyz"), "file");
+    }
+
+    #[test]
+    fn test_icon_resolver_register() {
+        let mut r = LabelIconResolver::new("file");
+        r.register("py", "python").register("js", "javascript");
+        assert_eq!(r.icon_count(), 2);
+        assert!(r.has_icon("py"));
+        assert!(!r.has_icon("go"));
     }
 }

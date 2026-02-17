@@ -1087,6 +1087,203 @@ impl fmt::Display for StatusBarSummary {
     }
 }
 
+// --- StatusBarAlignmentPriority: ordering struct for sorted display ---
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarAlignmentPriority {
+    pub alignment: StatusBarAlignment,
+    pub priority: i32,
+    pub item_id: String,
+}
+
+impl StatusBarAlignmentPriority {
+    pub fn new(
+        alignment: StatusBarAlignment,
+        priority: i32,
+        item_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            alignment,
+            priority,
+            item_id: item_id.into(),
+        }
+    }
+
+    /// Returns items sorted left-before-right, then by priority ascending.
+    pub fn sorted_items(items: &[StatusBarAlignmentPriority]) -> Vec<StatusBarAlignmentPriority> {
+        let mut sorted = items.to_vec();
+        sorted.sort();
+        sorted
+    }
+}
+
+impl Ord for StatusBarAlignmentPriority {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let align_ord = |a: &StatusBarAlignment| -> u8 {
+            match a {
+                StatusBarAlignment::Left => 0,
+                StatusBarAlignment::Right => 1,
+            }
+        };
+        align_ord(&self.alignment)
+            .cmp(&align_ord(&other.alignment))
+            .then_with(|| self.priority.cmp(&other.priority))
+            .then_with(|| self.item_id.cmp(&other.item_id))
+    }
+}
+
+impl PartialOrd for StatusBarAlignmentPriority {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+// --- StatusBarItemGroup: logical grouping of status bar items ---
+
+#[derive(Debug, Clone)]
+pub struct StatusBarItemGroup {
+    pub group_id: String,
+    pub item_ids: Vec<String>,
+    pub collapsed: bool,
+}
+
+impl StatusBarItemGroup {
+    pub fn new(group_id: impl Into<String>) -> Self {
+        Self {
+            group_id: group_id.into(),
+            item_ids: Vec::new(),
+            collapsed: false,
+        }
+    }
+
+    pub fn add_item(&mut self, item_id: impl Into<String>) {
+        let id = item_id.into();
+        if !self.item_ids.contains(&id) {
+            self.item_ids.push(id);
+        }
+    }
+
+    pub fn remove_item(&mut self, item_id: &str) -> bool {
+        let len_before = self.item_ids.len();
+        self.item_ids.retain(|id| id != item_id);
+        self.item_ids.len() != len_before
+    }
+
+    pub fn toggle_collapse(&mut self) {
+        self.collapsed = !self.collapsed;
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.item_ids.len()
+    }
+
+    pub fn contains(&self, item_id: &str) -> bool {
+        self.item_ids.iter().any(|id| id == item_id)
+    }
+}
+
+impl fmt::Display for StatusBarItemGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let state = if self.collapsed {
+            "collapsed"
+        } else {
+            "expanded"
+        };
+        write!(
+            f,
+            "Group '{}' ({}, {} items)",
+            self.group_id,
+            state,
+            self.item_ids.len()
+        )
+    }
+}
+
+// --- StatusBarTooltipBuilder: builder for rich tooltips ---
+
+#[derive(Debug, Clone)]
+pub struct StatusBarTooltipBuilder {
+    title: String,
+    body_lines: Vec<String>,
+    links: Vec<(String, String)>,
+}
+
+impl StatusBarTooltipBuilder {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            body_lines: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+
+    pub fn add_line(mut self, line: impl Into<String>) -> Self {
+        self.body_lines.push(line.into());
+        self
+    }
+
+    pub fn add_link(mut self, label: impl Into<String>, url: impl Into<String>) -> Self {
+        self.links.push((label.into(), url.into()));
+        self
+    }
+
+    /// Builds a `StatusBarTooltip` whose `title` field is the builder title
+    /// and whose `description` is the rendered body lines + links.
+    pub fn build(self, entry_id: impl Into<String>) -> StatusBarTooltip {
+        let mut text_parts: Vec<String> = Vec::new();
+        for line in &self.body_lines {
+            text_parts.push(line.clone());
+        }
+        for (label, url) in &self.links {
+            text_parts.push(format!("[{}]({})", label, url));
+        }
+        let description = if text_parts.is_empty() {
+            None
+        } else {
+            Some(text_parts.join("\n"))
+        };
+        StatusBarTooltip {
+            entry_id: entry_id.into(),
+            title: self.title,
+            description,
+            shortcut: None,
+        }
+    }
+}
+
+// --- StatusBarItemToggle: visibility toggle with counter ---
+
+#[derive(Debug, Clone)]
+pub struct StatusBarItemToggle {
+    pub item_id: String,
+    pub visible: bool,
+    pub toggle_count: u32,
+}
+
+impl StatusBarItemToggle {
+    pub fn new(item_id: impl Into<String>) -> Self {
+        Self {
+            item_id: item_id.into(),
+            visible: true,
+            toggle_count: 0,
+        }
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+        self.toggle_count += 1;
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    pub fn reset(&mut self) {
+        self.visible = true;
+        self.toggle_count = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1902,5 +2099,149 @@ mod tests {
         // Right: "CC"(2) fits
         let overflow = bar.overflow_entries(10, 1);
         assert_eq!(overflow, vec!["l2"]);
+    }
+
+    // ---- Tests for StatusBarAlignmentPriority ----
+
+    #[test]
+    fn test_alignment_priority_left_before_right() {
+        let left = StatusBarAlignmentPriority::new(StatusBarAlignment::Left, 5, "a");
+        let right = StatusBarAlignmentPriority::new(StatusBarAlignment::Right, 1, "b");
+        assert!(left < right, "Left items should sort before Right items");
+    }
+
+    #[test]
+    fn test_alignment_priority_sort_by_priority() {
+        let low = StatusBarAlignmentPriority::new(StatusBarAlignment::Left, 1, "low");
+        let high = StatusBarAlignmentPriority::new(StatusBarAlignment::Left, 10, "high");
+        assert!(low < high, "Lower priority value should sort first");
+    }
+
+    #[test]
+    fn test_alignment_priority_sorted_items() {
+        let items = vec![
+            StatusBarAlignmentPriority::new(StatusBarAlignment::Right, 2, "r2"),
+            StatusBarAlignmentPriority::new(StatusBarAlignment::Left, 5, "l5"),
+            StatusBarAlignmentPriority::new(StatusBarAlignment::Left, 1, "l1"),
+            StatusBarAlignmentPriority::new(StatusBarAlignment::Right, 0, "r0"),
+        ];
+        let sorted = StatusBarAlignmentPriority::sorted_items(&items);
+        assert_eq!(sorted[0].item_id, "l1");
+        assert_eq!(sorted[1].item_id, "l5");
+        assert_eq!(sorted[2].item_id, "r0");
+        assert_eq!(sorted[3].item_id, "r2");
+    }
+
+    // ---- Tests for StatusBarItemGroup ----
+
+    #[test]
+    fn test_item_group_add_and_contains() {
+        let mut group = StatusBarItemGroup::new("git-info");
+        group.add_item("branch");
+        group.add_item("sync");
+        assert!(group.contains("branch"));
+        assert!(group.contains("sync"));
+        assert!(!group.contains("stash"));
+        assert_eq!(group.item_count(), 2);
+    }
+
+    #[test]
+    fn test_item_group_no_duplicates() {
+        let mut group = StatusBarItemGroup::new("g1");
+        group.add_item("x");
+        group.add_item("x");
+        assert_eq!(group.item_count(), 1);
+    }
+
+    #[test]
+    fn test_item_group_remove_item() {
+        let mut group = StatusBarItemGroup::new("g1");
+        group.add_item("a");
+        group.add_item("b");
+        assert!(group.remove_item("a"));
+        assert!(!group.contains("a"));
+        assert!(!group.remove_item("nonexistent"));
+        assert_eq!(group.item_count(), 1);
+    }
+
+    #[test]
+    fn test_item_group_toggle_collapse() {
+        let mut group = StatusBarItemGroup::new("g1");
+        assert!(!group.collapsed);
+        group.toggle_collapse();
+        assert!(group.collapsed);
+        group.toggle_collapse();
+        assert!(!group.collapsed);
+    }
+
+    #[test]
+    fn test_item_group_display() {
+        let mut group = StatusBarItemGroup::new("editors");
+        group.add_item("tab1");
+        group.add_item("tab2");
+        let display = format!("{}", group);
+        assert_eq!(display, "Group 'editors' (expanded, 2 items)");
+        group.toggle_collapse();
+        let display = format!("{}", group);
+        assert_eq!(display, "Group 'editors' (collapsed, 2 items)");
+    }
+
+    // ---- Tests for StatusBarTooltipBuilder ----
+
+    #[test]
+    fn test_tooltip_builder_title_only() {
+        let tooltip = StatusBarTooltipBuilder::new("Git Branch")
+            .build("git-branch");
+        assert_eq!(tooltip.title, "Git Branch");
+        assert_eq!(tooltip.entry_id, "git-branch");
+        assert!(tooltip.description.is_none());
+    }
+
+    #[test]
+    fn test_tooltip_builder_with_lines_and_links() {
+        let tooltip = StatusBarTooltipBuilder::new("Encoding")
+            .add_line("Current: UTF-8")
+            .add_line("Click to change")
+            .add_link("Docs", "https://example.com/encoding")
+            .build("encoding");
+        assert_eq!(tooltip.title, "Encoding");
+        let desc = tooltip.description.unwrap();
+        assert!(desc.contains("Current: UTF-8"));
+        assert!(desc.contains("Click to change"));
+        assert!(desc.contains("[Docs](https://example.com/encoding)"));
+    }
+
+    // ---- Tests for StatusBarItemToggle ----
+
+    #[test]
+    fn test_item_toggle_initial_state() {
+        let toggle = StatusBarItemToggle::new("line-col");
+        assert!(toggle.is_visible());
+        assert_eq!(toggle.toggle_count, 0);
+        assert_eq!(toggle.item_id, "line-col");
+    }
+
+    #[test]
+    fn test_item_toggle_toggle_and_count() {
+        let mut toggle = StatusBarItemToggle::new("indent");
+        toggle.toggle();
+        assert!(!toggle.is_visible());
+        assert_eq!(toggle.toggle_count, 1);
+        toggle.toggle();
+        assert!(toggle.is_visible());
+        assert_eq!(toggle.toggle_count, 2);
+    }
+
+    #[test]
+    fn test_item_toggle_reset() {
+        let mut toggle = StatusBarItemToggle::new("lang");
+        toggle.toggle();
+        toggle.toggle();
+        toggle.toggle();
+        assert!(!toggle.is_visible());
+        assert_eq!(toggle.toggle_count, 3);
+        toggle.reset();
+        assert!(toggle.is_visible());
+        assert_eq!(toggle.toggle_count, 0);
     }
 }

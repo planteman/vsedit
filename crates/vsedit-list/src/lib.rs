@@ -1245,6 +1245,166 @@ where
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// ListAccessibilityProvider – ARIA attributes
+// ---------------------------------------------------------------------------
+
+/// ARIA role for list items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AriaRole {
+    TreeItem,
+    ListItem,
+    Option,
+    Row,
+}
+
+impl fmt::Display for AriaRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TreeItem => write!(f, "treeitem"),
+            Self::ListItem => write!(f, "listitem"),
+            Self::Option => write!(f, "option"),
+            Self::Row => write!(f, "row"),
+        }
+    }
+}
+
+/// Provides accessibility attributes for a list item.
+#[derive(Debug, Clone)]
+pub struct ListAccessibilityProvider {
+    pub role: AriaRole,
+    pub label: String,
+    pub level: u32,
+    pub set_size: u32,
+    pub pos_in_set: u32,
+    pub expanded: Option<bool>,
+    pub selected: bool,
+}
+
+impl ListAccessibilityProvider {
+    /// Build accessibility info from a list item and its context.
+    pub fn from_item(item: &ListItem, level: u32, pos: u32, siblings: u32) -> Self {
+        Self {
+            role: if item.is_leaf() { AriaRole::ListItem } else { AriaRole::TreeItem },
+            label: item.label.clone(),
+            level,
+            set_size: siblings,
+            pos_in_set: pos,
+            expanded: if item.is_leaf() { None } else { Some(item.expanded) },
+            selected: item.selected,
+        }
+    }
+
+    /// Format as HTML aria attribute string.
+    pub fn to_aria_attrs(&self) -> String {
+        let mut attrs = format!(
+            "role=\"{}\" aria-label=\"{}\" aria-level=\"{}\" aria-setsize=\"{}\" aria-posinset=\"{}\"",
+            self.role, self.label, self.level, self.set_size, self.pos_in_set
+        );
+        if let Some(exp) = self.expanded {
+            attrs.push_str(&format!(" aria-expanded=\"{}\"", exp));
+        }
+        if self.selected {
+            attrs.push_str(" aria-selected=\"true\"");
+        }
+        attrs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ListFilterWidget – inline filtering
+// ---------------------------------------------------------------------------
+
+/// Inline filter widget for filtering list items by text.
+#[derive(Debug, Clone)]
+pub struct ListFilterWidget {
+    query: String,
+    active: bool,
+}
+
+impl ListFilterWidget {
+    pub fn new() -> Self {
+        Self { query: String::new(), active: false }
+    }
+
+    /// Activate the filter.
+    pub fn activate(&mut self) {
+        self.active = true;
+    }
+
+    /// Deactivate and clear the filter.
+    pub fn deactivate(&mut self) {
+        self.active = false;
+        self.query.clear();
+    }
+
+    /// Set the filter query.
+    pub fn set_query(&mut self, query: impl Into<String>) {
+        self.query = query.into();
+    }
+
+    /// Filter items by label (case-insensitive substring match).
+    pub fn filter<'a>(&self, items: &'a [ListItem]) -> Vec<&'a ListItem> {
+        if self.query.is_empty() {
+            return items.iter().collect();
+        }
+        let q = self.query.to_lowercase();
+        items.iter().filter(|item| item.label.to_lowercase().contains(&q)).collect()
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+}
+
+impl Default for ListFilterWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ListStickyScroll – sticky header for tree items
+// ---------------------------------------------------------------------------
+
+/// Tracks which parent items should be "sticky" at the top of the viewport.
+#[derive(Debug, Clone)]
+pub struct ListStickyScroll {
+    sticky_items: Vec<String>,
+    max_sticky: usize,
+}
+
+impl ListStickyScroll {
+    pub fn new(max_sticky: usize) -> Self {
+        Self { sticky_items: Vec::new(), max_sticky }
+    }
+
+    /// Update sticky items based on the first visible item in the viewport.
+    pub fn update(&mut self, ancestors: Vec<String>) {
+        self.sticky_items = ancestors;
+        self.sticky_items.truncate(self.max_sticky);
+    }
+
+    /// Currently sticky item labels.
+    pub fn sticky_labels(&self) -> &[String] {
+        &self.sticky_items
+    }
+
+    /// Number of sticky items.
+    pub fn count(&self) -> usize {
+        self.sticky_items.len()
+    }
+
+    /// Clear sticky state.
+    pub fn clear(&mut self) {
+        self.sticky_items.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1985,5 +2145,130 @@ mod tests {
         assert_eq!(groups[1].items.len(), 2);
         assert_eq!(groups[2].key, "C");
         assert_eq!(groups[2].items.len(), 1);
+    }
+
+    // -- ListAccessibilityProvider tests --
+
+    #[test]
+    fn a11y_leaf_item() {
+        let item = ListItem::new("f1", "file.rs");
+        let a11y = ListAccessibilityProvider::from_item(&item, 1, 1, 5);
+        assert_eq!(a11y.role, AriaRole::ListItem);
+        assert!(a11y.expanded.is_none());
+        let attrs = a11y.to_aria_attrs();
+        assert!(attrs.contains("listitem"));
+        assert!(attrs.contains("file.rs"));
+    }
+
+    #[test]
+    fn a11y_tree_item_expanded() {
+        let item = ListItem::new("d1", "src").with_child(ListItem::new("f1", "main.rs")).with_expanded(true);
+        let a11y = ListAccessibilityProvider::from_item(&item, 0, 1, 3);
+        assert_eq!(a11y.role, AriaRole::TreeItem);
+        assert_eq!(a11y.expanded, Some(true));
+        let attrs = a11y.to_aria_attrs();
+        assert!(attrs.contains("aria-expanded=\"true\""));
+    }
+
+    #[test]
+    fn aria_role_display() {
+        assert_eq!(format!("{}", AriaRole::Option), "option");
+        assert_eq!(format!("{}", AriaRole::Row), "row");
+    }
+
+    // -- ListMultiSelect tests (using existing ListMultiSelect) --
+
+    #[test]
+    fn multi_select_click() {
+        let mut ms = ListMultiSelect::new(10);
+        ms.click(3);
+        assert!(ms.is_selected(3));
+        assert!(!ms.is_selected(0));
+        assert_eq!(ms.selected_count(), 1);
+    }
+
+    #[test]
+    fn multi_select_shift_click() {
+        let mut ms = ListMultiSelect::new(10);
+        ms.click(2);
+        ms.shift_click(5);
+        assert_eq!(ms.selected_indices(), vec![2, 3, 4, 5]);
+        assert_eq!(ms.selected_count(), 4);
+    }
+
+    #[test]
+    fn multi_select_ctrl_click_toggle() {
+        let mut ms = ListMultiSelect::new(10);
+        ms.click(1);
+        ms.ctrl_click(3);
+        assert_eq!(ms.selected_count(), 2);
+        ms.ctrl_click(1); // deselect
+        assert_eq!(ms.selected_count(), 1);
+        assert!(!ms.is_selected(1));
+    }
+
+    #[test]
+    fn multi_select_deselect_all() {
+        let mut ms = ListMultiSelect::new(10);
+        ms.click(0);
+        ms.shift_click(5);
+        ms.deselect_all();
+        assert_eq!(ms.selected_count(), 0);
+    }
+
+    // -- ListFilterWidget tests --
+
+    #[test]
+    fn filter_basic() {
+        let mut fw = ListFilterWidget::new();
+        let items = vec![
+            ListItem::new("1", "Apple"),
+            ListItem::new("2", "Banana"),
+            ListItem::new("3", "Avocado"),
+        ];
+        fw.activate();
+        fw.set_query("a");
+        let filtered = fw.filter(&items);
+        // "Apple", "Banana", "Avocado" all contain 'a'
+        assert_eq!(filtered.len(), 3);
+        fw.set_query("av");
+        let filtered = fw.filter(&items);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].label, "Avocado");
+    }
+
+    #[test]
+    fn filter_empty_query_returns_all() {
+        let fw = ListFilterWidget::default();
+        let items = vec![ListItem::new("1", "X"), ListItem::new("2", "Y")];
+        assert_eq!(fw.filter(&items).len(), 2);
+    }
+
+    #[test]
+    fn filter_deactivate_clears() {
+        let mut fw = ListFilterWidget::new();
+        fw.activate();
+        fw.set_query("test");
+        fw.deactivate();
+        assert!(!fw.is_active());
+        assert!(fw.query().is_empty());
+    }
+
+    // -- ListStickyScroll tests --
+
+    #[test]
+    fn sticky_scroll_basic() {
+        let mut ss = ListStickyScroll::new(2);
+        ss.update(vec!["root".into(), "src".into(), "lib".into()]);
+        assert_eq!(ss.count(), 2); // truncated to max
+        assert_eq!(ss.sticky_labels(), &["root", "src"]);
+    }
+
+    #[test]
+    fn sticky_scroll_clear() {
+        let mut ss = ListStickyScroll::new(3);
+        ss.update(vec!["a".into()]);
+        ss.clear();
+        assert_eq!(ss.count(), 0);
     }
 }

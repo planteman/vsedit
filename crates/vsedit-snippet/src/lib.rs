@@ -1365,6 +1365,192 @@ pub fn prev_choice(choices: &[String], current: &str) -> Option<String> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SnippetTransformPipeline – chained regex transforms
+// ---------------------------------------------------------------------------
+
+/// A pipeline of [`SnippetTransform`] steps applied in sequence.
+#[derive(Debug, Clone)]
+pub struct SnippetTransformPipeline {
+    transforms: Vec<SnippetTransform>,
+}
+
+impl SnippetTransformPipeline {
+    pub fn new() -> Self {
+        Self { transforms: Vec::new() }
+    }
+
+    pub fn add(&mut self, transform: SnippetTransform) {
+        self.transforms.push(transform);
+    }
+
+    /// Apply all transforms in order.
+    pub fn apply(&self, input: &str) -> String {
+        let mut result = input.to_string();
+        for t in &self.transforms {
+            result = t.apply(&result);
+        }
+        result
+    }
+
+    pub fn len(&self) -> usize {
+        self.transforms.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.transforms.is_empty()
+    }
+}
+
+impl Default for SnippetTransformPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetMirrorLinker – synchronized placeholder edits
+// ---------------------------------------------------------------------------
+
+/// Tracks linked tabstop mirrors so editing one updates all copies.
+#[derive(Debug, Clone)]
+pub struct SnippetMirrorLinker {
+    /// Map from tabstop index to list of (line, col) positions.
+    mirrors: HashMap<u32, Vec<(u32, u32)>>,
+}
+
+impl SnippetMirrorLinker {
+    pub fn new() -> Self {
+        Self { mirrors: HashMap::new() }
+    }
+
+    /// Register a mirror position for a tabstop.
+    pub fn add_mirror(&mut self, tabstop: u32, line: u32, col: u32) {
+        self.mirrors.entry(tabstop).or_default().push((line, col));
+    }
+
+    /// Get all mirror positions for a tabstop.
+    pub fn mirrors_for(&self, tabstop: u32) -> &[(u32, u32)] {
+        self.mirrors.get(&tabstop).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// True if a tabstop has more than one position (i.e. has mirrors).
+    pub fn has_mirrors(&self, tabstop: u32) -> bool {
+        self.mirrors.get(&tabstop).map_or(false, |v| v.len() > 1)
+    }
+
+    /// All tabstop indices that have mirrors.
+    pub fn mirrored_tabstops(&self) -> Vec<u32> {
+        let mut result: Vec<u32> = self.mirrors
+            .iter()
+            .filter(|(_, v)| v.len() > 1)
+            .map(|(k, _)| *k)
+            .collect();
+        result.sort();
+        result
+    }
+
+    /// Total number of tracked tabstops.
+    pub fn tabstop_count(&self) -> usize {
+        self.mirrors.len()
+    }
+}
+
+impl Default for SnippetMirrorLinker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SnippetFinalTabstop – handles $0
+// ---------------------------------------------------------------------------
+
+/// Handles the final tabstop ($0) position in a snippet session.
+#[derive(Debug, Clone)]
+pub struct SnippetFinalTabstop {
+    pub line: u32,
+    pub col: u32,
+    pub has_placeholder: bool,
+}
+
+impl SnippetFinalTabstop {
+    pub fn new(line: u32, col: u32) -> Self {
+        Self { line, col, has_placeholder: false }
+    }
+
+    pub fn with_placeholder(mut self) -> Self {
+        self.has_placeholder = true;
+        self
+    }
+}
+
+impl fmt::Display for SnippetFinalTabstop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "$0 at {}:{}", self.line, self.col)
+    }
+}
+
+/// Locate the $0 tabstop in a snippet's elements, returning its index in the
+/// flat element list, or `None` if absent.
+pub fn find_final_tabstop(elements: &[SnippetElement]) -> Option<usize> {
+    elements.iter().position(|e| matches!(e, SnippetElement::Tabstop(0)))
+}
+
+// ---------------------------------------------------------------------------
+// SnippetScopeFilter – language filtering
+// ---------------------------------------------------------------------------
+
+/// A filter that restricts a snippet to specific languages.
+#[derive(Debug, Clone)]
+pub struct SnippetScopeFilter {
+    pub languages: Vec<String>,
+}
+
+impl SnippetScopeFilter {
+    pub fn new(languages: Vec<String>) -> Self {
+        Self { languages }
+    }
+
+    /// A filter that accepts all languages.
+    pub fn all() -> Self {
+        Self { languages: Vec::new() }
+    }
+
+    /// Check if this snippet is available for the given language.
+    pub fn matches(&self, language_id: &str) -> bool {
+        if self.languages.is_empty() {
+            return true;
+        }
+        self.languages.iter().any(|l| l == language_id)
+    }
+
+    /// True if the filter is unrestricted.
+    pub fn is_unrestricted(&self) -> bool {
+        self.languages.is_empty()
+    }
+
+    /// Parse a comma-separated scope string into a filter.
+    pub fn parse(scope: &str) -> Self {
+        let languages: Vec<String> = scope
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        Self { languages }
+    }
+}
+
+impl fmt::Display for SnippetScopeFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.languages.is_empty() {
+            write!(f, "*")
+        } else {
+            write!(f, "{}", self.languages.join(", "))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1983,5 +2169,111 @@ mod tests {
         let choices: Vec<String> = vec![];
         assert_eq!(next_choice(&choices, "x"), None);
         assert_eq!(prev_choice(&choices, "x"), None);
+    }
+
+    // -- SnippetTransformPipeline tests --
+
+    #[test]
+    fn transform_pipeline_single() {
+        let t = SnippetTransform::parse("foo/bar/g").unwrap();
+        let mut pipe = SnippetTransformPipeline::new();
+        pipe.add(t);
+        assert_eq!(pipe.apply("foo baz foo"), "bar baz bar");
+        assert_eq!(pipe.len(), 1);
+    }
+
+    #[test]
+    fn transform_pipeline_chained() {
+        let mut pipe = SnippetTransformPipeline::new();
+        pipe.add(SnippetTransform::parse("hello/world/g").unwrap());
+        pipe.add(SnippetTransform::parse("world/earth/g").unwrap());
+        assert_eq!(pipe.apply("hello world"), "earth earth");
+        assert_eq!(pipe.len(), 2);
+    }
+
+    #[test]
+    fn transform_pipeline_empty() {
+        let pipe = SnippetTransformPipeline::default();
+        assert!(pipe.is_empty());
+        assert_eq!(pipe.apply("unchanged"), "unchanged");
+    }
+
+    // -- SnippetMirrorLinker tests --
+
+    #[test]
+    fn mirror_linker_basic() {
+        let mut linker = SnippetMirrorLinker::new();
+        linker.add_mirror(1, 0, 5);
+        linker.add_mirror(1, 2, 10);
+        linker.add_mirror(2, 1, 0);
+        assert!(linker.has_mirrors(1));
+        assert!(!linker.has_mirrors(2));
+        assert_eq!(linker.mirrors_for(1).len(), 2);
+        assert_eq!(linker.mirrored_tabstops(), vec![1]);
+    }
+
+    #[test]
+    fn mirror_linker_empty() {
+        let linker = SnippetMirrorLinker::default();
+        assert_eq!(linker.tabstop_count(), 0);
+        assert!(linker.mirrors_for(1).is_empty());
+    }
+
+    // -- SnippetFinalTabstop tests --
+
+    #[test]
+    fn final_tabstop_display() {
+        let ft = SnippetFinalTabstop::new(5, 10);
+        assert_eq!(format!("{}", ft), "$0 at 5:10");
+        assert!(!ft.has_placeholder);
+    }
+
+    #[test]
+    fn final_tabstop_with_placeholder() {
+        let ft = SnippetFinalTabstop::new(0, 0).with_placeholder();
+        assert!(ft.has_placeholder);
+    }
+
+    #[test]
+    fn find_final_tabstop_present() {
+        let elements = vec![
+            SnippetElement::Text("hello ".into()),
+            SnippetElement::Tabstop(1),
+            SnippetElement::Tabstop(0),
+        ];
+        assert_eq!(find_final_tabstop(&elements), Some(2));
+    }
+
+    #[test]
+    fn find_final_tabstop_absent() {
+        let elements = vec![SnippetElement::Text("hello".into())];
+        assert_eq!(find_final_tabstop(&elements), None);
+    }
+
+    // -- SnippetScopeFilter tests --
+
+    #[test]
+    fn scope_filter_matches() {
+        let f = SnippetScopeFilter::new(vec!["rust".into(), "go".into()]);
+        assert!(f.matches("rust"));
+        assert!(f.matches("go"));
+        assert!(!f.matches("python"));
+        assert!(!f.is_unrestricted());
+    }
+
+    #[test]
+    fn scope_filter_all() {
+        let f = SnippetScopeFilter::all();
+        assert!(f.matches("anything"));
+        assert!(f.is_unrestricted());
+        assert_eq!(format!("{}", f), "*");
+    }
+
+    #[test]
+    fn scope_filter_parse() {
+        let f = SnippetScopeFilter::parse("rust, python, go");
+        assert_eq!(f.languages.len(), 3);
+        assert!(f.matches("python"));
+        assert_eq!(format!("{}", f), "rust, python, go");
     }
 }

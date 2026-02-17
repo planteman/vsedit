@@ -1183,6 +1183,251 @@ pub fn dependency_summary(graph: &HashMap<String, Vec<String>>) -> String {
     out
 }
 
+// -- ServiceScopeGuard for scoped injection ----------------------------------
+
+/// A scope that tracks services registered within it. When dropped,
+/// the services are conceptually removed from the scope.
+#[derive(Debug)]
+pub struct ServiceScopeGuard {
+    scope_name: String,
+    registered_types: Vec<String>,
+    active: bool,
+}
+
+impl ServiceScopeGuard {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            scope_name: name.into(),
+            registered_types: Vec::new(),
+            active: true,
+        }
+    }
+
+    pub fn scope_name(&self) -> &str {
+        &self.scope_name
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    /// Record that a service type was registered in this scope.
+    pub fn track(&mut self, type_name: &str) {
+        if self.active {
+            self.registered_types.push(type_name.to_string());
+        }
+    }
+
+    /// Number of services registered in this scope.
+    pub fn service_count(&self) -> usize {
+        self.registered_types.len()
+    }
+
+    /// Get all tracked type names.
+    pub fn tracked_types(&self) -> &[String] {
+        &self.registered_types
+    }
+
+    /// Close the scope, marking it inactive.
+    pub fn close(&mut self) {
+        self.active = false;
+    }
+}
+
+impl fmt::Display for ServiceScopeGuard {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.active { "active" } else { "closed" };
+        write!(
+            f,
+            "Scope({}, {}, {} services)",
+            self.scope_name,
+            status,
+            self.registered_types.len()
+        )
+    }
+}
+
+impl Drop for ServiceScopeGuard {
+    fn drop(&mut self) {
+        self.active = false;
+    }
+}
+
+// -- ServiceDecorator for wrapping services ----------------------------------
+
+/// Describes a decorator that wraps an existing service.
+#[derive(Debug, Clone)]
+pub struct ServiceDecorator {
+    pub target_service: String,
+    pub decorator_name: String,
+    pub priority: i32,
+}
+
+impl ServiceDecorator {
+    pub fn new(target: &str, decorator: &str, priority: i32) -> Self {
+        Self {
+            target_service: target.to_string(),
+            decorator_name: decorator.to_string(),
+            priority,
+        }
+    }
+}
+
+impl fmt::Display for ServiceDecorator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Decorator({} -> {}, priority={})",
+            self.decorator_name, self.target_service, self.priority
+        )
+    }
+}
+
+/// Registry for service decorators.
+#[derive(Debug, Default)]
+pub struct DecoratorRegistry {
+    decorators: Vec<ServiceDecorator>,
+}
+
+impl DecoratorRegistry {
+    pub fn new() -> Self {
+        Self {
+            decorators: Vec::new(),
+        }
+    }
+
+    pub fn register(&mut self, decorator: ServiceDecorator) {
+        self.decorators.push(decorator);
+        self.decorators.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    pub fn for_service(&self, service_name: &str) -> Vec<&ServiceDecorator> {
+        self.decorators
+            .iter()
+            .filter(|d| d.target_service == service_name)
+            .collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.decorators.len()
+    }
+}
+
+// -- ServiceDiagnostics showing dependency graph -----------------------------
+
+/// A node in the service dependency graph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyNode {
+    pub service_name: String,
+    pub dependencies: Vec<String>,
+}
+
+/// Build a simple dependency graph from descriptors.
+pub fn build_dependency_graph(descriptors: &[ServiceDescriptor]) -> Vec<DependencyNode> {
+    descriptors
+        .iter()
+        .map(|d| DependencyNode {
+            service_name: d.name.clone(),
+            dependencies: d.dependencies.clone(),
+        })
+        .collect()
+}
+
+/// Find services with no dependencies (roots).
+pub fn find_root_services(graph: &[DependencyNode]) -> Vec<&str> {
+    graph
+        .iter()
+        .filter(|n| n.dependencies.is_empty())
+        .map(|n| n.service_name.as_str())
+        .collect()
+}
+
+/// Find services that nothing depends on (leaves).
+pub fn find_leaf_services(graph: &[DependencyNode]) -> Vec<&str> {
+    let all_deps: std::collections::HashSet<&str> = graph
+        .iter()
+        .flat_map(|n| n.dependencies.iter().map(|s| s.as_str()))
+        .collect();
+    graph
+        .iter()
+        .filter(|n| !all_deps.contains(n.service_name.as_str()))
+        .map(|n| n.service_name.as_str())
+        .collect()
+}
+
+/// Detect circular dependencies (simple check).
+pub fn has_circular_dependency(graph: &[DependencyNode]) -> bool {
+    for node in graph {
+        if node.dependencies.contains(&node.service_name) {
+            return true;
+        }
+    }
+    // Check 2-level cycles
+    for node in graph {
+        for dep in &node.dependencies {
+            if let Some(dep_node) = graph.iter().find(|n| n.service_name == *dep) {
+                if dep_node.dependencies.contains(&node.service_name) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+// -- Lazy service initialization tracking ------------------------------------
+
+/// Tracks whether services have been lazily initialized.
+#[derive(Debug, Default)]
+pub struct LazyInitTracker {
+    initialized: HashMap<String, bool>,
+}
+
+impl LazyInitTracker {
+    pub fn new() -> Self {
+        Self {
+            initialized: HashMap::new(),
+        }
+    }
+
+    pub fn register(&mut self, name: &str) {
+        self.initialized.insert(name.to_string(), false);
+    }
+
+    pub fn mark_initialized(&mut self, name: &str) {
+        if let Some(v) = self.initialized.get_mut(name) {
+            *v = true;
+        }
+    }
+
+    pub fn is_initialized(&self, name: &str) -> bool {
+        self.initialized.get(name).copied().unwrap_or(false)
+    }
+
+    pub fn initialized_count(&self) -> usize {
+        self.initialized.values().filter(|&&v| v).count()
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.initialized.values().filter(|&&v| !v).count()
+    }
+
+    pub fn all_names(&self) -> Vec<&str> {
+        self.initialized.keys().map(|s| s.as_str()).collect()
+    }
+}
+
+impl fmt::Display for LazyInitTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LazyInit({} initialized, {} pending)",
+            self.initialized_count(),
+            self.pending_count()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1975,5 +2220,172 @@ mod tests {
     fn service_kind_display() {
         assert_eq!(ServiceKind::Singleton.to_string(), "Singleton");
         assert_eq!(ServiceKind::Transient.to_string(), "Transient");
+    }
+
+    // -- ServiceScopeGuard tests ----------------------------------------------
+
+    #[test]
+    fn scope_guard_track_and_close() {
+        let mut scope = ServiceScopeGuard::new("test-scope");
+        assert!(scope.is_active());
+        scope.track("Logger");
+        scope.track("Config");
+        assert_eq!(scope.service_count(), 2);
+        scope.close();
+        assert!(!scope.is_active());
+    }
+
+    #[test]
+    fn scope_guard_no_track_when_closed() {
+        let mut scope = ServiceScopeGuard::new("closed");
+        scope.close();
+        scope.track("ShouldNotTrack");
+        assert_eq!(scope.service_count(), 0);
+    }
+
+    #[test]
+    fn scope_guard_display() {
+        let scope = ServiceScopeGuard::new("my-scope");
+        let s = scope.to_string();
+        assert!(s.contains("my-scope"));
+        assert!(s.contains("active"));
+    }
+
+    // -- ServiceDecorator tests -----------------------------------------------
+
+    #[test]
+    fn decorator_registry_for_service() {
+        let mut reg = DecoratorRegistry::new();
+        reg.register(ServiceDecorator::new("Logger", "LogDecorator", 10));
+        reg.register(ServiceDecorator::new("Logger", "MetricsDecorator", 5));
+        reg.register(ServiceDecorator::new("Config", "ConfigDecorator", 1));
+        let logger_decs = reg.for_service("Logger");
+        assert_eq!(logger_decs.len(), 2);
+        assert_eq!(logger_decs[0].priority, 10);
+    }
+
+    #[test]
+    fn decorator_display() {
+        let dec = ServiceDecorator::new("Target", "Dec", 5);
+        let s = dec.to_string();
+        assert!(s.contains("Dec"));
+        assert!(s.contains("Target"));
+    }
+
+    // -- LazyInitTracker tests ------------------------------------------------
+
+    #[test]
+    fn lazy_init_tracker_workflow() {
+        let mut tracker = LazyInitTracker::new();
+        tracker.register("A");
+        tracker.register("B");
+        assert_eq!(tracker.pending_count(), 2);
+        assert_eq!(tracker.initialized_count(), 0);
+
+        tracker.mark_initialized("A");
+        assert!(tracker.is_initialized("A"));
+        assert!(!tracker.is_initialized("B"));
+        assert_eq!(tracker.initialized_count(), 1);
+    }
+
+    #[test]
+    fn lazy_init_tracker_display() {
+        let mut tracker = LazyInitTracker::new();
+        tracker.register("X");
+        tracker.mark_initialized("X");
+        let s = tracker.to_string();
+        assert!(s.contains("1 initialized"));
+        assert!(s.contains("0 pending"));
+    }
+
+    #[test]
+    fn lazy_init_unknown_service() {
+        let tracker = LazyInitTracker::new();
+        assert!(!tracker.is_initialized("nonexistent"));
+    }
+
+    // -- Dependency graph tests -----------------------------------------------
+
+    #[test]
+    fn build_dependency_graph_from_descriptors() {
+        let descriptors = vec![
+            ServiceDescriptor::new("A", ServiceKind::Singleton),
+            ServiceDescriptor::new("B", ServiceKind::Transient).depends_on("A"),
+        ];
+        let graph = build_dependency_graph(&descriptors);
+        assert_eq!(graph.len(), 2);
+        assert!(graph[0].dependencies.is_empty());
+        assert_eq!(graph[1].dependencies, vec!["A".to_string()]);
+    }
+
+    #[test]
+    fn find_root_services_works() {
+        let graph = vec![
+            DependencyNode {
+                service_name: "A".into(),
+                dependencies: vec![],
+            },
+            DependencyNode {
+                service_name: "B".into(),
+                dependencies: vec!["A".into()],
+            },
+        ];
+        let roots = find_root_services(&graph);
+        assert_eq!(roots, vec!["A"]);
+    }
+
+    #[test]
+    fn find_leaf_services_works() {
+        let graph = vec![
+            DependencyNode {
+                service_name: "A".into(),
+                dependencies: vec![],
+            },
+            DependencyNode {
+                service_name: "B".into(),
+                dependencies: vec!["A".into()],
+            },
+        ];
+        let leaves = find_leaf_services(&graph);
+        assert_eq!(leaves, vec!["B"]);
+    }
+
+    #[test]
+    fn circular_dependency_self_ref() {
+        let graph = vec![DependencyNode {
+            service_name: "A".into(),
+            dependencies: vec!["A".into()],
+        }];
+        assert!(has_circular_dependency(&graph));
+    }
+
+    #[test]
+    fn circular_dependency_mutual() {
+        let graph = vec![
+            DependencyNode {
+                service_name: "A".into(),
+                dependencies: vec!["B".into()],
+            },
+            DependencyNode {
+                service_name: "B".into(),
+                dependencies: vec!["A".into()],
+            },
+        ];
+        assert!(has_circular_dependency(&graph));
+    }
+
+    #[test]
+    fn no_circular_dependency() {
+        let graph = vec![
+            DependencyNode {
+                service_name: "A".into(),
+                dependencies: vec![],
+            },
+            DependencyNode {
+                service_name: "B".into(),
+                dependencies: vec!["A".into()],
+            },
+        ];
+        assert!(!has_circular_dependency(&graph));
     }
 }

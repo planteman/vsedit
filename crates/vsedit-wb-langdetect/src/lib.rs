@@ -1238,6 +1238,301 @@ pub fn merge_detections(results: &[DetectionResult]) -> Vec<DetectionResult> {
     merged
 }
 
+// ---------------------------------------------------------------------------
+// DetectionCache – cache detection results with a time-to-live
+// ---------------------------------------------------------------------------
+
+/// A simple TTL-based cache for detection results.
+///
+/// Each entry is stamped with the time it was inserted (in milliseconds) and
+/// is considered expired once `current_ms - inserted_ms >= ttl_ms`.
+pub struct DetectionCache {
+    /// Time-to-live in milliseconds.
+    ttl_ms: u64,
+    /// Map from cache key to (result, insertion timestamp).
+    entries: HashMap<String, (DetectionResult, u64)>,
+}
+
+impl DetectionCache {
+    /// Create a new cache with the given TTL (in milliseconds).
+    pub fn new(ttl_ms: u64) -> Self {
+        Self {
+            ttl_ms,
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Insert a detection result into the cache.
+    pub fn insert(&mut self, key: &str, result: DetectionResult, timestamp_ms: u64) {
+        self.entries
+            .insert(key.to_string(), (result, timestamp_ms));
+    }
+
+    /// Retrieve a cached result if it has not expired.
+    pub fn get(&self, key: &str, current_ms: u64) -> Option<&DetectionResult> {
+        self.entries.get(key).and_then(|(res, ts)| {
+            if current_ms.saturating_sub(*ts) < self.ttl_ms {
+                Some(res)
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Remove a single entry from the cache.
+    pub fn invalidate(&mut self, key: &str) {
+        self.entries.remove(key);
+    }
+
+    /// Remove all entries from the cache.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return the number of entries currently stored (including expired).
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the cache contains no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContentPatternDetector – pattern-based language detection
+// ---------------------------------------------------------------------------
+
+/// A single pattern rule used by [`ContentPatternDetector`].
+struct PatternRule {
+    /// Substring to search for in the content.
+    pattern: String,
+    /// Language identifier to return on a match.
+    language: String,
+    /// Base score assigned when the pattern matches.
+    score: f64,
+}
+
+/// Detects languages by scanning content for characteristic substrings.
+///
+/// Ships with a set of built-in patterns and allows users to register
+/// additional ones via [`add_pattern`](ContentPatternDetector::add_pattern).
+pub struct ContentPatternDetector {
+    rules: Vec<PatternRule>,
+}
+
+impl ContentPatternDetector {
+    /// Create a detector pre-loaded with common patterns.
+    pub fn new() -> Self {
+        let rules = vec![
+            PatternRule { pattern: "fn main(".into(), language: "rust".into(), score: 0.85 },
+            PatternRule { pattern: "impl ".into(), language: "rust".into(), score: 0.60 },
+            PatternRule { pattern: "pub fn ".into(), language: "rust".into(), score: 0.55 },
+            PatternRule { pattern: "def ".into(), language: "python".into(), score: 0.50 },
+            PatternRule { pattern: "import ".into(), language: "python".into(), score: 0.30 },
+            PatternRule { pattern: "function ".into(), language: "javascript".into(), score: 0.50 },
+            PatternRule { pattern: "const ".into(), language: "javascript".into(), score: 0.25 },
+            PatternRule { pattern: "func ".into(), language: "go".into(), score: 0.55 },
+            PatternRule { pattern: "package ".into(), language: "go".into(), score: 0.35 },
+            PatternRule { pattern: "public class ".into(), language: "java".into(), score: 0.65 },
+            PatternRule { pattern: "System.out.".into(), language: "java".into(), score: 0.50 },
+            PatternRule { pattern: "#include ".into(), language: "c".into(), score: 0.55 },
+            PatternRule { pattern: "int main(".into(), language: "c".into(), score: 0.70 },
+            PatternRule { pattern: "class ".into(), language: "python".into(), score: 0.30 },
+            PatternRule { pattern: "require ".into(), language: "ruby".into(), score: 0.35 },
+            PatternRule { pattern: "puts ".into(), language: "ruby".into(), score: 0.30 },
+        ];
+        Self { rules }
+    }
+
+    /// Register an additional pattern rule.
+    pub fn add_pattern(&mut self, pattern: &str, language: &str, score: f64) {
+        self.rules.push(PatternRule {
+            pattern: pattern.to_string(),
+            language: language.to_string(),
+            score: score.clamp(0.0, 1.0),
+        });
+    }
+
+    /// Scan `content` and return scored detection results.
+    ///
+    /// Each matching pattern contributes its score; when multiple patterns
+    /// map to the same language the highest score wins.
+    pub fn detect(&self, content: &str) -> Vec<DetectionResult> {
+        let mut scores: HashMap<String, f64> = HashMap::new();
+        for rule in &self.rules {
+            if content.contains(&rule.pattern) {
+                let entry = scores.entry(rule.language.clone()).or_insert(0.0);
+                if rule.score > *entry {
+                    *entry = rule.score;
+                }
+            }
+        }
+        let mut results: Vec<DetectionResult> = scores
+            .into_iter()
+            .map(|(lang, conf)| DetectionResult {
+                language_id: lang,
+                confidence: conf,
+            })
+            .collect();
+        sort_detections(&mut results);
+        results
+    }
+}
+
+impl Default for ContentPatternDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShebangParser – structured shebang parsing
+// ---------------------------------------------------------------------------
+
+/// Structured information extracted from a shebang line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShebangInfo {
+    /// The interpreter name (e.g. `python3`, `bash`).
+    pub interpreter: String,
+    /// Any arguments that follow the interpreter on the shebang line.
+    pub args: Vec<String>,
+}
+
+/// Parses shebang (`#!`) lines into structured information.
+pub struct ShebangParser;
+
+impl ShebangParser {
+    /// Parse a shebang line and return structured info.
+    ///
+    /// Returns `None` if the line does not start with `#!`.
+    pub fn parse(line: &str) -> Option<ShebangInfo> {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("#!") {
+            return None;
+        }
+        let after_hash = trimmed[2..].trim();
+        let parts: Vec<&str> = after_hash.split_whitespace().collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        // Handle `/usr/bin/env <interpreter> [args...]`
+        if parts[0].ends_with("/env") && parts.len() > 1 {
+            let interpreter = parts[1]
+                .rsplit('/')
+                .next()
+                .unwrap_or(parts[1])
+                .to_string();
+            let args = parts[2..].iter().map(|s| s.to_string()).collect();
+            return Some(ShebangInfo { interpreter, args });
+        }
+
+        // Direct path: `/usr/bin/python3 [args...]`
+        let interpreter = parts[0]
+            .rsplit('/')
+            .next()
+            .unwrap_or(parts[0])
+            .to_string();
+        let args = parts[1..].iter().map(|s| s.to_string()).collect();
+        Some(ShebangInfo { interpreter, args })
+    }
+
+    /// Map an interpreter name to a language identifier.
+    pub fn language_from_interpreter(interpreter: &str) -> Option<String> {
+        // Strip version suffixes like "python3.11" → "python"
+        let base = interpreter
+            .trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
+        match base {
+            "python" => Some("python".into()),
+            "ruby" => Some("ruby".into()),
+            "node" => Some("javascript".into()),
+            "bash" | "sh" | "zsh" | "fish" | "dash" => Some("shellscript".into()),
+            "perl" => Some("perl".into()),
+            "lua" => Some("lua".into()),
+            "Rscript" => Some("r".into()),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DetectionScorer – combine multiple signals into a final score
+// ---------------------------------------------------------------------------
+
+/// A single signal fed into the scorer.
+#[allow(dead_code)]
+struct ScorerSignal {
+    source: String,
+    language: String,
+    confidence: f64,
+}
+
+/// Combines detection signals from different sources to produce a ranked
+/// list of candidate languages.
+///
+/// Signals are weighted equally; for each language the maximum confidence
+/// across all sources is used.
+pub struct DetectionScorer {
+    signals: Vec<ScorerSignal>,
+}
+
+impl DetectionScorer {
+    /// Create an empty scorer.
+    pub fn new() -> Self {
+        Self {
+            signals: Vec::new(),
+        }
+    }
+
+    /// Record a detection signal from the named `source`.
+    pub fn add_signal(&mut self, source: &str, language: &str, confidence: f64) {
+        self.signals.push(ScorerSignal {
+            source: source.to_string(),
+            language: language.to_string(),
+            confidence: confidence.clamp(0.0, 1.0),
+        });
+    }
+
+    /// Return the single best candidate, or `None` if no signals have been
+    /// recorded.
+    pub fn best_match(&self) -> Option<DetectionResult> {
+        self.all_candidates().into_iter().next()
+    }
+
+    /// Return all candidate languages sorted by descending confidence.
+    pub fn all_candidates(&self) -> Vec<DetectionResult> {
+        let mut best: HashMap<String, f64> = HashMap::new();
+        for sig in &self.signals {
+            let entry = best.entry(sig.language.clone()).or_insert(0.0);
+            if sig.confidence > *entry {
+                *entry = sig.confidence;
+            }
+        }
+        let mut results: Vec<DetectionResult> = best
+            .into_iter()
+            .map(|(lang, conf)| DetectionResult {
+                language_id: lang,
+                confidence: conf,
+            })
+            .collect();
+        sort_detections(&mut results);
+        results
+    }
+
+    /// Return the number of signals that have been added.
+    pub fn signal_count(&self) -> usize {
+        self.signals.len()
+    }
+}
+
+impl Default for DetectionScorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1871,5 +2166,137 @@ mod tests {
         // Same confidence — shorter name first
         let ord = compare_detections(&a, &b);
         assert_eq!(ord, std::cmp::Ordering::Less);
+    }
+
+    // -----------------------------------------------------------------------
+    // DetectionCache tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cache_insert_and_get() {
+        let mut cache = DetectionCache::new(1000);
+        let result = DetectionResult { language_id: "rust".into(), confidence: 0.9 };
+        cache.insert("main.rs", result, 100);
+        assert_eq!(cache.len(), 1);
+        let got = cache.get("main.rs", 500);
+        assert!(got.is_some());
+        assert_eq!(got.unwrap().language_id, "rust");
+    }
+
+    #[test]
+    fn cache_entry_expires() {
+        let mut cache = DetectionCache::new(500);
+        let result = DetectionResult { language_id: "python".into(), confidence: 0.8 };
+        cache.insert("app.py", result, 100);
+        // Within TTL
+        assert!(cache.get("app.py", 599).is_some());
+        // Expired
+        assert!(cache.get("app.py", 600).is_none());
+    }
+
+    #[test]
+    fn cache_invalidate_and_clear() {
+        let mut cache = DetectionCache::new(5000);
+        cache.insert("a", DetectionResult { language_id: "go".into(), confidence: 0.7 }, 0);
+        cache.insert("b", DetectionResult { language_id: "c".into(), confidence: 0.6 }, 0);
+        assert_eq!(cache.len(), 2);
+        cache.invalidate("a");
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("a", 0).is_none());
+        cache.clear();
+        assert!(cache.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // ContentPatternDetector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn pattern_detector_rust() {
+        let det = ContentPatternDetector::new();
+        let results = det.detect("fn main() {\n    println!(\"hello\");\n}");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].language_id, "rust");
+    }
+
+    #[test]
+    fn pattern_detector_python() {
+        let det = ContentPatternDetector::new();
+        let results = det.detect("def hello():\n    print('hi')");
+        assert!(results.iter().any(|r| r.language_id == "python"));
+    }
+
+    #[test]
+    fn pattern_detector_add_custom() {
+        let mut det = ContentPatternDetector::new();
+        det.add_pattern("SELECT ", "sql", 0.75);
+        let results = det.detect("SELECT * FROM users;");
+        assert!(results.iter().any(|r| r.language_id == "sql"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ShebangParser tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn shebang_parse_env_python() {
+        let info = ShebangParser::parse("#!/usr/bin/env python3 -u").unwrap();
+        assert_eq!(info.interpreter, "python3");
+        assert_eq!(info.args, vec!["-u"]);
+    }
+
+    #[test]
+    fn shebang_parse_direct_path() {
+        let info = ShebangParser::parse("#!/bin/bash").unwrap();
+        assert_eq!(info.interpreter, "bash");
+        assert!(info.args.is_empty());
+    }
+
+    #[test]
+    fn shebang_no_shebang() {
+        assert!(ShebangParser::parse("just a comment").is_none());
+    }
+
+    #[test]
+    fn shebang_language_mapping() {
+        assert_eq!(ShebangParser::language_from_interpreter("python3"), Some("python".into()));
+        assert_eq!(ShebangParser::language_from_interpreter("node"), Some("javascript".into()));
+        assert_eq!(ShebangParser::language_from_interpreter("bash"), Some("shellscript".into()));
+        assert_eq!(ShebangParser::language_from_interpreter("unknown_interp"), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // DetectionScorer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scorer_best_match() {
+        let mut scorer = DetectionScorer::new();
+        scorer.add_signal("extension", "rust", 0.9);
+        scorer.add_signal("content", "python", 0.5);
+        scorer.add_signal("shebang", "python", 0.7);
+        let best = scorer.best_match().unwrap();
+        assert_eq!(best.language_id, "rust");
+        assert!((best.confidence - 0.9).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scorer_all_candidates_sorted() {
+        let mut scorer = DetectionScorer::new();
+        scorer.add_signal("ext", "go", 0.4);
+        scorer.add_signal("content", "rust", 0.8);
+        scorer.add_signal("content", "go", 0.6);
+        let candidates = scorer.all_candidates();
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].language_id, "rust");
+        // go should get the max of its two signals
+        assert!((candidates[1].confidence - 0.6).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scorer_empty_returns_none() {
+        let scorer = DetectionScorer::new();
+        assert!(scorer.best_match().is_none());
+        assert_eq!(scorer.signal_count(), 0);
     }
 }

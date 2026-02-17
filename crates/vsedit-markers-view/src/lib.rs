@@ -982,6 +982,182 @@ pub fn format_uri_report(markers: &[Marker], uri: &str) -> String {
     lines.join("\n")
 }
 
+// ---------------------------------------------------------------------------
+// MarkerTableSort — sort markers by different columns
+// ---------------------------------------------------------------------------
+
+/// Column by which to sort a list of markers in a table view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MarkerTableSort {
+    ByFile,
+    BySeverity,
+    ByMessage,
+    ByLine,
+    BySource,
+}
+
+impl MarkerTableSort {
+    /// Sort `markers` in place using the chosen column (unstable sort).
+    pub fn sort(markers: &mut [Marker], order: MarkerTableSort) {
+        match order {
+            MarkerTableSort::ByFile => markers.sort_unstable_by(|a, b| a.uri.cmp(&b.uri)),
+            MarkerTableSort::BySeverity => {
+                markers.sort_unstable_by(|a, b| a.severity.cmp(&b.severity))
+            }
+            MarkerTableSort::ByMessage => {
+                markers.sort_unstable_by(|a, b| a.message.cmp(&b.message))
+            }
+            MarkerTableSort::ByLine => {
+                markers.sort_unstable_by(|a, b| {
+                    a.start_line.cmp(&b.start_line).then(a.start_col.cmp(&b.start_col))
+                })
+            }
+            MarkerTableSort::BySource => markers.sort_unstable_by(|a, b| a.source.cmp(&b.source)),
+        }
+    }
+
+    /// Sort `markers` in place using the chosen column (stable sort).
+    pub fn sort_stable(markers: &mut [Marker], order: MarkerTableSort) {
+        match order {
+            MarkerTableSort::ByFile => markers.sort_by(|a, b| a.uri.cmp(&b.uri)),
+            MarkerTableSort::BySeverity => markers.sort_by(|a, b| a.severity.cmp(&b.severity)),
+            MarkerTableSort::ByMessage => markers.sort_by(|a, b| a.message.cmp(&b.message)),
+            MarkerTableSort::ByLine => {
+                markers.sort_by(|a, b| {
+                    a.start_line.cmp(&b.start_line).then(a.start_col.cmp(&b.start_col))
+                })
+            }
+            MarkerTableSort::BySource => markers.sort_by(|a, b| a.source.cmp(&b.source)),
+        }
+    }
+}
+
+impl std::fmt::Display for MarkerTableSort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self {
+            MarkerTableSort::ByFile => "File",
+            MarkerTableSort::BySeverity => "Severity",
+            MarkerTableSort::ByMessage => "Message",
+            MarkerTableSort::ByLine => "Line",
+            MarkerTableSort::BySource => "Source",
+        };
+        f.write_str(label)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerQuickFixRegistry — manage quick-fix associations
+// ---------------------------------------------------------------------------
+
+/// Registry that maps marker indices to their available quick fixes.
+#[derive(Debug, Clone, Default)]
+pub struct MarkerQuickFixRegistry {
+    fixes: Vec<(usize, MarkerQuickFix)>,
+}
+
+impl MarkerQuickFixRegistry {
+    pub fn new() -> Self {
+        Self { fixes: Vec::new() }
+    }
+
+    /// Register a quick fix for the marker at `marker_index`.
+    pub fn register(&mut self, marker_index: usize, fix: MarkerQuickFix) {
+        self.fixes.push((marker_index, fix));
+    }
+
+    /// Return references to all fixes associated with `idx`.
+    pub fn fixes_for_marker(&self, idx: usize) -> Vec<&MarkerQuickFix> {
+        self.fixes.iter().filter(|(i, _)| *i == idx).map(|(_, f)| f).collect()
+    }
+
+    /// Remove every fix associated with `idx`.
+    pub fn remove_for_marker(&mut self, idx: usize) {
+        self.fixes.retain(|(i, _)| *i != idx);
+    }
+
+    /// All registered (index, fix) pairs.
+    pub fn all(&self) -> &[(usize, MarkerQuickFix)] {
+        &self.fixes
+    }
+
+    /// Total number of registered fixes.
+    pub fn count(&self) -> usize {
+        self.fixes.len()
+    }
+
+    /// Whether any fix is registered for `idx`.
+    pub fn has_fixes(&self, idx: usize) -> bool {
+        self.fixes.iter().any(|(i, _)| *i == idx)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerBatchActions — bulk operations on marker vectors
+// ---------------------------------------------------------------------------
+
+/// Stateless helpers for bulk marker operations.
+pub struct MarkerBatchActions;
+
+impl MarkerBatchActions {
+    /// Remove all markers that match `severity`.
+    pub fn dismiss_all(markers: &mut Vec<Marker>, severity: MarkerSeverity) {
+        markers.retain(|m| m.severity != severity);
+    }
+
+    /// Keep only markers that match `severity`, removing everything else.
+    pub fn retain_only(markers: &mut Vec<Marker>, severity: MarkerSeverity) {
+        markers.retain(|m| m.severity == severity);
+    }
+
+    /// Remove markers whose `source` matches `source` exactly.
+    pub fn clear_source(markers: &mut Vec<Marker>, source: &str) {
+        markers.retain(|m| m.source.as_deref() != Some(source));
+    }
+
+    /// Count markers grouped by severity label.
+    pub fn count_by_severity(markers: &[Marker]) -> std::collections::HashMap<String, usize> {
+        let mut map = std::collections::HashMap::new();
+        for m in markers {
+            *map.entry(m.severity.label().to_string()).or_insert(0) += 1;
+        }
+        map
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerSeverityIconMapper — emoji/text icons for severity levels
+// ---------------------------------------------------------------------------
+
+/// Maps severity levels to visual icons for terminal or UI rendering.
+pub struct MarkerSeverityIconMapper;
+
+impl MarkerSeverityIconMapper {
+    /// Return an emoji icon for the given severity.
+    pub fn icon(severity: &MarkerSeverity) -> &'static str {
+        match severity {
+            MarkerSeverity::Error => "❌",
+            MarkerSeverity::Warning => "⚠️",
+            MarkerSeverity::Info => "ℹ️",
+            MarkerSeverity::Hint => "💡",
+        }
+    }
+
+    /// Return "icon label" string, e.g. `"❌ error"`.
+    pub fn label_with_icon(severity: &MarkerSeverity) -> String {
+        format!("{} {}", Self::icon(severity), severity.label())
+    }
+
+    /// All severity icons as `(label, icon)` pairs.
+    pub fn all_icons() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("error", "❌"),
+            ("warning", "⚠️"),
+            ("info", "ℹ️"),
+            ("hint", "💡"),
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1910,5 +2086,172 @@ mod tests {
     #[test]
     fn format_uri_report_no_markers() {
         assert!(format_uri_report(&[], "src/main.rs").contains("no diagnostics"));
+    }
+
+    // -- MarkerTableSort tests -----------------------------------------------
+
+    #[test]
+    fn table_sort_by_severity() {
+        let mut markers = vec![
+            make_marker("a.rs", MarkerSeverity::Hint, "h"),
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+        ];
+        MarkerTableSort::sort(&mut markers, MarkerTableSort::BySeverity);
+        assert_eq!(markers[0].severity, MarkerSeverity::Error);
+        assert_eq!(markers[1].severity, MarkerSeverity::Warning);
+        assert_eq!(markers[2].severity, MarkerSeverity::Hint);
+    }
+
+    #[test]
+    fn table_sort_by_file() {
+        let mut markers = vec![
+            make_marker("z.rs", MarkerSeverity::Error, "e"),
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+        ];
+        MarkerTableSort::sort(&mut markers, MarkerTableSort::ByFile);
+        assert_eq!(markers[0].uri, "a.rs");
+        assert_eq!(markers[1].uri, "z.rs");
+    }
+
+    #[test]
+    fn table_sort_by_line() {
+        let mut markers = vec![
+            make_marker_ext("a.rs", MarkerSeverity::Error, "e2", 10, None),
+            make_marker_ext("a.rs", MarkerSeverity::Error, "e1", 1, None),
+        ];
+        MarkerTableSort::sort(&mut markers, MarkerTableSort::ByLine);
+        assert_eq!(markers[0].start_line, 1);
+        assert_eq!(markers[1].start_line, 10);
+    }
+
+    #[test]
+    fn table_sort_stable_preserves_order() {
+        let mut markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "beta"),
+            make_marker("a.rs", MarkerSeverity::Error, "alpha"),
+        ];
+        MarkerTableSort::sort_stable(&mut markers, MarkerTableSort::BySeverity);
+        // Same severity — stable sort preserves insertion order.
+        assert_eq!(markers[0].message, "beta");
+        assert_eq!(markers[1].message, "alpha");
+    }
+
+    #[test]
+    fn table_sort_display() {
+        assert_eq!(MarkerTableSort::ByFile.to_string(), "File");
+        assert_eq!(MarkerTableSort::BySeverity.to_string(), "Severity");
+        assert_eq!(MarkerTableSort::BySource.to_string(), "Source");
+    }
+
+    // -- MarkerQuickFixRegistry tests ----------------------------------------
+
+    #[test]
+    fn registry_register_and_query() {
+        let mut reg = MarkerQuickFixRegistry::new();
+        let fix = MarkerQuickFix::new("Add import", "a.rs", 1, 0, "use std::io;");
+        reg.register(0, fix);
+        assert_eq!(reg.count(), 1);
+        assert!(reg.has_fixes(0));
+        assert!(!reg.has_fixes(1));
+        assert_eq!(reg.fixes_for_marker(0).len(), 1);
+        assert_eq!(reg.fixes_for_marker(0)[0].title, "Add import");
+    }
+
+    #[test]
+    fn registry_remove_for_marker() {
+        let mut reg = MarkerQuickFixRegistry::new();
+        reg.register(0, MarkerQuickFix::new("fix1", "a.rs", 1, 0, "t1"));
+        reg.register(0, MarkerQuickFix::new("fix2", "a.rs", 2, 0, "t2"));
+        reg.register(1, MarkerQuickFix::new("fix3", "b.rs", 1, 0, "t3"));
+        assert_eq!(reg.count(), 3);
+        reg.remove_for_marker(0);
+        assert_eq!(reg.count(), 1);
+        assert!(!reg.has_fixes(0));
+        assert!(reg.has_fixes(1));
+    }
+
+    #[test]
+    fn registry_all_returns_slice() {
+        let mut reg = MarkerQuickFixRegistry::new();
+        reg.register(5, MarkerQuickFix::new("f", "x.rs", 1, 0, "txt"));
+        let all = reg.all();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, 5);
+    }
+
+    // -- MarkerBatchActions tests --------------------------------------------
+
+    #[test]
+    fn batch_dismiss_all_removes_severity() {
+        let mut markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+            make_marker("a.rs", MarkerSeverity::Error, "e2"),
+        ];
+        MarkerBatchActions::dismiss_all(&mut markers, MarkerSeverity::Error);
+        assert_eq!(markers.len(), 1);
+        assert_eq!(markers[0].severity, MarkerSeverity::Warning);
+    }
+
+    #[test]
+    fn batch_retain_only_keeps_severity() {
+        let mut markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+            make_marker("a.rs", MarkerSeverity::Info, "i"),
+        ];
+        MarkerBatchActions::retain_only(&mut markers, MarkerSeverity::Warning);
+        assert_eq!(markers.len(), 1);
+        assert_eq!(markers[0].severity, MarkerSeverity::Warning);
+    }
+
+    #[test]
+    fn batch_clear_source() {
+        let mut markers = vec![
+            make_marker_ext("a.rs", MarkerSeverity::Error, "e", 1, Some("rustc")),
+            make_marker_ext("a.rs", MarkerSeverity::Warning, "w", 2, Some("clippy")),
+            make_marker_ext("a.rs", MarkerSeverity::Info, "i", 3, Some("rustc")),
+        ];
+        MarkerBatchActions::clear_source(&mut markers, "rustc");
+        assert_eq!(markers.len(), 1);
+        assert_eq!(markers[0].source.as_deref(), Some("clippy"));
+    }
+
+    #[test]
+    fn batch_count_by_severity() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("a.rs", MarkerSeverity::Error, "e2"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+        ];
+        let counts = MarkerBatchActions::count_by_severity(&markers);
+        assert_eq!(counts.get("error"), Some(&2));
+        assert_eq!(counts.get("warning"), Some(&1));
+        assert_eq!(counts.get("info"), None);
+    }
+
+    // -- MarkerSeverityIconMapper tests --------------------------------------
+
+    #[test]
+    fn icon_mapper_returns_correct_icons() {
+        assert_eq!(MarkerSeverityIconMapper::icon(&MarkerSeverity::Error), "❌");
+        assert_eq!(MarkerSeverityIconMapper::icon(&MarkerSeverity::Warning), "⚠️");
+        assert_eq!(MarkerSeverityIconMapper::icon(&MarkerSeverity::Info), "ℹ️");
+        assert_eq!(MarkerSeverityIconMapper::icon(&MarkerSeverity::Hint), "💡");
+    }
+
+    #[test]
+    fn icon_mapper_label_with_icon() {
+        let label = MarkerSeverityIconMapper::label_with_icon(&MarkerSeverity::Error);
+        assert!(label.contains("❌"));
+        assert!(label.contains("error"));
+    }
+
+    #[test]
+    fn icon_mapper_all_icons() {
+        let icons = MarkerSeverityIconMapper::all_icons();
+        assert_eq!(icons.len(), 4);
+        assert_eq!(icons[0], ("error", "❌"));
     }
 }

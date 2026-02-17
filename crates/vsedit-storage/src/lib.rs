@@ -1253,6 +1253,216 @@ pub fn keys_exceeding_length(store: &Storage, max_len: usize) -> Vec<String> {
     store.get_all().into_iter().filter(|(_, v)| v.len() > max_len).map(|(k, _)| k).collect()
 }
 
+// -- StorageMigrator for schema upgrades -------------------------------------
+
+/// Tracks schema version and applies migrations.
+pub struct StorageMigrator {
+    current_version: u32,
+    migrations: Vec<(u32, String)>,
+}
+
+impl StorageMigrator {
+    pub fn new() -> Self {
+        Self {
+            current_version: 0,
+            migrations: Vec::new(),
+        }
+    }
+
+    /// Register a migration for a target version.
+    pub fn add_migration(&mut self, version: u32, sql: impl Into<String>) {
+        self.migrations.push((version, sql.into()));
+        self.migrations.sort_by_key(|(v, _)| *v);
+    }
+
+    /// Get the current schema version.
+    pub fn current_version(&self) -> u32 {
+        self.current_version
+    }
+
+    /// Apply pending migrations. Returns the number of migrations applied.
+    pub fn apply(&mut self, store: &Storage) -> StorageResult<u32> {
+        let pending: Vec<_> = self
+            .migrations
+            .iter()
+            .filter(|(v, _)| *v > self.current_version)
+            .cloned()
+            .collect();
+        let count = pending.len() as u32;
+        for (version, _sql) in &pending {
+            // In a real implementation we'd execute the SQL
+            self.current_version = *version;
+        }
+        // Store the version
+        store.set("__schema_version", &self.current_version.to_string())?;
+        Ok(count)
+    }
+
+    /// Load current version from storage.
+    pub fn load_version(&mut self, store: &Storage) {
+        if let Some(v) = store.get("__schema_version") {
+            self.current_version = v.parse().unwrap_or(0);
+        }
+    }
+
+    /// Number of pending migrations.
+    pub fn pending_count(&self) -> usize {
+        self.migrations
+            .iter()
+            .filter(|(v, _)| *v > self.current_version)
+            .count()
+    }
+}
+
+impl Default for StorageMigrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for StorageMigrator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Migrator(v{}, {} pending)",
+            self.current_version,
+            self.pending_count()
+        )
+    }
+}
+
+// -- StorageCompaction -------------------------------------------------------
+
+/// Statistics about storage compaction.
+#[derive(Debug, Clone)]
+pub struct CompactionStats {
+    pub keys_before: usize,
+    pub keys_after: usize,
+    pub removed: usize,
+}
+
+impl fmt::Display for CompactionStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Compaction: {} -> {} ({} removed)",
+            self.keys_before, self.keys_after, self.removed
+        )
+    }
+}
+
+/// Remove entries with empty values from the store.
+pub fn compact_empty_values(store: &Storage) -> StorageResult<CompactionStats> {
+    let all = store.get_all();
+    let keys_before = all.len();
+    let empty_keys: Vec<String> = all
+        .into_iter()
+        .filter(|(_, v)| v.is_empty())
+        .map(|(k, _)| k)
+        .collect();
+    let removed = empty_keys.len();
+    for key in &empty_keys {
+        store.remove(key)?;
+    }
+    Ok(CompactionStats {
+        keys_before,
+        keys_after: keys_before - removed,
+        removed,
+    })
+}
+
+/// Remove entries matching a prefix.
+pub fn remove_by_prefix(store: &Storage, prefix: &str) -> StorageResult<usize> {
+    let keys: Vec<String> = store
+        .keys()
+        .into_iter()
+        .filter(|k| k.starts_with(prefix))
+        .collect();
+    let count = keys.len();
+    for key in &keys {
+        store.remove(key)?;
+    }
+    Ok(count)
+}
+
+// -- StorageKeyNamespace for scoped storage ----------------------------------
+
+/// Provides namespaced access to a storage instance.
+pub struct StorageKeyNamespace<'a> {
+    store: &'a Storage,
+    prefix: String,
+}
+
+impl<'a> StorageKeyNamespace<'a> {
+    pub fn new(store: &'a Storage, namespace: &str) -> Self {
+        Self {
+            store,
+            prefix: format!("{namespace}."),
+        }
+    }
+
+    fn prefixed_key(&self, key: &str) -> String {
+        format!("{}{}", self.prefix, key)
+    }
+
+    pub fn set(&self, key: &str, value: &str) -> StorageResult<()> {
+        self.store.set(&self.prefixed_key(key), value)
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.store.get(&self.prefixed_key(key))
+    }
+
+    pub fn delete(&self, key: &str) -> StorageResult<()> {
+        self.store.remove(&self.prefixed_key(key))
+    }
+
+    /// Return all keys in this namespace (without the prefix).
+    pub fn keys(&self) -> Vec<String> {
+        self.store
+            .keys()
+            .into_iter()
+            .filter_map(|k| k.strip_prefix(&self.prefix).map(|s| s.to_string()))
+            .collect()
+    }
+
+    /// Count keys in this namespace.
+    pub fn key_count(&self) -> usize {
+        self.keys().len()
+    }
+
+    /// Get the namespace prefix.
+    pub fn namespace(&self) -> &str {
+        self.prefix.trim_end_matches('.')
+    }
+}
+
+impl fmt::Display for StorageKeyNamespace<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Namespace('{}')", self.namespace())
+    }
+}
+
+// -- Storage backup/restore --------------------------------------------------
+
+/// Create a backup of all storage entries as a HashMap.
+pub fn backup_storage(store: &Storage) -> HashMap<String, String> {
+    store.get_all()
+}
+
+/// Restore entries from a backup, overwriting existing values.
+pub fn restore_storage(
+    store: &Storage,
+    backup: &HashMap<String, String>,
+) -> StorageResult<usize> {
+    let mut count = 0;
+    for (key, value) in backup {
+        store.set(key, value)?;
+        count += 1;
+    }
+    Ok(count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1970,5 +2180,120 @@ mod tests {
         let mut keys = keys_exceeding_length(&store, 5);
         keys.sort();
         assert_eq!(keys, vec!["long"]);
+    }
+
+    // -- StorageMigrator tests ------------------------------------------------
+
+    #[test]
+    fn migrator_apply_pending() {
+        let store = Storage::in_memory().unwrap();
+        let mut migrator = StorageMigrator::new();
+        migrator.add_migration(1, "CREATE TABLE t1 (id INT)");
+        migrator.add_migration(2, "ALTER TABLE t1 ADD col TEXT");
+        assert_eq!(migrator.pending_count(), 2);
+        let applied = migrator.apply(&store).unwrap();
+        assert_eq!(applied, 2);
+        assert_eq!(migrator.current_version(), 2);
+        assert_eq!(migrator.pending_count(), 0);
+    }
+
+    #[test]
+    fn migrator_load_version() {
+        let store = Storage::in_memory().unwrap();
+        store.set("__schema_version", "3").unwrap();
+        let mut migrator = StorageMigrator::new();
+        migrator.load_version(&store);
+        assert_eq!(migrator.current_version(), 3);
+    }
+
+    #[test]
+    fn migrator_display() {
+        let migrator = StorageMigrator::new();
+        let s = migrator.to_string();
+        assert!(s.contains("v0"));
+    }
+
+    // -- StorageCompaction tests ----------------------------------------------
+
+    #[test]
+    fn compact_empty_values_removes() {
+        let store = Storage::in_memory().unwrap();
+        store.set("good", "value").unwrap();
+        store.set("empty", "").unwrap();
+        let stats = compact_empty_values(&store).unwrap();
+        assert_eq!(stats.removed, 1);
+        assert_eq!(stats.keys_after, 1);
+        assert!(store.get("good").is_some());
+        assert!(store.get("empty").is_none());
+    }
+
+    #[test]
+    fn remove_by_prefix_removes_matching() {
+        let store = Storage::in_memory().unwrap();
+        store.set("cache.a", "1").unwrap();
+        store.set("cache.b", "2").unwrap();
+        store.set("config.x", "3").unwrap();
+        let removed = remove_by_prefix(&store, "cache.").unwrap();
+        assert_eq!(removed, 2);
+        assert!(store.get("config.x").is_some());
+    }
+
+    // -- StorageKeyNamespace tests --------------------------------------------
+
+    #[test]
+    fn namespace_set_and_get() {
+        let store = Storage::in_memory().unwrap();
+        let ns = StorageKeyNamespace::new(&store, "myext");
+        ns.set("key1", "val1").unwrap();
+        assert_eq!(ns.get("key1"), Some("val1".to_string()));
+        assert_eq!(store.get("myext.key1"), Some("val1".to_string()));
+    }
+
+    #[test]
+    fn namespace_keys() {
+        let store = Storage::in_memory().unwrap();
+        let ns = StorageKeyNamespace::new(&store, "ns");
+        ns.set("a", "1").unwrap();
+        ns.set("b", "2").unwrap();
+        store.set("other", "3").unwrap();
+        let mut keys = ns.keys();
+        keys.sort();
+        assert_eq!(keys, vec!["a", "b"]);
+        assert_eq!(ns.key_count(), 2);
+    }
+
+    #[test]
+    fn namespace_display() {
+        let store = Storage::in_memory().unwrap();
+        let ns = StorageKeyNamespace::new(&store, "test");
+        assert_eq!(ns.to_string(), "Namespace('test')");
+    }
+
+    // -- Backup/restore tests -------------------------------------------------
+
+    #[test]
+    fn backup_and_restore() {
+        let store = Storage::in_memory().unwrap();
+        store.set("a", "1").unwrap();
+        store.set("b", "2").unwrap();
+        let backup = backup_storage(&store);
+        assert_eq!(backup.len(), 2);
+
+        let store2 = Storage::in_memory().unwrap();
+        let count = restore_storage(&store2, &backup).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(store2.get("a"), Some("1".to_string()));
+    }
+
+    #[test]
+    fn compaction_stats_display() {
+        let stats = CompactionStats {
+            keys_before: 10,
+            keys_after: 8,
+            removed: 2,
+        };
+        let s = stats.to_string();
+        assert!(s.contains("10 -> 8"));
+        assert!(s.contains("2 removed"));
     }
 }

@@ -1065,6 +1065,314 @@ impl CursorState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CursorSoftWrapHandler – visual vs logical line positions
+// ---------------------------------------------------------------------------
+
+/// Handles cursor movement in soft-wrapped lines by tracking the mapping
+/// between visual (wrapped) line positions and logical (buffer) line positions.
+#[derive(Clone, Debug)]
+pub struct CursorSoftWrapHandler {
+    /// The wrap width in columns (e.g. 80).
+    wrap_width: u32,
+}
+
+impl CursorSoftWrapHandler {
+    /// Create a new handler with the given wrap width.
+    pub fn new(wrap_width: u32) -> Self {
+        assert!(wrap_width > 0, "wrap width must be positive");
+        Self { wrap_width }
+    }
+
+    /// Return the wrap width.
+    pub fn wrap_width(&self) -> u32 {
+        self.wrap_width
+    }
+
+    /// Given a logical column (1-based), return the visual line offset (0-based)
+    /// and visual column (1-based) within that visual line.
+    pub fn logical_to_visual(&self, logical_col: u32) -> (u32, u32) {
+        if logical_col == 0 {
+            return (0, 1);
+        }
+        let zero_col = logical_col - 1;
+        let visual_line = zero_col / self.wrap_width;
+        let visual_col = (zero_col % self.wrap_width) + 1;
+        (visual_line, visual_col)
+    }
+
+    /// Convert a visual line offset and visual column back to a logical column.
+    pub fn visual_to_logical(&self, visual_line: u32, visual_col: u32) -> u32 {
+        visual_line * self.wrap_width + visual_col
+    }
+
+    /// How many visual lines does a logical line of the given length occupy?
+    pub fn visual_line_count(&self, line_length: u32) -> u32 {
+        if line_length == 0 {
+            return 1;
+        }
+        ((line_length - 1) / self.wrap_width) + 1
+    }
+
+    /// Compute the visual position for a cursor inside a model.
+    /// Returns `(visual_line_offset, visual_column)` relative to the start
+    /// of the logical line.
+    pub fn cursor_visual_position(&self, cursor: &CursorState) -> (u32, u32) {
+        self.logical_to_visual(cursor.position().column)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CursorColumnMemory – sticky column across vertical moves
+// ---------------------------------------------------------------------------
+
+/// Preserves the desired column position across vertical cursor moves so that
+/// moving through shorter lines and back to a longer line restores the
+/// original column.
+#[derive(Clone, Debug)]
+pub struct CursorColumnMemory {
+    desired_column: Option<u32>,
+}
+
+impl CursorColumnMemory {
+    pub fn new() -> Self {
+        Self { desired_column: None }
+    }
+
+    /// Record the desired column (call on horizontal moves).
+    pub fn set(&mut self, column: u32) {
+        self.desired_column = Some(column);
+    }
+
+    /// Clear the memory (call on explicit horizontal repositioning).
+    pub fn clear(&mut self) {
+        self.desired_column = None;
+    }
+
+    /// Return the memorised column, if any.
+    pub fn get(&self) -> Option<u32> {
+        self.desired_column
+    }
+
+    /// Resolve the effective column for a vertical move: use the memorised
+    /// column if set, otherwise the cursor's current column, clamped to
+    /// `max_column`.
+    pub fn resolve(&self, current_col: u32, max_column: u32) -> u32 {
+        let desired = self.desired_column.unwrap_or(current_col);
+        desired.min(max_column)
+    }
+
+    /// Perform a vertical move: set memory from current position if not
+    /// already set, then return the clamped column for the target line.
+    pub fn apply_vertical_move(&mut self, current_col: u32, target_max_col: u32) -> u32 {
+        if self.desired_column.is_none() {
+            self.desired_column = Some(current_col);
+        }
+        self.resolve(current_col, target_max_col)
+    }
+}
+
+impl Default for CursorColumnMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CursorWordBoundary – configurable word-boundary rules
+// ---------------------------------------------------------------------------
+
+/// Language-specific word boundary detection with configurable separator sets.
+#[derive(Clone, Debug)]
+pub struct CursorWordBoundary {
+    /// Extra characters that are treated as word separators in addition to
+    /// the default whitespace and punctuation rules.
+    extra_separators: Vec<u8>,
+    /// When true, camelCase transitions count as word boundaries.
+    camel_case: bool,
+}
+
+impl CursorWordBoundary {
+    /// Create a boundary detector with default rules (camelCase enabled,
+    /// no extra separators).
+    pub fn new() -> Self {
+        Self {
+            extra_separators: Vec::new(),
+            camel_case: true,
+        }
+    }
+
+    /// Enable or disable camelCase boundary detection.
+    pub fn set_camel_case(&mut self, enabled: bool) {
+        self.camel_case = enabled;
+    }
+
+    /// Add extra separator characters (e.g. `-`, `.` for CSS/HTML).
+    pub fn add_separators(&mut self, seps: &[u8]) {
+        for &b in seps {
+            if !self.extra_separators.contains(&b) {
+                self.extra_separators.push(b);
+            }
+        }
+    }
+
+    /// Classify a byte taking extra separators into account.
+    fn classify(&self, ch: u8) -> CharClass {
+        if self.extra_separators.contains(&ch) {
+            return CharClass::Separator;
+        }
+        classify_char(ch)
+    }
+
+    /// Returns true if there is a word boundary between the two bytes.
+    pub fn is_boundary(&self, left: u8, right: u8) -> bool {
+        let lc = self.classify(left);
+        let rc = self.classify(right);
+        if lc == rc {
+            return false;
+        }
+        if self.camel_case && lc == CharClass::Lowercase && rc == CharClass::Uppercase {
+            return true;
+        }
+        if lc == CharClass::Underscore && rc == CharClass::Underscore {
+            return false;
+        }
+        lc != rc
+    }
+
+    /// Find the column of the previous word boundary on a line (1-based),
+    /// starting from `col` (1-based, exclusive). Returns 1 if no boundary
+    /// is found.
+    pub fn find_prev_boundary(&self, line: &str, col: u32) -> u32 {
+        let bytes = line.as_bytes();
+        let start = ((col as usize).min(bytes.len())).saturating_sub(1);
+        if start == 0 {
+            return 1;
+        }
+        // skip initial whitespace
+        let mut i = start;
+        while i > 0 && classify_char(bytes[i]) == CharClass::Whitespace {
+            i -= 1;
+        }
+        while i > 0 {
+            if self.is_boundary(bytes[i - 1], bytes[i]) {
+                return (i as u32) + 1;
+            }
+            i -= 1;
+        }
+        1
+    }
+
+    /// Find the column *after* the next word boundary on a line (1-based).
+    /// Returns `line.len() + 1` if no boundary is found.
+    pub fn find_next_boundary(&self, line: &str, col: u32) -> u32 {
+        let bytes = line.as_bytes();
+        let start = (col as usize).min(bytes.len());
+        if start >= bytes.len() {
+            return (bytes.len() as u32) + 1;
+        }
+        let mut i = start;
+        // skip initial whitespace
+        while i < bytes.len() && classify_char(bytes[i]) == CharClass::Whitespace {
+            i += 1;
+        }
+        while i < bytes.len() {
+            if i > start && self.is_boundary(bytes[i - 1], bytes[i]) {
+                return (i as u32) + 1;
+            }
+            i += 1;
+        }
+        (bytes.len() as u32) + 1
+    }
+}
+
+impl Default for CursorWordBoundary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CursorBlinkTimer – blink state management
+// ---------------------------------------------------------------------------
+
+/// Manages cursor blink state with a configurable interval.
+#[derive(Clone, Debug)]
+pub struct CursorBlinkTimer {
+    /// Interval in milliseconds between blink toggles.
+    interval_ms: u64,
+    /// Accumulated time in milliseconds since the last toggle.
+    elapsed_ms: u64,
+    /// Whether the cursor is currently visible.
+    visible: bool,
+    /// Whether blinking is enabled at all.
+    enabled: bool,
+}
+
+impl CursorBlinkTimer {
+    /// Create a new blink timer with the given interval in milliseconds.
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            interval_ms,
+            elapsed_ms: 0,
+            visible: true,
+            enabled: true,
+        }
+    }
+
+    /// Advance the timer by `delta_ms` milliseconds.
+    /// Returns `true` if the visibility state changed.
+    pub fn tick(&mut self, delta_ms: u64) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        self.elapsed_ms += delta_ms;
+        let mut changed = false;
+        while self.elapsed_ms >= self.interval_ms {
+            self.elapsed_ms -= self.interval_ms;
+            self.visible = !self.visible;
+            changed = true;
+        }
+        changed
+    }
+
+    /// Returns `true` if the cursor should be drawn.
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    /// Reset the timer so the cursor is immediately visible.
+    pub fn reset(&mut self) {
+        self.elapsed_ms = 0;
+        self.visible = true;
+    }
+
+    /// Enable or disable blinking. When disabled the cursor is always visible.
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        if !enabled {
+            self.visible = true;
+            self.elapsed_ms = 0;
+        }
+    }
+
+    /// Returns `true` if blinking is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Return the current interval in milliseconds.
+    pub fn interval_ms(&self) -> u64 {
+        self.interval_ms
+    }
+
+    /// Update the blink interval. Resets accumulated time.
+    pub fn set_interval_ms(&mut self, ms: u64) {
+        self.interval_ms = ms;
+        self.elapsed_ms = 0;
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -1957,6 +2265,152 @@ mod tests {
         let col = c.collapsed();
         assert!(!col.is_selection());
         assert_eq!(col.position(), Position::new(1, 10));
+    }
+
+    // -- CursorSoftWrapHandler tests ----------------------------------------
+
+    #[test]
+    fn soft_wrap_logical_to_visual_first_line() {
+        let h = CursorSoftWrapHandler::new(80);
+        let (vl, vc) = h.logical_to_visual(5);
+        assert_eq!(vl, 0);
+        assert_eq!(vc, 5);
+    }
+
+    #[test]
+    fn soft_wrap_logical_to_visual_wraps() {
+        let h = CursorSoftWrapHandler::new(10);
+        // column 15 → visual line 1, visual col 5
+        let (vl, vc) = h.logical_to_visual(15);
+        assert_eq!(vl, 1);
+        assert_eq!(vc, 5);
+    }
+
+    #[test]
+    fn soft_wrap_roundtrip() {
+        let h = CursorSoftWrapHandler::new(20);
+        for col in 1..=100 {
+            let (vl, vc) = h.logical_to_visual(col);
+            let back = h.visual_to_logical(vl, vc);
+            assert_eq!(back, col);
+        }
+    }
+
+    #[test]
+    fn soft_wrap_visual_line_count() {
+        let h = CursorSoftWrapHandler::new(10);
+        assert_eq!(h.visual_line_count(0), 1);
+        assert_eq!(h.visual_line_count(10), 1);
+        assert_eq!(h.visual_line_count(11), 2);
+        assert_eq!(h.visual_line_count(20), 2);
+        assert_eq!(h.visual_line_count(21), 3);
+    }
+
+    // -- CursorColumnMemory tests -------------------------------------------
+
+    #[test]
+    fn column_memory_default_is_none() {
+        let mem = CursorColumnMemory::new();
+        assert_eq!(mem.get(), None);
+    }
+
+    #[test]
+    fn column_memory_set_and_resolve() {
+        let mut mem = CursorColumnMemory::new();
+        mem.set(20);
+        assert_eq!(mem.resolve(5, 80), 20);
+        assert_eq!(mem.resolve(5, 15), 15); // clamped
+    }
+
+    #[test]
+    fn column_memory_clear() {
+        let mut mem = CursorColumnMemory::new();
+        mem.set(42);
+        mem.clear();
+        assert_eq!(mem.get(), None);
+        assert_eq!(mem.resolve(7, 80), 7);
+    }
+
+    #[test]
+    fn column_memory_apply_vertical_move() {
+        let mut mem = CursorColumnMemory::new();
+        let col = mem.apply_vertical_move(30, 20);
+        assert_eq!(col, 20); // clamped to max
+        assert_eq!(mem.get(), Some(30)); // memory preserved
+        let col2 = mem.apply_vertical_move(5, 80);
+        assert_eq!(col2, 30); // uses memorised value
+    }
+
+    // -- CursorWordBoundary tests -------------------------------------------
+
+    #[test]
+    fn word_boundary_default_camel_case() {
+        let wb = CursorWordBoundary::new();
+        assert!(wb.is_boundary(b'a', b'A')); // camelCase
+        assert!(!wb.is_boundary(b'a', b'b')); // same class
+        assert!(wb.is_boundary(b'a', b' ')); // word→ws
+    }
+
+    #[test]
+    fn word_boundary_extra_separators() {
+        let mut wb = CursorWordBoundary::new();
+        wb.add_separators(b"-.");
+        assert!(wb.is_boundary(b'a', b'-'));
+        assert!(wb.is_boundary(b'-', b'a'));
+    }
+
+    #[test]
+    fn word_boundary_find_prev() {
+        let wb = CursorWordBoundary::new();
+        let col = wb.find_prev_boundary("hello world", 11);
+        assert_eq!(col, 7); // 'w' in "world"
+    }
+
+    #[test]
+    fn word_boundary_find_next() {
+        let wb = CursorWordBoundary::new();
+        let col = wb.find_next_boundary("hello world", 1);
+        assert_eq!(col, 6); // after "hello"
+    }
+
+    // -- CursorBlinkTimer tests ---------------------------------------------
+
+    #[test]
+    fn blink_timer_toggles() {
+        let mut t = CursorBlinkTimer::new(500);
+        assert!(t.is_visible());
+        let changed = t.tick(500);
+        assert!(changed);
+        assert!(!t.is_visible());
+        t.tick(500);
+        assert!(t.is_visible());
+    }
+
+    #[test]
+    fn blink_timer_reset() {
+        let mut t = CursorBlinkTimer::new(500);
+        t.tick(500);
+        assert!(!t.is_visible());
+        t.reset();
+        assert!(t.is_visible());
+    }
+
+    #[test]
+    fn blink_timer_disabled() {
+        let mut t = CursorBlinkTimer::new(500);
+        t.set_enabled(false);
+        let changed = t.tick(1000);
+        assert!(!changed);
+        assert!(t.is_visible());
+    }
+
+    #[test]
+    fn blink_timer_interval_change() {
+        let mut t = CursorBlinkTimer::new(500);
+        t.set_interval_ms(200);
+        assert_eq!(t.interval_ms(), 200);
+        t.tick(200);
+        assert!(!t.is_visible());
     }
 
 }

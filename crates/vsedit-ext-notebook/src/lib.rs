@@ -3,6 +3,7 @@
 //! RPC bridge between the extension host and the main thread for notebook support.
 
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
 /// Proxy identifier for this extension API namespace.
@@ -1128,6 +1129,212 @@ impl NotebookExporter {
     }
 }
 
+// ── Kernel Matcher ──────────────────────────────────────────────────────────
+
+/// Matches kernels to notebooks based on language overlap.
+pub struct NotebookKernelMatcher;
+
+impl NotebookKernelMatcher {
+    /// Returns the number of cells whose language is supported by `kernel`.
+    pub fn match_score(kernel: &NotebookKernel, notebook: &NotebookDocument) -> usize {
+        notebook
+            .cells
+            .iter()
+            .filter(|c| kernel.supported_languages.contains(&c.language_id))
+            .count()
+    }
+
+    /// Returns `true` if any cell in `notebook` has a language supported by `kernel`.
+    pub fn matches(kernel: &NotebookKernel, notebook: &NotebookDocument) -> bool {
+        Self::match_score(kernel, notebook) > 0
+    }
+
+    /// Returns the index of the kernel with the highest match score, or `None`
+    /// if no kernel matches any cell.
+    pub fn best_match(
+        kernels: &[NotebookKernel],
+        notebook: &NotebookDocument,
+    ) -> Option<usize> {
+        kernels
+            .iter()
+            .enumerate()
+            .map(|(i, k)| (i, Self::match_score(k, notebook)))
+            .filter(|(_, score)| *score > 0)
+            .max_by_key(|(_, score)| *score)
+            .map(|(i, _)| i)
+    }
+}
+
+// ── Output Renderer ─────────────────────────────────────────────────────────
+
+/// Selects and renders the most appropriate cell output based on a MIME-type
+/// priority list.
+pub struct NotebookOutputRenderer {
+    pub priority_order: Vec<OutputMimeType>,
+}
+
+impl NotebookOutputRenderer {
+    /// Creates a renderer with the default priority order:
+    /// Html > Markdown > PlainText > Image > Error.
+    pub fn new() -> Self {
+        Self {
+            priority_order: vec![
+                OutputMimeType::Html,
+                OutputMimeType::Markdown,
+                OutputMimeType::PlainText,
+                OutputMimeType::Image,
+                OutputMimeType::Error,
+            ],
+        }
+    }
+
+    /// Returns the output whose MIME type appears earliest in the priority list.
+    pub fn preferred_output<'a>(
+        &self,
+        outputs: &'a [NotebookCellOutput],
+    ) -> Option<&'a NotebookCellOutput> {
+        for mime in &self.priority_order {
+            if let Some(out) = outputs.iter().find(|o| &o.mime_type == mime) {
+                return Some(out);
+            }
+        }
+        outputs.first()
+    }
+
+    /// Renders an output as a plain-text string suitable for terminal display.
+    pub fn render_text(output: &NotebookCellOutput) -> String {
+        match &output.mime_type {
+            OutputMimeType::PlainText => output.data.clone(),
+            OutputMimeType::Html => format!("[HTML] {}", output.data),
+            OutputMimeType::Markdown => format!("[Markdown] {}", output.data),
+            OutputMimeType::Image => "[binary image data]".to_string(),
+            OutputMimeType::Error => format!("[Error] {}", output.data),
+            OutputMimeType::Custom(mime) => format!("[{}] {}", mime, output.data),
+        }
+    }
+}
+
+impl Default for NotebookOutputRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Cell Execution Queue ────────────────────────────────────────────────────
+
+/// A FIFO queue of cell indices awaiting execution, with at most one cell
+/// running at a time.
+pub struct NotebookCellExecutionQueue {
+    queue: VecDeque<usize>,
+    running: Option<usize>,
+}
+
+impl NotebookCellExecutionQueue {
+    pub fn new() -> Self {
+        Self {
+            queue: VecDeque::new(),
+            running: None,
+        }
+    }
+
+    /// Appends a cell index to the back of the queue.
+    pub fn enqueue(&mut self, idx: usize) {
+        self.queue.push_back(idx);
+    }
+
+    /// Pops the next cell from the front of the queue and marks it as running.
+    /// Returns `None` if the queue is empty or a cell is already running.
+    pub fn dequeue(&mut self) -> Option<usize> {
+        if self.running.is_some() {
+            return None;
+        }
+        if let Some(idx) = self.queue.pop_front() {
+            self.running = Some(idx);
+            Some(idx)
+        } else {
+            None
+        }
+    }
+
+    /// Marks the currently running cell as complete.
+    pub fn complete(&mut self) {
+        self.running = None;
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.running.is_some()
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Clears the queue and the running cell.
+    pub fn cancel_all(&mut self) {
+        self.queue.clear();
+        self.running = None;
+    }
+
+    /// Returns `true` if `idx` is in the pending queue or currently running.
+    pub fn contains(&self, idx: usize) -> bool {
+        self.running == Some(idx) || self.queue.contains(&idx)
+    }
+}
+
+impl Default for NotebookCellExecutionQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Variable Inspector ──────────────────────────────────────────────────────
+
+/// Tracks named variables produced during notebook execution, keyed by name.
+pub struct NotebookVariableInspector {
+    variables: HashMap<String, String>,
+}
+
+impl NotebookVariableInspector {
+    pub fn new() -> Self {
+        Self {
+            variables: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        self.variables.insert(name.into(), value.into());
+    }
+
+    pub fn get(&self, name: &str) -> Option<&String> {
+        self.variables.get(name)
+    }
+
+    pub fn remove(&mut self, name: &str) -> Option<String> {
+        self.variables.remove(name)
+    }
+
+    /// Returns all variables sorted by name.
+    pub fn list(&self) -> Vec<(&String, &String)> {
+        let mut entries: Vec<_> = self.variables.iter().collect();
+        entries.sort_by_key(|(k, _)| *k);
+        entries
+    }
+
+    pub fn count(&self) -> usize {
+        self.variables.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.variables.clear();
+    }
+}
+
+impl Default for NotebookVariableInspector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1903,5 +2110,207 @@ mod tests {
         assert_eq!(s, CellExecutionState::Success);
         let s: CellExecutionState = false.into();
         assert!(matches!(s, CellExecutionState::Error(_)));
+    }
+
+    // -- Kernel Matcher tests ------------------------------------------------
+
+    fn make_notebook(languages: &[&str]) -> NotebookDocument {
+        let cells: Vec<NotebookCell> = languages
+            .iter()
+            .enumerate()
+            .map(|(i, lang)| NotebookCell {
+                index: i as u32,
+                kind: NotebookCellKind::Code,
+                language_id: lang.to_string(),
+                content: String::new(),
+                outputs: vec![],
+            })
+            .collect();
+        NotebookDocument {
+            uri: "file:///test.ipynb".into(),
+            notebook_type: "jupyter-notebook".into(),
+            cells,
+            is_dirty: false,
+        }
+    }
+
+    fn make_kernel(id: &str, languages: &[&str]) -> NotebookKernel {
+        NotebookKernel {
+            id: id.into(),
+            label: id.into(),
+            supported_languages: languages.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn kernel_matcher_matches_true() {
+        let kernel = make_kernel("py", &["python"]);
+        let nb = make_notebook(&["python", "markdown"]);
+        assert!(NotebookKernelMatcher::matches(&kernel, &nb));
+    }
+
+    #[test]
+    fn kernel_matcher_matches_false() {
+        let kernel = make_kernel("rs", &["rust"]);
+        let nb = make_notebook(&["python", "javascript"]);
+        assert!(!NotebookKernelMatcher::matches(&kernel, &nb));
+    }
+
+    #[test]
+    fn kernel_matcher_score() {
+        let kernel = make_kernel("multi", &["python", "javascript"]);
+        let nb = make_notebook(&["python", "javascript", "python"]);
+        assert_eq!(NotebookKernelMatcher::match_score(&kernel, &nb), 3);
+    }
+
+    #[test]
+    fn kernel_matcher_best_match() {
+        let kernels = vec![
+            make_kernel("rs", &["rust"]),
+            make_kernel("py", &["python"]),
+            make_kernel("multi", &["python", "javascript"]),
+        ];
+        let nb = make_notebook(&["python", "javascript", "python"]);
+        assert_eq!(NotebookKernelMatcher::best_match(&kernels, &nb), Some(2));
+    }
+
+    #[test]
+    fn kernel_matcher_best_match_none() {
+        let kernels = vec![make_kernel("rs", &["rust"])];
+        let nb = make_notebook(&["python"]);
+        assert_eq!(NotebookKernelMatcher::best_match(&kernels, &nb), None);
+    }
+
+    // -- Output Renderer tests -----------------------------------------------
+
+    #[test]
+    fn output_renderer_preferred() {
+        let renderer = NotebookOutputRenderer::new();
+        let outputs = vec![
+            NotebookCellOutput {
+                cell_index: 0,
+                mime_type: OutputMimeType::PlainText,
+                data: "hello".into(),
+                execution_order: None,
+                success: true,
+            },
+            NotebookCellOutput {
+                cell_index: 0,
+                mime_type: OutputMimeType::Html,
+                data: "<b>hello</b>".into(),
+                execution_order: None,
+                success: true,
+            },
+        ];
+        let pref = renderer.preferred_output(&outputs).unwrap();
+        assert_eq!(pref.mime_type, OutputMimeType::Html);
+    }
+
+    #[test]
+    fn output_renderer_render_text() {
+        let output = NotebookCellOutput {
+            cell_index: 0,
+            mime_type: OutputMimeType::PlainText,
+            data: "42".into(),
+            execution_order: Some(1),
+            success: true,
+        };
+        assert_eq!(NotebookOutputRenderer::render_text(&output), "42");
+    }
+
+    #[test]
+    fn output_renderer_render_html() {
+        let output = NotebookCellOutput {
+            cell_index: 0,
+            mime_type: OutputMimeType::Html,
+            data: "<p>hi</p>".into(),
+            execution_order: None,
+            success: true,
+        };
+        assert!(NotebookOutputRenderer::render_text(&output).starts_with("[HTML]"));
+    }
+
+    // -- Cell Execution Queue tests ------------------------------------------
+
+    #[test]
+    fn execution_queue_basic_flow() {
+        let mut q = NotebookCellExecutionQueue::new();
+        q.enqueue(0);
+        q.enqueue(1);
+        assert_eq!(q.pending_count(), 2);
+        assert!(!q.is_running());
+
+        let idx = q.dequeue();
+        assert_eq!(idx, Some(0));
+        assert!(q.is_running());
+        assert_eq!(q.pending_count(), 1);
+
+        // Cannot dequeue while running
+        assert_eq!(q.dequeue(), None);
+
+        q.complete();
+        assert!(!q.is_running());
+
+        let idx = q.dequeue();
+        assert_eq!(idx, Some(1));
+    }
+
+    #[test]
+    fn execution_queue_cancel_all() {
+        let mut q = NotebookCellExecutionQueue::new();
+        q.enqueue(0);
+        q.enqueue(1);
+        let _ = q.dequeue();
+        q.cancel_all();
+        assert!(!q.is_running());
+        assert_eq!(q.pending_count(), 0);
+    }
+
+    #[test]
+    fn execution_queue_contains() {
+        let mut q = NotebookCellExecutionQueue::new();
+        q.enqueue(5);
+        q.enqueue(10);
+        assert!(q.contains(5));
+        assert!(q.contains(10));
+        assert!(!q.contains(99));
+
+        let _ = q.dequeue(); // 5 is now running
+        assert!(q.contains(5));
+    }
+
+    // -- Variable Inspector tests --------------------------------------------
+
+    #[test]
+    fn variable_inspector_crud() {
+        let mut vi = NotebookVariableInspector::new();
+        vi.set("x", "42");
+        vi.set("y", "hello");
+        assert_eq!(vi.count(), 2);
+        assert_eq!(vi.get("x"), Some(&"42".to_string()));
+        vi.remove("x");
+        assert_eq!(vi.get("x"), None);
+        assert_eq!(vi.count(), 1);
+    }
+
+    #[test]
+    fn variable_inspector_list_sorted() {
+        let mut vi = NotebookVariableInspector::new();
+        vi.set("z", "3");
+        vi.set("a", "1");
+        vi.set("m", "2");
+        let list = vi.list();
+        let names: Vec<&str> = list.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(names, vec!["a", "m", "z"]);
+    }
+
+    #[test]
+    fn variable_inspector_clear() {
+        let mut vi = NotebookVariableInspector::new();
+        vi.set("x", "1");
+        vi.set("y", "2");
+        vi.clear();
+        assert_eq!(vi.count(), 0);
+        assert!(vi.list().is_empty());
     }
 }

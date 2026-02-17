@@ -1209,6 +1209,336 @@ impl From<&PerfService> for PerfReport {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PerfTimeline – hierarchical performance spans
+// ---------------------------------------------------------------------------
+
+/// A span in a hierarchical performance timeline.
+#[derive(Debug, Clone)]
+pub struct PerfSpan {
+    pub name: String,
+    pub start_ms: f64,
+    pub duration_ms: f64,
+    pub parent_index: Option<usize>,
+    pub depth: u32,
+}
+
+impl PerfSpan {
+    pub fn new(name: impl Into<String>, start_ms: f64, duration_ms: f64) -> Self {
+        Self {
+            name: name.into(),
+            start_ms,
+            duration_ms,
+            parent_index: None,
+            depth: 0,
+        }
+    }
+
+    pub fn end_ms(&self) -> f64 {
+        self.start_ms + self.duration_ms
+    }
+}
+
+impl fmt::Display for PerfSpan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({:.2}ms)", self.name, self.duration_ms)
+    }
+}
+
+/// A timeline of hierarchical performance spans.
+#[derive(Debug, Clone)]
+pub struct PerfTimeline {
+    spans: Vec<PerfSpan>,
+    open_stack: Vec<usize>,
+}
+
+impl PerfTimeline {
+    pub fn new() -> Self {
+        Self {
+            spans: Vec::new(),
+            open_stack: Vec::new(),
+        }
+    }
+
+    /// Begin a new span. Returns the span index.
+    pub fn begin_span(&mut self, name: impl Into<String>, start_ms: f64) -> usize {
+        let idx = self.spans.len();
+        let mut span = PerfSpan::new(name, start_ms, 0.0);
+        span.parent_index = self.open_stack.last().copied();
+        span.depth = self.open_stack.len() as u32;
+        self.spans.push(span);
+        self.open_stack.push(idx);
+        idx
+    }
+
+    /// End the most recently opened span.
+    pub fn end_span(&mut self, end_ms: f64) -> Option<usize> {
+        let idx = self.open_stack.pop()?;
+        self.spans[idx].duration_ms = end_ms - self.spans[idx].start_ms;
+        Some(idx)
+    }
+
+    /// Get all completed spans.
+    pub fn spans(&self) -> &[PerfSpan] {
+        &self.spans
+    }
+
+    /// Get root-level spans (no parent).
+    pub fn root_spans(&self) -> Vec<&PerfSpan> {
+        self.spans.iter().filter(|s| s.parent_index.is_none()).collect()
+    }
+
+    /// Get children of a given span.
+    pub fn children_of(&self, parent_idx: usize) -> Vec<(usize, &PerfSpan)> {
+        self.spans.iter().enumerate()
+            .filter(|(_, s)| s.parent_index == Some(parent_idx))
+            .collect()
+    }
+
+    /// Total duration of all root spans.
+    pub fn total_duration(&self) -> f64 {
+        self.root_spans().iter().map(|s| s.duration_ms).sum()
+    }
+
+    pub fn span_count(&self) -> usize {
+        self.spans.len()
+    }
+
+    pub fn max_depth(&self) -> u32 {
+        self.spans.iter().map(|s| s.depth).max().unwrap_or(0)
+    }
+}
+
+impl Default for PerfTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for PerfTimeline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PerfTimeline({} spans, {:.2}ms total)", self.spans.len(), self.total_duration())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PerfFrameBudget – frame time budget tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks whether operations stay within a frame time budget.
+#[derive(Debug, Clone)]
+pub struct PerfFrameBudget {
+    pub budget_ms: f64,
+    pub samples: Vec<f64>,
+    pub max_samples: usize,
+}
+
+impl PerfFrameBudget {
+    pub fn new(budget_ms: f64, max_samples: usize) -> Self {
+        Self {
+            budget_ms,
+            samples: Vec::new(),
+            max_samples,
+        }
+    }
+
+    /// Record a frame time sample.
+    pub fn record(&mut self, duration_ms: f64) {
+        if self.samples.len() >= self.max_samples {
+            self.samples.remove(0);
+        }
+        self.samples.push(duration_ms);
+    }
+
+    /// Number of samples that exceeded the budget.
+    pub fn violation_count(&self) -> usize {
+        self.samples.iter().filter(|&&s| s > self.budget_ms).count()
+    }
+
+    /// Violation rate as a fraction 0.0..=1.0.
+    pub fn violation_rate(&self) -> f64 {
+        if self.samples.is_empty() {
+            return 0.0;
+        }
+        self.violation_count() as f64 / self.samples.len() as f64
+    }
+
+    /// Average frame time.
+    pub fn average_ms(&self) -> f64 {
+        if self.samples.is_empty() {
+            return 0.0;
+        }
+        self.samples.iter().sum::<f64>() / self.samples.len() as f64
+    }
+
+    /// Whether the budget is currently being met (last sample within budget).
+    pub fn is_within_budget(&self) -> bool {
+        self.samples.last().map_or(true, |&s| s <= self.budget_ms)
+    }
+
+    /// The worst (highest) sample.
+    pub fn worst_ms(&self) -> f64 {
+        self.samples.iter().cloned().fold(0.0_f64, f64::max)
+    }
+}
+
+impl fmt::Display for PerfFrameBudget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PerfFrameBudget({:.1}ms, avg={:.2}ms, violations={}/{})",
+            self.budget_ms,
+            self.average_ms(),
+            self.violation_count(),
+            self.samples.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PerfHeatMap – hotspot detection
+// ---------------------------------------------------------------------------
+
+/// A heat map entry associating a label with cumulative time.
+#[derive(Debug, Clone)]
+pub struct PerfHeatMapEntry {
+    pub label: String,
+    pub total_ms: f64,
+    pub call_count: usize,
+}
+
+impl PerfHeatMapEntry {
+    pub fn average_ms(&self) -> f64 {
+        if self.call_count == 0 { 0.0 } else { self.total_ms / self.call_count as f64 }
+    }
+}
+
+/// Aggregates performance data to identify hotspots.
+#[derive(Debug, Clone)]
+pub struct PerfHeatMap {
+    entries: HashMap<String, PerfHeatMapEntry>,
+}
+
+impl PerfHeatMap {
+    pub fn new() -> Self {
+        Self { entries: HashMap::new() }
+    }
+
+    /// Record a measurement for a label.
+    pub fn record(&mut self, label: impl Into<String>, duration_ms: f64) {
+        let label = label.into();
+        let entry = self.entries.entry(label.clone()).or_insert(PerfHeatMapEntry {
+            label,
+            total_ms: 0.0,
+            call_count: 0,
+        });
+        entry.total_ms += duration_ms;
+        entry.call_count += 1;
+    }
+
+    /// Get the top N hottest entries sorted by total time descending.
+    pub fn top_hotspots(&self, n: usize) -> Vec<&PerfHeatMapEntry> {
+        let mut entries: Vec<_> = self.entries.values().collect();
+        entries.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
+        entries.truncate(n);
+        entries
+    }
+
+    /// Total time across all entries.
+    pub fn total_time(&self) -> f64 {
+        self.entries.values().map(|e| e.total_ms).sum()
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn get(&self, label: &str) -> Option<&PerfHeatMapEntry> {
+        self.entries.get(label)
+    }
+}
+
+impl Default for PerfHeatMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for PerfHeatMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PerfHeatMap({} entries, {:.2}ms total)", self.entries.len(), self.total_time())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Performance regression detector
+// ---------------------------------------------------------------------------
+
+use std::collections::HashMap;
+
+/// Detects performance regressions by comparing baseline and current measurements.
+#[derive(Debug, Clone)]
+pub struct PerfRegressionDetector {
+    /// Baseline measurements: label -> average duration ms.
+    baselines: HashMap<String, f64>,
+    /// Threshold multiplier for regression detection (e.g., 1.2 = 20% slower).
+    pub threshold: f64,
+}
+
+impl PerfRegressionDetector {
+    pub fn new(threshold: f64) -> Self {
+        Self {
+            baselines: HashMap::new(),
+            threshold: if threshold < 1.0 { 1.2 } else { threshold },
+        }
+    }
+
+    /// Set a baseline measurement.
+    pub fn set_baseline(&mut self, label: impl Into<String>, avg_ms: f64) {
+        self.baselines.insert(label.into(), avg_ms);
+    }
+
+    /// Check if a current measurement is a regression compared to baseline.
+    pub fn is_regression(&self, label: &str, current_ms: f64) -> bool {
+        if let Some(&baseline) = self.baselines.get(label) {
+            current_ms > baseline * self.threshold
+        } else {
+            false
+        }
+    }
+
+    /// Check multiple measurements and return labels that regressed.
+    pub fn detect_regressions(&self, measurements: &[(&str, f64)]) -> Vec<String> {
+        measurements
+            .iter()
+            .filter(|(label, ms)| self.is_regression(label, *ms))
+            .map(|(label, _)| label.to_string())
+            .collect()
+    }
+
+    /// Number of baselines set.
+    pub fn baseline_count(&self) -> usize {
+        self.baselines.len()
+    }
+}
+
+impl Default for PerfRegressionDetector {
+    fn default() -> Self {
+        Self::new(1.2)
+    }
+}
+
+impl fmt::Display for PerfRegressionDetector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PerfRegressionDetector({} baselines, threshold={:.1}x)",
+            self.baselines.len(),
+            self.threshold
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1926,5 +2256,142 @@ mod tests {
         let report2 = PerfReport::from(&svc);
         assert_eq!(report2.total_entries, 4);
         assert!(!report2.has_violations()); // no budget passed
+    }
+
+    // -- PerfTimeline ------------------------------------------------------
+
+    #[test]
+    fn timeline_begin_end_span() {
+        let mut tl = PerfTimeline::new();
+        tl.begin_span("outer", 0.0);
+        tl.begin_span("inner", 1.0);
+        tl.end_span(3.0);
+        tl.end_span(5.0);
+        assert_eq!(tl.span_count(), 2);
+        assert_eq!(tl.max_depth(), 1);
+        assert!((tl.spans()[0].duration_ms - 5.0).abs() < 0.001);
+        assert!((tl.spans()[1].duration_ms - 2.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn timeline_root_spans() {
+        let mut tl = PerfTimeline::new();
+        tl.begin_span("a", 0.0);
+        tl.end_span(1.0);
+        tl.begin_span("b", 1.0);
+        tl.end_span(2.0);
+        assert_eq!(tl.root_spans().len(), 2);
+    }
+
+    #[test]
+    fn timeline_children() {
+        let mut tl = PerfTimeline::new();
+        let parent = tl.begin_span("parent", 0.0);
+        tl.begin_span("child", 0.5);
+        tl.end_span(1.0);
+        tl.end_span(2.0);
+        let children = tl.children_of(parent);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].1.name, "child");
+    }
+
+    #[test]
+    fn timeline_display() {
+        let tl = PerfTimeline::default();
+        let s = format!("{tl}");
+        assert!(s.contains("0 spans"));
+    }
+
+    // -- PerfFrameBudget ----------------------------------------------------
+
+    #[test]
+    fn frame_budget_within() {
+        let mut b = PerfFrameBudget::new(16.67, 100);
+        b.record(10.0);
+        b.record(15.0);
+        assert!(b.is_within_budget());
+        assert_eq!(b.violation_count(), 0);
+    }
+
+    #[test]
+    fn frame_budget_violation() {
+        let mut b = PerfFrameBudget::new(16.67, 100);
+        b.record(10.0);
+        b.record(20.0);
+        assert!(!b.is_within_budget());
+        assert_eq!(b.violation_count(), 1);
+        assert!((b.violation_rate() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn frame_budget_worst() {
+        let mut b = PerfFrameBudget::new(16.67, 100);
+        b.record(5.0);
+        b.record(25.0);
+        b.record(10.0);
+        assert!((b.worst_ms() - 25.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn frame_budget_display() {
+        let b = PerfFrameBudget::new(16.67, 100);
+        let s = format!("{b}");
+        assert!(s.contains("16.7ms"));
+    }
+
+    // -- PerfHeatMap -------------------------------------------------------
+
+    #[test]
+    fn heatmap_record_and_top() {
+        let mut hm = PerfHeatMap::new();
+        hm.record("render", 5.0);
+        hm.record("render", 3.0);
+        hm.record("layout", 10.0);
+        let top = hm.top_hotspots(1);
+        assert_eq!(top[0].label, "layout");
+        assert_eq!(hm.entry_count(), 2);
+    }
+
+    #[test]
+    fn heatmap_average() {
+        let mut hm = PerfHeatMap::new();
+        hm.record("x", 10.0);
+        hm.record("x", 20.0);
+        let entry = hm.get("x").unwrap();
+        assert!((entry.average_ms() - 15.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn heatmap_display() {
+        let hm = PerfHeatMap::default();
+        let s = format!("{hm}");
+        assert!(s.contains("0 entries"));
+    }
+
+    // -- PerfRegressionDetector --------------------------------------------
+
+    #[test]
+    fn regression_detector_basic() {
+        let mut det = PerfRegressionDetector::new(1.2);
+        det.set_baseline("compile", 100.0);
+        assert!(!det.is_regression("compile", 110.0));
+        assert!(det.is_regression("compile", 130.0));
+        assert!(!det.is_regression("unknown", 999.0));
+    }
+
+    #[test]
+    fn regression_detector_batch() {
+        let mut det = PerfRegressionDetector::new(1.5);
+        det.set_baseline("a", 10.0);
+        det.set_baseline("b", 20.0);
+        let regressions = det.detect_regressions(&[("a", 16.0), ("b", 25.0)]);
+        assert_eq!(regressions, vec!["a"]);
+    }
+
+    #[test]
+    fn regression_detector_display() {
+        let det = PerfRegressionDetector::default();
+        let s = format!("{det}");
+        assert!(s.contains("baselines"));
     }
 }

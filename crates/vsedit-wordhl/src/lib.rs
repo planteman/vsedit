@@ -1123,6 +1123,256 @@ pub fn highlight_full_line(line: u32, line_text: &str, kind: DocumentHighlightKi
     DocumentHighlight::new(line, 1, (line_text.len() + 1) as u32, kind)
 }
 
+/// Navigator for cycling through a list of highlights.
+pub struct WordHighlightNavigation {
+    pub highlights: Vec<DocumentHighlight>,
+    pub current_index: Option<usize>,
+}
+
+impl WordHighlightNavigation {
+    pub fn new(highlights: Vec<DocumentHighlight>) -> Self {
+        let current_index = if highlights.is_empty() { None } else { Some(0) };
+        Self { highlights, current_index }
+    }
+
+    /// Advance to the next highlight, wrapping around to the beginning.
+    pub fn next(&mut self) -> Option<&DocumentHighlight> {
+        if self.highlights.is_empty() {
+            return None;
+        }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % self.highlights.len(),
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.highlights[idx])
+    }
+
+    /// Go to the previous highlight, wrapping around to the end.
+    pub fn previous(&mut self) -> Option<&DocumentHighlight> {
+        if self.highlights.is_empty() {
+            return None;
+        }
+        let idx = match self.current_index {
+            Some(0) => self.highlights.len() - 1,
+            Some(i) => i - 1,
+            None => self.highlights.len() - 1,
+        };
+        self.current_index = Some(idx);
+        Some(&self.highlights[idx])
+    }
+
+    /// Return the current highlight without advancing.
+    pub fn current(&self) -> Option<&DocumentHighlight> {
+        self.current_index.map(|i| &self.highlights[i])
+    }
+
+    /// Return the number of highlights.
+    pub fn count(&self) -> usize {
+        self.highlights.len()
+    }
+
+    /// Return a label like "3 of 5" describing the current position.
+    pub fn position_label(&self) -> String {
+        match self.current_index {
+            Some(i) => format!("{} of {}", i + 1, self.highlights.len()),
+            None => String::from("0 of 0"),
+        }
+    }
+
+    /// Reset the navigation back to the first highlight.
+    pub fn reset(&mut self) {
+        self.current_index = if self.highlights.is_empty() { None } else { Some(0) };
+    }
+}
+
+/// Scope that limits highlight searching to a range of lines.
+pub struct WordHighlightScope {
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
+impl WordHighlightScope {
+    pub fn new(start: u32, end: u32) -> Self {
+        Self {
+            start_line: start.min(end),
+            end_line: start.max(end),
+        }
+    }
+
+    /// Check whether a given line number falls within this scope.
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    /// Filter a slice of highlights to only those within this scope.
+    pub fn filter(&self, highlights: &[DocumentHighlight]) -> Vec<DocumentHighlight> {
+        highlights
+            .iter()
+            .filter(|h| self.contains_line(h.line))
+            .cloned()
+            .collect()
+    }
+
+    /// Return how many lines this scope covers (inclusive).
+    pub fn line_count(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Expand the scope by `lines` in each direction (saturating at 0).
+    pub fn expand(&mut self, lines: u32) {
+        self.start_line = self.start_line.saturating_sub(lines);
+        self.end_line = self.end_line.saturating_add(lines);
+    }
+
+    /// Shrink the scope by `lines` in each direction, keeping at least 1 line.
+    pub fn shrink(&mut self, lines: u32) {
+        let mid = self.start_line / 2 + self.end_line / 2;
+        self.start_line = self.start_line.saturating_add(lines).min(mid);
+        self.end_line = if self.end_line.saturating_sub(lines) < self.start_line {
+            self.start_line
+        } else {
+            self.end_line.saturating_sub(lines)
+        };
+    }
+}
+
+/// Highlight provider with semantic awareness (case sensitivity, whole-word, category filtering).
+pub struct SemanticHighlightProvider {
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub symbol_categories: Vec<SymbolCategory>,
+}
+
+impl SemanticHighlightProvider {
+    pub fn new() -> Self {
+        Self {
+            case_sensitive: true,
+            whole_word: true,
+            symbol_categories: Vec::new(),
+        }
+    }
+
+    pub fn with_case_sensitive(mut self, v: bool) -> Self {
+        self.case_sensitive = v;
+        self
+    }
+
+    pub fn with_whole_word(mut self, v: bool) -> Self {
+        self.whole_word = v;
+        self
+    }
+
+    pub fn with_categories(mut self, cats: Vec<SymbolCategory>) -> Self {
+        self.symbol_categories = cats;
+        self
+    }
+
+    /// Find highlights in the given lines, respecting case sensitivity and whole-word settings.
+    pub fn find_highlights(&self, lines: &[&str], word: &str) -> Vec<DocumentHighlight> {
+        let search_word: String;
+        let needle: &str;
+        if self.case_sensitive {
+            needle = word;
+        } else {
+            search_word = word.to_lowercase();
+            needle = &search_word;
+        }
+
+        let mut highlights = Vec::new();
+        for (i, line) in lines.iter().enumerate() {
+            let haystack: String;
+            let hay: &str;
+            if self.case_sensitive {
+                hay = line;
+            } else {
+                haystack = line.to_lowercase();
+                hay = &haystack;
+            }
+
+            let mut start = 0;
+            while let Some(pos) = hay[start..].find(needle) {
+                let abs_pos = start + pos;
+                let after_pos = abs_pos + needle.len();
+
+                let accept = if self.whole_word {
+                    let before_ok =
+                        abs_pos == 0 || !is_word_char(line.as_bytes()[abs_pos - 1]);
+                    let after_ok =
+                        after_pos >= line.len() || !is_word_char(line.as_bytes()[after_pos]);
+                    before_ok && after_ok
+                } else {
+                    true
+                };
+
+                if accept {
+                    highlights.push(DocumentHighlight {
+                        line: (i + 1) as u32,
+                        start_column: (abs_pos + 1) as u32,
+                        end_column: (after_pos + 1) as u32,
+                        kind: DocumentHighlightKind::Text,
+                    });
+                }
+                start = abs_pos + needle.len();
+            }
+        }
+        highlights
+    }
+
+    /// Check whether the word's category matches one of the configured categories.
+    pub fn matches_category(&self, word: &str) -> bool {
+        if self.symbol_categories.is_empty() {
+            return true;
+        }
+        let cat = categorize_symbol(word);
+        self.symbol_categories.contains(&cat)
+    }
+}
+
+/// Manages throttling of highlight requests to avoid excessive recomputation.
+pub struct HighlightThrottler {
+    pub last_request_ms: u64,
+    pub interval_ms: u64,
+    pub pending: Option<String>,
+}
+
+impl HighlightThrottler {
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            last_request_ms: 0,
+            interval_ms,
+            pending: None,
+        }
+    }
+
+    /// Check whether enough time has elapsed to process a new request.
+    pub fn should_process(&self, now_ms: u64) -> bool {
+        now_ms.saturating_sub(self.last_request_ms) >= self.interval_ms
+    }
+
+    /// Submit a request. Returns `true` if it should be processed immediately.
+    pub fn request(&mut self, word: String, now_ms: u64) -> bool {
+        if self.should_process(now_ms) {
+            self.last_request_ms = now_ms;
+            self.pending = None;
+            true
+        } else {
+            self.pending = Some(word);
+            false
+        }
+    }
+
+    /// Take the pending word, if any, clearing it.
+    pub fn take_pending(&mut self) -> Option<String> {
+        self.pending.take()
+    }
+
+    /// Clear all pending state.
+    pub fn clear(&mut self) {
+        self.pending = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1949,5 +2199,163 @@ mod tests {
         assert_eq!(h.start_column, 1);
         assert_eq!(h.end_column, 12);
         assert_eq!(h.kind, DocumentHighlightKind::Read);
+    }
+
+    #[test]
+    fn test_navigation_next_wraps() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 4, DocumentHighlightKind::Text),
+        ];
+        let mut nav = WordHighlightNavigation::new(hl);
+        assert_eq!(nav.current().unwrap().line, 1);
+        nav.next();
+        assert_eq!(nav.current().unwrap().line, 2);
+        nav.next();
+        assert_eq!(nav.current().unwrap().line, 1); // wrapped
+    }
+
+    #[test]
+    fn test_navigation_previous_wraps() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 4, DocumentHighlightKind::Text),
+            DocumentHighlight::new(3, 1, 4, DocumentHighlightKind::Text),
+        ];
+        let mut nav = WordHighlightNavigation::new(hl);
+        nav.previous(); // wraps from 0 to last
+        assert_eq!(nav.current().unwrap().line, 3);
+    }
+
+    #[test]
+    fn test_navigation_position_label() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 5, 8, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 1, 3, DocumentHighlightKind::Write),
+        ];
+        let mut nav = WordHighlightNavigation::new(hl);
+        assert_eq!(nav.position_label(), "1 of 3");
+        nav.next();
+        assert_eq!(nav.position_label(), "2 of 3");
+        nav.next();
+        assert_eq!(nav.position_label(), "3 of 3");
+    }
+
+    #[test]
+    fn test_navigation_empty() {
+        let mut nav = WordHighlightNavigation::new(vec![]);
+        assert!(nav.current().is_none());
+        assert!(nav.next().is_none());
+        assert!(nav.previous().is_none());
+        assert_eq!(nav.count(), 0);
+        assert_eq!(nav.position_label(), "0 of 0");
+    }
+
+    #[test]
+    fn test_navigation_reset() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 4, DocumentHighlightKind::Text),
+        ];
+        let mut nav = WordHighlightNavigation::new(hl);
+        nav.next();
+        nav.next();
+        assert_eq!(nav.current().unwrap().line, 1);
+        nav.next();
+        assert_eq!(nav.current().unwrap().line, 2);
+        nav.reset();
+        assert_eq!(nav.current().unwrap().line, 1);
+    }
+
+    #[test]
+    fn test_scope_contains_line() {
+        let scope = WordHighlightScope::new(5, 15);
+        assert!(!scope.contains_line(4));
+        assert!(scope.contains_line(5));
+        assert!(scope.contains_line(10));
+        assert!(scope.contains_line(15));
+        assert!(!scope.contains_line(16));
+    }
+
+    #[test]
+    fn test_scope_filter() {
+        let scope = WordHighlightScope::new(2, 4);
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
+            DocumentHighlight::new(5, 1, 5, DocumentHighlightKind::Text),
+        ];
+        let filtered = scope.filter(&hl);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].line, 2);
+        assert_eq!(filtered[1].line, 3);
+    }
+
+    #[test]
+    fn test_scope_expand_shrink() {
+        let mut scope = WordHighlightScope::new(10, 20);
+        assert_eq!(scope.line_count(), 11);
+        scope.expand(5);
+        assert_eq!(scope.start_line, 5);
+        assert_eq!(scope.end_line, 25);
+        scope.shrink(3);
+        assert_eq!(scope.start_line, 8);
+        assert_eq!(scope.end_line, 22);
+        // Shrink a lot — start and end should not cross
+        let mut small = WordHighlightScope::new(10, 12);
+        small.shrink(5);
+        assert!(small.start_line <= small.end_line);
+    }
+
+    #[test]
+    fn test_semantic_provider_case_insensitive() {
+        let provider = SemanticHighlightProvider::new().with_case_sensitive(false);
+        let lines = vec!["let Foo = 1;", "let foo = 2;", "let FOO = 3;"];
+        let hl = provider.find_highlights(&lines, "foo");
+        assert_eq!(hl.len(), 3);
+    }
+
+    #[test]
+    fn test_semantic_provider_whole_word() {
+        let provider = SemanticHighlightProvider::new().with_whole_word(false);
+        let lines = vec!["foobar foo barfoo"];
+        let hl = provider.find_highlights(&lines, "foo");
+        assert_eq!(hl.len(), 3); // foobar, foo, barfoo
+
+        let strict = SemanticHighlightProvider::new().with_whole_word(true);
+        let hl2 = strict.find_highlights(&lines, "foo");
+        assert_eq!(hl2.len(), 1); // only standalone "foo"
+    }
+
+    #[test]
+    fn test_semantic_provider_categories() {
+        let provider = SemanticHighlightProvider::new()
+            .with_categories(vec![SymbolCategory::Keyword, SymbolCategory::Type]);
+        assert!(provider.matches_category("fn"));
+        assert!(provider.matches_category("MyType"));
+        assert!(!provider.matches_category("my_var"));
+
+        let empty = SemanticHighlightProvider::new();
+        assert!(empty.matches_category("anything"));
+    }
+
+    #[test]
+    fn test_throttler_timing() {
+        let mut throttler = HighlightThrottler::new(100);
+        // First request at t=100 should process (100 - 0 >= 100)
+        assert!(throttler.should_process(100));
+        assert!(throttler.request("hello".into(), 100));
+        // At t=150, not enough time has passed
+        assert!(!throttler.should_process(150));
+        assert!(!throttler.request("world".into(), 150));
+        assert_eq!(throttler.take_pending(), Some("world".into()));
+        assert!(throttler.take_pending().is_none());
+        // At t=200, enough time has passed
+        assert!(throttler.should_process(200));
+        assert!(throttler.request("again".into(), 200));
+        throttler.clear();
+        assert!(throttler.pending.is_none());
     }
 }
