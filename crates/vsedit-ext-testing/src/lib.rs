@@ -1452,6 +1452,312 @@ impl TestDiffViewer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TestResultDiffViewer - test result diff viewer
+// ---------------------------------------------------------------------------
+
+/// Severity level for test result diff viewer issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TestResultDiffViewerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for TestResultDiffViewerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [TestResultDiffViewer].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestResultDiffViewerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: TestResultDiffViewerSeverity,
+    pub detail: Option<String>,
+    pub result_count: usize,
+    enabled: bool,
+}
+
+impl TestResultDiffViewerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: TestResultDiffViewerSeverity::Low,
+            detail: None,
+            result_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: TestResultDiffViewerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_result_count(mut self, val: usize) -> Self {
+        self.result_count = val;
+        self
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.enabled && self.severity >= TestResultDiffViewerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.result_count, det)
+    }
+}
+
+impl fmt::Display for TestResultDiffViewerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [TestResultDiffViewerEntry] items.
+#[derive(Debug, Clone)]
+pub struct TestResultDiffViewer {
+    entries: Vec<TestResultDiffViewerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl TestResultDiffViewer {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: TestResultDiffViewerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<TestResultDiffViewerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&TestResultDiffViewerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn result_count(&self) -> usize { self.entries.len() }
+
+    pub fn has_failures(&self) -> bool {
+        self.entries.iter().any(|e| e.has_failures())
+    }
+
+    pub fn entries_by_severity(&self, severity: TestResultDiffViewerSeverity) -> Vec<&TestResultDiffViewerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= TestResultDiffViewerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&TestResultDiffViewerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&TestResultDiffViewerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TestFilterExprParser - test filter expression parser
+// ---------------------------------------------------------------------------
+
+/// Configuration for [TestFilterExprParser].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestFilterExprParserConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub filter_depth: usize,
+}
+
+impl TestFilterExprParserConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, filter_depth: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_filter_depth(mut self, val: usize) -> Self { self.filter_depth = val; self }
+}
+
+impl Default for TestFilterExprParserConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [TestFilterExprParser].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestFilterExprParserItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl TestFilterExprParserItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_valid_filter(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for TestFilterExprParserItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [TestFilterExprParserItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct TestFilterExprParser {
+    config: TestFilterExprParserConfig,
+    items: Vec<TestFilterExprParserItem>,
+}
+
+impl TestFilterExprParser {
+    pub fn new(config: TestFilterExprParserConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: TestFilterExprParserItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<TestFilterExprParserItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&TestFilterExprParserItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn filter_depth(&self) -> usize { self.items.len() }
+
+    pub fn is_valid_filter(&self) -> bool {
+        self.items.iter().any(|i| i.is_valid_filter())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&TestFilterExprParserItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&TestFilterExprParserItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &TestFilterExprParserConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2327,4 +2633,146 @@ ignored_line
         assert_eq!(cm.file_count(), 1);
     }
 
+
+#[test]
+    fn testresultdiffviewer_severity_ordering() {
+        assert!(TestResultDiffViewerSeverity::Critical > TestResultDiffViewerSeverity::High);
+        assert!(TestResultDiffViewerSeverity::High > TestResultDiffViewerSeverity::Medium);
+        assert!(TestResultDiffViewerSeverity::Medium > TestResultDiffViewerSeverity::Low);
+    }
+
+    #[test]
+    fn testresultdiffviewer_severity_display() {
+        assert_eq!(TestResultDiffViewerSeverity::Low.to_string(), "low");
+        assert_eq!(TestResultDiffViewerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn testresultdiffviewer_entry_creation() {
+        let e = TestResultDiffViewerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, TestResultDiffViewerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn testresultdiffviewer_entry_builder() {
+        let e = TestResultDiffViewerEntry::new("e2", "Entry 2")
+            .with_severity(TestResultDiffViewerSeverity::High)
+            .with_detail("some detail")
+            .with_result_count(42);
+        assert_eq!(e.severity, TestResultDiffViewerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.result_count, 42);
+    }
+
+    #[test]
+    fn testresultdiffviewer_entry_enable_disable() {
+        let mut e = TestResultDiffViewerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn testresultdiffviewer_add_and_count() {
+        let mut mgr = TestResultDiffViewer::new("test");
+        mgr.add(TestResultDiffViewerEntry::new("a", "A"));
+        mgr.add(TestResultDiffViewerEntry::new("b", "B").with_severity(TestResultDiffViewerSeverity::High));
+        assert_eq!(mgr.result_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn testresultdiffviewer_remove() {
+        let mut mgr = TestResultDiffViewer::new("test");
+        mgr.add(TestResultDiffViewerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn testresultdiffviewer_capacity() {
+        let mut mgr = TestResultDiffViewer::new("test").with_capacity(1);
+        assert!(mgr.add(TestResultDiffViewerEntry::new("a", "A")));
+        assert!(!mgr.add(TestResultDiffViewerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn testresultdiffviewer_sorted_by_severity() {
+        let mut mgr = TestResultDiffViewer::new("test");
+        mgr.add(TestResultDiffViewerEntry::new("lo", "Low"));
+        mgr.add(TestResultDiffViewerEntry::new("hi", "High").with_severity(TestResultDiffViewerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, TestResultDiffViewerSeverity::Critical);
+    }
+
+    #[test]
+    fn testresultdiffviewer_summary() {
+        let mgr = TestResultDiffViewer::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn testfilterexprparser_config_defaults() {
+        let cfg = TestFilterExprParserConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn testfilterexprparser_item_creation() {
+        let item = TestFilterExprParserItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn testfilterexprparser_add_and_get() {
+        let mut mgr = TestFilterExprParser::new(TestFilterExprParserConfig::new("test"));
+        mgr.add(TestFilterExprParserItem::new("k1", "v1"));
+        assert_eq!(mgr.filter_depth(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn testfilterexprparser_remove_item() {
+        let mut mgr = TestFilterExprParser::new(TestFilterExprParserConfig::new("test"));
+        mgr.add(TestFilterExprParserItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn testfilterexprparser_sorted_by_priority() {
+        let mut mgr = TestFilterExprParser::new(TestFilterExprParserConfig::new("test"));
+        mgr.add(TestFilterExprParserItem::new("lo", "low").with_priority(1));
+        mgr.add(TestFilterExprParserItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn testfilterexprparser_items_with_tag() {
+        let mut mgr = TestFilterExprParser::new(TestFilterExprParserConfig::new("test"));
+        mgr.add(TestFilterExprParserItem::new("a", "1").with_tag("x"));
+        mgr.add(TestFilterExprParserItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn testfilterexprparser_report() {
+        let mgr = TestFilterExprParser::new(TestFilterExprParserConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
+    }
 }

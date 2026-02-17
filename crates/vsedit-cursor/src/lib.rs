@@ -1374,6 +1374,312 @@ impl CursorBlinkTimer {
 }
 
 
+// ---------------------------------------------------------------------------
+// CursorViewportScroller - cursor viewport scroller
+// ---------------------------------------------------------------------------
+
+/// Severity level for cursor viewport scroller issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CursorViewportScrollerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for CursorViewportScrollerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [CursorViewportScroller].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CursorViewportScrollerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: CursorViewportScrollerSeverity,
+    pub detail: Option<String>,
+    pub viewport_lines: usize,
+    enabled: bool,
+}
+
+impl CursorViewportScrollerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: CursorViewportScrollerSeverity::Low,
+            detail: None,
+            viewport_lines: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: CursorViewportScrollerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_viewport_lines(mut self, val: usize) -> Self {
+        self.viewport_lines = val;
+        self
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.enabled && self.severity >= CursorViewportScrollerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.viewport_lines, det)
+    }
+}
+
+impl fmt::Display for CursorViewportScrollerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [CursorViewportScrollerEntry] items.
+#[derive(Debug, Clone)]
+pub struct CursorViewportScroller {
+    entries: Vec<CursorViewportScrollerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl CursorViewportScroller {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: CursorViewportScrollerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<CursorViewportScrollerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&CursorViewportScrollerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn viewport_lines(&self) -> usize { self.entries.len() }
+
+    pub fn is_visible(&self) -> bool {
+        self.entries.iter().any(|e| e.is_visible())
+    }
+
+    pub fn entries_by_severity(&self, severity: CursorViewportScrollerSeverity) -> Vec<&CursorViewportScrollerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= CursorViewportScrollerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&CursorViewportScrollerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&CursorViewportScrollerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CursorSelectionExpander - cursor selection expander
+// ---------------------------------------------------------------------------
+
+/// Configuration for [CursorSelectionExpander].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CursorSelectionExpanderConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub selection_length: usize,
+}
+
+impl CursorSelectionExpanderConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, selection_length: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_selection_length(mut self, val: usize) -> Self { self.selection_length = val; self }
+}
+
+impl Default for CursorSelectionExpanderConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [CursorSelectionExpander].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CursorSelectionExpanderItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl CursorSelectionExpanderItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn has_selection(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for CursorSelectionExpanderItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [CursorSelectionExpanderItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct CursorSelectionExpander {
+    config: CursorSelectionExpanderConfig,
+    items: Vec<CursorSelectionExpanderItem>,
+}
+
+impl CursorSelectionExpander {
+    pub fn new(config: CursorSelectionExpanderConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: CursorSelectionExpanderItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<CursorSelectionExpanderItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&CursorSelectionExpanderItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn selection_length(&self) -> usize { self.items.len() }
+
+    pub fn has_selection(&self) -> bool {
+        self.items.iter().any(|i| i.has_selection())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&CursorSelectionExpanderItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&CursorSelectionExpanderItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &CursorSelectionExpanderConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2413,4 +2719,146 @@ mod tests {
         assert!(!t.is_visible());
     }
 
+
+#[test]
+    fn cursorviewportscroller_severity_ordering() {
+        assert!(CursorViewportScrollerSeverity::Critical > CursorViewportScrollerSeverity::High);
+        assert!(CursorViewportScrollerSeverity::High > CursorViewportScrollerSeverity::Medium);
+        assert!(CursorViewportScrollerSeverity::Medium > CursorViewportScrollerSeverity::Low);
+    }
+
+    #[test]
+    fn cursorviewportscroller_severity_display() {
+        assert_eq!(CursorViewportScrollerSeverity::Low.to_string(), "low");
+        assert_eq!(CursorViewportScrollerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn cursorviewportscroller_entry_creation() {
+        let e = CursorViewportScrollerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, CursorViewportScrollerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn cursorviewportscroller_entry_builder() {
+        let e = CursorViewportScrollerEntry::new("e2", "Entry 2")
+            .with_severity(CursorViewportScrollerSeverity::High)
+            .with_detail("some detail")
+            .with_viewport_lines(42);
+        assert_eq!(e.severity, CursorViewportScrollerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.viewport_lines, 42);
+    }
+
+    #[test]
+    fn cursorviewportscroller_entry_enable_disable() {
+        let mut e = CursorViewportScrollerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn cursorviewportscroller_add_and_count() {
+        let mut mgr = CursorViewportScroller::new("test");
+        mgr.add(CursorViewportScrollerEntry::new("a", "A"));
+        mgr.add(CursorViewportScrollerEntry::new("b", "B").with_severity(CursorViewportScrollerSeverity::High));
+        assert_eq!(mgr.viewport_lines(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn cursorviewportscroller_remove() {
+        let mut mgr = CursorViewportScroller::new("test");
+        mgr.add(CursorViewportScrollerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn cursorviewportscroller_capacity() {
+        let mut mgr = CursorViewportScroller::new("test").with_capacity(1);
+        assert!(mgr.add(CursorViewportScrollerEntry::new("a", "A")));
+        assert!(!mgr.add(CursorViewportScrollerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn cursorviewportscroller_sorted_by_severity() {
+        let mut mgr = CursorViewportScroller::new("test");
+        mgr.add(CursorViewportScrollerEntry::new("lo", "Low"));
+        mgr.add(CursorViewportScrollerEntry::new("hi", "High").with_severity(CursorViewportScrollerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, CursorViewportScrollerSeverity::Critical);
+    }
+
+    #[test]
+    fn cursorviewportscroller_summary() {
+        let mgr = CursorViewportScroller::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn cursorselectionexpander_config_defaults() {
+        let cfg = CursorSelectionExpanderConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn cursorselectionexpander_item_creation() {
+        let item = CursorSelectionExpanderItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn cursorselectionexpander_add_and_get() {
+        let mut mgr = CursorSelectionExpander::new(CursorSelectionExpanderConfig::new("test"));
+        mgr.add(CursorSelectionExpanderItem::new("k1", "v1"));
+        assert_eq!(mgr.selection_length(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn cursorselectionexpander_remove_item() {
+        let mut mgr = CursorSelectionExpander::new(CursorSelectionExpanderConfig::new("test"));
+        mgr.add(CursorSelectionExpanderItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn cursorselectionexpander_sorted_by_priority() {
+        let mut mgr = CursorSelectionExpander::new(CursorSelectionExpanderConfig::new("test"));
+        mgr.add(CursorSelectionExpanderItem::new("lo", "low").with_priority(1));
+        mgr.add(CursorSelectionExpanderItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn cursorselectionexpander_items_with_tag() {
+        let mut mgr = CursorSelectionExpander::new(CursorSelectionExpanderConfig::new("test"));
+        mgr.add(CursorSelectionExpanderItem::new("a", "1").with_tag("x"));
+        mgr.add(CursorSelectionExpanderItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn cursorselectionexpander_report() {
+        let mgr = CursorSelectionExpander::new(CursorSelectionExpanderConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
+    }
 }

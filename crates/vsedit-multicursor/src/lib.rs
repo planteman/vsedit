@@ -1459,6 +1459,281 @@ impl fmt::Display for MultiCursorClipboard {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// MulticursorColumnExtender
+// ---------------------------------------------------------------------------
+
+/// Extends cursors to fill a rectangular column selection area.
+///
+/// Given an anchor position and a target position, this computes a list of
+/// cursor positions that fill every line in the range at the specified column.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MulticursorColumnExtender {
+    /// The column at which cursors are placed.
+    column: u32,
+    /// Starting line (inclusive, 1-based).
+    start_line: u32,
+    /// Ending line (inclusive, 1-based).
+    end_line: u32,
+    /// Generated cursor positions.
+    positions: Vec<CursorPosition>,
+}
+
+impl MulticursorColumnExtender {
+    /// Create a new column extender from an anchor and a target line.
+    pub fn new(column: u32, start_line: u32, end_line: u32) -> Result<Self, MultiCursorError> {
+        if column == 0 {
+            return Err(MultiCursorError::InvalidPosition { line: start_line, column });
+        }
+        if start_line == 0 || end_line == 0 {
+            return Err(MultiCursorError::InvalidPosition { line: 0, column });
+        }
+        let (lo, hi) = if start_line <= end_line {
+            (start_line, end_line)
+        } else {
+            (end_line, start_line)
+        };
+        let positions: Vec<CursorPosition> = (lo..=hi)
+            .map(|line| CursorPosition::new(line, column))
+            .collect();
+        Ok(Self {
+            column,
+            start_line: lo,
+            end_line: hi,
+            positions,
+        })
+    }
+
+    /// Return the number of cursors generated.
+    pub fn cursor_count(&self) -> usize {
+        self.positions.len()
+    }
+
+    /// Return a slice of the generated positions.
+    pub fn positions(&self) -> &[CursorPosition] {
+        &self.positions
+    }
+
+    /// The column all cursors share.
+    pub fn column(&self) -> u32 {
+        self.column
+    }
+
+    /// The start line of the column selection.
+    pub fn start_line(&self) -> u32 {
+        self.start_line
+    }
+
+    /// The end line of the column selection.
+    pub fn end_line(&self) -> u32 {
+        self.end_line
+    }
+
+    /// Line span covered by this extender.
+    pub fn line_span(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Shift all cursor positions by a line delta.
+    pub fn shift_lines(&mut self, delta: i64) {
+        let new_start = (self.start_line as i64 + delta).max(1) as u32;
+        let new_end = (self.end_line as i64 + delta).max(1) as u32;
+        self.start_line = new_start;
+        self.end_line = new_end;
+        self.positions = (new_start..=new_end)
+            .map(|line| CursorPosition::new(line, self.column))
+            .collect();
+    }
+
+    /// Shift the column by a delta.
+    pub fn shift_column(&mut self, delta: i64) {
+        let new_col = (self.column as i64 + delta).max(1) as u32;
+        self.column = new_col;
+        for pos in &mut self.positions {
+            *pos = CursorPosition::new(pos.line, new_col);
+        }
+    }
+
+    /// Expand the selection by one line in each direction (clamped at 1).
+    pub fn expand(&mut self) {
+        if self.start_line > 1 {
+            self.start_line -= 1;
+        }
+        self.end_line += 1;
+        self.positions = (self.start_line..=self.end_line)
+            .map(|line| CursorPosition::new(line, self.column))
+            .collect();
+    }
+
+    /// Shrink the selection by one line on each side, if possible.
+    pub fn shrink(&mut self) {
+        if self.end_line - self.start_line >= 2 {
+            self.start_line += 1;
+            self.end_line -= 1;
+            self.positions = (self.start_line..=self.end_line)
+                .map(|line| CursorPosition::new(line, self.column))
+                .collect();
+        }
+    }
+
+    /// Check if a given position is within the column selection.
+    pub fn contains(&self, pos: &CursorPosition) -> bool {
+        pos.column == self.column && pos.line >= self.start_line && pos.line <= self.end_line
+    }
+
+    /// Merge two column extenders that share the same column.
+    pub fn merge(&self, other: &Self) -> Result<Self, MultiCursorError> {
+        if self.column != other.column {
+            return Err(MultiCursorError::InvalidPosition {
+                line: other.start_line,
+                column: other.column,
+            });
+        }
+        let lo = self.start_line.min(other.start_line);
+        let hi = self.end_line.max(other.end_line);
+        Self::new(self.column, lo, hi)
+    }
+}
+
+impl fmt::Display for MulticursorColumnExtender {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ColumnExtender(col={}, lines={}..={}, count={})",
+            self.column,
+            self.start_line,
+            self.end_line,
+            self.cursor_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MulticursorTypeFilter
+// ---------------------------------------------------------------------------
+
+/// Criteria for filtering cursors by position attributes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CursorFilterCriterion {
+    /// Keep cursors on a specific line.
+    OnLine(u32),
+    /// Keep cursors within a line range (inclusive).
+    InLineRange(u32, u32),
+    /// Keep cursors at a specific column.
+    AtColumn(u32),
+    /// Keep cursors where column >= threshold.
+    MinColumn(u32),
+    /// Keep cursors where column <= threshold.
+    MaxColumn(u32),
+    /// Keep cursors where line is even.
+    EvenLines,
+    /// Keep cursors where line is odd.
+    OddLines,
+}
+
+/// Filters a set of cursor positions by one or more criteria.
+#[derive(Debug, Clone)]
+pub struct MulticursorTypeFilter {
+    criteria: Vec<CursorFilterCriterion>,
+    /// When true, ALL criteria must match (AND). When false, ANY criterion suffices (OR).
+    require_all: bool,
+}
+
+impl MulticursorTypeFilter {
+    /// Create a new filter that requires all criteria to match.
+    pub fn all_of(criteria: Vec<CursorFilterCriterion>) -> Self {
+        Self { criteria, require_all: true }
+    }
+
+    /// Create a new filter that requires any criterion to match.
+    pub fn any_of(criteria: Vec<CursorFilterCriterion>) -> Self {
+        Self { criteria, require_all: false }
+    }
+
+    /// Create an empty filter that passes everything.
+    pub fn pass_all() -> Self {
+        Self { criteria: Vec::new(), require_all: true }
+    }
+
+    /// Add a criterion to this filter.
+    pub fn add(&mut self, criterion: CursorFilterCriterion) {
+        self.criteria.push(criterion);
+    }
+
+    /// Number of criteria in this filter.
+    pub fn criteria_count(&self) -> usize {
+        self.criteria.len()
+    }
+
+    /// Check if a single position matches a single criterion.
+    fn matches_criterion(pos: &CursorPosition, criterion: &CursorFilterCriterion) -> bool {
+        match criterion {
+            CursorFilterCriterion::OnLine(line) => pos.line == *line,
+            CursorFilterCriterion::InLineRange(lo, hi) => pos.line >= *lo && pos.line <= *hi,
+            CursorFilterCriterion::AtColumn(col) => pos.column == *col,
+            CursorFilterCriterion::MinColumn(min) => pos.column >= *min,
+            CursorFilterCriterion::MaxColumn(max) => pos.column <= *max,
+            CursorFilterCriterion::EvenLines => pos.line % 2 == 0,
+            CursorFilterCriterion::OddLines => pos.line % 2 == 1,
+        }
+    }
+
+    /// Check if a position passes this filter.
+    pub fn matches(&self, pos: &CursorPosition) -> bool {
+        if self.criteria.is_empty() {
+            return true;
+        }
+        if self.require_all {
+            self.criteria.iter().all(|c| Self::matches_criterion(pos, c))
+        } else {
+            self.criteria.iter().any(|c| Self::matches_criterion(pos, c))
+        }
+    }
+
+    /// Filter a slice of positions, returning those that match.
+    pub fn apply(&self, positions: &[CursorPosition]) -> Vec<CursorPosition> {
+        positions.iter().filter(|p| self.matches(p)).cloned().collect()
+    }
+
+    /// Count how many positions match.
+    pub fn count_matches(&self, positions: &[CursorPosition]) -> usize {
+        positions.iter().filter(|p| self.matches(p)).count()
+    }
+
+    /// Partition positions into (matched, unmatched).
+    pub fn partition(&self, positions: &[CursorPosition]) -> (Vec<CursorPosition>, Vec<CursorPosition>) {
+        let mut matched = Vec::new();
+        let mut unmatched = Vec::new();
+        for p in positions {
+            if self.matches(p) {
+                matched.push(p.clone());
+            } else {
+                unmatched.push(p.clone());
+            }
+        }
+        (matched, unmatched)
+    }
+
+    /// Return true if the filter is in AND mode.
+    pub fn is_require_all(&self) -> bool {
+        self.require_all
+    }
+
+    /// Clear all criteria.
+    pub fn clear(&mut self) {
+        self.criteria.clear();
+    }
+}
+
+impl fmt::Display for MulticursorTypeFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mode = if self.require_all { "ALL" } else { "ANY" };
+        write!(f, "TypeFilter({}, {} criteria)", mode, self.criteria.len())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2309,4 +2584,185 @@ mod tests {
         cb.clear();
         assert!(cb.is_empty());
     }
+
+    #[test]
+    fn column_extender_basic() {
+        let ext = MulticursorColumnExtender::new(5, 1, 3).unwrap();
+        assert_eq!(ext.cursor_count(), 3);
+        assert_eq!(ext.column(), 5);
+        assert_eq!(ext.start_line(), 1);
+        assert_eq!(ext.end_line(), 3);
+    }
+
+    #[test]
+    fn column_extender_reversed_range() {
+        let ext = MulticursorColumnExtender::new(10, 5, 2).unwrap();
+        assert_eq!(ext.start_line(), 2);
+        assert_eq!(ext.end_line(), 5);
+        assert_eq!(ext.cursor_count(), 4);
+    }
+
+    #[test]
+    fn column_extender_single_line() {
+        let ext = MulticursorColumnExtender::new(3, 7, 7).unwrap();
+        assert_eq!(ext.cursor_count(), 1);
+        assert_eq!(ext.line_span(), 1);
+    }
+
+    #[test]
+    fn column_extender_invalid_column() {
+        let result = MulticursorColumnExtender::new(0, 1, 3);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn column_extender_shift_lines() {
+        let mut ext = MulticursorColumnExtender::new(5, 2, 4).unwrap();
+        ext.shift_lines(3);
+        assert_eq!(ext.start_line(), 5);
+        assert_eq!(ext.end_line(), 7);
+        assert_eq!(ext.cursor_count(), 3);
+    }
+
+    #[test]
+    fn column_extender_shift_column() {
+        let mut ext = MulticursorColumnExtender::new(5, 1, 3).unwrap();
+        ext.shift_column(2);
+        assert_eq!(ext.column(), 7);
+        assert!(ext.positions().iter().all(|p| p.column == 7));
+    }
+
+    #[test]
+    fn column_extender_expand_shrink() {
+        let mut ext = MulticursorColumnExtender::new(5, 3, 5).unwrap();
+        ext.expand();
+        assert_eq!(ext.start_line(), 2);
+        assert_eq!(ext.end_line(), 6);
+        ext.shrink();
+        assert_eq!(ext.start_line(), 3);
+        assert_eq!(ext.end_line(), 5);
+    }
+
+    #[test]
+    fn column_extender_contains() {
+        let ext = MulticursorColumnExtender::new(5, 2, 4).unwrap();
+        assert!(ext.contains(&CursorPosition::new(3, 5)));
+        assert!(!ext.contains(&CursorPosition::new(3, 6)));
+        assert!(!ext.contains(&CursorPosition::new(1, 5)));
+    }
+
+    #[test]
+    fn column_extender_merge() {
+        let a = MulticursorColumnExtender::new(5, 1, 3).unwrap();
+        let b = MulticursorColumnExtender::new(5, 5, 7).unwrap();
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.start_line(), 1);
+        assert_eq!(merged.end_line(), 7);
+        assert_eq!(merged.cursor_count(), 7);
+    }
+
+    #[test]
+    fn column_extender_merge_different_col_fails() {
+        let a = MulticursorColumnExtender::new(5, 1, 3).unwrap();
+        let b = MulticursorColumnExtender::new(6, 5, 7).unwrap();
+        assert!(a.merge(&b).is_err());
+    }
+
+    #[test]
+    fn column_extender_display() {
+        let ext = MulticursorColumnExtender::new(5, 1, 3).unwrap();
+        let s = format!("{ext}");
+        assert!(s.contains("col=5"));
+        assert!(s.contains("count=3"));
+    }
+
+    #[test]
+    fn type_filter_on_line() {
+        let filter = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::OnLine(3)]);
+        let positions = vec![
+            CursorPosition::new(1, 1),
+            CursorPosition::new(3, 5),
+            CursorPosition::new(3, 10),
+        ];
+        let result = filter.apply(&positions);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn type_filter_in_line_range() {
+        let filter = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::InLineRange(2, 4)]);
+        let positions: Vec<CursorPosition> = (1..=6).map(|l| CursorPosition::new(l, 1)).collect();
+        assert_eq!(filter.count_matches(&positions), 3);
+    }
+
+    #[test]
+    fn type_filter_any_of() {
+        let filter = MulticursorTypeFilter::any_of(vec![
+            CursorFilterCriterion::OnLine(1),
+            CursorFilterCriterion::OnLine(5),
+        ]);
+        let positions: Vec<CursorPosition> = (1..=5).map(|l| CursorPosition::new(l, 1)).collect();
+        assert_eq!(filter.count_matches(&positions), 2);
+    }
+
+    #[test]
+    fn type_filter_all_of_combined() {
+        let filter = MulticursorTypeFilter::all_of(vec![
+            CursorFilterCriterion::InLineRange(1, 10),
+            CursorFilterCriterion::MinColumn(5),
+        ]);
+        let positions = vec![
+            CursorPosition::new(1, 3),
+            CursorPosition::new(5, 8),
+            CursorPosition::new(15, 8),
+        ];
+        assert_eq!(filter.count_matches(&positions), 1);
+    }
+
+    #[test]
+    fn type_filter_even_odd() {
+        let filter_even = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::EvenLines]);
+        let filter_odd = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::OddLines]);
+        let positions: Vec<CursorPosition> = (1..=6).map(|l| CursorPosition::new(l, 1)).collect();
+        assert_eq!(filter_even.count_matches(&positions), 3);
+        assert_eq!(filter_odd.count_matches(&positions), 3);
+    }
+
+    #[test]
+    fn type_filter_partition() {
+        let filter = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::MaxColumn(5)]);
+        let positions = vec![
+            CursorPosition::new(1, 3),
+            CursorPosition::new(2, 8),
+            CursorPosition::new(3, 5),
+        ];
+        let (matched, unmatched) = filter.partition(&positions);
+        assert_eq!(matched.len(), 2);
+        assert_eq!(unmatched.len(), 1);
+    }
+
+    #[test]
+    fn type_filter_pass_all() {
+        let filter = MulticursorTypeFilter::pass_all();
+        let positions: Vec<CursorPosition> = (1..=10).map(|l| CursorPosition::new(l, 1)).collect();
+        assert_eq!(filter.count_matches(&positions), 10);
+    }
+
+    #[test]
+    fn type_filter_display() {
+        let filter = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::OnLine(1)]);
+        let s = format!("{filter}");
+        assert!(s.contains("ALL"));
+        assert!(s.contains("1 criteria"));
+    }
+
+    #[test]
+    fn type_filter_clear() {
+        let mut filter = MulticursorTypeFilter::all_of(vec![CursorFilterCriterion::OnLine(1)]);
+        assert_eq!(filter.criteria_count(), 1);
+        filter.clear();
+        assert_eq!(filter.criteria_count(), 0);
+    }
+
+
 }

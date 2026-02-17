@@ -1450,6 +1450,271 @@ fn serialize_box_node<T, F>(
     }
 }
 
+
+// ── Tree Flatten Iterator ──
+
+/// Iterator that yields references to all nodes in depth-first order,
+/// regardless of expansion state.
+pub struct TreeFlattenIterator<'a, T> {
+    stack: Vec<&'a TreeNode<T>>,
+}
+
+impl<'a, T> TreeFlattenIterator<'a, T> {
+    /// Create a new flatten iterator from a tree model.
+    pub fn from_model(model: &'a TreeModel<T>) -> Self {
+        let mut stack: Vec<&'a TreeNode<T>> = Vec::new();
+        // Push roots in reverse so the first root is visited first.
+        for root in model.roots.iter().rev() {
+            stack.push(root);
+        }
+        Self { stack }
+    }
+
+    /// Create from a single node.
+    pub fn from_node(node: &'a TreeNode<T>) -> Self {
+        Self { stack: vec![node] }
+    }
+}
+
+impl<'a, T> Iterator for TreeFlattenIterator<'a, T> {
+    type Item = &'a TreeNode<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let node = self.stack.pop()?;
+        // Push children in reverse order so left-most child is visited first.
+        for child in node.children.iter().rev() {
+            self.stack.push(child);
+        }
+        Some(node)
+    }
+}
+
+// ── Tree Path Serializer ──
+
+/// Serializes and deserializes tree paths as slash-separated index strings.
+pub struct TreePathSerializer;
+
+impl TreePathSerializer {
+    /// Serialize a path of indices to a string like "0/1/2".
+    pub fn serialize(path: &[usize]) -> String {
+        path.iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// Deserialize a path string back to indices.
+    pub fn deserialize(s: &str) -> Option<Vec<usize>> {
+        if s.is_empty() {
+            return Some(Vec::new());
+        }
+        let mut result = Vec::new();
+        for part in s.split('/') {
+            match part.parse::<usize>() {
+                Ok(idx) => result.push(idx),
+                Err(_) => return None,
+            }
+        }
+        Some(result)
+    }
+
+    /// Determine if `child_path` is a descendant of `ancestor_path`.
+    pub fn is_descendant(ancestor_path: &str, child_path: &str) -> bool {
+        if ancestor_path.is_empty() {
+            return true;
+        }
+        child_path.starts_with(ancestor_path)
+            && child_path.len() > ancestor_path.len()
+            && child_path.as_bytes()[ancestor_path.len()] == b'/'
+    }
+
+    /// Return the parent path (everything before the last `/`).
+    pub fn parent_path(path: &str) -> Option<String> {
+        if path.is_empty() {
+            return None;
+        }
+        match path.rfind('/') {
+            Some(pos) => Some(path[..pos].to_string()),
+            None => Some(String::new()),
+        }
+    }
+
+    /// Depth of a path (number of segments).
+    pub fn depth(path: &str) -> usize {
+        if path.is_empty() {
+            0
+        } else {
+            path.split('/').count()
+        }
+    }
+
+    /// Append an index to a path.
+    pub fn append(path: &str, index: usize) -> String {
+        if path.is_empty() {
+            index.to_string()
+        } else {
+            format!("{path}/{index}")
+        }
+    }
+
+    /// Return the last segment (leaf index) of a path.
+    pub fn leaf_index(path: &str) -> Option<usize> {
+        path.rsplit('/').next()?.parse().ok()
+    }
+}
+
+// ── Tree Depth Calculator ──
+
+/// Utility for computing depth-related metrics on a tree.
+pub struct TreeDepthCalculator;
+
+impl TreeDepthCalculator {
+    /// Maximum depth in the tree model (0 if empty).
+    pub fn max_depth<T>(model: &TreeModel<T>) -> u32 {
+        model.roots.iter().map(|r| Self::node_max_depth(r)).max().unwrap_or(0)
+    }
+
+    fn node_max_depth<T>(node: &TreeNode<T>) -> u32 {
+        if node.children.is_empty() {
+            node.depth
+        } else {
+            node.children.iter().map(|c| Self::node_max_depth(c)).max().unwrap_or(node.depth)
+        }
+    }
+
+    /// Count of nodes at a given depth.
+    pub fn count_at_depth<T>(model: &TreeModel<T>, target_depth: u32) -> usize {
+        model.roots.iter()
+            .map(|r| Self::count_at_depth_node(r, target_depth))
+            .sum()
+    }
+
+    fn count_at_depth_node<T>(node: &TreeNode<T>, target_depth: u32) -> usize {
+        let mut count = if node.depth == target_depth { 1 } else { 0 };
+        for child in &node.children {
+            count += Self::count_at_depth_node(child, target_depth);
+        }
+        count
+    }
+
+    /// Return the average depth of all leaf nodes.
+    pub fn average_leaf_depth<T>(model: &TreeModel<T>) -> f64 {
+        let mut sum: u64 = 0;
+        let mut count: u64 = 0;
+        for root in &model.roots {
+            Self::collect_leaf_depths(root, &mut sum, &mut count);
+        }
+        if count == 0 { 0.0 } else { sum as f64 / count as f64 }
+    }
+
+    fn collect_leaf_depths<T>(node: &TreeNode<T>, sum: &mut u64, count: &mut u64) {
+        if node.children.is_empty() {
+            *sum += node.depth as u64;
+            *count += 1;
+        } else {
+            for child in &node.children {
+                Self::collect_leaf_depths(child, sum, count);
+            }
+        }
+    }
+
+    /// Collect all leaf nodes' data references.
+    pub fn leaf_data<'a, T>(model: &'a TreeModel<T>) -> Vec<&'a T> {
+        let mut leaves = Vec::new();
+        for root in &model.roots {
+            Self::collect_leaves(root, &mut leaves);
+        }
+        leaves
+    }
+
+    fn collect_leaves<'a, T>(node: &'a TreeNode<T>, out: &mut Vec<&'a T>) {
+        if node.children.is_empty() {
+            out.push(&node.data);
+        } else {
+            for child in &node.children {
+                Self::collect_leaves(child, out);
+            }
+        }
+    }
+}
+
+// ── Tree Sibling Navigator ──
+
+/// Navigator for moving between siblings in a tree model.
+pub struct TreeSiblingNavigator;
+
+impl TreeSiblingNavigator {
+    /// Return the number of siblings (including self) at the root level.
+    pub fn root_sibling_count<T>(model: &TreeModel<T>) -> usize {
+        model.roots.len()
+    }
+
+    /// Find the index of a root node by data equality.
+    pub fn find_root_index<T: PartialEq>(model: &TreeModel<T>, data: &T) -> Option<usize> {
+        model.roots.iter().position(|r| r.data == *data)
+    }
+
+    /// Get the data of the next root sibling.
+    pub fn next_root_sibling<'a, T: PartialEq>(model: &'a TreeModel<T>, data: &T) -> Option<&'a T> {
+        let idx = Self::find_root_index(model, data)?;
+        if idx + 1 < model.roots.len() {
+            Some(&model.roots[idx + 1].data)
+        } else {
+            None
+        }
+    }
+
+    /// Get the data of the previous root sibling.
+    pub fn prev_root_sibling<'a, T: PartialEq>(model: &'a TreeModel<T>, data: &T) -> Option<&'a T> {
+        let idx = Self::find_root_index(model, data)?;
+        if idx > 0 {
+            Some(&model.roots[idx - 1].data)
+        } else {
+            None
+        }
+    }
+
+    /// Count children of a specific root node by index.
+    pub fn child_count_of_root<T>(model: &TreeModel<T>, root_index: usize) -> usize {
+        model.roots.get(root_index).map_or(0, |r| r.children.len())
+    }
+
+    /// Return the index of a child within a node's children by data equality.
+    pub fn find_child_index<T: PartialEq>(node: &TreeNode<T>, data: &T) -> Option<usize> {
+        node.children.iter().position(|c| c.data == *data)
+    }
+
+    /// Check if a node is the first child among its siblings.
+    pub fn is_first_child<T: PartialEq>(parent: &TreeNode<T>, data: &T) -> bool {
+        parent.children.first().map_or(false, |c| c.data == *data)
+    }
+
+    /// Check if a node is the last child among its siblings.
+    pub fn is_last_child<T: PartialEq>(parent: &TreeNode<T>, data: &T) -> bool {
+        parent.children.last().map_or(false, |c| c.data == *data)
+    }
+
+    /// Get the next sibling data within a parent node.
+    pub fn next_sibling<'a, T: PartialEq>(parent: &'a TreeNode<T>, data: &T) -> Option<&'a T> {
+        let idx = Self::find_child_index(parent, data)?;
+        if idx + 1 < parent.children.len() {
+            Some(&parent.children[idx + 1].data)
+        } else {
+            None
+        }
+    }
+
+    /// Get the previous sibling data within a parent node.
+    pub fn prev_sibling<'a, T: PartialEq>(parent: &'a TreeNode<T>, data: &T) -> Option<&'a T> {
+        let idx = Self::find_child_index(parent, data)?;
+        if idx > 0 {
+            Some(&parent.children[idx - 1].data)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2235,4 +2500,184 @@ mod tests {
         assert_eq!(bfs[1], &"Cargo.toml");
         assert_eq!(bfs.len(), 6);
     }
+
+    // ── TreeFlattenIterator tests ──
+
+    #[test]
+    fn flatten_iterator_visits_all() {
+        let model = sample_model();
+        let iter = TreeFlattenIterator::from_model(&model);
+        let data: Vec<&&str> = iter.map(|n| &n.data).collect();
+        assert_eq!(data.len(), 6);
+        assert_eq!(data[0], &"src");
+        assert_eq!(data[1], &"main.rs");
+    }
+
+    #[test]
+    fn flatten_iterator_single_node() {
+        let node = TreeNode::new("root", 0);
+        let iter = TreeFlattenIterator::from_node(&node);
+        let data: Vec<&&str> = iter.map(|n| &n.data).collect();
+        assert_eq!(data.len(), 1);
+        assert_eq!(data[0], &"root");
+    }
+
+    #[test]
+    fn flatten_iterator_depth_first_order() {
+        let model = sample_model();
+        let iter = TreeFlattenIterator::from_model(&model);
+        let data: Vec<&&str> = iter.map(|n| &n.data).collect();
+        // src -> main.rs -> lib -> mod.rs -> utils.rs -> Cargo.toml
+        assert_eq!(data[2], &"lib");
+        assert_eq!(data[3], &"mod.rs");
+        assert_eq!(data[5], &"Cargo.toml");
+    }
+
+    // ── TreePathSerializer tests ──
+
+    #[test]
+    fn path_serialize_roundtrip() {
+        let path = vec![0, 1, 2];
+        let s = TreePathSerializer::serialize(&path);
+        assert_eq!(s, "0/1/2");
+        assert_eq!(TreePathSerializer::deserialize(&s), Some(vec![0, 1, 2]));
+    }
+
+    #[test]
+    fn path_deserialize_empty() {
+        assert_eq!(TreePathSerializer::deserialize(""), Some(Vec::new()));
+    }
+
+    #[test]
+    fn path_deserialize_invalid() {
+        assert_eq!(TreePathSerializer::deserialize("a/b"), None);
+    }
+
+    #[test]
+    fn path_is_descendant() {
+        assert!(TreePathSerializer::is_descendant("0", "0/1"));
+        assert!(TreePathSerializer::is_descendant("0/1", "0/1/2"));
+        assert!(!TreePathSerializer::is_descendant("0/1", "0/1"));
+        assert!(!TreePathSerializer::is_descendant("0/1", "0/2"));
+    }
+
+    #[test]
+    fn path_parent() {
+        assert_eq!(TreePathSerializer::parent_path("0/1/2"), Some("0/1".to_string()));
+        assert_eq!(TreePathSerializer::parent_path("0"), Some(String::new()));
+        assert_eq!(TreePathSerializer::parent_path(""), None);
+    }
+
+    #[test]
+    fn path_depth() {
+        assert_eq!(TreePathSerializer::depth("0/1/2"), 3);
+        assert_eq!(TreePathSerializer::depth("0"), 1);
+        assert_eq!(TreePathSerializer::depth(""), 0);
+    }
+
+    #[test]
+    fn path_append() {
+        assert_eq!(TreePathSerializer::append("0/1", 2), "0/1/2");
+        assert_eq!(TreePathSerializer::append("", 0), "0");
+    }
+
+    #[test]
+    fn path_leaf_index() {
+        assert_eq!(TreePathSerializer::leaf_index("0/1/3"), Some(3));
+        assert_eq!(TreePathSerializer::leaf_index("5"), Some(5));
+    }
+
+    // ── TreeDepthCalculator tests ──
+
+    #[test]
+    fn depth_max() {
+        let model = sample_model();
+        // src(0) -> lib(1) -> mod.rs(2) = max depth 2
+        assert_eq!(TreeDepthCalculator::max_depth(&model), 2);
+    }
+
+    #[test]
+    fn depth_count_at_depth() {
+        let model = sample_model();
+        assert_eq!(TreeDepthCalculator::count_at_depth(&model, 0), 2); // src, Cargo.toml
+        assert_eq!(TreeDepthCalculator::count_at_depth(&model, 1), 2); // main.rs, lib
+        assert_eq!(TreeDepthCalculator::count_at_depth(&model, 2), 2); // mod.rs, utils.rs
+    }
+
+    #[test]
+    fn depth_average_leaf() {
+        let model = sample_model();
+        // leaves: main.rs(1), mod.rs(2), utils.rs(2), Cargo.toml(0) => avg = 5/4 = 1.25
+        let avg = TreeDepthCalculator::average_leaf_depth(&model);
+        assert!((avg - 1.25).abs() < 0.001);
+    }
+
+    #[test]
+    fn depth_leaf_data() {
+        let model = sample_model();
+        let leaves = TreeDepthCalculator::leaf_data(&model);
+        assert_eq!(leaves.len(), 4);
+        assert!(leaves.contains(&&"main.rs"));
+        assert!(leaves.contains(&&"Cargo.toml"));
+    }
+
+    #[test]
+    fn depth_empty_model() {
+        let model: TreeModel<&str> = TreeModel::new();
+        assert_eq!(TreeDepthCalculator::max_depth(&model), 0);
+        assert_eq!(TreeDepthCalculator::average_leaf_depth(&model), 0.0);
+    }
+
+    // ── TreeSiblingNavigator tests ──
+
+    #[test]
+    fn sibling_root_count() {
+        let model = sample_model();
+        assert_eq!(TreeSiblingNavigator::root_sibling_count(&model), 2);
+    }
+
+    #[test]
+    fn sibling_find_root() {
+        let model = sample_model();
+        assert_eq!(TreeSiblingNavigator::find_root_index(&model, &"src"), Some(0));
+        assert_eq!(TreeSiblingNavigator::find_root_index(&model, &"Cargo.toml"), Some(1));
+        assert_eq!(TreeSiblingNavigator::find_root_index(&model, &"missing"), None);
+    }
+
+    #[test]
+    fn sibling_next_prev_root() {
+        let model = sample_model();
+        assert_eq!(TreeSiblingNavigator::next_root_sibling(&model, &"src"), Some(&"Cargo.toml"));
+        assert_eq!(TreeSiblingNavigator::next_root_sibling(&model, &"Cargo.toml"), None);
+        assert_eq!(TreeSiblingNavigator::prev_root_sibling(&model, &"Cargo.toml"), Some(&"src"));
+        assert_eq!(TreeSiblingNavigator::prev_root_sibling(&model, &"src"), None);
+    }
+
+    #[test]
+    fn sibling_child_count() {
+        let model = sample_model();
+        assert_eq!(TreeSiblingNavigator::child_count_of_root(&model, 0), 2); // src has main.rs + lib
+        assert_eq!(TreeSiblingNavigator::child_count_of_root(&model, 1), 0); // Cargo.toml has none
+        assert_eq!(TreeSiblingNavigator::child_count_of_root(&model, 99), 0);
+    }
+
+    #[test]
+    fn sibling_first_last_child() {
+        let model = sample_model();
+        let src = &model.roots[0];
+        assert!(TreeSiblingNavigator::is_first_child(src, &"main.rs"));
+        assert!(TreeSiblingNavigator::is_last_child(src, &"lib"));
+        assert!(!TreeSiblingNavigator::is_first_child(src, &"lib"));
+    }
+
+    #[test]
+    fn sibling_next_prev() {
+        let model = sample_model();
+        let src = &model.roots[0];
+        assert_eq!(TreeSiblingNavigator::next_sibling(src, &"main.rs"), Some(&"lib"));
+        assert_eq!(TreeSiblingNavigator::next_sibling(src, &"lib"), None);
+        assert_eq!(TreeSiblingNavigator::prev_sibling(src, &"lib"), Some(&"main.rs"));
+        assert_eq!(TreeSiblingNavigator::prev_sibling(src, &"main.rs"), None);
+    }
+
 }

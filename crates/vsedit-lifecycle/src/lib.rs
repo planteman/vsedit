@@ -1498,6 +1498,750 @@ impl RestartRequestHandler {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// LifecycleTimingReport – millisecond-level timing report builder
+// ---------------------------------------------------------------------------
+
+/// Represents a single timing entry in a lifecycle report.
+#[derive(Debug, Clone)]
+pub struct TimingEntry {
+    /// Label for the measured operation.
+    pub label: String,
+    /// Duration in milliseconds.
+    pub duration_ms: u64,
+    /// Optional parent label for hierarchical reports.
+    pub parent: Option<String>,
+}
+
+/// Builds a hierarchical timing report for lifecycle operations.
+///
+/// Unlike [`LifecyclePhaseTiming`] which tracks phase transitions using
+/// `Instant`, this struct collects labelled durations in milliseconds and
+/// can produce a formatted text report.
+#[derive(Debug, Clone)]
+pub struct LifecycleTimingReport {
+    entries: Vec<TimingEntry>,
+    report_name: String,
+}
+
+impl LifecycleTimingReport {
+    /// Create a new report with the given name.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            entries: Vec::new(),
+            report_name: name.into(),
+        }
+    }
+
+    /// Record a top-level timing entry.
+    pub fn record(&mut self, label: impl Into<String>, duration_ms: u64) {
+        self.entries.push(TimingEntry {
+            label: label.into(),
+            duration_ms,
+            parent: None,
+        });
+    }
+
+    /// Record a timing entry nested under a parent.
+    pub fn record_child(
+        &mut self,
+        label: impl Into<String>,
+        duration_ms: u64,
+        parent: impl Into<String>,
+    ) {
+        self.entries.push(TimingEntry {
+            label: label.into(),
+            duration_ms,
+            parent: Some(parent.into()),
+        });
+    }
+
+    /// Total time across all top-level entries.
+    pub fn total_ms(&self) -> u64 {
+        self.entries
+            .iter()
+            .filter(|e| e.parent.is_none())
+            .map(|e| e.duration_ms)
+            .sum()
+    }
+
+    /// Number of entries in the report.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get the report name.
+    pub fn name(&self) -> &str {
+        &self.report_name
+    }
+
+    /// Get all entries.
+    pub fn entries(&self) -> &[TimingEntry] {
+        &self.entries
+    }
+
+    /// Find the slowest top-level entry.
+    pub fn slowest(&self) -> Option<&TimingEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.parent.is_none())
+            .max_by_key(|e| e.duration_ms)
+    }
+
+    /// Children of a given parent label.
+    pub fn children_of(&self, parent: &str) -> Vec<&TimingEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.parent.as_deref() == Some(parent))
+            .collect()
+    }
+
+    /// Produce a human-readable text report.
+    pub fn format_report(&self) -> String {
+        let mut out = format!("=== {} ===\n", self.report_name);
+        for entry in &self.entries {
+            if entry.parent.is_none() {
+                out.push_str(&format!("  {} : {}ms\n", entry.label, entry.duration_ms));
+                for child in self.children_of(&entry.label) {
+                    out.push_str(&format!(
+                        "    {} : {}ms\n",
+                        child.label, child.duration_ms,
+                    ));
+                }
+            }
+        }
+        out.push_str(&format!("  TOTAL : {}ms\n", self.total_ms()));
+        out
+    }
+}
+
+impl fmt::Display for LifecycleTimingReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({} entries, {}ms)", self.report_name, self.entry_count(), self.total_ms())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleCheckpoint – saveable milestone markers
+// ---------------------------------------------------------------------------
+
+/// Identifies a named checkpoint in the lifecycle with a monotonic sequence number.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleCheckpoint {
+    /// Sequence number (assigned in order of creation).
+    pub seq: u32,
+    /// Human-readable label.
+    pub label: String,
+    /// Timestamp in milliseconds since an arbitrary epoch.
+    pub timestamp_ms: u64,
+}
+
+/// Collects [`LifecycleCheckpoint`]s and provides query methods.
+pub struct LifecycleCheckpointSaver {
+    checkpoints: Vec<LifecycleCheckpoint>,
+    next_seq: u32,
+}
+
+impl LifecycleCheckpointSaver {
+    /// Create an empty saver.
+    pub fn new() -> Self {
+        Self {
+            checkpoints: Vec::new(),
+            next_seq: 0,
+        }
+    }
+
+    /// Save a new checkpoint at the given timestamp.
+    pub fn save(&mut self, label: impl Into<String>, timestamp_ms: u64) -> u32 {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        self.checkpoints.push(LifecycleCheckpoint {
+            seq,
+            label: label.into(),
+            timestamp_ms,
+        });
+        seq
+    }
+
+    /// Get a checkpoint by sequence number.
+    pub fn get(&self, seq: u32) -> Option<&LifecycleCheckpoint> {
+        self.checkpoints.iter().find(|c| c.seq == seq)
+    }
+
+    /// Get a checkpoint by label. Returns the first match.
+    pub fn get_by_label(&self, label: &str) -> Option<&LifecycleCheckpoint> {
+        self.checkpoints.iter().find(|c| c.label == label)
+    }
+
+    /// Duration between two checkpoints (by seq) in milliseconds.
+    pub fn duration_between(&self, from: u32, to: u32) -> Option<u64> {
+        let a = self.get(from)?;
+        let b = self.get(to)?;
+        Some(b.timestamp_ms.saturating_sub(a.timestamp_ms))
+    }
+
+    /// Number of saved checkpoints.
+    pub fn count(&self) -> usize {
+        self.checkpoints.len()
+    }
+
+    /// All checkpoints in order.
+    pub fn all(&self) -> &[LifecycleCheckpoint] {
+        &self.checkpoints
+    }
+
+    /// Remove all checkpoints.
+    pub fn clear(&mut self) {
+        self.checkpoints.clear();
+        self.next_seq = 0;
+    }
+
+    /// Most recent checkpoint, if any.
+    pub fn latest(&self) -> Option<&LifecycleCheckpoint> {
+        self.checkpoints.last()
+    }
+}
+
+impl Default for LifecycleCheckpointSaver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleEventGraph – directed event dependency graph
+// ---------------------------------------------------------------------------
+
+/// A directed edge in the lifecycle event graph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EventEdge {
+    from: String,
+    to: String,
+}
+
+/// Models lifecycle events and their ordering constraints as a directed acyclic graph.
+///
+/// Each event is a string label. An edge `(A, B)` means "A must complete before B".
+pub struct LifecycleEventGraph {
+    events: Vec<String>,
+    edges: Vec<EventEdge>,
+}
+
+impl LifecycleEventGraph {
+    /// Create an empty graph.
+    pub fn new() -> Self {
+        Self {
+            events: Vec::new(),
+            edges: Vec::new(),
+        }
+    }
+
+    /// Add an event node. Duplicates are ignored.
+    pub fn add_event(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        if !self.events.contains(&name) {
+            self.events.push(name);
+        }
+    }
+
+    /// Add a dependency edge: `from` must complete before `to`.
+    /// Both events are added if they do not already exist.
+    pub fn add_dependency(&mut self, from: impl Into<String>, to: impl Into<String>) {
+        let from = from.into();
+        let to = to.into();
+        self.add_event(from.clone());
+        self.add_event(to.clone());
+        let edge = EventEdge { from, to };
+        if !self.edges.contains(&edge) {
+            self.edges.push(edge);
+        }
+    }
+
+    /// Events that have no predecessors (root events).
+    pub fn roots(&self) -> Vec<&str> {
+        self.events
+            .iter()
+            .filter(|e| !self.edges.iter().any(|edge| edge.to == **e))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Events that have no successors (leaf events).
+    pub fn leaves(&self) -> Vec<&str> {
+        self.events
+            .iter()
+            .filter(|e| !self.edges.iter().any(|edge| edge.from == **e))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Direct predecessors of an event.
+    pub fn predecessors(&self, event: &str) -> Vec<&str> {
+        self.edges
+            .iter()
+            .filter(|e| e.to == event)
+            .map(|e| e.from.as_str())
+            .collect()
+    }
+
+    /// Direct successors of an event.
+    pub fn successors(&self, event: &str) -> Vec<&str> {
+        self.edges
+            .iter()
+            .filter(|e| e.from == event)
+            .map(|e| e.to.as_str())
+            .collect()
+    }
+
+    /// Number of events.
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Number of edges.
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Whether the event exists.
+    pub fn has_event(&self, name: &str) -> bool {
+        self.events.iter().any(|e| e == name)
+    }
+
+    /// Topological sort of events. Returns `None` if a cycle is detected.
+    pub fn topological_sort(&self) -> Option<Vec<&str>> {
+        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        for e in &self.events {
+            in_degree.insert(e.as_str(), 0);
+        }
+        for edge in &self.edges {
+            *in_degree.entry(edge.to.as_str()).or_insert(0) += 1;
+        }
+
+        let mut queue: Vec<&str> = in_degree
+            .iter()
+            .filter(|&(_, deg)| *deg == 0)
+            .map(|(&name, _)| name)
+            .collect();
+        queue.sort(); // deterministic ordering
+
+        let mut result = Vec::new();
+        while let Some(node) = queue.pop() {
+            result.push(node);
+            for edge in &self.edges {
+                if edge.from.as_str() == node {
+                    if let Some(deg) = in_degree.get_mut(edge.to.as_str()) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push(edge.to.as_str());
+                            queue.sort();
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.len() == self.events.len() {
+            Some(result)
+        } else {
+            None // cycle detected
+        }
+    }
+}
+
+impl Default for LifecycleEventGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleDependencyTracker – track which subsystems depend on which
+// ---------------------------------------------------------------------------
+
+/// Tracks dependency relationships between named subsystems at runtime.
+///
+/// Unlike [`LifecycleEventGraph`] which models a static ordering,
+/// this tracker monitors whether subsystems have been initialised and
+/// whether all of a subsystem's dependencies are satisfied.
+pub struct LifecycleDependencyTracker {
+    /// Maps subsystem name → list of its dependency names.
+    deps: HashMap<String, Vec<String>>,
+    /// Set of subsystems that have been initialised.
+    initialised: Vec<String>,
+}
+
+impl LifecycleDependencyTracker {
+    /// Create an empty tracker.
+    pub fn new() -> Self {
+        Self {
+            deps: HashMap::new(),
+            initialised: Vec::new(),
+        }
+    }
+
+    /// Register a subsystem with its dependencies.
+    pub fn register(
+        &mut self,
+        subsystem: impl Into<String>,
+        dependencies: Vec<String>,
+    ) {
+        self.deps.insert(subsystem.into(), dependencies);
+    }
+
+    /// Mark a subsystem as initialised.
+    pub fn mark_initialised(&mut self, subsystem: impl Into<String>) {
+        let name = subsystem.into();
+        if !self.initialised.contains(&name) {
+            self.initialised.push(name);
+        }
+    }
+
+    /// Whether a subsystem is initialised.
+    pub fn is_initialised(&self, subsystem: &str) -> bool {
+        self.initialised.contains(&subsystem.to_string())
+    }
+
+    /// Whether all dependencies of a subsystem are satisfied (initialised).
+    pub fn dependencies_satisfied(&self, subsystem: &str) -> bool {
+        match self.deps.get(subsystem) {
+            Some(deps) => deps.iter().all(|d| self.is_initialised(d)),
+            None => true, // unknown subsystem has no deps
+        }
+    }
+
+    /// Get the list of unsatisfied dependencies for a subsystem.
+    pub fn unsatisfied(&self, subsystem: &str) -> Vec<&str> {
+        match self.deps.get(subsystem) {
+            Some(deps) => deps
+                .iter()
+                .filter(|d| !self.is_initialised(d))
+                .map(|d| d.as_str())
+                .collect(),
+            None => Vec::new(),
+        }
+    }
+
+    /// Subsystems that are ready to be initialised (all deps satisfied, not yet init).
+    pub fn ready_subsystems(&self) -> Vec<&str> {
+        self.deps
+            .keys()
+            .filter(|name| {
+                !self.is_initialised(name) && self.dependencies_satisfied(name)
+            })
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Number of registered subsystems.
+    pub fn registered_count(&self) -> usize {
+        self.deps.len()
+    }
+
+    /// Number of initialised subsystems.
+    pub fn initialised_count(&self) -> usize {
+        self.initialised.len()
+    }
+
+    /// Whether all registered subsystems are initialised.
+    pub fn all_initialised(&self) -> bool {
+        self.deps.keys().all(|name| self.is_initialised(name))
+    }
+
+    /// Reset all initialisation state (keeps registrations).
+    pub fn reset(&mut self) {
+        self.initialised.clear();
+    }
+}
+
+impl Default for LifecycleDependencyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for LifecycleDependencyTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "DependencyTracker({}/{} initialised)",
+            self.initialised_count(),
+            self.registered_count(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional LifecycleTimingReport methods
+// ---------------------------------------------------------------------------
+
+impl LifecycleTimingReport {
+    /// Find the fastest top-level entry.
+    pub fn fastest(&self) -> Option<&TimingEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.parent.is_none())
+            .min_by_key(|e| e.duration_ms)
+    }
+
+    /// Number of top-level phases (entries without a parent).
+    pub fn phase_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.parent.is_none()).count()
+    }
+
+    /// Return top-level phases as `(label, duration_ms)` pairs.
+    pub fn phases(&self) -> Vec<(String, u64)> {
+        self.entries
+            .iter()
+            .filter(|e| e.parent.is_none())
+            .map(|e| (e.label.clone(), e.duration_ms))
+            .collect()
+    }
+
+    /// Average duration across top-level entries (rounded down).
+    /// Returns `None` when the report is empty.
+    pub fn average_ms(&self) -> Option<u64> {
+        let count = self.phase_count() as u64;
+        if count == 0 {
+            return None;
+        }
+        Some(self.total_ms() / count)
+    }
+
+    /// One-line summary string: name, count, total, slowest, fastest.
+    pub fn report_summary(&self) -> String {
+        let slowest = self
+            .slowest()
+            .map(|e| format!("{} ({}ms)", e.label, e.duration_ms))
+            .unwrap_or_else(|| "n/a".to_string());
+        let fastest = self
+            .fastest()
+            .map(|e| format!("{} ({}ms)", e.label, e.duration_ms))
+            .unwrap_or_else(|| "n/a".to_string());
+        format!(
+            "{}: {} phases, {}ms total, slowest={}, fastest={}",
+            self.report_name,
+            self.phase_count(),
+            self.total_ms(),
+            slowest,
+            fastest,
+        )
+    }
+
+    /// Merge all entries from `other` into this report.
+    pub fn merge(&mut self, other: &LifecycleTimingReport) {
+        self.entries.extend(other.entries.iter().cloned());
+    }
+
+    /// Returns `true` if a top-level entry with the given label exists.
+    pub fn has_entry(&self, label: &str) -> bool {
+        self.entries.iter().any(|e| e.label == label && e.parent.is_none())
+    }
+
+    /// Remove all entries matching the given label (top-level and children).
+    /// Returns the number of entries removed.
+    pub fn remove_entry(&mut self, label: &str) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|e| {
+            e.label != label && e.parent.as_deref() != Some(label)
+        });
+        before - self.entries.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional LifecycleCheckpointSaver methods
+// ---------------------------------------------------------------------------
+
+impl LifecycleCheckpointSaver {
+    /// Returns `true` if a checkpoint with the given label exists.
+    pub fn has_checkpoint(&self, label: &str) -> bool {
+        self.checkpoints.iter().any(|c| c.label == label)
+    }
+
+    /// Duration between two checkpoints identified by label (in milliseconds).
+    pub fn elapsed_between_labels(&self, from: &str, to: &str) -> Option<u64> {
+        let a = self.get_by_label(from)?;
+        let b = self.get_by_label(to)?;
+        Some(b.timestamp_ms.saturating_sub(a.timestamp_ms))
+    }
+
+    /// All labels in the order they were saved.
+    pub fn labels(&self) -> Vec<&str> {
+        self.checkpoints.iter().map(|c| c.label.as_str()).collect()
+    }
+
+    /// Get a checkpoint by its positional index.
+    pub fn checkpoint_at_index(&self, idx: usize) -> Option<&LifecycleCheckpoint> {
+        self.checkpoints.get(idx)
+    }
+
+    /// Remove the first checkpoint matching the given label.
+    /// Returns `true` if a checkpoint was removed.
+    pub fn remove_by_label(&mut self, label: &str) -> bool {
+        if let Some(pos) = self.checkpoints.iter().position(|c| c.label == label) {
+            self.checkpoints.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns the span from the first to the last checkpoint in milliseconds.
+    /// Returns `None` if fewer than two checkpoints exist.
+    pub fn total_span_ms(&self) -> Option<u64> {
+        if self.checkpoints.len() < 2 {
+            return None;
+        }
+        let first = self.checkpoints.first().unwrap();
+        let last = self.checkpoints.last().unwrap();
+        Some(last.timestamp_ms.saturating_sub(first.timestamp_ms))
+    }
+}
+
+impl fmt::Display for LifecycleCheckpointSaver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Checkpoints({} saved, latest={:?})",
+            self.count(),
+            self.latest().map(|c| &c.label),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional LifecycleEventGraph methods
+// ---------------------------------------------------------------------------
+
+impl LifecycleEventGraph {
+    /// Checks whether `event` is ready, given a set of completed event names.
+    /// An event is ready when all its predecessors appear in `done`.
+    pub fn is_ready(&self, event: &str, done: &[&str]) -> bool {
+        if !self.has_event(event) {
+            return false;
+        }
+        self.predecessors(event).iter().all(|p| done.contains(p))
+    }
+
+    /// Returns all events that are ready (all predecessors in `done`).
+    pub fn ready_events<'a>(&'a self, done: &[&str]) -> Vec<&'a str> {
+        self.events
+            .iter()
+            .filter(|e| {
+                let name = e.as_str();
+                !done.contains(&name) && self.is_ready(name, done)
+            })
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Returns all event labels.
+    pub fn all_events(&self) -> Vec<&str> {
+        self.events.iter().map(|s| s.as_str()).collect()
+    }
+
+    /// Remove an event and all edges referencing it.
+    /// Returns `true` if the event existed.
+    pub fn remove_event(&mut self, name: &str) -> bool {
+        let before = self.events.len();
+        self.events.retain(|e| e != name);
+        self.edges.retain(|e| e.from != name && e.to != name);
+        self.events.len() < before
+    }
+
+    /// Compute transitive predecessors of an event (all ancestors in the DAG).
+    pub fn transitive_predecessors(&self, event: &str) -> Vec<String> {
+        let mut visited = Vec::new();
+        let mut stack = vec![event.to_string()];
+        while let Some(current) = stack.pop() {
+            for pred in self.predecessors(&current) {
+                let p = pred.to_string();
+                if !visited.contains(&p) {
+                    visited.push(p.clone());
+                    stack.push(p);
+                }
+            }
+        }
+        visited
+    }
+
+    /// Whether the graph contains a cycle.
+    pub fn has_cycle(&self) -> bool {
+        self.topological_sort().is_none()
+    }
+
+    /// Number of direct predecessors for an event.
+    pub fn predecessor_count(&self, event: &str) -> usize {
+        self.predecessors(event).len()
+    }
+}
+
+impl fmt::Display for LifecycleEventGraph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EventGraph({} events, {} edges)",
+            self.event_count(),
+            self.edge_count(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional LifecycleDependencyTracker methods
+// ---------------------------------------------------------------------------
+
+impl LifecycleDependencyTracker {
+    /// Compute a safe disposal order (reverse topological sort).
+    /// Subsystems that nothing depends on are disposed first.
+    /// Returns `None` if the dependency graph contains a cycle.
+    pub fn disposal_order(&self) -> Option<Vec<String>> {
+        // Build an event graph and use its topological sort.
+        let mut graph = LifecycleEventGraph::new();
+        for (sub, deps) in &self.deps {
+            graph.add_event(sub.clone());
+            for d in deps {
+                graph.add_dependency(d.clone(), sub.clone());
+            }
+        }
+        graph.topological_sort().map(|sorted| {
+            sorted.into_iter().rev().map(|s| s.to_string()).collect()
+        })
+    }
+
+    /// Whether the dependency graph contains a cycle.
+    pub fn has_cycle(&self) -> bool {
+        self.disposal_order().is_none()
+    }
+
+    /// Number of direct dependencies for a subsystem.
+    pub fn dependency_count(&self, subsystem: &str) -> usize {
+        self.deps.get(subsystem).map_or(0, |v| v.len())
+    }
+
+    /// Subsystems that directly depend on the given subsystem.
+    pub fn dependents(&self, subsystem: &str) -> Vec<&str> {
+        self.deps
+            .iter()
+            .filter(|(_, deps)| deps.iter().any(|d| d == subsystem))
+            .map(|(name, _)| name.as_str())
+            .collect()
+    }
+
+    /// Remove a subsystem and any references to it in other subsystems' dependency lists.
+    pub fn remove(&mut self, subsystem: &str) -> bool {
+        let existed = self.deps.remove(subsystem).is_some();
+        self.initialised.retain(|s| s != subsystem);
+        for deps in self.deps.values_mut() {
+            deps.retain(|d| d != subsystem);
+        }
+        existed
+    }
+}
+
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -2226,4 +2970,528 @@ mod tests {
         assert!(!h.is_restart_pending());
         assert_eq!(h.acknowledge_restart(), None);
     }
+
+    // -- LifecycleTimingReport tests --
+
+    #[test]
+    fn timing_report_basic() {
+        let mut r = LifecycleTimingReport::new("startup");
+        r.record("init", 50);
+        r.record("load", 120);
+        assert_eq!(r.entry_count(), 2);
+        assert_eq!(r.total_ms(), 170);
+        assert_eq!(r.name(), "startup");
+    }
+
+    #[test]
+    fn timing_report_slowest() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("a", 10);
+        r.record("b", 99);
+        r.record("c", 50);
+        let s = r.slowest().unwrap();
+        assert_eq!(s.label, "b");
+        assert_eq!(s.duration_ms, 99);
+    }
+
+    #[test]
+    fn timing_report_children() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("parent", 100);
+        r.record_child("child1", 40, "parent");
+        r.record_child("child2", 60, "parent");
+        let children = r.children_of("parent");
+        assert_eq!(children.len(), 2);
+        assert_eq!(r.total_ms(), 100); // children are not top-level
+    }
+
+    #[test]
+    fn timing_report_format_output() {
+        let mut r = LifecycleTimingReport::new("boot");
+        r.record("phase1", 30);
+        let txt = r.format_report();
+        assert!(txt.contains("boot"));
+        assert!(txt.contains("phase1"));
+        assert!(txt.contains("30ms"));
+    }
+
+    #[test]
+    fn timing_report_display() {
+        let mut r = LifecycleTimingReport::new("test");
+        r.record("x", 5);
+        let s = format!("{}", r);
+        assert!(s.contains("test"));
+        assert!(s.contains("5ms"));
+    }
+
+    // -- LifecycleCheckpointSaver tests --
+
+    #[test]
+    fn checkpoint_save_and_get() {
+        let mut saver = LifecycleCheckpointSaver::new();
+        let s0 = saver.save("start", 0);
+        let s1 = saver.save("loaded", 100);
+        assert_eq!(s0, 0);
+        assert_eq!(s1, 1);
+        assert_eq!(saver.count(), 2);
+        let cp = saver.get(0).unwrap();
+        assert_eq!(cp.label, "start");
+    }
+
+    #[test]
+    fn checkpoint_get_by_label() {
+        let mut saver = LifecycleCheckpointSaver::new();
+        saver.save("alpha", 10);
+        saver.save("beta", 20);
+        let cp = saver.get_by_label("beta").unwrap();
+        assert_eq!(cp.timestamp_ms, 20);
+        assert!(saver.get_by_label("gamma").is_none());
+    }
+
+    #[test]
+    fn checkpoint_duration_between() {
+        let mut saver = LifecycleCheckpointSaver::new();
+        saver.save("a", 100);
+        saver.save("b", 350);
+        assert_eq!(saver.duration_between(0, 1), Some(250));
+    }
+
+    #[test]
+    fn checkpoint_latest_and_clear() {
+        let mut saver = LifecycleCheckpointSaver::new();
+        saver.save("one", 10);
+        saver.save("two", 20);
+        assert_eq!(saver.latest().unwrap().label, "two");
+        saver.clear();
+        assert_eq!(saver.count(), 0);
+        assert!(saver.latest().is_none());
+    }
+
+    // -- LifecycleEventGraph tests --
+
+    #[test]
+    fn event_graph_add_and_query() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_event("init");
+        g.add_event("load");
+        g.add_event("init"); // duplicate
+        assert_eq!(g.event_count(), 2);
+        assert!(g.has_event("init"));
+        assert!(!g.has_event("other"));
+    }
+
+    #[test]
+    fn event_graph_dependency() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("init", "load");
+        g.add_dependency("load", "ready");
+        assert_eq!(g.predecessors("load"), vec!["init"]);
+        assert_eq!(g.successors("init"), vec!["load"]);
+    }
+
+    #[test]
+    fn event_graph_roots_and_leaves() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "c");
+        assert_eq!(g.roots(), vec!["a"]);
+        assert_eq!(g.leaves(), vec!["c"]);
+    }
+
+    #[test]
+    fn event_graph_topological_sort() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "c");
+        g.add_dependency("a", "c");
+        let sorted = g.topological_sort().unwrap();
+        let a_pos = sorted.iter().position(|&e| e == "a").unwrap();
+        let b_pos = sorted.iter().position(|&e| e == "b").unwrap();
+        let c_pos = sorted.iter().position(|&e| e == "c").unwrap();
+        assert!(a_pos < b_pos);
+        assert!(b_pos < c_pos);
+    }
+
+    #[test]
+    fn event_graph_cycle_detection() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        assert!(g.topological_sort().is_none());
+    }
+
+    #[test]
+    fn event_graph_edge_dedup() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("x", "y");
+        g.add_dependency("x", "y"); // duplicate
+        assert_eq!(g.edge_count(), 1);
+    }
+
+    // -- LifecycleDependencyTracker tests --
+
+    #[test]
+    fn dep_tracker_basic() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("ui", vec!["config".into(), "theme".into()]);
+        t.register("config", vec![]);
+        t.register("theme", vec!["config".into()]);
+        assert_eq!(t.registered_count(), 3);
+        assert!(!t.all_initialised());
+    }
+
+    #[test]
+    fn dep_tracker_satisfaction() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("ui", vec!["config".into()]);
+        t.register("config", vec![]);
+        assert!(t.dependencies_satisfied("config"));
+        assert!(!t.dependencies_satisfied("ui"));
+        t.mark_initialised("config");
+        assert!(t.dependencies_satisfied("ui"));
+    }
+
+    #[test]
+    fn dep_tracker_unsatisfied() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("app", vec!["db".into(), "cache".into()]);
+        t.mark_initialised("db");
+        let unsat = t.unsatisfied("app");
+        assert_eq!(unsat, vec!["cache"]);
+    }
+
+    #[test]
+    fn dep_tracker_ready_subsystems() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("a", vec![]);
+        t.register("b", vec!["a".into()]);
+        t.register("c", vec!["a".into(), "b".into()]);
+        let mut ready = t.ready_subsystems();
+        ready.sort();
+        assert_eq!(ready, vec!["a"]);
+        t.mark_initialised("a");
+        let mut ready = t.ready_subsystems();
+        ready.sort();
+        assert_eq!(ready, vec!["b"]);
+    }
+
+    #[test]
+    fn dep_tracker_reset() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("x", vec![]);
+        t.mark_initialised("x");
+        assert!(t.is_initialised("x"));
+        t.reset();
+        assert!(!t.is_initialised("x"));
+        assert_eq!(t.registered_count(), 1); // registration preserved
+    }
+
+    #[test]
+    fn dep_tracker_display() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("a", vec![]);
+        t.register("b", vec![]);
+        t.mark_initialised("a");
+        let s = format!("{}", t);
+        assert!(s.contains("1/2"));
+    }
+
+
+    // -- Additional LifecycleTimingReport tests --------------------------------
+
+    #[test]
+    fn timing_report_fastest() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("a", 100);
+        r.record("b", 50);
+        r.record("c", 200);
+        let fastest = r.fastest().unwrap();
+        assert_eq!(fastest.label, "b");
+        assert_eq!(fastest.duration_ms, 50);
+    }
+
+    #[test]
+    fn timing_report_phase_count() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("a", 10);
+        r.record("b", 20);
+        r.record_child("a1", 5, "a");
+        assert_eq!(r.phase_count(), 2);
+    }
+
+    #[test]
+    fn timing_report_phases() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("startup", 100);
+        r.record("load", 200);
+        let phases = r.phases();
+        assert_eq!(phases.len(), 2);
+        assert_eq!(phases[0], ("startup".to_string(), 100));
+        assert_eq!(phases[1], ("load".to_string(), 200));
+    }
+
+    #[test]
+    fn timing_report_average() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("a", 100);
+        r.record("b", 200);
+        assert_eq!(r.average_ms(), Some(150));
+    }
+
+    #[test]
+    fn timing_report_average_empty() {
+        let r = LifecycleTimingReport::new("t");
+        assert_eq!(r.average_ms(), None);
+    }
+
+    #[test]
+    fn timing_report_summary() {
+        let mut r = LifecycleTimingReport::new("boot");
+        r.record("init", 50);
+        r.record("ready", 150);
+        let s = r.report_summary();
+        assert!(s.contains("boot"));
+        assert!(s.contains("200ms total"));
+        assert!(s.contains("ready (150ms)"));
+        assert!(s.contains("init (50ms)"));
+    }
+
+    #[test]
+    fn timing_report_merge() {
+        let mut a = LifecycleTimingReport::new("a");
+        a.record("x", 10);
+        let mut b = LifecycleTimingReport::new("b");
+        b.record("y", 20);
+        a.merge(&b);
+        assert_eq!(a.entry_count(), 2);
+        assert_eq!(a.total_ms(), 30);
+    }
+
+    #[test]
+    fn timing_report_has_and_remove_entry() {
+        let mut r = LifecycleTimingReport::new("t");
+        r.record("keep", 10);
+        r.record("drop", 20);
+        r.record_child("drop_child", 5, "drop");
+        assert!(r.has_entry("drop"));
+        let removed = r.remove_entry("drop");
+        assert_eq!(removed, 2); // "drop" + "drop_child"
+        assert!(!r.has_entry("drop"));
+        assert_eq!(r.entry_count(), 1);
+    }
+
+    // -- Additional LifecycleCheckpointSaver tests -----------------------------
+
+    #[test]
+    fn checkpoint_has_checkpoint() {
+        let mut s = LifecycleCheckpointSaver::new();
+        s.save("alpha", 100);
+        assert!(s.has_checkpoint("alpha"));
+        assert!(!s.has_checkpoint("beta"));
+    }
+
+    #[test]
+    fn checkpoint_elapsed_between_labels() {
+        let mut s = LifecycleCheckpointSaver::new();
+        s.save("start", 1000);
+        s.save("middle", 1500);
+        s.save("end", 2000);
+        assert_eq!(s.elapsed_between_labels("start", "end"), Some(1000));
+        assert_eq!(s.elapsed_between_labels("start", "middle"), Some(500));
+        assert_eq!(s.elapsed_between_labels("start", "nope"), None);
+    }
+
+    #[test]
+    fn checkpoint_labels() {
+        let mut s = LifecycleCheckpointSaver::new();
+        s.save("a", 0);
+        s.save("b", 10);
+        s.save("c", 20);
+        assert_eq!(s.labels(), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn checkpoint_at_index() {
+        let mut s = LifecycleCheckpointSaver::new();
+        s.save("first", 100);
+        s.save("second", 200);
+        assert_eq!(s.checkpoint_at_index(0).unwrap().label, "first");
+        assert_eq!(s.checkpoint_at_index(1).unwrap().label, "second");
+        assert!(s.checkpoint_at_index(2).is_none());
+    }
+
+    #[test]
+    fn checkpoint_remove_by_label() {
+        let mut s = LifecycleCheckpointSaver::new();
+        s.save("a", 0);
+        s.save("b", 10);
+        assert!(s.remove_by_label("a"));
+        assert!(!s.has_checkpoint("a"));
+        assert_eq!(s.count(), 1);
+        assert!(!s.remove_by_label("nonexistent"));
+    }
+
+    #[test]
+    fn checkpoint_total_span() {
+        let mut s = LifecycleCheckpointSaver::new();
+        assert_eq!(s.total_span_ms(), None);
+        s.save("a", 100);
+        assert_eq!(s.total_span_ms(), None); // only 1 checkpoint
+        s.save("b", 350);
+        assert_eq!(s.total_span_ms(), Some(250));
+    }
+
+    #[test]
+    fn checkpoint_display() {
+        let mut s = LifecycleCheckpointSaver::new();
+        s.save("boot", 0);
+        let d = format!("{}", s);
+        assert!(d.contains("1 saved"));
+        assert!(d.contains("boot"));
+    }
+
+    // -- Additional LifecycleEventGraph tests ----------------------------------
+
+    #[test]
+    fn event_graph_is_ready() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b"); // a must finish before b
+        assert!(g.is_ready("a", &[])); // a has no predecessors
+        assert!(!g.is_ready("b", &[])); // b depends on a
+        assert!(g.is_ready("b", &["a"])); // a is done
+    }
+
+    #[test]
+    fn event_graph_ready_events() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("a", "c");
+        g.add_dependency("b", "d");
+        let ready = g.ready_events(&[]);
+        assert_eq!(ready, vec!["a"]);
+        let ready = g.ready_events(&["a"]);
+        assert!(ready.contains(&"b"));
+        assert!(ready.contains(&"c"));
+    }
+
+    #[test]
+    fn event_graph_all_events() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_event("x");
+        g.add_event("y");
+        let all = g.all_events();
+        assert_eq!(all.len(), 2);
+        assert!(all.contains(&"x"));
+        assert!(all.contains(&"y"));
+    }
+
+    #[test]
+    fn event_graph_remove_event() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "c");
+        assert!(g.remove_event("b"));
+        assert!(!g.has_event("b"));
+        assert_eq!(g.edge_count(), 0);
+        assert_eq!(g.event_count(), 2);
+        assert!(!g.remove_event("nonexistent"));
+    }
+
+    #[test]
+    fn event_graph_transitive_predecessors() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "c");
+        g.add_dependency("a", "c");
+        let preds = g.transitive_predecessors("c");
+        assert!(preds.contains(&"a".to_string()));
+        assert!(preds.contains(&"b".to_string()));
+        assert_eq!(preds.len(), 2);
+    }
+
+    #[test]
+    fn event_graph_has_cycle() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        assert!(!g.has_cycle());
+    }
+
+    #[test]
+    fn event_graph_predecessor_count() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "c");
+        g.add_dependency("b", "c");
+        assert_eq!(g.predecessor_count("c"), 2);
+        assert_eq!(g.predecessor_count("a"), 0);
+    }
+
+    #[test]
+    fn event_graph_display() {
+        let mut g = LifecycleEventGraph::new();
+        g.add_dependency("a", "b");
+        let d = format!("{}", g);
+        assert!(d.contains("2 events"));
+        assert!(d.contains("1 edges"));
+    }
+
+    // -- Additional LifecycleDependencyTracker tests ---------------------------
+
+    #[test]
+    fn dep_tracker_disposal_order() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("db", vec![]);
+        t.register("cache", vec!["db".into()]);
+        t.register("api", vec!["cache".into(), "db".into()]);
+        let order = t.disposal_order().unwrap();
+        // api should come before cache, cache before db
+        let api_pos = order.iter().position(|s| s == "api").unwrap();
+        let cache_pos = order.iter().position(|s| s == "cache").unwrap();
+        let db_pos = order.iter().position(|s| s == "db").unwrap();
+        assert!(api_pos < cache_pos);
+        assert!(cache_pos < db_pos);
+    }
+
+    #[test]
+    fn dep_tracker_has_cycle_false() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("a", vec![]);
+        t.register("b", vec!["a".into()]);
+        assert!(!t.has_cycle());
+    }
+
+    #[test]
+    fn dep_tracker_dependency_count() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("a", vec![]);
+        t.register("b", vec!["a".into()]);
+        t.register("c", vec!["a".into(), "b".into()]);
+        assert_eq!(t.dependency_count("a"), 0);
+        assert_eq!(t.dependency_count("b"), 1);
+        assert_eq!(t.dependency_count("c"), 2);
+        assert_eq!(t.dependency_count("unknown"), 0);
+    }
+
+    #[test]
+    fn dep_tracker_dependents() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("core", vec![]);
+        t.register("ui", vec!["core".into()]);
+        t.register("net", vec!["core".into()]);
+        let mut dependents = t.dependents("core");
+        dependents.sort();
+        assert_eq!(dependents, vec!["net", "ui"]);
+    }
+
+    #[test]
+    fn dep_tracker_remove() {
+        let mut t = LifecycleDependencyTracker::new();
+        t.register("a", vec![]);
+        t.register("b", vec!["a".into()]);
+        t.mark_initialised("a");
+        assert!(t.remove("a"));
+        assert!(!t.is_initialised("a"));
+        assert_eq!(t.dependency_count("b"), 0);
+        assert!(!t.remove("a")); // already gone
+    }
+
 }

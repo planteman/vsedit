@@ -1370,6 +1370,254 @@ impl fmt::Display for MergeResultPreview {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MergeConflictCounter – counts and categorizes conflicts in a merge
+// ---------------------------------------------------------------------------
+
+/// Category of a merge conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ConflictCategory {
+    /// Both sides modified the same lines differently.
+    ContentConflict,
+    /// One side deleted lines the other modified.
+    DeleteModify,
+    /// Both sides added content at the same location.
+    AddAdd,
+    /// Whitespace-only conflict.
+    WhitespaceOnly,
+}
+
+/// Summary statistics for conflicts.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConflictCountSummary {
+    pub content: usize,
+    pub delete_modify: usize,
+    pub add_add: usize,
+    pub whitespace_only: usize,
+}
+
+impl ConflictCountSummary {
+    pub fn total(&self) -> usize {
+        self.content + self.delete_modify + self.add_add + self.whitespace_only
+    }
+
+    pub fn has_real_conflicts(&self) -> bool {
+        self.content > 0 || self.delete_modify > 0 || self.add_add > 0
+    }
+
+    pub fn increment(&mut self, cat: ConflictCategory) {
+        match cat {
+            ConflictCategory::ContentConflict => self.content += 1,
+            ConflictCategory::DeleteModify => self.delete_modify += 1,
+            ConflictCategory::AddAdd => self.add_add += 1,
+            ConflictCategory::WhitespaceOnly => self.whitespace_only += 1,
+        }
+    }
+}
+
+impl fmt::Display for ConflictCountSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "conflicts: {} total (content={}, delete/modify={}, add/add={}, whitespace={})",
+            self.total(),
+            self.content,
+            self.delete_modify,
+            self.add_add,
+            self.whitespace_only,
+        )
+    }
+}
+
+/// Counts and categorizes conflicts within merge content.
+#[derive(Debug)]
+pub struct MergeConflictCounter;
+
+impl MergeConflictCounter {
+    /// Categorize a conflict based on the content of both sides.
+    pub fn categorize(left: &str, right: &str) -> ConflictCategory {
+        let left_trimmed = left.trim();
+        let right_trimmed = right.trim();
+
+        if left_trimmed == right_trimmed && left != right {
+            return ConflictCategory::WhitespaceOnly;
+        }
+        if left_trimmed.is_empty() {
+            return ConflictCategory::DeleteModify;
+        }
+        if right_trimmed.is_empty() {
+            return ConflictCategory::DeleteModify;
+        }
+        // Both non-empty but different
+        let left_lines: Vec<_> = left.lines().collect();
+        let right_lines: Vec<_> = right.lines().collect();
+        if left_lines.is_empty() && right_lines.is_empty() {
+            ConflictCategory::AddAdd
+        } else {
+            ConflictCategory::ContentConflict
+        }
+    }
+
+    /// Count conflicts in a list of (left, right) conflict pairs.
+    pub fn count(pairs: &[(&str, &str)]) -> ConflictCountSummary {
+        let mut summary = ConflictCountSummary::default();
+        for &(left, right) in pairs {
+            let cat = Self::categorize(left, right);
+            summary.increment(cat);
+        }
+        summary
+    }
+
+    /// Percentage of conflicts that are trivial (whitespace-only).
+    pub fn trivial_percentage(summary: &ConflictCountSummary) -> f64 {
+        if summary.total() == 0 {
+            return 0.0;
+        }
+        (summary.whitespace_only as f64 / summary.total() as f64) * 100.0
+    }
+
+    /// Estimate complexity: each content conflict scores 3, delete/modify scores 2,
+    /// add/add scores 1, whitespace scores 0.
+    pub fn complexity_score(summary: &ConflictCountSummary) -> usize {
+        summary.content * 3 + summary.delete_modify * 2 + summary.add_add
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeResultValidator – validates merge results for completeness
+// ---------------------------------------------------------------------------
+
+/// An issue found during merge result validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationIssue {
+    /// Conflict markers still present in the output.
+    UnresolvedMarker { line: usize },
+    /// An empty line range that might indicate accidentally deleted content.
+    SuspiciousEmptyRange { start_line: usize, end_line: usize },
+    /// Duplicate consecutive lines that may be a merge artifact.
+    DuplicateLines { line: usize, text: String },
+    /// Trailing whitespace introduced by merge.
+    TrailingWhitespace { line: usize },
+}
+
+/// Validates that a merge result is complete and free of artifacts.
+#[derive(Debug)]
+pub struct MergeResultValidator {
+    check_markers: bool,
+    check_duplicates: bool,
+    check_trailing_ws: bool,
+    max_allowed_empty_lines: usize,
+}
+
+impl MergeResultValidator {
+    pub fn new() -> Self {
+        Self {
+            check_markers: true,
+            check_duplicates: true,
+            check_trailing_ws: false,
+            max_allowed_empty_lines: 3,
+        }
+    }
+
+    pub fn with_trailing_ws_check(mut self, check: bool) -> Self {
+        self.check_trailing_ws = check;
+        self
+    }
+
+    pub fn with_max_empty_lines(mut self, max: usize) -> Self {
+        self.max_allowed_empty_lines = max;
+        self
+    }
+
+    /// Validate merge result text, returning any issues found.
+    pub fn validate(&self, text: &str) -> Vec<ValidationIssue> {
+        let mut issues = Vec::new();
+        let lines: Vec<&str> = text.lines().collect();
+
+        let mut empty_run_start: Option<usize> = None;
+        let mut empty_run_len: usize = 0;
+
+        for (i, line) in lines.iter().enumerate() {
+            if self.check_markers {
+                let trimmed = line.trim();
+                if trimmed.starts_with("<<<<<<<")
+                    || trimmed.starts_with(">>>>>>>")
+                    || trimmed == "======="
+                {
+                    issues.push(ValidationIssue::UnresolvedMarker { line: i + 1 });
+                }
+            }
+
+            if self.check_duplicates && i > 0 && *line == lines[i - 1] && !line.trim().is_empty() {
+                issues.push(ValidationIssue::DuplicateLines {
+                    line: i + 1,
+                    text: line.to_string(),
+                });
+            }
+
+            if self.check_trailing_ws && *line != line.trim_end() {
+                issues.push(ValidationIssue::TrailingWhitespace { line: i + 1 });
+            }
+
+            if line.trim().is_empty() {
+                if empty_run_start.is_none() {
+                    empty_run_start = Some(i + 1);
+                }
+                empty_run_len += 1;
+            } else {
+                if empty_run_len > self.max_allowed_empty_lines {
+                    if let Some(start) = empty_run_start {
+                        issues.push(ValidationIssue::SuspiciousEmptyRange {
+                            start_line: start,
+                            end_line: start + empty_run_len - 1,
+                        });
+                    }
+                }
+                empty_run_start = None;
+                empty_run_len = 0;
+            }
+        }
+
+        // Check trailing empty run
+        if empty_run_len > self.max_allowed_empty_lines {
+            if let Some(start) = empty_run_start {
+                issues.push(ValidationIssue::SuspiciousEmptyRange {
+                    start_line: start,
+                    end_line: start + empty_run_len - 1,
+                });
+            }
+        }
+
+        issues
+    }
+
+    /// Quick check: are there any unresolved conflict markers?
+    pub fn has_unresolved_markers(&self, text: &str) -> bool {
+        text.lines().any(|line| {
+            let t = line.trim();
+            t.starts_with("<<<<<<<") || t.starts_with(">>>>>>>") || t == "======="
+        })
+    }
+
+    /// Count total issues by category.
+    pub fn issue_counts(issues: &[ValidationIssue]) -> (usize, usize, usize, usize) {
+        let mut markers = 0;
+        let mut empty = 0;
+        let mut dupes = 0;
+        let mut ws = 0;
+        for issue in issues {
+            match issue {
+                ValidationIssue::UnresolvedMarker { .. } => markers += 1,
+                ValidationIssue::SuspiciousEmptyRange { .. } => empty += 1,
+                ValidationIssue::DuplicateLines { .. } => dupes += 1,
+                ValidationIssue::TrailingWhitespace { .. } => ws += 1,
+            }
+        }
+        (markers, empty, dupes, ws)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2335,6 +2583,111 @@ d
     fn three_way_display() {
         let v = MergeBase3WayViewer::new("a\nb", "c", "d");
         assert!(format!("{v}").contains("3Way"));
+    }
+
+
+    #[test]
+    fn conflict_counter_content() {
+        let cat = MergeConflictCounter::categorize("foo\nbar", "baz\nqux");
+        assert_eq!(cat, ConflictCategory::ContentConflict);
+    }
+
+    #[test]
+    fn conflict_counter_whitespace() {
+        let cat = MergeConflictCounter::categorize("  hello  ", "hello");
+        assert_eq!(cat, ConflictCategory::WhitespaceOnly);
+    }
+
+    #[test]
+    fn conflict_counter_delete_modify() {
+        let cat = MergeConflictCounter::categorize("", "something");
+        assert_eq!(cat, ConflictCategory::DeleteModify);
+    }
+
+    #[test]
+    fn conflict_summary_total() {
+        let mut s = ConflictCountSummary::default();
+        s.increment(ConflictCategory::ContentConflict);
+        s.increment(ConflictCategory::ContentConflict);
+        s.increment(ConflictCategory::WhitespaceOnly);
+        assert_eq!(s.total(), 3);
+        assert!(s.has_real_conflicts());
+    }
+
+    #[test]
+    fn conflict_summary_display() {
+        let s = ConflictCountSummary { content: 1, delete_modify: 2, add_add: 0, whitespace_only: 1 };
+        let d = format!("{s}");
+        assert!(d.contains("4 total"));
+    }
+
+    #[test]
+    fn conflict_counter_count_pairs() {
+        let pairs = vec![
+            ("a", "b"),
+            ("  x  ", "x"),
+            ("", "y"),
+        ];
+        let summary = MergeConflictCounter::count(&pairs);
+        assert_eq!(summary.content, 1);
+        assert_eq!(summary.whitespace_only, 1);
+        assert_eq!(summary.delete_modify, 1);
+    }
+
+    #[test]
+    fn conflict_counter_trivial_percentage() {
+        let s = ConflictCountSummary { content: 0, delete_modify: 0, add_add: 0, whitespace_only: 3 };
+        assert!((MergeConflictCounter::trivial_percentage(&s) - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn conflict_counter_complexity() {
+        let s = ConflictCountSummary { content: 2, delete_modify: 1, add_add: 1, whitespace_only: 5 };
+        assert_eq!(MergeConflictCounter::complexity_score(&s), 9); // 2*3 + 1*2 + 1*1
+    }
+
+    #[test]
+    fn validator_clean_text() {
+        let v = MergeResultValidator::new();
+        let issues = v.validate("line1\nline2\nline3\n");
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn validator_unresolved_markers() {
+        let v = MergeResultValidator::new();
+        let text = "before\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\nafter";
+        let issues = v.validate(text);
+        assert_eq!(MergeResultValidator::issue_counts(&issues).0, 3);
+    }
+
+    #[test]
+    fn validator_has_unresolved() {
+        let v = MergeResultValidator::new();
+        assert!(v.has_unresolved_markers("<<<<<<< HEAD\n=======\n>>>>>>> b"));
+        assert!(!v.has_unresolved_markers("clean text"));
+    }
+
+    #[test]
+    fn validator_duplicate_lines() {
+        let v = MergeResultValidator::new();
+        let issues = v.validate("a\na\nb");
+        assert_eq!(MergeResultValidator::issue_counts(&issues).2, 1);
+    }
+
+    #[test]
+    fn validator_trailing_ws() {
+        let v = MergeResultValidator::new().with_trailing_ws_check(true);
+        let issues = v.validate("hello   \nworld");
+        assert_eq!(MergeResultValidator::issue_counts(&issues).3, 1);
+    }
+
+    #[test]
+    fn validator_suspicious_empty_range() {
+        let v = MergeResultValidator::new().with_max_empty_lines(2);
+        let text = "a\n\n\n\n\nb";
+        let issues = v.validate(text);
+        assert_eq!(MergeResultValidator::issue_counts(&issues).1, 1);
     }
 
 }

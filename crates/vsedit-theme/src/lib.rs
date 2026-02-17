@@ -1555,6 +1555,339 @@ pub fn parse_color_string(input: &str) -> Option<Color> {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// === Theme Color Fallback Chain ===
+
+/// Theme Color Fallback Chain implementation.
+#[derive(Debug, Clone)]
+pub struct ThemeColorFallbackChain {
+    entries: Vec<String>,
+    index: HashMap<String, usize>,
+    enabled: bool,
+    capacity: usize,
+    stats: ThemeColorFallbackChainStats,
+}
+
+/// Statistics for ThemeColorFallbackChain.
+#[derive(Debug, Clone, Default)]
+pub struct ThemeColorFallbackChainStats {
+    pub total_operations: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub last_operation_ms: u64,
+}
+
+impl ThemeColorFallbackChainStats {
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.cache_hits + self.cache_misses;
+        if total == 0 {
+            return 0.0;
+        }
+        self.cache_hits as f64 / total as f64
+    }
+
+    pub fn reset(&mut self) {
+        self.total_operations = 0;
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+        self.last_operation_ms = 0;
+    }
+}
+
+impl ThemeColorFallbackChain {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            index: HashMap::new(),
+            enabled: true,
+            capacity: 1024,
+            stats: ThemeColorFallbackChainStats::default(),
+        }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: impl Into<String>) -> bool {
+        let entry = entry.into();
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        if self.index.contains_key(&entry) {
+            self.stats.cache_hits += 1;
+            return false;
+        }
+        let idx = self.entries.len();
+        self.index.insert(entry.clone(), idx);
+        self.entries.push(entry);
+        self.stats.total_operations += 1;
+        self.stats.cache_misses += 1;
+        true
+    }
+
+    pub fn remove(&mut self, entry: &str) -> bool {
+        if let Some(idx) = self.index.remove(entry) {
+            self.entries.remove(idx);
+            // Rebuild index after removal
+            self.index.clear();
+            for (i, e) in self.entries.iter().enumerate() {
+                self.index.insert(e.clone(), i);
+            }
+            self.stats.total_operations += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, entry: &str) -> bool {
+        self.index.contains_key(entry)
+    }
+
+    pub fn get(&self, index: usize) -> Option<&str> {
+        self.entries.get(index).map(|s| s.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.index.clear();
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn stats(&self) -> &ThemeColorFallbackChainStats {
+        &self.stats
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        self.entries.iter()
+            .filter(|e| e.contains(query))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    pub fn sorted_entries(&self) -> Vec<&str> {
+        let mut sorted: Vec<&str> = self.entries.iter().map(|s| s.as_str()).collect();
+        sorted.sort();
+        sorted
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|s| s.as_str())
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.capacity.saturating_sub(self.entries.len())
+    }
+}
+
+impl Default for ThemeColorFallbackChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// === Theme Editor Token Colorizer ===
+
+/// Priority level for ThemeEditorTokenColorizer items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ThemeEditorTokenColorizerPriority {
+    Low,
+    Normal,
+    High,
+    Critical,
+}
+
+impl ThemeEditorTokenColorizerPriority {
+    pub fn as_weight(&self) -> u32 {
+        match self {
+            Self::Low => 1,
+            Self::Normal => 5,
+            Self::High => 10,
+            Self::Critical => 100,
+        }
+    }
+}
+
+impl fmt::Display for ThemeEditorTokenColorizerPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Normal => write!(f, "normal"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Theme Editor Token Colorizer implementation.
+#[derive(Debug, Clone)]
+pub struct ThemeEditorTokenColorizer {
+    items: Vec<ThemeEditorTokenColorizerItem>,
+    max_items: usize,
+    default_priority: ThemeEditorTokenColorizerPriority,
+}
+
+/// A single item in ThemeEditorTokenColorizer.
+#[derive(Debug, Clone)]
+pub struct ThemeEditorTokenColorizerItem {
+    pub id: String,
+    pub label: String,
+    pub priority: ThemeEditorTokenColorizerPriority,
+    pub timestamp: u64,
+    pub metadata: HashMap<String, String>,
+}
+
+impl ThemeEditorTokenColorizerItem {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            priority: ThemeEditorTokenColorizerPriority::Normal,
+            timestamp: 0,
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, priority: ThemeEditorTokenColorizerPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_timestamp(mut self, ts: u64) -> Self {
+        self.timestamp = ts;
+        self
+    }
+
+    pub fn set_meta(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.metadata.insert(key.into(), value.into());
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.get(key).map(|s| s.as_str())
+    }
+}
+
+impl ThemeEditorTokenColorizer {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            max_items: 500,
+            default_priority: ThemeEditorTokenColorizerPriority::Normal,
+        }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self {
+        self.max_items = max;
+        self
+    }
+
+    pub fn add(&mut self, item: ThemeEditorTokenColorizerItem) -> bool {
+        if self.items.len() >= self.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove_by_id(&mut self, id: &str) -> Option<ThemeEditorTokenColorizerItem> {
+        if let Some(idx) = self.items.iter().position(|i| i.id == id) {
+            Some(self.items.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&ThemeEditorTokenColorizerItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    pub fn by_priority(&self, priority: ThemeEditorTokenColorizerPriority) -> Vec<&ThemeEditorTokenColorizerItem> {
+        self.items.iter().filter(|i| i.priority == priority).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ThemeEditorTokenColorizerItem> {
+        let mut sorted: Vec<&ThemeEditorTokenColorizerItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn sorted_by_timestamp(&self) -> Vec<&ThemeEditorTokenColorizerItem> {
+        let mut sorted: Vec<&ThemeEditorTokenColorizerItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        sorted
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&ThemeEditorTokenColorizerItem> {
+        let q = query.to_lowercase();
+        self.items.iter()
+            .filter(|i| i.label.to_lowercase().contains(&q) || i.id.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn total_weight(&self) -> u32 {
+        self.items.iter().map(|i| i.priority.as_weight()).sum()
+    }
+
+    pub fn set_default_priority(&mut self, p: ThemeEditorTokenColorizerPriority) {
+        self.default_priority = p;
+    }
+
+    pub fn default_priority(&self) -> ThemeEditorTokenColorizerPriority {
+        self.default_priority
+    }
+
+    pub fn max_items(&self) -> usize {
+        self.max_items
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.max_items.saturating_sub(self.items.len())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ThemeEditorTokenColorizerItem> {
+        self.items.iter()
+    }
+}
+
+impl Default for ThemeEditorTokenColorizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2374,4 +2707,151 @@ mod tests {
         let violations = ThemeContrastCalculator::check(&theme, WcagLevel::AA);
         assert!(violations.iter().any(|v| v.fg_key == "editor.foreground"));
     }
+
+    #[test]
+    fn themeColorFallbackChain_new() {
+        let s = ThemeColorFallbackChain::new();
+        assert!(s.is_empty());
+        assert_eq!(s.len(), 0);
+    }
+
+    #[test]
+    fn themeColorFallbackChain_add_contains() {
+        let mut s = ThemeColorFallbackChain::new();
+        assert!(s.add("item1"));
+        assert!(s.contains("item1"));
+        assert!(!s.contains("item2"));
+    }
+
+    #[test]
+    fn themeColorFallbackChain_add_duplicate() {
+        let mut s = ThemeColorFallbackChain::new();
+        assert!(s.add("dup"));
+        assert!(!s.add("dup"));
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
+    fn themeColorFallbackChain_remove() {
+        let mut s = ThemeColorFallbackChain::new();
+        s.add("rem");
+        assert!(s.remove("rem"));
+        assert!(!s.contains("rem"));
+    }
+
+    #[test]
+    fn themeColorFallbackChain_capacity() {
+        let s = ThemeColorFallbackChain::new().with_capacity(5);
+        assert_eq!(s.capacity(), 5);
+        assert_eq!(s.remaining_capacity(), 5);
+    }
+
+    #[test]
+    fn themeColorFallbackChain_search() {
+        let mut s = ThemeColorFallbackChain::new();
+        s.add("hello_world");
+        s.add("hello_rust");
+        s.add("goodbye");
+        let results = s.search("hello");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn themeColorFallbackChain_stats() {
+        let mut s = ThemeColorFallbackChain::new();
+        s.add("a");
+        s.add("a"); // duplicate = cache hit
+        assert_eq!(s.stats().cache_hits, 1);
+        assert_eq!(s.stats().cache_misses, 1);
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_new() {
+        let m = ThemeEditorTokenColorizer::new();
+        assert!(m.is_empty());
+        assert_eq!(m.len(), 0);
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_add_find() {
+        let mut m = ThemeEditorTokenColorizer::new();
+        m.add(ThemeEditorTokenColorizerItem::new("id1", "Label 1"));
+        assert!(m.find_by_id("id1").is_some());
+        assert!(m.find_by_id("id2").is_none());
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_priority_filter() {
+        let mut m = ThemeEditorTokenColorizer::new();
+        m.add(ThemeEditorTokenColorizerItem::new("a", "A").with_priority(ThemeEditorTokenColorizerPriority::High));
+        m.add(ThemeEditorTokenColorizerItem::new("b", "B").with_priority(ThemeEditorTokenColorizerPriority::Low));
+        m.add(ThemeEditorTokenColorizerItem::new("c", "C").with_priority(ThemeEditorTokenColorizerPriority::High));
+        assert_eq!(m.by_priority(ThemeEditorTokenColorizerPriority::High).len(), 2);
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_remove() {
+        let mut m = ThemeEditorTokenColorizer::new();
+        m.add(ThemeEditorTokenColorizerItem::new("r1", "Remove me"));
+        assert!(m.remove_by_id("r1").is_some());
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_search() {
+        let mut m = ThemeEditorTokenColorizer::new();
+        m.add(ThemeEditorTokenColorizerItem::new("id1", "Hello World"));
+        m.add(ThemeEditorTokenColorizerItem::new("id2", "Goodbye"));
+        let results = m.search("hello");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_total_weight() {
+        let mut m = ThemeEditorTokenColorizer::new();
+        m.add(ThemeEditorTokenColorizerItem::new("a", "A").with_priority(ThemeEditorTokenColorizerPriority::Critical));
+        m.add(ThemeEditorTokenColorizerItem::new("b", "B").with_priority(ThemeEditorTokenColorizerPriority::Low));
+        assert_eq!(m.total_weight(), 101);
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_capacity_limit() {
+        let mut m = ThemeEditorTokenColorizer::new().with_max_items(2);
+        m.add(ThemeEditorTokenColorizerItem::new("1", "one"));
+        m.add(ThemeEditorTokenColorizerItem::new("2", "two"));
+        assert!(!m.add(ThemeEditorTokenColorizerItem::new("3", "three")));
+        assert_eq!(m.len(), 2);
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_sorted_by_priority() {
+        let mut m = ThemeEditorTokenColorizer::new();
+        m.add(ThemeEditorTokenColorizerItem::new("lo", "Low").with_priority(ThemeEditorTokenColorizerPriority::Low));
+        m.add(ThemeEditorTokenColorizerItem::new("hi", "High").with_priority(ThemeEditorTokenColorizerPriority::Critical));
+        let sorted = m.sorted_by_priority();
+        assert_eq!(sorted[0].id, "hi");
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_item_metadata() {
+        let mut item = ThemeEditorTokenColorizerItem::new("m1", "Meta");
+        item.set_meta("key", "value");
+        assert_eq!(item.get_meta("key"), Some("value"));
+        assert_eq!(item.get_meta("missing"), None);
+    }
+
+    #[test]
+    fn themeColorFallbackChain_enabled_toggle() {
+        let mut s = ThemeColorFallbackChain::new();
+        assert!(s.is_enabled());
+        s.set_enabled(false);
+        assert!(!s.is_enabled());
+    }
+
+    #[test]
+    fn themeEditorTokenColorizer_priority_display() {
+        assert_eq!(format!("{}", ThemeEditorTokenColorizerPriority::High), "high");
+        assert_eq!(format!("{}", ThemeEditorTokenColorizerPriority::Low), "low");
+    }
+
 }

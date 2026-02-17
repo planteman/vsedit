@@ -1419,6 +1419,239 @@ impl LabelIconResolver {
     }
 }
 
+
+// ── Label Template Engine ──
+
+/// A parsed template token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TemplateToken {
+    Literal(String),
+    Variable(String),
+    Conditional { variable: String, if_true: String, if_false: String },
+}
+
+/// A compiled template ready for rendering.
+#[derive(Debug, Clone)]
+pub struct CompiledTemplate {
+    tokens: Vec<TemplateToken>,
+    source: String,
+}
+
+/// Template engine with variable substitution and conditionals.
+///
+/// Supports `${var}` for variable substitution and `${var?then:else}` for conditionals.
+pub struct LabelTemplateEngine {
+    variables: Vec<(String, String)>,
+}
+
+impl LabelTemplateEngine {
+    pub fn new() -> Self {
+        Self {
+            variables: Vec::new(),
+        }
+    }
+
+    /// Register a variable and its value.
+    pub fn set_var(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        let name = name.into();
+        if let Some(entry) = self.variables.iter_mut().find(|(k, _)| *k == name) {
+            entry.1 = value.into();
+        } else {
+            self.variables.push((name, value.into()));
+        }
+        self
+    }
+
+    /// Remove a variable.
+    pub fn remove_var(&mut self, name: &str) -> bool {
+        let len = self.variables.len();
+        self.variables.retain(|(k, _)| k != name);
+        self.variables.len() != len
+    }
+
+    /// Get a variable value.
+    pub fn get_var(&self, name: &str) -> Option<&str> {
+        self.variables.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
+    }
+
+    /// Compile a template string into tokens.
+    pub fn compile(&self, template: &str) -> CompiledTemplate {
+        let mut tokens = Vec::new();
+        let mut rest = template;
+        while let Some(start) = rest.find("${") {
+            if start > 0 {
+                tokens.push(TemplateToken::Literal(rest[..start].to_string()));
+            }
+            let after_start = &rest[start + 2..];
+            if let Some(end) = after_start.find('}') {
+                let expr = &after_start[..end];
+                if let Some(q_pos) = expr.find('?') {
+                    let var_name = expr[..q_pos].to_string();
+                    let branches = &expr[q_pos + 1..];
+                    let (if_true, if_false) = if let Some(colon) = branches.find(':') {
+                        (branches[..colon].to_string(), branches[colon + 1..].to_string())
+                    } else {
+                        (branches.to_string(), String::new())
+                    };
+                    tokens.push(TemplateToken::Conditional { variable: var_name, if_true, if_false });
+                } else {
+                    tokens.push(TemplateToken::Variable(expr.to_string()));
+                }
+                rest = &after_start[end + 1..];
+            } else {
+                tokens.push(TemplateToken::Literal(rest[start..].to_string()));
+                rest = "";
+            }
+        }
+        if !rest.is_empty() {
+            tokens.push(TemplateToken::Literal(rest.to_string()));
+        }
+        CompiledTemplate {
+            tokens,
+            source: template.to_string(),
+        }
+    }
+
+    /// Render a compiled template with the current variables.
+    pub fn render_compiled(&self, template: &CompiledTemplate) -> String {
+        let mut result = String::new();
+        for token in &template.tokens {
+            match token {
+                TemplateToken::Literal(text) => result.push_str(text),
+                TemplateToken::Variable(name) => {
+                    if let Some(val) = self.get_var(name) {
+                        result.push_str(val);
+                    }
+                }
+                TemplateToken::Conditional { variable, if_true, if_false } => {
+                    let val = self.get_var(variable).unwrap_or("");
+                    if !val.is_empty() {
+                        result.push_str(if_true);
+                    } else {
+                        result.push_str(if_false);
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Compile and render in one step.
+    pub fn render(&self, template: &str) -> String {
+        let compiled = self.compile(template);
+        self.render_compiled(&compiled)
+    }
+
+    /// Count the number of registered variables.
+    pub fn var_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    /// Clear all variables.
+    pub fn clear_vars(&mut self) {
+        self.variables.clear();
+    }
+
+    /// List all variable names.
+    pub fn var_names(&self) -> Vec<&str> {
+        self.variables.iter().map(|(k, _)| k.as_str()).collect()
+    }
+}
+
+// ── Label Accessibility Text Builder ──
+
+/// Builds accessible text descriptions from labels.
+pub struct LabelAccessibilityTextBuilder {
+    parts: Vec<String>,
+    separator: String,
+    prefix: Option<String>,
+    suffix: Option<String>,
+}
+
+impl LabelAccessibilityTextBuilder {
+    pub fn new() -> Self {
+        Self {
+            parts: Vec::new(),
+            separator: ", ".to_string(),
+            prefix: None,
+            suffix: None,
+        }
+    }
+
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self {
+        self.separator = sep.into();
+        self
+    }
+
+    pub fn with_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = Some(prefix.into());
+        self
+    }
+
+    pub fn with_suffix(mut self, suffix: impl Into<String>) -> Self {
+        self.suffix = Some(suffix.into());
+        self
+    }
+
+    /// Add a text part.
+    pub fn add(&mut self, text: impl Into<String>) -> &mut Self {
+        let text = text.into();
+        if !text.is_empty() {
+            self.parts.push(text);
+        }
+        self
+    }
+
+    /// Add a label with a role description.
+    pub fn add_with_role(&mut self, text: impl Into<String>, role: impl Into<String>) -> &mut Self {
+        let text = text.into();
+        let role = role.into();
+        if !text.is_empty() {
+            self.parts.push(format!("{} ({})", text, role));
+        }
+        self
+    }
+
+    /// Add a key-value pair.
+    pub fn add_property(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.parts.push(format!("{}: {}", key.into(), value.into()));
+        self
+    }
+
+    /// Build the final accessible text string.
+    pub fn build(&self) -> String {
+        let mut result = String::new();
+        if let Some(ref prefix) = self.prefix {
+            result.push_str(prefix);
+            if !self.parts.is_empty() {
+                result.push_str(&self.separator);
+            }
+        }
+        result.push_str(&self.parts.join(&self.separator));
+        if let Some(ref suffix) = self.suffix {
+            if !result.is_empty() {
+                result.push_str(&self.separator);
+            }
+            result.push_str(suffix);
+        }
+        result
+    }
+
+    pub fn part_count(&self) -> usize {
+        self.parts.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.parts.clear();
+    }
+
+    /// Build and wrap in an ARIA label attribute string.
+    pub fn to_aria_label(&self) -> String {
+        format!("aria-label=\"{}\"", self.build())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2297,4 +2530,113 @@ mod tests {
         assert!(r.has_icon("py"));
         assert!(!r.has_icon("go"));
     }
+
+    #[test]
+    fn template_engine_variable_substitution() {
+        let mut engine = LabelTemplateEngine::new();
+        engine.set_var("name", "file.rs");
+        let result = engine.render("Opening ${name}");
+        assert_eq!(result, "Opening file.rs");
+    }
+
+    #[test]
+    fn template_engine_missing_variable() {
+        let engine = LabelTemplateEngine::new();
+        let result = engine.render("Hello ${name}!");
+        assert_eq!(result, "Hello !");
+    }
+
+    #[test]
+    fn template_engine_conditional_true() {
+        let mut engine = LabelTemplateEngine::new();
+        engine.set_var("modified", "yes");
+        let result = engine.render("File ${modified?[modified]:[clean]}");
+        assert_eq!(result, "File [modified]");
+    }
+
+    #[test]
+    fn template_engine_conditional_false() {
+        let engine = LabelTemplateEngine::new();
+        let result = engine.render("Status: ${modified?dirty:clean}");
+        assert_eq!(result, "Status: clean");
+    }
+
+    #[test]
+    fn template_engine_multiple_vars() {
+        let mut engine = LabelTemplateEngine::new();
+        engine.set_var("dir", "src").set_var("file", "main.rs");
+        let result = engine.render("${dir}/${file}");
+        assert_eq!(result, "src/main.rs");
+    }
+
+    #[test]
+    fn template_engine_set_overwrites() {
+        let mut engine = LabelTemplateEngine::new();
+        engine.set_var("x", "1");
+        engine.set_var("x", "2");
+        assert_eq!(engine.get_var("x"), Some("2"));
+        assert_eq!(engine.var_count(), 1);
+    }
+
+    #[test]
+    fn template_engine_remove_var() {
+        let mut engine = LabelTemplateEngine::new();
+        engine.set_var("x", "1");
+        assert!(engine.remove_var("x"));
+        assert!(!engine.remove_var("x"));
+        assert_eq!(engine.var_count(), 0);
+    }
+
+    #[test]
+    fn template_engine_compile_and_rerender() {
+        let mut engine = LabelTemplateEngine::new();
+        let compiled = engine.compile("Hello ${name}!");
+        engine.set_var("name", "Alice");
+        assert_eq!(engine.render_compiled(&compiled), "Hello Alice!");
+        engine.set_var("name", "Bob");
+        assert_eq!(engine.render_compiled(&compiled), "Hello Bob!");
+    }
+
+    #[test]
+    fn accessibility_builder_basic() {
+        let mut builder = LabelAccessibilityTextBuilder::new();
+        builder.add("File").add("main.rs");
+        assert_eq!(builder.build(), "File, main.rs");
+    }
+
+    #[test]
+    fn accessibility_builder_with_role() {
+        let mut builder = LabelAccessibilityTextBuilder::new();
+        builder.add_with_role("Save", "button");
+        assert_eq!(builder.build(), "Save (button)");
+    }
+
+    #[test]
+    fn accessibility_builder_prefix_suffix() {
+        let mut builder = LabelAccessibilityTextBuilder::new()
+            .with_prefix("Start")
+            .with_suffix("End");
+        builder.add("Middle");
+        let result = builder.build();
+        assert!(result.starts_with("Start"));
+        assert!(result.ends_with("End"));
+        assert!(result.contains("Middle"));
+    }
+
+    #[test]
+    fn accessibility_builder_aria() {
+        let mut builder = LabelAccessibilityTextBuilder::new();
+        builder.add("Close");
+        assert_eq!(builder.to_aria_label(), "aria-label=\"Close\"");
+    }
+
+    #[test]
+    fn accessibility_builder_property() {
+        let mut builder = LabelAccessibilityTextBuilder::new();
+        builder.add_property("Type", "File");
+        assert_eq!(builder.build(), "Type: File");
+        assert_eq!(builder.part_count(), 1);
+    }
+
+
 }

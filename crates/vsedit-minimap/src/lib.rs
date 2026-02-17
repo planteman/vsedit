@@ -1484,6 +1484,221 @@ impl fmt::Display for MinimapViewportIndicator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MinimapSearchHighlighter – highlights search matches in minimap
+// ---------------------------------------------------------------------------
+
+/// A single search match position for minimap highlighting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchMatchLocation {
+    pub line: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+}
+
+/// Configuration for search highlighting in the minimap.
+#[derive(Debug, Clone)]
+pub struct SearchHighlightConfig {
+    pub highlight_all: bool,
+    pub current_match_distinct: bool,
+    pub max_highlights: usize,
+}
+
+impl SearchHighlightConfig {
+    pub fn new() -> Self {
+        Self {
+            highlight_all: true,
+            current_match_distinct: true,
+            max_highlights: 10_000,
+        }
+    }
+
+    pub fn with_max_highlights(mut self, max: usize) -> Self {
+        self.max_highlights = max;
+        self
+    }
+}
+
+/// Manages search match highlights for the minimap display.
+#[derive(Debug)]
+pub struct MinimapSearchHighlighter {
+    config: SearchHighlightConfig,
+    matches: Vec<SearchMatchLocation>,
+    current_index: Option<usize>,
+    query: String,
+}
+
+impl MinimapSearchHighlighter {
+    pub fn new(config: SearchHighlightConfig) -> Self {
+        Self {
+            config,
+            matches: Vec::new(),
+            current_index: None,
+            query: String::new(),
+        }
+    }
+
+    /// Set search results from a list of matches.
+    pub fn set_matches(&mut self, query: impl Into<String>, matches: Vec<SearchMatchLocation>) {
+        self.query = query.into();
+        self.matches = if matches.len() > self.config.max_highlights {
+            matches[..self.config.max_highlights].to_vec()
+        } else {
+            matches
+        };
+        self.current_index = if self.matches.is_empty() { None } else { Some(0) };
+    }
+
+    /// Clear all search highlights.
+    pub fn clear(&mut self) {
+        self.matches.clear();
+        self.current_index = None;
+        self.query.clear();
+    }
+
+    /// Advance to the next match.
+    pub fn next_match(&mut self) -> Option<&SearchMatchLocation> {
+        if self.matches.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % self.matches.len(),
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        self.matches.get(idx)
+    }
+
+    /// Go to the previous match.
+    pub fn prev_match(&mut self) -> Option<&SearchMatchLocation> {
+        if self.matches.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(0) => self.matches.len() - 1,
+            Some(i) => i - 1,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        self.matches.get(idx)
+    }
+
+    /// Get all match lines (deduplicated) for minimap rendering.
+    pub fn highlight_lines(&self) -> Vec<usize> {
+        let mut lines: Vec<usize> = self.matches.iter().map(|m| m.line).collect();
+        lines.sort_unstable();
+        lines.dedup();
+        lines
+    }
+
+    /// Check whether a line has any matches.
+    pub fn line_has_match(&self, line: usize) -> bool {
+        self.matches.iter().any(|m| m.line == line)
+    }
+
+    /// Count matches on a specific line.
+    pub fn matches_on_line(&self, line: usize) -> usize {
+        self.matches.iter().filter(|m| m.line == line).count()
+    }
+
+    pub fn match_count(&self) -> usize { self.matches.len() }
+    pub fn current_index(&self) -> Option<usize> { self.current_index }
+    pub fn query(&self) -> &str { &self.query }
+    pub fn is_active(&self) -> bool { !self.query.is_empty() }
+}
+
+// ---------------------------------------------------------------------------
+// MinimapDecorationAggregator – aggregates decorations from multiple sources
+// ---------------------------------------------------------------------------
+
+/// Source identifier for a decoration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DecorationSourceId(pub String);
+
+/// A single decoration entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecorationItem {
+    pub source: DecorationSourceId,
+    pub line: usize,
+    pub kind: DecorationItemKind,
+    pub priority: i32,
+}
+
+/// Kind of decoration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecorationItemKind {
+    Error,
+    Warning,
+    Info,
+    Highlight,
+    Bookmark,
+    Change,
+}
+
+/// Aggregates decorations from multiple providers for minimap rendering.
+#[derive(Debug)]
+pub struct MinimapDecorationAggregator {
+    items: Vec<DecorationItem>,
+    max_per_line: usize,
+}
+
+impl MinimapDecorationAggregator {
+    pub fn new(max_per_line: usize) -> Self {
+        Self { items: Vec::new(), max_per_line }
+    }
+
+    /// Add decorations from a source.
+    pub fn add_items(&mut self, items: Vec<DecorationItem>) {
+        self.items.extend(items);
+    }
+
+    /// Remove all decorations from a specific source.
+    pub fn remove_source(&mut self, source: &DecorationSourceId) {
+        self.items.retain(|item| &item.source != source);
+    }
+
+    /// Clear all decorations.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    /// Get the highest-priority decorations for a line (up to `max_per_line`).
+    pub fn decorations_for_line(&self, line: usize) -> Vec<&DecorationItem> {
+        let mut line_items: Vec<&DecorationItem> = self.items.iter()
+            .filter(|item| item.line == line)
+            .collect();
+        line_items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        line_items.truncate(self.max_per_line);
+        line_items
+    }
+
+    /// Get all lines that have at least one decoration, sorted.
+    pub fn decorated_lines(&self) -> Vec<usize> {
+        let mut lines: Vec<usize> = self.items.iter().map(|i| i.line).collect();
+        lines.sort_unstable();
+        lines.dedup();
+        lines
+    }
+
+    /// Total number of decoration items.
+    pub fn total_count(&self) -> usize { self.items.len() }
+
+    /// Count items by kind.
+    pub fn count_by_kind(&self, kind: DecorationItemKind) -> usize {
+        self.items.iter().filter(|i| i.kind == kind).count()
+    }
+
+    /// Get all unique sources.
+    pub fn sources(&self) -> Vec<&DecorationSourceId> {
+        let mut sources: Vec<&DecorationSourceId> = self.items.iter().map(|i| &i.source).collect();
+        sources.sort_by_key(|s| &s.0);
+        sources.dedup_by_key(|s| &s.0);
+        sources
+    }
+
+    /// Merge from another aggregator.
+    pub fn merge(&mut self, other: &MinimapDecorationAggregator) {
+        self.items.extend(other.items.iter().cloned());
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2487,4 +2702,161 @@ mod tests {
         assert!(s.contains("5..15"));
         assert!(s.contains("w=40"));
     }
+
+    #[test]
+    fn search_highlighter_new() {
+        let h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        assert_eq!(h.match_count(), 0);
+        assert!(!h.is_active());
+    }
+
+    #[test]
+    fn search_highlighter_set_matches() {
+        let mut h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        h.set_matches("hello", vec![
+            SearchMatchLocation { line: 1, start_col: 0, end_col: 5 },
+            SearchMatchLocation { line: 3, start_col: 10, end_col: 15 },
+        ]);
+        assert_eq!(h.match_count(), 2);
+        assert!(h.is_active());
+        assert_eq!(h.query(), "hello");
+    }
+
+    #[test]
+    fn search_highlighter_next_prev() {
+        let mut h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        h.set_matches("x", vec![
+            SearchMatchLocation { line: 1, start_col: 0, end_col: 1 },
+            SearchMatchLocation { line: 5, start_col: 0, end_col: 1 },
+        ]);
+        let n = h.next_match().unwrap();
+        assert_eq!(n.line, 5);
+        let p = h.prev_match().unwrap();
+        assert_eq!(p.line, 1);
+    }
+
+    #[test]
+    fn search_highlighter_wrap() {
+        let mut h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        h.set_matches("x", vec![
+            SearchMatchLocation { line: 1, start_col: 0, end_col: 1 },
+        ]);
+        h.next_match(); // wraps to 0
+        let m = h.next_match().unwrap();
+        assert_eq!(m.line, 1);
+    }
+
+    #[test]
+    fn search_highlighter_clear() {
+        let mut h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        h.set_matches("test", vec![SearchMatchLocation { line: 0, start_col: 0, end_col: 4 }]);
+        h.clear();
+        assert_eq!(h.match_count(), 0);
+        assert!(!h.is_active());
+    }
+
+    #[test]
+    fn search_highlighter_highlight_lines() {
+        let mut h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        h.set_matches("x", vec![
+            SearchMatchLocation { line: 5, start_col: 0, end_col: 1 },
+            SearchMatchLocation { line: 5, start_col: 10, end_col: 11 },
+            SearchMatchLocation { line: 10, start_col: 0, end_col: 1 },
+        ]);
+        let lines = h.highlight_lines();
+        assert_eq!(lines, vec![5, 10]);
+    }
+
+    #[test]
+    fn search_highlighter_matches_on_line() {
+        let mut h = MinimapSearchHighlighter::new(SearchHighlightConfig::new());
+        h.set_matches("x", vec![
+            SearchMatchLocation { line: 3, start_col: 0, end_col: 1 },
+            SearchMatchLocation { line: 3, start_col: 5, end_col: 6 },
+        ]);
+        assert_eq!(h.matches_on_line(3), 2);
+        assert_eq!(h.matches_on_line(4), 0);
+    }
+
+    #[test]
+    fn search_highlighter_max_highlights() {
+        let config = SearchHighlightConfig::new().with_max_highlights(2);
+        let mut h = MinimapSearchHighlighter::new(config);
+        h.set_matches("x", vec![
+            SearchMatchLocation { line: 1, start_col: 0, end_col: 1 },
+            SearchMatchLocation { line: 2, start_col: 0, end_col: 1 },
+            SearchMatchLocation { line: 3, start_col: 0, end_col: 1 },
+        ]);
+        assert_eq!(h.match_count(), 2);
+    }
+
+    #[test]
+    fn decoration_aggregator_add_and_query() {
+        let mut agg = MinimapDecorationAggregator::new(5);
+        agg.add_items(vec![
+            DecorationItem { source: DecorationSourceId("diag".into()), line: 10, kind: DecorationItemKind::Error, priority: 10 },
+            DecorationItem { source: DecorationSourceId("git".into()), line: 10, kind: DecorationItemKind::Change, priority: 5 },
+        ]);
+        assert_eq!(agg.total_count(), 2);
+        let line_decs = agg.decorations_for_line(10);
+        assert_eq!(line_decs.len(), 2);
+        assert_eq!(line_decs[0].priority, 10); // highest first
+    }
+
+    #[test]
+    fn decoration_aggregator_remove_source() {
+        let mut agg = MinimapDecorationAggregator::new(5);
+        let src = DecorationSourceId("diag".into());
+        agg.add_items(vec![
+            DecorationItem { source: src.clone(), line: 1, kind: DecorationItemKind::Error, priority: 1 },
+        ]);
+        agg.remove_source(&src);
+        assert_eq!(agg.total_count(), 0);
+    }
+
+    #[test]
+    fn decoration_aggregator_decorated_lines() {
+        let mut agg = MinimapDecorationAggregator::new(5);
+        agg.add_items(vec![
+            DecorationItem { source: DecorationSourceId("a".into()), line: 5, kind: DecorationItemKind::Info, priority: 1 },
+            DecorationItem { source: DecorationSourceId("a".into()), line: 15, kind: DecorationItemKind::Warning, priority: 1 },
+            DecorationItem { source: DecorationSourceId("b".into()), line: 5, kind: DecorationItemKind::Bookmark, priority: 2 },
+        ]);
+        assert_eq!(agg.decorated_lines(), vec![5, 15]);
+    }
+
+    #[test]
+    fn decoration_aggregator_count_by_kind() {
+        let mut agg = MinimapDecorationAggregator::new(5);
+        agg.add_items(vec![
+            DecorationItem { source: DecorationSourceId("a".into()), line: 1, kind: DecorationItemKind::Error, priority: 1 },
+            DecorationItem { source: DecorationSourceId("a".into()), line: 2, kind: DecorationItemKind::Error, priority: 1 },
+            DecorationItem { source: DecorationSourceId("a".into()), line: 3, kind: DecorationItemKind::Warning, priority: 1 },
+        ]);
+        assert_eq!(agg.count_by_kind(DecorationItemKind::Error), 2);
+        assert_eq!(agg.count_by_kind(DecorationItemKind::Warning), 1);
+    }
+
+    #[test]
+    fn decoration_aggregator_max_per_line() {
+        let mut agg = MinimapDecorationAggregator::new(1);
+        agg.add_items(vec![
+            DecorationItem { source: DecorationSourceId("a".into()), line: 1, kind: DecorationItemKind::Error, priority: 10 },
+            DecorationItem { source: DecorationSourceId("b".into()), line: 1, kind: DecorationItemKind::Warning, priority: 5 },
+        ]);
+        let decs = agg.decorations_for_line(1);
+        assert_eq!(decs.len(), 1);
+        assert_eq!(decs[0].kind, DecorationItemKind::Error);
+    }
+
+    #[test]
+    fn decoration_aggregator_merge() {
+        let mut a = MinimapDecorationAggregator::new(5);
+        let mut b = MinimapDecorationAggregator::new(5);
+        a.add_items(vec![DecorationItem { source: DecorationSourceId("s".into()), line: 1, kind: DecorationItemKind::Info, priority: 1 }]);
+        b.add_items(vec![DecorationItem { source: DecorationSourceId("s".into()), line: 2, kind: DecorationItemKind::Info, priority: 1 }]);
+        a.merge(&b);
+        assert_eq!(a.total_count(), 2);
+    }
+
 }

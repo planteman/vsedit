@@ -1432,6 +1432,227 @@ impl WebviewBridge {
     }
 }
 
+
+// -- Webview Content Sanitizer --
+
+/// Sanitizes HTML content for safe rendering in webview panels.
+#[derive(Debug, Clone)]
+pub struct WebviewContentSanitizer {
+    allowed_tags: Vec<String>,
+    allowed_attrs: Vec<String>,
+    strip_scripts: bool,
+    strip_event_handlers: bool,
+    max_content_length: usize,
+}
+
+/// Result of a sanitization pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SanitizeResult {
+    pub output: String,
+    pub elements_removed: usize,
+    pub attrs_removed: usize,
+    pub was_truncated: bool,
+}
+
+impl Default for WebviewContentSanitizer {
+    fn default() -> Self {
+        Self {
+            allowed_tags: ["div","span","p","h1","h2","h3","a","img","ul","ol","li","table","tr","td","th","br","hr","em","strong","code","pre"].iter().map(|s| s.to_string()).collect(),
+            allowed_attrs: ["class","id","href","src","alt","title","style"].iter().map(|s| s.to_string()).collect(),
+            strip_scripts: true,
+            strip_event_handlers: true,
+            max_content_length: 1_000_000,
+        }
+    }
+}
+
+impl WebviewContentSanitizer {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn with_max_length(mut self, max: usize) -> Self {
+        self.max_content_length = max;
+        self
+    }
+
+    pub fn allow_tag(mut self, tag: &str) -> Self {
+        if !self.allowed_tags.iter().any(|t| t == tag) {
+            self.allowed_tags.push(tag.to_string());
+        }
+        self
+    }
+
+    pub fn is_tag_allowed(&self, tag: &str) -> bool {
+        self.allowed_tags.iter().any(|t| t.eq_ignore_ascii_case(tag))
+    }
+
+    pub fn is_attr_allowed(&self, attr: &str) -> bool {
+        if self.strip_event_handlers && attr.starts_with("on") { return false; }
+        self.allowed_attrs.iter().any(|a| a.eq_ignore_ascii_case(attr))
+    }
+
+    pub fn sanitize(&self, html: &str) -> SanitizeResult {
+        let mut output = html.to_string();
+        let mut elements_removed = 0usize;
+        let mut attrs_removed = 0usize;
+        let was_truncated = output.len() > self.max_content_length;
+        if was_truncated { output.truncate(self.max_content_length); }
+        if self.strip_scripts {
+            while let Some(start) = output.to_lowercase().find("<script") {
+                if let Some(end) = output[start..].to_lowercase().find("</script>") {
+                    output = format!("{}{}", &output[..start], &output[start + end + 9..]);
+                    elements_removed += 1;
+                } else {
+                    output = output[..start].to_string();
+                    elements_removed += 1;
+                    break;
+                }
+            }
+        }
+        if self.strip_event_handlers {
+            for pat in &["onclick=", "onload=", "onerror=", "onmouseover="] {
+                while output.to_lowercase().contains(pat) {
+                    if let Some(pos) = output.to_lowercase().find(pat) {
+                        let rest = &output[pos..];
+                        let end = rest.find(|c: char| c == ' ' || c == '>' || c == '/').unwrap_or(rest.len());
+                        output = format!("{}{}", &output[..pos], &output[pos + end..]);
+                        attrs_removed += 1;
+                    }
+                }
+            }
+        }
+        SanitizeResult { output, elements_removed, attrs_removed, was_truncated }
+    }
+}
+
+// -- Webview Resource Mapper --
+
+/// Maps webview URIs to local filesystem paths.
+#[derive(Debug, Clone)]
+pub struct WebviewResourceMapper {
+    mappings: HashMap<String, String>,
+    scheme_prefix: String,
+}
+
+impl WebviewResourceMapper {
+    pub fn new(scheme_prefix: &str) -> Self {
+        Self { mappings: HashMap::new(), scheme_prefix: scheme_prefix.to_string() }
+    }
+    pub fn add_mapping(&mut self, webview_uri: &str, local_path: &str) {
+        self.mappings.insert(webview_uri.to_string(), local_path.to_string());
+    }
+    pub fn resolve(&self, webview_uri: &str) -> Option<&str> {
+        self.mappings.get(webview_uri).map(|s| s.as_str())
+    }
+    pub fn to_webview_uri(&self, local_path: &str) -> String {
+        format!("{}://{}", self.scheme_prefix, local_path)
+    }
+    pub fn mapping_count(&self) -> usize { self.mappings.len() }
+    pub fn clear_mappings(&mut self) { self.mappings.clear(); }
+    pub fn has_mapping(&self, uri: &str) -> bool { self.mappings.contains_key(uri) }
+
+    pub fn guess_mime(path: &str) -> &'static str {
+        let lower = path.to_lowercase();
+        if lower.ends_with(".html") || lower.ends_with(".htm") { "text/html" }
+        else if lower.ends_with(".css") { "text/css" }
+        else if lower.ends_with(".js") { "application/javascript" }
+        else if lower.ends_with(".json") { "application/json" }
+        else if lower.ends_with(".png") { "image/png" }
+        else if lower.ends_with(".svg") { "image/svg+xml" }
+        else { "application/octet-stream" }
+    }
+}
+
+
+// -- Webview CSP Directive Builder --
+
+/// Builds Content-Security-Policy directives for webview panels.
+#[derive(Debug, Clone)]
+pub struct WebviewCspDirectiveBuilder {
+    directives: Vec<(String, Vec<String>)>,
+}
+
+impl WebviewCspDirectiveBuilder {
+    pub fn new() -> Self {
+        Self { directives: Vec::new() }
+    }
+
+    pub fn add_directive(&mut self, name: &str, values: &[&str]) -> &mut Self {
+        self.directives.push((
+            name.to_string(),
+            values.iter().map(|v| v.to_string()).collect(),
+        ));
+        self
+    }
+
+    pub fn default_src(&mut self, sources: &[&str]) -> &mut Self {
+        self.add_directive("default-src", sources)
+    }
+
+    pub fn script_src(&mut self, sources: &[&str]) -> &mut Self {
+        self.add_directive("script-src", sources)
+    }
+
+    pub fn style_src(&mut self, sources: &[&str]) -> &mut Self {
+        self.add_directive("style-src", sources)
+    }
+
+    pub fn img_src(&mut self, sources: &[&str]) -> &mut Self {
+        self.add_directive("img-src", sources)
+    }
+
+    pub fn font_src(&mut self, sources: &[&str]) -> &mut Self {
+        self.add_directive("font-src", sources)
+    }
+
+    pub fn connect_src(&mut self, sources: &[&str]) -> &mut Self {
+        self.add_directive("connect-src", sources)
+    }
+
+    pub fn build(&self) -> String {
+        self.directives
+            .iter()
+            .map(|(name, values)| format!("{} {}", name, values.join(" ")))
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+
+    pub fn directive_count(&self) -> usize {
+        self.directives.len()
+    }
+
+    pub fn has_directive(&self, name: &str) -> bool {
+        self.directives.iter().any(|(n, _)| n == name)
+    }
+
+    /// Create a restrictive CSP suitable for untrusted content.
+    pub fn restrictive() -> Self {
+        let mut builder = Self::new();
+        builder
+            .default_src(&["'none'"])
+            .script_src(&["'none'"])
+            .style_src(&["'unsafe-inline'"])
+            .img_src(&["data:", "https:"])
+            .font_src(&["data:"]);
+        builder
+    }
+
+    /// Create a permissive CSP for trusted extensions.
+    pub fn permissive() -> Self {
+        let mut builder = Self::new();
+        builder
+            .default_src(&["'self'", "https:"])
+            .script_src(&["'self'", "'unsafe-inline'", "'unsafe-eval'"])
+            .style_src(&["'self'", "'unsafe-inline'"])
+            .img_src(&["'self'", "data:", "https:"])
+            .font_src(&["'self'", "data:", "https:"]);
+        builder
+    }
+}
+
+impl Default for WebviewCspDirectiveBuilder {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2388,4 +2609,135 @@ mod tests {
         assert_eq!(bridge.clone_options(99, 1), Err(WebviewError::NotFound(99)));
         assert_eq!(bridge.clone_options(1, 99), Err(WebviewError::NotFound(99)));
     }
+
+    // -- Content Sanitizer Tests --
+    #[test]
+    fn test_sanitizer_default_tags() {
+        let san = WebviewContentSanitizer::new();
+        assert!(san.is_tag_allowed("div"));
+        assert!(!san.is_tag_allowed("script"));
+    }
+    #[test]
+    fn test_sanitizer_custom_tag() {
+        let san = WebviewContentSanitizer::new().allow_tag("my-elem");
+        assert!(san.is_tag_allowed("my-elem"));
+    }
+    #[test]
+    fn test_sanitizer_strip_scripts() {
+        let san = WebviewContentSanitizer::new();
+        let r = san.sanitize("<p>Hi</p><script>alert(1)</script><p>Safe</p>");
+        assert!(!r.output.to_lowercase().contains("<script"));
+        assert_eq!(r.elements_removed, 1);
+    }
+    #[test]
+    fn test_sanitizer_strip_events() {
+        let san = WebviewContentSanitizer::new();
+        let r = san.sanitize(r#"<div onclick="bad()">x</div>"#);
+        assert!(!r.output.contains("onclick"));
+    }
+    #[test]
+    fn test_sanitizer_truncation() {
+        let san = WebviewContentSanitizer::new().with_max_length(5);
+        let r = san.sanitize("Hello World");
+        assert!(r.was_truncated);
+    }
+    #[test]
+    fn test_sanitizer_safe_pass() {
+        let san = WebviewContentSanitizer::new();
+        let r = san.sanitize("<div>Hello</div>");
+        assert_eq!(r.elements_removed, 0);
+    }
+    #[test]
+    fn test_sanitizer_attr_check() {
+        let san = WebviewContentSanitizer::new();
+        assert!(!san.is_attr_allowed("onclick"));
+        assert!(san.is_attr_allowed("class"));
+    }
+    // -- Resource Mapper Tests --
+    #[test]
+    fn test_mapper_resolve() {
+        let mut m = WebviewResourceMapper::new("vscode-resource");
+        m.add_mapping("res://s.css", "/ws/s.css");
+        assert_eq!(m.resolve("res://s.css"), Some("/ws/s.css"));
+    }
+    #[test]
+    fn test_mapper_uri() {
+        let m = WebviewResourceMapper::new("vscode-resource");
+        assert!(m.to_webview_uri("/ws/a.js").starts_with("vscode-resource://"));
+    }
+    #[test]
+    fn test_mapper_mime() {
+        assert_eq!(WebviewResourceMapper::guess_mime("s.css"), "text/css");
+        assert_eq!(WebviewResourceMapper::guess_mime("a.js"), "application/javascript");
+    }
+    #[test]
+    fn test_mapper_clear() {
+        let mut m = WebviewResourceMapper::new("r");
+        m.add_mapping("a", "b");
+        m.clear_mappings();
+        assert_eq!(m.mapping_count(), 0);
+    }
+    #[test]
+    fn test_mapper_has() {
+        let mut m = WebviewResourceMapper::new("r");
+        m.add_mapping("a", "b");
+        assert!(m.has_mapping("a"));
+        assert!(!m.has_mapping("c"));
+    }
+
+
+    // -- CSP Directive Builder Tests --
+
+    #[test]
+    fn test_csp_build_empty() {
+        let b = WebviewCspDirectiveBuilder::new();
+        assert_eq!(b.build(), "");
+    }
+
+    #[test]
+    fn test_csp_single_directive() {
+        let mut b = WebviewCspDirectiveBuilder::new();
+        b.default_src(&["'self'"]);
+        assert_eq!(b.build(), "default-src 'self'");
+    }
+
+    #[test]
+    fn test_csp_multiple_directives() {
+        let mut b = WebviewCspDirectiveBuilder::new();
+        b.default_src(&["'none'"]).script_src(&["'self'"]);
+        let csp = b.build();
+        assert!(csp.contains("default-src 'none'"));
+        assert!(csp.contains("script-src 'self'"));
+    }
+
+    #[test]
+    fn test_csp_restrictive() {
+        let b = WebviewCspDirectiveBuilder::restrictive();
+        let csp = b.build();
+        assert!(csp.contains("script-src 'none'"));
+        assert!(csp.contains("default-src 'none'"));
+    }
+
+    #[test]
+    fn test_csp_permissive() {
+        let b = WebviewCspDirectiveBuilder::permissive();
+        let csp = b.build();
+        assert!(csp.contains("'unsafe-eval'"));
+    }
+
+    #[test]
+    fn test_csp_has_directive() {
+        let mut b = WebviewCspDirectiveBuilder::new();
+        b.img_src(&["data:"]);
+        assert!(b.has_directive("img-src"));
+        assert!(!b.has_directive("script-src"));
+    }
+
+    #[test]
+    fn test_csp_directive_count() {
+        let mut b = WebviewCspDirectiveBuilder::new();
+        b.default_src(&["'self'"]).style_src(&["'unsafe-inline'"]);
+        assert_eq!(b.directive_count(), 2);
+    }
+
 }

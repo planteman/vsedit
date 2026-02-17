@@ -1359,6 +1359,290 @@ pub const RUST_KEYWORDS: &[&str] = &[
     "trait", "true", "type", "unsafe", "use", "where", "while", "yield",
 ];
 
+// ---------------------------------------------------------------------------
+// RenamePreviewGenerator
+// ---------------------------------------------------------------------------
+
+/// A single change in a rename preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenamePreviewChange {
+    pub file_path: String,
+    pub line: usize,
+    pub column: usize,
+    pub old_text: String,
+    pub new_text: String,
+}
+
+impl RenamePreviewChange {
+    pub fn new(
+        file_path: impl Into<String>,
+        line: usize,
+        column: usize,
+        old_text: impl Into<String>,
+        new_text: impl Into<String>,
+    ) -> Self {
+        Self {
+            file_path: file_path.into(),
+            line,
+            column,
+            old_text: old_text.into(),
+            new_text: new_text.into(),
+        }
+    }
+
+    /// Returns a unified-diff-style summary line.
+    pub fn diff_line(&self) -> String {
+        format!("{}:{}:{}: '{}' -> '{}'", self.file_path, self.line, self.column, self.old_text, self.new_text)
+    }
+}
+
+impl std::fmt::Display for RenamePreviewChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.diff_line())
+    }
+}
+
+/// Generates a preview of rename changes across files.
+pub struct RenamePreviewGenerator {
+    changes: Vec<RenamePreviewChange>,
+}
+
+impl RenamePreviewGenerator {
+    pub fn new() -> Self {
+        Self { changes: Vec::new() }
+    }
+
+    pub fn add_change(&mut self, change: RenamePreviewChange) {
+        self.changes.push(change);
+    }
+
+    pub fn change_count(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// How many distinct files are affected.
+    pub fn affected_file_count(&self) -> usize {
+        let mut files = std::collections::HashSet::new();
+        for c in &self.changes {
+            files.insert(&c.file_path);
+        }
+        files.len()
+    }
+
+    /// Return changes grouped by file.
+    pub fn changes_by_file(&self) -> std::collections::HashMap<&str, Vec<&RenamePreviewChange>> {
+        let mut map: std::collections::HashMap<&str, Vec<&RenamePreviewChange>> =
+            std::collections::HashMap::new();
+        for c in &self.changes {
+            map.entry(&c.file_path).or_default().push(c);
+        }
+        map
+    }
+
+    /// Generate a full preview string.
+    pub fn generate_preview(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("Rename Preview: {} changes in {} files",
+            self.changes.len(), self.affected_file_count()));
+        lines.push("---".into());
+        let by_file = self.changes_by_file();
+        let mut files: Vec<&&str> = by_file.keys().collect();
+        files.sort();
+        for file in files {
+            lines.push(format!("  {file}:"));
+            for change in &by_file[*file] {
+                lines.push(format!("    L{}:C{}: '{}' -> '{}'",
+                    change.line, change.column, change.old_text, change.new_text));
+            }
+        }
+        lines.join("\n")
+    }
+
+    /// Clear all changes.
+    pub fn clear(&mut self) {
+        self.changes.clear();
+    }
+
+    /// List affected files sorted alphabetically.
+    pub fn affected_files(&self) -> Vec<String> {
+        let mut files: Vec<String> = self
+            .changes
+            .iter()
+            .map(|c| c.file_path.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        files.sort();
+        files
+    }
+}
+
+impl std::fmt::Display for RenamePreviewGenerator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RenamePreviewGenerator({} changes, {} files)",
+            self.changes.len(), self.affected_file_count())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenameConflictResolver
+// ---------------------------------------------------------------------------
+
+/// The kind of naming conflict detected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenameConflictKind {
+    /// New name already exists in the same scope.
+    NameAlreadyExists,
+    /// New name shadows a name from an outer scope.
+    ShadowsOuterScope,
+    /// New name is a language keyword.
+    ReservedKeyword,
+    /// New name collides with an import.
+    ImportCollision,
+}
+
+impl std::fmt::Display for RenameConflictKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RenameConflictKind::NameAlreadyExists => write!(f, "name already exists"),
+            RenameConflictKind::ShadowsOuterScope => write!(f, "shadows outer scope"),
+            RenameConflictKind::ReservedKeyword => write!(f, "reserved keyword"),
+            RenameConflictKind::ImportCollision => write!(f, "import collision"),
+        }
+    }
+}
+
+/// A detected naming conflict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetectedRenameConflict {
+    pub new_name: String,
+    pub file_path: String,
+    pub line: usize,
+    pub kind: RenameConflictKind,
+    pub suggestion: Option<String>,
+}
+
+impl DetectedRenameConflict {
+    pub fn new(
+        new_name: impl Into<String>,
+        file_path: impl Into<String>,
+        line: usize,
+        kind: RenameConflictKind,
+    ) -> Self {
+        Self {
+            new_name: new_name.into(),
+            file_path: file_path.into(),
+            line,
+            kind,
+            suggestion: None,
+        }
+    }
+
+    pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
+        self.suggestion = Some(suggestion.into());
+        self
+    }
+}
+
+impl std::fmt::Display for DetectedRenameConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Conflict: '{}' at {}:{} - {}", self.new_name, self.file_path, self.line, self.kind)?;
+        if let Some(s) = &self.suggestion {
+            write!(f, " (suggest: {s})")?;
+        }
+        Ok(())
+    }
+}
+
+/// Detects and resolves naming conflicts during rename operations.
+pub struct RenameConflictResolver {
+    existing_names: std::collections::HashSet<String>,
+    keywords: std::collections::HashSet<String>,
+    imports: std::collections::HashSet<String>,
+}
+
+impl RenameConflictResolver {
+    pub fn new() -> Self {
+        Self {
+            existing_names: std::collections::HashSet::new(),
+            keywords: std::collections::HashSet::new(),
+            imports: std::collections::HashSet::new(),
+        }
+    }
+
+    pub fn add_existing_name(&mut self, name: impl Into<String>) {
+        self.existing_names.insert(name.into());
+    }
+
+    pub fn add_keyword(&mut self, kw: impl Into<String>) {
+        self.keywords.insert(kw.into());
+    }
+
+    pub fn add_import(&mut self, import: impl Into<String>) {
+        self.imports.insert(import.into());
+    }
+
+    /// Check a proposed new name for conflicts at a given location.
+    pub fn check(&self, new_name: &str, file_path: &str, line: usize) -> Vec<DetectedRenameConflict> {
+        let mut conflicts = Vec::new();
+
+        if self.keywords.contains(new_name) {
+            conflicts.push(
+                DetectedRenameConflict::new(new_name, file_path, line, RenameConflictKind::ReservedKeyword)
+                    .with_suggestion(format!("r#{new_name}")),
+            );
+        }
+
+        if self.existing_names.contains(new_name) {
+            conflicts.push(
+                DetectedRenameConflict::new(new_name, file_path, line, RenameConflictKind::NameAlreadyExists)
+                    .with_suggestion(format!("{new_name}_1")),
+            );
+        }
+
+        if self.imports.contains(new_name) {
+            conflicts.push(
+                DetectedRenameConflict::new(new_name, file_path, line, RenameConflictKind::ImportCollision),
+            );
+        }
+
+        conflicts
+    }
+
+    /// Suggest an alternative name that doesn't conflict.
+    pub fn suggest_alternative(&self, base_name: &str) -> String {
+        let mut candidate = base_name.to_string();
+        let mut suffix = 1u32;
+        while self.existing_names.contains(&candidate)
+            || self.keywords.contains(&candidate)
+            || self.imports.contains(&candidate)
+        {
+            candidate = format!("{base_name}_{suffix}");
+            suffix += 1;
+        }
+        candidate
+    }
+
+    /// Number of registered existing names.
+    pub fn existing_name_count(&self) -> usize {
+        self.existing_names.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.existing_names.clear();
+        self.keywords.clear();
+        self.imports.clear();
+    }
+}
+
+impl std::fmt::Display for RenameConflictResolver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RenameConflictResolver(names={}, kw={}, imports={})",
+            self.existing_names.len(), self.keywords.len(), self.imports.len())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2336,4 +2620,146 @@ mod tests {
         assert!(!is_reserved_name("my_func", RUST_KEYWORDS));
         assert!(!is_reserved_name("FN", RUST_KEYWORDS)); // case-sensitive
     }
+
+    #[test]
+    fn preview_gen_add_and_count() {
+        let mut preview_gen = RenamePreviewGenerator::new();
+        preview_gen.add_change(RenamePreviewChange::new("a.rs", 1, 5, "old", "new"));
+        assert_eq!(preview_gen.change_count(), 1);
+        assert_eq!(preview_gen.affected_file_count(), 1);
+    }
+
+    #[test]
+    fn preview_gen_multiple_files() {
+        let mut preview_gen = RenamePreviewGenerator::new();
+        preview_gen.add_change(RenamePreviewChange::new("a.rs", 1, 5, "x", "y"));
+        preview_gen.add_change(RenamePreviewChange::new("b.rs", 10, 3, "x", "y"));
+        assert_eq!(preview_gen.affected_file_count(), 2);
+    }
+
+    #[test]
+    fn preview_gen_changes_by_file() {
+        let mut preview_gen = RenamePreviewGenerator::new();
+        preview_gen.add_change(RenamePreviewChange::new("a.rs", 1, 0, "x", "y"));
+        preview_gen.add_change(RenamePreviewChange::new("a.rs", 5, 0, "x", "y"));
+        preview_gen.add_change(RenamePreviewChange::new("b.rs", 2, 0, "x", "y"));
+        let by_file = preview_gen.changes_by_file();
+        assert_eq!(by_file["a.rs"].len(), 2);
+        assert_eq!(by_file["b.rs"].len(), 1);
+    }
+
+    #[test]
+    fn preview_gen_generate_preview() {
+        let mut preview_gen = RenamePreviewGenerator::new();
+        preview_gen.add_change(RenamePreviewChange::new("main.rs", 10, 4, "foo", "bar"));
+        let preview = preview_gen.generate_preview();
+        assert!(preview.contains("main.rs"));
+        assert!(preview.contains("foo"));
+        assert!(preview.contains("bar"));
+    }
+
+    #[test]
+    fn preview_gen_affected_files_sorted() {
+        let mut preview_gen = RenamePreviewGenerator::new();
+        preview_gen.add_change(RenamePreviewChange::new("z.rs", 1, 0, "a", "b"));
+        preview_gen.add_change(RenamePreviewChange::new("a.rs", 1, 0, "a", "b"));
+        let files = preview_gen.affected_files();
+        assert_eq!(files, vec!["a.rs", "z.rs"]);
+    }
+
+    #[test]
+    fn preview_gen_clear_and_display() {
+        let mut preview_gen = RenamePreviewGenerator::new();
+        preview_gen.add_change(RenamePreviewChange::new("a.rs", 1, 0, "x", "y"));
+        assert!(format!("{preview_gen}").contains("1 changes"));
+        preview_gen.clear();
+        assert_eq!(preview_gen.change_count(), 0);
+    }
+
+    #[test]
+    fn preview_change_diff_line() {
+        let c = RenamePreviewChange::new("lib.rs", 42, 8, "old_name", "new_name");
+        let d = c.diff_line();
+        assert!(d.contains("lib.rs:42:8"));
+        assert!(d.contains("old_name"));
+    }
+
+    #[test]
+    fn conflict_resolver_keyword_conflict() {
+        let mut resolver = RenameConflictResolver::new();
+        resolver.add_keyword("fn");
+        let conflicts = resolver.check("fn", "main.rs", 10);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].kind, RenameConflictKind::ReservedKeyword);
+        assert!(conflicts[0].suggestion.is_some());
+    }
+
+    #[test]
+    fn conflict_resolver_existing_name() {
+        let mut resolver = RenameConflictResolver::new();
+        resolver.add_existing_name("my_var");
+        let conflicts = resolver.check("my_var", "lib.rs", 5);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].kind, RenameConflictKind::NameAlreadyExists);
+    }
+
+    #[test]
+    fn conflict_resolver_import_collision() {
+        let mut resolver = RenameConflictResolver::new();
+        resolver.add_import("HashMap");
+        let conflicts = resolver.check("HashMap", "lib.rs", 1);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].kind, RenameConflictKind::ImportCollision);
+    }
+
+    #[test]
+    fn conflict_resolver_no_conflict() {
+        let resolver = RenameConflictResolver::new();
+        let conflicts = resolver.check("unique_name", "lib.rs", 1);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn conflict_resolver_suggest_alternative() {
+        let mut resolver = RenameConflictResolver::new();
+        resolver.add_existing_name("count");
+        let alt = resolver.suggest_alternative("count");
+        assert_eq!(alt, "count_1");
+    }
+
+    #[test]
+    fn conflict_resolver_suggest_no_conflict() {
+        let resolver = RenameConflictResolver::new();
+        let alt = resolver.suggest_alternative("unique");
+        assert_eq!(alt, "unique");
+    }
+
+    #[test]
+    fn conflict_resolver_display_and_clear() {
+        let mut resolver = RenameConflictResolver::new();
+        resolver.add_existing_name("x");
+        resolver.add_keyword("fn");
+        assert!(format!("{resolver}").contains("names=1"));
+        resolver.clear();
+        assert_eq!(resolver.existing_name_count(), 0);
+    }
+
+    #[test]
+    fn conflict_kind_display() {
+        assert_eq!(format!("{}", RenameConflictKind::NameAlreadyExists), "name already exists");
+        assert_eq!(format!("{}", RenameConflictKind::ShadowsOuterScope), "shadows outer scope");
+        assert_eq!(format!("{}", RenameConflictKind::ReservedKeyword), "reserved keyword");
+        assert_eq!(format!("{}", RenameConflictKind::ImportCollision), "import collision");
+    }
+
+    #[test]
+    fn detected_conflict_display() {
+        let c = DetectedRenameConflict::new("fn", "main.rs", 10, RenameConflictKind::ReservedKeyword)
+            .with_suggestion("r#fn");
+        let s = format!("{c}");
+        assert!(s.contains("fn"));
+        assert!(s.contains("main.rs"));
+        assert!(s.contains("r#fn"));
+    }
+
 }

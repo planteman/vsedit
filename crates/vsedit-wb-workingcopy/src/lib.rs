@@ -1280,6 +1280,342 @@ impl WorkingCopyExporter {
     }
 }
 
+
+// ── Working Copy Conflict Detector ──
+
+/// Detects and categorizes conflicts across multiple providers.
+#[derive(Debug)]
+pub struct WorkingCopyConflictDetector {
+    conflict_uris: Vec<String>,
+}
+
+impl WorkingCopyConflictDetector {
+    pub fn new() -> Self {
+        Self {
+            conflict_uris: Vec::new(),
+        }
+    }
+
+    /// Scan a provider for conflicted resources.
+    pub fn scan_provider(&mut self, provider: &ScmProvider) {
+        for group in &provider.groups {
+            for resource in &group.resources {
+                if resource.status == ScmStatus::Conflict
+                    && !self.conflict_uris.contains(&resource.uri)
+                {
+                    self.conflict_uris.push(resource.uri.clone());
+                }
+            }
+        }
+    }
+
+    /// Scan all providers in a service.
+    pub fn scan_service(&mut self, service: &WorkingCopyService) {
+        for provider in &service.providers {
+            self.scan_provider(provider);
+        }
+    }
+
+    /// Number of detected conflicts.
+    pub fn conflict_count(&self) -> usize {
+        self.conflict_uris.len()
+    }
+
+    /// Whether there are any conflicts.
+    pub fn has_conflicts(&self) -> bool {
+        !self.conflict_uris.is_empty()
+    }
+
+    /// Return the list of conflicted URIs.
+    pub fn conflicted_uris(&self) -> &[String] {
+        &self.conflict_uris
+    }
+
+    /// Check if a specific URI is in conflict.
+    pub fn is_conflicted(&self, uri: &str) -> bool {
+        self.conflict_uris.iter().any(|u| u == uri)
+    }
+
+    /// Clear all recorded conflicts.
+    pub fn clear(&mut self) {
+        self.conflict_uris.clear();
+    }
+
+    /// Remove a specific URI from the conflict list (e.g. after resolution).
+    pub fn mark_resolved(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.conflict_uris.iter().position(|u| u == uri) {
+            self.conflict_uris.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// ── Dirty File Tracker ──
+
+/// Tracks dirty (modified, unsaved) files with timestamps.
+#[derive(Debug, Clone)]
+pub struct DirtyFileEntry {
+    pub uri: String,
+    pub dirty_since: u64,
+    pub last_modified: u64,
+}
+
+#[derive(Debug)]
+pub struct DirtyFileTracker {
+    entries: Vec<DirtyFileEntry>,
+}
+
+impl DirtyFileTracker {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Mark a file as dirty with the given timestamp.
+    pub fn mark_dirty(&mut self, uri: &str, timestamp: u64) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.uri == uri) {
+            entry.last_modified = timestamp;
+        } else {
+            self.entries.push(DirtyFileEntry {
+                uri: uri.to_string(),
+                dirty_since: timestamp,
+                last_modified: timestamp,
+            });
+        }
+    }
+
+    /// Mark a file as clean (saved).
+    pub fn mark_clean(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.entries.iter().position(|e| e.uri == uri) {
+            self.entries.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if a file is dirty.
+    pub fn is_dirty(&self, uri: &str) -> bool {
+        self.entries.iter().any(|e| e.uri == uri)
+    }
+
+    /// Number of dirty files.
+    pub fn dirty_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get all dirty file URIs, sorted.
+    pub fn dirty_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.entries.iter().map(|e| e.uri.as_str()).collect();
+        uris.sort_unstable();
+        uris
+    }
+
+    /// Get the entry for a specific URI.
+    pub fn get_entry(&self, uri: &str) -> Option<&DirtyFileEntry> {
+        self.entries.iter().find(|e| e.uri == uri)
+    }
+
+    /// Get files dirty for longer than `duration` time units.
+    pub fn dirty_longer_than(&self, current_time: u64, duration: u64) -> Vec<&str> {
+        self.entries.iter()
+            .filter(|e| current_time.saturating_sub(e.dirty_since) > duration)
+            .map(|e| e.uri.as_str())
+            .collect()
+    }
+
+    /// Mark all files as clean.
+    pub fn mark_all_clean(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return the oldest dirty file (by dirty_since timestamp).
+    pub fn oldest_dirty(&self) -> Option<&DirtyFileEntry> {
+        self.entries.iter().min_by_key(|e| e.dirty_since)
+    }
+}
+
+// ── Working Copy Diff Summary ──
+
+/// A provider-level summary of changes in a working copy.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProviderDiffSummary {
+    pub files_changed: usize,
+    pub insertions: usize,
+    pub deletions: usize,
+}
+
+impl fmt::Display for ProviderDiffSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} file(s) changed, {} insertion(s), {} deletion(s)",
+            self.files_changed, self.insertions, self.deletions
+        )
+    }
+}
+
+/// Builds diff summaries from provider data.
+pub struct WorkingCopyDiffSummary;
+
+impl WorkingCopyDiffSummary {
+    /// Compute a summary from an SCM provider by counting resources per status.
+    pub fn from_provider(provider: &ScmProvider) -> ProviderDiffSummary {
+        let mut summary = ProviderDiffSummary::default();
+        for group in &provider.groups {
+            for resource in &group.resources {
+                summary.files_changed += 1;
+                match resource.status {
+                    ScmStatus::Added | ScmStatus::Untracked => summary.insertions += 1,
+                    ScmStatus::Deleted => summary.deletions += 1,
+                    ScmStatus::Modified | ScmStatus::Renamed => {
+                        summary.insertions += 1;
+                        summary.deletions += 1;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        summary
+    }
+
+    /// Compute a summary from stats.
+    pub fn from_stats(stats: &ScmStats) -> ProviderDiffSummary {
+        ProviderDiffSummary {
+            files_changed: stats.total,
+            insertions: stats.added + stats.untracked,
+            deletions: stats.deleted,
+        }
+    }
+
+    /// Merge two summaries.
+    pub fn merge(a: &ProviderDiffSummary, b: &ProviderDiffSummary) -> ProviderDiffSummary {
+        ProviderDiffSummary {
+            files_changed: a.files_changed + b.files_changed,
+            insertions: a.insertions + b.insertions,
+            deletions: a.deletions + b.deletions,
+        }
+    }
+
+    /// Whether a summary represents a clean state.
+    pub fn is_clean(summary: &ProviderDiffSummary) -> bool {
+        summary.files_changed == 0
+    }
+
+    /// Format a one-line summary string.
+    pub fn one_line(summary: &ProviderDiffSummary) -> String {
+        if Self::is_clean(summary) {
+            "Working tree clean".to_string()
+        } else {
+            format!(
+                "{} changed, +{} -{}", 
+                summary.files_changed, summary.insertions, summary.deletions
+            )
+        }
+    }
+}
+
+// ── Working Copy Revert Handler ──
+
+/// Tracks which files should be reverted and their status.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RevertStatus {
+    Pending,
+    Reverted,
+    Failed(String),
+}
+
+/// Handler for reverting working copy changes.
+#[derive(Debug)]
+pub struct WorkingCopyRevertHandler {
+    items: Vec<(String, RevertStatus)>,
+}
+
+impl WorkingCopyRevertHandler {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Queue a URI for revert.
+    pub fn queue_revert(&mut self, uri: &str) {
+        if !self.items.iter().any(|(u, _)| u == uri) {
+            self.items.push((uri.to_string(), RevertStatus::Pending));
+        }
+    }
+
+    /// Queue all resources in a provider for revert.
+    pub fn queue_provider(&mut self, provider: &ScmProvider) {
+        for group in &provider.groups {
+            for resource in &group.resources {
+                self.queue_revert(&resource.uri);
+            }
+        }
+    }
+
+    /// Mark a URI as successfully reverted.
+    pub fn mark_reverted(&mut self, uri: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|(u, _)| u == uri) {
+            item.1 = RevertStatus::Reverted;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Mark a URI as failed.
+    pub fn mark_failed(&mut self, uri: &str, reason: &str) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|(u, _)| u == uri) {
+            item.1 = RevertStatus::Failed(reason.to_string());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Number of items queued.
+    pub fn queued_count(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Number of pending items.
+    pub fn pending_count(&self) -> usize {
+        self.items.iter().filter(|(_, s)| *s == RevertStatus::Pending).count()
+    }
+
+    /// Number of successfully reverted items.
+    pub fn reverted_count(&self) -> usize {
+        self.items.iter().filter(|(_, s)| *s == RevertStatus::Reverted).count()
+    }
+
+    /// Number of failed items.
+    pub fn failed_count(&self) -> usize {
+        self.items.iter().filter(|(_, s)| matches!(s, RevertStatus::Failed(_))).count()
+    }
+
+    /// Get all failed URIs with their error messages.
+    pub fn failed_items(&self) -> Vec<(&str, &str)> {
+        self.items.iter()
+            .filter_map(|(u, s)| match s {
+                RevertStatus::Failed(msg) => Some((u.as_str(), msg.as_str())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Whether all items have been processed (none pending).
+    pub fn is_complete(&self) -> bool {
+        self.items.iter().all(|(_, s)| *s != RevertStatus::Pending)
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2235,4 +2571,206 @@ mod tests {
         assert_eq!(cr.resolved_count(), 0);
         assert!(cr.resolved_uris().is_empty());
     }
+
+    // ── Conflict detector tests ──
+
+    fn provider_with_conflict() -> ScmProvider {
+        ScmProvider {
+            id: "git".into(),
+            label: "Git".into(),
+            root_uri: "/workspace".into(),
+            groups: vec![ScmGroup {
+                id: "changes".into(),
+                label: "Changes".into(),
+                resources: vec![
+                    ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None },
+                    ScmResource { uri: "b.rs".into(), status: ScmStatus::Conflict, original_uri: None },
+                    ScmResource { uri: "c.rs".into(), status: ScmStatus::Conflict, original_uri: None },
+                ],
+            }],
+            count: 3,
+        }
+    }
+
+    #[test]
+    fn conflict_detector_scan() {
+        let mut detector = WorkingCopyConflictDetector::new();
+        let provider = provider_with_conflict();
+        detector.scan_provider(&provider);
+        assert_eq!(detector.conflict_count(), 2);
+        assert!(detector.is_conflicted("b.rs"));
+        assert!(!detector.is_conflicted("a.rs"));
+    }
+
+    #[test]
+    fn conflict_detector_mark_resolved() {
+        let mut detector = WorkingCopyConflictDetector::new();
+        let provider = provider_with_conflict();
+        detector.scan_provider(&provider);
+        assert!(detector.mark_resolved("b.rs"));
+        assert!(!detector.is_conflicted("b.rs"));
+        assert_eq!(detector.conflict_count(), 1);
+    }
+
+    #[test]
+    fn conflict_detector_clear() {
+        let mut detector = WorkingCopyConflictDetector::new();
+        let provider = provider_with_conflict();
+        detector.scan_provider(&provider);
+        detector.clear();
+        assert!(!detector.has_conflicts());
+    }
+
+    // ── Dirty file tracker tests ──
+
+    #[test]
+    fn dirty_tracker_basic() {
+        let mut tracker = DirtyFileTracker::new();
+        tracker.mark_dirty("a.rs", 100);
+        tracker.mark_dirty("b.rs", 200);
+        assert_eq!(tracker.dirty_count(), 2);
+        assert!(tracker.is_dirty("a.rs"));
+        assert!(!tracker.is_dirty("c.rs"));
+    }
+
+    #[test]
+    fn dirty_tracker_mark_clean() {
+        let mut tracker = DirtyFileTracker::new();
+        tracker.mark_dirty("a.rs", 100);
+        assert!(tracker.mark_clean("a.rs"));
+        assert!(!tracker.is_dirty("a.rs"));
+        assert!(!tracker.mark_clean("nonexistent.rs"));
+    }
+
+    #[test]
+    fn dirty_tracker_update_timestamp() {
+        let mut tracker = DirtyFileTracker::new();
+        tracker.mark_dirty("a.rs", 100);
+        tracker.mark_dirty("a.rs", 200);
+        assert_eq!(tracker.dirty_count(), 1);
+        let entry = tracker.get_entry("a.rs").unwrap();
+        assert_eq!(entry.dirty_since, 100);
+        assert_eq!(entry.last_modified, 200);
+    }
+
+    #[test]
+    fn dirty_tracker_dirty_longer_than() {
+        let mut tracker = DirtyFileTracker::new();
+        tracker.mark_dirty("old.rs", 10);
+        tracker.mark_dirty("new.rs", 90);
+        let old_files = tracker.dirty_longer_than(100, 50);
+        assert_eq!(old_files.len(), 1);
+        assert_eq!(old_files[0], "old.rs");
+    }
+
+    #[test]
+    fn dirty_tracker_oldest() {
+        let mut tracker = DirtyFileTracker::new();
+        tracker.mark_dirty("b.rs", 200);
+        tracker.mark_dirty("a.rs", 100);
+        assert_eq!(tracker.oldest_dirty().unwrap().uri, "a.rs");
+    }
+
+    #[test]
+    fn dirty_tracker_mark_all_clean() {
+        let mut tracker = DirtyFileTracker::new();
+        tracker.mark_dirty("a.rs", 100);
+        tracker.mark_dirty("b.rs", 200);
+        tracker.mark_all_clean();
+        assert_eq!(tracker.dirty_count(), 0);
+    }
+
+    // ── Diff summary tests ──
+
+    #[test]
+    fn diff_summary_from_provider() {
+        let provider = ScmProvider {
+            id: "git".into(),
+            label: "Git".into(),
+            root_uri: "/ws".into(),
+            groups: vec![ScmGroup {
+                id: "changes".into(),
+                label: "Changes".into(),
+                resources: vec![
+                    ScmResource { uri: "a.rs".into(), status: ScmStatus::Added, original_uri: None },
+                    ScmResource { uri: "b.rs".into(), status: ScmStatus::Deleted, original_uri: None },
+                    ScmResource { uri: "c.rs".into(), status: ScmStatus::Modified, original_uri: None },
+                ],
+            }],
+            count: 3,
+        };
+        let summary = WorkingCopyDiffSummary::from_provider(&provider);
+        assert_eq!(summary.files_changed, 3);
+        assert_eq!(summary.insertions, 2); // added + modified
+        assert_eq!(summary.deletions, 2);  // deleted + modified
+    }
+
+    #[test]
+    fn diff_summary_merge() {
+        let a = ProviderDiffSummary { files_changed: 2, insertions: 3, deletions: 1 };
+        let b = ProviderDiffSummary { files_changed: 1, insertions: 1, deletions: 0 };
+        let merged = WorkingCopyDiffSummary::merge(&a, &b);
+        assert_eq!(merged.files_changed, 3);
+        assert_eq!(merged.insertions, 4);
+    }
+
+    #[test]
+    fn diff_summary_one_line_clean() {
+        let s = ProviderDiffSummary::default();
+        assert_eq!(WorkingCopyDiffSummary::one_line(&s), "Working tree clean");
+    }
+
+    #[test]
+    fn provider_diff_summary_display() {
+        let s = ProviderDiffSummary { files_changed: 2, insertions: 3, deletions: 1 };
+        let display = format!("{s}");
+        assert!(display.contains("2 file(s)"));
+    }
+
+    // ── Revert handler tests ──
+
+    #[test]
+    fn revert_handler_queue_and_process() {
+        let mut handler = WorkingCopyRevertHandler::new();
+        handler.queue_revert("a.rs");
+        handler.queue_revert("b.rs");
+        handler.queue_revert("a.rs"); // duplicate ignored
+        assert_eq!(handler.queued_count(), 2);
+        assert_eq!(handler.pending_count(), 2);
+
+        handler.mark_reverted("a.rs");
+        assert_eq!(handler.pending_count(), 1);
+        assert_eq!(handler.reverted_count(), 1);
+
+        handler.mark_failed("b.rs", "permission denied");
+        assert_eq!(handler.failed_count(), 1);
+        assert!(handler.is_complete());
+    }
+
+    #[test]
+    fn revert_handler_failed_items() {
+        let mut handler = WorkingCopyRevertHandler::new();
+        handler.queue_revert("x.rs");
+        handler.mark_failed("x.rs", "read only");
+        let failed = handler.failed_items();
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0], ("x.rs", "read only"));
+    }
+
+    #[test]
+    fn revert_handler_queue_provider() {
+        let mut handler = WorkingCopyRevertHandler::new();
+        let provider = provider_with_conflict();
+        handler.queue_provider(&provider);
+        assert_eq!(handler.queued_count(), 3);
+    }
+
+    #[test]
+    fn revert_handler_clear() {
+        let mut handler = WorkingCopyRevertHandler::new();
+        handler.queue_revert("a.rs");
+        handler.clear();
+        assert_eq!(handler.queued_count(), 0);
+    }
+
 }

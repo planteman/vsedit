@@ -1450,6 +1450,339 @@ impl WorkspaceRecentList {
 
 impl Default for WorkspaceRecentList { fn default() -> Self { Self::new(20) } }
 
+
+// === Workspace Recommendation Engine ===
+
+/// Workspace Recommendation Engine implementation.
+#[derive(Debug, Clone)]
+pub struct WorkspaceRecommendationEngine {
+    entries: Vec<String>,
+    index: HashMap<String, usize>,
+    enabled: bool,
+    capacity: usize,
+    stats: WorkspaceRecommendationEngineStats,
+}
+
+/// Statistics for WorkspaceRecommendationEngine.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceRecommendationEngineStats {
+    pub total_operations: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub last_operation_ms: u64,
+}
+
+impl WorkspaceRecommendationEngineStats {
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.cache_hits + self.cache_misses;
+        if total == 0 {
+            return 0.0;
+        }
+        self.cache_hits as f64 / total as f64
+    }
+
+    pub fn reset(&mut self) {
+        self.total_operations = 0;
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+        self.last_operation_ms = 0;
+    }
+}
+
+impl WorkspaceRecommendationEngine {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            index: HashMap::new(),
+            enabled: true,
+            capacity: 1024,
+            stats: WorkspaceRecommendationEngineStats::default(),
+        }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: impl Into<String>) -> bool {
+        let entry = entry.into();
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        if self.index.contains_key(&entry) {
+            self.stats.cache_hits += 1;
+            return false;
+        }
+        let idx = self.entries.len();
+        self.index.insert(entry.clone(), idx);
+        self.entries.push(entry);
+        self.stats.total_operations += 1;
+        self.stats.cache_misses += 1;
+        true
+    }
+
+    pub fn remove(&mut self, entry: &str) -> bool {
+        if let Some(idx) = self.index.remove(entry) {
+            self.entries.remove(idx);
+            // Rebuild index after removal
+            self.index.clear();
+            for (i, e) in self.entries.iter().enumerate() {
+                self.index.insert(e.clone(), i);
+            }
+            self.stats.total_operations += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, entry: &str) -> bool {
+        self.index.contains_key(entry)
+    }
+
+    pub fn get(&self, index: usize) -> Option<&str> {
+        self.entries.get(index).map(|s| s.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.index.clear();
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn stats(&self) -> &WorkspaceRecommendationEngineStats {
+        &self.stats
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        self.entries.iter()
+            .filter(|e| e.contains(query))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    pub fn sorted_entries(&self) -> Vec<&str> {
+        let mut sorted: Vec<&str> = self.entries.iter().map(|s| s.as_str()).collect();
+        sorted.sort();
+        sorted
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|s| s.as_str())
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.capacity.saturating_sub(self.entries.len())
+    }
+}
+
+impl Default for WorkspaceRecommendationEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// === Workspace Template Loader ===
+
+/// Priority level for WorkspaceTemplateLoader items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WorkspaceTemplateLoaderPriority {
+    Low,
+    Normal,
+    High,
+    Critical,
+}
+
+impl WorkspaceTemplateLoaderPriority {
+    pub fn as_weight(&self) -> u32 {
+        match self {
+            Self::Low => 1,
+            Self::Normal => 5,
+            Self::High => 10,
+            Self::Critical => 100,
+        }
+    }
+}
+
+impl fmt::Display for WorkspaceTemplateLoaderPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Normal => write!(f, "normal"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Workspace Template Loader implementation.
+#[derive(Debug, Clone)]
+pub struct WorkspaceTemplateLoader {
+    items: Vec<WorkspaceTemplateLoaderItem>,
+    max_items: usize,
+    default_priority: WorkspaceTemplateLoaderPriority,
+}
+
+/// A single item in WorkspaceTemplateLoader.
+#[derive(Debug, Clone)]
+pub struct WorkspaceTemplateLoaderItem {
+    pub id: String,
+    pub label: String,
+    pub priority: WorkspaceTemplateLoaderPriority,
+    pub timestamp: u64,
+    pub metadata: HashMap<String, String>,
+}
+
+impl WorkspaceTemplateLoaderItem {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            priority: WorkspaceTemplateLoaderPriority::Normal,
+            timestamp: 0,
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, priority: WorkspaceTemplateLoaderPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_timestamp(mut self, ts: u64) -> Self {
+        self.timestamp = ts;
+        self
+    }
+
+    pub fn set_meta(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.metadata.insert(key.into(), value.into());
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.get(key).map(|s| s.as_str())
+    }
+}
+
+impl WorkspaceTemplateLoader {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            max_items: 500,
+            default_priority: WorkspaceTemplateLoaderPriority::Normal,
+        }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self {
+        self.max_items = max;
+        self
+    }
+
+    pub fn add(&mut self, item: WorkspaceTemplateLoaderItem) -> bool {
+        if self.items.len() >= self.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove_by_id(&mut self, id: &str) -> Option<WorkspaceTemplateLoaderItem> {
+        if let Some(idx) = self.items.iter().position(|i| i.id == id) {
+            Some(self.items.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&WorkspaceTemplateLoaderItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    pub fn by_priority(&self, priority: WorkspaceTemplateLoaderPriority) -> Vec<&WorkspaceTemplateLoaderItem> {
+        self.items.iter().filter(|i| i.priority == priority).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&WorkspaceTemplateLoaderItem> {
+        let mut sorted: Vec<&WorkspaceTemplateLoaderItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn sorted_by_timestamp(&self) -> Vec<&WorkspaceTemplateLoaderItem> {
+        let mut sorted: Vec<&WorkspaceTemplateLoaderItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        sorted
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&WorkspaceTemplateLoaderItem> {
+        let q = query.to_lowercase();
+        self.items.iter()
+            .filter(|i| i.label.to_lowercase().contains(&q) || i.id.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn total_weight(&self) -> u32 {
+        self.items.iter().map(|i| i.priority.as_weight()).sum()
+    }
+
+    pub fn set_default_priority(&mut self, p: WorkspaceTemplateLoaderPriority) {
+        self.default_priority = p;
+    }
+
+    pub fn default_priority(&self) -> WorkspaceTemplateLoaderPriority {
+        self.default_priority
+    }
+
+    pub fn max_items(&self) -> usize {
+        self.max_items
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.max_items.saturating_sub(self.items.len())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &WorkspaceTemplateLoaderItem> {
+        self.items.iter()
+    }
+}
+
+impl Default for WorkspaceTemplateLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2361,6 +2694,153 @@ mod tests {
     fn recommendation_display() {
         let r = WorkspaceRecommendation::new("ext", "reason");
         assert!(format!("{r}").contains("ext"));
+    }
+
+
+    #[test]
+    fn workspaceRecommendationEngine_new() {
+        let s = WorkspaceRecommendationEngine::new();
+        assert!(s.is_empty());
+        assert_eq!(s.len(), 0);
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_add_contains() {
+        let mut s = WorkspaceRecommendationEngine::new();
+        assert!(s.add("item1"));
+        assert!(s.contains("item1"));
+        assert!(!s.contains("item2"));
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_add_duplicate() {
+        let mut s = WorkspaceRecommendationEngine::new();
+        assert!(s.add("dup"));
+        assert!(!s.add("dup"));
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_remove() {
+        let mut s = WorkspaceRecommendationEngine::new();
+        s.add("rem");
+        assert!(s.remove("rem"));
+        assert!(!s.contains("rem"));
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_capacity() {
+        let s = WorkspaceRecommendationEngine::new().with_capacity(5);
+        assert_eq!(s.capacity(), 5);
+        assert_eq!(s.remaining_capacity(), 5);
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_search() {
+        let mut s = WorkspaceRecommendationEngine::new();
+        s.add("hello_world");
+        s.add("hello_rust");
+        s.add("goodbye");
+        let results = s.search("hello");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_stats() {
+        let mut s = WorkspaceRecommendationEngine::new();
+        s.add("a");
+        s.add("a"); // duplicate = cache hit
+        assert_eq!(s.stats().cache_hits, 1);
+        assert_eq!(s.stats().cache_misses, 1);
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_new() {
+        let m = WorkspaceTemplateLoader::new();
+        assert!(m.is_empty());
+        assert_eq!(m.len(), 0);
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_add_find() {
+        let mut m = WorkspaceTemplateLoader::new();
+        m.add(WorkspaceTemplateLoaderItem::new("id1", "Label 1"));
+        assert!(m.find_by_id("id1").is_some());
+        assert!(m.find_by_id("id2").is_none());
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_priority_filter() {
+        let mut m = WorkspaceTemplateLoader::new();
+        m.add(WorkspaceTemplateLoaderItem::new("a", "A").with_priority(WorkspaceTemplateLoaderPriority::High));
+        m.add(WorkspaceTemplateLoaderItem::new("b", "B").with_priority(WorkspaceTemplateLoaderPriority::Low));
+        m.add(WorkspaceTemplateLoaderItem::new("c", "C").with_priority(WorkspaceTemplateLoaderPriority::High));
+        assert_eq!(m.by_priority(WorkspaceTemplateLoaderPriority::High).len(), 2);
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_remove() {
+        let mut m = WorkspaceTemplateLoader::new();
+        m.add(WorkspaceTemplateLoaderItem::new("r1", "Remove me"));
+        assert!(m.remove_by_id("r1").is_some());
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_search() {
+        let mut m = WorkspaceTemplateLoader::new();
+        m.add(WorkspaceTemplateLoaderItem::new("id1", "Hello World"));
+        m.add(WorkspaceTemplateLoaderItem::new("id2", "Goodbye"));
+        let results = m.search("hello");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_total_weight() {
+        let mut m = WorkspaceTemplateLoader::new();
+        m.add(WorkspaceTemplateLoaderItem::new("a", "A").with_priority(WorkspaceTemplateLoaderPriority::Critical));
+        m.add(WorkspaceTemplateLoaderItem::new("b", "B").with_priority(WorkspaceTemplateLoaderPriority::Low));
+        assert_eq!(m.total_weight(), 101);
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_capacity_limit() {
+        let mut m = WorkspaceTemplateLoader::new().with_max_items(2);
+        m.add(WorkspaceTemplateLoaderItem::new("1", "one"));
+        m.add(WorkspaceTemplateLoaderItem::new("2", "two"));
+        assert!(!m.add(WorkspaceTemplateLoaderItem::new("3", "three")));
+        assert_eq!(m.len(), 2);
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_sorted_by_priority() {
+        let mut m = WorkspaceTemplateLoader::new();
+        m.add(WorkspaceTemplateLoaderItem::new("lo", "Low").with_priority(WorkspaceTemplateLoaderPriority::Low));
+        m.add(WorkspaceTemplateLoaderItem::new("hi", "High").with_priority(WorkspaceTemplateLoaderPriority::Critical));
+        let sorted = m.sorted_by_priority();
+        assert_eq!(sorted[0].id, "hi");
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_item_metadata() {
+        let mut item = WorkspaceTemplateLoaderItem::new("m1", "Meta");
+        item.set_meta("key", "value");
+        assert_eq!(item.get_meta("key"), Some("value"));
+        assert_eq!(item.get_meta("missing"), None);
+    }
+
+    #[test]
+    fn workspaceRecommendationEngine_enabled_toggle() {
+        let mut s = WorkspaceRecommendationEngine::new();
+        assert!(s.is_enabled());
+        s.set_enabled(false);
+        assert!(!s.is_enabled());
+    }
+
+    #[test]
+    fn workspaceTemplateLoader_priority_display() {
+        assert_eq!(format!("{}", WorkspaceTemplateLoaderPriority::High), "high");
+        assert_eq!(format!("{}", WorkspaceTemplateLoaderPriority::Low), "low");
     }
 
 }

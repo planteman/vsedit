@@ -1362,6 +1362,419 @@ impl<T> fmt::Debug for EventRouter<T> {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// EventPriorityQueue — priority-based event delivery
+// ---------------------------------------------------------------------------
+
+/// Priority levels for event listeners.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EventPriority {
+    /// Lowest priority — runs last.
+    Low,
+    /// Default priority.
+    Normal,
+    /// Higher priority — runs before normal.
+    High,
+    /// Highest priority — runs first.
+    Critical,
+}
+
+impl EventPriority {
+    /// Numeric weight (higher = more important).
+    pub fn weight(&self) -> u32 {
+        match self {
+            Self::Low => 0,
+            Self::Normal => 10,
+            Self::High => 20,
+            Self::Critical => 30,
+        }
+    }
+
+    /// Parse from a string label (case-insensitive).
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "low" => Some(Self::Low),
+            "normal" => Some(Self::Normal),
+            "high" => Some(Self::High),
+            "critical" => Some(Self::Critical),
+            _ => None,
+        }
+    }
+}
+
+impl Default for EventPriority {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+impl fmt::Display for EventPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Critical => "critical",
+        };
+        f.write_str(label)
+    }
+}
+
+/// A prioritised event entry waiting to be delivered.
+#[derive(Debug, Clone)]
+pub struct PriorityEntry<T> {
+    pub value: T,
+    pub priority: EventPriority,
+    sequence: u64,
+}
+
+/// A queue that orders events by priority before delivery.
+pub struct EventPriorityQueue<T> {
+    entries: Vec<PriorityEntry<T>>,
+    next_seq: u64,
+}
+
+impl<T: Clone + fmt::Debug> EventPriorityQueue<T> {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_seq: 0,
+        }
+    }
+
+    /// Enqueue an event with a given priority.
+    pub fn push(&mut self, value: T, priority: EventPriority) {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        self.entries.push(PriorityEntry { value, priority, sequence: seq });
+    }
+
+    /// Number of queued events.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Sort entries by descending priority, then ascending sequence.
+    fn sort(&mut self) {
+        self.entries.sort_by(|a, b| {
+            b.priority.weight().cmp(&a.priority.weight())
+                .then_with(|| a.sequence.cmp(&b.sequence))
+        });
+    }
+
+    /// Drain all entries in priority order.
+    pub fn drain_sorted(&mut self) -> Vec<PriorityEntry<T>> {
+        self.sort();
+        self.entries.drain(..).collect()
+    }
+
+    /// Peek at the highest-priority entry without removing it.
+    pub fn peek(&mut self) -> Option<&PriorityEntry<T>> {
+        self.sort();
+        self.entries.first()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Count entries at a specific priority level.
+    pub fn count_at_priority(&self, priority: EventPriority) -> usize {
+        self.entries.iter().filter(|e| e.priority == priority).count()
+    }
+}
+
+impl<T: Clone + fmt::Debug> Default for EventPriorityQueue<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Clone + fmt::Debug> fmt::Debug for EventPriorityQueue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventPriorityQueue")
+            .field("len", &self.entries.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventReplaySession — record and replay events for debugging
+// ---------------------------------------------------------------------------
+
+/// A recorded event with metadata.
+#[derive(Debug, Clone)]
+pub struct RecordedEvent<T> {
+    pub value: T,
+    pub sequence: u64,
+    pub label: String,
+}
+
+/// Records events and allows replaying them through an emitter.
+pub struct EventReplaySession<T> {
+    events: Vec<RecordedEvent<T>>,
+    next_seq: u64,
+}
+
+impl<T: Clone + Send + Sync + 'static> EventReplaySession<T> {
+    pub fn new() -> Self {
+        Self {
+            events: Vec::new(),
+            next_seq: 0,
+        }
+    }
+
+    /// Record an event with a label.
+    pub fn record(&mut self, value: T, label: impl Into<String>) {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        self.events.push(RecordedEvent {
+            value,
+            sequence: seq,
+            label: label.into(),
+        });
+    }
+
+    /// Number of recorded events.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Whether no events have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Get a reference to all recorded events.
+    pub fn events(&self) -> &[RecordedEvent<T>] {
+        &self.events
+    }
+
+    /// Replay all recorded events through the given emitter.
+    pub fn replay(&self, emitter: &Emitter<T>) {
+        for event in &self.events {
+            emitter.fire(&event.value);
+        }
+    }
+
+    /// Replay events from index `start` (inclusive) to `end` (exclusive).
+    pub fn replay_range(&self, emitter: &Emitter<T>, start: usize, end: usize) {
+        let end = end.min(self.events.len());
+        for event in &self.events[start..end] {
+            emitter.fire(&event.value);
+        }
+    }
+
+    /// Clear all recorded events.
+    pub fn clear(&mut self) {
+        self.events.clear();
+        self.next_seq = 0;
+    }
+
+    /// Get events matching a label prefix.
+    pub fn events_with_prefix(&self, prefix: &str) -> Vec<&RecordedEvent<T>> {
+        self.events.iter().filter(|e| e.label.starts_with(prefix)).collect()
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> Default for EventReplaySession<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> fmt::Debug for EventReplaySession<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventReplaySession")
+            .field("events", &self.events.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventBatchAggregator — aggregate multiple events into batches
+// ---------------------------------------------------------------------------
+
+/// Collects events and flushes them as a batch.
+pub struct EventBatchAggregator<T> {
+    buffer: Vec<T>,
+    max_size: usize,
+}
+
+impl<T: Clone + Send + Sync + 'static> EventBatchAggregator<T> {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            buffer: Vec::new(),
+            max_size: if max_size == 0 { 1 } else { max_size },
+        }
+    }
+
+    /// Add an event to the batch buffer.
+    /// Returns `true` if the batch is now full and should be flushed.
+    pub fn add(&mut self, value: T) -> bool {
+        self.buffer.push(value);
+        self.buffer.len() >= self.max_size
+    }
+
+    /// Whether the buffer is full.
+    pub fn is_full(&self) -> bool {
+        self.buffer.len() >= self.max_size
+    }
+
+    /// Current number of buffered events.
+    pub fn buffered_count(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Drain the buffer, returning all buffered events.
+    pub fn flush(&mut self) -> Vec<T> {
+        self.buffer.drain(..).collect()
+    }
+
+    /// Flush and fire all buffered events through an emitter.
+    pub fn flush_to_emitter(&mut self, emitter: &Emitter<T>) {
+        let events = self.flush();
+        for event in &events {
+            emitter.fire(event);
+        }
+    }
+
+    /// Clear the buffer without returning events.
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
+    /// The configured maximum batch size.
+    pub fn max_size(&self) -> usize {
+        self.max_size
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> Default for EventBatchAggregator<T> {
+    fn default() -> Self {
+        Self::new(10)
+    }
+}
+
+impl<T> fmt::Debug for EventBatchAggregator<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventBatchAggregator")
+            .field("buffered", &self.buffer.len())
+            .field("max_size", &self.max_size)
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventThrottleWindow — rate-limit event delivery
+// ---------------------------------------------------------------------------
+
+/// Tracks event delivery rate within a time window.
+/// Uses a simple counter-based approach (time-independent for testability).
+#[derive(Debug, Clone)]
+pub struct EventThrottleWindow {
+    /// Maximum events allowed in the window.
+    max_events: usize,
+    /// Events delivered in the current window.
+    current_count: usize,
+    /// Total events that were throttled (dropped).
+    throttled_total: u64,
+    /// Total events that were allowed.
+    allowed_total: u64,
+}
+
+impl EventThrottleWindow {
+    pub fn new(max_events: usize) -> Self {
+        Self {
+            max_events: if max_events == 0 { 1 } else { max_events },
+            current_count: 0,
+            throttled_total: 0,
+            allowed_total: 0,
+        }
+    }
+
+    /// Try to allow an event. Returns `true` if the event should proceed,
+    /// `false` if it should be throttled.
+    pub fn try_allow(&mut self) -> bool {
+        if self.current_count < self.max_events {
+            self.current_count += 1;
+            self.allowed_total += 1;
+            true
+        } else {
+            self.throttled_total += 1;
+            false
+        }
+    }
+
+    /// Reset the window counter (call this at the start of each time window).
+    pub fn reset_window(&mut self) {
+        self.current_count = 0;
+    }
+
+    /// Current count in this window.
+    pub fn current_count(&self) -> usize {
+        self.current_count
+    }
+
+    /// Total events throttled across all windows.
+    pub fn throttled_total(&self) -> u64 {
+        self.throttled_total
+    }
+
+    /// Total events allowed across all windows.
+    pub fn allowed_total(&self) -> u64 {
+        self.allowed_total
+    }
+
+    /// Whether the window is currently full.
+    pub fn is_throttled(&self) -> bool {
+        self.current_count >= self.max_events
+    }
+
+    /// Remaining capacity in the current window.
+    pub fn remaining(&self) -> usize {
+        self.max_events.saturating_sub(self.current_count)
+    }
+
+    /// The throttle rate as a percentage (0.0 – 100.0).
+    pub fn throttle_rate(&self) -> f64 {
+        let total = self.allowed_total + self.throttled_total;
+        if total == 0 {
+            return 0.0;
+        }
+        (self.throttled_total as f64 / total as f64) * 100.0
+    }
+
+    /// The configured maximum events per window.
+    pub fn max_events(&self) -> usize {
+        self.max_events
+    }
+}
+
+impl Default for EventThrottleWindow {
+    fn default() -> Self {
+        Self::new(100)
+    }
+}
+
+impl fmt::Display for EventThrottleWindow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "throttle({}/{}, allowed={}, throttled={})",
+            self.current_count, self.max_events,
+            self.allowed_total, self.throttled_total,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2222,4 +2635,277 @@ mod tests {
             vec!["pos:5".to_string(), "small:5".to_string()]
         );
     }
+
+    // --- EventPriority tests ------------------------------------------------
+
+    #[test]
+    fn priority_ordering() {
+        assert!(EventPriority::Low < EventPriority::Normal);
+        assert!(EventPriority::Normal < EventPriority::High);
+        assert!(EventPriority::High < EventPriority::Critical);
+    }
+
+    #[test]
+    fn priority_from_label() {
+        assert_eq!(EventPriority::from_label("high"), Some(EventPriority::High));
+        assert_eq!(EventPriority::from_label("LOW"), Some(EventPriority::Low));
+        assert_eq!(EventPriority::from_label("unknown"), None);
+    }
+
+    #[test]
+    fn priority_display() {
+        assert_eq!(EventPriority::Normal.to_string(), "normal");
+        assert_eq!(EventPriority::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn priority_default() {
+        assert_eq!(EventPriority::default(), EventPriority::Normal);
+    }
+
+    // --- EventPriorityQueue tests -------------------------------------------
+
+    #[test]
+    fn priority_queue_basic() {
+        let mut q = EventPriorityQueue::<i32>::new();
+        q.push(1, EventPriority::Low);
+        q.push(2, EventPriority::Critical);
+        q.push(3, EventPriority::Normal);
+        assert_eq!(q.len(), 3);
+        let drained = q.drain_sorted();
+        assert_eq!(drained[0].value, 2); // critical first
+        assert_eq!(drained[1].value, 3); // normal second
+        assert_eq!(drained[2].value, 1); // low last
+    }
+
+    #[test]
+    fn priority_queue_empty() {
+        let q = EventPriorityQueue::<String>::new();
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_peek() {
+        let mut q = EventPriorityQueue::<i32>::new();
+        q.push(10, EventPriority::Normal);
+        q.push(20, EventPriority::High);
+        let peeked = q.peek().unwrap();
+        assert_eq!(peeked.value, 20);
+        assert_eq!(q.len(), 2); // peek doesn't remove
+    }
+
+    #[test]
+    fn priority_queue_count_at_priority() {
+        let mut q = EventPriorityQueue::<i32>::new();
+        q.push(1, EventPriority::High);
+        q.push(2, EventPriority::High);
+        q.push(3, EventPriority::Low);
+        assert_eq!(q.count_at_priority(EventPriority::High), 2);
+        assert_eq!(q.count_at_priority(EventPriority::Low), 1);
+        assert_eq!(q.count_at_priority(EventPriority::Normal), 0);
+    }
+
+    #[test]
+    fn priority_queue_clear() {
+        let mut q = EventPriorityQueue::<i32>::new();
+        q.push(1, EventPriority::Normal);
+        q.clear();
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_fifo_within_same_priority() {
+        let mut q = EventPriorityQueue::<&str>::new();
+        q.push("first", EventPriority::Normal);
+        q.push("second", EventPriority::Normal);
+        q.push("third", EventPriority::Normal);
+        let drained = q.drain_sorted();
+        assert_eq!(drained[0].value, "first");
+        assert_eq!(drained[1].value, "second");
+        assert_eq!(drained[2].value, "third");
+    }
+
+    // --- EventReplaySession tests -------------------------------------------
+
+    #[test]
+    fn replay_session_record() {
+        let mut session = EventReplaySession::<i32>::new();
+        session.record(42, "first");
+        session.record(99, "second");
+        assert_eq!(session.len(), 2);
+        assert!(!session.is_empty());
+    }
+
+    #[test]
+    fn replay_session_replay() {
+        let mut session = EventReplaySession::<i32>::new();
+        session.record(1, "a");
+        session.record(2, "b");
+
+        let emitter = Emitter::new();
+        let event = emitter.event();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = event.on(move |v: &i32| { r.lock().unwrap().push(*v); });
+
+        session.replay(&emitter);
+        assert_eq!(*received.lock().unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn replay_session_replay_range() {
+        let mut session = EventReplaySession::<i32>::new();
+        for i in 0..5 {
+            session.record(i, format!("e{i}"));
+        }
+
+        let emitter = Emitter::new();
+        let event = emitter.event();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = event.on(move |v: &i32| { r.lock().unwrap().push(*v); });
+
+        session.replay_range(&emitter, 1, 3);
+        assert_eq!(*received.lock().unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn replay_session_events_with_prefix() {
+        let mut session = EventReplaySession::<i32>::new();
+        session.record(1, "mouse.click");
+        session.record(2, "key.press");
+        session.record(3, "mouse.move");
+        let mouse = session.events_with_prefix("mouse");
+        assert_eq!(mouse.len(), 2);
+    }
+
+    #[test]
+    fn replay_session_clear() {
+        let mut session = EventReplaySession::<i32>::new();
+        session.record(1, "x");
+        session.clear();
+        assert!(session.is_empty());
+    }
+
+    // --- EventBatchAggregator tests -----------------------------------------
+
+    #[test]
+    fn batch_aggregator_add() {
+        let mut agg = EventBatchAggregator::<i32>::new(3);
+        assert!(!agg.add(1));
+        assert!(!agg.add(2));
+        assert!(agg.add(3)); // full
+        assert!(agg.is_full());
+    }
+
+    #[test]
+    fn batch_aggregator_flush() {
+        let mut agg = EventBatchAggregator::<i32>::new(10);
+        agg.add(1);
+        agg.add(2);
+        let batch = agg.flush();
+        assert_eq!(batch, vec![1, 2]);
+        assert_eq!(agg.buffered_count(), 0);
+    }
+
+    #[test]
+    fn batch_aggregator_flush_to_emitter() {
+        let mut agg = EventBatchAggregator::<i32>::new(10);
+        agg.add(10);
+        agg.add(20);
+
+        let emitter = Emitter::new();
+        let event = emitter.event();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = event.on(move |v: &i32| { r.lock().unwrap().push(*v); });
+
+        agg.flush_to_emitter(&emitter);
+        assert_eq!(*received.lock().unwrap(), vec![10, 20]);
+        assert_eq!(agg.buffered_count(), 0);
+    }
+
+    #[test]
+    fn batch_aggregator_clear() {
+        let mut agg = EventBatchAggregator::<i32>::new(5);
+        agg.add(1);
+        agg.clear();
+        assert_eq!(agg.buffered_count(), 0);
+    }
+
+    #[test]
+    fn batch_aggregator_max_size() {
+        let agg = EventBatchAggregator::<i32>::new(7);
+        assert_eq!(agg.max_size(), 7);
+    }
+
+    // --- EventThrottleWindow tests ------------------------------------------
+
+    #[test]
+    fn throttle_window_basic() {
+        let mut tw = EventThrottleWindow::new(3);
+        assert!(tw.try_allow());
+        assert!(tw.try_allow());
+        assert!(tw.try_allow());
+        assert!(!tw.try_allow()); // throttled
+        assert!(tw.is_throttled());
+    }
+
+    #[test]
+    fn throttle_window_reset() {
+        let mut tw = EventThrottleWindow::new(2);
+        tw.try_allow();
+        tw.try_allow();
+        tw.try_allow(); // throttled
+        tw.reset_window();
+        assert!(!tw.is_throttled());
+        assert!(tw.try_allow());
+    }
+
+    #[test]
+    fn throttle_window_remaining() {
+        let mut tw = EventThrottleWindow::new(5);
+        tw.try_allow();
+        assert_eq!(tw.remaining(), 4);
+    }
+
+    #[test]
+    fn throttle_window_stats() {
+        let mut tw = EventThrottleWindow::new(2);
+        tw.try_allow();
+        tw.try_allow();
+        tw.try_allow(); // throttled
+        assert_eq!(tw.allowed_total(), 2);
+        assert_eq!(tw.throttled_total(), 1);
+    }
+
+    #[test]
+    fn throttle_window_rate() {
+        let mut tw = EventThrottleWindow::new(1);
+        tw.try_allow();  // allowed
+        tw.try_allow();  // throttled
+        tw.try_allow();  // throttled
+        // 1 allowed, 2 throttled => 66.67%
+        assert!(tw.throttle_rate() > 60.0);
+    }
+
+    #[test]
+    fn throttle_window_empty_rate() {
+        let tw = EventThrottleWindow::new(10);
+        assert!((tw.throttle_rate() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn throttle_window_display() {
+        let tw = EventThrottleWindow::new(100);
+        let s = tw.to_string();
+        assert!(s.contains("0/100"));
+    }
+
+    #[test]
+    fn throttle_window_default() {
+        let tw = EventThrottleWindow::default();
+        assert_eq!(tw.max_events(), 100);
+    }
+
 }

@@ -1284,6 +1284,383 @@ impl StatusBarItemToggle {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StatusBarAnimationTick – animate status bar elements
+// ---------------------------------------------------------------------------
+
+/// Frame data for a status bar animation (e.g. a spinner).
+#[derive(Debug, Clone)]
+pub struct StatusBarAnimationTick {
+    frames: Vec<String>,
+    current_frame: usize,
+    interval_ms: u64,
+    elapsed_ms: u64,
+    running: bool,
+}
+
+impl StatusBarAnimationTick {
+    pub fn new(frames: Vec<String>, interval_ms: u64) -> Self {
+        Self {
+            frames,
+            current_frame: 0,
+            interval_ms,
+            elapsed_ms: 0,
+            running: false,
+        }
+    }
+
+    /// Create a spinner animation with default frames.
+    pub fn spinner(interval_ms: u64) -> Self {
+        Self::new(
+            vec![
+                "⠋".into(), "⠙".into(), "⠹".into(), "⠸".into(),
+                "⠼".into(), "⠴".into(), "⠦".into(), "⠧".into(),
+                "⠇".into(), "⠏".into(),
+            ],
+            interval_ms,
+        )
+    }
+
+    /// Create a dots animation.
+    pub fn dots(interval_ms: u64) -> Self {
+        Self::new(
+            vec![".".into(), "..".into(), "...".into(), "".into()],
+            interval_ms,
+        )
+    }
+
+    pub fn start(&mut self) {
+        self.running = true;
+        self.elapsed_ms = 0;
+        self.current_frame = 0;
+    }
+
+    pub fn stop(&mut self) {
+        self.running = false;
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.running
+    }
+
+    /// Advance the animation by `delta_ms` milliseconds. Returns true if the frame changed.
+    pub fn tick(&mut self, delta_ms: u64) -> bool {
+        if !self.running || self.frames.is_empty() {
+            return false;
+        }
+        self.elapsed_ms += delta_ms;
+        if self.elapsed_ms >= self.interval_ms {
+            self.elapsed_ms -= self.interval_ms;
+            self.current_frame = (self.current_frame + 1) % self.frames.len();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the current frame string.
+    pub fn current_frame_str(&self) -> &str {
+        if self.frames.is_empty() {
+            return "";
+        }
+        &self.frames[self.current_frame]
+    }
+
+    pub fn frame_count(&self) -> usize {
+        self.frames.len()
+    }
+
+    pub fn current_index(&self) -> usize {
+        self.current_frame
+    }
+
+    pub fn reset(&mut self) {
+        self.current_frame = 0;
+        self.elapsed_ms = 0;
+    }
+
+    pub fn interval_ms(&self) -> u64 {
+        self.interval_ms
+    }
+
+    pub fn set_interval_ms(&mut self, ms: u64) {
+        self.interval_ms = ms;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarSeparatorRenderer – render separators between items
+// ---------------------------------------------------------------------------
+
+/// Style of separator between status bar items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeparatorStyle {
+    Pipe,
+    Dot,
+    Dash,
+    Space,
+    Custom(char),
+}
+
+impl SeparatorStyle {
+    pub fn as_str(&self) -> String {
+        match self {
+            Self::Pipe => " | ".to_string(),
+            Self::Dot => " · ".to_string(),
+            Self::Dash => " - ".to_string(),
+            Self::Space => "  ".to_string(),
+            Self::Custom(c) => format!(" {c} "),
+        }
+    }
+}
+
+impl fmt::Display for SeparatorStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Renders separators between status bar items.
+#[derive(Debug, Clone)]
+pub struct StatusBarSeparatorRenderer {
+    left_style: SeparatorStyle,
+    right_style: SeparatorStyle,
+}
+
+impl StatusBarSeparatorRenderer {
+    pub fn new(style: SeparatorStyle) -> Self {
+        Self {
+            left_style: style,
+            right_style: style,
+        }
+    }
+
+    pub fn with_different_sides(left: SeparatorStyle, right: SeparatorStyle) -> Self {
+        Self {
+            left_style: left,
+            right_style: right,
+        }
+    }
+
+    pub fn left_style(&self) -> SeparatorStyle {
+        self.left_style
+    }
+
+    pub fn right_style(&self) -> SeparatorStyle {
+        self.right_style
+    }
+
+    /// Join a list of entry texts with the appropriate separator for the given alignment.
+    pub fn join_texts(&self, texts: &[&str], alignment: StatusBarAlignment) -> String {
+        let sep = match alignment {
+            StatusBarAlignment::Left => self.left_style.as_str(),
+            StatusBarAlignment::Right => self.right_style.as_str(),
+        };
+        texts.join(&sep)
+    }
+
+    /// Render left and right sides into a full status bar string with a given total width.
+    pub fn render_bar(&self, left_items: &[&str], right_items: &[&str], total_width: usize) -> String {
+        let left = self.join_texts(left_items, StatusBarAlignment::Left);
+        let right = self.join_texts(right_items, StatusBarAlignment::Right);
+        let padding = total_width.saturating_sub(left.len() + right.len());
+        format!("{}{}{}", left, " ".repeat(padding), right)
+    }
+}
+
+impl Default for StatusBarSeparatorRenderer {
+    fn default() -> Self {
+        Self::new(SeparatorStyle::Pipe)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarItemPriority – manage item ordering by priority
+// ---------------------------------------------------------------------------
+
+/// A priority-sortable wrapper around a status bar entry ID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarItemPriority {
+    pub entry_id: String,
+    pub priority: i32,
+    pub alignment: StatusBarAlignment,
+}
+
+/// Manages priority ordering for status bar entries.
+#[derive(Debug)]
+pub struct StatusBarPriorityManager {
+    items: Vec<StatusBarItemPriority>,
+}
+
+impl StatusBarPriorityManager {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn register(&mut self, entry_id: impl Into<String>, priority: i32, alignment: StatusBarAlignment) {
+        let id = entry_id.into();
+        if let Some(existing) = self.items.iter_mut().find(|i| i.entry_id == id) {
+            existing.priority = priority;
+            existing.alignment = alignment;
+        } else {
+            self.items.push(StatusBarItemPriority {
+                entry_id: id,
+                priority,
+                alignment,
+            });
+        }
+    }
+
+    pub fn unregister(&mut self, entry_id: &str) -> bool {
+        let before = self.items.len();
+        self.items.retain(|i| i.entry_id != entry_id);
+        self.items.len() < before
+    }
+
+    /// Get ordered entry IDs for one side, sorted by descending priority.
+    pub fn ordered_ids(&self, alignment: StatusBarAlignment) -> Vec<&str> {
+        let mut side: Vec<&StatusBarItemPriority> = self
+            .items
+            .iter()
+            .filter(|i| i.alignment == alignment)
+            .collect();
+        side.sort_by(|a, b| b.priority.cmp(&a.priority));
+        side.iter().map(|i| i.entry_id.as_str()).collect()
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn get_priority(&self, entry_id: &str) -> Option<i32> {
+        self.items.iter().find(|i| i.entry_id == entry_id).map(|i| i.priority)
+    }
+
+    pub fn set_priority(&mut self, entry_id: &str, priority: i32) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|i| i.entry_id == entry_id) {
+            item.priority = priority;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Find the highest-priority item on a given side.
+    pub fn highest_priority(&self, alignment: StatusBarAlignment) -> Option<&StatusBarItemPriority> {
+        self.items
+            .iter()
+            .filter(|i| i.alignment == alignment)
+            .max_by_key(|i| i.priority)
+    }
+}
+
+impl Default for StatusBarPriorityManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarBackgroundColorManager – manage item background colors
+// ---------------------------------------------------------------------------
+
+/// Manages background colors for status bar regions.
+#[derive(Debug, Clone)]
+pub struct StatusBarBackgroundColorManager {
+    default_color: String,
+    overrides: Vec<(String, String)>,
+    error_color: String,
+    warning_color: String,
+}
+
+impl StatusBarBackgroundColorManager {
+    pub fn new(default_color: impl Into<String>) -> Self {
+        Self {
+            default_color: default_color.into(),
+            overrides: Vec::new(),
+            error_color: "#e51400".to_string(),
+            warning_color: "#c8a000".to_string(),
+        }
+    }
+
+    pub fn default_color(&self) -> &str {
+        &self.default_color
+    }
+
+    pub fn set_default_color(&mut self, color: impl Into<String>) {
+        self.default_color = color.into();
+    }
+
+    pub fn error_color(&self) -> &str {
+        &self.error_color
+    }
+
+    pub fn set_error_color(&mut self, color: impl Into<String>) {
+        self.error_color = color.into();
+    }
+
+    pub fn warning_color(&self) -> &str {
+        &self.warning_color
+    }
+
+    pub fn set_warning_color(&mut self, color: impl Into<String>) {
+        self.warning_color = color.into();
+    }
+
+    /// Set an override color for a specific entry.
+    pub fn set_override(&mut self, entry_id: impl Into<String>, color: impl Into<String>) {
+        let id = entry_id.into();
+        let color = color.into();
+        if let Some(existing) = self.overrides.iter_mut().find(|(eid, _)| *eid == id) {
+            existing.1 = color;
+        } else {
+            self.overrides.push((id, color));
+        }
+    }
+
+    /// Remove an override for a specific entry.
+    pub fn remove_override(&mut self, entry_id: &str) -> bool {
+        let before = self.overrides.len();
+        self.overrides.retain(|(eid, _)| eid != entry_id);
+        self.overrides.len() < before
+    }
+
+    /// Resolve the background color for an entry, checking overrides first.
+    pub fn resolve_color(&self, entry_id: &str) -> &str {
+        self.overrides
+            .iter()
+            .find(|(eid, _)| eid == entry_id)
+            .map(|(_, c)| c.as_str())
+            .unwrap_or(&self.default_color)
+    }
+
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Clear all overrides.
+    pub fn clear_overrides(&mut self) {
+        self.overrides.clear();
+    }
+
+    /// Resolve a color based on whether there are errors or warnings.
+    pub fn resolve_status_color(&self, has_errors: bool, has_warnings: bool) -> &str {
+        if has_errors {
+            &self.error_color
+        } else if has_warnings {
+            &self.warning_color
+        } else {
+            &self.default_color
+        }
+    }
+}
+
+impl Default for StatusBarBackgroundColorManager {
+    fn default() -> Self {
+        Self::new("#007acc")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2244,4 +2621,179 @@ mod tests {
         assert!(toggle.is_visible());
         assert_eq!(toggle.toggle_count, 0);
     }
+    #[test]
+    fn animation_tick_basic() {
+        let mut anim = StatusBarAnimationTick::spinner(100);
+        assert_eq!(anim.frame_count(), 10);
+        assert!(!anim.is_running());
+        anim.start();
+        assert!(anim.is_running());
+        assert_eq!(anim.current_frame_str(), "⠋");
+        assert!(!anim.tick(50));
+        assert!(anim.tick(60));
+        assert_eq!(anim.current_index(), 1);
+    }
+
+    #[test]
+    fn animation_tick_wrap_around() {
+        let mut anim = StatusBarAnimationTick::dots(10);
+        anim.start();
+        for _ in 0..4 {
+            anim.tick(10);
+        }
+        assert_eq!(anim.current_index(), 0);
+    }
+
+    #[test]
+    fn animation_tick_stop_reset() {
+        let mut anim = StatusBarAnimationTick::spinner(50);
+        anim.start();
+        anim.tick(50);
+        assert_eq!(anim.current_index(), 1);
+        anim.stop();
+        assert!(!anim.is_running());
+        assert!(!anim.tick(100));
+        anim.reset();
+        assert_eq!(anim.current_index(), 0);
+    }
+
+    #[test]
+    fn animation_set_interval() {
+        let mut anim = StatusBarAnimationTick::spinner(100);
+        assert_eq!(anim.interval_ms(), 100);
+        anim.set_interval_ms(200);
+        assert_eq!(anim.interval_ms(), 200);
+    }
+
+    #[test]
+    fn separator_style_as_str() {
+        assert_eq!(SeparatorStyle::Pipe.as_str(), " | ");
+        assert_eq!(SeparatorStyle::Dot.as_str(), " · ");
+        assert_eq!(SeparatorStyle::Dash.as_str(), " - ");
+        assert_eq!(SeparatorStyle::Space.as_str(), "  ");
+        assert_eq!(SeparatorStyle::Custom('•').as_str(), " • ");
+    }
+
+    #[test]
+    fn separator_renderer_join() {
+        let renderer = StatusBarSeparatorRenderer::new(SeparatorStyle::Pipe);
+        let result = renderer.join_texts(&["git", "main"], StatusBarAlignment::Left);
+        assert_eq!(result, "git | main");
+    }
+
+    #[test]
+    fn separator_renderer_different_sides() {
+        let renderer = StatusBarSeparatorRenderer::with_different_sides(
+            SeparatorStyle::Pipe,
+            SeparatorStyle::Dot,
+        );
+        assert_eq!(renderer.left_style(), SeparatorStyle::Pipe);
+        assert_eq!(renderer.right_style(), SeparatorStyle::Dot);
+    }
+
+    #[test]
+    fn separator_renderer_full_bar() {
+        let renderer = StatusBarSeparatorRenderer::default();
+        let bar = renderer.render_bar(&["git"], &["Ln 1"], 40);
+        assert_eq!(bar.len(), 40);
+        assert!(bar.starts_with("git"));
+        assert!(bar.ends_with("Ln 1"));
+    }
+
+    #[test]
+    fn priority_manager_register_order() {
+        let mut mgr = StatusBarPriorityManager::new();
+        mgr.register("git", 100, StatusBarAlignment::Left);
+        mgr.register("encoding", 50, StatusBarAlignment::Right);
+        mgr.register("lang", 200, StatusBarAlignment::Left);
+        let left_order = mgr.ordered_ids(StatusBarAlignment::Left);
+        assert_eq!(left_order, vec!["lang", "git"]);
+    }
+
+    #[test]
+    fn priority_manager_unregister() {
+        let mut mgr = StatusBarPriorityManager::new();
+        mgr.register("a", 10, StatusBarAlignment::Left);
+        assert!(mgr.unregister("a"));
+        assert!(!mgr.unregister("a"));
+        assert_eq!(mgr.item_count(), 0);
+    }
+
+    #[test]
+    fn priority_manager_update_existing() {
+        let mut mgr = StatusBarPriorityManager::new();
+        mgr.register("x", 10, StatusBarAlignment::Left);
+        mgr.register("x", 99, StatusBarAlignment::Right);
+        assert_eq!(mgr.item_count(), 1);
+        assert_eq!(mgr.get_priority("x"), Some(99));
+    }
+
+    #[test]
+    fn priority_manager_set_priority() {
+        let mut mgr = StatusBarPriorityManager::new();
+        mgr.register("a", 10, StatusBarAlignment::Left);
+        assert!(mgr.set_priority("a", 50));
+        assert_eq!(mgr.get_priority("a"), Some(50));
+        assert!(!mgr.set_priority("none", 0));
+    }
+
+    #[test]
+    fn priority_manager_highest() {
+        let mut mgr = StatusBarPriorityManager::new();
+        mgr.register("a", 10, StatusBarAlignment::Left);
+        mgr.register("b", 100, StatusBarAlignment::Left);
+        mgr.register("c", 50, StatusBarAlignment::Left);
+        let h = mgr.highest_priority(StatusBarAlignment::Left).unwrap();
+        assert_eq!(h.entry_id, "b");
+        assert!(mgr.highest_priority(StatusBarAlignment::Right).is_none());
+    }
+
+    #[test]
+    fn bg_color_manager_defaults() {
+        let mgr = StatusBarBackgroundColorManager::default();
+        assert_eq!(mgr.default_color(), "#007acc");
+        assert_eq!(mgr.error_color(), "#e51400");
+        assert_eq!(mgr.warning_color(), "#c8a000");
+    }
+
+    #[test]
+    fn bg_color_manager_overrides() {
+        let mut mgr = StatusBarBackgroundColorManager::new("#000");
+        mgr.set_override("git", "#ff0000");
+        assert_eq!(mgr.resolve_color("git"), "#ff0000");
+        assert_eq!(mgr.resolve_color("other"), "#000");
+        assert_eq!(mgr.override_count(), 1);
+        assert!(mgr.remove_override("git"));
+        assert_eq!(mgr.resolve_color("git"), "#000");
+    }
+
+    #[test]
+    fn bg_color_manager_status_color() {
+        let mgr = StatusBarBackgroundColorManager::default();
+        assert_eq!(mgr.resolve_status_color(true, false), "#e51400");
+        assert_eq!(mgr.resolve_status_color(false, true), "#c8a000");
+        assert_eq!(mgr.resolve_status_color(false, false), "#007acc");
+        assert_eq!(mgr.resolve_status_color(true, true), "#e51400");
+    }
+
+    #[test]
+    fn bg_color_manager_set_colors() {
+        let mut mgr = StatusBarBackgroundColorManager::new("#000");
+        mgr.set_default_color("#111");
+        mgr.set_error_color("#222");
+        mgr.set_warning_color("#333");
+        assert_eq!(mgr.default_color(), "#111");
+        assert_eq!(mgr.error_color(), "#222");
+        assert_eq!(mgr.warning_color(), "#333");
+    }
+
+    #[test]
+    fn bg_color_manager_clear_overrides() {
+        let mut mgr = StatusBarBackgroundColorManager::new("#000");
+        mgr.set_override("a", "#aaa");
+        mgr.set_override("b", "#bbb");
+        mgr.clear_overrides();
+        assert_eq!(mgr.override_count(), 0);
+    }
+
 }

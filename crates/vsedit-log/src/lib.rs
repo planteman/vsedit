@@ -1402,6 +1402,212 @@ pub fn all_data_keys(entries: &[LogEntry]) -> Vec<String> {
     keys
 }
 
+// ---------------------------------------------------------------------------
+// LogOutputRotator – rotates log files by size/count
+// ---------------------------------------------------------------------------
+
+/// Policy describing when and how to rotate log files.
+#[derive(Debug, Clone)]
+pub struct RotationPolicy {
+    /// Maximum size in bytes before rotation is triggered.
+    pub max_bytes: u64,
+    /// Maximum number of rotated files to keep.
+    pub max_files: usize,
+    /// Suffix pattern for rotated files (e.g. ".1", ".2", …).
+    pub suffix_style: RotationSuffixStyle,
+}
+
+/// How rotated file names are generated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RotationSuffixStyle {
+    /// Numeric suffix: log.1, log.2, …
+    Numeric,
+    /// Timestamp-based suffix.
+    Timestamp,
+}
+
+impl RotationPolicy {
+    pub fn new(max_bytes: u64, max_files: usize) -> Self {
+        Self {
+            max_bytes,
+            max_files,
+            suffix_style: RotationSuffixStyle::Numeric,
+        }
+    }
+
+    pub fn with_suffix_style(mut self, style: RotationSuffixStyle) -> Self {
+        self.suffix_style = style;
+        self
+    }
+}
+
+/// Manages log file rotation logic (does not touch the filesystem directly).
+#[derive(Debug)]
+pub struct LogOutputRotator {
+    policy: RotationPolicy,
+    current_size: u64,
+    rotation_count: usize,
+    history: Vec<RotationRecord>,
+}
+
+/// Record of a single rotation event.
+#[derive(Debug, Clone)]
+pub struct RotationRecord {
+    pub old_name: String,
+    pub new_name: String,
+    pub rotated_at_bytes: u64,
+    pub sequence: usize,
+}
+
+impl LogOutputRotator {
+    pub fn new(policy: RotationPolicy) -> Self {
+        Self {
+            policy,
+            current_size: 0,
+            rotation_count: 0,
+            history: Vec::new(),
+        }
+    }
+
+    /// Record that `bytes` were written.  Returns `true` if rotation is needed.
+    pub fn record_write(&mut self, bytes: u64) -> bool {
+        self.current_size += bytes;
+        self.needs_rotation()
+    }
+
+    /// Whether the current file has exceeded the size limit.
+    pub fn needs_rotation(&self) -> bool {
+        self.current_size >= self.policy.max_bytes
+    }
+
+    /// Perform a rotation (logically): resets size counter, bumps sequence,
+    /// and returns the name of the rotated file.
+    pub fn rotate(&mut self, base_name: &str) -> Option<String> {
+        if !self.needs_rotation() {
+            return None;
+        }
+        self.rotation_count += 1;
+        let new_name = match self.policy.suffix_style {
+            RotationSuffixStyle::Numeric => format!("{base_name}.{}", self.rotation_count),
+            RotationSuffixStyle::Timestamp => format!("{base_name}.ts{}", self.rotation_count),
+        };
+        self.history.push(RotationRecord {
+            old_name: base_name.to_string(),
+            new_name: new_name.clone(),
+            rotated_at_bytes: self.current_size,
+            sequence: self.rotation_count,
+        });
+        self.current_size = 0;
+        Some(new_name)
+    }
+
+    /// Names of files that should be pruned (oldest first) to stay within `max_files`.
+    pub fn files_to_prune(&self) -> Vec<String> {
+        if self.history.len() <= self.policy.max_files {
+            return Vec::new();
+        }
+        let excess = self.history.len() - self.policy.max_files;
+        self.history[..excess].iter().map(|r| r.new_name.clone()).collect()
+    }
+
+    pub fn rotation_count(&self) -> usize { self.rotation_count }
+    pub fn current_size(&self) -> u64 { self.current_size }
+    pub fn policy(&self) -> &RotationPolicy { &self.policy }
+    pub fn history(&self) -> &[RotationRecord] { &self.history }
+}
+
+// ---------------------------------------------------------------------------
+// LogLevelRuntimeAdjuster – adjusts log levels at runtime
+// ---------------------------------------------------------------------------
+
+/// Tracks per-channel runtime log level overrides.
+#[derive(Debug)]
+pub struct LogLevelRuntimeAdjuster {
+    global_level: LogLevel,
+    channel_overrides: HashMap<String, LogLevel>,
+    change_log: Vec<LevelChangeRecord>,
+}
+
+/// Record of a log level change.
+#[derive(Debug, Clone)]
+pub struct LevelChangeRecord {
+    pub channel: Option<String>,
+    pub old_level: LogLevel,
+    pub new_level: LogLevel,
+    pub timestamp: u64,
+}
+
+impl LogLevelRuntimeAdjuster {
+    pub fn new(global_level: LogLevel) -> Self {
+        Self {
+            global_level,
+            channel_overrides: HashMap::new(),
+            change_log: Vec::new(),
+        }
+    }
+
+    /// Set the global log level, recording the change.
+    pub fn set_global(&mut self, level: LogLevel, timestamp: u64) {
+        let old = self.global_level;
+        self.global_level = level;
+        self.change_log.push(LevelChangeRecord {
+            channel: None,
+            old_level: old,
+            new_level: level,
+            timestamp,
+        });
+    }
+
+    /// Set a channel-specific override.
+    pub fn set_channel(&mut self, channel: impl Into<String>, level: LogLevel, timestamp: u64) {
+        let channel = channel.into();
+        let old = self.effective_level(&channel);
+        self.change_log.push(LevelChangeRecord {
+            channel: Some(channel.clone()),
+            old_level: old,
+            new_level: level,
+            timestamp,
+        });
+        self.channel_overrides.insert(channel, level);
+    }
+
+    /// Remove a channel override so it falls back to global.
+    pub fn clear_channel(&mut self, channel: &str) {
+        self.channel_overrides.remove(channel);
+    }
+
+    /// Effective level for a channel (override or global).
+    pub fn effective_level(&self, channel: &str) -> LogLevel {
+        self.channel_overrides
+            .get(channel)
+            .copied()
+            .unwrap_or(self.global_level)
+    }
+
+    /// Whether a message at `level` on `channel` should be logged.
+    pub fn should_log(&self, channel: &str, level: LogLevel) -> bool {
+        if level == LogLevel::Off {
+            return false;
+        }
+        let effective = self.effective_level(channel);
+        if effective == LogLevel::Off {
+            return false;
+        }
+        level >= effective
+    }
+
+    pub fn global_level(&self) -> LogLevel { self.global_level }
+    pub fn overrides(&self) -> &HashMap<String, LogLevel> { &self.channel_overrides }
+    pub fn change_count(&self) -> usize { self.change_log.len() }
+    pub fn changes(&self) -> &[LevelChangeRecord] { &self.change_log }
+
+    /// Reset all channel overrides.
+    pub fn reset_all_overrides(&mut self) {
+        self.channel_overrides.clear();
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2329,4 +2535,123 @@ mod tests {
         let keys = all_data_keys(&entries);
         assert_eq!(keys, vec!["method", "path", "status"]);
     }
+
+    #[test]
+    fn rotation_policy_new() {
+        let p = RotationPolicy::new(1024, 5);
+        assert_eq!(p.max_bytes, 1024);
+        assert_eq!(p.max_files, 5);
+        assert_eq!(p.suffix_style, RotationSuffixStyle::Numeric);
+    }
+
+    #[test]
+    fn rotator_record_write_no_rotation() {
+        let mut r = LogOutputRotator::new(RotationPolicy::new(100, 3));
+        assert!(!r.record_write(50));
+        assert_eq!(r.current_size(), 50);
+    }
+
+    #[test]
+    fn rotator_needs_rotation() {
+        let mut r = LogOutputRotator::new(RotationPolicy::new(100, 3));
+        r.record_write(101);
+        assert!(r.needs_rotation());
+    }
+
+    #[test]
+    fn rotator_rotate() {
+        let mut r = LogOutputRotator::new(RotationPolicy::new(100, 3));
+        r.record_write(150);
+        let name = r.rotate("app.log");
+        assert_eq!(name, Some("app.log.1".to_string()));
+        assert_eq!(r.current_size(), 0);
+        assert_eq!(r.rotation_count(), 1);
+    }
+
+    #[test]
+    fn rotator_rotate_not_needed() {
+        let mut r = LogOutputRotator::new(RotationPolicy::new(100, 3));
+        r.record_write(50);
+        assert!(r.rotate("app.log").is_none());
+    }
+
+    #[test]
+    fn rotator_timestamp_suffix() {
+        let policy = RotationPolicy::new(10, 5).with_suffix_style(RotationSuffixStyle::Timestamp);
+        let mut r = LogOutputRotator::new(policy);
+        r.record_write(20);
+        let name = r.rotate("out.log").unwrap();
+        assert!(name.starts_with("out.log.ts"));
+    }
+
+    #[test]
+    fn rotator_files_to_prune() {
+        let mut r = LogOutputRotator::new(RotationPolicy::new(10, 2));
+        for _ in 0..4 {
+            r.record_write(20);
+            r.rotate("x.log");
+        }
+        let prune = r.files_to_prune();
+        assert_eq!(prune.len(), 2);
+        assert_eq!(prune[0], "x.log.1");
+    }
+
+    #[test]
+    fn rotator_history() {
+        let mut r = LogOutputRotator::new(RotationPolicy::new(10, 5));
+        r.record_write(15);
+        r.rotate("a.log");
+        assert_eq!(r.history().len(), 1);
+        assert_eq!(r.history()[0].sequence, 1);
+    }
+
+    #[test]
+    fn adjuster_global_level() {
+        let mut adj = LogLevelRuntimeAdjuster::new(LogLevel::Info);
+        assert_eq!(adj.global_level(), LogLevel::Info);
+        adj.set_global(LogLevel::Debug, 100);
+        assert_eq!(adj.global_level(), LogLevel::Debug);
+        assert_eq!(adj.change_count(), 1);
+    }
+
+    #[test]
+    fn adjuster_channel_override() {
+        let mut adj = LogLevelRuntimeAdjuster::new(LogLevel::Warning);
+        adj.set_channel("net", LogLevel::Trace, 1);
+        assert_eq!(adj.effective_level("net"), LogLevel::Trace);
+        assert_eq!(adj.effective_level("other"), LogLevel::Warning);
+    }
+
+    #[test]
+    fn adjuster_should_log() {
+        let mut adj = LogLevelRuntimeAdjuster::new(LogLevel::Warning);
+        assert!(adj.should_log("ch", LogLevel::Error));
+        assert!(!adj.should_log("ch", LogLevel::Debug));
+        adj.set_channel("ch", LogLevel::Debug, 1);
+        assert!(adj.should_log("ch", LogLevel::Debug));
+    }
+
+    #[test]
+    fn adjuster_clear_channel() {
+        let mut adj = LogLevelRuntimeAdjuster::new(LogLevel::Info);
+        adj.set_channel("x", LogLevel::Trace, 1);
+        adj.clear_channel("x");
+        assert_eq!(adj.effective_level("x"), LogLevel::Info);
+    }
+
+    #[test]
+    fn adjuster_reset_all() {
+        let mut adj = LogLevelRuntimeAdjuster::new(LogLevel::Info);
+        adj.set_channel("a", LogLevel::Trace, 1);
+        adj.set_channel("b", LogLevel::Error, 2);
+        adj.reset_all_overrides();
+        assert!(adj.overrides().is_empty());
+    }
+
+    #[test]
+    fn adjuster_off_never_logs() {
+        let adj = LogLevelRuntimeAdjuster::new(LogLevel::Trace);
+        assert!(!adj.should_log("ch", LogLevel::Off));
+    }
+
 }

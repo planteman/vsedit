@@ -1423,6 +1423,383 @@ impl FileMetadataCache {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FileBatchNotifier – group rapid file change events
+// ---------------------------------------------------------------------------
+
+/// Accumulates file change events and groups rapid changes into batches.
+#[derive(Debug)]
+pub struct FileBatchNotifier {
+    pending: Vec<FileChangeEvent>,
+    batch_window_ms: u64,
+    last_event_ms: Option<u64>,
+    max_batch_size: usize,
+}
+
+impl FileBatchNotifier {
+    pub fn new(batch_window_ms: u64, max_batch_size: usize) -> Self {
+        Self {
+            pending: Vec::new(),
+            batch_window_ms,
+            last_event_ms: None,
+            max_batch_size,
+        }
+    }
+
+    /// Add a file change event with the current timestamp in milliseconds.
+    pub fn add_event(&mut self, event: FileChangeEvent, timestamp_ms: u64) {
+        self.last_event_ms = Some(timestamp_ms);
+        // Coalesce: if same URI and same type already pending, skip.
+        let dominated = self.pending.iter().any(|e| {
+            e.uri == event.uri && e.change_type == event.change_type
+        });
+        if !dominated {
+            self.pending.push(event);
+        }
+        // Force flush if we hit max batch size.
+        if self.pending.len() >= self.max_batch_size {
+            // Caller should drain via `flush`.
+        }
+    }
+
+    /// Check if the batch window has elapsed and a flush is due.
+    pub fn should_flush(&self, current_ms: u64) -> bool {
+        if self.pending.is_empty() {
+            return false;
+        }
+        if self.pending.len() >= self.max_batch_size {
+            return true;
+        }
+        match self.last_event_ms {
+            Some(last) => current_ms.saturating_sub(last) >= self.batch_window_ms,
+            None => false,
+        }
+    }
+
+    /// Flush and return all pending events.
+    pub fn flush(&mut self) -> Vec<FileChangeEvent> {
+        self.last_event_ms = None;
+        std::mem::take(&mut self.pending)
+    }
+
+    /// Number of pending events.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// True if no events are pending.
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    pub fn batch_window_ms(&self) -> u64 {
+        self.batch_window_ms
+    }
+
+    pub fn set_batch_window_ms(&mut self, ms: u64) {
+        self.batch_window_ms = ms;
+    }
+
+    /// Peek at pending events without draining.
+    pub fn peek(&self) -> &[FileChangeEvent] {
+        &self.pending
+    }
+
+    /// Count pending events by change type.
+    pub fn count_by_type(&self, change_type: FileChangeType) -> usize {
+        self.pending.iter().filter(|e| e.change_type == change_type).count()
+    }
+
+    /// Get all unique URIs in the pending batch.
+    pub fn unique_uris(&self) -> Vec<&VsUri> {
+        let mut uris: Vec<&VsUri> = self.pending.iter().map(|e| &e.uri).collect();
+        uris.dedup_by(|a, b| a.path == b.path && a.scheme == b.scheme);
+        uris
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileEncodingGuesser – guess file encoding from content bytes
+// ---------------------------------------------------------------------------
+
+/// Detected file encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetectedEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Ascii,
+    Latin1,
+    Unknown,
+}
+
+impl fmt::Display for DetectedEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Utf8 => write!(f, "UTF-8"),
+            Self::Utf8Bom => write!(f, "UTF-8 with BOM"),
+            Self::Utf16Le => write!(f, "UTF-16 LE"),
+            Self::Utf16Be => write!(f, "UTF-16 BE"),
+            Self::Ascii => write!(f, "ASCII"),
+            Self::Latin1 => write!(f, "ISO-8859-1"),
+            Self::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+/// Guesses file encoding by examining leading bytes.
+pub struct FileEncodingGuesser;
+
+impl FileEncodingGuesser {
+    /// Guess the encoding from raw bytes.
+    pub fn guess(data: &[u8]) -> DetectedEncoding {
+        if data.is_empty() {
+            return DetectedEncoding::Ascii;
+        }
+        // Check BOM
+        if data.len() >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+            return DetectedEncoding::Utf8Bom;
+        }
+        if data.len() >= 2 && data[0] == 0xFF && data[1] == 0xFE {
+            return DetectedEncoding::Utf16Le;
+        }
+        if data.len() >= 2 && data[0] == 0xFE && data[1] == 0xFF {
+            return DetectedEncoding::Utf16Be;
+        }
+        // Check if valid UTF-8
+        if std::str::from_utf8(data).is_ok() {
+            // Check if it's pure ASCII
+            if data.iter().all(|&b| b < 128) {
+                return DetectedEncoding::Ascii;
+            }
+            return DetectedEncoding::Utf8;
+        }
+        // Check if it might be Latin-1 (all bytes valid)
+        if data.iter().all(|&b| b != 0) {
+            return DetectedEncoding::Latin1;
+        }
+        DetectedEncoding::Unknown
+    }
+
+    /// Guess encoding and return a human-readable label.
+    pub fn guess_label(data: &[u8]) -> String {
+        Self::guess(data).to_string()
+    }
+
+    /// Check if the data is likely binary (contains null bytes).
+    pub fn is_likely_binary(data: &[u8]) -> bool {
+        let check_len = data.len().min(8192);
+        data[..check_len].iter().any(|&b| b == 0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileSizeFormatter – human-readable file sizes
+// ---------------------------------------------------------------------------
+
+/// Formats file sizes into human-readable strings.
+pub struct FileSizeFormatter;
+
+impl FileSizeFormatter {
+    /// Format bytes as a human-readable size string.
+    pub fn format(bytes: u64) -> String {
+        if bytes < 1024 {
+            return format!("{} B", bytes);
+        }
+        let units = ["KB", "MB", "GB", "TB"];
+        let mut size = bytes as f64 / 1024.0;
+        for unit in &units {
+            if size < 1024.0 {
+                return if size < 10.0 {
+                    format!("{:.1} {}", size, unit)
+                } else {
+                    format!("{:.0} {}", size, unit)
+                };
+            }
+            size /= 1024.0;
+        }
+        format!("{:.0} PB", size)
+    }
+
+    /// Format with explicit precision.
+    pub fn format_with_precision(bytes: u64, precision: usize) -> String {
+        if bytes < 1024 {
+            return format!("{} B", bytes);
+        }
+        let units = ["KB", "MB", "GB", "TB"];
+        let mut size = bytes as f64 / 1024.0;
+        for unit in &units {
+            if size < 1024.0 {
+                return format!("{:.prec$} {}", size, unit, prec = precision);
+            }
+            size /= 1024.0;
+        }
+        format!("{:.prec$} PB", size, prec = precision)
+    }
+
+    /// Return the appropriate unit for a given byte count.
+    pub fn unit_for(bytes: u64) -> &'static str {
+        if bytes < 1024 { return "B"; }
+        if bytes < 1024 * 1024 { return "KB"; }
+        if bytes < 1024 * 1024 * 1024 { return "MB"; }
+        if bytes < 1024u64 * 1024 * 1024 * 1024 { return "GB"; }
+        "TB"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileModifiedIndicator – track file modification state
+// ---------------------------------------------------------------------------
+
+/// Tracks the modification state of a file.
+#[derive(Debug, Clone)]
+pub struct FileModifiedIndicator {
+    uri: VsUri,
+    original_hash: u64,
+    current_hash: u64,
+    save_count: u32,
+}
+
+impl FileModifiedIndicator {
+    pub fn new(uri: VsUri, initial_hash: u64) -> Self {
+        Self {
+            uri,
+            original_hash: initial_hash,
+            current_hash: initial_hash,
+            save_count: 0,
+        }
+    }
+
+    /// Simple hash function for content bytes.
+    pub fn hash_content(content: &[u8]) -> u64 {
+        let mut h: u64 = 5381;
+        for &b in content {
+            h = h.wrapping_mul(33).wrapping_add(b as u64);
+        }
+        h
+    }
+
+    /// Update the current content hash.
+    pub fn update_hash(&mut self, content: &[u8]) {
+        self.current_hash = Self::hash_content(content);
+    }
+
+    /// Returns true if the file is modified (differs from original).
+    pub fn is_modified(&self) -> bool {
+        self.current_hash != self.original_hash
+    }
+
+    /// Mark the current state as saved (original = current).
+    pub fn mark_saved(&mut self) {
+        self.original_hash = self.current_hash;
+        self.save_count += 1;
+    }
+
+    /// Revert to the original hash.
+    pub fn revert(&mut self) {
+        self.current_hash = self.original_hash;
+    }
+
+    pub fn uri(&self) -> &VsUri {
+        &self.uri
+    }
+
+    pub fn save_count(&self) -> u32 {
+        self.save_count
+    }
+
+    /// Get a display indicator string: "●" if modified, empty otherwise.
+    pub fn indicator_char(&self) -> &'static str {
+        if self.is_modified() { "●" } else { "" }
+    }
+
+    /// Format a title with modification indicator.
+    pub fn format_title(&self, filename: &str) -> String {
+        if self.is_modified() {
+            format!("● {}", filename)
+        } else {
+            filename.to_string()
+        }
+    }
+}
+
+/// Manager that tracks modification state for multiple files.
+#[derive(Debug)]
+pub struct FileModifiedTracker {
+    indicators: HashMap<String, FileModifiedIndicator>,
+}
+
+impl FileModifiedTracker {
+    pub fn new() -> Self {
+        Self {
+            indicators: HashMap::new(),
+        }
+    }
+
+    /// Register a file for tracking.
+    pub fn register(&mut self, uri: VsUri, content: &[u8]) {
+        let hash = FileModifiedIndicator::hash_content(content);
+        let key = uri.to_string();
+        self.indicators.insert(key, FileModifiedIndicator::new(uri, hash));
+    }
+
+    /// Update a file's content hash.
+    pub fn update(&mut self, uri_str: &str, content: &[u8]) -> bool {
+        if let Some(ind) = self.indicators.get_mut(uri_str) {
+            ind.update_hash(content);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if a file is modified.
+    pub fn is_modified(&self, uri_str: &str) -> bool {
+        self.indicators.get(uri_str).map_or(false, |i| i.is_modified())
+    }
+
+    /// Mark a file as saved.
+    pub fn mark_saved(&mut self, uri_str: &str) -> bool {
+        if let Some(ind) = self.indicators.get_mut(uri_str) {
+            ind.mark_saved();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get all modified file URIs.
+    pub fn modified_files(&self) -> Vec<&str> {
+        self.indicators
+            .iter()
+            .filter(|(_, ind)| ind.is_modified())
+            .map(|(key, _)| key.as_str())
+            .collect()
+    }
+
+    /// Total number of tracked files.
+    pub fn tracked_count(&self) -> usize {
+        self.indicators.len()
+    }
+
+    /// Number of modified files.
+    pub fn modified_count(&self) -> usize {
+        self.indicators.values().filter(|i| i.is_modified()).count()
+    }
+
+    /// Remove a tracked file.
+    pub fn unregister(&mut self, uri_str: &str) -> bool {
+        self.indicators.remove(uri_str).is_some()
+    }
+}
+
+impl Default for FileModifiedTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2247,4 +2624,219 @@ mod tests {
         // Missing entry is always stale
         assert!(cache.is_stale("missing.rs", 1000, 1000));
     }
+    #[test]
+    fn batch_notifier_basic() {
+        let mut notifier = FileBatchNotifier::new(100, 50);
+        assert!(notifier.is_empty());
+        let uri = VsUri::file("/test.rs");
+        notifier.add_event(FileChangeEvent { uri, change_type: FileChangeType::Changed }, 10);
+        assert_eq!(notifier.pending_count(), 1);
+        assert!(!notifier.should_flush(50));
+        assert!(notifier.should_flush(120));
+    }
+
+    #[test]
+    fn batch_notifier_coalesce() {
+        let mut notifier = FileBatchNotifier::new(100, 50);
+        let uri = VsUri::file("/test.rs");
+        notifier.add_event(FileChangeEvent { uri: uri.clone(), change_type: FileChangeType::Changed }, 10);
+        notifier.add_event(FileChangeEvent { uri: uri.clone(), change_type: FileChangeType::Changed }, 20);
+        assert_eq!(notifier.pending_count(), 1);
+    }
+
+    #[test]
+    fn batch_notifier_flush() {
+        let mut notifier = FileBatchNotifier::new(100, 50);
+        let uri = VsUri::file("/a.rs");
+        notifier.add_event(FileChangeEvent { uri, change_type: FileChangeType::Created }, 10);
+        let events = notifier.flush();
+        assert_eq!(events.len(), 1);
+        assert!(notifier.is_empty());
+    }
+
+    #[test]
+    fn batch_notifier_max_batch_size() {
+        let mut notifier = FileBatchNotifier::new(1000, 3);
+        for i in 0..4 {
+            let uri = VsUri::file(&format!("/file{i}.rs"));
+            notifier.add_event(FileChangeEvent { uri, change_type: FileChangeType::Changed }, 10);
+        }
+        assert!(notifier.should_flush(10));
+    }
+
+    #[test]
+    fn batch_notifier_count_by_type() {
+        let mut notifier = FileBatchNotifier::new(100, 50);
+        notifier.add_event(FileChangeEvent { uri: VsUri::file("/a"), change_type: FileChangeType::Created }, 10);
+        notifier.add_event(FileChangeEvent { uri: VsUri::file("/b"), change_type: FileChangeType::Changed }, 20);
+        notifier.add_event(FileChangeEvent { uri: VsUri::file("/c"), change_type: FileChangeType::Created }, 30);
+        assert_eq!(notifier.count_by_type(FileChangeType::Created), 2);
+        assert_eq!(notifier.count_by_type(FileChangeType::Changed), 1);
+    }
+
+    #[test]
+    fn batch_notifier_set_window() {
+        let mut notifier = FileBatchNotifier::new(100, 50);
+        assert_eq!(notifier.batch_window_ms(), 100);
+        notifier.set_batch_window_ms(200);
+        assert_eq!(notifier.batch_window_ms(), 200);
+    }
+
+    #[test]
+    fn encoding_guesser_utf8() {
+        assert_eq!(FileEncodingGuesser::guess(b"hello world"), DetectedEncoding::Ascii);
+        assert_eq!(FileEncodingGuesser::guess("héllo".as_bytes()), DetectedEncoding::Utf8);
+    }
+
+    #[test]
+    fn encoding_guesser_bom() {
+        assert_eq!(FileEncodingGuesser::guess(&[0xEF, 0xBB, 0xBF, b'h']), DetectedEncoding::Utf8Bom);
+        assert_eq!(FileEncodingGuesser::guess(&[0xFF, 0xFE, 0, 0]), DetectedEncoding::Utf16Le);
+        assert_eq!(FileEncodingGuesser::guess(&[0xFE, 0xFF, 0, 0]), DetectedEncoding::Utf16Be);
+    }
+
+    #[test]
+    fn encoding_guesser_empty() {
+        assert_eq!(FileEncodingGuesser::guess(b""), DetectedEncoding::Ascii);
+    }
+
+    #[test]
+    fn encoding_guesser_label() {
+        assert_eq!(FileEncodingGuesser::guess_label(b"hello"), "ASCII");
+    }
+
+    #[test]
+    fn encoding_guesser_binary() {
+        assert!(FileEncodingGuesser::is_likely_binary(&[0, 1, 2, 3]));
+        assert!(!FileEncodingGuesser::is_likely_binary(b"text"));
+    }
+
+    #[test]
+    fn file_size_formatter_bytes() {
+        assert_eq!(FileSizeFormatter::format(0), "0 B");
+        assert_eq!(FileSizeFormatter::format(512), "512 B");
+        assert_eq!(FileSizeFormatter::format(1023), "1023 B");
+    }
+
+    #[test]
+    fn file_size_formatter_kb() {
+        assert_eq!(FileSizeFormatter::format(1024), "1.0 KB");
+        assert_eq!(FileSizeFormatter::format(1536), "1.5 KB");
+        assert_eq!(FileSizeFormatter::format(10240), "10 KB");
+    }
+
+    #[test]
+    fn file_size_formatter_mb_gb() {
+        assert_eq!(FileSizeFormatter::format(1024 * 1024), "1.0 MB");
+        assert_eq!(FileSizeFormatter::format(1024 * 1024 * 1024), "1.0 GB");
+    }
+
+    #[test]
+    fn file_size_formatter_precision() {
+        assert_eq!(FileSizeFormatter::format_with_precision(1536, 2), "1.50 KB");
+        assert_eq!(FileSizeFormatter::format_with_precision(100, 2), "100 B");
+    }
+
+    #[test]
+    fn file_size_formatter_unit() {
+        assert_eq!(FileSizeFormatter::unit_for(100), "B");
+        assert_eq!(FileSizeFormatter::unit_for(2048), "KB");
+        assert_eq!(FileSizeFormatter::unit_for(2 * 1024 * 1024), "MB");
+    }
+
+    #[test]
+    fn file_modified_indicator_basic() {
+        let uri = VsUri::file("/test.rs");
+        let content = b"hello world";
+        let hash = FileModifiedIndicator::hash_content(content);
+        let mut ind = FileModifiedIndicator::new(uri, hash);
+        assert!(!ind.is_modified());
+        assert_eq!(ind.indicator_char(), "");
+
+        ind.update_hash(b"changed");
+        assert!(ind.is_modified());
+        assert_eq!(ind.indicator_char(), "●");
+    }
+
+    #[test]
+    fn file_modified_indicator_save_revert() {
+        let uri = VsUri::file("/test.rs");
+        let mut ind = FileModifiedIndicator::new(uri, 100);
+        ind.current_hash = 200;
+        assert!(ind.is_modified());
+        ind.mark_saved();
+        assert!(!ind.is_modified());
+        assert_eq!(ind.save_count(), 1);
+
+        ind.current_hash = 300;
+        assert!(ind.is_modified());
+        ind.revert();
+        assert!(!ind.is_modified());
+    }
+
+    #[test]
+    fn file_modified_indicator_title() {
+        let uri = VsUri::file("/test.rs");
+        let mut ind = FileModifiedIndicator::new(uri, 100);
+        assert_eq!(ind.format_title("test.rs"), "test.rs");
+        ind.current_hash = 200;
+        assert_eq!(ind.format_title("test.rs"), "● test.rs");
+    }
+
+    #[test]
+    fn file_modified_tracker_basic() {
+        let mut tracker = FileModifiedTracker::new();
+        let uri = VsUri::file("/test.rs");
+        tracker.register(uri, b"hello");
+        assert_eq!(tracker.tracked_count(), 1);
+        assert_eq!(tracker.modified_count(), 0);
+    }
+
+    #[test]
+    fn file_modified_tracker_update() {
+        let mut tracker = FileModifiedTracker::new();
+        let uri = VsUri::file("/test.rs");
+        let key = uri.to_string();
+        tracker.register(uri, b"hello");
+        tracker.update(&key, b"changed");
+        assert!(tracker.is_modified(&key));
+        assert_eq!(tracker.modified_count(), 1);
+    }
+
+    #[test]
+    fn file_modified_tracker_save() {
+        let mut tracker = FileModifiedTracker::new();
+        let uri = VsUri::file("/test.rs");
+        let key = uri.to_string();
+        tracker.register(uri, b"hello");
+        tracker.update(&key, b"changed");
+        tracker.mark_saved(&key);
+        assert!(!tracker.is_modified(&key));
+    }
+
+    #[test]
+    fn file_modified_tracker_modified_files() {
+        let mut tracker = FileModifiedTracker::new();
+        let u1 = VsUri::file("/a.rs");
+        let u2 = VsUri::file("/b.rs");
+        let k1 = u1.to_string();
+        let k2 = u2.to_string();
+        tracker.register(u1, b"a");
+        tracker.register(u2, b"b");
+        tracker.update(&k1, b"changed");
+        assert_eq!(tracker.modified_files().len(), 1);
+        assert!(!tracker.is_modified(&k2));
+    }
+
+    #[test]
+    fn file_modified_tracker_unregister() {
+        let mut tracker = FileModifiedTracker::new();
+        let uri = VsUri::file("/test.rs");
+        let key = uri.to_string();
+        tracker.register(uri, b"hello");
+        assert!(tracker.unregister(&key));
+        assert!(!tracker.unregister(&key));
+        assert_eq!(tracker.tracked_count(), 0);
+    }
+
 }

@@ -1525,6 +1525,526 @@ impl Default for NotebookScrollSync {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// NotebookCellSearchEngine
+// ---------------------------------------------------------------------------
+
+/// A match found by the search engine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellSearchMatch {
+    pub cell_index: usize,
+    pub line_number: usize,
+    pub column_start: usize,
+    pub column_end: usize,
+    pub matched_text: String,
+}
+
+/// Searches across notebook cells for text patterns.
+#[derive(Debug)]
+pub struct NotebookCellSearchEngine {
+    case_sensitive: bool,
+    whole_word: bool,
+    matches: Vec<CellSearchMatch>,
+}
+
+impl NotebookCellSearchEngine {
+    pub fn new(case_sensitive: bool, whole_word: bool) -> Self {
+        Self {
+            case_sensitive,
+            whole_word,
+            matches: Vec::new(),
+        }
+    }
+
+    /// Clear previous results.
+    pub fn clear(&mut self) {
+        self.matches.clear();
+    }
+
+    /// Search a set of cell sources for a pattern.
+    pub fn search(&mut self, cells: &[(usize, &str)], pattern: &str) {
+        self.matches.clear();
+        if pattern.is_empty() {
+            return;
+        }
+        let pat = if self.case_sensitive { pattern.to_string() } else { pattern.to_lowercase() };
+        for &(cell_idx, source) in cells {
+            for (line_no, line) in source.lines().enumerate() {
+                let haystack = if self.case_sensitive { line.to_string() } else { line.to_lowercase() };
+                let mut start = 0;
+                while let Some(pos) = haystack[start..].find(&pat) {
+                    let abs_pos = start + pos;
+                    if self.whole_word {
+                        let before_ok = abs_pos == 0 || !haystack.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
+                        let after_pos = abs_pos + pat.len();
+                        let after_ok = after_pos >= haystack.len() || !haystack.as_bytes()[after_pos].is_ascii_alphanumeric();
+                        if before_ok && after_ok {
+                            self.matches.push(CellSearchMatch {
+                                cell_index: cell_idx,
+                                line_number: line_no,
+                                column_start: abs_pos,
+                                column_end: abs_pos + pat.len(),
+                                matched_text: line[abs_pos..abs_pos + pat.len()].to_string(),
+                            });
+                        }
+                    } else {
+                        self.matches.push(CellSearchMatch {
+                            cell_index: cell_idx,
+                            line_number: line_no,
+                            column_start: abs_pos,
+                            column_end: abs_pos + pat.len(),
+                            matched_text: line[abs_pos..abs_pos + pat.len()].to_string(),
+                        });
+                    }
+                    start = abs_pos + 1;
+                }
+            }
+        }
+    }
+
+    /// Get all matches.
+    pub fn matches(&self) -> &[CellSearchMatch] {
+        &self.matches
+    }
+
+    /// Count of matches.
+    pub fn match_count(&self) -> usize {
+        self.matches.len()
+    }
+
+    /// Matches in a specific cell.
+    pub fn matches_in_cell(&self, cell_index: usize) -> Vec<&CellSearchMatch> {
+        self.matches.iter().filter(|m| m.cell_index == cell_index).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookCellDependencyTracker
+// ---------------------------------------------------------------------------
+
+/// Tracks dependencies between notebook cells based on variable usage.
+#[derive(Debug)]
+pub struct NotebookCellDependencyTracker {
+    /// cell_index -> set of variable names defined in that cell
+    definitions: HashMap<usize, HashSet<String>>,
+    /// cell_index -> set of variable names used in that cell
+    usages: HashMap<usize, HashSet<String>>,
+}
+
+impl NotebookCellDependencyTracker {
+    pub fn new() -> Self {
+        Self {
+            definitions: HashMap::new(),
+            usages: HashMap::new(),
+        }
+    }
+
+    /// Register that a cell defines a variable.
+    pub fn add_definition(&mut self, cell_index: usize, var_name: &str) {
+        self.definitions.entry(cell_index).or_default().insert(var_name.to_string());
+    }
+
+    /// Register that a cell uses a variable.
+    pub fn add_usage(&mut self, cell_index: usize, var_name: &str) {
+        self.usages.entry(cell_index).or_default().insert(var_name.to_string());
+    }
+
+    /// Find which cells a given cell depends on (cells that define variables this cell uses).
+    pub fn dependencies_of(&self, cell_index: usize) -> Vec<usize> {
+        let used = match self.usages.get(&cell_index) {
+            Some(u) => u,
+            None => return Vec::new(),
+        };
+        let mut deps = Vec::new();
+        for (&def_cell, def_vars) in &self.definitions {
+            if def_cell == cell_index {
+                continue;
+            }
+            if used.iter().any(|u| def_vars.contains(u)) {
+                deps.push(def_cell);
+            }
+        }
+        deps.sort();
+        deps
+    }
+
+    /// Find which cells depend on a given cell (cells that use variables this cell defines).
+    pub fn dependents_of(&self, cell_index: usize) -> Vec<usize> {
+        let defined = match self.definitions.get(&cell_index) {
+            Some(d) => d,
+            None => return Vec::new(),
+        };
+        let mut deps = Vec::new();
+        for (&use_cell, use_vars) in &self.usages {
+            if use_cell == cell_index {
+                continue;
+            }
+            if defined.iter().any(|d| use_vars.contains(d)) {
+                deps.push(use_cell);
+            }
+        }
+        deps.sort();
+        deps
+    }
+
+    /// Build a topological execution order for all registered cells.
+    /// Returns `None` if there is a cycle.
+    pub fn execution_order(&self) -> Option<Vec<usize>> {
+        let all_cells: HashSet<usize> = self.definitions.keys().chain(self.usages.keys()).copied().collect();
+        let mut in_degree: HashMap<usize, usize> = all_cells.iter().map(|&c| (c, 0)).collect();
+        let mut adj: HashMap<usize, Vec<usize>> = HashMap::new();
+
+        for &cell in &all_cells {
+            for dep in self.dependencies_of(cell) {
+                adj.entry(dep).or_default().push(cell);
+                *in_degree.entry(cell).or_default() += 1;
+            }
+        }
+
+        let queue: VecDeque<usize> = in_degree.iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(c, _)| *c)
+            .collect();
+        let mut sorted: Vec<usize> = queue.iter().copied().collect();
+        sorted.sort();
+        let mut result_queue: VecDeque<usize> = sorted.into_iter().collect();
+        let mut result = Vec::new();
+
+        while let Some(cell) = result_queue.pop_front() {
+            result.push(cell);
+            if let Some(neighbors) = adj.get(&cell) {
+                for &n in neighbors {
+                    let deg = in_degree.get_mut(&n).unwrap();
+                    *deg -= 1;
+                    if *deg == 0 {
+                        result_queue.push_back(n);
+                    }
+                }
+            }
+        }
+
+        if result.len() == all_cells.len() { Some(result) } else { None }
+    }
+
+    /// Total number of tracked cells.
+    pub fn cell_count(&self) -> usize {
+        let all: HashSet<usize> = self.definitions.keys().chain(self.usages.keys()).copied().collect();
+        all.len()
+    }
+}
+
+
+
+// ---------------------------------------------------------------------------
+// NotebookCellToolbarActions
+// ---------------------------------------------------------------------------
+
+/// Represents a registered toolbar action for notebook cells.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotebookToolbarActionEntry {
+    /// Unique action identifier.
+    pub id: String,
+    /// Human-readable label.
+    pub label: String,
+    /// Tooltip text.
+    pub tooltip: String,
+    /// Icon name (e.g. "play", "delete", "move-up").
+    pub icon: String,
+    /// Whether the action is currently enabled.
+    pub enabled: bool,
+    /// Optional keyboard shortcut representation.
+    pub shortcut: Option<String>,
+}
+
+impl fmt::Display for NotebookToolbarActionEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let state = if self.enabled { "enabled" } else { "disabled" };
+        write!(f, "[{}] {} ({})", self.id, self.label, state)
+    }
+}
+
+/// Manages registration and execution of cell toolbar actions.
+#[derive(Debug, Clone)]
+pub struct NotebookCellToolbarActions {
+    actions: Vec<NotebookToolbarActionEntry>,
+    /// Log of executed action IDs for undo/replay.
+    execution_log: VecDeque<String>,
+    max_log_size: usize,
+}
+
+impl NotebookCellToolbarActions {
+    /// Create a new empty toolbar actions manager.
+    pub fn new() -> Self {
+        Self {
+            actions: Vec::new(),
+            execution_log: VecDeque::new(),
+            max_log_size: 100,
+        }
+    }
+
+    /// Register a new toolbar action.
+    pub fn register(&mut self, entry: NotebookToolbarActionEntry) -> Result<(), NotebookError> {
+        if self.actions.iter().any(|a| a.id == entry.id) {
+            return Err(NotebookError::InvalidIndex(0));
+        }
+        self.actions.push(entry);
+        Ok(())
+    }
+
+    /// Unregister an action by ID.
+    pub fn unregister(&mut self, id: &str) -> bool {
+        let before = self.actions.len();
+        self.actions.retain(|a| a.id != id);
+        self.actions.len() < before
+    }
+
+    /// Find an action by ID.
+    pub fn get_action(&self, id: &str) -> Option<&NotebookToolbarActionEntry> {
+        self.actions.iter().find(|a| a.id == id)
+    }
+
+    /// Execute an action by ID. Returns the action label if found and enabled.
+    pub fn execute(&mut self, id: &str) -> Result<String, NotebookError> {
+        let action = self.actions.iter().find(|a| a.id == id);
+        match action {
+            None => Err(NotebookError::CellNotFound(0)),
+            Some(a) if !a.enabled => Err(NotebookError::InvalidIndex(0)),
+            Some(a) => {
+                let label = a.label.clone();
+                if self.execution_log.len() >= self.max_log_size {
+                    self.execution_log.pop_front();
+                }
+                self.execution_log.push_back(id.to_string());
+                Ok(label)
+            }
+        }
+    }
+
+    /// Return the number of registered actions.
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+
+    /// Return the number of enabled actions.
+    pub fn enabled_count(&self) -> usize {
+        self.actions.iter().filter(|a| a.enabled).count()
+    }
+
+    /// Enable or disable an action by ID.
+    pub fn set_enabled(&mut self, id: &str, enabled: bool) -> bool {
+        if let Some(a) = self.actions.iter_mut().find(|a| a.id == id) {
+            a.enabled = enabled;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the execution log as a slice.
+    pub fn execution_log(&self) -> Vec<&str> {
+        self.execution_log.iter().map(|s| s.as_str()).collect()
+    }
+
+    /// Clear the execution log.
+    pub fn clear_log(&mut self) {
+        self.execution_log.clear();
+    }
+
+    /// Return all action IDs.
+    pub fn action_ids(&self) -> Vec<&str> {
+        self.actions.iter().map(|a| a.id.as_str()).collect()
+    }
+
+    /// Return all actions that match a label substring.
+    pub fn search_actions(&self, query: &str) -> Vec<&NotebookToolbarActionEntry> {
+        let q = query.to_lowercase();
+        self.actions.iter().filter(|a| a.label.to_lowercase().contains(&q)).collect()
+    }
+}
+
+impl fmt::Display for NotebookCellToolbarActions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ToolbarActions({} registered, {} enabled)",
+            self.action_count(),
+            self.enabled_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookStatusIndicator
+// ---------------------------------------------------------------------------
+
+/// Represents the overall execution status of a notebook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotebookExecutionStatus {
+    Idle,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+impl fmt::Display for NotebookExecutionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Idle => "Idle",
+            Self::Running => "Running",
+            Self::Succeeded => "Succeeded",
+            Self::Failed => "Failed",
+            Self::Cancelled => "Cancelled",
+        };
+        write!(f, "{label}")
+    }
+}
+
+/// Tracks and displays notebook execution status across cells.
+#[derive(Debug, Clone)]
+pub struct NotebookStatusIndicator {
+    /// Current overall status.
+    status: NotebookExecutionStatus,
+    /// Number of cells that have succeeded.
+    cells_succeeded: usize,
+    /// Number of cells that have failed.
+    cells_failed: usize,
+    /// Number of cells currently running.
+    cells_running: usize,
+    /// Total cells in the notebook.
+    total_cells: usize,
+    /// Status history log.
+    history: Vec<(NotebookExecutionStatus, u64)>,
+    /// Elapsed time in ms for the current/last run.
+    elapsed_ms: u64,
+}
+
+impl NotebookStatusIndicator {
+    /// Create a new indicator for a notebook.
+    pub fn new(total_cells: usize) -> Self {
+        Self {
+            status: NotebookExecutionStatus::Idle,
+            cells_succeeded: 0,
+            cells_failed: 0,
+            cells_running: 0,
+            total_cells,
+            history: Vec::new(),
+            elapsed_ms: 0,
+        }
+    }
+
+    /// Mark the notebook as running.
+    pub fn start(&mut self, timestamp_ms: u64) {
+        self.status = NotebookExecutionStatus::Running;
+        self.cells_succeeded = 0;
+        self.cells_failed = 0;
+        self.cells_running = 0;
+        self.elapsed_ms = 0;
+        self.history.push((NotebookExecutionStatus::Running, timestamp_ms));
+    }
+
+    /// Record a cell success.
+    pub fn cell_succeeded(&mut self) {
+        self.cells_succeeded += 1;
+        if self.cells_running > 0 {
+            self.cells_running -= 1;
+        }
+        self.check_completion();
+    }
+
+    /// Record a cell failure.
+    pub fn cell_failed(&mut self) {
+        self.cells_failed += 1;
+        if self.cells_running > 0 {
+            self.cells_running -= 1;
+        }
+        self.check_completion();
+    }
+
+    /// Record a cell starting execution.
+    pub fn cell_started(&mut self) {
+        self.cells_running += 1;
+    }
+
+    /// Cancel the execution.
+    pub fn cancel(&mut self, timestamp_ms: u64) {
+        self.status = NotebookExecutionStatus::Cancelled;
+        self.cells_running = 0;
+        self.history.push((NotebookExecutionStatus::Cancelled, timestamp_ms));
+    }
+
+    /// Set total elapsed time.
+    pub fn set_elapsed(&mut self, ms: u64) {
+        self.elapsed_ms = ms;
+    }
+
+    fn check_completion(&mut self) {
+        let completed = self.cells_succeeded + self.cells_failed;
+        if completed >= self.total_cells && self.cells_running == 0 {
+            if self.cells_failed > 0 {
+                self.status = NotebookExecutionStatus::Failed;
+            } else {
+                self.status = NotebookExecutionStatus::Succeeded;
+            }
+        }
+    }
+
+    /// Current status.
+    pub fn status(&self) -> NotebookExecutionStatus {
+        self.status
+    }
+
+    /// Progress as a fraction 0.0 .. 1.0.
+    pub fn progress(&self) -> f64 {
+        if self.total_cells == 0 {
+            return 1.0;
+        }
+        let done = self.cells_succeeded + self.cells_failed;
+        done as f64 / self.total_cells as f64
+    }
+
+    /// Number of cells completed.
+    pub fn completed_cells(&self) -> usize {
+        self.cells_succeeded + self.cells_failed
+    }
+
+    /// Summary string for the status bar.
+    pub fn summary(&self) -> String {
+        format!(
+            "{}: {}/{} cells ({} ok, {} fail, {} running) [{}ms]",
+            self.status,
+            self.completed_cells(),
+            self.total_cells,
+            self.cells_succeeded,
+            self.cells_failed,
+            self.cells_running,
+            self.elapsed_ms
+        )
+    }
+
+    /// History length.
+    pub fn history_len(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Reset to idle.
+    pub fn reset(&mut self) {
+        self.status = NotebookExecutionStatus::Idle;
+        self.cells_succeeded = 0;
+        self.cells_failed = 0;
+        self.cells_running = 0;
+        self.elapsed_ms = 0;
+    }
+}
+
+impl fmt::Display for NotebookStatusIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2324,4 +2844,282 @@ mod tests {
         ss.set_viewport(0, 3);
         assert_eq!(ss.scroll_target(5), None);
     }
+
+    // -- NotebookCellSearchEngine tests ----------------------------------------
+
+    #[test]
+    fn search_basic() {
+        let mut e = NotebookCellSearchEngine::new(true, false);
+        e.search(&[(0, "hello world")], "world");
+        assert_eq!(e.match_count(), 1);
+        assert_eq!(e.matches()[0].column_start, 6);
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let mut e = NotebookCellSearchEngine::new(false, false);
+        e.search(&[(0, "Hello World")], "hello");
+        assert_eq!(e.match_count(), 1);
+    }
+
+    #[test]
+    fn search_whole_word() {
+        let mut e = NotebookCellSearchEngine::new(true, true);
+        e.search(&[(0, "foobar foo barfoo")], "foo");
+        assert_eq!(e.match_count(), 1);
+        assert_eq!(e.matches()[0].column_start, 7);
+    }
+
+    #[test]
+    fn search_multiple_cells() {
+        let mut e = NotebookCellSearchEngine::new(true, false);
+        e.search(&[(0, "aaa"), (1, "bbb aaa"), (2, "ccc")], "aaa");
+        assert_eq!(e.match_count(), 2);
+        assert_eq!(e.matches_in_cell(1).len(), 1);
+    }
+
+    #[test]
+    fn search_empty_pattern() {
+        let mut e = NotebookCellSearchEngine::new(true, false);
+        e.search(&[(0, "hello")], "");
+        assert_eq!(e.match_count(), 0);
+    }
+
+    #[test]
+    fn search_multiline_cell() {
+        let mut e = NotebookCellSearchEngine::new(true, false);
+        e.search(&[(0, "line1\nline2 target\nline3")], "target");
+        assert_eq!(e.match_count(), 1);
+        assert_eq!(e.matches()[0].line_number, 1);
+    }
+
+    #[test]
+    fn search_clear() {
+        let mut e = NotebookCellSearchEngine::new(true, false);
+        e.search(&[(0, "hello")], "hello");
+        assert_eq!(e.match_count(), 1);
+        e.clear();
+        assert_eq!(e.match_count(), 0);
+    }
+
+    // -- NotebookCellDependencyTracker tests ----------------------------------
+
+    #[test]
+    fn dep_tracker_basic_dependency() {
+        let mut t = NotebookCellDependencyTracker::new();
+        t.add_definition(0, "x");
+        t.add_usage(1, "x");
+        assert_eq!(t.dependencies_of(1), vec![0]);
+        assert_eq!(t.dependents_of(0), vec![1]);
+    }
+
+    #[test]
+    fn dep_tracker_no_self_dependency() {
+        let mut t = NotebookCellDependencyTracker::new();
+        t.add_definition(0, "x");
+        t.add_usage(0, "x");
+        assert!(t.dependencies_of(0).is_empty());
+    }
+
+    #[test]
+    fn dep_tracker_execution_order() {
+        let mut t = NotebookCellDependencyTracker::new();
+        t.add_definition(0, "a");
+        t.add_definition(1, "b");
+        t.add_usage(1, "a");
+        t.add_usage(2, "b");
+        t.add_definition(2, "c");
+        let order = t.execution_order().unwrap();
+        let pos_0 = order.iter().position(|&c| c == 0).unwrap();
+        let pos_1 = order.iter().position(|&c| c == 1).unwrap();
+        let pos_2 = order.iter().position(|&c| c == 2).unwrap();
+        assert!(pos_0 < pos_1);
+        assert!(pos_1 < pos_2);
+    }
+
+    #[test]
+    fn dep_tracker_cell_count() {
+        let mut t = NotebookCellDependencyTracker::new();
+        t.add_definition(0, "x");
+        t.add_usage(1, "y");
+        assert_eq!(t.cell_count(), 2);
+    }
+
+    #[test]
+    fn dep_tracker_no_deps() {
+        let t = NotebookCellDependencyTracker::new();
+        assert!(t.dependencies_of(0).is_empty());
+        assert!(t.dependents_of(0).is_empty());
+    }
+
+
+
+    #[test]
+    fn toolbar_actions_register() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        let action = NotebookToolbarActionEntry {
+            id: "run".into(), label: "Run Cell".into(), tooltip: "Run".into(),
+            icon: "play".into(), enabled: true, shortcut: None,
+        };
+        assert!(mgr.register(action).is_ok());
+        assert_eq!(mgr.action_count(), 1);
+    }
+
+    #[test]
+    fn toolbar_actions_duplicate_register_fails() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        let action = NotebookToolbarActionEntry {
+            id: "run".into(), label: "Run".into(), tooltip: "".into(),
+            icon: "play".into(), enabled: true, shortcut: None,
+        };
+        mgr.register(action.clone()).unwrap();
+        assert!(mgr.register(action).is_err());
+    }
+
+    #[test]
+    fn toolbar_actions_execute() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        let action = NotebookToolbarActionEntry {
+            id: "run".into(), label: "Run Cell".into(), tooltip: "".into(),
+            icon: "play".into(), enabled: true, shortcut: None,
+        };
+        mgr.register(action).unwrap();
+        let label = mgr.execute("run").unwrap();
+        assert_eq!(label, "Run Cell");
+        assert_eq!(mgr.execution_log().len(), 1);
+    }
+
+    #[test]
+    fn toolbar_actions_execute_disabled() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        let action = NotebookToolbarActionEntry {
+            id: "del".into(), label: "Delete".into(), tooltip: "".into(),
+            icon: "trash".into(), enabled: false, shortcut: None,
+        };
+        mgr.register(action).unwrap();
+        assert!(mgr.execute("del").is_err());
+    }
+
+    #[test]
+    fn toolbar_actions_unregister() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        let action = NotebookToolbarActionEntry {
+            id: "run".into(), label: "Run".into(), tooltip: "".into(),
+            icon: "play".into(), enabled: true, shortcut: None,
+        };
+        mgr.register(action).unwrap();
+        assert!(mgr.unregister("run"));
+        assert_eq!(mgr.action_count(), 0);
+    }
+
+    #[test]
+    fn toolbar_actions_set_enabled() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        let action = NotebookToolbarActionEntry {
+            id: "run".into(), label: "Run".into(), tooltip: "".into(),
+            icon: "play".into(), enabled: true, shortcut: None,
+        };
+        mgr.register(action).unwrap();
+        assert_eq!(mgr.enabled_count(), 1);
+        mgr.set_enabled("run", false);
+        assert_eq!(mgr.enabled_count(), 0);
+    }
+
+    #[test]
+    fn toolbar_actions_search() {
+        let mut mgr = NotebookCellToolbarActions::new();
+        for (id, label) in &[("run", "Run Cell"), ("del", "Delete Cell"), ("mv", "Move Up")] {
+            let action = NotebookToolbarActionEntry {
+                id: id.to_string(), label: label.to_string(), tooltip: "".into(),
+                icon: "x".into(), enabled: true, shortcut: None,
+            };
+            mgr.register(action).unwrap();
+        }
+        assert_eq!(mgr.search_actions("cell").len(), 2);
+    }
+
+    #[test]
+    fn toolbar_actions_display() {
+        let mgr = NotebookCellToolbarActions::new();
+        let s = format!("{mgr}");
+        assert!(s.contains("0 registered"));
+    }
+
+    #[test]
+    fn status_indicator_basic_flow() {
+        let mut ind = NotebookStatusIndicator::new(3);
+        assert_eq!(ind.status(), NotebookExecutionStatus::Idle);
+        ind.start(1000);
+        assert_eq!(ind.status(), NotebookExecutionStatus::Running);
+        ind.cell_started();
+        ind.cell_succeeded();
+        ind.cell_started();
+        ind.cell_succeeded();
+        ind.cell_started();
+        ind.cell_succeeded();
+        assert_eq!(ind.status(), NotebookExecutionStatus::Succeeded);
+        assert_eq!(ind.completed_cells(), 3);
+    }
+
+    #[test]
+    fn status_indicator_failure() {
+        let mut ind = NotebookStatusIndicator::new(2);
+        ind.start(0);
+        ind.cell_started();
+        ind.cell_succeeded();
+        ind.cell_started();
+        ind.cell_failed();
+        assert_eq!(ind.status(), NotebookExecutionStatus::Failed);
+    }
+
+    #[test]
+    fn status_indicator_cancel() {
+        let mut ind = NotebookStatusIndicator::new(5);
+        ind.start(0);
+        ind.cell_started();
+        ind.cancel(100);
+        assert_eq!(ind.status(), NotebookExecutionStatus::Cancelled);
+    }
+
+    #[test]
+    fn status_indicator_progress() {
+        let mut ind = NotebookStatusIndicator::new(4);
+        ind.start(0);
+        assert!((ind.progress() - 0.0).abs() < f64::EPSILON);
+        ind.cell_started();
+        ind.cell_succeeded();
+        ind.cell_started();
+        ind.cell_succeeded();
+        assert!((ind.progress() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn status_indicator_summary() {
+        let mut ind = NotebookStatusIndicator::new(2);
+        ind.start(0);
+        ind.set_elapsed(500);
+        let s = ind.summary();
+        assert!(s.contains("500ms"));
+        assert!(s.contains("Running"));
+    }
+
+    #[test]
+    fn status_indicator_reset() {
+        let mut ind = NotebookStatusIndicator::new(2);
+        ind.start(0);
+        ind.cell_started();
+        ind.cell_succeeded();
+        ind.reset();
+        assert_eq!(ind.status(), NotebookExecutionStatus::Idle);
+        assert_eq!(ind.completed_cells(), 0);
+    }
+
+    #[test]
+    fn status_indicator_display() {
+        let ind = NotebookStatusIndicator::new(3);
+        let s = format!("{ind}");
+        assert!(s.contains("Idle"));
+    }
+
+
 }

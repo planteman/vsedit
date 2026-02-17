@@ -1551,6 +1551,255 @@ impl RevocationChecker {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// SignatureCacheManager
+// ---------------------------------------------------------------------------
+
+/// Result of a cached signature verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CachedVerification {
+    pub content_hash: u64,
+    pub algorithm: SignatureAlgorithm,
+    pub verified: bool,
+    pub cached_at_epoch: u64,
+    pub ttl_secs: u64,
+}
+
+impl CachedVerification {
+    /// Whether this cache entry has expired given the current epoch time.
+    pub fn is_expired(&self, current_epoch: u64) -> bool {
+        current_epoch.saturating_sub(self.cached_at_epoch) > self.ttl_secs
+    }
+}
+
+/// Caches signature verification results to avoid repeated computation.
+#[derive(Debug)]
+pub struct SignatureCacheManager {
+    cache: HashMap<u64, CachedVerification>,
+    default_ttl: u64,
+    max_entries: usize,
+    hits: u64,
+    misses: u64,
+}
+
+impl SignatureCacheManager {
+    /// Create a new cache manager with a given TTL (in seconds) and max capacity.
+    pub fn new(default_ttl: u64, max_entries: usize) -> Self {
+        Self {
+            cache: HashMap::new(),
+            default_ttl,
+            max_entries,
+            hits: 0,
+            misses: 0,
+        }
+    }
+
+    /// Simple hash function for content bytes.
+    pub fn hash_content(content: &[u8]) -> u64 {
+        let mut h: u64 = 5381;
+        for &b in content {
+            h = h.wrapping_mul(33).wrapping_add(b as u64);
+        }
+        h
+    }
+
+    /// Store a verification result in the cache.
+    pub fn store(&mut self, content_hash: u64, algorithm: SignatureAlgorithm, verified: bool, current_epoch: u64) {
+        if self.cache.len() >= self.max_entries {
+            // Evict the oldest entry
+            if let Some(&oldest_key) = self.cache.values()
+                .min_by_key(|v| v.cached_at_epoch)
+                .map(|v| v.content_hash)
+                .as_ref()
+            {
+                // Find and remove by content_hash match
+                let key_to_remove = self.cache.iter()
+                    .find(|(_, v)| v.content_hash == oldest_key)
+                    .map(|(&k, _)| k);
+                if let Some(k) = key_to_remove {
+                    self.cache.remove(&k);
+                }
+            }
+        }
+        self.cache.insert(content_hash, CachedVerification {
+            content_hash,
+            algorithm,
+            verified,
+            cached_at_epoch: current_epoch,
+            ttl_secs: self.default_ttl,
+        });
+    }
+
+    /// Look up a cached result, returning `None` if not found or expired.
+    pub fn lookup(&mut self, content_hash: u64, current_epoch: u64) -> Option<&CachedVerification> {
+        let expired = self.cache.get(&content_hash)
+            .map(|v| v.is_expired(current_epoch))
+            .unwrap_or(false);
+        if expired {
+            self.cache.remove(&content_hash);
+            self.misses += 1;
+            return None;
+        }
+        if self.cache.contains_key(&content_hash) {
+            self.hits += 1;
+            self.cache.get(&content_hash)
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    /// Invalidate a specific entry.
+    pub fn invalidate(&mut self, content_hash: u64) -> bool {
+        self.cache.remove(&content_hash).is_some()
+    }
+
+    /// Clear all cached entries.
+    pub fn clear(&mut self) {
+        self.cache.clear();
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
+    }
+
+    /// Hit rate as a fraction (0.0 to 1.0).
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+
+    /// Remove all expired entries.
+    pub fn evict_expired(&mut self, current_epoch: u64) -> usize {
+        let before = self.cache.len();
+        self.cache.retain(|_, v| !v.is_expired(current_epoch));
+        before - self.cache.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureTrustChainBuilder
+// ---------------------------------------------------------------------------
+
+/// A link in a trust chain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrustChainLink {
+    pub key_id: String,
+    pub issuer_key_id: Option<String>,
+    pub trust_level: u8,
+    pub description: String,
+}
+
+/// Errors specific to trust chain operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrustChainError {
+    MissingRootKey,
+    CircularChain(String),
+    KeyNotFound(String),
+    ChainTooLong(usize),
+}
+
+impl fmt::Display for TrustChainError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingRootKey => write!(f, "no root key found in chain"),
+            Self::CircularChain(id) => write!(f, "circular chain detected at key {id}"),
+            Self::KeyNotFound(id) => write!(f, "key not found: {id}"),
+            Self::ChainTooLong(len) => write!(f, "chain exceeds maximum length: {len}"),
+        }
+    }
+}
+
+/// Builds and validates trust chains for signatures.
+#[derive(Debug)]
+pub struct SignatureTrustChainBuilder {
+    links: Vec<TrustChainLink>,
+    max_chain_length: usize,
+}
+
+impl SignatureTrustChainBuilder {
+    pub fn new(max_chain_length: usize) -> Self {
+        Self {
+            links: Vec::new(),
+            max_chain_length,
+        }
+    }
+
+    /// Add a trust chain link.
+    pub fn add_link(&mut self, key_id: &str, issuer: Option<&str>, trust_level: u8, description: &str) {
+        self.links.push(TrustChainLink {
+            key_id: key_id.to_string(),
+            issuer_key_id: issuer.map(|s| s.to_string()),
+            trust_level,
+            description: description.to_string(),
+        });
+    }
+
+    /// Find the root key (the link with no issuer).
+    pub fn find_root(&self) -> Option<&TrustChainLink> {
+        self.links.iter().find(|l| l.issuer_key_id.is_none())
+    }
+
+    /// Build the chain from root to a given leaf key.
+    pub fn build_chain(&self, leaf_key_id: &str) -> Result<Vec<&TrustChainLink>, TrustChainError> {
+        let mut chain = Vec::new();
+        let mut current_id = leaf_key_id;
+        let mut visited = std::collections::HashSet::new();
+
+        loop {
+            if !visited.insert(current_id.to_string()) {
+                return Err(TrustChainError::CircularChain(current_id.to_string()));
+            }
+            let link = self.links.iter().find(|l| l.key_id == current_id)
+                .ok_or_else(|| TrustChainError::KeyNotFound(current_id.to_string()))?;
+            chain.push(link);
+            if chain.len() > self.max_chain_length {
+                return Err(TrustChainError::ChainTooLong(chain.len()));
+            }
+            match &link.issuer_key_id {
+                Some(issuer) => current_id = issuer,
+                None => break,
+            }
+        }
+        chain.reverse();
+        Ok(chain)
+    }
+
+    /// Validate the chain: ensure a root exists and trust levels are non-decreasing from root.
+    pub fn validate_chain(&self, chain: &[&TrustChainLink]) -> bool {
+        if chain.is_empty() {
+            return false;
+        }
+        if chain[0].issuer_key_id.is_some() {
+            return false;
+        }
+        for window in chain.windows(2) {
+            if window[1].trust_level > window[0].trust_level {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Minimum trust level in a chain.
+    pub fn min_trust_level(&self, chain: &[&TrustChainLink]) -> u8 {
+        chain.iter().map(|l| l.trust_level).min().unwrap_or(0)
+    }
+
+    /// Total number of links registered.
+    pub fn link_count(&self) -> usize {
+        self.links.len()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2491,4 +2740,127 @@ mod tests {
         assert!(!rc.check_signature(&bad_sig));
         assert!(rc.check_signature(&anon_sig));
     }
+
+    // -- SignatureCacheManager tests ------------------------------------------
+
+    #[test]
+    fn cache_store_and_lookup() {
+        let mut c = SignatureCacheManager::new(300, 100);
+        c.store(42, SignatureAlgorithm::HmacSha256Stub, true, 1000);
+        let result = c.lookup(42, 1100);
+        assert!(result.is_some());
+        assert!(result.unwrap().verified);
+    }
+
+    #[test]
+    fn cache_expired_entry() {
+        let mut c = SignatureCacheManager::new(100, 100);
+        c.store(42, SignatureAlgorithm::HmacSha256Stub, true, 1000);
+        let result = c.lookup(42, 1200);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cache_invalidate() {
+        let mut c = SignatureCacheManager::new(300, 100);
+        c.store(42, SignatureAlgorithm::HmacSha256Stub, true, 1000);
+        assert!(c.invalidate(42));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn cache_hit_rate() {
+        let mut c = SignatureCacheManager::new(300, 100);
+        c.store(1, SignatureAlgorithm::Ed25519Stub, true, 0);
+        let _ = c.lookup(1, 0); // hit
+        let _ = c.lookup(2, 0); // miss
+        assert!((c.hit_rate() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn cache_evict_expired() {
+        let mut c = SignatureCacheManager::new(50, 100);
+        c.store(1, SignatureAlgorithm::HmacSha256Stub, true, 100);
+        c.store(2, SignatureAlgorithm::HmacSha256Stub, false, 200);
+        let evicted = c.evict_expired(160);
+        assert_eq!(evicted, 1);
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn cache_hash_content_deterministic() {
+        let h1 = SignatureCacheManager::hash_content(b"hello");
+        let h2 = SignatureCacheManager::hash_content(b"hello");
+        assert_eq!(h1, h2);
+        let h3 = SignatureCacheManager::hash_content(b"world");
+        assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn cache_clear() {
+        let mut c = SignatureCacheManager::new(300, 100);
+        c.store(1, SignatureAlgorithm::HmacSha256Stub, true, 0);
+        c.store(2, SignatureAlgorithm::Ed25519Stub, false, 0);
+        c.clear();
+        assert!(c.is_empty());
+    }
+
+    // -- SignatureTrustChainBuilder tests -------------------------------------
+
+    #[test]
+    fn trust_chain_build_simple() {
+        let mut b = SignatureTrustChainBuilder::new(10);
+        b.add_link("root", None, 100, "Root CA");
+        b.add_link("intermediate", Some("root"), 80, "Intermediate");
+        b.add_link("leaf", Some("intermediate"), 60, "Leaf");
+        let chain = b.build_chain("leaf").unwrap();
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain[0].key_id, "root");
+        assert_eq!(chain[2].key_id, "leaf");
+    }
+
+    #[test]
+    fn trust_chain_validate_valid() {
+        let mut b = SignatureTrustChainBuilder::new(10);
+        b.add_link("root", None, 100, "Root");
+        b.add_link("leaf", Some("root"), 80, "Leaf");
+        let chain = b.build_chain("leaf").unwrap();
+        assert!(b.validate_chain(&chain));
+    }
+
+    #[test]
+    fn trust_chain_circular_detection() {
+        let mut b = SignatureTrustChainBuilder::new(10);
+        b.add_link("a", Some("b"), 100, "A");
+        b.add_link("b", Some("a"), 100, "B");
+        let result = b.build_chain("a");
+        assert!(matches!(result, Err(TrustChainError::CircularChain(_))));
+    }
+
+    #[test]
+    fn trust_chain_key_not_found() {
+        let b = SignatureTrustChainBuilder::new(10);
+        let result = b.build_chain("nonexistent");
+        assert!(matches!(result, Err(TrustChainError::KeyNotFound(_))));
+    }
+
+    #[test]
+    fn trust_chain_min_trust_level() {
+        let mut b = SignatureTrustChainBuilder::new(10);
+        b.add_link("root", None, 100, "Root");
+        b.add_link("mid", Some("root"), 50, "Mid");
+        b.add_link("leaf", Some("mid"), 70, "Leaf");
+        let chain = b.build_chain("leaf").unwrap();
+        assert_eq!(b.min_trust_level(&chain), 50);
+    }
+
+    #[test]
+    fn trust_chain_error_display() {
+        let e = TrustChainError::MissingRootKey;
+        assert_eq!(e.to_string(), "no root key found in chain");
+        let e2 = TrustChainError::ChainTooLong(5);
+        assert!(e2.to_string().contains("5"));
+    }
+
+
 }

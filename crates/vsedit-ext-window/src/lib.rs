@@ -1476,6 +1476,293 @@ impl std::fmt::Display for WindowActiveTheme {
     }
 }
 
+
+// ── Modal Dialog Handler ──
+
+/// Possible states of a modal dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalDialogState {
+    /// Dialog is not visible.
+    Hidden,
+    /// Dialog is visible and awaiting user input.
+    Open,
+    /// User confirmed the dialog.
+    Confirmed,
+    /// User dismissed the dialog.
+    Dismissed,
+    /// Dialog timed out without user action.
+    TimedOut,
+}
+
+impl fmt::Display for ModalDialogState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ModalDialogState::Hidden => write!(f, "hidden"),
+            ModalDialogState::Open => write!(f, "open"),
+            ModalDialogState::Confirmed => write!(f, "confirmed"),
+            ModalDialogState::Dismissed => write!(f, "dismissed"),
+            ModalDialogState::TimedOut => write!(f, "timed_out"),
+        }
+    }
+}
+
+/// A response from a modal dialog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModalDialogResponse {
+    pub dialog_id: String,
+    pub selected_button: Option<String>,
+    pub input_value: Option<String>,
+    pub state: ModalDialogState,
+}
+
+impl ModalDialogResponse {
+    pub fn confirmed(dialog_id: impl Into<String>, button: impl Into<String>) -> Self {
+        Self {
+            dialog_id: dialog_id.into(),
+            selected_button: Some(button.into()),
+            input_value: None,
+            state: ModalDialogState::Confirmed,
+        }
+    }
+
+    pub fn dismissed(dialog_id: impl Into<String>) -> Self {
+        Self {
+            dialog_id: dialog_id.into(),
+            selected_button: None,
+            input_value: None,
+            state: ModalDialogState::Dismissed,
+        }
+    }
+
+    pub fn is_confirmed(&self) -> bool {
+        self.state == ModalDialogState::Confirmed
+    }
+}
+
+/// Manages modal dialog state and queued responses.
+pub struct WindowModalHandler {
+    pending_dialogs: VecDeque<String>,
+    responses: Vec<ModalDialogResponse>,
+    max_queue_size: usize,
+    current_state: ModalDialogState,
+}
+
+impl WindowModalHandler {
+    pub fn new(max_queue_size: usize) -> Self {
+        Self {
+            pending_dialogs: VecDeque::new(),
+            responses: Vec::new(),
+            max_queue_size,
+            current_state: ModalDialogState::Hidden,
+        }
+    }
+
+    /// Enqueue a dialog. Returns false if queue is full.
+    pub fn enqueue_dialog(&mut self, dialog_id: impl Into<String>) -> bool {
+        if self.pending_dialogs.len() >= self.max_queue_size {
+            return false;
+        }
+        self.pending_dialogs.push_back(dialog_id.into());
+        if self.current_state == ModalDialogState::Hidden {
+            self.current_state = ModalDialogState::Open;
+        }
+        true
+    }
+
+    /// Pop the next pending dialog to show.
+    pub fn next_dialog(&mut self) -> Option<String> {
+        let dialog = self.pending_dialogs.pop_front();
+        if self.pending_dialogs.is_empty() && dialog.is_some() {
+            self.current_state = ModalDialogState::Open;
+        }
+        dialog
+    }
+
+    /// Record a response for a dialog.
+    pub fn record_response(&mut self, response: ModalDialogResponse) {
+        self.current_state = response.state;
+        self.responses.push(response);
+        if !self.pending_dialogs.is_empty() {
+            self.current_state = ModalDialogState::Open;
+        } else {
+            self.current_state = ModalDialogState::Hidden;
+        }
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.pending_dialogs.len()
+    }
+
+    pub fn response_count(&self) -> usize {
+        self.responses.len()
+    }
+
+    pub fn state(&self) -> ModalDialogState {
+        self.current_state
+    }
+
+    pub fn confirmed_responses(&self) -> Vec<&ModalDialogResponse> {
+        self.responses.iter().filter(|r| r.is_confirmed()).collect()
+    }
+
+    pub fn clear_responses(&mut self) {
+        self.responses.clear();
+    }
+
+    /// Find the response for a specific dialog id.
+    pub fn find_response(&self, dialog_id: &str) -> Option<&ModalDialogResponse> {
+        self.responses.iter().find(|r| r.dialog_id == dialog_id)
+    }
+}
+
+// ── Tab Group Manager ──
+
+/// Represents a single tab within a group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabEntry {
+    pub id: String,
+    pub label: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub sort_order: u32,
+}
+
+impl TabEntry {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            is_dirty: false,
+            is_pinned: false,
+            sort_order: 0,
+        }
+    }
+
+    pub fn with_pinned(mut self, pinned: bool) -> Self {
+        self.is_pinned = pinned;
+        self
+    }
+
+    pub fn with_order(mut self, order: u32) -> Self {
+        self.sort_order = order;
+        self
+    }
+}
+
+/// Manages a collection of tab groups with focus tracking and ordering.
+pub struct WindowTabGroupManager {
+    groups: Vec<(String, Vec<TabEntry>)>,
+    active_group_index: Option<usize>,
+    active_tab_ids: Vec<Option<String>>,
+}
+
+impl WindowTabGroupManager {
+    pub fn new() -> Self {
+        Self {
+            groups: Vec::new(),
+            active_group_index: None,
+            active_tab_ids: Vec::new(),
+        }
+    }
+
+    /// Add a new tab group. Returns the group index.
+    pub fn add_group(&mut self, name: impl Into<String>) -> usize {
+        let idx = self.groups.len();
+        self.groups.push((name.into(), Vec::new()));
+        self.active_tab_ids.push(None);
+        if self.active_group_index.is_none() {
+            self.active_group_index = Some(idx);
+        }
+        idx
+    }
+
+    /// Add a tab to a group. Returns false if group doesn't exist.
+    pub fn add_tab(&mut self, group_index: usize, tab: TabEntry) -> bool {
+        if group_index >= self.groups.len() {
+            return false;
+        }
+        let tab_id = tab.id.clone();
+        self.groups[group_index].1.push(tab);
+        if self.active_tab_ids[group_index].is_none() {
+            self.active_tab_ids[group_index] = Some(tab_id);
+        }
+        true
+    }
+
+    /// Set the active tab in a group.
+    pub fn set_active_tab(&mut self, group_index: usize, tab_id: &str) -> bool {
+        if group_index >= self.groups.len() {
+            return false;
+        }
+        let exists = self.groups[group_index].1.iter().any(|t| t.id == tab_id);
+        if exists {
+            self.active_tab_ids[group_index] = Some(tab_id.to_string());
+            self.active_group_index = Some(group_index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Set the active group.
+    pub fn set_active_group(&mut self, group_index: usize) -> bool {
+        if group_index < self.groups.len() {
+            self.active_group_index = Some(group_index);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn tab_count(&self, group_index: usize) -> usize {
+        self.groups.get(group_index).map_or(0, |(_, tabs)| tabs.len())
+    }
+
+    pub fn active_group_index(&self) -> Option<usize> {
+        self.active_group_index
+    }
+
+    pub fn active_tab_id(&self, group_index: usize) -> Option<&str> {
+        self.active_tab_ids.get(group_index).and_then(|id| id.as_deref())
+    }
+
+    /// Remove a tab by id from a group. Returns the removed tab, if found.
+    pub fn remove_tab(&mut self, group_index: usize, tab_id: &str) -> Option<TabEntry> {
+        if group_index >= self.groups.len() {
+            return None;
+        }
+        let tabs = &mut self.groups[group_index].1;
+        let pos = tabs.iter().position(|t| t.id == tab_id)?;
+        let removed = tabs.remove(pos);
+        if self.active_tab_ids[group_index].as_deref() == Some(tab_id) {
+            self.active_tab_ids[group_index] = tabs.first().map(|t| t.id.clone());
+        }
+        Some(removed)
+    }
+
+    /// Get sorted tabs in a group (pinned first, then by sort_order).
+    pub fn sorted_tabs(&self, group_index: usize) -> Vec<&TabEntry> {
+        let Some((_, tabs)) = self.groups.get(group_index) else {
+            return Vec::new();
+        };
+        let mut sorted: Vec<&TabEntry> = tabs.iter().collect();
+        sorted.sort_by(|a, b| {
+            b.is_pinned.cmp(&a.is_pinned).then(a.sort_order.cmp(&b.sort_order))
+        });
+        sorted
+    }
+
+    /// Count total dirty tabs across all groups.
+    pub fn dirty_tab_count(&self) -> usize {
+        self.groups.iter().flat_map(|(_, tabs)| tabs).filter(|t| t.is_dirty).count()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2299,5 +2586,120 @@ mod tests {
         f.create("ch1");
         assert_eq!(f.channel_count(), 2);
     }
+
+
+    #[test]
+    fn modal_dialog_state_display() {
+        assert_eq!(format!("{}", ModalDialogState::Hidden), "hidden");
+        assert_eq!(format!("{}", ModalDialogState::Open), "open");
+        assert_eq!(format!("{}", ModalDialogState::Confirmed), "confirmed");
+        assert_eq!(format!("{}", ModalDialogState::Dismissed), "dismissed");
+        assert_eq!(format!("{}", ModalDialogState::TimedOut), "timed_out");
+    }
+
+    #[test]
+    fn modal_handler_enqueue_and_next() {
+        let mut handler = WindowModalHandler::new(3);
+        assert!(handler.enqueue_dialog("d1"));
+        assert!(handler.enqueue_dialog("d2"));
+        assert_eq!(handler.pending_count(), 2);
+        assert_eq!(handler.next_dialog(), Some("d1".to_string()));
+        assert_eq!(handler.pending_count(), 1);
+    }
+
+    #[test]
+    fn modal_handler_queue_full() {
+        let mut handler = WindowModalHandler::new(2);
+        assert!(handler.enqueue_dialog("d1"));
+        assert!(handler.enqueue_dialog("d2"));
+        assert!(!handler.enqueue_dialog("d3"));
+    }
+
+    #[test]
+    fn modal_handler_record_response() {
+        let mut handler = WindowModalHandler::new(5);
+        handler.enqueue_dialog("d1");
+        handler.next_dialog();
+        handler.record_response(ModalDialogResponse::confirmed("d1", "OK"));
+        assert_eq!(handler.response_count(), 1);
+        assert_eq!(handler.confirmed_responses().len(), 1);
+        assert_eq!(handler.state(), ModalDialogState::Hidden);
+    }
+
+    #[test]
+    fn modal_handler_find_response() {
+        let mut handler = WindowModalHandler::new(5);
+        handler.record_response(ModalDialogResponse::dismissed("d1"));
+        let r = handler.find_response("d1").unwrap();
+        assert!(!r.is_confirmed());
+        assert!(handler.find_response("d2").is_none());
+    }
+
+    #[test]
+    fn modal_response_confirmed_builder() {
+        let r = ModalDialogResponse::confirmed("dlg1", "Yes");
+        assert!(r.is_confirmed());
+        assert_eq!(r.selected_button.as_deref(), Some("Yes"));
+    }
+
+    #[test]
+    fn tab_entry_builder() {
+        let tab = TabEntry::new("t1", "Tab 1").with_pinned(true).with_order(5);
+        assert!(tab.is_pinned);
+        assert_eq!(tab.sort_order, 5);
+        assert_eq!(tab.label, "Tab 1");
+    }
+
+    #[test]
+    fn tab_group_manager_add_and_count() {
+        let mut mgr = WindowTabGroupManager::new();
+        let g0 = mgr.add_group("Group 1");
+        assert_eq!(mgr.group_count(), 1);
+        assert_eq!(mgr.active_group_index(), Some(g0));
+        mgr.add_tab(g0, TabEntry::new("t1", "File 1"));
+        assert_eq!(mgr.tab_count(g0), 1);
+        assert_eq!(mgr.active_tab_id(g0), Some("t1"));
+    }
+
+    #[test]
+    fn tab_group_manager_remove_tab() {
+        let mut mgr = WindowTabGroupManager::new();
+        let g = mgr.add_group("G");
+        mgr.add_tab(g, TabEntry::new("t1", "F1"));
+        mgr.add_tab(g, TabEntry::new("t2", "F2"));
+        mgr.set_active_tab(g, "t1");
+        let removed = mgr.remove_tab(g, "t1").unwrap();
+        assert_eq!(removed.id, "t1");
+        assert_eq!(mgr.active_tab_id(g), Some("t2"));
+    }
+
+    #[test]
+    fn tab_group_manager_sorted_tabs() {
+        let mut mgr = WindowTabGroupManager::new();
+        let g = mgr.add_group("G");
+        mgr.add_tab(g, TabEntry::new("a", "A").with_order(2));
+        mgr.add_tab(g, TabEntry::new("b", "B").with_pinned(true).with_order(3));
+        mgr.add_tab(g, TabEntry::new("c", "C").with_order(1));
+        let sorted = mgr.sorted_tabs(g);
+        assert_eq!(sorted[0].id, "b"); // pinned first
+        assert_eq!(sorted[1].id, "c"); // order 1
+        assert_eq!(sorted[2].id, "a"); // order 2
+    }
+
+    #[test]
+    fn tab_group_manager_dirty_count() {
+        let mut mgr = WindowTabGroupManager::new();
+        let g0 = mgr.add_group("G0");
+        let g1 = mgr.add_group("G1");
+        let mut t1 = TabEntry::new("t1", "F1");
+        t1.is_dirty = true;
+        let mut t2 = TabEntry::new("t2", "F2");
+        t2.is_dirty = true;
+        mgr.add_tab(g0, t1);
+        mgr.add_tab(g1, t2);
+        mgr.add_tab(g1, TabEntry::new("t3", "F3"));
+        assert_eq!(mgr.dirty_tab_count(), 2);
+    }
+
 
 }

@@ -1282,6 +1282,324 @@ impl fmt::Display for MenuBarOverflow {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// MenuBarRecentlyUsed – tracks recently used menu commands
+// ---------------------------------------------------------------------------
+
+/// Tracks recently used commands in the menu bar for quick access / ordering.
+#[derive(Debug, Clone)]
+pub struct MenuBarRecentlyUsed {
+    /// Ordered list of command IDs (most recent first).
+    entries: Vec<String>,
+    /// Maximum number of entries to keep.
+    max_entries: usize,
+}
+
+impl MenuBarRecentlyUsed {
+    /// Create a new tracker with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record that a command was used.  If the command is already in the list,
+    /// it is moved to the front.
+    pub fn record(&mut self, command_id: &str) {
+        self.entries.retain(|e| e != command_id);
+        self.entries.insert(0, command_id.to_string());
+        if self.entries.len() > self.max_entries {
+            self.entries.truncate(self.max_entries);
+        }
+    }
+
+    /// Return the list of recently used command IDs (most recent first).
+    pub fn list(&self) -> &[String] {
+        &self.entries
+    }
+
+    /// Number of tracked entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the tracker is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Whether a given command was recently used.
+    pub fn contains(&self, command_id: &str) -> bool {
+        self.entries.iter().any(|e| e == command_id)
+    }
+
+    /// Return the rank (0-based) of a command, or `None` if not in the list.
+    pub fn rank(&self, command_id: &str) -> Option<usize> {
+        self.entries.iter().position(|e| e == command_id)
+    }
+
+    /// Remove a specific command from the history.
+    pub fn remove(&mut self, command_id: &str) {
+        self.entries.retain(|e| e != command_id);
+    }
+
+    /// Return the most recently used command, if any.
+    pub fn most_recent(&self) -> Option<&str> {
+        self.entries.first().map(|s| s.as_str())
+    }
+
+    /// Maximum capacity of the tracker.
+    pub fn capacity(&self) -> usize {
+        self.max_entries
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuBarCommandSearch – search across all menu entries
+// ---------------------------------------------------------------------------
+
+/// Searches across all registered menus for entries matching a query string.
+#[derive(Debug, Clone)]
+pub struct MenuBarCommandSearchResult {
+    /// The menu this entry belongs to.
+    pub menu_key: String,
+    /// The matching entry.
+    pub command_id: String,
+    pub title: String,
+    pub shortcut: Option<String>,
+    /// How well the query matched (higher = better).
+    pub score: i64,
+}
+
+/// Provides command-palette-style search over all menu entries.
+pub struct MenuBarCommandSearch;
+
+impl MenuBarCommandSearch {
+    /// Search all menus in the service for entries matching `query`.
+    /// Results are sorted by score (descending).
+    pub fn search(service: &MenuBarService, query: &str) -> Vec<MenuBarCommandSearchResult> {
+        let q_lower = query.to_lowercase();
+        let mut results = Vec::new();
+
+        for (menu_key, entry) in service.flatten_items() {
+            let title_lower = entry.title.to_lowercase();
+            let cmd_lower = entry.command_id.to_lowercase();
+
+            let mut score: i64 = 0;
+            let mut matched = false;
+
+            // Exact prefix match on title
+            if title_lower.starts_with(&q_lower) {
+                score += 100;
+                matched = true;
+            } else if title_lower.contains(&q_lower) {
+                score += 50;
+                matched = true;
+            }
+
+            // Also check command ID
+            if cmd_lower.starts_with(&q_lower) {
+                score += 80;
+                matched = true;
+            } else if cmd_lower.contains(&q_lower) {
+                score += 30;
+                matched = true;
+            }
+
+            if matched {
+                results.push(MenuBarCommandSearchResult {
+                    menu_key,
+                    command_id: entry.command_id.clone(),
+                    title: entry.title.clone(),
+                    shortcut: entry.shortcut.clone(),
+                    score,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.score.cmp(&a.score).then(a.title.cmp(&b.title)));
+        results
+    }
+
+    /// Like `search`, but limits results to a maximum count.
+    pub fn search_top(service: &MenuBarService, query: &str, max: usize) -> Vec<MenuBarCommandSearchResult> {
+        let mut results = Self::search(service, query);
+        results.truncate(max);
+        results
+    }
+
+    /// Search only within a specific menu.
+    pub fn search_in_menu(service: &MenuBarService, menu_id: &MenuId, query: &str) -> Vec<MenuBarCommandSearchResult> {
+        let key = menu_id.key();
+        Self::search(service, query).into_iter()
+            .filter(|r| r.menu_key == key)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuBarSeparatorOptimizer – removes redundant separators
+// ---------------------------------------------------------------------------
+
+/// Represents a visual element in a rendered menu: either a concrete entry
+/// or a group separator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuVisualItem {
+    Entry(String),   // command_id
+    Separator,
+}
+
+/// Cleans up a list of visual items by removing leading separators, trailing
+/// separators, and consecutive duplicate separators.
+pub struct MenuBarSeparatorOptimizer;
+
+impl MenuBarSeparatorOptimizer {
+    /// Optimize a list of visual items.
+    pub fn optimize(items: &[MenuVisualItem]) -> Vec<MenuVisualItem> {
+        let mut result: Vec<MenuVisualItem> = Vec::new();
+
+        for item in items {
+            match item {
+                MenuVisualItem::Separator => {
+                    // Only add if the last item is not already a separator
+                    if let Some(last) = result.last() {
+                        if *last != MenuVisualItem::Separator {
+                            result.push(MenuVisualItem::Separator);
+                        }
+                    }
+                    // Don't add separator at the beginning
+                }
+                MenuVisualItem::Entry(id) => {
+                    result.push(MenuVisualItem::Entry(id.clone()));
+                }
+            }
+        }
+
+        // Remove trailing separator
+        if let Some(MenuVisualItem::Separator) = result.last() {
+            result.pop();
+        }
+
+        result
+    }
+
+    /// Build visual items from menu entries, inserting separators between groups.
+    pub fn build_from_entries(entries: &[MenuEntry]) -> Vec<MenuVisualItem> {
+        let mut items = Vec::new();
+        let mut last_group: Option<&str> = None;
+
+        let mut sorted: Vec<&MenuEntry> = entries.iter().collect();
+        sorted.sort_by(|a, b| {
+            let ga = a.group.as_deref().unwrap_or("");
+            let gb = b.group.as_deref().unwrap_or("");
+            ga.cmp(gb).then(a.order.cmp(&b.order))
+        });
+
+        for entry in &sorted {
+            let group = entry.group.as_deref().unwrap_or("");
+            if let Some(lg) = last_group {
+                if lg != group {
+                    items.push(MenuVisualItem::Separator);
+                }
+            }
+            items.push(MenuVisualItem::Entry(entry.command_id.clone()));
+            last_group = Some(group);
+        }
+
+        Self::optimize(&items)
+    }
+
+    /// Count the number of separators in an optimized list.
+    pub fn separator_count(items: &[MenuVisualItem]) -> usize {
+        items.iter().filter(|i| matches!(i, MenuVisualItem::Separator)).count()
+    }
+
+    /// Count the number of entries in a list.
+    pub fn entry_count(items: &[MenuVisualItem]) -> usize {
+        items.iter().filter(|i| matches!(i, MenuVisualItem::Entry(_))).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuBarRoleFilter – filter entries based on user roles
+// ---------------------------------------------------------------------------
+
+/// User role for role-based menu filtering.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum UserRole {
+    Admin,
+    Developer,
+    Viewer,
+    Custom(String),
+}
+
+impl UserRole {
+    pub fn label(&self) -> &str {
+        match self {
+            UserRole::Admin => "admin",
+            UserRole::Developer => "developer",
+            UserRole::Viewer => "viewer",
+            UserRole::Custom(s) => s.as_str(),
+        }
+    }
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label())
+    }
+}
+
+/// Filters menu entries based on user roles.  Each entry may have a `when`
+/// clause containing "role:<name>".  If present, only users with that role
+/// see the entry.
+pub struct MenuBarRoleFilter;
+
+impl MenuBarRoleFilter {
+    /// Filter entries to only those accessible by the given roles.
+    pub fn filter<'a>(entries: &'a [MenuEntry], roles: &[UserRole]) -> Vec<&'a MenuEntry> {
+        entries.iter().filter(|e| Self::is_allowed(e, roles)).collect()
+    }
+
+    /// Whether a single entry is allowed for the given roles.
+    pub fn is_allowed(entry: &MenuEntry, roles: &[UserRole]) -> bool {
+        let when = match &entry.when {
+            Some(w) => w,
+            None => return true, // no constraint
+        };
+        if !when.contains("role:") {
+            return true; // not a role constraint
+        }
+        for role in roles {
+            let needle = format!("role:{}", role.label());
+            if when.contains(&needle) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Count how many entries are hidden for a given set of roles.
+    pub fn hidden_count(entries: &[MenuEntry], roles: &[UserRole]) -> usize {
+        entries.len() - Self::filter(entries, roles).len()
+    }
+
+    /// Return the command IDs of hidden entries.
+    pub fn hidden_commands(entries: &[MenuEntry], roles: &[UserRole]) -> Vec<String> {
+        entries.iter()
+            .filter(|e| !Self::is_allowed(e, roles))
+            .map(|e| e.command_id.clone())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2255,4 +2573,258 @@ mod tests {
         let ov = MenuBarOverflow::new(5);
         assert!(format!("{ov}").contains("max=5"));
     }
+
+    // -- MenuBarRecentlyUsed tests --
+
+    #[test]
+    fn recently_used_empty() {
+        let ru = MenuBarRecentlyUsed::new(5);
+        assert!(ru.is_empty());
+        assert_eq!(ru.len(), 0);
+        assert_eq!(ru.most_recent(), None);
+        assert_eq!(ru.capacity(), 5);
+    }
+
+    #[test]
+    fn recently_used_record() {
+        let mut ru = MenuBarRecentlyUsed::new(3);
+        ru.record("file.save");
+        ru.record("edit.copy");
+        ru.record("edit.paste");
+
+        assert_eq!(ru.len(), 3);
+        assert_eq!(ru.most_recent(), Some("edit.paste"));
+        assert_eq!(ru.rank("edit.paste"), Some(0));
+        assert_eq!(ru.rank("edit.copy"), Some(1));
+        assert_eq!(ru.rank("file.save"), Some(2));
+    }
+
+    #[test]
+    fn recently_used_dedup_and_reorder() {
+        let mut ru = MenuBarRecentlyUsed::new(5);
+        ru.record("a");
+        ru.record("b");
+        ru.record("a"); // should move to front
+        assert_eq!(ru.len(), 2);
+        assert_eq!(ru.most_recent(), Some("a"));
+        assert_eq!(ru.rank("b"), Some(1));
+    }
+
+    #[test]
+    fn recently_used_max_capacity() {
+        let mut ru = MenuBarRecentlyUsed::new(2);
+        ru.record("a");
+        ru.record("b");
+        ru.record("c"); // pushes "a" out
+        assert_eq!(ru.len(), 2);
+        assert!(!ru.contains("a"));
+        assert!(ru.contains("b"));
+        assert!(ru.contains("c"));
+    }
+
+    #[test]
+    fn recently_used_remove() {
+        let mut ru = MenuBarRecentlyUsed::new(5);
+        ru.record("a");
+        ru.record("b");
+        ru.remove("a");
+        assert!(!ru.contains("a"));
+        assert_eq!(ru.len(), 1);
+    }
+
+    #[test]
+    fn recently_used_clear() {
+        let mut ru = MenuBarRecentlyUsed::new(5);
+        ru.record("x");
+        ru.clear();
+        assert!(ru.is_empty());
+    }
+
+    // -- MenuBarCommandSearch tests --
+
+    fn build_search_service() -> MenuBarService {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, MenuEntry {
+            command_id: "file.save".to_string(),
+            title: "Save".to_string(),
+            group: None, order: 0, when: None, enabled: true,
+            shortcut: Some("Ctrl+S".to_string()),
+        });
+        svc.add_entry(&MenuId::File, MenuEntry {
+            command_id: "file.saveAs".to_string(),
+            title: "Save As".to_string(),
+            group: None, order: 1, when: None, enabled: true,
+            shortcut: None,
+        });
+        svc.add_entry(&MenuId::Edit, MenuEntry {
+            command_id: "edit.copy".to_string(),
+            title: "Copy".to_string(),
+            group: None, order: 0, when: None, enabled: true,
+            shortcut: Some("Ctrl+C".to_string()),
+        });
+        svc
+    }
+
+    #[test]
+    fn command_search_basic() {
+        let svc = build_search_service();
+        let results = MenuBarCommandSearch::search(&svc, "save");
+        assert_eq!(results.len(), 2);
+        // Higher score first: "Save" title starts with query
+        assert!(results[0].score >= results[1].score);
+    }
+
+    #[test]
+    fn command_search_no_results() {
+        let svc = build_search_service();
+        let results = MenuBarCommandSearch::search(&svc, "zzzzz");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn command_search_top() {
+        let svc = build_search_service();
+        let results = MenuBarCommandSearch::search_top(&svc, "save", 1);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn command_search_in_menu() {
+        let svc = build_search_service();
+        let results = MenuBarCommandSearch::search_in_menu(&svc, &MenuId::Edit, "copy");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].command_id, "edit.copy");
+    }
+
+    // -- MenuBarSeparatorOptimizer tests --
+
+    #[test]
+    fn separator_optimize_removes_leading() {
+        let items = vec![
+            MenuVisualItem::Separator,
+            MenuVisualItem::Entry("a".into()),
+        ];
+        let opt = MenuBarSeparatorOptimizer::optimize(&items);
+        assert_eq!(opt, vec![MenuVisualItem::Entry("a".into())]);
+    }
+
+    #[test]
+    fn separator_optimize_removes_trailing() {
+        let items = vec![
+            MenuVisualItem::Entry("a".into()),
+            MenuVisualItem::Separator,
+        ];
+        let opt = MenuBarSeparatorOptimizer::optimize(&items);
+        assert_eq!(opt, vec![MenuVisualItem::Entry("a".into())]);
+    }
+
+    #[test]
+    fn separator_optimize_dedup_consecutive() {
+        let items = vec![
+            MenuVisualItem::Entry("a".into()),
+            MenuVisualItem::Separator,
+            MenuVisualItem::Separator,
+            MenuVisualItem::Entry("b".into()),
+        ];
+        let opt = MenuBarSeparatorOptimizer::optimize(&items);
+        assert_eq!(opt, vec![
+            MenuVisualItem::Entry("a".into()),
+            MenuVisualItem::Separator,
+            MenuVisualItem::Entry("b".into()),
+        ]);
+    }
+
+    #[test]
+    fn separator_build_from_entries() {
+        let entries = vec![
+            MenuEntry {
+                command_id: "a".into(), title: "A".into(),
+                group: Some("1".into()), order: 0, when: None,
+                enabled: true, shortcut: None,
+            },
+            MenuEntry {
+                command_id: "b".into(), title: "B".into(),
+                group: Some("2".into()), order: 0, when: None,
+                enabled: true, shortcut: None,
+            },
+        ];
+        let items = MenuBarSeparatorOptimizer::build_from_entries(&entries);
+        assert_eq!(MenuBarSeparatorOptimizer::separator_count(&items), 1);
+        assert_eq!(MenuBarSeparatorOptimizer::entry_count(&items), 2);
+    }
+
+    // -- MenuBarRoleFilter tests --
+
+    #[test]
+    fn role_filter_no_when() {
+        let entry = MenuEntry {
+            command_id: "open".into(), title: "Open".into(),
+            group: None, order: 0, when: None,
+            enabled: true, shortcut: None,
+        };
+        assert!(MenuBarRoleFilter::is_allowed(&entry, &[UserRole::Viewer]));
+    }
+
+    #[test]
+    fn role_filter_role_match() {
+        let entry = MenuEntry {
+            command_id: "deploy".into(), title: "Deploy".into(),
+            group: None, order: 0,
+            when: Some("role:admin".into()),
+            enabled: true, shortcut: None,
+        };
+        assert!(MenuBarRoleFilter::is_allowed(&entry, &[UserRole::Admin]));
+        assert!(!MenuBarRoleFilter::is_allowed(&entry, &[UserRole::Viewer]));
+    }
+
+    #[test]
+    fn role_filter_non_role_when() {
+        let entry = MenuEntry {
+            command_id: "x".into(), title: "X".into(),
+            group: None, order: 0,
+            when: Some("editorLangId == rust".into()),
+            enabled: true, shortcut: None,
+        };
+        // Non-role when clauses always pass
+        assert!(MenuBarRoleFilter::is_allowed(&entry, &[UserRole::Viewer]));
+    }
+
+    #[test]
+    fn role_filter_hidden_count() {
+        let entries = vec![
+            MenuEntry {
+                command_id: "a".into(), title: "A".into(),
+                group: None, order: 0, when: Some("role:admin".into()),
+                enabled: true, shortcut: None,
+            },
+            MenuEntry {
+                command_id: "b".into(), title: "B".into(),
+                group: None, order: 0, when: None,
+                enabled: true, shortcut: None,
+            },
+        ];
+        assert_eq!(MenuBarRoleFilter::hidden_count(&entries, &[UserRole::Viewer]), 1);
+        assert_eq!(MenuBarRoleFilter::hidden_count(&entries, &[UserRole::Admin]), 0);
+    }
+
+    #[test]
+    fn role_filter_hidden_commands() {
+        let entries = vec![
+            MenuEntry {
+                command_id: "secret".into(), title: "Secret".into(),
+                group: None, order: 0, when: Some("role:admin".into()),
+                enabled: true, shortcut: None,
+            },
+        ];
+        let hidden = MenuBarRoleFilter::hidden_commands(&entries, &[UserRole::Developer]);
+        assert_eq!(hidden, vec!["secret".to_string()]);
+    }
+
+    #[test]
+    fn user_role_display() {
+        assert_eq!(format!("{}", UserRole::Admin), "admin");
+        assert_eq!(format!("{}", UserRole::Developer), "developer");
+        assert_eq!(format!("{}", UserRole::Custom("tester".into())), "tester");
+    }
+
 }

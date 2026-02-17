@@ -1268,6 +1268,382 @@ impl TreeViewPaginator {
     }
 }
 
+
+// ── Multi-Select ──
+
+/// Tracks multiple selected indices in a tree view, supporting range and toggle.
+#[derive(Debug, Clone)]
+pub struct TreeViewMultiSelect {
+    selected: Vec<usize>,
+    anchor: Option<usize>,
+    total_items: usize,
+}
+
+impl TreeViewMultiSelect {
+    /// Create a new multi-select tracker for a tree with `total_items` items.
+    pub fn new(total_items: usize) -> Self {
+        Self {
+            selected: Vec::new(),
+            anchor: None,
+            total_items,
+        }
+    }
+
+    /// Toggle selection of a single index.
+    pub fn toggle(&mut self, index: usize) {
+        if index >= self.total_items {
+            return;
+        }
+        if let Some(pos) = self.selected.iter().position(|&i| i == index) {
+            self.selected.remove(pos);
+        } else {
+            self.selected.push(index);
+            self.selected.sort_unstable();
+        }
+        self.anchor = Some(index);
+    }
+
+    /// Select a contiguous range from the anchor to `end` (inclusive).
+    pub fn select_range(&mut self, end: usize) {
+        let end = end.min(self.total_items.saturating_sub(1));
+        let start = self.anchor.unwrap_or(0);
+        let (lo, hi) = if start <= end { (start, end) } else { (end, start) };
+        for idx in lo..=hi {
+            if !self.selected.contains(&idx) {
+                self.selected.push(idx);
+            }
+        }
+        self.selected.sort_unstable();
+    }
+
+    /// Clear the entire selection.
+    pub fn clear(&mut self) {
+        self.selected.clear();
+        self.anchor = None;
+    }
+
+    /// Select all items.
+    pub fn select_all(&mut self) {
+        self.selected = (0..self.total_items).collect();
+        self.anchor = Some(0);
+    }
+
+    /// Return the currently selected indices.
+    pub fn selected_indices(&self) -> &[usize] {
+        &self.selected
+    }
+
+    /// Number of selected items.
+    pub fn count(&self) -> usize {
+        self.selected.len()
+    }
+
+    /// Whether a particular index is selected.
+    pub fn is_selected(&self, index: usize) -> bool {
+        self.selected.contains(&index)
+    }
+
+    /// Invert the selection.
+    pub fn invert(&mut self) {
+        let new: Vec<usize> = (0..self.total_items)
+            .filter(|i| !self.selected.contains(i))
+            .collect();
+        self.selected = new;
+    }
+}
+
+// ── Search Overlay ──
+
+/// A search overlay for filtering tree view items by label.
+#[derive(Debug, Clone)]
+pub struct TreeViewSearchOverlay {
+    query: String,
+    case_sensitive: bool,
+    matched_indices: Vec<usize>,
+    current_match: Option<usize>,
+}
+
+impl TreeViewSearchOverlay {
+    pub fn new() -> Self {
+        Self {
+            query: String::new(),
+            case_sensitive: false,
+            matched_indices: Vec::new(),
+            current_match: None,
+        }
+    }
+
+    /// Set the search query and run the match against items.
+    pub fn search(&mut self, query: &str, items: &[TreeItem]) {
+        self.query = query.to_string();
+        self.matched_indices.clear();
+        self.current_match = None;
+
+        if query.is_empty() {
+            return;
+        }
+
+        let q = if self.case_sensitive {
+            query.to_string()
+        } else {
+            query.to_lowercase()
+        };
+
+        for (i, item) in items.iter().enumerate() {
+            let label = if self.case_sensitive {
+                item.label.clone()
+            } else {
+                item.label.to_lowercase()
+            };
+            if label.contains(&q) {
+                self.matched_indices.push(i);
+            }
+        }
+        if !self.matched_indices.is_empty() {
+            self.current_match = Some(0);
+        }
+    }
+
+    /// Toggle case sensitivity.
+    pub fn set_case_sensitive(&mut self, yes: bool) {
+        self.case_sensitive = yes;
+    }
+
+    /// Move to the next match, wrapping around.
+    pub fn next_match(&mut self) -> Option<usize> {
+        if self.matched_indices.is_empty() {
+            return None;
+        }
+        let next = match self.current_match {
+            Some(i) => (i + 1) % self.matched_indices.len(),
+            None => 0,
+        };
+        self.current_match = Some(next);
+        Some(self.matched_indices[next])
+    }
+
+    /// Move to the previous match, wrapping around.
+    pub fn prev_match(&mut self) -> Option<usize> {
+        if self.matched_indices.is_empty() {
+            return None;
+        }
+        let prev = match self.current_match {
+            Some(0) => self.matched_indices.len() - 1,
+            Some(i) => i - 1,
+            None => self.matched_indices.len() - 1,
+        };
+        self.current_match = Some(prev);
+        Some(self.matched_indices[prev])
+    }
+
+    /// Number of matched items.
+    pub fn match_count(&self) -> usize {
+        self.matched_indices.len()
+    }
+
+    /// The current query string.
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    /// Whether the search is active.
+    pub fn is_active(&self) -> bool {
+        !self.query.is_empty()
+    }
+
+    /// Clear the search.
+    pub fn clear(&mut self) {
+        self.query.clear();
+        self.matched_indices.clear();
+        self.current_match = None;
+    }
+}
+
+// ── Keyboard Navigation ──
+
+/// Keyboard navigation state for a tree view.
+#[derive(Debug, Clone)]
+pub struct TreeViewKeyboardNav {
+    focused_index: Option<usize>,
+    item_count: usize,
+}
+
+impl TreeViewKeyboardNav {
+    pub fn new(item_count: usize) -> Self {
+        Self {
+            focused_index: if item_count > 0 { Some(0) } else { None },
+            item_count,
+        }
+    }
+
+    /// Move focus down by one item.
+    pub fn move_down(&mut self) {
+        if self.item_count == 0 {
+            return;
+        }
+        self.focused_index = Some(match self.focused_index {
+            Some(i) if i + 1 < self.item_count => i + 1,
+            Some(i) => i,
+            None => 0,
+        });
+    }
+
+    /// Move focus up by one item.
+    pub fn move_up(&mut self) {
+        if self.item_count == 0 {
+            return;
+        }
+        self.focused_index = Some(match self.focused_index {
+            Some(0) => 0,
+            Some(i) => i - 1,
+            None => 0,
+        });
+    }
+
+    /// Jump to the first item.
+    pub fn move_to_first(&mut self) {
+        if self.item_count > 0 {
+            self.focused_index = Some(0);
+        }
+    }
+
+    /// Jump to the last item.
+    pub fn move_to_last(&mut self) {
+        if self.item_count > 0 {
+            self.focused_index = Some(self.item_count - 1);
+        }
+    }
+
+    /// Page down by `page_size` items.
+    pub fn page_down(&mut self, page_size: usize) {
+        if self.item_count == 0 {
+            return;
+        }
+        let current = self.focused_index.unwrap_or(0);
+        self.focused_index = Some((current + page_size).min(self.item_count - 1));
+    }
+
+    /// Page up by `page_size` items.
+    pub fn page_up(&mut self, page_size: usize) {
+        if self.item_count == 0 {
+            return;
+        }
+        let current = self.focused_index.unwrap_or(0);
+        self.focused_index = Some(current.saturating_sub(page_size));
+    }
+
+    /// The currently focused index.
+    pub fn focused(&self) -> Option<usize> {
+        self.focused_index
+    }
+
+    /// Update the total item count (e.g. after filtering).
+    pub fn set_item_count(&mut self, count: usize) {
+        self.item_count = count;
+        if count == 0 {
+            self.focused_index = None;
+        } else if let Some(i) = self.focused_index {
+            if i >= count {
+                self.focused_index = Some(count - 1);
+            }
+        }
+    }
+}
+
+// ── Context Menu Builder ──
+
+/// An action entry within a context menu.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContextMenuAction {
+    pub id: String,
+    pub label: String,
+    pub icon: Option<String>,
+    pub enabled: bool,
+    pub group: Option<String>,
+}
+
+/// Builder for assembling a context menu for tree view items.
+#[derive(Debug, Clone)]
+pub struct TreeViewContextMenuBuilder {
+    actions: Vec<ContextMenuAction>,
+}
+
+impl TreeViewContextMenuBuilder {
+    pub fn new() -> Self {
+        Self {
+            actions: Vec::new(),
+        }
+    }
+
+    /// Add an action to the context menu.
+    pub fn add_action(mut self, id: &str, label: &str) -> Self {
+        self.actions.push(ContextMenuAction {
+            id: id.to_string(),
+            label: label.to_string(),
+            icon: None,
+            enabled: true,
+            group: None,
+        });
+        self
+    }
+
+    /// Add an action with icon.
+    pub fn add_action_with_icon(mut self, id: &str, label: &str, icon: &str) -> Self {
+        self.actions.push(ContextMenuAction {
+            id: id.to_string(),
+            label: label.to_string(),
+            icon: Some(icon.to_string()),
+            enabled: true,
+            group: None,
+        });
+        self
+    }
+
+    /// Add a disabled action.
+    pub fn add_disabled(mut self, id: &str, label: &str) -> Self {
+        self.actions.push(ContextMenuAction {
+            id: id.to_string(),
+            label: label.to_string(),
+            icon: None,
+            enabled: false,
+            group: None,
+        });
+        self
+    }
+
+    /// Assign a group to the last added action.
+    pub fn with_group(mut self, group: &str) -> Self {
+        if let Some(last) = self.actions.last_mut() {
+            last.group = Some(group.to_string());
+        }
+        self
+    }
+
+    /// Build the final list of actions.
+    pub fn build(self) -> Vec<ContextMenuAction> {
+        self.actions
+    }
+
+    /// Return only enabled actions.
+    pub fn enabled_actions(&self) -> Vec<&ContextMenuAction> {
+        self.actions.iter().filter(|a| a.enabled).collect()
+    }
+
+    /// Return actions grouped by their group label (None key for ungrouped).
+    pub fn grouped(&self) -> HashMap<Option<String>, Vec<&ContextMenuAction>> {
+        let mut map: HashMap<Option<String>, Vec<&ContextMenuAction>> = HashMap::new();
+        for action in &self.actions {
+            map.entry(action.group.clone()).or_default().push(action);
+        }
+        map
+    }
+
+    /// Number of actions.
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2233,4 +2609,183 @@ mod tests {
         let pager = TreeViewPaginator::new(0);
         assert_eq!(pager.total_pages(5), 5); // page_size clamped to 1
     }
+
+    // ── Multi-select tests ──
+
+    #[test]
+    fn multi_select_toggle() {
+        let mut ms = TreeViewMultiSelect::new(10);
+        ms.toggle(3);
+        ms.toggle(5);
+        assert_eq!(ms.count(), 2);
+        assert!(ms.is_selected(3));
+        assert!(ms.is_selected(5));
+        ms.toggle(3);
+        assert_eq!(ms.count(), 1);
+        assert!(!ms.is_selected(3));
+    }
+
+    #[test]
+    fn multi_select_range() {
+        let mut ms = TreeViewMultiSelect::new(10);
+        ms.toggle(2);
+        ms.select_range(6);
+        assert_eq!(ms.count(), 5);
+        assert!(ms.is_selected(2));
+        assert!(ms.is_selected(4));
+        assert!(ms.is_selected(6));
+    }
+
+    #[test]
+    fn multi_select_all_and_clear() {
+        let mut ms = TreeViewMultiSelect::new(5);
+        ms.select_all();
+        assert_eq!(ms.count(), 5);
+        ms.clear();
+        assert_eq!(ms.count(), 0);
+    }
+
+    #[test]
+    fn multi_select_invert() {
+        let mut ms = TreeViewMultiSelect::new(5);
+        ms.toggle(1);
+        ms.toggle(3);
+        ms.invert();
+        assert_eq!(ms.count(), 3);
+        assert!(ms.is_selected(0));
+        assert!(ms.is_selected(2));
+        assert!(ms.is_selected(4));
+    }
+
+    #[test]
+    fn multi_select_out_of_range_ignored() {
+        let mut ms = TreeViewMultiSelect::new(3);
+        ms.toggle(10);
+        assert_eq!(ms.count(), 0);
+    }
+
+    // ── Search overlay tests ──
+
+    #[test]
+    fn search_overlay_basic() {
+        let mut so = TreeViewSearchOverlay::new();
+        let items = make_items(5);
+        so.search("Item 2", &items);
+        assert_eq!(so.match_count(), 1);
+        assert!(so.is_active());
+    }
+
+    #[test]
+    fn search_overlay_case_insensitive() {
+        let mut so = TreeViewSearchOverlay::new();
+        let items = make_items(3);
+        so.search("item", &items);
+        assert_eq!(so.match_count(), 3);
+    }
+
+    #[test]
+    fn search_overlay_next_prev() {
+        let mut so = TreeViewSearchOverlay::new();
+        let items = make_items(5);
+        so.search("item", &items);
+        let first = so.next_match();
+        assert_eq!(first, Some(1)); // wraps from 0->1
+        let prev = so.prev_match();
+        assert_eq!(prev, Some(0));
+    }
+
+    #[test]
+    fn search_overlay_clear() {
+        let mut so = TreeViewSearchOverlay::new();
+        let items = make_items(3);
+        so.search("Item", &items);
+        so.clear();
+        assert!(!so.is_active());
+        assert_eq!(so.match_count(), 0);
+    }
+
+    // ── Keyboard nav tests ──
+
+    #[test]
+    fn keyboard_nav_move_down_up() {
+        let mut nav = TreeViewKeyboardNav::new(5);
+        assert_eq!(nav.focused(), Some(0));
+        nav.move_down();
+        assert_eq!(nav.focused(), Some(1));
+        nav.move_up();
+        assert_eq!(nav.focused(), Some(0));
+        nav.move_up();
+        assert_eq!(nav.focused(), Some(0)); // stays at 0
+    }
+
+    #[test]
+    fn keyboard_nav_first_last() {
+        let mut nav = TreeViewKeyboardNav::new(10);
+        nav.move_to_last();
+        assert_eq!(nav.focused(), Some(9));
+        nav.move_to_first();
+        assert_eq!(nav.focused(), Some(0));
+    }
+
+    #[test]
+    fn keyboard_nav_page() {
+        let mut nav = TreeViewKeyboardNav::new(20);
+        nav.page_down(5);
+        assert_eq!(nav.focused(), Some(5));
+        nav.page_up(3);
+        assert_eq!(nav.focused(), Some(2));
+    }
+
+    #[test]
+    fn keyboard_nav_set_item_count_clamps() {
+        let mut nav = TreeViewKeyboardNav::new(10);
+        nav.move_to_last();
+        nav.set_item_count(5);
+        assert_eq!(nav.focused(), Some(4));
+        nav.set_item_count(0);
+        assert_eq!(nav.focused(), None);
+    }
+
+    // ── Context menu tests ──
+
+    #[test]
+    fn context_menu_builder_basic() {
+        let menu = TreeViewContextMenuBuilder::new()
+            .add_action("copy", "Copy")
+            .add_action("paste", "Paste")
+            .add_disabled("cut", "Cut")
+            .build();
+        assert_eq!(menu.len(), 3);
+        assert!(!menu[2].enabled);
+    }
+
+    #[test]
+    fn context_menu_enabled_actions() {
+        let builder = TreeViewContextMenuBuilder::new()
+            .add_action("a", "A")
+            .add_disabled("b", "B")
+            .add_action("c", "C");
+        let enabled = builder.enabled_actions();
+        assert_eq!(enabled.len(), 2);
+    }
+
+    #[test]
+    fn context_menu_grouped() {
+        let builder = TreeViewContextMenuBuilder::new()
+            .add_action("a", "A").with_group("edit")
+            .add_action("b", "B").with_group("edit")
+            .add_action("c", "C").with_group("file");
+        let groups = builder.grouped();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[&Some("edit".to_string())].len(), 2);
+    }
+
+    #[test]
+    fn context_menu_with_icon() {
+        let menu = TreeViewContextMenuBuilder::new()
+            .add_action_with_icon("del", "Delete", "trash")
+            .build();
+        assert_eq!(menu[0].icon.as_deref(), Some("trash"));
+    }
+
 }

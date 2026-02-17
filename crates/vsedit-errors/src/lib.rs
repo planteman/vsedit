@@ -1456,6 +1456,312 @@ impl ErrorContextBuilder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ErrorBoundaryHandler - error boundary handler
+// ---------------------------------------------------------------------------
+
+/// Severity level for error boundary handler issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ErrorBoundaryHandlerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ErrorBoundaryHandlerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ErrorBoundaryHandler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorBoundaryHandlerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ErrorBoundaryHandlerSeverity,
+    pub detail: Option<String>,
+    pub error_count: usize,
+    enabled: bool,
+}
+
+impl ErrorBoundaryHandlerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ErrorBoundaryHandlerSeverity::Low,
+            detail: None,
+            error_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ErrorBoundaryHandlerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_error_count(mut self, val: usize) -> Self {
+        self.error_count = val;
+        self
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.enabled && self.severity >= ErrorBoundaryHandlerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.error_count, det)
+    }
+}
+
+impl fmt::Display for ErrorBoundaryHandlerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ErrorBoundaryHandlerEntry] items.
+#[derive(Debug, Clone)]
+pub struct ErrorBoundaryHandler {
+    entries: Vec<ErrorBoundaryHandlerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ErrorBoundaryHandler {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ErrorBoundaryHandlerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ErrorBoundaryHandlerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ErrorBoundaryHandlerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn error_count(&self) -> usize { self.entries.len() }
+
+    pub fn has_errors(&self) -> bool {
+        self.entries.iter().any(|e| e.has_errors())
+    }
+
+    pub fn entries_by_severity(&self, severity: ErrorBoundaryHandlerSeverity) -> Vec<&ErrorBoundaryHandlerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ErrorBoundaryHandlerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ErrorBoundaryHandlerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ErrorBoundaryHandlerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ErrorDialogFormatter - error dialog formatter
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ErrorDialogFormatter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorDialogFormatterConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub boundary_depth: usize,
+}
+
+impl ErrorDialogFormatterConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, boundary_depth: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_boundary_depth(mut self, val: usize) -> Self { self.boundary_depth = val; self }
+}
+
+impl Default for ErrorDialogFormatterConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ErrorDialogFormatter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorDialogFormatterItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ErrorDialogFormatterItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_recoverable(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ErrorDialogFormatterItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ErrorDialogFormatterItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ErrorDialogFormatter {
+    config: ErrorDialogFormatterConfig,
+    items: Vec<ErrorDialogFormatterItem>,
+}
+
+impl ErrorDialogFormatter {
+    pub fn new(config: ErrorDialogFormatterConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ErrorDialogFormatterItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ErrorDialogFormatterItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ErrorDialogFormatterItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn boundary_depth(&self) -> usize { self.items.len() }
+
+    pub fn is_recoverable(&self) -> bool {
+        self.items.iter().any(|i| i.is_recoverable())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ErrorDialogFormatterItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ErrorDialogFormatterItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ErrorDialogFormatterConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2344,4 +2650,146 @@ mod tests {
         assert_eq!(empty.build_message(), "");
     }
 
+
+#[test]
+    fn errorboundaryhandler_severity_ordering() {
+        assert!(ErrorBoundaryHandlerSeverity::Critical > ErrorBoundaryHandlerSeverity::High);
+        assert!(ErrorBoundaryHandlerSeverity::High > ErrorBoundaryHandlerSeverity::Medium);
+        assert!(ErrorBoundaryHandlerSeverity::Medium > ErrorBoundaryHandlerSeverity::Low);
+    }
+
+    #[test]
+    fn errorboundaryhandler_severity_display() {
+        assert_eq!(ErrorBoundaryHandlerSeverity::Low.to_string(), "low");
+        assert_eq!(ErrorBoundaryHandlerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn errorboundaryhandler_entry_creation() {
+        let e = ErrorBoundaryHandlerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ErrorBoundaryHandlerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn errorboundaryhandler_entry_builder() {
+        let e = ErrorBoundaryHandlerEntry::new("e2", "Entry 2")
+            .with_severity(ErrorBoundaryHandlerSeverity::High)
+            .with_detail("some detail")
+            .with_error_count(42);
+        assert_eq!(e.severity, ErrorBoundaryHandlerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.error_count, 42);
+    }
+
+    #[test]
+    fn errorboundaryhandler_entry_enable_disable() {
+        let mut e = ErrorBoundaryHandlerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn errorboundaryhandler_add_and_count() {
+        let mut mgr = ErrorBoundaryHandler::new("test");
+        mgr.add(ErrorBoundaryHandlerEntry::new("a", "A"));
+        mgr.add(ErrorBoundaryHandlerEntry::new("b", "B").with_severity(ErrorBoundaryHandlerSeverity::High));
+        assert_eq!(mgr.error_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn errorboundaryhandler_remove() {
+        let mut mgr = ErrorBoundaryHandler::new("test");
+        mgr.add(ErrorBoundaryHandlerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn errorboundaryhandler_capacity() {
+        let mut mgr = ErrorBoundaryHandler::new("test").with_capacity(1);
+        assert!(mgr.add(ErrorBoundaryHandlerEntry::new("a", "A")));
+        assert!(!mgr.add(ErrorBoundaryHandlerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn errorboundaryhandler_sorted_by_severity() {
+        let mut mgr = ErrorBoundaryHandler::new("test");
+        mgr.add(ErrorBoundaryHandlerEntry::new("lo", "Low"));
+        mgr.add(ErrorBoundaryHandlerEntry::new("hi", "High").with_severity(ErrorBoundaryHandlerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ErrorBoundaryHandlerSeverity::Critical);
+    }
+
+    #[test]
+    fn errorboundaryhandler_summary() {
+        let mgr = ErrorBoundaryHandler::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn errordialogformatter_config_defaults() {
+        let cfg = ErrorDialogFormatterConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn errordialogformatter_item_creation() {
+        let item = ErrorDialogFormatterItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn errordialogformatter_add_and_get() {
+        let mut mgr = ErrorDialogFormatter::new(ErrorDialogFormatterConfig::new("test"));
+        mgr.add(ErrorDialogFormatterItem::new("k1", "v1"));
+        assert_eq!(mgr.boundary_depth(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn errordialogformatter_remove_item() {
+        let mut mgr = ErrorDialogFormatter::new(ErrorDialogFormatterConfig::new("test"));
+        mgr.add(ErrorDialogFormatterItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn errordialogformatter_sorted_by_priority() {
+        let mut mgr = ErrorDialogFormatter::new(ErrorDialogFormatterConfig::new("test"));
+        mgr.add(ErrorDialogFormatterItem::new("lo", "low").with_priority(1));
+        mgr.add(ErrorDialogFormatterItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn errordialogformatter_items_with_tag() {
+        let mut mgr = ErrorDialogFormatter::new(ErrorDialogFormatterConfig::new("test"));
+        mgr.add(ErrorDialogFormatterItem::new("a", "1").with_tag("x"));
+        mgr.add(ErrorDialogFormatterItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn errordialogformatter_report() {
+        let mgr = ErrorDialogFormatter::new(ErrorDialogFormatterConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
+    }
 }

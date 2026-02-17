@@ -1239,6 +1239,312 @@ impl Selection {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SelectionComparator - selection comparator
+// ---------------------------------------------------------------------------
+
+/// Severity level for selection comparator issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SelectionComparatorSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for SelectionComparatorSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [SelectionComparator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectionComparatorEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: SelectionComparatorSeverity,
+    pub detail: Option<String>,
+    pub selection_count: usize,
+    enabled: bool,
+}
+
+impl SelectionComparatorEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: SelectionComparatorSeverity::Low,
+            detail: None,
+            selection_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: SelectionComparatorSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_selection_count(mut self, val: usize) -> Self {
+        self.selection_count = val;
+        self
+    }
+
+    pub fn are_equal(&self) -> bool {
+        self.enabled && self.severity >= SelectionComparatorSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.selection_count, det)
+    }
+}
+
+impl fmt::Display for SelectionComparatorEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [SelectionComparatorEntry] items.
+#[derive(Debug, Clone)]
+pub struct SelectionComparator {
+    entries: Vec<SelectionComparatorEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl SelectionComparator {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: SelectionComparatorEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<SelectionComparatorEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&SelectionComparatorEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn selection_count(&self) -> usize { self.entries.len() }
+
+    pub fn are_equal(&self) -> bool {
+        self.entries.iter().any(|e| e.are_equal())
+    }
+
+    pub fn entries_by_severity(&self, severity: SelectionComparatorSeverity) -> Vec<&SelectionComparatorEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= SelectionComparatorSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&SelectionComparatorEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&SelectionComparatorEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RangeMerger - range merger utility
+// ---------------------------------------------------------------------------
+
+/// Configuration for [RangeMerger].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RangeMergerConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub range_count: usize,
+}
+
+impl RangeMergerConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, range_count: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_range_count(mut self, val: usize) -> Self { self.range_count = val; self }
+}
+
+impl Default for RangeMergerConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [RangeMerger].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RangeMergerItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl RangeMergerItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn can_merge(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for RangeMergerItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [RangeMergerItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct RangeMerger {
+    config: RangeMergerConfig,
+    items: Vec<RangeMergerItem>,
+}
+
+impl RangeMerger {
+    pub fn new(config: RangeMergerConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: RangeMergerItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<RangeMergerItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&RangeMergerItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn range_count(&self) -> usize { self.items.len() }
+
+    pub fn can_merge(&self) -> bool {
+        self.items.iter().any(|i| i.can_merge())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&RangeMergerItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&RangeMergerItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &RangeMergerConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2300,5 +2606,147 @@ mod tests {
         let sel = Selection::new(1, 1, 1, 10);
         assert!(sel.contains_position(&Position::new(1, 5)));
         assert!(!sel.contains_position(&Position::new(1, 10))); // exclusive end
+    }
+
+#[test]
+    fn selectioncomparator_severity_ordering() {
+        assert!(SelectionComparatorSeverity::Critical > SelectionComparatorSeverity::High);
+        assert!(SelectionComparatorSeverity::High > SelectionComparatorSeverity::Medium);
+        assert!(SelectionComparatorSeverity::Medium > SelectionComparatorSeverity::Low);
+    }
+
+    #[test]
+    fn selectioncomparator_severity_display() {
+        assert_eq!(SelectionComparatorSeverity::Low.to_string(), "low");
+        assert_eq!(SelectionComparatorSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn selectioncomparator_entry_creation() {
+        let e = SelectionComparatorEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, SelectionComparatorSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn selectioncomparator_entry_builder() {
+        let e = SelectionComparatorEntry::new("e2", "Entry 2")
+            .with_severity(SelectionComparatorSeverity::High)
+            .with_detail("some detail")
+            .with_selection_count(42);
+        assert_eq!(e.severity, SelectionComparatorSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.selection_count, 42);
+    }
+
+    #[test]
+    fn selectioncomparator_entry_enable_disable() {
+        let mut e = SelectionComparatorEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn selectioncomparator_add_and_count() {
+        let mut mgr = SelectionComparator::new("test");
+        mgr.add(SelectionComparatorEntry::new("a", "A"));
+        mgr.add(SelectionComparatorEntry::new("b", "B").with_severity(SelectionComparatorSeverity::High));
+        assert_eq!(mgr.selection_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn selectioncomparator_remove() {
+        let mut mgr = SelectionComparator::new("test");
+        mgr.add(SelectionComparatorEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn selectioncomparator_capacity() {
+        let mut mgr = SelectionComparator::new("test").with_capacity(1);
+        assert!(mgr.add(SelectionComparatorEntry::new("a", "A")));
+        assert!(!mgr.add(SelectionComparatorEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn selectioncomparator_sorted_by_severity() {
+        let mut mgr = SelectionComparator::new("test");
+        mgr.add(SelectionComparatorEntry::new("lo", "Low"));
+        mgr.add(SelectionComparatorEntry::new("hi", "High").with_severity(SelectionComparatorSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, SelectionComparatorSeverity::Critical);
+    }
+
+    #[test]
+    fn selectioncomparator_summary() {
+        let mgr = SelectionComparator::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn rangemerger_config_defaults() {
+        let cfg = RangeMergerConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn rangemerger_item_creation() {
+        let item = RangeMergerItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn rangemerger_add_and_get() {
+        let mut mgr = RangeMerger::new(RangeMergerConfig::new("test"));
+        mgr.add(RangeMergerItem::new("k1", "v1"));
+        assert_eq!(mgr.range_count(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn rangemerger_remove_item() {
+        let mut mgr = RangeMerger::new(RangeMergerConfig::new("test"));
+        mgr.add(RangeMergerItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn rangemerger_sorted_by_priority() {
+        let mut mgr = RangeMerger::new(RangeMergerConfig::new("test"));
+        mgr.add(RangeMergerItem::new("lo", "low").with_priority(1));
+        mgr.add(RangeMergerItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn rangemerger_items_with_tag() {
+        let mut mgr = RangeMerger::new(RangeMergerConfig::new("test"));
+        mgr.add(RangeMergerItem::new("a", "1").with_tag("x"));
+        mgr.add(RangeMergerItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn rangemerger_report() {
+        let mgr = RangeMerger::new(RangeMergerConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

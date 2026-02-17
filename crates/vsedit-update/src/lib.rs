@@ -1270,6 +1270,374 @@ impl UpdateService {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// UpdateChannelSelector
+// ---------------------------------------------------------------------------
+
+/// Manages channel selection and channel-specific update policies.
+#[derive(Debug, Clone)]
+pub struct UpdateChannelSelector {
+    current: UpdateChannel,
+    allowed: Vec<UpdateChannel>,
+}
+
+impl UpdateChannelSelector {
+    /// Create a selector defaulting to Stable with all channels allowed.
+    pub fn new() -> Self {
+        Self {
+            current: UpdateChannel::Stable,
+            allowed: UpdateChannel::all(),
+        }
+    }
+
+    /// Create a selector restricted to the given channels.
+    pub fn with_allowed(allowed: Vec<UpdateChannel>) -> Self {
+        let current = allowed.first().cloned().unwrap_or(UpdateChannel::Stable);
+        Self { current, allowed }
+    }
+
+    /// Get the currently selected channel.
+    pub fn current(&self) -> &UpdateChannel {
+        &self.current
+    }
+
+    /// Try to select a channel. Returns an error if the channel is not allowed.
+    pub fn select(&mut self, channel: UpdateChannel) -> Result<(), UpdateError> {
+        if !self.allowed.contains(&channel) {
+            return Err(UpdateError::InvalidVersion(format!(
+                "channel {} is not allowed",
+                channel
+            )));
+        }
+        self.current = channel;
+        Ok(())
+    }
+
+    /// Check whether a channel is in the allowed list.
+    pub fn is_allowed(&self, channel: &UpdateChannel) -> bool {
+        self.allowed.contains(channel)
+    }
+
+    /// Return the allowed channels.
+    pub fn allowed_channels(&self) -> &[UpdateChannel] {
+        &self.allowed
+    }
+
+    /// Whether the current channel receives preview/insider builds.
+    pub fn receives_previews(&self) -> bool {
+        self.current.is_preview()
+    }
+
+    /// Cycle to the next allowed channel, wrapping around.
+    pub fn cycle_next(&mut self) {
+        if self.allowed.is_empty() {
+            return;
+        }
+        let idx = self.allowed.iter().position(|c| c == &self.current).unwrap_or(0);
+        self.current = self.allowed[(idx + 1) % self.allowed.len()].clone();
+    }
+
+    /// Display name of the current channel.
+    pub fn display_name(&self) -> String {
+        format!("{}", self.current)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateRollback
+// ---------------------------------------------------------------------------
+
+/// An entry in the rollback history.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollbackEntry {
+    pub version: VersionParts,
+    pub channel: UpdateChannel,
+    pub timestamp_secs: u64,
+    pub reason: Option<String>,
+}
+
+impl RollbackEntry {
+    /// Create a new rollback entry.
+    pub fn new(version: VersionParts, channel: UpdateChannel, timestamp_secs: u64) -> Self {
+        Self {
+            version,
+            channel,
+            timestamp_secs,
+            reason: None,
+        }
+    }
+
+    /// Attach a rollback reason.
+    pub fn with_reason(mut self, reason: impl Into<String>) -> Self {
+        self.reason = Some(reason.into());
+        self
+    }
+}
+
+impl fmt::Display for RollbackEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "v{} ({})", self.version, self.channel)?;
+        if let Some(reason) = &self.reason {
+            write!(f, " — {reason}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Manages a list of previous versions that the user can roll back to.
+#[derive(Debug, Clone)]
+pub struct UpdateRollbackHistory {
+    entries: Vec<RollbackEntry>,
+    max_entries: usize,
+}
+
+impl UpdateRollbackHistory {
+    /// Create a history with a maximum capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record a new rollback entry.
+    pub fn push(&mut self, entry: RollbackEntry) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    /// Get all entries, oldest first.
+    pub fn entries(&self) -> &[RollbackEntry] {
+        &self.entries
+    }
+
+    /// Get the most recent entry.
+    pub fn latest(&self) -> Option<&RollbackEntry> {
+        self.entries.last()
+    }
+
+    /// Find entries for a specific channel.
+    pub fn for_channel(&self, channel: &UpdateChannel) -> Vec<&RollbackEntry> {
+        self.entries.iter().filter(|e| &e.channel == channel).collect()
+    }
+
+    /// Check if a specific version has been rolled back before.
+    pub fn was_rolled_back(&self, version: &VersionParts) -> bool {
+        self.entries.iter().any(|e| &e.version == version)
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Number of entries currently stored.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Update notification scheduler
+// ---------------------------------------------------------------------------
+
+/// When to show update notifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotificationPolicy {
+    /// Show immediately when an update is available.
+    Immediate,
+    /// Show after a delay (in seconds).
+    Delayed(u64),
+    /// Only show when the user opens the update panel.
+    OnDemand,
+    /// Never show notifications.
+    Silent,
+}
+
+/// Schedules and manages update notifications.
+#[derive(Debug, Clone)]
+pub struct UpdateNotificationScheduler {
+    policy: NotificationPolicy,
+    pending_version: Option<String>,
+    dismissed_versions: Vec<String>,
+    snooze_until_secs: Option<u64>,
+}
+
+impl UpdateNotificationScheduler {
+    /// Create a new scheduler with the given policy.
+    pub fn new(policy: NotificationPolicy) -> Self {
+        Self {
+            policy,
+            pending_version: None,
+            dismissed_versions: Vec::new(),
+            snooze_until_secs: None,
+        }
+    }
+
+    /// Set a pending update version.
+    pub fn set_pending(&mut self, version: impl Into<String>) {
+        self.pending_version = Some(version.into());
+    }
+
+    /// Dismiss the current notification.
+    pub fn dismiss(&mut self) {
+        if let Some(v) = self.pending_version.take() {
+            self.dismissed_versions.push(v);
+        }
+    }
+
+    /// Snooze notifications until a given timestamp.
+    pub fn snooze_until(&mut self, timestamp_secs: u64) {
+        self.snooze_until_secs = Some(timestamp_secs);
+    }
+
+    /// Check whether a notification should be shown at the given time.
+    pub fn should_show(&self, current_time_secs: u64) -> bool {
+        if self.policy == NotificationPolicy::Silent {
+            return false;
+        }
+        if self.policy == NotificationPolicy::OnDemand {
+            return false;
+        }
+        if let Some(snooze) = self.snooze_until_secs {
+            if current_time_secs < snooze {
+                return false;
+            }
+        }
+        if let Some(pending) = &self.pending_version {
+            if self.dismissed_versions.contains(pending) {
+                return false;
+            }
+            match self.policy {
+                NotificationPolicy::Immediate => true,
+                NotificationPolicy::Delayed(delay) => current_time_secs >= delay,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Return the pending version, if any.
+    pub fn pending(&self) -> Option<&str> {
+        self.pending_version.as_deref()
+    }
+
+    /// Return the current policy.
+    pub fn policy(&self) -> NotificationPolicy {
+        self.policy
+    }
+
+    /// Change the policy.
+    pub fn set_policy(&mut self, policy: NotificationPolicy) {
+        self.policy = policy;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Update download verifier
+// ---------------------------------------------------------------------------
+
+/// Result of verifying a downloaded update artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerifyResult {
+    /// The artifact passed verification.
+    Ok,
+    /// The checksum did not match.
+    ChecksumMismatch { expected: String, actual: String },
+    /// The file size was wrong.
+    SizeMismatch { expected: u64, actual: u64 },
+    /// The signature could not be verified.
+    SignatureInvalid(String),
+}
+
+impl VerifyResult {
+    /// Whether the result indicates success.
+    pub fn is_ok(&self) -> bool {
+        matches!(self, VerifyResult::Ok)
+    }
+}
+
+impl fmt::Display for VerifyResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerifyResult::Ok => write!(f, "verification passed"),
+            VerifyResult::ChecksumMismatch { expected, actual } => {
+                write!(f, "checksum mismatch: expected {expected}, got {actual}")
+            }
+            VerifyResult::SizeMismatch { expected, actual } => {
+                write!(f, "size mismatch: expected {expected}, got {actual}")
+            }
+            VerifyResult::SignatureInvalid(msg) => write!(f, "invalid signature: {msg}"),
+        }
+    }
+}
+
+/// Verifies downloaded update artifacts against expected metadata.
+#[derive(Debug, Clone)]
+pub struct UpdateDownloadVerifier {
+    expected_checksum: Option<String>,
+    expected_size: Option<u64>,
+}
+
+impl UpdateDownloadVerifier {
+    /// Create a new verifier.
+    pub fn new() -> Self {
+        Self {
+            expected_checksum: None,
+            expected_size: None,
+        }
+    }
+
+    /// Set the expected checksum (hex-encoded hash).
+    pub fn expect_checksum(mut self, checksum: impl Into<String>) -> Self {
+        self.expected_checksum = Some(checksum.into());
+        self
+    }
+
+    /// Set the expected file size in bytes.
+    pub fn expect_size(mut self, size: u64) -> Self {
+        self.expected_size = Some(size);
+        self
+    }
+
+    /// Verify the given artifact data against expectations.
+    pub fn verify(&self, actual_checksum: &str, actual_size: u64) -> VerifyResult {
+        if let Some(expected) = &self.expected_size {
+            if *expected != actual_size {
+                return VerifyResult::SizeMismatch {
+                    expected: *expected,
+                    actual: actual_size,
+                };
+            }
+        }
+        if let Some(expected) = &self.expected_checksum {
+            if expected != actual_checksum {
+                return VerifyResult::ChecksumMismatch {
+                    expected: expected.clone(),
+                    actual: actual_checksum.to_string(),
+                };
+            }
+        }
+        VerifyResult::Ok
+    }
+
+    /// Quick check: does the size match?
+    pub fn size_ok(&self, actual_size: u64) -> bool {
+        self.expected_size.map_or(true, |s| s == actual_size)
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2203,4 +2571,172 @@ mod tests {
         let latest = svc.latest_in_history().unwrap();
         assert_eq!(latest.version, "1.3.0");
     }
+
+    // -----------------------------------------------------------------------
+    // UpdateChannelSelector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn channel_selector_default() {
+        let sel = UpdateChannelSelector::new();
+        assert_eq!(*sel.current(), UpdateChannel::Stable);
+        assert!(!sel.receives_previews());
+    }
+
+    #[test]
+    fn channel_selector_select() {
+        let mut sel = UpdateChannelSelector::new();
+        sel.select(UpdateChannel::Insider).unwrap();
+        assert_eq!(*sel.current(), UpdateChannel::Insider);
+        assert!(sel.receives_previews());
+    }
+
+    #[test]
+    fn channel_selector_disallowed() {
+        let mut sel = UpdateChannelSelector::with_allowed(vec![UpdateChannel::Stable]);
+        let err = sel.select(UpdateChannel::Insider);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn channel_selector_cycle() {
+        let mut sel = UpdateChannelSelector::with_allowed(vec![
+            UpdateChannel::Stable,
+            UpdateChannel::Insider,
+        ]);
+        assert_eq!(*sel.current(), UpdateChannel::Stable);
+        sel.cycle_next();
+        assert_eq!(*sel.current(), UpdateChannel::Insider);
+        sel.cycle_next();
+        assert_eq!(*sel.current(), UpdateChannel::Stable);
+    }
+
+    // -----------------------------------------------------------------------
+    // UpdateRollbackHistory tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn rollback_push_and_query() {
+        let mut hist = UpdateRollbackHistory::new(5);
+        assert!(hist.is_empty());
+        hist.push(RollbackEntry::new(
+            VersionParts { major: 1, minor: 0, patch: 0 },
+            UpdateChannel::Stable,
+            1000,
+        ));
+        assert_eq!(hist.len(), 1);
+        assert!(!hist.is_empty());
+        assert!(hist.was_rolled_back(&VersionParts { major: 1, minor: 0, patch: 0 }));
+        assert!(!hist.was_rolled_back(&VersionParts { major: 2, minor: 0, patch: 0 }));
+    }
+
+    #[test]
+    fn rollback_max_entries() {
+        let mut hist = UpdateRollbackHistory::new(2);
+        hist.push(RollbackEntry::new(VersionParts { major: 1, minor: 0, patch: 0 }, UpdateChannel::Stable, 1));
+        hist.push(RollbackEntry::new(VersionParts { major: 1, minor: 1, patch: 0 }, UpdateChannel::Stable, 2));
+        hist.push(RollbackEntry::new(VersionParts { major: 1, minor: 2, patch: 0 }, UpdateChannel::Stable, 3));
+        assert_eq!(hist.len(), 2);
+        assert!(!hist.was_rolled_back(&VersionParts { major: 1, minor: 0, patch: 0 }));
+    }
+
+    #[test]
+    fn rollback_for_channel() {
+        let mut hist = UpdateRollbackHistory::new(10);
+        hist.push(RollbackEntry::new(VersionParts { major: 1, minor: 0, patch: 0 }, UpdateChannel::Stable, 1));
+        hist.push(RollbackEntry::new(VersionParts { major: 2, minor: 0, patch: 0 }, UpdateChannel::Insider, 2));
+        assert_eq!(hist.for_channel(&UpdateChannel::Stable).len(), 1);
+        assert_eq!(hist.for_channel(&UpdateChannel::Insider).len(), 1);
+    }
+
+    #[test]
+    fn rollback_entry_display() {
+        let entry = RollbackEntry::new(
+            VersionParts { major: 1, minor: 2, patch: 3 },
+            UpdateChannel::Stable,
+            0,
+        ).with_reason("buggy release");
+        let s = format!("{entry}");
+        assert!(s.contains("v1.2.3"));
+        assert!(s.contains("buggy release"));
+    }
+
+    // -----------------------------------------------------------------------
+    // UpdateNotificationScheduler tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn notification_immediate() {
+        let mut sched = UpdateNotificationScheduler::new(NotificationPolicy::Immediate);
+        sched.set_pending("2.0.0");
+        assert!(sched.should_show(0));
+    }
+
+    #[test]
+    fn notification_silent() {
+        let mut sched = UpdateNotificationScheduler::new(NotificationPolicy::Silent);
+        sched.set_pending("2.0.0");
+        assert!(!sched.should_show(0));
+    }
+
+    #[test]
+    fn notification_delayed() {
+        let mut sched = UpdateNotificationScheduler::new(NotificationPolicy::Delayed(100));
+        sched.set_pending("2.0.0");
+        assert!(!sched.should_show(50));
+        assert!(sched.should_show(100));
+    }
+
+    #[test]
+    fn notification_dismiss() {
+        let mut sched = UpdateNotificationScheduler::new(NotificationPolicy::Immediate);
+        sched.set_pending("2.0.0");
+        sched.dismiss();
+        sched.set_pending("2.0.0");
+        assert!(!sched.should_show(0));
+    }
+
+    #[test]
+    fn notification_snooze() {
+        let mut sched = UpdateNotificationScheduler::new(NotificationPolicy::Immediate);
+        sched.set_pending("2.0.0");
+        sched.snooze_until(500);
+        assert!(!sched.should_show(200));
+        assert!(sched.should_show(500));
+    }
+
+    // -----------------------------------------------------------------------
+    // UpdateDownloadVerifier tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn verifier_ok() {
+        let v = UpdateDownloadVerifier::new()
+            .expect_checksum("abc123")
+            .expect_size(1024);
+        assert!(v.verify("abc123", 1024).is_ok());
+    }
+
+    #[test]
+    fn verifier_checksum_mismatch() {
+        let v = UpdateDownloadVerifier::new().expect_checksum("abc123");
+        let result = v.verify("wrong", 100);
+        assert!(!result.is_ok());
+        assert!(format!("{result}").contains("checksum mismatch"));
+    }
+
+    #[test]
+    fn verifier_size_mismatch() {
+        let v = UpdateDownloadVerifier::new().expect_size(1024);
+        let result = v.verify("any", 512);
+        assert!(!result.is_ok());
+    }
+
+    #[test]
+    fn verifier_no_expectations() {
+        let v = UpdateDownloadVerifier::new();
+        assert!(v.verify("anything", 999).is_ok());
+    }
+
+
 }

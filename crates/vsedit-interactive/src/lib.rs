@@ -1597,6 +1597,273 @@ impl<T> NavigableList<T> {
     }
 }
 
+
+// ── Interactive Cell Renderer ──
+
+/// Rendering options for cell display.
+#[derive(Debug, Clone)]
+pub struct CellRenderOptions {
+    pub show_line_numbers: bool,
+    pub max_output_lines: usize,
+    pub indent_size: usize,
+    pub wrap_width: Option<usize>,
+    pub show_status_indicator: bool,
+}
+
+impl Default for CellRenderOptions {
+    fn default() -> Self {
+        Self {
+            show_line_numbers: true,
+            max_output_lines: 50,
+            indent_size: 4,
+            wrap_width: None,
+            show_status_indicator: true,
+        }
+    }
+}
+
+/// A rendered line with optional decorations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedLine {
+    pub line_number: Option<u32>,
+    pub content: String,
+    pub is_continuation: bool,
+}
+
+impl RenderedLine {
+    pub fn new(number: Option<u32>, content: impl Into<String>) -> Self {
+        Self {
+            line_number: number,
+            content: content.into(),
+            is_continuation: false,
+        }
+    }
+
+    pub fn continuation(content: impl Into<String>) -> Self {
+        Self {
+            line_number: None,
+            content: content.into(),
+            is_continuation: true,
+        }
+    }
+}
+
+impl fmt::Display for RenderedLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(n) = self.line_number {
+            write!(f, "{:>4} | {}", n, self.content)
+        } else if self.is_continuation {
+            write!(f, "     | {}", self.content)
+        } else {
+            write!(f, "       {}", self.content)
+        }
+    }
+}
+
+/// Formats cells for display in the interactive editor.
+pub struct InteractiveCellRenderer {
+    options: CellRenderOptions,
+}
+
+impl InteractiveCellRenderer {
+    pub fn new() -> Self {
+        Self {
+            options: CellRenderOptions::default(),
+        }
+    }
+
+    pub fn with_options(options: CellRenderOptions) -> Self {
+        Self { options }
+    }
+
+    /// Render the source code lines of a cell.
+    pub fn render_source(&self, source: &str) -> Vec<RenderedLine> {
+        let mut lines = Vec::new();
+        for (i, line) in source.lines().enumerate() {
+            let num = if self.options.show_line_numbers {
+                Some((i + 1) as u32)
+            } else {
+                None
+            };
+            if let Some(wrap_width) = self.options.wrap_width {
+                if line.len() > wrap_width {
+                    let mut start = 0;
+                    let mut first = true;
+                    while start < line.len() {
+                        let end = (start + wrap_width).min(line.len());
+                        let chunk = &line[start..end];
+                        if first {
+                            lines.push(RenderedLine::new(num, chunk));
+                            first = false;
+                        } else {
+                            lines.push(RenderedLine::continuation(chunk));
+                        }
+                        start = end;
+                    }
+                    continue;
+                }
+            }
+            lines.push(RenderedLine::new(num, line));
+        }
+        lines
+    }
+
+    /// Render the output of a cell, truncating if needed.
+    pub fn render_output(&self, output: &str) -> Vec<RenderedLine> {
+        let all_lines: Vec<&str> = output.lines().collect();
+        let truncated = all_lines.len() > self.options.max_output_lines;
+        let visible = if truncated {
+            &all_lines[..self.options.max_output_lines]
+        } else {
+            &all_lines
+        };
+        let mut rendered: Vec<RenderedLine> = visible
+            .iter()
+            .map(|l| RenderedLine::new(None, *l))
+            .collect();
+        if truncated {
+            let hidden = all_lines.len() - self.options.max_output_lines;
+            rendered.push(RenderedLine::new(
+                None,
+                format!("... ({} more lines)", hidden),
+            ));
+        }
+        rendered
+    }
+
+    /// Render a status indicator string for a cell.
+    pub fn render_status_indicator(&self, status: CellStatus) -> &str {
+        if !self.options.show_status_indicator {
+            return "";
+        }
+        match status {
+            CellStatus::Idle => "[ ]",
+            CellStatus::Running => "[*]",
+            CellStatus::Success => "[✓]",
+            CellStatus::Error => "[✗]",
+        }
+    }
+
+    /// Render a full cell (source + output) as a string.
+    pub fn render_cell(&self, kind: CellKind, source: &str, output: Option<&str>, status: CellStatus) -> String {
+        let mut result = String::new();
+        result.push_str(&format!("--- {} {} ---\n", kind, self.render_status_indicator(status)));
+        for line in self.render_source(source) {
+            result.push_str(&format!("{}\n", line));
+        }
+        if let Some(out) = output {
+            result.push_str("--- Output ---\n");
+            for line in self.render_output(out) {
+                result.push_str(&format!("{}\n", line));
+            }
+        }
+        result
+    }
+}
+
+// ── Interactive Output Formatter ──
+
+/// Formats output text with ANSI stripping, truncation, and normalization.
+pub struct InteractiveOutputFormatter {
+    max_length: usize,
+    strip_ansi: bool,
+    normalize_newlines: bool,
+    trim_trailing: bool,
+}
+
+impl InteractiveOutputFormatter {
+    pub fn new(max_length: usize) -> Self {
+        Self {
+            max_length,
+            strip_ansi: true,
+            normalize_newlines: true,
+            trim_trailing: true,
+        }
+    }
+
+    pub fn with_strip_ansi(mut self, strip: bool) -> Self {
+        self.strip_ansi = strip;
+        self
+    }
+
+    pub fn with_normalize_newlines(mut self, normalize: bool) -> Self {
+        self.normalize_newlines = normalize;
+        self
+    }
+
+    pub fn with_trim_trailing(mut self, trim: bool) -> Self {
+        self.trim_trailing = trim;
+        self
+    }
+
+    /// Format the given output text according to configured rules.
+    pub fn format(&self, text: &str) -> String {
+        let mut result = text.to_string();
+        if self.strip_ansi {
+            result = Self::strip_ansi_codes(&result);
+        }
+        if self.normalize_newlines {
+            result = result.replace("\r\n", "\n").replace('\r', "\n");
+        }
+        if self.trim_trailing {
+            result = result.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n");
+        }
+        if result.len() > self.max_length {
+            result.truncate(self.max_length);
+            result.push_str("...");
+        }
+        result
+    }
+
+    /// Strip ANSI escape codes from text.
+    pub fn strip_ansi_codes(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut chars = text.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '\x1b' {
+                // Skip until we find a letter (end of ANSI sequence)
+                if chars.peek() == Some(&'[') {
+                    chars.next();
+                    while let Some(&next) = chars.peek() {
+                        chars.next();
+                        if next.is_ascii_alphabetic() {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    }
+
+    /// Count the number of visible characters (excluding ANSI codes).
+    pub fn visible_length(text: &str) -> usize {
+        Self::strip_ansi_codes(text).len()
+    }
+
+    /// Split text into chunks of at most `chunk_size` visible characters.
+    pub fn chunk_output(text: &str, chunk_size: usize) -> Vec<String> {
+        if chunk_size == 0 {
+            return vec![text.to_string()];
+        }
+        let clean = Self::strip_ansi_codes(text);
+        let mut chunks = Vec::new();
+        let mut start = 0;
+        while start < clean.len() {
+            let end = (start + chunk_size).min(clean.len());
+            chunks.push(clean[start..end].to_string());
+            start = end;
+        }
+        if chunks.is_empty() {
+            chunks.push(String::new());
+        }
+        chunks
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2407,4 +2674,115 @@ mod tests {
         assert_eq!(list.selected(), Some(&"a"));
         assert_eq!(list.len(), 1);
     }
+
+    #[test]
+    fn rendered_line_display_with_number() {
+        let line = RenderedLine::new(Some(1), "hello");
+        assert_eq!(format!("{}", line), "   1 | hello");
+    }
+
+    #[test]
+    fn rendered_line_display_continuation() {
+        let line = RenderedLine::continuation("continued");
+        assert_eq!(format!("{}", line), "     | continued");
+    }
+
+    #[test]
+    fn cell_renderer_source_basic() {
+        let renderer = InteractiveCellRenderer::new();
+        let lines = renderer.render_source("line1\nline2");
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].line_number, Some(1));
+        assert_eq!(lines[1].line_number, Some(2));
+    }
+
+    #[test]
+    fn cell_renderer_source_no_line_numbers() {
+        let opts = CellRenderOptions {
+            show_line_numbers: false,
+            ..Default::default()
+        };
+        let renderer = InteractiveCellRenderer::with_options(opts);
+        let lines = renderer.render_source("hello");
+        assert_eq!(lines[0].line_number, None);
+    }
+
+    #[test]
+    fn cell_renderer_source_wrapping() {
+        let opts = CellRenderOptions {
+            wrap_width: Some(5),
+            ..Default::default()
+        };
+        let renderer = InteractiveCellRenderer::with_options(opts);
+        let lines = renderer.render_source("1234567890");
+        assert_eq!(lines.len(), 2);
+        assert!(lines[1].is_continuation);
+    }
+
+    #[test]
+    fn cell_renderer_output_truncation() {
+        let opts = CellRenderOptions {
+            max_output_lines: 2,
+            ..Default::default()
+        };
+        let renderer = InteractiveCellRenderer::with_options(opts);
+        let lines = renderer.render_output("a\nb\nc\nd");
+        assert_eq!(lines.len(), 3); // 2 visible + 1 truncation msg
+        assert!(lines[2].content.contains("2 more lines"));
+    }
+
+    #[test]
+    fn cell_renderer_status_indicator() {
+        let renderer = InteractiveCellRenderer::new();
+        assert_eq!(renderer.render_status_indicator(CellStatus::Idle), "[ ]");
+        assert_eq!(renderer.render_status_indicator(CellStatus::Running), "[*]");
+        assert_eq!(renderer.render_status_indicator(CellStatus::Success), "[✓]");
+        assert_eq!(renderer.render_status_indicator(CellStatus::Error), "[✗]");
+    }
+
+    #[test]
+    fn cell_renderer_full_cell() {
+        let renderer = InteractiveCellRenderer::new();
+        let result = renderer.render_cell(CellKind::Code, "print(1)", Some("1"), CellStatus::Success);
+        assert!(result.contains("Code"));
+        assert!(result.contains("print(1)"));
+        assert!(result.contains("Output"));
+    }
+
+    #[test]
+    fn output_formatter_strip_ansi() {
+        let text = "\x1b[31mred\x1b[0m normal";
+        let clean = InteractiveOutputFormatter::strip_ansi_codes(text);
+        assert_eq!(clean, "red normal");
+    }
+
+    #[test]
+    fn output_formatter_format() {
+        let fmt = InteractiveOutputFormatter::new(100);
+        let result = fmt.format("hello  \r\nworld  ");
+        assert_eq!(result, "hello\nworld");
+    }
+
+    #[test]
+    fn output_formatter_truncate() {
+        let fmt = InteractiveOutputFormatter::new(5);
+        let result = fmt.format("hello world");
+        assert_eq!(result, "hello...");
+    }
+
+    #[test]
+    fn output_formatter_chunk() {
+        let chunks = InteractiveOutputFormatter::chunk_output("abcdefghij", 3);
+        assert_eq!(chunks.len(), 4);
+        assert_eq!(chunks[0], "abc");
+        assert_eq!(chunks[3], "j");
+    }
+
+    #[test]
+    fn output_formatter_visible_length() {
+        let len = InteractiveOutputFormatter::visible_length("\x1b[32mhi\x1b[0m");
+        assert_eq!(len, 2);
+    }
+
+
 }

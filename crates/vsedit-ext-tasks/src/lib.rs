@@ -1521,6 +1521,312 @@ impl fmt::Display for TaskTerminalAssignment {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TaskShellExecutor - task shell executor
+// ---------------------------------------------------------------------------
+
+/// Severity level for task shell executor issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TaskShellExecutorSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for TaskShellExecutorSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [TaskShellExecutor].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskShellExecutorEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: TaskShellExecutorSeverity,
+    pub detail: Option<String>,
+    pub task_count: usize,
+    enabled: bool,
+}
+
+impl TaskShellExecutorEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: TaskShellExecutorSeverity::Low,
+            detail: None,
+            task_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: TaskShellExecutorSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_task_count(mut self, val: usize) -> Self {
+        self.task_count = val;
+        self
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.enabled && self.severity >= TaskShellExecutorSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.task_count, det)
+    }
+}
+
+impl fmt::Display for TaskShellExecutorEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [TaskShellExecutorEntry] items.
+#[derive(Debug, Clone)]
+pub struct TaskShellExecutor {
+    entries: Vec<TaskShellExecutorEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl TaskShellExecutor {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: TaskShellExecutorEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<TaskShellExecutorEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&TaskShellExecutorEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn task_count(&self) -> usize { self.entries.len() }
+
+    pub fn is_running(&self) -> bool {
+        self.entries.iter().any(|e| e.is_running())
+    }
+
+    pub fn entries_by_severity(&self, severity: TaskShellExecutorSeverity) -> Vec<&TaskShellExecutorEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= TaskShellExecutorSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&TaskShellExecutorEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&TaskShellExecutorEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskOutputParser - task output parser
+// ---------------------------------------------------------------------------
+
+/// Configuration for [TaskOutputParser].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskOutputParserConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub output_lines: usize,
+}
+
+impl TaskOutputParserConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, output_lines: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_output_lines(mut self, val: usize) -> Self { self.output_lines = val; self }
+}
+
+impl Default for TaskOutputParserConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [TaskOutputParser].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskOutputParserItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl TaskOutputParserItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn has_output(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for TaskOutputParserItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [TaskOutputParserItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct TaskOutputParser {
+    config: TaskOutputParserConfig,
+    items: Vec<TaskOutputParserItem>,
+}
+
+impl TaskOutputParser {
+    pub fn new(config: TaskOutputParserConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: TaskOutputParserItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<TaskOutputParserItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&TaskOutputParserItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn output_lines(&self) -> usize { self.items.len() }
+
+    pub fn has_output(&self) -> bool {
+        self.items.iter().any(|i| i.has_output())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&TaskOutputParserItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&TaskOutputParserItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &TaskOutputParserConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2348,5 +2654,147 @@ mod tests {
         let a = TaskTerminalAssignment::new("lint", TaskTerminalKind::Integrated);
         let s = format!("{a}");
         assert!(s.contains("lint"));
+    }
+
+#[test]
+    fn taskshellexecutor_severity_ordering() {
+        assert!(TaskShellExecutorSeverity::Critical > TaskShellExecutorSeverity::High);
+        assert!(TaskShellExecutorSeverity::High > TaskShellExecutorSeverity::Medium);
+        assert!(TaskShellExecutorSeverity::Medium > TaskShellExecutorSeverity::Low);
+    }
+
+    #[test]
+    fn taskshellexecutor_severity_display() {
+        assert_eq!(TaskShellExecutorSeverity::Low.to_string(), "low");
+        assert_eq!(TaskShellExecutorSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn taskshellexecutor_entry_creation() {
+        let e = TaskShellExecutorEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, TaskShellExecutorSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn taskshellexecutor_entry_builder() {
+        let e = TaskShellExecutorEntry::new("e2", "Entry 2")
+            .with_severity(TaskShellExecutorSeverity::High)
+            .with_detail("some detail")
+            .with_task_count(42);
+        assert_eq!(e.severity, TaskShellExecutorSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.task_count, 42);
+    }
+
+    #[test]
+    fn taskshellexecutor_entry_enable_disable() {
+        let mut e = TaskShellExecutorEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn taskshellexecutor_add_and_count() {
+        let mut mgr = TaskShellExecutor::new("test");
+        mgr.add(TaskShellExecutorEntry::new("a", "A"));
+        mgr.add(TaskShellExecutorEntry::new("b", "B").with_severity(TaskShellExecutorSeverity::High));
+        assert_eq!(mgr.task_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn taskshellexecutor_remove() {
+        let mut mgr = TaskShellExecutor::new("test");
+        mgr.add(TaskShellExecutorEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn taskshellexecutor_capacity() {
+        let mut mgr = TaskShellExecutor::new("test").with_capacity(1);
+        assert!(mgr.add(TaskShellExecutorEntry::new("a", "A")));
+        assert!(!mgr.add(TaskShellExecutorEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn taskshellexecutor_sorted_by_severity() {
+        let mut mgr = TaskShellExecutor::new("test");
+        mgr.add(TaskShellExecutorEntry::new("lo", "Low"));
+        mgr.add(TaskShellExecutorEntry::new("hi", "High").with_severity(TaskShellExecutorSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, TaskShellExecutorSeverity::Critical);
+    }
+
+    #[test]
+    fn taskshellexecutor_summary() {
+        let mgr = TaskShellExecutor::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn taskoutputparser_config_defaults() {
+        let cfg = TaskOutputParserConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn taskoutputparser_item_creation() {
+        let item = TaskOutputParserItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn taskoutputparser_add_and_get() {
+        let mut mgr = TaskOutputParser::new(TaskOutputParserConfig::new("test"));
+        mgr.add(TaskOutputParserItem::new("k1", "v1"));
+        assert_eq!(mgr.output_lines(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn taskoutputparser_remove_item() {
+        let mut mgr = TaskOutputParser::new(TaskOutputParserConfig::new("test"));
+        mgr.add(TaskOutputParserItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn taskoutputparser_sorted_by_priority() {
+        let mut mgr = TaskOutputParser::new(TaskOutputParserConfig::new("test"));
+        mgr.add(TaskOutputParserItem::new("lo", "low").with_priority(1));
+        mgr.add(TaskOutputParserItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn taskoutputparser_items_with_tag() {
+        let mut mgr = TaskOutputParser::new(TaskOutputParserConfig::new("test"));
+        mgr.add(TaskOutputParserItem::new("a", "1").with_tag("x"));
+        mgr.add(TaskOutputParserItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn taskoutputparser_report() {
+        let mgr = TaskOutputParser::new(TaskOutputParserConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

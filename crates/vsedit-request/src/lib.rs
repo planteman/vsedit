@@ -1379,6 +1379,271 @@ impl fmt::Display for RequestLatencyTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RequestCircuitBreaker
+// ---------------------------------------------------------------------------
+
+/// State of a circuit breaker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CircuitBreakerState {
+    Closed,
+    Open { until: u64 },
+    HalfOpen,
+}
+
+impl std::fmt::Display for CircuitBreakerState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CircuitBreakerState::Closed => write!(f, "closed"),
+            CircuitBreakerState::Open { until } => write!(f, "open (until {until})"),
+            CircuitBreakerState::HalfOpen => write!(f, "half-open"),
+        }
+    }
+}
+
+/// Circuit breaker pattern for HTTP requests.
+/// Tracks failures and opens the circuit when failures exceed a threshold.
+pub struct RequestCircuitBreaker {
+    state: CircuitBreakerState,
+    failure_count: u32,
+    success_count: u32,
+    failure_threshold: u32,
+    success_threshold: u32,
+    reset_timeout: u64,
+    total_requests: u64,
+    total_failures: u64,
+}
+
+impl RequestCircuitBreaker {
+    pub fn new(failure_threshold: u32, success_threshold: u32, reset_timeout: u64) -> Self {
+        Self {
+            state: CircuitBreakerState::Closed,
+            failure_count: 0,
+            success_count: 0,
+            failure_threshold,
+            success_threshold,
+            reset_timeout,
+            total_requests: 0,
+            total_failures: 0,
+        }
+    }
+
+    pub fn state(&self) -> &CircuitBreakerState {
+        &self.state
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.state == CircuitBreakerState::Closed
+    }
+
+    /// Whether a request should be allowed through.
+    pub fn allow_request(&mut self, now: u64) -> bool {
+        self.total_requests += 1;
+        match &self.state {
+            CircuitBreakerState::Closed => true,
+            CircuitBreakerState::Open { until } => {
+                if now >= *until {
+                    self.state = CircuitBreakerState::HalfOpen;
+                    self.success_count = 0;
+                    true
+                } else {
+                    false
+                }
+            }
+            CircuitBreakerState::HalfOpen => true,
+        }
+    }
+
+    /// Record a successful request.
+    pub fn record_success(&mut self) {
+        match &self.state {
+            CircuitBreakerState::HalfOpen => {
+                self.success_count += 1;
+                if self.success_count >= self.success_threshold {
+                    self.state = CircuitBreakerState::Closed;
+                    self.failure_count = 0;
+                    self.success_count = 0;
+                }
+            }
+            CircuitBreakerState::Closed => {
+                self.failure_count = 0;
+            }
+            _ => {}
+        }
+    }
+
+    /// Record a failed request.
+    pub fn record_failure(&mut self, now: u64) {
+        self.total_failures += 1;
+        match &self.state {
+            CircuitBreakerState::Closed => {
+                self.failure_count += 1;
+                if self.failure_count >= self.failure_threshold {
+                    self.state = CircuitBreakerState::Open {
+                        until: now + self.reset_timeout,
+                    };
+                }
+            }
+            CircuitBreakerState::HalfOpen => {
+                self.state = CircuitBreakerState::Open {
+                    until: now + self.reset_timeout,
+                };
+                self.success_count = 0;
+            }
+            _ => {}
+        }
+    }
+
+    /// Manually reset to closed.
+    pub fn reset(&mut self) {
+        self.state = CircuitBreakerState::Closed;
+        self.failure_count = 0;
+        self.success_count = 0;
+    }
+
+    pub fn failure_count(&self) -> u32 {
+        self.failure_count
+    }
+
+    pub fn total_requests(&self) -> u64 {
+        self.total_requests
+    }
+
+    pub fn total_failures(&self) -> u64 {
+        self.total_failures
+    }
+
+    /// Failure rate as a fraction (0.0 - 1.0).
+    pub fn failure_rate(&self) -> f64 {
+        if self.total_requests == 0 {
+            0.0
+        } else {
+            self.total_failures as f64 / self.total_requests as f64
+        }
+    }
+}
+
+impl std::fmt::Display for RequestCircuitBreaker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CircuitBreaker[{}] failures={}/{} total={}", self.state, self.failure_count, self.failure_threshold, self.total_requests)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestDeduplicatorService
+// ---------------------------------------------------------------------------
+
+/// Tracks in-flight requests by key to avoid duplicate concurrent requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InFlightEntry {
+    pub key: String,
+    pub started_at: u64,
+    pub request_count: u32,
+}
+
+impl InFlightEntry {
+    pub fn new(key: impl Into<String>, started_at: u64) -> Self {
+        Self { key: key.into(), started_at, request_count: 1 }
+    }
+
+    pub fn elapsed(&self, now: u64) -> u64 {
+        now.saturating_sub(self.started_at)
+    }
+}
+
+impl std::fmt::Display for InFlightEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InFlight('{}', count={}, started={})", self.key, self.request_count, self.started_at)
+    }
+}
+
+/// Deduplicates in-flight requests by key. When a request with a matching key
+/// is already in-flight, the duplicate is coalesced.
+pub struct RequestDeduplicatorService {
+    in_flight: std::collections::HashMap<String, InFlightEntry>,
+    dedup_count: u64,
+    total_requests: u64,
+}
+
+impl RequestDeduplicatorService {
+    pub fn new() -> Self {
+        Self {
+            in_flight: std::collections::HashMap::new(),
+            dedup_count: 0,
+            total_requests: 0,
+        }
+    }
+
+    /// Try to start a request. Returns true if this is a new request,
+    /// false if it was deduplicated (already in-flight).
+    pub fn try_start(&mut self, key: impl Into<String>, now: u64) -> bool {
+        let k = key.into();
+        self.total_requests += 1;
+        if let Some(entry) = self.in_flight.get_mut(&k) {
+            entry.request_count += 1;
+            self.dedup_count += 1;
+            false
+        } else {
+            self.in_flight.insert(k.clone(), InFlightEntry::new(k, now));
+            true
+        }
+    }
+
+    /// Complete a request, removing it from in-flight tracking.
+    pub fn complete(&mut self, key: &str) -> Option<InFlightEntry> {
+        self.in_flight.remove(key)
+    }
+
+    pub fn is_in_flight(&self, key: &str) -> bool {
+        self.in_flight.contains_key(key)
+    }
+
+    pub fn in_flight_count(&self) -> usize {
+        self.in_flight.len()
+    }
+
+    pub fn dedup_count(&self) -> u64 {
+        self.dedup_count
+    }
+
+    pub fn total_requests(&self) -> u64 {
+        self.total_requests
+    }
+
+    /// Deduplication ratio (0.0 - 1.0).
+    pub fn dedup_ratio(&self) -> f64 {
+        if self.total_requests == 0 {
+            0.0
+        } else {
+            self.dedup_count as f64 / self.total_requests as f64
+        }
+    }
+
+    /// Evict in-flight entries that have been running too long.
+    pub fn evict_stale(&mut self, now: u64, max_age: u64) -> usize {
+        let before = self.in_flight.len();
+        self.in_flight.retain(|_, e| e.elapsed(now) <= max_age);
+        before - self.in_flight.len()
+    }
+
+    /// All currently in-flight keys.
+    pub fn in_flight_keys(&self) -> Vec<String> {
+        self.in_flight.keys().cloned().collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.in_flight.clear();
+    }
+}
+
+impl std::fmt::Display for RequestDeduplicatorService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RequestDeduplicatorService(in_flight={}, deduped={}, total={})",
+            self.in_flight.len(), self.dedup_count, self.total_requests)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2332,6 +2597,173 @@ mod tests {
     fn cache_display() {
         let c = RequestCache::new(1000);
         assert!(format!("{c}").contains("0 entries"));
+    }
+
+
+    #[test]
+    fn circuit_breaker_starts_closed() {
+        let cb = RequestCircuitBreaker::new(3, 2, 100);
+        assert!(cb.is_closed());
+    }
+
+    #[test]
+    fn circuit_breaker_opens_on_failures() {
+        let mut cb = RequestCircuitBreaker::new(3, 2, 100);
+        cb.allow_request(0);
+        cb.record_failure(10);
+        cb.allow_request(10);
+        cb.record_failure(20);
+        cb.allow_request(20);
+        cb.record_failure(30);
+        assert!(!cb.is_closed());
+        assert_eq!(cb.failure_count(), 3);
+    }
+
+    #[test]
+    fn circuit_breaker_rejects_when_open() {
+        let mut cb = RequestCircuitBreaker::new(1, 1, 100);
+        cb.allow_request(0);
+        cb.record_failure(10);
+        assert!(!cb.allow_request(20)); // still open
+    }
+
+    #[test]
+    fn circuit_breaker_half_open_after_timeout() {
+        let mut cb = RequestCircuitBreaker::new(1, 1, 100);
+        cb.allow_request(0);
+        cb.record_failure(10);
+        assert!(cb.allow_request(200)); // timeout passed
+        assert_eq!(*cb.state(), CircuitBreakerState::HalfOpen);
+    }
+
+    #[test]
+    fn circuit_breaker_closes_after_success_in_half_open() {
+        let mut cb = RequestCircuitBreaker::new(1, 1, 100);
+        cb.allow_request(0);
+        cb.record_failure(10);
+        cb.allow_request(200);
+        cb.record_success();
+        assert!(cb.is_closed());
+    }
+
+    #[test]
+    fn circuit_breaker_reopens_on_failure_in_half_open() {
+        let mut cb = RequestCircuitBreaker::new(1, 2, 100);
+        cb.allow_request(0);
+        cb.record_failure(10);
+        cb.allow_request(200);
+        cb.record_failure(200);
+        assert!(matches!(cb.state(), CircuitBreakerState::Open { .. }));
+    }
+
+    #[test]
+    fn circuit_breaker_reset() {
+        let mut cb = RequestCircuitBreaker::new(1, 1, 100);
+        cb.allow_request(0);
+        cb.record_failure(10);
+        cb.reset();
+        assert!(cb.is_closed());
+        assert_eq!(cb.failure_count(), 0);
+    }
+
+    #[test]
+    fn circuit_breaker_failure_rate() {
+        let mut cb = RequestCircuitBreaker::new(5, 1, 100);
+        cb.allow_request(0); cb.record_failure(0);
+        cb.allow_request(1); cb.record_success();
+        let rate = cb.failure_rate();
+        assert!((rate - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn circuit_breaker_display() {
+        let cb = RequestCircuitBreaker::new(3, 2, 100);
+        let s = format!("{cb}");
+        assert!(s.contains("closed"));
+        assert!(s.contains("0/3"));
+    }
+
+    #[test]
+    fn circuit_breaker_state_display() {
+        assert_eq!(format!("{}", CircuitBreakerState::Closed), "closed");
+        assert!(format!("{}", CircuitBreakerState::Open { until: 42 }).contains("42"));
+        assert_eq!(format!("{}", CircuitBreakerState::HalfOpen), "half-open");
+    }
+
+    #[test]
+    fn dedup_service_new_request() {
+        let mut svc = RequestDeduplicatorService::new();
+        assert!(svc.try_start("key1", 100));
+        assert!(svc.is_in_flight("key1"));
+        assert_eq!(svc.in_flight_count(), 1);
+    }
+
+    #[test]
+    fn dedup_service_duplicate_request() {
+        let mut svc = RequestDeduplicatorService::new();
+        assert!(svc.try_start("key1", 100));
+        assert!(!svc.try_start("key1", 200)); // deduped
+        assert_eq!(svc.dedup_count(), 1);
+    }
+
+    #[test]
+    fn dedup_service_complete() {
+        let mut svc = RequestDeduplicatorService::new();
+        svc.try_start("key1", 100);
+        let entry = svc.complete("key1").unwrap();
+        assert_eq!(entry.key, "key1");
+        assert!(!svc.is_in_flight("key1"));
+    }
+
+    #[test]
+    fn dedup_service_dedup_ratio() {
+        let mut svc = RequestDeduplicatorService::new();
+        svc.try_start("a", 1); // new
+        svc.try_start("a", 2); // deduped
+        svc.try_start("a", 3); // deduped
+        let ratio = svc.dedup_ratio();
+        assert!((ratio - 2.0/3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn dedup_service_evict_stale() {
+        let mut svc = RequestDeduplicatorService::new();
+        svc.try_start("old", 10);
+        svc.try_start("new", 500);
+        let evicted = svc.evict_stale(500, 100);
+        assert_eq!(evicted, 1);
+        assert!(!svc.is_in_flight("old"));
+    }
+
+    #[test]
+    fn dedup_service_in_flight_keys() {
+        let mut svc = RequestDeduplicatorService::new();
+        svc.try_start("a", 1);
+        svc.try_start("b", 2);
+        let keys = svc.in_flight_keys();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn dedup_service_clear_and_display() {
+        let mut svc = RequestDeduplicatorService::new();
+        svc.try_start("a", 1);
+        assert!(format!("{svc}").contains("in_flight=1"));
+        svc.clear();
+        assert_eq!(svc.in_flight_count(), 0);
+    }
+
+    #[test]
+    fn in_flight_entry_display_and_elapsed() {
+        let e = InFlightEntry::new("k", 100);
+        assert_eq!(e.elapsed(200), 100);
+        assert!(format!("{e}").contains("k"));
+    }
+
+    #[test]
+    fn dedup_service_complete_unknown_key() {
+        let mut svc = RequestDeduplicatorService::new();
+        assert!(svc.complete("nope").is_none());
     }
 
 }

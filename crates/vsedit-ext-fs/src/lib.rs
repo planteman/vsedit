@@ -1447,6 +1447,307 @@ impl FileChangeAccumulator {
     }
 }
 
+
+// ── Fs Event Debouncer ──
+
+/// A change event with a URI and event kind.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FsChangeKind {
+    Created,
+    Changed,
+    Deleted,
+}
+
+/// A single file system change event.
+#[derive(Debug, Clone)]
+pub struct FsChangeEvent {
+    pub uri: String,
+    pub kind: FsChangeKind,
+    pub timestamp: u64,
+}
+
+/// Debouncer that batches rapid file system changes within a time window.
+#[derive(Debug)]
+pub struct FsEventDebouncer {
+    window_ms: u64,
+    pending: Vec<FsChangeEvent>,
+}
+
+impl FsEventDebouncer {
+    /// Create a debouncer with the given window in milliseconds.
+    pub fn new(window_ms: u64) -> Self {
+        Self {
+            window_ms,
+            pending: Vec::new(),
+        }
+    }
+
+    /// Add an event to the pending queue.
+    pub fn push(&mut self, event: FsChangeEvent) {
+        self.pending.push(event);
+    }
+
+    /// Flush events that are older than `now - window_ms`.
+    /// Returns the flushed (debounced) events grouped by URI, keeping only
+    /// the latest event per URI.
+    pub fn flush(&mut self, now: u64) -> Vec<FsChangeEvent> {
+        let cutoff = now.saturating_sub(self.window_ms);
+        let (ready, remaining): (Vec<_>, Vec<_>) =
+            self.pending.drain(..).partition(|e| e.timestamp <= cutoff);
+
+        self.pending = remaining;
+
+        // Keep only the latest event per URI.
+        let mut latest: HashMap<String, FsChangeEvent> = HashMap::new();
+        for event in ready {
+            let entry = latest.entry(event.uri.clone()).or_insert_with(|| event.clone());
+            if event.timestamp > entry.timestamp {
+                *entry = event;
+            }
+        }
+
+        let mut result: Vec<FsChangeEvent> = latest.into_values().collect();
+        result.sort_by(|a, b| a.uri.cmp(&b.uri));
+        result
+    }
+
+    /// Number of pending (not yet flushed) events.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Clear all pending events without flushing.
+    pub fn clear(&mut self) {
+        self.pending.clear();
+    }
+
+    /// Return unique URIs currently pending.
+    pub fn pending_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.pending.iter().map(|e| e.uri.as_str()).collect();
+        uris.sort_unstable();
+        uris.dedup();
+        uris
+    }
+
+    /// The configured window size in ms.
+    pub fn window_ms(&self) -> u64 {
+        self.window_ms
+    }
+}
+
+// ── Recursive Delete Safety Check ──
+
+/// Safety checks before performing recursive deletes.
+pub struct RecursiveDeleteSafetyCheck;
+
+impl RecursiveDeleteSafetyCheck {
+    /// Disallowed root paths that must never be recursively deleted.
+    const DISALLOWED: &[&str] = &[
+        "/", "/home", "/usr", "/etc", "/var", "/tmp", "/bin", "/sbin",
+        "/boot", "/dev", "/proc", "/sys", "/lib", "/opt",
+        "C:\\", "C:\\Windows", "C:\\Program Files",
+    ];
+
+    /// Check if a URI is safe to delete recursively.
+    pub fn is_safe(uri: &str) -> bool {
+        let normalized = uri.trim_end_matches('/');
+        if normalized.is_empty() {
+            return false;
+        }
+        for disallowed in Self::DISALLOWED {
+            if normalized.eq_ignore_ascii_case(disallowed) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Count path segments (to reject very shallow paths).
+    pub fn path_depth(uri: &str) -> usize {
+        uri.split('/')
+            .filter(|s| !s.is_empty())
+            .count()
+    }
+
+    /// Require a minimum path depth for recursive deletes.
+    pub fn is_deep_enough(uri: &str, min_depth: usize) -> bool {
+        Self::path_depth(uri) >= min_depth
+    }
+
+    /// Validate a delete operation, returning an error message if unsafe.
+    pub fn validate(uri: &str, recursive: bool) -> Result<(), String> {
+        if !recursive {
+            return Ok(());
+        }
+        if !Self::is_safe(uri) {
+            return Err(format!("refusing to recursively delete protected path: {uri}"));
+        }
+        if !Self::is_deep_enough(uri, 2) {
+            return Err(format!("path too shallow for recursive delete: {uri}"));
+        }
+        Ok(())
+    }
+}
+
+// ── Fs Rename Validator ──
+
+/// Validates file rename operations.
+pub struct FsRenameValidator;
+
+impl FsRenameValidator {
+    /// Maximum allowed file name length.
+    const MAX_NAME_LEN: usize = 255;
+
+    /// Characters not allowed in file names.
+    const INVALID_CHARS: &[char] = &['<', '>', ':', '"', '|', '?', '*'];
+
+    /// Validate that a new name is acceptable.
+    pub fn validate_name(name: &str) -> Result<(), String> {
+        if name.is_empty() {
+            return Err("name cannot be empty".to_string());
+        }
+        if name.len() > Self::MAX_NAME_LEN {
+            return Err(format!("name exceeds maximum length of {}", Self::MAX_NAME_LEN));
+        }
+        if name.contains('/') || name.contains('\\') {
+            return Err("name cannot contain path separators".to_string());
+        }
+        for ch in Self::INVALID_CHARS {
+            if name.contains(*ch) {
+                return Err(format!("name contains invalid character: {ch}"));
+            }
+        }
+        if name.starts_with('.') && name.len() == 1 {
+            return Err("name cannot be '.'".to_string());
+        }
+        if name == ".." {
+            return Err("name cannot be '..'".to_string());
+        }
+        Ok(())
+    }
+
+    /// Extract the file name from a URI.
+    pub fn file_name_from_uri(uri: &str) -> Option<String> {
+        uri.rsplit('/').next().map(|s| s.to_string()).filter(|s| !s.is_empty())
+    }
+
+    /// Check if a rename would change the file extension.
+    pub fn extension_changed(old_uri: &str, new_uri: &str) -> bool {
+        let old_ext = old_uri.rsplit('.').next();
+        let new_ext = new_uri.rsplit('.').next();
+        old_ext != new_ext
+    }
+
+    /// Check if old and new URIs are in the same directory.
+    pub fn same_directory(old_uri: &str, new_uri: &str) -> bool {
+        let old_parent = old_uri.rsplit_once('/').map(|(p, _)| p);
+        let new_parent = new_uri.rsplit_once('/').map(|(p, _)| p);
+        old_parent == new_parent
+    }
+
+    /// Validate a full rename operation.
+    pub fn validate_rename(old_uri: &str, new_uri: &str) -> Result<(), String> {
+        if old_uri == new_uri {
+            return Err("old and new URIs are the same".to_string());
+        }
+        if let Some(name) = Self::file_name_from_uri(new_uri) {
+            Self::validate_name(&name)?;
+        }
+        Ok(())
+    }
+}
+
+// ── Fs Encoding Detector ──
+
+/// Simple encoding detector based on byte patterns.
+pub struct FsEncodingDetector;
+
+/// Detected encoding type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetectedEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Ascii,
+    Binary,
+}
+
+impl fmt::Display for DetectedEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Utf8 => write!(f, "UTF-8"),
+            Self::Utf8Bom => write!(f, "UTF-8 with BOM"),
+            Self::Utf16Le => write!(f, "UTF-16 LE"),
+            Self::Utf16Be => write!(f, "UTF-16 BE"),
+            Self::Ascii => write!(f, "ASCII"),
+            Self::Binary => write!(f, "Binary"),
+        }
+    }
+}
+
+impl FsEncodingDetector {
+    /// Detect encoding from file content bytes.
+    pub fn detect(content: &[u8]) -> DetectedEncoding {
+        if content.is_empty() {
+            return DetectedEncoding::Ascii;
+        }
+        // Check BOM markers.
+        if content.len() >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
+            return DetectedEncoding::Utf8Bom;
+        }
+        if content.len() >= 2 && content[0] == 0xFF && content[1] == 0xFE {
+            return DetectedEncoding::Utf16Le;
+        }
+        if content.len() >= 2 && content[0] == 0xFE && content[1] == 0xFF {
+            return DetectedEncoding::Utf16Be;
+        }
+        // Check for null bytes (likely binary).
+        if content.iter().any(|&b| b == 0) {
+            return DetectedEncoding::Binary;
+        }
+        // Check if all bytes are valid ASCII.
+        if content.iter().all(|&b| b < 128) {
+            return DetectedEncoding::Ascii;
+        }
+        // Check if valid UTF-8.
+        if std::str::from_utf8(content).is_ok() {
+            DetectedEncoding::Utf8
+        } else {
+            DetectedEncoding::Binary
+        }
+    }
+
+    /// Check if content is likely a text file.
+    pub fn is_text(content: &[u8]) -> bool {
+        !matches!(Self::detect(content), DetectedEncoding::Binary)
+    }
+
+    /// Strip BOM from content if present, returning the payload.
+    pub fn strip_bom(content: &[u8]) -> &[u8] {
+        if content.len() >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
+            &content[3..]
+        } else if content.len() >= 2
+            && ((content[0] == 0xFF && content[1] == 0xFE)
+                || (content[0] == 0xFE && content[1] == 0xFF))
+        {
+            &content[2..]
+        } else {
+            content
+        }
+    }
+
+    /// Get the BOM bytes for a given encoding, or empty if none.
+    pub fn bom_bytes(encoding: DetectedEncoding) -> &'static [u8] {
+        match encoding {
+            DetectedEncoding::Utf8Bom => &[0xEF, 0xBB, 0xBF],
+            DetectedEncoding::Utf16Le => &[0xFF, 0xFE],
+            DetectedEncoding::Utf16Be => &[0xFE, 0xFF],
+            _ => &[],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2238,4 +2539,221 @@ mod tests {
         assert!(acc1.is_empty());
         assert_eq!(acc1.pending_count(), 0);
     }
+
+    // ── Debouncer tests ──
+
+    #[test]
+    fn debouncer_basic_flush() {
+        let mut debouncer = FsEventDebouncer::new(100);
+        debouncer.push(FsChangeEvent {
+            uri: "a.rs".into(),
+            kind: FsChangeKind::Changed,
+            timestamp: 10,
+        });
+        debouncer.push(FsChangeEvent {
+            uri: "b.rs".into(),
+            kind: FsChangeKind::Created,
+            timestamp: 20,
+        });
+        let flushed = debouncer.flush(200);
+        assert_eq!(flushed.len(), 2);
+        assert_eq!(debouncer.pending_count(), 0);
+    }
+
+    #[test]
+    fn debouncer_deduplicates_by_uri() {
+        let mut debouncer = FsEventDebouncer::new(100);
+        debouncer.push(FsChangeEvent {
+            uri: "a.rs".into(),
+            kind: FsChangeKind::Changed,
+            timestamp: 10,
+        });
+        debouncer.push(FsChangeEvent {
+            uri: "a.rs".into(),
+            kind: FsChangeKind::Changed,
+            timestamp: 50,
+        });
+        let flushed = debouncer.flush(200);
+        assert_eq!(flushed.len(), 1);
+        assert_eq!(flushed[0].timestamp, 50);
+    }
+
+    #[test]
+    fn debouncer_keeps_recent_events() {
+        let mut debouncer = FsEventDebouncer::new(100);
+        debouncer.push(FsChangeEvent {
+            uri: "a.rs".into(),
+            kind: FsChangeKind::Changed,
+            timestamp: 150,
+        });
+        let flushed = debouncer.flush(200);
+        assert_eq!(flushed.len(), 0);
+        assert_eq!(debouncer.pending_count(), 1);
+    }
+
+    #[test]
+    fn debouncer_pending_uris() {
+        let mut debouncer = FsEventDebouncer::new(100);
+        debouncer.push(FsChangeEvent {
+            uri: "b.rs".into(),
+            kind: FsChangeKind::Created,
+            timestamp: 10,
+        });
+        debouncer.push(FsChangeEvent {
+            uri: "a.rs".into(),
+            kind: FsChangeKind::Changed,
+            timestamp: 20,
+        });
+        let uris = debouncer.pending_uris();
+        assert_eq!(uris, vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn debouncer_clear() {
+        let mut debouncer = FsEventDebouncer::new(100);
+        debouncer.push(FsChangeEvent {
+            uri: "a.rs".into(),
+            kind: FsChangeKind::Changed,
+            timestamp: 10,
+        });
+        debouncer.clear();
+        assert_eq!(debouncer.pending_count(), 0);
+    }
+
+    // ── Recursive delete safety tests ──
+
+    #[test]
+    fn recursive_delete_blocks_root() {
+        assert!(!RecursiveDeleteSafetyCheck::is_safe("/"));
+        assert!(!RecursiveDeleteSafetyCheck::is_safe("/home"));
+        assert!(!RecursiveDeleteSafetyCheck::is_safe("/usr"));
+    }
+
+    #[test]
+    fn recursive_delete_allows_deep_path() {
+        assert!(RecursiveDeleteSafetyCheck::is_safe("/home/user/project"));
+        assert!(RecursiveDeleteSafetyCheck::is_safe("/var/data/app"));
+    }
+
+    #[test]
+    fn recursive_delete_depth() {
+        assert_eq!(RecursiveDeleteSafetyCheck::path_depth("/a/b/c"), 3);
+        assert_eq!(RecursiveDeleteSafetyCheck::path_depth("/a"), 1);
+    }
+
+    #[test]
+    fn recursive_delete_validate() {
+        assert!(RecursiveDeleteSafetyCheck::validate("/", true).is_err());
+        assert!(RecursiveDeleteSafetyCheck::validate("/home/user/dir/sub", true).is_ok());
+        assert!(RecursiveDeleteSafetyCheck::validate("/", false).is_ok());
+    }
+
+    // ── Rename validator tests ──
+
+    #[test]
+    fn rename_valid_name() {
+        assert!(FsRenameValidator::validate_name("hello.rs").is_ok());
+        assert!(FsRenameValidator::validate_name(".hidden").is_ok());
+    }
+
+    #[test]
+    fn rename_invalid_names() {
+        assert!(FsRenameValidator::validate_name("").is_err());
+        assert!(FsRenameValidator::validate_name("..").is_err());
+        assert!(FsRenameValidator::validate_name("bad<name").is_err());
+        assert!(FsRenameValidator::validate_name("bad|name").is_err());
+    }
+
+    #[test]
+    fn rename_file_name_from_uri() {
+        assert_eq!(
+            FsRenameValidator::file_name_from_uri("file:///home/user/test.rs"),
+            Some("test.rs".to_string())
+        );
+        assert_eq!(FsRenameValidator::file_name_from_uri("file:///"), None);
+    }
+
+    #[test]
+    fn rename_extension_changed() {
+        assert!(FsRenameValidator::extension_changed("a.rs", "a.txt"));
+        assert!(!FsRenameValidator::extension_changed("a.rs", "b.rs"));
+    }
+
+    #[test]
+    fn rename_same_directory() {
+        assert!(FsRenameValidator::same_directory("/home/a.rs", "/home/b.rs"));
+        assert!(!FsRenameValidator::same_directory("/home/a.rs", "/other/a.rs"));
+    }
+
+    #[test]
+    fn rename_validate_full() {
+        assert!(FsRenameValidator::validate_rename("a.rs", "a.rs").is_err());
+        assert!(FsRenameValidator::validate_rename("a.rs", "b.rs").is_ok());
+    }
+
+    // ── Encoding detector tests ──
+
+    #[test]
+    fn encoding_detect_ascii() {
+        let content = b"Hello, world!";
+        assert_eq!(FsEncodingDetector::detect(content), DetectedEncoding::Ascii);
+        assert!(FsEncodingDetector::is_text(content));
+    }
+
+    #[test]
+    fn encoding_detect_utf8() {
+        let content = "Hello, café!".as_bytes();
+        assert_eq!(FsEncodingDetector::detect(content), DetectedEncoding::Utf8);
+    }
+
+    #[test]
+    fn encoding_detect_utf8_bom() {
+        let content = &[0xEF, 0xBB, 0xBF, b'H', b'i'];
+        assert_eq!(FsEncodingDetector::detect(content), DetectedEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn encoding_detect_utf16_le() {
+        let content = &[0xFF, 0xFE, b'H', 0x00];
+        assert_eq!(FsEncodingDetector::detect(content), DetectedEncoding::Utf16Le);
+    }
+
+    #[test]
+    fn encoding_detect_utf16_be() {
+        let content = &[0xFE, 0xFF, 0x00, b'H'];
+        assert_eq!(FsEncodingDetector::detect(content), DetectedEncoding::Utf16Be);
+    }
+
+    #[test]
+    fn encoding_detect_binary() {
+        let content = &[0x00, 0x01, 0x02, 0xFF];
+        assert_eq!(FsEncodingDetector::detect(content), DetectedEncoding::Binary);
+        assert!(!FsEncodingDetector::is_text(content));
+    }
+
+    #[test]
+    fn encoding_strip_bom() {
+        let content = &[0xEF, 0xBB, 0xBF, b'H', b'i'];
+        assert_eq!(FsEncodingDetector::strip_bom(content), &[b'H', b'i']);
+        let no_bom = b"Hello";
+        assert_eq!(FsEncodingDetector::strip_bom(no_bom), b"Hello");
+    }
+
+    #[test]
+    fn encoding_empty() {
+        assert_eq!(FsEncodingDetector::detect(&[]), DetectedEncoding::Ascii);
+    }
+
+    #[test]
+    fn encoding_bom_bytes() {
+        assert_eq!(FsEncodingDetector::bom_bytes(DetectedEncoding::Utf8Bom), &[0xEF, 0xBB, 0xBF]);
+        assert_eq!(FsEncodingDetector::bom_bytes(DetectedEncoding::Utf8), &[] as &[u8]);
+    }
+
+    #[test]
+    fn encoding_display() {
+        assert_eq!(DetectedEncoding::Utf8.to_string(), "UTF-8");
+        assert_eq!(DetectedEncoding::Binary.to_string(), "Binary");
+    }
+
 }

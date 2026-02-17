@@ -1393,6 +1393,404 @@ impl CredentialEncryptionWrapper {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// AuthSessionListView — display a list of auth sessions
+// ---------------------------------------------------------------------------
+
+/// Display formatting for a list of authentication sessions.
+#[derive(Debug, Clone)]
+pub struct AuthSessionListView {
+    sessions: Vec<AuthenticationSession>,
+    show_scopes: bool,
+    show_provider: bool,
+}
+
+impl AuthSessionListView {
+    pub fn new(sessions: Vec<AuthenticationSession>) -> Self {
+        Self {
+            sessions,
+            show_scopes: true,
+            show_provider: true,
+        }
+    }
+
+    /// Set whether scopes are shown.
+    pub fn with_scopes(mut self, show: bool) -> Self {
+        self.show_scopes = show;
+        self
+    }
+
+    /// Set whether the provider id is shown.
+    pub fn with_provider(mut self, show: bool) -> Self {
+        self.show_provider = show;
+        self
+    }
+
+    /// Number of sessions in the list.
+    pub fn len(&self) -> usize {
+        self.sessions.len()
+    }
+
+    /// Whether the list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+
+    /// Render a single session to a display string.
+    pub fn render_session(&self, session: &AuthenticationSession) -> String {
+        let mut parts = Vec::new();
+        parts.push(format!("id={}", session.id));
+        if self.show_provider {
+            parts.push(format!("provider={}", session.provider_id));
+        }
+        parts.push(format!("account={}", session.account_label));
+        if self.show_scopes && !session.scopes.is_empty() {
+            parts.push(format!("scopes=[{}]", session.scopes.join(", ")));
+        }
+        parts.join(" | ")
+    }
+
+    /// Render all sessions to display strings.
+    pub fn render_all(&self) -> Vec<String> {
+        self.sessions.iter().map(|s| self.render_session(s)).collect()
+    }
+
+    /// Filter sessions that include a specific scope.
+    pub fn filter_by_scope(&self, scope: &str) -> Vec<&AuthenticationSession> {
+        self.sessions.iter().filter(|s| s.has_scope(scope)).collect()
+    }
+
+    /// Filter sessions by provider id.
+    pub fn filter_by_provider(&self, provider_id: &str) -> Vec<&AuthenticationSession> {
+        self.sessions.iter().filter(|s| s.provider_id == provider_id).collect()
+    }
+
+    /// Get a session by id.
+    pub fn get(&self, id: &str) -> Option<&AuthenticationSession> {
+        self.sessions.iter().find(|s| s.id == id)
+    }
+
+    /// Return unique provider ids across all sessions.
+    pub fn provider_ids(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self.sessions.iter().map(|s| s.provider_id.as_str()).collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+}
+
+impl fmt::Display for AuthSessionListView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Sessions ({}):", self.sessions.len())?;
+        for line in self.render_all() {
+            writeln!(f, "  {}", line)?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthTokenInspector — inspect token claims
+// ---------------------------------------------------------------------------
+
+/// A single claim inside a token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenClaim {
+    pub key: String,
+    pub value: String,
+}
+
+impl TokenClaim {
+    pub fn new(key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self { key: key.into(), value: value.into() }
+    }
+}
+
+impl fmt::Display for TokenClaim {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Inspects a token and extracts claims.
+///
+/// This is a simplified mock inspector — real JWT parsing would use a
+/// dedicated library. Here we parse a `key=value;key=value` format.
+#[derive(Debug, Clone)]
+pub struct AuthTokenInspector {
+    claims: Vec<TokenClaim>,
+    raw: String,
+}
+
+impl AuthTokenInspector {
+    /// Parse a simplified token string of the form `key=val;key=val`.
+    pub fn parse(token: &str) -> Self {
+        let claims: Vec<TokenClaim> = token
+            .split(';')
+            .filter_map(|part| {
+                let mut kv = part.splitn(2, '=');
+                match (kv.next(), kv.next()) {
+                    (Some(k), Some(v)) if !k.trim().is_empty() => {
+                        Some(TokenClaim::new(k.trim(), v.trim()))
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+        Self { claims, raw: token.to_string() }
+    }
+
+    /// The raw token string.
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+
+    /// All parsed claims.
+    pub fn claims(&self) -> &[TokenClaim] {
+        &self.claims
+    }
+
+    /// Get the value of a specific claim.
+    pub fn get_claim(&self, key: &str) -> Option<&str> {
+        self.claims.iter().find(|c| c.key == key).map(|c| c.value.as_str())
+    }
+
+    /// Whether a claim with the given key exists.
+    pub fn has_claim(&self, key: &str) -> bool {
+        self.claims.iter().any(|c| c.key == key)
+    }
+
+    /// Number of claims.
+    pub fn claim_count(&self) -> usize {
+        self.claims.len()
+    }
+
+    /// Render all claims to a human-readable string.
+    pub fn render_claims(&self) -> String {
+        self.claims
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    /// Get the "sub" (subject) claim if present.
+    pub fn subject(&self) -> Option<&str> {
+        self.get_claim("sub")
+    }
+
+    /// Get the "iss" (issuer) claim if present.
+    pub fn issuer(&self) -> Option<&str> {
+        self.get_claim("iss")
+    }
+
+    /// Get the "exp" (expiry) claim as a u64 timestamp if present and parsable.
+    pub fn expiry_timestamp(&self) -> Option<u64> {
+        self.get_claim("exp").and_then(|v| v.parse().ok())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthScopeDisplay — display scopes in a readable format
+// ---------------------------------------------------------------------------
+
+/// A parsed scope with optional resource and permission parts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedScope {
+    pub full: String,
+    pub resource: String,
+    pub permission: Option<String>,
+}
+
+impl ParsedScope {
+    /// Parse a scope string. Format: `resource:permission` or just `resource`.
+    pub fn parse(scope: &str) -> Self {
+        let parts: Vec<&str> = scope.splitn(2, ':').collect();
+        Self {
+            full: scope.to_string(),
+            resource: parts[0].to_string(),
+            permission: parts.get(1).map(|s| s.to_string()),
+        }
+    }
+
+    /// Whether this scope grants write permission (permission contains "write").
+    pub fn is_write(&self) -> bool {
+        self.permission.as_deref().map_or(false, |p| p.contains("write"))
+    }
+
+    /// Whether this scope grants read permission.
+    pub fn is_read(&self) -> bool {
+        self.permission.as_deref().map_or(false, |p| p.contains("read"))
+    }
+
+    /// Whether this scope is a wildcard (resource is "*" or permission is "*").
+    pub fn is_wildcard(&self) -> bool {
+        self.resource == "*" || self.permission.as_deref() == Some("*")
+    }
+}
+
+impl fmt::Display for ParsedScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.full)
+    }
+}
+
+/// Display helper for a collection of scopes.
+#[derive(Debug, Clone)]
+pub struct AuthScopeDisplay {
+    scopes: Vec<ParsedScope>,
+}
+
+impl AuthScopeDisplay {
+    /// Parse a list of scope strings.
+    pub fn new(scopes: &[String]) -> Self {
+        Self {
+            scopes: scopes.iter().map(|s| ParsedScope::parse(s)).collect(),
+        }
+    }
+
+    /// All parsed scopes.
+    pub fn scopes(&self) -> &[ParsedScope] {
+        &self.scopes
+    }
+
+    /// Number of scopes.
+    pub fn len(&self) -> usize {
+        self.scopes.len()
+    }
+
+    /// Whether the scope list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.scopes.is_empty()
+    }
+
+    /// Unique resources across all scopes.
+    pub fn resources(&self) -> Vec<&str> {
+        let mut res: Vec<&str> = self.scopes.iter().map(|s| s.resource.as_str()).collect();
+        res.sort();
+        res.dedup();
+        res
+    }
+
+    /// Scopes that grant write access.
+    pub fn write_scopes(&self) -> Vec<&ParsedScope> {
+        self.scopes.iter().filter(|s| s.is_write()).collect()
+    }
+
+    /// Scopes that are wildcards.
+    pub fn wildcard_scopes(&self) -> Vec<&ParsedScope> {
+        self.scopes.iter().filter(|s| s.is_wildcard()).collect()
+    }
+
+    /// Render as a comma-separated list of full scopes.
+    pub fn render(&self) -> String {
+        self.scopes.iter().map(|s| s.full.as_str()).collect::<Vec<_>>().join(", ")
+    }
+}
+
+impl fmt::Display for AuthScopeDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.render())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthExpiryWarning — warn when tokens are about to expire
+// ---------------------------------------------------------------------------
+
+/// The urgency level of an expiry warning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExpiryUrgency {
+    /// More than 1 hour remaining.
+    Ok,
+    /// Less than 1 hour remaining.
+    Warning,
+    /// Less than 10 minutes remaining.
+    Critical,
+    /// Already expired.
+    Expired,
+}
+
+impl fmt::Display for ExpiryUrgency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ok => write!(f, "ok"),
+            Self::Warning => write!(f, "warning"),
+            Self::Critical => write!(f, "critical"),
+            Self::Expired => write!(f, "expired"),
+        }
+    }
+}
+
+/// Tracks token expiry and generates warnings.
+#[derive(Debug, Clone)]
+pub struct AuthExpiryWarning {
+    pub session_id: String,
+    pub expiry_epoch_secs: u64,
+}
+
+impl AuthExpiryWarning {
+    pub fn new(session_id: impl Into<String>, expiry_epoch_secs: u64) -> Self {
+        Self {
+            session_id: session_id.into(),
+            expiry_epoch_secs,
+        }
+    }
+
+    /// Compute the urgency given the current time as epoch seconds.
+    pub fn urgency(&self, now_epoch_secs: u64) -> ExpiryUrgency {
+        if now_epoch_secs >= self.expiry_epoch_secs {
+            ExpiryUrgency::Expired
+        } else {
+            let remaining = self.expiry_epoch_secs - now_epoch_secs;
+            if remaining < 600 {
+                ExpiryUrgency::Critical
+            } else if remaining < 3600 {
+                ExpiryUrgency::Warning
+            } else {
+                ExpiryUrgency::Ok
+            }
+        }
+    }
+
+    /// Remaining seconds until expiry (0 if already expired).
+    pub fn remaining_secs(&self, now_epoch_secs: u64) -> u64 {
+        self.expiry_epoch_secs.saturating_sub(now_epoch_secs)
+    }
+
+    /// Human-readable remaining time.
+    pub fn remaining_display(&self, now_epoch_secs: u64) -> String {
+        let secs = self.remaining_secs(now_epoch_secs);
+        if secs == 0 {
+            return "expired".to_string();
+        }
+        let hours = secs / 3600;
+        let minutes = (secs % 3600) / 60;
+        if hours > 0 {
+            format!("{}h {}m", hours, minutes)
+        } else {
+            format!("{}m", minutes)
+        }
+    }
+
+    /// Whether the token has expired.
+    pub fn is_expired(&self, now_epoch_secs: u64) -> bool {
+        now_epoch_secs >= self.expiry_epoch_secs
+    }
+
+    /// Whether a warning should be shown.
+    pub fn should_warn(&self, now_epoch_secs: u64) -> bool {
+        matches!(self.urgency(now_epoch_secs), ExpiryUrgency::Warning | ExpiryUrgency::Critical)
+    }
+}
+
+impl fmt::Display for AuthExpiryWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "session {} expires at {}", self.session_id, self.expiry_epoch_secs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2218,4 +2616,234 @@ mod tests {
         let e2 = w2.encrypt("test");
         assert_ne!(e1, e2);
     }
+
+    // --- AuthSessionListView tests ------------------------------------------
+
+    fn make_session(id: &str, provider: &str, scopes: &[&str]) -> AuthenticationSession {
+        AuthenticationSession {
+            id: id.to_string(),
+            provider_id: provider.to_string(),
+            account_label: format!("user@{provider}"),
+            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn session_list_view_basic() {
+        let sessions = vec![
+            make_session("s1", "github", &["repo", "user"]),
+            make_session("s2", "azure", &["mail"]),
+        ];
+        let view = AuthSessionListView::new(sessions);
+        assert_eq!(view.len(), 2);
+        assert!(!view.is_empty());
+    }
+
+    #[test]
+    fn session_list_view_render() {
+        let sessions = vec![make_session("s1", "github", &["repo"])];
+        let view = AuthSessionListView::new(sessions);
+        let rendered = view.render_all();
+        assert_eq!(rendered.len(), 1);
+        assert!(rendered[0].contains("github"));
+        assert!(rendered[0].contains("repo"));
+    }
+
+    #[test]
+    fn session_list_view_hide_scopes() {
+        let sessions = vec![make_session("s1", "gh", &["a"])];
+        let view = AuthSessionListView::new(sessions).with_scopes(false);
+        let rendered = view.render_all();
+        assert!(!rendered[0].contains("scopes"));
+    }
+
+    #[test]
+    fn session_list_view_filter_by_scope() {
+        let sessions = vec![
+            make_session("s1", "gh", &["repo", "user"]),
+            make_session("s2", "gh", &["user"]),
+        ];
+        let view = AuthSessionListView::new(sessions);
+        let filtered = view.filter_by_scope("repo");
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn session_list_view_filter_by_provider() {
+        let sessions = vec![
+            make_session("s1", "github", &[]),
+            make_session("s2", "azure", &[]),
+        ];
+        let view = AuthSessionListView::new(sessions);
+        assert_eq!(view.filter_by_provider("azure").len(), 1);
+    }
+
+    #[test]
+    fn session_list_view_provider_ids() {
+        let sessions = vec![
+            make_session("s1", "github", &[]),
+            make_session("s2", "azure", &[]),
+            make_session("s3", "github", &[]),
+        ];
+        let view = AuthSessionListView::new(sessions);
+        let ids = view.provider_ids();
+        assert_eq!(ids.len(), 2);
+    }
+
+    #[test]
+    fn session_list_view_display() {
+        let sessions = vec![make_session("s1", "gh", &[])];
+        let view = AuthSessionListView::new(sessions);
+        let display = format!("{}", view);
+        assert!(display.contains("Sessions (1)"));
+    }
+
+    // --- AuthTokenInspector tests -------------------------------------------
+
+    #[test]
+    fn token_inspector_parse() {
+        let inspector = AuthTokenInspector::parse("sub=user123;iss=github;exp=1700000000");
+        assert_eq!(inspector.claim_count(), 3);
+        assert_eq!(inspector.subject(), Some("user123"));
+        assert_eq!(inspector.issuer(), Some("github"));
+        assert_eq!(inspector.expiry_timestamp(), Some(1700000000));
+    }
+
+    #[test]
+    fn token_inspector_get_claim() {
+        let inspector = AuthTokenInspector::parse("key=value;other=data");
+        assert_eq!(inspector.get_claim("key"), Some("value"));
+        assert!(inspector.has_claim("other"));
+        assert!(!inspector.has_claim("missing"));
+    }
+
+    #[test]
+    fn token_inspector_render() {
+        let inspector = AuthTokenInspector::parse("a=1;b=2");
+        let rendered = inspector.render_claims();
+        assert!(rendered.contains("a=1"));
+        assert!(rendered.contains("b=2"));
+    }
+
+    #[test]
+    fn token_inspector_empty() {
+        let inspector = AuthTokenInspector::parse("");
+        assert_eq!(inspector.claim_count(), 0);
+        assert_eq!(inspector.subject(), None);
+    }
+
+    #[test]
+    fn token_claim_display() {
+        let claim = TokenClaim::new("sub", "user1");
+        assert_eq!(claim.to_string(), "sub=user1");
+    }
+
+    // --- AuthScopeDisplay tests ---------------------------------------------
+
+    #[test]
+    fn scope_display_parse() {
+        let scopes = vec!["repo:read".into(), "user:write".into(), "admin".into()];
+        let display = AuthScopeDisplay::new(&scopes);
+        assert_eq!(display.len(), 3);
+    }
+
+    #[test]
+    fn parsed_scope_permissions() {
+        let read = ParsedScope::parse("repo:read");
+        assert!(read.is_read());
+        assert!(!read.is_write());
+        let write = ParsedScope::parse("repo:write");
+        assert!(write.is_write());
+    }
+
+    #[test]
+    fn parsed_scope_wildcard() {
+        let wc = ParsedScope::parse("*:read");
+        assert!(wc.is_wildcard());
+        let normal = ParsedScope::parse("repo:read");
+        assert!(!normal.is_wildcard());
+    }
+
+    #[test]
+    fn scope_display_resources() {
+        let scopes = vec!["repo:read".into(), "repo:write".into(), "user:read".into()];
+        let display = AuthScopeDisplay::new(&scopes);
+        let res = display.resources();
+        assert_eq!(res.len(), 2);
+    }
+
+    #[test]
+    fn scope_display_write_scopes() {
+        let scopes = vec!["repo:write".into(), "user:read".into()];
+        let display = AuthScopeDisplay::new(&scopes);
+        assert_eq!(display.write_scopes().len(), 1);
+    }
+
+    #[test]
+    fn scope_display_render() {
+        let scopes = vec!["a".into(), "b".into()];
+        let display = AuthScopeDisplay::new(&scopes);
+        assert_eq!(display.render(), "a, b");
+    }
+
+    // --- AuthExpiryWarning tests --------------------------------------------
+
+    #[test]
+    fn expiry_warning_ok() {
+        let w = AuthExpiryWarning::new("s1", 10000);
+        assert_eq!(w.urgency(0), ExpiryUrgency::Ok);
+        assert!(!w.is_expired(0));
+        assert!(!w.should_warn(0));
+    }
+
+    #[test]
+    fn expiry_warning_warning() {
+        let w = AuthExpiryWarning::new("s1", 1800);
+        assert_eq!(w.urgency(0), ExpiryUrgency::Warning);
+        assert!(w.should_warn(0));
+    }
+
+    #[test]
+    fn expiry_warning_critical() {
+        let w = AuthExpiryWarning::new("s1", 300);
+        assert_eq!(w.urgency(0), ExpiryUrgency::Critical);
+        assert!(w.should_warn(0));
+    }
+
+    #[test]
+    fn expiry_warning_expired() {
+        let w = AuthExpiryWarning::new("s1", 100);
+        assert_eq!(w.urgency(200), ExpiryUrgency::Expired);
+        assert!(w.is_expired(200));
+    }
+
+    #[test]
+    fn expiry_remaining_display() {
+        let w = AuthExpiryWarning::new("s1", 7200);
+        assert!(w.remaining_display(0).contains("2h"));
+        let w2 = AuthExpiryWarning::new("s2", 0);
+        assert_eq!(w2.remaining_display(100), "expired");
+    }
+
+    #[test]
+    fn expiry_urgency_ordering() {
+        assert!(ExpiryUrgency::Ok < ExpiryUrgency::Warning);
+        assert!(ExpiryUrgency::Warning < ExpiryUrgency::Critical);
+        assert!(ExpiryUrgency::Critical < ExpiryUrgency::Expired);
+    }
+
+    #[test]
+    fn expiry_urgency_display() {
+        assert_eq!(ExpiryUrgency::Ok.to_string(), "ok");
+        assert_eq!(ExpiryUrgency::Expired.to_string(), "expired");
+    }
+
+    #[test]
+    fn expiry_warning_display() {
+        let w = AuthExpiryWarning::new("s1", 1000);
+        let s = w.to_string();
+        assert!(s.contains("s1"));
+        assert!(s.contains("1000"));
+    }
+
 }

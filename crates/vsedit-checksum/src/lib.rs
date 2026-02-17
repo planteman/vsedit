@@ -1446,6 +1446,312 @@ impl Default for MtimeChecksumCache {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChecksumBatchVerifier - checksum batch verifier
+// ---------------------------------------------------------------------------
+
+/// Severity level for checksum batch verifier issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ChecksumBatchVerifierSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ChecksumBatchVerifierSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ChecksumBatchVerifier].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChecksumBatchVerifierEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ChecksumBatchVerifierSeverity,
+    pub detail: Option<String>,
+    pub file_count: usize,
+    enabled: bool,
+}
+
+impl ChecksumBatchVerifierEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ChecksumBatchVerifierSeverity::Low,
+            detail: None,
+            file_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ChecksumBatchVerifierSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_file_count(mut self, val: usize) -> Self {
+        self.file_count = val;
+        self
+    }
+
+    pub fn all_valid(&self) -> bool {
+        self.enabled && self.severity >= ChecksumBatchVerifierSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.file_count, det)
+    }
+}
+
+impl fmt::Display for ChecksumBatchVerifierEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ChecksumBatchVerifierEntry] items.
+#[derive(Debug, Clone)]
+pub struct ChecksumBatchVerifier {
+    entries: Vec<ChecksumBatchVerifierEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ChecksumBatchVerifier {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ChecksumBatchVerifierEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ChecksumBatchVerifierEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ChecksumBatchVerifierEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn file_count(&self) -> usize { self.entries.len() }
+
+    pub fn all_valid(&self) -> bool {
+        self.entries.iter().any(|e| e.all_valid())
+    }
+
+    pub fn entries_by_severity(&self, severity: ChecksumBatchVerifierSeverity) -> Vec<&ChecksumBatchVerifierEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ChecksumBatchVerifierSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ChecksumBatchVerifierEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ChecksumBatchVerifierEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChecksumFormatConverter - checksum format converter
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ChecksumFormatConverter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChecksumFormatConverterConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub algorithm_count: usize,
+}
+
+impl ChecksumFormatConverterConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, algorithm_count: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_algorithm_count(mut self, val: usize) -> Self { self.algorithm_count = val; self }
+}
+
+impl Default for ChecksumFormatConverterConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ChecksumFormatConverter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChecksumFormatConverterItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ChecksumFormatConverterItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn needs_conversion(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ChecksumFormatConverterItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ChecksumFormatConverterItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ChecksumFormatConverter {
+    config: ChecksumFormatConverterConfig,
+    items: Vec<ChecksumFormatConverterItem>,
+}
+
+impl ChecksumFormatConverter {
+    pub fn new(config: ChecksumFormatConverterConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ChecksumFormatConverterItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ChecksumFormatConverterItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ChecksumFormatConverterItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn algorithm_count(&self) -> usize { self.items.len() }
+
+    pub fn needs_conversion(&self) -> bool {
+        self.items.iter().any(|i| i.needs_conversion())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ChecksumFormatConverterItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ChecksumFormatConverterItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ChecksumFormatConverterConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2439,4 +2745,146 @@ mod tests {
         assert!(cache.get("a.txt", 1).is_some());
     }
 
+
+#[test]
+    fn checksumbatchverifier_severity_ordering() {
+        assert!(ChecksumBatchVerifierSeverity::Critical > ChecksumBatchVerifierSeverity::High);
+        assert!(ChecksumBatchVerifierSeverity::High > ChecksumBatchVerifierSeverity::Medium);
+        assert!(ChecksumBatchVerifierSeverity::Medium > ChecksumBatchVerifierSeverity::Low);
+    }
+
+    #[test]
+    fn checksumbatchverifier_severity_display() {
+        assert_eq!(ChecksumBatchVerifierSeverity::Low.to_string(), "low");
+        assert_eq!(ChecksumBatchVerifierSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn checksumbatchverifier_entry_creation() {
+        let e = ChecksumBatchVerifierEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ChecksumBatchVerifierSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn checksumbatchverifier_entry_builder() {
+        let e = ChecksumBatchVerifierEntry::new("e2", "Entry 2")
+            .with_severity(ChecksumBatchVerifierSeverity::High)
+            .with_detail("some detail")
+            .with_file_count(42);
+        assert_eq!(e.severity, ChecksumBatchVerifierSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.file_count, 42);
+    }
+
+    #[test]
+    fn checksumbatchverifier_entry_enable_disable() {
+        let mut e = ChecksumBatchVerifierEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn checksumbatchverifier_add_and_count() {
+        let mut mgr = ChecksumBatchVerifier::new("test");
+        mgr.add(ChecksumBatchVerifierEntry::new("a", "A"));
+        mgr.add(ChecksumBatchVerifierEntry::new("b", "B").with_severity(ChecksumBatchVerifierSeverity::High));
+        assert_eq!(mgr.file_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn checksumbatchverifier_remove() {
+        let mut mgr = ChecksumBatchVerifier::new("test");
+        mgr.add(ChecksumBatchVerifierEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn checksumbatchverifier_capacity() {
+        let mut mgr = ChecksumBatchVerifier::new("test").with_capacity(1);
+        assert!(mgr.add(ChecksumBatchVerifierEntry::new("a", "A")));
+        assert!(!mgr.add(ChecksumBatchVerifierEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn checksumbatchverifier_sorted_by_severity() {
+        let mut mgr = ChecksumBatchVerifier::new("test");
+        mgr.add(ChecksumBatchVerifierEntry::new("lo", "Low"));
+        mgr.add(ChecksumBatchVerifierEntry::new("hi", "High").with_severity(ChecksumBatchVerifierSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ChecksumBatchVerifierSeverity::Critical);
+    }
+
+    #[test]
+    fn checksumbatchverifier_summary() {
+        let mgr = ChecksumBatchVerifier::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn checksumformatconverter_config_defaults() {
+        let cfg = ChecksumFormatConverterConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn checksumformatconverter_item_creation() {
+        let item = ChecksumFormatConverterItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn checksumformatconverter_add_and_get() {
+        let mut mgr = ChecksumFormatConverter::new(ChecksumFormatConverterConfig::new("test"));
+        mgr.add(ChecksumFormatConverterItem::new("k1", "v1"));
+        assert_eq!(mgr.algorithm_count(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn checksumformatconverter_remove_item() {
+        let mut mgr = ChecksumFormatConverter::new(ChecksumFormatConverterConfig::new("test"));
+        mgr.add(ChecksumFormatConverterItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn checksumformatconverter_sorted_by_priority() {
+        let mut mgr = ChecksumFormatConverter::new(ChecksumFormatConverterConfig::new("test"));
+        mgr.add(ChecksumFormatConverterItem::new("lo", "low").with_priority(1));
+        mgr.add(ChecksumFormatConverterItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn checksumformatconverter_items_with_tag() {
+        let mut mgr = ChecksumFormatConverter::new(ChecksumFormatConverterConfig::new("test"));
+        mgr.add(ChecksumFormatConverterItem::new("a", "1").with_tag("x"));
+        mgr.add(ChecksumFormatConverterItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn checksumformatconverter_report() {
+        let mgr = ChecksumFormatConverter::new(ChecksumFormatConverterConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
+    }
 }

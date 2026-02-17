@@ -1521,6 +1521,222 @@ impl Default for QuickInputBusyIndicator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// QuickInputAutoComplete
+// ---------------------------------------------------------------------------
+
+/// A single auto-completion suggestion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoCompleteSuggestion {
+    pub text: String,
+    pub label: String,
+    pub score: u32,
+    pub category: String,
+}
+
+impl AutoCompleteSuggestion {
+    pub fn new(text: impl Into<String>, label: impl Into<String>, score: u32, category: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            label: label.into(),
+            score,
+            category: category.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for AutoCompleteSuggestion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} [{}] (score={})", self.label, self.category, self.score)
+    }
+}
+
+/// Provides auto-completion suggestions for quick input based on prefix matching and scoring.
+pub struct QuickInputAutoComplete {
+    suggestions: Vec<AutoCompleteSuggestion>,
+    max_results: usize,
+    case_sensitive: bool,
+}
+
+impl QuickInputAutoComplete {
+    pub fn new(max_results: usize) -> Self {
+        Self {
+            suggestions: Vec::new(),
+            max_results,
+            case_sensitive: false,
+        }
+    }
+
+    pub fn set_case_sensitive(&mut self, case_sensitive: bool) {
+        self.case_sensitive = case_sensitive;
+    }
+
+    pub fn add_suggestion(&mut self, suggestion: AutoCompleteSuggestion) {
+        self.suggestions.push(suggestion);
+    }
+
+    pub fn add_suggestions(&mut self, items: impl IntoIterator<Item = AutoCompleteSuggestion>) {
+        self.suggestions.extend(items);
+    }
+
+    pub fn suggestion_count(&self) -> usize {
+        self.suggestions.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.suggestions.clear();
+    }
+
+    /// Return completions matching the given prefix, sorted by score descending.
+    pub fn complete(&self, prefix: &str) -> Vec<&AutoCompleteSuggestion> {
+        let normalized_prefix = if self.case_sensitive {
+            prefix.to_string()
+        } else {
+            prefix.to_lowercase()
+        };
+        let mut matches: Vec<&AutoCompleteSuggestion> = self
+            .suggestions
+            .iter()
+            .filter(|s| {
+                let text = if self.case_sensitive {
+                    s.text.clone()
+                } else {
+                    s.text.to_lowercase()
+                };
+                text.starts_with(&normalized_prefix)
+            })
+            .collect();
+        matches.sort_by(|a, b| b.score.cmp(&a.score));
+        matches.truncate(self.max_results);
+        matches
+    }
+
+    /// Return completions that contain the query as a substring.
+    pub fn fuzzy_match(&self, query: &str) -> Vec<&AutoCompleteSuggestion> {
+        let q = if self.case_sensitive { query.to_string() } else { query.to_lowercase() };
+        let mut matches: Vec<&AutoCompleteSuggestion> = self
+            .suggestions
+            .iter()
+            .filter(|s| {
+                let text = if self.case_sensitive { s.text.clone() } else { s.text.to_lowercase() };
+                text.contains(&q)
+            })
+            .collect();
+        matches.sort_by(|a, b| b.score.cmp(&a.score));
+        matches.truncate(self.max_results);
+        matches
+    }
+
+    /// Return distinct categories from all suggestions.
+    pub fn categories(&self) -> Vec<String> {
+        let mut cats: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for s in &self.suggestions {
+            cats.insert(s.category.clone());
+        }
+        let mut v: Vec<String> = cats.into_iter().collect();
+        v.sort();
+        v
+    }
+}
+
+impl std::fmt::Display for QuickInputAutoComplete {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QuickInputAutoComplete({} suggestions, max={})", self.suggestions.len(), self.max_results)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickInputResultCache
+// ---------------------------------------------------------------------------
+
+/// A cached result entry for quick input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CachedQuickInputResult {
+    pub query: String,
+    pub results: Vec<String>,
+    pub timestamp: u64,
+}
+
+impl CachedQuickInputResult {
+    pub fn new(query: impl Into<String>, results: Vec<String>, timestamp: u64) -> Self {
+        Self { query: query.into(), results, timestamp }
+    }
+
+    pub fn is_expired(&self, now: u64, ttl: u64) -> bool {
+        now.saturating_sub(self.timestamp) > ttl
+    }
+}
+
+impl std::fmt::Display for CachedQuickInputResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CachedResult('{}', {} items, ts={})", self.query, self.results.len(), self.timestamp)
+    }
+}
+
+/// Caches previous quick input results for fast recall. Uses LRU-style eviction.
+pub struct QuickInputResultCache {
+    entries: Vec<CachedQuickInputResult>,
+    capacity: usize,
+    ttl: u64,
+}
+
+impl QuickInputResultCache {
+    pub fn new(capacity: usize, ttl: u64) -> Self {
+        Self { entries: Vec::new(), capacity, ttl }
+    }
+
+    pub fn insert(&mut self, entry: CachedQuickInputResult) {
+        // Remove existing entry for same query
+        self.entries.retain(|e| e.query != entry.query);
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    pub fn get(&self, query: &str, now: u64) -> Option<&CachedQuickInputResult> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|e| e.query == query && !e.is_expired(now, self.ttl))
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Evict all expired entries relative to the given timestamp.
+    pub fn evict_expired(&mut self, now: u64) {
+        self.entries.retain(|e| !e.is_expired(now, self.ttl));
+    }
+
+    /// Return all cached queries.
+    pub fn cached_queries(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.query.as_str()).collect()
+    }
+
+    /// Returns hit ratio info: (hits_possible, total_entries).
+    pub fn stats(&self, now: u64) -> (usize, usize) {
+        let valid = self.entries.iter().filter(|e| !e.is_expired(now, self.ttl)).count();
+        (valid, self.entries.len())
+    }
+}
+
+impl std::fmt::Display for QuickInputResultCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QuickInputResultCache({}/{} entries, ttl={})", self.entries.len(), self.capacity, self.ttl)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2449,4 +2665,161 @@ mod tests {
         ind.set_progress(150.0);
         assert_eq!(ind.progress, Some(100.0));
     }
+
+    #[test]
+    fn autocomplete_prefix_match() {
+        let mut ac = QuickInputAutoComplete::new(10);
+        ac.add_suggestion(AutoCompleteSuggestion::new("hello", "Hello", 10, "greet"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("help", "Help", 5, "cmd"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("world", "World", 8, "greet"));
+        let results = ac.complete("hel");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].text, "hello"); // higher score first
+    }
+
+    #[test]
+    fn autocomplete_case_insensitive() {
+        let mut ac = QuickInputAutoComplete::new(10);
+        ac.add_suggestion(AutoCompleteSuggestion::new("Hello", "Hello", 10, "g"));
+        let results = ac.complete("hel");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn autocomplete_case_sensitive() {
+        let mut ac = QuickInputAutoComplete::new(10);
+        ac.set_case_sensitive(true);
+        ac.add_suggestion(AutoCompleteSuggestion::new("Hello", "Hello", 10, "g"));
+        let results = ac.complete("hel");
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn autocomplete_max_results() {
+        let mut ac = QuickInputAutoComplete::new(2);
+        ac.add_suggestion(AutoCompleteSuggestion::new("a1", "A1", 1, "c"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("a2", "A2", 2, "c"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("a3", "A3", 3, "c"));
+        let results = ac.complete("a");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn autocomplete_fuzzy_match() {
+        let mut ac = QuickInputAutoComplete::new(10);
+        ac.add_suggestion(AutoCompleteSuggestion::new("foobar", "FooBar", 10, "c"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("baz", "Baz", 5, "c"));
+        let results = ac.fuzzy_match("oob");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].text, "foobar");
+    }
+
+    #[test]
+    fn autocomplete_categories() {
+        let mut ac = QuickInputAutoComplete::new(10);
+        ac.add_suggestion(AutoCompleteSuggestion::new("a", "A", 1, "cat1"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("b", "B", 1, "cat2"));
+        ac.add_suggestion(AutoCompleteSuggestion::new("c", "C", 1, "cat1"));
+        let cats = ac.categories();
+        assert_eq!(cats.len(), 2);
+    }
+
+    #[test]
+    fn autocomplete_display_and_clear() {
+        let mut ac = QuickInputAutoComplete::new(10);
+        ac.add_suggestion(AutoCompleteSuggestion::new("x", "X", 1, "c"));
+        assert!(format!("{ac}").contains("1 suggestions"));
+        assert_eq!(ac.suggestion_count(), 1);
+        ac.clear();
+        assert_eq!(ac.suggestion_count(), 0);
+    }
+
+    #[test]
+    fn result_cache_insert_and_get() {
+        let mut cache = QuickInputResultCache::new(10, 1000);
+        cache.insert(CachedQuickInputResult::new("q1", vec!["r1".into()], 100));
+        let r = cache.get("q1", 200);
+        assert!(r.is_some());
+        assert_eq!(r.unwrap().results, vec!["r1"]);
+    }
+
+    #[test]
+    fn result_cache_expired_entry() {
+        let mut cache = QuickInputResultCache::new(10, 100);
+        cache.insert(CachedQuickInputResult::new("q1", vec!["r1".into()], 100));
+        assert!(cache.get("q1", 300).is_none()); // expired
+    }
+
+    #[test]
+    fn result_cache_eviction() {
+        let mut cache = QuickInputResultCache::new(2, 1000);
+        cache.insert(CachedQuickInputResult::new("q1", vec![], 100));
+        cache.insert(CachedQuickInputResult::new("q2", vec![], 200));
+        cache.insert(CachedQuickInputResult::new("q3", vec![], 300));
+        assert_eq!(cache.len(), 2);
+        assert!(cache.get("q1", 300).is_none()); // evicted
+    }
+
+    #[test]
+    fn result_cache_evict_expired() {
+        let mut cache = QuickInputResultCache::new(10, 100);
+        cache.insert(CachedQuickInputResult::new("old", vec![], 10));
+        cache.insert(CachedQuickInputResult::new("new", vec![], 500));
+        cache.evict_expired(500);
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn result_cache_stats_and_display() {
+        let mut cache = QuickInputResultCache::new(10, 100);
+        cache.insert(CachedQuickInputResult::new("q1", vec![], 10));
+        cache.insert(CachedQuickInputResult::new("q2", vec![], 200));
+        let (valid, total) = cache.stats(250);
+        assert_eq!(total, 2);
+        assert_eq!(valid, 1);
+        assert!(format!("{cache}").contains("2/10"));
+    }
+
+    #[test]
+    fn result_cache_cached_queries() {
+        let mut cache = QuickInputResultCache::new(10, 1000);
+        cache.insert(CachedQuickInputResult::new("alpha", vec![], 1));
+        cache.insert(CachedQuickInputResult::new("beta", vec![], 2));
+        let queries = cache.cached_queries();
+        assert!(queries.contains(&"alpha"));
+        assert!(queries.contains(&"beta"));
+    }
+
+    #[test]
+    fn result_cache_replace_same_query() {
+        let mut cache = QuickInputResultCache::new(10, 1000);
+        cache.insert(CachedQuickInputResult::new("q", vec!["old".into()], 1));
+        cache.insert(CachedQuickInputResult::new("q", vec!["new".into()], 2));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.get("q", 5).unwrap().results, vec!["new"]);
+    }
+
+    #[test]
+    fn suggestion_display() {
+        let s = AutoCompleteSuggestion::new("txt", "Label", 42, "Cat");
+        assert!(format!("{s}").contains("Label"));
+        assert!(format!("{s}").contains("Cat"));
+        assert!(format!("{s}").contains("42"));
+    }
+
+    #[test]
+    fn cached_result_is_expired() {
+        let r = CachedQuickInputResult::new("q", vec![], 100);
+        assert!(!r.is_expired(150, 100));
+        assert!(r.is_expired(250, 100));
+    }
+
+    #[test]
+    fn cached_result_display() {
+        let r = CachedQuickInputResult::new("q", vec!["a".into(), "b".into()], 50);
+        let s = format!("{r}");
+        assert!(s.contains("q"));
+        assert!(s.contains("2 items"));
+    }
+
 }

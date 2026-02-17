@@ -1447,6 +1447,312 @@ pub fn generate_follow_ups(response: &str, max: usize) -> Vec<ChatFollowUp> {
     suggestions
 }
 
+// ---------------------------------------------------------------------------
+// ChatFormatter - chat message format helper
+// ---------------------------------------------------------------------------
+
+/// Severity level for chat message format helper issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ChatFormatterSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ChatFormatterSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ChatFormatter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatFormatterEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ChatFormatterSeverity,
+    pub detail: Option<String>,
+    pub message_count: usize,
+    enabled: bool,
+}
+
+impl ChatFormatterEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ChatFormatterSeverity::Low,
+            detail: None,
+            message_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ChatFormatterSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_message_count(mut self, val: usize) -> Self {
+        self.message_count = val;
+        self
+    }
+
+    pub fn has_code_block(&self) -> bool {
+        self.enabled && self.severity >= ChatFormatterSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.message_count, det)
+    }
+}
+
+impl fmt::Display for ChatFormatterEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ChatFormatterEntry] items.
+#[derive(Debug, Clone)]
+pub struct ChatFormatter {
+    entries: Vec<ChatFormatterEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ChatFormatter {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ChatFormatterEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ChatFormatterEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ChatFormatterEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn message_count(&self) -> usize { self.entries.len() }
+
+    pub fn has_code_block(&self) -> bool {
+        self.entries.iter().any(|e| e.has_code_block())
+    }
+
+    pub fn entries_by_severity(&self, severity: ChatFormatterSeverity) -> Vec<&ChatFormatterEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ChatFormatterSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ChatFormatterEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ChatFormatterEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatCtxBuilder - chat context builder
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ChatCtxBuilder].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatCtxBuilderConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub context_tokens: usize,
+}
+
+impl ChatCtxBuilderConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, context_tokens: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_context_tokens(mut self, val: usize) -> Self { self.context_tokens = val; self }
+}
+
+impl Default for ChatCtxBuilderConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ChatCtxBuilder].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatCtxBuilderItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ChatCtxBuilderItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn exceeds_budget(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ChatCtxBuilderItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ChatCtxBuilderItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ChatCtxBuilder {
+    config: ChatCtxBuilderConfig,
+    items: Vec<ChatCtxBuilderItem>,
+}
+
+impl ChatCtxBuilder {
+    pub fn new(config: ChatCtxBuilderConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ChatCtxBuilderItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ChatCtxBuilderItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ChatCtxBuilderItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn context_tokens(&self) -> usize { self.items.len() }
+
+    pub fn exceeds_budget(&self) -> bool {
+        self.items.iter().any(|i| i.exceeds_budget())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ChatCtxBuilderItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ChatCtxBuilderItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ChatCtxBuilderConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2294,5 +2600,147 @@ mod tests {
         let long = "x".repeat(300);
         let suggestions = generate_follow_ups(&long, 1);
         assert_eq!(suggestions.len(), 1);
+    }
+
+#[test]
+    fn chatformatter_severity_ordering() {
+        assert!(ChatFormatterSeverity::Critical > ChatFormatterSeverity::High);
+        assert!(ChatFormatterSeverity::High > ChatFormatterSeverity::Medium);
+        assert!(ChatFormatterSeverity::Medium > ChatFormatterSeverity::Low);
+    }
+
+    #[test]
+    fn chatformatter_severity_display() {
+        assert_eq!(ChatFormatterSeverity::Low.to_string(), "low");
+        assert_eq!(ChatFormatterSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn chatformatter_entry_creation() {
+        let e = ChatFormatterEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ChatFormatterSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn chatformatter_entry_builder() {
+        let e = ChatFormatterEntry::new("e2", "Entry 2")
+            .with_severity(ChatFormatterSeverity::High)
+            .with_detail("some detail")
+            .with_message_count(42);
+        assert_eq!(e.severity, ChatFormatterSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.message_count, 42);
+    }
+
+    #[test]
+    fn chatformatter_entry_enable_disable() {
+        let mut e = ChatFormatterEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn chatformatter_add_and_count() {
+        let mut mgr = ChatFormatter::new("test");
+        mgr.add(ChatFormatterEntry::new("a", "A"));
+        mgr.add(ChatFormatterEntry::new("b", "B").with_severity(ChatFormatterSeverity::High));
+        assert_eq!(mgr.message_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn chatformatter_remove() {
+        let mut mgr = ChatFormatter::new("test");
+        mgr.add(ChatFormatterEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn chatformatter_capacity() {
+        let mut mgr = ChatFormatter::new("test").with_capacity(1);
+        assert!(mgr.add(ChatFormatterEntry::new("a", "A")));
+        assert!(!mgr.add(ChatFormatterEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn chatformatter_sorted_by_severity() {
+        let mut mgr = ChatFormatter::new("test");
+        mgr.add(ChatFormatterEntry::new("lo", "Low"));
+        mgr.add(ChatFormatterEntry::new("hi", "High").with_severity(ChatFormatterSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ChatFormatterSeverity::Critical);
+    }
+
+    #[test]
+    fn chatformatter_summary() {
+        let mgr = ChatFormatter::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn chatctxbuilder_config_defaults() {
+        let cfg = ChatCtxBuilderConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn chatctxbuilder_item_creation() {
+        let item = ChatCtxBuilderItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn chatctxbuilder_add_and_get() {
+        let mut mgr = ChatCtxBuilder::new(ChatCtxBuilderConfig::new("test"));
+        mgr.add(ChatCtxBuilderItem::new("k1", "v1"));
+        assert_eq!(mgr.context_tokens(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn chatctxbuilder_remove_item() {
+        let mut mgr = ChatCtxBuilder::new(ChatCtxBuilderConfig::new("test"));
+        mgr.add(ChatCtxBuilderItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn chatctxbuilder_sorted_by_priority() {
+        let mut mgr = ChatCtxBuilder::new(ChatCtxBuilderConfig::new("test"));
+        mgr.add(ChatCtxBuilderItem::new("lo", "low").with_priority(1));
+        mgr.add(ChatCtxBuilderItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn chatctxbuilder_items_with_tag() {
+        let mut mgr = ChatCtxBuilder::new(ChatCtxBuilderConfig::new("test"));
+        mgr.add(ChatCtxBuilderItem::new("a", "1").with_tag("x"));
+        mgr.add(ChatCtxBuilderItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn chatctxbuilder_report() {
+        let mgr = ChatCtxBuilder::new(ChatCtxBuilderConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

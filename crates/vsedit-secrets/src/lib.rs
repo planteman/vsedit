@@ -1463,6 +1463,267 @@ impl fmt::Display for SecretDiff {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// SecretsVaultMigrator
+// ---------------------------------------------------------------------------
+
+/// Describes a secret storage backend.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VaultBackendKind {
+    InMemory,
+    EncryptedFile,
+    Keyring,
+    Custom(String),
+}
+
+impl fmt::Display for VaultBackendKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InMemory => write!(f, "in-memory"),
+            Self::EncryptedFile => write!(f, "encrypted-file"),
+            Self::Keyring => write!(f, "keyring"),
+            Self::Custom(name) => write!(f, "custom({name})"),
+        }
+    }
+}
+
+/// A record of a single migrated secret.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MigrationRecord {
+    pub key: String,
+    pub source: VaultBackendKind,
+    pub destination: VaultBackendKind,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+
+/// Migrates secrets between storage backends.
+#[derive(Debug)]
+pub struct SecretsVaultMigrator {
+    records: Vec<MigrationRecord>,
+    dry_run: bool,
+    overwrite_existing: bool,
+    key_filter: Option<String>,
+}
+
+impl SecretsVaultMigrator {
+    /// Create a new migrator.
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            dry_run: false,
+            overwrite_existing: false,
+            key_filter: None,
+        }
+    }
+
+    /// Enable or disable dry-run mode (no actual migration).
+    pub fn set_dry_run(&mut self, enabled: bool) -> &mut Self {
+        self.dry_run = enabled;
+        self
+    }
+
+    /// Allow or disallow overwriting existing secrets in the destination.
+    pub fn set_overwrite(&mut self, enabled: bool) -> &mut Self {
+        self.overwrite_existing = enabled;
+        self
+    }
+
+    /// Set a prefix filter: only keys starting with this prefix will be migrated.
+    pub fn set_key_filter(&mut self, prefix: &str) -> &mut Self {
+        self.key_filter = Some(prefix.to_string());
+        self
+    }
+
+    /// Whether a given key passes the current filter.
+    pub fn key_matches_filter(&self, key: &str) -> bool {
+        match &self.key_filter {
+            Some(prefix) => key.starts_with(prefix),
+            None => true,
+        }
+    }
+
+    /// Simulate migration of a set of entries from one backend to another.
+    pub fn migrate_entries(
+        &mut self,
+        entries: &[SecretEntry],
+        source: VaultBackendKind,
+        destination: VaultBackendKind,
+        existing_keys: &[String],
+    ) -> Vec<MigrationRecord> {
+        let mut batch = Vec::new();
+        for entry in entries {
+            if !self.key_matches_filter(&entry.key) {
+                continue;
+            }
+            let already_exists = existing_keys.contains(&entry.key);
+            let record = if already_exists && !self.overwrite_existing {
+                MigrationRecord {
+                    key: entry.key.clone(),
+                    source: source.clone(),
+                    destination: destination.clone(),
+                    success: false,
+                    error_message: Some("key already exists in destination".into()),
+                }
+            } else if self.dry_run {
+                MigrationRecord {
+                    key: entry.key.clone(),
+                    source: source.clone(),
+                    destination: destination.clone(),
+                    success: true,
+                    error_message: None,
+                }
+            } else {
+                MigrationRecord {
+                    key: entry.key.clone(),
+                    source: source.clone(),
+                    destination: destination.clone(),
+                    success: true,
+                    error_message: None,
+                }
+            };
+            batch.push(record.clone());
+            self.records.push(record);
+        }
+        batch
+    }
+
+    /// Return all migration records.
+    pub fn records(&self) -> &[MigrationRecord] {
+        &self.records
+    }
+
+    /// Count of successful migrations.
+    pub fn success_count(&self) -> usize {
+        self.records.iter().filter(|r| r.success).count()
+    }
+
+    /// Count of failed migrations.
+    pub fn failure_count(&self) -> usize {
+        self.records.iter().filter(|r| !r.success).count()
+    }
+
+    /// Summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "Migration complete: {} succeeded, {} failed out of {} total",
+            self.success_count(),
+            self.failure_count(),
+            self.records.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SecretsAccessAuditor
+// ---------------------------------------------------------------------------
+
+/// The kind of access operation performed on a secret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditAccessKind {
+    Read,
+    Write,
+    Delete,
+    List,
+}
+
+impl fmt::Display for AuditAccessKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Read => write!(f, "READ"),
+            Self::Write => write!(f, "WRITE"),
+            Self::Delete => write!(f, "DELETE"),
+            Self::List => write!(f, "LIST"),
+        }
+    }
+}
+
+/// A logged access event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuditEvent {
+    pub key: String,
+    pub kind: AuditAccessKind,
+    pub actor: String,
+    pub timestamp_epoch_secs: u64,
+    pub allowed: bool,
+}
+
+/// Audits and logs all secret access events.
+#[derive(Debug)]
+pub struct SecretsAccessAuditor {
+    events: Vec<AuditEvent>,
+    denied_actors: Vec<String>,
+    max_events: usize,
+}
+
+impl SecretsAccessAuditor {
+    pub fn new(max_events: usize) -> Self {
+        Self {
+            events: Vec::new(),
+            denied_actors: Vec::new(),
+            max_events,
+        }
+    }
+
+    /// Deny all access from a given actor.
+    pub fn deny_actor(&mut self, actor: &str) {
+        self.denied_actors.push(actor.to_string());
+    }
+
+    /// Returns true if the actor is denied.
+    pub fn is_denied(&self, actor: &str) -> bool {
+        self.denied_actors.iter().any(|a| a == actor)
+    }
+
+    /// Log an access event, automatically checking the deny list.
+    pub fn log_access(&mut self, key: &str, kind: AuditAccessKind, actor: &str, epoch: u64) -> bool {
+        let allowed = !self.is_denied(actor);
+        let event = AuditEvent {
+            key: key.to_string(),
+            kind,
+            actor: actor.to_string(),
+            timestamp_epoch_secs: epoch,
+            allowed,
+        };
+        if self.events.len() >= self.max_events {
+            self.events.remove(0);
+        }
+        self.events.push(event);
+        allowed
+    }
+
+    /// Return all logged events.
+    pub fn events(&self) -> &[AuditEvent] {
+        &self.events
+    }
+
+    /// Filter events by actor.
+    pub fn events_for_actor(&self, actor: &str) -> Vec<&AuditEvent> {
+        self.events.iter().filter(|e| e.actor == actor).collect()
+    }
+
+    /// Filter events by key.
+    pub fn events_for_key(&self, key: &str) -> Vec<&AuditEvent> {
+        self.events.iter().filter(|e| e.key == key).collect()
+    }
+
+    /// Count of denied events.
+    pub fn denied_count(&self) -> usize {
+        self.events.iter().filter(|e| !e.allowed).count()
+    }
+
+    /// Summary for auditing purposes.
+    pub fn summary(&self) -> String {
+        format!(
+            "Audit: {} total events, {} denied",
+            self.events.len(),
+            self.denied_count(),
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2333,4 +2594,135 @@ mod tests {
         // Short value is fully redacted
         assert!(summary[1].contains("****"));
     }
+
+    // -- SecretsVaultMigrator tests ------------------------------------------
+
+    #[test]
+    fn migrator_basic_migration() {
+        let mut m = SecretsVaultMigrator::new();
+        let entries = vec![
+            SecretEntry { key: "db.password".into(), value: "s3cret".into() },
+        ];
+        let results = m.migrate_entries(&entries, VaultBackendKind::InMemory, VaultBackendKind::Keyring, &[]);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+    }
+
+    #[test]
+    fn migrator_key_filter() {
+        let mut m = SecretsVaultMigrator::new();
+        m.set_key_filter("db.");
+        assert!(m.key_matches_filter("db.password"));
+        assert!(!m.key_matches_filter("api.key"));
+    }
+
+    #[test]
+    fn migrator_filter_applied_in_migration() {
+        let mut m = SecretsVaultMigrator::new();
+        m.set_key_filter("db.");
+        let entries = vec![
+            SecretEntry { key: "db.password".into(), value: "pw".into() },
+            SecretEntry { key: "api.key".into(), value: "k".into() },
+        ];
+        let results = m.migrate_entries(&entries, VaultBackendKind::InMemory, VaultBackendKind::EncryptedFile, &[]);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].key, "db.password");
+    }
+
+    #[test]
+    fn migrator_overwrite_disabled() {
+        let mut m = SecretsVaultMigrator::new();
+        let entries = vec![SecretEntry { key: "existing".into(), value: "v".into() }];
+        let results = m.migrate_entries(&entries, VaultBackendKind::InMemory, VaultBackendKind::Keyring, &["existing".into()]);
+        assert!(!results[0].success);
+    }
+
+    #[test]
+    fn migrator_overwrite_enabled() {
+        let mut m = SecretsVaultMigrator::new();
+        m.set_overwrite(true);
+        let entries = vec![SecretEntry { key: "existing".into(), value: "v".into() }];
+        let results = m.migrate_entries(&entries, VaultBackendKind::InMemory, VaultBackendKind::Keyring, &["existing".into()]);
+        assert!(results[0].success);
+    }
+
+    #[test]
+    fn migrator_dry_run() {
+        let mut m = SecretsVaultMigrator::new();
+        m.set_dry_run(true);
+        let entries = vec![SecretEntry { key: "k".into(), value: "v".into() }];
+        let _ = m.migrate_entries(&entries, VaultBackendKind::InMemory, VaultBackendKind::Keyring, &[]);
+        assert_eq!(m.success_count(), 1);
+    }
+
+    #[test]
+    fn migrator_summary() {
+        let mut m = SecretsVaultMigrator::new();
+        let entries = vec![SecretEntry { key: "a".into(), value: "1".into() }];
+        let _ = m.migrate_entries(&entries, VaultBackendKind::InMemory, VaultBackendKind::Keyring, &[]);
+        assert!(m.summary().contains("1 succeeded"));
+    }
+
+    #[test]
+    fn vault_backend_display() {
+        assert_eq!(VaultBackendKind::InMemory.to_string(), "in-memory");
+        assert_eq!(VaultBackendKind::Custom("vault".into()).to_string(), "custom(vault)");
+    }
+
+    // -- SecretsAccessAuditor tests ------------------------------------------
+
+    #[test]
+    fn auditor_log_access() {
+        let mut a = SecretsAccessAuditor::new(100);
+        let allowed = a.log_access("db.pw", AuditAccessKind::Read, "alice", 1000);
+        assert!(allowed);
+        assert_eq!(a.events().len(), 1);
+    }
+
+    #[test]
+    fn auditor_deny_actor() {
+        let mut a = SecretsAccessAuditor::new(100);
+        a.deny_actor("mallory");
+        let allowed = a.log_access("db.pw", AuditAccessKind::Read, "mallory", 1000);
+        assert!(!allowed);
+        assert_eq!(a.denied_count(), 1);
+    }
+
+    #[test]
+    fn auditor_events_for_actor() {
+        let mut a = SecretsAccessAuditor::new(100);
+        a.log_access("k1", AuditAccessKind::Read, "alice", 1);
+        a.log_access("k2", AuditAccessKind::Write, "bob", 2);
+        a.log_access("k3", AuditAccessKind::Read, "alice", 3);
+        assert_eq!(a.events_for_actor("alice").len(), 2);
+    }
+
+    #[test]
+    fn auditor_max_events_eviction() {
+        let mut a = SecretsAccessAuditor::new(2);
+        a.log_access("k1", AuditAccessKind::Read, "a", 1);
+        a.log_access("k2", AuditAccessKind::Read, "a", 2);
+        a.log_access("k3", AuditAccessKind::Read, "a", 3);
+        assert_eq!(a.events().len(), 2);
+        assert_eq!(a.events()[0].key, "k2");
+    }
+
+    #[test]
+    fn auditor_summary_format() {
+        let mut a = SecretsAccessAuditor::new(100);
+        a.deny_actor("bad");
+        a.log_access("k1", AuditAccessKind::Read, "good", 1);
+        a.log_access("k2", AuditAccessKind::Write, "bad", 2);
+        let s = a.summary();
+        assert!(s.contains("2 total events"));
+        assert!(s.contains("1 denied"));
+    }
+
+    #[test]
+    fn audit_access_kind_display() {
+        assert_eq!(AuditAccessKind::Read.to_string(), "READ");
+        assert_eq!(AuditAccessKind::Delete.to_string(), "DELETE");
+    }
+
+
 }

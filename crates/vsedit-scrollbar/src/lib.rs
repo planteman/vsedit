@@ -1583,6 +1583,356 @@ pub fn alpha_blend(fg: u32, bg: u32) -> u32 {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// AnnotationType – simpler annotation classification (Error/Warning/Info/Search/Change)
+// ---------------------------------------------------------------------------
+
+/// Simplified annotation type for scrollbar decorations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnnotationType {
+    /// A diagnostic error.
+    Error,
+    /// A diagnostic warning.
+    Warning,
+    /// An informational annotation.
+    Info,
+    /// A search result highlight.
+    Search,
+    /// A change indicator (e.g. unsaved edit, diff).
+    Change,
+}
+
+impl AnnotationType {
+    /// Returns the rendering priority. Errors are highest priority (drawn on top).
+    pub fn priority(&self) -> u8 {
+        match self {
+            AnnotationType::Error => 100,
+            AnnotationType::Warning => 80,
+            AnnotationType::Search => 60,
+            AnnotationType::Change => 40,
+            AnnotationType::Info => 20,
+        }
+    }
+
+    /// Returns `true` if this is an error annotation.
+    pub fn is_error(&self) -> bool {
+        matches!(self, AnnotationType::Error)
+    }
+
+    /// Returns `true` if this is a warning annotation.
+    pub fn is_warning(&self) -> bool {
+        matches!(self, AnnotationType::Warning)
+    }
+}
+
+impl fmt::Display for AnnotationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnnotationType::Error => write!(f, "error"),
+            AnnotationType::Warning => write!(f, "warning"),
+            AnnotationType::Info => write!(f, "info"),
+            AnnotationType::Search => write!(f, "search"),
+            AnnotationType::Change => write!(f, "change"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarAnnotationSimple – annotation with line, color, and AnnotationType
+// ---------------------------------------------------------------------------
+
+/// A simplified scrollbar annotation keyed by a single line number, a packed
+/// colour, and an `AnnotationType`.
+#[derive(Debug, Clone)]
+pub struct ScrollbarAnnotationSimple {
+    line: usize,
+    color: u32,
+    annotation_type: AnnotationType,
+}
+
+impl ScrollbarAnnotationSimple {
+    /// Create a new annotation for the given line with the specified colour and type.
+    pub fn new(line: usize, color: u32, annotation_type: AnnotationType) -> Self {
+        Self { line, color, annotation_type }
+    }
+
+    /// The line number this annotation is placed on.
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    /// The packed RGBA colour (`0xRRGGBBAA`).
+    pub fn color(&self) -> u32 {
+        self.color
+    }
+
+    /// The type of this annotation.
+    pub fn annotation_type(&self) -> AnnotationType {
+        self.annotation_type
+    }
+
+    /// Returns `true` if this annotation represents an error.
+    pub fn is_error(&self) -> bool {
+        self.annotation_type.is_error()
+    }
+
+    /// Returns `true` if this annotation represents a warning.
+    pub fn is_warning(&self) -> bool {
+        self.annotation_type.is_warning()
+    }
+
+    /// Rendering priority derived from the annotation type.
+    pub fn priority(&self) -> u8 {
+        self.annotation_type.priority()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarOverviewRuler – VS Code-style overview ruler with annotation storage
+// ---------------------------------------------------------------------------
+
+/// A VS Code-style overview ruler that maps document lines to vertical pixel
+/// positions on the scrollbar track. Annotations can be added, queried by line
+/// or viewport range, and cleared.
+pub struct ScrollbarOverviewRuler {
+    track_height: f64,
+    total_lines: usize,
+    annotations: Vec<ScrollbarAnnotationSimple>,
+}
+
+impl ScrollbarOverviewRuler {
+    /// Create a new overview ruler for the given track height and document size.
+    pub fn new(track_height: f64, total_lines: usize) -> Self {
+        Self {
+            track_height,
+            total_lines: total_lines.max(1),
+            annotations: Vec::new(),
+        }
+    }
+
+    /// Add an annotation to the ruler.
+    pub fn add_annotation(&mut self, ann: ScrollbarAnnotationSimple) {
+        self.annotations.push(ann);
+    }
+
+    /// Return all annotations placed on the given line.
+    pub fn annotations_at_line(&self, line: usize) -> Vec<&ScrollbarAnnotationSimple> {
+        self.annotations.iter().filter(|a| a.line() == line).collect()
+    }
+
+    /// Total number of annotations stored.
+    pub fn annotation_count(&self) -> usize {
+        self.annotations.len()
+    }
+
+    /// Remove all annotations.
+    pub fn clear(&mut self) {
+        self.annotations.clear();
+    }
+
+    /// Map a line number to a y-pixel coordinate on the ruler track.
+    pub fn y_position(&self, line: usize) -> f64 {
+        if self.total_lines <= 1 {
+            return 0.0;
+        }
+        let clamped = line.min(self.total_lines.saturating_sub(1));
+        (clamped as f64 / (self.total_lines - 1) as f64) * self.track_height
+    }
+
+    /// Map a y-pixel coordinate back to a line number.
+    pub fn line_from_y(&self, y: f64) -> usize {
+        if self.track_height <= 0.0 || self.total_lines <= 1 {
+            return 0;
+        }
+        let fraction = (y / self.track_height).clamp(0.0, 1.0);
+        let line = (fraction * (self.total_lines - 1) as f64).round() as usize;
+        line.min(self.total_lines.saturating_sub(1))
+    }
+
+    /// Return annotations whose line falls within `[viewport_start, viewport_end]`.
+    pub fn visible_annotations(
+        &self,
+        viewport_start: usize,
+        viewport_end: usize,
+    ) -> Vec<&ScrollbarAnnotationSimple> {
+        self.annotations
+            .iter()
+            .filter(|a| a.line() >= viewport_start && a.line() <= viewport_end)
+            .collect()
+    }
+
+    /// Return annotations matching a specific type.
+    pub fn annotations_by_type(&self, t: AnnotationType) -> Vec<&ScrollbarAnnotationSimple> {
+        self.annotations.iter().filter(|a| a.annotation_type() == t).collect()
+    }
+
+    /// Total lines in the document.
+    pub fn total_lines(&self) -> usize {
+        self.total_lines
+    }
+
+    /// Track height in pixels.
+    pub fn track_height(&self) -> f64 {
+        self.track_height
+    }
+}
+
+impl fmt::Debug for ScrollbarOverviewRuler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ScrollbarOverviewRuler")
+            .field("track_height", &self.track_height)
+            .field("total_lines", &self.total_lines)
+            .field("annotation_count", &self.annotations.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarThumbSizeCalculator – thumb sizing with min-size and max-ratio
+// ---------------------------------------------------------------------------
+
+/// Calculates the optimal scrollbar thumb size given viewport, content, and
+/// track dimensions. Enforces a configurable minimum thumb size and a maximum
+/// ratio so the thumb never exceeds a set fraction of the track.
+#[derive(Debug, Clone)]
+pub struct ScrollbarThumbSizeCalculator {
+    min_size: f64,
+    max_ratio: f64,
+}
+
+impl ScrollbarThumbSizeCalculator {
+    /// Create a calculator with the given minimum thumb size (pixels) and maximum
+    /// ratio (fraction of track, 0.0–1.0).
+    pub fn new(min_size: f64, max_ratio: f64) -> Self {
+        Self {
+            min_size: min_size.max(1.0),
+            max_ratio: max_ratio.clamp(0.01, 1.0),
+        }
+    }
+
+    /// Calculate thumb size for the given viewport, content, and track dimensions.
+    ///
+    /// Returns a value clamped between `min_size` and `track * max_ratio`.
+    pub fn calculate(&self, viewport: f64, content: f64, track: f64) -> f64 {
+        if content <= 0.0 || track <= 0.0 {
+            return self.min_size;
+        }
+        if viewport >= content {
+            return (track * self.max_ratio).max(self.min_size);
+        }
+        let proportional = (viewport / content) * track;
+        proportional.clamp(self.min_size, track * self.max_ratio)
+    }
+
+    /// Like `calculate`, but subtracts `padding` from the track before computing.
+    pub fn calculate_with_padding(
+        &self,
+        viewport: f64,
+        content: f64,
+        track: f64,
+        padding: f64,
+    ) -> f64 {
+        let effective_track = (track - padding).max(0.0);
+        self.calculate(viewport, content, effective_track)
+    }
+
+    /// Returns `true` if the viewport is large enough to show all content
+    /// (i.e. no scrolling is needed).
+    pub fn is_full_visible(&self, viewport: f64, content: f64) -> bool {
+        viewport >= content
+    }
+
+    /// Minimum thumb size configured.
+    pub fn min_size(&self) -> f64 {
+        self.min_size
+    }
+
+    /// Maximum ratio configured.
+    pub fn max_ratio(&self) -> f64 {
+        self.max_ratio
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarClickToPosition – click-to-scroll position mapper
+// ---------------------------------------------------------------------------
+
+/// Maps a click position on the scrollbar track to a scroll offset in content
+/// coordinates. Supports percentage mapping, bounds checking, and
+/// centre-on-click behaviour.
+#[derive(Debug, Clone)]
+pub struct ScrollbarClickToPosition {
+    track_start: f64,
+    track_length: f64,
+}
+
+impl ScrollbarClickToPosition {
+    /// Create a new mapper for a track starting at `track_start` pixels with
+    /// the given `track_length` in pixels.
+    pub fn new(track_start: f64, track_length: f64) -> Self {
+        Self {
+            track_start,
+            track_length: track_length.max(0.0),
+        }
+    }
+
+    /// Convert a click position to a scroll offset within `[0, content_size - viewport_size]`.
+    ///
+    /// The click fraction along the track is mapped linearly onto the scrollable
+    /// content range.
+    pub fn click_to_scroll_offset(
+        &self,
+        click_pos: f64,
+        content_size: f64,
+        viewport_size: f64,
+    ) -> f64 {
+        let pct = self.click_to_percentage(click_pos);
+        let max_scroll = (content_size - viewport_size).max(0.0);
+        pct * max_scroll
+    }
+
+    /// Return the click position as a fraction of the track length (`0.0..=1.0`).
+    pub fn click_to_percentage(&self, click_pos: f64) -> f64 {
+        if self.track_length <= 0.0 {
+            return 0.0;
+        }
+        let relative = click_pos - self.track_start;
+        (relative / self.track_length).clamp(0.0, 1.0)
+    }
+
+    /// Returns `true` if `pos` falls within the track bounds.
+    pub fn is_in_track(&self, pos: f64) -> bool {
+        pos >= self.track_start && pos <= self.track_start + self.track_length
+    }
+
+    /// Compute a scroll offset that centres the viewport around the click
+    /// position, clamped to valid bounds.
+    pub fn center_on_click(
+        &self,
+        click_pos: f64,
+        viewport_size: f64,
+        content_size: f64,
+    ) -> f64 {
+        let pct = self.click_to_percentage(click_pos);
+        let content_pos = pct * content_size;
+        let offset = content_pos - viewport_size / 2.0;
+        let max_scroll = (content_size - viewport_size).max(0.0);
+        offset.clamp(0.0, max_scroll)
+    }
+
+    /// Track start position.
+    pub fn track_start(&self) -> f64 {
+        self.track_start
+    }
+
+    /// Track length in pixels.
+    pub fn track_length(&self) -> f64 {
+        self.track_length
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2898,5 +3248,362 @@ mod tests {
         assert!(b > 90 && b < 110);
     }
 
+
+
+    // ---------------------------------------------------------------
+    // AnnotationType tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn annotation_type_priority_error_is_highest() {
+        assert!(AnnotationType::Error.priority() > AnnotationType::Warning.priority());
+        assert!(AnnotationType::Warning.priority() > AnnotationType::Search.priority());
+        assert!(AnnotationType::Search.priority() > AnnotationType::Change.priority());
+        assert!(AnnotationType::Change.priority() > AnnotationType::Info.priority());
+    }
+
+    #[test]
+    fn annotation_type_is_error_and_warning() {
+        assert!(AnnotationType::Error.is_error());
+        assert!(!AnnotationType::Warning.is_error());
+        assert!(AnnotationType::Warning.is_warning());
+        assert!(!AnnotationType::Error.is_warning());
+        assert!(!AnnotationType::Info.is_error());
+        assert!(!AnnotationType::Search.is_warning());
+    }
+
+    #[test]
+    fn annotation_type_display() {
+        assert_eq!(format!("{}", AnnotationType::Error), "error");
+        assert_eq!(format!("{}", AnnotationType::Warning), "warning");
+        assert_eq!(format!("{}", AnnotationType::Info), "info");
+        assert_eq!(format!("{}", AnnotationType::Search), "search");
+        assert_eq!(format!("{}", AnnotationType::Change), "change");
+    }
+
+    #[test]
+    fn annotation_type_equality() {
+        assert_eq!(AnnotationType::Error, AnnotationType::Error);
+        assert_ne!(AnnotationType::Error, AnnotationType::Warning);
+        let a = AnnotationType::Search;
+        let b = a; // Copy
+        assert_eq!(a, b);
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarAnnotationSimple tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn annotation_simple_new_and_accessors() {
+        let ann = ScrollbarAnnotationSimple::new(42, 0xFF0000FF, AnnotationType::Error);
+        assert_eq!(ann.line(), 42);
+        assert_eq!(ann.color(), 0xFF0000FF);
+        assert_eq!(ann.annotation_type(), AnnotationType::Error);
+    }
+
+    #[test]
+    fn annotation_simple_is_error_and_warning() {
+        let err = ScrollbarAnnotationSimple::new(0, 0, AnnotationType::Error);
+        let warn = ScrollbarAnnotationSimple::new(0, 0, AnnotationType::Warning);
+        let info = ScrollbarAnnotationSimple::new(0, 0, AnnotationType::Info);
+        assert!(err.is_error());
+        assert!(!err.is_warning());
+        assert!(warn.is_warning());
+        assert!(!warn.is_error());
+        assert!(!info.is_error());
+        assert!(!info.is_warning());
+    }
+
+    #[test]
+    fn annotation_simple_priority_delegates_to_type() {
+        let err = ScrollbarAnnotationSimple::new(10, 0, AnnotationType::Error);
+        let search = ScrollbarAnnotationSimple::new(10, 0, AnnotationType::Search);
+        assert_eq!(err.priority(), AnnotationType::Error.priority());
+        assert!(err.priority() > search.priority());
+    }
+
+    #[test]
+    fn annotation_simple_clone() {
+        let a = ScrollbarAnnotationSimple::new(5, 0xAABBCCDD, AnnotationType::Change);
+        let b = a.clone();
+        assert_eq!(b.line(), 5);
+        assert_eq!(b.color(), 0xAABBCCDD);
+        assert_eq!(b.annotation_type(), AnnotationType::Change);
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarOverviewRuler tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn overview_ruler_add_and_count() {
+        let mut ruler = ScrollbarOverviewRuler::new(500.0, 1000);
+        assert_eq!(ruler.annotation_count(), 0);
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(10, 0xFF0000FF, AnnotationType::Error));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(20, 0x00FF00FF, AnnotationType::Warning));
+        assert_eq!(ruler.annotation_count(), 2);
+    }
+
+    #[test]
+    fn overview_ruler_annotations_at_line() {
+        let mut ruler = ScrollbarOverviewRuler::new(500.0, 1000);
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(10, 0xFF0000FF, AnnotationType::Error));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(10, 0x00FF00FF, AnnotationType::Warning));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(20, 0x0000FFFF, AnnotationType::Info));
+        let at_10 = ruler.annotations_at_line(10);
+        assert_eq!(at_10.len(), 2);
+        let at_20 = ruler.annotations_at_line(20);
+        assert_eq!(at_20.len(), 1);
+        let at_30 = ruler.annotations_at_line(30);
+        assert_eq!(at_30.len(), 0);
+    }
+
+    #[test]
+    fn overview_ruler_clear() {
+        let mut ruler = ScrollbarOverviewRuler::new(500.0, 100);
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(1, 0, AnnotationType::Info));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(2, 0, AnnotationType::Info));
+        ruler.clear();
+        assert_eq!(ruler.annotation_count(), 0);
+    }
+
+    #[test]
+    fn overview_ruler_y_position_maps_lines() {
+        let ruler = ScrollbarOverviewRuler::new(999.0, 1000);
+        let y0 = ruler.y_position(0);
+        assert!((y0 - 0.0).abs() < 0.01);
+        let y_last = ruler.y_position(999);
+        assert!((y_last - 999.0).abs() < 0.01);
+        let y_mid = ruler.y_position(500);
+        assert!(y_mid > 400.0 && y_mid < 600.0);
+    }
+
+    #[test]
+    fn overview_ruler_y_position_clamps() {
+        let ruler = ScrollbarOverviewRuler::new(100.0, 50);
+        let y = ruler.y_position(9999);
+        assert!((y - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn overview_ruler_line_from_y_roundtrip() {
+        let ruler = ScrollbarOverviewRuler::new(1000.0, 500);
+        for line in [0, 1, 100, 250, 499] {
+            let y = ruler.y_position(line);
+            let back = ruler.line_from_y(y);
+            assert!(
+                (back as isize - line as isize).unsigned_abs() <= 1,
+                "line={line}, y={y}, back={back}"
+            );
+        }
+    }
+
+    #[test]
+    fn overview_ruler_line_from_y_clamped() {
+        let ruler = ScrollbarOverviewRuler::new(100.0, 50);
+        assert_eq!(ruler.line_from_y(-10.0), 0);
+        assert_eq!(ruler.line_from_y(200.0), 49);
+    }
+
+    #[test]
+    fn overview_ruler_visible_annotations() {
+        let mut ruler = ScrollbarOverviewRuler::new(500.0, 1000);
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(5, 0, AnnotationType::Error));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(50, 0, AnnotationType::Warning));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(150, 0, AnnotationType::Info));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(500, 0, AnnotationType::Search));
+        let visible = ruler.visible_annotations(10, 200);
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].line(), 50);
+        assert_eq!(visible[1].line(), 150);
+    }
+
+    #[test]
+    fn overview_ruler_annotations_by_type() {
+        let mut ruler = ScrollbarOverviewRuler::new(500.0, 1000);
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(1, 0, AnnotationType::Error));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(2, 0, AnnotationType::Error));
+        ruler.add_annotation(ScrollbarAnnotationSimple::new(3, 0, AnnotationType::Warning));
+        let errors = ruler.annotations_by_type(AnnotationType::Error);
+        assert_eq!(errors.len(), 2);
+        let warnings = ruler.annotations_by_type(AnnotationType::Warning);
+        assert_eq!(warnings.len(), 1);
+        let changes = ruler.annotations_by_type(AnnotationType::Change);
+        assert_eq!(changes.len(), 0);
+    }
+
+    #[test]
+    fn overview_ruler_debug_format() {
+        let ruler = ScrollbarOverviewRuler::new(100.0, 50);
+        let dbg = format!("{:?}", ruler);
+        assert!(dbg.contains("ScrollbarOverviewRuler"));
+        assert!(dbg.contains("annotation_count"));
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarThumbSizeCalculator tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn simple_thumb_calc_proportional() {
+        let calc = ScrollbarThumbSizeCalculator::new(20.0, 1.0);
+        let size = calc.calculate(100.0, 1000.0, 500.0);
+        // viewport/content = 0.1, so proportional = 50px, clamped >= 20
+        assert!((size - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn simple_thumb_calc_enforces_min_size() {
+        let calc = ScrollbarThumbSizeCalculator::new(30.0, 1.0);
+        let size = calc.calculate(10.0, 100_000.0, 500.0);
+        assert!((size - 30.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn simple_thumb_calc_enforces_max_ratio() {
+        let calc = ScrollbarThumbSizeCalculator::new(5.0, 0.5);
+        let size = calc.calculate(900.0, 1000.0, 500.0);
+        // proportional = 450px, but max = 0.5 * 500 = 250
+        assert!((size - 250.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn simple_thumb_calc_full_visible_returns_max() {
+        let calc = ScrollbarThumbSizeCalculator::new(20.0, 1.0);
+        let size = calc.calculate(1000.0, 500.0, 400.0);
+        // viewport >= content -> full track
+        assert!((size - 400.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn simple_thumb_calc_with_padding() {
+        let calc = ScrollbarThumbSizeCalculator::new(10.0, 1.0);
+        let size_no_pad = calc.calculate(100.0, 1000.0, 500.0);
+        let size_pad = calc.calculate_with_padding(100.0, 1000.0, 500.0, 100.0);
+        // padding reduces effective track from 500 to 400
+        assert!(size_pad < size_no_pad);
+        let expected = calc.calculate(100.0, 1000.0, 400.0);
+        assert!((size_pad - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn simple_thumb_calc_is_full_visible() {
+        let calc = ScrollbarThumbSizeCalculator::new(10.0, 1.0);
+        assert!(calc.is_full_visible(1000.0, 500.0));
+        assert!(calc.is_full_visible(500.0, 500.0));
+        assert!(!calc.is_full_visible(100.0, 500.0));
+    }
+
+    #[test]
+    fn simple_thumb_calc_zero_content() {
+        let calc = ScrollbarThumbSizeCalculator::new(15.0, 1.0);
+        let size = calc.calculate(100.0, 0.0, 500.0);
+        assert!((size - 15.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn simple_thumb_calc_accessors() {
+        let calc = ScrollbarThumbSizeCalculator::new(25.0, 0.8);
+        assert!((calc.min_size() - 25.0).abs() < 0.01);
+        assert!((calc.max_ratio() - 0.8).abs() < 0.01);
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarClickToPosition tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn click_to_pos_percentage_at_boundaries() {
+        let mapper = ScrollbarClickToPosition::new(100.0, 400.0);
+        assert!((mapper.click_to_percentage(100.0) - 0.0).abs() < 0.001);
+        assert!((mapper.click_to_percentage(500.0) - 1.0).abs() < 0.001);
+        assert!((mapper.click_to_percentage(300.0) - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn click_to_pos_percentage_clamped() {
+        let mapper = ScrollbarClickToPosition::new(100.0, 400.0);
+        assert!((mapper.click_to_percentage(50.0) - 0.0).abs() < 0.001);
+        assert!((mapper.click_to_percentage(600.0) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn click_to_pos_is_in_track() {
+        let mapper = ScrollbarClickToPosition::new(100.0, 400.0);
+        assert!(mapper.is_in_track(100.0));
+        assert!(mapper.is_in_track(300.0));
+        assert!(mapper.is_in_track(500.0));
+        assert!(!mapper.is_in_track(99.9));
+        assert!(!mapper.is_in_track(500.1));
+    }
+
+    #[test]
+    fn click_to_pos_scroll_offset() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        // Click at 50% of track, content=1000, viewport=200 => max_scroll=800
+        let offset = mapper.click_to_scroll_offset(50.0, 1000.0, 200.0);
+        assert!((offset - 400.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_scroll_offset_at_start() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        let offset = mapper.click_to_scroll_offset(0.0, 1000.0, 200.0);
+        assert!((offset - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_scroll_offset_at_end() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        let offset = mapper.click_to_scroll_offset(100.0, 1000.0, 200.0);
+        assert!((offset - 800.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_center_on_click() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        // Click at 50% => content_pos = 500, offset = 500 - 100 = 400
+        let offset = mapper.center_on_click(50.0, 200.0, 1000.0);
+        assert!((offset - 400.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_center_on_click_clamped_start() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        // Click at 0% => content_pos = 0, offset = 0 - 100 = -100 => clamp to 0
+        let offset = mapper.center_on_click(0.0, 200.0, 1000.0);
+        assert!((offset - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_center_on_click_clamped_end() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        // Click at 100% => content_pos = 1000, offset = 1000 - 100 = 900 => clamp to 800
+        let offset = mapper.center_on_click(100.0, 200.0, 1000.0);
+        assert!((offset - 800.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_zero_length_track() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 0.0);
+        assert!((mapper.click_to_percentage(50.0) - 0.0).abs() < 0.001);
+        assert!((mapper.click_to_scroll_offset(50.0, 1000.0, 200.0) - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_accessors() {
+        let mapper = ScrollbarClickToPosition::new(10.0, 300.0);
+        assert!((mapper.track_start() - 10.0).abs() < 0.01);
+        assert!((mapper.track_length() - 300.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn click_to_pos_viewport_larger_than_content() {
+        let mapper = ScrollbarClickToPosition::new(0.0, 100.0);
+        // viewport >= content => max_scroll = 0
+        let offset = mapper.click_to_scroll_offset(50.0, 200.0, 500.0);
+        assert!((offset - 0.0).abs() < 0.01);
+    }
 
 }

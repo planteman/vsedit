@@ -1462,6 +1462,312 @@ pub fn expand_lorem(word_count: usize) -> String {
     text
 }
 
+// ---------------------------------------------------------------------------
+// EmmetAbbreviationValidator - emmet abbreviation validator
+// ---------------------------------------------------------------------------
+
+/// Severity level for emmet abbreviation validator issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EmmetAbbreviationValidatorSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for EmmetAbbreviationValidatorSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [EmmetAbbreviationValidator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmmetAbbreviationValidatorEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: EmmetAbbreviationValidatorSeverity,
+    pub detail: Option<String>,
+    pub tag_count: usize,
+    enabled: bool,
+}
+
+impl EmmetAbbreviationValidatorEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: EmmetAbbreviationValidatorSeverity::Low,
+            detail: None,
+            tag_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: EmmetAbbreviationValidatorSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_tag_count(mut self, val: usize) -> Self {
+        self.tag_count = val;
+        self
+    }
+
+    pub fn is_valid_abbrev(&self) -> bool {
+        self.enabled && self.severity >= EmmetAbbreviationValidatorSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.tag_count, det)
+    }
+}
+
+impl fmt::Display for EmmetAbbreviationValidatorEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [EmmetAbbreviationValidatorEntry] items.
+#[derive(Debug, Clone)]
+pub struct EmmetAbbreviationValidator {
+    entries: Vec<EmmetAbbreviationValidatorEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl EmmetAbbreviationValidator {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: EmmetAbbreviationValidatorEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<EmmetAbbreviationValidatorEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&EmmetAbbreviationValidatorEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn tag_count(&self) -> usize { self.entries.len() }
+
+    pub fn is_valid_abbrev(&self) -> bool {
+        self.entries.iter().any(|e| e.is_valid_abbrev())
+    }
+
+    pub fn entries_by_severity(&self, severity: EmmetAbbreviationValidatorSeverity) -> Vec<&EmmetAbbreviationValidatorEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= EmmetAbbreviationValidatorSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&EmmetAbbreviationValidatorEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&EmmetAbbreviationValidatorEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EmmetOutputFormatter - emmet output formatter
+// ---------------------------------------------------------------------------
+
+/// Configuration for [EmmetOutputFormatter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmmetOutputFormatterConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub nesting_depth: usize,
+}
+
+impl EmmetOutputFormatterConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, nesting_depth: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_nesting_depth(mut self, val: usize) -> Self { self.nesting_depth = val; self }
+}
+
+impl Default for EmmetOutputFormatterConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [EmmetOutputFormatter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmmetOutputFormatterItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl EmmetOutputFormatterItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn needs_formatting(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for EmmetOutputFormatterItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [EmmetOutputFormatterItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct EmmetOutputFormatter {
+    config: EmmetOutputFormatterConfig,
+    items: Vec<EmmetOutputFormatterItem>,
+}
+
+impl EmmetOutputFormatter {
+    pub fn new(config: EmmetOutputFormatterConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: EmmetOutputFormatterItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<EmmetOutputFormatterItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&EmmetOutputFormatterItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn nesting_depth(&self) -> usize { self.items.len() }
+
+    pub fn needs_formatting(&self) -> bool {
+        self.items.iter().any(|i| i.needs_formatting())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&EmmetOutputFormatterItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&EmmetOutputFormatterItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &EmmetOutputFormatterConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2364,5 +2670,147 @@ mod tests {
         let text = expand_lorem(5);
         assert!(text.starts_with('L'));
         assert!(text.ends_with('.'));
+    }
+
+#[test]
+    fn emmetabbreviationvalidator_severity_ordering() {
+        assert!(EmmetAbbreviationValidatorSeverity::Critical > EmmetAbbreviationValidatorSeverity::High);
+        assert!(EmmetAbbreviationValidatorSeverity::High > EmmetAbbreviationValidatorSeverity::Medium);
+        assert!(EmmetAbbreviationValidatorSeverity::Medium > EmmetAbbreviationValidatorSeverity::Low);
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_severity_display() {
+        assert_eq!(EmmetAbbreviationValidatorSeverity::Low.to_string(), "low");
+        assert_eq!(EmmetAbbreviationValidatorSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_entry_creation() {
+        let e = EmmetAbbreviationValidatorEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, EmmetAbbreviationValidatorSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_entry_builder() {
+        let e = EmmetAbbreviationValidatorEntry::new("e2", "Entry 2")
+            .with_severity(EmmetAbbreviationValidatorSeverity::High)
+            .with_detail("some detail")
+            .with_tag_count(42);
+        assert_eq!(e.severity, EmmetAbbreviationValidatorSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.tag_count, 42);
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_entry_enable_disable() {
+        let mut e = EmmetAbbreviationValidatorEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_add_and_count() {
+        let mut mgr = EmmetAbbreviationValidator::new("test");
+        mgr.add(EmmetAbbreviationValidatorEntry::new("a", "A"));
+        mgr.add(EmmetAbbreviationValidatorEntry::new("b", "B").with_severity(EmmetAbbreviationValidatorSeverity::High));
+        assert_eq!(mgr.tag_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_remove() {
+        let mut mgr = EmmetAbbreviationValidator::new("test");
+        mgr.add(EmmetAbbreviationValidatorEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_capacity() {
+        let mut mgr = EmmetAbbreviationValidator::new("test").with_capacity(1);
+        assert!(mgr.add(EmmetAbbreviationValidatorEntry::new("a", "A")));
+        assert!(!mgr.add(EmmetAbbreviationValidatorEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_sorted_by_severity() {
+        let mut mgr = EmmetAbbreviationValidator::new("test");
+        mgr.add(EmmetAbbreviationValidatorEntry::new("lo", "Low"));
+        mgr.add(EmmetAbbreviationValidatorEntry::new("hi", "High").with_severity(EmmetAbbreviationValidatorSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, EmmetAbbreviationValidatorSeverity::Critical);
+    }
+
+    #[test]
+    fn emmetabbreviationvalidator_summary() {
+        let mgr = EmmetAbbreviationValidator::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn emmetoutputformatter_config_defaults() {
+        let cfg = EmmetOutputFormatterConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn emmetoutputformatter_item_creation() {
+        let item = EmmetOutputFormatterItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn emmetoutputformatter_add_and_get() {
+        let mut mgr = EmmetOutputFormatter::new(EmmetOutputFormatterConfig::new("test"));
+        mgr.add(EmmetOutputFormatterItem::new("k1", "v1"));
+        assert_eq!(mgr.nesting_depth(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn emmetoutputformatter_remove_item() {
+        let mut mgr = EmmetOutputFormatter::new(EmmetOutputFormatterConfig::new("test"));
+        mgr.add(EmmetOutputFormatterItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn emmetoutputformatter_sorted_by_priority() {
+        let mut mgr = EmmetOutputFormatter::new(EmmetOutputFormatterConfig::new("test"));
+        mgr.add(EmmetOutputFormatterItem::new("lo", "low").with_priority(1));
+        mgr.add(EmmetOutputFormatterItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn emmetoutputformatter_items_with_tag() {
+        let mut mgr = EmmetOutputFormatter::new(EmmetOutputFormatterConfig::new("test"));
+        mgr.add(EmmetOutputFormatterItem::new("a", "1").with_tag("x"));
+        mgr.add(EmmetOutputFormatterItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn emmetoutputformatter_report() {
+        let mgr = EmmetOutputFormatter::new(EmmetOutputFormatterConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

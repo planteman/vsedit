@@ -1344,6 +1344,339 @@ impl PreferencesService {
     }
 }
 
+
+// === Preferences Search Index ===
+
+/// Preferences Search Index implementation.
+#[derive(Debug, Clone)]
+pub struct PreferencesSearchIndex {
+    entries: Vec<String>,
+    index: HashMap<String, usize>,
+    enabled: bool,
+    capacity: usize,
+    stats: PreferencesSearchIndexStats,
+}
+
+/// Statistics for PreferencesSearchIndex.
+#[derive(Debug, Clone, Default)]
+pub struct PreferencesSearchIndexStats {
+    pub total_operations: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub last_operation_ms: u64,
+}
+
+impl PreferencesSearchIndexStats {
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.cache_hits + self.cache_misses;
+        if total == 0 {
+            return 0.0;
+        }
+        self.cache_hits as f64 / total as f64
+    }
+
+    pub fn reset(&mut self) {
+        self.total_operations = 0;
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+        self.last_operation_ms = 0;
+    }
+}
+
+impl PreferencesSearchIndex {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            index: HashMap::new(),
+            enabled: true,
+            capacity: 1024,
+            stats: PreferencesSearchIndexStats::default(),
+        }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: impl Into<String>) -> bool {
+        let entry = entry.into();
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        if self.index.contains_key(&entry) {
+            self.stats.cache_hits += 1;
+            return false;
+        }
+        let idx = self.entries.len();
+        self.index.insert(entry.clone(), idx);
+        self.entries.push(entry);
+        self.stats.total_operations += 1;
+        self.stats.cache_misses += 1;
+        true
+    }
+
+    pub fn remove(&mut self, entry: &str) -> bool {
+        if let Some(idx) = self.index.remove(entry) {
+            self.entries.remove(idx);
+            // Rebuild index after removal
+            self.index.clear();
+            for (i, e) in self.entries.iter().enumerate() {
+                self.index.insert(e.clone(), i);
+            }
+            self.stats.total_operations += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, entry: &str) -> bool {
+        self.index.contains_key(entry)
+    }
+
+    pub fn get(&self, index: usize) -> Option<&str> {
+        self.entries.get(index).map(|s| s.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.index.clear();
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn stats(&self) -> &PreferencesSearchIndexStats {
+        &self.stats
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        self.entries.iter()
+            .filter(|e| e.contains(query))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    pub fn sorted_entries(&self) -> Vec<&str> {
+        let mut sorted: Vec<&str> = self.entries.iter().map(|s| s.as_str()).collect();
+        sorted.sort();
+        sorted
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|s| s.as_str())
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.capacity.saturating_sub(self.entries.len())
+    }
+}
+
+impl Default for PreferencesSearchIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// === Preferences Modified Badge ===
+
+/// Priority level for PreferencesModifiedBadge items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PreferencesModifiedBadgePriority {
+    Low,
+    Normal,
+    High,
+    Critical,
+}
+
+impl PreferencesModifiedBadgePriority {
+    pub fn as_weight(&self) -> u32 {
+        match self {
+            Self::Low => 1,
+            Self::Normal => 5,
+            Self::High => 10,
+            Self::Critical => 100,
+        }
+    }
+}
+
+impl fmt::Display for PreferencesModifiedBadgePriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Normal => write!(f, "normal"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Preferences Modified Badge implementation.
+#[derive(Debug, Clone)]
+pub struct PreferencesModifiedBadge {
+    items: Vec<PreferencesModifiedBadgeItem>,
+    max_items: usize,
+    default_priority: PreferencesModifiedBadgePriority,
+}
+
+/// A single item in PreferencesModifiedBadge.
+#[derive(Debug, Clone)]
+pub struct PreferencesModifiedBadgeItem {
+    pub id: String,
+    pub label: String,
+    pub priority: PreferencesModifiedBadgePriority,
+    pub timestamp: u64,
+    pub metadata: HashMap<String, String>,
+}
+
+impl PreferencesModifiedBadgeItem {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            priority: PreferencesModifiedBadgePriority::Normal,
+            timestamp: 0,
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, priority: PreferencesModifiedBadgePriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_timestamp(mut self, ts: u64) -> Self {
+        self.timestamp = ts;
+        self
+    }
+
+    pub fn set_meta(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.metadata.insert(key.into(), value.into());
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.get(key).map(|s| s.as_str())
+    }
+}
+
+impl PreferencesModifiedBadge {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            max_items: 500,
+            default_priority: PreferencesModifiedBadgePriority::Normal,
+        }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self {
+        self.max_items = max;
+        self
+    }
+
+    pub fn add(&mut self, item: PreferencesModifiedBadgeItem) -> bool {
+        if self.items.len() >= self.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove_by_id(&mut self, id: &str) -> Option<PreferencesModifiedBadgeItem> {
+        if let Some(idx) = self.items.iter().position(|i| i.id == id) {
+            Some(self.items.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&PreferencesModifiedBadgeItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    pub fn by_priority(&self, priority: PreferencesModifiedBadgePriority) -> Vec<&PreferencesModifiedBadgeItem> {
+        self.items.iter().filter(|i| i.priority == priority).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&PreferencesModifiedBadgeItem> {
+        let mut sorted: Vec<&PreferencesModifiedBadgeItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn sorted_by_timestamp(&self) -> Vec<&PreferencesModifiedBadgeItem> {
+        let mut sorted: Vec<&PreferencesModifiedBadgeItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        sorted
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&PreferencesModifiedBadgeItem> {
+        let q = query.to_lowercase();
+        self.items.iter()
+            .filter(|i| i.label.to_lowercase().contains(&q) || i.id.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn total_weight(&self) -> u32 {
+        self.items.iter().map(|i| i.priority.as_weight()).sum()
+    }
+
+    pub fn set_default_priority(&mut self, p: PreferencesModifiedBadgePriority) {
+        self.default_priority = p;
+    }
+
+    pub fn default_priority(&self) -> PreferencesModifiedBadgePriority {
+        self.default_priority
+    }
+
+    pub fn max_items(&self) -> usize {
+        self.max_items
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.max_items.saturating_sub(self.items.len())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &PreferencesModifiedBadgeItem> {
+        self.items.iter()
+    }
+}
+
+impl Default for PreferencesModifiedBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2372,4 +2705,151 @@ mod tests {
     fn coerce_string_is_identity() {
         assert_eq!(coerce_value("anything", PreferenceType::String).unwrap(), "anything");
     }
+
+    #[test]
+    fn preferencesSearchIndex_new() {
+        let s = PreferencesSearchIndex::new();
+        assert!(s.is_empty());
+        assert_eq!(s.len(), 0);
+    }
+
+    #[test]
+    fn preferencesSearchIndex_add_contains() {
+        let mut s = PreferencesSearchIndex::new();
+        assert!(s.add("item1"));
+        assert!(s.contains("item1"));
+        assert!(!s.contains("item2"));
+    }
+
+    #[test]
+    fn preferencesSearchIndex_add_duplicate() {
+        let mut s = PreferencesSearchIndex::new();
+        assert!(s.add("dup"));
+        assert!(!s.add("dup"));
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
+    fn preferencesSearchIndex_remove() {
+        let mut s = PreferencesSearchIndex::new();
+        s.add("rem");
+        assert!(s.remove("rem"));
+        assert!(!s.contains("rem"));
+    }
+
+    #[test]
+    fn preferencesSearchIndex_capacity() {
+        let s = PreferencesSearchIndex::new().with_capacity(5);
+        assert_eq!(s.capacity(), 5);
+        assert_eq!(s.remaining_capacity(), 5);
+    }
+
+    #[test]
+    fn preferencesSearchIndex_search() {
+        let mut s = PreferencesSearchIndex::new();
+        s.add("hello_world");
+        s.add("hello_rust");
+        s.add("goodbye");
+        let results = s.search("hello");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn preferencesSearchIndex_stats() {
+        let mut s = PreferencesSearchIndex::new();
+        s.add("a");
+        s.add("a"); // duplicate = cache hit
+        assert_eq!(s.stats().cache_hits, 1);
+        assert_eq!(s.stats().cache_misses, 1);
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_new() {
+        let m = PreferencesModifiedBadge::new();
+        assert!(m.is_empty());
+        assert_eq!(m.len(), 0);
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_add_find() {
+        let mut m = PreferencesModifiedBadge::new();
+        m.add(PreferencesModifiedBadgeItem::new("id1", "Label 1"));
+        assert!(m.find_by_id("id1").is_some());
+        assert!(m.find_by_id("id2").is_none());
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_priority_filter() {
+        let mut m = PreferencesModifiedBadge::new();
+        m.add(PreferencesModifiedBadgeItem::new("a", "A").with_priority(PreferencesModifiedBadgePriority::High));
+        m.add(PreferencesModifiedBadgeItem::new("b", "B").with_priority(PreferencesModifiedBadgePriority::Low));
+        m.add(PreferencesModifiedBadgeItem::new("c", "C").with_priority(PreferencesModifiedBadgePriority::High));
+        assert_eq!(m.by_priority(PreferencesModifiedBadgePriority::High).len(), 2);
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_remove() {
+        let mut m = PreferencesModifiedBadge::new();
+        m.add(PreferencesModifiedBadgeItem::new("r1", "Remove me"));
+        assert!(m.remove_by_id("r1").is_some());
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_search() {
+        let mut m = PreferencesModifiedBadge::new();
+        m.add(PreferencesModifiedBadgeItem::new("id1", "Hello World"));
+        m.add(PreferencesModifiedBadgeItem::new("id2", "Goodbye"));
+        let results = m.search("hello");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_total_weight() {
+        let mut m = PreferencesModifiedBadge::new();
+        m.add(PreferencesModifiedBadgeItem::new("a", "A").with_priority(PreferencesModifiedBadgePriority::Critical));
+        m.add(PreferencesModifiedBadgeItem::new("b", "B").with_priority(PreferencesModifiedBadgePriority::Low));
+        assert_eq!(m.total_weight(), 101);
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_capacity_limit() {
+        let mut m = PreferencesModifiedBadge::new().with_max_items(2);
+        m.add(PreferencesModifiedBadgeItem::new("1", "one"));
+        m.add(PreferencesModifiedBadgeItem::new("2", "two"));
+        assert!(!m.add(PreferencesModifiedBadgeItem::new("3", "three")));
+        assert_eq!(m.len(), 2);
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_sorted_by_priority() {
+        let mut m = PreferencesModifiedBadge::new();
+        m.add(PreferencesModifiedBadgeItem::new("lo", "Low").with_priority(PreferencesModifiedBadgePriority::Low));
+        m.add(PreferencesModifiedBadgeItem::new("hi", "High").with_priority(PreferencesModifiedBadgePriority::Critical));
+        let sorted = m.sorted_by_priority();
+        assert_eq!(sorted[0].id, "hi");
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_item_metadata() {
+        let mut item = PreferencesModifiedBadgeItem::new("m1", "Meta");
+        item.set_meta("key", "value");
+        assert_eq!(item.get_meta("key"), Some("value"));
+        assert_eq!(item.get_meta("missing"), None);
+    }
+
+    #[test]
+    fn preferencesSearchIndex_enabled_toggle() {
+        let mut s = PreferencesSearchIndex::new();
+        assert!(s.is_enabled());
+        s.set_enabled(false);
+        assert!(!s.is_enabled());
+    }
+
+    #[test]
+    fn preferencesModifiedBadge_priority_display() {
+        assert_eq!(format!("{}", PreferencesModifiedBadgePriority::High), "high");
+        assert_eq!(format!("{}", PreferencesModifiedBadgePriority::Low), "low");
+    }
+
 }

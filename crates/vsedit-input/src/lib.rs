@@ -1106,6 +1106,366 @@ impl Default for InputFilter {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// InputGestureComposer
+// ---------------------------------------------------------------------------
+
+/// Combines multiple key inputs into a chord sequence.
+///
+/// This is used for multi-key shortcuts like `Ctrl+K Ctrl+C` where the user
+/// must press two chords in sequence.
+#[derive(Debug, Clone)]
+pub struct InputGestureComposer {
+    /// Accumulated chord sequence.
+    chords: Vec<KeyInput>,
+    /// Maximum number of chords in a gesture.
+    max_chords: usize,
+    /// Whether we are mid-gesture (waiting for the next chord).
+    active: bool,
+}
+
+impl InputGestureComposer {
+    /// Create a new composer with a maximum chord count.
+    pub fn new(max_chords: usize) -> Self {
+        Self {
+            chords: Vec::new(),
+            max_chords,
+            active: false,
+        }
+    }
+
+    /// Feed a key input into the composer.
+    ///
+    /// Returns `Some(chords)` when the gesture is complete, or `None` if
+    /// more chords are expected.
+    pub fn feed(&mut self, key: KeyInput) -> Option<Vec<KeyInput>> {
+        self.chords.push(key);
+        self.active = true;
+        if self.chords.len() >= self.max_chords {
+            let result = self.chords.clone();
+            self.reset();
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    /// Reset the composer, discarding any partial gesture.
+    pub fn reset(&mut self) {
+        self.chords.clear();
+        self.active = false;
+    }
+
+    /// Whether we are in the middle of composing a gesture.
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    /// Number of chords collected so far.
+    pub fn current_chord_count(&self) -> usize {
+        self.chords.len()
+    }
+
+    /// Remaining chords needed to complete the gesture.
+    pub fn remaining(&self) -> usize {
+        self.max_chords.saturating_sub(self.chords.len())
+    }
+
+    /// Return the chords collected so far (for preview).
+    pub fn pending_chords(&self) -> &[KeyInput] {
+        &self.chords
+    }
+
+    /// Display the pending chord sequence as a human-readable string.
+    pub fn display_pending(&self) -> String {
+        self.chords.iter().map(|k| k.display_name()).collect::<Vec<_>>().join(" ")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InputMethodEditorState (IME)
+// ---------------------------------------------------------------------------
+
+/// Tracks the state of an Input Method Editor composition session.
+///
+/// When an IME is active (e.g. for CJK input), key events should be buffered
+/// until the composition is committed or cancelled.
+#[derive(Debug, Clone)]
+pub struct InputMethodEditorState {
+    composing: bool,
+    composition_text: String,
+    cursor_pos: usize,
+}
+
+impl InputMethodEditorState {
+    /// Create a new idle IME state.
+    pub fn new() -> Self {
+        Self {
+            composing: false,
+            composition_text: String::new(),
+            cursor_pos: 0,
+        }
+    }
+
+    /// Start a new composition session.
+    pub fn start_composition(&mut self) {
+        self.composing = true;
+        self.composition_text.clear();
+        self.cursor_pos = 0;
+    }
+
+    /// Update the composition text (called as the user types).
+    pub fn update(&mut self, text: &str) {
+        self.composition_text = text.to_string();
+        self.cursor_pos = self.composition_text.len();
+    }
+
+    /// Set the cursor position within the composition text.
+    pub fn set_cursor(&mut self, pos: usize) {
+        self.cursor_pos = pos.min(self.composition_text.len());
+    }
+
+    /// Commit the composition and return the final text.
+    pub fn commit(&mut self) -> String {
+        self.composing = false;
+        let result = std::mem::take(&mut self.composition_text);
+        self.cursor_pos = 0;
+        result
+    }
+
+    /// Cancel the composition, discarding the text.
+    pub fn cancel(&mut self) {
+        self.composing = false;
+        self.composition_text.clear();
+        self.cursor_pos = 0;
+    }
+
+    /// Whether we are currently composing.
+    pub fn is_composing(&self) -> bool {
+        self.composing
+    }
+
+    /// The current composition text.
+    pub fn text(&self) -> &str {
+        &self.composition_text
+    }
+
+    /// The cursor position within the composition text.
+    pub fn cursor(&self) -> usize {
+        self.cursor_pos
+    }
+
+    /// Length of the current composition text in characters.
+    pub fn text_len(&self) -> usize {
+        self.composition_text.chars().count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input macro recorder
+// ---------------------------------------------------------------------------
+
+/// A recorded input macro — a sequence of input events that can be replayed.
+#[derive(Debug, Clone)]
+pub struct InputMacro {
+    name: String,
+    events: Vec<InputEvent>,
+}
+
+impl InputMacro {
+    /// Create a new named macro.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            events: Vec::new(),
+        }
+    }
+
+    /// Return the macro name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Number of events in this macro.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Whether the macro is empty.
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Get the events.
+    pub fn events(&self) -> &[InputEvent] {
+        &self.events
+    }
+
+    /// Push an event to the macro recording.
+    pub fn push(&mut self, event: InputEvent) {
+        self.events.push(event);
+    }
+}
+
+/// Records input events into macros and manages a library of saved macros.
+#[derive(Debug, Clone)]
+pub struct InputMacroRecorder {
+    recording: Option<InputMacro>,
+    library: Vec<InputMacro>,
+}
+
+impl InputMacroRecorder {
+    /// Create a new macro recorder.
+    pub fn new() -> Self {
+        Self {
+            recording: None,
+            library: Vec::new(),
+        }
+    }
+
+    /// Begin recording a new macro with the given name.
+    pub fn start_recording(&mut self, name: impl Into<String>) {
+        self.recording = Some(InputMacro::new(name));
+    }
+
+    /// Record an event into the current macro. Returns `false` if not recording.
+    pub fn record(&mut self, event: InputEvent) -> bool {
+        if let Some(macro_) = &mut self.recording {
+            macro_.push(event);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Stop recording and save the macro to the library.
+    /// Returns the finished macro, or `None` if not recording.
+    pub fn stop_recording(&mut self) -> Option<InputMacro> {
+        let finished = self.recording.take()?;
+        self.library.push(finished.clone());
+        Some(finished)
+    }
+
+    /// Whether we are currently recording.
+    pub fn is_recording(&self) -> bool {
+        self.recording.is_some()
+    }
+
+    /// Look up a macro by name.
+    pub fn get_macro(&self, name: &str) -> Option<&InputMacro> {
+        self.library.iter().find(|m| m.name() == name)
+    }
+
+    /// List all macro names.
+    pub fn macro_names(&self) -> Vec<&str> {
+        self.library.iter().map(|m| m.name()).collect()
+    }
+
+    /// Number of macros in the library.
+    pub fn macro_count(&self) -> usize {
+        self.library.len()
+    }
+
+    /// Delete a macro by name. Returns `true` if found and removed.
+    pub fn delete_macro(&mut self, name: &str) -> bool {
+        let before = self.library.len();
+        self.library.retain(|m| m.name() != name);
+        self.library.len() < before
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input repeat handler
+// ---------------------------------------------------------------------------
+
+/// Handles key-repeat logic: detects when a key is held down and controls
+/// repeat rate.
+#[derive(Debug, Clone)]
+pub struct InputRepeatHandler {
+    last_key: Option<KeyInput>,
+    repeat_count: u32,
+    initial_delay_ms: u64,
+    repeat_interval_ms: u64,
+    last_event_ms: Option<u64>,
+}
+
+impl InputRepeatHandler {
+    /// Create a new repeat handler with the given timing parameters.
+    pub fn new(initial_delay_ms: u64, repeat_interval_ms: u64) -> Self {
+        Self {
+            last_key: None,
+            repeat_count: 0,
+            initial_delay_ms,
+            repeat_interval_ms,
+            last_event_ms: None,
+        }
+    }
+
+    /// Create a handler with default timing (500ms initial, 50ms repeat).
+    pub fn with_defaults() -> Self {
+        Self::new(500, 50)
+    }
+
+    /// Process a key event at the given timestamp (in milliseconds).
+    ///
+    /// Returns `true` if the event should be dispatched (i.e. it's not a
+    /// repeat that's too fast).
+    pub fn process(&mut self, key: KeyInput, timestamp_ms: u64) -> bool {
+        let same_key = self.last_key.as_ref() == Some(&key);
+
+        if same_key {
+            if let Some(last) = self.last_event_ms {
+                let elapsed = timestamp_ms.saturating_sub(last);
+                let threshold = if self.repeat_count == 0 {
+                    self.initial_delay_ms
+                } else {
+                    self.repeat_interval_ms
+                };
+                if elapsed < threshold {
+                    return false;
+                }
+            }
+            self.repeat_count += 1;
+        } else {
+            self.last_key = Some(key);
+            self.repeat_count = 0;
+        }
+
+        self.last_event_ms = Some(timestamp_ms);
+        true
+    }
+
+    /// Return the current repeat count for the held key.
+    pub fn repeat_count(&self) -> u32 {
+        self.repeat_count
+    }
+
+    /// Whether a key is currently being held (repeat_count > 0).
+    pub fn is_repeating(&self) -> bool {
+        self.repeat_count > 0
+    }
+
+    /// Reset the repeat state (e.g. on key release).
+    pub fn reset(&mut self) {
+        self.last_key = None;
+        self.repeat_count = 0;
+        self.last_event_ms = None;
+    }
+
+    /// Get the initial delay in milliseconds.
+    pub fn initial_delay(&self) -> u64 {
+        self.initial_delay_ms
+    }
+
+    /// Get the repeat interval in milliseconds.
+    pub fn repeat_interval(&self) -> u64 {
+        self.repeat_interval_ms
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2204,5 +2564,200 @@ mod tests {
         assert!(accepted[0].is_key());
         assert_eq!(accepted[1].as_paste(), Some("hello"));
     }
+
+
+    // -----------------------------------------------------------------------
+    // InputGestureComposer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gesture_single_chord() {
+        let mut composer = InputGestureComposer::new(1);
+        let result = composer.feed(KeyInput::plain(KeyCode::KeyA));
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().len(), 1);
+        assert!(!composer.is_active());
+    }
+
+    #[test]
+    fn gesture_two_chord() {
+        let mut composer = InputGestureComposer::new(2);
+        assert_eq!(composer.remaining(), 2);
+        let r1 = composer.feed(KeyInput::plain(KeyCode::KeyK));
+        assert!(r1.is_none());
+        assert!(composer.is_active());
+        assert_eq!(composer.remaining(), 1);
+        let r2 = composer.feed(KeyInput::plain(KeyCode::KeyC));
+        assert!(r2.is_some());
+        assert_eq!(r2.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn gesture_reset() {
+        let mut composer = InputGestureComposer::new(2);
+        composer.feed(KeyInput::plain(KeyCode::KeyK));
+        assert!(composer.is_active());
+        composer.reset();
+        assert!(!composer.is_active());
+        assert_eq!(composer.current_chord_count(), 0);
+    }
+
+    #[test]
+    fn gesture_display_pending() {
+        let mut composer = InputGestureComposer::new(3);
+        composer.feed(KeyInput { key_code: KeyCode::KeyK, ctrl: true, shift: false, alt: false, meta: false });
+        let display = composer.display_pending();
+        assert!(display.contains("Ctrl"));
+    }
+
+    // -----------------------------------------------------------------------
+    // InputMethodEditorState tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ime_composition_flow() {
+        let mut ime = InputMethodEditorState::new();
+        assert!(!ime.is_composing());
+
+        ime.start_composition();
+        assert!(ime.is_composing());
+
+        ime.update("hello");
+        assert_eq!(ime.text(), "hello");
+        assert_eq!(ime.cursor(), 5);
+
+        let committed = ime.commit();
+        assert_eq!(committed, "hello");
+        assert!(!ime.is_composing());
+        assert_eq!(ime.text(), "");
+    }
+
+    #[test]
+    fn ime_cancel() {
+        let mut ime = InputMethodEditorState::new();
+        ime.start_composition();
+        ime.update("partial");
+        ime.cancel();
+        assert!(!ime.is_composing());
+        assert_eq!(ime.text(), "");
+    }
+
+    #[test]
+    fn ime_cursor_clamped() {
+        let mut ime = InputMethodEditorState::new();
+        ime.start_composition();
+        ime.update("abc");
+        ime.set_cursor(100);
+        assert_eq!(ime.cursor(), 3);
+    }
+
+    #[test]
+    fn ime_text_len() {
+        let mut ime = InputMethodEditorState::new();
+        ime.start_composition();
+        ime.update("abc");
+        assert_eq!(ime.text_len(), 3);
+    }
+
+    // -----------------------------------------------------------------------
+    // InputMacroRecorder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn macro_record_and_replay() {
+        let mut recorder = InputMacroRecorder::new();
+        recorder.start_recording("test_macro");
+        assert!(recorder.is_recording());
+
+        recorder.record(InputEvent::Key(KeyInput::plain(KeyCode::KeyA)));
+        recorder.record(InputEvent::Key(KeyInput::plain(KeyCode::KeyB)));
+
+        let macro_ = recorder.stop_recording().unwrap();
+        assert_eq!(macro_.name(), "test_macro");
+        assert_eq!(macro_.len(), 2);
+        assert!(!recorder.is_recording());
+    }
+
+    #[test]
+    fn macro_not_recording() {
+        let mut recorder = InputMacroRecorder::new();
+        assert!(!recorder.record(InputEvent::Key(KeyInput::plain(KeyCode::KeyA))));
+    }
+
+    #[test]
+    fn macro_library() {
+        let mut recorder = InputMacroRecorder::new();
+
+        recorder.start_recording("macro1");
+        recorder.record(InputEvent::Key(KeyInput::plain(KeyCode::KeyA)));
+        recorder.stop_recording();
+
+        recorder.start_recording("macro2");
+        recorder.record(InputEvent::Key(KeyInput::plain(KeyCode::KeyB)));
+        recorder.stop_recording();
+
+        assert_eq!(recorder.macro_count(), 2);
+        assert!(recorder.get_macro("macro1").is_some());
+        assert_eq!(recorder.macro_names(), vec!["macro1", "macro2"]);
+    }
+
+    #[test]
+    fn macro_delete() {
+        let mut recorder = InputMacroRecorder::new();
+        recorder.start_recording("tmp");
+        recorder.stop_recording();
+        assert!(recorder.delete_macro("tmp"));
+        assert_eq!(recorder.macro_count(), 0);
+        assert!(!recorder.delete_macro("nonexistent"));
+    }
+
+    // -----------------------------------------------------------------------
+    // InputRepeatHandler tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn repeat_first_press() {
+        let mut handler = InputRepeatHandler::new(500, 50);
+        assert!(handler.process(KeyInput::plain(KeyCode::KeyA), 0));
+        assert_eq!(handler.repeat_count(), 0);
+        assert!(!handler.is_repeating());
+    }
+
+    #[test]
+    fn repeat_too_fast() {
+        let mut handler = InputRepeatHandler::new(500, 50);
+        handler.process(KeyInput::plain(KeyCode::KeyA), 0);
+        assert!(!handler.process(KeyInput::plain(KeyCode::KeyA), 100));
+    }
+
+    #[test]
+    fn repeat_after_delay() {
+        let mut handler = InputRepeatHandler::new(500, 50);
+        handler.process(KeyInput::plain(KeyCode::KeyA), 0);
+        assert!(handler.process(KeyInput::plain(KeyCode::KeyA), 500));
+        assert_eq!(handler.repeat_count(), 1);
+        assert!(handler.is_repeating());
+    }
+
+    #[test]
+    fn repeat_different_key_resets() {
+        let mut handler = InputRepeatHandler::new(500, 50);
+        handler.process(KeyInput::plain(KeyCode::KeyA), 0);
+        handler.process(KeyInput::plain(KeyCode::KeyA), 500);
+        assert!(handler.is_repeating());
+        handler.process(KeyInput::plain(KeyCode::KeyB), 600);
+        assert!(!handler.is_repeating());
+    }
+
+    #[test]
+    fn repeat_reset() {
+        let mut handler = InputRepeatHandler::with_defaults();
+        handler.process(KeyInput::plain(KeyCode::KeyA), 0);
+        handler.process(KeyInput::plain(KeyCode::KeyA), 1000);
+        handler.reset();
+        assert!(!handler.is_repeating());
+        assert_eq!(handler.repeat_count(), 0);
+    }
+
 
 }

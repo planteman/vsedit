@@ -1183,6 +1183,326 @@ impl LineHeightTracker {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ViewModelColumnCache – cached column widths for wrapped lines
+// ---------------------------------------------------------------------------
+
+/// Caches the column offset for each view line to avoid recomputation during
+/// scrolling or cursor movement.
+#[derive(Debug, Clone)]
+pub struct ViewModelColumnCache {
+    /// One entry per view line: the cumulative column offset within the model line.
+    offsets: Vec<u32>,
+    /// Whether the cache is valid.
+    valid: bool,
+}
+
+impl ViewModelColumnCache {
+    /// Create a new empty cache.
+    pub fn new() -> Self {
+        Self {
+            offsets: Vec::new(),
+            valid: false,
+        }
+    }
+
+    /// Build (or rebuild) the cache from the current set of view lines.
+    pub fn rebuild(&mut self, view_lines: &[ViewLine]) {
+        self.offsets.clear();
+        self.offsets.reserve(view_lines.len());
+        for vl in view_lines {
+            self.offsets.push(vl.model_start_column.saturating_sub(1));
+        }
+        self.valid = true;
+    }
+
+    /// Returns `true` if the cache has been built and has not been invalidated.
+    pub fn is_valid(&self) -> bool {
+        self.valid
+    }
+
+    /// Invalidate the cache so it will be rebuilt on the next access.
+    pub fn invalidate(&mut self) {
+        self.valid = false;
+    }
+
+    /// Look up the column offset for a specific view line index (0-based).
+    /// Returns `None` if the cache is invalid or `idx` is out of range.
+    pub fn get_offset(&self, idx: usize) -> Option<u32> {
+        if !self.valid {
+            return None;
+        }
+        self.offsets.get(idx).copied()
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.offsets.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
+    }
+
+    /// Returns the maximum column offset across all view lines, or 0 if empty.
+    pub fn max_offset(&self) -> u32 {
+        self.offsets.iter().copied().max().unwrap_or(0)
+    }
+
+    /// Returns the sum of all column offsets (useful for statistics / debugging).
+    pub fn total_offset(&self) -> u64 {
+        self.offsets.iter().map(|&o| o as u64).sum()
+    }
+}
+
+impl Default for ViewModelColumnCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewModelScrollDelta – scroll position tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks a delta between two scroll positions expressed in view lines and
+/// fractional columns.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ViewModelScrollDelta {
+    /// Number of view lines to scroll (positive = down, negative = up).
+    pub delta_lines: i64,
+    /// Fractional column offset (0.0–1.0 of a character width).
+    pub delta_columns: f64,
+}
+
+impl ViewModelScrollDelta {
+    /// Zero delta (no scroll).
+    pub fn zero() -> Self {
+        Self {
+            delta_lines: 0,
+            delta_columns: 0.0,
+        }
+    }
+
+    /// Create a delta from line and column counts.
+    pub fn new(delta_lines: i64, delta_columns: f64) -> Self {
+        Self {
+            delta_lines,
+            delta_columns,
+        }
+    }
+
+    /// Whether this delta is effectively zero.
+    pub fn is_zero(&self) -> bool {
+        self.delta_lines == 0 && self.delta_columns.abs() < f64::EPSILON
+    }
+
+    /// Negate the delta (reverse direction).
+    pub fn negate(&self) -> Self {
+        Self {
+            delta_lines: -self.delta_lines,
+            delta_columns: -self.delta_columns,
+        }
+    }
+
+    /// Add two deltas component-wise.
+    pub fn add(&self, other: &Self) -> Self {
+        Self {
+            delta_lines: self.delta_lines + other.delta_lines,
+            delta_columns: self.delta_columns + other.delta_columns,
+        }
+    }
+
+    /// Scale the delta by an integer factor.
+    pub fn scale(&self, factor: i64) -> Self {
+        Self {
+            delta_lines: self.delta_lines * factor,
+            delta_columns: self.delta_columns * factor as f64,
+        }
+    }
+
+    /// Return the absolute magnitude of the line delta.
+    pub fn abs_lines(&self) -> u64 {
+        self.delta_lines.unsigned_abs()
+    }
+}
+
+impl fmt::Display for ViewModelScrollDelta {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ScrollΔ(lines={}, cols={:.2})", self.delta_lines, self.delta_columns)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// View-line range calculator
+// ---------------------------------------------------------------------------
+
+/// Calculates which view lines are visible given a scroll position and
+/// viewport height (both expressed in view-line counts).
+#[derive(Debug, Clone)]
+pub struct ViewModelLineRangeCalculator {
+    /// Total number of view lines in the model.
+    total_view_lines: usize,
+}
+
+impl ViewModelLineRangeCalculator {
+    pub fn new(total_view_lines: usize) -> Self {
+        Self { total_view_lines }
+    }
+
+    /// Return the 0-based start and end (exclusive) of visible view lines.
+    pub fn visible_range(&self, scroll_top: usize, viewport_height: usize) -> (usize, usize) {
+        let start = scroll_top.min(self.total_view_lines);
+        let end = (start + viewport_height).min(self.total_view_lines);
+        (start, end)
+    }
+
+    /// Number of lines visible in the returned range.
+    pub fn visible_count(&self, scroll_top: usize, viewport_height: usize) -> usize {
+        let (start, end) = self.visible_range(scroll_top, viewport_height);
+        end - start
+    }
+
+    /// Whether the scroll position is at the very top.
+    pub fn is_at_top(&self, scroll_top: usize) -> bool {
+        scroll_top == 0
+    }
+
+    /// Whether the scroll position shows the very last line.
+    pub fn is_at_bottom(&self, scroll_top: usize, viewport_height: usize) -> bool {
+        scroll_top + viewport_height >= self.total_view_lines
+    }
+
+    /// Clamp a proposed scroll position to valid bounds.
+    pub fn clamp_scroll(&self, scroll_top: usize, viewport_height: usize) -> usize {
+        if self.total_view_lines <= viewport_height {
+            return 0;
+        }
+        scroll_top.min(self.total_view_lines - viewport_height)
+    }
+
+    /// Return how many lines remain below the current viewport.
+    pub fn lines_below(&self, scroll_top: usize, viewport_height: usize) -> usize {
+        let (_, end) = self.visible_range(scroll_top, viewport_height);
+        self.total_view_lines.saturating_sub(end)
+    }
+
+    /// Return how many lines are above the current viewport.
+    pub fn lines_above(&self, scroll_top: usize) -> usize {
+        scroll_top.min(self.total_view_lines)
+    }
+
+    /// Scroll by `delta` lines (positive = down), clamping to valid bounds.
+    pub fn scroll_by(&self, scroll_top: usize, delta: i64, viewport_height: usize) -> usize {
+        let new_top = if delta >= 0 {
+            scroll_top.saturating_add(delta as usize)
+        } else {
+            scroll_top.saturating_sub(delta.unsigned_abs() as usize)
+        };
+        self.clamp_scroll(new_top, viewport_height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Coordinate transform – model ↔ view position mapping
+// ---------------------------------------------------------------------------
+
+/// Converts between model positions (line, column) and view positions
+/// (view line index, column within the view line).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ViewModelCoordinate {
+    /// 0-based view line index.
+    pub view_line: usize,
+    /// 1-based column within the view line.
+    pub view_column: u32,
+}
+
+impl ViewModelCoordinate {
+    pub fn new(view_line: usize, view_column: u32) -> Self {
+        Self { view_line, view_column }
+    }
+}
+
+/// Utility for mapping model positions to/from view coordinates.
+pub struct ViewModelCoordinateTransform<'a> {
+    view_lines: &'a [ViewLine],
+}
+
+impl<'a> ViewModelCoordinateTransform<'a> {
+    pub fn new(view_lines: &'a [ViewLine]) -> Self {
+        Self { view_lines }
+    }
+
+    /// Map a 1-based (model_line, model_column) to a view coordinate.
+    /// Returns `None` if the model line is not found.
+    pub fn model_to_view(&self, model_line: u32, model_column: u32) -> Option<ViewModelCoordinate> {
+        for (idx, vl) in self.view_lines.iter().enumerate() {
+            if vl.model_line != model_line {
+                continue;
+            }
+            let line_end_col = vl.model_start_column + vl.content.len() as u32;
+            if model_column >= vl.model_start_column && model_column < line_end_col {
+                let view_col = model_column - vl.model_start_column + 1;
+                return Some(ViewModelCoordinate::new(idx, view_col));
+            }
+            // If this is the last segment of the model line, clamp to end
+            let is_last = self.view_lines.get(idx + 1)
+                .map_or(true, |next| next.model_line != model_line);
+            if is_last && model_column >= vl.model_start_column {
+                let view_col = (model_column - vl.model_start_column + 1)
+                    .min(vl.content.len() as u32 + 1);
+                return Some(ViewModelCoordinate::new(idx, view_col));
+            }
+        }
+        None
+    }
+
+    /// Map a view coordinate back to a (model_line, model_column) pair.
+    /// Returns `None` if the view line index is out of range.
+    pub fn view_to_model(&self, coord: &ViewModelCoordinate) -> Option<(u32, u32)> {
+        let vl = self.view_lines.get(coord.view_line)?;
+        let model_col = vl.model_start_column + coord.view_column.saturating_sub(1);
+        Some((vl.model_line, model_col))
+    }
+
+    /// Return the view line index of the first view line for a given model line.
+    pub fn first_view_line_for_model(&self, model_line: u32) -> Option<usize> {
+        self.view_lines.iter().position(|vl| vl.model_line == model_line)
+    }
+
+    /// Return the view line index of the last view line for a given model line.
+    pub fn last_view_line_for_model(&self, model_line: u32) -> Option<usize> {
+        self.view_lines.iter().rposition(|vl| vl.model_line == model_line)
+    }
+
+    /// Count how many view lines correspond to a given model line.
+    pub fn view_line_count_for_model(&self, model_line: u32) -> usize {
+        self.view_lines.iter().filter(|vl| vl.model_line == model_line).count()
+    }
+
+    /// Total number of view lines.
+    pub fn total_view_lines(&self) -> usize {
+        self.view_lines.len()
+    }
+
+    /// Returns the model line numbers that have wrapped (i.e. span more than one view line).
+    pub fn wrapped_model_lines(&self) -> Vec<u32> {
+        let mut result = Vec::new();
+        let mut last_model_line: Option<u32> = None;
+        for vl in self.view_lines {
+            if vl.is_wrapped {
+                if last_model_line != Some(vl.model_line) {
+                    result.push(vl.model_line);
+                    last_model_line = Some(vl.model_line);
+                }
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2248,4 +2568,222 @@ mod tests {
         let tracker2 = LineHeightTracker::new(20);
         assert_eq!(tracker2.tallest_line(3), Some(2));
     }
+
+    // -- ViewModelColumnCache tests --
+
+    #[test]
+    fn column_cache_empty() {
+        let cache = ViewModelColumnCache::new();
+        assert!(!cache.is_valid());
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+        assert_eq!(cache.get_offset(0), None);
+    }
+
+    #[test]
+    fn column_cache_rebuild() {
+        let mut cache = ViewModelColumnCache::new();
+        let view_lines = vec![
+            ViewLine { content: "hello".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "world".into(), model_line: 1, model_start_column: 6, is_wrapped: true },
+            ViewLine { content: "foo".into(), model_line: 2, model_start_column: 1, is_wrapped: false },
+        ];
+        cache.rebuild(&view_lines);
+        assert!(cache.is_valid());
+        assert_eq!(cache.len(), 3);
+        assert_eq!(cache.get_offset(0), Some(0));
+        assert_eq!(cache.get_offset(1), Some(5));
+        assert_eq!(cache.get_offset(2), Some(0));
+        assert_eq!(cache.max_offset(), 5);
+    }
+
+    #[test]
+    fn column_cache_invalidate() {
+        let mut cache = ViewModelColumnCache::new();
+        let view_lines = vec![
+            ViewLine { content: "a".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+        ];
+        cache.rebuild(&view_lines);
+        assert!(cache.is_valid());
+        cache.invalidate();
+        assert!(!cache.is_valid());
+        assert_eq!(cache.get_offset(0), None);
+    }
+
+    #[test]
+    fn column_cache_total_offset() {
+        let mut cache = ViewModelColumnCache::new();
+        let view_lines = vec![
+            ViewLine { content: "abc".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "de".into(), model_line: 1, model_start_column: 4, is_wrapped: true },
+        ];
+        cache.rebuild(&view_lines);
+        assert_eq!(cache.total_offset(), 3); // 0 + 3
+    }
+
+    // -- ViewModelScrollDelta tests --
+
+    #[test]
+    fn scroll_delta_zero() {
+        let d = ViewModelScrollDelta::zero();
+        assert!(d.is_zero());
+        assert_eq!(d.abs_lines(), 0);
+    }
+
+    #[test]
+    fn scroll_delta_negate() {
+        let d = ViewModelScrollDelta::new(5, 1.5);
+        let neg = d.negate();
+        assert_eq!(neg.delta_lines, -5);
+        assert!((neg.delta_columns - (-1.5)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scroll_delta_add() {
+        let a = ViewModelScrollDelta::new(3, 0.5);
+        let b = ViewModelScrollDelta::new(-1, 0.25);
+        let sum = a.add(&b);
+        assert_eq!(sum.delta_lines, 2);
+        assert!((sum.delta_columns - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scroll_delta_scale() {
+        let d = ViewModelScrollDelta::new(2, 0.5);
+        let s = d.scale(3);
+        assert_eq!(s.delta_lines, 6);
+        assert!((s.delta_columns - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scroll_delta_display() {
+        let d = ViewModelScrollDelta::new(10, 0.33);
+        let s = format!("{d}");
+        assert!(s.contains("10"));
+        assert!(s.contains("0.33"));
+    }
+
+    // -- ViewModelLineRangeCalculator tests --
+
+    #[test]
+    fn range_calc_visible_range_basic() {
+        let calc = ViewModelLineRangeCalculator::new(100);
+        assert_eq!(calc.visible_range(0, 20), (0, 20));
+        assert_eq!(calc.visible_range(90, 20), (90, 100));
+        assert_eq!(calc.visible_count(0, 20), 20);
+    }
+
+    #[test]
+    fn range_calc_at_boundaries() {
+        let calc = ViewModelLineRangeCalculator::new(50);
+        assert!(calc.is_at_top(0));
+        assert!(!calc.is_at_top(1));
+        assert!(calc.is_at_bottom(40, 10));
+        assert!(!calc.is_at_bottom(30, 10));
+    }
+
+    #[test]
+    fn range_calc_clamp_scroll() {
+        let calc = ViewModelLineRangeCalculator::new(50);
+        assert_eq!(calc.clamp_scroll(100, 20), 30);
+        assert_eq!(calc.clamp_scroll(0, 20), 0);
+        // When viewport is larger than total, clamp to 0
+        assert_eq!(calc.clamp_scroll(10, 60), 0);
+    }
+
+    #[test]
+    fn range_calc_lines_above_below() {
+        let calc = ViewModelLineRangeCalculator::new(100);
+        assert_eq!(calc.lines_above(25), 25);
+        assert_eq!(calc.lines_below(25, 20), 55);
+    }
+
+    #[test]
+    fn range_calc_scroll_by() {
+        let calc = ViewModelLineRangeCalculator::new(100);
+        assert_eq!(calc.scroll_by(10, 5, 20), 15);
+        assert_eq!(calc.scroll_by(10, -5, 20), 5);
+        assert_eq!(calc.scroll_by(10, -20, 20), 0);
+        assert_eq!(calc.scroll_by(10, 200, 20), 80);
+    }
+
+    // -- ViewModelCoordinateTransform tests --
+
+    #[test]
+    fn coord_transform_no_wrap() {
+        let view_lines = vec![
+            ViewLine { content: "hello".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "world".into(), model_line: 2, model_start_column: 1, is_wrapped: false },
+        ];
+        let tx = ViewModelCoordinateTransform::new(&view_lines);
+        let coord = tx.model_to_view(1, 3).unwrap();
+        assert_eq!(coord.view_line, 0);
+        assert_eq!(coord.view_column, 3);
+        let (ml, mc) = tx.view_to_model(&coord).unwrap();
+        assert_eq!(ml, 1);
+        assert_eq!(mc, 3);
+    }
+
+    #[test]
+    fn coord_transform_wrapped() {
+        let view_lines = vec![
+            ViewLine { content: "hell".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "o wo".into(), model_line: 1, model_start_column: 5, is_wrapped: true },
+            ViewLine { content: "rld".into(), model_line: 1, model_start_column: 9, is_wrapped: true },
+        ];
+        let tx = ViewModelCoordinateTransform::new(&view_lines);
+        // Column 6 in model → view line 1, view column 2
+        let coord = tx.model_to_view(1, 6).unwrap();
+        assert_eq!(coord.view_line, 1);
+        assert_eq!(coord.view_column, 2);
+    }
+
+    #[test]
+    fn coord_transform_first_last() {
+        let view_lines = vec![
+            ViewLine { content: "ab".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "cd".into(), model_line: 1, model_start_column: 3, is_wrapped: true },
+            ViewLine { content: "ef".into(), model_line: 2, model_start_column: 1, is_wrapped: false },
+        ];
+        let tx = ViewModelCoordinateTransform::new(&view_lines);
+        assert_eq!(tx.first_view_line_for_model(1), Some(0));
+        assert_eq!(tx.last_view_line_for_model(1), Some(1));
+        assert_eq!(tx.first_view_line_for_model(2), Some(2));
+        assert_eq!(tx.view_line_count_for_model(1), 2);
+        assert_eq!(tx.view_line_count_for_model(2), 1);
+        assert_eq!(tx.total_view_lines(), 3);
+    }
+
+    #[test]
+    fn coord_transform_wrapped_model_lines() {
+        let view_lines = vec![
+            ViewLine { content: "hello".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "ab".into(), model_line: 2, model_start_column: 1, is_wrapped: false },
+            ViewLine { content: "cd".into(), model_line: 2, model_start_column: 3, is_wrapped: true },
+            ViewLine { content: "xyz".into(), model_line: 3, model_start_column: 1, is_wrapped: false },
+        ];
+        let tx = ViewModelCoordinateTransform::new(&view_lines);
+        let wrapped = tx.wrapped_model_lines();
+        assert_eq!(wrapped, vec![2]);
+    }
+
+    #[test]
+    fn coord_transform_model_to_view_not_found() {
+        let view_lines = vec![
+            ViewLine { content: "hello".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+        ];
+        let tx = ViewModelCoordinateTransform::new(&view_lines);
+        assert!(tx.model_to_view(99, 1).is_none());
+    }
+
+    #[test]
+    fn coord_transform_view_to_model_out_of_range() {
+        let view_lines = vec![
+            ViewLine { content: "hello".into(), model_line: 1, model_start_column: 1, is_wrapped: false },
+        ];
+        let tx = ViewModelCoordinateTransform::new(&view_lines);
+        let coord = ViewModelCoordinate::new(5, 1);
+        assert!(tx.view_to_model(&coord).is_none());
+    }
+
 }

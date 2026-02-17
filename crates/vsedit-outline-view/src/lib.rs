@@ -1284,6 +1284,259 @@ impl OutlineKind {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// OutlineSortToggler
+// ---------------------------------------------------------------------------
+
+/// Available sort orders for outline elements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutlineSortMode {
+    /// Sort by position in the document.
+    ByPosition,
+    /// Sort by name alphabetically.
+    ByName,
+    /// Sort by kind (group by symbol kind, then by position).
+    ByKind,
+    /// Sort by name length.
+    ByNameLength,
+}
+
+/// Manages outline sort order with toggle cycling.
+#[derive(Debug, Clone)]
+pub struct OutlineSortToggler {
+    modes: Vec<OutlineSortMode>,
+    current_index: usize,
+    toggle_count: u64,
+}
+
+impl OutlineSortToggler {
+    /// Create a new sort toggler with default mode order.
+    pub fn new() -> Self {
+        Self {
+            modes: vec![
+                OutlineSortMode::ByPosition,
+                OutlineSortMode::ByName,
+                OutlineSortMode::ByKind,
+                OutlineSortMode::ByNameLength,
+            ],
+            current_index: 0,
+            toggle_count: 0,
+        }
+    }
+
+    /// Create a toggler with custom modes.
+    pub fn with_modes(modes: Vec<OutlineSortMode>) -> Self {
+        Self {
+            modes,
+            current_index: 0,
+            toggle_count: 0,
+        }
+    }
+
+    /// Get the current sort mode.
+    pub fn current(&self) -> OutlineSortMode {
+        self.modes[self.current_index]
+    }
+
+    /// Toggle to the next sort mode, returning the new mode.
+    pub fn toggle(&mut self) -> OutlineSortMode {
+        self.current_index = (self.current_index + 1) % self.modes.len();
+        self.toggle_count += 1;
+        self.current()
+    }
+
+    /// Toggle to the previous sort mode.
+    pub fn toggle_back(&mut self) -> OutlineSortMode {
+        if self.current_index == 0 {
+            self.current_index = self.modes.len() - 1;
+        } else {
+            self.current_index -= 1;
+        }
+        self.toggle_count += 1;
+        self.current()
+    }
+
+    /// Set the mode directly, returns true if found.
+    pub fn set_mode(&mut self, mode: OutlineSortMode) -> bool {
+        if let Some(idx) = self.modes.iter().position(|m| *m == mode) {
+            self.current_index = idx;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Number of available modes.
+    pub fn mode_count(&self) -> usize {
+        self.modes.len()
+    }
+
+    /// Number of times toggled.
+    pub fn toggle_count(&self) -> u64 {
+        self.toggle_count
+    }
+
+    /// Apply current sort to a mutable slice of outline elements.
+    pub fn sort_elements(&self, elements: &mut [OutlineElement]) {
+        match self.current() {
+            OutlineSortMode::ByPosition => {
+                elements.sort_by_key(|e| (e.range_start_line, e.range_end_line));
+            }
+            OutlineSortMode::ByName => {
+                elements.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+            }
+            OutlineSortMode::ByKind => {
+                elements.sort_by(|a, b| {
+                    let ka = format!("{:?}", a.kind);
+                    let kb = format!("{:?}", b.kind);
+                    ka.cmp(&kb).then(a.range_start_line.cmp(&b.range_start_line))
+                });
+            }
+            OutlineSortMode::ByNameLength => {
+                elements.sort_by_key(|e| e.label.len());
+            }
+        }
+    }
+
+    /// Reset to first mode.
+    pub fn reset(&mut self) {
+        self.current_index = 0;
+        self.toggle_count = 0;
+    }
+}
+
+impl fmt::Display for OutlineSortToggler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SortToggler({:?}, toggled {} times)", self.current(), self.toggle_count)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutlineFilterByKind
+// ---------------------------------------------------------------------------
+
+/// Filters outline elements by symbol kind.
+#[derive(Debug, Clone)]
+pub struct OutlineFilterByKind {
+    /// Allowed kinds. If empty, all kinds are shown.
+    allowed: Vec<OutlineKind>,
+    /// Excluded kinds.
+    excluded: Vec<OutlineKind>,
+    /// Number of times the filter has been applied.
+    apply_count: u64,
+}
+
+impl OutlineFilterByKind {
+    /// Create a new filter that allows all kinds.
+    pub fn new() -> Self {
+        Self {
+            allowed: Vec::new(),
+            excluded: Vec::new(),
+            apply_count: 0,
+        }
+    }
+
+    /// Create a filter that only shows the specified kinds.
+    pub fn only(kinds: Vec<OutlineKind>) -> Self {
+        Self {
+            allowed: kinds,
+            excluded: Vec::new(),
+            apply_count: 0,
+        }
+    }
+
+    /// Create a filter that excludes the specified kinds.
+    pub fn excluding(kinds: Vec<OutlineKind>) -> Self {
+        Self {
+            allowed: Vec::new(),
+            excluded: kinds,
+            apply_count: 0,
+        }
+    }
+
+    /// Add a kind to the allowed list.
+    pub fn allow_kind(&mut self, kind: OutlineKind) {
+        if !self.allowed.contains(&kind) {
+            self.allowed.push(kind);
+        }
+    }
+
+    /// Add a kind to the excluded list.
+    pub fn exclude_kind(&mut self, kind: OutlineKind) {
+        if !self.excluded.contains(&kind) {
+            self.excluded.push(kind);
+        }
+    }
+
+    /// Check if a kind passes this filter.
+    pub fn accepts(&self, kind: OutlineKind) -> bool {
+        if self.excluded.contains(&kind) {
+            return false;
+        }
+        if self.allowed.is_empty() {
+            return true;
+        }
+        self.allowed.contains(&kind)
+    }
+
+    /// Filter a slice of elements, returning only those whose kind is accepted.
+    pub fn apply<'a>(&mut self, elements: &'a [OutlineElement]) -> Vec<&'a OutlineElement> {
+        self.apply_count += 1;
+        elements.iter().filter(|e| self.accepts(e.kind)).collect()
+    }
+
+    /// Count how many elements would pass.
+    pub fn count_matching(&self, elements: &[OutlineElement]) -> usize {
+        elements.iter().filter(|e| self.accepts(e.kind)).count()
+    }
+
+    /// Count how many elements would be filtered out.
+    pub fn count_filtered_out(&self, elements: &[OutlineElement]) -> usize {
+        elements.iter().filter(|e| !self.accepts(e.kind)).count()
+    }
+
+    /// Number of times apply was called.
+    pub fn apply_count(&self) -> u64 {
+        self.apply_count
+    }
+
+    /// Number of allowed kinds.
+    pub fn allowed_count(&self) -> usize {
+        self.allowed.len()
+    }
+
+    /// Number of excluded kinds.
+    pub fn excluded_count(&self) -> usize {
+        self.excluded.len()
+    }
+
+    /// Reset the filter to accept all kinds.
+    pub fn reset(&mut self) {
+        self.allowed.clear();
+        self.excluded.clear();
+        self.apply_count = 0;
+    }
+
+    /// Check if filter is in default (accept-all) state.
+    pub fn is_default(&self) -> bool {
+        self.allowed.is_empty() && self.excluded.is_empty()
+    }
+}
+
+impl fmt::Display for OutlineFilterByKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "FilterByKind(allowed={}, excluded={}, applied {} times)",
+            self.allowed_count(),
+            self.excluded_count(),
+            self.apply_count
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2376,4 +2629,147 @@ mod tests {
             ("C".to_string(), 0),
         ]);
     }
+
+    #[test]
+    fn sort_toggler_default_is_position() {
+        let toggler = OutlineSortToggler::new();
+        assert_eq!(toggler.current(), OutlineSortMode::ByPosition);
+    }
+
+    #[test]
+    fn sort_toggler_toggle_cycles() {
+        let mut toggler = OutlineSortToggler::new();
+        assert_eq!(toggler.toggle(), OutlineSortMode::ByName);
+        assert_eq!(toggler.toggle(), OutlineSortMode::ByKind);
+        assert_eq!(toggler.toggle(), OutlineSortMode::ByNameLength);
+        assert_eq!(toggler.toggle(), OutlineSortMode::ByPosition);
+    }
+
+    #[test]
+    fn sort_toggler_toggle_back() {
+        let mut toggler = OutlineSortToggler::new();
+        assert_eq!(toggler.toggle_back(), OutlineSortMode::ByNameLength);
+        assert_eq!(toggler.toggle_back(), OutlineSortMode::ByKind);
+    }
+
+    #[test]
+    fn sort_toggler_set_mode() {
+        let mut toggler = OutlineSortToggler::new();
+        assert!(toggler.set_mode(OutlineSortMode::ByKind));
+        assert_eq!(toggler.current(), OutlineSortMode::ByKind);
+    }
+
+    #[test]
+    fn sort_toggler_toggle_count() {
+        let mut toggler = OutlineSortToggler::new();
+        toggler.toggle();
+        toggler.toggle();
+        assert_eq!(toggler.toggle_count(), 2);
+    }
+
+    #[test]
+    fn sort_toggler_sort_by_name() {
+        let mut toggler = OutlineSortToggler::new();
+        toggler.set_mode(OutlineSortMode::ByName);
+        let mut elems = vec![
+            OutlineElement { label: "Zeta".into(), kind: OutlineKind::Function, range_start_line: 1, range_end_line: 10, detail: None, children: vec![] },
+            OutlineElement { label: "Alpha".into(), kind: OutlineKind::Function, range_start_line: 20, range_end_line: 30, detail: None, children: vec![] },
+        ];
+        toggler.sort_elements(&mut elems);
+        assert_eq!(elems[0].label, "Alpha");
+        assert_eq!(elems[1].label, "Zeta");
+    }
+
+    #[test]
+    fn sort_toggler_sort_by_position() {
+        let mut toggler = OutlineSortToggler::new();
+        let mut elems = vec![
+            OutlineElement { label: "B".into(), kind: OutlineKind::Function, range_start_line: 20, range_end_line: 30, detail: None, children: vec![] },
+            OutlineElement { label: "A".into(), kind: OutlineKind::Function, range_start_line: 1, range_end_line: 10, detail: None, children: vec![] },
+        ];
+        toggler.sort_elements(&mut elems);
+        assert_eq!(elems[0].label, "A");
+    }
+
+    #[test]
+    fn sort_toggler_display() {
+        let toggler = OutlineSortToggler::new();
+        let s = format!("{toggler}");
+        assert!(s.contains("ByPosition"));
+        assert!(s.contains("0 times"));
+    }
+
+    #[test]
+    fn sort_toggler_reset() {
+        let mut toggler = OutlineSortToggler::new();
+        toggler.toggle();
+        toggler.toggle();
+        toggler.reset();
+        assert_eq!(toggler.current(), OutlineSortMode::ByPosition);
+        assert_eq!(toggler.toggle_count(), 0);
+    }
+
+    #[test]
+    fn filter_by_kind_accepts_all_by_default() {
+        let filter = OutlineFilterByKind::new();
+        assert!(filter.accepts(OutlineKind::Function));
+        assert!(filter.accepts(OutlineKind::Class));
+        assert!(filter.is_default());
+    }
+
+    #[test]
+    fn filter_by_kind_only() {
+        let filter = OutlineFilterByKind::only(vec![OutlineKind::Function, OutlineKind::Method]);
+        assert!(filter.accepts(OutlineKind::Function));
+        assert!(filter.accepts(OutlineKind::Method));
+        assert!(!filter.accepts(OutlineKind::Class));
+    }
+
+    #[test]
+    fn filter_by_kind_excluding() {
+        let filter = OutlineFilterByKind::excluding(vec![OutlineKind::Variable]);
+        assert!(filter.accepts(OutlineKind::Function));
+        assert!(!filter.accepts(OutlineKind::Variable));
+    }
+
+    #[test]
+    fn filter_by_kind_apply() {
+        let mut filter = OutlineFilterByKind::only(vec![OutlineKind::Function]);
+        let elems = vec![
+            OutlineElement { label: "foo".into(), kind: OutlineKind::Function, range_start_line: 1, range_end_line: 10, detail: None, children: vec![] },
+            OutlineElement { label: "Bar".into(), kind: OutlineKind::Class, range_start_line: 20, range_end_line: 30, detail: None, children: vec![] },
+            OutlineElement { label: "baz".into(), kind: OutlineKind::Function, range_start_line: 40, range_end_line: 50, detail: None, children: vec![] },
+        ];
+        let result = filter.apply(&elems);
+        assert_eq!(result.len(), 2);
+        assert_eq!(filter.apply_count(), 1);
+    }
+
+    #[test]
+    fn filter_by_kind_count_matching() {
+        let filter = OutlineFilterByKind::excluding(vec![OutlineKind::Variable]);
+        let elems = vec![
+            OutlineElement { label: "x".into(), kind: OutlineKind::Variable, range_start_line: 1, range_end_line: 2, detail: None, children: vec![] },
+            OutlineElement { label: "f".into(), kind: OutlineKind::Function, range_start_line: 3, range_end_line: 4, detail: None, children: vec![] },
+        ];
+        assert_eq!(filter.count_matching(&elems), 1);
+        assert_eq!(filter.count_filtered_out(&elems), 1);
+    }
+
+    #[test]
+    fn filter_by_kind_reset() {
+        let mut filter = OutlineFilterByKind::only(vec![OutlineKind::Function]);
+        filter.reset();
+        assert!(filter.is_default());
+    }
+
+    #[test]
+    fn filter_by_kind_display() {
+        let filter = OutlineFilterByKind::new();
+        let s = format!("{filter}");
+        assert!(s.contains("allowed=0"));
+        assert!(s.contains("excluded=0"));
+    }
+
+
 }

@@ -1330,6 +1330,406 @@ impl ViewLayoutManager {
     }
 }
 
+
+// ── View Serializer ──
+
+/// Provides JSON serialization and deserialization for view types.
+pub struct ViewSerializer;
+
+impl ViewSerializer {
+    /// Serialize a `WebviewPanel` to a JSON string.
+    pub fn serialize_panel(panel: &WebviewPanel) -> Result<String, serde_json::Error> {
+        serde_json::to_string(panel)
+    }
+
+    /// Serialize a `WebviewPanel` to a pretty-printed JSON string.
+    pub fn serialize_panel_pretty(panel: &WebviewPanel) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(panel)
+    }
+
+    /// Deserialize a `WebviewPanel` from a JSON string.
+    pub fn deserialize_panel(json: &str) -> Result<WebviewPanel, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Serialize a `ViewMessage` to a JSON string.
+    pub fn serialize_message(msg: &ViewMessage) -> Result<String, serde_json::Error> {
+        serde_json::to_string(msg)
+    }
+
+    /// Deserialize a `ViewMessage` from a JSON string.
+    pub fn deserialize_message(json: &str) -> Result<ViewMessage, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Serialize a slice of panels into a JSON array string.
+    pub fn serialize_panels(panels: &[WebviewPanel]) -> Result<String, serde_json::Error> {
+        serde_json::to_string(panels)
+    }
+
+    /// Deserialize a JSON array string into a vector of panels.
+    pub fn deserialize_panels(json: &str) -> Result<Vec<WebviewPanel>, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Serialize a slice of messages into a JSON array string.
+    pub fn serialize_messages(msgs: &[ViewMessage]) -> Result<String, serde_json::Error> {
+        serde_json::to_string(msgs)
+    }
+
+    /// Deserialize a JSON array string into a vector of messages.
+    pub fn deserialize_messages(json: &str) -> Result<Vec<ViewMessage>, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Convert a `WebviewPanel` to a `serde_json::Value`.
+    pub fn panel_to_value(panel: &WebviewPanel) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(panel)
+    }
+
+    /// Convert a `serde_json::Value` to a `WebviewPanel`.
+    pub fn value_to_panel(value: serde_json::Value) -> Result<WebviewPanel, serde_json::Error> {
+        serde_json::from_value(value)
+    }
+}
+
+// ── Badge Counter ──
+
+/// Tracks badge counts per view identifier.
+///
+/// Used to display notification badges on view tabs or sidebar items.
+pub struct ViewBadgeCounter {
+    counts: std::collections::HashMap<String, u32>,
+}
+
+impl ViewBadgeCounter {
+    /// Create a new empty badge counter.
+    pub fn new() -> Self {
+        Self {
+            counts: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Set the badge count for the given view to an exact value.
+    pub fn set(&mut self, view_id: &str, count: u32) {
+        self.counts.insert(view_id.to_string(), count);
+    }
+
+    /// Get the current badge count for the given view, returning 0 if unset.
+    pub fn get(&self, view_id: &str) -> u32 {
+        self.counts.get(view_id).copied().unwrap_or(0)
+    }
+
+    /// Increment the badge count for the given view by one, returning the new value.
+    pub fn increment(&mut self, view_id: &str) -> u32 {
+        let entry = self.counts.entry(view_id.to_string()).or_insert(0);
+        *entry = entry.saturating_add(1);
+        *entry
+    }
+
+    /// Decrement the badge count for the given view by one (saturating at 0).
+    /// Returns the new value.
+    pub fn decrement(&mut self, view_id: &str) -> u32 {
+        let entry = self.counts.entry(view_id.to_string()).or_insert(0);
+        *entry = entry.saturating_sub(1);
+        *entry
+    }
+
+    /// Clear the badge count for a single view, returning the old value.
+    pub fn clear(&mut self, view_id: &str) -> u32 {
+        self.counts.remove(view_id).unwrap_or(0)
+    }
+
+    /// Clear all badge counts.
+    pub fn clear_all(&mut self) {
+        self.counts.clear();
+    }
+
+    /// Return the total badge count across all views.
+    pub fn total(&self) -> u32 {
+        self.counts.values().sum()
+    }
+
+    /// Return the number of views that have a non-zero badge count.
+    pub fn active_count(&self) -> usize {
+        self.counts.values().filter(|&&v| v > 0).count()
+    }
+
+    /// Return true if a view has a non-zero badge count.
+    pub fn has_badge(&self, view_id: &str) -> bool {
+        self.get(view_id) > 0
+    }
+
+    /// Return all view ids that currently have badges, sorted alphabetically.
+    pub fn views_with_badges(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .counts
+            .iter()
+            .filter(|(_, v)| **v > 0)
+            .map(|(k, _)| k.clone())
+            .collect();
+        ids.sort();
+        ids
+    }
+}
+
+impl Default for ViewBadgeCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Context Menu Builder ──
+
+/// A single item in a context menu.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ContextMenuItem {
+    /// A clickable action with a label, command id, and enabled state.
+    Action {
+        label: String,
+        command: String,
+        enabled: bool,
+    },
+    /// A visual separator between groups of items.
+    Separator,
+    /// A submenu containing nested items.
+    SubMenu {
+        label: String,
+        items: Vec<ContextMenuItem>,
+    },
+}
+
+impl ContextMenuItem {
+    /// Create a new enabled action item.
+    pub fn action(label: &str, command: &str) -> Self {
+        Self::Action {
+            label: label.to_string(),
+            command: command.to_string(),
+            enabled: true,
+        }
+    }
+
+    /// Create a new disabled action item.
+    pub fn action_disabled(label: &str, command: &str) -> Self {
+        Self::Action {
+            label: label.to_string(),
+            command: command.to_string(),
+            enabled: false,
+        }
+    }
+
+    /// Create a separator.
+    pub fn separator() -> Self {
+        Self::Separator
+    }
+
+    /// Create a submenu with the given items.
+    pub fn submenu(label: &str, items: Vec<ContextMenuItem>) -> Self {
+        Self::SubMenu {
+            label: label.to_string(),
+            items,
+        }
+    }
+
+    /// Returns true if this item is a separator.
+    pub fn is_separator(&self) -> bool {
+        matches!(self, Self::Separator)
+    }
+
+    /// Returns true if this item is a submenu.
+    pub fn is_submenu(&self) -> bool {
+        matches!(self, Self::SubMenu { .. })
+    }
+
+    /// Returns true if this item is an enabled action.
+    pub fn is_enabled(&self) -> bool {
+        matches!(self, Self::Action { enabled: true, .. })
+    }
+
+    /// Recursively count all action items (excluding separators).
+    pub fn action_count(&self) -> usize {
+        match self {
+            Self::Action { .. } => 1,
+            Self::Separator => 0,
+            Self::SubMenu { items, .. } => items.iter().map(|i| i.action_count()).sum(),
+        }
+    }
+}
+
+impl fmt::Display for ContextMenuItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Action { label, command, enabled } => {
+                if *enabled {
+                    write!(f, "{label} ({command})")
+                } else {
+                    write!(f, "{label} ({command}) [disabled]")
+                }
+            }
+            Self::Separator => write!(f, "---"),
+            Self::SubMenu { label, items } => {
+                write!(f, "{label} [{} items]", items.len())
+            }
+        }
+    }
+}
+
+/// Builder for constructing context menus incrementally.
+pub struct ViewContextMenuBuilder {
+    items: Vec<ContextMenuItem>,
+}
+
+impl ViewContextMenuBuilder {
+    /// Create a new empty context menu builder.
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Add an enabled action to the menu.
+    pub fn action(mut self, label: &str, command: &str) -> Self {
+        self.items.push(ContextMenuItem::action(label, command));
+        self
+    }
+
+    /// Add a disabled action to the menu.
+    pub fn action_disabled(mut self, label: &str, command: &str) -> Self {
+        self.items.push(ContextMenuItem::action_disabled(label, command));
+        self
+    }
+
+    /// Add a separator to the menu.
+    pub fn separator(mut self) -> Self {
+        self.items.push(ContextMenuItem::separator());
+        self
+    }
+
+    /// Add a submenu built via a closure.
+    pub fn submenu(mut self, label: &str, build: impl FnOnce(ViewContextMenuBuilder) -> ViewContextMenuBuilder) -> Self {
+        let sub = build(ViewContextMenuBuilder::new()).build();
+        self.items.push(ContextMenuItem::submenu(label, sub));
+        self
+    }
+
+    /// Add a pre-built submenu.
+    pub fn submenu_items(mut self, label: &str, items: Vec<ContextMenuItem>) -> Self {
+        self.items.push(ContextMenuItem::submenu(label, items));
+        self
+    }
+
+    /// Return the number of top-level items added so far.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Return true if no items have been added.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Consume the builder and return the list of menu items.
+    pub fn build(self) -> Vec<ContextMenuItem> {
+        self.items
+    }
+
+    /// Count all action items recursively across all submenus.
+    pub fn total_actions(&self) -> usize {
+        self.items.iter().map(|i| i.action_count()).sum()
+    }
+}
+
+impl Default for ViewContextMenuBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Collapse State ──
+
+/// Tracks which tree nodes are collapsed in a tree view.
+///
+/// By default nodes are expanded; only collapsed node ids are stored.
+pub struct ViewCollapseState {
+    collapsed: std::collections::HashSet<String>,
+}
+
+impl ViewCollapseState {
+    /// Create a new state with all nodes expanded.
+    pub fn new() -> Self {
+        Self {
+            collapsed: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Collapse a single node. Returns true if it was not already collapsed.
+    pub fn collapse(&mut self, node_id: &str) -> bool {
+        self.collapsed.insert(node_id.to_string())
+    }
+
+    /// Expand a single node. Returns true if it was previously collapsed.
+    pub fn expand(&mut self, node_id: &str) -> bool {
+        self.collapsed.remove(node_id)
+    }
+
+    /// Toggle the collapse state of a node. Returns `true` if the node is
+    /// now collapsed, `false` if it is now expanded.
+    pub fn toggle(&mut self, node_id: &str) -> bool {
+        if self.collapsed.contains(node_id) {
+            self.collapsed.remove(node_id);
+            false
+        } else {
+            self.collapsed.insert(node_id.to_string());
+            true
+        }
+    }
+
+    /// Returns true if the given node is currently collapsed.
+    pub fn is_collapsed(&self, node_id: &str) -> bool {
+        self.collapsed.contains(node_id)
+    }
+
+    /// Returns true if the given node is currently expanded.
+    pub fn is_expanded(&self, node_id: &str) -> bool {
+        !self.is_collapsed(node_id)
+    }
+
+    /// Collapse all nodes in the provided list.
+    pub fn collapse_all(&mut self, node_ids: &[&str]) {
+        for id in node_ids {
+            self.collapsed.insert(id.to_string());
+        }
+    }
+
+    /// Expand all nodes, clearing the collapsed set entirely.
+    pub fn expand_all(&mut self) {
+        self.collapsed.clear();
+    }
+
+    /// Return the number of currently collapsed nodes.
+    pub fn collapsed_count(&self) -> usize {
+        self.collapsed.len()
+    }
+
+    /// Return all collapsed node ids, sorted alphabetically.
+    pub fn collapsed_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self.collapsed.iter().cloned().collect();
+        ids.sort();
+        ids
+    }
+
+    /// Returns true if no nodes are collapsed (all expanded).
+    pub fn all_expanded(&self) -> bool {
+        self.collapsed.is_empty()
+    }
+}
+
+impl Default for ViewCollapseState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2226,4 +2626,459 @@ mod tests {
         assert_eq!(view.installed_count(), 1);
         assert!(!view.remove_installed("pub.remove")); // already gone
     }
+
+    // ── ViewSerializer tests ──
+
+    #[test]
+    fn serializer_panel_roundtrip() {
+        let panel = WebviewPanel {
+            id: "p-1".into(),
+            view_type: "markdown".into(),
+            title: "Notes".into(),
+            column: ViewColumn::Two,
+            html: "<h1>Hi</h1>".into(),
+            is_visible: true,
+        };
+        let json = ViewSerializer::serialize_panel(&panel).unwrap();
+        let back = ViewSerializer::deserialize_panel(&json).unwrap();
+        assert_eq!(panel, back);
+    }
+
+    #[test]
+    fn serializer_panel_pretty() {
+        let panel = WebviewPanel {
+            id: "p-2".into(),
+            view_type: "preview".into(),
+            title: "Preview".into(),
+            column: ViewColumn::Active,
+            html: "".into(),
+            is_visible: false,
+        };
+        let pretty = ViewSerializer::serialize_panel_pretty(&panel).unwrap();
+        assert!(pretty.contains('\n'), "pretty output should have newlines");
+        let back = ViewSerializer::deserialize_panel(&pretty).unwrap();
+        assert_eq!(panel, back);
+    }
+
+    #[test]
+    fn serializer_message_roundtrip() {
+        let msg = ViewMessage::SetHtml {
+            panel_id: "p-1".into(),
+            html: "<p>test</p>".into(),
+        };
+        let json = ViewSerializer::serialize_message(&msg).unwrap();
+        let back = ViewSerializer::deserialize_message(&json).unwrap();
+        assert_eq!(msg, back);
+    }
+
+    #[test]
+    fn serializer_panels_batch() {
+        let panels = vec![
+            WebviewPanel {
+                id: "a".into(),
+                view_type: "t".into(),
+                title: "A".into(),
+                column: ViewColumn::One,
+                html: "".into(),
+                is_visible: true,
+            },
+            WebviewPanel {
+                id: "b".into(),
+                view_type: "t".into(),
+                title: "B".into(),
+                column: ViewColumn::Three,
+                html: "<b>bold</b>".into(),
+                is_visible: false,
+            },
+        ];
+        let json = ViewSerializer::serialize_panels(&panels).unwrap();
+        let back = ViewSerializer::deserialize_panels(&json).unwrap();
+        assert_eq!(panels, back);
+    }
+
+    #[test]
+    fn serializer_messages_batch() {
+        let msgs = vec![
+            ViewMessage::CreateWebviewPanel {
+                view_type: "md".into(),
+                title: "MD".into(),
+                column: ViewColumn::Beside,
+            },
+            ViewMessage::DisposePanel {
+                panel_id: "x".into(),
+            },
+        ];
+        let json = ViewSerializer::serialize_messages(&msgs).unwrap();
+        let back = ViewSerializer::deserialize_messages(&json).unwrap();
+        assert_eq!(msgs, back);
+    }
+
+    #[test]
+    fn serializer_panel_to_value() {
+        let panel = WebviewPanel {
+            id: "v1".into(),
+            view_type: "html".into(),
+            title: "Val".into(),
+            column: ViewColumn::One,
+            html: "".into(),
+            is_visible: true,
+        };
+        let val = ViewSerializer::panel_to_value(&panel).unwrap();
+        assert_eq!(val["id"], "v1");
+        assert_eq!(val["is_visible"], true);
+        let back = ViewSerializer::value_to_panel(val).unwrap();
+        assert_eq!(panel, back);
+    }
+
+    #[test]
+    fn serializer_invalid_json() {
+        assert!(ViewSerializer::deserialize_panel("not json").is_err());
+        assert!(ViewSerializer::deserialize_message("{\"bad\": 1}").is_err());
+    }
+
+    // ── ViewBadgeCounter tests ──
+
+    #[test]
+    fn badge_set_and_get() {
+        let mut bc = ViewBadgeCounter::new();
+        assert_eq!(bc.get("explorer"), 0);
+        bc.set("explorer", 5);
+        assert_eq!(bc.get("explorer"), 5);
+        bc.set("explorer", 0);
+        assert_eq!(bc.get("explorer"), 0);
+    }
+
+    #[test]
+    fn badge_increment() {
+        let mut bc = ViewBadgeCounter::new();
+        assert_eq!(bc.increment("git"), 1);
+        assert_eq!(bc.increment("git"), 2);
+        assert_eq!(bc.increment("git"), 3);
+        assert_eq!(bc.get("git"), 3);
+    }
+
+    #[test]
+    fn badge_decrement_saturates() {
+        let mut bc = ViewBadgeCounter::new();
+        assert_eq!(bc.decrement("x"), 0, "decrementing unknown stays at 0");
+        bc.set("x", 2);
+        assert_eq!(bc.decrement("x"), 1);
+        assert_eq!(bc.decrement("x"), 0);
+        assert_eq!(bc.decrement("x"), 0, "should saturate at 0");
+    }
+
+    #[test]
+    fn badge_increment_saturates_at_max() {
+        let mut bc = ViewBadgeCounter::new();
+        bc.set("overflow", u32::MAX);
+        assert_eq!(bc.increment("overflow"), u32::MAX, "saturating_add at max");
+    }
+
+    #[test]
+    fn badge_clear_single() {
+        let mut bc = ViewBadgeCounter::new();
+        bc.set("a", 10);
+        bc.set("b", 20);
+        assert_eq!(bc.clear("a"), 10);
+        assert_eq!(bc.get("a"), 0);
+        assert_eq!(bc.get("b"), 20);
+    }
+
+    #[test]
+    fn badge_clear_all() {
+        let mut bc = ViewBadgeCounter::new();
+        bc.set("a", 5);
+        bc.set("b", 3);
+        bc.clear_all();
+        assert_eq!(bc.total(), 0);
+        assert_eq!(bc.active_count(), 0);
+    }
+
+    #[test]
+    fn badge_total_and_active() {
+        let mut bc = ViewBadgeCounter::new();
+        bc.set("a", 3);
+        bc.set("b", 7);
+        bc.set("c", 0);
+        assert_eq!(bc.total(), 10);
+        assert_eq!(bc.active_count(), 2);
+    }
+
+    #[test]
+    fn badge_has_badge() {
+        let mut bc = ViewBadgeCounter::new();
+        assert!(!bc.has_badge("x"));
+        bc.increment("x");
+        assert!(bc.has_badge("x"));
+    }
+
+    #[test]
+    fn badge_views_with_badges_sorted() {
+        let mut bc = ViewBadgeCounter::new();
+        bc.set("zebra", 1);
+        bc.set("alpha", 2);
+        bc.set("mid", 0);
+        let ids = bc.views_with_badges();
+        assert_eq!(ids, vec!["alpha", "zebra"]);
+    }
+
+    #[test]
+    fn badge_default() {
+        let bc = ViewBadgeCounter::default();
+        assert_eq!(bc.total(), 0);
+    }
+
+    // ── ViewContextMenuBuilder tests ──
+
+    #[test]
+    fn menu_builder_empty() {
+        let builder = ViewContextMenuBuilder::new();
+        assert!(builder.is_empty());
+        assert_eq!(builder.len(), 0);
+        assert_eq!(builder.total_actions(), 0);
+        let items = builder.build();
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn menu_builder_actions_and_separator() {
+        let items = ViewContextMenuBuilder::new()
+            .action("Cut", "edit.cut")
+            .action("Copy", "edit.copy")
+            .separator()
+            .action("Paste", "edit.paste")
+            .build();
+        assert_eq!(items.len(), 4);
+        assert_eq!(items[2], ContextMenuItem::Separator);
+        assert!(items[0].is_enabled());
+        assert!(!items[2].is_separator() == false || items[2].is_separator());
+    }
+
+    #[test]
+    fn menu_builder_disabled_action() {
+        let items = ViewContextMenuBuilder::new()
+            .action_disabled("Redo", "edit.redo")
+            .build();
+        assert_eq!(items.len(), 1);
+        assert!(!items[0].is_enabled());
+        match &items[0] {
+            ContextMenuItem::Action { label, command, enabled } => {
+                assert_eq!(label, "Redo");
+                assert_eq!(command, "edit.redo");
+                assert!(!enabled);
+            }
+            _ => panic!("expected Action"),
+        }
+    }
+
+    #[test]
+    fn menu_builder_submenu_closure() {
+        let items = ViewContextMenuBuilder::new()
+            .action("Open", "file.open")
+            .submenu("Recent", |b| {
+                b.action("file1.rs", "open.file1")
+                 .action("file2.rs", "open.file2")
+                 .separator()
+                 .action("Clear", "recent.clear")
+            })
+            .build();
+        assert_eq!(items.len(), 2);
+        match &items[1] {
+            ContextMenuItem::SubMenu { label, items: sub } => {
+                assert_eq!(label, "Recent");
+                assert_eq!(sub.len(), 4);
+                assert!(sub[2].is_separator());
+            }
+            _ => panic!("expected SubMenu"),
+        }
+    }
+
+    #[test]
+    fn menu_builder_nested_submenu() {
+        let items = ViewContextMenuBuilder::new()
+            .submenu("Level1", |b| {
+                b.submenu("Level2", |b2| {
+                    b2.action("Deep", "cmd.deep")
+                })
+            })
+            .build();
+        assert_eq!(items.len(), 1);
+        if let ContextMenuItem::SubMenu { items: l1, .. } = &items[0] {
+            assert_eq!(l1.len(), 1);
+            if let ContextMenuItem::SubMenu { items: l2, .. } = &l1[0] {
+                assert_eq!(l2.len(), 1);
+                assert!(l2[0].is_enabled());
+            } else {
+                panic!("expected nested SubMenu");
+            }
+        } else {
+            panic!("expected SubMenu");
+        }
+    }
+
+    #[test]
+    fn menu_total_actions_recursive() {
+        let builder = ViewContextMenuBuilder::new()
+            .action("A", "a")
+            .separator()
+            .submenu("Sub", |b| {
+                b.action("B", "b")
+                 .action("C", "c")
+                 .submenu("Deep", |b2| b2.action("D", "d"))
+            });
+        assert_eq!(builder.total_actions(), 4);
+    }
+
+    #[test]
+    fn menu_item_display() {
+        let action = ContextMenuItem::action("Cut", "edit.cut");
+        assert_eq!(format!("{action}"), "Cut (edit.cut)");
+        let disabled = ContextMenuItem::action_disabled("Redo", "edit.redo");
+        assert_eq!(format!("{disabled}"), "Redo (edit.redo) [disabled]");
+        let sep = ContextMenuItem::separator();
+        assert_eq!(format!("{sep}"), "---");
+        let sub = ContextMenuItem::submenu("More", vec![
+            ContextMenuItem::action("X", "x"),
+        ]);
+        assert_eq!(format!("{sub}"), "More [1 items]");
+    }
+
+    #[test]
+    fn menu_item_serialization_roundtrip() {
+        let items = vec![
+            ContextMenuItem::action("Cut", "edit.cut"),
+            ContextMenuItem::separator(),
+            ContextMenuItem::submenu("Sub", vec![
+                ContextMenuItem::action_disabled("Nope", "nope"),
+            ]),
+        ];
+        let json = serde_json::to_string(&items).unwrap();
+        let back: Vec<ContextMenuItem> = serde_json::from_str(&json).unwrap();
+        assert_eq!(items, back);
+    }
+
+    #[test]
+    fn menu_submenu_items_method() {
+        let pre = vec![ContextMenuItem::action("A", "a")];
+        let items = ViewContextMenuBuilder::new()
+            .submenu_items("Pre", pre)
+            .build();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].is_submenu());
+    }
+
+    #[test]
+    fn menu_action_count_on_item() {
+        let sep = ContextMenuItem::separator();
+        assert_eq!(sep.action_count(), 0);
+        let act = ContextMenuItem::action("X", "x");
+        assert_eq!(act.action_count(), 1);
+        let sub = ContextMenuItem::submenu("S", vec![
+            ContextMenuItem::action("A", "a"),
+            ContextMenuItem::separator(),
+            ContextMenuItem::action("B", "b"),
+        ]);
+        assert_eq!(sub.action_count(), 2);
+    }
+
+    #[test]
+    fn menu_default() {
+        let builder = ViewContextMenuBuilder::default();
+        assert!(builder.is_empty());
+    }
+
+    // ── ViewCollapseState tests ──
+
+    #[test]
+    fn collapse_initial_all_expanded() {
+        let state = ViewCollapseState::new();
+        assert!(state.all_expanded());
+        assert_eq!(state.collapsed_count(), 0);
+        assert!(state.is_expanded("any"));
+    }
+
+    #[test]
+    fn collapse_and_expand() {
+        let mut state = ViewCollapseState::new();
+        assert!(state.collapse("node-1"), "first collapse returns true");
+        assert!(state.is_collapsed("node-1"));
+        assert!(!state.collapse("node-1"), "already collapsed returns false");
+
+        assert!(state.expand("node-1"), "expand returns true");
+        assert!(state.is_expanded("node-1"));
+        assert!(!state.expand("node-1"), "already expanded returns false");
+    }
+
+    #[test]
+    fn collapse_toggle() {
+        let mut state = ViewCollapseState::new();
+        assert!(state.toggle("n"), "toggle expands->collapsed = true");
+        assert!(state.is_collapsed("n"));
+        assert!(!state.toggle("n"), "toggle collapsed->expanded = false");
+        assert!(state.is_expanded("n"));
+        assert!(state.toggle("n"), "toggle again");
+        assert!(state.is_collapsed("n"));
+    }
+
+    #[test]
+    fn collapse_all_nodes() {
+        let mut state = ViewCollapseState::new();
+        state.collapse_all(&["a", "b", "c"]);
+        assert_eq!(state.collapsed_count(), 3);
+        assert!(state.is_collapsed("a"));
+        assert!(state.is_collapsed("b"));
+        assert!(state.is_collapsed("c"));
+        assert!(state.is_expanded("d"));
+    }
+
+    #[test]
+    fn collapse_all_idempotent() {
+        let mut state = ViewCollapseState::new();
+        state.collapse("a");
+        state.collapse_all(&["a", "b"]);
+        assert_eq!(state.collapsed_count(), 2);
+    }
+
+    #[test]
+    fn expand_all() {
+        let mut state = ViewCollapseState::new();
+        state.collapse_all(&["x", "y", "z"]);
+        assert_eq!(state.collapsed_count(), 3);
+        state.expand_all();
+        assert!(state.all_expanded());
+        assert_eq!(state.collapsed_count(), 0);
+    }
+
+    #[test]
+    fn collapse_ids_sorted() {
+        let mut state = ViewCollapseState::new();
+        state.collapse("zebra");
+        state.collapse("alpha");
+        state.collapse("mid");
+        let ids = state.collapsed_ids();
+        assert_eq!(ids, vec!["alpha", "mid", "zebra"]);
+    }
+
+    #[test]
+    fn collapse_default() {
+        let state = ViewCollapseState::default();
+        assert!(state.all_expanded());
+    }
+
+    #[test]
+    fn collapse_mixed_operations() {
+        let mut state = ViewCollapseState::new();
+        state.collapse_all(&["a", "b", "c", "d"]);
+        state.expand("b");
+        state.toggle("c"); // c was collapsed -> now expanded
+        state.toggle("e"); // e was expanded -> now collapsed
+        assert_eq!(state.collapsed_count(), 3); // a, d, e
+        assert!(state.is_collapsed("a"));
+        assert!(state.is_expanded("b"));
+        assert!(state.is_expanded("c"));
+        assert!(state.is_collapsed("d"));
+        assert!(state.is_collapsed("e"));
+    }
+
+
 }

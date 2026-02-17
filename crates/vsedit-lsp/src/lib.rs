@@ -1531,6 +1531,200 @@ impl Default for LspProgressTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LspWorkspaceFoldersSync – synchronizes workspace folders with LSP server
+// ---------------------------------------------------------------------------
+
+/// Represents a workspace folder tracked by the LSP client.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrackedWorkspaceFolder {
+    pub uri: String,
+    pub name: String,
+    pub added_at: u64,
+}
+
+/// Event describing a change to the set of workspace folders.
+#[derive(Debug, Clone)]
+pub enum WorkspaceFolderChange {
+    Added(TrackedWorkspaceFolder),
+    Removed(String),
+}
+
+/// Synchronizes workspace folders between the editor and the LSP server.
+#[derive(Debug)]
+pub struct LspWorkspaceFoldersSync {
+    folders: Vec<TrackedWorkspaceFolder>,
+    pending_changes: Vec<WorkspaceFolderChange>,
+    sync_count: usize,
+}
+
+impl LspWorkspaceFoldersSync {
+    pub fn new() -> Self {
+        Self {
+            folders: Vec::new(),
+            pending_changes: Vec::new(),
+            sync_count: 0,
+        }
+    }
+
+    /// Add a workspace folder, queuing a notification.
+    pub fn add_folder(&mut self, uri: impl Into<String>, name: impl Into<String>, timestamp: u64) {
+        let folder = TrackedWorkspaceFolder {
+            uri: uri.into(),
+            name: name.into(),
+            added_at: timestamp,
+        };
+        if !self.folders.iter().any(|f| f.uri == folder.uri) {
+            self.pending_changes.push(WorkspaceFolderChange::Added(folder.clone()));
+            self.folders.push(folder);
+        }
+    }
+
+    /// Remove a workspace folder by URI.
+    pub fn remove_folder(&mut self, uri: &str) -> bool {
+        let before = self.folders.len();
+        self.folders.retain(|f| f.uri != uri);
+        if self.folders.len() < before {
+            self.pending_changes.push(WorkspaceFolderChange::Removed(uri.to_string()));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Drain pending changes (to send as `workspace/didChangeWorkspaceFolders`).
+    pub fn drain_pending(&mut self) -> Vec<WorkspaceFolderChange> {
+        self.sync_count += 1;
+        std::mem::take(&mut self.pending_changes)
+    }
+
+    /// Whether there are unsent changes.
+    pub fn has_pending(&self) -> bool {
+        !self.pending_changes.is_empty()
+    }
+
+    pub fn folder_count(&self) -> usize { self.folders.len() }
+    pub fn folders(&self) -> &[TrackedWorkspaceFolder] { &self.folders }
+    pub fn sync_count(&self) -> usize { self.sync_count }
+
+    /// Find a folder by URI.
+    pub fn find(&self, uri: &str) -> Option<&TrackedWorkspaceFolder> {
+        self.folders.iter().find(|f| f.uri == uri)
+    }
+
+    /// Build the LSP-compatible `added` / `removed` arrays from pending changes.
+    pub fn build_change_event(&self) -> (Vec<String>, Vec<String>) {
+        let mut added = Vec::new();
+        let mut removed = Vec::new();
+        for change in &self.pending_changes {
+            match change {
+                WorkspaceFolderChange::Added(f) => added.push(f.uri.clone()),
+                WorkspaceFolderChange::Removed(uri) => removed.push(uri.clone()),
+            }
+        }
+        (added, removed)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LspFileOperationHandler – handles LSP file create/rename/delete operations
+// ---------------------------------------------------------------------------
+
+/// Kind of file operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileOperationKind {
+    Create,
+    Rename,
+    Delete,
+}
+
+/// A single file operation.
+#[derive(Debug, Clone)]
+pub struct FileOperation {
+    pub kind: FileOperationKind,
+    pub uri: String,
+    pub new_uri: Option<String>,
+}
+
+/// Collects and processes file operations for LSP notification.
+#[derive(Debug)]
+pub struct LspFileOperationHandler {
+    operations: Vec<FileOperation>,
+    create_count: usize,
+    rename_count: usize,
+    delete_count: usize,
+}
+
+impl LspFileOperationHandler {
+    pub fn new() -> Self {
+        Self {
+            operations: Vec::new(),
+            create_count: 0,
+            rename_count: 0,
+            delete_count: 0,
+        }
+    }
+
+    /// Record a file creation.
+    pub fn record_create(&mut self, uri: impl Into<String>) {
+        self.create_count += 1;
+        self.operations.push(FileOperation {
+            kind: FileOperationKind::Create,
+            uri: uri.into(),
+            new_uri: None,
+        });
+    }
+
+    /// Record a file rename.
+    pub fn record_rename(&mut self, old_uri: impl Into<String>, new_uri: impl Into<String>) {
+        self.rename_count += 1;
+        self.operations.push(FileOperation {
+            kind: FileOperationKind::Rename,
+            uri: old_uri.into(),
+            new_uri: Some(new_uri.into()),
+        });
+    }
+
+    /// Record a file deletion.
+    pub fn record_delete(&mut self, uri: impl Into<String>) {
+        self.delete_count += 1;
+        self.operations.push(FileOperation {
+            kind: FileOperationKind::Delete,
+            uri: uri.into(),
+            new_uri: None,
+        });
+    }
+
+    /// Drain all recorded operations.
+    pub fn drain(&mut self) -> Vec<FileOperation> {
+        std::mem::take(&mut self.operations)
+    }
+
+    /// Filter operations by kind.
+    pub fn filter_by_kind(&self, kind: FileOperationKind) -> Vec<&FileOperation> {
+        self.operations.iter().filter(|op| op.kind == kind).collect()
+    }
+
+    /// Check if a URI was affected by any operation.
+    pub fn is_affected(&self, uri: &str) -> bool {
+        self.operations.iter().any(|op| {
+            op.uri == uri || op.new_uri.as_deref() == Some(uri)
+        })
+    }
+
+    pub fn total_count(&self) -> usize { self.operations.len() }
+    pub fn create_count(&self) -> usize { self.create_count }
+    pub fn rename_count(&self) -> usize { self.rename_count }
+    pub fn delete_count(&self) -> usize { self.delete_count }
+    pub fn operations(&self) -> &[FileOperation] { &self.operations }
+
+    /// Check if any operations are recorded.
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2488,4 +2682,113 @@ mod tests {
         let tracker = LspProgressTracker::default();
         assert_eq!(tracker.active_count(), 0);
     }
+
+    #[test]
+    fn workspace_folders_sync_add() {
+        let mut sync = LspWorkspaceFoldersSync::new();
+        sync.add_folder("file:///project", "project", 100);
+        assert_eq!(sync.folder_count(), 1);
+        assert!(sync.has_pending());
+    }
+
+    #[test]
+    fn workspace_folders_sync_no_dup() {
+        let mut sync = LspWorkspaceFoldersSync::new();
+        sync.add_folder("file:///a", "a", 1);
+        sync.add_folder("file:///a", "a", 2);
+        assert_eq!(sync.folder_count(), 1);
+    }
+
+    #[test]
+    fn workspace_folders_sync_remove() {
+        let mut sync = LspWorkspaceFoldersSync::new();
+        sync.add_folder("file:///a", "a", 1);
+        assert!(sync.remove_folder("file:///a"));
+        assert_eq!(sync.folder_count(), 0);
+        assert!(!sync.remove_folder("file:///b"));
+    }
+
+    #[test]
+    fn workspace_folders_sync_drain() {
+        let mut sync = LspWorkspaceFoldersSync::new();
+        sync.add_folder("file:///a", "a", 1);
+        sync.remove_folder("file:///a");
+        let changes = sync.drain_pending();
+        assert_eq!(changes.len(), 2);
+        assert!(!sync.has_pending());
+        assert_eq!(sync.sync_count(), 1);
+    }
+
+    #[test]
+    fn workspace_folders_sync_find() {
+        let mut sync = LspWorkspaceFoldersSync::new();
+        sync.add_folder("file:///x", "x", 10);
+        let f = sync.find("file:///x").unwrap();
+        assert_eq!(f.name, "x");
+        assert_eq!(f.added_at, 10);
+        assert!(sync.find("file:///y").is_none());
+    }
+
+    #[test]
+    fn workspace_folders_sync_change_event() {
+        let mut sync = LspWorkspaceFoldersSync::new();
+        sync.add_folder("file:///a", "a", 1);
+        sync.add_folder("file:///b", "b", 2);
+        sync.remove_folder("file:///a");
+        let (added, removed) = sync.build_change_event();
+        assert_eq!(added.len(), 2);
+        assert_eq!(removed.len(), 1);
+    }
+
+    #[test]
+    fn file_operation_handler_create() {
+        let mut h = LspFileOperationHandler::new();
+        h.record_create("file:///new.rs");
+        assert_eq!(h.total_count(), 1);
+        assert_eq!(h.create_count(), 1);
+    }
+
+    #[test]
+    fn file_operation_handler_rename() {
+        let mut h = LspFileOperationHandler::new();
+        h.record_rename("file:///old.rs", "file:///new.rs");
+        assert_eq!(h.rename_count(), 1);
+        let renames = h.filter_by_kind(FileOperationKind::Rename);
+        assert_eq!(renames.len(), 1);
+        assert_eq!(renames[0].new_uri.as_deref(), Some("file:///new.rs"));
+    }
+
+    #[test]
+    fn file_operation_handler_delete() {
+        let mut h = LspFileOperationHandler::new();
+        h.record_delete("file:///gone.rs");
+        assert_eq!(h.delete_count(), 1);
+    }
+
+    #[test]
+    fn file_operation_handler_is_affected() {
+        let mut h = LspFileOperationHandler::new();
+        h.record_rename("file:///a.rs", "file:///b.rs");
+        assert!(h.is_affected("file:///a.rs"));
+        assert!(h.is_affected("file:///b.rs"));
+        assert!(!h.is_affected("file:///c.rs"));
+    }
+
+    #[test]
+    fn file_operation_handler_drain() {
+        let mut h = LspFileOperationHandler::new();
+        h.record_create("file:///x.rs");
+        h.record_delete("file:///y.rs");
+        let ops = h.drain();
+        assert_eq!(ops.len(), 2);
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn file_operation_handler_empty() {
+        let h = LspFileOperationHandler::new();
+        assert!(h.is_empty());
+        assert_eq!(h.total_count(), 0);
+    }
+
 }

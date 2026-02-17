@@ -1349,6 +1349,250 @@ pub fn find_bracket_range(text: &str, offset: usize, pair: BracketPair) -> Optio
     None
 }
 
+
+// ---------------------------------------------------------------------------
+// SmartSelectBracketBalancer
+// ---------------------------------------------------------------------------
+
+/// A bracket pair definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketDef {
+    pub open: char,
+    pub close: char,
+}
+
+impl BracketDef {
+    pub fn new(open: char, close: char) -> Self {
+        Self { open, close }
+    }
+}
+
+/// Expands selection to the nearest balanced bracket pair.
+#[derive(Debug)]
+pub struct SmartSelectBracketBalancer {
+    bracket_defs: Vec<BracketDef>,
+}
+
+impl SmartSelectBracketBalancer {
+    /// Create with the standard bracket set: `()`, `[]`, `{}`, `<>`.
+    pub fn new() -> Self {
+        Self {
+            bracket_defs: vec![
+                BracketDef::new('(', ')'),
+                BracketDef::new('[', ']'),
+                BracketDef::new('{', '}'),
+                BracketDef::new('<', '>'),
+            ],
+        }
+    }
+
+    /// Create with a custom set of brackets.
+    pub fn with_brackets(defs: Vec<BracketDef>) -> Self {
+        Self { bracket_defs: defs }
+    }
+
+    /// Check if a character is an opening bracket.
+    pub fn is_open(&self, ch: char) -> bool {
+        self.bracket_defs.iter().any(|b| b.open == ch)
+    }
+
+    /// Check if a character is a closing bracket.
+    pub fn is_close(&self, ch: char) -> bool {
+        self.bracket_defs.iter().any(|b| b.close == ch)
+    }
+
+    /// Find the matching bracket character.
+    pub fn matching_bracket(&self, ch: char) -> Option<char> {
+        for b in &self.bracket_defs {
+            if b.open == ch { return Some(b.close); }
+            if b.close == ch { return Some(b.open); }
+        }
+        None
+    }
+
+    /// Expand selection outward to the next balanced bracket pair containing
+    /// the given position in a single-line string.
+    ///
+    /// Returns `Some((open_idx, close_idx))` or `None` if no enclosing brackets are found.
+    pub fn expand_at(&self, text: &str, position: usize) -> Option<(usize, usize)> {
+        let chars: Vec<char> = text.chars().collect();
+        if position >= chars.len() {
+            return None;
+        }
+        // Search outward from position
+        for radius in 1..chars.len() {
+            let left = position.checked_sub(radius);
+            if let Some(l) = left {
+                if self.is_open(chars[l]) {
+                    let expected_close = self.matching_bracket(chars[l])?;
+                    // Find matching close
+                    let mut depth = 1i32;
+                    for r in (l + 1)..chars.len() {
+                        if chars[r] == chars[l] {
+                            depth += 1;
+                        } else if chars[r] == expected_close {
+                            depth -= 1;
+                            if depth == 0 && r >= position {
+                                return Some((l, r));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Check if brackets in a string are balanced.
+    pub fn is_balanced(&self, text: &str) -> bool {
+        let mut stack: Vec<char> = Vec::new();
+        for ch in text.chars() {
+            if self.is_open(ch) {
+                stack.push(ch);
+            } else if self.is_close(ch) {
+                match stack.pop() {
+                    Some(open) => {
+                        if self.matching_bracket(open) != Some(ch) {
+                            return false;
+                        }
+                    }
+                    None => return false,
+                }
+            }
+        }
+        stack.is_empty()
+    }
+
+    /// Find all bracket pair positions in a string, returned as `(open_idx, close_idx, bracket_def_index)`.
+    pub fn find_all_pairs(&self, text: &str) -> Vec<(usize, usize, usize)> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut stack: Vec<(usize, usize)> = Vec::new(); // (char_idx, bracket_def_index)
+        let mut pairs = Vec::new();
+        for (i, &ch) in chars.iter().enumerate() {
+            if let Some(def_idx) = self.bracket_defs.iter().position(|b| b.open == ch) {
+                stack.push((i, def_idx));
+            } else if let Some(def_idx) = self.bracket_defs.iter().position(|b| b.close == ch) {
+                if let Some((open_idx, open_def_idx)) = stack.pop() {
+                    if open_def_idx == def_idx {
+                        pairs.push((open_idx, i, def_idx));
+                    }
+                }
+            }
+        }
+        pairs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SmartSelectWordExtender
+// ---------------------------------------------------------------------------
+
+/// Classification of characters for word boundary detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharClass {
+    Word,
+    Whitespace,
+    Punctuation,
+    Digit,
+}
+
+/// Extends selection to word boundaries with language awareness.
+#[derive(Debug)]
+pub struct SmartSelectWordExtender {
+    word_separators: Vec<char>,
+    include_underscores_in_words: bool,
+}
+
+impl SmartSelectWordExtender {
+    pub fn new() -> Self {
+        Self {
+            word_separators: vec![' ', '\t', '\n', '.', ',', ';', ':', '!', '?', '"', '\''],
+            include_underscores_in_words: true,
+        }
+    }
+
+    /// Create with custom separator set.
+    pub fn with_separators(seps: Vec<char>, include_underscores: bool) -> Self {
+        Self {
+            word_separators: seps,
+            include_underscores_in_words: include_underscores,
+        }
+    }
+
+    /// Classify a character.
+    pub fn classify(&self, ch: char) -> CharClass {
+        if ch.is_whitespace() {
+            CharClass::Whitespace
+        } else if ch.is_ascii_digit() {
+            CharClass::Digit
+        } else if ch.is_alphanumeric() || (self.include_underscores_in_words && ch == '_') {
+            CharClass::Word
+        } else {
+            CharClass::Punctuation
+        }
+    }
+
+    /// Extend selection to the word at a given byte offset.
+    /// Returns `(start, end)` byte range of the word, or `None` if position is out of range.
+    pub fn word_at(&self, text: &str, position: usize) -> Option<(usize, usize)> {
+        let chars: Vec<char> = text.chars().collect();
+        if position >= chars.len() {
+            return None;
+        }
+        let target_class = self.classify(chars[position]);
+        if target_class == CharClass::Whitespace {
+            return None;
+        }
+        let mut start = position;
+        while start > 0 && self.classify(chars[start - 1]) == target_class {
+            start -= 1;
+        }
+        let mut end = position;
+        while end < chars.len() - 1 && self.classify(chars[end + 1]) == target_class {
+            end += 1;
+        }
+        Some((start, end + 1))
+    }
+
+    /// Split text into words (runs of same-class non-whitespace characters).
+    pub fn split_words(&self, text: &str) -> Vec<String> {
+        let mut words = Vec::new();
+        let chars: Vec<char> = text.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let cls = self.classify(chars[i]);
+            if cls == CharClass::Whitespace {
+                i += 1;
+                continue;
+            }
+            let start = i;
+            while i < chars.len() && self.classify(chars[i]) == cls {
+                i += 1;
+            }
+            words.push(chars[start..i].iter().collect());
+        }
+        words
+    }
+
+    /// Extend a selection outward to include surrounding whitespace on one side.
+    pub fn extend_with_trailing_space(&self, text: &str, start: usize, end: usize) -> (usize, usize) {
+        let chars: Vec<char> = text.chars().collect();
+        let mut new_end = end;
+        while new_end < chars.len() && chars[new_end].is_whitespace() {
+            new_end += 1;
+        }
+        if new_end == end {
+            let mut new_start = start;
+            while new_start > 0 && chars[new_start - 1].is_whitespace() {
+                new_start -= 1;
+            }
+            return (new_start, end);
+        }
+        (start, new_end)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2303,4 +2547,118 @@ mod tests {
         let result = find_bracket_range(text, 13, BracketPair::BRACES);
         assert_eq!(result, Some((10, 14)));
     }
+
+    // -- SmartSelectBracketBalancer tests --------------------------------------
+
+    #[test]
+    fn bracket_is_open_close() {
+        let b = SmartSelectBracketBalancer::new();
+        assert!(b.is_open('('));
+        assert!(b.is_open('{'));
+        assert!(b.is_close(')'));
+        assert!(!b.is_open('a'));
+    }
+
+    #[test]
+    fn bracket_matching() {
+        let b = SmartSelectBracketBalancer::new();
+        assert_eq!(b.matching_bracket('('), Some(')'));
+        assert_eq!(b.matching_bracket(']'), Some('['));
+        assert_eq!(b.matching_bracket('a'), None);
+    }
+
+    #[test]
+    fn bracket_is_balanced() {
+        let b = SmartSelectBracketBalancer::new();
+        assert!(b.is_balanced("(hello [world])"));
+        assert!(!b.is_balanced("(hello [world)"));
+        assert!(b.is_balanced(""));
+    }
+
+    #[test]
+    fn bracket_expand_at() {
+        let b = SmartSelectBracketBalancer::new();
+        // text: "(abc)"  positions: 0='(' 1='a' 2='b' 3='c' 4=')'
+        let result = b.expand_at("(abc)", 2);
+        assert_eq!(result, Some((0, 4)));
+    }
+
+    #[test]
+    fn bracket_expand_nested() {
+        let b = SmartSelectBracketBalancer::new();
+        // text: "([x])"  positions: 0='(' 1='[' 2='x' 3=']' 4=')'
+        let result = b.expand_at("([x])", 2);
+        assert_eq!(result, Some((1, 3)));
+    }
+
+    #[test]
+    fn bracket_expand_no_match() {
+        let b = SmartSelectBracketBalancer::new();
+        let result = b.expand_at("hello", 2);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn bracket_find_all_pairs() {
+        let b = SmartSelectBracketBalancer::new();
+        let pairs = b.find_all_pairs("(a[b]c)");
+        assert_eq!(pairs.len(), 2);
+    }
+
+    #[test]
+    fn bracket_custom_set() {
+        let b = SmartSelectBracketBalancer::with_brackets(vec![BracketDef::new('|', '|')]);
+        assert!(b.is_open('|'));
+        assert!(b.is_close('|'));
+    }
+
+    // -- SmartSelectWordExtender tests ----------------------------------------
+
+    #[test]
+    fn word_classify() {
+        let w = SmartSelectWordExtender::new();
+        assert_eq!(w.classify('a'), CharClass::Word);
+        assert_eq!(w.classify(' '), CharClass::Whitespace);
+        assert_eq!(w.classify('5'), CharClass::Digit);
+        assert_eq!(w.classify('.'), CharClass::Punctuation);
+        assert_eq!(w.classify('_'), CharClass::Word);
+    }
+
+    #[test]
+    fn word_at_basic() {
+        let w = SmartSelectWordExtender::new();
+        // "hello world" -> word at pos 1 => "hello" -> (0, 5)
+        let result = w.word_at("hello world", 1);
+        assert_eq!(result, Some((0, 5)));
+    }
+
+    #[test]
+    fn word_at_second_word() {
+        let w = SmartSelectWordExtender::new();
+        let result = w.word_at("hello world", 7);
+        assert_eq!(result, Some((6, 11)));
+    }
+
+    #[test]
+    fn word_split_words() {
+        let w = SmartSelectWordExtender::new();
+        let words = w.split_words("hello world 123");
+        assert_eq!(words, vec!["hello", "world", "123"]);
+    }
+
+    #[test]
+    fn word_extend_with_trailing_space() {
+        let w = SmartSelectWordExtender::new();
+        let (s, e) = w.extend_with_trailing_space("hello   world", 0, 5);
+        assert_eq!((s, e), (0, 8));
+    }
+
+    #[test]
+    fn word_at_whitespace_returns_none() {
+        let w = SmartSelectWordExtender::new();
+        let result = w.word_at("hello world", 5);
+        assert_eq!(result, None);
+    }
+
+
 }

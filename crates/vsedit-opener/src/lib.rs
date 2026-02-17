@@ -1499,6 +1499,287 @@ impl std::fmt::Display for OpenerMetricsTracker {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// OpenerProtocolHandlerRegistry
+// ---------------------------------------------------------------------------
+
+/// A handler for a specific URI protocol/scheme.
+pub trait ProtocolHandler: Send + Sync + fmt::Debug {
+    /// The scheme this handler is registered for (e.g., "vscode", "mailto").
+    fn scheme(&self) -> &str;
+    /// Attempt to handle the URI. Returns `true` if handled.
+    fn handle(&self, uri: &str) -> bool;
+    /// A human-readable description of this handler.
+    fn description(&self) -> &str;
+}
+
+/// Registry for URI protocol handlers.
+#[derive(Debug)]
+pub struct OpenerProtocolHandlerRegistry {
+    handlers: Vec<Arc<dyn ProtocolHandler>>,
+    /// Dispatch log: (scheme, uri, handled)
+    dispatch_log: Vec<(String, String, bool)>,
+    max_log: usize,
+}
+
+impl OpenerProtocolHandlerRegistry {
+    /// Create a new empty registry.
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            dispatch_log: Vec::new(),
+            max_log: 200,
+        }
+    }
+
+    /// Register a protocol handler.
+    pub fn register(&mut self, handler: Arc<dyn ProtocolHandler>) {
+        self.handlers.push(handler);
+    }
+
+    /// Unregister all handlers for a given scheme. Returns count removed.
+    pub fn unregister_scheme(&mut self, scheme: &str) -> usize {
+        let before = self.handlers.len();
+        self.handlers.retain(|h| h.scheme() != scheme);
+        before - self.handlers.len()
+    }
+
+    /// Dispatch a URI to the appropriate handler.
+    pub fn dispatch(&mut self, uri: &str) -> OpenResult {
+        let scheme = extract_scheme(uri).unwrap_or("").to_string();
+        let mut result_handled = false;
+        for handler in &self.handlers {
+            if handler.scheme() == scheme {
+                let handled = handler.handle(uri);
+                if handled {
+                    result_handled = true;
+                    break;
+                }
+            }
+        }
+        if result_handled {
+            self.log_dispatch(&scheme, uri, true);
+            OpenResult::Handled
+        } else {
+            self.log_dispatch(&scheme, uri, false);
+            OpenResult::NotHandled
+        }
+    }
+
+    fn log_dispatch(&mut self, scheme: &str, uri: &str, handled: bool) {
+        if self.dispatch_log.len() >= self.max_log {
+            self.dispatch_log.remove(0);
+        }
+        self.dispatch_log.push((scheme.to_string(), uri.to_string(), handled));
+    }
+
+    /// Number of registered handlers.
+    pub fn handler_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    /// All unique schemes with registered handlers.
+    pub fn registered_schemes(&self) -> Vec<String> {
+        let mut schemes: Vec<String> = self.handlers.iter().map(|h| h.scheme().to_string()).collect();
+        schemes.sort();
+        schemes.dedup();
+        schemes
+    }
+
+    /// Check if a scheme has at least one handler.
+    pub fn has_handler(&self, scheme: &str) -> bool {
+        self.handlers.iter().any(|h| h.scheme() == scheme)
+    }
+
+    /// Number of dispatches logged.
+    pub fn dispatch_count(&self) -> usize {
+        self.dispatch_log.len()
+    }
+
+    /// Number of successful dispatches.
+    pub fn successful_dispatches(&self) -> usize {
+        self.dispatch_log.iter().filter(|(_, _, h)| *h).count()
+    }
+
+    /// Clear all handlers.
+    pub fn clear(&mut self) {
+        self.handlers.clear();
+    }
+
+    /// Clear the dispatch log.
+    pub fn clear_log(&mut self) {
+        self.dispatch_log.clear();
+    }
+
+    /// Find handlers for a specific scheme.
+    pub fn handlers_for_scheme(&self, scheme: &str) -> Vec<&dyn ProtocolHandler> {
+        self.handlers.iter().filter(|h| h.scheme() == scheme).map(|h| h.as_ref()).collect()
+    }
+}
+
+impl fmt::Display for OpenerProtocolHandlerRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ProtocolHandlerRegistry({} handlers, {} schemes)",
+            self.handler_count(),
+            self.registered_schemes().len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OpenerExternalConfirm
+// ---------------------------------------------------------------------------
+
+/// Confirmation policy for opening external URIs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExternalConfirmPolicy {
+    /// Always allow without prompting.
+    AlwaysAllow,
+    /// Always deny without prompting.
+    AlwaysDeny,
+    /// Prompt user for confirmation.
+    Prompt,
+}
+
+/// Result of a confirmation check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfirmResult {
+    Allowed,
+    Denied,
+    NeedsPrompt { uri: String, scheme: String },
+}
+
+/// Manages confirmation dialogs for opening external URIs.
+#[derive(Debug, Clone)]
+pub struct OpenerExternalConfirm {
+    /// Per-scheme policies.
+    scheme_policies: HashMap<String, ExternalConfirmPolicy>,
+    /// Global default policy.
+    default_policy: ExternalConfirmPolicy,
+    /// Trusted domains (bypass confirmation).
+    trusted_domains: Vec<String>,
+    /// Blocked domains.
+    blocked_domains: Vec<String>,
+}
+
+impl OpenerExternalConfirm {
+    /// Create with a default policy.
+    pub fn new(default_policy: ExternalConfirmPolicy) -> Self {
+        Self {
+            scheme_policies: HashMap::new(),
+            default_policy,
+            trusted_domains: Vec::new(),
+            blocked_domains: Vec::new(),
+        }
+    }
+
+    /// Set policy for a specific scheme.
+    pub fn set_scheme_policy(&mut self, scheme: &str, policy: ExternalConfirmPolicy) {
+        self.scheme_policies.insert(scheme.to_string(), policy);
+    }
+
+    /// Add a trusted domain (will always be allowed).
+    pub fn trust_domain(&mut self, domain: &str) {
+        if !self.trusted_domains.contains(&domain.to_string()) {
+            self.trusted_domains.push(domain.to_string());
+        }
+    }
+
+    /// Block a domain (will always be denied).
+    pub fn block_domain(&mut self, domain: &str) {
+        if !self.blocked_domains.contains(&domain.to_string()) {
+            self.blocked_domains.push(domain.to_string());
+        }
+    }
+
+    /// Remove a trusted domain.
+    pub fn untrust_domain(&mut self, domain: &str) -> bool {
+        let before = self.trusted_domains.len();
+        self.trusted_domains.retain(|d| d != domain);
+        self.trusted_domains.len() < before
+    }
+
+    /// Check if a URI should be allowed, denied, or needs a prompt.
+    pub fn check(&self, uri: &str) -> ConfirmResult {
+        // Check blocked domains first.
+        for domain in &self.blocked_domains {
+            if uri.contains(domain.as_str()) {
+                return ConfirmResult::Denied;
+            }
+        }
+        // Check trusted domains.
+        for domain in &self.trusted_domains {
+            if uri.contains(domain.as_str()) {
+                return ConfirmResult::Allowed;
+            }
+        }
+        // Check scheme-specific policy.
+        let scheme = extract_scheme(uri).unwrap_or("").to_string();
+        let policy = self.scheme_policies.get(&scheme).copied().unwrap_or(self.default_policy);
+        match policy {
+            ExternalConfirmPolicy::AlwaysAllow => ConfirmResult::Allowed,
+            ExternalConfirmPolicy::AlwaysDeny => ConfirmResult::Denied,
+            ExternalConfirmPolicy::Prompt => ConfirmResult::NeedsPrompt {
+                uri: uri.to_string(),
+                scheme,
+            },
+        }
+    }
+
+    /// Number of trusted domains.
+    pub fn trusted_count(&self) -> usize {
+        self.trusted_domains.len()
+    }
+
+    /// Number of blocked domains.
+    pub fn blocked_count(&self) -> usize {
+        self.blocked_domains.len()
+    }
+
+    /// Number of scheme-specific policies.
+    pub fn scheme_policy_count(&self) -> usize {
+        self.scheme_policies.len()
+    }
+
+    /// Default policy.
+    pub fn default_policy(&self) -> ExternalConfirmPolicy {
+        self.default_policy
+    }
+
+    /// Check if a domain is trusted.
+    pub fn is_trusted(&self, domain: &str) -> bool {
+        self.trusted_domains.iter().any(|d| d == domain)
+    }
+
+    /// Check if a domain is blocked.
+    pub fn is_blocked(&self, domain: &str) -> bool {
+        self.blocked_domains.iter().any(|d| d == domain)
+    }
+
+    /// Reset all policies, trusts, and blocks.
+    pub fn reset(&mut self) {
+        self.scheme_policies.clear();
+        self.trusted_domains.clear();
+        self.blocked_domains.clear();
+    }
+}
+
+impl fmt::Display for OpenerExternalConfirm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ExternalConfirm(default={:?}, {} trusted, {} blocked)",
+            self.default_policy,
+            self.trusted_count(),
+            self.blocked_count()
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2311,5 +2592,136 @@ mod tests {
         m.reset();
         assert_eq!(m.total_opens(), 0);
     }
+
+
+    #[derive(Debug)]
+    struct TestHandler {
+        scheme_name: String,
+    }
+    impl ProtocolHandler for TestHandler {
+        fn scheme(&self) -> &str { &self.scheme_name }
+        fn handle(&self, _uri: &str) -> bool { true }
+        fn description(&self) -> &str { "test handler" }
+    }
+
+    #[test]
+    fn protocol_registry_register_and_dispatch() {
+        let mut reg = OpenerProtocolHandlerRegistry::new();
+        reg.register(Arc::new(TestHandler { scheme_name: "vscode".into() }));
+        assert_eq!(reg.handler_count(), 1);
+        let result = reg.dispatch("vscode://open/file");
+        assert_eq!(result, OpenResult::Handled);
+    }
+
+    #[test]
+    fn protocol_registry_unhandled() {
+        let mut reg = OpenerProtocolHandlerRegistry::new();
+        let result = reg.dispatch("mailto:test@example.com");
+        assert_eq!(result, OpenResult::NotHandled);
+    }
+
+    #[test]
+    fn protocol_registry_unregister() {
+        let mut reg = OpenerProtocolHandlerRegistry::new();
+        reg.register(Arc::new(TestHandler { scheme_name: "vscode".into() }));
+        assert_eq!(reg.unregister_scheme("vscode"), 1);
+        assert_eq!(reg.handler_count(), 0);
+    }
+
+    #[test]
+    fn protocol_registry_registered_schemes() {
+        let mut reg = OpenerProtocolHandlerRegistry::new();
+        reg.register(Arc::new(TestHandler { scheme_name: "http".into() }));
+        reg.register(Arc::new(TestHandler { scheme_name: "https".into() }));
+        let schemes = reg.registered_schemes();
+        assert!(schemes.contains(&"http".to_string()));
+        assert!(schemes.contains(&"https".to_string()));
+    }
+
+    #[test]
+    fn protocol_registry_has_handler() {
+        let mut reg = OpenerProtocolHandlerRegistry::new();
+        reg.register(Arc::new(TestHandler { scheme_name: "ftp".into() }));
+        assert!(reg.has_handler("ftp"));
+        assert!(!reg.has_handler("ssh"));
+    }
+
+    #[test]
+    fn protocol_registry_dispatch_log() {
+        let mut reg = OpenerProtocolHandlerRegistry::new();
+        reg.register(Arc::new(TestHandler { scheme_name: "http".into() }));
+        reg.dispatch("http://example.com");
+        reg.dispatch("ftp://unknown");
+        assert_eq!(reg.dispatch_count(), 2);
+        assert_eq!(reg.successful_dispatches(), 1);
+    }
+
+    #[test]
+    fn protocol_registry_display() {
+        let reg = OpenerProtocolHandlerRegistry::new();
+        let s = format!("{reg}");
+        assert!(s.contains("0 handlers"));
+    }
+
+    #[test]
+    fn external_confirm_trusted_domain() {
+        let mut confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::Prompt);
+        confirm.trust_domain("github.com");
+        let result = confirm.check("https://github.com/repo");
+        assert_eq!(result, ConfirmResult::Allowed);
+    }
+
+    #[test]
+    fn external_confirm_blocked_domain() {
+        let mut confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::AlwaysAllow);
+        confirm.block_domain("malware.com");
+        let result = confirm.check("https://malware.com/bad");
+        assert_eq!(result, ConfirmResult::Denied);
+    }
+
+    #[test]
+    fn external_confirm_prompt_policy() {
+        let confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::Prompt);
+        let result = confirm.check("https://unknown.com");
+        assert!(matches!(result, ConfirmResult::NeedsPrompt { .. }));
+    }
+
+    #[test]
+    fn external_confirm_scheme_policy() {
+        let mut confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::Prompt);
+        confirm.set_scheme_policy("mailto", ExternalConfirmPolicy::AlwaysAllow);
+        let result = confirm.check("mailto:user@example.com");
+        assert_eq!(result, ConfirmResult::Allowed);
+    }
+
+    #[test]
+    fn external_confirm_untrust() {
+        let mut confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::Prompt);
+        confirm.trust_domain("github.com");
+        assert!(confirm.is_trusted("github.com"));
+        assert!(confirm.untrust_domain("github.com"));
+        assert!(!confirm.is_trusted("github.com"));
+    }
+
+    #[test]
+    fn external_confirm_reset() {
+        let mut confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::AlwaysAllow);
+        confirm.trust_domain("a.com");
+        confirm.block_domain("b.com");
+        confirm.set_scheme_policy("ftp", ExternalConfirmPolicy::AlwaysDeny);
+        confirm.reset();
+        assert_eq!(confirm.trusted_count(), 0);
+        assert_eq!(confirm.blocked_count(), 0);
+        assert_eq!(confirm.scheme_policy_count(), 0);
+    }
+
+    #[test]
+    fn external_confirm_display() {
+        let confirm = OpenerExternalConfirm::new(ExternalConfirmPolicy::Prompt);
+        let s = format!("{confirm}");
+        assert!(s.contains("Prompt"));
+        assert!(s.contains("0 trusted"));
+    }
+
 
 }

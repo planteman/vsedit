@@ -1464,6 +1464,312 @@ impl Default for KeyboardNavigationMode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ContrastMode - high contrast mode detector
+// ---------------------------------------------------------------------------
+
+/// Severity level for high contrast mode detector issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ContrastModeSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ContrastModeSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ContrastMode].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContrastModeEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ContrastModeSeverity,
+    pub detail: Option<String>,
+    pub contrast_level: usize,
+    enabled: bool,
+}
+
+impl ContrastModeEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ContrastModeSeverity::Low,
+            detail: None,
+            contrast_level: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ContrastModeSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_contrast_level(mut self, val: usize) -> Self {
+        self.contrast_level = val;
+        self
+    }
+
+    pub fn is_high_contrast(&self) -> bool {
+        self.enabled && self.severity >= ContrastModeSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.contrast_level, det)
+    }
+}
+
+impl fmt::Display for ContrastModeEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ContrastModeEntry] items.
+#[derive(Debug, Clone)]
+pub struct ContrastMode {
+    entries: Vec<ContrastModeEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ContrastMode {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ContrastModeEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ContrastModeEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ContrastModeEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn contrast_level(&self) -> usize { self.entries.len() }
+
+    pub fn is_high_contrast(&self) -> bool {
+        self.entries.iter().any(|e| e.is_high_contrast())
+    }
+
+    pub fn entries_by_severity(&self, severity: ContrastModeSeverity) -> Vec<&ContrastModeEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ContrastModeSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ContrastModeEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ContrastModeEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReducedMotionHandler - reduced motion handler
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ReducedMotionHandler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReducedMotionHandlerConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub motion_preference: usize,
+}
+
+impl ReducedMotionHandlerConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, motion_preference: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_motion_preference(mut self, val: usize) -> Self { self.motion_preference = val; self }
+}
+
+impl Default for ReducedMotionHandlerConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ReducedMotionHandler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReducedMotionHandlerItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ReducedMotionHandlerItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_reduced_motion(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ReducedMotionHandlerItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ReducedMotionHandlerItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ReducedMotionHandler {
+    config: ReducedMotionHandlerConfig,
+    items: Vec<ReducedMotionHandlerItem>,
+}
+
+impl ReducedMotionHandler {
+    pub fn new(config: ReducedMotionHandlerConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ReducedMotionHandlerItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ReducedMotionHandlerItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ReducedMotionHandlerItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn motion_preference(&self) -> usize { self.items.len() }
+
+    pub fn is_reduced_motion(&self) -> bool {
+        self.items.iter().any(|i| i.is_reduced_motion())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ReducedMotionHandlerItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ReducedMotionHandlerItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ReducedMotionHandlerConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2401,5 +2707,147 @@ mod tests {
         let nav = KeyboardNavigationMode::new();
         assert_eq!(nav.next_focus("nonexistent"), None);
         assert_eq!(nav.prev_focus("nonexistent"), None);
+    }
+
+#[test]
+    fn contrastmode_severity_ordering() {
+        assert!(ContrastModeSeverity::Critical > ContrastModeSeverity::High);
+        assert!(ContrastModeSeverity::High > ContrastModeSeverity::Medium);
+        assert!(ContrastModeSeverity::Medium > ContrastModeSeverity::Low);
+    }
+
+    #[test]
+    fn contrastmode_severity_display() {
+        assert_eq!(ContrastModeSeverity::Low.to_string(), "low");
+        assert_eq!(ContrastModeSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn contrastmode_entry_creation() {
+        let e = ContrastModeEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ContrastModeSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn contrastmode_entry_builder() {
+        let e = ContrastModeEntry::new("e2", "Entry 2")
+            .with_severity(ContrastModeSeverity::High)
+            .with_detail("some detail")
+            .with_contrast_level(42);
+        assert_eq!(e.severity, ContrastModeSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.contrast_level, 42);
+    }
+
+    #[test]
+    fn contrastmode_entry_enable_disable() {
+        let mut e = ContrastModeEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn contrastmode_add_and_count() {
+        let mut mgr = ContrastMode::new("test");
+        mgr.add(ContrastModeEntry::new("a", "A"));
+        mgr.add(ContrastModeEntry::new("b", "B").with_severity(ContrastModeSeverity::High));
+        assert_eq!(mgr.contrast_level(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn contrastmode_remove() {
+        let mut mgr = ContrastMode::new("test");
+        mgr.add(ContrastModeEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn contrastmode_capacity() {
+        let mut mgr = ContrastMode::new("test").with_capacity(1);
+        assert!(mgr.add(ContrastModeEntry::new("a", "A")));
+        assert!(!mgr.add(ContrastModeEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn contrastmode_sorted_by_severity() {
+        let mut mgr = ContrastMode::new("test");
+        mgr.add(ContrastModeEntry::new("lo", "Low"));
+        mgr.add(ContrastModeEntry::new("hi", "High").with_severity(ContrastModeSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ContrastModeSeverity::Critical);
+    }
+
+    #[test]
+    fn contrastmode_summary() {
+        let mgr = ContrastMode::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn reducedmotionhandler_config_defaults() {
+        let cfg = ReducedMotionHandlerConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn reducedmotionhandler_item_creation() {
+        let item = ReducedMotionHandlerItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn reducedmotionhandler_add_and_get() {
+        let mut mgr = ReducedMotionHandler::new(ReducedMotionHandlerConfig::new("test"));
+        mgr.add(ReducedMotionHandlerItem::new("k1", "v1"));
+        assert_eq!(mgr.motion_preference(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn reducedmotionhandler_remove_item() {
+        let mut mgr = ReducedMotionHandler::new(ReducedMotionHandlerConfig::new("test"));
+        mgr.add(ReducedMotionHandlerItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn reducedmotionhandler_sorted_by_priority() {
+        let mut mgr = ReducedMotionHandler::new(ReducedMotionHandlerConfig::new("test"));
+        mgr.add(ReducedMotionHandlerItem::new("lo", "low").with_priority(1));
+        mgr.add(ReducedMotionHandlerItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn reducedmotionhandler_items_with_tag() {
+        let mut mgr = ReducedMotionHandler::new(ReducedMotionHandlerConfig::new("test"));
+        mgr.add(ReducedMotionHandlerItem::new("a", "1").with_tag("x"));
+        mgr.add(ReducedMotionHandlerItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn reducedmotionhandler_report() {
+        let mgr = ReducedMotionHandler::new(ReducedMotionHandlerConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

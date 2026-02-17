@@ -1459,6 +1459,220 @@ impl fmt::Display for ScreenReaderTextBuilder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AuditSeverity
+// ---------------------------------------------------------------------------
+
+/// Severity of an accessibility audit finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AuditSeverity {
+    Info,
+    Warning,
+    Error,
+    Critical,
+}
+
+impl fmt::Display for AuditSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Info => write!(f, "info"),
+            Self::Warning => write!(f, "warning"),
+            Self::Error => write!(f, "error"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// A single finding from an accessibility audit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuditFinding {
+    pub severity: AuditSeverity,
+    pub rule_id: String,
+    pub message: String,
+    pub element_path: String,
+    pub suggestion: Option<String>,
+}
+
+impl AuditFinding {
+    pub fn new(severity: AuditSeverity, rule_id: &str, message: &str, element_path: &str) -> Self {
+        Self {
+            severity,
+            rule_id: rule_id.to_string(),
+            message: message.to_string(),
+            element_path: element_path.to_string(),
+            suggestion: None,
+        }
+    }
+
+    pub fn with_suggestion(mut self, suggestion: &str) -> Self {
+        self.suggestion = Some(suggestion.to_string());
+        self
+    }
+
+    pub fn is_critical(&self) -> bool {
+        self.severity == AuditSeverity::Critical
+    }
+
+    pub fn format_report_line(&self) -> String {
+        let sug = self.suggestion.as_deref().unwrap_or("N/A");
+        format!(
+            "[{}] {} at {}: {} (suggestion: {})",
+            self.severity, self.rule_id, self.element_path, self.message, sug
+        )
+    }
+}
+
+impl fmt::Display for AuditFinding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}: {}", self.severity, self.rule_id, self.message)
+    }
+}
+
+/// Collects accessibility audit findings and generates reports.
+#[derive(Debug, Clone)]
+pub struct AuditReporter {
+    findings: Vec<AuditFinding>,
+    scope: String,
+}
+
+impl AuditReporter {
+    pub fn new(scope: &str) -> Self {
+        Self { findings: Vec::new(), scope: scope.to_string() }
+    }
+
+    pub fn add_finding(&mut self, finding: AuditFinding) {
+        self.findings.push(finding);
+    }
+
+    pub fn finding_count(&self) -> usize { self.findings.len() }
+
+    pub fn has_errors(&self) -> bool {
+        self.findings.iter().any(|f| f.severity >= AuditSeverity::Error)
+    }
+
+    pub fn has_critical(&self) -> bool {
+        self.findings.iter().any(|f| f.is_critical())
+    }
+
+    pub fn findings_by_severity(&self, severity: AuditSeverity) -> Vec<&AuditFinding> {
+        self.findings.iter().filter(|f| f.severity == severity).collect()
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.findings.iter().filter(|f| f.severity >= AuditSeverity::Error).count()
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.findings.iter().filter(|f| f.severity == AuditSeverity::Warning).count()
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "Audit scope: {} | Total: {} | Errors: {} | Warnings: {}",
+            self.scope, self.findings.len(), self.error_count(), self.warning_count()
+        )
+    }
+
+    pub fn generate_full_report(&self) -> String {
+        let mut lines = vec![self.generate_summary()];
+        for f in &self.findings {
+            lines.push(f.format_report_line());
+        }
+        lines.join("\n")
+    }
+
+    pub fn clear(&mut self) { self.findings.clear(); }
+
+    pub fn sorted_findings(&self) -> Vec<&AuditFinding> {
+        let mut sorted: Vec<&AuditFinding> = self.findings.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+}
+
+/// A keyboard shortcut with modifier keys.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct KeyboardShortcut {
+    pub key: String,
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
+impl KeyboardShortcut {
+    pub fn new(key: &str) -> Self {
+        Self { key: key.to_string(), ctrl: false, shift: false, alt: false, meta: false }
+    }
+    pub fn with_ctrl(mut self) -> Self { self.ctrl = true; self }
+    pub fn with_shift(mut self) -> Self { self.shift = true; self }
+    pub fn with_alt(mut self) -> Self { self.alt = true; self }
+    pub fn with_meta(mut self) -> Self { self.meta = true; self }
+
+    pub fn modifier_count(&self) -> u8 {
+        self.ctrl as u8 + self.shift as u8 + self.alt as u8 + self.meta as u8
+    }
+
+    pub fn format_announcement(&self) -> String {
+        let mut parts = Vec::new();
+        if self.ctrl { parts.push("Ctrl"); }
+        if self.shift { parts.push("Shift"); }
+        if self.alt { parts.push("Alt"); }
+        if self.meta { parts.push("Meta"); }
+        parts.push(&self.key);
+        parts.join("+")
+    }
+
+    pub fn is_simple(&self) -> bool { self.modifier_count() == 0 }
+}
+
+impl fmt::Display for KeyboardShortcut {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format_announcement())
+    }
+}
+
+/// Queues and announces keyboard shortcuts for screen reader users.
+#[derive(Debug, Clone)]
+pub struct ShortcutAnnouncer {
+    announcements: Vec<String>,
+    prefix: String,
+    max_queue: usize,
+}
+
+impl ShortcutAnnouncer {
+    pub fn new() -> Self {
+        Self { announcements: Vec::new(), prefix: "Shortcut: ".to_string(), max_queue: 50 }
+    }
+    pub fn with_prefix(mut self, prefix: &str) -> Self { self.prefix = prefix.to_string(); self }
+    pub fn with_max_queue(mut self, max: usize) -> Self { self.max_queue = max; self }
+
+    pub fn announce(&mut self, shortcut: &KeyboardShortcut, action: &str) {
+        let msg = format!("{}{} - {}", self.prefix, shortcut.format_announcement(), action);
+        if self.announcements.len() >= self.max_queue {
+            self.announcements.remove(0);
+        }
+        self.announcements.push(msg);
+    }
+
+    pub fn pending_count(&self) -> usize { self.announcements.len() }
+
+    pub fn drain_announcements(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.announcements)
+    }
+
+    pub fn last_announcement(&self) -> Option<&str> {
+        self.announcements.last().map(|s| s.as_str())
+    }
+
+    pub fn clear(&mut self) { self.announcements.clear(); }
+}
+
+impl Default for ShortcutAnnouncer {
+    fn default() -> Self { Self::new() }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2345,5 +2559,110 @@ mod tests {
         b.add("test");
         let s = format!("{b}");
         assert_eq!(s, "test");
+    }
+
+#[test]
+    fn audit_severity_ordering() {
+        assert!(AuditSeverity::Critical > AuditSeverity::Error);
+        assert!(AuditSeverity::Error > AuditSeverity::Warning);
+        assert!(AuditSeverity::Warning > AuditSeverity::Info);
+    }
+
+    #[test]
+    fn audit_severity_display() {
+        assert_eq!(AuditSeverity::Info.to_string(), "info");
+        assert_eq!(AuditSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn audit_finding_creation() {
+        let f = AuditFinding::new(AuditSeverity::Error, "ARIA-01", "Missing label", "/div/input");
+        assert_eq!(f.severity, AuditSeverity::Error);
+        assert_eq!(f.rule_id, "ARIA-01");
+        assert!(f.suggestion.is_none());
+    }
+
+    #[test]
+    fn audit_finding_with_suggestion() {
+        let f = AuditFinding::new(AuditSeverity::Warning, "ARIA-02", "Low contrast", "/p")
+            .with_suggestion("Increase contrast ratio");
+        assert_eq!(f.suggestion.as_deref(), Some("Increase contrast ratio"));
+    }
+
+    #[test]
+    fn audit_finding_is_critical() {
+        let crit = AuditFinding::new(AuditSeverity::Critical, "C1", "msg", "/");
+        let warn = AuditFinding::new(AuditSeverity::Warning, "W1", "msg", "/");
+        assert!(crit.is_critical());
+        assert!(!warn.is_critical());
+    }
+
+    #[test]
+    fn audit_reporter_summary() {
+        let mut r = AuditReporter::new("editor");
+        r.add_finding(AuditFinding::new(AuditSeverity::Error, "E1", "msg", "/"));
+        r.add_finding(AuditFinding::new(AuditSeverity::Warning, "W1", "msg", "/"));
+        assert_eq!(r.finding_count(), 2);
+        assert!(r.has_errors());
+        assert!(!r.has_critical());
+    }
+
+    #[test]
+    fn audit_reporter_clear() {
+        let mut r = AuditReporter::new("test");
+        r.add_finding(AuditFinding::new(AuditSeverity::Info, "I1", "msg", "/"));
+        r.clear();
+        assert_eq!(r.finding_count(), 0);
+    }
+
+    #[test]
+    fn audit_reporter_sorted() {
+        let mut r = AuditReporter::new("scope");
+        r.add_finding(AuditFinding::new(AuditSeverity::Info, "I1", "info", "/"));
+        r.add_finding(AuditFinding::new(AuditSeverity::Critical, "C1", "crit", "/"));
+        let sorted = r.sorted_findings();
+        assert_eq!(sorted[0].severity, AuditSeverity::Critical);
+    }
+
+    #[test]
+    fn keyboard_shortcut_format() {
+        let s = KeyboardShortcut::new("S").with_ctrl().with_shift();
+        assert_eq!(s.format_announcement(), "Ctrl+Shift+S");
+        assert_eq!(s.modifier_count(), 2);
+    }
+
+    #[test]
+    fn keyboard_shortcut_simple() {
+        let s = KeyboardShortcut::new("F1");
+        assert!(s.is_simple());
+        assert_eq!(s.format_announcement(), "F1");
+    }
+
+    #[test]
+    fn shortcut_announcer_flow() {
+        let mut a = ShortcutAnnouncer::new();
+        let s = KeyboardShortcut::new("S").with_ctrl();
+        a.announce(&s, "Save file");
+        assert_eq!(a.pending_count(), 1);
+        let drained = a.drain_announcements();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(a.pending_count(), 0);
+    }
+
+    #[test]
+    fn shortcut_announcer_max_queue() {
+        let mut a = ShortcutAnnouncer::new().with_max_queue(2);
+        let s = KeyboardShortcut::new("A");
+        a.announce(&s, "a1");
+        a.announce(&s, "a2");
+        a.announce(&s, "a3");
+        assert_eq!(a.pending_count(), 2);
+    }
+
+    #[test]
+    fn audit_finding_display() {
+        let f = AuditFinding::new(AuditSeverity::Error, "ARIA-01", "Missing label", "/input");
+        let s = format!("{f}");
+        assert!(s.contains("ARIA-01"));
     }
 }

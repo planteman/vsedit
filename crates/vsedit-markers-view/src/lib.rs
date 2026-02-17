@@ -1158,6 +1158,313 @@ impl MarkerSeverityIconMapper {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// MarkersTreeView – tree-shaped rendering of markers grouped by file
+// ---------------------------------------------------------------------------
+
+/// A node in the markers tree: either a file header or an individual marker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MarkersTreeNode {
+    /// File-level grouping node.
+    File {
+        uri: String,
+        error_count: usize,
+        warning_count: usize,
+        info_count: usize,
+        hint_count: usize,
+        expanded: bool,
+    },
+    /// Individual marker entry nested under a file.
+    Entry {
+        message: String,
+        severity: MarkerSeverity,
+        line: u32,
+        col: u32,
+    },
+}
+
+/// Builds a flat list of `MarkersTreeNode`s from a `MarkersService`, grouped
+/// by URI and sorted by severity then line number.
+pub struct MarkersTreeView;
+
+impl MarkersTreeView {
+    /// Build tree nodes from the marker service.
+    pub fn build(service: &MarkersService) -> Vec<MarkersTreeNode> {
+        // Collect unique URIs in the order they first appear.
+        let mut uri_order: Vec<String> = Vec::new();
+        for m in &service.markers {
+            if !uri_order.contains(&m.uri) {
+                uri_order.push(m.uri.clone());
+            }
+        }
+
+        let mut nodes = Vec::new();
+        for uri in &uri_order {
+            let file_markers: Vec<&Marker> = service.markers.iter()
+                .filter(|m| m.uri == *uri)
+                .collect();
+
+            let error_count = file_markers.iter().filter(|m| m.severity == MarkerSeverity::Error).count();
+            let warning_count = file_markers.iter().filter(|m| m.severity == MarkerSeverity::Warning).count();
+            let info_count = file_markers.iter().filter(|m| m.severity == MarkerSeverity::Info).count();
+            let hint_count = file_markers.iter().filter(|m| m.severity == MarkerSeverity::Hint).count();
+
+            nodes.push(MarkersTreeNode::File {
+                uri: uri.clone(),
+                error_count,
+                warning_count,
+                info_count,
+                hint_count,
+                expanded: true,
+            });
+
+            // Sort markers: by severity (most severe first), then by line
+            let mut sorted: Vec<&Marker> = file_markers;
+            sorted.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.start_line.cmp(&b.start_line)));
+
+            for m in sorted {
+                nodes.push(MarkersTreeNode::Entry {
+                    message: m.message.clone(),
+                    severity: m.severity,
+                    line: m.start_line,
+                    col: m.start_col,
+                });
+            }
+        }
+        nodes
+    }
+
+    /// Count the total number of file nodes.
+    pub fn file_count(nodes: &[MarkersTreeNode]) -> usize {
+        nodes.iter().filter(|n| matches!(n, MarkersTreeNode::File { .. })).count()
+    }
+
+    /// Count the total number of entry nodes.
+    pub fn entry_count(nodes: &[MarkersTreeNode]) -> usize {
+        nodes.iter().filter(|n| matches!(n, MarkersTreeNode::Entry { .. })).count()
+    }
+
+    /// Render a single node to a display string.
+    pub fn render_node(node: &MarkersTreeNode) -> String {
+        match node {
+            MarkersTreeNode::File { uri, error_count, warning_count, .. } => {
+                let name = uri.rsplit('/').next().unwrap_or(uri);
+                format!("{} (errors: {}, warnings: {})", name, error_count, warning_count)
+            }
+            MarkersTreeNode::Entry { message, severity, line, col } => {
+                let icon = match severity {
+                    MarkerSeverity::Error => "❌",
+                    MarkerSeverity::Warning => "⚠️",
+                    MarkerSeverity::Info => "ℹ️",
+                    MarkerSeverity::Hint => "💡",
+                };
+                format!("{} [{}:{}] {}", icon, line, col, message)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkersWorkspaceSummary – aggregate summary across all files
+// ---------------------------------------------------------------------------
+
+/// High-level summary of diagnostics across the entire workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkersWorkspaceSummary {
+    /// Total files with at least one marker.
+    pub files_with_markers: usize,
+    /// Total errors across all files.
+    pub total_errors: usize,
+    /// Total warnings.
+    pub total_warnings: usize,
+    /// Total info markers.
+    pub total_infos: usize,
+    /// Total hints.
+    pub total_hints: usize,
+}
+
+impl MarkersWorkspaceSummary {
+    /// Compute a workspace summary from a marker service.
+    pub fn from_service(service: &MarkersService) -> Self {
+        let mut uris: Vec<&str> = Vec::new();
+        for m in &service.markers {
+            if !uris.contains(&m.uri.as_str()) {
+                uris.push(&m.uri);
+            }
+        }
+        let stats = service.get_stats();
+        Self {
+            files_with_markers: uris.len(),
+            total_errors: stats.errors,
+            total_warnings: stats.warnings,
+            total_infos: stats.infos,
+            total_hints: stats.hints,
+        }
+    }
+
+    /// Total number of markers across all severities.
+    pub fn total_markers(&self) -> usize {
+        self.total_errors + self.total_warnings + self.total_infos + self.total_hints
+    }
+
+    /// Whether the workspace has any errors.
+    pub fn has_errors(&self) -> bool {
+        self.total_errors > 0
+    }
+
+    /// Whether the workspace is clean (no markers at all).
+    pub fn is_clean(&self) -> bool {
+        self.total_markers() == 0
+    }
+
+    /// A short status-bar string like "3 errors, 2 warnings".
+    pub fn status_text(&self) -> String {
+        let mut parts = Vec::new();
+        if self.total_errors > 0 {
+            parts.push(format!("{} error{}", self.total_errors, if self.total_errors == 1 { "" } else { "s" }));
+        }
+        if self.total_warnings > 0 {
+            parts.push(format!("{} warning{}", self.total_warnings, if self.total_warnings == 1 { "" } else { "s" }));
+        }
+        if self.total_infos > 0 {
+            parts.push(format!("{} info", self.total_infos));
+        }
+        if self.total_hints > 0 {
+            parts.push(format!("{} hint{}", self.total_hints, if self.total_hints == 1 { "" } else { "s" }));
+        }
+        if parts.is_empty() {
+            "No problems".to_string()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkersOutlineProvider – outline entries derived from markers
+// ---------------------------------------------------------------------------
+
+/// An outline entry representing a marker in the document outline view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerOutlineEntry {
+    pub label: String,
+    pub severity: MarkerSeverity,
+    pub line: u32,
+    pub col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+}
+
+/// Generates outline entries from markers for a given document.
+pub struct MarkersOutlineProvider;
+
+impl MarkersOutlineProvider {
+    /// Generate outline entries for a given URI from the service.
+    pub fn provide(service: &MarkersService, uri: &str) -> Vec<MarkerOutlineEntry> {
+        let mut entries: Vec<MarkerOutlineEntry> = service.markers.iter()
+            .filter(|m| m.uri == uri)
+            .map(|m| MarkerOutlineEntry {
+                label: m.message.clone(),
+                severity: m.severity,
+                line: m.start_line,
+                col: m.start_col,
+                end_line: m.end_line,
+                end_col: m.end_col,
+            })
+            .collect();
+        entries.sort_by(|a, b| a.line.cmp(&b.line).then(a.col.cmp(&b.col)));
+        entries
+    }
+
+    /// Return only outline entries that are errors.
+    pub fn errors_only(service: &MarkersService, uri: &str) -> Vec<MarkerOutlineEntry> {
+        Self::provide(service, uri).into_iter()
+            .filter(|e| e.severity == MarkerSeverity::Error)
+            .collect()
+    }
+
+    /// Return the total line span covered by markers in a file.
+    pub fn affected_line_range(service: &MarkersService, uri: &str) -> Option<(u32, u32)> {
+        let entries = Self::provide(service, uri);
+        if entries.is_empty() {
+            return None;
+        }
+        let min_line = entries.iter().map(|e| e.line).min().unwrap();
+        let max_line = entries.iter().map(|e| e.end_line).max().unwrap();
+        Some((min_line, max_line))
+    }
+
+    /// Total number of affected lines (unique lines that have at least one marker).
+    pub fn affected_line_count(service: &MarkersService, uri: &str) -> usize {
+        let entries = Self::provide(service, uri);
+        let mut lines: Vec<u32> = entries.iter().map(|e| e.line).collect();
+        lines.sort_unstable();
+        lines.dedup();
+        lines.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Copy diagnostic text – format markers for clipboard
+// ---------------------------------------------------------------------------
+
+/// Formats markers from a service into copyable diagnostic text.
+pub struct MarkersCopyDiagnosticText;
+
+impl MarkersCopyDiagnosticText {
+    /// Format a single marker to a diagnostic string.
+    pub fn format_one(marker: &Marker) -> String {
+        let sev = marker.severity.label();
+        let loc = format!("{}:{}:{}", marker.uri, marker.start_line, marker.start_col);
+        let src = marker.source.as_deref().unwrap_or("unknown");
+        format!("{} - {} [{}] ({})", loc, marker.message, sev, src)
+    }
+
+    /// Format all markers in the service to a multi-line string.
+    pub fn format_all(service: &MarkersService) -> String {
+        service.markers.iter()
+            .map(Self::format_one)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Format markers for a specific URI.
+    pub fn format_for_uri(service: &MarkersService, uri: &str) -> String {
+        service.markers.iter()
+            .filter(|m| m.uri == uri)
+            .map(Self::format_one)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Format only errors.
+    pub fn format_errors(service: &MarkersService) -> String {
+        service.markers.iter()
+            .filter(|m| m.severity == MarkerSeverity::Error)
+            .map(Self::format_one)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Number of lines the formatted output would produce.
+    pub fn line_count(service: &MarkersService) -> usize {
+        service.markers.len()
+    }
+
+    /// Format as a markdown table.
+    pub fn format_as_table(service: &MarkersService) -> String {
+        let mut out = String::from("| Severity | Location | Message | Source |\n");
+        out.push_str("|----------|----------|---------|--------|\n");
+        for m in &service.markers {
+            let loc = format!("{}:{}:{}", m.uri, m.start_line, m.start_col);
+            let src = m.source.as_deref().unwrap_or("-");
+            out.push_str(&format!("| {} | {} | {} | {} |\n", m.severity.label(), loc, m.message, src));
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2254,4 +2561,209 @@ mod tests {
         assert_eq!(icons.len(), 4);
         assert_eq!(icons[0], ("error", "❌"));
     }
+
+    // -- MarkersTreeView tests --
+
+    fn make_test_marker(uri: &str, msg: &str, severity: MarkerSeverity, line: u32) -> Marker {
+        Marker {
+            uri: uri.to_string(),
+            message: msg.to_string(),
+            severity,
+            start_line: line,
+            start_col: 1,
+            end_line: line,
+            end_col: 10,
+            source: Some("test".to_string()),
+            code: None,
+            tags: vec![],
+            related_information: vec![],
+        }
+    }
+
+    #[test]
+    fn tree_view_build_groups_by_uri() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "err1", MarkerSeverity::Error, 1));
+        svc.add_marker(make_test_marker("file:///b.rs", "warn1", MarkerSeverity::Warning, 5));
+        svc.add_marker(make_test_marker("file:///a.rs", "err2", MarkerSeverity::Error, 10));
+
+        let nodes = MarkersTreeView::build(&svc);
+        assert_eq!(MarkersTreeView::file_count(&nodes), 2);
+        assert_eq!(MarkersTreeView::entry_count(&nodes), 3);
+    }
+
+    #[test]
+    fn tree_view_render_file_node() {
+        let node = MarkersTreeNode::File {
+            uri: "file:///src/main.rs".to_string(),
+            error_count: 2,
+            warning_count: 1,
+            info_count: 0,
+            hint_count: 0,
+            expanded: true,
+        };
+        let rendered = MarkersTreeView::render_node(&node);
+        assert!(rendered.contains("main.rs"));
+        assert!(rendered.contains("errors: 2"));
+    }
+
+    #[test]
+    fn tree_view_render_entry_node() {
+        let node = MarkersTreeNode::Entry {
+            message: "unused variable".to_string(),
+            severity: MarkerSeverity::Warning,
+            line: 42,
+            col: 5,
+        };
+        let rendered = MarkersTreeView::render_node(&node);
+        assert!(rendered.contains("[42:5]"));
+        assert!(rendered.contains("unused variable"));
+    }
+
+    // -- MarkersWorkspaceSummary tests --
+
+    #[test]
+    fn workspace_summary_empty() {
+        let svc = MarkersService::new();
+        let summary = MarkersWorkspaceSummary::from_service(&svc);
+        assert!(summary.is_clean());
+        assert!(!summary.has_errors());
+        assert_eq!(summary.total_markers(), 0);
+        assert_eq!(summary.status_text(), "No problems");
+    }
+
+    #[test]
+    fn workspace_summary_with_markers() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "e1", MarkerSeverity::Error, 1));
+        svc.add_marker(make_test_marker("file:///a.rs", "w1", MarkerSeverity::Warning, 2));
+        svc.add_marker(make_test_marker("file:///b.rs", "e2", MarkerSeverity::Error, 3));
+
+        let summary = MarkersWorkspaceSummary::from_service(&svc);
+        assert_eq!(summary.files_with_markers, 2);
+        assert_eq!(summary.total_errors, 2);
+        assert_eq!(summary.total_warnings, 1);
+        assert!(summary.has_errors());
+        assert!(!summary.is_clean());
+        assert_eq!(summary.total_markers(), 3);
+    }
+
+    #[test]
+    fn workspace_summary_status_text() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "e", MarkerSeverity::Error, 1));
+        let summary = MarkersWorkspaceSummary::from_service(&svc);
+        assert_eq!(summary.status_text(), "1 error");
+    }
+
+    // -- MarkersOutlineProvider tests --
+
+    #[test]
+    fn outline_provider_basic() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "msg1", MarkerSeverity::Error, 10));
+        svc.add_marker(make_test_marker("file:///a.rs", "msg2", MarkerSeverity::Warning, 5));
+        svc.add_marker(make_test_marker("file:///b.rs", "msg3", MarkerSeverity::Info, 1));
+
+        let entries = MarkersOutlineProvider::provide(&svc, "file:///a.rs");
+        assert_eq!(entries.len(), 2);
+        // Sorted by line: line 5 before line 10
+        assert_eq!(entries[0].line, 5);
+        assert_eq!(entries[1].line, 10);
+    }
+
+    #[test]
+    fn outline_provider_errors_only() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "e", MarkerSeverity::Error, 1));
+        svc.add_marker(make_test_marker("file:///a.rs", "w", MarkerSeverity::Warning, 2));
+
+        let errors = MarkersOutlineProvider::errors_only(&svc, "file:///a.rs");
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].severity, MarkerSeverity::Error);
+    }
+
+    #[test]
+    fn outline_provider_affected_range() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "m1", MarkerSeverity::Error, 5));
+        svc.add_marker(make_test_marker("file:///a.rs", "m2", MarkerSeverity::Warning, 20));
+
+        let range = MarkersOutlineProvider::affected_line_range(&svc, "file:///a.rs");
+        assert_eq!(range, Some((5, 20)));
+    }
+
+    #[test]
+    fn outline_provider_affected_line_count() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "m1", MarkerSeverity::Error, 5));
+        svc.add_marker(make_test_marker("file:///a.rs", "m2", MarkerSeverity::Warning, 5));
+        svc.add_marker(make_test_marker("file:///a.rs", "m3", MarkerSeverity::Info, 10));
+
+        assert_eq!(MarkersOutlineProvider::affected_line_count(&svc, "file:///a.rs"), 2);
+    }
+
+    #[test]
+    fn outline_provider_no_markers() {
+        let svc = MarkersService::new();
+        assert!(MarkersOutlineProvider::provide(&svc, "file:///x.rs").is_empty());
+        assert_eq!(MarkersOutlineProvider::affected_line_range(&svc, "file:///x.rs"), None);
+    }
+
+    // -- MarkersCopyDiagnosticText tests --
+
+    #[test]
+    fn copy_diagnostic_format_one() {
+        let m = make_test_marker("file:///a.rs", "unused var", MarkerSeverity::Warning, 10);
+        let text = MarkersCopyDiagnosticText::format_one(&m);
+        assert!(text.contains("file:///a.rs:10:1"));
+        assert!(text.contains("unused var"));
+        assert!(text.contains("warning"));
+        assert!(text.contains("test"));
+    }
+
+    #[test]
+    fn copy_diagnostic_format_all() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "e1", MarkerSeverity::Error, 1));
+        svc.add_marker(make_test_marker("file:///b.rs", "w1", MarkerSeverity::Warning, 2));
+
+        let text = MarkersCopyDiagnosticText::format_all(&svc);
+        let line_count = text.lines().count();
+        assert_eq!(line_count, 2);
+        assert_eq!(MarkersCopyDiagnosticText::line_count(&svc), 2);
+    }
+
+    #[test]
+    fn copy_diagnostic_format_for_uri() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "e1", MarkerSeverity::Error, 1));
+        svc.add_marker(make_test_marker("file:///b.rs", "w1", MarkerSeverity::Warning, 2));
+
+        let text = MarkersCopyDiagnosticText::format_for_uri(&svc, "file:///a.rs");
+        assert_eq!(text.lines().count(), 1);
+        assert!(text.contains("e1"));
+    }
+
+    #[test]
+    fn copy_diagnostic_format_errors() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "e1", MarkerSeverity::Error, 1));
+        svc.add_marker(make_test_marker("file:///a.rs", "w1", MarkerSeverity::Warning, 2));
+
+        let text = MarkersCopyDiagnosticText::format_errors(&svc);
+        assert_eq!(text.lines().count(), 1);
+        assert!(text.contains("e1"));
+    }
+
+    #[test]
+    fn copy_diagnostic_format_table() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_test_marker("file:///a.rs", "err", MarkerSeverity::Error, 1));
+
+        let table = MarkersCopyDiagnosticText::format_as_table(&svc);
+        assert!(table.contains("| Severity |"));
+        assert!(table.contains("| error |"));
+    }
+
 }

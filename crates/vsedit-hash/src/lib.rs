@@ -1363,6 +1363,197 @@ impl HashBenchmark {
 
 impl Default for HashBenchmark { fn default() -> Self { Self::new() } }
 
+
+// ── Hash Accumulator ──
+
+/// Accumulates multiple values into a combined hash using the DJB2 algorithm.
+pub struct HashAccumulator {
+    state: u32,
+    count: usize,
+}
+
+impl HashAccumulator {
+    /// Create a new accumulator with default seed.
+    pub fn new() -> Self {
+        Self { state: 5381, count: 0 }
+    }
+
+    /// Create with a custom seed.
+    pub fn with_seed(seed: u32) -> Self {
+        Self { state: seed, count: 0 }
+    }
+
+    /// Feed a string value into the accumulator.
+    pub fn feed_str(&mut self, s: &str) -> &mut Self {
+        self.state = number_hash(string_hash(s), self.state);
+        self.count += 1;
+        self
+    }
+
+    /// Feed a u32 value.
+    pub fn feed_u32(&mut self, value: u32) -> &mut Self {
+        self.state = number_hash(value, self.state);
+        self.count += 1;
+        self
+    }
+
+    /// Feed a boolean value.
+    pub fn feed_bool(&mut self, value: bool) -> &mut Self {
+        self.feed_u32(if value { 1 } else { 0 })
+    }
+
+    /// Feed raw bytes by hashing each byte.
+    pub fn feed_bytes(&mut self, data: &[u8]) -> &mut Self {
+        for &b in data {
+            self.state = self.state.wrapping_mul(33).wrapping_add(u32::from(b));
+        }
+        self.count += 1;
+        self
+    }
+
+    /// Feed an optional string (hashes differently for None vs Some).
+    pub fn feed_option_str(&mut self, value: Option<&str>) -> &mut Self {
+        match value {
+            Some(s) => {
+                self.feed_bool(true);
+                self.feed_str(s);
+            }
+            None => {
+                self.feed_bool(false);
+            }
+        }
+        self
+    }
+
+    /// Feed a slice of strings.
+    pub fn feed_str_slice(&mut self, values: &[&str]) -> &mut Self {
+        self.feed_u32(values.len() as u32);
+        for s in values {
+            self.feed_str(s);
+        }
+        self
+    }
+
+    /// Get the current accumulated hash.
+    pub fn finish(&self) -> u32 {
+        self.state
+    }
+
+    /// Number of items fed so far.
+    pub fn item_count(&self) -> usize {
+        self.count
+    }
+
+    /// Reset to initial state.
+    pub fn reset(&mut self) {
+        self.state = 5381;
+        self.count = 0;
+    }
+
+    /// Create a SHA-256 hex string from the accumulated state.
+    pub fn finish_sha256(&self) -> String {
+        sha256_hex(&self.state.to_le_bytes())
+    }
+
+    /// Combine two accumulators.
+    pub fn combine(&mut self, other: &HashAccumulator) -> &mut Self {
+        self.state = number_hash(other.state, self.state);
+        self.count += other.count;
+        self
+    }
+}
+
+impl Default for HashAccumulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Debug for HashAccumulator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HashAccumulator")
+            .field("state", &format!("{:#010x}", self.state))
+            .field("count", &self.count)
+            .finish()
+    }
+}
+
+// ── Hash Comparison Helper ──
+
+/// Provides constant-time comparison and formatting utilities for hashes.
+pub struct HashComparisonHelper;
+
+impl HashComparisonHelper {
+    /// Constant-time comparison of two byte slices.
+    pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut diff = 0u8;
+        for (x, y) in a.iter().zip(b.iter()) {
+            diff |= x ^ y;
+        }
+        diff == 0
+    }
+
+    /// Constant-time comparison of two hex strings.
+    pub fn hex_eq(a: &str, b: &str) -> bool {
+        Self::constant_time_eq(a.as_bytes(), b.as_bytes())
+    }
+
+    /// Compare two SHA-256 hex digests of strings.
+    pub fn sha256_strings_eq(a: &str, b: &str) -> bool {
+        let hash_a = sha256_string(a);
+        let hash_b = sha256_string(b);
+        Self::hex_eq(&hash_a, &hash_b)
+    }
+
+    /// Format a u32 hash as a zero-padded hex string.
+    pub fn format_hex(hash: u32) -> String {
+        format!("{:08x}", hash)
+    }
+
+    /// Format a u32 hash as a short 4-char hex prefix.
+    pub fn format_short(hash: u32) -> String {
+        format!("{:08x}", hash)[..4].to_string()
+    }
+
+    /// Check if a hex string is valid.
+    pub fn is_valid_hex(s: &str) -> bool {
+        !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit())
+    }
+
+    /// Compare a string's hash against an expected u32 hash value.
+    pub fn verify_string_hash(s: &str, expected: u32) -> bool {
+        string_hash(s) == expected
+    }
+
+    /// Compute the hamming distance between two u32 hashes.
+    pub fn hamming_distance(a: u32, b: u32) -> u32 {
+        (a ^ b).count_ones()
+    }
+
+    /// Check if two strings produce the same DJB2 hash.
+    pub fn djb2_collision(a: &str, b: &str) -> bool {
+        string_hash(a) == string_hash(b)
+    }
+
+    /// Split a SHA-256 hex string into 8-char chunks.
+    pub fn split_sha256(hex: &str) -> Vec<&str> {
+        let mut chunks = Vec::new();
+        let mut start = 0;
+        while start + 8 <= hex.len() {
+            chunks.push(&hex[start..start + 8]);
+            start += 8;
+        }
+        if start < hex.len() {
+            chunks.push(&hex[start..]);
+        }
+        chunks
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2343,5 +2534,106 @@ mod tests {
         h.reset();
         assert_eq!(h.finish(), initial);
     }
+
+
+    #[test]
+    fn hash_accumulator_basic() {
+        let mut acc = HashAccumulator::new();
+        acc.feed_str("hello");
+        acc.feed_u32(42);
+        assert_eq!(acc.item_count(), 2);
+        assert_ne!(acc.finish(), 5381);
+    }
+
+    #[test]
+    fn hash_accumulator_with_seed() {
+        let a = HashAccumulator::with_seed(100);
+        let b = HashAccumulator::new();
+        assert_ne!(a.finish(), b.finish());
+    }
+
+    #[test]
+    fn hash_accumulator_reset() {
+        let mut acc = HashAccumulator::new();
+        acc.feed_str("data");
+        let initial = HashAccumulator::new().finish();
+        acc.reset();
+        assert_eq!(acc.finish(), initial);
+        assert_eq!(acc.item_count(), 0);
+    }
+
+    #[test]
+    fn hash_accumulator_option_str() {
+        let mut a = HashAccumulator::new();
+        a.feed_option_str(Some("test"));
+        let mut b = HashAccumulator::new();
+        b.feed_option_str(None);
+        assert_ne!(a.finish(), b.finish());
+    }
+
+    #[test]
+    fn hash_accumulator_str_slice() {
+        let mut acc = HashAccumulator::new();
+        acc.feed_str_slice(&["a", "b", "c"]);
+        assert!(acc.item_count() > 0);
+    }
+
+    #[test]
+    fn hash_accumulator_combine() {
+        let mut a = HashAccumulator::new();
+        a.feed_str("hello");
+        let mut b = HashAccumulator::new();
+        b.feed_str("world");
+        a.combine(&b);
+        assert!(a.item_count() > 1);
+    }
+
+    #[test]
+    fn hash_accumulator_sha256() {
+        let acc = HashAccumulator::new();
+        let hex = acc.finish_sha256();
+        assert_eq!(hex.len(), 64);
+        assert!(hex.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hash_comparison_constant_time() {
+        assert!(HashComparisonHelper::constant_time_eq(b"hello", b"hello"));
+        assert!(!HashComparisonHelper::constant_time_eq(b"hello", b"world"));
+        assert!(!HashComparisonHelper::constant_time_eq(b"hi", b"hello"));
+    }
+
+    #[test]
+    fn hash_comparison_format() {
+        let h = string_hash("test");
+        let hex = HashComparisonHelper::format_hex(h);
+        assert_eq!(hex.len(), 8);
+        let short = HashComparisonHelper::format_short(h);
+        assert_eq!(short.len(), 4);
+    }
+
+    #[test]
+    fn hash_comparison_valid_hex() {
+        assert!(HashComparisonHelper::is_valid_hex("abcdef01"));
+        assert!(!HashComparisonHelper::is_valid_hex("xyz"));
+        assert!(!HashComparisonHelper::is_valid_hex(""));
+    }
+
+    #[test]
+    fn hash_comparison_hamming() {
+        assert_eq!(HashComparisonHelper::hamming_distance(0, 0), 0);
+        assert_eq!(HashComparisonHelper::hamming_distance(0b1010, 0b0101), 4);
+    }
+
+    #[test]
+    fn hash_comparison_split_sha256() {
+        let hex = sha256_string("test");
+        let chunks = HashComparisonHelper::split_sha256(&hex);
+        assert_eq!(chunks.len(), 8);
+        for c in &chunks {
+            assert_eq!(c.len(), 8);
+        }
+    }
+
 
 }

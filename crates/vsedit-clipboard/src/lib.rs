@@ -1507,6 +1507,312 @@ impl ClipboardSyncState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ClipboardFormatNegotiator - clipboard format negotiator
+// ---------------------------------------------------------------------------
+
+/// Severity level for clipboard format negotiator issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ClipboardFormatNegotiatorSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ClipboardFormatNegotiatorSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ClipboardFormatNegotiator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardFormatNegotiatorEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ClipboardFormatNegotiatorSeverity,
+    pub detail: Option<String>,
+    pub format_count: usize,
+    enabled: bool,
+}
+
+impl ClipboardFormatNegotiatorEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ClipboardFormatNegotiatorSeverity::Low,
+            detail: None,
+            format_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ClipboardFormatNegotiatorSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_format_count(mut self, val: usize) -> Self {
+        self.format_count = val;
+        self
+    }
+
+    pub fn has_text(&self) -> bool {
+        self.enabled && self.severity >= ClipboardFormatNegotiatorSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.format_count, det)
+    }
+}
+
+impl fmt::Display for ClipboardFormatNegotiatorEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ClipboardFormatNegotiatorEntry] items.
+#[derive(Debug, Clone)]
+pub struct ClipboardFormatNegotiator {
+    entries: Vec<ClipboardFormatNegotiatorEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ClipboardFormatNegotiator {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ClipboardFormatNegotiatorEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ClipboardFormatNegotiatorEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ClipboardFormatNegotiatorEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn format_count(&self) -> usize { self.entries.len() }
+
+    pub fn has_text(&self) -> bool {
+        self.entries.iter().any(|e| e.has_text())
+    }
+
+    pub fn entries_by_severity(&self, severity: ClipboardFormatNegotiatorSeverity) -> Vec<&ClipboardFormatNegotiatorEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ClipboardFormatNegotiatorSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ClipboardFormatNegotiatorEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ClipboardFormatNegotiatorEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardPasteTransform - clipboard paste transform
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ClipboardPasteTransform].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardPasteTransformConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub transform_count: usize,
+}
+
+impl ClipboardPasteTransformConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, transform_count: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_transform_count(mut self, val: usize) -> Self { self.transform_count = val; self }
+}
+
+impl Default for ClipboardPasteTransformConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ClipboardPasteTransform].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardPasteTransformItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ClipboardPasteTransformItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn needs_transform(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ClipboardPasteTransformItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ClipboardPasteTransformItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ClipboardPasteTransform {
+    config: ClipboardPasteTransformConfig,
+    items: Vec<ClipboardPasteTransformItem>,
+}
+
+impl ClipboardPasteTransform {
+    pub fn new(config: ClipboardPasteTransformConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ClipboardPasteTransformItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ClipboardPasteTransformItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ClipboardPasteTransformItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn transform_count(&self) -> usize { self.items.len() }
+
+    pub fn needs_transform(&self) -> bool {
+        self.items.iter().any(|i| i.needs_transform())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ClipboardPasteTransformItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ClipboardPasteTransformItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ClipboardPasteTransformConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2332,5 +2638,147 @@ mod tests {
             ClipboardContentDetector::detect("user@example.com"),
             ClipboardContentKind::Email
         );
+    }
+
+#[test]
+    fn clipboardformatnegotiator_severity_ordering() {
+        assert!(ClipboardFormatNegotiatorSeverity::Critical > ClipboardFormatNegotiatorSeverity::High);
+        assert!(ClipboardFormatNegotiatorSeverity::High > ClipboardFormatNegotiatorSeverity::Medium);
+        assert!(ClipboardFormatNegotiatorSeverity::Medium > ClipboardFormatNegotiatorSeverity::Low);
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_severity_display() {
+        assert_eq!(ClipboardFormatNegotiatorSeverity::Low.to_string(), "low");
+        assert_eq!(ClipboardFormatNegotiatorSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_entry_creation() {
+        let e = ClipboardFormatNegotiatorEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ClipboardFormatNegotiatorSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_entry_builder() {
+        let e = ClipboardFormatNegotiatorEntry::new("e2", "Entry 2")
+            .with_severity(ClipboardFormatNegotiatorSeverity::High)
+            .with_detail("some detail")
+            .with_format_count(42);
+        assert_eq!(e.severity, ClipboardFormatNegotiatorSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.format_count, 42);
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_entry_enable_disable() {
+        let mut e = ClipboardFormatNegotiatorEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_add_and_count() {
+        let mut mgr = ClipboardFormatNegotiator::new("test");
+        mgr.add(ClipboardFormatNegotiatorEntry::new("a", "A"));
+        mgr.add(ClipboardFormatNegotiatorEntry::new("b", "B").with_severity(ClipboardFormatNegotiatorSeverity::High));
+        assert_eq!(mgr.format_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_remove() {
+        let mut mgr = ClipboardFormatNegotiator::new("test");
+        mgr.add(ClipboardFormatNegotiatorEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_capacity() {
+        let mut mgr = ClipboardFormatNegotiator::new("test").with_capacity(1);
+        assert!(mgr.add(ClipboardFormatNegotiatorEntry::new("a", "A")));
+        assert!(!mgr.add(ClipboardFormatNegotiatorEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_sorted_by_severity() {
+        let mut mgr = ClipboardFormatNegotiator::new("test");
+        mgr.add(ClipboardFormatNegotiatorEntry::new("lo", "Low"));
+        mgr.add(ClipboardFormatNegotiatorEntry::new("hi", "High").with_severity(ClipboardFormatNegotiatorSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ClipboardFormatNegotiatorSeverity::Critical);
+    }
+
+    #[test]
+    fn clipboardformatnegotiator_summary() {
+        let mgr = ClipboardFormatNegotiator::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn clipboardpastetransform_config_defaults() {
+        let cfg = ClipboardPasteTransformConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn clipboardpastetransform_item_creation() {
+        let item = ClipboardPasteTransformItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn clipboardpastetransform_add_and_get() {
+        let mut mgr = ClipboardPasteTransform::new(ClipboardPasteTransformConfig::new("test"));
+        mgr.add(ClipboardPasteTransformItem::new("k1", "v1"));
+        assert_eq!(mgr.transform_count(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn clipboardpastetransform_remove_item() {
+        let mut mgr = ClipboardPasteTransform::new(ClipboardPasteTransformConfig::new("test"));
+        mgr.add(ClipboardPasteTransformItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn clipboardpastetransform_sorted_by_priority() {
+        let mut mgr = ClipboardPasteTransform::new(ClipboardPasteTransformConfig::new("test"));
+        mgr.add(ClipboardPasteTransformItem::new("lo", "low").with_priority(1));
+        mgr.add(ClipboardPasteTransformItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn clipboardpastetransform_items_with_tag() {
+        let mut mgr = ClipboardPasteTransform::new(ClipboardPasteTransformConfig::new("test"));
+        mgr.add(ClipboardPasteTransformItem::new("a", "1").with_tag("x"));
+        mgr.add(ClipboardPasteTransformItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn clipboardpastetransform_report() {
+        let mgr = ClipboardPasteTransform::new(ClipboardPasteTransformConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

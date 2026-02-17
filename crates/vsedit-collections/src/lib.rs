@@ -17,6 +17,7 @@
 //! - [`diff_maps`] — compute added/removed/changed entries between two maps.
 //! - [`coalesce`] — merge adjacent matching items.
 
+use std::fmt;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
@@ -1518,6 +1519,312 @@ impl<T: Eq + Hash> CountingSet<T> {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// WeightedRandomSampler - weighted random sampler
+// ---------------------------------------------------------------------------
+
+/// Severity level for weighted random sampler issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WeightedRandomSamplerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for WeightedRandomSamplerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [WeightedRandomSampler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeightedRandomSamplerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: WeightedRandomSamplerSeverity,
+    pub detail: Option<String>,
+    pub item_count: usize,
+    enabled: bool,
+}
+
+impl WeightedRandomSamplerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: WeightedRandomSamplerSeverity::Low,
+            detail: None,
+            item_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: WeightedRandomSamplerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_item_count(mut self, val: usize) -> Self {
+        self.item_count = val;
+        self
+    }
+
+    pub fn total_weight(&self) -> bool {
+        self.enabled && self.severity >= WeightedRandomSamplerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.item_count, det)
+    }
+}
+
+impl fmt::Display for WeightedRandomSamplerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [WeightedRandomSamplerEntry] items.
+#[derive(Debug, Clone)]
+pub struct WeightedRandomSampler {
+    entries: Vec<WeightedRandomSamplerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl WeightedRandomSampler {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: WeightedRandomSamplerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<WeightedRandomSamplerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&WeightedRandomSamplerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn item_count(&self) -> usize { self.entries.len() }
+
+    pub fn total_weight(&self) -> bool {
+        self.entries.iter().any(|e| e.total_weight())
+    }
+
+    pub fn entries_by_severity(&self, severity: WeightedRandomSamplerSeverity) -> Vec<&WeightedRandomSamplerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= WeightedRandomSamplerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&WeightedRandomSamplerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&WeightedRandomSamplerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SlidingWindowIterator - sliding window iterator
+// ---------------------------------------------------------------------------
+
+/// Configuration for [SlidingWindowIterator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlidingWindowIteratorConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub window_size: usize,
+}
+
+impl SlidingWindowIteratorConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, window_size: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_window_size(mut self, val: usize) -> Self { self.window_size = val; self }
+}
+
+impl Default for SlidingWindowIteratorConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [SlidingWindowIterator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlidingWindowIteratorItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl SlidingWindowIteratorItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn has_next_window(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for SlidingWindowIteratorItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [SlidingWindowIteratorItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct SlidingWindowIterator {
+    config: SlidingWindowIteratorConfig,
+    items: Vec<SlidingWindowIteratorItem>,
+}
+
+impl SlidingWindowIterator {
+    pub fn new(config: SlidingWindowIteratorConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: SlidingWindowIteratorItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<SlidingWindowIteratorItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&SlidingWindowIteratorItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn window_size(&self) -> usize { self.items.len() }
+
+    pub fn has_next_window(&self) -> bool {
+        self.items.iter().any(|i| i.has_next_window())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&SlidingWindowIteratorItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&SlidingWindowIteratorItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &SlidingWindowIteratorConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2273,5 +2580,147 @@ mod tests {
         let (item, count) = cs.most_frequent().unwrap();
         assert_eq!(*item, "b");
         assert_eq!(count, 3);
+    }
+
+#[test]
+    fn weightedrandomsampler_severity_ordering() {
+        assert!(WeightedRandomSamplerSeverity::Critical > WeightedRandomSamplerSeverity::High);
+        assert!(WeightedRandomSamplerSeverity::High > WeightedRandomSamplerSeverity::Medium);
+        assert!(WeightedRandomSamplerSeverity::Medium > WeightedRandomSamplerSeverity::Low);
+    }
+
+    #[test]
+    fn weightedrandomsampler_severity_display() {
+        assert_eq!(WeightedRandomSamplerSeverity::Low.to_string(), "low");
+        assert_eq!(WeightedRandomSamplerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn weightedrandomsampler_entry_creation() {
+        let e = WeightedRandomSamplerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, WeightedRandomSamplerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn weightedrandomsampler_entry_builder() {
+        let e = WeightedRandomSamplerEntry::new("e2", "Entry 2")
+            .with_severity(WeightedRandomSamplerSeverity::High)
+            .with_detail("some detail")
+            .with_item_count(42);
+        assert_eq!(e.severity, WeightedRandomSamplerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.item_count, 42);
+    }
+
+    #[test]
+    fn weightedrandomsampler_entry_enable_disable() {
+        let mut e = WeightedRandomSamplerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn weightedrandomsampler_add_and_count() {
+        let mut mgr = WeightedRandomSampler::new("test");
+        mgr.add(WeightedRandomSamplerEntry::new("a", "A"));
+        mgr.add(WeightedRandomSamplerEntry::new("b", "B").with_severity(WeightedRandomSamplerSeverity::High));
+        assert_eq!(mgr.item_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn weightedrandomsampler_remove() {
+        let mut mgr = WeightedRandomSampler::new("test");
+        mgr.add(WeightedRandomSamplerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn weightedrandomsampler_capacity() {
+        let mut mgr = WeightedRandomSampler::new("test").with_capacity(1);
+        assert!(mgr.add(WeightedRandomSamplerEntry::new("a", "A")));
+        assert!(!mgr.add(WeightedRandomSamplerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn weightedrandomsampler_sorted_by_severity() {
+        let mut mgr = WeightedRandomSampler::new("test");
+        mgr.add(WeightedRandomSamplerEntry::new("lo", "Low"));
+        mgr.add(WeightedRandomSamplerEntry::new("hi", "High").with_severity(WeightedRandomSamplerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, WeightedRandomSamplerSeverity::Critical);
+    }
+
+    #[test]
+    fn weightedrandomsampler_summary() {
+        let mgr = WeightedRandomSampler::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn slidingwindowiterator_config_defaults() {
+        let cfg = SlidingWindowIteratorConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn slidingwindowiterator_item_creation() {
+        let item = SlidingWindowIteratorItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn slidingwindowiterator_add_and_get() {
+        let mut mgr = SlidingWindowIterator::new(SlidingWindowIteratorConfig::new("test"));
+        mgr.add(SlidingWindowIteratorItem::new("k1", "v1"));
+        assert_eq!(mgr.window_size(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn slidingwindowiterator_remove_item() {
+        let mut mgr = SlidingWindowIterator::new(SlidingWindowIteratorConfig::new("test"));
+        mgr.add(SlidingWindowIteratorItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn slidingwindowiterator_sorted_by_priority() {
+        let mut mgr = SlidingWindowIterator::new(SlidingWindowIteratorConfig::new("test"));
+        mgr.add(SlidingWindowIteratorItem::new("lo", "low").with_priority(1));
+        mgr.add(SlidingWindowIteratorItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn slidingwindowiterator_items_with_tag() {
+        let mut mgr = SlidingWindowIterator::new(SlidingWindowIteratorConfig::new("test"));
+        mgr.add(SlidingWindowIteratorItem::new("a", "1").with_tag("x"));
+        mgr.add(SlidingWindowIteratorItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn slidingwindowiterator_report() {
+        let mgr = SlidingWindowIterator::new(SlidingWindowIteratorConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

@@ -1443,6 +1443,278 @@ impl fmt::Display for ScopeDetector {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// StickyScrollScopeDetectorEngine
+// ---------------------------------------------------------------------------
+
+/// A detected scope in source code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetectedScope {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub nesting: u32,
+    pub kind: ScopeKind,
+    pub header_text: String,
+}
+
+/// Kind of detected scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScopeKind {
+    Function,
+    Block,
+    Class,
+    Module,
+    Loop,
+    Conditional,
+    Unknown,
+}
+
+impl fmt::Display for ScopeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Function => write!(f, "function"),
+            Self::Block => write!(f, "block"),
+            Self::Class => write!(f, "class"),
+            Self::Module => write!(f, "module"),
+            Self::Loop => write!(f, "loop"),
+            Self::Conditional => write!(f, "conditional"),
+            Self::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+impl DetectedScope {
+    /// Number of lines in this scope.
+    pub fn line_count(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+
+    /// Whether a given line is inside this scope (inclusive).
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+}
+
+/// Engine that detects code scopes for sticky scroll display.
+///
+/// Uses indentation-based heuristics (suitable for Python-like languages)
+/// and brace-based heuristics (suitable for C-like languages).
+#[derive(Debug)]
+pub struct StickyScrollScopeDetectorEngine {
+    scopes: Vec<DetectedScope>,
+    indent_width: u32,
+    max_nesting: u32,
+}
+
+impl StickyScrollScopeDetectorEngine {
+    pub fn new(indent_width: u32, max_nesting: u32) -> Self {
+        Self {
+            scopes: Vec::new(),
+            indent_width,
+            max_nesting,
+        }
+    }
+
+    /// Count leading spaces of a line.
+    fn leading_spaces(line: &str) -> u32 {
+        line.chars().take_while(|c| *c == ' ').count() as u32
+    }
+
+    /// Detect scopes using indentation heuristics.
+    pub fn detect_by_indentation(&mut self, source: &str) {
+        let lines: Vec<&str> = source.lines().collect();
+        let mut scope_stack: Vec<(u32, u32, String)> = Vec::new(); // (indent, start_line, header)
+
+        for (i, &line) in lines.iter().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let indent = Self::leading_spaces(line);
+            let nesting = if self.indent_width > 0 { indent / self.indent_width } else { 0 };
+
+            // Close scopes that have ended
+            while let Some(&(scope_indent, start, _)) = scope_stack.last() {
+                if indent <= scope_indent && i as u32 > start {
+                    let (si, sl, header) = scope_stack.pop().unwrap();
+                    let scope_nesting = if self.indent_width > 0 { si / self.indent_width } else { 0 };
+                    if scope_nesting <= self.max_nesting {
+                        self.scopes.push(DetectedScope {
+                            start_line: sl,
+                            end_line: i as u32 - 1,
+                            nesting: scope_nesting,
+                            kind: Self::guess_kind(&header),
+                            header_text: header,
+                        });
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            // If next line has more indent, this starts a scope
+            if i + 1 < lines.len() {
+                let next = lines[i + 1];
+                if !next.trim().is_empty() && Self::leading_spaces(next) > indent {
+                    scope_stack.push((indent, i as u32, line.trim().to_string()));
+                }
+            }
+        }
+        // Close remaining scopes
+        let total_lines = lines.len() as u32;
+        while let Some((si, sl, header)) = scope_stack.pop() {
+            let scope_nesting = if self.indent_width > 0 { si / self.indent_width } else { 0 };
+            if scope_nesting <= self.max_nesting {
+                self.scopes.push(DetectedScope {
+                    start_line: sl,
+                    end_line: total_lines.saturating_sub(1),
+                    nesting: scope_nesting,
+                    kind: Self::guess_kind(&header),
+                    header_text: header,
+                });
+            }
+        }
+    }
+
+    /// Guess the scope kind from the header line.
+    fn guess_kind(header: &str) -> ScopeKind {
+        let trimmed = header.trim();
+        if trimmed.starts_with("fn ") || trimmed.starts_with("def ") || trimmed.starts_with("func ") {
+            ScopeKind::Function
+        } else if trimmed.starts_with("class ") || trimmed.starts_with("struct ") {
+            ScopeKind::Class
+        } else if trimmed.starts_with("mod ") {
+            ScopeKind::Module
+        } else if trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("loop") {
+            ScopeKind::Loop
+        } else if trimmed.starts_with("if ") || trimmed.starts_with("else") || trimmed.starts_with("match ") {
+            ScopeKind::Conditional
+        } else {
+            ScopeKind::Unknown
+        }
+    }
+
+    /// Get all detected scopes.
+    pub fn scopes(&self) -> &[DetectedScope] {
+        &self.scopes
+    }
+
+    /// Get scopes active at a particular line.
+    pub fn scopes_at_line(&self, line: u32) -> Vec<&DetectedScope> {
+        self.scopes.iter().filter(|s| s.contains_line(line)).collect()
+    }
+
+    /// Clear all detected scopes.
+    pub fn clear(&mut self) {
+        self.scopes.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StickyScrollAnimationController
+// ---------------------------------------------------------------------------
+
+/// Easing function used for scroll animation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EasingFunction {
+    Linear,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+}
+
+impl EasingFunction {
+    /// Compute the eased value for `t` in `[0.0, 1.0]`.
+    pub fn apply(self, t: f64) -> f64 {
+        let t = t.clamp(0.0, 1.0);
+        match self {
+            Self::Linear => t,
+            Self::EaseIn => t * t,
+            Self::EaseOut => t * (2.0 - t),
+            Self::EaseInOut => {
+                if t < 0.5 { 2.0 * t * t } else { -1.0 + (4.0 - 2.0 * t) * t }
+            }
+        }
+    }
+}
+
+/// Controls scroll animation timing and easing for sticky scroll transitions.
+#[derive(Debug)]
+pub struct StickyScrollAnimationController {
+    easing: EasingFunction,
+    duration_ms: u64,
+    current_progress: f64,
+    start_offset: f64,
+    target_offset: f64,
+    is_running: bool,
+    elapsed_ms: u64,
+}
+
+impl StickyScrollAnimationController {
+    pub fn new(easing: EasingFunction, duration_ms: u64) -> Self {
+        Self {
+            easing,
+            duration_ms,
+            current_progress: 0.0,
+            start_offset: 0.0,
+            target_offset: 0.0,
+            is_running: false,
+            elapsed_ms: 0,
+        }
+    }
+
+    /// Start an animation from `start` to `target`.
+    pub fn start(&mut self, start: f64, target: f64) {
+        self.start_offset = start;
+        self.target_offset = target;
+        self.current_progress = 0.0;
+        self.elapsed_ms = 0;
+        self.is_running = true;
+    }
+
+    /// Advance the animation by `delta_ms` milliseconds. Returns the current offset.
+    pub fn tick(&mut self, delta_ms: u64) -> f64 {
+        if !self.is_running {
+            return self.target_offset;
+        }
+        self.elapsed_ms += delta_ms;
+        if self.elapsed_ms >= self.duration_ms {
+            self.is_running = false;
+            self.current_progress = 1.0;
+            return self.target_offset;
+        }
+        let t = self.elapsed_ms as f64 / self.duration_ms as f64;
+        self.current_progress = self.easing.apply(t);
+        self.start_offset + (self.target_offset - self.start_offset) * self.current_progress
+    }
+
+    /// Current interpolated offset.
+    pub fn current_offset(&self) -> f64 {
+        self.start_offset + (self.target_offset - self.start_offset) * self.current_progress
+    }
+
+    /// Whether the animation is currently running.
+    pub fn is_running(&self) -> bool {
+        self.is_running
+    }
+
+    /// Cancel the animation, snapping to the target.
+    pub fn cancel(&mut self) {
+        self.is_running = false;
+        self.current_progress = 1.0;
+    }
+
+    /// Reset to idle state.
+    pub fn reset(&mut self) {
+        self.is_running = false;
+        self.current_progress = 0.0;
+        self.elapsed_ms = 0;
+        self.start_offset = 0.0;
+        self.target_offset = 0.0;
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2387,4 +2659,134 @@ mod tests {
         let s = format!("{det}");
         assert!(s.contains("keywords"));
     }
+
+    // -- StickyScrollScopeDetectorEngine tests --------------------------------
+
+    #[test]
+    fn scope_detect_simple_indentation() {
+        let mut engine = StickyScrollScopeDetectorEngine::new(4, 10);
+        let source = "def foo():\n    body\n    more\nend";
+        engine.detect_by_indentation(source);
+        assert!(!engine.scopes().is_empty());
+        assert_eq!(engine.scopes()[0].kind, ScopeKind::Function);
+    }
+
+    #[test]
+    fn scope_contains_line() {
+        let s = DetectedScope {
+            start_line: 5,
+            end_line: 10,
+            nesting: 0,
+            kind: ScopeKind::Block,
+            header_text: "block".into(),
+        };
+        assert!(s.contains_line(5));
+        assert!(s.contains_line(10));
+        assert!(!s.contains_line(11));
+    }
+
+    #[test]
+    fn scope_line_count() {
+        let s = DetectedScope {
+            start_line: 3,
+            end_line: 7,
+            nesting: 0,
+            kind: ScopeKind::Function,
+            header_text: "fn foo".into(),
+        };
+        assert_eq!(s.line_count(), 5);
+    }
+
+    #[test]
+    fn scope_kind_display() {
+        assert_eq!(ScopeKind::Function.to_string(), "function");
+        assert_eq!(ScopeKind::Class.to_string(), "class");
+        assert_eq!(ScopeKind::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn scope_scopes_at_line() {
+        let mut engine = StickyScrollScopeDetectorEngine::new(4, 10);
+        let source = "if cond:\n    inner\n    more\noutside";
+        engine.detect_by_indentation(source);
+        let at_1 = engine.scopes_at_line(1);
+        assert!(!at_1.is_empty());
+    }
+
+    #[test]
+    fn scope_clear() {
+        let mut engine = StickyScrollScopeDetectorEngine::new(4, 10);
+        engine.detect_by_indentation("def foo():\n    body");
+        assert!(!engine.scopes().is_empty());
+        engine.clear();
+        assert!(engine.scopes().is_empty());
+    }
+
+    // -- StickyScrollAnimationController tests --------------------------------
+
+    #[test]
+    fn animation_linear_halfway() {
+        let mut c = StickyScrollAnimationController::new(EasingFunction::Linear, 100);
+        c.start(0.0, 100.0);
+        let val = c.tick(50);
+        assert!((val - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn animation_completes() {
+        let mut c = StickyScrollAnimationController::new(EasingFunction::Linear, 100);
+        c.start(0.0, 200.0);
+        let val = c.tick(150);
+        assert!((val - 200.0).abs() < 0.01);
+        assert!(!c.is_running());
+    }
+
+    #[test]
+    fn animation_cancel() {
+        let mut c = StickyScrollAnimationController::new(EasingFunction::EaseIn, 100);
+        c.start(0.0, 50.0);
+        c.tick(10);
+        c.cancel();
+        assert!(!c.is_running());
+        assert!((c.current_offset() - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn animation_controller_reset() {
+        let mut c = StickyScrollAnimationController::new(EasingFunction::Linear, 100);
+        c.start(10.0, 90.0);
+        c.tick(50);
+        c.reset();
+        assert!(!c.is_running());
+        assert!((c.current_offset() - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn easing_ease_in_starts_slow() {
+        let val = EasingFunction::EaseIn.apply(0.5);
+        assert!(val < 0.5); // quadratic: 0.25
+    }
+
+    #[test]
+    fn easing_ease_out_starts_fast() {
+        let val = EasingFunction::EaseOut.apply(0.5);
+        assert!(val > 0.5); // 0.75
+    }
+
+    #[test]
+    fn easing_clamps() {
+        assert!((EasingFunction::Linear.apply(-0.5) - 0.0).abs() < 0.001);
+        assert!((EasingFunction::Linear.apply(1.5) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn animation_not_running_returns_target() {
+        let mut c = StickyScrollAnimationController::new(EasingFunction::Linear, 100);
+        c.start(0.0, 42.0);
+        c.tick(200); // finish
+        let val = c.tick(10); // already done
+        assert!((val - 42.0).abs() < 0.01);
+    }
+
+
 }

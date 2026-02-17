@@ -1539,6 +1539,353 @@ impl fmt::Display for PerfRegressionDetector {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// PerfBudgetAlert
+// ---------------------------------------------------------------------------
+
+/// Severity of a budget alert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlertSeverity {
+    /// Performance is within budget.
+    Ok,
+    /// Performance is close to the budget threshold.
+    Warning,
+    /// Performance exceeds the budget.
+    Critical,
+}
+
+impl fmt::Display for AlertSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ok => write!(f, "OK"),
+            Self::Warning => write!(f, "WARNING"),
+            Self::Critical => write!(f, "CRITICAL"),
+        }
+    }
+}
+
+/// A budget rule for a named metric.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BudgetRule {
+    pub metric_name: String,
+    pub warning_threshold_ms: f64,
+    pub critical_threshold_ms: f64,
+}
+
+/// A triggered alert from budget evaluation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PerfAlert {
+    pub metric_name: String,
+    pub measured_ms: f64,
+    pub severity: AlertSeverity,
+    pub message: String,
+}
+
+impl fmt::Display for PerfAlert {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}: {:.2}ms - {}", self.severity, self.metric_name, self.measured_ms, self.message)
+    }
+}
+
+/// Monitors performance budgets and triggers alerts.
+#[derive(Debug, Clone)]
+pub struct PerfBudgetAlert {
+    rules: Vec<BudgetRule>,
+    alerts: Vec<PerfAlert>,
+    evaluations: u64,
+}
+
+impl PerfBudgetAlert {
+    /// Create a new budget alert monitor.
+    pub fn new() -> Self {
+        Self {
+            rules: Vec::new(),
+            alerts: Vec::new(),
+            evaluations: 0,
+        }
+    }
+
+    /// Add a budget rule.
+    pub fn add_rule(&mut self, rule: BudgetRule) {
+        self.rules.push(rule);
+    }
+
+    /// Remove rules for a given metric name. Returns count removed.
+    pub fn remove_rules(&mut self, metric_name: &str) -> usize {
+        let before = self.rules.len();
+        self.rules.retain(|r| r.metric_name != metric_name);
+        before - self.rules.len()
+    }
+
+    /// Evaluate a measurement against all matching rules.
+    pub fn evaluate(&mut self, metric_name: &str, measured_ms: f64) -> Vec<PerfAlert> {
+        self.evaluations += 1;
+        let mut new_alerts = Vec::new();
+        for rule in &self.rules {
+            if rule.metric_name == metric_name {
+                let (severity, message) = if measured_ms >= rule.critical_threshold_ms {
+                    (AlertSeverity::Critical, format!(
+                        "exceeds critical budget {:.2}ms",
+                        rule.critical_threshold_ms
+                    ))
+                } else if measured_ms >= rule.warning_threshold_ms {
+                    (AlertSeverity::Warning, format!(
+                        "exceeds warning budget {:.2}ms",
+                        rule.warning_threshold_ms
+                    ))
+                } else {
+                    (AlertSeverity::Ok, "within budget".to_string())
+                };
+                let alert = PerfAlert {
+                    metric_name: metric_name.to_string(),
+                    measured_ms,
+                    severity,
+                    message,
+                };
+                new_alerts.push(alert.clone());
+                self.alerts.push(alert);
+            }
+        }
+        new_alerts
+    }
+
+    /// Get all alerts that have been triggered.
+    pub fn all_alerts(&self) -> &[PerfAlert] {
+        &self.alerts
+    }
+
+    /// Get only critical alerts.
+    pub fn critical_alerts(&self) -> Vec<&PerfAlert> {
+        self.alerts.iter().filter(|a| a.severity == AlertSeverity::Critical).collect()
+    }
+
+    /// Get only warning alerts.
+    pub fn warning_alerts(&self) -> Vec<&PerfAlert> {
+        self.alerts.iter().filter(|a| a.severity == AlertSeverity::Warning).collect()
+    }
+
+    /// Number of rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// Number of alerts.
+    pub fn alert_count(&self) -> usize {
+        self.alerts.len()
+    }
+
+    /// Number of evaluations.
+    pub fn evaluation_count(&self) -> u64 {
+        self.evaluations
+    }
+
+    /// Clear all alerts.
+    pub fn clear_alerts(&mut self) {
+        self.alerts.clear();
+    }
+
+    /// Clear all rules and alerts.
+    pub fn reset(&mut self) {
+        self.rules.clear();
+        self.alerts.clear();
+        self.evaluations = 0;
+    }
+
+    /// Check if any critical alerts exist.
+    pub fn has_critical(&self) -> bool {
+        self.alerts.iter().any(|a| a.severity == AlertSeverity::Critical)
+    }
+}
+
+impl fmt::Display for PerfBudgetAlert {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BudgetAlert({} rules, {} alerts, {} evals)",
+            self.rule_count(),
+            self.alert_count(),
+            self.evaluations
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PerfFlameGraphBuilder
+// ---------------------------------------------------------------------------
+
+/// A node in a flame graph.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FlameNode {
+    pub label: String,
+    pub duration_ms: f64,
+    pub self_time_ms: f64,
+    pub children: Vec<FlameNode>,
+    pub depth: u32,
+}
+
+impl FlameNode {
+    /// Create a new leaf node.
+    pub fn leaf(label: impl Into<String>, duration_ms: f64) -> Self {
+        Self {
+            label: label.into(),
+            duration_ms,
+            self_time_ms: duration_ms,
+            children: Vec::new(),
+            depth: 0,
+        }
+    }
+
+    /// Total number of nodes in this subtree.
+    pub fn node_count(&self) -> usize {
+        1 + self.children.iter().map(|c| c.node_count()).sum::<usize>()
+    }
+
+    /// Maximum depth of the subtree.
+    pub fn max_depth(&self) -> u32 {
+        if self.children.is_empty() {
+            self.depth
+        } else {
+            self.children.iter().map(|c| c.max_depth()).max().unwrap_or(self.depth)
+        }
+    }
+}
+
+impl fmt::Display for FlameNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({:.2}ms, self={:.2}ms)", self.label, self.duration_ms, self.self_time_ms)
+    }
+}
+
+/// Builds flame graph data structures from perf spans.
+#[derive(Debug, Clone)]
+pub struct PerfFlameGraphBuilder {
+    /// Stack of open spans: (label, start_ms).
+    stack: Vec<(String, f64)>,
+    /// Completed root nodes.
+    roots: Vec<FlameNode>,
+    /// Total spans processed.
+    spans_processed: u64,
+}
+
+impl PerfFlameGraphBuilder {
+    /// Create a new builder.
+    pub fn new() -> Self {
+        Self {
+            stack: Vec::new(),
+            roots: Vec::new(),
+            spans_processed: 0,
+        }
+    }
+
+    /// Begin a new span.
+    pub fn begin_span(&mut self, label: impl Into<String>, start_ms: f64) {
+        self.stack.push((label.into(), start_ms));
+    }
+
+    /// End the current span.
+    pub fn end_span(&mut self, end_ms: f64) -> Option<FlameNode> {
+        let (label, start_ms) = self.stack.pop()?;
+        self.spans_processed += 1;
+        let duration = end_ms - start_ms;
+        let node = FlameNode {
+            label,
+            duration_ms: duration,
+            self_time_ms: duration,
+            children: Vec::new(),
+            depth: self.stack.len() as u32,
+        };
+        if self.stack.is_empty() {
+            self.roots.push(node.clone());
+        }
+        Some(node)
+    }
+
+    /// Add a completed node directly as a root.
+    pub fn add_root(&mut self, node: FlameNode) {
+        self.roots.push(node);
+        self.spans_processed += 1;
+    }
+
+    /// Build a flame node from a parent label and child nodes.
+    pub fn build_node(label: impl Into<String>, children: Vec<FlameNode>) -> FlameNode {
+        let total: f64 = children.iter().map(|c| c.duration_ms).sum();
+        let child_time: f64 = children.iter().map(|c| c.duration_ms).sum();
+        FlameNode {
+            label: label.into(),
+            duration_ms: total,
+            self_time_ms: total - child_time,
+            children,
+            depth: 0,
+        }
+    }
+
+    /// Get all root nodes.
+    pub fn roots(&self) -> &[FlameNode] {
+        &self.roots
+    }
+
+    /// Total number of root nodes.
+    pub fn root_count(&self) -> usize {
+        self.roots.len()
+    }
+
+    /// Total number of spans processed.
+    pub fn spans_processed(&self) -> u64 {
+        self.spans_processed
+    }
+
+    /// Current stack depth.
+    pub fn stack_depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Total duration of all root nodes.
+    pub fn total_duration_ms(&self) -> f64 {
+        self.roots.iter().map(|r| r.duration_ms).sum()
+    }
+
+    /// Find the slowest root node.
+    pub fn slowest_root(&self) -> Option<&FlameNode> {
+        self.roots.iter().max_by(|a, b| a.duration_ms.partial_cmp(&b.duration_ms).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// Clear all roots and stack.
+    pub fn reset(&mut self) {
+        self.stack.clear();
+        self.roots.clear();
+        self.spans_processed = 0;
+    }
+
+    /// Flatten all nodes (roots + children) into a list.
+    pub fn flatten(&self) -> Vec<&FlameNode> {
+        fn collect<'a>(node: &'a FlameNode, out: &mut Vec<&'a FlameNode>) {
+            out.push(node);
+            for child in &node.children {
+                collect(child, out);
+            }
+        }
+        let mut result = Vec::new();
+        for root in &self.roots {
+            collect(root, &mut result);
+        }
+        result
+    }
+}
+
+impl fmt::Display for PerfFlameGraphBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "FlameGraphBuilder({} roots, {:.2}ms total, {} spans)",
+            self.root_count(),
+            self.total_duration_ms(),
+            self.spans_processed
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2394,4 +2741,184 @@ mod tests {
         let s = format!("{det}");
         assert!(s.contains("baselines"));
     }
+
+    #[test]
+    fn budget_alert_no_rules() {
+        let mut monitor = PerfBudgetAlert::new();
+        let alerts = monitor.evaluate("metric", 100.0);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn budget_alert_within_budget() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.add_rule(BudgetRule {
+            metric_name: "render".into(),
+            warning_threshold_ms: 16.0,
+            critical_threshold_ms: 33.0,
+        });
+        let alerts = monitor.evaluate("render", 10.0);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].severity, AlertSeverity::Ok);
+    }
+
+    #[test]
+    fn budget_alert_warning() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.add_rule(BudgetRule {
+            metric_name: "render".into(),
+            warning_threshold_ms: 16.0,
+            critical_threshold_ms: 33.0,
+        });
+        let alerts = monitor.evaluate("render", 20.0);
+        assert_eq!(alerts[0].severity, AlertSeverity::Warning);
+    }
+
+    #[test]
+    fn budget_alert_critical() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.add_rule(BudgetRule {
+            metric_name: "render".into(),
+            warning_threshold_ms: 16.0,
+            critical_threshold_ms: 33.0,
+        });
+        let alerts = monitor.evaluate("render", 50.0);
+        assert_eq!(alerts[0].severity, AlertSeverity::Critical);
+        assert!(monitor.has_critical());
+    }
+
+    #[test]
+    fn budget_alert_remove_rules() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.add_rule(BudgetRule {
+            metric_name: "render".into(),
+            warning_threshold_ms: 16.0,
+            critical_threshold_ms: 33.0,
+        });
+        assert_eq!(monitor.remove_rules("render"), 1);
+        assert_eq!(monitor.rule_count(), 0);
+    }
+
+    #[test]
+    fn budget_alert_clear() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.add_rule(BudgetRule {
+            metric_name: "x".into(),
+            warning_threshold_ms: 1.0,
+            critical_threshold_ms: 2.0,
+        });
+        monitor.evaluate("x", 5.0);
+        monitor.clear_alerts();
+        assert_eq!(monitor.alert_count(), 0);
+    }
+
+    #[test]
+    fn budget_alert_display() {
+        let monitor = PerfBudgetAlert::new();
+        let s = format!("{monitor}");
+        assert!(s.contains("0 rules"));
+    }
+
+    #[test]
+    fn budget_alert_evaluation_count() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.evaluate("a", 1.0);
+        monitor.evaluate("b", 2.0);
+        assert_eq!(monitor.evaluation_count(), 2);
+    }
+
+    #[test]
+    fn budget_alert_reset() {
+        let mut monitor = PerfBudgetAlert::new();
+        monitor.add_rule(BudgetRule {
+            metric_name: "x".into(),
+            warning_threshold_ms: 1.0,
+            critical_threshold_ms: 2.0,
+        });
+        monitor.evaluate("x", 5.0);
+        monitor.reset();
+        assert_eq!(monitor.rule_count(), 0);
+        assert_eq!(monitor.alert_count(), 0);
+        assert_eq!(monitor.evaluation_count(), 0);
+    }
+
+    #[test]
+    fn flame_graph_begin_end() {
+        let mut builder = PerfFlameGraphBuilder::new();
+        builder.begin_span("main", 0.0);
+        let node = builder.end_span(100.0).unwrap();
+        assert_eq!(node.label, "main");
+        assert!((node.duration_ms - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn flame_graph_nested_spans() {
+        let mut builder = PerfFlameGraphBuilder::new();
+        builder.begin_span("outer", 0.0);
+        builder.begin_span("inner", 10.0);
+        let inner = builder.end_span(50.0).unwrap();
+        assert_eq!(inner.depth, 1);
+        let outer = builder.end_span(100.0).unwrap();
+        assert_eq!(outer.depth, 0);
+    }
+
+    #[test]
+    fn flame_graph_add_root() {
+        let mut builder = PerfFlameGraphBuilder::new();
+        builder.add_root(FlameNode::leaf("task", 50.0));
+        assert_eq!(builder.root_count(), 1);
+        assert!((builder.total_duration_ms() - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn flame_graph_slowest_root() {
+        let mut builder = PerfFlameGraphBuilder::new();
+        builder.add_root(FlameNode::leaf("fast", 10.0));
+        builder.add_root(FlameNode::leaf("slow", 100.0));
+        builder.add_root(FlameNode::leaf("medium", 50.0));
+        let slowest = builder.slowest_root().unwrap();
+        assert_eq!(slowest.label, "slow");
+    }
+
+    #[test]
+    fn flame_graph_flatten() {
+        let mut builder = PerfFlameGraphBuilder::new();
+        let child = FlameNode::leaf("child", 30.0);
+        let parent = FlameNode {
+            label: "parent".into(),
+            duration_ms: 100.0,
+            self_time_ms: 70.0,
+            children: vec![child],
+            depth: 0,
+        };
+        builder.add_root(parent);
+        assert_eq!(builder.flatten().len(), 2);
+    }
+
+    #[test]
+    fn flame_graph_reset() {
+        let mut builder = PerfFlameGraphBuilder::new();
+        builder.add_root(FlameNode::leaf("a", 10.0));
+        builder.begin_span("b", 0.0);
+        builder.reset();
+        assert_eq!(builder.root_count(), 0);
+        assert_eq!(builder.stack_depth(), 0);
+    }
+
+    #[test]
+    fn flame_graph_display() {
+        let builder = PerfFlameGraphBuilder::new();
+        let s = format!("{builder}");
+        assert!(s.contains("0 roots"));
+    }
+
+    #[test]
+    fn flame_node_display() {
+        let node = FlameNode::leaf("test", 42.5);
+        let s = format!("{node}");
+        assert!(s.contains("test"));
+        assert!(s.contains("42.50ms"));
+    }
+
+
 }

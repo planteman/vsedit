@@ -1506,6 +1506,294 @@ pub fn format_outline(headings: &[(u8, String, usize)]) -> String {
     }).collect::<Vec<_>>().join("\n")
 }
 
+
+// ---------------------------------------------------------------------------
+// Footnote renderer
+// ---------------------------------------------------------------------------
+
+/// Represents a footnote reference found in Markdown text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FootnoteRef {
+    /// The label used in the text, e.g. `[^1]`.
+    pub label: String,
+    /// Zero-based index into the footnote list.
+    pub index: usize,
+}
+
+/// Collects and renders Markdown footnotes.
+///
+/// Footnotes are stored as `[^label]: content` and referenced inline with
+/// `[^label]`.  The renderer resolves references to numeric indices and
+/// produces a rendered footnote section.
+#[derive(Debug, Clone)]
+pub struct MarkdownFootnoteRenderer {
+    definitions: Vec<(String, String)>,
+}
+
+impl MarkdownFootnoteRenderer {
+    /// Create a new empty footnote renderer.
+    pub fn new() -> Self {
+        Self { definitions: Vec::new() }
+    }
+
+    /// Register a footnote definition.
+    pub fn add_definition(&mut self, label: impl Into<String>, content: impl Into<String>) {
+        self.definitions.push((label.into(), content.into()));
+    }
+
+    /// Look up a footnote by label and return its index.
+    pub fn resolve(&self, label: &str) -> Option<FootnoteRef> {
+        self.definitions.iter().enumerate().find_map(|(i, (l, _))| {
+            if l == label {
+                Some(FootnoteRef { label: label.to_string(), index: i })
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Render the footnote section as plain text.
+    pub fn render_section(&self) -> String {
+        if self.definitions.is_empty() {
+            return String::new();
+        }
+        let mut out = String::from("---\n");
+        for (i, (label, content)) in self.definitions.iter().enumerate() {
+            out.push_str(&format!("[^{}] ({}): {}\n", i + 1, label, content));
+        }
+        out
+    }
+
+    /// Return the total number of registered footnotes.
+    pub fn count(&self) -> usize {
+        self.definitions.len()
+    }
+
+    /// Return all labels in definition order.
+    pub fn labels(&self) -> Vec<&str> {
+        self.definitions.iter().map(|(l, _)| l.as_str()).collect()
+    }
+
+    /// Parse footnote definitions from a block of Markdown text.
+    ///
+    /// Lines matching `[^label]: content` are extracted.
+    pub fn parse_definitions(text: &str) -> Vec<(String, String)> {
+        let mut defs = Vec::new();
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("[^") {
+                if let Some(close) = trimmed.find("]:") {
+                    let label = trimmed[2..close].to_string();
+                    let content = trimmed[close + 2..].trim().to_string();
+                    defs.push((label, content));
+                }
+            }
+        }
+        defs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task-list toggling
+// ---------------------------------------------------------------------------
+
+/// Represents the state of a Markdown task-list item (`- [ ]` / `- [x]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskState {
+    Incomplete,
+    Complete,
+}
+
+/// Locates and toggles Markdown task-list checkboxes.
+#[derive(Debug, Clone)]
+pub struct MarkdownTaskListToggle {
+    items: Vec<(usize, TaskState, String)>,
+}
+
+impl MarkdownTaskListToggle {
+    /// Parse task-list items from Markdown source.
+    pub fn parse(source: &str) -> Self {
+        let mut items = Vec::new();
+        for (line_num, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("- [ ] ") {
+                let text = trimmed[6..].to_string();
+                items.push((line_num, TaskState::Incomplete, text));
+            } else if trimmed.starts_with("- [x] ") || trimmed.starts_with("- [X] ") {
+                let text = trimmed[6..].to_string();
+                items.push((line_num, TaskState::Complete, text));
+            }
+        }
+        Self { items }
+    }
+
+    /// Return a slice of all parsed items.
+    pub fn items(&self) -> &[(usize, TaskState, String)] {
+        &self.items
+    }
+
+    /// Count of incomplete tasks.
+    pub fn incomplete_count(&self) -> usize {
+        self.items.iter().filter(|(_, s, _)| *s == TaskState::Incomplete).count()
+    }
+
+    /// Count of completed tasks.
+    pub fn complete_count(&self) -> usize {
+        self.items.iter().filter(|(_, s, _)| *s == TaskState::Complete).count()
+    }
+
+    /// Toggle the state of the task at the given index, returning the new
+    /// source text.  If the index is out of range the original text is returned
+    /// unchanged.
+    pub fn toggle(&self, source: &str, item_index: usize) -> String {
+        if item_index >= self.items.len() {
+            return source.to_string();
+        }
+        let (target_line, state, _) = &self.items[item_index];
+        let mut result_lines: Vec<String> = Vec::new();
+        for (i, line) in source.lines().enumerate() {
+            if i == *target_line {
+                let new_line = match state {
+                    TaskState::Incomplete => line.replace("- [ ] ", "- [x] "),
+                    TaskState::Complete => {
+                        line.replace("- [x] ", "- [ ] ").replace("- [X] ", "- [ ] ")
+                    }
+                };
+                result_lines.push(new_line);
+            } else {
+                result_lines.push(line.to_string());
+            }
+        }
+        result_lines.join("\n")
+    }
+
+    /// Progress as a percentage (0–100).
+    pub fn progress_percent(&self) -> u8 {
+        if self.items.is_empty() {
+            return 0;
+        }
+        let done = self.complete_count();
+        ((done * 100) / self.items.len()) as u8
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Anchor generation
+// ---------------------------------------------------------------------------
+
+/// Generate a GitHub-compatible anchor slug from heading text.
+///
+/// Rules: lowercase, strip non-alphanumeric characters except hyphens and
+/// spaces, collapse whitespace to hyphens.
+pub fn generate_anchor(heading: &str) -> String {
+    let mut slug = String::new();
+    for ch in heading.chars() {
+        if ch.is_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+        } else if ch == ' ' || ch == '-' {
+            if !slug.ends_with('-') {
+                slug.push('-');
+            }
+        }
+    }
+    slug.trim_matches('-').to_string()
+}
+
+/// Generate anchors for every heading in a list and return `(level, title, anchor)`.
+pub fn generate_heading_anchors(headings: &[(u8, String, usize)]) -> Vec<(u8, String, String)> {
+    headings.iter().map(|(level, title, _line)| {
+        (*level, title.clone(), generate_anchor(title))
+    }).collect()
+}
+
+/// Build a Markdown table-of-contents from headings with anchor links.
+pub fn build_toc(headings: &[(u8, String, usize)]) -> String {
+    let anchored = generate_heading_anchors(headings);
+    let mut toc = String::new();
+    for (level, title, anchor) in &anchored {
+        let indent = "  ".repeat((*level as usize).saturating_sub(1));
+        toc.push_str(&format!("{}- [{}](#{})\n", indent, title, anchor));
+    }
+    toc
+}
+
+// ---------------------------------------------------------------------------
+// Code-fence language detection
+// ---------------------------------------------------------------------------
+
+/// Detect the language identifier from a fenced code block opening line.
+///
+/// Given a line like `` ```rust `` returns `Some("rust")`.
+pub fn detect_code_fence_language(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("```") {
+        return None;
+    }
+    let after = trimmed[3..].trim();
+    if after.is_empty() || after == "```" {
+        return None;
+    }
+    // Take the first word (no spaces allowed in the info string's language).
+    let lang = after.split_whitespace().next()?;
+    Some(lang.to_string())
+}
+
+/// Map a code-fence language tag to a display-friendly name.
+pub fn language_display_name(tag: &str) -> &str {
+    match tag {
+        "rs" | "rust" => "Rust",
+        "py" | "python" | "python3" => "Python",
+        "js" | "javascript" => "JavaScript",
+        "ts" | "typescript" => "TypeScript",
+        "rb" | "ruby" => "Ruby",
+        "go" | "golang" => "Go",
+        "java" => "Java",
+        "c" => "C",
+        "cpp" | "c++" | "cxx" => "C++",
+        "cs" | "csharp" => "C#",
+        "sh" | "bash" | "shell" => "Shell",
+        "json" => "JSON",
+        "yaml" | "yml" => "YAML",
+        "toml" => "TOML",
+        "xml" => "XML",
+        "html" => "HTML",
+        "css" => "CSS",
+        "sql" => "SQL",
+        "md" | "markdown" => "Markdown",
+        other => other,
+    }
+}
+
+/// Extract all fenced code blocks from raw Markdown source text, returning
+/// `(language, code_content)` pairs.
+pub fn extract_fenced_code_blocks(source: &str) -> Vec<(Option<String>, String)> {
+    let mut blocks = Vec::new();
+    let mut in_block = false;
+    let mut current_lang: Option<String> = None;
+    let mut current_code = String::new();
+
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if !in_block && trimmed.starts_with("```") {
+            in_block = true;
+            current_lang = detect_code_fence_language(line);
+            current_code.clear();
+        } else if in_block && trimmed == "```" {
+            blocks.push((current_lang.take(), current_code.clone()));
+            current_code.clear();
+            in_block = false;
+        } else if in_block {
+            if !current_code.is_empty() {
+                current_code.push('\n');
+            }
+            current_code.push_str(line);
+        }
+    }
+    blocks
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2203,4 +2491,182 @@ mod tests {
         assert!(formatted.contains("Title"));
         assert!(formatted.contains("  Section")); // indented
     }
+
+    // -----------------------------------------------------------------------
+    // MarkdownFootnoteRenderer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn footnote_add_and_resolve() {
+        let mut renderer = MarkdownFootnoteRenderer::new();
+        renderer.add_definition("note1", "First footnote");
+        renderer.add_definition("note2", "Second footnote");
+        assert_eq!(renderer.count(), 2);
+        let r = renderer.resolve("note1").unwrap();
+        assert_eq!(r.index, 0);
+        assert_eq!(r.label, "note1");
+        assert!(renderer.resolve("missing").is_none());
+    }
+
+    #[test]
+    fn footnote_render_section() {
+        let mut renderer = MarkdownFootnoteRenderer::new();
+        renderer.add_definition("a", "Alpha");
+        renderer.add_definition("b", "Beta");
+        let section = renderer.render_section();
+        assert!(section.starts_with("---\n"));
+        assert!(section.contains("[^1] (a): Alpha"));
+        assert!(section.contains("[^2] (b): Beta"));
+    }
+
+    #[test]
+    fn footnote_empty_section() {
+        let renderer = MarkdownFootnoteRenderer::new();
+        assert_eq!(renderer.render_section(), "");
+    }
+
+    #[test]
+    fn footnote_labels() {
+        let mut renderer = MarkdownFootnoteRenderer::new();
+        renderer.add_definition("x", "");
+        renderer.add_definition("y", "");
+        assert_eq!(renderer.labels(), vec!["x", "y"]);
+    }
+
+    #[test]
+    fn footnote_parse_definitions() {
+        let text = "[^fn1]: First\n[^fn2]: Second\nNormal line\n";
+        let defs = MarkdownFootnoteRenderer::parse_definitions(text);
+        assert_eq!(defs.len(), 2);
+        assert_eq!(defs[0], ("fn1".to_string(), "First".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // MarkdownTaskListToggle tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn task_list_parse() {
+        let src = "- [ ] Task A\n- [x] Task B\n- [ ] Task C\n";
+        let toggle = MarkdownTaskListToggle::parse(src);
+        assert_eq!(toggle.items().len(), 3);
+        assert_eq!(toggle.incomplete_count(), 2);
+        assert_eq!(toggle.complete_count(), 1);
+    }
+
+    #[test]
+    fn task_list_toggle_incomplete() {
+        let src = "- [ ] Task A\n- [x] Task B\n";
+        let toggle = MarkdownTaskListToggle::parse(src);
+        let result = toggle.toggle(src, 0);
+        assert!(result.contains("- [x] Task A"));
+    }
+
+    #[test]
+    fn task_list_toggle_complete() {
+        let src = "- [ ] Task A\n- [x] Task B\n";
+        let toggle = MarkdownTaskListToggle::parse(src);
+        let result = toggle.toggle(src, 1);
+        assert!(result.contains("- [ ] Task B"));
+    }
+
+    #[test]
+    fn task_list_progress() {
+        let src = "- [x] Done\n- [ ] Todo\n- [x] Also Done\n- [ ] Another\n";
+        let toggle = MarkdownTaskListToggle::parse(src);
+        assert_eq!(toggle.progress_percent(), 50);
+    }
+
+    #[test]
+    fn task_list_empty_progress() {
+        let toggle = MarkdownTaskListToggle::parse("No tasks here");
+        assert_eq!(toggle.progress_percent(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Anchor generation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn anchor_simple_heading() {
+        assert_eq!(generate_anchor("Hello World"), "hello-world");
+    }
+
+    #[test]
+    fn anchor_special_chars() {
+        assert_eq!(generate_anchor("What's New?"), "whats-new");
+    }
+
+    #[test]
+    fn anchor_multiple_spaces() {
+        assert_eq!(generate_anchor("A   B"), "a-b");
+    }
+
+    #[test]
+    fn anchor_heading_anchors() {
+        let headings = vec![
+            (1, "Title".into(), 1),
+            (2, "Section One".into(), 5),
+        ];
+        let anchored = generate_heading_anchors(&headings);
+        assert_eq!(anchored[0].2, "title");
+        assert_eq!(anchored[1].2, "section-one");
+    }
+
+    #[test]
+    fn toc_generation() {
+        let headings = vec![
+            (1, "Intro".into(), 1),
+            (2, "Details".into(), 3),
+        ];
+        let toc = build_toc(&headings);
+        assert!(toc.contains("[Intro](#intro)"));
+        assert!(toc.contains("[Details](#details)"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Code-fence language detection tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn detect_language_rust() {
+        assert_eq!(detect_code_fence_language("```rust"), Some("rust".into()));
+    }
+
+    #[test]
+    fn detect_language_none() {
+        assert_eq!(detect_code_fence_language("```"), None);
+    }
+
+    #[test]
+    fn detect_language_with_spaces() {
+        assert_eq!(detect_code_fence_language("  ```python  "), Some("python".into()));
+    }
+
+    #[test]
+    fn language_display() {
+        assert_eq!(language_display_name("rs"), "Rust");
+        assert_eq!(language_display_name("py"), "Python");
+        assert_eq!(language_display_name("unknown"), "unknown");
+    }
+
+    #[test]
+    fn extract_single_code_block() {
+        let src = "text\n```rust\nfn main() {}\n```\nmore";
+        let blocks = extract_fenced_code_blocks(src);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].0, Some("rust".into()));
+        assert_eq!(blocks[0].1, "fn main() {}");
+    }
+
+    #[test]
+    fn extract_multiple_code_blocks() {
+        let src = "```python\nprint(1)\n```\n\n```\nplain\n```\n";
+        let blocks = extract_fenced_code_blocks(src);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].0, Some("python".into()));
+        assert_eq!(blocks[1].0, None);
+    }
+
+
 }

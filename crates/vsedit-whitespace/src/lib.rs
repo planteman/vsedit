@@ -1407,6 +1407,402 @@ impl fmt::Display for WhitespaceVisualization {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// WhitespaceGuideRenderer — render indentation guides
+// ---------------------------------------------------------------------------
+
+/// Style for rendering indentation guide lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GuideStyle {
+    /// Thin vertical bar: │
+    Thin,
+    /// Dotted vertical line: ┆
+    Dotted,
+    /// No guide character (just spacing).
+    None,
+}
+
+impl fmt::Display for GuideStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Thin => write!(f, "thin"),
+            Self::Dotted => write!(f, "dotted"),
+            Self::None => write!(f, "none"),
+        }
+    }
+}
+
+/// Renders indentation guide characters for a set of lines.
+#[derive(Debug, Clone)]
+pub struct WhitespaceGuideRenderer {
+    pub tab_size: usize,
+    pub style: GuideStyle,
+    pub max_depth: usize,
+}
+
+impl WhitespaceGuideRenderer {
+    pub fn new(tab_size: usize, style: GuideStyle) -> Self {
+        Self {
+            tab_size: if tab_size == 0 { 1 } else { tab_size },
+            style,
+            max_depth: 20,
+        }
+    }
+
+    /// Return the guide character for the configured style.
+    pub fn guide_char(&self) -> char {
+        match self.style {
+            GuideStyle::Thin => '│',
+            GuideStyle::Dotted => '┆',
+            GuideStyle::None => ' ',
+        }
+    }
+
+    /// Compute the indentation depth (in units of `tab_size`) for a line.
+    pub fn indent_depth(&self, line: &str) -> usize {
+        let mut spaces = 0usize;
+        for ch in line.chars() {
+            match ch {
+                ' ' => spaces += 1,
+                '\t' => spaces += self.tab_size - (spaces % self.tab_size),
+                _ => break,
+            }
+        }
+        (spaces / self.tab_size).min(self.max_depth)
+    }
+
+    /// Render guide markers for a single line.
+    /// Returns a string of guide characters at each indentation level.
+    pub fn render_guides(&self, line: &str) -> String {
+        let depth = self.indent_depth(line);
+        if depth == 0 || self.style == GuideStyle::None {
+            return String::new();
+        }
+        let guide = self.guide_char();
+        let mut result = String::with_capacity(depth);
+        for _ in 0..depth {
+            result.push(guide);
+        }
+        result
+    }
+
+    /// Compute guide depths for multiple lines.
+    pub fn compute_depths(&self, lines: &[&str]) -> Vec<usize> {
+        lines.iter().map(|l| self.indent_depth(l)).collect()
+    }
+
+    /// Find the maximum indentation depth across all lines.
+    pub fn max_indent_depth(&self, lines: &[&str]) -> usize {
+        lines.iter().map(|l| self.indent_depth(l)).max().unwrap_or(0)
+    }
+
+    /// Render guides for all lines, returning (depth, guide_string) pairs.
+    pub fn render_all(&self, lines: &[&str]) -> Vec<(usize, String)> {
+        lines
+            .iter()
+            .map(|l| {
+                let d = self.indent_depth(l);
+                let g = self.render_guides(l);
+                (d, g)
+            })
+            .collect()
+    }
+}
+
+impl Default for WhitespaceGuideRenderer {
+    fn default() -> Self {
+        Self::new(4, GuideStyle::Thin)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceReport — statistics about whitespace in a document
+// ---------------------------------------------------------------------------
+
+/// Aggregated statistics about whitespace in a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WhitespaceReport {
+    /// Total number of lines analysed.
+    pub total_lines: usize,
+    /// Lines that contain trailing whitespace.
+    pub lines_with_trailing: usize,
+    /// Total number of trailing whitespace characters.
+    pub trailing_char_count: usize,
+    /// Lines that are entirely blank (only whitespace).
+    pub blank_lines: usize,
+    /// Number of lines using tabs for indentation.
+    pub tab_indented_lines: usize,
+    /// Number of lines using spaces for indentation.
+    pub space_indented_lines: usize,
+    /// Number of lines with mixed indentation.
+    pub mixed_indented_lines: usize,
+}
+
+impl WhitespaceReport {
+    /// Analyse a document and produce a report.
+    pub fn analyse(text: &str) -> Self {
+        let mut report = Self {
+            total_lines: 0,
+            lines_with_trailing: 0,
+            trailing_char_count: 0,
+            blank_lines: 0,
+            tab_indented_lines: 0,
+            space_indented_lines: 0,
+            mixed_indented_lines: 0,
+        };
+
+        for line in text.lines() {
+            report.total_lines += 1;
+
+            if line.trim().is_empty() {
+                report.blank_lines += 1;
+            }
+
+            let trailing = trailing_whitespace_count(line);
+            if trailing > 0 {
+                report.lines_with_trailing += 1;
+                report.trailing_char_count += trailing;
+            }
+
+            // Classify indentation
+            let indent_chars: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+            if !indent_chars.is_empty() {
+                let has_tabs = indent_chars.contains('\t');
+                let has_spaces = indent_chars.contains(' ');
+                if has_tabs && has_spaces {
+                    report.mixed_indented_lines += 1;
+                } else if has_tabs {
+                    report.tab_indented_lines += 1;
+                } else {
+                    report.space_indented_lines += 1;
+                }
+            }
+        }
+
+        report
+    }
+
+    /// Percentage of lines with trailing whitespace.
+    pub fn trailing_percentage(&self) -> f64 {
+        if self.total_lines == 0 {
+            return 0.0;
+        }
+        (self.lines_with_trailing as f64 / self.total_lines as f64) * 100.0
+    }
+
+    /// The dominant indentation style.
+    pub fn dominant_indent(&self) -> &'static str {
+        if self.tab_indented_lines > self.space_indented_lines {
+            "tabs"
+        } else if self.space_indented_lines > self.tab_indented_lines {
+            "spaces"
+        } else {
+            "mixed"
+        }
+    }
+
+    /// Whether the document has any whitespace issues.
+    pub fn has_issues(&self) -> bool {
+        self.lines_with_trailing > 0 || self.mixed_indented_lines > 0
+    }
+
+    /// A short summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} lines, {} trailing, {} blank, indent={}",
+            self.total_lines,
+            self.lines_with_trailing,
+            self.blank_lines,
+            self.dominant_indent()
+        )
+    }
+}
+
+impl fmt::Display for WhitespaceReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceAutoFix — auto-fix whitespace issues on save
+// ---------------------------------------------------------------------------
+
+/// Configuration for automatic whitespace fixing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoFixConfig {
+    pub trim_trailing: bool,
+    pub ensure_final_newline: bool,
+    pub trim_final_newlines: bool,
+    pub normalize_indent: bool,
+    pub target_indent: IndentStyle,
+    pub tab_size: usize,
+}
+
+/// The target indentation style for auto-fix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndentStyle {
+    Spaces,
+    Tabs,
+}
+
+impl fmt::Display for IndentStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Spaces => write!(f, "spaces"),
+            Self::Tabs => write!(f, "tabs"),
+        }
+    }
+}
+
+impl Default for AutoFixConfig {
+    fn default() -> Self {
+        Self {
+            trim_trailing: true,
+            ensure_final_newline: true,
+            trim_final_newlines: false,
+            normalize_indent: false,
+            target_indent: IndentStyle::Spaces,
+            tab_size: 4,
+        }
+    }
+}
+
+/// Result of an auto-fix pass.
+#[derive(Debug, Clone)]
+pub struct AutoFixResult {
+    pub original: String,
+    pub fixed: String,
+    pub changes_made: usize,
+}
+
+impl AutoFixResult {
+    /// Whether any changes were made.
+    pub fn was_modified(&self) -> bool {
+        self.changes_made > 0
+    }
+
+    /// Character-level difference in length.
+    pub fn length_delta(&self) -> isize {
+        self.fixed.len() as isize - self.original.len() as isize
+    }
+}
+
+/// Apply automatic whitespace fixes to a text buffer.
+pub fn auto_fix(text: &str, config: &AutoFixConfig) -> AutoFixResult {
+    let original = text.to_string();
+    let mut result = text.to_string();
+    let mut changes = 0usize;
+
+    if config.trim_trailing {
+        let trimmed = trim_trailing_whitespace(&result);
+        if trimmed != result {
+            changes += 1;
+            result = trimmed;
+        }
+    }
+
+    if config.normalize_indent {
+        let converted = match config.target_indent {
+            IndentStyle::Spaces => tabs_to_spaces(&result, config.tab_size),
+            IndentStyle::Tabs => spaces_to_tabs(&result, config.tab_size),
+        };
+        if converted != result {
+            changes += 1;
+            result = converted;
+        }
+    }
+
+    if config.trim_final_newlines {
+        let trimmed = trim_final_newlines(&result);
+        if trimmed != result {
+            changes += 1;
+            result = trimmed;
+        }
+    }
+
+    if config.ensure_final_newline {
+        let ensured = ensure_final_newline(&result);
+        if ensured != result {
+            changes += 1;
+            result = ensured;
+        }
+    }
+
+    AutoFixResult {
+        original,
+        fixed: result,
+        changes_made: changes,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceScopeDetector — detect indentation scope boundaries
+// ---------------------------------------------------------------------------
+
+/// A detected scope (block) based on indentation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentScope {
+    /// First line of the scope (0-based).
+    pub start_line: usize,
+    /// Last line of the scope (inclusive, 0-based).
+    pub end_line: usize,
+    /// Indentation depth of this scope.
+    pub depth: usize,
+}
+
+impl IndentScope {
+    /// Number of lines in this scope.
+    pub fn line_count(&self) -> usize {
+        self.end_line - self.start_line + 1
+    }
+}
+
+impl fmt::Display for IndentScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "scope(lines {}-{}, depth {})", self.start_line, self.end_line, self.depth)
+    }
+}
+
+/// Detect indentation-based scopes in a document.
+pub fn detect_scopes(text: &str, tab_size: usize) -> Vec<IndentScope> {
+    let renderer = WhitespaceGuideRenderer::new(tab_size, GuideStyle::None);
+    let lines: Vec<&str> = text.lines().collect();
+    let depths: Vec<usize> = lines.iter().map(|l| renderer.indent_depth(l)).collect();
+
+    let mut scopes: Vec<IndentScope> = Vec::new();
+    if depths.is_empty() {
+        return scopes;
+    }
+
+    let mut i = 0;
+    while i < depths.len() {
+        let depth = depths[i];
+        let start = i;
+        // Extend while depth is >= this depth
+        while i < depths.len() && depths[i] >= depth {
+            i += 1;
+        }
+        if i > start {
+            scopes.push(IndentScope {
+                start_line: start,
+                end_line: i - 1,
+                depth,
+            });
+        }
+    }
+    scopes
+}
+
+/// Find the scope containing a given line number.
+pub fn scope_at_line(scopes: &[IndentScope], line: usize) -> Option<&IndentScope> {
+    scopes
+        .iter()
+        .filter(|s| s.start_line <= line && s.end_line >= line)
+        .max_by_key(|s| s.depth)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2212,4 +2608,191 @@ mod tests {
         assert_eq!(IndentationType::Mixed.to_string(), "mixed");
         assert_eq!(IndentationType::Tabs.to_string(), "tabs");
     }
+
+    // --- WhitespaceGuideRenderer tests --------------------------------------
+
+    #[test]
+    fn guide_renderer_depth() {
+        let r = WhitespaceGuideRenderer::new(4, GuideStyle::Thin);
+        assert_eq!(r.indent_depth("hello"), 0);
+        assert_eq!(r.indent_depth("    hello"), 1);
+        assert_eq!(r.indent_depth("        hello"), 2);
+    }
+
+    #[test]
+    fn guide_renderer_tab_depth() {
+        let r = WhitespaceGuideRenderer::new(4, GuideStyle::Thin);
+        assert_eq!(r.indent_depth("\thello"), 1);
+        assert_eq!(r.indent_depth("\t\thello"), 2);
+    }
+
+    #[test]
+    fn guide_renderer_render() {
+        let r = WhitespaceGuideRenderer::new(4, GuideStyle::Thin);
+        assert_eq!(r.render_guides("        hello"), "││");
+    }
+
+    #[test]
+    fn guide_renderer_none_style() {
+        let r = WhitespaceGuideRenderer::new(4, GuideStyle::None);
+        assert_eq!(r.render_guides("    hello"), "");
+    }
+
+    #[test]
+    fn guide_renderer_max_depth() {
+        let lines: Vec<&str> = vec!["    a", "        b", "c"];
+        let r = WhitespaceGuideRenderer::default();
+        assert_eq!(r.max_indent_depth(&lines), 2);
+    }
+
+    #[test]
+    fn guide_renderer_render_all() {
+        let r = WhitespaceGuideRenderer::new(4, GuideStyle::Dotted);
+        let results = r.render_all(&["hello", "    world"]);
+        assert_eq!(results[0].0, 0);
+        assert_eq!(results[1].0, 1);
+        assert_eq!(r.guide_char(), '┆');
+    }
+
+    #[test]
+    fn guide_style_display() {
+        assert_eq!(GuideStyle::Thin.to_string(), "thin");
+        assert_eq!(GuideStyle::Dotted.to_string(), "dotted");
+    }
+
+    // --- WhitespaceReport tests ---------------------------------------------
+
+    #[test]
+    fn report_basic() {
+        let text = "hello   \n    world\n\n";
+        let report = WhitespaceReport::analyse(text);
+        assert_eq!(report.total_lines, 3);
+        assert!(report.lines_with_trailing > 0);
+        assert_eq!(report.blank_lines, 1);
+    }
+
+    #[test]
+    fn report_dominant_indent_spaces() {
+        let text = "    a\n    b\n    c";
+        let report = WhitespaceReport::analyse(text);
+        assert_eq!(report.dominant_indent(), "spaces");
+    }
+
+    #[test]
+    fn report_trailing_percentage() {
+        let text = "ok\ntrailing  \nok2";
+        let report = WhitespaceReport::analyse(text);
+        assert!(report.trailing_percentage() > 0.0);
+    }
+
+    #[test]
+    fn report_no_issues() {
+        let text = "clean\nlines\nhere";
+        let report = WhitespaceReport::analyse(text);
+        assert!(!report.has_issues());
+    }
+
+    #[test]
+    fn report_summary() {
+        let text = "a\nb";
+        let report = WhitespaceReport::analyse(text);
+        let s = report.summary();
+        assert!(s.contains("2 lines"));
+    }
+
+    #[test]
+    fn report_empty() {
+        let report = WhitespaceReport::analyse("");
+        assert_eq!(report.total_lines, 0);
+        assert!((report.trailing_percentage() - 0.0).abs() < f64::EPSILON);
+    }
+
+    // --- AutoFix tests ------------------------------------------------------
+
+    #[test]
+    fn autofix_trim_trailing() {
+        let config = AutoFixConfig::default();
+        let result = auto_fix("hello   \nworld  ", &config);
+        assert!(result.was_modified());
+        assert!(result.fixed.contains("hello"));
+        assert!(!result.fixed.contains("hello   "));
+    }
+
+    #[test]
+    fn autofix_ensure_final_newline() {
+        let config = AutoFixConfig {
+            trim_trailing: false,
+            ensure_final_newline: true,
+            trim_final_newlines: false,
+            normalize_indent: false,
+            target_indent: IndentStyle::Spaces,
+            tab_size: 4,
+        };
+        let result = auto_fix("hello", &config);
+        assert!(result.fixed.ends_with('\n'));
+    }
+
+    #[test]
+    fn autofix_no_change() {
+        let config = AutoFixConfig {
+            trim_trailing: false,
+            ensure_final_newline: false,
+            trim_final_newlines: false,
+            normalize_indent: false,
+            target_indent: IndentStyle::Spaces,
+            tab_size: 4,
+        };
+        let result = auto_fix("hello", &config);
+        assert!(!result.was_modified());
+    }
+
+    #[test]
+    fn autofix_length_delta() {
+        let config = AutoFixConfig::default();
+        let result = auto_fix("hello   ", &config);
+        assert!(result.length_delta() != 0 || result.was_modified());
+    }
+
+    #[test]
+    fn indent_style_display() {
+        assert_eq!(IndentStyle::Spaces.to_string(), "spaces");
+        assert_eq!(IndentStyle::Tabs.to_string(), "tabs");
+    }
+
+    // --- Scope detection tests ----------------------------------------------
+
+    #[test]
+    fn detect_scopes_basic() {
+        let text = "top\n    inner\n        deep\ntop2";
+        let scopes = detect_scopes(text, 4);
+        assert!(!scopes.is_empty());
+    }
+
+    #[test]
+    fn scope_at_line_basic() {
+        let text = "a\n    b\n    c\nd";
+        let scopes = detect_scopes(text, 4);
+        let s = scope_at_line(&scopes, 1);
+        assert!(s.is_some());
+    }
+
+    #[test]
+    fn indent_scope_line_count() {
+        let scope = IndentScope { start_line: 2, end_line: 5, depth: 1 };
+        assert_eq!(scope.line_count(), 4);
+    }
+
+    #[test]
+    fn indent_scope_display() {
+        let scope = IndentScope { start_line: 0, end_line: 3, depth: 2 };
+        let s = scope.to_string();
+        assert!(s.contains("depth 2"));
+    }
+
+    #[test]
+    fn detect_scopes_empty() {
+        let scopes = detect_scopes("", 4);
+        assert!(scopes.is_empty());
+    }
+
 }

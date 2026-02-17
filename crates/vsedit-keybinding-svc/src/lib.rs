@@ -11,6 +11,8 @@
 //! - **keybindings.json loading** with removal (`-command`) support
 //! - **50+ default keybindings** matching VS Code
 
+use std::fmt;
+
 use vsedit_contextkey::{ContextKeyExpr, IContext};
 use vsedit_keybindings::{
     keybinding_matches, parse_keybinding, serialize_keybinding, Keybinding,
@@ -794,6 +796,272 @@ pub fn register_default_keybindings(resolver: &mut KeybindingResolver) {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// KeybindingExporter – serialise bindings to JSON format
+// ---------------------------------------------------------------------------
+
+/// Exports keybinding configurations to a structured JSON-like format.
+#[derive(Debug, Clone)]
+pub struct KeybindingExporter {
+    pretty: bool,
+    include_defaults: bool,
+    include_extensions: bool,
+}
+
+impl KeybindingExporter {
+    pub fn new() -> Self {
+        Self {
+            pretty: true,
+            include_defaults: false,
+            include_extensions: true,
+        }
+    }
+
+    pub fn pretty(mut self, yes: bool) -> Self {
+        self.pretty = yes;
+        self
+    }
+
+    pub fn include_defaults(mut self, yes: bool) -> Self {
+        self.include_defaults = yes;
+        self
+    }
+
+    pub fn include_extensions(mut self, yes: bool) -> Self {
+        self.include_extensions = yes;
+        self
+    }
+
+    /// Export rules from a resolver to a JSON string.
+    pub fn export(&self, resolver: &KeybindingResolver) -> String {
+        let mut entries = Vec::new();
+        for rule in resolver.rules() {
+            let dominated = match &rule.source {
+                KeybindingSource::Default if !self.include_defaults => true,
+                KeybindingSource::Extension(_) if !self.include_extensions => true,
+                _ => false,
+            };
+            if dominated {
+                continue;
+            }
+            let key_str = serialize_keybinding(&rule.keybinding);
+            let when_str = rule
+                .when
+                .as_ref()
+                .map(|w| format!("{w:?}"))
+                .unwrap_or_default();
+            entries.push(format!(
+                "  {{ \"key\": \"{}\", \"command\": \"{}\", \"when\": \"{}\" }}",
+                key_str, rule.command, when_str
+            ));
+        }
+        if self.pretty {
+            format!("[\n{}\n]", entries.join(",\n"))
+        } else {
+            format!("[{}]", entries.join(","))
+        }
+    }
+
+    /// Count exportable rules.
+    pub fn exportable_count(&self, resolver: &KeybindingResolver) -> usize {
+        resolver
+            .rules()
+            .iter()
+            .filter(|r| match &r.source {
+                KeybindingSource::Default => self.include_defaults,
+                KeybindingSource::Extension(_) => self.include_extensions,
+                KeybindingSource::User => true,
+            })
+            .count()
+    }
+}
+
+impl Default for KeybindingExporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingImporter – parse and validate keybinding entries
+// ---------------------------------------------------------------------------
+
+/// Validation error when importing keybindings.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportError {
+    EmptyKey,
+    EmptyCommand,
+    InvalidKeySequence(String),
+    DuplicateEntry(String),
+}
+
+impl fmt::Display for ImportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImportError::EmptyKey => write!(f, "key field is empty"),
+            ImportError::EmptyCommand => write!(f, "command field is empty"),
+            ImportError::InvalidKeySequence(s) => write!(f, "invalid key: {s}"),
+            ImportError::DuplicateEntry(s) => write!(f, "duplicate: {s}"),
+        }
+    }
+}
+
+/// An entry parsed from a keybindings file.
+#[derive(Debug, Clone)]
+pub struct ImportedKeybinding {
+    pub key: String,
+    pub command: String,
+    pub when: Option<String>,
+    pub is_removal: bool,
+}
+
+/// Importer that validates and deduplicates keybinding entries.
+#[derive(Debug)]
+pub struct KeybindingImporter {
+    strict: bool,
+    seen_keys: std::collections::HashSet<String>,
+}
+
+impl KeybindingImporter {
+    pub fn new(strict: bool) -> Self {
+        Self {
+            strict,
+            seen_keys: std::collections::HashSet::new(),
+        }
+    }
+
+    pub fn validate_entry(
+        &mut self,
+        key: &str,
+        command: &str,
+        when: Option<&str>,
+    ) -> Result<ImportedKeybinding, ImportError> {
+        if key.is_empty() {
+            return Err(ImportError::EmptyKey);
+        }
+        if command.is_empty() {
+            return Err(ImportError::EmptyCommand);
+        }
+        let is_removal = command.starts_with('-');
+        let canonical = format!("{}::{}", key, command);
+        if self.strict && self.seen_keys.contains(&canonical) {
+            return Err(ImportError::DuplicateEntry(canonical));
+        }
+        self.seen_keys.insert(canonical);
+        Ok(ImportedKeybinding {
+            key: key.to_string(),
+            command: command.to_string(),
+            when: when.map(|s| s.to_string()),
+            is_removal,
+        })
+    }
+
+    pub fn imported_count(&self) -> usize {
+        self.seen_keys.len()
+    }
+
+    pub fn reset(&mut self) {
+        self.seen_keys.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingDiff – compare two sets of keybindings
+// ---------------------------------------------------------------------------
+
+/// Describes differences between keybinding configurations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiffEntry {
+    Added(String, String),
+    Removed(String, String),
+    Changed { key: String, old_cmd: String, new_cmd: String },
+}
+
+/// Compares two keybinding maps and returns the differences.
+pub fn diff_keybindings(
+    old: &[(String, String)],
+    new: &[(String, String)],
+) -> Vec<DiffEntry> {
+    let old_map: std::collections::HashMap<&str, &str> =
+        old.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let new_map: std::collections::HashMap<&str, &str> =
+        new.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+
+    let mut result = Vec::new();
+    for (k, v) in &new_map {
+        match old_map.get(k) {
+            None => result.push(DiffEntry::Added(k.to_string(), v.to_string())),
+            Some(old_v) if old_v != v => result.push(DiffEntry::Changed {
+                key: k.to_string(),
+                old_cmd: old_v.to_string(),
+                new_cmd: v.to_string(),
+            }),
+            _ => {}
+        }
+    }
+    for (k, v) in &old_map {
+        if !new_map.contains_key(k) {
+            result.push(DiffEntry::Removed(k.to_string(), v.to_string()));
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// MergeStrategy – merge keybinding configs
+// ---------------------------------------------------------------------------
+
+/// Strategy for merging keybinding configurations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeStrategy {
+    /// User bindings override everything.
+    UserWins,
+    /// Extension bindings override defaults but not user.
+    ExtensionThenDefault,
+    /// Keep first occurrence only.
+    FirstWins,
+}
+
+/// Merge two keybinding lists according to a strategy.
+pub fn merge_keybindings(
+    base: &[(String, String)],
+    overlay: &[(String, String)],
+    strategy: MergeStrategy,
+) -> Vec<(String, String)> {
+    let mut result: Vec<(String, String)> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let (first, second) = match strategy {
+        MergeStrategy::UserWins | MergeStrategy::ExtensionThenDefault => (overlay, base),
+        MergeStrategy::FirstWins => (base, overlay),
+    };
+
+    for (k, v) in first {
+        if seen.insert(k.clone()) {
+            result.push((k.clone(), v.clone()));
+        }
+    }
+    for (k, v) in second {
+        if seen.insert(k.clone()) {
+            result.push((k.clone(), v.clone()));
+        }
+    }
+    result
+}
+
+/// Count duplicate keys in a keybinding list.
+pub fn count_duplicates(bindings: &[(String, String)]) -> usize {
+    let mut seen = std::collections::HashSet::new();
+    let mut dups = 0;
+    for (k, _) in bindings {
+        if !seen.insert(k) {
+            dups += 1;
+        }
+    }
+    dups
+}
 
 #[cfg(test)]
 mod tests {
@@ -2200,4 +2468,169 @@ mod tests {
         assert!(resolver.has_command("workbench.action.showCommands"));
         assert!(!resolver.has_command("nonexistent.command"));
     }
+
+    // =================================================================
+    // KeybindingExporter tests
+    // =================================================================
+
+    #[test]
+    fn exporter_default_excludes_defaults() {
+        let exporter = KeybindingExporter::new();
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "cmd.default",
+        ));
+        assert_eq!(exporter.exportable_count(&resolver), 0);
+    }
+
+    #[test]
+    fn exporter_include_defaults_works() {
+        let exporter = KeybindingExporter::new().include_defaults(true);
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "cmd.default",
+        ));
+        assert!(exporter.exportable_count(&resolver) > 0);
+    }
+
+    #[test]
+    fn exporter_pretty_output_has_newlines() {
+        let exporter = KeybindingExporter::new().include_defaults(true);
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "cmd.default",
+        ));
+        let json = exporter.export(&resolver);
+        assert!(json.contains('\n'));
+    }
+
+    #[test]
+    fn exporter_compact_output() {
+        let exporter = KeybindingExporter::new()
+            .include_defaults(true)
+            .pretty(false);
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "cmd.default",
+        ));
+        let json = exporter.export(&resolver);
+        assert!(json.starts_with('['));
+        assert!(json.ends_with(']'));
+    }
+
+    // =================================================================
+    // KeybindingImporter tests
+    // =================================================================
+
+    #[test]
+    fn importer_validates_empty_key() {
+        let mut imp = KeybindingImporter::new(true);
+        assert_eq!(imp.validate_entry("", "cmd", None).unwrap_err(), ImportError::EmptyKey);
+    }
+
+    #[test]
+    fn importer_validates_empty_command() {
+        let mut imp = KeybindingImporter::new(true);
+        assert_eq!(imp.validate_entry("ctrl+a", "", None).unwrap_err(), ImportError::EmptyCommand);
+    }
+
+    #[test]
+    fn importer_detects_removal() {
+        let mut imp = KeybindingImporter::new(false);
+        let entry = imp.validate_entry("ctrl+a", "-editor.action.cut", None).unwrap();
+        assert!(entry.is_removal);
+    }
+
+    #[test]
+    fn importer_strict_detects_duplicate() {
+        let mut imp = KeybindingImporter::new(true);
+        imp.validate_entry("ctrl+a", "cmd1", None).unwrap();
+        assert!(matches!(imp.validate_entry("ctrl+a", "cmd1", None), Err(ImportError::DuplicateEntry(_))));
+    }
+
+    #[test]
+    fn importer_reset_clears_state() {
+        let mut imp = KeybindingImporter::new(true);
+        imp.validate_entry("ctrl+a", "cmd1", None).unwrap();
+        imp.reset();
+        assert_eq!(imp.imported_count(), 0);
+    }
+
+    // =================================================================
+    // KeybindingDiff tests
+    // =================================================================
+
+    #[test]
+    fn diff_detects_added() {
+        let old = vec![];
+        let new = vec![("k1".into(), "cmd1".into())];
+        let d = diff_keybindings(&old, &new);
+        assert!(matches!(&d[0], DiffEntry::Added(..)));
+    }
+
+    #[test]
+    fn diff_detects_removed() {
+        let old = vec![("k1".into(), "cmd1".into())];
+        let d = diff_keybindings(&old, &[]);
+        assert!(matches!(&d[0], DiffEntry::Removed(..)));
+    }
+
+    #[test]
+    fn diff_detects_changed() {
+        let old = vec![("k1".into(), "old".into())];
+        let new = vec![("k1".into(), "new".into())];
+        let d = diff_keybindings(&old, &new);
+        assert!(matches!(&d[0], DiffEntry::Changed { .. }));
+    }
+
+    #[test]
+    fn diff_identical_is_empty() {
+        let a = vec![("k1".into(), "cmd1".into())];
+        assert!(diff_keybindings(&a, &a).is_empty());
+    }
+
+    // =================================================================
+    // MergeStrategy tests
+    // =================================================================
+
+    #[test]
+    fn merge_user_wins() {
+        let base = vec![("k1".into(), "default".into())];
+        let overlay = vec![("k1".into(), "user".into())];
+        let merged = merge_keybindings(&base, &overlay, MergeStrategy::UserWins);
+        assert_eq!(merged[0].1, "user");
+    }
+
+    #[test]
+    fn merge_first_wins() {
+        let base = vec![("k1".into(), "base".into())];
+        let overlay = vec![("k1".into(), "overlay".into())];
+        let merged = merge_keybindings(&base, &overlay, MergeStrategy::FirstWins);
+        assert_eq!(merged[0].1, "base");
+    }
+
+    #[test]
+    fn merge_disjoint() {
+        let base = vec![("k1".into(), "a".into())];
+        let overlay = vec![("k2".into(), "b".into())];
+        let merged = merge_keybindings(&base, &overlay, MergeStrategy::UserWins);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn count_duplicates_works() {
+        let b = vec![("k1".into(), "a".into()), ("k2".into(), "b".into()), ("k1".into(), "c".into())];
+        assert_eq!(count_duplicates(&b), 1);
+    }
+
+    #[test]
+    fn import_error_display() {
+        assert_eq!(format!("{}", ImportError::EmptyKey), "key field is empty");
+        assert!(format!("{}", ImportError::InvalidKeySequence("bad".into())).contains("bad"));
+    }
+
 }

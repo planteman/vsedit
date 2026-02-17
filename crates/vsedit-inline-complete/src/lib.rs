@@ -1339,6 +1339,271 @@ impl Default for CompletionAcceptRejectTracker {
     }
 }
 
+
+// ── Inline Completion Confidence Scorer ──
+
+/// Individual scoring criteria for an inline completion.
+#[derive(Debug, Clone)]
+pub struct CompletionConfidenceFactors {
+    pub prefix_match_ratio: f64,
+    pub text_length_score: f64,
+    pub provider_priority: f64,
+    pub recency_bonus: f64,
+    pub frequency_bonus: f64,
+}
+
+impl Default for CompletionConfidenceFactors {
+    fn default() -> Self {
+        Self {
+            prefix_match_ratio: 0.0,
+            text_length_score: 0.0,
+            provider_priority: 1.0,
+            recency_bonus: 0.0,
+            frequency_bonus: 0.0,
+        }
+    }
+}
+
+impl CompletionConfidenceFactors {
+    /// Compute a weighted confidence score in [0, 1].
+    pub fn score(&self) -> f64 {
+        let raw = self.prefix_match_ratio * 0.4
+            + self.text_length_score * 0.15
+            + self.provider_priority * 0.2
+            + self.recency_bonus * 0.15
+            + self.frequency_bonus * 0.1;
+        raw.clamp(0.0, 1.0)
+    }
+}
+
+/// A scored inline completion item.
+#[derive(Debug, Clone)]
+pub struct ScoredCompletion {
+    pub insert_text: String,
+    pub factors: CompletionConfidenceFactors,
+}
+
+impl ScoredCompletion {
+    pub fn new(insert_text: impl Into<String>) -> Self {
+        Self {
+            insert_text: insert_text.into(),
+            factors: CompletionConfidenceFactors::default(),
+        }
+    }
+
+    pub fn confidence(&self) -> f64 {
+        self.factors.score()
+    }
+}
+
+/// Scores inline completions by confidence and relevance.
+pub struct InlineCompletionConfidenceScorer {
+    items: Vec<ScoredCompletion>,
+    min_confidence_threshold: f64,
+}
+
+impl InlineCompletionConfidenceScorer {
+    pub fn new(min_threshold: f64) -> Self {
+        Self {
+            items: Vec::new(),
+            min_confidence_threshold: min_threshold.clamp(0.0, 1.0),
+        }
+    }
+
+    /// Score a completion's prefix match ratio against the typed text.
+    pub fn compute_prefix_match(typed: &str, completion: &str) -> f64 {
+        if typed.is_empty() || completion.is_empty() {
+            return 0.0;
+        }
+        let common = typed
+            .chars()
+            .zip(completion.chars())
+            .take_while(|(a, b)| a == b)
+            .count();
+        common as f64 / typed.len().max(completion.len()) as f64
+    }
+
+    /// Score text length (prefer medium-length completions).
+    pub fn compute_length_score(text: &str) -> f64 {
+        let len = text.len();
+        if len == 0 {
+            return 0.0;
+        }
+        // Bell curve peaking at ~30 chars
+        let x = (len as f64 - 30.0) / 20.0;
+        (-x * x / 2.0).exp()
+    }
+
+    /// Add a completion with auto-computed scores.
+    pub fn add_completion(&mut self, text: impl Into<String>, typed_prefix: &str) {
+        let text = text.into();
+        let mut item = ScoredCompletion::new(text.clone());
+        item.factors.prefix_match_ratio = Self::compute_prefix_match(typed_prefix, &text);
+        item.factors.text_length_score = Self::compute_length_score(&text);
+        self.items.push(item);
+    }
+
+    /// Add a pre-scored completion.
+    pub fn add_scored(&mut self, item: ScoredCompletion) {
+        self.items.push(item);
+    }
+
+    /// Get completions above the minimum confidence threshold, sorted by score.
+    pub fn filtered_results(&self) -> Vec<&ScoredCompletion> {
+        let mut results: Vec<&ScoredCompletion> = self
+            .items
+            .iter()
+            .filter(|i| i.confidence() >= self.min_confidence_threshold)
+            .collect();
+        results.sort_by(|a, b| {
+            b.confidence()
+                .partial_cmp(&a.confidence())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results
+    }
+
+    /// Get the best completion above threshold.
+    pub fn best(&self) -> Option<&ScoredCompletion> {
+        self.filtered_results().into_iter().next()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn above_threshold_count(&self) -> usize {
+        self.filtered_results().len()
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+}
+
+// ── Ghost Text Styler ──
+
+/// Visual style properties for ghost text rendering.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GhostTextStyle {
+    pub color: String,
+    pub font_style: GhostFontStyle,
+    pub opacity: f64,
+    pub background_color: Option<String>,
+    pub border: Option<String>,
+}
+
+/// Font style variants for ghost text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GhostFontStyle {
+    Normal,
+    Italic,
+    Bold,
+    BoldItalic,
+}
+
+impl fmt::Display for GhostFontStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GhostFontStyle::Normal => write!(f, "normal"),
+            GhostFontStyle::Italic => write!(f, "italic"),
+            GhostFontStyle::Bold => write!(f, "bold"),
+            GhostFontStyle::BoldItalic => write!(f, "bold italic"),
+        }
+    }
+}
+
+impl Default for GhostTextStyle {
+    fn default() -> Self {
+        Self {
+            color: "#888888".to_string(),
+            font_style: GhostFontStyle::Italic,
+            opacity: 0.6,
+            background_color: None,
+            border: None,
+        }
+    }
+}
+
+/// Manages visual styling of ghost text for inline completions.
+pub struct GhostTextStyler {
+    base_style: GhostTextStyle,
+    keyword_style: Option<GhostTextStyle>,
+    diff_add_color: String,
+    diff_remove_color: String,
+    active: bool,
+}
+
+impl GhostTextStyler {
+    pub fn new() -> Self {
+        Self {
+            base_style: GhostTextStyle::default(),
+            keyword_style: None,
+            diff_add_color: "#22aa22".to_string(),
+            diff_remove_color: "#aa2222".to_string(),
+            active: true,
+        }
+    }
+
+    pub fn with_base_style(mut self, style: GhostTextStyle) -> Self {
+        self.base_style = style;
+        self
+    }
+
+    pub fn with_keyword_style(mut self, style: GhostTextStyle) -> Self {
+        self.keyword_style = Some(style);
+        self
+    }
+
+    /// Get the style for a given piece of ghost text.
+    pub fn style_for(&self, text: &str) -> &GhostTextStyle {
+        if let Some(ref kw_style) = self.keyword_style {
+            let keywords = ["fn", "let", "if", "else", "for", "while", "return", "struct", "enum"];
+            if keywords.iter().any(|kw| text.trim_start().starts_with(kw)) {
+                return kw_style;
+            }
+        }
+        &self.base_style
+    }
+
+    /// Generate a CSS-like style string for the ghost text.
+    pub fn to_css(&self, text: &str) -> String {
+        let style = self.style_for(text);
+        let mut css = format!("color: {}; opacity: {};", style.color, style.opacity);
+        css.push_str(&format!(" font-style: {};", style.font_style));
+        if let Some(ref bg) = style.background_color {
+            css.push_str(&format!(" background-color: {};", bg));
+        }
+        if let Some(ref border) = style.border {
+            css.push_str(&format!(" border: {};", border));
+        }
+        css
+    }
+
+    /// Get diff highlighting color for added text.
+    pub fn diff_add_color(&self) -> &str {
+        &self.diff_add_color
+    }
+
+    /// Get diff highlighting color for removed text.
+    pub fn diff_remove_color(&self) -> &str {
+        &self.diff_remove_color
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    pub fn set_active(&mut self, active: bool) {
+        self.active = active;
+    }
+
+    pub fn base_style(&self) -> &GhostTextStyle {
+        &self.base_style
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2373,4 +2638,117 @@ mod tests {
         let rate = tracker.accept_rate();
         assert!((rate - 2.0 / 3.0).abs() < 1e-9);
     }
+
+    #[test]
+    fn confidence_factors_default_score() {
+        let f = CompletionConfidenceFactors::default();
+        let s = f.score();
+        assert!(s >= 0.0 && s <= 1.0);
+    }
+
+    #[test]
+    fn confidence_factors_max_score() {
+        let f = CompletionConfidenceFactors {
+            prefix_match_ratio: 1.0,
+            text_length_score: 1.0,
+            provider_priority: 1.0,
+            recency_bonus: 1.0,
+            frequency_bonus: 1.0,
+        };
+        assert!((f.score() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn scorer_prefix_match() {
+        let s = InlineCompletionConfidenceScorer::compute_prefix_match("hel", "hello");
+        assert!(s > 0.5);
+        let s2 = InlineCompletionConfidenceScorer::compute_prefix_match("xyz", "hello");
+        assert!((s2 - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn scorer_length_score() {
+        let short = InlineCompletionConfidenceScorer::compute_length_score("hi");
+        let medium = InlineCompletionConfidenceScorer::compute_length_score(&"x".repeat(30));
+        let long = InlineCompletionConfidenceScorer::compute_length_score(&"x".repeat(100));
+        assert!(medium > short);
+        assert!(medium > long);
+    }
+
+    #[test]
+    fn scorer_add_and_filter() {
+        let mut scorer = InlineCompletionConfidenceScorer::new(0.0);
+        scorer.add_completion("hello world", "hel");
+        scorer.add_completion("goodbye", "hel");
+        assert_eq!(scorer.total_count(), 2);
+        let results = scorer.filtered_results();
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn scorer_threshold_filter() {
+        let mut scorer = InlineCompletionConfidenceScorer::new(0.9);
+        scorer.add_completion("x", "y");
+        assert_eq!(scorer.above_threshold_count(), 0);
+    }
+
+    #[test]
+    fn scorer_best() {
+        let mut scorer = InlineCompletionConfidenceScorer::new(0.0);
+        let mut high = ScoredCompletion::new("best");
+        high.factors.prefix_match_ratio = 1.0;
+        high.factors.provider_priority = 1.0;
+        scorer.add_scored(high);
+        scorer.add_completion("low", "xxx");
+        let best = scorer.best().unwrap();
+        assert_eq!(best.insert_text, "best");
+    }
+
+    #[test]
+    fn ghost_font_style_display() {
+        assert_eq!(format!("{}", GhostFontStyle::Normal), "normal");
+        assert_eq!(format!("{}", GhostFontStyle::Italic), "italic");
+        assert_eq!(format!("{}", GhostFontStyle::Bold), "bold");
+        assert_eq!(format!("{}", GhostFontStyle::BoldItalic), "bold italic");
+    }
+
+    #[test]
+    fn ghost_styler_default() {
+        let styler = GhostTextStyler::new();
+        assert!(styler.is_active());
+        assert_eq!(styler.base_style().opacity, 0.6);
+    }
+
+    #[test]
+    fn ghost_styler_css() {
+        let styler = GhostTextStyler::new();
+        let css = styler.to_css("some text");
+        assert!(css.contains("color: #888888"));
+        assert!(css.contains("opacity: 0.6"));
+    }
+
+    #[test]
+    fn ghost_styler_keyword_style() {
+        let kw_style = GhostTextStyle {
+            color: "#ff0000".to_string(),
+            font_style: GhostFontStyle::Bold,
+            opacity: 0.8,
+            background_color: None,
+            border: None,
+        };
+        let styler = GhostTextStyler::new().with_keyword_style(kw_style);
+        let style = styler.style_for("fn main()");
+        assert_eq!(style.color, "#ff0000");
+        let style2 = styler.style_for("some text");
+        assert_eq!(style2.color, "#888888");
+    }
+
+    #[test]
+    fn ghost_styler_diff_colors() {
+        let styler = GhostTextStyler::new();
+        assert_eq!(styler.diff_add_color(), "#22aa22");
+        assert_eq!(styler.diff_remove_color(), "#aa2222");
+    }
+
+
 }

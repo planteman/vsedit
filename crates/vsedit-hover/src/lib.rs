@@ -1513,6 +1513,253 @@ impl Default for HoverLinkHandler {
     }
 }
 
+
+// ── Hover Content Size Calculator ──
+
+/// Estimated dimensions for rendered hover content.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HoverDimensions {
+    pub width_chars: u32,
+    pub height_lines: u32,
+    pub estimated_pixel_width: f64,
+    pub estimated_pixel_height: f64,
+}
+
+impl HoverDimensions {
+    pub fn new(width: u32, height: u32, char_width: f64, line_height: f64) -> Self {
+        Self {
+            width_chars: width,
+            height_lines: height,
+            estimated_pixel_width: width as f64 * char_width,
+            estimated_pixel_height: height as f64 * line_height,
+        }
+    }
+
+    /// Check if the hover would exceed given pixel bounds.
+    pub fn exceeds_bounds(&self, max_width: f64, max_height: f64) -> bool {
+        self.estimated_pixel_width > max_width || self.estimated_pixel_height > max_height
+    }
+}
+
+/// Estimates display dimensions for hover content.
+pub struct HoverContentSizeCalculator {
+    char_width_px: f64,
+    line_height_px: f64,
+    max_width_chars: u32,
+    padding_lines: u32,
+}
+
+impl HoverContentSizeCalculator {
+    pub fn new(char_width_px: f64, line_height_px: f64) -> Self {
+        Self {
+            char_width_px,
+            line_height_px,
+            max_width_chars: 80,
+            padding_lines: 2,
+        }
+    }
+
+    /// Set maximum width in characters before wrapping.
+    pub fn with_max_width(mut self, max: u32) -> Self {
+        self.max_width_chars = max;
+        self
+    }
+
+    /// Set padding lines added above and below content.
+    pub fn with_padding(mut self, padding: u32) -> Self {
+        self.padding_lines = padding;
+        self
+    }
+
+    /// Estimate dimensions for plain text content.
+    pub fn estimate_text(&self, text: &str) -> HoverDimensions {
+        if text.is_empty() {
+            return HoverDimensions::new(0, self.padding_lines, self.char_width_px, self.line_height_px);
+        }
+        let mut max_line_width = 0u32;
+        let mut total_lines = 0u32;
+        for line in text.lines() {
+            let line_len = line.len() as u32;
+            if line_len <= self.max_width_chars {
+                max_line_width = max_line_width.max(line_len);
+                total_lines += 1;
+            } else {
+                // Line wraps
+                max_line_width = self.max_width_chars;
+                total_lines += (line_len + self.max_width_chars - 1) / self.max_width_chars;
+            }
+        }
+        HoverDimensions::new(
+            max_line_width,
+            total_lines + self.padding_lines,
+            self.char_width_px,
+            self.line_height_px,
+        )
+    }
+
+    /// Estimate dimensions for markdown content (approximation).
+    pub fn estimate_markdown(&self, markdown: &str) -> HoverDimensions {
+        let cleaned = Self::strip_markdown_syntax(markdown);
+        let mut dims = self.estimate_text(&cleaned);
+        // Code blocks add extra height for borders
+        let code_block_count = markdown.matches("```").count() / 2;
+        dims.height_lines += code_block_count as u32 * 2;
+        dims
+    }
+
+    /// Strip basic markdown syntax for size estimation.
+    fn strip_markdown_syntax(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        for line in text.lines() {
+            let trimmed = line.trim_start_matches('#').trim_start_matches('>').trim_start();
+            let trimmed = trimmed.trim_start_matches("- ").trim_start_matches("* ");
+            result.push_str(trimmed);
+            result.push('\n');
+        }
+        result
+    }
+
+    /// Estimate dimensions for a code block.
+    pub fn estimate_code_block(&self, code: &str, _language: &str) -> HoverDimensions {
+        let line_count = code.lines().count() as u32;
+        let max_width = code.lines().map(|l| l.len() as u32).max().unwrap_or(0);
+        HoverDimensions::new(
+            max_width.min(self.max_width_chars),
+            line_count + self.padding_lines + 2, // +2 for code block borders
+            self.char_width_px,
+            self.line_height_px,
+        )
+    }
+
+    /// Estimate combined dimensions for multiple content blocks.
+    pub fn estimate_combined(&self, blocks: &[&str]) -> HoverDimensions {
+        let mut total_height = 0u32;
+        let mut max_width = 0u32;
+        for block in blocks {
+            let dims = self.estimate_text(block);
+            total_height += dims.height_lines;
+            max_width = max_width.max(dims.width_chars);
+        }
+        HoverDimensions::new(max_width, total_height, self.char_width_px, self.line_height_px)
+    }
+}
+
+// ── Hover Widget Animator ──
+
+/// Animation phase for hover widget transitions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationPhase {
+    Hidden,
+    FadingIn,
+    Visible,
+    FadingOut,
+}
+
+impl std::fmt::Display for AnimationPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AnimationPhase::Hidden => write!(f, "hidden"),
+            AnimationPhase::FadingIn => write!(f, "fading_in"),
+            AnimationPhase::Visible => write!(f, "visible"),
+            AnimationPhase::FadingOut => write!(f, "fading_out"),
+        }
+    }
+}
+
+/// Manages fade-in/out animation state for hover widgets.
+pub struct HoverWidgetAnimator {
+    phase: AnimationPhase,
+    opacity: f64,
+    fade_in_duration_ms: u64,
+    fade_out_duration_ms: u64,
+    elapsed_ms: u64,
+}
+
+impl HoverWidgetAnimator {
+    pub fn new(fade_in_ms: u64, fade_out_ms: u64) -> Self {
+        Self {
+            phase: AnimationPhase::Hidden,
+            opacity: 0.0,
+            fade_in_duration_ms: fade_in_ms,
+            fade_out_duration_ms: fade_out_ms,
+            elapsed_ms: 0,
+        }
+    }
+
+    /// Start the fade-in animation.
+    pub fn start_fade_in(&mut self) {
+        self.phase = AnimationPhase::FadingIn;
+        self.elapsed_ms = 0;
+    }
+
+    /// Start the fade-out animation.
+    pub fn start_fade_out(&mut self) {
+        self.phase = AnimationPhase::FadingOut;
+        self.elapsed_ms = 0;
+    }
+
+    /// Advance the animation by a given number of milliseconds.
+    pub fn tick(&mut self, delta_ms: u64) {
+        self.elapsed_ms += delta_ms;
+        match self.phase {
+            AnimationPhase::FadingIn => {
+                if self.fade_in_duration_ms == 0 {
+                    self.opacity = 1.0;
+                    self.phase = AnimationPhase::Visible;
+                } else {
+                    self.opacity = (self.elapsed_ms as f64 / self.fade_in_duration_ms as f64).min(1.0);
+                    if self.opacity >= 1.0 {
+                        self.phase = AnimationPhase::Visible;
+                    }
+                }
+            }
+            AnimationPhase::FadingOut => {
+                if self.fade_out_duration_ms == 0 {
+                    self.opacity = 0.0;
+                    self.phase = AnimationPhase::Hidden;
+                } else {
+                    self.opacity = 1.0 - (self.elapsed_ms as f64 / self.fade_out_duration_ms as f64).min(1.0);
+                    if self.opacity <= 0.0 {
+                        self.phase = AnimationPhase::Hidden;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Jump to fully visible immediately.
+    pub fn show_immediate(&mut self) {
+        self.phase = AnimationPhase::Visible;
+        self.opacity = 1.0;
+        self.elapsed_ms = 0;
+    }
+
+    /// Jump to hidden immediately.
+    pub fn hide_immediate(&mut self) {
+        self.phase = AnimationPhase::Hidden;
+        self.opacity = 0.0;
+        self.elapsed_ms = 0;
+    }
+
+    pub fn phase(&self) -> AnimationPhase {
+        self.phase
+    }
+
+    pub fn opacity(&self) -> f64 {
+        self.opacity
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.opacity > 0.0
+    }
+
+    pub fn is_animating(&self) -> bool {
+        matches!(self.phase, AnimationPhase::FadingIn | AnimationPhase::FadingOut)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2466,4 +2713,110 @@ mod tests {
         assert_eq!(format!("{}", HoverLinkType::FileReference), "file");
         assert_eq!(format!("{}", HoverLinkType::Definition), "definition");
     }
+
+    #[test]
+    fn hover_dimensions_basic() {
+        let d = HoverDimensions::new(40, 10, 8.0, 16.0);
+        assert_eq!(d.estimated_pixel_width, 320.0);
+        assert_eq!(d.estimated_pixel_height, 160.0);
+    }
+
+    #[test]
+    fn hover_dimensions_exceeds_bounds() {
+        let d = HoverDimensions::new(40, 10, 8.0, 16.0);
+        assert!(!d.exceeds_bounds(400.0, 200.0));
+        assert!(d.exceeds_bounds(200.0, 100.0));
+    }
+
+    #[test]
+    fn size_calc_empty_text() {
+        let calc = HoverContentSizeCalculator::new(8.0, 16.0);
+        let dims = calc.estimate_text("");
+        assert_eq!(dims.width_chars, 0);
+        assert_eq!(dims.height_lines, 2); // padding
+    }
+
+    #[test]
+    fn size_calc_single_line() {
+        let calc = HoverContentSizeCalculator::new(8.0, 16.0);
+        let dims = calc.estimate_text("hello world");
+        assert_eq!(dims.width_chars, 11);
+        assert_eq!(dims.height_lines, 3); // 1 line + 2 padding
+    }
+
+    #[test]
+    fn size_calc_multiline() {
+        let calc = HoverContentSizeCalculator::new(8.0, 16.0);
+        let dims = calc.estimate_text("line 1\nline two\nline three here");
+        assert_eq!(dims.height_lines, 5); // 3 lines + 2 padding
+        assert_eq!(dims.width_chars, 15); // "line three here"
+    }
+
+    #[test]
+    fn size_calc_wrapping() {
+        let calc = HoverContentSizeCalculator::new(8.0, 16.0).with_max_width(10);
+        let dims = calc.estimate_text("this is a very long line that wraps");
+        assert_eq!(dims.width_chars, 10);
+        assert!(dims.height_lines > 3);
+    }
+
+    #[test]
+    fn size_calc_code_block() {
+        let calc = HoverContentSizeCalculator::new(8.0, 16.0);
+        let dims = calc.estimate_code_block("fn main() {\n    println!(\"hi\");\n}", "rust");
+        assert_eq!(dims.height_lines, 7); // 3 lines + 2 padding + 2 borders
+    }
+
+    #[test]
+    fn size_calc_combined() {
+        let calc = HoverContentSizeCalculator::new(8.0, 16.0);
+        let dims = calc.estimate_combined(&["line 1", "line 2"]);
+        assert_eq!(dims.height_lines, 6); // 2 * (1 + 2 padding)
+    }
+
+    #[test]
+    fn animator_fade_in() {
+        let mut anim = HoverWidgetAnimator::new(200, 100);
+        assert_eq!(anim.phase(), AnimationPhase::Hidden);
+        anim.start_fade_in();
+        assert_eq!(anim.phase(), AnimationPhase::FadingIn);
+        anim.tick(100);
+        assert!((anim.opacity() - 0.5).abs() < 1e-9);
+        assert!(anim.is_animating());
+        anim.tick(100);
+        assert!((anim.opacity() - 1.0).abs() < 1e-9);
+        assert_eq!(anim.phase(), AnimationPhase::Visible);
+    }
+
+    #[test]
+    fn animator_fade_out() {
+        let mut anim = HoverWidgetAnimator::new(100, 200);
+        anim.show_immediate();
+        anim.start_fade_out();
+        anim.tick(100);
+        assert!((anim.opacity() - 0.5).abs() < 1e-9);
+        anim.tick(100);
+        assert_eq!(anim.phase(), AnimationPhase::Hidden);
+        assert!(!anim.is_visible());
+    }
+
+    #[test]
+    fn animator_immediate_show_hide() {
+        let mut anim = HoverWidgetAnimator::new(100, 100);
+        anim.show_immediate();
+        assert_eq!(anim.phase(), AnimationPhase::Visible);
+        assert!((anim.opacity() - 1.0).abs() < 1e-9);
+        anim.hide_immediate();
+        assert_eq!(anim.phase(), AnimationPhase::Hidden);
+    }
+
+    #[test]
+    fn animation_phase_display() {
+        assert_eq!(format!("{}", AnimationPhase::Hidden), "hidden");
+        assert_eq!(format!("{}", AnimationPhase::FadingIn), "fading_in");
+        assert_eq!(format!("{}", AnimationPhase::Visible), "visible");
+        assert_eq!(format!("{}", AnimationPhase::FadingOut), "fading_out");
+    }
+
+
 }

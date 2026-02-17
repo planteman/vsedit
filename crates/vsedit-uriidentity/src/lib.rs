@@ -1409,6 +1409,339 @@ pub fn uri_compare_case_insensitive(a: &ResourceUri, b: &ResourceUri) -> bool {
         && a.fragment == b.fragment
 }
 
+
+// === URI Identity Resolver Cache ===
+
+/// URI Identity Resolver Cache implementation.
+#[derive(Debug, Clone)]
+pub struct UriIdentityResolverCache {
+    entries: Vec<String>,
+    index: HashMap<String, usize>,
+    enabled: bool,
+    capacity: usize,
+    stats: UriIdentityResolverCacheStats,
+}
+
+/// Statistics for UriIdentityResolverCache.
+#[derive(Debug, Clone, Default)]
+pub struct UriIdentityResolverCacheStats {
+    pub total_operations: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub last_operation_ms: u64,
+}
+
+impl UriIdentityResolverCacheStats {
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.cache_hits + self.cache_misses;
+        if total == 0 {
+            return 0.0;
+        }
+        self.cache_hits as f64 / total as f64
+    }
+
+    pub fn reset(&mut self) {
+        self.total_operations = 0;
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+        self.last_operation_ms = 0;
+    }
+}
+
+impl UriIdentityResolverCache {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            index: HashMap::new(),
+            enabled: true,
+            capacity: 1024,
+            stats: UriIdentityResolverCacheStats::default(),
+        }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: impl Into<String>) -> bool {
+        let entry = entry.into();
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        if self.index.contains_key(&entry) {
+            self.stats.cache_hits += 1;
+            return false;
+        }
+        let idx = self.entries.len();
+        self.index.insert(entry.clone(), idx);
+        self.entries.push(entry);
+        self.stats.total_operations += 1;
+        self.stats.cache_misses += 1;
+        true
+    }
+
+    pub fn remove(&mut self, entry: &str) -> bool {
+        if let Some(idx) = self.index.remove(entry) {
+            self.entries.remove(idx);
+            // Rebuild index after removal
+            self.index.clear();
+            for (i, e) in self.entries.iter().enumerate() {
+                self.index.insert(e.clone(), i);
+            }
+            self.stats.total_operations += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, entry: &str) -> bool {
+        self.index.contains_key(entry)
+    }
+
+    pub fn get(&self, index: usize) -> Option<&str> {
+        self.entries.get(index).map(|s| s.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.index.clear();
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn stats(&self) -> &UriIdentityResolverCacheStats {
+        &self.stats
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        self.entries.iter()
+            .filter(|e| e.contains(query))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    pub fn sorted_entries(&self) -> Vec<&str> {
+        let mut sorted: Vec<&str> = self.entries.iter().map(|s| s.as_str()).collect();
+        sorted.sort();
+        sorted
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|s| s.as_str())
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.capacity.saturating_sub(self.entries.len())
+    }
+}
+
+impl Default for UriIdentityResolverCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// === URI Identity Batch Comparator ===
+
+/// Priority level for UriIdentityBatchComparator items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UriIdentityBatchComparatorPriority {
+    Low,
+    Normal,
+    High,
+    Critical,
+}
+
+impl UriIdentityBatchComparatorPriority {
+    pub fn as_weight(&self) -> u32 {
+        match self {
+            Self::Low => 1,
+            Self::Normal => 5,
+            Self::High => 10,
+            Self::Critical => 100,
+        }
+    }
+}
+
+impl fmt::Display for UriIdentityBatchComparatorPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Normal => write!(f, "normal"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// URI Identity Batch Comparator implementation.
+#[derive(Debug, Clone)]
+pub struct UriIdentityBatchComparator {
+    items: Vec<UriIdentityBatchComparatorItem>,
+    max_items: usize,
+    default_priority: UriIdentityBatchComparatorPriority,
+}
+
+/// A single item in UriIdentityBatchComparator.
+#[derive(Debug, Clone)]
+pub struct UriIdentityBatchComparatorItem {
+    pub id: String,
+    pub label: String,
+    pub priority: UriIdentityBatchComparatorPriority,
+    pub timestamp: u64,
+    pub metadata: HashMap<String, String>,
+}
+
+impl UriIdentityBatchComparatorItem {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            priority: UriIdentityBatchComparatorPriority::Normal,
+            timestamp: 0,
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, priority: UriIdentityBatchComparatorPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_timestamp(mut self, ts: u64) -> Self {
+        self.timestamp = ts;
+        self
+    }
+
+    pub fn set_meta(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.metadata.insert(key.into(), value.into());
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.get(key).map(|s| s.as_str())
+    }
+}
+
+impl UriIdentityBatchComparator {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            max_items: 500,
+            default_priority: UriIdentityBatchComparatorPriority::Normal,
+        }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self {
+        self.max_items = max;
+        self
+    }
+
+    pub fn add(&mut self, item: UriIdentityBatchComparatorItem) -> bool {
+        if self.items.len() >= self.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove_by_id(&mut self, id: &str) -> Option<UriIdentityBatchComparatorItem> {
+        if let Some(idx) = self.items.iter().position(|i| i.id == id) {
+            Some(self.items.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&UriIdentityBatchComparatorItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    pub fn by_priority(&self, priority: UriIdentityBatchComparatorPriority) -> Vec<&UriIdentityBatchComparatorItem> {
+        self.items.iter().filter(|i| i.priority == priority).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&UriIdentityBatchComparatorItem> {
+        let mut sorted: Vec<&UriIdentityBatchComparatorItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn sorted_by_timestamp(&self) -> Vec<&UriIdentityBatchComparatorItem> {
+        let mut sorted: Vec<&UriIdentityBatchComparatorItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        sorted
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&UriIdentityBatchComparatorItem> {
+        let q = query.to_lowercase();
+        self.items.iter()
+            .filter(|i| i.label.to_lowercase().contains(&q) || i.id.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn total_weight(&self) -> u32 {
+        self.items.iter().map(|i| i.priority.as_weight()).sum()
+    }
+
+    pub fn set_default_priority(&mut self, p: UriIdentityBatchComparatorPriority) {
+        self.default_priority = p;
+    }
+
+    pub fn default_priority(&self) -> UriIdentityBatchComparatorPriority {
+        self.default_priority
+    }
+
+    pub fn max_items(&self) -> usize {
+        self.max_items
+    }
+
+    pub fn remaining_capacity(&self) -> usize {
+        self.max_items.saturating_sub(self.items.len())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &UriIdentityBatchComparatorItem> {
+        self.items.iter()
+    }
+}
+
+impl Default for UriIdentityBatchComparator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2329,4 +2662,151 @@ mod tests {
         let b = ResourceUri::new("http", "/path");
         assert!(!uri_compare_case_insensitive(&a, &b));
     }
+
+    #[test]
+    fn uriIdentityResolverCache_new() {
+        let s = UriIdentityResolverCache::new();
+        assert!(s.is_empty());
+        assert_eq!(s.len(), 0);
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_add_contains() {
+        let mut s = UriIdentityResolverCache::new();
+        assert!(s.add("item1"));
+        assert!(s.contains("item1"));
+        assert!(!s.contains("item2"));
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_add_duplicate() {
+        let mut s = UriIdentityResolverCache::new();
+        assert!(s.add("dup"));
+        assert!(!s.add("dup"));
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_remove() {
+        let mut s = UriIdentityResolverCache::new();
+        s.add("rem");
+        assert!(s.remove("rem"));
+        assert!(!s.contains("rem"));
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_capacity() {
+        let s = UriIdentityResolverCache::new().with_capacity(5);
+        assert_eq!(s.capacity(), 5);
+        assert_eq!(s.remaining_capacity(), 5);
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_search() {
+        let mut s = UriIdentityResolverCache::new();
+        s.add("hello_world");
+        s.add("hello_rust");
+        s.add("goodbye");
+        let results = s.search("hello");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_stats() {
+        let mut s = UriIdentityResolverCache::new();
+        s.add("a");
+        s.add("a"); // duplicate = cache hit
+        assert_eq!(s.stats().cache_hits, 1);
+        assert_eq!(s.stats().cache_misses, 1);
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_new() {
+        let m = UriIdentityBatchComparator::new();
+        assert!(m.is_empty());
+        assert_eq!(m.len(), 0);
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_add_find() {
+        let mut m = UriIdentityBatchComparator::new();
+        m.add(UriIdentityBatchComparatorItem::new("id1", "Label 1"));
+        assert!(m.find_by_id("id1").is_some());
+        assert!(m.find_by_id("id2").is_none());
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_priority_filter() {
+        let mut m = UriIdentityBatchComparator::new();
+        m.add(UriIdentityBatchComparatorItem::new("a", "A").with_priority(UriIdentityBatchComparatorPriority::High));
+        m.add(UriIdentityBatchComparatorItem::new("b", "B").with_priority(UriIdentityBatchComparatorPriority::Low));
+        m.add(UriIdentityBatchComparatorItem::new("c", "C").with_priority(UriIdentityBatchComparatorPriority::High));
+        assert_eq!(m.by_priority(UriIdentityBatchComparatorPriority::High).len(), 2);
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_remove() {
+        let mut m = UriIdentityBatchComparator::new();
+        m.add(UriIdentityBatchComparatorItem::new("r1", "Remove me"));
+        assert!(m.remove_by_id("r1").is_some());
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_search() {
+        let mut m = UriIdentityBatchComparator::new();
+        m.add(UriIdentityBatchComparatorItem::new("id1", "Hello World"));
+        m.add(UriIdentityBatchComparatorItem::new("id2", "Goodbye"));
+        let results = m.search("hello");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_total_weight() {
+        let mut m = UriIdentityBatchComparator::new();
+        m.add(UriIdentityBatchComparatorItem::new("a", "A").with_priority(UriIdentityBatchComparatorPriority::Critical));
+        m.add(UriIdentityBatchComparatorItem::new("b", "B").with_priority(UriIdentityBatchComparatorPriority::Low));
+        assert_eq!(m.total_weight(), 101);
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_capacity_limit() {
+        let mut m = UriIdentityBatchComparator::new().with_max_items(2);
+        m.add(UriIdentityBatchComparatorItem::new("1", "one"));
+        m.add(UriIdentityBatchComparatorItem::new("2", "two"));
+        assert!(!m.add(UriIdentityBatchComparatorItem::new("3", "three")));
+        assert_eq!(m.len(), 2);
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_sorted_by_priority() {
+        let mut m = UriIdentityBatchComparator::new();
+        m.add(UriIdentityBatchComparatorItem::new("lo", "Low").with_priority(UriIdentityBatchComparatorPriority::Low));
+        m.add(UriIdentityBatchComparatorItem::new("hi", "High").with_priority(UriIdentityBatchComparatorPriority::Critical));
+        let sorted = m.sorted_by_priority();
+        assert_eq!(sorted[0].id, "hi");
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_item_metadata() {
+        let mut item = UriIdentityBatchComparatorItem::new("m1", "Meta");
+        item.set_meta("key", "value");
+        assert_eq!(item.get_meta("key"), Some("value"));
+        assert_eq!(item.get_meta("missing"), None);
+    }
+
+    #[test]
+    fn uriIdentityResolverCache_enabled_toggle() {
+        let mut s = UriIdentityResolverCache::new();
+        assert!(s.is_enabled());
+        s.set_enabled(false);
+        assert!(!s.is_enabled());
+    }
+
+    #[test]
+    fn uriIdentityBatchComparator_priority_display() {
+        assert_eq!(format!("{}", UriIdentityBatchComparatorPriority::High), "high");
+        assert_eq!(format!("{}", UriIdentityBatchComparatorPriority::Low), "low");
+    }
+
 }

@@ -1323,6 +1323,295 @@ impl fmt::Display for RegistryChangeBatch {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RegistryDependencyChecker
+// ---------------------------------------------------------------------------
+
+/// Result of a single dependency check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepCheckResult {
+    pub extension_id: String,
+    pub dependency_id: String,
+    pub satisfied: bool,
+    pub reason: String,
+}
+
+impl DepCheckResult {
+    pub fn satisfied(ext: impl Into<String>, dep: impl Into<String>) -> Self {
+        Self {
+            extension_id: ext.into(),
+            dependency_id: dep.into(),
+            satisfied: true,
+            reason: "dependency found".into(),
+        }
+    }
+
+    pub fn unsatisfied(ext: impl Into<String>, dep: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self {
+            extension_id: ext.into(),
+            dependency_id: dep.into(),
+            satisfied: false,
+            reason: reason.into(),
+        }
+    }
+}
+
+impl fmt::Display for DepCheckResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.satisfied { "OK" } else { "FAIL" };
+        write!(f, "[{status}] {} -> {}: {}", self.extension_id, self.dependency_id, self.reason)
+    }
+}
+
+/// Validates extension dependencies in the registry.
+pub struct RegistryDependencyChecker {
+    registered_extensions: std::collections::HashSet<String>,
+    dependencies: std::collections::HashMap<String, Vec<String>>,
+}
+
+impl RegistryDependencyChecker {
+    pub fn new() -> Self {
+        Self {
+            registered_extensions: std::collections::HashSet::new(),
+            dependencies: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn register_extension(&mut self, id: impl Into<String>) {
+        self.registered_extensions.insert(id.into());
+    }
+
+    pub fn add_dependency(&mut self, ext_id: impl Into<String>, dep_id: impl Into<String>) {
+        self.dependencies.entry(ext_id.into()).or_default().push(dep_id.into());
+    }
+
+    pub fn extension_count(&self) -> usize {
+        self.registered_extensions.len()
+    }
+
+    /// Check all dependencies for a given extension.
+    pub fn check(&self, ext_id: &str) -> Vec<DepCheckResult> {
+        match self.dependencies.get(ext_id) {
+            None => vec![],
+            Some(deps) => deps
+                .iter()
+                .map(|dep| {
+                    if self.registered_extensions.contains(dep) {
+                        DepCheckResult::satisfied(ext_id, dep)
+                    } else {
+                        DepCheckResult::unsatisfied(ext_id, dep, "dependency not registered")
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    /// Check all extensions and return all unsatisfied dependencies.
+    pub fn check_all(&self) -> Vec<DepCheckResult> {
+        let mut results = Vec::new();
+        for ext_id in self.dependencies.keys() {
+            for r in self.check(ext_id) {
+                if !r.satisfied {
+                    results.push(r);
+                }
+            }
+        }
+        results
+    }
+
+    /// Detect circular dependencies using DFS.
+    pub fn find_cycles(&self) -> Vec<Vec<String>> {
+        let mut cycles = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = Vec::new();
+
+        for ext in self.dependencies.keys() {
+            if !visited.contains(ext) {
+                self.dfs_cycle(ext, &mut visited, &mut stack, &mut cycles);
+            }
+        }
+        cycles
+    }
+
+    fn dfs_cycle(
+        &self,
+        node: &str,
+        visited: &mut std::collections::HashSet<String>,
+        stack: &mut Vec<String>,
+        cycles: &mut Vec<Vec<String>>,
+    ) {
+        if let Some(pos) = stack.iter().position(|n| n == node) {
+            cycles.push(stack[pos..].to_vec());
+            return;
+        }
+        if visited.contains(node) {
+            return;
+        }
+        stack.push(node.to_string());
+        if let Some(deps) = self.dependencies.get(node) {
+            for dep in deps {
+                self.dfs_cycle(dep, visited, stack, cycles);
+            }
+        }
+        stack.pop();
+        visited.insert(node.to_string());
+    }
+
+    /// Return topological order if no cycles, or None.
+    pub fn topological_order(&self) -> Option<Vec<String>> {
+        if !self.find_cycles().is_empty() {
+            return None;
+        }
+        let mut result = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        for ext in &self.registered_extensions {
+            self.topo_visit(ext, &mut visited, &mut result);
+        }
+        Some(result)
+    }
+
+    fn topo_visit(&self, node: &str, visited: &mut std::collections::HashSet<String>, result: &mut Vec<String>) {
+        if visited.contains(node) {
+            return;
+        }
+        visited.insert(node.to_string());
+        if let Some(deps) = self.dependencies.get(node) {
+            for dep in deps {
+                self.topo_visit(dep, visited, result);
+            }
+        }
+        result.push(node.to_string());
+    }
+}
+
+impl fmt::Display for RegistryDependencyChecker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegistryDependencyChecker({} exts, {} dep sets)",
+            self.registered_extensions.len(), self.dependencies.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RegistryHotReloadHandler
+// ---------------------------------------------------------------------------
+
+/// Status of a hot-reload operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HotReloadStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Failed(String),
+}
+
+impl fmt::Display for HotReloadStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HotReloadStatus::Pending => write!(f, "pending"),
+            HotReloadStatus::InProgress => write!(f, "in-progress"),
+            HotReloadStatus::Completed => write!(f, "completed"),
+            HotReloadStatus::Failed(msg) => write!(f, "failed: {msg}"),
+        }
+    }
+}
+
+/// Record of a hot-reload event.
+#[derive(Debug, Clone)]
+pub struct HotReloadRecord {
+    pub extension_id: String,
+    pub version: String,
+    pub status: HotReloadStatus,
+    pub timestamp: u64,
+}
+
+impl HotReloadRecord {
+    pub fn new(ext_id: impl Into<String>, version: impl Into<String>, timestamp: u64) -> Self {
+        Self {
+            extension_id: ext_id.into(),
+            version: version.into(),
+            status: HotReloadStatus::Pending,
+            timestamp,
+        }
+    }
+}
+
+impl fmt::Display for HotReloadRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{} [{}] t={}", self.extension_id, self.version, self.status, self.timestamp)
+    }
+}
+
+/// Handles hot-reloading of registry entries by tracking reload events and versions.
+pub struct RegistryHotReloadHandler {
+    records: Vec<HotReloadRecord>,
+    max_history: usize,
+}
+
+impl RegistryHotReloadHandler {
+    pub fn new(max_history: usize) -> Self {
+        Self { records: Vec::new(), max_history }
+    }
+
+    pub fn request_reload(&mut self, ext_id: impl Into<String>, version: impl Into<String>, timestamp: u64) -> usize {
+        let record = HotReloadRecord::new(ext_id, version, timestamp);
+        self.records.push(record);
+        if self.records.len() > self.max_history {
+            self.records.remove(0);
+        }
+        self.records.len() - 1
+    }
+
+    pub fn mark_in_progress(&mut self, index: usize) -> bool {
+        if let Some(r) = self.records.get_mut(index) {
+            r.status = HotReloadStatus::InProgress;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn mark_completed(&mut self, index: usize) -> bool {
+        if let Some(r) = self.records.get_mut(index) {
+            r.status = HotReloadStatus::Completed;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn mark_failed(&mut self, index: usize, reason: impl Into<String>) -> bool {
+        if let Some(r) = self.records.get_mut(index) {
+            r.status = HotReloadStatus::Failed(reason.into());
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn history_len(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn latest_for(&self, ext_id: &str) -> Option<&HotReloadRecord> {
+        self.records.iter().rev().find(|r| r.extension_id == ext_id)
+    }
+
+    pub fn failed_records(&self) -> Vec<&HotReloadRecord> {
+        self.records.iter().filter(|r| matches!(r.status, HotReloadStatus::Failed(_))).collect()
+    }
+
+    pub fn completed_count(&self) -> usize {
+        self.records.iter().filter(|r| r.status == HotReloadStatus::Completed).count()
+    }
+}
+
+impl fmt::Display for RegistryHotReloadHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegistryHotReloadHandler({} records, max={})", self.records.len(), self.max_history)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2390,4 +2679,165 @@ mod tests {
         assert_eq!(format!("{}", RegistryChange::Removed("x".into())), "-x");
         assert_eq!(format!("{}", RegistryChange::MetadataUpdated("x".into())), "~x");
     }
+
+    #[test]
+    fn dep_checker_satisfied() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("ext-a");
+        checker.register_extension("ext-b");
+        checker.add_dependency("ext-a", "ext-b");
+        let results = checker.check("ext-a");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].satisfied);
+    }
+
+    #[test]
+    fn dep_checker_unsatisfied() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("ext-a");
+        checker.add_dependency("ext-a", "ext-missing");
+        let results = checker.check("ext-a");
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].satisfied);
+    }
+
+    #[test]
+    fn dep_checker_check_all() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("a");
+        checker.add_dependency("a", "missing1");
+        checker.add_dependency("a", "missing2");
+        let fails = checker.check_all();
+        assert_eq!(fails.len(), 2);
+    }
+
+    #[test]
+    fn dep_checker_no_deps() {
+        let checker = RegistryDependencyChecker::new();
+        let results = checker.check("anything");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn dep_checker_cycle_detection() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("a");
+        checker.register_extension("b");
+        checker.add_dependency("a", "b");
+        checker.add_dependency("b", "a");
+        let cycles = checker.find_cycles();
+        assert!(!cycles.is_empty());
+    }
+
+    #[test]
+    fn dep_checker_no_cycle() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("a");
+        checker.register_extension("b");
+        checker.add_dependency("a", "b");
+        let cycles = checker.find_cycles();
+        assert!(cycles.is_empty());
+    }
+
+    #[test]
+    fn dep_checker_topological_order() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("a");
+        checker.register_extension("b");
+        checker.add_dependency("a", "b");
+        let order = checker.topological_order().unwrap();
+        let pos_b = order.iter().position(|x| x == "b").unwrap();
+        let pos_a = order.iter().position(|x| x == "a").unwrap();
+        assert!(pos_b < pos_a);
+    }
+
+    #[test]
+    fn dep_checker_topological_order_cycle_returns_none() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.add_dependency("a", "b");
+        checker.add_dependency("b", "a");
+        assert!(checker.topological_order().is_none());
+    }
+
+    #[test]
+    fn dep_checker_display() {
+        let mut checker = RegistryDependencyChecker::new();
+        checker.register_extension("a");
+        assert!(format!("{checker}").contains("1 exts"));
+    }
+
+    #[test]
+    fn dep_check_result_display() {
+        let ok = DepCheckResult::satisfied("a", "b");
+        assert!(format!("{ok}").contains("OK"));
+        let fail = DepCheckResult::unsatisfied("a", "c", "not found");
+        assert!(format!("{fail}").contains("FAIL"));
+    }
+
+    #[test]
+    fn hot_reload_lifecycle() {
+        let mut handler = RegistryHotReloadHandler::new(100);
+        let idx = handler.request_reload("ext1", "1.0.0", 1000);
+        assert!(handler.mark_in_progress(idx));
+        assert!(handler.mark_completed(idx));
+        assert_eq!(handler.completed_count(), 1);
+    }
+
+    #[test]
+    fn hot_reload_failed() {
+        let mut handler = RegistryHotReloadHandler::new(100);
+        let idx = handler.request_reload("ext1", "1.0.0", 1000);
+        handler.mark_failed(idx, "load error");
+        assert_eq!(handler.failed_records().len(), 1);
+    }
+
+    #[test]
+    fn hot_reload_latest_for() {
+        let mut handler = RegistryHotReloadHandler::new(100);
+        handler.request_reload("ext1", "1.0.0", 1000);
+        handler.request_reload("ext1", "2.0.0", 2000);
+        let latest = handler.latest_for("ext1").unwrap();
+        assert_eq!(latest.version, "2.0.0");
+    }
+
+    #[test]
+    fn hot_reload_max_history() {
+        let mut handler = RegistryHotReloadHandler::new(2);
+        handler.request_reload("a", "1", 1);
+        handler.request_reload("b", "1", 2);
+        handler.request_reload("c", "1", 3);
+        assert_eq!(handler.history_len(), 2);
+    }
+
+    #[test]
+    fn hot_reload_invalid_index() {
+        let mut handler = RegistryHotReloadHandler::new(10);
+        assert!(!handler.mark_in_progress(99));
+        assert!(!handler.mark_completed(99));
+        assert!(!handler.mark_failed(99, "x"));
+    }
+
+    #[test]
+    fn hot_reload_status_display() {
+        assert_eq!(format!("{}", HotReloadStatus::Pending), "pending");
+        assert_eq!(format!("{}", HotReloadStatus::InProgress), "in-progress");
+        assert_eq!(format!("{}", HotReloadStatus::Completed), "completed");
+        assert!(format!("{}", HotReloadStatus::Failed("err".into())).contains("err"));
+    }
+
+    #[test]
+    fn hot_reload_record_display() {
+        let r = HotReloadRecord::new("ext1", "1.0", 500);
+        let s = format!("{r}");
+        assert!(s.contains("ext1"));
+        assert!(s.contains("1.0"));
+        assert!(s.contains("pending"));
+    }
+
+    #[test]
+    fn hot_reload_handler_display() {
+        let handler = RegistryHotReloadHandler::new(50);
+        assert!(format!("{handler}").contains("0 records"));
+    }
+
 }

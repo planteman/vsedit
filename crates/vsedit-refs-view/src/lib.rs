@@ -1314,6 +1314,416 @@ impl Default for ReferenceNavigationHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ReferenceCountBadge – display reference counts
+// ---------------------------------------------------------------------------
+
+/// A badge showing the count of references for a symbol.
+#[derive(Debug, Clone)]
+pub struct ReferenceCountBadge {
+    pub symbol_name: String,
+    pub total_refs: usize,
+    pub file_count: usize,
+    pub kind_counts: HashMap<ReferenceKind, usize>,
+}
+
+impl ReferenceCountBadge {
+    /// Create a badge from a references model.
+    pub fn from_model(symbol_name: impl Into<String>, model: &ReferencesModel) -> Self {
+        Self {
+            symbol_name: symbol_name.into(),
+            total_refs: model.total_count(),
+            file_count: model.file_count(),
+            kind_counts: HashMap::new(),
+        }
+    }
+
+    /// Increment the count for a given reference kind.
+    pub fn add_kind(&mut self, kind: ReferenceKind, count: usize) {
+        *self.kind_counts.entry(kind).or_insert(0) += count;
+    }
+
+    /// Get the count for a specific kind.
+    pub fn kind_count(&self, kind: &ReferenceKind) -> usize {
+        self.kind_counts.get(kind).copied().unwrap_or(0)
+    }
+
+    /// Format as a short badge string, e.g. "foo (5 refs in 3 files)".
+    pub fn format_short(&self) -> String {
+        format!(
+            "{} ({} ref{} in {} file{})",
+            self.symbol_name,
+            self.total_refs,
+            if self.total_refs == 1 { "" } else { "s" },
+            self.file_count,
+            if self.file_count == 1 { "" } else { "s" },
+        )
+    }
+
+    /// Format as a detailed badge with kind breakdown.
+    pub fn format_detailed(&self) -> String {
+        let mut parts = vec![self.format_short()];
+        if !self.kind_counts.is_empty() {
+            let mut kinds: Vec<(&ReferenceKind, &usize)> = self.kind_counts.iter().collect();
+            kinds.sort_by(|a, b| b.1.cmp(a.1));
+            for (kind, count) in kinds {
+                parts.push(format!("  {kind}: {count}"));
+            }
+        }
+        parts.join("\n")
+    }
+
+    /// Returns true if there are any references.
+    pub fn has_references(&self) -> bool {
+        self.total_refs > 0
+    }
+
+    /// Total across all tracked kinds.
+    pub fn tracked_kind_total(&self) -> usize {
+        self.kind_counts.values().sum()
+    }
+}
+
+impl fmt::Display for ReferenceCountBadge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format_short())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferenceInlinePreview – inline preview of references
+// ---------------------------------------------------------------------------
+
+/// An inline preview showing a reference with surrounding context.
+#[derive(Debug, Clone)]
+pub struct ReferenceInlinePreview {
+    pub location: Location,
+    pub preview_lines: Vec<String>,
+    pub highlight_line_index: usize,
+    pub max_preview_lines: usize,
+}
+
+impl ReferenceInlinePreview {
+    pub fn new(location: Location, context_line: String, max_preview_lines: usize) -> Self {
+        Self {
+            location,
+            preview_lines: vec![context_line],
+            highlight_line_index: 0,
+            max_preview_lines,
+        }
+    }
+
+    /// Create from a ReferenceItem, including its context if available.
+    pub fn from_reference_item(item: &ReferenceItem, max_lines: usize) -> Self {
+        let mut lines = Vec::new();
+        let mut highlight_idx = 0;
+        if let Some(ref before) = item.context_before {
+            lines.push(before.clone());
+            highlight_idx = 1;
+        }
+        lines.push(item.context_line.clone());
+        if let Some(ref after) = item.context_after {
+            lines.push(after.clone());
+        }
+        Self {
+            location: item.location.clone(),
+            preview_lines: lines,
+            highlight_line_index: highlight_idx,
+            max_preview_lines: max_lines,
+        }
+    }
+
+    /// Get the highlighted (main) line.
+    pub fn highlighted_line(&self) -> &str {
+        self.preview_lines.get(self.highlight_line_index).map_or("", |s| s.as_str())
+    }
+
+    /// Total number of preview lines.
+    pub fn line_count(&self) -> usize {
+        self.preview_lines.len()
+    }
+
+    /// Is the preview truncated?
+    pub fn is_truncated(&self) -> bool {
+        self.preview_lines.len() > self.max_preview_lines
+    }
+
+    /// Get lines capped to max.
+    pub fn visible_lines(&self) -> &[String] {
+        let end = self.preview_lines.len().min(self.max_preview_lines);
+        &self.preview_lines[..end]
+    }
+
+    /// Format the preview header (file:line).
+    pub fn format_header(&self) -> String {
+        format!("{}:{}", self.location.uri, self.location.start_line)
+    }
+
+    /// Render the full preview as a string block.
+    pub fn render(&self) -> String {
+        let mut output = vec![self.format_header()];
+        for (i, line) in self.visible_lines().iter().enumerate() {
+            let prefix = if i == self.highlight_line_index { ">" } else { " " };
+            output.push(format!("{prefix} {line}"));
+        }
+        output.join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferenceNavigationBreadcrumb – breadcrumb trail for navigation
+// ---------------------------------------------------------------------------
+
+/// A single breadcrumb entry in reference navigation.
+#[derive(Debug, Clone)]
+pub struct BreadcrumbEntry {
+    pub label: String,
+    pub uri: String,
+    pub line: u32,
+}
+
+impl BreadcrumbEntry {
+    pub fn new(label: impl Into<String>, uri: impl Into<String>, line: u32) -> Self {
+        Self {
+            label: label.into(),
+            uri: uri.into(),
+            line,
+        }
+    }
+}
+
+impl fmt::Display for BreadcrumbEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.label, self.line)
+    }
+}
+
+/// A breadcrumb trail for navigating through references.
+#[derive(Debug)]
+pub struct ReferenceNavigationBreadcrumb {
+    entries: Vec<BreadcrumbEntry>,
+    max_entries: usize,
+    current_index: usize,
+}
+
+impl ReferenceNavigationBreadcrumb {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+            current_index: 0,
+        }
+    }
+
+    /// Push a new entry onto the breadcrumb trail.
+    pub fn push(&mut self, entry: BreadcrumbEntry) {
+        // Truncate any forward history
+        if self.current_index < self.entries.len() {
+            self.entries.truncate(self.current_index);
+        }
+        self.entries.push(entry);
+        if self.entries.len() > self.max_entries {
+            self.entries.remove(0);
+        }
+        self.current_index = self.entries.len();
+    }
+
+    /// Navigate back one step.
+    pub fn go_back(&mut self) -> Option<&BreadcrumbEntry> {
+        if self.current_index > 0 {
+            self.current_index -= 1;
+            Some(&self.entries[self.current_index])
+        } else {
+            None
+        }
+    }
+
+    /// Navigate forward one step.
+    pub fn go_forward(&mut self) -> Option<&BreadcrumbEntry> {
+        if self.current_index < self.entries.len() {
+            let entry = &self.entries[self.current_index];
+            self.current_index += 1;
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Can we go back?
+    pub fn can_go_back(&self) -> bool {
+        self.current_index > 0
+    }
+
+    /// Can we go forward?
+    pub fn can_go_forward(&self) -> bool {
+        self.current_index < self.entries.len()
+    }
+
+    /// Get current position (0-based).
+    pub fn current_position(&self) -> usize {
+        self.current_index
+    }
+
+    /// Total entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Render breadcrumb trail as a string like "file1:10 > file2:20 > file3:30".
+    pub fn render(&self) -> String {
+        self.entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                if i + 1 == self.current_index {
+                    format!("[{}]", e)
+                } else {
+                    format!("{}", e)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" > ")
+    }
+
+    /// Clear the trail.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.current_index = 0;
+    }
+
+    /// Get all entries.
+    pub fn entries(&self) -> &[BreadcrumbEntry] {
+        &self.entries
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferenceTypeIndicator – visual indicator for reference kinds
+// ---------------------------------------------------------------------------
+
+/// Visual indicator for different reference types.
+#[derive(Debug, Clone)]
+pub struct ReferenceTypeIndicator {
+    kind: ReferenceKind,
+}
+
+impl ReferenceTypeIndicator {
+    pub fn new(kind: ReferenceKind) -> Self {
+        Self { kind }
+    }
+
+    /// Get the icon character for this reference kind.
+    pub fn icon(&self) -> &'static str {
+        match self.kind {
+            ReferenceKind::Declaration => "◇",
+            ReferenceKind::Definition => "◆",
+            ReferenceKind::Read => "→",
+            ReferenceKind::Write => "←",
+            ReferenceKind::Call => "⊕",
+            ReferenceKind::Import => "⬆",
+            ReferenceKind::Other => "○",
+        }
+    }
+
+    /// Get a short label for this reference kind.
+    pub fn short_label(&self) -> &'static str {
+        match self.kind {
+            ReferenceKind::Declaration => "decl",
+            ReferenceKind::Definition => "def",
+            ReferenceKind::Read => "read",
+            ReferenceKind::Write => "write",
+            ReferenceKind::Call => "call",
+            ReferenceKind::Import => "import",
+            ReferenceKind::Other => "other",
+        }
+    }
+
+    /// Format as "icon label", e.g. "◆ def".
+    pub fn format(&self) -> String {
+        format!("{} {}", self.icon(), self.short_label())
+    }
+
+    /// Get the kind.
+    pub fn kind(&self) -> ReferenceKind {
+        self.kind
+    }
+
+    /// Returns true if this is a write-type reference (Write or Definition).
+    pub fn is_write_type(&self) -> bool {
+        matches!(self.kind, ReferenceKind::Write | ReferenceKind::Definition)
+    }
+
+    /// Returns true if this is a read-type reference.
+    pub fn is_read_type(&self) -> bool {
+        matches!(self.kind, ReferenceKind::Read | ReferenceKind::Call | ReferenceKind::Import)
+    }
+}
+
+impl fmt::Display for ReferenceTypeIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format())
+    }
+}
+
+/// Classify and annotate a list of reference items with their kinds.
+pub struct ReferenceTypeClassifier;
+
+impl ReferenceTypeClassifier {
+    /// Given a list of items and a parallel list of kinds, produce annotated display strings.
+    pub fn annotate(items: &[ReferenceItem], kinds: &[ReferenceKind]) -> Vec<String> {
+        items
+            .iter()
+            .zip(kinds.iter())
+            .map(|(item, kind)| {
+                let indicator = ReferenceTypeIndicator::new(*kind);
+                format!("{} {}", indicator.format(), item)
+            })
+            .collect()
+    }
+
+    /// Count items by kind.
+    pub fn count_by_kind(kinds: &[ReferenceKind]) -> HashMap<ReferenceKind, usize> {
+        let mut counts = HashMap::new();
+        for k in kinds {
+            *counts.entry(*k).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    /// Partition kinds into write-types and read-types.
+    pub fn partition_by_access(kinds: &[ReferenceKind]) -> (Vec<ReferenceKind>, Vec<ReferenceKind>) {
+        let mut writes = Vec::new();
+        let mut reads = Vec::new();
+        for k in kinds {
+            let ind = ReferenceTypeIndicator::new(*k);
+            if ind.is_write_type() {
+                writes.push(*k);
+            } else if ind.is_read_type() {
+                reads.push(*k);
+            }
+        }
+        (writes, reads)
+    }
+
+    /// Format a summary of kind counts.
+    pub fn format_summary(kinds: &[ReferenceKind]) -> String {
+        let counts = Self::count_by_kind(kinds);
+        let mut parts: Vec<String> = counts
+            .iter()
+            .map(|(k, v)| {
+                let ind = ReferenceTypeIndicator::new(*k);
+                format!("{}: {}", ind.short_label(), v)
+            })
+            .collect();
+        parts.sort();
+        parts.join(", ")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2247,4 +2657,205 @@ mod tests {
         assert_eq!(history.visited_count(), 0);
         assert!(history.recent_visits(5).is_empty());
     }
+    #[test]
+    fn reference_count_badge_basic() {
+        let base = loc("file.rs", 1, 0);
+        let mut model = ReferencesModel::new("foo", base);
+        model.add_reference(ref_item("a.rs", 10, 5));
+        model.add_reference(ref_item("b.rs", 20, 3));
+        let badge = ReferenceCountBadge::from_model("foo", &model);
+        assert_eq!(badge.total_refs, 2);
+        assert_eq!(badge.file_count, 2);
+        assert!(badge.has_references());
+    }
+
+    #[test]
+    fn reference_count_badge_format() {
+        let base = loc("file.rs", 1, 0);
+        let mut model = ReferencesModel::new("bar", base);
+        model.add_reference(ref_item("a.rs", 10, 5));
+        let badge = ReferenceCountBadge::from_model("bar", &model);
+        assert_eq!(badge.format_short(), "bar (1 ref in 1 file)");
+    }
+
+    #[test]
+    fn reference_count_badge_kinds() {
+        let base = loc("file.rs", 1, 0);
+        let model = ReferencesModel::new("x", base);
+        let mut badge = ReferenceCountBadge::from_model("x", &model);
+        badge.add_kind(ReferenceKind::Read, 3);
+        badge.add_kind(ReferenceKind::Write, 1);
+        assert_eq!(badge.kind_count(&ReferenceKind::Read), 3);
+        assert_eq!(badge.kind_count(&ReferenceKind::Call), 0);
+        assert_eq!(badge.tracked_kind_total(), 4);
+    }
+
+    #[test]
+    fn reference_count_badge_detailed() {
+        let base = loc("f.rs", 1, 0);
+        let model = ReferencesModel::new("z", base);
+        let mut badge = ReferenceCountBadge::from_model("z", &model);
+        badge.add_kind(ReferenceKind::Read, 2);
+        let detail = badge.format_detailed();
+        assert!(detail.contains("Read: 2"));
+    }
+
+    #[test]
+    fn inline_preview_basic() {
+        let location = loc("test.rs", 10, 5);
+        let preview = ReferenceInlinePreview::new(location, "let x = 42;".into(), 5);
+        assert_eq!(preview.highlighted_line(), "let x = 42;");
+        assert_eq!(preview.line_count(), 1);
+        assert!(!preview.is_truncated());
+    }
+
+    #[test]
+    fn inline_preview_from_item() {
+        let mut item = ref_item("test.rs", 10, 5);
+        item.context_before = Some("// before".into());
+        item.context_after = Some("// after".into());
+        let preview = ReferenceInlinePreview::from_reference_item(&item, 10);
+        assert_eq!(preview.line_count(), 3);
+        assert_eq!(preview.highlight_line_index, 1);
+    }
+
+    #[test]
+    fn inline_preview_render() {
+        let location = loc("test.rs", 10, 5);
+        let preview = ReferenceInlinePreview::new(location, "let x = 42;".into(), 5);
+        let rendered = preview.render();
+        assert!(rendered.contains("test.rs:10"));
+        assert!(rendered.contains("let x = 42;"));
+    }
+
+    #[test]
+    fn inline_preview_header() {
+        let location = loc("main.rs", 42, 0);
+        let preview = ReferenceInlinePreview::new(location, "fn main()".into(), 5);
+        assert_eq!(preview.format_header(), "main.rs:42");
+    }
+
+    #[test]
+    fn breadcrumb_navigation() {
+        let mut crumb = ReferenceNavigationBreadcrumb::new(10);
+        assert!(crumb.is_empty());
+        crumb.push(BreadcrumbEntry::new("main.rs", "file:///main.rs", 10));
+        crumb.push(BreadcrumbEntry::new("lib.rs", "file:///lib.rs", 20));
+        assert_eq!(crumb.len(), 2);
+        assert!(crumb.can_go_back());
+        let back = crumb.go_back().unwrap();
+        assert_eq!(back.label, "lib.rs");
+    }
+
+    #[test]
+    fn breadcrumb_forward() {
+        let mut crumb = ReferenceNavigationBreadcrumb::new(10);
+        crumb.push(BreadcrumbEntry::new("a", "a", 1));
+        crumb.push(BreadcrumbEntry::new("b", "b", 2));
+        crumb.go_back();
+        assert!(crumb.can_go_forward());
+        let fwd = crumb.go_forward().unwrap();
+        assert_eq!(fwd.label, "b");
+    }
+
+    #[test]
+    fn breadcrumb_truncate_on_push() {
+        let mut crumb = ReferenceNavigationBreadcrumb::new(10);
+        crumb.push(BreadcrumbEntry::new("a", "a", 1));
+        crumb.push(BreadcrumbEntry::new("b", "b", 2));
+        crumb.go_back();
+        crumb.push(BreadcrumbEntry::new("c", "c", 3));
+        assert_eq!(crumb.len(), 2);
+    }
+
+    #[test]
+    fn breadcrumb_max_entries() {
+        let mut crumb = ReferenceNavigationBreadcrumb::new(3);
+        for i in 0..5 {
+            crumb.push(BreadcrumbEntry::new(&format!("f{i}"), &format!("f{i}"), i));
+        }
+        assert_eq!(crumb.len(), 3);
+    }
+
+    #[test]
+    fn breadcrumb_render() {
+        let mut crumb = ReferenceNavigationBreadcrumb::new(10);
+        crumb.push(BreadcrumbEntry::new("a", "a", 1));
+        crumb.push(BreadcrumbEntry::new("b", "b", 2));
+        let rendered = crumb.render();
+        assert!(rendered.contains("a:1"));
+        assert!(rendered.contains("b:2"));
+    }
+
+    #[test]
+    fn breadcrumb_clear() {
+        let mut crumb = ReferenceNavigationBreadcrumb::new(10);
+        crumb.push(BreadcrumbEntry::new("a", "a", 1));
+        crumb.clear();
+        assert!(crumb.is_empty());
+        assert!(!crumb.can_go_back());
+    }
+
+    #[test]
+    fn type_indicator_icons() {
+        let decl = ReferenceTypeIndicator::new(ReferenceKind::Declaration);
+        assert_eq!(decl.icon(), "◇");
+        assert_eq!(decl.short_label(), "decl");
+        assert!(!decl.is_write_type());
+        assert!(!decl.is_read_type());
+
+        let def = ReferenceTypeIndicator::new(ReferenceKind::Definition);
+        assert!(def.is_write_type());
+
+        let read = ReferenceTypeIndicator::new(ReferenceKind::Read);
+        assert!(read.is_read_type());
+    }
+
+    #[test]
+    fn type_indicator_format() {
+        let ind = ReferenceTypeIndicator::new(ReferenceKind::Call);
+        assert_eq!(ind.format(), "⊕ call");
+        assert_eq!(ind.to_string(), "⊕ call");
+    }
+
+    #[test]
+    fn type_classifier_count_by_kind() {
+        let kinds = vec![
+            ReferenceKind::Read, ReferenceKind::Read,
+            ReferenceKind::Write, ReferenceKind::Call,
+        ];
+        let counts = ReferenceTypeClassifier::count_by_kind(&kinds);
+        assert_eq!(counts[&ReferenceKind::Read], 2);
+        assert_eq!(counts[&ReferenceKind::Write], 1);
+        assert_eq!(counts[&ReferenceKind::Call], 1);
+    }
+
+    #[test]
+    fn type_classifier_partition() {
+        let kinds = vec![
+            ReferenceKind::Read, ReferenceKind::Write,
+            ReferenceKind::Definition, ReferenceKind::Call,
+        ];
+        let (writes, reads) = ReferenceTypeClassifier::partition_by_access(&kinds);
+        assert_eq!(writes.len(), 2);
+        assert_eq!(reads.len(), 2);
+    }
+
+    #[test]
+    fn type_classifier_annotate() {
+        let items = vec![ref_item("a.rs", 1, 0)];
+        let kinds = vec![ReferenceKind::Read];
+        let annotated = ReferenceTypeClassifier::annotate(&items, &kinds);
+        assert_eq!(annotated.len(), 1);
+        assert!(annotated[0].contains("→ read"));
+    }
+
+    #[test]
+    fn type_classifier_format_summary() {
+        let kinds = vec![ReferenceKind::Read, ReferenceKind::Read, ReferenceKind::Write];
+        let summary = ReferenceTypeClassifier::format_summary(&kinds);
+        assert!(summary.contains("read: 2"));
+        assert!(summary.contains("write: 1"));
+    }
+
 }

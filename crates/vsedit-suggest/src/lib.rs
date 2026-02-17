@@ -1314,6 +1314,346 @@ pub fn resolve_suggestion_detail(item: &CompletionItem) -> ResolvedSuggestionDet
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// SuggestCommitCharHandler – decides whether a typed char commits a suggestion
+// ---------------------------------------------------------------------------
+
+/// Determines whether a given character should commit (accept) the current
+/// suggestion.  Different completion kinds may have different commit-character
+/// sets.
+#[derive(Debug, Clone)]
+pub struct SuggestCommitCharHandler {
+    /// Default characters that always commit.
+    default_chars: Vec<char>,
+    /// Per-kind overrides.
+    kind_overrides: Vec<(CompletionItemKind, Vec<char>)>,
+}
+
+impl SuggestCommitCharHandler {
+    /// Create with sensible defaults: `.`, `;`, `(` commit for most kinds.
+    pub fn new() -> Self {
+        Self {
+            default_chars: vec!['.', ';', '('],
+            kind_overrides: Vec::new(),
+        }
+    }
+
+    /// Replace the default commit characters.
+    pub fn set_default_chars(&mut self, chars: Vec<char>) {
+        self.default_chars = chars;
+    }
+
+    /// Add commit characters for a specific completion kind.
+    pub fn add_override(&mut self, kind: CompletionItemKind, chars: Vec<char>) {
+        // Remove existing override for same kind
+        self.kind_overrides.retain(|(k, _)| *k != kind);
+        self.kind_overrides.push((kind, chars));
+    }
+
+    /// Returns `true` if `ch` should commit the suggestion of the given `kind`.
+    pub fn should_commit(&self, ch: char, kind: CompletionItemKind) -> bool {
+        for (k, chars) in &self.kind_overrides {
+            if *k == kind {
+                return chars.contains(&ch);
+            }
+        }
+        self.default_chars.contains(&ch)
+    }
+
+    /// Return the effective commit characters for a given kind.
+    pub fn commit_chars_for(&self, kind: CompletionItemKind) -> &[char] {
+        for (k, chars) in &self.kind_overrides {
+            if *k == kind {
+                return chars;
+            }
+        }
+        &self.default_chars
+    }
+
+    /// Number of default commit characters.
+    pub fn default_count(&self) -> usize {
+        self.default_chars.len()
+    }
+
+    /// Number of kind-specific overrides registered.
+    pub fn override_count(&self) -> usize {
+        self.kind_overrides.len()
+    }
+
+    /// Clear all overrides.
+    pub fn clear_overrides(&mut self) {
+        self.kind_overrides.clear();
+    }
+}
+
+impl Default for SuggestCommitCharHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestDetailPanel – layout for showing documentation / detail
+// ---------------------------------------------------------------------------
+
+/// Layout information for the suggestion detail panel that appears beside
+/// the suggestion list.
+#[derive(Debug, Clone)]
+pub struct SuggestDetailPanel {
+    /// Whether the detail panel is visible.
+    pub visible: bool,
+    /// Width in characters.
+    pub width: u32,
+    /// Maximum height in lines.
+    pub max_height: u32,
+    /// Currently displayed documentation text (rendered).
+    pub rendered_doc: Option<String>,
+    /// Label of the currently selected item.
+    pub current_label: Option<String>,
+}
+
+impl SuggestDetailPanel {
+    /// Create a hidden panel with default dimensions.
+    pub fn new() -> Self {
+        Self {
+            visible: false,
+            width: 60,
+            max_height: 20,
+            rendered_doc: None,
+            current_label: None,
+        }
+    }
+
+    /// Show the panel with a given item's detail.
+    pub fn show(&mut self, item: &CompletionItem) {
+        self.visible = true;
+        self.current_label = Some(item.label.clone());
+        self.rendered_doc = item.documentation.clone()
+            .or_else(|| item.detail.clone());
+    }
+
+    /// Hide the panel and clear its content.
+    pub fn hide(&mut self) {
+        self.visible = false;
+        self.rendered_doc = None;
+        self.current_label = None;
+    }
+
+    /// Whether the panel has content to display.
+    pub fn has_content(&self) -> bool {
+        self.rendered_doc.is_some()
+    }
+
+    /// Count of lines in the rendered documentation.
+    pub fn doc_line_count(&self) -> usize {
+        self.rendered_doc
+            .as_ref()
+            .map(|d| d.lines().count())
+            .unwrap_or(0)
+    }
+
+    /// Truncate the rendered doc to fit `max_height` lines, appending "..." if needed.
+    pub fn truncated_doc(&self) -> Option<String> {
+        let doc = self.rendered_doc.as_ref()?;
+        let lines: Vec<&str> = doc.lines().collect();
+        if lines.len() <= self.max_height as usize {
+            return Some(doc.clone());
+        }
+        let mut result: Vec<&str> = lines[..self.max_height as usize].to_vec();
+        result.push("...");
+        Some(result.join("\n"))
+    }
+
+    /// Set the panel width.
+    pub fn set_width(&mut self, width: u32) {
+        self.width = width;
+    }
+
+    /// Set the panel max height.
+    pub fn set_max_height(&mut self, height: u32) {
+        self.max_height = height;
+    }
+}
+
+impl Default for SuggestDetailPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestTypingIndicator – tracks typing state for suggestion triggering
+// ---------------------------------------------------------------------------
+
+/// Tracks the user's typing cadence to help decide when to trigger or
+/// dismiss the suggestion widget.
+#[derive(Debug, Clone)]
+pub struct SuggestTypingIndicator {
+    /// Characters typed since the last trigger point.
+    buffer: String,
+    /// Number of consecutive non-whitespace chars typed.
+    consecutive_chars: usize,
+    /// Minimum chars before auto-triggering.
+    min_trigger_length: usize,
+    /// Whether the user is actively typing (set to false on pause).
+    active: bool,
+}
+
+impl SuggestTypingIndicator {
+    /// Create a new indicator that triggers after `min_trigger_length` characters.
+    pub fn new(min_trigger_length: usize) -> Self {
+        Self {
+            buffer: String::new(),
+            consecutive_chars: 0,
+            min_trigger_length,
+            active: false,
+        }
+    }
+
+    /// Record a typed character.
+    pub fn type_char(&mut self, ch: char) {
+        self.active = true;
+        if ch.is_whitespace() {
+            self.consecutive_chars = 0;
+        } else {
+            self.consecutive_chars += 1;
+            self.buffer.push(ch);
+        }
+    }
+
+    /// Whether enough characters have been typed to trigger suggestions.
+    pub fn should_trigger(&self) -> bool {
+        self.active && self.consecutive_chars >= self.min_trigger_length
+    }
+
+    /// The current typed word/prefix.
+    pub fn current_prefix(&self) -> &str {
+        // Return the last `consecutive_chars` characters from buffer
+        let start = self.buffer.len().saturating_sub(self.consecutive_chars);
+        &self.buffer[start..]
+    }
+
+    /// Reset the indicator (e.g., when suggestion is accepted or dismissed).
+    pub fn reset(&mut self) {
+        self.buffer.clear();
+        self.consecutive_chars = 0;
+        self.active = false;
+    }
+
+    /// Mark typing as paused.
+    pub fn pause(&mut self) {
+        self.active = false;
+    }
+
+    /// Whether the indicator is active.
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    /// Number of consecutive non-whitespace characters.
+    pub fn consecutive_count(&self) -> usize {
+        self.consecutive_chars
+    }
+
+    /// Simulate a backspace: remove the last character if any.
+    pub fn backspace(&mut self) {
+        if self.consecutive_chars > 0 {
+            self.consecutive_chars -= 1;
+            self.buffer.pop();
+        }
+    }
+
+    /// Total characters in the buffer.
+    pub fn buffer_len(&self) -> usize {
+        self.buffer.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestPreselectionStrategy – decides which item to pre-select
+// ---------------------------------------------------------------------------
+
+/// Strategy for selecting which completion item should be pre-selected
+/// when the suggestion list appears.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreselectionSource {
+    /// Always select the first item.
+    First,
+    /// Select the item with the highest fuzzy score.
+    BestScore,
+    /// Select the item that was most recently accepted in the same context.
+    RecentlyUsed,
+    /// Select an item marked with `preselect: true`.
+    Preselect,
+}
+
+/// Applies a preselection strategy to a completion list and returns the
+/// 0-based index of the item that should be selected.
+pub struct SuggestPreselectionStrategy {
+    pub source: PreselectionSource,
+}
+
+impl SuggestPreselectionStrategy {
+    pub fn new(source: PreselectionSource) -> Self {
+        Self { source }
+    }
+
+    /// Given a list of items and an optional query, return the 0-based index
+    /// of the item to pre-select.  Returns 0 if the list is empty.
+    pub fn select_index(&self, items: &[CompletionItem], query: &str) -> usize {
+        if items.is_empty() {
+            return 0;
+        }
+        match self.source {
+            PreselectionSource::First => 0,
+            PreselectionSource::BestScore => {
+                let mut best_idx = 0usize;
+                let mut best_score: Option<i64> = None;
+                for (i, item) in items.iter().enumerate() {
+                    if let Some(score) = fuzzy_score(query, item.get_filter_text()) {
+                        if best_score.map_or(true, |bs| score > bs) {
+                            best_score = Some(score);
+                            best_idx = i;
+                        }
+                    }
+                }
+                best_idx
+            }
+            PreselectionSource::RecentlyUsed => {
+                // Fallback: we don't have history here, so pick the first.
+                0
+            }
+            PreselectionSource::Preselect => {
+                items.iter()
+                    .position(|item| item.preselect)
+                    .unwrap_or(0)
+            }
+        }
+    }
+
+    /// Shorthand: is this the "first" strategy?
+    pub fn is_first(&self) -> bool {
+        self.source == PreselectionSource::First
+    }
+
+    /// Shorthand: is this the "best score" strategy?
+    pub fn is_best_score(&self) -> bool {
+        self.source == PreselectionSource::BestScore
+    }
+}
+
+impl fmt::Display for PreselectionSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PreselectionSource::First => write!(f, "first"),
+            PreselectionSource::BestScore => write!(f, "bestScore"),
+            PreselectionSource::RecentlyUsed => write!(f, "recentlyUsed"),
+            PreselectionSource::Preselect => write!(f, "preselect"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2253,4 +2593,222 @@ mod tests {
         assert!(detail.preview.is_none());
         assert!(detail.parameters.is_empty());
     }
+
+    // -- SuggestCommitCharHandler tests --
+
+    #[test]
+    fn commit_char_defaults() {
+        let handler = SuggestCommitCharHandler::new();
+        assert!(handler.should_commit('.', CompletionItemKind::Method));
+        assert!(handler.should_commit(';', CompletionItemKind::Variable));
+        assert!(!handler.should_commit('x', CompletionItemKind::Function));
+        assert_eq!(handler.default_count(), 3);
+    }
+
+    #[test]
+    fn commit_char_override() {
+        let mut handler = SuggestCommitCharHandler::new();
+        handler.add_override(CompletionItemKind::Snippet, vec!['|', '\t']);
+        assert!(handler.should_commit('|', CompletionItemKind::Snippet));
+        assert!(!handler.should_commit('.', CompletionItemKind::Snippet));
+        // Default still works for other kinds
+        assert!(handler.should_commit('.', CompletionItemKind::Method));
+        assert_eq!(handler.override_count(), 1);
+    }
+
+    #[test]
+    fn commit_char_clear_overrides() {
+        let mut handler = SuggestCommitCharHandler::new();
+        handler.add_override(CompletionItemKind::Snippet, vec!['|']);
+        handler.clear_overrides();
+        assert_eq!(handler.override_count(), 0);
+        // Falls back to default
+        assert!(handler.should_commit('.', CompletionItemKind::Snippet));
+    }
+
+    #[test]
+    fn commit_char_for_kind() {
+        let mut handler = SuggestCommitCharHandler::new();
+        handler.add_override(CompletionItemKind::Keyword, vec!['(', ' ']);
+        let chars = handler.commit_chars_for(CompletionItemKind::Keyword);
+        assert_eq!(chars, &['(', ' ']);
+        // Non-overridden kind returns defaults
+        let def = handler.commit_chars_for(CompletionItemKind::Variable);
+        assert_eq!(def, &['.', ';', '(']);
+    }
+
+    // -- SuggestDetailPanel tests --
+
+    #[test]
+    fn detail_panel_hidden_by_default() {
+        let panel = SuggestDetailPanel::new();
+        assert!(!panel.visible);
+        assert!(!panel.has_content());
+        assert_eq!(panel.doc_line_count(), 0);
+    }
+
+    #[test]
+    fn detail_panel_show_item() {
+        let mut panel = SuggestDetailPanel::new();
+        let item = CompletionItem::new("myFunc", CompletionItemKind::Function)
+            .with_documentation("Does something\nuseful");
+        panel.show(&item);
+        assert!(panel.visible);
+        assert!(panel.has_content());
+        assert_eq!(panel.current_label.as_deref(), Some("myFunc"));
+        assert_eq!(panel.doc_line_count(), 2);
+    }
+
+    #[test]
+    fn detail_panel_hide() {
+        let mut panel = SuggestDetailPanel::new();
+        let item = CompletionItem::new("x", CompletionItemKind::Variable)
+            .with_documentation("info");
+        panel.show(&item);
+        panel.hide();
+        assert!(!panel.visible);
+        assert!(!panel.has_content());
+    }
+
+    #[test]
+    fn detail_panel_truncated_doc() {
+        let mut panel = SuggestDetailPanel::new();
+        panel.set_max_height(3);
+        let long_doc = "line1\nline2\nline3\nline4\nline5";
+        let item = CompletionItem::new("f", CompletionItemKind::Function)
+            .with_documentation(long_doc);
+        panel.show(&item);
+        let trunc = panel.truncated_doc().unwrap();
+        let lines: Vec<&str> = trunc.lines().collect();
+        assert_eq!(lines.len(), 4); // 3 lines + "..."
+        assert_eq!(lines[3], "...");
+    }
+
+    #[test]
+    fn detail_panel_no_truncation_needed() {
+        let mut panel = SuggestDetailPanel::new();
+        panel.set_max_height(10);
+        let item = CompletionItem::new("g", CompletionItemKind::Variable)
+            .with_documentation("short");
+        panel.show(&item);
+        let trunc = panel.truncated_doc().unwrap();
+        assert_eq!(trunc, "short");
+    }
+
+    // -- SuggestTypingIndicator tests --
+
+    #[test]
+    fn typing_indicator_initial() {
+        let ind = SuggestTypingIndicator::new(3);
+        assert!(!ind.is_active());
+        assert!(!ind.should_trigger());
+        assert_eq!(ind.current_prefix(), "");
+        assert_eq!(ind.buffer_len(), 0);
+    }
+
+    #[test]
+    fn typing_indicator_trigger() {
+        let mut ind = SuggestTypingIndicator::new(3);
+        ind.type_char('f');
+        assert!(!ind.should_trigger());
+        ind.type_char('o');
+        assert!(!ind.should_trigger());
+        ind.type_char('o');
+        assert!(ind.should_trigger());
+        assert_eq!(ind.current_prefix(), "foo");
+        assert_eq!(ind.consecutive_count(), 3);
+    }
+
+    #[test]
+    fn typing_indicator_whitespace_resets_consecutive() {
+        let mut ind = SuggestTypingIndicator::new(2);
+        ind.type_char('a');
+        ind.type_char('b');
+        assert!(ind.should_trigger());
+        ind.type_char(' ');
+        assert!(!ind.should_trigger());
+        assert_eq!(ind.consecutive_count(), 0);
+    }
+
+    #[test]
+    fn typing_indicator_reset() {
+        let mut ind = SuggestTypingIndicator::new(1);
+        ind.type_char('x');
+        assert!(ind.should_trigger());
+        ind.reset();
+        assert!(!ind.is_active());
+        assert_eq!(ind.buffer_len(), 0);
+    }
+
+    #[test]
+    fn typing_indicator_backspace() {
+        let mut ind = SuggestTypingIndicator::new(2);
+        ind.type_char('a');
+        ind.type_char('b');
+        ind.backspace();
+        assert_eq!(ind.consecutive_count(), 1);
+        assert!(!ind.should_trigger());
+    }
+
+    #[test]
+    fn typing_indicator_pause() {
+        let mut ind = SuggestTypingIndicator::new(1);
+        ind.type_char('z');
+        assert!(ind.is_active());
+        ind.pause();
+        assert!(!ind.is_active());
+        assert!(!ind.should_trigger());
+    }
+
+    // -- SuggestPreselectionStrategy tests --
+
+    #[test]
+    fn preselect_first() {
+        let strat = SuggestPreselectionStrategy::new(PreselectionSource::First);
+        let items = vec![
+            CompletionItem::new("alpha", CompletionItemKind::Variable),
+            CompletionItem::new("beta", CompletionItemKind::Variable),
+        ];
+        assert_eq!(strat.select_index(&items, ""), 0);
+        assert!(strat.is_first());
+    }
+
+    #[test]
+    fn preselect_best_score() {
+        let strat = SuggestPreselectionStrategy::new(PreselectionSource::BestScore);
+        let items = vec![
+            CompletionItem::new("something_else", CompletionItemKind::Variable),
+            CompletionItem::new("toString", CompletionItemKind::Method),
+        ];
+        // "toStr" should match "toString" better
+        let idx = strat.select_index(&items, "toStr");
+        assert_eq!(idx, 1);
+        assert!(strat.is_best_score());
+    }
+
+    #[test]
+    fn preselect_preselect_flag() {
+        let strat = SuggestPreselectionStrategy::new(PreselectionSource::Preselect);
+        let items = vec![
+            CompletionItem::new("a", CompletionItemKind::Variable),
+            CompletionItem::new("b", CompletionItemKind::Variable).with_preselect(),
+            CompletionItem::new("c", CompletionItemKind::Variable),
+        ];
+        assert_eq!(strat.select_index(&items, ""), 1);
+    }
+
+    #[test]
+    fn preselect_empty_list() {
+        let strat = SuggestPreselectionStrategy::new(PreselectionSource::BestScore);
+        assert_eq!(strat.select_index(&[], "query"), 0);
+    }
+
+    #[test]
+    fn preselection_source_display() {
+        assert_eq!(format!("{}", PreselectionSource::First), "first");
+        assert_eq!(format!("{}", PreselectionSource::BestScore), "bestScore");
+        assert_eq!(format!("{}", PreselectionSource::RecentlyUsed), "recentlyUsed");
+        assert_eq!(format!("{}", PreselectionSource::Preselect), "preselect");
+    }
+
 }

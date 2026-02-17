@@ -1325,6 +1325,389 @@ pub fn summarize_diffs(diffs: &[KeymapDiffEntry]) -> (usize, usize, usize) {
     (added, removed, modified)
 }
 
+// ---------------------------------------------------------------------------
+// KeybindingTableRenderer – render keybindings as a text table
+// ---------------------------------------------------------------------------
+
+/// Column widths for keybinding table rendering.
+#[derive(Debug, Clone)]
+pub struct KeybindingTableColumnWidths {
+    pub command_width: usize,
+    pub keybinding_width: usize,
+    pub when_width: usize,
+    pub source_width: usize,
+}
+
+impl KeybindingTableColumnWidths {
+    pub fn default_widths() -> Self {
+        Self {
+            command_width: 30,
+            keybinding_width: 20,
+            when_width: 25,
+            source_width: 10,
+        }
+    }
+
+    pub fn total_width(&self) -> usize {
+        self.command_width + self.keybinding_width + self.when_width + self.source_width + 9
+    }
+}
+
+/// Renders keybindings as a formatted text table.
+#[derive(Debug)]
+pub struct KeybindingTableRenderer {
+    widths: KeybindingTableColumnWidths,
+}
+
+impl KeybindingTableRenderer {
+    pub fn new() -> Self {
+        Self {
+            widths: KeybindingTableColumnWidths::default_widths(),
+        }
+    }
+
+    pub fn with_widths(widths: KeybindingTableColumnWidths) -> Self {
+        Self { widths }
+    }
+
+    fn pad(s: &str, width: usize) -> String {
+        if s.len() >= width {
+            s[..width].to_string()
+        } else {
+            format!("{}{}", s, " ".repeat(width - s.len()))
+        }
+    }
+
+    /// Render the header line.
+    pub fn render_header(&self) -> String {
+        format!(
+            "{} | {} | {} | {}",
+            Self::pad("Command", self.widths.command_width),
+            Self::pad("Keybinding", self.widths.keybinding_width),
+            Self::pad("When", self.widths.when_width),
+            Self::pad("Source", self.widths.source_width),
+        )
+    }
+
+    /// Render a separator line.
+    pub fn render_separator(&self) -> String {
+        format!(
+            "{}-+-{}-+-{}-+-{}",
+            "-".repeat(self.widths.command_width),
+            "-".repeat(self.widths.keybinding_width),
+            "-".repeat(self.widths.when_width),
+            "-".repeat(self.widths.source_width),
+        )
+    }
+
+    /// Render a single binding as a table row.
+    pub fn render_row(&self, binding: &Keybinding) -> String {
+        let key_str = format_key_combo(&binding.key, &binding.modifiers);
+        let when = binding.when_clause.as_deref().unwrap_or("");
+        let source = match binding.source {
+            KeybindingSource::Default => "Default",
+            KeybindingSource::User => "User",
+            KeybindingSource::Extension => "Extension",
+        };
+        format!(
+            "{} | {} | {} | {}",
+            Self::pad(&binding.command, self.widths.command_width),
+            Self::pad(&key_str, self.widths.keybinding_width),
+            Self::pad(when, self.widths.when_width),
+            Self::pad(source, self.widths.source_width),
+        )
+    }
+
+    /// Render a full table from a list of bindings.
+    pub fn render_table(&self, bindings: &[Keybinding]) -> String {
+        let mut lines = Vec::new();
+        lines.push(self.render_header());
+        lines.push(self.render_separator());
+        for b in bindings {
+            lines.push(self.render_row(b));
+        }
+        lines.join("\n")
+    }
+
+    pub fn column_widths(&self) -> &KeybindingTableColumnWidths {
+        &self.widths
+    }
+}
+
+impl Default for KeybindingTableRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingWhenClausePreview – preview when-clause evaluation
+// ---------------------------------------------------------------------------
+
+/// A context variable and its current value, used for when-clause preview.
+#[derive(Debug, Clone)]
+pub struct ContextVariable {
+    pub name: String,
+    pub value: String,
+}
+
+/// Preview engine for when clauses, showing how they evaluate against context.
+#[derive(Debug)]
+pub struct KeybindingWhenClausePreview {
+    variables: Vec<ContextVariable>,
+}
+
+impl KeybindingWhenClausePreview {
+    pub fn new() -> Self {
+        Self {
+            variables: Vec::new(),
+        }
+    }
+
+    /// Set a context variable.
+    pub fn set_variable(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        let name = name.into();
+        let value = value.into();
+        if let Some(existing) = self.variables.iter_mut().find(|v| v.name == name) {
+            existing.value = value;
+        } else {
+            self.variables.push(ContextVariable { name, value });
+        }
+    }
+
+    /// Get the value of a context variable.
+    pub fn get_variable(&self, name: &str) -> Option<&str> {
+        self.variables.iter().find(|v| v.name == name).map(|v| v.value.as_str())
+    }
+
+    /// Remove a context variable.
+    pub fn remove_variable(&mut self, name: &str) -> bool {
+        let before = self.variables.len();
+        self.variables.retain(|v| v.name != name);
+        self.variables.len() < before
+    }
+
+    /// Evaluate a simple when clause against the current context.
+    /// Supports: `key`, `!key`, `key == value`, `key != value`.
+    pub fn evaluate_simple(&self, clause: &str) -> bool {
+        let clause = clause.trim();
+        if clause.is_empty() {
+            return true;
+        }
+        if let Some(rest) = clause.strip_prefix('!') {
+            let key = rest.trim();
+            return self.get_variable(key).map_or(true, |v| v == "false" || v.is_empty());
+        }
+        if let Some(idx) = clause.find("!=") {
+            let key = clause[..idx].trim();
+            let expected = clause[idx + 2..].trim().trim_matches('\'').trim_matches('"');
+            return self.get_variable(key).map_or(true, |v| v != expected);
+        }
+        if let Some(idx) = clause.find("==") {
+            let key = clause[..idx].trim();
+            let expected = clause[idx + 2..].trim().trim_matches('\'').trim_matches('"');
+            return self.get_variable(key).map_or(false, |v| v == expected);
+        }
+        // Plain key – truthy check
+        self.get_variable(clause).map_or(false, |v| v != "false" && !v.is_empty())
+    }
+
+    /// Preview a binding's when clause evaluation.
+    pub fn preview_binding(&self, binding: &Keybinding) -> (bool, String) {
+        match &binding.when_clause {
+            None => (true, "no when clause – always active".to_string()),
+            Some(clause) => {
+                let result = self.evaluate_simple(clause);
+                let status = if result { "ACTIVE" } else { "INACTIVE" };
+                (result, format!("{status}: {clause}"))
+            }
+        }
+    }
+
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    pub fn clear_variables(&mut self) {
+        self.variables.clear();
+    }
+
+    /// List all variable names.
+    pub fn variable_names(&self) -> Vec<&str> {
+        self.variables.iter().map(|v| v.name.as_str()).collect()
+    }
+}
+
+impl Default for KeybindingWhenClausePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingSearchFilter – search/filter keybindings
+// ---------------------------------------------------------------------------
+
+/// A search filter for keybindings in the editor UI.
+#[derive(Debug, Clone)]
+pub struct KeybindingSearchFilter {
+    pub query: String,
+    pub search_in_commands: bool,
+    pub search_in_keys: bool,
+    pub search_in_when: bool,
+    pub source_filter: Option<KeybindingSource>,
+}
+
+impl KeybindingSearchFilter {
+    pub fn new(query: impl Into<String>) -> Self {
+        Self {
+            query: query.into(),
+            search_in_commands: true,
+            search_in_keys: true,
+            search_in_when: true,
+            source_filter: None,
+        }
+    }
+
+    pub fn with_source_filter(mut self, source: KeybindingSource) -> Self {
+        self.source_filter = Some(source);
+        self
+    }
+
+    pub fn commands_only(query: impl Into<String>) -> Self {
+        Self {
+            query: query.into(),
+            search_in_commands: true,
+            search_in_keys: false,
+            search_in_when: false,
+            source_filter: None,
+        }
+    }
+
+    /// Check if a binding matches this filter.
+    pub fn matches(&self, binding: &Keybinding) -> bool {
+        if let Some(ref src) = self.source_filter {
+            if binding.source != *src {
+                return false;
+            }
+        }
+        if self.query.is_empty() {
+            return true;
+        }
+        let query_lower = self.query.to_lowercase();
+        if self.search_in_commands && binding.command.to_lowercase().contains(&query_lower) {
+            return true;
+        }
+        if self.search_in_keys {
+            let key_str = format_key_combo(&binding.key, &binding.modifiers).to_lowercase();
+            if key_str.contains(&query_lower) {
+                return true;
+            }
+        }
+        if self.search_in_when {
+            if let Some(ref when) = binding.when_clause {
+                if when.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Filter a slice of bindings, returning matching ones.
+    pub fn filter<'a>(&self, bindings: &'a [Keybinding]) -> Vec<&'a Keybinding> {
+        bindings.iter().filter(|b| self.matches(b)).collect()
+    }
+
+    /// Count matches in a slice.
+    pub fn count_matches(&self, bindings: &[Keybinding]) -> usize {
+        bindings.iter().filter(|b| self.matches(b)).count()
+    }
+
+    pub fn is_empty_query(&self) -> bool {
+        self.query.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingCopyToClipboard – format keybindings for clipboard
+// ---------------------------------------------------------------------------
+
+/// Format for copying keybindings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeybindingCopyFormat {
+    Json,
+    Text,
+    Markdown,
+}
+
+/// Formats keybindings for copying to the clipboard.
+pub struct KeybindingCopyToClipboard;
+
+impl KeybindingCopyToClipboard {
+    /// Format a single binding as a JSON-like string.
+    pub fn format_as_json(binding: &Keybinding) -> String {
+        let key_str = format_key_combo(&binding.key, &binding.modifiers);
+        let when = binding.when_clause.as_deref().unwrap_or("");
+        format!(
+            r#"{{ "key": "{}", "command": "{}"{} }}"#,
+            key_str,
+            binding.command,
+            if when.is_empty() {
+                String::new()
+            } else {
+                format!(r#", "when": "{}""#, when)
+            },
+        )
+    }
+
+    /// Format a single binding as plain text.
+    pub fn format_as_text(binding: &Keybinding) -> String {
+        let key_str = format_key_combo(&binding.key, &binding.modifiers);
+        let when = binding.when_clause.as_deref().unwrap_or("");
+        if when.is_empty() {
+            format!("{}\t{}", key_str, binding.command)
+        } else {
+            format!("{}\t{}\t{}", key_str, binding.command, when)
+        }
+    }
+
+    /// Format a single binding as markdown.
+    pub fn format_as_markdown(binding: &Keybinding) -> String {
+        let key_str = format_key_combo(&binding.key, &binding.modifiers);
+        let when = binding.when_clause.as_deref().unwrap_or("-");
+        format!("| `{}` | `{}` | {} |", key_str, binding.command, when)
+    }
+
+    /// Format multiple bindings in the given format.
+    pub fn format_bindings(bindings: &[Keybinding], format: KeybindingCopyFormat) -> String {
+        match format {
+            KeybindingCopyFormat::Json => {
+                let items: Vec<String> = bindings.iter().map(Self::format_as_json).collect();
+                format!("[\n  {}\n]", items.join(",\n  "))
+            }
+            KeybindingCopyFormat::Text => {
+                bindings.iter().map(Self::format_as_text).collect::<Vec<_>>().join("\n")
+            }
+            KeybindingCopyFormat::Markdown => {
+                let mut lines = vec![
+                    "| Keybinding | Command | When |".to_string(),
+                    "| --- | --- | --- |".to_string(),
+                ];
+                for b in bindings {
+                    lines.push(Self::format_as_markdown(b));
+                }
+                lines.join("\n")
+            }
+        }
+    }
+
+    /// Count how many characters the formatted output would be.
+    pub fn estimate_size(bindings: &[Keybinding], format: KeybindingCopyFormat) -> usize {
+        Self::format_bindings(bindings, format).len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2245,4 +2628,186 @@ mod tests {
         assert_eq!(removed, 1);
         assert_eq!(modified, 1);
     }
+    #[test]
+    fn table_renderer_header_and_separator() {
+        let renderer = KeybindingTableRenderer::new();
+        let header = renderer.render_header();
+        assert!(header.contains("Command"));
+        assert!(header.contains("Keybinding"));
+        let sep = renderer.render_separator();
+        assert!(sep.contains("---"));
+    }
+
+    #[test]
+    fn table_renderer_row() {
+        let renderer = KeybindingTableRenderer::new();
+        let b = kb(KeyCode::Char('s'), true, "file.save");
+        let row = renderer.render_row(&b);
+        assert!(row.contains("file.save"));
+        assert!(row.contains("Ctrl+S"));
+    }
+
+    #[test]
+    fn table_renderer_full_table() {
+        let renderer = KeybindingTableRenderer::new();
+        let bindings = vec![
+            kb(KeyCode::Char('s'), true, "file.save"),
+            kb(KeyCode::Char('z'), true, "edit.undo"),
+        ];
+        let table = renderer.render_table(&bindings);
+        let lines: Vec<&str> = table.lines().collect();
+        assert_eq!(lines.len(), 4); // header + separator + 2 rows
+    }
+
+    #[test]
+    fn table_column_widths() {
+        let widths = KeybindingTableColumnWidths::default_widths();
+        assert!(widths.total_width() > 0);
+        assert_eq!(widths.command_width, 30);
+    }
+
+    #[test]
+    fn when_clause_preview_simple() {
+        let mut preview = KeybindingWhenClausePreview::new();
+        preview.set_variable("editorFocus", "true");
+        assert!(preview.evaluate_simple("editorFocus"));
+        assert!(!preview.evaluate_simple("!editorFocus"));
+        assert!(!preview.evaluate_simple("terminalFocus"));
+    }
+
+    #[test]
+    fn when_clause_preview_equality() {
+        let mut preview = KeybindingWhenClausePreview::new();
+        preview.set_variable("language", "rust");
+        assert!(preview.evaluate_simple("language == 'rust'"));
+        assert!(!preview.evaluate_simple("language == 'python'"));
+        assert!(preview.evaluate_simple("language != 'python'"));
+        assert!(!preview.evaluate_simple("language != 'rust'"));
+    }
+
+    #[test]
+    fn when_clause_preview_binding() {
+        let mut preview = KeybindingWhenClausePreview::new();
+        preview.set_variable("editorFocus", "true");
+        let mut b = kb(KeyCode::Char('s'), true, "file.save");
+        b.when_clause = Some("editorFocus".to_string());
+        let (active, msg) = preview.preview_binding(&b);
+        assert!(active);
+        assert!(msg.contains("ACTIVE"));
+    }
+
+    #[test]
+    fn when_clause_preview_no_clause() {
+        let preview = KeybindingWhenClausePreview::new();
+        let b = kb(KeyCode::Char('s'), true, "file.save");
+        let (active, msg) = preview.preview_binding(&b);
+        assert!(active);
+        assert!(msg.contains("always active"));
+    }
+
+    #[test]
+    fn when_clause_preview_variables() {
+        let mut preview = KeybindingWhenClausePreview::new();
+        preview.set_variable("a", "1");
+        preview.set_variable("b", "2");
+        assert_eq!(preview.variable_count(), 2);
+        assert!(preview.remove_variable("a"));
+        assert_eq!(preview.variable_count(), 1);
+        preview.clear_variables();
+        assert_eq!(preview.variable_count(), 0);
+    }
+
+    #[test]
+    fn search_filter_by_command() {
+        let bindings = vec![
+            kb(KeyCode::Char('s'), true, "file.save"),
+            kb(KeyCode::Char('z'), true, "edit.undo"),
+            kb(KeyCode::Char('c'), true, "edit.copy"),
+        ];
+        let filter = KeybindingSearchFilter::commands_only("file");
+        assert_eq!(filter.count_matches(&bindings), 1);
+        let matches = filter.filter(&bindings);
+        assert_eq!(matches[0].command, "file.save");
+    }
+
+    #[test]
+    fn search_filter_by_key() {
+        let bindings = vec![
+            kb(KeyCode::Char('s'), true, "file.save"),
+            kb(KeyCode::Char('z'), true, "edit.undo"),
+        ];
+        let filter = KeybindingSearchFilter::new("Ctrl+S");
+        let matches = filter.filter(&bindings);
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn search_filter_empty_query() {
+        let filter = KeybindingSearchFilter::new("");
+        assert!(filter.is_empty_query());
+        let bindings = vec![kb(KeyCode::Char('s'), true, "file.save")];
+        assert_eq!(filter.count_matches(&bindings), 1);
+    }
+
+    #[test]
+    fn search_filter_by_source() {
+        let bindings = vec![
+            kb_with_source(KeyCode::Char('s'), true, "file.save", KeybindingSource::User),
+            kb_with_source(KeyCode::Char('z'), true, "edit.undo", KeybindingSource::Default),
+        ];
+        let filter = KeybindingSearchFilter::new("").with_source_filter(KeybindingSource::User);
+        assert_eq!(filter.count_matches(&bindings), 1);
+    }
+
+    #[test]
+    fn copy_format_json() {
+        let b = kb(KeyCode::Char('s'), true, "file.save");
+        let json = KeybindingCopyToClipboard::format_as_json(&b);
+        assert!(json.contains("Ctrl+S"));
+        assert!(json.contains("file.save"));
+    }
+
+    #[test]
+    fn copy_format_text() {
+        let b = kb(KeyCode::Char('s'), true, "file.save");
+        let text = KeybindingCopyToClipboard::format_as_text(&b);
+        assert!(text.contains("Ctrl+S"));
+        assert!(text.contains("file.save"));
+    }
+
+    #[test]
+    fn copy_format_markdown() {
+        let b = kb(KeyCode::Char('s'), true, "file.save");
+        let md = KeybindingCopyToClipboard::format_as_markdown(&b);
+        assert!(md.starts_with("| `Ctrl+S`"));
+    }
+
+    #[test]
+    fn copy_format_multiple_json() {
+        let bindings = vec![
+            kb(KeyCode::Char('s'), true, "file.save"),
+            kb(KeyCode::Char('z'), true, "edit.undo"),
+        ];
+        let json = KeybindingCopyToClipboard::format_bindings(&bindings, KeybindingCopyFormat::Json);
+        assert!(json.starts_with('['));
+        assert!(json.ends_with(']'));
+    }
+
+    #[test]
+    fn copy_format_multiple_markdown() {
+        let bindings = vec![
+            kb(KeyCode::Char('s'), true, "file.save"),
+        ];
+        let md = KeybindingCopyToClipboard::format_bindings(&bindings, KeybindingCopyFormat::Markdown);
+        assert!(md.contains("| Keybinding |"));
+        assert!(md.contains("| --- |"));
+    }
+
+    #[test]
+    fn copy_estimate_size() {
+        let bindings = vec![kb(KeyCode::Char('s'), true, "file.save")];
+        let size = KeybindingCopyToClipboard::estimate_size(&bindings, KeybindingCopyFormat::Text);
+        assert!(size > 0);
+    }
+
 }

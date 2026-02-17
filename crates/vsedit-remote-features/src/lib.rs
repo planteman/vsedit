@@ -1420,6 +1420,246 @@ impl fmt::Display for RemoteConnectionDiagnostics {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RemoteFilesystemCacheManager
+// ---------------------------------------------------------------------------
+
+/// A cached filesystem entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CachedFsEntry {
+    pub path: String,
+    pub is_dir: bool,
+    pub size_bytes: u64,
+    pub modified_ts: u64,
+    pub cached_at: u64,
+}
+
+impl CachedFsEntry {
+    pub fn file(path: impl Into<String>, size: u64, modified: u64, cached_at: u64) -> Self {
+        Self { path: path.into(), is_dir: false, size_bytes: size, modified_ts: modified, cached_at }
+    }
+
+    pub fn directory(path: impl Into<String>, modified: u64, cached_at: u64) -> Self {
+        Self { path: path.into(), is_dir: true, size_bytes: 0, modified_ts: modified, cached_at }
+    }
+
+    pub fn is_stale(&self, now: u64, ttl: u64) -> bool {
+        now.saturating_sub(self.cached_at) > ttl
+    }
+}
+
+impl std::fmt::Display for CachedFsEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = if self.is_dir { "dir" } else { "file" };
+        write!(f, "{} [{}] {}B mod={}", self.path, kind, self.size_bytes, self.modified_ts)
+    }
+}
+
+/// Caches remote filesystem entries locally for faster lookups.
+pub struct RemoteFilesystemCacheManager {
+    entries: std::collections::HashMap<String, CachedFsEntry>,
+    ttl: u64,
+    max_entries: usize,
+}
+
+impl RemoteFilesystemCacheManager {
+    pub fn new(max_entries: usize, ttl: u64) -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            ttl,
+            max_entries,
+        }
+    }
+
+    pub fn put(&mut self, entry: CachedFsEntry) {
+        if self.entries.len() >= self.max_entries && !self.entries.contains_key(&entry.path) {
+            // Evict oldest entry
+            if let Some(oldest_key) = self
+                .entries
+                .values()
+                .min_by_key(|e| e.cached_at)
+                .map(|e| e.path.clone())
+            {
+                self.entries.remove(&oldest_key);
+            }
+        }
+        self.entries.insert(entry.path.clone(), entry);
+    }
+
+    pub fn get(&self, path: &str, now: u64) -> Option<&CachedFsEntry> {
+        self.entries.get(path).filter(|e| !e.is_stale(now, self.ttl))
+    }
+
+    pub fn invalidate(&mut self, path: &str) -> bool {
+        self.entries.remove(path).is_some()
+    }
+
+    pub fn invalidate_prefix(&mut self, prefix: &str) -> usize {
+        let keys: Vec<String> = self
+            .entries
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect();
+        let count = keys.len();
+        for k in keys {
+            self.entries.remove(&k);
+        }
+        count
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn evict_stale(&mut self, now: u64) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|_, e| !e.is_stale(now, self.ttl));
+        before - self.entries.len()
+    }
+
+    /// List cached paths matching a directory prefix.
+    pub fn list_dir(&self, dir_prefix: &str, now: u64) -> Vec<&CachedFsEntry> {
+        self.entries
+            .values()
+            .filter(|e| {
+                e.path.starts_with(dir_prefix) && !e.is_stale(now, self.ttl)
+            })
+            .collect()
+    }
+
+    /// Total cached size in bytes (files only).
+    pub fn total_cached_size(&self) -> u64 {
+        self.entries.values().filter(|e| !e.is_dir).map(|e| e.size_bytes).sum()
+    }
+}
+
+impl std::fmt::Display for RemoteFilesystemCacheManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RemoteFilesystemCacheManager({}/{} entries, ttl={})",
+            self.entries.len(), self.max_entries, self.ttl)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemotePortDetector
+// ---------------------------------------------------------------------------
+
+/// A detected open port on a remote host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetectedPort {
+    pub port: u16,
+    pub protocol: String,
+    pub process_name: Option<String>,
+    pub detected_at: u64,
+}
+
+impl DetectedPort {
+    pub fn new(port: u16, protocol: impl Into<String>, detected_at: u64) -> Self {
+        Self { port, protocol: protocol.into(), process_name: None, detected_at }
+    }
+
+    pub fn with_process(mut self, name: impl Into<String>) -> Self {
+        self.process_name = Some(name.into());
+        self
+    }
+}
+
+impl std::fmt::Display for DetectedPort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.process_name {
+            Some(name) => write!(f, ":{}/{} ({})", self.port, self.protocol, name),
+            None => write!(f, ":{}/{}", self.port, self.protocol),
+        }
+    }
+}
+
+/// Detects and tracks open ports on a remote host.
+pub struct RemotePortDetector {
+    detected_ports: Vec<DetectedPort>,
+    ignored_ports: std::collections::HashSet<u16>,
+}
+
+impl RemotePortDetector {
+    pub fn new() -> Self {
+        Self {
+            detected_ports: Vec::new(),
+            ignored_ports: std::collections::HashSet::new(),
+        }
+    }
+
+    pub fn add_detected(&mut self, port: DetectedPort) {
+        if self.ignored_ports.contains(&port.port) {
+            return;
+        }
+        if !self.detected_ports.iter().any(|p| p.port == port.port) {
+            self.detected_ports.push(port);
+        }
+    }
+
+    pub fn ignore_port(&mut self, port: u16) {
+        self.ignored_ports.insert(port);
+        self.detected_ports.retain(|p| p.port != port);
+    }
+
+    pub fn unignore_port(&mut self, port: u16) {
+        self.ignored_ports.remove(&port);
+    }
+
+    pub fn is_detected(&self, port: u16) -> bool {
+        self.detected_ports.iter().any(|p| p.port == port)
+    }
+
+    pub fn detected_count(&self) -> usize {
+        self.detected_ports.len()
+    }
+
+    pub fn all_detected(&self) -> &[DetectedPort] {
+        &self.detected_ports
+    }
+
+    pub fn remove_port(&mut self, port: u16) -> bool {
+        let before = self.detected_ports.len();
+        self.detected_ports.retain(|p| p.port != port);
+        self.detected_ports.len() < before
+    }
+
+    pub fn clear(&mut self) {
+        self.detected_ports.clear();
+    }
+
+    /// Get ports in a specific range.
+    pub fn ports_in_range(&self, min: u16, max: u16) -> Vec<&DetectedPort> {
+        self.detected_ports
+            .iter()
+            .filter(|p| p.port >= min && p.port <= max)
+            .collect()
+    }
+
+    /// Get all detected port numbers, sorted.
+    pub fn port_numbers(&self) -> Vec<u16> {
+        let mut ports: Vec<u16> = self.detected_ports.iter().map(|p| p.port).collect();
+        ports.sort();
+        ports
+    }
+}
+
+impl std::fmt::Display for RemotePortDetector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RemotePortDetector({} detected, {} ignored)",
+            self.detected_ports.len(), self.ignored_ports.len())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2384,4 +2624,177 @@ mod tests {
         let s = format!("{diag}");
         assert!(s.contains("checks"));
     }
+
+    #[test]
+    fn fs_cache_put_and_get() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 1000);
+        cache.put(CachedFsEntry::file("/a.txt", 100, 50, 100));
+        assert!(cache.get("/a.txt", 200).is_some());
+    }
+
+    #[test]
+    fn fs_cache_stale_entry() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 100);
+        cache.put(CachedFsEntry::file("/a.txt", 100, 50, 100));
+        assert!(cache.get("/a.txt", 300).is_none());
+    }
+
+    #[test]
+    fn fs_cache_invalidate() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 1000);
+        cache.put(CachedFsEntry::file("/a.txt", 100, 50, 100));
+        assert!(cache.invalidate("/a.txt"));
+        assert!(!cache.invalidate("/a.txt"));
+    }
+
+    #[test]
+    fn fs_cache_invalidate_prefix() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 1000);
+        cache.put(CachedFsEntry::file("/src/a.rs", 100, 50, 100));
+        cache.put(CachedFsEntry::file("/src/b.rs", 200, 50, 100));
+        cache.put(CachedFsEntry::file("/doc/c.md", 50, 50, 100));
+        assert_eq!(cache.invalidate_prefix("/src/"), 2);
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn fs_cache_eviction() {
+        let mut cache = RemoteFilesystemCacheManager::new(2, 1000);
+        cache.put(CachedFsEntry::file("/a", 10, 1, 1));
+        cache.put(CachedFsEntry::file("/b", 20, 2, 2));
+        cache.put(CachedFsEntry::file("/c", 30, 3, 3));
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn fs_cache_evict_stale() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 100);
+        cache.put(CachedFsEntry::file("/old", 10, 1, 10));
+        cache.put(CachedFsEntry::file("/new", 20, 2, 500));
+        let evicted = cache.evict_stale(500);
+        assert_eq!(evicted, 1);
+    }
+
+    #[test]
+    fn fs_cache_list_dir() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 1000);
+        cache.put(CachedFsEntry::file("/src/a.rs", 10, 1, 100));
+        cache.put(CachedFsEntry::file("/src/b.rs", 20, 2, 100));
+        cache.put(CachedFsEntry::file("/doc/c.md", 5, 3, 100));
+        let listing = cache.list_dir("/src/", 200);
+        assert_eq!(listing.len(), 2);
+    }
+
+    #[test]
+    fn fs_cache_total_size() {
+        let mut cache = RemoteFilesystemCacheManager::new(100, 1000);
+        cache.put(CachedFsEntry::file("/a", 100, 1, 1));
+        cache.put(CachedFsEntry::file("/b", 200, 2, 2));
+        cache.put(CachedFsEntry::directory("/d", 3, 3));
+        assert_eq!(cache.total_cached_size(), 300);
+    }
+
+    #[test]
+    fn fs_cache_display_and_clear() {
+        let mut cache = RemoteFilesystemCacheManager::new(10, 100);
+        cache.put(CachedFsEntry::file("/x", 1, 1, 1));
+        assert!(format!("{cache}").contains("1/10"));
+        cache.clear();
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn cached_fs_entry_display() {
+        let f = CachedFsEntry::file("/a.txt", 1024, 50, 100);
+        let s = format!("{f}");
+        assert!(s.contains("file"));
+        assert!(s.contains("/a.txt"));
+        let d = CachedFsEntry::directory("/dir", 50, 100);
+        let s = format!("{d}");
+        assert!(s.contains("dir"));
+    }
+
+    #[test]
+    fn port_detector_add_and_detect() {
+        let mut det = RemotePortDetector::new();
+        det.add_detected(DetectedPort::new(8080, "tcp", 100));
+        assert!(det.is_detected(8080));
+        assert_eq!(det.detected_count(), 1);
+    }
+
+    #[test]
+    fn port_detector_ignore() {
+        let mut det = RemotePortDetector::new();
+        det.add_detected(DetectedPort::new(8080, "tcp", 100));
+        det.ignore_port(8080);
+        assert!(!det.is_detected(8080));
+        // Adding ignored port does nothing
+        det.add_detected(DetectedPort::new(8080, "tcp", 200));
+        assert!(!det.is_detected(8080));
+    }
+
+    #[test]
+    fn port_detector_unignore() {
+        let mut det = RemotePortDetector::new();
+        det.ignore_port(3000);
+        det.unignore_port(3000);
+        det.add_detected(DetectedPort::new(3000, "tcp", 100));
+        assert!(det.is_detected(3000));
+    }
+
+    #[test]
+    fn port_detector_no_duplicates() {
+        let mut det = RemotePortDetector::new();
+        det.add_detected(DetectedPort::new(8080, "tcp", 100));
+        det.add_detected(DetectedPort::new(8080, "tcp", 200));
+        assert_eq!(det.detected_count(), 1);
+    }
+
+    #[test]
+    fn port_detector_range() {
+        let mut det = RemotePortDetector::new();
+        det.add_detected(DetectedPort::new(80, "tcp", 1));
+        det.add_detected(DetectedPort::new(443, "tcp", 2));
+        det.add_detected(DetectedPort::new(8080, "tcp", 3));
+        let high = det.ports_in_range(1000, 9000);
+        assert_eq!(high.len(), 1);
+    }
+
+    #[test]
+    fn port_detector_port_numbers_sorted() {
+        let mut det = RemotePortDetector::new();
+        det.add_detected(DetectedPort::new(8080, "tcp", 1));
+        det.add_detected(DetectedPort::new(80, "tcp", 2));
+        det.add_detected(DetectedPort::new(443, "tcp", 3));
+        assert_eq!(det.port_numbers(), vec![80, 443, 8080]);
+    }
+
+    #[test]
+    fn port_detector_remove_and_clear() {
+        let mut det = RemotePortDetector::new();
+        det.add_detected(DetectedPort::new(80, "tcp", 1));
+        det.add_detected(DetectedPort::new(443, "tcp", 2));
+        assert!(det.remove_port(80));
+        assert!(!det.remove_port(80));
+        det.clear();
+        assert_eq!(det.detected_count(), 0);
+    }
+
+    #[test]
+    fn port_detector_display() {
+        let det = RemotePortDetector::new();
+        assert!(format!("{det}").contains("0 detected"));
+    }
+
+    #[test]
+    fn detected_port_display() {
+        let p = DetectedPort::new(8080, "tcp", 100).with_process("node");
+        let s = format!("{p}");
+        assert!(s.contains("8080"));
+        assert!(s.contains("node"));
+        let p2 = DetectedPort::new(443, "tcp", 100);
+        let s2 = format!("{p2}");
+        assert!(s2.contains("443"));
+    }
+
 }

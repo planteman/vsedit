@@ -1261,6 +1261,395 @@ impl SuggestKeyboardNav {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// SuggestPriority — priority levels for sorting suggestions
+// ---------------------------------------------------------------------------
+
+/// Priority level that can be assigned to a completion item to influence
+/// the final ordering in the suggest widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SuggestPriority {
+    /// Lowest priority — shown last.
+    Low,
+    /// Normal priority — default.
+    Normal,
+    /// Elevated priority — shown before normal items.
+    High,
+    /// Highest priority — always at the top of the list.
+    Critical,
+}
+
+impl SuggestPriority {
+    /// Return a numeric weight for the priority (higher = more important).
+    pub fn weight(&self) -> u32 {
+        match self {
+            Self::Low => 0,
+            Self::Normal => 10,
+            Self::High => 20,
+            Self::Critical => 30,
+        }
+    }
+
+    /// Parse a priority from a string label (case-insensitive).
+    pub fn from_label(label: &str) -> Option<Self> {
+        match label.to_ascii_lowercase().as_str() {
+            "low" => Some(Self::Low),
+            "normal" => Some(Self::Normal),
+            "high" => Some(Self::High),
+            "critical" => Some(Self::Critical),
+            _ => None,
+        }
+    }
+
+    /// Return the human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Critical => "critical",
+        }
+    }
+}
+
+impl Default for SuggestPriority {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestPrioritySort — sort a list of completion items by priority
+// ---------------------------------------------------------------------------
+
+/// A prioritised wrapper around a [`CompletionItem`].
+#[derive(Debug, Clone)]
+pub struct PrioritisedItem {
+    pub item: CompletionItem,
+    pub priority: SuggestPriority,
+}
+
+/// Sorter that arranges completion items by their assigned priority,
+/// breaking ties with the existing `sort_text` / `label` ordering.
+#[derive(Debug)]
+pub struct SuggestPrioritySort {
+    items: Vec<PrioritisedItem>,
+}
+
+impl SuggestPrioritySort {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Add a single item with a priority.
+    pub fn push(&mut self, item: CompletionItem, priority: SuggestPriority) {
+        self.items.push(PrioritisedItem { item, priority });
+    }
+
+    /// Return the number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether the sorter contains no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Sort in-place by descending priority then ascending sort_text/label.
+    pub fn sort(&mut self) {
+        self.items.sort_by(|a, b| {
+            b.priority.weight().cmp(&a.priority.weight()).then_with(|| {
+                let sa = a.item.sort_text.as_deref().unwrap_or(&a.item.label);
+                let sb = b.item.sort_text.as_deref().unwrap_or(&b.item.label);
+                sa.cmp(sb)
+            })
+        });
+    }
+
+    /// Consume the sorter and return the sorted items.
+    pub fn into_sorted(mut self) -> Vec<PrioritisedItem> {
+        self.sort();
+        self.items
+    }
+
+    /// Return a reference to the inner items (unsorted).
+    pub fn items(&self) -> &[PrioritisedItem] {
+        &self.items
+    }
+
+    /// Return only items of a specific priority.
+    pub fn items_with_priority(&self, p: SuggestPriority) -> Vec<&PrioritisedItem> {
+        self.items.iter().filter(|i| i.priority == p).collect()
+    }
+}
+
+impl Default for SuggestPrioritySort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestDocPanel — a documentation panel with markdown rendering
+// ---------------------------------------------------------------------------
+
+/// Represents a section of markdown content inside the doc panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkdownSection {
+    pub heading: String,
+    pub body: String,
+}
+
+impl MarkdownSection {
+    pub fn new(heading: impl Into<String>, body: impl Into<String>) -> Self {
+        Self {
+            heading: heading.into(),
+            body: body.into(),
+        }
+    }
+
+    /// Render the section to a simple markdown string.
+    pub fn render(&self) -> String {
+        if self.heading.is_empty() {
+            self.body.clone()
+        } else {
+            format!("## {}\n\n{}", self.heading, self.body)
+        }
+    }
+
+    /// The total character length of heading + body.
+    pub fn char_count(&self) -> usize {
+        self.heading.len() + self.body.len()
+    }
+}
+
+/// Documentation panel shown alongside the suggest widget.
+#[derive(Debug, Clone)]
+pub struct SuggestDocPanel {
+    sections: Vec<MarkdownSection>,
+    visible: bool,
+    max_height_lines: usize,
+}
+
+impl SuggestDocPanel {
+    pub fn new(max_height_lines: usize) -> Self {
+        Self {
+            sections: Vec::new(),
+            visible: false,
+            max_height_lines,
+        }
+    }
+
+    /// Show the doc panel with the given sections.
+    pub fn show(&mut self, sections: Vec<MarkdownSection>) {
+        self.sections = sections;
+        self.visible = true;
+    }
+
+    /// Hide the panel.
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+
+    /// Whether the panel is currently visible.
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    /// Return all sections.
+    pub fn sections(&self) -> &[MarkdownSection] {
+        &self.sections
+    }
+
+    /// Render the full markdown document.
+    pub fn render_all(&self) -> String {
+        self.sections
+            .iter()
+            .map(|s| s.render())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    /// Total character count across all sections.
+    pub fn total_chars(&self) -> usize {
+        self.sections.iter().map(|s| s.char_count()).sum()
+    }
+
+    /// The estimated number of rendered lines (crude: chars / 80).
+    pub fn estimated_lines(&self) -> usize {
+        let total = self.total_chars();
+        if total == 0 { 0 } else { (total / 80).max(1) }
+    }
+
+    /// Whether the content exceeds the configured max height.
+    pub fn is_overflowing(&self) -> bool {
+        self.estimated_lines() > self.max_height_lines
+    }
+
+    /// Clear all sections and hide.
+    pub fn clear(&mut self) {
+        self.sections.clear();
+        self.visible = false;
+    }
+}
+
+impl Default for SuggestDocPanel {
+    fn default() -> Self {
+        Self::new(20)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestItemGroup — group completion items by kind
+// ---------------------------------------------------------------------------
+
+/// A named group of completion items.
+#[derive(Debug, Clone)]
+pub struct SuggestItemGroup {
+    pub kind: CompletionItemKind,
+    pub items: Vec<CompletionItem>,
+}
+
+impl SuggestItemGroup {
+    pub fn new(kind: CompletionItemKind) -> Self {
+        Self {
+            kind,
+            items: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, item: CompletionItem) {
+        self.items.push(item);
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Sort items within the group alphabetically by label.
+    pub fn sort_by_label(&mut self) {
+        self.items.sort_by(|a, b| a.label.cmp(&b.label));
+    }
+}
+
+/// Group a slice of completion items by their [`CompletionItemKind`].
+pub fn group_items_by_kind(items: &[CompletionItem]) -> Vec<SuggestItemGroup> {
+    let mut groups: Vec<SuggestItemGroup> = Vec::new();
+    for item in items {
+        if let Some(g) = groups.iter_mut().find(|g| g.kind == item.kind) {
+            g.push(item.clone());
+        } else {
+            let mut g = SuggestItemGroup::new(item.kind);
+            g.push(item.clone());
+            groups.push(g);
+        }
+    }
+    groups
+}
+
+/// Count items per kind and return pairs of (kind, count).
+pub fn count_items_by_kind(items: &[CompletionItem]) -> Vec<(CompletionItemKind, usize)> {
+    let groups = group_items_by_kind(items);
+    groups.iter().map(|g| (g.kind, g.len())).collect()
+}
+
+// ---------------------------------------------------------------------------
+// SuggestCompletionCommit — track completion commit events
+// ---------------------------------------------------------------------------
+
+/// The reason a completion was committed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommitReason {
+    /// User explicitly chose the item (Enter / click).
+    Explicit,
+    /// Triggered by a commit character (e.g. `.`, `(`).
+    CommitChar(char),
+    /// Triggered by Tab key.
+    Tab,
+}
+
+/// A record of a committed completion.
+#[derive(Debug, Clone)]
+pub struct CompletionCommitRecord {
+    pub label: String,
+    pub kind: CompletionItemKind,
+    pub reason: CommitReason,
+    pub prefix_length: usize,
+}
+
+/// Tracker for completion commit history.
+#[derive(Debug, Default)]
+pub struct CompletionCommitLog {
+    records: Vec<CompletionCommitRecord>,
+}
+
+impl CompletionCommitLog {
+    pub fn new() -> Self {
+        Self { records: Vec::new() }
+    }
+
+    /// Record a committed completion.
+    pub fn record(&mut self, label: String, kind: CompletionItemKind, reason: CommitReason, prefix_length: usize) {
+        self.records.push(CompletionCommitRecord {
+            label,
+            kind,
+            reason,
+            prefix_length,
+        });
+    }
+
+    /// Total number of commits recorded.
+    pub fn total(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Count commits by a specific reason.
+    pub fn count_by_reason(&self, reason: CommitReason) -> usize {
+        self.records.iter().filter(|r| r.reason == reason).count()
+    }
+
+    /// Average prefix length across all commits.
+    pub fn average_prefix_length(&self) -> f64 {
+        if self.records.is_empty() {
+            return 0.0;
+        }
+        let sum: usize = self.records.iter().map(|r| r.prefix_length).sum();
+        sum as f64 / self.records.len() as f64
+    }
+
+    /// Most common completion kind across all commits.
+    pub fn most_common_kind(&self) -> Option<CompletionItemKind> {
+        if self.records.is_empty() {
+            return None;
+        }
+        let mut counts: Vec<(CompletionItemKind, usize)> = Vec::new();
+        for rec in &self.records {
+            if let Some(entry) = counts.iter_mut().find(|(k, _)| *k == rec.kind) {
+                entry.1 += 1;
+            } else {
+                counts.push((rec.kind, 1));
+            }
+        }
+        counts.into_iter().max_by_key(|&(_, c)| c).map(|(k, _)| k)
+    }
+
+    /// Return records filtered by kind.
+    pub fn records_of_kind(&self, kind: CompletionItemKind) -> Vec<&CompletionCommitRecord> {
+        self.records.iter().filter(|r| r.kind == kind).collect()
+    }
+
+    /// Clear the log.
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2211,4 +2600,188 @@ mod tests {
         nav.home();
         assert_eq!(nav.selected(), 0);
     }
+
+    // --- SuggestPriority tests -----------------------------------------------
+
+    #[test]
+    fn priority_ordering() {
+        assert!(SuggestPriority::Low < SuggestPriority::Normal);
+        assert!(SuggestPriority::Normal < SuggestPriority::High);
+        assert!(SuggestPriority::High < SuggestPriority::Critical);
+    }
+
+    #[test]
+    fn priority_weight() {
+        assert_eq!(SuggestPriority::Low.weight(), 0);
+        assert_eq!(SuggestPriority::Critical.weight(), 30);
+    }
+
+    #[test]
+    fn priority_from_label() {
+        assert_eq!(SuggestPriority::from_label("high"), Some(SuggestPriority::High));
+        assert_eq!(SuggestPriority::from_label("HIGH"), Some(SuggestPriority::High));
+        assert_eq!(SuggestPriority::from_label("unknown"), None);
+    }
+
+    #[test]
+    fn priority_default() {
+        assert_eq!(SuggestPriority::default(), SuggestPriority::Normal);
+    }
+
+    // --- SuggestPrioritySort tests -------------------------------------------
+
+    #[test]
+    fn priority_sort_basic() {
+        let mut sorter = SuggestPrioritySort::new();
+        sorter.push(make_item("aaa", CompletionItemKind::Text), SuggestPriority::Low);
+        sorter.push(make_item("bbb", CompletionItemKind::Function), SuggestPriority::Critical);
+        sorter.push(make_item("ccc", CompletionItemKind::Variable), SuggestPriority::Normal);
+        let sorted = sorter.into_sorted();
+        assert_eq!(sorted[0].item.label, "bbb");
+        assert_eq!(sorted[1].item.label, "ccc");
+        assert_eq!(sorted[2].item.label, "aaa");
+    }
+
+    #[test]
+    fn priority_sort_empty() {
+        let sorter = SuggestPrioritySort::new();
+        assert!(sorter.is_empty());
+        assert_eq!(sorter.len(), 0);
+    }
+
+    #[test]
+    fn priority_sort_items_with_priority() {
+        let mut sorter = SuggestPrioritySort::new();
+        sorter.push(make_item("a", CompletionItemKind::Text), SuggestPriority::High);
+        sorter.push(make_item("b", CompletionItemKind::Text), SuggestPriority::Low);
+        sorter.push(make_item("c", CompletionItemKind::Text), SuggestPriority::High);
+        let high = sorter.items_with_priority(SuggestPriority::High);
+        assert_eq!(high.len(), 2);
+    }
+
+    // --- SuggestDocPanel tests -----------------------------------------------
+
+    #[test]
+    fn doc_panel_show_hide() {
+        let mut panel = SuggestDocPanel::new(20);
+        assert!(!panel.is_visible());
+        panel.show(vec![MarkdownSection::new("Title", "body text")]);
+        assert!(panel.is_visible());
+        assert_eq!(panel.sections().len(), 1);
+        panel.hide();
+        assert!(!panel.is_visible());
+    }
+
+    #[test]
+    fn doc_panel_render() {
+        let section = MarkdownSection::new("Heading", "Some content");
+        assert!(section.render().contains("Heading"));
+        assert!(section.render().contains("Some content"));
+    }
+
+    #[test]
+    fn doc_panel_overflow() {
+        let mut panel = SuggestDocPanel::new(1);
+        let long = "x".repeat(500);
+        panel.show(vec![MarkdownSection::new("", long)]);
+        assert!(panel.is_overflowing());
+    }
+
+    #[test]
+    fn doc_panel_clear() {
+        let mut panel = SuggestDocPanel::default();
+        panel.show(vec![MarkdownSection::new("H", "B")]);
+        panel.clear();
+        assert!(!panel.is_visible());
+        assert!(panel.sections().is_empty());
+    }
+
+    // --- group_items_by_kind tests -------------------------------------------
+
+    #[test]
+    fn group_by_kind() {
+        let items = vec![
+            make_item("a", CompletionItemKind::Function),
+            make_item("b", CompletionItemKind::Variable),
+            make_item("c", CompletionItemKind::Function),
+        ];
+        let groups = group_items_by_kind(&items);
+        assert_eq!(groups.len(), 2);
+        let fn_group = groups.iter().find(|g| g.kind == CompletionItemKind::Function).unwrap();
+        assert_eq!(fn_group.len(), 2);
+    }
+
+    #[test]
+    fn count_by_kind() {
+        let items = vec![
+            make_item("x", CompletionItemKind::Text),
+            make_item("y", CompletionItemKind::Text),
+            make_item("z", CompletionItemKind::Keyword),
+        ];
+        let counts = count_items_by_kind(&items);
+        let text_count = counts.iter().find(|(k, _)| *k == CompletionItemKind::Text).unwrap().1;
+        assert_eq!(text_count, 2);
+    }
+
+    #[test]
+    fn group_sort_by_label() {
+        let mut group = SuggestItemGroup::new(CompletionItemKind::Text);
+        group.push(make_item("cherry", CompletionItemKind::Text));
+        group.push(make_item("apple", CompletionItemKind::Text));
+        group.push(make_item("banana", CompletionItemKind::Text));
+        group.sort_by_label();
+        assert_eq!(group.items[0].label, "apple");
+        assert_eq!(group.items[2].label, "cherry");
+    }
+
+    // --- CompletionCommitLog tests -------------------------------------------
+
+    #[test]
+    fn commit_log_record() {
+        let mut log = CompletionCommitLog::new();
+        log.record("foo".into(), CompletionItemKind::Function, CommitReason::Explicit, 3);
+        assert_eq!(log.total(), 1);
+    }
+
+    #[test]
+    fn commit_log_by_reason() {
+        let mut log = CompletionCommitLog::new();
+        log.record("a".into(), CompletionItemKind::Text, CommitReason::Tab, 1);
+        log.record("b".into(), CompletionItemKind::Text, CommitReason::Explicit, 2);
+        log.record("c".into(), CompletionItemKind::Text, CommitReason::Tab, 1);
+        assert_eq!(log.count_by_reason(CommitReason::Tab), 2);
+        assert_eq!(log.count_by_reason(CommitReason::Explicit), 1);
+    }
+
+    #[test]
+    fn commit_log_avg_prefix() {
+        let mut log = CompletionCommitLog::new();
+        log.record("a".into(), CompletionItemKind::Text, CommitReason::Tab, 2);
+        log.record("b".into(), CompletionItemKind::Text, CommitReason::Tab, 4);
+        assert!((log.average_prefix_length() - 3.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn commit_log_empty_avg() {
+        let log = CompletionCommitLog::new();
+        assert!((log.average_prefix_length() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn commit_log_most_common_kind() {
+        let mut log = CompletionCommitLog::new();
+        log.record("a".into(), CompletionItemKind::Function, CommitReason::Explicit, 1);
+        log.record("b".into(), CompletionItemKind::Variable, CommitReason::Explicit, 1);
+        log.record("c".into(), CompletionItemKind::Function, CommitReason::Tab, 1);
+        assert_eq!(log.most_common_kind(), Some(CompletionItemKind::Function));
+    }
+
+    #[test]
+    fn commit_log_clear() {
+        let mut log = CompletionCommitLog::new();
+        log.record("a".into(), CompletionItemKind::Text, CommitReason::Explicit, 1);
+        log.clear();
+        assert_eq!(log.total(), 0);
+    }
+
 }

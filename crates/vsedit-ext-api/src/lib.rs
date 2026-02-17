@@ -1463,6 +1463,359 @@ impl ExtensionCapabilityProbe {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ApiMockProvider
+// ---------------------------------------------------------------------------
+
+/// A mock API provider for testing extension API interactions.
+///
+/// Records all namespace calls and can return pre-configured responses.
+#[derive(Debug, Clone)]
+pub struct ApiMockProvider {
+    call_log: Vec<ApiMockCall>,
+    responses: HashMap<String, Vec<String>>,
+}
+
+/// A recorded API call made through the mock provider.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiMockCall {
+    pub namespace: String,
+    pub method: String,
+    pub args: Vec<String>,
+}
+
+impl ApiMockProvider {
+    /// Create a new empty mock provider.
+    pub fn new() -> Self {
+        Self {
+            call_log: Vec::new(),
+            responses: HashMap::new(),
+        }
+    }
+
+    /// Register a canned response for a `namespace.method` key.
+    pub fn register_response(&mut self, key: impl Into<String>, values: Vec<String>) {
+        self.responses.insert(key.into(), values);
+    }
+
+    /// Record a call and return any registered response.
+    pub fn call(
+        &mut self,
+        namespace: &str,
+        method: &str,
+        args: Vec<String>,
+    ) -> Option<Vec<String>> {
+        self.call_log.push(ApiMockCall {
+            namespace: namespace.to_string(),
+            method: method.to_string(),
+            args,
+        });
+        let key = format!("{namespace}.{method}");
+        self.responses.get(&key).cloned()
+    }
+
+    /// Return all recorded calls.
+    pub fn calls(&self) -> &[ApiMockCall] {
+        &self.call_log
+    }
+
+    /// Return calls filtered by namespace.
+    pub fn calls_for_namespace(&self, ns: &str) -> Vec<&ApiMockCall> {
+        self.call_log.iter().filter(|c| c.namespace == ns).collect()
+    }
+
+    /// Return calls filtered by method name.
+    pub fn calls_for_method(&self, method: &str) -> Vec<&ApiMockCall> {
+        self.call_log.iter().filter(|c| c.method == method).collect()
+    }
+
+    /// Number of calls recorded so far.
+    pub fn call_count(&self) -> usize {
+        self.call_log.len()
+    }
+
+    /// Clear the call log.
+    pub fn reset(&mut self) {
+        self.call_log.clear();
+    }
+
+    /// Check if a specific method was ever called.
+    pub fn was_called(&self, namespace: &str, method: &str) -> bool {
+        self.call_log.iter().any(|c| c.namespace == namespace && c.method == method)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ApiEventBus
+// ---------------------------------------------------------------------------
+
+/// Typed event that can be dispatched through the event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiEvent {
+    /// The namespace that fired this event (e.g. "workspace").
+    pub namespace: String,
+    /// Event name (e.g. "onDidChangeConfiguration").
+    pub name: String,
+    /// Serialised event data.
+    pub data: Option<String>,
+}
+
+impl ApiEvent {
+    /// Create a new event.
+    pub fn new(namespace: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            namespace: namespace.into(),
+            name: name.into(),
+            data: None,
+        }
+    }
+
+    /// Attach data to the event.
+    pub fn with_data(mut self, data: impl Into<String>) -> Self {
+        self.data = Some(data.into());
+        self
+    }
+}
+
+impl fmt::Display for ApiEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}", self.namespace, self.name)?;
+        if let Some(d) = &self.data {
+            write!(f, " ({d})")?;
+        }
+        Ok(())
+    }
+}
+
+/// A simple in-process event bus for API events.
+///
+/// Listeners are stored as `(namespace_filter, event_name_filter)` pairs.
+/// A `None` filter matches all values.
+#[derive(Debug, Clone)]
+pub struct ApiEventBus {
+    history: Vec<ApiEvent>,
+    listeners: Vec<(Option<String>, Option<String>)>,
+}
+
+impl ApiEventBus {
+    /// Create a new empty event bus.
+    pub fn new() -> Self {
+        Self {
+            history: Vec::new(),
+            listeners: Vec::new(),
+        }
+    }
+
+    /// Register a listener with optional namespace and event name filters.
+    pub fn on(
+        &mut self,
+        namespace: Option<String>,
+        event_name: Option<String>,
+    ) -> usize {
+        let id = self.listeners.len();
+        self.listeners.push((namespace, event_name));
+        id
+    }
+
+    /// Fire an event, recording it in history and returning matching listener IDs.
+    pub fn emit(&mut self, event: ApiEvent) -> Vec<usize> {
+        let matching: Vec<usize> = self
+            .listeners
+            .iter()
+            .enumerate()
+            .filter(|(_, (ns_filter, name_filter))| {
+                let ns_ok = ns_filter.as_ref().map_or(true, |f| f == &event.namespace);
+                let name_ok = name_filter.as_ref().map_or(true, |f| f == &event.name);
+                ns_ok && name_ok
+            })
+            .map(|(id, _)| id)
+            .collect();
+        self.history.push(event);
+        matching
+    }
+
+    /// Get the full event history.
+    pub fn history(&self) -> &[ApiEvent] {
+        &self.history
+    }
+
+    /// Get events for a specific namespace.
+    pub fn events_for_namespace(&self, ns: &str) -> Vec<&ApiEvent> {
+        self.history.iter().filter(|e| e.namespace == ns).collect()
+    }
+
+    /// Total number of events emitted.
+    pub fn event_count(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Number of registered listeners.
+    pub fn listener_count(&self) -> usize {
+        self.listeners.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// API request interceptor
+// ---------------------------------------------------------------------------
+
+/// Intercept decision for an API request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterceptAction {
+    /// Allow the request to proceed.
+    Allow,
+    /// Block the request with a reason.
+    Block(String),
+    /// Modify the request arguments before proceeding.
+    Rewrite(Vec<String>),
+}
+
+/// Rule for intercepting API requests by namespace/method.
+#[derive(Debug, Clone)]
+pub struct InterceptRule {
+    pub namespace: String,
+    pub method_pattern: String,
+    pub action: InterceptAction,
+}
+
+/// Intercepts API requests based on configured rules.
+#[derive(Debug, Clone)]
+pub struct ApiRequestInterceptor {
+    rules: Vec<InterceptRule>,
+}
+
+impl ApiRequestInterceptor {
+    /// Create a new empty interceptor.
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Add an intercept rule.
+    pub fn add_rule(&mut self, rule: InterceptRule) {
+        self.rules.push(rule);
+    }
+
+    /// Evaluate a request and return the applicable action.
+    /// First matching rule wins.
+    pub fn evaluate(&self, namespace: &str, method: &str) -> InterceptAction {
+        for rule in &self.rules {
+            if rule.namespace == namespace {
+                if rule.method_pattern == "*" || rule.method_pattern == method {
+                    return rule.action.clone();
+                }
+            }
+        }
+        InterceptAction::Allow
+    }
+
+    /// Number of configured rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// Check if any rule would block a given namespace/method combination.
+    pub fn would_block(&self, namespace: &str, method: &str) -> bool {
+        matches!(self.evaluate(namespace, method), InterceptAction::Block(_))
+    }
+
+    /// Remove all rules for a specific namespace.
+    pub fn clear_namespace(&mut self, namespace: &str) {
+        self.rules.retain(|r| r.namespace != namespace);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// API compatibility layer
+// ---------------------------------------------------------------------------
+
+/// Represents a minimum version requirement for an API feature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiVersionRequirement {
+    pub feature_name: String,
+    pub min_version: String,
+}
+
+/// Checks whether the current API version satisfies feature requirements.
+#[derive(Debug, Clone)]
+pub struct ApiCompatibilityLayer {
+    current_version: String,
+    requirements: Vec<ApiVersionRequirement>,
+}
+
+impl ApiCompatibilityLayer {
+    /// Create a new compatibility layer for the given API version.
+    pub fn new(current_version: impl Into<String>) -> Self {
+        Self {
+            current_version: current_version.into(),
+            requirements: Vec::new(),
+        }
+    }
+
+    /// Register a feature requirement.
+    pub fn require(
+        &mut self,
+        feature: impl Into<String>,
+        min_version: impl Into<String>,
+    ) {
+        self.requirements.push(ApiVersionRequirement {
+            feature_name: feature.into(),
+            min_version: min_version.into(),
+        });
+    }
+
+    /// Parse a dotted version string to a comparable tuple.
+    fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
+        let parts: Vec<&str> = v.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        Some((
+            parts[0].parse().ok()?,
+            parts[1].parse().ok()?,
+            parts[2].parse().ok()?,
+        ))
+    }
+
+    /// Check if the current version satisfies a minimum.
+    fn version_satisfies(current: &str, min: &str) -> bool {
+        match (Self::parse_version(current), Self::parse_version(min)) {
+            (Some(c), Some(m)) => c >= m,
+            _ => false,
+        }
+    }
+
+    /// Check if a specific feature is supported.
+    pub fn supports_feature(&self, feature: &str) -> bool {
+        self.requirements
+            .iter()
+            .find(|r| r.feature_name == feature)
+            .map(|r| Self::version_satisfies(&self.current_version, &r.min_version))
+            .unwrap_or(true)
+    }
+
+    /// Return all unsupported features.
+    pub fn unsupported_features(&self) -> Vec<&str> {
+        self.requirements
+            .iter()
+            .filter(|r| !Self::version_satisfies(&self.current_version, &r.min_version))
+            .map(|r| r.feature_name.as_str())
+            .collect()
+    }
+
+    /// Return the current API version.
+    pub fn current_version(&self) -> &str {
+        &self.current_version
+    }
+
+    /// Total number of registered requirements.
+    pub fn requirement_count(&self) -> usize {
+        self.requirements.len()
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2205,4 +2558,171 @@ mod tests {
         assert_eq!(probe.capability_count(), 0);
         assert!(!probe.supports_namespace("anything"));
     }
+
+    // -----------------------------------------------------------------------
+    // ApiMockProvider tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn mock_provider_call_log() {
+        let mut mock = ApiMockProvider::new();
+        mock.call("commands", "execute", vec!["openFile".into()]);
+        mock.call("workspace", "getConfig", vec![]);
+        assert_eq!(mock.call_count(), 2);
+        assert!(mock.was_called("commands", "execute"));
+        assert!(!mock.was_called("commands", "register"));
+    }
+
+    #[test]
+    fn mock_provider_responses() {
+        let mut mock = ApiMockProvider::new();
+        mock.register_response("workspace.getConfig", vec!["value1".into()]);
+        let resp = mock.call("workspace", "getConfig", vec![]);
+        assert_eq!(resp, Some(vec!["value1".into()]));
+    }
+
+    #[test]
+    fn mock_provider_filter_by_namespace() {
+        let mut mock = ApiMockProvider::new();
+        mock.call("commands", "execute", vec![]);
+        mock.call("workspace", "getConfig", vec![]);
+        mock.call("commands", "register", vec![]);
+        assert_eq!(mock.calls_for_namespace("commands").len(), 2);
+    }
+
+    #[test]
+    fn mock_provider_reset() {
+        let mut mock = ApiMockProvider::new();
+        mock.call("commands", "execute", vec![]);
+        assert_eq!(mock.call_count(), 1);
+        mock.reset();
+        assert_eq!(mock.call_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // ApiEventBus tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn event_bus_emit_and_history() {
+        let mut bus = ApiEventBus::new();
+        bus.emit(ApiEvent::new("workspace", "didChange"));
+        bus.emit(ApiEvent::new("window", "didOpen"));
+        assert_eq!(bus.event_count(), 2);
+        assert_eq!(bus.events_for_namespace("workspace").len(), 1);
+    }
+
+    #[test]
+    fn event_bus_listeners() {
+        let mut bus = ApiEventBus::new();
+        let id0 = bus.on(Some("workspace".into()), None);
+        let id1 = bus.on(None, Some("didChange".into()));
+        let _id2 = bus.on(Some("window".into()), None);
+
+        let matched = bus.emit(ApiEvent::new("workspace", "didChange"));
+        assert!(matched.contains(&id0));
+        assert!(matched.contains(&id1));
+        assert_eq!(matched.len(), 2);
+    }
+
+    #[test]
+    fn event_bus_wildcard_listener() {
+        let mut bus = ApiEventBus::new();
+        let id = bus.on(None, None);
+        let matched = bus.emit(ApiEvent::new("any", "event"));
+        assert!(matched.contains(&id));
+    }
+
+    #[test]
+    fn event_with_data_display() {
+        let event = ApiEvent::new("workspace", "didSave").with_data("file.rs");
+        let s = format!("{event}");
+        assert!(s.contains("workspace.didSave"));
+        assert!(s.contains("file.rs"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ApiRequestInterceptor tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn interceptor_default_allow() {
+        let interceptor = ApiRequestInterceptor::new();
+        assert_eq!(interceptor.evaluate("commands", "execute"), InterceptAction::Allow);
+    }
+
+    #[test]
+    fn interceptor_block_rule() {
+        let mut interceptor = ApiRequestInterceptor::new();
+        interceptor.add_rule(InterceptRule {
+            namespace: "debug".into(),
+            method_pattern: "*".into(),
+            action: InterceptAction::Block("debug disabled".into()),
+        });
+        assert!(interceptor.would_block("debug", "start"));
+        assert!(!interceptor.would_block("commands", "execute"));
+    }
+
+    #[test]
+    fn interceptor_specific_method() {
+        let mut interceptor = ApiRequestInterceptor::new();
+        interceptor.add_rule(InterceptRule {
+            namespace: "workspace".into(),
+            method_pattern: "deleteFile".into(),
+            action: InterceptAction::Block("read-only".into()),
+        });
+        assert!(interceptor.would_block("workspace", "deleteFile"));
+        assert!(!interceptor.would_block("workspace", "openFile"));
+    }
+
+    #[test]
+    fn interceptor_clear_namespace() {
+        let mut interceptor = ApiRequestInterceptor::new();
+        interceptor.add_rule(InterceptRule {
+            namespace: "debug".into(),
+            method_pattern: "*".into(),
+            action: InterceptAction::Block("no".into()),
+        });
+        assert_eq!(interceptor.rule_count(), 1);
+        interceptor.clear_namespace("debug");
+        assert_eq!(interceptor.rule_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // ApiCompatibilityLayer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compat_feature_supported() {
+        let mut compat = ApiCompatibilityLayer::new("1.110.0");
+        compat.require("inlineChat", "1.100.0");
+        assert!(compat.supports_feature("inlineChat"));
+    }
+
+    #[test]
+    fn compat_feature_unsupported() {
+        let mut compat = ApiCompatibilityLayer::new("1.90.0");
+        compat.require("inlineChat", "1.100.0");
+        assert!(!compat.supports_feature("inlineChat"));
+    }
+
+    #[test]
+    fn compat_unknown_feature() {
+        let compat = ApiCompatibilityLayer::new("1.110.0");
+        assert!(compat.supports_feature("nonexistent"));
+    }
+
+    #[test]
+    fn compat_unsupported_list() {
+        let mut compat = ApiCompatibilityLayer::new("1.90.0");
+        compat.require("featureA", "1.80.0");
+        compat.require("featureB", "1.100.0");
+        compat.require("featureC", "1.95.0");
+        let unsupported = compat.unsupported_features();
+        assert_eq!(unsupported.len(), 2);
+        assert!(unsupported.contains(&"featureB"));
+        assert!(unsupported.contains(&"featureC"));
+    }
+
+
 }

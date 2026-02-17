@@ -1382,6 +1382,312 @@ impl DebugCallStack {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DebugVariableFormatter - debug variable formatter
+// ---------------------------------------------------------------------------
+
+/// Severity level for debug variable formatter issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DebugVariableFormatterSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for DebugVariableFormatterSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [DebugVariableFormatter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DebugVariableFormatterEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: DebugVariableFormatterSeverity,
+    pub detail: Option<String>,
+    pub var_count: usize,
+    enabled: bool,
+}
+
+impl DebugVariableFormatterEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: DebugVariableFormatterSeverity::Low,
+            detail: None,
+            var_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: DebugVariableFormatterSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_var_count(mut self, val: usize) -> Self {
+        self.var_count = val;
+        self
+    }
+
+    pub fn is_expandable(&self) -> bool {
+        self.enabled && self.severity >= DebugVariableFormatterSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.var_count, det)
+    }
+}
+
+impl fmt::Display for DebugVariableFormatterEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [DebugVariableFormatterEntry] items.
+#[derive(Debug, Clone)]
+pub struct DebugVariableFormatter {
+    entries: Vec<DebugVariableFormatterEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl DebugVariableFormatter {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: DebugVariableFormatterEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<DebugVariableFormatterEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&DebugVariableFormatterEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn var_count(&self) -> usize { self.entries.len() }
+
+    pub fn is_expandable(&self) -> bool {
+        self.entries.iter().any(|e| e.is_expandable())
+    }
+
+    pub fn entries_by_severity(&self, severity: DebugVariableFormatterSeverity) -> Vec<&DebugVariableFormatterEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= DebugVariableFormatterSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&DebugVariableFormatterEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&DebugVariableFormatterEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DebugMemoryViewer - debug memory viewer
+// ---------------------------------------------------------------------------
+
+/// Configuration for [DebugMemoryViewer].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DebugMemoryViewerConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub memory_size: usize,
+}
+
+impl DebugMemoryViewerConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, memory_size: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_memory_size(mut self, val: usize) -> Self { self.memory_size = val; self }
+}
+
+impl Default for DebugMemoryViewerConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [DebugMemoryViewer].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DebugMemoryViewerItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl DebugMemoryViewerItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn has_children(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for DebugMemoryViewerItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [DebugMemoryViewerItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct DebugMemoryViewer {
+    config: DebugMemoryViewerConfig,
+    items: Vec<DebugMemoryViewerItem>,
+}
+
+impl DebugMemoryViewer {
+    pub fn new(config: DebugMemoryViewerConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: DebugMemoryViewerItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<DebugMemoryViewerItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&DebugMemoryViewerItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn memory_size(&self) -> usize { self.items.len() }
+
+    pub fn has_children(&self) -> bool {
+        self.items.iter().any(|i| i.has_children())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&DebugMemoryViewerItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&DebugMemoryViewerItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &DebugMemoryViewerConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2444,5 +2750,147 @@ mod tests {
         let frame = cs.frame_at(0).unwrap();
         let display = format!("{}", frame);
         assert!(display.contains("main.rs"));
+    }
+
+#[test]
+    fn debugvariableformatter_severity_ordering() {
+        assert!(DebugVariableFormatterSeverity::Critical > DebugVariableFormatterSeverity::High);
+        assert!(DebugVariableFormatterSeverity::High > DebugVariableFormatterSeverity::Medium);
+        assert!(DebugVariableFormatterSeverity::Medium > DebugVariableFormatterSeverity::Low);
+    }
+
+    #[test]
+    fn debugvariableformatter_severity_display() {
+        assert_eq!(DebugVariableFormatterSeverity::Low.to_string(), "low");
+        assert_eq!(DebugVariableFormatterSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn debugvariableformatter_entry_creation() {
+        let e = DebugVariableFormatterEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, DebugVariableFormatterSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn debugvariableformatter_entry_builder() {
+        let e = DebugVariableFormatterEntry::new("e2", "Entry 2")
+            .with_severity(DebugVariableFormatterSeverity::High)
+            .with_detail("some detail")
+            .with_var_count(42);
+        assert_eq!(e.severity, DebugVariableFormatterSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.var_count, 42);
+    }
+
+    #[test]
+    fn debugvariableformatter_entry_enable_disable() {
+        let mut e = DebugVariableFormatterEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn debugvariableformatter_add_and_count() {
+        let mut mgr = DebugVariableFormatter::new("test");
+        mgr.add(DebugVariableFormatterEntry::new("a", "A"));
+        mgr.add(DebugVariableFormatterEntry::new("b", "B").with_severity(DebugVariableFormatterSeverity::High));
+        assert_eq!(mgr.var_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn debugvariableformatter_remove() {
+        let mut mgr = DebugVariableFormatter::new("test");
+        mgr.add(DebugVariableFormatterEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn debugvariableformatter_capacity() {
+        let mut mgr = DebugVariableFormatter::new("test").with_capacity(1);
+        assert!(mgr.add(DebugVariableFormatterEntry::new("a", "A")));
+        assert!(!mgr.add(DebugVariableFormatterEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn debugvariableformatter_sorted_by_severity() {
+        let mut mgr = DebugVariableFormatter::new("test");
+        mgr.add(DebugVariableFormatterEntry::new("lo", "Low"));
+        mgr.add(DebugVariableFormatterEntry::new("hi", "High").with_severity(DebugVariableFormatterSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, DebugVariableFormatterSeverity::Critical);
+    }
+
+    #[test]
+    fn debugvariableformatter_summary() {
+        let mgr = DebugVariableFormatter::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn debugmemoryviewer_config_defaults() {
+        let cfg = DebugMemoryViewerConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn debugmemoryviewer_item_creation() {
+        let item = DebugMemoryViewerItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn debugmemoryviewer_add_and_get() {
+        let mut mgr = DebugMemoryViewer::new(DebugMemoryViewerConfig::new("test"));
+        mgr.add(DebugMemoryViewerItem::new("k1", "v1"));
+        assert_eq!(mgr.memory_size(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn debugmemoryviewer_remove_item() {
+        let mut mgr = DebugMemoryViewer::new(DebugMemoryViewerConfig::new("test"));
+        mgr.add(DebugMemoryViewerItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn debugmemoryviewer_sorted_by_priority() {
+        let mut mgr = DebugMemoryViewer::new(DebugMemoryViewerConfig::new("test"));
+        mgr.add(DebugMemoryViewerItem::new("lo", "low").with_priority(1));
+        mgr.add(DebugMemoryViewerItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn debugmemoryviewer_items_with_tag() {
+        let mut mgr = DebugMemoryViewer::new(DebugMemoryViewerConfig::new("test"));
+        mgr.add(DebugMemoryViewerItem::new("a", "1").with_tag("x"));
+        mgr.add(DebugMemoryViewerItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn debugmemoryviewer_report() {
+        let mgr = DebugMemoryViewer::new(DebugMemoryViewerConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

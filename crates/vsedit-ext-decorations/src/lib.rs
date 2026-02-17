@@ -1418,6 +1418,312 @@ impl DecorationBridge {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DecorationRangeMerger - decoration range merger
+// ---------------------------------------------------------------------------
+
+/// Severity level for decoration range merger issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DecorationRangeMergerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for DecorationRangeMergerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [DecorationRangeMerger].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecorationRangeMergerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: DecorationRangeMergerSeverity,
+    pub detail: Option<String>,
+    pub range_count: usize,
+    enabled: bool,
+}
+
+impl DecorationRangeMergerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: DecorationRangeMergerSeverity::Low,
+            detail: None,
+            range_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: DecorationRangeMergerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_range_count(mut self, val: usize) -> Self {
+        self.range_count = val;
+        self
+    }
+
+    pub fn can_merge(&self) -> bool {
+        self.enabled && self.severity >= DecorationRangeMergerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.range_count, det)
+    }
+}
+
+impl fmt::Display for DecorationRangeMergerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [DecorationRangeMergerEntry] items.
+#[derive(Debug, Clone)]
+pub struct DecorationRangeMerger {
+    entries: Vec<DecorationRangeMergerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl DecorationRangeMerger {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: DecorationRangeMergerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<DecorationRangeMergerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&DecorationRangeMergerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn range_count(&self) -> usize { self.entries.len() }
+
+    pub fn can_merge(&self) -> bool {
+        self.entries.iter().any(|e| e.can_merge())
+    }
+
+    pub fn entries_by_severity(&self, severity: DecorationRangeMergerSeverity) -> Vec<&DecorationRangeMergerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= DecorationRangeMergerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&DecorationRangeMergerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&DecorationRangeMergerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DecorationPriorityResolver - decoration priority resolver
+// ---------------------------------------------------------------------------
+
+/// Configuration for [DecorationPriorityResolver].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecorationPriorityResolverConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub priority_count: usize,
+}
+
+impl DecorationPriorityResolverConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, priority_count: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_priority_count(mut self, val: usize) -> Self { self.priority_count = val; self }
+}
+
+impl Default for DecorationPriorityResolverConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [DecorationPriorityResolver].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecorationPriorityResolverItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl DecorationPriorityResolverItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn has_conflict(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for DecorationPriorityResolverItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [DecorationPriorityResolverItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct DecorationPriorityResolver {
+    config: DecorationPriorityResolverConfig,
+    items: Vec<DecorationPriorityResolverItem>,
+}
+
+impl DecorationPriorityResolver {
+    pub fn new(config: DecorationPriorityResolverConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: DecorationPriorityResolverItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<DecorationPriorityResolverItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&DecorationPriorityResolverItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn priority_count(&self) -> usize { self.items.len() }
+
+    pub fn has_conflict(&self) -> bool {
+        self.items.iter().any(|i| i.has_conflict())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&DecorationPriorityResolverItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&DecorationPriorityResolverItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &DecorationPriorityResolverConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2439,5 +2745,147 @@ mod tests {
         let at6 = bridge.all_decorations_at_line(6);
         assert_eq!(at6.len(), 1);
         assert_eq!(at6[0].0, "warn");
+    }
+
+#[test]
+    fn decorationrangemerger_severity_ordering() {
+        assert!(DecorationRangeMergerSeverity::Critical > DecorationRangeMergerSeverity::High);
+        assert!(DecorationRangeMergerSeverity::High > DecorationRangeMergerSeverity::Medium);
+        assert!(DecorationRangeMergerSeverity::Medium > DecorationRangeMergerSeverity::Low);
+    }
+
+    #[test]
+    fn decorationrangemerger_severity_display() {
+        assert_eq!(DecorationRangeMergerSeverity::Low.to_string(), "low");
+        assert_eq!(DecorationRangeMergerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn decorationrangemerger_entry_creation() {
+        let e = DecorationRangeMergerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, DecorationRangeMergerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn decorationrangemerger_entry_builder() {
+        let e = DecorationRangeMergerEntry::new("e2", "Entry 2")
+            .with_severity(DecorationRangeMergerSeverity::High)
+            .with_detail("some detail")
+            .with_range_count(42);
+        assert_eq!(e.severity, DecorationRangeMergerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.range_count, 42);
+    }
+
+    #[test]
+    fn decorationrangemerger_entry_enable_disable() {
+        let mut e = DecorationRangeMergerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn decorationrangemerger_add_and_count() {
+        let mut mgr = DecorationRangeMerger::new("test");
+        mgr.add(DecorationRangeMergerEntry::new("a", "A"));
+        mgr.add(DecorationRangeMergerEntry::new("b", "B").with_severity(DecorationRangeMergerSeverity::High));
+        assert_eq!(mgr.range_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn decorationrangemerger_remove() {
+        let mut mgr = DecorationRangeMerger::new("test");
+        mgr.add(DecorationRangeMergerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn decorationrangemerger_capacity() {
+        let mut mgr = DecorationRangeMerger::new("test").with_capacity(1);
+        assert!(mgr.add(DecorationRangeMergerEntry::new("a", "A")));
+        assert!(!mgr.add(DecorationRangeMergerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn decorationrangemerger_sorted_by_severity() {
+        let mut mgr = DecorationRangeMerger::new("test");
+        mgr.add(DecorationRangeMergerEntry::new("lo", "Low"));
+        mgr.add(DecorationRangeMergerEntry::new("hi", "High").with_severity(DecorationRangeMergerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, DecorationRangeMergerSeverity::Critical);
+    }
+
+    #[test]
+    fn decorationrangemerger_summary() {
+        let mgr = DecorationRangeMerger::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn decorationpriorityresolver_config_defaults() {
+        let cfg = DecorationPriorityResolverConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn decorationpriorityresolver_item_creation() {
+        let item = DecorationPriorityResolverItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn decorationpriorityresolver_add_and_get() {
+        let mut mgr = DecorationPriorityResolver::new(DecorationPriorityResolverConfig::new("test"));
+        mgr.add(DecorationPriorityResolverItem::new("k1", "v1"));
+        assert_eq!(mgr.priority_count(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn decorationpriorityresolver_remove_item() {
+        let mut mgr = DecorationPriorityResolver::new(DecorationPriorityResolverConfig::new("test"));
+        mgr.add(DecorationPriorityResolverItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn decorationpriorityresolver_sorted_by_priority() {
+        let mut mgr = DecorationPriorityResolver::new(DecorationPriorityResolverConfig::new("test"));
+        mgr.add(DecorationPriorityResolverItem::new("lo", "low").with_priority(1));
+        mgr.add(DecorationPriorityResolverItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn decorationpriorityresolver_items_with_tag() {
+        let mut mgr = DecorationPriorityResolver::new(DecorationPriorityResolverConfig::new("test"));
+        mgr.add(DecorationPriorityResolverItem::new("a", "1").with_tag("x"));
+        mgr.add(DecorationPriorityResolverItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn decorationpriorityresolver_report() {
+        let mgr = DecorationPriorityResolver::new(DecorationPriorityResolverConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

@@ -1507,6 +1507,313 @@ impl fmt::Display for WordWrapGuideRuler {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RulerInteractiveEditor
+// ---------------------------------------------------------------------------
+
+/// An edit action on a ruler position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RulerEditAction {
+    Add(u32),
+    Remove(u32),
+    Move { from: u32, to: u32 },
+}
+
+impl std::fmt::Display for RulerEditAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RulerEditAction::Add(col) => write!(f, "+{col}"),
+            RulerEditAction::Remove(col) => write!(f, "-{col}"),
+            RulerEditAction::Move { from, to } => write!(f, "{from}->{to}"),
+        }
+    }
+}
+
+/// Allows interactive editing of ruler positions with undo/redo support.
+pub struct RulerInteractiveEditor {
+    positions: Vec<u32>,
+    undo_stack: Vec<RulerEditAction>,
+    redo_stack: Vec<RulerEditAction>,
+    max_rulers: usize,
+}
+
+impl RulerInteractiveEditor {
+    pub fn new(max_rulers: usize) -> Self {
+        Self {
+            positions: Vec::new(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_rulers,
+        }
+    }
+
+    pub fn positions(&self) -> &[u32] {
+        &self.positions
+    }
+
+    pub fn count(&self) -> usize {
+        self.positions.len()
+    }
+
+    pub fn add(&mut self, column: u32) -> Result<(), String> {
+        if self.positions.len() >= self.max_rulers {
+            return Err(format!("max rulers ({}) reached", self.max_rulers));
+        }
+        if self.positions.contains(&column) {
+            return Err(format!("ruler at column {column} already exists"));
+        }
+        self.positions.push(column);
+        self.positions.sort();
+        self.undo_stack.push(RulerEditAction::Add(column));
+        self.redo_stack.clear();
+        Ok(())
+    }
+
+    pub fn remove(&mut self, column: u32) -> Result<(), String> {
+        if let Some(pos) = self.positions.iter().position(|&c| c == column) {
+            self.positions.remove(pos);
+            self.undo_stack.push(RulerEditAction::Remove(column));
+            self.redo_stack.clear();
+            Ok(())
+        } else {
+            Err(format!("no ruler at column {column}"))
+        }
+    }
+
+    pub fn move_ruler(&mut self, from: u32, to: u32) -> Result<(), String> {
+        if !self.positions.contains(&from) {
+            return Err(format!("no ruler at column {from}"));
+        }
+        if self.positions.contains(&to) {
+            return Err(format!("ruler at column {to} already exists"));
+        }
+        self.positions.retain(|&c| c != from);
+        self.positions.push(to);
+        self.positions.sort();
+        self.undo_stack.push(RulerEditAction::Move { from, to });
+        self.redo_stack.clear();
+        Ok(())
+    }
+
+    pub fn undo(&mut self) -> Option<RulerEditAction> {
+        let action = self.undo_stack.pop()?;
+        match &action {
+            RulerEditAction::Add(col) => {
+                self.positions.retain(|c| c != col);
+            }
+            RulerEditAction::Remove(col) => {
+                self.positions.push(*col);
+                self.positions.sort();
+            }
+            RulerEditAction::Move { from, to } => {
+                self.positions.retain(|c| c != to);
+                self.positions.push(*from);
+                self.positions.sort();
+            }
+        }
+        self.redo_stack.push(action.clone());
+        Some(action)
+    }
+
+    pub fn redo(&mut self) -> Option<RulerEditAction> {
+        let action = self.redo_stack.pop()?;
+        match &action {
+            RulerEditAction::Add(col) => {
+                self.positions.push(*col);
+                self.positions.sort();
+            }
+            RulerEditAction::Remove(col) => {
+                self.positions.retain(|c| c != col);
+            }
+            RulerEditAction::Move { from, to } => {
+                self.positions.retain(|c| c != from);
+                self.positions.push(*to);
+                self.positions.sort();
+            }
+        }
+        self.undo_stack.push(action.clone());
+        Some(action)
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.positions.clear();
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+
+    /// Generate a summary of the current state.
+    pub fn summary(&self) -> String {
+        let cols: Vec<String> = self.positions.iter().map(|c| c.to_string()).collect();
+        format!("Rulers at columns: [{}]", cols.join(", "))
+    }
+}
+
+impl std::fmt::Display for RulerInteractiveEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RulerInteractiveEditor({} rulers, max={})", self.positions.len(), self.max_rulers)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RulerPositionValidator
+// ---------------------------------------------------------------------------
+
+/// Constraint for validating ruler positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulerConstraint {
+    pub min_column: u32,
+    pub max_column: u32,
+    pub min_spacing: u32,
+    pub max_rulers: usize,
+}
+
+impl RulerConstraint {
+    pub fn new(min_column: u32, max_column: u32, min_spacing: u32, max_rulers: usize) -> Self {
+        Self { min_column, max_column, min_spacing, max_rulers }
+    }
+}
+
+impl Default for RulerConstraint {
+    fn default() -> Self {
+        Self { min_column: 1, max_column: 320, min_spacing: 1, max_rulers: 20 }
+    }
+}
+
+impl std::fmt::Display for RulerConstraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RulerConstraint(col {}-{}, spacing>={}, max={})",
+            self.min_column, self.max_column, self.min_spacing, self.max_rulers)
+    }
+}
+
+/// Validation error for ruler positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RulerValidationError {
+    OutOfRange { column: u32, min: u32, max: u32 },
+    TooClose { col_a: u32, col_b: u32, min_spacing: u32 },
+    TooManyRulers { count: usize, max: usize },
+    DuplicateColumn(u32),
+}
+
+impl std::fmt::Display for RulerValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RulerValidationError::OutOfRange { column, min, max } =>
+                write!(f, "column {column} out of range [{min}, {max}]"),
+            RulerValidationError::TooClose { col_a, col_b, min_spacing } =>
+                write!(f, "columns {col_a} and {col_b} too close (min spacing {min_spacing})"),
+            RulerValidationError::TooManyRulers { count, max } =>
+                write!(f, "too many rulers: {count} > {max}"),
+            RulerValidationError::DuplicateColumn(col) =>
+                write!(f, "duplicate column: {col}"),
+        }
+    }
+}
+
+/// Validates ruler positions against document constraints.
+pub struct RulerPositionValidator {
+    constraint: RulerConstraint,
+}
+
+impl RulerPositionValidator {
+    pub fn new(constraint: RulerConstraint) -> Self {
+        Self { constraint }
+    }
+
+    pub fn with_defaults() -> Self {
+        Self { constraint: RulerConstraint::default() }
+    }
+
+    pub fn constraint(&self) -> &RulerConstraint {
+        &self.constraint
+    }
+
+    /// Validate a set of ruler positions against the constraints.
+    pub fn validate(&self, positions: &[u32]) -> Vec<RulerValidationError> {
+        let mut errors = Vec::new();
+
+        if positions.len() > self.constraint.max_rulers {
+            errors.push(RulerValidationError::TooManyRulers {
+                count: positions.len(),
+                max: self.constraint.max_rulers,
+            });
+        }
+
+        let mut seen = std::collections::HashSet::new();
+        for &col in positions {
+            if !seen.insert(col) {
+                errors.push(RulerValidationError::DuplicateColumn(col));
+            }
+            if col < self.constraint.min_column || col > self.constraint.max_column {
+                errors.push(RulerValidationError::OutOfRange {
+                    column: col,
+                    min: self.constraint.min_column,
+                    max: self.constraint.max_column,
+                });
+            }
+        }
+
+        let mut sorted = positions.to_vec();
+        sorted.sort();
+        for w in sorted.windows(2) {
+            if w[1] - w[0] < self.constraint.min_spacing {
+                errors.push(RulerValidationError::TooClose {
+                    col_a: w[0],
+                    col_b: w[1],
+                    min_spacing: self.constraint.min_spacing,
+                });
+            }
+        }
+
+        errors
+    }
+
+    /// Check if positions are valid (no errors).
+    pub fn is_valid(&self, positions: &[u32]) -> bool {
+        self.validate(positions).is_empty()
+    }
+
+    /// Snap a column to the nearest valid position.
+    pub fn snap_to_valid(&self, column: u32) -> u32 {
+        column.clamp(self.constraint.min_column, self.constraint.max_column)
+    }
+
+    /// Filter out invalid positions and return only valid ones.
+    pub fn filter_valid(&self, positions: &[u32]) -> Vec<u32> {
+        let mut result: Vec<u32> = positions
+            .iter()
+            .copied()
+            .filter(|&c| c >= self.constraint.min_column && c <= self.constraint.max_column)
+            .collect();
+        result.sort();
+        result.dedup();
+        // Enforce spacing
+        let mut filtered = Vec::new();
+        for col in result {
+            if filtered.last().map_or(true, |&last: &u32| col - last >= self.constraint.min_spacing) {
+                filtered.push(col);
+            }
+        }
+        filtered.truncate(self.constraint.max_rulers);
+        filtered
+    }
+}
+
+impl std::fmt::Display for RulerPositionValidator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RulerPositionValidator({})", self.constraint)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2328,4 +2635,188 @@ mod tests {
         assert_eq!(format!("{}", WrapGuideStyle::Dashed), "dashed");
         assert_eq!(format!("{}", WrapGuideStyle::Dotted), "dotted");
     }
+
+    #[test]
+    fn editor_add_ruler() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        assert_eq!(editor.positions(), &[80]);
+        assert_eq!(editor.count(), 1);
+    }
+
+    #[test]
+    fn editor_add_duplicate_error() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        assert!(editor.add(80).is_err());
+    }
+
+    #[test]
+    fn editor_add_max_reached() {
+        let mut editor = RulerInteractiveEditor::new(1);
+        editor.add(80).unwrap();
+        assert!(editor.add(120).is_err());
+    }
+
+    #[test]
+    fn editor_remove_ruler() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        editor.remove(80).unwrap();
+        assert_eq!(editor.count(), 0);
+    }
+
+    #[test]
+    fn editor_remove_nonexistent() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        assert!(editor.remove(999).is_err());
+    }
+
+    #[test]
+    fn editor_move_ruler() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        editor.move_ruler(80, 100).unwrap();
+        assert_eq!(editor.positions(), &[100]);
+    }
+
+    #[test]
+    fn editor_undo_add() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        let action = editor.undo().unwrap();
+        assert_eq!(action, RulerEditAction::Add(80));
+        assert_eq!(editor.count(), 0);
+    }
+
+    #[test]
+    fn editor_undo_remove() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        editor.remove(80).unwrap();
+        editor.undo();
+        assert_eq!(editor.positions(), &[80]);
+    }
+
+    #[test]
+    fn editor_redo() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        editor.undo();
+        assert!(editor.can_redo());
+        editor.redo();
+        assert_eq!(editor.positions(), &[80]);
+    }
+
+    #[test]
+    fn editor_summary_and_display() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        editor.add(120).unwrap();
+        let s = editor.summary();
+        assert!(s.contains("80"));
+        assert!(s.contains("120"));
+        assert!(format!("{editor}").contains("2 rulers"));
+    }
+
+    #[test]
+    fn editor_clear() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(80).unwrap();
+        editor.clear();
+        assert_eq!(editor.count(), 0);
+        assert!(!editor.can_undo());
+    }
+
+    #[test]
+    fn editor_positions_sorted() {
+        let mut editor = RulerInteractiveEditor::new(10);
+        editor.add(120).unwrap();
+        editor.add(80).unwrap();
+        editor.add(40).unwrap();
+        assert_eq!(editor.positions(), &[40, 80, 120]);
+    }
+
+    #[test]
+    fn edit_action_display() {
+        assert_eq!(format!("{}", RulerEditAction::Add(80)), "+80");
+        assert_eq!(format!("{}", RulerEditAction::Remove(80)), "-80");
+        assert_eq!(format!("{}", RulerEditAction::Move { from: 80, to: 100 }), "80->100");
+    }
+
+    #[test]
+    fn validator_valid_positions() {
+        let v = RulerPositionValidator::with_defaults();
+        assert!(v.is_valid(&[40, 80, 120]));
+    }
+
+    #[test]
+    fn validator_out_of_range() {
+        let v = RulerPositionValidator::new(RulerConstraint::new(1, 100, 1, 10));
+        let errors = v.validate(&[200]);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(errors[0], RulerValidationError::OutOfRange { .. }));
+    }
+
+    #[test]
+    fn validator_too_many() {
+        let v = RulerPositionValidator::new(RulerConstraint::new(1, 320, 1, 2));
+        let errors = v.validate(&[10, 20, 30]);
+        assert!(errors.iter().any(|e| matches!(e, RulerValidationError::TooManyRulers { .. })));
+    }
+
+    #[test]
+    fn validator_too_close() {
+        let v = RulerPositionValidator::new(RulerConstraint::new(1, 320, 10, 20));
+        let errors = v.validate(&[80, 85]);
+        assert!(errors.iter().any(|e| matches!(e, RulerValidationError::TooClose { .. })));
+    }
+
+    #[test]
+    fn validator_duplicate() {
+        let v = RulerPositionValidator::with_defaults();
+        let errors = v.validate(&[80, 80]);
+        assert!(errors.iter().any(|e| matches!(e, RulerValidationError::DuplicateColumn(80))));
+    }
+
+    #[test]
+    fn validator_snap_to_valid() {
+        let v = RulerPositionValidator::new(RulerConstraint::new(10, 200, 1, 10));
+        assert_eq!(v.snap_to_valid(5), 10);
+        assert_eq!(v.snap_to_valid(300), 200);
+        assert_eq!(v.snap_to_valid(100), 100);
+    }
+
+    #[test]
+    fn validator_filter_valid() {
+        let v = RulerPositionValidator::new(RulerConstraint::new(10, 200, 10, 5));
+        let result = v.filter_valid(&[5, 10, 15, 20, 200, 300]);
+        assert!(result.iter().all(|&c| c >= 10 && c <= 200));
+        for w in result.windows(2) {
+            assert!(w[1] - w[0] >= 10);
+        }
+    }
+
+    #[test]
+    fn validator_display() {
+        let v = RulerPositionValidator::with_defaults();
+        let s = format!("{v}");
+        assert!(s.contains("RulerPositionValidator"));
+    }
+
+    #[test]
+    fn validation_error_display() {
+        let e = RulerValidationError::OutOfRange { column: 500, min: 1, max: 320 };
+        assert!(format!("{e}").contains("500"));
+        let e2 = RulerValidationError::TooClose { col_a: 10, col_b: 12, min_spacing: 5 };
+        assert!(format!("{e2}").contains("too close"));
+    }
+
+    #[test]
+    fn constraint_display() {
+        let c = RulerConstraint::default();
+        let s = format!("{c}");
+        assert!(s.contains("1-320"));
+    }
+
 }

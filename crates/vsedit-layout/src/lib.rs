@@ -1562,6 +1562,206 @@ impl LayoutSnapper {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LayoutGridCalculator – calculates grid positions from constraints
+// ---------------------------------------------------------------------------
+
+/// A cell position within a calculated grid layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GridCellPosition {
+    pub row: u16,
+    pub col: u16,
+    pub x: u16,
+    pub y: u16,
+    pub width: u16,
+    pub height: u16,
+}
+
+/// Specification for a grid layout.
+#[derive(Debug, Clone)]
+pub struct GridSpec {
+    pub rows: u16,
+    pub cols: u16,
+    pub row_gap: u16,
+    pub col_gap: u16,
+}
+
+impl GridSpec {
+    pub fn new(rows: u16, cols: u16) -> Self {
+        Self { rows, cols, row_gap: 0, col_gap: 0 }
+    }
+
+    pub fn with_gaps(mut self, row_gap: u16, col_gap: u16) -> Self {
+        self.row_gap = row_gap;
+        self.col_gap = col_gap;
+        self
+    }
+
+    pub fn cell_count(&self) -> u16 {
+        self.rows * self.cols
+    }
+}
+
+/// Calculates grid cell positions from a specification and a bounding area.
+#[derive(Debug)]
+pub struct LayoutGridCalculator {
+    spec: GridSpec,
+}
+
+impl LayoutGridCalculator {
+    pub fn new(spec: GridSpec) -> Self {
+        Self { spec }
+    }
+
+    /// Calculate positions for all grid cells within the given bounding rect.
+    pub fn calculate(&self, area: &Rect) -> Vec<GridCellPosition> {
+        if self.spec.rows == 0 || self.spec.cols == 0 {
+            return Vec::new();
+        }
+        let total_row_gap = self.spec.row_gap.saturating_mul(self.spec.rows.saturating_sub(1));
+        let total_col_gap = self.spec.col_gap.saturating_mul(self.spec.cols.saturating_sub(1));
+        let usable_w = area.width.saturating_sub(total_col_gap);
+        let usable_h = area.height.saturating_sub(total_row_gap);
+        let cell_w = usable_w / self.spec.cols;
+        let cell_h = usable_h / self.spec.rows;
+
+        let mut cells = Vec::with_capacity(self.spec.cell_count() as usize);
+        for r in 0..self.spec.rows {
+            for c in 0..self.spec.cols {
+                let x = area.x + c * (cell_w + self.spec.col_gap);
+                let y = area.y + r * (cell_h + self.spec.row_gap);
+                cells.push(GridCellPosition { row: r, col: c, x, y, width: cell_w, height: cell_h });
+            }
+        }
+        cells
+    }
+
+    /// Get the cell at a specific row/col (0-indexed), or None if out of bounds.
+    pub fn cell_at(&self, area: &Rect, row: u16, col: u16) -> Option<GridCellPosition> {
+        if row >= self.spec.rows || col >= self.spec.cols {
+            return None;
+        }
+        let cells = self.calculate(area);
+        let idx = (row * self.spec.cols + col) as usize;
+        cells.into_iter().nth(idx)
+    }
+
+    /// Total number of cells.
+    pub fn cell_count(&self) -> u16 {
+        self.spec.cell_count()
+    }
+
+    /// Get the spec.
+    pub fn spec(&self) -> &GridSpec {
+        &self.spec
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutSnapToEdgeHandler – snaps elements to edges/grid lines
+// ---------------------------------------------------------------------------
+
+/// Which edge an element was snapped to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapEdge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Result of a snap operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapResult {
+    pub snapped_x: u16,
+    pub snapped_y: u16,
+    pub edges: Vec<SnapEdge>,
+}
+
+/// Handles snapping elements to edges and grid lines.
+#[derive(Debug)]
+pub struct LayoutSnapToEdgeHandler {
+    threshold: u16,
+    grid_size: u16,
+    snap_to_grid: bool,
+}
+
+impl LayoutSnapToEdgeHandler {
+    pub fn new(threshold: u16) -> Self {
+        Self { threshold, grid_size: 1, snap_to_grid: false }
+    }
+
+    pub fn with_grid(mut self, grid_size: u16) -> Self {
+        self.grid_size = if grid_size == 0 { 1 } else { grid_size };
+        self.snap_to_grid = true;
+        self
+    }
+
+    /// Snap a point to the nearest grid line.
+    pub fn snap_to_nearest_grid(&self, value: u16) -> u16 {
+        if self.grid_size <= 1 {
+            return value;
+        }
+        let remainder = value % self.grid_size;
+        if remainder <= self.grid_size / 2 {
+            value - remainder
+        } else {
+            value - remainder + self.grid_size
+        }
+    }
+
+    /// Snap a position within a bounding area, considering edges and grid.
+    pub fn snap(&self, x: u16, y: u16, area: &Rect) -> SnapResult {
+        let mut snapped_x = x;
+        let mut snapped_y = y;
+        let mut edges = Vec::new();
+
+        // Snap to left edge
+        if x.saturating_sub(area.x) <= self.threshold {
+            snapped_x = area.x;
+            edges.push(SnapEdge::Left);
+        }
+        // Snap to right edge
+        let right = area.x.saturating_add(area.width);
+        if right.saturating_sub(x) <= self.threshold {
+            snapped_x = right;
+            edges.push(SnapEdge::Right);
+        }
+        // Snap to top edge
+        if y.saturating_sub(area.y) <= self.threshold {
+            snapped_y = area.y;
+            edges.push(SnapEdge::Top);
+        }
+        // Snap to bottom edge
+        let bottom = area.y.saturating_add(area.height);
+        if bottom.saturating_sub(y) <= self.threshold {
+            snapped_y = bottom;
+            edges.push(SnapEdge::Bottom);
+        }
+
+        // Apply grid snapping if enabled and no edge snap happened
+        if self.snap_to_grid {
+            if !edges.iter().any(|e| matches!(e, SnapEdge::Left | SnapEdge::Right)) {
+                snapped_x = self.snap_to_nearest_grid(snapped_x);
+            }
+            if !edges.iter().any(|e| matches!(e, SnapEdge::Top | SnapEdge::Bottom)) {
+                snapped_y = self.snap_to_nearest_grid(snapped_y);
+            }
+        }
+
+        SnapResult { snapped_x, snapped_y, edges }
+    }
+
+    pub fn threshold(&self) -> u16 {
+        self.threshold
+    }
+
+    pub fn grid_size(&self) -> u16 {
+        self.grid_size
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2343,6 +2543,116 @@ mod tests {
         assert_eq!(snapped.y, 10);
         assert_eq!(snapped.width, 10);
         assert_eq!(snapped.height, 30);
+    }
+
+
+    #[test]
+    fn grid_spec_cell_count() {
+        let spec = GridSpec::new(3, 4);
+        assert_eq!(spec.cell_count(), 12);
+    }
+
+    #[test]
+    fn grid_calculator_basic() {
+        let calc = LayoutGridCalculator::new(GridSpec::new(2, 2));
+        let area = rect(0, 0, 100, 100);
+        let cells = calc.calculate(&area);
+        assert_eq!(cells.len(), 4);
+        assert_eq!(cells[0], GridCellPosition { row: 0, col: 0, x: 0, y: 0, width: 50, height: 50 });
+        assert_eq!(cells[3], GridCellPosition { row: 1, col: 1, x: 50, y: 50, width: 50, height: 50 });
+    }
+
+    #[test]
+    fn grid_calculator_with_gaps() {
+        let spec = GridSpec::new(2, 2).with_gaps(2, 4);
+        let calc = LayoutGridCalculator::new(spec);
+        let area = rect(0, 0, 104, 52);
+        let cells = calc.calculate(&area);
+        assert_eq!(cells.len(), 4);
+        assert_eq!(cells[0].width, 50);
+        assert_eq!(cells[0].height, 25);
+    }
+
+    #[test]
+    fn grid_calculator_empty() {
+        let calc = LayoutGridCalculator::new(GridSpec::new(0, 5));
+        let area = rect(0, 0, 100, 100);
+        assert!(calc.calculate(&area).is_empty());
+    }
+
+    #[test]
+    fn grid_calculator_cell_at() {
+        let calc = LayoutGridCalculator::new(GridSpec::new(3, 3));
+        let area = rect(0, 0, 90, 90);
+        let cell = calc.cell_at(&area, 1, 2).unwrap();
+        assert_eq!(cell.row, 1);
+        assert_eq!(cell.col, 2);
+        assert_eq!(cell.x, 60);
+        assert_eq!(cell.y, 30);
+        assert!(calc.cell_at(&area, 5, 0).is_none());
+    }
+
+    #[test]
+    fn grid_calculator_cell_count() {
+        let calc = LayoutGridCalculator::new(GridSpec::new(4, 3));
+        assert_eq!(calc.cell_count(), 12);
+    }
+
+    #[test]
+    fn snap_to_edge_left() {
+        let handler = LayoutSnapToEdgeHandler::new(5);
+        let area = rect(10, 10, 100, 100);
+        let result = handler.snap(12, 50, &area);
+        assert_eq!(result.snapped_x, 10);
+        assert!(result.edges.contains(&SnapEdge::Left));
+    }
+
+    #[test]
+    fn snap_to_edge_bottom() {
+        let handler = LayoutSnapToEdgeHandler::new(5);
+        let area = rect(0, 0, 100, 100);
+        let result = handler.snap(50, 98, &area);
+        assert_eq!(result.snapped_y, 100);
+        assert!(result.edges.contains(&SnapEdge::Bottom));
+    }
+
+    #[test]
+    fn snap_no_edge() {
+        let handler = LayoutSnapToEdgeHandler::new(5);
+        let area = rect(0, 0, 100, 100);
+        let result = handler.snap(50, 50, &area);
+        assert_eq!(result.snapped_x, 50);
+        assert_eq!(result.snapped_y, 50);
+        assert!(result.edges.is_empty());
+    }
+
+    #[test]
+    fn snap_to_grid_lines() {
+        let handler = LayoutSnapToEdgeHandler::new(2).with_grid(10);
+        let area = rect(0, 0, 200, 200);
+        let result = handler.snap(53, 47, &area);
+        assert_eq!(result.snapped_x, 50);
+        assert_eq!(result.snapped_y, 50);
+    }
+
+    #[test]
+    fn snap_grid_nearest() {
+        let handler = LayoutSnapToEdgeHandler::new(0).with_grid(10);
+        assert_eq!(handler.snap_to_nearest_grid(14), 10);
+        assert_eq!(handler.snap_to_nearest_grid(16), 20);
+        assert_eq!(handler.snap_to_nearest_grid(15), 10);
+    }
+
+    #[test]
+    fn snap_grid_size_zero_handled() {
+        let handler = LayoutSnapToEdgeHandler::new(0).with_grid(0);
+        assert_eq!(handler.grid_size(), 1);
+    }
+
+    #[test]
+    fn snap_threshold_accessor() {
+        let handler = LayoutSnapToEdgeHandler::new(7);
+        assert_eq!(handler.threshold(), 7);
     }
 
 }

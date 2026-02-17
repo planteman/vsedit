@@ -1399,6 +1399,229 @@ impl HistorySizeTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LocalHistoryEntryFormatter – formats history entries for display
+// ---------------------------------------------------------------------------
+
+/// Display format style for history entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HistoryDisplayStyle {
+    /// Short one-line summary.
+    Compact,
+    /// Multi-line detail view.
+    Detailed,
+    /// Machine-readable key=value pairs.
+    KeyValue,
+}
+
+/// Formats history entries for display in the UI.
+#[derive(Debug)]
+pub struct LocalHistoryEntryFormatter {
+    style: HistoryDisplayStyle,
+    show_content_hash: bool,
+    max_label_width: usize,
+    time_format_24h: bool,
+}
+
+impl LocalHistoryEntryFormatter {
+    pub fn new(style: HistoryDisplayStyle) -> Self {
+        Self {
+            style,
+            show_content_hash: false,
+            max_label_width: 40,
+            time_format_24h: true,
+        }
+    }
+
+    pub fn with_content_hash(mut self, show: bool) -> Self {
+        self.show_content_hash = show;
+        self
+    }
+
+    pub fn with_max_label_width(mut self, w: usize) -> Self {
+        self.max_label_width = w;
+        self
+    }
+
+    pub fn with_24h_format(mut self, v: bool) -> Self {
+        self.time_format_24h = v;
+        self
+    }
+
+    /// Format a single history entry.
+    pub fn format_entry(&self, entry: &HistoryEntry) -> String {
+        match self.style {
+            HistoryDisplayStyle::Compact => self.format_compact(entry),
+            HistoryDisplayStyle::Detailed => self.format_detailed(entry),
+            HistoryDisplayStyle::KeyValue => self.format_kv(entry),
+        }
+    }
+
+    fn format_compact(&self, entry: &HistoryEntry) -> String {
+        let label = entry.label.as_deref().unwrap_or("(no label)");
+        let label = self.truncate_label(label);
+        let source_char = match entry.source {
+            HistorySource::Auto => 'A',
+            HistorySource::Manual => 'M',
+            HistorySource::Undo => 'U',
+        };
+        format!("[{}] {} t={}", source_char, label, entry.timestamp)
+    }
+
+    fn format_detailed(&self, entry: &HistoryEntry) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("URI:    {}", entry.uri));
+        lines.push(format!("Time:   {}", self.format_timestamp(entry.timestamp)));
+        lines.push(format!("Source: {:?}", entry.source));
+        if let Some(ref label) = entry.label {
+            lines.push(format!("Label:  {}", self.truncate_label(label)));
+        }
+        if self.show_content_hash {
+            lines.push(format!("Hash:   {}", entry.content_hash));
+        }
+        if let Some(ref content) = entry.content {
+            let preview_len = content.len().min(80);
+            lines.push(format!("Preview: {}…", &content[..preview_len]));
+        }
+        lines.join("\n")
+    }
+
+    fn format_kv(&self, entry: &HistoryEntry) -> String {
+        let mut pairs = vec![
+            format!("uri={}", entry.uri),
+            format!("timestamp={}", entry.timestamp),
+            format!("source={:?}", entry.source),
+            format!("hash={}", entry.content_hash),
+        ];
+        if let Some(ref label) = entry.label {
+            pairs.push(format!("label={}", label));
+        }
+        pairs.join(" ")
+    }
+
+    fn truncate_label<'a>(&self, label: &'a str) -> &'a str {
+        if label.len() <= self.max_label_width {
+            label
+        } else {
+            &label[..self.max_label_width]
+        }
+    }
+
+    fn format_timestamp(&self, ts: u64) -> String {
+        let hours = (ts / 3600) % 24;
+        let minutes = (ts / 60) % 60;
+        let seconds = ts % 60;
+        if self.time_format_24h {
+            format!("{hours:02}:{minutes:02}:{seconds:02}")
+        } else {
+            let period = if hours < 12 { "AM" } else { "PM" };
+            let h12 = if hours == 0 { 12 } else if hours > 12 { hours - 12 } else { hours };
+            format!("{h12}:{minutes:02}:{seconds:02} {period}")
+        }
+    }
+
+    pub fn style(&self) -> HistoryDisplayStyle {
+        self.style
+    }
+
+    /// Format multiple entries, separated by a blank line.
+    pub fn format_entries(&self, entries: &[HistoryEntry]) -> String {
+        entries
+            .iter()
+            .map(|e| self.format_entry(e))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LocalHistoryMergeTool – merges history entries from multiple sources
+// ---------------------------------------------------------------------------
+
+/// Strategy used when entries conflict during merge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeConflictStrategy {
+    /// Keep the newer entry based on timestamp.
+    PreferNewer,
+    /// Keep the older entry.
+    PreferOlder,
+    /// Keep both entries.
+    KeepBoth,
+}
+
+/// Merges history entries from multiple sources into a unified timeline.
+#[derive(Debug)]
+pub struct LocalHistoryMergeTool {
+    strategy: MergeConflictStrategy,
+    dedup_by_hash: bool,
+}
+
+impl LocalHistoryMergeTool {
+    pub fn new(strategy: MergeConflictStrategy) -> Self {
+        Self { strategy, dedup_by_hash: true }
+    }
+
+    pub fn with_dedup(mut self, dedup: bool) -> Self {
+        self.dedup_by_hash = dedup;
+        self
+    }
+
+    /// Merge two sorted (by timestamp) entry lists into a single sorted list.
+    pub fn merge(&self, a: &[HistoryEntry], b: &[HistoryEntry]) -> Vec<HistoryEntry> {
+        let mut combined: Vec<HistoryEntry> = a.iter().chain(b.iter()).cloned().collect();
+        combined.sort_by_key(|e| e.timestamp);
+
+        if self.dedup_by_hash {
+            self.dedup_entries(&mut combined);
+        }
+        combined
+    }
+
+    fn dedup_entries(&self, entries: &mut Vec<HistoryEntry>) {
+        let mut seen = std::collections::HashSet::new();
+        entries.retain(|e| {
+            let key = format!("{}:{}", e.uri, e.content_hash);
+            if seen.contains(&key) {
+                match self.strategy {
+                    MergeConflictStrategy::KeepBoth => true,
+                    MergeConflictStrategy::PreferNewer => false,
+                    MergeConflictStrategy::PreferOlder => false,
+                }
+            } else {
+                seen.insert(key);
+                true
+            }
+        });
+    }
+
+    /// Merge multiple sources at once.
+    pub fn merge_all(&self, sources: &[Vec<HistoryEntry>]) -> Vec<HistoryEntry> {
+        let mut result = Vec::new();
+        for source in sources {
+            result = self.merge(&result, source);
+        }
+        result
+    }
+
+    /// Count how many duplicates would be removed.
+    pub fn count_duplicates(&self, entries: &[HistoryEntry]) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        let mut dupes = 0;
+        for e in entries {
+            let key = format!("{}:{}", e.uri, e.content_hash);
+            if !seen.insert(key) {
+                dupes += 1;
+            }
+        }
+        dupes
+    }
+
+    pub fn strategy(&self) -> MergeConflictStrategy {
+        self.strategy
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2479,4 +2702,141 @@ mod tests {
         assert_eq!(over[0].0, "big.rs");
         assert_eq!(over[1].0, "med.rs");
     }
+
+    fn make_hist_entry(uri: &str, ts: u64, hash: &str, source: HistorySource) -> HistoryEntry {
+        HistoryEntry {
+            uri: uri.to_string(),
+            timestamp: ts,
+            content_hash: hash.to_string(),
+            label: Some(format!("entry-{ts}")),
+            source,
+            content: None,
+            size_bytes: 0,
+        }
+    }
+
+    #[test]
+    fn formatter_compact() {
+        let e = make_hist_entry("file.rs", 100, "abc", HistorySource::Auto);
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::Compact);
+        let s = fmt.format_entry(&e);
+        assert!(s.starts_with("[A]"));
+        assert!(s.contains("entry-100"));
+    }
+
+    #[test]
+    fn formatter_detailed() {
+        let e = make_hist_entry("file.rs", 3661, "abc", HistorySource::Manual);
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::Detailed)
+            .with_content_hash(true);
+        let s = fmt.format_entry(&e);
+        assert!(s.contains("URI:    file.rs"));
+        assert!(s.contains("Manual"));
+        assert!(s.contains("Hash:   abc"));
+    }
+
+    #[test]
+    fn formatter_kv() {
+        let e = make_hist_entry("a.rs", 50, "xyz", HistorySource::Undo);
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::KeyValue);
+        let s = fmt.format_entry(&e);
+        assert!(s.contains("uri=a.rs"));
+        assert!(s.contains("hash=xyz"));
+    }
+
+    #[test]
+    fn formatter_truncate_label() {
+        let mut e = make_hist_entry("f.rs", 1, "h", HistorySource::Auto);
+        e.label = Some("a".repeat(100));
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::Compact)
+            .with_max_label_width(10);
+        let s = fmt.format_entry(&e);
+        assert!(s.len() < 100);
+    }
+
+    #[test]
+    fn formatter_12h_time() {
+        let e = make_hist_entry("f.rs", 3600 * 14 + 60 * 30, "h", HistorySource::Auto);
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::Detailed)
+            .with_24h_format(false);
+        let s = fmt.format_entry(&e);
+        assert!(s.contains("PM"));
+    }
+
+    #[test]
+    fn formatter_entries_multiple() {
+        let entries = vec![
+            make_hist_entry("a.rs", 1, "h1", HistorySource::Auto),
+            make_hist_entry("b.rs", 2, "h2", HistorySource::Manual),
+        ];
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::Compact);
+        let s = fmt.format_entries(&entries);
+        assert!(s.contains("[A]"));
+        assert!(s.contains("[M]"));
+    }
+
+    #[test]
+    fn formatter_style_accessor() {
+        let fmt = LocalHistoryEntryFormatter::new(HistoryDisplayStyle::KeyValue);
+        assert_eq!(fmt.style(), HistoryDisplayStyle::KeyValue);
+    }
+
+    #[test]
+    fn merge_tool_basic() {
+        let a = vec![make_hist_entry("f.rs", 1, "h1", HistorySource::Auto)];
+        let b = vec![make_hist_entry("f.rs", 2, "h2", HistorySource::Auto)];
+        let tool = LocalHistoryMergeTool::new(MergeConflictStrategy::PreferNewer);
+        let merged = tool.merge(&a, &b);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].timestamp, 1);
+        assert_eq!(merged[1].timestamp, 2);
+    }
+
+    #[test]
+    fn merge_tool_dedup() {
+        let a = vec![make_hist_entry("f.rs", 1, "same", HistorySource::Auto)];
+        let b = vec![make_hist_entry("f.rs", 2, "same", HistorySource::Auto)];
+        let tool = LocalHistoryMergeTool::new(MergeConflictStrategy::PreferOlder);
+        let merged = tool.merge(&a, &b);
+        assert_eq!(merged.len(), 1);
+    }
+
+    #[test]
+    fn merge_tool_keep_both() {
+        let a = vec![make_hist_entry("f.rs", 1, "same", HistorySource::Auto)];
+        let b = vec![make_hist_entry("f.rs", 2, "same", HistorySource::Auto)];
+        let tool = LocalHistoryMergeTool::new(MergeConflictStrategy::KeepBoth);
+        let merged = tool.merge(&a, &b);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_tool_count_duplicates() {
+        let entries = vec![
+            make_hist_entry("f.rs", 1, "h1", HistorySource::Auto),
+            make_hist_entry("f.rs", 2, "h1", HistorySource::Auto),
+            make_hist_entry("f.rs", 3, "h2", HistorySource::Manual),
+        ];
+        let tool = LocalHistoryMergeTool::new(MergeConflictStrategy::PreferNewer);
+        assert_eq!(tool.count_duplicates(&entries), 1);
+    }
+
+    #[test]
+    fn merge_tool_merge_all() {
+        let s1 = vec![make_hist_entry("a.rs", 1, "h1", HistorySource::Auto)];
+        let s2 = vec![make_hist_entry("b.rs", 3, "h2", HistorySource::Auto)];
+        let s3 = vec![make_hist_entry("c.rs", 2, "h3", HistorySource::Manual)];
+        let tool = LocalHistoryMergeTool::new(MergeConflictStrategy::PreferNewer);
+        let merged = tool.merge_all(&[s1, s2, s3]);
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged[0].timestamp, 1);
+        assert_eq!(merged[1].timestamp, 2);
+    }
+
+    #[test]
+    fn merge_tool_strategy_accessor() {
+        let tool = LocalHistoryMergeTool::new(MergeConflictStrategy::KeepBoth);
+        assert_eq!(tool.strategy(), MergeConflictStrategy::KeepBoth);
+    }
+
 }

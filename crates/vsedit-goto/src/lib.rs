@@ -1365,6 +1365,245 @@ impl fmt::Debug for GotoDefinitionFallback {
     }
 }
 
+
+// ── Goto Symbol Ranker ──
+
+/// Scoring factors for goto symbol ranking.
+#[derive(Debug, Clone)]
+pub struct SymbolScoreFactors {
+    pub name_match_score: f64,
+    pub kind_boost: f64,
+    pub proximity_score: f64,
+    pub recency_score: f64,
+    pub frequency_score: f64,
+}
+
+impl Default for SymbolScoreFactors {
+    fn default() -> Self {
+        Self {
+            name_match_score: 0.0,
+            kind_boost: 1.0,
+            proximity_score: 0.0,
+            recency_score: 0.0,
+            frequency_score: 0.0,
+        }
+    }
+}
+
+impl SymbolScoreFactors {
+    /// Compute a weighted total score.
+    pub fn total(&self) -> f64 {
+        self.name_match_score * 3.0
+            + self.kind_boost * 1.0
+            + self.proximity_score * 2.0
+            + self.recency_score * 1.5
+            + self.frequency_score * 1.0
+    }
+}
+
+/// A ranked goto result with associated score.
+#[derive(Debug, Clone)]
+pub struct RankedGotoResult {
+    pub location: Location,
+    pub symbol_name: String,
+    pub factors: SymbolScoreFactors,
+}
+
+impl RankedGotoResult {
+    pub fn new(location: Location, symbol_name: impl Into<String>) -> Self {
+        Self {
+            location,
+            symbol_name: symbol_name.into(),
+            factors: SymbolScoreFactors::default(),
+        }
+    }
+
+    pub fn score(&self) -> f64 {
+        self.factors.total()
+    }
+}
+
+/// Ranks goto results by relevance using multiple scoring criteria.
+pub struct GotoSymbolRanker {
+    results: Vec<RankedGotoResult>,
+    current_uri: Option<String>,
+    current_line: Option<u32>,
+}
+
+impl GotoSymbolRanker {
+    pub fn new() -> Self {
+        Self {
+            results: Vec::new(),
+            current_uri: None,
+            current_line: None,
+        }
+    }
+
+    /// Set the current cursor position for proximity scoring.
+    pub fn set_cursor(&mut self, uri: impl Into<String>, line: u32) {
+        self.current_uri = Some(uri.into());
+        self.current_line = Some(line);
+    }
+
+    /// Add a result with auto-calculated proximity score.
+    pub fn add_result(&mut self, mut result: RankedGotoResult) {
+        if let (Some(cur_uri), Some(cur_line)) = (&self.current_uri, self.current_line) {
+            if result.location.uri == *cur_uri {
+                let dist = (result.location.line as f64 - cur_line as f64).abs();
+                result.factors.proximity_score = 1.0 / (1.0 + dist * 0.01);
+            }
+        }
+        self.results.push(result);
+    }
+
+    /// Score a symbol name against a query using prefix and substring matching.
+    pub fn score_name_match(symbol: &str, query: &str) -> f64 {
+        if symbol.is_empty() || query.is_empty() {
+            return 0.0;
+        }
+        let sym_lower = symbol.to_lowercase();
+        let query_lower = query.to_lowercase();
+        if sym_lower == query_lower {
+            return 1.0;
+        }
+        if sym_lower.starts_with(&query_lower) {
+            return 0.8;
+        }
+        if sym_lower.contains(&query_lower) {
+            return 0.5;
+        }
+        // Check camelCase initials match
+        let initials: String = symbol
+            .chars()
+            .filter(|c| c.is_uppercase() || *c == '_')
+            .map(|c| c.to_lowercase().next().unwrap_or(c))
+            .collect();
+        if initials.contains(&query_lower) {
+            return 0.3;
+        }
+        0.0
+    }
+
+    /// Return results sorted by score (highest first).
+    pub fn ranked_results(&self) -> Vec<&RankedGotoResult> {
+        let mut sorted: Vec<&RankedGotoResult> = self.results.iter().collect();
+        sorted.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(std::cmp::Ordering::Equal));
+        sorted
+    }
+
+    /// Return the top N results.
+    pub fn top_n(&self, n: usize) -> Vec<&RankedGotoResult> {
+        self.ranked_results().into_iter().take(n).collect()
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.results.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.results.clear();
+    }
+}
+
+// ── Goto Definition Chain Resolver ──
+
+/// A node in a definition chain (e.g. re-exports).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DefinitionChainNode {
+    pub location: Location,
+    pub symbol_name: String,
+    pub is_reexport: bool,
+}
+
+impl DefinitionChainNode {
+    pub fn new(location: Location, symbol_name: impl Into<String>, is_reexport: bool) -> Self {
+        Self {
+            location,
+            symbol_name: symbol_name.into(),
+            is_reexport,
+        }
+    }
+}
+
+/// Resolves chains of definitions (e.g. following re-exports to the original).
+pub struct GotoDefinitionChainResolver {
+    chains: Vec<Vec<DefinitionChainNode>>,
+    max_chain_depth: usize,
+}
+
+impl GotoDefinitionChainResolver {
+    pub fn new(max_depth: usize) -> Self {
+        Self {
+            chains: Vec::new(),
+            max_chain_depth: max_depth,
+        }
+    }
+
+    /// Start a new chain with the initial definition.
+    pub fn start_chain(&mut self, node: DefinitionChainNode) -> usize {
+        let idx = self.chains.len();
+        self.chains.push(vec![node]);
+        idx
+    }
+
+    /// Extend a chain with a subsequent link. Returns false if max depth reached.
+    pub fn extend_chain(&mut self, chain_index: usize, node: DefinitionChainNode) -> bool {
+        if chain_index >= self.chains.len() {
+            return false;
+        }
+        if self.chains[chain_index].len() >= self.max_chain_depth {
+            return false;
+        }
+        self.chains[chain_index].push(node);
+        true
+    }
+
+    /// Get the final (deepest) definition of a chain.
+    pub fn resolve_final(&self, chain_index: usize) -> Option<&DefinitionChainNode> {
+        self.chains.get(chain_index).and_then(|c| c.last())
+    }
+
+    /// Get the original (first) definition of a chain.
+    pub fn resolve_origin(&self, chain_index: usize) -> Option<&DefinitionChainNode> {
+        self.chains.get(chain_index).and_then(|c| c.first())
+    }
+
+    /// Get the full chain for a given index.
+    pub fn chain(&self, chain_index: usize) -> Option<&[DefinitionChainNode]> {
+        self.chains.get(chain_index).map(|c| c.as_slice())
+    }
+
+    pub fn chain_count(&self) -> usize {
+        self.chains.len()
+    }
+
+    /// Get the depth of a chain.
+    pub fn chain_depth(&self, chain_index: usize) -> usize {
+        self.chains.get(chain_index).map_or(0, |c| c.len())
+    }
+
+    /// Count how many re-export hops exist in a chain.
+    pub fn reexport_count(&self, chain_index: usize) -> usize {
+        self.chains
+            .get(chain_index)
+            .map_or(0, |c| c.iter().filter(|n| n.is_reexport).count())
+    }
+
+    /// Check if a chain forms a cycle (first and last point to same URI+line).
+    pub fn is_cyclic(&self, chain_index: usize) -> bool {
+        let Some(chain) = self.chains.get(chain_index) else {
+            return false;
+        };
+        if chain.len() < 2 {
+            return false;
+        }
+        let first = &chain[0].location;
+        let last = &chain[chain.len() - 1].location;
+        first.uri == last.uri && first.line == last.line && first.column == last.column
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2338,4 +2577,108 @@ mod tests {
         let (name, _) = fb.resolve("a.rs", 1, 0).unwrap();
         assert_eq!(name, "text");
     }
+
+    #[test]
+    fn symbol_score_factors_total() {
+        let f = SymbolScoreFactors {
+            name_match_score: 1.0,
+            kind_boost: 1.0,
+            proximity_score: 0.5,
+            recency_score: 0.5,
+            frequency_score: 0.5,
+        };
+        let total = f.total();
+        assert!((total - 6.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ranker_score_name_exact() {
+        assert!((GotoSymbolRanker::score_name_match("Foo", "foo") - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ranker_score_name_prefix() {
+        let s = GotoSymbolRanker::score_name_match("FooBar", "foo");
+        assert!((s - 0.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ranker_score_name_substring() {
+        let s = GotoSymbolRanker::score_name_match("MyFooBar", "foo");
+        assert!((s - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ranker_score_name_no_match() {
+        assert!((GotoSymbolRanker::score_name_match("Baz", "foo")).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ranker_add_and_rank() {
+        let mut ranker = GotoSymbolRanker::new();
+        let mut r1 = RankedGotoResult::new(Location::new("a.rs", 1, 0), "foo");
+        r1.factors.name_match_score = 0.5;
+        let mut r2 = RankedGotoResult::new(Location::new("b.rs", 1, 0), "bar");
+        r2.factors.name_match_score = 1.0;
+        ranker.add_result(r1);
+        ranker.add_result(r2);
+        let ranked = ranker.ranked_results();
+        assert_eq!(ranked[0].symbol_name, "bar");
+    }
+
+    #[test]
+    fn ranker_proximity_scoring() {
+        let mut ranker = GotoSymbolRanker::new();
+        ranker.set_cursor("a.rs", 10);
+        let r1 = RankedGotoResult::new(Location::new("a.rs", 11, 0), "near");
+        let r2 = RankedGotoResult::new(Location::new("a.rs", 500, 0), "far");
+        ranker.add_result(r1);
+        ranker.add_result(r2);
+        let ranked = ranker.ranked_results();
+        assert!(ranked[0].factors.proximity_score > ranked[1].factors.proximity_score);
+    }
+
+    #[test]
+    fn ranker_top_n() {
+        let mut ranker = GotoSymbolRanker::new();
+        for i in 0..5 {
+            let mut r = RankedGotoResult::new(Location::new("a.rs", i, 0), format!("s{}", i));
+            r.factors.name_match_score = i as f64 * 0.1;
+            ranker.add_result(r);
+        }
+        assert_eq!(ranker.top_n(2).len(), 2);
+        assert_eq!(ranker.result_count(), 5);
+    }
+
+    #[test]
+    fn definition_chain_basic() {
+        let mut resolver = GotoDefinitionChainResolver::new(5);
+        let n0 = DefinitionChainNode::new(Location::new("a.rs", 1, 0), "Foo", false);
+        let idx = resolver.start_chain(n0);
+        let n1 = DefinitionChainNode::new(Location::new("b.rs", 10, 0), "Foo", true);
+        assert!(resolver.extend_chain(idx, n1));
+        assert_eq!(resolver.chain_depth(idx), 2);
+        assert_eq!(resolver.reexport_count(idx), 1);
+        let final_node = resolver.resolve_final(idx).unwrap();
+        assert_eq!(final_node.location.uri, "b.rs");
+    }
+
+    #[test]
+    fn definition_chain_max_depth() {
+        let mut resolver = GotoDefinitionChainResolver::new(2);
+        let idx = resolver.start_chain(DefinitionChainNode::new(Location::new("a.rs", 1, 0), "X", false));
+        assert!(resolver.extend_chain(idx, DefinitionChainNode::new(Location::new("b.rs", 1, 0), "X", true)));
+        assert!(!resolver.extend_chain(idx, DefinitionChainNode::new(Location::new("c.rs", 1, 0), "X", true)));
+    }
+
+    #[test]
+    fn definition_chain_cycle_detection() {
+        let mut resolver = GotoDefinitionChainResolver::new(10);
+        let idx = resolver.start_chain(DefinitionChainNode::new(Location::new("a.rs", 5, 3), "Y", false));
+        resolver.extend_chain(idx, DefinitionChainNode::new(Location::new("b.rs", 1, 0), "Y", true));
+        resolver.extend_chain(idx, DefinitionChainNode::new(Location::new("a.rs", 5, 3), "Y", true));
+        assert!(resolver.is_cyclic(idx));
+    }
+
+
 }

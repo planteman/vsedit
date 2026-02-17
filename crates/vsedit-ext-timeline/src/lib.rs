@@ -1288,6 +1288,208 @@ impl fmt::Display for TimelineExportFormat {
     }
 }
 
+
+// ── Timeline Pagination Controller ──
+
+/// Controls cursor-based pagination for timeline items.
+#[derive(Debug, Clone)]
+pub struct TimelinePaginationController {
+    page_size: usize,
+    current_cursor: Option<String>,
+    total_items: usize,
+    has_more: bool,
+    loaded_pages: Vec<TimelinePage>,
+}
+
+/// A single page of timeline items.
+#[derive(Debug, Clone)]
+pub struct TimelinePage {
+    pub cursor: String,
+    pub items: Vec<TimelineItem>,
+    pub page_index: usize,
+}
+
+/// Snapshot of the pagination state.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PaginationState {
+    pub current_page: usize,
+    pub total_pages: usize,
+    pub items_loaded: usize,
+    pub has_next: bool,
+    pub has_prev: bool,
+}
+
+impl TimelinePaginationController {
+    pub fn new(page_size: usize) -> Self {
+        Self {
+            page_size: page_size.max(1),
+            current_cursor: None,
+            total_items: 0,
+            has_more: true,
+            loaded_pages: Vec::new(),
+        }
+    }
+
+    pub fn page_size(&self) -> usize {
+        self.page_size
+    }
+
+    pub fn set_page_size(&mut self, size: usize) {
+        self.page_size = size.max(1);
+    }
+
+    pub fn load_page(&mut self, items: Vec<TimelineItem>, cursor: String, has_more: bool) {
+        let page_index = self.loaded_pages.len();
+        self.total_items += items.len();
+        self.has_more = has_more;
+        self.current_cursor = Some(cursor.clone());
+        self.loaded_pages.push(TimelinePage { cursor, items, page_index });
+    }
+
+    pub fn state(&self) -> PaginationState {
+        let total_pages = self.loaded_pages.len();
+        let current_page = if total_pages > 0 { total_pages - 1 } else { 0 };
+        PaginationState {
+            current_page,
+            total_pages,
+            items_loaded: self.total_items,
+            has_next: self.has_more,
+            has_prev: current_page > 0,
+        }
+    }
+
+    pub fn all_items(&self) -> Vec<&TimelineItem> {
+        self.loaded_pages.iter().flat_map(|p| p.items.iter()).collect()
+    }
+
+    pub fn items_in_range(&self, start: usize, end: usize) -> Vec<&TimelineItem> {
+        self.all_items().into_iter().skip(start).take(end.saturating_sub(start)).collect()
+    }
+
+    pub fn current_cursor(&self) -> Option<&str> {
+        self.current_cursor.as_deref()
+    }
+
+    pub fn reset(&mut self) {
+        self.current_cursor = None;
+        self.total_items = 0;
+        self.has_more = true;
+        self.loaded_pages.clear();
+    }
+
+    pub fn page_count(&self) -> usize {
+        self.loaded_pages.len()
+    }
+
+    pub fn get_page(&self, index: usize) -> Option<&TimelinePage> {
+        self.loaded_pages.get(index)
+    }
+}
+
+// ── Timeline Snapshot Diff ──
+
+/// Structured difference between two timeline snapshots.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimelineSnapshotDiff {
+    pub added: Vec<TimelineItem>,
+    pub removed: Vec<TimelineItem>,
+    pub modified: Vec<(TimelineItem, TimelineItem)>,
+    pub unchanged_count: usize,
+}
+
+/// Compares two timeline snapshots by id.
+pub struct TimelineChangeComparator;
+
+impl TimelineChangeComparator {
+    pub fn diff(old: &[TimelineItem], new: &[TimelineItem]) -> TimelineSnapshotDiff {
+        let old_map: HashMap<&str, &TimelineItem> =
+            old.iter().map(|i| (i.id.as_str(), i)).collect();
+        let new_map: HashMap<&str, &TimelineItem> =
+            new.iter().map(|i| (i.id.as_str(), i)).collect();
+
+        let mut added = Vec::new();
+        let mut modified = Vec::new();
+        let mut unchanged_count = 0usize;
+
+        for item in new {
+            match old_map.get(item.id.as_str()) {
+                Some(old_item) => {
+                    if *old_item != item {
+                        modified.push(((*old_item).clone(), item.clone()));
+                    } else {
+                        unchanged_count += 1;
+                    }
+                }
+                None => added.push(item.clone()),
+            }
+        }
+
+        let removed: Vec<TimelineItem> = old
+            .iter()
+            .filter(|item| !new_map.contains_key(item.id.as_str()))
+            .cloned()
+            .collect();
+
+        TimelineSnapshotDiff { added, removed, modified, unchanged_count }
+    }
+
+    pub fn is_identical(old: &[TimelineItem], new: &[TimelineItem]) -> bool {
+        let diff = Self::diff(old, new);
+        diff.added.is_empty() && diff.removed.is_empty() && diff.modified.is_empty()
+    }
+
+    pub fn summary(diff: &TimelineSnapshotDiff) -> String {
+        format!("+{} -{} ~{} ={}", diff.added.len(), diff.removed.len(), diff.modified.len(), diff.unchanged_count)
+    }
+}
+
+
+
+// -- Timeline Item Grouper --
+
+/// Groups timeline items by time period (day, week, month).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimelineGroupPeriod {
+    Day,
+    Week,
+    Month,
+}
+
+/// A group of timeline items sharing the same time period.
+#[derive(Debug, Clone)]
+pub struct TimelineItemGroup {
+    pub period: TimelineGroupPeriod,
+    pub period_label: String,
+    pub items: Vec<TimelineItem>,
+}
+
+pub struct TimelineItemGrouper;
+
+impl TimelineItemGrouper {
+    /// Group items by the specified period using timestamp buckets.
+    pub fn group_by(items: &[TimelineItem], period: TimelineGroupPeriod) -> Vec<TimelineItemGroup> {
+        let bucket_size = match period {
+            TimelineGroupPeriod::Day => 86400u64,
+            TimelineGroupPeriod::Week => 604800u64,
+            TimelineGroupPeriod::Month => 2592000u64,
+        };
+        let mut buckets: HashMap<u64, Vec<TimelineItem>> = HashMap::new();
+        for item in items {
+            let key = item.timestamp / bucket_size;
+            buckets.entry(key).or_default().push(item.clone());
+        }
+        let mut keys: Vec<u64> = buckets.keys().cloned().collect();
+        keys.sort_unstable();
+        keys.into_iter().map(|key| {
+            TimelineItemGroup {
+                period,
+                period_label: format!("period-{}", key),
+                items: buckets.remove(&key).unwrap_or_default(),
+            }
+        }).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2314,4 +2516,146 @@ mod tests {
         assert!(md.contains("| id |"));
         assert!(md.contains("Initial commit"));
     }
+
+    // ── Pagination Controller Tests ──
+
+    #[test]
+    fn test_pagination_new() {
+        let ctrl = TimelinePaginationController::new(10);
+        assert_eq!(ctrl.page_size(), 10);
+        assert_eq!(ctrl.page_count(), 0);
+        assert!(ctrl.current_cursor().is_none());
+    }
+
+    #[test]
+    fn test_pagination_min_page_size() {
+        let ctrl = TimelinePaginationController::new(0);
+        assert_eq!(ctrl.page_size(), 1);
+    }
+
+    #[test]
+    fn test_pagination_load_page() {
+        let mut ctrl = TimelinePaginationController::new(5);
+        ctrl.load_page(sample_items(), "cursor1".into(), true);
+        assert_eq!(ctrl.page_count(), 1);
+        assert!(ctrl.state().has_next);
+    }
+
+    #[test]
+    fn test_pagination_multi_pages() {
+        let mut ctrl = TimelinePaginationController::new(2);
+        ctrl.load_page(sample_items()[..2].to_vec(), "c1".into(), true);
+        ctrl.load_page(sample_items()[2..].to_vec(), "c2".into(), false);
+        assert_eq!(ctrl.page_count(), 2);
+        assert!(!ctrl.state().has_next);
+        assert!(ctrl.state().has_prev);
+    }
+
+    #[test]
+    fn test_pagination_all_items_count() {
+        let mut ctrl = TimelinePaginationController::new(2);
+        let items = sample_items();
+        ctrl.load_page(items[..2].to_vec(), "c1".into(), true);
+        ctrl.load_page(items[2..].to_vec(), "c2".into(), false);
+        assert_eq!(ctrl.all_items().len(), items.len());
+    }
+
+    #[test]
+    fn test_pagination_items_in_range() {
+        let mut ctrl = TimelinePaginationController::new(10);
+        ctrl.load_page(sample_items(), "c1".into(), false);
+        let range = ctrl.items_in_range(1, 3);
+        assert_eq!(range.len(), 2);
+    }
+
+    #[test]
+    fn test_pagination_reset() {
+        let mut ctrl = TimelinePaginationController::new(5);
+        ctrl.load_page(sample_items(), "c1".into(), false);
+        ctrl.reset();
+        assert_eq!(ctrl.page_count(), 0);
+        assert!(ctrl.current_cursor().is_none());
+    }
+
+    #[test]
+    fn test_pagination_get_page() {
+        let mut ctrl = TimelinePaginationController::new(5);
+        ctrl.load_page(sample_items(), "cur1".into(), false);
+        assert!(ctrl.get_page(0).is_some());
+        assert!(ctrl.get_page(1).is_none());
+    }
+
+    #[test]
+    fn test_snapshot_diff_identical() {
+        let items = sample_items();
+        assert!(TimelineChangeComparator::is_identical(&items, &items));
+    }
+
+    #[test]
+    fn test_snapshot_diff_added_items() {
+        let old = &sample_items()[..2];
+        let new_items = sample_items();
+        let diff = TimelineChangeComparator::diff(old, &new_items);
+        assert_eq!(diff.added.len(), new_items.len() - old.len());
+    }
+
+    #[test]
+    fn test_snapshot_diff_removed_items() {
+        let old = sample_items();
+        let new_items = &old[..1];
+        let diff = TimelineChangeComparator::diff(&old, new_items);
+        assert!(!diff.removed.is_empty());
+    }
+
+    #[test]
+    fn test_snapshot_diff_modified_items() {
+        let old = sample_items();
+        let mut new_items = old.clone();
+        new_items[0].label = "Modified".into();
+        let diff = TimelineChangeComparator::diff(&old, &new_items);
+        assert_eq!(diff.modified.len(), 1);
+    }
+
+    #[test]
+    fn test_snapshot_summary_format() {
+        let old = sample_items();
+        let mut new_items = old.clone();
+        new_items[0].label = "Changed".into();
+        let diff = TimelineChangeComparator::diff(&old, &new_items);
+        let s = TimelineChangeComparator::summary(&diff);
+        assert!(s.contains("+0"));
+        assert!(s.contains("~1"));
+    }
+
+
+
+    // -- Timeline Grouper Tests --
+
+    #[test]
+    fn test_grouper_single_day() {
+        let items = vec![
+            TimelineItem { id: "1".into(), label: "A".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "B".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ];
+        let groups = TimelineItemGrouper::group_by(&items, TimelineGroupPeriod::Day);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].items.len(), 2);
+    }
+
+    #[test]
+    fn test_grouper_multiple_days() {
+        let items = vec![
+            TimelineItem { id: "1".into(), label: "A".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "B".into(), description: None, timestamp: 100000, icon_id: None, command: None },
+        ];
+        let groups = TimelineItemGrouper::group_by(&items, TimelineGroupPeriod::Day);
+        assert!(groups.len() >= 2);
+    }
+
+    #[test]
+    fn test_grouper_empty() {
+        let groups = TimelineItemGrouper::group_by(&[], TimelineGroupPeriod::Week);
+        assert!(groups.is_empty());
+    }
+
 }

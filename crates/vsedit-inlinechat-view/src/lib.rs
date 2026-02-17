@@ -1316,6 +1316,380 @@ pub fn filter_messages<'a>(history: &'a ChatHistory, filter: &MessageFilter) -> 
     history.messages().iter().filter(|m| filter.matches(m)).collect()
 }
 
+
+// ---------------------------------------------------------------------------
+// InlineChatSuggestionApply — apply/preview inline chat suggestions
+// ---------------------------------------------------------------------------
+
+/// Describes how a suggestion was applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyOutcome {
+    /// The suggestion was fully applied.
+    Applied,
+    /// The suggestion was partially applied (some edits conflicted).
+    PartiallyApplied { applied: usize, skipped: usize },
+    /// The suggestion could not be applied.
+    Failed,
+}
+
+impl fmt::Display for ApplyOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Applied => write!(f, "applied"),
+            Self::PartiallyApplied { applied, skipped } => {
+                write!(f, "partially applied ({applied} ok, {skipped} skipped)")
+            }
+            Self::Failed => write!(f, "failed"),
+        }
+    }
+}
+
+/// Tracks the application of an inline-chat suggestion to the document.
+#[derive(Debug, Clone)]
+pub struct InlineChatSuggestionApply {
+    pub edits: Vec<InlineChatEdit>,
+    pub outcome: ApplyOutcome,
+    pub original_lines: Vec<String>,
+}
+
+impl InlineChatSuggestionApply {
+    /// Create a new apply record.
+    pub fn new(edits: Vec<InlineChatEdit>, original_lines: Vec<String>) -> Self {
+        Self {
+            edits,
+            outcome: ApplyOutcome::Applied,
+            original_lines,
+        }
+    }
+
+    /// Simulate applying edits to a flat text buffer.
+    /// Returns the resulting text if all edits are non-overlapping insertions.
+    pub fn simulate_apply(&self, source: &str) -> Result<String, InlineChatError> {
+        let src_lines: Vec<&str> = source.lines().collect();
+        let mut result_lines: Vec<String> = src_lines.iter().map(|s| s.to_string()).collect();
+
+        // Apply edits in reverse line order to avoid index shifting
+        let mut sorted_edits = self.edits.clone();
+        sorted_edits.sort_by(|a, b| b.start_line.cmp(&a.start_line));
+
+        for edit in &sorted_edits {
+            let start = edit.start_line as usize;
+            let end = edit.end_line as usize;
+            if end >= result_lines.len() {
+                return Err(InlineChatError::NoActiveRequest);
+            }
+            let new_lines: Vec<String> = if edit.new_text.is_empty() {
+                Vec::new()
+            } else {
+                edit.new_text.lines().map(|l| l.to_string()).collect()
+            };
+            let range_len = end - start + 1;
+            result_lines.splice(start..start + range_len, new_lines);
+        }
+
+        Ok(result_lines.join("
+"))
+    }
+
+    /// The number of edits that were applied.
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    /// Whether the outcome was successful (fully or partially applied).
+    pub fn is_success(&self) -> bool {
+        !matches!(self.outcome, ApplyOutcome::Failed)
+    }
+
+    /// Total number of new-text lines across all edits.
+    pub fn total_new_lines(&self) -> usize {
+        self.edits.iter().map(|e| e.new_text_line_count()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlineChatUndoStack — undo/redo for inline chat changes
+// ---------------------------------------------------------------------------
+
+/// A single undo entry representing the state before an inline chat change.
+#[derive(Debug, Clone)]
+pub struct UndoEntry {
+    pub description: String,
+    pub original_text: String,
+    pub applied_text: String,
+    pub edit_count: usize,
+}
+
+/// An undo/redo stack for inline chat operations.
+#[derive(Debug, Clone)]
+pub struct InlineChatUndoStack {
+    undo_stack: Vec<UndoEntry>,
+    redo_stack: Vec<UndoEntry>,
+    max_depth: usize,
+}
+
+impl InlineChatUndoStack {
+    pub fn new(max_depth: usize) -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_depth,
+        }
+    }
+
+    /// Push a new entry onto the undo stack, clearing the redo stack.
+    pub fn push(&mut self, entry: UndoEntry) {
+        if self.undo_stack.len() >= self.max_depth {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(entry);
+        self.redo_stack.clear();
+    }
+
+    /// Undo the last operation and return the entry.
+    pub fn undo(&mut self) -> Option<UndoEntry> {
+        if let Some(entry) = self.undo_stack.pop() {
+            self.redo_stack.push(entry.clone());
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Redo the last undone operation.
+    pub fn redo(&mut self) -> Option<UndoEntry> {
+        if let Some(entry) = self.redo_stack.pop() {
+            self.undo_stack.push(entry.clone());
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Whether undo is available.
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Whether redo is available.
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    /// Number of entries on the undo stack.
+    pub fn undo_depth(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Number of entries on the redo stack.
+    pub fn redo_depth(&self) -> usize {
+        self.redo_stack.len()
+    }
+
+    /// Clear both stacks.
+    pub fn clear(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+}
+
+impl Default for InlineChatUndoStack {
+    fn default() -> Self {
+        Self::new(50)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlineChatDiffPreview — show a diff between original and suggestion
+// ---------------------------------------------------------------------------
+
+/// A single line in a diff view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffLineKind {
+    /// Unchanged context line.
+    Context,
+    /// Line was added by the suggestion.
+    Added,
+    /// Line was removed by the suggestion.
+    Removed,
+}
+
+/// A line in the diff preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffLine {
+    pub kind: DiffLineKind,
+    pub content: String,
+    pub line_number: Option<usize>,
+}
+
+/// A computed diff between original and suggested text.
+#[derive(Debug, Clone)]
+pub struct InlineChatDiffPreview {
+    pub lines: Vec<DiffLine>,
+}
+
+impl InlineChatDiffPreview {
+    /// Compute a simple line-by-line diff between two texts.
+    pub fn compute(original: &str, suggested: &str) -> Self {
+        let orig_lines: Vec<&str> = original.lines().collect();
+        let sugg_lines: Vec<&str> = suggested.lines().collect();
+        let mut diff_lines = Vec::new();
+
+        let max_len = orig_lines.len().max(sugg_lines.len());
+        for i in 0..max_len {
+            match (orig_lines.get(i), sugg_lines.get(i)) {
+                (Some(o), Some(s)) if *o == *s => {
+                    diff_lines.push(DiffLine {
+                        kind: DiffLineKind::Context,
+                        content: o.to_string(),
+                        line_number: Some(i + 1),
+                    });
+                }
+                (Some(o), Some(s)) => {
+                    diff_lines.push(DiffLine {
+                        kind: DiffLineKind::Removed,
+                        content: o.to_string(),
+                        line_number: Some(i + 1),
+                    });
+                    diff_lines.push(DiffLine {
+                        kind: DiffLineKind::Added,
+                        content: s.to_string(),
+                        line_number: Some(i + 1),
+                    });
+                }
+                (Some(o), None) => {
+                    diff_lines.push(DiffLine {
+                        kind: DiffLineKind::Removed,
+                        content: o.to_string(),
+                        line_number: Some(i + 1),
+                    });
+                }
+                (None, Some(s)) => {
+                    diff_lines.push(DiffLine {
+                        kind: DiffLineKind::Added,
+                        content: s.to_string(),
+                        line_number: None,
+                    });
+                }
+                (None, None) => {}
+            }
+        }
+
+        Self { lines: diff_lines }
+    }
+
+    /// Number of added lines.
+    pub fn additions(&self) -> usize {
+        self.lines.iter().filter(|l| l.kind == DiffLineKind::Added).count()
+    }
+
+    /// Number of removed lines.
+    pub fn deletions(&self) -> usize {
+        self.lines.iter().filter(|l| l.kind == DiffLineKind::Removed).count()
+    }
+
+    /// Number of context (unchanged) lines.
+    pub fn context_lines(&self) -> usize {
+        self.lines.iter().filter(|l| l.kind == DiffLineKind::Context).count()
+    }
+
+    /// Whether the diff contains any changes.
+    pub fn has_changes(&self) -> bool {
+        self.additions() > 0 || self.deletions() > 0
+    }
+
+    /// Total number of lines in the diff.
+    pub fn total_lines(&self) -> usize {
+        self.lines.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlineChatAcceptRejectTracker — track accept/reject decisions
+// ---------------------------------------------------------------------------
+
+/// The decision made about an inline chat suggestion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SuggestionDecision {
+    Accepted,
+    Rejected,
+    Cancelled,
+}
+
+impl fmt::Display for SuggestionDecision {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Accepted => write!(f, "accepted"),
+            Self::Rejected => write!(f, "rejected"),
+            Self::Cancelled => write!(f, "cancelled"),
+        }
+    }
+}
+
+/// A record of a decision made about a suggestion.
+#[derive(Debug, Clone)]
+pub struct DecisionRecord {
+    pub prompt: String,
+    pub decision: SuggestionDecision,
+    pub edit_count: usize,
+}
+
+/// Tracks accept/reject decisions for inline chat suggestions.
+#[derive(Debug, Clone, Default)]
+pub struct AcceptRejectTracker {
+    records: Vec<DecisionRecord>,
+}
+
+impl AcceptRejectTracker {
+    pub fn new() -> Self {
+        Self { records: Vec::new() }
+    }
+
+    /// Record a decision.
+    pub fn record(&mut self, prompt: String, decision: SuggestionDecision, edit_count: usize) {
+        self.records.push(DecisionRecord { prompt, decision, edit_count });
+    }
+
+    /// Total number of decisions.
+    pub fn total(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Number of accepted suggestions.
+    pub fn accepted_count(&self) -> usize {
+        self.records.iter().filter(|r| r.decision == SuggestionDecision::Accepted).count()
+    }
+
+    /// Number of rejected suggestions.
+    pub fn rejected_count(&self) -> usize {
+        self.records.iter().filter(|r| r.decision == SuggestionDecision::Rejected).count()
+    }
+
+    /// Number of cancelled suggestions.
+    pub fn cancelled_count(&self) -> usize {
+        self.records.iter().filter(|r| r.decision == SuggestionDecision::Cancelled).count()
+    }
+
+    /// Acceptance rate as a percentage (0.0 – 100.0).
+    pub fn acceptance_rate(&self) -> f64 {
+        let decided = self.accepted_count() + self.rejected_count();
+        if decided == 0 {
+            return 0.0;
+        }
+        (self.accepted_count() as f64 / decided as f64) * 100.0
+    }
+
+    /// All records.
+    pub fn records(&self) -> &[DecisionRecord] {
+        &self.records
+    }
+
+    /// Clear all records.
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2212,4 +2586,199 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "a longer message with many words");
     }
+
+    // --- InlineChatSuggestionApply tests ------------------------------------
+
+    #[test]
+    fn apply_outcome_display() {
+        assert_eq!(format!("{}", ApplyOutcome::Applied), "applied");
+        assert_eq!(format!("{}", ApplyOutcome::Failed), "failed");
+        let partial = ApplyOutcome::PartiallyApplied { applied: 2, skipped: 1 };
+        assert!(format!("{}", partial).contains("2 ok"));
+    }
+
+    #[test]
+    fn suggestion_apply_basic() {
+        let edit = InlineChatEdit::new(0, 0, 0, 5, "replaced");
+        let apply = InlineChatSuggestionApply::new(
+            vec![edit],
+            vec!["hello world".into()],
+        );
+        assert!(apply.is_success());
+        assert_eq!(apply.edit_count(), 1);
+    }
+
+    #[test]
+    fn suggestion_apply_simulate() {
+        let edit = InlineChatEdit::new(1, 0, 1, 0, "new line 2");
+        let apply = InlineChatSuggestionApply::new(vec![edit], vec![]);
+        let result = apply.simulate_apply("line 1
+line 2
+line 3");
+        assert!(result.is_ok());
+        let text = result.unwrap();
+        assert!(text.contains("new line 2"));
+    }
+
+    #[test]
+    fn suggestion_apply_failed_outcome() {
+        let apply = InlineChatSuggestionApply {
+            edits: vec![],
+            outcome: ApplyOutcome::Failed,
+            original_lines: vec![],
+        };
+        assert!(!apply.is_success());
+    }
+
+    // --- InlineChatUndoStack tests ------------------------------------------
+
+    #[test]
+    fn undo_stack_push_and_undo() {
+        let mut stack = InlineChatUndoStack::new(10);
+        assert!(!stack.can_undo());
+        stack.push(UndoEntry {
+            description: "edit 1".into(),
+            original_text: "before".into(),
+            applied_text: "after".into(),
+            edit_count: 1,
+        });
+        assert!(stack.can_undo());
+        assert_eq!(stack.undo_depth(), 1);
+        let entry = stack.undo().unwrap();
+        assert_eq!(entry.description, "edit 1");
+        assert!(!stack.can_undo());
+        assert!(stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_redo() {
+        let mut stack = InlineChatUndoStack::new(10);
+        stack.push(UndoEntry {
+            description: "e1".into(),
+            original_text: "a".into(),
+            applied_text: "b".into(),
+            edit_count: 1,
+        });
+        stack.undo();
+        let re = stack.redo().unwrap();
+        assert_eq!(re.description, "e1");
+        assert!(stack.can_undo());
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_max_depth() {
+        let mut stack = InlineChatUndoStack::new(2);
+        for i in 0..5 {
+            stack.push(UndoEntry {
+                description: format!("e{i}"),
+                original_text: String::new(),
+                applied_text: String::new(),
+                edit_count: 0,
+            });
+        }
+        assert_eq!(stack.undo_depth(), 2);
+    }
+
+    #[test]
+    fn undo_stack_push_clears_redo() {
+        let mut stack = InlineChatUndoStack::new(10);
+        stack.push(UndoEntry { description: "a".into(), original_text: String::new(), applied_text: String::new(), edit_count: 0 });
+        stack.undo();
+        assert!(stack.can_redo());
+        stack.push(UndoEntry { description: "b".into(), original_text: String::new(), applied_text: String::new(), edit_count: 0 });
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_clear() {
+        let mut stack = InlineChatUndoStack::default();
+        stack.push(UndoEntry { description: "x".into(), original_text: String::new(), applied_text: String::new(), edit_count: 0 });
+        stack.clear();
+        assert!(!stack.can_undo());
+        assert!(!stack.can_redo());
+    }
+
+    // --- InlineChatDiffPreview tests ----------------------------------------
+
+    #[test]
+    fn diff_identical() {
+        let diff = InlineChatDiffPreview::compute("hello\nworld", "hello\nworld");
+        assert!(!diff.has_changes());
+        assert_eq!(diff.context_lines(), 2);
+    }
+
+    #[test]
+    fn diff_addition() {
+        let diff = InlineChatDiffPreview::compute("a", "a\nb");
+        assert!(diff.has_changes());
+        assert_eq!(diff.additions(), 1);
+        assert_eq!(diff.deletions(), 0);
+    }
+
+    #[test]
+    fn diff_removal() {
+        let diff = InlineChatDiffPreview::compute("a\nb", "a");
+        assert_eq!(diff.deletions(), 1);
+    }
+
+    #[test]
+    fn diff_modification() {
+        let diff = InlineChatDiffPreview::compute("old line", "new line");
+        assert_eq!(diff.additions(), 1);
+        assert_eq!(diff.deletions(), 1);
+        assert_eq!(diff.context_lines(), 0);
+    }
+
+    // --- AcceptRejectTracker tests ------------------------------------------
+
+    #[test]
+    fn tracker_record_and_count() {
+        let mut tracker = AcceptRejectTracker::new();
+        tracker.record("fix bug".into(), SuggestionDecision::Accepted, 2);
+        tracker.record("refactor".into(), SuggestionDecision::Rejected, 1);
+        assert_eq!(tracker.total(), 2);
+        assert_eq!(tracker.accepted_count(), 1);
+        assert_eq!(tracker.rejected_count(), 1);
+    }
+
+    #[test]
+    fn tracker_acceptance_rate() {
+        let mut tracker = AcceptRejectTracker::new();
+        tracker.record("a".into(), SuggestionDecision::Accepted, 1);
+        tracker.record("b".into(), SuggestionDecision::Accepted, 1);
+        tracker.record("c".into(), SuggestionDecision::Rejected, 1);
+        let rate = tracker.acceptance_rate();
+        assert!((rate - 66.666).abs() < 1.0);
+    }
+
+    #[test]
+    fn tracker_empty_rate() {
+        let tracker = AcceptRejectTracker::new();
+        assert!((tracker.acceptance_rate() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn tracker_cancelled() {
+        let mut tracker = AcceptRejectTracker::new();
+        tracker.record("x".into(), SuggestionDecision::Cancelled, 0);
+        assert_eq!(tracker.cancelled_count(), 1);
+        assert_eq!(tracker.accepted_count(), 0);
+    }
+
+    #[test]
+    fn tracker_clear() {
+        let mut tracker = AcceptRejectTracker::new();
+        tracker.record("a".into(), SuggestionDecision::Accepted, 1);
+        tracker.clear();
+        assert_eq!(tracker.total(), 0);
+    }
+
+    #[test]
+    fn suggestion_decision_display() {
+        assert_eq!(SuggestionDecision::Accepted.to_string(), "accepted");
+        assert_eq!(SuggestionDecision::Rejected.to_string(), "rejected");
+        assert_eq!(SuggestionDecision::Cancelled.to_string(), "cancelled");
+    }
+
 }

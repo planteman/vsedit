@@ -1452,6 +1452,379 @@ pub fn capabilities_summary(caps: &PlatformCapabilities) -> String {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// PlatformCapabilityDetector
+// ---------------------------------------------------------------------------
+
+/// A detected capability with its status.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapabilityStatus {
+    pub name: String,
+    pub available: bool,
+    pub detail: String,
+}
+
+impl fmt::Display for CapabilityStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mark = if self.available { "✓" } else { "✗" };
+        write!(f, "[{mark}] {}: {}", self.name, self.detail)
+    }
+}
+
+/// Detects platform capabilities at runtime.
+#[derive(Debug, Clone)]
+pub struct PlatformCapabilityDetector {
+    capabilities: Vec<CapabilityStatus>,
+    detection_count: u64,
+}
+
+impl PlatformCapabilityDetector {
+    /// Create a new detector.
+    pub fn new() -> Self {
+        Self {
+            capabilities: Vec::new(),
+            detection_count: 0,
+        }
+    }
+
+    /// Run all standard detections.
+    pub fn detect_all(&mut self) {
+        self.detect_true_color();
+        self.detect_unicode();
+        self.detect_mouse();
+        self.detect_clipboard();
+        self.detect_sixel();
+    }
+
+    /// Detect true color support.
+    pub fn detect_true_color(&mut self) {
+        self.detection_count += 1;
+        let available = env::var("COLORTERM")
+            .map(|v| v == "truecolor" || v == "24bit")
+            .unwrap_or(false);
+        self.add_capability("true_color", available, if available {
+            "COLORTERM=truecolor/24bit".into()
+        } else {
+            "COLORTERM not set or unsupported".into()
+        });
+    }
+
+    /// Detect unicode support.
+    pub fn detect_unicode(&mut self) {
+        self.detection_count += 1;
+        let available = env::var("LANG")
+            .map(|v| v.contains("UTF-8") || v.contains("utf-8") || v.contains("UTF8"))
+            .unwrap_or(false);
+        self.add_capability("unicode", available, if available {
+            "LANG contains UTF-8".into()
+        } else {
+            "UTF-8 not detected in LANG".into()
+        });
+    }
+
+    /// Detect mouse support.
+    pub fn detect_mouse(&mut self) {
+        self.detection_count += 1;
+        let term = env::var("TERM").unwrap_or_default();
+        let available = term.contains("xterm") || term.contains("screen") || term.contains("tmux")
+            || term.contains("kitty") || term.contains("alacritty");
+        self.add_capability("mouse", available, format!("TERM={term}"));
+    }
+
+    /// Detect clipboard access.
+    pub fn detect_clipboard(&mut self) {
+        self.detection_count += 1;
+        let has_display = env::var("DISPLAY").is_ok() || env::var("WAYLAND_DISPLAY").is_ok();
+        self.add_capability("clipboard", has_display, if has_display {
+            "DISPLAY or WAYLAND_DISPLAY set".into()
+        } else {
+            "no display server detected".into()
+        });
+    }
+
+    /// Detect sixel graphics support.
+    pub fn detect_sixel(&mut self) {
+        self.detection_count += 1;
+        let term = env::var("TERM").unwrap_or_default();
+        let available = term.contains("sixel") || term.contains("mlterm") || term.contains("xterm");
+        self.add_capability("sixel", available, format!("TERM={term}"));
+    }
+
+    fn add_capability(&mut self, name: &str, available: bool, detail: String) {
+        // Replace existing capability of same name.
+        self.capabilities.retain(|c| c.name != name);
+        self.capabilities.push(CapabilityStatus {
+            name: name.to_string(),
+            available,
+            detail,
+        });
+    }
+
+    /// Get a capability by name.
+    pub fn get(&self, name: &str) -> Option<&CapabilityStatus> {
+        self.capabilities.iter().find(|c| c.name == name)
+    }
+
+    /// Check if a capability is available.
+    pub fn is_available(&self, name: &str) -> bool {
+        self.get(name).map(|c| c.available).unwrap_or(false)
+    }
+
+    /// Number of capabilities detected.
+    pub fn capability_count(&self) -> usize {
+        self.capabilities.len()
+    }
+
+    /// Number of available capabilities.
+    pub fn available_count(&self) -> usize {
+        self.capabilities.iter().filter(|c| c.available).count()
+    }
+
+    /// Number of detections performed.
+    pub fn detection_count(&self) -> u64 {
+        self.detection_count
+    }
+
+    /// Get all capabilities.
+    pub fn all(&self) -> &[CapabilityStatus] {
+        &self.capabilities
+    }
+
+    /// Reset all detections.
+    pub fn reset(&mut self) {
+        self.capabilities.clear();
+        self.detection_count = 0;
+    }
+}
+
+impl fmt::Display for PlatformCapabilityDetector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CapabilityDetector({}/{} available)",
+            self.available_count(),
+            self.capability_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PlatformPathNormalizer
+// ---------------------------------------------------------------------------
+
+/// Path separator style for normalization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathSeparatorStyle {
+    /// Always use forward slashes.
+    Unix,
+    /// Always use backslashes.
+    Windows,
+    /// Use the current platform's separator.
+    Native,
+}
+
+/// Normalizes file paths across platforms.
+#[derive(Debug, Clone)]
+pub struct PlatformPathNormalizer {
+    style: PathSeparatorStyle,
+    normalize_count: u64,
+    /// Whether to resolve `..` and `.` components.
+    resolve_dots: bool,
+    /// Whether to lowercase drive letters on Windows-style paths.
+    lowercase_drive: bool,
+}
+
+impl PlatformPathNormalizer {
+    /// Create with the specified separator style.
+    pub fn new(style: PathSeparatorStyle) -> Self {
+        Self {
+            style,
+            normalize_count: 0,
+            resolve_dots: true,
+            lowercase_drive: true,
+        }
+    }
+
+    /// Create for the current platform.
+    pub fn native() -> Self {
+        Self::new(PathSeparatorStyle::Native)
+    }
+
+    /// Create for unix-style normalization.
+    pub fn unix() -> Self {
+        Self::new(PathSeparatorStyle::Unix)
+    }
+
+    /// Normalize a path string.
+    pub fn normalize(&mut self, path: &str) -> String {
+        self.normalize_count += 1;
+        let mut result = path.to_string();
+
+        // Normalize separators.
+        result = match self.style {
+            PathSeparatorStyle::Unix => result.replace('\\', "/"),
+            PathSeparatorStyle::Windows => result.replace('/', "\\"),
+            PathSeparatorStyle::Native => {
+                if cfg!(windows) {
+                    result.replace('/', "\\")
+                } else {
+                    result.replace('\\', "/")
+                }
+            }
+        };
+
+        // Lowercase drive letter if applicable.
+        if self.lowercase_drive && result.len() >= 2 {
+            let bytes = result.as_bytes();
+            if bytes[0].is_ascii_uppercase() && bytes[1] == b':' {
+                let mut chars: Vec<char> = result.chars().collect();
+                chars[0] = chars[0].to_lowercase().next().unwrap_or(chars[0]);
+                result = chars.into_iter().collect();
+            }
+        }
+
+        // Collapse repeated separators.
+        let sep = match self.style {
+            PathSeparatorStyle::Windows => '\\',
+            _ => '/',
+        };
+        let double_sep: String = [sep, sep].iter().collect();
+        let single_sep: String = [sep].iter().collect();
+
+        // Preserve leading `//` for UNC paths on Windows, but collapse others.
+        while result.contains(&double_sep) {
+            // For Windows UNC paths starting with \\, preserve leading.
+            if self.style == PathSeparatorStyle::Windows && result.starts_with("\\\\") {
+                let rest = &result[2..];
+                let cleaned = rest.replace(&double_sep, &single_sep);
+                result = format!("\\\\{cleaned}");
+                break;
+            } else {
+                result = result.replace(&double_sep, &single_sep);
+            }
+        }
+
+        // Remove trailing separator (unless it's the root).
+        if result.len() > 1 && result.ends_with(sep) {
+            result.pop();
+        }
+
+        // Resolve `.` and `..` if enabled.
+        if self.resolve_dots {
+            result = self.resolve_dot_components(&result, sep);
+        }
+
+        result
+    }
+
+    fn resolve_dot_components(&self, path: &str, sep: char) -> String {
+        let parts: Vec<&str> = path.split(sep).collect();
+        let mut stack: Vec<&str> = Vec::new();
+        for part in &parts {
+            match *part {
+                "." => {}
+                ".." => {
+                    if let Some(last) = stack.last() {
+                        if *last != ".." && !last.is_empty() {
+                            stack.pop();
+                            continue;
+                        }
+                    }
+                    stack.push(part);
+                }
+                _ => stack.push(part),
+            }
+        }
+        let result = stack.join(&sep.to_string());
+        if result.is_empty() {
+            sep.to_string()
+        } else {
+            result
+        }
+    }
+
+    /// Check if a path is absolute.
+    pub fn is_absolute(&self, path: &str) -> bool {
+        if path.starts_with('/') {
+            return true;
+        }
+        // Windows: C:\ or C:/
+        if path.len() >= 3 {
+            let bytes = path.as_bytes();
+            if bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && (bytes[2] == b'\\' || bytes[2] == b'/') {
+                return true;
+            }
+        }
+        // UNC path
+        if path.starts_with("\\\\") {
+            return true;
+        }
+        false
+    }
+
+    /// Join two path components.
+    pub fn join(&mut self, base: &str, relative: &str) -> String {
+        let sep = match self.style {
+            PathSeparatorStyle::Windows => "\\",
+            _ => "/",
+        };
+        let combined = format!("{base}{sep}{relative}");
+        self.normalize(&combined)
+    }
+
+    /// Get the file name from a path.
+    pub fn file_name<'a>(&self, path: &'a str) -> Option<&'a str> {
+        // Use either separator for splitting.
+        let last = path.rsplit(|c| c == '/' || c == '\\').next()?;
+        if last.is_empty() { None } else { Some(last) }
+    }
+
+    /// Get the parent directory.
+    pub fn parent(&mut self, path: &str) -> Option<String> {
+        let sep = match self.style {
+            PathSeparatorStyle::Windows => '\\',
+            _ => '/',
+        };
+        let normalized = self.normalize(path);
+        if let Some(pos) = normalized.rfind(sep) {
+            if pos == 0 {
+                Some(sep.to_string())
+            } else {
+                Some(normalized[..pos].to_string())
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Number of normalizations performed.
+    pub fn normalize_count(&self) -> u64 {
+        self.normalize_count
+    }
+
+    /// Current separator style.
+    pub fn style(&self) -> PathSeparatorStyle {
+        self.style
+    }
+
+    /// Enable/disable dot resolution.
+    pub fn set_resolve_dots(&mut self, resolve: bool) {
+        self.resolve_dots = resolve;
+    }
+}
+
+impl fmt::Display for PlatformPathNormalizer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PathNormalizer({:?}, normalized={})",
+            self.style, self.normalize_count
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2364,4 +2737,138 @@ mod tests {
         assert!(s.contains("a"));
         assert!(s.contains("b"));
     }
+
+    #[test]
+    fn capability_detector_new_empty() {
+        let det = PlatformCapabilityDetector::new();
+        assert_eq!(det.capability_count(), 0);
+        assert_eq!(det.detection_count(), 0);
+    }
+
+    #[test]
+    fn capability_detector_detect_all() {
+        let mut det = PlatformCapabilityDetector::new();
+        det.detect_all();
+        assert!(det.capability_count() >= 5);
+        assert!(det.detection_count() >= 5);
+    }
+
+    #[test]
+    fn capability_detector_get() {
+        let mut det = PlatformCapabilityDetector::new();
+        det.detect_true_color();
+        assert!(det.get("true_color").is_some());
+        assert!(det.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn capability_detector_reset() {
+        let mut det = PlatformCapabilityDetector::new();
+        det.detect_all();
+        det.reset();
+        assert_eq!(det.capability_count(), 0);
+        assert_eq!(det.detection_count(), 0);
+    }
+
+    #[test]
+    fn capability_detector_display() {
+        let det = PlatformCapabilityDetector::new();
+        let s = format!("{det}");
+        assert!(s.contains("0/0 available"));
+    }
+
+    #[test]
+    fn capability_status_display() {
+        let cap = CapabilityStatus {
+            name: "test".into(),
+            available: true,
+            detail: "ok".into(),
+        };
+        let s = format!("{cap}");
+        assert!(s.contains("✓"));
+        assert!(s.contains("test"));
+    }
+
+    #[test]
+    fn path_normalizer_unix_separators() {
+        let mut norm = PlatformPathNormalizer::new(PathSeparatorStyle::Unix);
+        assert_eq!(norm.normalize("a\\b\\c"), "a/b/c");
+    }
+
+    #[test]
+    fn path_normalizer_windows_separators() {
+        let mut norm = PlatformPathNormalizer::new(PathSeparatorStyle::Windows);
+        assert_eq!(norm.normalize("a/b/c"), "a\\b\\c");
+    }
+
+    #[test]
+    fn path_normalizer_collapse_double() {
+        let mut norm = PlatformPathNormalizer::unix();
+        assert_eq!(norm.normalize("a//b///c"), "a/b/c");
+    }
+
+    #[test]
+    fn path_normalizer_resolve_dots() {
+        let mut norm = PlatformPathNormalizer::unix();
+        assert_eq!(norm.normalize("a/b/../c"), "a/c");
+        assert_eq!(norm.normalize("a/./b"), "a/b");
+    }
+
+    #[test]
+    fn path_normalizer_trailing_sep() {
+        let mut norm = PlatformPathNormalizer::unix();
+        assert_eq!(norm.normalize("a/b/c/"), "a/b/c");
+    }
+
+    #[test]
+    fn path_normalizer_lowercase_drive() {
+        let mut norm = PlatformPathNormalizer::new(PathSeparatorStyle::Windows);
+        let result = norm.normalize("C:\\Users\\test");
+        assert!(result.starts_with("c:\\"));
+    }
+
+    #[test]
+    fn path_normalizer_is_absolute() {
+        let norm = PlatformPathNormalizer::unix();
+        assert!(norm.is_absolute("/usr/bin"));
+        assert!(!norm.is_absolute("relative/path"));
+        assert!(norm.is_absolute("C:\\Windows"));
+    }
+
+    #[test]
+    fn path_normalizer_join() {
+        let mut norm = PlatformPathNormalizer::unix();
+        assert_eq!(norm.join("/home/user", "docs/file.txt"), "/home/user/docs/file.txt");
+    }
+
+    #[test]
+    fn path_normalizer_file_name() {
+        let norm = PlatformPathNormalizer::unix();
+        assert_eq!(norm.file_name("/home/user/file.txt"), Some("file.txt"));
+        assert_eq!(norm.file_name("C:\\Users\\file.txt"), Some("file.txt"));
+    }
+
+    #[test]
+    fn path_normalizer_parent() {
+        let mut norm = PlatformPathNormalizer::unix();
+        assert_eq!(norm.parent("/home/user/file.txt"), Some("/home/user".into()));
+    }
+
+    #[test]
+    fn path_normalizer_display() {
+        let norm = PlatformPathNormalizer::unix();
+        let s = format!("{norm}");
+        assert!(s.contains("Unix"));
+        assert!(s.contains("normalized=0"));
+    }
+
+    #[test]
+    fn path_normalizer_count() {
+        let mut norm = PlatformPathNormalizer::unix();
+        norm.normalize("a");
+        norm.normalize("b");
+        assert_eq!(norm.normalize_count(), 2);
+    }
+
+
 }

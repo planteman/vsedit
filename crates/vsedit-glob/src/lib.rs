@@ -1615,6 +1615,203 @@ impl Default for GlobPriorityOrder {
     }
 }
 
+
+// ── Glob Compilation Cache ──
+
+use std::collections::HashMap as GlobCacheMap;
+
+/// Caches compiled glob patterns to avoid redundant compilation.
+#[derive(Debug)]
+pub struct GlobCompilationCache {
+    cache: GlobCacheMap<String, GlobPattern>,
+    hits: usize,
+    misses: usize,
+    max_entries: usize,
+}
+
+impl GlobCompilationCache {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            cache: GlobCacheMap::new(),
+            hits: 0,
+            misses: 0,
+            max_entries: max_entries.max(1),
+        }
+    }
+
+    /// Get or compile a glob pattern. Returns a reference to the cached pattern.
+    pub fn get_or_compile(&mut self, pattern: &str) -> Result<&GlobPattern, GlobError> {
+        if self.cache.contains_key(pattern) {
+            self.hits += 1;
+            return Ok(self.cache.get(pattern).unwrap());
+        }
+        self.misses += 1;
+        let compiled = GlobPattern::new(pattern).map_err(GlobError::InvalidPattern)?;
+        if self.cache.len() >= self.max_entries {
+            // Evict the first entry (simple LRU approximation)
+            if let Some(key) = self.cache.keys().next().cloned() {
+                self.cache.remove(&key);
+            }
+        }
+        self.cache.insert(pattern.to_string(), compiled);
+        Ok(self.cache.get(pattern).unwrap())
+    }
+
+    pub fn contains(&self, pattern: &str) -> bool {
+        self.cache.contains_key(pattern)
+    }
+
+    pub fn invalidate(&mut self, pattern: &str) -> bool {
+        self.cache.remove(pattern).is_some()
+    }
+
+    pub fn clear(&mut self) {
+        self.cache.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+
+    pub fn size(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn hit_count(&self) -> usize {
+        self.hits
+    }
+
+    pub fn miss_count(&self) -> usize {
+        self.misses
+    }
+
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+}
+
+// ── Glob Match Statistics ──
+
+/// Tracks match statistics for glob operations.
+#[derive(Debug, Clone)]
+pub struct GlobMatchStatistics {
+    pattern_stats: GlobCacheMap<String, PatternStats>,
+}
+
+/// Statistics for a single glob pattern.
+#[derive(Debug, Clone, Default)]
+pub struct PatternStats {
+    pub matches: usize,
+    pub misses: usize,
+    pub total_paths_tested: usize,
+    pub last_matched_path: Option<String>,
+}
+
+impl PatternStats {
+    pub fn match_rate(&self) -> f64 {
+        if self.total_paths_tested == 0 {
+            0.0
+        } else {
+            self.matches as f64 / self.total_paths_tested as f64
+        }
+    }
+}
+
+impl GlobMatchStatistics {
+    pub fn new() -> Self {
+        Self { pattern_stats: GlobCacheMap::new() }
+    }
+
+    pub fn record_match(&mut self, pattern: &str, path: &str) {
+        let stats = self.pattern_stats.entry(pattern.to_string()).or_default();
+        stats.matches += 1;
+        stats.total_paths_tested += 1;
+        stats.last_matched_path = Some(path.to_string());
+    }
+
+    pub fn record_miss(&mut self, pattern: &str) {
+        let stats = self.pattern_stats.entry(pattern.to_string()).or_default();
+        stats.misses += 1;
+        stats.total_paths_tested += 1;
+    }
+
+    pub fn get_stats(&self, pattern: &str) -> Option<&PatternStats> {
+        self.pattern_stats.get(pattern)
+    }
+
+    pub fn pattern_count(&self) -> usize {
+        self.pattern_stats.len()
+    }
+
+    pub fn total_matches(&self) -> usize {
+        self.pattern_stats.values().map(|s| s.matches).sum()
+    }
+
+    pub fn total_misses(&self) -> usize {
+        self.pattern_stats.values().map(|s| s.misses).sum()
+    }
+
+    pub fn overall_match_rate(&self) -> f64 {
+        let total = self.total_matches() + self.total_misses();
+        if total == 0 { 0.0 } else { self.total_matches() as f64 / total as f64 }
+    }
+
+    pub fn top_patterns(&self, n: usize) -> Vec<(&str, &PatternStats)> {
+        let mut entries: Vec<_> = self.pattern_stats.iter().map(|(k, v)| (k.as_str(), v)).collect();
+        entries.sort_by(|a, b| b.1.matches.cmp(&a.1.matches));
+        entries.truncate(n);
+        entries
+    }
+
+    pub fn reset(&mut self) {
+        self.pattern_stats.clear();
+    }
+}
+
+impl Default for GlobMatchStatistics {
+    fn default() -> Self { Self::new() }
+}
+
+
+// -- Glob Pattern Normalizer --
+
+/// Normalizes glob patterns to a canonical form.
+pub struct GlobPatternNormalizer;
+
+impl GlobPatternNormalizer {
+    /// Normalize path separators to forward slashes.
+    pub fn normalize_separators(pattern: &str) -> String {
+        pattern.replace('\\', "/")
+    }
+
+    /// Remove redundant segments like "./" and "foo/../".
+    pub fn simplify(pattern: &str) -> String {
+        let normalized = Self::normalize_separators(pattern);
+        let mut parts: Vec<&str> = Vec::new();
+        for segment in normalized.split('/') {
+            match segment {
+                "." | "" => {}
+                ".." => { parts.pop(); }
+                other => parts.push(other),
+            }
+        }
+        if parts.is_empty() { ".".to_string() }
+        else { parts.join("/") }
+    }
+
+    /// Check if a pattern is a simple (non-glob) path.
+    pub fn is_simple_path(pattern: &str) -> bool {
+        !pattern.contains('*') && !pattern.contains('?') && !pattern.contains('[')
+    }
+
+    /// Extract the non-glob prefix from a pattern (for optimization).
+    pub fn extract_base_path(pattern: &str) -> &str {
+        let glob_start = pattern.find(|c| c == '*' || c == '?' || c == '[')
+            .unwrap_or(pattern.len());
+        let last_sep = pattern[..glob_start].rfind('/').unwrap_or(0);
+        if last_sep == 0 { "." } else { &pattern[..last_sep] }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2488,4 +2685,135 @@ mod tests {
         assert_eq!(prio.len(), 0);
         assert_eq!(prio.highest_priority(), None);
     }
+
+    // ── Glob Compilation Cache Tests ──
+
+    #[test]
+    fn test_cache_compile_and_hit() {
+        let mut cache = GlobCompilationCache::new(10);
+        assert!(cache.get_or_compile("*.rs").is_ok());
+        assert!(cache.get_or_compile("*.rs").is_ok());
+        assert_eq!(cache.hit_count(), 1);
+        assert_eq!(cache.miss_count(), 1);
+    }
+
+    #[test]
+    fn test_cache_invalid_pattern() {
+        let mut cache = GlobCompilationCache::new(10);
+        assert!(cache.get_or_compile("[invalid").is_err());
+    }
+
+    #[test]
+    fn test_cache_eviction() {
+        let mut cache = GlobCompilationCache::new(2);
+        cache.get_or_compile("*.rs").ok();
+        cache.get_or_compile("*.toml").ok();
+        cache.get_or_compile("*.md").ok();
+        assert_eq!(cache.size(), 2);
+    }
+
+    #[test]
+    fn test_cache_invalidate() {
+        let mut cache = GlobCompilationCache::new(10);
+        cache.get_or_compile("*.rs").ok();
+        assert!(cache.invalidate("*.rs"));
+        assert!(!cache.contains("*.rs"));
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        let mut cache = GlobCompilationCache::new(10);
+        cache.get_or_compile("*.rs").ok();
+        cache.clear();
+        assert_eq!(cache.size(), 0);
+        assert_eq!(cache.hit_count(), 0);
+    }
+
+    #[test]
+    fn test_cache_hit_rate() {
+        let mut cache = GlobCompilationCache::new(10);
+        cache.get_or_compile("*.rs").ok();
+        cache.get_or_compile("*.rs").ok();
+        cache.get_or_compile("*.rs").ok();
+        assert!((cache.hit_rate() - 2.0 / 3.0).abs() < 1e-9);
+    }
+
+    // ── Glob Match Statistics Tests ──
+
+    #[test]
+    fn test_stats_record_match() {
+        let mut stats = GlobMatchStatistics::new();
+        stats.record_match("*.rs", "main.rs");
+        assert_eq!(stats.total_matches(), 1);
+        assert_eq!(stats.get_stats("*.rs").unwrap().last_matched_path, Some("main.rs".into()));
+    }
+
+    #[test]
+    fn test_stats_record_miss() {
+        let mut stats = GlobMatchStatistics::new();
+        stats.record_miss("*.rs");
+        assert_eq!(stats.total_misses(), 1);
+    }
+
+    #[test]
+    fn test_stats_match_rate() {
+        let mut stats = GlobMatchStatistics::new();
+        stats.record_match("*.rs", "a.rs");
+        stats.record_miss("*.rs");
+        let ps = stats.get_stats("*.rs").unwrap();
+        assert!((ps.match_rate() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_stats_top_patterns() {
+        let mut stats = GlobMatchStatistics::new();
+        stats.record_match("*.rs", "a.rs");
+        stats.record_match("*.rs", "b.rs");
+        stats.record_match("*.toml", "Cargo.toml");
+        let top = stats.top_patterns(1);
+        assert_eq!(top[0].0, "*.rs");
+    }
+
+    #[test]
+    fn test_stats_reset() {
+        let mut stats = GlobMatchStatistics::new();
+        stats.record_match("*.rs", "a.rs");
+        stats.reset();
+        assert_eq!(stats.pattern_count(), 0);
+    }
+
+    #[test]
+    fn test_stats_overall_rate() {
+        let mut stats = GlobMatchStatistics::new();
+        stats.record_match("*.rs", "a.rs");
+        stats.record_match("*.rs", "b.rs");
+        stats.record_miss("*.toml");
+        assert!((stats.overall_match_rate() - 2.0 / 3.0).abs() < 1e-9);
+    }
+
+
+    // -- Glob Normalizer Tests --
+
+    #[test]
+    fn test_normalizer_separators() {
+        assert_eq!(GlobPatternNormalizer::normalize_separators("a\\b\\c"), "a/b/c");
+    }
+
+    #[test]
+    fn test_normalizer_simplify() {
+        assert_eq!(GlobPatternNormalizer::simplify("./src/../src/main.rs"), "src/main.rs");
+    }
+
+    #[test]
+    fn test_normalizer_is_simple() {
+        assert!(GlobPatternNormalizer::is_simple_path("src/main.rs"));
+        assert!(!GlobPatternNormalizer::is_simple_path("*.rs"));
+    }
+
+    #[test]
+    fn test_normalizer_base_path() {
+        assert_eq!(GlobPatternNormalizer::extract_base_path("src/test/*.rs"), "src/test");
+        assert_eq!(GlobPatternNormalizer::extract_base_path("*.rs"), ".");
+    }
+
 }

@@ -1391,6 +1391,302 @@ impl EnvironmentValidator {
     }
 }
 
+
+// ── Environment Snapshot ──
+
+/// A frozen snapshot of environment variables for comparison.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnvironmentSnapshot {
+    vars: HashMap<String, String>,
+    timestamp: u64,
+}
+
+impl EnvironmentSnapshot {
+    /// Create a snapshot from a map of variables.
+    pub fn from_map(vars: HashMap<String, String>, timestamp: u64) -> Self {
+        Self { vars, timestamp }
+    }
+
+    /// Create an empty snapshot.
+    pub fn empty(timestamp: u64) -> Self {
+        Self {
+            vars: HashMap::new(),
+            timestamp,
+        }
+    }
+
+    /// Get a variable value.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.vars.get(key).map(|s| s.as_str())
+    }
+
+    /// Number of variables in this snapshot.
+    pub fn len(&self) -> usize {
+        self.vars.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.vars.is_empty()
+    }
+
+    /// The timestamp of this snapshot.
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    /// Return keys present in `self` but not in `other`.
+    pub fn added_keys(&self, other: &EnvironmentSnapshot) -> Vec<String> {
+        let mut keys: Vec<String> = self.vars.keys()
+            .filter(|k| !other.vars.contains_key(*k))
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// Return keys present in `other` but not in `self`.
+    pub fn removed_keys(&self, other: &EnvironmentSnapshot) -> Vec<String> {
+        let mut keys: Vec<String> = other.vars.keys()
+            .filter(|k| !self.vars.contains_key(*k))
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// Return keys whose values differ between the two snapshots.
+    pub fn changed_keys(&self, other: &EnvironmentSnapshot) -> Vec<String> {
+        let mut keys: Vec<String> = self.vars.iter()
+            .filter(|(k, v)| other.vars.get(*k).map_or(false, |ov| ov != *v))
+            .map(|(k, _)| k.clone())
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// Return true if two snapshots are equivalent (same keys and values).
+    pub fn is_equivalent(&self, other: &EnvironmentSnapshot) -> bool {
+        self.vars == other.vars
+    }
+}
+
+// ── Environment Override Resolver ──
+
+/// Layer-based override resolver for environment variables.
+/// Higher-priority layers override lower ones.
+#[derive(Debug, Clone)]
+pub struct EnvironmentOverrideResolver {
+    layers: Vec<(String, HashMap<String, String>)>,
+}
+
+impl EnvironmentOverrideResolver {
+    pub fn new() -> Self {
+        Self {
+            layers: Vec::new(),
+        }
+    }
+
+    /// Add a named layer of overrides. Later layers have higher priority.
+    pub fn add_layer(&mut self, name: &str, vars: HashMap<String, String>) {
+        self.layers.push((name.to_string(), vars));
+    }
+
+    /// Resolve a single variable by checking layers from highest to lowest priority.
+    pub fn resolve(&self, key: &str) -> Option<&str> {
+        for (_name, vars) in self.layers.iter().rev() {
+            if let Some(val) = vars.get(key) {
+                return Some(val.as_str());
+            }
+        }
+        None
+    }
+
+    /// Which layer provides a given key (the highest-priority one).
+    pub fn provided_by(&self, key: &str) -> Option<&str> {
+        for (name, vars) in self.layers.iter().rev() {
+            if vars.contains_key(key) {
+                return Some(name.as_str());
+            }
+        }
+        None
+    }
+
+    /// Resolve all keys across all layers into a single merged map.
+    pub fn resolve_all(&self) -> HashMap<String, String> {
+        let mut merged = HashMap::new();
+        for (_name, vars) in &self.layers {
+            for (k, v) in vars {
+                merged.insert(k.clone(), v.clone());
+            }
+        }
+        merged
+    }
+
+    /// Number of layers.
+    pub fn layer_count(&self) -> usize {
+        self.layers.len()
+    }
+
+    /// Total number of unique keys across all layers.
+    pub fn total_unique_keys(&self) -> usize {
+        self.resolve_all().len()
+    }
+
+    /// Return layer names in priority order (lowest first).
+    pub fn layer_names(&self) -> Vec<&str> {
+        self.layers.iter().map(|(n, _)| n.as_str()).collect()
+    }
+}
+
+// ── Environment Variable Sanitizer ──
+
+/// Sanitizer for environment variable names and values.
+pub struct EnvironmentSanitizer;
+
+impl EnvironmentSanitizer {
+    /// Check if a variable name is valid (non-empty, no '=', no null bytes).
+    pub fn is_valid_name(name: &str) -> bool {
+        !name.is_empty() && !name.contains('=') && !name.contains('\0')
+    }
+
+    /// Sanitize a variable name by removing invalid characters.
+    pub fn sanitize_name(name: &str) -> String {
+        name.chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_')
+            .collect()
+    }
+
+    /// Remove null bytes from a value.
+    pub fn sanitize_value(value: &str) -> String {
+        value.replace('\0', "")
+    }
+
+    /// Validate and sanitize an entire map, returning only valid entries.
+    pub fn sanitize_map(vars: &HashMap<String, String>) -> HashMap<String, String> {
+        vars.iter()
+            .filter(|(k, _)| Self::is_valid_name(k))
+            .map(|(k, v)| (Self::sanitize_name(k), Self::sanitize_value(v)))
+            .collect()
+    }
+
+    /// Return names of invalid variables from a map.
+    pub fn invalid_names(vars: &HashMap<String, String>) -> Vec<String> {
+        let mut names: Vec<String> = vars.keys()
+            .filter(|k| !Self::is_valid_name(k))
+            .cloned()
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Check if a PATH-like variable has duplicate entries.
+    pub fn has_duplicate_path_entries(path_value: &str) -> bool {
+        let entries: Vec<&str> = path_value.split(':').collect();
+        let unique: std::collections::HashSet<&str> = entries.iter().copied().collect();
+        unique.len() < entries.len()
+    }
+
+    /// Deduplicate PATH entries, preserving first occurrence order.
+    pub fn dedup_path(path_value: &str) -> String {
+        let mut seen = std::collections::HashSet::new();
+        let deduped: Vec<&str> = path_value.split(':')
+            .filter(|entry| seen.insert(*entry))
+            .collect();
+        deduped.join(":")
+    }
+}
+
+// ── Environment Diff Display ──
+
+/// Represents a single change in an environment diff.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnvDiffEntry {
+    Added { key: String, value: String },
+    Removed { key: String, value: String },
+    Changed { key: String, old_value: String, new_value: String },
+}
+
+impl fmt::Display for EnvDiffEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Added { key, value } => write!(f, "+ {key}={value}"),
+            Self::Removed { key, value } => write!(f, "- {key}={value}"),
+            Self::Changed { key, old_value, new_value } => {
+                write!(f, "~ {key}: {old_value} -> {new_value}")
+            }
+        }
+    }
+}
+
+/// Compute a full diff between two environment snapshots.
+pub struct EnvDiffDisplay;
+
+impl EnvDiffDisplay {
+    /// Compute diff entries between `old` and `new` snapshots.
+    pub fn diff(old: &EnvironmentSnapshot, new: &EnvironmentSnapshot) -> Vec<EnvDiffEntry> {
+        let mut entries = Vec::new();
+
+        let added = new.added_keys(old);
+        for key in &added {
+            if let Some(val) = new.get(key) {
+                entries.push(EnvDiffEntry::Added {
+                    key: key.clone(),
+                    value: val.to_string(),
+                });
+            }
+        }
+
+        let removed = new.removed_keys(old);
+        for key in &removed {
+            if let Some(val) = old.get(key) {
+                entries.push(EnvDiffEntry::Removed {
+                    key: key.clone(),
+                    value: val.to_string(),
+                });
+            }
+        }
+
+        let changed = new.changed_keys(old);
+        for key in &changed {
+            if let (Some(ov), Some(nv)) = (old.get(key), new.get(key)) {
+                entries.push(EnvDiffEntry::Changed {
+                    key: key.clone(),
+                    old_value: ov.to_string(),
+                    new_value: nv.to_string(),
+                });
+            }
+        }
+
+        entries
+    }
+
+    /// Format diff as a multi-line string.
+    pub fn format(entries: &[EnvDiffEntry]) -> String {
+        entries.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")
+    }
+
+    /// How many changes total.
+    pub fn change_count(entries: &[EnvDiffEntry]) -> usize {
+        entries.len()
+    }
+
+    /// Count only additions.
+    pub fn addition_count(entries: &[EnvDiffEntry]) -> usize {
+        entries.iter().filter(|e| matches!(e, EnvDiffEntry::Added { .. })).count()
+    }
+
+    /// Count only removals.
+    pub fn removal_count(entries: &[EnvDiffEntry]) -> usize {
+        entries.iter().filter(|e| matches!(e, EnvDiffEntry::Removed { .. })).count()
+    }
+
+    /// Whether the diff is empty (no changes).
+    pub fn is_empty(entries: &[EnvDiffEntry]) -> bool {
+        entries.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2235,4 +2531,179 @@ mod tests {
         let norm = EnvironmentValidator::normalize_path("/usr///local//bin");
         assert_eq!(norm, "/usr/local/bin");
     }
+
+    // ── Snapshot tests ──
+
+    #[test]
+    fn snapshot_empty() {
+        let snap = EnvironmentSnapshot::empty(100);
+        assert!(snap.is_empty());
+        assert_eq!(snap.timestamp(), 100);
+    }
+
+    #[test]
+    fn snapshot_from_map() {
+        let mut vars = HashMap::new();
+        vars.insert("HOME".into(), "/home/user".into());
+        vars.insert("SHELL".into(), "/bin/bash".into());
+        let snap = EnvironmentSnapshot::from_map(vars, 200);
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.get("HOME"), Some("/home/user"));
+    }
+
+    #[test]
+    fn snapshot_added_removed_keys() {
+        let mut old_vars = HashMap::new();
+        old_vars.insert("A".into(), "1".into());
+        old_vars.insert("B".into(), "2".into());
+        let old = EnvironmentSnapshot::from_map(old_vars, 1);
+
+        let mut new_vars = HashMap::new();
+        new_vars.insert("B".into(), "2".into());
+        new_vars.insert("C".into(), "3".into());
+        let new = EnvironmentSnapshot::from_map(new_vars, 2);
+
+        assert_eq!(new.added_keys(&old), vec!["C"]);
+        assert_eq!(new.removed_keys(&old), vec!["A"]);
+    }
+
+    #[test]
+    fn snapshot_changed_keys() {
+        let mut old_vars = HashMap::new();
+        old_vars.insert("X".into(), "old".into());
+        let old = EnvironmentSnapshot::from_map(old_vars, 1);
+
+        let mut new_vars = HashMap::new();
+        new_vars.insert("X".into(), "new".into());
+        let new = EnvironmentSnapshot::from_map(new_vars, 2);
+
+        assert_eq!(new.changed_keys(&old), vec!["X"]);
+    }
+
+    #[test]
+    fn snapshot_is_equivalent() {
+        let mut vars = HashMap::new();
+        vars.insert("K".into(), "V".into());
+        let a = EnvironmentSnapshot::from_map(vars.clone(), 1);
+        let b = EnvironmentSnapshot::from_map(vars, 2);
+        assert!(a.is_equivalent(&b));
+    }
+
+    // ── Override resolver tests ──
+
+    #[test]
+    fn override_resolver_basic() {
+        let mut resolver = EnvironmentOverrideResolver::new();
+        let mut base = HashMap::new();
+        base.insert("PATH".into(), "/usr/bin".into());
+        base.insert("HOME".into(), "/home/user".into());
+        resolver.add_layer("base", base);
+
+        let mut overrides = HashMap::new();
+        overrides.insert("PATH".into(), "/custom/bin".into());
+        resolver.add_layer("override", overrides);
+
+        assert_eq!(resolver.resolve("PATH"), Some("/custom/bin"));
+        assert_eq!(resolver.resolve("HOME"), Some("/home/user"));
+        assert_eq!(resolver.provided_by("PATH"), Some("override"));
+        assert_eq!(resolver.provided_by("HOME"), Some("base"));
+    }
+
+    #[test]
+    fn override_resolver_resolve_all() {
+        let mut resolver = EnvironmentOverrideResolver::new();
+        let mut l1 = HashMap::new();
+        l1.insert("A".into(), "1".into());
+        resolver.add_layer("l1", l1);
+        let mut l2 = HashMap::new();
+        l2.insert("B".into(), "2".into());
+        resolver.add_layer("l2", l2);
+
+        let all = resolver.resolve_all();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all["A"], "1");
+        assert_eq!(all["B"], "2");
+    }
+
+    #[test]
+    fn override_resolver_layer_names() {
+        let mut resolver = EnvironmentOverrideResolver::new();
+        resolver.add_layer("system", HashMap::new());
+        resolver.add_layer("user", HashMap::new());
+        assert_eq!(resolver.layer_names(), vec!["system", "user"]);
+        assert_eq!(resolver.layer_count(), 2);
+    }
+
+    // ── Sanitizer tests ──
+
+    #[test]
+    fn sanitizer_valid_names() {
+        assert!(EnvironmentSanitizer::is_valid_name("PATH"));
+        assert!(EnvironmentSanitizer::is_valid_name("MY_VAR_1"));
+        assert!(!EnvironmentSanitizer::is_valid_name(""));
+        assert!(!EnvironmentSanitizer::is_valid_name("BAD=NAME"));
+    }
+
+    #[test]
+    fn sanitizer_sanitize_name() {
+        assert_eq!(EnvironmentSanitizer::sanitize_name("MY-VAR!"), "MYVAR");
+        assert_eq!(EnvironmentSanitizer::sanitize_name("ok_123"), "ok_123");
+    }
+
+    #[test]
+    fn sanitizer_path_dedup() {
+        assert!(EnvironmentSanitizer::has_duplicate_path_entries("/usr/bin:/usr/bin"));
+        assert!(!EnvironmentSanitizer::has_duplicate_path_entries("/usr/bin:/usr/local/bin"));
+        let deduped = EnvironmentSanitizer::dedup_path("/a:/b:/a:/c:/b");
+        assert_eq!(deduped, "/a:/b:/c");
+    }
+
+    #[test]
+    fn sanitizer_sanitize_map() {
+        let mut vars = HashMap::new();
+        vars.insert("GOOD".into(), "val".into());
+        vars.insert("BAD=KEY".into(), "val".into());
+        let clean = EnvironmentSanitizer::sanitize_map(&vars);
+        assert_eq!(clean.len(), 1);
+        assert!(clean.contains_key("GOOD"));
+    }
+
+    // ── Env diff display tests ──
+
+    #[test]
+    fn env_diff_basic() {
+        let mut old_vars = HashMap::new();
+        old_vars.insert("A".into(), "1".into());
+        old_vars.insert("B".into(), "old".into());
+        let old = EnvironmentSnapshot::from_map(old_vars, 1);
+
+        let mut new_vars = HashMap::new();
+        new_vars.insert("B".into(), "new".into());
+        new_vars.insert("C".into(), "3".into());
+        let new_snap = EnvironmentSnapshot::from_map(new_vars, 2);
+
+        let diff = EnvDiffDisplay::diff(&old, &new_snap);
+        assert_eq!(EnvDiffDisplay::addition_count(&diff), 1);
+        assert_eq!(EnvDiffDisplay::removal_count(&diff), 1);
+        assert_eq!(EnvDiffDisplay::change_count(&diff), 3);
+    }
+
+    #[test]
+    fn env_diff_empty_when_same() {
+        let mut vars = HashMap::new();
+        vars.insert("X".into(), "Y".into());
+        let a = EnvironmentSnapshot::from_map(vars.clone(), 1);
+        let b = EnvironmentSnapshot::from_map(vars, 2);
+        let diff = EnvDiffDisplay::diff(&a, &b);
+        assert!(EnvDiffDisplay::is_empty(&diff));
+    }
+
+    #[test]
+    fn env_diff_entry_display() {
+        let entry = EnvDiffEntry::Added { key: "FOO".into(), value: "bar".into() };
+        assert_eq!(entry.to_string(), "+ FOO=bar");
+        let entry2 = EnvDiffEntry::Removed { key: "BAZ".into(), value: "qux".into() };
+        assert_eq!(entry2.to_string(), "- BAZ=qux");
+    }
+
 }

@@ -1443,6 +1443,226 @@ impl KeyStringParser {
     }
 }
 
+
+// ── Keycode Modifier Combiner ──
+
+/// Represents a set of modifier keys combined into a single value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModifierSet {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
+impl ModifierSet {
+    pub const NONE: Self = Self { ctrl: false, shift: false, alt: false, meta: false };
+
+    pub fn new() -> Self {
+        Self::NONE
+    }
+
+    pub fn with_ctrl(mut self) -> Self {
+        self.ctrl = true;
+        self
+    }
+
+    pub fn with_shift(mut self) -> Self {
+        self.shift = true;
+        self
+    }
+
+    pub fn with_alt(mut self) -> Self {
+        self.alt = true;
+        self
+    }
+
+    pub fn with_meta(mut self) -> Self {
+        self.meta = true;
+        self
+    }
+
+    /// Count how many modifiers are active.
+    pub fn count(&self) -> u8 {
+        self.ctrl as u8 + self.shift as u8 + self.alt as u8 + self.meta as u8
+    }
+
+    /// Check if no modifiers are set.
+    pub fn is_empty(&self) -> bool {
+        !self.ctrl && !self.shift && !self.alt && !self.meta
+    }
+
+    /// Convert to a bitmask (ctrl=1, shift=2, alt=4, meta=8).
+    pub fn to_bitmask(&self) -> u8 {
+        (self.ctrl as u8) | ((self.shift as u8) << 1) | ((self.alt as u8) << 2) | ((self.meta as u8) << 3)
+    }
+
+    /// Create from a bitmask.
+    pub fn from_bitmask(mask: u8) -> Self {
+        Self {
+            ctrl: mask & 1 != 0,
+            shift: mask & 2 != 0,
+            alt: mask & 4 != 0,
+            meta: mask & 8 != 0,
+        }
+    }
+}
+
+impl Default for ModifierSet {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+/// Combines multiple modifier keys into a combined chord representation.
+pub struct KeycodeModifierCombiner;
+
+impl KeycodeModifierCombiner {
+    /// Parse a modifier string like "Ctrl+Shift" into a ModifierSet.
+    pub fn parse_modifiers(s: &str) -> ModifierSet {
+        let mut set = ModifierSet::new();
+        for part in s.split('+') {
+            match part.trim().to_lowercase().as_str() {
+                "ctrl" | "control" => set.ctrl = true,
+                "shift" => set.shift = true,
+                "alt" | "option" => set.alt = true,
+                "meta" | "cmd" | "command" | "win" | "super" => set.meta = true,
+                _ => {}
+            }
+        }
+        set
+    }
+
+    /// Combine two modifier sets (union).
+    pub fn combine(a: ModifierSet, b: ModifierSet) -> ModifierSet {
+        ModifierSet {
+            ctrl: a.ctrl || b.ctrl,
+            shift: a.shift || b.shift,
+            alt: a.alt || b.alt,
+            meta: a.meta || b.meta,
+        }
+    }
+
+    /// Intersect two modifier sets.
+    pub fn intersect(a: ModifierSet, b: ModifierSet) -> ModifierSet {
+        ModifierSet {
+            ctrl: a.ctrl && b.ctrl,
+            shift: a.shift && b.shift,
+            alt: a.alt && b.alt,
+            meta: a.meta && b.meta,
+        }
+    }
+
+    /// Check if set `a` is a subset of set `b`.
+    pub fn is_subset(a: ModifierSet, b: ModifierSet) -> bool {
+        (!a.ctrl || b.ctrl) && (!a.shift || b.shift) && (!a.alt || b.alt) && (!a.meta || b.meta)
+    }
+
+    /// Remove modifiers in `remove` from `base`.
+    pub fn subtract(base: ModifierSet, remove: ModifierSet) -> ModifierSet {
+        ModifierSet {
+            ctrl: base.ctrl && !remove.ctrl,
+            shift: base.shift && !remove.shift,
+            alt: base.alt && !remove.alt,
+            meta: base.meta && !remove.meta,
+        }
+    }
+}
+
+// ── Keycode Display Formatter ──
+
+/// Platform-specific display conventions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyDisplayPlatform {
+    Windows,
+    Mac,
+    Linux,
+}
+
+/// Formats key combinations for display in the UI.
+pub struct KeycodeDisplayFormatter {
+    platform: KeyDisplayPlatform,
+    use_symbols: bool,
+}
+
+impl KeycodeDisplayFormatter {
+    pub fn new(platform: KeyDisplayPlatform) -> Self {
+        Self {
+            platform,
+            use_symbols: matches!(platform, KeyDisplayPlatform::Mac),
+        }
+    }
+
+    pub fn with_symbols(mut self, use_symbols: bool) -> Self {
+        self.use_symbols = use_symbols;
+        self
+    }
+
+    /// Format a modifier set as a display string.
+    pub fn format_modifiers(&self, mods: ModifierSet) -> String {
+        let mut parts = Vec::new();
+        if self.use_symbols {
+            if mods.ctrl { parts.push("⌃"); }
+            if mods.alt { parts.push("⌥"); }
+            if mods.shift { parts.push("⇧"); }
+            if mods.meta { parts.push("⌘"); }
+        } else {
+            if mods.ctrl { parts.push("Ctrl"); }
+            if mods.alt { parts.push("Alt"); }
+            if mods.shift { parts.push("Shift"); }
+            if mods.meta {
+                match self.platform {
+                    KeyDisplayPlatform::Windows => parts.push("Win"),
+                    KeyDisplayPlatform::Mac => parts.push("Cmd"),
+                    KeyDisplayPlatform::Linux => parts.push("Super"),
+                };
+            }
+        }
+        if self.use_symbols {
+            parts.join("")
+        } else {
+            parts.join("+")
+        }
+    }
+
+    /// Format a full key combination (modifiers + key name).
+    pub fn format_keybinding(&self, mods: ModifierSet, key_name: &str) -> String {
+        let mod_str = self.format_modifiers(mods);
+        if mod_str.is_empty() {
+            return key_name.to_string();
+        }
+        if self.use_symbols {
+            format!("{}{}", mod_str, key_name)
+        } else {
+            format!("{}+{}", mod_str, key_name)
+        }
+    }
+
+    /// Format a chord (sequence of key combinations).
+    pub fn format_chord(&self, bindings: &[(ModifierSet, &str)]) -> String {
+        bindings
+            .iter()
+            .map(|(mods, key)| self.format_keybinding(*mods, key))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Get the platform-specific name for a key.
+    pub fn platform_key_name<'a>(&self, key_name: &'a str) -> &'a str {
+        match (self.platform, key_name) {
+            (KeyDisplayPlatform::Mac, "Backspace") => "Delete",
+            (KeyDisplayPlatform::Mac, "Delete") => "Fn+Delete",
+            (KeyDisplayPlatform::Mac, "Enter") => "Return",
+            _ => key_name,
+        }
+    }
+
+    pub fn platform(&self) -> KeyDisplayPlatform {
+        self.platform
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2297,5 +2517,106 @@ mod tests {
     fn key_string_parser_parse_key() {
         assert_eq!(KeyStringParser::parse_key("a"), KeyCode::KeyA);
     }
+
+
+    #[test]
+    fn modifier_set_new_empty() {
+        let m = ModifierSet::new();
+        assert!(m.is_empty());
+        assert_eq!(m.count(), 0);
+    }
+
+    #[test]
+    fn modifier_set_builders() {
+        let m = ModifierSet::new().with_ctrl().with_shift();
+        assert!(m.ctrl);
+        assert!(m.shift);
+        assert!(!m.alt);
+        assert_eq!(m.count(), 2);
+    }
+
+    #[test]
+    fn modifier_set_bitmask_roundtrip() {
+        let m = ModifierSet::new().with_ctrl().with_alt().with_meta();
+        let mask = m.to_bitmask();
+        let m2 = ModifierSet::from_bitmask(mask);
+        assert_eq!(m, m2);
+    }
+
+    #[test]
+    fn combiner_parse_modifiers() {
+        let m = KeycodeModifierCombiner::parse_modifiers("Ctrl+Shift");
+        assert!(m.ctrl);
+        assert!(m.shift);
+        assert!(!m.alt);
+    }
+
+    #[test]
+    fn combiner_parse_mac_modifiers() {
+        let m = KeycodeModifierCombiner::parse_modifiers("Cmd+Option");
+        assert!(m.meta);
+        assert!(m.alt);
+    }
+
+    #[test]
+    fn combiner_combine() {
+        let a = ModifierSet::new().with_ctrl();
+        let b = ModifierSet::new().with_shift();
+        let c = KeycodeModifierCombiner::combine(a, b);
+        assert!(c.ctrl && c.shift);
+    }
+
+    #[test]
+    fn combiner_intersect() {
+        let a = ModifierSet::new().with_ctrl().with_shift();
+        let b = ModifierSet::new().with_ctrl().with_alt();
+        let c = KeycodeModifierCombiner::intersect(a, b);
+        assert!(c.ctrl);
+        assert!(!c.shift);
+        assert!(!c.alt);
+    }
+
+    #[test]
+    fn combiner_subset() {
+        let a = ModifierSet::new().with_ctrl();
+        let b = ModifierSet::new().with_ctrl().with_shift();
+        assert!(KeycodeModifierCombiner::is_subset(a, b));
+        assert!(!KeycodeModifierCombiner::is_subset(b, a));
+    }
+
+    #[test]
+    fn formatter_windows_keybinding() {
+        let fmt = KeycodeDisplayFormatter::new(KeyDisplayPlatform::Windows);
+        let mods = ModifierSet::new().with_ctrl().with_shift();
+        let result = fmt.format_keybinding(mods, "A");
+        assert_eq!(result, "Ctrl+Shift+A");
+    }
+
+    #[test]
+    fn formatter_mac_symbols() {
+        let fmt = KeycodeDisplayFormatter::new(KeyDisplayPlatform::Mac);
+        let mods = ModifierSet::new().with_ctrl().with_meta();
+        let result = fmt.format_keybinding(mods, "A");
+        assert_eq!(result, "⌃⌘A");
+    }
+
+    #[test]
+    fn formatter_chord() {
+        let fmt = KeycodeDisplayFormatter::new(KeyDisplayPlatform::Linux);
+        let bindings = vec![
+            (ModifierSet::new().with_ctrl(), "K"),
+            (ModifierSet::new().with_ctrl(), "C"),
+        ];
+        let result = fmt.format_chord(&bindings);
+        assert_eq!(result, "Ctrl+K Ctrl+C");
+    }
+
+    #[test]
+    fn formatter_platform_key_name_mac() {
+        let fmt = KeycodeDisplayFormatter::new(KeyDisplayPlatform::Mac);
+        assert_eq!(fmt.platform_key_name("Backspace"), "Delete");
+        assert_eq!(fmt.platform_key_name("Enter"), "Return");
+    }
+
 
 }

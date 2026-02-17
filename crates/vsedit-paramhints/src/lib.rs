@@ -1367,6 +1367,344 @@ impl RetriggerState {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ParameterHintAnimator
+// ---------------------------------------------------------------------------
+
+/// Animation phase for the parameter hint widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationPhase {
+    /// Widget is hidden.
+    Hidden,
+    /// Widget is fading in.
+    FadingIn,
+    /// Widget is fully visible.
+    Visible,
+    /// Widget is fading out.
+    FadingOut,
+}
+
+impl fmt::Display for AnimationPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Hidden => "Hidden",
+            Self::FadingIn => "FadingIn",
+            Self::Visible => "Visible",
+            Self::FadingOut => "FadingOut",
+        };
+        write!(f, "{label}")
+    }
+}
+
+/// Manages animation state for the parameter hint widget.
+#[derive(Debug, Clone)]
+pub struct ParameterHintAnimator {
+    phase: AnimationPhase,
+    /// Progress within the current phase (0.0 to 1.0).
+    progress: f64,
+    /// Duration of fade-in in milliseconds.
+    fade_in_ms: u64,
+    /// Duration of fade-out in milliseconds.
+    fade_out_ms: u64,
+    /// Minimum display time before fade-out can start.
+    min_visible_ms: u64,
+    /// Time at which the current phase started (epoch ms).
+    phase_start_ms: u64,
+    /// Whether animation is enabled.
+    enabled: bool,
+    /// Number of show/hide transitions.
+    transition_count: u64,
+}
+
+impl ParameterHintAnimator {
+    /// Create a new animator with default durations.
+    pub fn new() -> Self {
+        Self {
+            phase: AnimationPhase::Hidden,
+            progress: 0.0,
+            fade_in_ms: 150,
+            fade_out_ms: 100,
+            min_visible_ms: 500,
+            phase_start_ms: 0,
+            enabled: true,
+            transition_count: 0,
+        }
+    }
+
+    /// Create an animator with custom durations.
+    pub fn with_durations(fade_in_ms: u64, fade_out_ms: u64, min_visible_ms: u64) -> Self {
+        Self {
+            phase: AnimationPhase::Hidden,
+            progress: 0.0,
+            fade_in_ms,
+            fade_out_ms,
+            min_visible_ms,
+            phase_start_ms: 0,
+            enabled: true,
+            transition_count: 0,
+        }
+    }
+
+    /// Start showing the widget (begin fade-in).
+    pub fn show(&mut self, now_ms: u64) {
+        if !self.enabled {
+            self.phase = AnimationPhase::Visible;
+            self.progress = 1.0;
+            return;
+        }
+        self.phase = AnimationPhase::FadingIn;
+        self.progress = 0.0;
+        self.phase_start_ms = now_ms;
+        self.transition_count += 1;
+    }
+
+    /// Start hiding the widget (begin fade-out).
+    pub fn hide(&mut self, now_ms: u64) {
+        if !self.enabled {
+            self.phase = AnimationPhase::Hidden;
+            self.progress = 0.0;
+            return;
+        }
+        // Enforce minimum visible time.
+        if self.phase == AnimationPhase::Visible {
+            let elapsed = now_ms.saturating_sub(self.phase_start_ms);
+            if elapsed < self.min_visible_ms {
+                return;
+            }
+        }
+        self.phase = AnimationPhase::FadingOut;
+        self.progress = 1.0;
+        self.phase_start_ms = now_ms;
+        self.transition_count += 1;
+    }
+
+    /// Update the animation state given current time.
+    pub fn update(&mut self, now_ms: u64) {
+        let elapsed = now_ms.saturating_sub(self.phase_start_ms);
+        match self.phase {
+            AnimationPhase::FadingIn => {
+                if self.fade_in_ms == 0 {
+                    self.phase = AnimationPhase::Visible;
+                    self.progress = 1.0;
+                    self.phase_start_ms = now_ms;
+                } else {
+                    self.progress = (elapsed as f64 / self.fade_in_ms as f64).min(1.0);
+                    if self.progress >= 1.0 {
+                        self.phase = AnimationPhase::Visible;
+                        self.phase_start_ms = now_ms;
+                    }
+                }
+            }
+            AnimationPhase::FadingOut => {
+                if self.fade_out_ms == 0 {
+                    self.phase = AnimationPhase::Hidden;
+                    self.progress = 0.0;
+                } else {
+                    self.progress = 1.0 - (elapsed as f64 / self.fade_out_ms as f64).min(1.0);
+                    if self.progress <= 0.0 {
+                        self.phase = AnimationPhase::Hidden;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Current phase.
+    pub fn phase(&self) -> AnimationPhase {
+        self.phase
+    }
+
+    /// Current opacity (0.0 = invisible, 1.0 = fully visible).
+    pub fn opacity(&self) -> f64 {
+        self.progress
+    }
+
+    /// Whether the widget is at least partially visible.
+    pub fn is_visible(&self) -> bool {
+        self.phase != AnimationPhase::Hidden
+    }
+
+    /// Whether animation is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Enable/disable animation.
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    /// Number of transitions performed.
+    pub fn transition_count(&self) -> u64 {
+        self.transition_count
+    }
+
+    /// Reset to hidden state.
+    pub fn reset(&mut self) {
+        self.phase = AnimationPhase::Hidden;
+        self.progress = 0.0;
+        self.transition_count = 0;
+    }
+}
+
+impl fmt::Display for ParameterHintAnimator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "HintAnimator({}, opacity={:.2}, transitions={})",
+            self.phase, self.progress, self.transition_count
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ParameterSignatureFormatter
+// ---------------------------------------------------------------------------
+
+/// Options for formatting a function signature.
+#[derive(Debug, Clone)]
+pub struct SignatureFormatOptions {
+    /// Maximum width before wrapping.
+    pub max_width: usize,
+    /// Whether to include parameter types.
+    pub show_types: bool,
+    /// Whether to include return type.
+    pub show_return_type: bool,
+    /// Indentation for wrapped parameters.
+    pub indent: String,
+    /// Whether to number parameters.
+    pub number_params: bool,
+}
+
+impl Default for SignatureFormatOptions {
+    fn default() -> Self {
+        Self {
+            max_width: 80,
+            show_types: true,
+            show_return_type: true,
+            indent: "    ".to_string(),
+            number_params: false,
+        }
+    }
+}
+
+/// Formats function signatures for display in the hint widget.
+#[derive(Debug, Clone)]
+pub struct ParameterSignatureFormatter {
+    options: SignatureFormatOptions,
+    format_count: u64,
+}
+
+impl ParameterSignatureFormatter {
+    /// Create a new formatter with default options.
+    pub fn new() -> Self {
+        Self {
+            options: SignatureFormatOptions::default(),
+            format_count: 0,
+        }
+    }
+
+    /// Create with custom options.
+    pub fn with_options(options: SignatureFormatOptions) -> Self {
+        Self { options, format_count: 0 }
+    }
+
+    /// Format a `SignatureInformation` into display lines.
+    pub fn format(&mut self, sig: &SignatureInformation) -> Vec<String> {
+        self.format_count += 1;
+        let mut lines = Vec::new();
+
+        // Build parameter list.
+        let params: Vec<String> = sig.parameters.iter().enumerate().map(|(i, p)| {
+            if self.options.number_params {
+                format!("{}. {}", i + 1, p.label)
+            } else {
+                p.label.clone()
+            }
+        }).collect();
+
+        let one_line = format!("{}({})", sig.label, params.join(", "));
+
+        if one_line.len() <= self.options.max_width {
+            lines.push(one_line);
+        } else {
+            // Multi-line format.
+            lines.push(format!("{}(", sig.label));
+            for (i, param) in params.iter().enumerate() {
+                let suffix = if i < params.len() - 1 { "," } else { "" };
+                lines.push(format!("{}{}{}", self.options.indent, param, suffix));
+            }
+            lines.push(")".to_string());
+        }
+
+        // Add documentation if present.
+        if let Some(ref doc) = sig.documentation {
+            lines.push(String::new());
+            lines.push(doc.clone());
+        }
+
+        lines
+    }
+
+    /// Format a signature into a single compact string.
+    pub fn format_compact(&mut self, sig: &SignatureInformation) -> String {
+        self.format_count += 1;
+        let params: Vec<&str> = sig.parameters.iter().map(|p| p.label.as_str()).collect();
+        format!("{}({})", sig.label, params.join(", "))
+    }
+
+    /// Format only the parameter list.
+    pub fn format_params(&self, sig: &SignatureInformation) -> String {
+        sig.parameters.iter().map(|p| p.label.as_str()).collect::<Vec<_>>().join(", ")
+    }
+
+    /// Highlight the active parameter by wrapping it with markers.
+    pub fn highlight_active(&mut self, sig: &SignatureInformation, active: u32) -> String {
+        self.format_count += 1;
+        let params: Vec<String> = sig.parameters.iter().enumerate().map(|(i, p)| {
+            if i as u32 == active {
+                format!(">>{}<<", p.label)
+            } else {
+                p.label.clone()
+            }
+        }).collect();
+        format!("{}({})", sig.label, params.join(", "))
+    }
+
+    /// Number of format operations performed.
+    pub fn format_count(&self) -> u64 {
+        self.format_count
+    }
+
+    /// Get a reference to the current options.
+    pub fn options(&self) -> &SignatureFormatOptions {
+        &self.options
+    }
+
+    /// Set max width.
+    pub fn set_max_width(&mut self, width: usize) {
+        self.options.max_width = width;
+    }
+
+    /// Reset the format counter.
+    pub fn reset_count(&mut self) {
+        self.format_count = 0;
+    }
+}
+
+impl fmt::Display for ParameterSignatureFormatter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SignatureFormatter(max_width={}, formatted={})",
+            self.options.max_width, self.format_count
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2445,4 +2783,174 @@ mod tests {
         let mut st = RetriggerState::new();
         assert_eq!(st.on_char(',', &det), RetriggerAction::None);
     }
+
+    #[test]
+    fn animator_starts_hidden() {
+        let anim = ParameterHintAnimator::new();
+        assert_eq!(anim.phase(), AnimationPhase::Hidden);
+        assert!(!anim.is_visible());
+    }
+
+    #[test]
+    fn animator_show_starts_fading_in() {
+        let mut anim = ParameterHintAnimator::new();
+        anim.show(0);
+        assert_eq!(anim.phase(), AnimationPhase::FadingIn);
+        assert!(anim.is_visible());
+    }
+
+    #[test]
+    fn animator_fade_in_completes() {
+        let mut anim = ParameterHintAnimator::new();
+        anim.show(0);
+        anim.update(200);
+        assert_eq!(anim.phase(), AnimationPhase::Visible);
+        assert!((anim.opacity() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn animator_hide_after_min_visible() {
+        let mut anim = ParameterHintAnimator::with_durations(0, 100, 500);
+        anim.show(0);
+        anim.update(0);
+        anim.hide(600);
+        assert_eq!(anim.phase(), AnimationPhase::FadingOut);
+    }
+
+    #[test]
+    fn animator_hide_blocked_before_min_visible() {
+        let mut anim = ParameterHintAnimator::with_durations(0, 100, 500);
+        anim.show(0);
+        anim.update(0);
+        anim.hide(100);
+        assert_eq!(anim.phase(), AnimationPhase::Visible);
+    }
+
+    #[test]
+    fn animator_fade_out_completes() {
+        let mut anim = ParameterHintAnimator::with_durations(0, 100, 0);
+        anim.show(0);
+        anim.update(0);
+        anim.hide(0);
+        anim.update(200);
+        assert_eq!(anim.phase(), AnimationPhase::Hidden);
+    }
+
+    #[test]
+    fn animator_disabled_shows_immediately() {
+        let mut anim = ParameterHintAnimator::new();
+        anim.set_enabled(false);
+        anim.show(0);
+        assert_eq!(anim.phase(), AnimationPhase::Visible);
+    }
+
+    #[test]
+    fn animator_transition_count() {
+        let mut anim = ParameterHintAnimator::new();
+        anim.show(0);
+        anim.update(200);
+        anim.hide(800);
+        assert_eq!(anim.transition_count(), 2);
+    }
+
+    #[test]
+    fn animator_reset() {
+        let mut anim = ParameterHintAnimator::new();
+        anim.show(0);
+        anim.reset();
+        assert_eq!(anim.phase(), AnimationPhase::Hidden);
+        assert_eq!(anim.transition_count(), 0);
+    }
+
+    #[test]
+    fn animator_display() {
+        let anim = ParameterHintAnimator::new();
+        let s = format!("{anim}");
+        assert!(s.contains("Hidden"));
+        assert!(s.contains("transitions=0"));
+    }
+
+    #[test]
+    fn sig_formatter_compact() {
+        let mut fmt = ParameterSignatureFormatter::new();
+        let sig = SignatureInformation {
+            label: "add".into(),
+            documentation: None,
+            parameters: vec![
+                ParameterInformation { label: "a: i32".into(), documentation: None },
+                ParameterInformation { label: "b: i32".into(), documentation: None },
+            ],
+            active_parameter: None,
+        };
+        let result = fmt.format_compact(&sig);
+        assert_eq!(result, "add(a: i32, b: i32)");
+    }
+
+    #[test]
+    fn sig_formatter_multiline() {
+        let mut fmt = ParameterSignatureFormatter::new();
+        fmt.set_max_width(10);
+        let sig = SignatureInformation {
+            label: "long_function_name".into(),
+            documentation: None,
+            parameters: vec![
+                ParameterInformation { label: "param1".into(), documentation: None },
+                ParameterInformation { label: "param2".into(), documentation: None },
+            ],
+            active_parameter: None,
+        };
+        let lines = fmt.format(&sig);
+        assert!(lines.len() > 1);
+    }
+
+    #[test]
+    fn sig_formatter_highlight_active() {
+        let mut fmt = ParameterSignatureFormatter::new();
+        let sig = SignatureInformation {
+            label: "foo".into(),
+            documentation: None,
+            parameters: vec![
+                ParameterInformation { label: "x".into(), documentation: None },
+                ParameterInformation { label: "y".into(), documentation: None },
+            ],
+            active_parameter: None,
+        };
+        let result = fmt.highlight_active(&sig, 1);
+        assert!(result.contains(">>y<<"));
+        assert!(!result.contains(">>x<<"));
+    }
+
+    #[test]
+    fn sig_formatter_with_documentation() {
+        let mut fmt = ParameterSignatureFormatter::new();
+        let sig = SignatureInformation {
+            label: "bar".into(),
+            documentation: Some("Does bar things".into()),
+            parameters: vec![],
+            active_parameter: None,
+        };
+        let lines = fmt.format(&sig);
+        assert!(lines.iter().any(|l| l.contains("Does bar things")));
+    }
+
+    #[test]
+    fn sig_formatter_format_count() {
+        let mut fmt = ParameterSignatureFormatter::new();
+        let sig = SignatureInformation {
+            label: "f".into(), documentation: None,
+            parameters: vec![], active_parameter: None,
+        };
+        fmt.format_compact(&sig);
+        fmt.format_compact(&sig);
+        assert_eq!(fmt.format_count(), 2);
+    }
+
+    #[test]
+    fn sig_formatter_display() {
+        let fmt = ParameterSignatureFormatter::new();
+        let s = format!("{fmt}");
+        assert!(s.contains("max_width=80"));
+    }
+
+
 }

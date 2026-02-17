@@ -1369,6 +1369,312 @@ impl CallDepthLimiter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HierarchyExporter - call hierarchy exporter
+// ---------------------------------------------------------------------------
+
+/// Severity level for call hierarchy exporter issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum HierarchyExporterSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for HierarchyExporterSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [HierarchyExporter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HierarchyExporterEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: HierarchyExporterSeverity,
+    pub detail: Option<String>,
+    pub node_count: usize,
+    enabled: bool,
+}
+
+impl HierarchyExporterEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: HierarchyExporterSeverity::Low,
+            detail: None,
+            node_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: HierarchyExporterSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_node_count(mut self, val: usize) -> Self {
+        self.node_count = val;
+        self
+    }
+
+    pub fn has_recursion(&self) -> bool {
+        self.enabled && self.severity >= HierarchyExporterSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.node_count, det)
+    }
+}
+
+impl fmt::Display for HierarchyExporterEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [HierarchyExporterEntry] items.
+#[derive(Debug, Clone)]
+pub struct HierarchyExporter {
+    entries: Vec<HierarchyExporterEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl HierarchyExporter {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: HierarchyExporterEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<HierarchyExporterEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&HierarchyExporterEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn node_count(&self) -> usize { self.entries.len() }
+
+    pub fn has_recursion(&self) -> bool {
+        self.entries.iter().any(|e| e.has_recursion())
+    }
+
+    pub fn entries_by_severity(&self, severity: HierarchyExporterSeverity) -> Vec<&HierarchyExporterEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= HierarchyExporterSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&HierarchyExporterEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&HierarchyExporterEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChainDepthMeter - call chain depth meter
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ChainDepthMeter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChainDepthMeterConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub max_depth: usize,
+}
+
+impl ChainDepthMeterConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, max_depth: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_max_depth(mut self, val: usize) -> Self { self.max_depth = val; self }
+}
+
+impl Default for ChainDepthMeterConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ChainDepthMeter].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChainDepthMeterItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ChainDepthMeterItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ChainDepthMeterItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ChainDepthMeterItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ChainDepthMeter {
+    config: ChainDepthMeterConfig,
+    items: Vec<ChainDepthMeterItem>,
+}
+
+impl ChainDepthMeter {
+    pub fn new(config: ChainDepthMeterConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ChainDepthMeterItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ChainDepthMeterItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ChainDepthMeterItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn max_depth(&self) -> usize { self.items.len() }
+
+    pub fn is_leaf(&self) -> bool {
+        self.items.iter().any(|i| i.is_leaf())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ChainDepthMeterItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ChainDepthMeterItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ChainDepthMeterConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2307,5 +2613,147 @@ mod tests {
         assert_eq!(lim.limit(), 10);
         assert!(lim.is_within_limit(10));
         assert!(!lim.is_within_limit(11));
+    }
+
+#[test]
+    fn hierarchyexporter_severity_ordering() {
+        assert!(HierarchyExporterSeverity::Critical > HierarchyExporterSeverity::High);
+        assert!(HierarchyExporterSeverity::High > HierarchyExporterSeverity::Medium);
+        assert!(HierarchyExporterSeverity::Medium > HierarchyExporterSeverity::Low);
+    }
+
+    #[test]
+    fn hierarchyexporter_severity_display() {
+        assert_eq!(HierarchyExporterSeverity::Low.to_string(), "low");
+        assert_eq!(HierarchyExporterSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn hierarchyexporter_entry_creation() {
+        let e = HierarchyExporterEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, HierarchyExporterSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn hierarchyexporter_entry_builder() {
+        let e = HierarchyExporterEntry::new("e2", "Entry 2")
+            .with_severity(HierarchyExporterSeverity::High)
+            .with_detail("some detail")
+            .with_node_count(42);
+        assert_eq!(e.severity, HierarchyExporterSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.node_count, 42);
+    }
+
+    #[test]
+    fn hierarchyexporter_entry_enable_disable() {
+        let mut e = HierarchyExporterEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn hierarchyexporter_add_and_count() {
+        let mut mgr = HierarchyExporter::new("test");
+        mgr.add(HierarchyExporterEntry::new("a", "A"));
+        mgr.add(HierarchyExporterEntry::new("b", "B").with_severity(HierarchyExporterSeverity::High));
+        assert_eq!(mgr.node_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn hierarchyexporter_remove() {
+        let mut mgr = HierarchyExporter::new("test");
+        mgr.add(HierarchyExporterEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn hierarchyexporter_capacity() {
+        let mut mgr = HierarchyExporter::new("test").with_capacity(1);
+        assert!(mgr.add(HierarchyExporterEntry::new("a", "A")));
+        assert!(!mgr.add(HierarchyExporterEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn hierarchyexporter_sorted_by_severity() {
+        let mut mgr = HierarchyExporter::new("test");
+        mgr.add(HierarchyExporterEntry::new("lo", "Low"));
+        mgr.add(HierarchyExporterEntry::new("hi", "High").with_severity(HierarchyExporterSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, HierarchyExporterSeverity::Critical);
+    }
+
+    #[test]
+    fn hierarchyexporter_summary() {
+        let mgr = HierarchyExporter::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn chaindepthmeter_config_defaults() {
+        let cfg = ChainDepthMeterConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn chaindepthmeter_item_creation() {
+        let item = ChainDepthMeterItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn chaindepthmeter_add_and_get() {
+        let mut mgr = ChainDepthMeter::new(ChainDepthMeterConfig::new("test"));
+        mgr.add(ChainDepthMeterItem::new("k1", "v1"));
+        assert_eq!(mgr.max_depth(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn chaindepthmeter_remove_item() {
+        let mut mgr = ChainDepthMeter::new(ChainDepthMeterConfig::new("test"));
+        mgr.add(ChainDepthMeterItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn chaindepthmeter_sorted_by_priority() {
+        let mut mgr = ChainDepthMeter::new(ChainDepthMeterConfig::new("test"));
+        mgr.add(ChainDepthMeterItem::new("lo", "low").with_priority(1));
+        mgr.add(ChainDepthMeterItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn chaindepthmeter_items_with_tag() {
+        let mut mgr = ChainDepthMeter::new(ChainDepthMeterConfig::new("test"));
+        mgr.add(ChainDepthMeterItem::new("a", "1").with_tag("x"));
+        mgr.add(ChainDepthMeterItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn chaindepthmeter_report() {
+        let mgr = ChainDepthMeter::new(ChainDepthMeterConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

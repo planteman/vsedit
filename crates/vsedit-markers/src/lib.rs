@@ -1166,6 +1166,236 @@ impl MarkerOwnerTracker {
 
 impl Default for MarkerOwnerTracker { fn default() -> Self { Self::new() } }
 
+// ---------------------------------------------------------------------------
+// MarkerNavigationRing – circular navigation through markers
+// ---------------------------------------------------------------------------
+
+/// An entry in the navigation ring.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NavRingEntry {
+    pub uri: String,
+    pub line: u32,
+    pub column: u32,
+    pub severity: MarkerSeverity,
+    pub message: String,
+}
+
+/// Circular buffer for navigating through diagnostic markers.
+#[derive(Debug)]
+pub struct MarkerNavigationRing {
+    entries: Vec<NavRingEntry>,
+    cursor: Option<usize>,
+    wrap_around: bool,
+}
+
+impl MarkerNavigationRing {
+    pub fn new(wrap_around: bool) -> Self {
+        Self { entries: Vec::new(), cursor: None, wrap_around }
+    }
+
+    /// Replace all entries (resets cursor).
+    pub fn set_entries(&mut self, entries: Vec<NavRingEntry>) {
+        self.entries = entries;
+        self.cursor = if self.entries.is_empty() { None } else { Some(0) };
+    }
+
+    /// Move to the next marker. Returns it if available.
+    pub fn next(&mut self) -> Option<&NavRingEntry> {
+        if self.entries.is_empty() { return None; }
+        let idx = match self.cursor {
+            Some(i) => {
+                let next = i + 1;
+                if next >= self.entries.len() {
+                    if self.wrap_around { 0 } else { return None; }
+                } else {
+                    next
+                }
+            }
+            None => 0,
+        };
+        self.cursor = Some(idx);
+        self.entries.get(idx)
+    }
+
+    /// Move to the previous marker.
+    pub fn prev(&mut self) -> Option<&NavRingEntry> {
+        if self.entries.is_empty() { return None; }
+        let idx = match self.cursor {
+            Some(0) => {
+                if self.wrap_around { self.entries.len() - 1 } else { return None; }
+            }
+            Some(i) => i - 1,
+            None => 0,
+        };
+        self.cursor = Some(idx);
+        self.entries.get(idx)
+    }
+
+    /// Current entry without moving.
+    pub fn current(&self) -> Option<&NavRingEntry> {
+        self.cursor.and_then(|i| self.entries.get(i))
+    }
+
+    /// Jump to a specific index.
+    pub fn jump_to(&mut self, index: usize) -> Option<&NavRingEntry> {
+        if index < self.entries.len() {
+            self.cursor = Some(index);
+            self.entries.get(index)
+        } else {
+            None
+        }
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn cursor_index(&self) -> Option<usize> { self.cursor }
+
+    /// Filter entries by severity, returning a new ring.
+    pub fn filter_severity(&self, severity: MarkerSeverity) -> Self {
+        let filtered = self.entries.iter()
+            .filter(|e| e.severity == severity)
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut ring = Self::new(self.wrap_around);
+        ring.set_entries(filtered);
+        ring
+    }
+
+    /// Count entries by severity.
+    pub fn count_by_severity(&self, severity: MarkerSeverity) -> usize {
+        self.entries.iter().filter(|e| e.severity == severity).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerFilterExpressionParser – parses filter expressions
+// ---------------------------------------------------------------------------
+
+/// A token in a filter expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FilterToken {
+    /// A bare text term to match against message.
+    Text(String),
+    /// A key:value filter (e.g. "file:*.rs").
+    KeyValue(String, String),
+    /// Boolean AND.
+    And,
+    /// Boolean OR.
+    Or,
+    /// Boolean NOT (prefix).
+    Not,
+}
+
+/// Parsed filter expression tree node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FilterExprNode {
+    Term(String),
+    Field(String, String),
+    And(Box<FilterExprNode>, Box<FilterExprNode>),
+    Or(Box<FilterExprNode>, Box<FilterExprNode>),
+    Not(Box<FilterExprNode>),
+}
+
+/// Parses filter expressions like `"error AND file:*.rs"`.
+#[derive(Debug)]
+pub struct MarkerFilterExpressionParser;
+
+impl MarkerFilterExpressionParser {
+    /// Tokenize a raw filter string.
+    pub fn tokenize(input: &str) -> Vec<FilterToken> {
+        let mut tokens = Vec::new();
+        for word in input.split_whitespace() {
+            match word {
+                "AND" | "&&" => tokens.push(FilterToken::And),
+                "OR" | "||" => tokens.push(FilterToken::Or),
+                "NOT" | "!" => tokens.push(FilterToken::Not),
+                _ => {
+                    if let Some((key, value)) = word.split_once(':') {
+                        tokens.push(FilterToken::KeyValue(key.to_string(), value.to_string()));
+                    } else {
+                        tokens.push(FilterToken::Text(word.to_string()));
+                    }
+                }
+            }
+        }
+        tokens
+    }
+
+    /// Parse tokens into an expression tree (simple left-to-right precedence).
+    pub fn parse(input: &str) -> Option<FilterExprNode> {
+        let tokens = Self::tokenize(input);
+        if tokens.is_empty() { return None; }
+
+        let mut iter = tokens.into_iter().peekable();
+        let mut result = Self::parse_primary(&mut iter)?;
+
+        while let Some(tok) = iter.peek() {
+            match tok {
+                FilterToken::And => {
+                    iter.next();
+                    let right = Self::parse_primary(&mut iter)?;
+                    result = FilterExprNode::And(Box::new(result), Box::new(right));
+                }
+                FilterToken::Or => {
+                    iter.next();
+                    let right = Self::parse_primary(&mut iter)?;
+                    result = FilterExprNode::Or(Box::new(result), Box::new(right));
+                }
+                _ => break,
+            }
+        }
+
+        Some(result)
+    }
+
+    fn parse_primary(iter: &mut std::iter::Peekable<std::vec::IntoIter<FilterToken>>) -> Option<FilterExprNode> {
+        let tok = iter.next()?;
+        match tok {
+            FilterToken::Text(s) => Some(FilterExprNode::Term(s)),
+            FilterToken::KeyValue(k, v) => Some(FilterExprNode::Field(k, v)),
+            FilterToken::Not => {
+                let inner = Self::parse_primary(iter)?;
+                Some(FilterExprNode::Not(Box::new(inner)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if a marker entry matches the parsed expression.
+    pub fn matches(node: &FilterExprNode, entry: &NavRingEntry) -> bool {
+        match node {
+            FilterExprNode::Term(t) => {
+                let lower = t.to_lowercase();
+                entry.message.to_lowercase().contains(&lower)
+            }
+            FilterExprNode::Field(key, value) => {
+                match key.as_str() {
+                    "file" => Self::glob_match(&entry.uri, value),
+                    "severity" | "sev" => format!("{:?}", entry.severity).to_lowercase() == value.to_lowercase(),
+                    "line" => entry.line.to_string() == *value,
+                    _ => false,
+                }
+            }
+            FilterExprNode::And(l, r) => Self::matches(l, entry) && Self::matches(r, entry),
+            FilterExprNode::Or(l, r) => Self::matches(l, entry) || Self::matches(r, entry),
+            FilterExprNode::Not(inner) => !Self::matches(inner, entry),
+        }
+    }
+
+    /// Simple glob matching (only `*` is supported as wildcard).
+    fn glob_match(text: &str, pattern: &str) -> bool {
+        if pattern == "*" { return true; }
+        if let Some(suffix) = pattern.strip_prefix('*') {
+            return text.ends_with(suffix);
+        }
+        if let Some(prefix) = pattern.strip_suffix('*') {
+            return text.starts_with(prefix);
+        }
+        text == pattern
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2346,6 +2576,150 @@ mod tests {
     fn code_action_linker_empty() {
         let linker = MarkerCodeActionLinker::new();
         assert!(linker.is_empty());
+    }
+
+
+    fn nav_entry(uri: &str, line: u32, sev: MarkerSeverity, msg: &str) -> NavRingEntry {
+        NavRingEntry {
+            uri: uri.to_string(),
+            line,
+            column: 0,
+            severity: sev,
+            message: msg.to_string(),
+        }
+    }
+
+    #[test]
+    fn nav_ring_basic() {
+        let mut ring = MarkerNavigationRing::new(true);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Error, "e1"),
+            nav_entry("b.rs", 2, MarkerSeverity::Warning, "w1"),
+        ]);
+        assert_eq!(ring.len(), 2);
+        assert_eq!(ring.current().unwrap().message, "e1");
+    }
+
+    #[test]
+    fn nav_ring_next_prev() {
+        let mut ring = MarkerNavigationRing::new(false);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Error, "e1"),
+            nav_entry("b.rs", 2, MarkerSeverity::Warning, "w1"),
+        ]);
+        let n = ring.next().unwrap();
+        assert_eq!(n.message, "w1");
+        let p = ring.prev().unwrap();
+        assert_eq!(p.message, "e1");
+    }
+
+    #[test]
+    fn nav_ring_wrap_around() {
+        let mut ring = MarkerNavigationRing::new(true);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Error, "e1"),
+            nav_entry("b.rs", 2, MarkerSeverity::Warning, "w1"),
+        ]);
+        ring.next(); // w1
+        let wrapped = ring.next().unwrap();
+        assert_eq!(wrapped.message, "e1");
+    }
+
+    #[test]
+    fn nav_ring_no_wrap() {
+        let mut ring = MarkerNavigationRing::new(false);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Error, "e1"),
+        ]);
+        ring.next(); // beyond end
+        assert!(ring.next().is_none());
+    }
+
+    #[test]
+    fn nav_ring_empty() {
+        let mut ring = MarkerNavigationRing::new(true);
+        assert!(ring.is_empty());
+        assert!(ring.next().is_none());
+        assert!(ring.prev().is_none());
+    }
+
+    #[test]
+    fn nav_ring_jump_to() {
+        let mut ring = MarkerNavigationRing::new(false);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Error, "e1"),
+            nav_entry("b.rs", 2, MarkerSeverity::Warning, "w1"),
+            nav_entry("c.rs", 3, MarkerSeverity::Hint, "h1"),
+        ]);
+        let e = ring.jump_to(2).unwrap();
+        assert_eq!(e.message, "h1");
+        assert!(ring.jump_to(99).is_none());
+    }
+
+    #[test]
+    fn nav_ring_filter_severity() {
+        let mut ring = MarkerNavigationRing::new(true);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Error, "e1"),
+            nav_entry("b.rs", 2, MarkerSeverity::Warning, "w1"),
+            nav_entry("c.rs", 3, MarkerSeverity::Error, "e2"),
+        ]);
+        let errors = ring.filter_severity(MarkerSeverity::Error);
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn nav_ring_count_by_severity() {
+        let mut ring = MarkerNavigationRing::new(true);
+        ring.set_entries(vec![
+            nav_entry("a.rs", 1, MarkerSeverity::Warning, "w1"),
+            nav_entry("b.rs", 2, MarkerSeverity::Warning, "w2"),
+        ]);
+        assert_eq!(ring.count_by_severity(MarkerSeverity::Warning), 2);
+        assert_eq!(ring.count_by_severity(MarkerSeverity::Error), 0);
+    }
+
+    #[test]
+    fn filter_tokenize() {
+        let tokens = MarkerFilterExpressionParser::tokenize("error AND file:*.rs");
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], FilterToken::Text("error".into()));
+        assert_eq!(tokens[1], FilterToken::And);
+        assert_eq!(tokens[2], FilterToken::KeyValue("file".into(), "*.rs".into()));
+    }
+
+    #[test]
+    fn filter_parse_and() {
+        let node = MarkerFilterExpressionParser::parse("error AND file:*.rs").unwrap();
+        assert!(matches!(node, FilterExprNode::And(_, _)));
+    }
+
+    #[test]
+    fn filter_matches_term() {
+        let entry = nav_entry("a.rs", 1, MarkerSeverity::Error, "undefined variable");
+        let node = MarkerFilterExpressionParser::parse("undefined").unwrap();
+        assert!(MarkerFilterExpressionParser::matches(&node, &entry));
+    }
+
+    #[test]
+    fn filter_matches_field() {
+        let entry = nav_entry("main.rs", 5, MarkerSeverity::Error, "oops");
+        let node = MarkerFilterExpressionParser::parse("file:*.rs").unwrap();
+        assert!(MarkerFilterExpressionParser::matches(&node, &entry));
+    }
+
+    #[test]
+    fn filter_matches_not() {
+        let entry = nav_entry("a.rs", 1, MarkerSeverity::Warning, "unused");
+        let node = MarkerFilterExpressionParser::parse("NOT error").unwrap();
+        assert!(MarkerFilterExpressionParser::matches(&node, &entry));
+    }
+
+    #[test]
+    fn filter_matches_severity() {
+        let entry = nav_entry("a.rs", 1, MarkerSeverity::Error, "x");
+        let node = MarkerFilterExpressionParser::parse("sev:error").unwrap();
+        assert!(MarkerFilterExpressionParser::matches(&node, &entry));
     }
 
 }

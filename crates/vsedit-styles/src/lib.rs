@@ -1401,6 +1401,250 @@ impl StyleDiffComparison {
     }
 }
 
+
+// === Style Variable Resolver ===
+
+/// Resolves style variables like `${color.primary}` in style strings.
+#[derive(Debug, Clone)]
+pub struct StyleVarResolver {
+    variables: HashMap<String, String>,
+    fallbacks: HashMap<String, String>,
+    resolution_cache: HashMap<String, String>,
+    max_depth: usize,
+}
+
+impl StyleVarResolver {
+    pub fn new() -> Self {
+        Self {
+            variables: HashMap::new(),
+            fallbacks: HashMap::new(),
+            resolution_cache: HashMap::new(),
+            max_depth: 10,
+        }
+    }
+
+    pub fn with_max_depth(mut self, depth: usize) -> Self {
+        self.max_depth = depth;
+        self
+    }
+
+    pub fn set_variable(&mut self, name: impl Into<String>, value: impl Into<String>) {
+        let name = name.into();
+        self.resolution_cache.remove(&name);
+        self.variables.insert(name, value.into());
+    }
+
+    pub fn set_fallback(&mut self, name: impl Into<String>, fallback: impl Into<String>) {
+        self.fallbacks.insert(name.into(), fallback.into());
+    }
+
+    pub fn resolve(&mut self, input: &str) -> String {
+        if let Some(cached) = self.resolution_cache.get(input) {
+            return cached.clone();
+        }
+        let result = self.resolve_recursive(input, 0);
+        self.resolution_cache.insert(input.to_string(), result.clone());
+        result
+    }
+
+    fn resolve_recursive(&self, input: &str, depth: usize) -> String {
+        if depth >= self.max_depth {
+            return input.to_string();
+        }
+        let mut result = input.to_string();
+        let mut start = 0;
+        while let Some(var_start) = result[start..].find("${") {
+            let abs_start = start + var_start;
+            if let Some(var_end) = result[abs_start..].find('}') {
+                let abs_end = abs_start + var_end;
+                let var_name = &result[abs_start + 2..abs_end];
+                let replacement = self.variables.get(var_name)
+                    .or_else(|| self.fallbacks.get(var_name))
+                    .cloned()
+                    .unwrap_or_else(|| format!("${{{}}}", var_name));
+                let resolved = self.resolve_recursive(&replacement, depth + 1);
+                result = format!("{}{}{}", &result[..abs_start], resolved, &result[abs_end + 1..]);
+                start = abs_start + resolved.len();
+            } else {
+                break;
+            }
+        }
+        result
+    }
+
+    pub fn clear_cache(&mut self) {
+        self.resolution_cache.clear();
+    }
+
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    pub fn has_variable(&self, name: &str) -> bool {
+        self.variables.contains_key(name)
+    }
+
+    pub fn remove_variable(&mut self, name: &str) -> Option<String> {
+        self.resolution_cache.remove(name);
+        self.variables.remove(name)
+    }
+
+    pub fn all_variable_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.variables.keys().cloned().collect();
+        names.sort();
+        names
+    }
+}
+
+impl Default for StyleVarResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// === Style Theme Switcher ===
+
+/// A named style theme with key-value style pairs.
+#[derive(Debug, Clone)]
+pub struct StyleThemeEntry {
+    pub name: String,
+    pub styles: HashMap<String, Style>,
+    pub is_dark: bool,
+    pub priority: u32,
+}
+
+impl StyleThemeEntry {
+    pub fn new(name: impl Into<String>, is_dark: bool) -> Self {
+        Self {
+            name: name.into(),
+            styles: HashMap::new(),
+            is_dark,
+            priority: 0,
+        }
+    }
+
+    pub fn with_priority(mut self, priority: u32) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn set_style(&mut self, key: impl Into<String>, style: Style) {
+        self.styles.insert(key.into(), style);
+    }
+
+    pub fn get_style(&self, key: &str) -> Option<&Style> {
+        self.styles.get(key)
+    }
+
+    pub fn style_count(&self) -> usize {
+        self.styles.len()
+    }
+
+    pub fn merge_from(&mut self, other: &StyleThemeEntry) {
+        for (k, v) in &other.styles {
+            self.styles.entry(k.clone()).or_insert(*v);
+        }
+    }
+}
+
+/// Manages switching between multiple themes.
+#[derive(Debug)]
+pub struct StyleThemeSwitcher {
+    themes: Vec<StyleThemeEntry>,
+    active_index: usize,
+    history: Vec<usize>,
+    max_history: usize,
+}
+
+impl StyleThemeSwitcher {
+    pub fn new() -> Self {
+        Self {
+            themes: Vec::new(),
+            active_index: 0,
+            history: Vec::new(),
+            max_history: 20,
+        }
+    }
+
+    pub fn add_theme(&mut self, theme: StyleThemeEntry) {
+        self.themes.push(theme);
+    }
+
+    pub fn switch_to(&mut self, index: usize) -> bool {
+        if index < self.themes.len() {
+            self.history.push(self.active_index);
+            if self.history.len() > self.max_history {
+                self.history.remove(0);
+            }
+            self.active_index = index;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn switch_by_name(&mut self, name: &str) -> bool {
+        if let Some(idx) = self.themes.iter().position(|t| t.name == name) {
+            self.switch_to(idx)
+        } else {
+            false
+        }
+    }
+
+    pub fn active_theme(&self) -> Option<&StyleThemeEntry> {
+        self.themes.get(self.active_index)
+    }
+
+    pub fn active_theme_name(&self) -> Option<&str> {
+        self.active_theme().map(|t| t.name.as_str())
+    }
+
+    pub fn switch_to_previous(&mut self) -> bool {
+        if let Some(prev) = self.history.pop() {
+            self.active_index = prev;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn theme_count(&self) -> usize {
+        self.themes.len()
+    }
+
+    pub fn dark_themes(&self) -> Vec<&StyleThemeEntry> {
+        self.themes.iter().filter(|t| t.is_dark).collect()
+    }
+
+    pub fn light_themes(&self) -> Vec<&StyleThemeEntry> {
+        self.themes.iter().filter(|t| !t.is_dark).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&StyleThemeEntry> {
+        let mut sorted: Vec<&StyleThemeEntry> = self.themes.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn remove_theme(&mut self, name: &str) -> bool {
+        if let Some(idx) = self.themes.iter().position(|t| t.name == name) {
+            self.themes.remove(idx);
+            if self.active_index >= self.themes.len() && !self.themes.is_empty() {
+                self.active_index = self.themes.len() - 1;
+            }
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for StyleThemeSwitcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2317,6 +2561,119 @@ mod tests {
         vr.set("a", "b");
         vr.clear();
         assert!(vr.is_empty());
+    }
+
+
+    #[test]
+    fn style_var_resolver_basic() {
+        let mut r = StyleVarResolver::new();
+        r.set_variable("color", "red");
+        assert_eq!(r.resolve("bg: ${color}"), "bg: red");
+    }
+
+    #[test]
+    fn style_var_resolver_nested() {
+        let mut r = StyleVarResolver::new();
+        r.set_variable("primary", "${base}");
+        r.set_variable("base", "blue");
+        assert_eq!(r.resolve("${primary}"), "blue");
+    }
+
+    #[test]
+    fn style_var_resolver_fallback() {
+        let mut r = StyleVarResolver::new();
+        r.set_fallback("missing", "default_val");
+        assert_eq!(r.resolve("${missing}"), "default_val");
+    }
+
+    #[test]
+    fn style_var_resolver_no_var() {
+        let mut r = StyleVarResolver::new();
+        assert_eq!(r.resolve("plain text"), "plain text");
+    }
+
+    #[test]
+    fn style_var_resolver_count() {
+        let mut r = StyleVarResolver::new();
+        r.set_variable("a", "1");
+        r.set_variable("b", "2");
+        assert_eq!(r.variable_count(), 2);
+    }
+
+    #[test]
+    fn style_var_resolver_remove() {
+        let mut r = StyleVarResolver::new();
+        r.set_variable("x", "y");
+        assert!(r.has_variable("x"));
+        r.remove_variable("x");
+        assert!(!r.has_variable("x"));
+    }
+
+    #[test]
+    fn style_theme_switcher_add_switch() {
+        let mut sw = StyleThemeSwitcher::new();
+        sw.add_theme(StyleThemeEntry::new("dark", true));
+        sw.add_theme(StyleThemeEntry::new("light", false));
+        assert_eq!(sw.active_theme_name(), Some("dark"));
+        sw.switch_to(1);
+        assert_eq!(sw.active_theme_name(), Some("light"));
+    }
+
+    #[test]
+    fn style_theme_switcher_by_name() {
+        let mut sw = StyleThemeSwitcher::new();
+        sw.add_theme(StyleThemeEntry::new("monokai", true));
+        sw.add_theme(StyleThemeEntry::new("solarized", false));
+        assert!(sw.switch_by_name("solarized"));
+        assert_eq!(sw.active_theme_name(), Some("solarized"));
+    }
+
+    #[test]
+    fn style_theme_switcher_previous() {
+        let mut sw = StyleThemeSwitcher::new();
+        sw.add_theme(StyleThemeEntry::new("a", true));
+        sw.add_theme(StyleThemeEntry::new("b", false));
+        sw.switch_to(1);
+        sw.switch_to_previous();
+        assert_eq!(sw.active_theme_name(), Some("a"));
+    }
+
+    #[test]
+    fn style_theme_dark_light_filter() {
+        let mut sw = StyleThemeSwitcher::new();
+        sw.add_theme(StyleThemeEntry::new("d1", true));
+        sw.add_theme(StyleThemeEntry::new("l1", false));
+        sw.add_theme(StyleThemeEntry::new("d2", true));
+        assert_eq!(sw.dark_themes().len(), 2);
+        assert_eq!(sw.light_themes().len(), 1);
+    }
+
+    #[test]
+    fn style_theme_merge_styles() {
+        let mut t1 = StyleThemeEntry::new("base", true);
+        t1.set_style("bg", Style::default());
+        let mut t2 = StyleThemeEntry::new("ext", true);
+        t2.set_style("fg", Style::default());
+        t2.set_style("bg", Style::default().fg(Color::Red));
+        t1.merge_from(&t2);
+        assert_eq!(t1.style_count(), 2);
+    }
+
+    #[test]
+    fn style_var_resolver_max_depth() {
+        let r = StyleVarResolver::new().with_max_depth(2);
+        assert_eq!(r.max_depth, 2);
+    }
+
+    #[test]
+    fn style_theme_priority_sort() {
+        let mut sw = StyleThemeSwitcher::new();
+        sw.add_theme(StyleThemeEntry::new("low", true).with_priority(1));
+        sw.add_theme(StyleThemeEntry::new("high", true).with_priority(10));
+        sw.add_theme(StyleThemeEntry::new("mid", true).with_priority(5));
+        let sorted = sw.sorted_by_priority();
+        assert_eq!(sorted[0].name, "high");
+        assert_eq!(sorted[2].name, "low");
     }
 
 }

@@ -1344,6 +1344,281 @@ pub fn remove_expired(policies: &mut Vec<ExpiringPolicy>, now: u64) -> usize {
     before - policies.len()
 }
 
+// ---------------------------------------------------------------------------
+// PolicyExpressionEvaluator
+// ---------------------------------------------------------------------------
+
+/// Token types for policy expression parsing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PolicyToken {
+    Identifier(String),
+    And,
+    Or,
+    Not,
+    LeftParen,
+    RightParen,
+}
+
+impl fmt::Display for PolicyToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PolicyToken::Identifier(s) => write!(f, "{s}"),
+            PolicyToken::And => write!(f, "AND"),
+            PolicyToken::Or => write!(f, "OR"),
+            PolicyToken::Not => write!(f, "NOT"),
+            PolicyToken::LeftParen => write!(f, "("),
+            PolicyToken::RightParen => write!(f, ")"),
+        }
+    }
+}
+
+/// Tokenizes a policy expression string into tokens.
+fn tokenize_policy_expr(input: &str) -> Result<Vec<PolicyToken>, String> {
+    let mut tokens = Vec::new();
+    let mut chars = input.chars().peekable();
+    while let Some(&ch) = chars.peek() {
+        match ch {
+            ' ' | '\t' | '\n' | '\r' => { chars.next(); }
+            '(' => { tokens.push(PolicyToken::LeftParen); chars.next(); }
+            ')' => { tokens.push(PolicyToken::RightParen); chars.next(); }
+            _ if ch.is_alphanumeric() || ch == '_' || ch == '.' => {
+                let mut word = String::new();
+                while let Some(&c) = chars.peek() {
+                    if c.is_alphanumeric() || c == '_' || c == '.' {
+                        word.push(c);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                match word.to_uppercase().as_str() {
+                    "AND" => tokens.push(PolicyToken::And),
+                    "OR" => tokens.push(PolicyToken::Or),
+                    "NOT" => tokens.push(PolicyToken::Not),
+                    _ => tokens.push(PolicyToken::Identifier(word)),
+                }
+            }
+            other => return Err(format!("unexpected character: '{other}'")),
+        }
+    }
+    Ok(tokens)
+}
+
+/// Evaluates boolean policy expressions like "feature.enabled AND NOT trial.expired".
+/// Identifiers are resolved against a set of truthy policy keys.
+pub struct PolicyExpressionEvaluator {
+    truthy_keys: HashSet<String>,
+}
+
+impl PolicyExpressionEvaluator {
+    pub fn new() -> Self {
+        Self { truthy_keys: HashSet::new() }
+    }
+
+    pub fn with_keys(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Self {
+            truthy_keys: keys.into_iter().map(|k| k.into()).collect(),
+        }
+    }
+
+    pub fn set_key(&mut self, key: impl Into<String>, value: bool) {
+        let k = key.into();
+        if value {
+            self.truthy_keys.insert(k);
+        } else {
+            self.truthy_keys.remove(&k);
+        }
+    }
+
+    pub fn is_key_set(&self, key: &str) -> bool {
+        self.truthy_keys.contains(key)
+    }
+
+    pub fn key_count(&self) -> usize {
+        self.truthy_keys.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.truthy_keys.clear();
+    }
+
+    /// Evaluate a boolean expression string.
+    pub fn evaluate(&self, expr: &str) -> Result<bool, String> {
+        let tokens = tokenize_policy_expr(expr)?;
+        if tokens.is_empty() {
+            return Err("empty expression".into());
+        }
+        let mut pos = 0;
+        let result = self.parse_or(&tokens, &mut pos)?;
+        if pos < tokens.len() {
+            return Err(format!("unexpected token at position {pos}"));
+        }
+        Ok(result)
+    }
+
+    fn parse_or(&self, tokens: &[PolicyToken], pos: &mut usize) -> Result<bool, String> {
+        let mut left = self.parse_and(tokens, pos)?;
+        while *pos < tokens.len() && tokens[*pos] == PolicyToken::Or {
+            *pos += 1;
+            let right = self.parse_and(tokens, pos)?;
+            left = left || right;
+        }
+        Ok(left)
+    }
+
+    fn parse_and(&self, tokens: &[PolicyToken], pos: &mut usize) -> Result<bool, String> {
+        let mut left = self.parse_not(tokens, pos)?;
+        while *pos < tokens.len() && tokens[*pos] == PolicyToken::And {
+            *pos += 1;
+            let right = self.parse_not(tokens, pos)?;
+            left = left && right;
+        }
+        Ok(left)
+    }
+
+    fn parse_not(&self, tokens: &[PolicyToken], pos: &mut usize) -> Result<bool, String> {
+        if *pos < tokens.len() && tokens[*pos] == PolicyToken::Not {
+            *pos += 1;
+            let val = self.parse_not(tokens, pos)?;
+            return Ok(!val);
+        }
+        self.parse_primary(tokens, pos)
+    }
+
+    fn parse_primary(&self, tokens: &[PolicyToken], pos: &mut usize) -> Result<bool, String> {
+        if *pos >= tokens.len() {
+            return Err("unexpected end of expression".into());
+        }
+        match &tokens[*pos] {
+            PolicyToken::Identifier(name) => {
+                *pos += 1;
+                Ok(self.truthy_keys.contains(name))
+            }
+            PolicyToken::LeftParen => {
+                *pos += 1;
+                let val = self.parse_or(tokens, pos)?;
+                if *pos >= tokens.len() || tokens[*pos] != PolicyToken::RightParen {
+                    return Err("missing closing parenthesis".into());
+                }
+                *pos += 1;
+                Ok(val)
+            }
+            other => Err(format!("unexpected token: {other}")),
+        }
+    }
+}
+
+impl fmt::Display for PolicyExpressionEvaluator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PolicyExpressionEvaluator({} keys)", self.truthy_keys.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PolicyOverrideApplier
+// ---------------------------------------------------------------------------
+
+/// A single prioritised policy override entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PolicyOverrideEntry {
+    pub key: String,
+    pub value: String,
+    pub priority: i32,
+    pub source: String,
+}
+
+impl PolicyOverrideEntry {
+    pub fn new(key: impl Into<String>, value: impl Into<String>, priority: i32, source: impl Into<String>) -> Self {
+        Self { key: key.into(), value: value.into(), priority, source: source.into() }
+    }
+}
+
+impl fmt::Display for PolicyOverrideEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={} (pri={}, src={})", self.key, self.value, self.priority, self.source)
+    }
+}
+
+/// Applies policy overrides with priority ordering.
+/// Higher priority overrides win when multiple overrides target the same key.
+pub struct PolicyOverrideApplier {
+    overrides: Vec<PolicyOverrideEntry>,
+}
+
+impl PolicyOverrideApplier {
+    pub fn new() -> Self {
+        Self { overrides: Vec::new() }
+    }
+
+    pub fn add_override(&mut self, entry: PolicyOverrideEntry) {
+        self.overrides.push(entry);
+    }
+
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.overrides.clear();
+    }
+
+    /// Returns the effective value for a key (highest priority override wins).
+    pub fn resolve(&self, key: &str) -> Option<&str> {
+        self.overrides
+            .iter()
+            .filter(|e| e.key == key)
+            .max_by_key(|e| e.priority)
+            .map(|e| e.value.as_str())
+    }
+
+    /// Returns all effective overrides as a map (highest priority per key).
+    pub fn resolve_all(&self) -> HashMap<String, String> {
+        let mut best: HashMap<String, &PolicyOverrideEntry> = HashMap::new();
+        for entry in &self.overrides {
+            let is_better = best
+                .get(&entry.key)
+                .map_or(true, |existing| entry.priority > existing.priority);
+            if is_better {
+                best.insert(entry.key.clone(), entry);
+            }
+        }
+        best.into_iter().map(|(k, v)| (k, v.value.clone())).collect()
+    }
+
+    /// Returns all overrides for a specific key, sorted by priority descending.
+    pub fn overrides_for_key(&self, key: &str) -> Vec<&PolicyOverrideEntry> {
+        let mut entries: Vec<_> = self.overrides.iter().filter(|e| e.key == key).collect();
+        entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+        entries
+    }
+
+    /// Returns the set of all keys that have overrides.
+    pub fn overridden_keys(&self) -> HashSet<String> {
+        self.overrides.iter().map(|e| e.key.clone()).collect()
+    }
+
+    /// Removes all overrides from a given source.
+    pub fn remove_source(&mut self, source: &str) {
+        self.overrides.retain(|e| e.source != source);
+    }
+
+    /// Apply overrides to a base config map, returning the merged result.
+    pub fn apply_to(&self, base: &HashMap<String, String>) -> HashMap<String, String> {
+        let mut result = base.clone();
+        for (k, v) in self.resolve_all() {
+            result.insert(k, v);
+        }
+        result
+    }
+}
+
+impl fmt::Display for PolicyOverrideApplier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PolicyOverrideApplier({} overrides)", self.overrides.len())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2346,4 +2621,176 @@ mod tests {
         assert!(s.contains("x"));
         assert!(s.contains("admin"));
     }
+
+    #[test]
+    fn expr_eval_simple_true_key() {
+        let eval = PolicyExpressionEvaluator::with_keys(vec!["feature.enabled"]);
+        assert!(eval.evaluate("feature.enabled").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_simple_false_key() {
+        let eval = PolicyExpressionEvaluator::new();
+        assert!(!eval.evaluate("feature.enabled").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_and_both_true() {
+        let eval = PolicyExpressionEvaluator::with_keys(vec!["a", "b"]);
+        assert!(eval.evaluate("a AND b").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_and_one_false() {
+        let eval = PolicyExpressionEvaluator::with_keys(vec!["a"]);
+        assert!(!eval.evaluate("a AND b").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_or_one_true() {
+        let eval = PolicyExpressionEvaluator::with_keys(vec!["a"]);
+        assert!(eval.evaluate("a OR b").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_not() {
+        let eval = PolicyExpressionEvaluator::new();
+        assert!(eval.evaluate("NOT missing").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_complex_expression() {
+        let eval = PolicyExpressionEvaluator::with_keys(vec!["feature.enabled"]);
+        assert!(eval.evaluate("feature.enabled AND NOT trial.expired").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_parentheses() {
+        let eval = PolicyExpressionEvaluator::with_keys(vec!["a"]);
+        assert!(eval.evaluate("(a OR b) AND NOT c").unwrap());
+    }
+
+    #[test]
+    fn expr_eval_empty_error() {
+        let eval = PolicyExpressionEvaluator::new();
+        assert!(eval.evaluate("").is_err());
+    }
+
+    #[test]
+    fn expr_eval_display_and_key_ops() {
+        let mut eval = PolicyExpressionEvaluator::new();
+        eval.set_key("x", true);
+        assert!(eval.is_key_set("x"));
+        assert_eq!(eval.key_count(), 1);
+        eval.set_key("x", false);
+        assert!(!eval.is_key_set("x"));
+        eval.set_key("y", true);
+        eval.clear();
+        assert_eq!(eval.key_count(), 0);
+        assert!(format!("{eval}").contains("0 keys"));
+    }
+
+    #[test]
+    fn override_applier_resolve_highest_priority() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("k", "low", 1, "s1"));
+        applier.add_override(PolicyOverrideEntry::new("k", "high", 10, "s2"));
+        assert_eq!(applier.resolve("k"), Some("high"));
+    }
+
+    #[test]
+    fn override_applier_resolve_missing_key() {
+        let applier = PolicyOverrideApplier::new();
+        assert_eq!(applier.resolve("nope"), None);
+    }
+
+    #[test]
+    fn override_applier_resolve_all() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("a", "1", 5, "s"));
+        applier.add_override(PolicyOverrideEntry::new("a", "2", 10, "s"));
+        applier.add_override(PolicyOverrideEntry::new("b", "3", 1, "s"));
+        let resolved = applier.resolve_all();
+        assert_eq!(resolved.get("a").unwrap(), "2");
+        assert_eq!(resolved.get("b").unwrap(), "3");
+    }
+
+    #[test]
+    fn override_applier_overrides_for_key_sorted() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("k", "low", 1, "s1"));
+        applier.add_override(PolicyOverrideEntry::new("k", "mid", 5, "s2"));
+        applier.add_override(PolicyOverrideEntry::new("k", "high", 10, "s3"));
+        let entries = applier.overrides_for_key("k");
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].value, "high");
+    }
+
+    #[test]
+    fn override_applier_remove_source() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("k", "v1", 1, "admin"));
+        applier.add_override(PolicyOverrideEntry::new("k", "v2", 2, "user"));
+        applier.remove_source("admin");
+        assert_eq!(applier.override_count(), 1);
+        assert_eq!(applier.resolve("k"), Some("v2"));
+    }
+
+    #[test]
+    fn override_applier_apply_to_base() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("color", "red", 1, "s"));
+        let mut base = HashMap::new();
+        base.insert("color".into(), "blue".into());
+        base.insert("size".into(), "10".into());
+        let merged = applier.apply_to(&base);
+        assert_eq!(merged.get("color").unwrap(), "red");
+        assert_eq!(merged.get("size").unwrap(), "10");
+    }
+
+    #[test]
+    fn override_applier_display_and_clear() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("k", "v", 1, "s"));
+        assert!(format!("{applier}").contains("1 overrides"));
+        applier.clear();
+        assert_eq!(applier.override_count(), 0);
+    }
+
+    #[test]
+    fn override_entry_display() {
+        let e = PolicyOverrideEntry::new("k", "v", 5, "admin");
+        let s = format!("{e}");
+        assert!(s.contains("k=v"));
+        assert!(s.contains("pri=5"));
+        assert!(s.contains("src=admin"));
+    }
+
+    #[test]
+    fn override_applier_overridden_keys() {
+        let mut applier = PolicyOverrideApplier::new();
+        applier.add_override(PolicyOverrideEntry::new("a", "1", 1, "s"));
+        applier.add_override(PolicyOverrideEntry::new("b", "2", 1, "s"));
+        let keys = applier.overridden_keys();
+        assert!(keys.contains("a"));
+        assert!(keys.contains("b"));
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn tokenize_policy_expr_invalid_char() {
+        let result = tokenize_policy_expr("a & b");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn policy_token_display() {
+        assert_eq!(format!("{}", PolicyToken::And), "AND");
+        assert_eq!(format!("{}", PolicyToken::Or), "OR");
+        assert_eq!(format!("{}", PolicyToken::Not), "NOT");
+        assert_eq!(format!("{}", PolicyToken::LeftParen), "(");
+        assert_eq!(format!("{}", PolicyToken::RightParen), ")");
+        assert_eq!(format!("{}", PolicyToken::Identifier("x".into())), "x");
+    }
+
 }

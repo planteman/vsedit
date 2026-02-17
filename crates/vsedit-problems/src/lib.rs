@@ -1270,6 +1270,275 @@ impl ProblemDeduplicator {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ProblemQuickFix
+// ---------------------------------------------------------------------------
+
+/// A suggested quick-fix action for a diagnostic problem.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickFixAction {
+    /// Short label shown in the UI.
+    pub title: String,
+    /// The kind of fix (e.g. "quickfix", "refactor").
+    pub kind: String,
+    /// Whether this fix is the preferred one.
+    pub is_preferred: bool,
+}
+
+impl QuickFixAction {
+    /// Create a new quick-fix action.
+    pub fn new(title: impl Into<String>, kind: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            kind: kind.into(),
+            is_preferred: false,
+        }
+    }
+
+    /// Mark this action as the preferred fix.
+    pub fn preferred(mut self) -> Self {
+        self.is_preferred = true;
+        self
+    }
+}
+
+/// Manages quick-fix actions associated with problems.
+#[derive(Debug, Clone)]
+pub struct ProblemQuickFixList {
+    /// Map from problem index → list of available fixes.
+    fixes: Vec<(usize, Vec<QuickFixAction>)>,
+}
+
+impl ProblemQuickFixList {
+    /// Create a new empty quick-fix list.
+    pub fn new() -> Self {
+        Self { fixes: Vec::new() }
+    }
+
+    /// Register quick-fix actions for a given problem index.
+    pub fn add_fixes(&mut self, problem_index: usize, actions: Vec<QuickFixAction>) {
+        if let Some(entry) = self.fixes.iter_mut().find(|(idx, _)| *idx == problem_index) {
+            entry.1.extend(actions);
+        } else {
+            self.fixes.push((problem_index, actions));
+        }
+    }
+
+    /// Get all fixes for a specific problem.
+    pub fn fixes_for(&self, problem_index: usize) -> &[QuickFixAction] {
+        self.fixes
+            .iter()
+            .find(|(idx, _)| *idx == problem_index)
+            .map(|(_, actions)| actions.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Get the preferred fix for a problem, if any.
+    pub fn preferred_fix(&self, problem_index: usize) -> Option<&QuickFixAction> {
+        self.fixes_for(problem_index).iter().find(|a| a.is_preferred)
+    }
+
+    /// Total number of registered fixes across all problems.
+    pub fn total_fix_count(&self) -> usize {
+        self.fixes.iter().map(|(_, v)| v.len()).sum()
+    }
+
+    /// Number of problems that have at least one fix.
+    pub fn problems_with_fixes(&self) -> usize {
+        self.fixes.iter().filter(|(_, v)| !v.is_empty()).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProblemWorkspaceFilter
+// ---------------------------------------------------------------------------
+
+/// Filter problems to a specific workspace folder or set of files.
+#[derive(Debug, Clone)]
+pub struct ProblemWorkspaceFilter {
+    /// Workspace root paths to include.
+    included_roots: Vec<String>,
+    /// Specific file paths to exclude.
+    excluded_files: HashSet<String>,
+}
+
+impl ProblemWorkspaceFilter {
+    /// Create a new workspace filter with the given root paths.
+    pub fn new(roots: Vec<String>) -> Self {
+        Self {
+            included_roots: roots,
+            excluded_files: HashSet::new(),
+        }
+    }
+
+    /// Add a file path to the exclusion set.
+    pub fn exclude_file(&mut self, path: impl Into<String>) {
+        self.excluded_files.insert(path.into());
+    }
+
+    /// Check whether a problem passes this workspace filter.
+    pub fn matches(&self, problem: &Problem) -> bool {
+        if self.excluded_files.contains(&problem.file_path) {
+            return false;
+        }
+        if self.included_roots.is_empty() {
+            return true;
+        }
+        self.included_roots.iter().any(|root| problem.file_path.starts_with(root))
+    }
+
+    /// Filter a slice of problems, returning only those that match.
+    pub fn filter<'a>(&self, problems: &'a [Problem]) -> Vec<&'a Problem> {
+        problems.iter().filter(|p| self.matches(p)).collect()
+    }
+
+    /// Return the number of included workspace roots.
+    pub fn root_count(&self) -> usize {
+        self.included_roots.len()
+    }
+
+    /// Return the number of excluded files.
+    pub fn excluded_count(&self) -> usize {
+        self.excluded_files.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Severity counter widget
+// ---------------------------------------------------------------------------
+
+/// Counts problems by severity level for status-bar display.
+#[derive(Debug, Clone, Default)]
+pub struct SeverityCounter {
+    pub errors: usize,
+    pub warnings: usize,
+    pub infos: usize,
+    pub hints: usize,
+}
+
+impl SeverityCounter {
+    /// Count severities from a slice of problems.
+    pub fn from_problems(problems: &[Problem]) -> Self {
+        let mut counter = Self::default();
+        for p in problems {
+            match p.severity {
+                ProblemSeverity::Error => counter.errors += 1,
+                ProblemSeverity::Warning => counter.warnings += 1,
+                ProblemSeverity::Info => counter.infos += 1,
+                ProblemSeverity::Hint => counter.hints += 1,
+            }
+        }
+        counter
+    }
+
+    /// Total number of problems across all severities.
+    pub fn total(&self) -> usize {
+        self.errors + self.warnings + self.infos + self.hints
+    }
+
+    /// Return `true` if there are any error-level problems.
+    pub fn has_errors(&self) -> bool {
+        self.errors > 0
+    }
+
+    /// Return a one-line summary string like "2E 3W 1I 0H".
+    pub fn summary(&self) -> String {
+        format!("{}E {}W {}I {}H", self.errors, self.warnings, self.infos, self.hints)
+    }
+
+    /// Return the highest severity that has at least one problem.
+    pub fn worst_severity(&self) -> Option<ProblemSeverity> {
+        if self.errors > 0 {
+            Some(ProblemSeverity::Error)
+        } else if self.warnings > 0 {
+            Some(ProblemSeverity::Warning)
+        } else if self.infos > 0 {
+            Some(ProblemSeverity::Info)
+        } else if self.hints > 0 {
+            Some(ProblemSeverity::Hint)
+        } else {
+            None
+        }
+    }
+
+    /// Merge another counter into this one.
+    pub fn merge(&mut self, other: &SeverityCounter) {
+        self.errors += other.errors;
+        self.warnings += other.warnings;
+        self.infos += other.infos;
+        self.hints += other.hints;
+    }
+}
+
+impl fmt::Display for SeverityCounter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Problem source aggregator
+// ---------------------------------------------------------------------------
+
+/// Aggregates problems by their `source` field (e.g. "rustc", "clippy").
+#[derive(Debug, Clone)]
+pub struct ProblemSourceAggregator {
+    source_counts: BTreeMap<String, SeverityCounter>,
+}
+
+impl ProblemSourceAggregator {
+    /// Build aggregation from a slice of problems.
+    pub fn from_problems(problems: &[Problem]) -> Self {
+        let mut source_counts: BTreeMap<String, SeverityCounter> = BTreeMap::new();
+        for p in problems {
+            let counter = source_counts.entry(p.source.clone()).or_default();
+            match p.severity {
+                ProblemSeverity::Error => counter.errors += 1,
+                ProblemSeverity::Warning => counter.warnings += 1,
+                ProblemSeverity::Info => counter.infos += 1,
+                ProblemSeverity::Hint => counter.hints += 1,
+            }
+        }
+        Self { source_counts }
+    }
+
+    /// Get the counter for a specific source.
+    pub fn counts_for(&self, source: &str) -> Option<&SeverityCounter> {
+        self.source_counts.get(source)
+    }
+
+    /// Return all sources sorted alphabetically.
+    pub fn sources(&self) -> Vec<&str> {
+        self.source_counts.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Return the source with the most errors.
+    pub fn worst_source(&self) -> Option<&str> {
+        self.source_counts
+            .iter()
+            .max_by_key(|(_, c)| c.errors)
+            .filter(|(_, c)| c.errors > 0)
+            .map(|(s, _)| s.as_str())
+    }
+
+    /// Total problems across all sources.
+    pub fn total(&self) -> usize {
+        self.source_counts.values().map(|c| c.total()).sum()
+    }
+
+    /// Format a summary table for display.
+    pub fn summary_table(&self) -> String {
+        let mut out = String::new();
+        for (source, counter) in &self.source_counts {
+            out.push_str(&format!("{}: {}\n", source, counter.summary()));
+        }
+        out
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2203,4 +2472,163 @@ src/b.rs:5:3: warning: msg2
         let deduped = ProblemDeduplicator::deduplicate(&problems);
         assert_eq!(deduped.len(), 2);
     }
+
+    // -----------------------------------------------------------------------
+    // ProblemQuickFixList tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn quickfix_add_and_query() {
+        let mut list = ProblemQuickFixList::new();
+        list.add_fixes(0, vec![
+            QuickFixAction::new("Remove unused", "quickfix"),
+            QuickFixAction::new("Rename", "refactor"),
+        ]);
+        assert_eq!(list.fixes_for(0).len(), 2);
+        assert_eq!(list.fixes_for(1).len(), 0);
+    }
+
+    #[test]
+    fn quickfix_preferred() {
+        let mut list = ProblemQuickFixList::new();
+        list.add_fixes(0, vec![
+            QuickFixAction::new("Option A", "quickfix"),
+            QuickFixAction::new("Option B", "quickfix").preferred(),
+        ]);
+        let pref = list.preferred_fix(0).unwrap();
+        assert_eq!(pref.title, "Option B");
+    }
+
+    #[test]
+    fn quickfix_total_count() {
+        let mut list = ProblemQuickFixList::new();
+        list.add_fixes(0, vec![QuickFixAction::new("a", "q")]);
+        list.add_fixes(1, vec![QuickFixAction::new("b", "q"), QuickFixAction::new("c", "q")]);
+        assert_eq!(list.total_fix_count(), 3);
+        assert_eq!(list.problems_with_fixes(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // ProblemWorkspaceFilter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn workspace_filter_matches_root() {
+        let filter = ProblemWorkspaceFilter::new(vec!["/project/src".into()]);
+        let p = Problem::new(ProblemSeverity::Error, "err", "s", "/project/src/main.rs", 1, 1);
+        assert!(filter.matches(&p));
+    }
+
+    #[test]
+    fn workspace_filter_excludes() {
+        let mut filter = ProblemWorkspaceFilter::new(vec!["/project".into()]);
+        filter.exclude_file("/project/build.rs");
+        let p = Problem::new(ProblemSeverity::Warning, "w", "s", "/project/build.rs", 1, 1);
+        assert!(!filter.matches(&p));
+    }
+
+    #[test]
+    fn workspace_filter_empty_roots_matches_all() {
+        let filter = ProblemWorkspaceFilter::new(vec![]);
+        let p = Problem::new(ProblemSeverity::Info, "i", "s", "any/path.rs", 1, 1);
+        assert!(filter.matches(&p));
+    }
+
+    #[test]
+    fn workspace_filter_batch() {
+        let filter = ProblemWorkspaceFilter::new(vec!["/src".into()]);
+        let problems = vec![
+            Problem::new(ProblemSeverity::Error, "a", "s", "/src/a.rs", 1, 1),
+            Problem::new(ProblemSeverity::Error, "b", "s", "/lib/b.rs", 1, 1),
+        ];
+        let matched = filter.filter(&problems);
+        assert_eq!(matched.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // SeverityCounter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn severity_counter_from_problems() {
+        let problems = sample_problems();
+        let counter = SeverityCounter::from_problems(&problems);
+        assert_eq!(counter.errors, 2);
+        assert_eq!(counter.warnings, 1);
+        assert_eq!(counter.infos, 1);
+        assert_eq!(counter.hints, 1);
+        assert_eq!(counter.total(), 5);
+    }
+
+    #[test]
+    fn severity_counter_summary() {
+        let counter = SeverityCounter { errors: 1, warnings: 2, infos: 0, hints: 3 };
+        assert_eq!(counter.summary(), "1E 2W 0I 3H");
+    }
+
+    #[test]
+    fn severity_counter_worst() {
+        let c1 = SeverityCounter { errors: 0, warnings: 1, infos: 0, hints: 0 };
+        assert_eq!(c1.worst_severity(), Some(ProblemSeverity::Warning));
+        let c2 = SeverityCounter::default();
+        assert_eq!(c2.worst_severity(), None);
+    }
+
+    #[test]
+    fn severity_counter_merge() {
+        let mut c1 = SeverityCounter { errors: 1, warnings: 0, infos: 2, hints: 0 };
+        let c2 = SeverityCounter { errors: 0, warnings: 3, infos: 0, hints: 1 };
+        c1.merge(&c2);
+        assert_eq!(c1.errors, 1);
+        assert_eq!(c1.warnings, 3);
+        assert_eq!(c1.infos, 2);
+        assert_eq!(c1.hints, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // ProblemSourceAggregator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn source_aggregator_basic() {
+        let problems = sample_problems();
+        let agg = ProblemSourceAggregator::from_problems(&problems);
+        let sources = agg.sources();
+        assert!(sources.contains(&"rustc"));
+        assert!(sources.contains(&"clippy"));
+    }
+
+    #[test]
+    fn source_aggregator_counts() {
+        let problems = sample_problems();
+        let agg = ProblemSourceAggregator::from_problems(&problems);
+        let rustc = agg.counts_for("rustc").unwrap();
+        assert_eq!(rustc.errors, 2);
+        assert_eq!(rustc.hints, 1);
+    }
+
+    #[test]
+    fn source_aggregator_worst() {
+        let problems = sample_problems();
+        let agg = ProblemSourceAggregator::from_problems(&problems);
+        assert_eq!(agg.worst_source(), Some("rustc"));
+    }
+
+    #[test]
+    fn source_aggregator_total() {
+        let problems = sample_problems();
+        let agg = ProblemSourceAggregator::from_problems(&problems);
+        assert_eq!(agg.total(), 5);
+    }
+
+    #[test]
+    fn source_aggregator_table() {
+        let problems = sample_problems();
+        let agg = ProblemSourceAggregator::from_problems(&problems);
+        let table = agg.summary_table();
+        assert!(table.contains("rustc:"));
+        assert!(table.contains("clippy:"));
+    }
+
+
 }

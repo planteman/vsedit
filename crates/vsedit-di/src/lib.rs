@@ -1428,6 +1428,312 @@ impl fmt::Display for LazyInitTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ServiceHealthChecker - service health checker
+// ---------------------------------------------------------------------------
+
+/// Severity level for service health checker issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ServiceHealthCheckerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ServiceHealthCheckerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ServiceHealthChecker].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceHealthCheckerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ServiceHealthCheckerSeverity,
+    pub detail: Option<String>,
+    pub service_count: usize,
+    enabled: bool,
+}
+
+impl ServiceHealthCheckerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ServiceHealthCheckerSeverity::Low,
+            detail: None,
+            service_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ServiceHealthCheckerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_service_count(mut self, val: usize) -> Self {
+        self.service_count = val;
+        self
+    }
+
+    pub fn all_healthy(&self) -> bool {
+        self.enabled && self.severity >= ServiceHealthCheckerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.service_count, det)
+    }
+}
+
+impl fmt::Display for ServiceHealthCheckerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ServiceHealthCheckerEntry] items.
+#[derive(Debug, Clone)]
+pub struct ServiceHealthChecker {
+    entries: Vec<ServiceHealthCheckerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ServiceHealthChecker {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ServiceHealthCheckerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ServiceHealthCheckerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ServiceHealthCheckerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn service_count(&self) -> usize { self.entries.len() }
+
+    pub fn all_healthy(&self) -> bool {
+        self.entries.iter().any(|e| e.all_healthy())
+    }
+
+    pub fn entries_by_severity(&self, severity: ServiceHealthCheckerSeverity) -> Vec<&ServiceHealthCheckerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ServiceHealthCheckerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ServiceHealthCheckerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ServiceHealthCheckerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServiceInitProfiler - service initialization profiler
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ServiceInitProfiler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceInitProfilerConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub init_time_ms: usize,
+}
+
+impl ServiceInitProfilerConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, init_time_ms: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_init_time_ms(mut self, val: usize) -> Self { self.init_time_ms = val; self }
+}
+
+impl Default for ServiceInitProfilerConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ServiceInitProfiler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceInitProfilerItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ServiceInitProfilerItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ServiceInitProfilerItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ServiceInitProfilerItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ServiceInitProfiler {
+    config: ServiceInitProfilerConfig,
+    items: Vec<ServiceInitProfilerItem>,
+}
+
+impl ServiceInitProfiler {
+    pub fn new(config: ServiceInitProfilerConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ServiceInitProfilerItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ServiceInitProfilerItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ServiceInitProfilerItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn init_time_ms(&self) -> usize { self.items.len() }
+
+    pub fn is_initialized(&self) -> bool {
+        self.items.iter().any(|i| i.is_initialized())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ServiceInitProfilerItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ServiceInitProfilerItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ServiceInitProfilerConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2387,5 +2693,147 @@ mod tests {
             },
         ];
         assert!(!has_circular_dependency(&graph));
+    }
+
+#[test]
+    fn servicehealthchecker_severity_ordering() {
+        assert!(ServiceHealthCheckerSeverity::Critical > ServiceHealthCheckerSeverity::High);
+        assert!(ServiceHealthCheckerSeverity::High > ServiceHealthCheckerSeverity::Medium);
+        assert!(ServiceHealthCheckerSeverity::Medium > ServiceHealthCheckerSeverity::Low);
+    }
+
+    #[test]
+    fn servicehealthchecker_severity_display() {
+        assert_eq!(ServiceHealthCheckerSeverity::Low.to_string(), "low");
+        assert_eq!(ServiceHealthCheckerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn servicehealthchecker_entry_creation() {
+        let e = ServiceHealthCheckerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ServiceHealthCheckerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn servicehealthchecker_entry_builder() {
+        let e = ServiceHealthCheckerEntry::new("e2", "Entry 2")
+            .with_severity(ServiceHealthCheckerSeverity::High)
+            .with_detail("some detail")
+            .with_service_count(42);
+        assert_eq!(e.severity, ServiceHealthCheckerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.service_count, 42);
+    }
+
+    #[test]
+    fn servicehealthchecker_entry_enable_disable() {
+        let mut e = ServiceHealthCheckerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn servicehealthchecker_add_and_count() {
+        let mut mgr = ServiceHealthChecker::new("test");
+        mgr.add(ServiceHealthCheckerEntry::new("a", "A"));
+        mgr.add(ServiceHealthCheckerEntry::new("b", "B").with_severity(ServiceHealthCheckerSeverity::High));
+        assert_eq!(mgr.service_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn servicehealthchecker_remove() {
+        let mut mgr = ServiceHealthChecker::new("test");
+        mgr.add(ServiceHealthCheckerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn servicehealthchecker_capacity() {
+        let mut mgr = ServiceHealthChecker::new("test").with_capacity(1);
+        assert!(mgr.add(ServiceHealthCheckerEntry::new("a", "A")));
+        assert!(!mgr.add(ServiceHealthCheckerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn servicehealthchecker_sorted_by_severity() {
+        let mut mgr = ServiceHealthChecker::new("test");
+        mgr.add(ServiceHealthCheckerEntry::new("lo", "Low"));
+        mgr.add(ServiceHealthCheckerEntry::new("hi", "High").with_severity(ServiceHealthCheckerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ServiceHealthCheckerSeverity::Critical);
+    }
+
+    #[test]
+    fn servicehealthchecker_summary() {
+        let mgr = ServiceHealthChecker::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn serviceinitprofiler_config_defaults() {
+        let cfg = ServiceInitProfilerConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn serviceinitprofiler_item_creation() {
+        let item = ServiceInitProfilerItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn serviceinitprofiler_add_and_get() {
+        let mut mgr = ServiceInitProfiler::new(ServiceInitProfilerConfig::new("test"));
+        mgr.add(ServiceInitProfilerItem::new("k1", "v1"));
+        assert_eq!(mgr.init_time_ms(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn serviceinitprofiler_remove_item() {
+        let mut mgr = ServiceInitProfiler::new(ServiceInitProfilerConfig::new("test"));
+        mgr.add(ServiceInitProfilerItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn serviceinitprofiler_sorted_by_priority() {
+        let mut mgr = ServiceInitProfiler::new(ServiceInitProfilerConfig::new("test"));
+        mgr.add(ServiceInitProfilerItem::new("lo", "low").with_priority(1));
+        mgr.add(ServiceInitProfilerItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn serviceinitprofiler_items_with_tag() {
+        let mut mgr = ServiceInitProfiler::new(ServiceInitProfilerConfig::new("test"));
+        mgr.add(ServiceInitProfilerItem::new("a", "1").with_tag("x"));
+        mgr.add(ServiceInitProfilerItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn serviceinitprofiler_report() {
+        let mgr = ServiceInitProfiler::new(ServiceInitProfilerConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

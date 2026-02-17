@@ -1417,6 +1417,865 @@ pub fn expand_tilde(path: &str, home: &str) -> String {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// PathCompletionProvider – suggest completions for partial path input
+// ---------------------------------------------------------------------------
+
+/// Result of a path completion suggestion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PathCompletion {
+    /// The completed path string.
+    pub completed: String,
+    /// Whether the completion represents a directory (true) or file (false).
+    pub is_directory: bool,
+    /// The portion of the input that was matched.
+    pub matched_prefix: String,
+    /// Display label for the completion (typically the last segment).
+    pub label: String,
+}
+
+/// Provides path completion suggestions from a known set of paths.
+///
+/// This is a pure in-memory completer: it does not touch the filesystem.
+/// Callers supply the candidate paths up front, then query for completions
+/// against partial input.
+#[derive(Debug, Clone)]
+pub struct PathCompletionProvider {
+    candidates: Vec<String>,
+    case_sensitive: bool,
+}
+
+impl PathCompletionProvider {
+    /// Create a new provider with a set of known candidate paths.
+    pub fn new(candidates: Vec<String>) -> Self {
+        Self {
+            candidates,
+            case_sensitive: true,
+        }
+    }
+
+    /// Set whether matching is case-sensitive (default: `true`).
+    pub fn case_sensitive(mut self, yes: bool) -> Self {
+        self.case_sensitive = yes;
+        self
+    }
+
+    /// Return completions that match the given partial input.
+    pub fn complete(&self, partial: &str) -> Vec<PathCompletion> {
+        let normalized_partial = to_forward_slashes(partial);
+        let match_partial = if self.case_sensitive {
+            normalized_partial.clone()
+        } else {
+            normalized_partial.to_lowercase()
+        };
+
+        let mut results = Vec::new();
+        for candidate in &self.candidates {
+            let normalized_candidate = to_forward_slashes(candidate);
+            let match_candidate = if self.case_sensitive {
+                normalized_candidate.clone()
+            } else {
+                normalized_candidate.to_lowercase()
+            };
+
+            if match_candidate.starts_with(&match_partial) {
+                let is_dir = normalized_candidate.ends_with('/');
+                let label = basename(&normalized_candidate);
+                results.push(PathCompletion {
+                    completed: normalized_candidate,
+                    is_directory: is_dir,
+                    matched_prefix: normalized_partial.clone(),
+                    label: if label.is_empty() {
+                        candidate.clone()
+                    } else {
+                        label
+                    },
+                });
+            }
+        }
+        results.sort_by(|a, b| a.completed.cmp(&b.completed));
+        results
+    }
+
+    /// Return completions that match the given partial input at any segment
+    /// boundary (not just as a prefix of the whole path).
+    pub fn complete_fuzzy(&self, partial: &str) -> Vec<PathCompletion> {
+        if partial.is_empty() {
+            return Vec::new();
+        }
+        let match_partial = if self.case_sensitive {
+            partial.to_string()
+        } else {
+            partial.to_lowercase()
+        };
+
+        let mut results = Vec::new();
+        for candidate in &self.candidates {
+            let normalized = to_forward_slashes(candidate);
+            let match_candidate = if self.case_sensitive {
+                normalized.clone()
+            } else {
+                normalized.to_lowercase()
+            };
+
+            // Check if any segment starts with the partial
+            let segments: Vec<&str> = match_candidate.split('/').collect();
+            let matched = segments.iter().any(|seg| seg.starts_with(&match_partial));
+            if matched {
+                let is_dir = normalized.ends_with('/');
+                let label = basename(&normalized);
+                results.push(PathCompletion {
+                    completed: normalized,
+                    is_directory: is_dir,
+                    matched_prefix: partial.to_string(),
+                    label: if label.is_empty() {
+                        candidate.clone()
+                    } else {
+                        label
+                    },
+                });
+            }
+        }
+        results.sort_by(|a, b| a.completed.cmp(&b.completed));
+        results
+    }
+
+    /// Add new candidates to the provider.
+    pub fn add_candidates(&mut self, paths: &[&str]) {
+        for p in paths {
+            self.candidates.push((*p).to_string());
+        }
+    }
+
+    /// Return the number of candidates.
+    pub fn candidate_count(&self) -> usize {
+        self.candidates.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathEnvVarResolver – resolve environment variable references in paths
+// ---------------------------------------------------------------------------
+
+/// Resolves `$VAR` and `${VAR}` references in path strings using a provided
+/// variable map.
+///
+/// This does **not** read the actual process environment; all variables must
+/// be supplied explicitly so the resolver is deterministic and testable.
+#[derive(Debug, Clone)]
+pub struct PathEnvVarResolver {
+    vars: std::collections::HashMap<String, String>,
+}
+
+impl PathEnvVarResolver {
+    /// Create a resolver with no variables.
+    pub fn new() -> Self {
+        Self {
+            vars: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Create a resolver pre-populated with common Unix-like variables.
+    pub fn with_defaults(home: &str, user: &str) -> Self {
+        let mut vars = std::collections::HashMap::new();
+        vars.insert("HOME".to_string(), home.to_string());
+        vars.insert("USER".to_string(), user.to_string());
+        Self { vars }
+    }
+
+    /// Set a variable value.
+    pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.vars.insert(name.into(), value.into());
+        self
+    }
+
+    /// Resolve all `$VAR` and `${VAR}` references in the given string.
+    ///
+    /// Unknown variables are left as-is.
+    pub fn resolve(&self, input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        let bytes = input.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'$' && i + 1 < bytes.len() {
+                if bytes[i + 1] == b'{' {
+                    // ${VAR} form
+                    if let Some(end) = input[i + 2..].find('}') {
+                        let var_name = &input[i + 2..i + 2 + end];
+                        if let Some(value) = self.vars.get(var_name) {
+                            result.push_str(value);
+                        } else {
+                            result.push_str(&input[i..i + 3 + end]);
+                        }
+                        i += 3 + end;
+                    } else {
+                        result.push('$');
+                        i += 1;
+                    }
+                } else if bytes[i + 1].is_ascii_alphabetic() || bytes[i + 1] == b'_' {
+                    // $VAR form – consume alphanumeric + underscore
+                    let start = i + 1;
+                    let mut end = start;
+                    while end < bytes.len()
+                        && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_')
+                    {
+                        end += 1;
+                    }
+                    let var_name = &input[start..end];
+                    if let Some(value) = self.vars.get(var_name) {
+                        result.push_str(value);
+                    } else {
+                        result.push_str(&input[i..end]);
+                    }
+                    i = end;
+                } else {
+                    result.push('$');
+                    i += 1;
+                }
+            } else {
+                result.push(bytes[i] as char);
+                i += 1;
+            }
+        }
+        result
+    }
+
+    /// Return the names of all variables referenced in the input string.
+    pub fn referenced_vars(input: &str) -> Vec<String> {
+        let mut vars = Vec::new();
+        let bytes = input.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'$' && i + 1 < bytes.len() {
+                if bytes[i + 1] == b'{' {
+                    if let Some(end) = input[i + 2..].find('}') {
+                        let var_name = &input[i + 2..i + 2 + end];
+                        if !var_name.is_empty() && !vars.contains(&var_name.to_string()) {
+                            vars.push(var_name.to_string());
+                        }
+                        i += 3 + end;
+                    } else {
+                        i += 1;
+                    }
+                } else if bytes[i + 1].is_ascii_alphabetic() || bytes[i + 1] == b'_' {
+                    let start = i + 1;
+                    let mut end = start;
+                    while end < bytes.len()
+                        && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_')
+                    {
+                        end += 1;
+                    }
+                    let var_name = input[start..end].to_string();
+                    if !vars.contains(&var_name) {
+                        vars.push(var_name);
+                    }
+                    i = end;
+                } else {
+                    i += 1;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        vars
+    }
+
+    /// Check if the input contains any variable references.
+    pub fn has_variables(input: &str) -> bool {
+        !Self::referenced_vars(input).is_empty()
+    }
+}
+
+impl Default for PathEnvVarResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathShortener – shorten paths for display
+// ---------------------------------------------------------------------------
+
+/// Shortens long paths for display by abbreviating intermediate directories.
+///
+/// For example, `/home/user/projects/my-app/src/lib.rs` can become
+/// `/h/u/p/m/src/lib.rs` or `…/src/lib.rs` depending on the strategy.
+#[derive(Debug, Clone)]
+pub struct PathShortener {
+    max_length: usize,
+    ellipsis: String,
+}
+
+impl PathShortener {
+    /// Create a new shortener with the given maximum display length.
+    pub fn new(max_length: usize) -> Self {
+        Self {
+            max_length,
+            ellipsis: "…".to_string(),
+        }
+    }
+
+    /// Set a custom ellipsis string (default: `"…"`).
+    pub fn ellipsis(mut self, e: impl Into<String>) -> Self {
+        self.ellipsis = e.into();
+        self
+    }
+
+    /// Shorten a path by abbreviating each intermediate directory to its
+    /// first character.
+    ///
+    /// The last two segments (parent dir + filename) are always kept intact.
+    pub fn abbreviate(&self, path: &str) -> String {
+        let fwd = to_forward_slashes(path);
+        let is_abs = fwd.starts_with('/');
+        let segments: Vec<&str> = fwd.split('/').filter(|s| !s.is_empty()).collect();
+
+        if segments.len() <= 2 {
+            return path.to_string();
+        }
+
+        // Keep last 2 segments fully, abbreviate the rest
+        let boundary = segments.len() - 2;
+        let mut parts: Vec<String> = Vec::with_capacity(segments.len());
+        for (i, seg) in segments.iter().enumerate() {
+            if i < boundary {
+                // Take first char of the segment
+                let first: String = seg.chars().take(1).collect();
+                parts.push(first);
+            } else {
+                parts.push(seg.to_string());
+            }
+        }
+        let joined = parts.join("/");
+        if is_abs {
+            format!("/{joined}")
+        } else {
+            joined
+        }
+    }
+
+    /// Shorten a path by replacing leading segments with the ellipsis,
+    /// keeping only enough trailing segments to fit within `max_length`.
+    pub fn truncate_leading(&self, path: &str) -> String {
+        if path.len() <= self.max_length {
+            return path.to_string();
+        }
+
+        let fwd = to_forward_slashes(path);
+        let segments: Vec<&str> = fwd.split('/').filter(|s| !s.is_empty()).collect();
+        if segments.is_empty() {
+            return path.to_string();
+        }
+
+        // Try keeping progressively fewer trailing segments
+        for keep in (1..=segments.len()).rev() {
+            let tail: String = segments[segments.len() - keep..].join("/");
+            let shortened = format!("{}/{tail}", self.ellipsis);
+            if shortened.len() <= self.max_length || keep == 1 {
+                return shortened;
+            }
+        }
+        path.to_string()
+    }
+
+    /// Shorten a path by collapsing the middle, keeping the first and last
+    /// segments.
+    pub fn collapse_middle(&self, path: &str) -> String {
+        if path.len() <= self.max_length {
+            return path.to_string();
+        }
+
+        let fwd = to_forward_slashes(path);
+        let is_abs = fwd.starts_with('/');
+        let segments: Vec<&str> = fwd.split('/').filter(|s| !s.is_empty()).collect();
+
+        if segments.len() <= 2 {
+            return path.to_string();
+        }
+
+        let first = segments[0];
+        let last = segments[segments.len() - 1];
+        let collapsed = format!("{first}/{}/{last}", self.ellipsis);
+        if is_abs {
+            format!("/{collapsed}")
+        } else {
+            collapsed
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathSegmentValidator – validate individual path segments
+// ---------------------------------------------------------------------------
+
+/// Validates individual path segments against common filesystem rules.
+#[derive(Debug, Clone)]
+pub struct PathSegmentValidator {
+    max_segment_length: usize,
+    forbidden_names: Vec<String>,
+    forbidden_chars: Vec<char>,
+}
+
+impl PathSegmentValidator {
+    /// Create a new validator with defaults suitable for cross-platform use.
+    pub fn new() -> Self {
+        Self {
+            max_segment_length: 255,
+            forbidden_names: vec![
+                "CON", "PRN", "AUX", "NUL",
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            forbidden_chars: vec!['<', '>', ':', '"', '|', '?', '*', '\0'],
+        }
+    }
+
+    /// Set the maximum segment length.
+    pub fn max_segment_length(mut self, max: usize) -> Self {
+        self.max_segment_length = max;
+        self
+    }
+
+    /// Add additional forbidden segment names (checked case-insensitively).
+    pub fn forbid_name(mut self, name: impl Into<String>) -> Self {
+        self.forbidden_names.push(name.into());
+        self
+    }
+
+    /// Validate a single path segment, returning all violations found.
+    pub fn validate_segment(&self, segment: &str) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        if segment.is_empty() {
+            errors.push("segment must not be empty".to_string());
+            return errors;
+        }
+
+        if segment.len() > self.max_segment_length {
+            errors.push(format!(
+                "segment length {} exceeds maximum {}",
+                segment.len(),
+                self.max_segment_length
+            ));
+        }
+
+        let upper = segment.to_uppercase();
+        // Check the stem part (before extension) against forbidden names
+        let stem_part = upper.split('.').next().unwrap_or(&upper);
+        for forbidden in &self.forbidden_names {
+            if stem_part == forbidden.to_uppercase() {
+                errors.push(format!(
+                    "'{}' is a reserved device name",
+                    segment
+                ));
+                break;
+            }
+        }
+
+        for ch in segment.chars() {
+            if self.forbidden_chars.contains(&ch) {
+                errors.push(format!("character '{}' is not allowed in segment", ch));
+            }
+            if ch.is_control() {
+                errors.push(format!(
+                    "control character U+{:04X} is not allowed",
+                    ch as u32
+                ));
+            }
+        }
+
+        if segment.ends_with(' ') || segment.ends_with('.') {
+            errors.push(format!(
+                "segment '{}' must not end with a space or period",
+                segment
+            ));
+        }
+
+        errors
+    }
+
+    /// Validate every segment of a full path.
+    pub fn validate_path(&self, path: &str) -> Vec<(String, Vec<String>)> {
+        let fwd = to_forward_slashes(path);
+        let mut results = Vec::new();
+        for seg in fwd.split('/') {
+            if seg.is_empty() || seg == "." || seg == ".." {
+                continue;
+            }
+            // Skip drive letter segments like "C:"
+            if seg.len() == 2 && seg.as_bytes()[1] == b':' {
+                continue;
+            }
+            let errors = self.validate_segment(seg);
+            if !errors.is_empty() {
+                results.push((seg.to_string(), errors));
+            }
+        }
+        results
+    }
+
+    /// Check if a full path is valid (all segments pass validation).
+    pub fn is_valid_path(&self, path: &str) -> bool {
+        self.validate_path(path).is_empty()
+    }
+}
+
+impl Default for PathSegmentValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// PathCompletionProvider – additional methods
+// ---------------------------------------------------------------------------
+
+impl PathCompletionProvider {
+    /// Add a single known path to the candidate set.
+    pub fn add_known_path(&mut self, path: &str) {
+        self.candidates.push(path.to_string());
+    }
+
+    /// Return completions whose basename starts with the given prefix.
+    pub fn complete_basename(&self, prefix: &str) -> Vec<PathCompletion> {
+        if prefix.is_empty() {
+            return Vec::new();
+        }
+        let match_prefix = if self.case_sensitive {
+            prefix.to_string()
+        } else {
+            prefix.to_lowercase()
+        };
+
+        let mut results = Vec::new();
+        for candidate in &self.candidates {
+            let normalized = to_forward_slashes(candidate);
+            let base = basename(&normalized);
+            let match_base = if self.case_sensitive {
+                base.clone()
+            } else {
+                base.to_lowercase()
+            };
+
+            if match_base.starts_with(&match_prefix) {
+                let is_dir = normalized.ends_with('/');
+                results.push(PathCompletion {
+                    completed: normalized,
+                    is_directory: is_dir,
+                    matched_prefix: prefix.to_string(),
+                    label: if base.is_empty() {
+                        candidate.clone()
+                    } else {
+                        base
+                    },
+                });
+            }
+        }
+        results.sort_by(|a, b| a.completed.cmp(&b.completed));
+        results
+    }
+
+    /// Clear all known candidate paths.
+    pub fn clear(&mut self) {
+        self.candidates.clear();
+    }
+
+    /// Return all candidate paths that are immediate children of the given
+    /// directory (i.e. whose dirname matches `dir`).
+    pub fn paths_in_dir(&self, dir: &str) -> Vec<String> {
+        let norm_dir = to_forward_slashes(dir);
+        let norm_dir_trimmed = norm_dir.trim_end_matches('/');
+
+        let mut results = Vec::new();
+        for candidate in &self.candidates {
+            let norm_cand = to_forward_slashes(candidate);
+            let cand_dir = dirname(&norm_cand);
+            let cand_dir_trimmed = cand_dir.trim_end_matches('/');
+            if cand_dir_trimmed == norm_dir_trimmed {
+                results.push(norm_cand);
+            }
+        }
+        results.sort();
+        results
+    }
+
+    /// Check whether a specific path is in the candidate set.
+    pub fn has_path(&self, path: &str) -> bool {
+        let norm = to_forward_slashes(path);
+        self.candidates.iter().any(|c| to_forward_slashes(c) == norm)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathEnvVarResolver – additional methods
+// ---------------------------------------------------------------------------
+
+impl PathEnvVarResolver {
+    /// Check whether a variable with the given name is defined.
+    pub fn has_var(&self, name: &str) -> bool {
+        self.vars.contains_key(name)
+    }
+
+    /// Return the number of defined variables.
+    pub fn var_count(&self) -> usize {
+        self.vars.len()
+    }
+
+    /// Return the names of variables that are referenced in `path` but not
+    /// defined in this resolver.
+    pub fn unresolved_vars(&self, path: &str) -> Vec<String> {
+        let referenced = Self::referenced_vars(path);
+        referenced
+            .into_iter()
+            .filter(|name| !self.vars.contains_key(name))
+            .collect()
+    }
+
+    /// Remove a variable from the resolver. Returns `true` if it was present.
+    pub fn remove_var(&mut self, name: &str) -> bool {
+        self.vars.remove(name).is_some()
+    }
+
+    /// Return the value of a variable, if defined.
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.vars.get(name).map(|s| s.as_str())
+    }
+
+    /// Return all variable names defined in this resolver.
+    pub fn var_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.vars.keys().cloned().collect();
+        names.sort();
+        names
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathShortener – additional methods
+// ---------------------------------------------------------------------------
+
+impl PathShortener {
+    /// Shorten a path using the default strategy: abbreviate first, and if
+    /// still too long, truncate the leading portion.
+    pub fn shorten(&self, path: &str) -> String {
+        let abbreviated = self.abbreviate(path);
+        if abbreviated.len() <= self.max_length {
+            return abbreviated;
+        }
+        self.truncate_leading(path)
+    }
+
+    /// Shorten a path relative to a base directory. If the path starts with
+    /// `base`, strip the base prefix before shortening.
+    pub fn shorten_relative(&self, path: &str, base: &str) -> String {
+        let norm_path = to_forward_slashes(path);
+        let mut norm_base = to_forward_slashes(base);
+        if !norm_base.ends_with('/') {
+            norm_base.push('/');
+        }
+        let rel = if norm_path.starts_with(&norm_base) {
+            &norm_path[norm_base.len()..]
+        } else {
+            &norm_path
+        };
+        self.shorten(rel)
+    }
+
+    /// Shorten a path by replacing the home-directory prefix with `~`, then
+    /// applying the standard shortening strategy.
+    pub fn shorten_home(&self, path: &str, home: &str) -> String {
+        let norm_path = to_forward_slashes(path);
+        let mut norm_home = to_forward_slashes(home);
+        if !norm_home.ends_with('/') {
+            norm_home.push('/');
+        }
+        let replaced = if norm_path.starts_with(&norm_home) {
+            format!("~/{}", &norm_path[norm_home.len()..])
+        } else if norm_path == norm_home.trim_end_matches('/') {
+            "~".to_string()
+        } else {
+            norm_path
+        };
+        self.shorten(&replaced)
+    }
+
+    /// Check whether the path already fits within the maximum length.
+    pub fn fits(&self, path: &str) -> bool {
+        path.len() <= self.max_length
+    }
+
+    /// Return the configured maximum display length.
+    pub fn max_length(&self) -> usize {
+        self.max_length
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathValidatorExtended – thorough cross-platform path validation
+// ---------------------------------------------------------------------------
+
+/// Extended path validation utilities, complementing `PathSegmentValidator`.
+///
+/// Provides additional helpers for checking and sanitising file names against
+/// common filesystem restrictions on Windows, macOS, and Linux.
+#[derive(Debug, Clone)]
+pub struct PathValidatorExtended {
+    /// Characters considered invalid in file names.
+    invalid_chars: Vec<char>,
+    /// Maximum allowed length for a single path component.
+    max_component: usize,
+    /// Reserved device names (case-insensitive, Windows).
+    reserved_names: Vec<String>,
+}
+
+impl PathValidatorExtended {
+    /// Create a validator with cross-platform defaults.
+    pub fn new() -> Self {
+        Self {
+            invalid_chars: vec![
+                '<', '>', ':', '"', '/', '\\', '|', '?', '*', '\0',
+            ],
+            max_component: 255,
+            reserved_names: vec![
+                "CON", "PRN", "AUX", "NUL",
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        }
+    }
+
+    /// Check whether `name` is a valid filename (single component, no separators).
+    pub fn is_valid_filename(&self, name: &str) -> bool {
+        if name.is_empty() {
+            return false;
+        }
+        if name.len() > self.max_component {
+            return false;
+        }
+        if self.has_invalid_chars(name) {
+            return false;
+        }
+        if name.ends_with(' ') || name.ends_with('.') {
+            return false;
+        }
+        // Check reserved names (stem only, before first dot)
+        let stem = name.split('.').next().unwrap_or(name);
+        let upper = stem.to_uppercase();
+        if self.reserved_names.iter().any(|r| r == &upper) {
+            return false;
+        }
+        // Reject names that are only dots or spaces
+        if name.chars().all(|c| c == '.' || c == ' ') {
+            return false;
+        }
+        true
+    }
+
+    /// Check whether `path` is a valid full path (all components valid).
+    pub fn is_valid_path(&self, path: &str) -> bool {
+        if path.is_empty() {
+            return false;
+        }
+        let fwd = to_forward_slashes(path);
+        for seg in fwd.split('/') {
+            if seg.is_empty() || seg == "." || seg == ".." {
+                continue;
+            }
+            // Skip drive letters like "C:"
+            if seg.len() == 2 && seg.as_bytes().get(1) == Some(&b':') {
+                continue;
+            }
+            if !self.is_valid_filename(seg) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Return a sorted list of invalid characters found in `name`.
+    pub fn invalid_chars(&self, name: &str) -> Vec<char> {
+        let mut found: Vec<char> = name
+            .chars()
+            .filter(|c| self.invalid_chars.contains(c) || c.is_control())
+            .collect();
+        found.sort();
+        found.dedup();
+        found
+    }
+
+    /// Suggest a sanitised filename by replacing invalid characters with `_`.
+    pub fn suggested_filename(&self, name: &str) -> String {
+        if name.is_empty() {
+            return "_".to_string();
+        }
+        let mut result = String::with_capacity(name.len());
+        for ch in name.chars() {
+            if self.invalid_chars.contains(&ch) || ch.is_control() {
+                result.push('_');
+            } else {
+                result.push(ch);
+            }
+        }
+        // Trim trailing spaces and dots
+        let trimmed = result.trim_end_matches(|c: char| c == ' ' || c == '.').to_string();
+        let trimmed = if trimmed.is_empty() { "_".to_string() } else { trimmed };
+
+        // Handle reserved names by prefixing with underscore
+        let stem = trimmed.split('.').next().unwrap_or(&trimmed);
+        let upper = stem.to_uppercase();
+        if self.reserved_names.iter().any(|r| r == &upper) {
+            return format!("_{trimmed}");
+        }
+        trimmed
+    }
+
+    /// Return the maximum allowed component length.
+    pub fn max_component_length(&self) -> usize {
+        self.max_component
+    }
+
+    /// Check whether a path exceeds a given maximum total length.
+    pub fn is_too_long(&self, path: &str, max: usize) -> bool {
+        path.len() > max
+    }
+
+    /// Check whether a filename contains any invalid characters.
+    pub fn has_invalid_chars(&self, name: &str) -> bool {
+        name.chars()
+            .any(|c| self.invalid_chars.contains(&c) || c.is_control())
+    }
+
+    /// Set a custom maximum component length.
+    pub fn with_max_component(mut self, max: usize) -> Self {
+        self.max_component = max;
+        self
+    }
+
+    /// Add extra characters to the forbidden set.
+    pub fn forbid_chars(mut self, chars: &[char]) -> Self {
+        for &ch in chars {
+            if !self.invalid_chars.contains(&ch) {
+                self.invalid_chars.push(ch);
+            }
+        }
+        self
+    }
+}
+
+impl Default for PathValidatorExtended {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2229,4 +3088,694 @@ mod tests {
     fn test_expand_tilde_trailing_slash_home() {
         assert_eq!(expand_tilde("~/file", "/home/user/"), "/home/user/file");
     }
+
+    // -- PathCompletionProvider tests --------------------------------------
+
+    #[test]
+    fn test_completion_basic_prefix() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/lib.rs".to_string(),
+            "src/main.rs".to_string(),
+            "tests/test1.rs".to_string(),
+        ]);
+        let results = provider.complete("src/");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].completed, "src/lib.rs");
+        assert_eq!(results[1].completed, "src/main.rs");
+    }
+
+    #[test]
+    fn test_completion_no_match() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/lib.rs".to_string(),
+        ]);
+        let results = provider.complete("tests/");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_completion_case_insensitive() {
+        let provider = PathCompletionProvider::new(vec![
+            "Src/Lib.rs".to_string(),
+            "src/main.rs".to_string(),
+        ])
+        .case_sensitive(false);
+        let results = provider.complete("src/");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_completion_directory_flag() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/".to_string(),
+            "src/lib.rs".to_string(),
+        ]);
+        let results = provider.complete("src");
+        assert_eq!(results.len(), 2);
+        assert!(results[0].is_directory); // "src/"
+        assert!(!results[1].is_directory); // "src/lib.rs"
+    }
+
+    #[test]
+    fn test_completion_fuzzy() {
+        let provider = PathCompletionProvider::new(vec![
+            "a/b/target.rs".to_string(),
+            "x/y/other.rs".to_string(),
+        ]);
+        let results = provider.complete_fuzzy("target");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].label, "target.rs");
+    }
+
+    #[test]
+    fn test_completion_fuzzy_empty_input() {
+        let provider = PathCompletionProvider::new(vec![
+            "a/b.rs".to_string(),
+        ]);
+        assert!(provider.complete_fuzzy("").is_empty());
+    }
+
+    #[test]
+    fn test_completion_add_candidates() {
+        let mut provider = PathCompletionProvider::new(vec![]);
+        assert_eq!(provider.candidate_count(), 0);
+        provider.add_candidates(&["a.rs", "b.rs"]);
+        assert_eq!(provider.candidate_count(), 2);
+    }
+
+    // -- PathEnvVarResolver tests ------------------------------------------
+
+    #[test]
+    fn test_env_resolve_dollar_var() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("HOME", "/home/alice");
+        assert_eq!(resolver.resolve("$HOME/docs"), "/home/alice/docs");
+    }
+
+    #[test]
+    fn test_env_resolve_braced_var() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("PROJECT", "myapp");
+        assert_eq!(
+            resolver.resolve("/opt/${PROJECT}/bin"),
+            "/opt/myapp/bin"
+        );
+    }
+
+    #[test]
+    fn test_env_resolve_unknown_var_left_intact() {
+        let resolver = PathEnvVarResolver::new();
+        assert_eq!(resolver.resolve("$UNKNOWN/path"), "$UNKNOWN/path");
+        assert_eq!(resolver.resolve("${MISSING}/path"), "${MISSING}/path");
+    }
+
+    #[test]
+    fn test_env_resolve_multiple_vars() {
+        let resolver = PathEnvVarResolver::with_defaults("/home/bob", "bob");
+        assert_eq!(
+            resolver.resolve("$HOME/users/$USER"),
+            "/home/bob/users/bob"
+        );
+    }
+
+    #[test]
+    fn test_env_resolve_no_vars() {
+        let resolver = PathEnvVarResolver::new();
+        assert_eq!(resolver.resolve("/plain/path"), "/plain/path");
+    }
+
+    #[test]
+    fn test_env_referenced_vars() {
+        let vars = PathEnvVarResolver::referenced_vars("$HOME/${PROJECT}/src/$USER");
+        assert_eq!(vars, vec!["HOME", "PROJECT", "USER"]);
+    }
+
+    #[test]
+    fn test_env_has_variables() {
+        assert!(PathEnvVarResolver::has_variables("$HOME/path"));
+        assert!(!PathEnvVarResolver::has_variables("/plain/path"));
+    }
+
+    #[test]
+    fn test_env_adjacent_dollar_signs() {
+        let resolver = PathEnvVarResolver::new();
+        assert_eq!(resolver.resolve("$$"), "$$");
+    }
+
+    // -- PathShortener tests -----------------------------------------------
+
+    #[test]
+    fn test_shortener_abbreviate() {
+        let shortener = PathShortener::new(40);
+        assert_eq!(
+            shortener.abbreviate("/home/user/projects/my-app/src/lib.rs"),
+            "/h/u/p/m/src/lib.rs"
+        );
+    }
+
+    #[test]
+    fn test_shortener_abbreviate_short_path() {
+        let shortener = PathShortener::new(40);
+        assert_eq!(shortener.abbreviate("src/lib.rs"), "src/lib.rs");
+    }
+
+    #[test]
+    fn test_shortener_abbreviate_relative() {
+        let shortener = PathShortener::new(40);
+        assert_eq!(
+            shortener.abbreviate("a/b/c/d/file.txt"),
+            "a/b/c/d/file.txt"
+        );
+        // Only 5 segments: first 3 abbreviated, last 2 kept
+        assert_eq!(
+            shortener.abbreviate("alpha/bravo/charlie/delta/file.txt"),
+            "a/b/c/delta/file.txt"
+        );
+    }
+
+    #[test]
+    fn test_shortener_truncate_leading() {
+        let shortener = PathShortener::new(20);
+        let result = shortener.truncate_leading("/very/long/deep/nested/path/file.rs");
+        assert!(result.len() <= 20);
+        assert!(result.contains("file.rs"));
+    }
+
+    #[test]
+    fn test_shortener_truncate_leading_short() {
+        let shortener = PathShortener::new(40);
+        let path = "/a/b.rs";
+        assert_eq!(shortener.truncate_leading(path), path);
+    }
+
+    #[test]
+    fn test_shortener_collapse_middle() {
+        let shortener = PathShortener::new(20);
+        let result = shortener.collapse_middle("/home/user/projects/deep/nested/file.rs");
+        assert!(result.contains("home"));
+        assert!(result.contains("file.rs"));
+        assert!(result.contains("…"));
+    }
+
+    #[test]
+    fn test_shortener_collapse_middle_short() {
+        let shortener = PathShortener::new(40);
+        assert_eq!(shortener.collapse_middle("a/b"), "a/b");
+    }
+
+    #[test]
+    fn test_shortener_custom_ellipsis() {
+        let shortener = PathShortener::new(20).ellipsis("...");
+        let result = shortener.truncate_leading("/aaa/bbb/ccc/ddd/eee/fff.rs");
+        assert!(result.contains("..."));
+    }
+
+    // -- PathSegmentValidator tests ----------------------------------------
+
+    #[test]
+    fn test_segment_validator_valid() {
+        let v = PathSegmentValidator::new();
+        assert!(v.validate_segment("hello.txt").is_empty());
+        assert!(v.validate_segment("my-file_v2").is_empty());
+    }
+
+    #[test]
+    fn test_segment_validator_reserved_name() {
+        let v = PathSegmentValidator::new();
+        let errors = v.validate_segment("CON");
+        assert!(!errors.is_empty());
+        assert!(errors[0].contains("reserved"));
+    }
+
+    #[test]
+    fn test_segment_validator_reserved_with_extension() {
+        let v = PathSegmentValidator::new();
+        let errors = v.validate_segment("con.txt");
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_segment_validator_forbidden_chars() {
+        let v = PathSegmentValidator::new();
+        let errors = v.validate_segment("file<name>.txt");
+        assert!(errors.len() >= 2); // '<' and '>'
+    }
+
+    #[test]
+    fn test_segment_validator_trailing_space() {
+        let v = PathSegmentValidator::new();
+        let errors = v.validate_segment("file ");
+        assert!(!errors.is_empty());
+        assert!(errors.iter().any(|e| e.contains("space or period")));
+    }
+
+    #[test]
+    fn test_segment_validator_trailing_dot() {
+        let v = PathSegmentValidator::new();
+        let errors = v.validate_segment("file.");
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_segment_validator_empty() {
+        let v = PathSegmentValidator::new();
+        let errors = v.validate_segment("");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("empty"));
+    }
+
+    #[test]
+    fn test_segment_validator_too_long() {
+        let v = PathSegmentValidator::new().max_segment_length(10);
+        let errors = v.validate_segment("verylongname.txt");
+        assert!(!errors.is_empty());
+        assert!(errors[0].contains("exceeds"));
+    }
+
+    #[test]
+    fn test_segment_validator_custom_forbidden() {
+        let v = PathSegmentValidator::new().forbid_name("CUSTOM");
+        let errors = v.validate_segment("custom");
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_segment_validate_path() {
+        let v = PathSegmentValidator::new();
+        assert!(v.is_valid_path("/usr/local/bin"));
+        assert!(v.is_valid_path("src/main.rs"));
+    }
+
+    #[test]
+    fn test_segment_validate_path_with_bad_segment() {
+        let v = PathSegmentValidator::new();
+        let results = v.validate_path("/usr/CON/file.txt");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "CON");
+    }
+
+    #[test]
+    fn test_segment_validate_path_skips_dots_and_drive() {
+        let v = PathSegmentValidator::new();
+        assert!(v.is_valid_path("C:/Users/file.txt"));
+        assert!(v.is_valid_path("./relative/../path/file.txt"));
+    }
+
+
+    // -----------------------------------------------------------------------
+    // PathCompletionProvider – additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_completion_add_known_path() {
+        let mut provider = PathCompletionProvider::new(vec![]);
+        provider.add_known_path("src/main.rs");
+        provider.add_known_path("src/lib.rs");
+        assert_eq!(provider.candidate_count(), 2);
+    }
+
+    #[test]
+    fn test_completion_complete_basename() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/main.rs".to_string(),
+            "src/lib.rs".to_string(),
+            "tests/main_test.rs".to_string(),
+        ]);
+        let results = provider.complete_basename("main");
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|c| c.completed == "src/main.rs"));
+        assert!(results.iter().any(|c| c.completed == "tests/main_test.rs"));
+    }
+
+    #[test]
+    fn test_completion_complete_basename_empty() {
+        let provider = PathCompletionProvider::new(vec!["a.rs".to_string()]);
+        assert!(provider.complete_basename("").is_empty());
+    }
+
+    #[test]
+    fn test_completion_clear() {
+        let mut provider = PathCompletionProvider::new(vec!["a.rs".to_string()]);
+        assert_eq!(provider.candidate_count(), 1);
+        provider.clear();
+        assert_eq!(provider.candidate_count(), 0);
+    }
+
+    #[test]
+    fn test_completion_paths_in_dir() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/main.rs".to_string(),
+            "src/lib.rs".to_string(),
+            "tests/test.rs".to_string(),
+        ]);
+        let in_src = provider.paths_in_dir("src");
+        assert_eq!(in_src.len(), 2);
+        assert!(in_src.contains(&"src/lib.rs".to_string()));
+        assert!(in_src.contains(&"src/main.rs".to_string()));
+    }
+
+    #[test]
+    fn test_completion_paths_in_dir_trailing_slash() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/main.rs".to_string(),
+        ]);
+        let in_src = provider.paths_in_dir("src/");
+        assert_eq!(in_src.len(), 1);
+    }
+
+    #[test]
+    fn test_completion_has_path() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/main.rs".to_string(),
+        ]);
+        assert!(provider.has_path("src/main.rs"));
+        assert!(!provider.has_path("src/lib.rs"));
+    }
+
+    #[test]
+    fn test_completion_has_path_backslash() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/main.rs".to_string(),
+        ]);
+        // Backslash path should match forward slash candidate
+        assert!(provider.has_path("src\\main.rs"));
+    }
+
+    #[test]
+    fn test_completion_basename_case_insensitive() {
+        let provider = PathCompletionProvider::new(vec![
+            "src/README.md".to_string(),
+            "docs/readme.txt".to_string(),
+        ])
+        .case_sensitive(false);
+        let results = provider.complete_basename("readme");
+        assert_eq!(results.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // PathEnvVarResolver – additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_resolver_has_var() {
+        let mut resolver = PathEnvVarResolver::new();
+        assert!(!resolver.has_var("HOME"));
+        resolver.set("HOME", "/home/user");
+        assert!(resolver.has_var("HOME"));
+    }
+
+    #[test]
+    fn test_resolver_var_count() {
+        let mut resolver = PathEnvVarResolver::new();
+        assert_eq!(resolver.var_count(), 0);
+        resolver.set("A", "1");
+        resolver.set("B", "2");
+        assert_eq!(resolver.var_count(), 2);
+    }
+
+    #[test]
+    fn test_resolver_unresolved_vars() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("HOME", "/home/user");
+        let unresolved = resolver.unresolved_vars("$HOME/$PROJECT/src");
+        assert_eq!(unresolved, vec!["PROJECT"]);
+    }
+
+    #[test]
+    fn test_resolver_unresolved_vars_all_resolved() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("HOME", "/home/user");
+        let unresolved = resolver.unresolved_vars("$HOME/src");
+        assert!(unresolved.is_empty());
+    }
+
+    #[test]
+    fn test_resolver_remove_var() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("HOME", "/home/user");
+        assert!(resolver.remove_var("HOME"));
+        assert!(!resolver.has_var("HOME"));
+        assert!(!resolver.remove_var("HOME")); // already removed
+    }
+
+    #[test]
+    fn test_resolver_get() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("HOME", "/home/user");
+        assert_eq!(resolver.get("HOME"), Some("/home/user"));
+        assert_eq!(resolver.get("MISSING"), None);
+    }
+
+    #[test]
+    fn test_resolver_var_names() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("ZEBRA", "z");
+        resolver.set("ALPHA", "a");
+        let names = resolver.var_names();
+        assert_eq!(names, vec!["ALPHA", "ZEBRA"]);
+    }
+
+    #[test]
+    fn test_resolver_unresolved_with_braces() {
+        let mut resolver = PathEnvVarResolver::new();
+        resolver.set("HOME", "/home/user");
+        let unresolved = resolver.unresolved_vars("${HOME}/${WORKSPACE}/file");
+        assert_eq!(unresolved, vec!["WORKSPACE"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // PathShortener – additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_shortener_shorten_short_path() {
+        let s = PathShortener::new(50);
+        assert_eq!(s.shorten("src/lib.rs"), "src/lib.rs");
+    }
+
+    #[test]
+    fn test_shortener_shorten_long_path() {
+        let s = PathShortener::new(20);
+        let result = s.shorten("/home/user/projects/my-app/src/lib.rs");
+        assert!(result.len() <= 20 || result.contains("…"));
+    }
+
+    #[test]
+    fn test_shortener_shorten_relative() {
+        let s = PathShortener::new(50);
+        let result = s.shorten_relative("/home/user/project/src/lib.rs", "/home/user/project");
+        assert_eq!(result, "src/lib.rs");
+    }
+
+    #[test]
+    fn test_shortener_shorten_relative_no_match() {
+        let s = PathShortener::new(50);
+        let result = s.shorten_relative("/other/path/file.rs", "/home/user");
+        // Path doesn't start with base, so full path is shortened (abbreviated)
+        assert!(result.contains("file.rs"));
+    }
+
+    #[test]
+    fn test_shortener_shorten_home() {
+        let s = PathShortener::new(50);
+        let result = s.shorten_home("/home/user/projects/file.rs", "/home/user");
+        assert!(result.starts_with("~/"));
+        assert!(result.contains("projects/file.rs"));
+    }
+
+    #[test]
+    fn test_shortener_shorten_home_exact() {
+        let s = PathShortener::new(50);
+        let result = s.shorten_home("/home/user", "/home/user");
+        assert_eq!(result, "~");
+    }
+
+    #[test]
+    fn test_shortener_shorten_home_no_match() {
+        let s = PathShortener::new(50);
+        let result = s.shorten_home("/opt/bin/tool", "/home/user");
+        // Path doesn't match home, so it's abbreviated: /o/bin/tool
+        assert!(result.contains("bin/tool"));
+    }
+
+    #[test]
+    fn test_shortener_fits() {
+        let s = PathShortener::new(10);
+        assert!(s.fits("short.rs"));
+        assert!(!s.fits("a_very_long_filename.rs"));
+    }
+
+    #[test]
+    fn test_shortener_max_length() {
+        let s = PathShortener::new(42);
+        assert_eq!(s.max_length(), 42);
+    }
+
+    #[test]
+    fn test_shortener_shorten_relative_trailing_slash() {
+        let s = PathShortener::new(50);
+        let result = s.shorten_relative("/home/user/project/src/lib.rs", "/home/user/project/");
+        assert_eq!(result, "src/lib.rs");
+    }
+
+    // -----------------------------------------------------------------------
+    // PathValidatorExtended – tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validator_ext_valid_filename() {
+        let v = PathValidatorExtended::new();
+        assert!(v.is_valid_filename("hello.txt"));
+        assert!(v.is_valid_filename("my-file_v2.tar.gz"));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_filename_empty() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_filename(""));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_filename_reserved() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_filename("CON"));
+        assert!(!v.is_valid_filename("con.txt"));
+        assert!(!v.is_valid_filename("NUL"));
+        assert!(!v.is_valid_filename("COM1"));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_filename_chars() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_filename("file<name>.txt"));
+        assert!(!v.is_valid_filename("file:name"));
+        assert!(!v.is_valid_filename("file\0name"));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_filename_trailing() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_filename("file."));
+        assert!(!v.is_valid_filename("file "));
+    }
+
+    #[test]
+    fn test_validator_ext_valid_path() {
+        let v = PathValidatorExtended::new();
+        assert!(v.is_valid_path("/home/user/file.txt"));
+        assert!(v.is_valid_path("relative/path/file.rs"));
+        assert!(v.is_valid_path("C:/Users/file.txt"));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_path_empty() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_path(""));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_path_bad_segment() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_path("/home/user/CON/file.txt"));
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_chars() {
+        let v = PathValidatorExtended::new();
+        let chars = v.invalid_chars("he<ll>o");
+        assert_eq!(chars, vec!['<', '>']);
+    }
+
+    #[test]
+    fn test_validator_ext_invalid_chars_none() {
+        let v = PathValidatorExtended::new();
+        assert!(v.invalid_chars("hello.txt").is_empty());
+    }
+
+    #[test]
+    fn test_validator_ext_suggested_filename() {
+        let v = PathValidatorExtended::new();
+        assert_eq!(v.suggested_filename("he<ll>o.txt"), "he_ll_o.txt");
+    }
+
+    #[test]
+    fn test_validator_ext_suggested_filename_empty() {
+        let v = PathValidatorExtended::new();
+        assert_eq!(v.suggested_filename(""), "_");
+    }
+
+    #[test]
+    fn test_validator_ext_suggested_filename_reserved() {
+        let v = PathValidatorExtended::new();
+        assert_eq!(v.suggested_filename("CON"), "_CON");
+    }
+
+    #[test]
+    fn test_validator_ext_suggested_trailing_dots() {
+        let v = PathValidatorExtended::new();
+        assert_eq!(v.suggested_filename("file..."), "file");
+    }
+
+    #[test]
+    fn test_validator_ext_max_component_length() {
+        let v = PathValidatorExtended::new();
+        assert_eq!(v.max_component_length(), 255);
+    }
+
+    #[test]
+    fn test_validator_ext_is_too_long() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_too_long("short", 100));
+        assert!(v.is_too_long("short", 3));
+    }
+
+    #[test]
+    fn test_validator_ext_has_invalid_chars() {
+        let v = PathValidatorExtended::new();
+        assert!(v.has_invalid_chars("file<name>"));
+        assert!(!v.has_invalid_chars("valid-file_name.txt"));
+    }
+
+    #[test]
+    fn test_validator_ext_with_max_component() {
+        let v = PathValidatorExtended::new().with_max_component(10);
+        assert!(v.is_valid_filename("short.txt"));
+        assert!(!v.is_valid_filename("very_long_filename.txt"));
+    }
+
+    #[test]
+    fn test_validator_ext_forbid_chars() {
+        let v = PathValidatorExtended::new().forbid_chars(&['@', '#']);
+        assert!(v.has_invalid_chars("file@name"));
+        assert!(v.has_invalid_chars("file#name"));
+        assert!(v.is_valid_filename("file-name.txt"));
+    }
+
+    #[test]
+    fn test_validator_ext_dots_only() {
+        let v = PathValidatorExtended::new();
+        assert!(!v.is_valid_filename("..."));
+        assert!(!v.is_valid_filename("  "));
+    }
+
+    #[test]
+    fn test_validator_ext_path_with_dots_and_parent() {
+        let v = PathValidatorExtended::new();
+        assert!(v.is_valid_path("./src/../lib/file.rs"));
+    }
+
+    #[test]
+    fn test_validator_ext_suggested_control_chars() {
+        let v = PathValidatorExtended::new();
+        let result = v.suggested_filename("file\x01name\x02.txt");
+        assert_eq!(result, "file_name_.txt");
+    }
+
+    #[test]
+    fn test_validator_ext_default() {
+        let v = PathValidatorExtended::default();
+        assert_eq!(v.max_component_length(), 255);
+        assert!(v.is_valid_filename("test.rs"));
+    }
+
 }

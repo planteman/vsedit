@@ -1407,6 +1407,374 @@ impl std::fmt::Debug for NotificationActionHandler {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// NotificationSourceFilter – filter notifications by source
+// ---------------------------------------------------------------------------
+
+/// Filter criteria for notifications based on their source.
+#[derive(Debug, Clone)]
+pub struct NotificationSourceFilter {
+    included_sources: Vec<String>,
+    excluded_sources: Vec<String>,
+    severity_filter: Option<NotificationSeverity>,
+}
+
+impl NotificationSourceFilter {
+    pub fn new() -> Self {
+        Self {
+            included_sources: Vec::new(),
+            excluded_sources: Vec::new(),
+            severity_filter: None,
+        }
+    }
+
+    pub fn include_source(&mut self, source: impl Into<String>) {
+        let s = source.into();
+        if !self.included_sources.contains(&s) {
+            self.included_sources.push(s);
+        }
+    }
+
+    pub fn exclude_source(&mut self, source: impl Into<String>) {
+        let s = source.into();
+        if !self.excluded_sources.contains(&s) {
+            self.excluded_sources.push(s);
+        }
+    }
+
+    pub fn set_severity_filter(&mut self, severity: NotificationSeverity) {
+        self.severity_filter = Some(severity);
+    }
+
+    pub fn clear_severity_filter(&mut self) {
+        self.severity_filter = None;
+    }
+
+    pub fn matches(&self, notification: &Notification) -> bool {
+        if let Some(ref sev) = self.severity_filter {
+            if notification.severity != *sev {
+                return false;
+            }
+        }
+        if let Some(ref src) = notification.source {
+            if self.excluded_sources.contains(src) {
+                return false;
+            }
+            if !self.included_sources.is_empty() && !self.included_sources.contains(src) {
+                return false;
+            }
+        } else if !self.included_sources.is_empty() {
+            return false;
+        }
+        true
+    }
+
+    pub fn filter_notifications<'a>(
+        &self,
+        notifications: &'a [Notification],
+    ) -> Vec<&'a Notification> {
+        notifications.iter().filter(|n| self.matches(n)).collect()
+    }
+
+    pub fn included_count(&self) -> usize {
+        self.included_sources.len()
+    }
+
+    pub fn excluded_count(&self) -> usize {
+        self.excluded_sources.len()
+    }
+
+    pub fn reset(&mut self) {
+        self.included_sources.clear();
+        self.excluded_sources.clear();
+        self.severity_filter = None;
+    }
+}
+
+impl Default for NotificationSourceFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationPersistence – store and recall notifications
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct PersistedNotification {
+    pub id: u64,
+    pub severity: NotificationSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub timestamp_ms: u64,
+    pub was_actioned: bool,
+}
+
+#[derive(Debug)]
+pub struct NotificationPersistence {
+    records: Vec<PersistedNotification>,
+    max_records: usize,
+}
+
+impl NotificationPersistence {
+    pub fn new(max_records: usize) -> Self {
+        Self {
+            records: Vec::new(),
+            max_records,
+        }
+    }
+
+    pub fn persist(&mut self, notification: &Notification, timestamp_ms: u64) {
+        let record = PersistedNotification {
+            id: notification.id,
+            severity: notification.severity,
+            message: notification.message.clone(),
+            source: notification.source.clone(),
+            timestamp_ms,
+            was_actioned: false,
+        };
+        self.records.push(record);
+        if self.records.len() > self.max_records {
+            self.records.remove(0);
+        }
+    }
+
+    pub fn mark_actioned(&mut self, id: u64) -> bool {
+        for r in &mut self.records {
+            if r.id == id {
+                r.was_actioned = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn all_records(&self) -> &[PersistedNotification] {
+        &self.records
+    }
+
+    pub fn records_by_severity(&self, severity: NotificationSeverity) -> Vec<&PersistedNotification> {
+        self.records.iter().filter(|r| r.severity == severity).collect()
+    }
+
+    pub fn records_in_range(&self, from_ms: u64, to_ms: u64) -> Vec<&PersistedNotification> {
+        self.records
+            .iter()
+            .filter(|r| r.timestamp_ms >= from_ms && r.timestamp_ms <= to_ms)
+            .collect()
+    }
+
+    pub fn unactioned_records(&self) -> Vec<&PersistedNotification> {
+        self.records.iter().filter(|r| !r.was_actioned).collect()
+    }
+
+    pub fn record_count(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn prune_before(&mut self, threshold_ms: u64) -> usize {
+        let before = self.records.len();
+        self.records.retain(|r| r.timestamp_ms >= threshold_ms);
+        before - self.records.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationActionChain – chain multiple actions together
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct ActionStep {
+    pub label: String,
+    pub command: String,
+    pub args: Vec<String>,
+}
+
+impl ActionStep {
+    pub fn new(label: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            command: command.into(),
+            args: Vec::new(),
+        }
+    }
+
+    pub fn with_arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    pub fn arg_count(&self) -> usize {
+        self.args.len()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NotificationActionChain {
+    pub name: String,
+    steps: Vec<ActionStep>,
+    stop_on_failure: bool,
+}
+
+impl NotificationActionChain {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            steps: Vec::new(),
+            stop_on_failure: true,
+        }
+    }
+
+    pub fn add_step(&mut self, step: ActionStep) {
+        self.steps.push(step);
+    }
+
+    pub fn set_stop_on_failure(&mut self, stop: bool) {
+        self.stop_on_failure = stop;
+    }
+
+    pub fn stop_on_failure(&self) -> bool {
+        self.stop_on_failure
+    }
+
+    pub fn steps(&self) -> &[ActionStep] {
+        &self.steps
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+
+    pub fn get_step(&self, index: usize) -> Option<&ActionStep> {
+        self.steps.get(index)
+    }
+
+    pub fn remove_step(&mut self, index: usize) -> Option<ActionStep> {
+        if index < self.steps.len() {
+            Some(self.steps.remove(index))
+        } else {
+            None
+        }
+    }
+
+    pub fn all_commands(&self) -> Vec<&str> {
+        self.steps.iter().map(|s| s.command.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationCenterView – view model for notification center panel
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotificationCenterViewMode {
+    All,
+    Unread,
+    BySeverity(NotificationSeverity),
+}
+
+#[derive(Debug)]
+pub struct NotificationCenterView {
+    persistence: NotificationPersistence,
+    filter: NotificationSourceFilter,
+    view_mode: NotificationCenterViewMode,
+    selected_index: Option<usize>,
+    expanded_ids: Vec<u64>,
+}
+
+impl NotificationCenterView {
+    pub fn new(max_history: usize) -> Self {
+        Self {
+            persistence: NotificationPersistence::new(max_history),
+            filter: NotificationSourceFilter::new(),
+            view_mode: NotificationCenterViewMode::All,
+            selected_index: None,
+            expanded_ids: Vec::new(),
+        }
+    }
+
+    pub fn add_notification(&mut self, notification: &Notification, timestamp_ms: u64) {
+        self.persistence.persist(notification, timestamp_ms);
+    }
+
+    pub fn set_view_mode(&mut self, mode: NotificationCenterViewMode) {
+        self.view_mode = mode;
+        self.selected_index = None;
+    }
+
+    pub fn view_mode(&self) -> NotificationCenterViewMode {
+        self.view_mode
+    }
+
+    pub fn visible_records(&self) -> Vec<&PersistedNotification> {
+        let all = self.persistence.all_records();
+        match self.view_mode {
+            NotificationCenterViewMode::All => all.iter().collect(),
+            NotificationCenterViewMode::Unread => {
+                all.iter().filter(|r| !r.was_actioned).collect()
+            }
+            NotificationCenterViewMode::BySeverity(sev) => {
+                all.iter().filter(|r| r.severity == sev).collect()
+            }
+        }
+    }
+
+    pub fn visible_count(&self) -> usize {
+        self.visible_records().len()
+    }
+
+    pub fn select(&mut self, index: usize) {
+        self.selected_index = Some(index);
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.selected_index = None;
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        self.selected_index
+    }
+
+    pub fn toggle_expanded(&mut self, id: u64) {
+        if let Some(pos) = self.expanded_ids.iter().position(|&x| x == id) {
+            self.expanded_ids.remove(pos);
+        } else {
+            self.expanded_ids.push(id);
+        }
+    }
+
+    pub fn is_expanded(&self, id: u64) -> bool {
+        self.expanded_ids.contains(&id)
+    }
+
+    pub fn mark_read(&mut self, id: u64) -> bool {
+        self.persistence.mark_actioned(id)
+    }
+
+    pub fn filter_mut(&mut self) -> &mut NotificationSourceFilter {
+        &mut self.filter
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.persistence.record_count()
+    }
+
+    pub fn clear_all(&mut self) {
+        self.persistence.clear();
+        self.selected_index = None;
+        self.expanded_ids.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2241,4 +2609,201 @@ mod tests {
         h.register("b", Box::new(|_| false));
         assert_eq!(h.handler_count(), 2);
     }
+    #[test]
+    fn source_filter_basic() {
+        let mut filter = NotificationSourceFilter::new();
+        let info = Notification::info("msg").with_source("Rust");
+        assert!(filter.matches(&info));
+        filter.include_source("TypeScript");
+        assert!(!filter.matches(&info));
+        filter.include_source("Rust");
+        assert!(filter.matches(&info));
+    }
+
+    #[test]
+    fn source_filter_exclude() {
+        let mut filter = NotificationSourceFilter::new();
+        filter.exclude_source("Rust");
+        let n = Notification::info("msg").with_source("Rust");
+        assert!(!filter.matches(&n));
+        let n2 = Notification::info("msg").with_source("Go");
+        assert!(filter.matches(&n2));
+    }
+
+    #[test]
+    fn source_filter_severity() {
+        let mut filter = NotificationSourceFilter::new();
+        filter.set_severity_filter(NotificationSeverity::Error);
+        assert!(!filter.matches(&Notification::info("msg")));
+        assert!(filter.matches(&Notification::error("msg")));
+        filter.clear_severity_filter();
+        assert!(filter.matches(&Notification::info("msg")));
+    }
+
+    #[test]
+    fn source_filter_reset() {
+        let mut filter = NotificationSourceFilter::new();
+        filter.include_source("X");
+        filter.exclude_source("Y");
+        filter.set_severity_filter(NotificationSeverity::Info);
+        filter.reset();
+        assert_eq!(filter.included_count(), 0);
+        assert_eq!(filter.excluded_count(), 0);
+    }
+
+    #[test]
+    fn persistence_basic() {
+        let mut store = NotificationPersistence::new(10);
+        let n = Notification::info("hello");
+        store.persist(&n, 1000);
+        assert_eq!(store.record_count(), 1);
+        assert_eq!(store.all_records()[0].message, "hello");
+    }
+
+    #[test]
+    fn persistence_max_records() {
+        let mut store = NotificationPersistence::new(3);
+        for i in 0..5 {
+            let n = Notification::info(&format!("msg{i}"));
+            store.persist(&n, i as u64 * 100);
+        }
+        assert_eq!(store.record_count(), 3);
+        assert_eq!(store.all_records()[0].message, "msg2");
+    }
+
+    #[test]
+    fn persistence_mark_actioned() {
+        let mut store = NotificationPersistence::new(10);
+        let n = Notification::info("x");
+        let nid = n.id;
+        store.persist(&n, 100);
+        assert_eq!(store.unactioned_records().len(), 1);
+        assert!(store.mark_actioned(nid));
+        assert_eq!(store.unactioned_records().len(), 0);
+    }
+
+    #[test]
+    fn persistence_prune() {
+        let mut store = NotificationPersistence::new(100);
+        for i in 0..5 {
+            let n = Notification::info(&format!("m{i}"));
+            store.persist(&n, i as u64 * 100);
+        }
+        assert_eq!(store.prune_before(200), 2);
+        assert_eq!(store.record_count(), 3);
+    }
+
+    #[test]
+    fn persistence_by_severity() {
+        let mut store = NotificationPersistence::new(10);
+        store.persist(&Notification::info("i"), 100);
+        store.persist(&Notification::error("e"), 200);
+        assert_eq!(store.records_by_severity(NotificationSeverity::Info).len(), 1);
+        assert_eq!(store.records_by_severity(NotificationSeverity::Error).len(), 1);
+    }
+
+    #[test]
+    fn persistence_range_query() {
+        let mut store = NotificationPersistence::new(10);
+        for i in 0..5 {
+            store.persist(&Notification::info(&format!("m{i}")), i as u64 * 100);
+        }
+        assert_eq!(store.records_in_range(100, 300).len(), 3);
+    }
+
+    #[test]
+    fn action_step_building() {
+        let step = ActionStep::new("retry", "workbench.action.retry")
+            .with_arg("force")
+            .with_arg("--verbose");
+        assert_eq!(step.label, "retry");
+        assert_eq!(step.arg_count(), 2);
+    }
+
+    #[test]
+    fn action_chain_operations() {
+        let mut chain = NotificationActionChain::new("build-and-test");
+        assert!(chain.is_empty());
+        chain.add_step(ActionStep::new("build", "task.build"));
+        chain.add_step(ActionStep::new("test", "task.test"));
+        assert_eq!(chain.step_count(), 2);
+        assert_eq!(chain.all_commands(), vec!["task.build", "task.test"]);
+        assert!(chain.stop_on_failure());
+        chain.set_stop_on_failure(false);
+        assert!(!chain.stop_on_failure());
+    }
+
+    #[test]
+    fn action_chain_get_remove() {
+        let mut chain = NotificationActionChain::new("c");
+        chain.add_step(ActionStep::new("a", "cmd.a"));
+        chain.add_step(ActionStep::new("b", "cmd.b"));
+        assert_eq!(chain.get_step(0).unwrap().label, "a");
+        let removed = chain.remove_step(0).unwrap();
+        assert_eq!(removed.label, "a");
+        assert_eq!(chain.step_count(), 1);
+        assert!(chain.remove_step(99).is_none());
+    }
+
+    #[test]
+    fn center_view_basic() {
+        let mut view = NotificationCenterView::new(100);
+        view.add_notification(&Notification::info("hello"), 1000);
+        assert_eq!(view.total_count(), 1);
+        assert_eq!(view.visible_count(), 1);
+    }
+
+    #[test]
+    fn center_view_modes() {
+        let mut view = NotificationCenterView::new(100);
+        view.add_notification(&Notification::info("i"), 100);
+        view.add_notification(&Notification::error("e"), 200);
+        view.set_view_mode(NotificationCenterViewMode::All);
+        assert_eq!(view.visible_count(), 2);
+        view.set_view_mode(NotificationCenterViewMode::BySeverity(NotificationSeverity::Error));
+        assert_eq!(view.visible_count(), 1);
+    }
+
+    #[test]
+    fn center_view_selection() {
+        let mut view = NotificationCenterView::new(100);
+        view.add_notification(&Notification::info("a"), 100);
+        view.select(0);
+        assert_eq!(view.selected_index(), Some(0));
+        view.clear_selection();
+        assert_eq!(view.selected_index(), None);
+    }
+
+    #[test]
+    fn center_view_expand_toggle() {
+        let mut view = NotificationCenterView::new(100);
+        view.toggle_expanded(42);
+        assert!(view.is_expanded(42));
+        view.toggle_expanded(42);
+        assert!(!view.is_expanded(42));
+    }
+
+    #[test]
+    fn center_view_mark_read() {
+        let mut view = NotificationCenterView::new(100);
+        let n = Notification::info("msg");
+        let nid = n.id;
+        view.add_notification(&n, 100);
+        view.set_view_mode(NotificationCenterViewMode::Unread);
+        assert_eq!(view.visible_count(), 1);
+        view.mark_read(nid);
+        assert_eq!(view.visible_count(), 0);
+    }
+
+    #[test]
+    fn center_view_clear_all() {
+        let mut view = NotificationCenterView::new(100);
+        view.add_notification(&Notification::info("a"), 100);
+        view.select(0);
+        view.toggle_expanded(1);
+        view.clear_all();
+        assert_eq!(view.total_count(), 0);
+        assert_eq!(view.selected_index(), None);
+    }
+
 }

@@ -1381,6 +1381,666 @@ pub fn format_color(color: &Color, format: ColorFormat) -> String {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ColorPalettePicker – preset palette collections
+// ---------------------------------------------------------------------------
+
+/// A named collection of preset color palettes for common use cases.
+pub struct ColorPalettePicker {
+    palettes: Vec<(String, Vec<(String, Color)>)>,
+}
+
+impl ColorPalettePicker {
+    /// Create an empty palette picker.
+    pub fn new() -> Self {
+        Self { palettes: Vec::new() }
+    }
+
+    /// Create a palette picker pre-loaded with Material Design primary colors.
+    pub fn material_design() -> Self {
+        let mut picker = Self::new();
+        let colors = vec![
+            ("Red",         Color::new(0.957, 0.263, 0.212, 1.0)),
+            ("Pink",        Color::new(0.914, 0.118, 0.388, 1.0)),
+            ("Purple",      Color::new(0.612, 0.153, 0.690, 1.0)),
+            ("Deep Purple", Color::new(0.404, 0.227, 0.718, 1.0)),
+            ("Indigo",      Color::new(0.247, 0.318, 0.710, 1.0)),
+            ("Blue",        Color::new(0.129, 0.588, 0.953, 1.0)),
+            ("Cyan",        Color::new(0.0,   0.737, 0.831, 1.0)),
+            ("Teal",        Color::new(0.0,   0.588, 0.533, 1.0)),
+            ("Green",       Color::new(0.298, 0.686, 0.314, 1.0)),
+            ("Yellow",      Color::new(1.0,   0.922, 0.231, 1.0)),
+            ("Orange",      Color::new(1.0,   0.596, 0.0,   1.0)),
+            ("Brown",       Color::new(0.475, 0.333, 0.282, 1.0)),
+        ];
+        let entries: Vec<(String, Color)> = colors
+            .into_iter()
+            .map(|(n, c)| (n.to_string(), c))
+            .collect();
+        picker.add_palette("Material Design", entries);
+        picker
+    }
+
+    /// Create a palette picker with Tailwind CSS base colors.
+    pub fn tailwind_css() -> Self {
+        let mut picker = Self::new();
+        let colors = vec![
+            ("Slate",   Color::new(0.392, 0.455, 0.545, 1.0)),
+            ("Gray",    Color::new(0.420, 0.447, 0.502, 1.0)),
+            ("Zinc",    Color::new(0.443, 0.443, 0.478, 1.0)),
+            ("Red",     Color::new(0.937, 0.267, 0.267, 1.0)),
+            ("Orange",  Color::new(0.976, 0.451, 0.086, 1.0)),
+            ("Amber",   Color::new(0.961, 0.620, 0.043, 1.0)),
+            ("Yellow",  Color::new(0.918, 0.702, 0.031, 1.0)),
+            ("Lime",    Color::new(0.518, 0.776, 0.086, 1.0)),
+            ("Green",   Color::new(0.133, 0.725, 0.384, 1.0)),
+            ("Teal",    Color::new(0.078, 0.714, 0.651, 1.0)),
+            ("Sky",     Color::new(0.055, 0.647, 0.914, 1.0)),
+            ("Blue",    Color::new(0.231, 0.510, 0.965, 1.0)),
+            ("Violet",  Color::new(0.545, 0.361, 0.965, 1.0)),
+            ("Fuchsia", Color::new(0.851, 0.275, 0.937, 1.0)),
+            ("Rose",    Color::new(0.957, 0.247, 0.369, 1.0)),
+        ];
+        let entries: Vec<(String, Color)> = colors
+            .into_iter()
+            .map(|(n, c)| (n.to_string(), c))
+            .collect();
+        picker.add_palette("Tailwind CSS", entries);
+        picker
+    }
+
+    /// Add a named palette.
+    pub fn add_palette(
+        &mut self,
+        name: impl Into<String>,
+        colors: Vec<(String, Color)>,
+    ) {
+        self.palettes.push((name.into(), colors));
+    }
+
+    /// List all palette names.
+    pub fn palette_names(&self) -> Vec<&str> {
+        self.palettes.iter().map(|(n, _)| n.as_str()).collect()
+    }
+
+    /// Look up a palette by name.
+    pub fn get_palette(&self, name: &str) -> Option<&[(String, Color)]> {
+        self.palettes
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, c)| c.as_slice())
+    }
+
+    /// Total number of palettes.
+    pub fn palette_count(&self) -> usize {
+        self.palettes.len()
+    }
+
+    /// Total number of colors across all palettes.
+    pub fn total_colors(&self) -> usize {
+        self.palettes.iter().map(|(_, c)| c.len()).sum()
+    }
+
+    /// Search all palettes for colors whose name contains the query
+    /// (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<(&str, &str, &Color)> {
+        let q = query.to_ascii_lowercase();
+        let mut results = Vec::new();
+        for (palette_name, colors) in &self.palettes {
+            for (color_name, color) in colors {
+                if color_name.to_ascii_lowercase().contains(&q) {
+                    results.push((palette_name.as_str(), color_name.as_str(), color));
+                }
+            }
+        }
+        results
+    }
+
+    /// Remove a palette by name. Returns `true` if found and removed.
+    pub fn remove_palette(&mut self, name: &str) -> bool {
+        let before = self.palettes.len();
+        self.palettes.retain(|(n, _)| n != name);
+        self.palettes.len() < before
+    }
+}
+
+impl Default for ColorPalettePicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorFormatAutoDetector – detect the format of a color string
+// ---------------------------------------------------------------------------
+
+/// The detected format of a color string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetectedColorFormat {
+    /// `#RGB` shorthand hex.
+    Hex3,
+    /// `#RRGGBB` hex.
+    Hex6,
+    /// `#RRGGBBAA` hex with alpha.
+    Hex8,
+    /// `rgb(...)` or `rgba(...)` functional notation.
+    RgbFunction,
+    /// `hsl(...)` or `hsla(...)` functional notation.
+    HslFunction,
+    /// `hwb(...)` functional notation.
+    HwbFunction,
+    /// A CSS named color like `red` or `cornflowerblue`.
+    Named,
+}
+
+/// Detects the format of a color string without fully parsing it.
+pub struct ColorFormatAutoDetector;
+
+impl ColorFormatAutoDetector {
+    /// Detect the color format of the given input string.
+    ///
+    /// Returns `None` if the input does not look like any recognized color
+    /// format.
+    pub fn detect(input: &str) -> Option<DetectedColorFormat> {
+        let trimmed = input.trim();
+        if trimmed.starts_with('#') {
+            let hex_part = &trimmed[1..];
+            if hex_part.len() == 3 && hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Some(DetectedColorFormat::Hex3);
+            }
+            if hex_part.len() == 6 && hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Some(DetectedColorFormat::Hex6);
+            }
+            if hex_part.len() == 8 && hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Some(DetectedColorFormat::Hex8);
+            }
+            return None;
+        }
+        if trimmed.starts_with("rgb(") || trimmed.starts_with("rgba(") {
+            return Some(DetectedColorFormat::RgbFunction);
+        }
+        if trimmed.starts_with("hsl(") || trimmed.starts_with("hsla(") {
+            return Some(DetectedColorFormat::HslFunction);
+        }
+        if trimmed.starts_with("hwb(") {
+            return Some(DetectedColorFormat::HwbFunction);
+        }
+        // Check for named colors
+        if parse_named_color(trimmed).is_some() {
+            return Some(DetectedColorFormat::Named);
+        }
+        None
+    }
+
+    /// Detect the format and parse the color in one step.
+    pub fn detect_and_parse(input: &str) -> Option<(DetectedColorFormat, Color)> {
+        let format = Self::detect(input)?;
+        let color = parse_color(input)?;
+        Some((format, color))
+    }
+
+    /// Suggest the best `ColorFormat` for re-serializing a color that was
+    /// originally written in the detected format.
+    pub fn suggest_output_format(detected: DetectedColorFormat) -> ColorFormat {
+        match detected {
+            DetectedColorFormat::Hex3
+            | DetectedColorFormat::Hex6
+            | DetectedColorFormat::Hex8 => ColorFormat::Hex,
+            DetectedColorFormat::RgbFunction => ColorFormat::Rgb,
+            DetectedColorFormat::HslFunction => ColorFormat::Hsl,
+            DetectedColorFormat::HwbFunction => ColorFormat::Hsl,
+            DetectedColorFormat::Named => ColorFormat::Hex,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorSwatchRenderer – multi-character swatch rendering
+// ---------------------------------------------------------------------------
+
+/// Renders color swatches as multi-character block strings for terminal UIs.
+pub struct ColorSwatchRenderer {
+    width: usize,
+    height: usize,
+    border: bool,
+}
+
+impl ColorSwatchRenderer {
+    /// Create a renderer with custom swatch dimensions.
+    pub fn new(width: usize, height: usize) -> Self {
+        Self {
+            width: width.max(1),
+            height: height.max(1),
+            border: false,
+        }
+    }
+
+    /// Enable or disable a simple ASCII border around the swatch.
+    pub fn with_border(mut self, border: bool) -> Self {
+        self.border = border;
+        self
+    }
+
+    /// Render a single color swatch as a vector of lines.
+    ///
+    /// Each line is a string of block characters. The caller is responsible for
+    /// applying ANSI foreground color escape codes.
+    pub fn render(&self, _color: &Color) -> Vec<String> {
+        let block_line: String = "█".repeat(self.width);
+        let mut rows = Vec::new();
+        if self.border {
+            let top = format!("+{}+", "-".repeat(self.width));
+            rows.push(top);
+            for _ in 0..self.height {
+                rows.push(format!("|{}|", block_line));
+            }
+            let bottom = format!("+{}+", "-".repeat(self.width));
+            rows.push(bottom);
+        } else {
+            for _ in 0..self.height {
+                rows.push(block_line.clone());
+            }
+        }
+        rows
+    }
+
+    /// Render a swatch with an ANSI true-color escape sequence baked in.
+    pub fn render_ansi(&self, color: &Color) -> Vec<String> {
+        let r = (color.r.clamp(0.0, 1.0) * 255.0).round() as u8;
+        let g = (color.g.clamp(0.0, 1.0) * 255.0).round() as u8;
+        let b = (color.b.clamp(0.0, 1.0) * 255.0).round() as u8;
+        let esc_start = format!("\x1b[38;2;{};{};{}m", r, g, b);
+        let esc_end = "\x1b[0m";
+        self.render(color)
+            .into_iter()
+            .map(|line| format!("{}{}{}", esc_start, line, esc_end))
+            .collect()
+    }
+
+    /// Render a grid of swatches side-by-side, separated by a single space.
+    pub fn render_row(&self, colors: &[Color]) -> Vec<String> {
+        if colors.is_empty() {
+            return Vec::new();
+        }
+        let rendered: Vec<Vec<String>> = colors.iter().map(|c| self.render(c)).collect();
+        let max_rows = rendered.iter().map(|r| r.len()).max().unwrap_or(0);
+        let empty_cell = " ".repeat(if self.border { self.width + 2 } else { self.width });
+        (0..max_rows)
+            .map(|row_idx| {
+                rendered
+                    .iter()
+                    .map(|swatch| {
+                        swatch
+                            .get(row_idx)
+                            .cloned()
+                            .unwrap_or_else(|| empty_cell.clone())
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .collect()
+    }
+
+    /// Total character width of a single swatch (including border).
+    pub fn swatch_width(&self) -> usize {
+        if self.border { self.width + 2 } else { self.width }
+    }
+
+    /// Total character height of a single swatch (including border).
+    pub fn swatch_height(&self) -> usize {
+        if self.border { self.height + 2 } else { self.height }
+    }
+}
+
+impl Default for ColorSwatchRenderer {
+    fn default() -> Self {
+        Self::new(2, 1)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorNameLookup – bidirectional name↔color lookup with fuzzy matching
+// ---------------------------------------------------------------------------
+
+/// Bidirectional lookup between CSS color names and their RGB values.
+pub struct ColorNameLookup {
+    entries: Vec<(&'static str, Color)>,
+}
+
+impl ColorNameLookup {
+    /// Build the lookup table with the standard named colors.
+    pub fn new() -> Self {
+        let entries: Vec<(&'static str, Color)> = vec![
+            ("black",     Color::new(0.0,   0.0,   0.0,   1.0)),
+            ("white",     Color::new(1.0,   1.0,   1.0,   1.0)),
+            ("red",       Color::new(1.0,   0.0,   0.0,   1.0)),
+            ("green",     Color::new(0.0,   0.502, 0.0,   1.0)),
+            ("blue",      Color::new(0.0,   0.0,   1.0,   1.0)),
+            ("yellow",    Color::new(1.0,   1.0,   0.0,   1.0)),
+            ("cyan",      Color::new(0.0,   1.0,   1.0,   1.0)),
+            ("magenta",   Color::new(1.0,   0.0,   1.0,   1.0)),
+            ("orange",    Color::new(1.0,   0.647, 0.0,   1.0)),
+            ("purple",    Color::new(0.502, 0.0,   0.502, 1.0)),
+            ("pink",      Color::new(1.0,   0.753, 0.796, 1.0)),
+            ("brown",     Color::new(0.647, 0.165, 0.165, 1.0)),
+            ("gray",      Color::new(0.502, 0.502, 0.502, 1.0)),
+            ("silver",    Color::new(0.753, 0.753, 0.753, 1.0)),
+            ("navy",      Color::new(0.0,   0.0,   0.502, 1.0)),
+            ("teal",      Color::new(0.0,   0.502, 0.502, 1.0)),
+            ("maroon",    Color::new(0.502, 0.0,   0.0,   1.0)),
+            ("olive",     Color::new(0.502, 0.502, 0.0,   1.0)),
+            ("lime",      Color::new(0.0,   1.0,   0.0,   1.0)),
+            ("coral",     Color::new(1.0,   0.498, 0.314, 1.0)),
+            ("salmon",    Color::new(0.980, 0.502, 0.447, 1.0)),
+            ("gold",      Color::new(1.0,   0.843, 0.0,   1.0)),
+            ("ivory",     Color::new(1.0,   1.0,   0.941, 1.0)),
+            ("indigo",    Color::new(0.294, 0.0,   0.510, 1.0)),
+            ("violet",    Color::new(0.933, 0.510, 0.933, 1.0)),
+            ("khaki",     Color::new(0.941, 0.902, 0.549, 1.0)),
+            ("crimson",   Color::new(0.863, 0.078, 0.235, 1.0)),
+            ("turquoise", Color::new(0.251, 0.878, 0.816, 1.0)),
+        ];
+        Self { entries }
+    }
+
+    /// Look up a color by its CSS name (case-insensitive).
+    pub fn by_name(&self, name: &str) -> Option<&Color> {
+        let lower = name.to_ascii_lowercase();
+        self.entries
+            .iter()
+            .find(|(n, _)| *n == lower.as_str())
+            .map(|(_, c)| c)
+    }
+
+    /// Find the closest named color to the given color (Euclidean RGB
+    /// distance). Returns the name and distance.
+    pub fn closest(&self, color: &Color) -> (&'static str, f64) {
+        let mut best_name = "black";
+        let mut best_dist = f64::MAX;
+        for (name, entry) in &self.entries {
+            let dr = color.r - entry.r;
+            let dg = color.g - entry.g;
+            let db = color.b - entry.b;
+            let dist = (dr * dr + dg * dg + db * db).sqrt();
+            if dist < best_dist {
+                best_dist = dist;
+                best_name = name;
+            }
+        }
+        (best_name, best_dist)
+    }
+
+    /// Return all color names that fuzzy-match the query (the query is a
+    /// substring of the name, case-insensitive).
+    pub fn fuzzy_search(&self, query: &str) -> Vec<&'static str> {
+        let q = query.to_ascii_lowercase();
+        self.entries
+            .iter()
+            .filter(|(n, _)| n.contains(q.as_str()))
+            .map(|(n, _)| *n)
+            .collect()
+    }
+
+    /// Number of entries in the lookup table.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the lookup table is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Iterate over all `(name, color)` pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&'static str, &Color)> {
+        self.entries.iter().map(|(n, c)| (*n, c))
+    }
+
+    /// Return all names sorted alphabetically.
+    pub fn sorted_names(&self) -> Vec<&'static str> {
+        let mut names: Vec<&str> = self.entries.iter().map(|(n, _)| *n).collect();
+        names.sort_unstable();
+        names
+    }
+}
+
+impl Default for ColorNameLookup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
+
+// ---------------------------------------------------------------------------
+// ColorPalettePicker – additional convenience methods
+// ---------------------------------------------------------------------------
+
+impl ColorPalettePicker {
+    /// Create a palette picker pre-loaded with a "material" palette containing
+    /// red, blue, green, and yellow.
+    pub fn with_material_preset() -> Self {
+        let mut picker = Self::new();
+        let colors = vec![
+            ("red".to_string(),    Color::new(1.0, 0.0, 0.0, 1.0)),
+            ("blue".to_string(),   Color::new(0.0, 0.0, 1.0, 1.0)),
+            ("green".to_string(),  Color::new(0.0, 0.502, 0.0, 1.0)),
+            ("yellow".to_string(), Color::new(1.0, 1.0, 0.0, 1.0)),
+        ];
+        picker.add_palette("material", colors);
+        picker
+    }
+
+    /// Create a palette picker pre-loaded with a "pastel" palette containing
+    /// soft pastel shades.
+    pub fn with_pastel_preset() -> Self {
+        let mut picker = Self::new();
+        let colors = vec![
+            ("pastel_pink".to_string(),   Color::new(1.0, 0.714, 0.757, 1.0)),
+            ("pastel_blue".to_string(),   Color::new(0.686, 0.878, 0.898, 1.0)),
+            ("pastel_green".to_string(),  Color::new(0.596, 0.984, 0.596, 1.0)),
+            ("pastel_yellow".to_string(), Color::new(0.992, 0.992, 0.588, 1.0)),
+            ("pastel_purple".to_string(), Color::new(0.702, 0.620, 0.859, 1.0)),
+            ("pastel_orange".to_string(), Color::new(1.0, 0.702, 0.482, 1.0)),
+        ];
+        picker.add_palette("pastel", colors);
+        picker
+    }
+
+    /// Search all palettes for a color by name and return the first match.
+    pub fn find_color_in_any(&self, name: &str) -> Option<Color> {
+        let lower = name.to_ascii_lowercase();
+        for (_palette_name, colors) in &self.palettes {
+            for (color_name, color) in colors {
+                if color_name.to_ascii_lowercase() == lower {
+                    return Some(*color);
+                }
+            }
+        }
+        None
+    }
+
+    /// Total number of individual colors across every palette.
+    pub fn total_color_count(&self) -> usize {
+        self.palettes.iter().map(|(_, c)| c.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorFormatAutoDetector – additional detection helpers
+// ---------------------------------------------------------------------------
+
+impl ColorFormatAutoDetector {
+    /// Detect all color format occurrences in a line of text.
+    /// Returns (byte_offset, format) pairs.
+    pub fn detect_all_in_line(line: &str) -> Vec<(usize, DetectedColorFormat)> {
+        let mut results = Vec::new();
+        let mut i = 0;
+        let bytes = line.as_bytes();
+        while i < bytes.len() {
+            if bytes[i] == b'#' {
+                // Try hex patterns
+                for len in &[9usize, 7, 4] {
+                    if i + len <= bytes.len() {
+                        let candidate = &line[i..i + len];
+                        if let Some(fmt) = Self::detect(candidate) {
+                            results.push((i, fmt));
+                            i += len;
+                            continue;
+                        }
+                    }
+                }
+                i += 1;
+            } else if line[i..].starts_with("rgb(") || line[i..].starts_with("rgba(") {
+                if let Some(end) = line[i..].find(')') {
+                    let candidate = &line[i..i + end + 1];
+                    if let Some(fmt) = Self::detect(candidate) {
+                        results.push((i, fmt));
+                        i += end + 1;
+                        continue;
+                    }
+                }
+                i += 1;
+            } else if line[i..].starts_with("hsl(") || line[i..].starts_with("hsla(") {
+                if let Some(end) = line[i..].find(')') {
+                    let candidate = &line[i..i + end + 1];
+                    if let Some(fmt) = Self::detect(candidate) {
+                        results.push((i, fmt));
+                        i += end + 1;
+                        continue;
+                    }
+                }
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+        results
+    }
+
+    /// Check whether the input looks like a hex color.
+    pub fn is_hex(input: &str) -> bool {
+        matches!(
+            Self::detect(input),
+            Some(DetectedColorFormat::Hex3)
+                | Some(DetectedColorFormat::Hex6)
+                | Some(DetectedColorFormat::Hex8)
+        )
+    }
+
+    /// Check whether the input looks like an `rgb(…)` / `rgba(…)` string.
+    pub fn is_rgb(input: &str) -> bool {
+        matches!(Self::detect(input), Some(DetectedColorFormat::RgbFunction))
+    }
+
+    /// Check whether the input looks like an `hsl(…)` / `hsla(…)` string.
+    pub fn is_hsl(input: &str) -> bool {
+        matches!(Self::detect(input), Some(DetectedColorFormat::HslFunction))
+    }
+
+    /// Check whether the input matches a CSS named color.
+    pub fn is_named(input: &str) -> bool {
+        matches!(Self::detect(input), Some(DetectedColorFormat::Named))
+    }
+
+    /// Suggest the best serialization format for a given color.
+    ///
+    /// Fully opaque colors get `Hex`; colors with fractional channels get
+    /// `Rgb`; anything else gets `Hsl`.
+    pub fn suggest_format(color: &Color) -> ColorFormat {
+        if (color.a - 1.0).abs() < f64::EPSILON {
+            ColorFormat::Hex
+        } else {
+            ColorFormat::Rgb
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorSwatchRenderer – additional rendering helpers
+// ---------------------------------------------------------------------------
+
+impl ColorSwatchRenderer {
+    /// Render a swatch with a text label on the last line.
+    pub fn render_with_label(&self, color: &Color, label: &str) -> Vec<String> {
+        let mut rows = self.render(color);
+        let padded = if label.len() < self.width {
+            let pad = self.width - label.len();
+            let left = pad / 2;
+            let right = pad - left;
+            format!("{}{}{}", " ".repeat(left), label, " ".repeat(right))
+        } else {
+            label[..self.width].to_string()
+        };
+        rows.push(padded);
+        rows
+    }
+
+    /// Render every color in a `ColorPalette` as a sequence of labeled
+    /// swatches, one per color, stacked vertically.
+    pub fn render_palette(&self, palette: &ColorPalette) -> Vec<String> {
+        let mut output = Vec::new();
+        for (name, color) in palette.iter() {
+            let swatch_lines = self.render_with_label(color, name);
+            for line in swatch_lines {
+                output.push(line);
+            }
+        }
+        output
+    }
+
+    /// The Unicode full-block character used by the renderer.
+    pub fn block_char() -> char {
+        '█'
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorNameLookup – additional convenience methods
+// ---------------------------------------------------------------------------
+
+impl ColorNameLookup {
+    /// Look up the exact name for a color (exact RGB match, ignoring alpha).
+    pub fn lookup(&self, color: &Color) -> Option<&str> {
+        for (name, entry) in &self.entries {
+            if (entry.r - color.r).abs() < 1e-4
+                && (entry.g - color.g).abs() < 1e-4
+                && (entry.b - color.b).abs() < 1e-4
+            {
+                return Some(name);
+            }
+        }
+        None
+    }
+
+    /// Return the name of the closest named color (by Euclidean distance).
+    pub fn closest_name(&self, color: &Color) -> String {
+        let (name, _dist) = self.closest(color);
+        name.to_string()
+    }
+
+    /// Return all color names in insertion order.
+    pub fn all_names(&self) -> Vec<&str> {
+        self.entries.iter().map(|(n, _)| *n).collect()
+    }
+
+    /// Resolve a name to its `Color` value (case-insensitive).
+    pub fn name_to_color(&self, name: &str) -> Option<Color> {
+        self.by_name(name).copied()
+    }
+
+    /// Number of named colors in this lookup.
+    pub fn name_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the lookup contains a color with the given name.
+    pub fn contains(&self, name: &str) -> bool {
+        self.by_name(name).is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2228,4 +2888,581 @@ mod tests {
         let s = format_color(&c, ColorFormat::Rgb);
         assert!(s.starts_with("rgba(") || s.starts_with("rgb("));
     }
+
+    // -- ColorPalettePicker tests --
+
+    #[test]
+    fn palette_picker_material_design() {
+        let picker = ColorPalettePicker::material_design();
+        assert_eq!(picker.palette_count(), 1);
+        assert!(picker.total_colors() >= 12);
+        assert_eq!(picker.palette_names(), vec!["Material Design"]);
+    }
+
+    #[test]
+    fn palette_picker_tailwind_css() {
+        let picker = ColorPalettePicker::tailwind_css();
+        assert_eq!(picker.palette_count(), 1);
+        assert!(picker.total_colors() >= 15);
+        let palette = picker.get_palette("Tailwind CSS").unwrap();
+        assert!(palette.iter().any(|(n, _)| n == "Blue"));
+    }
+
+    #[test]
+    fn palette_picker_search() {
+        let picker = ColorPalettePicker::material_design();
+        let results = picker.search("pur");
+        assert!(results.len() >= 1);
+        assert!(results.iter().any(|(_, name, _)| name.contains("Purple")));
+    }
+
+    #[test]
+    fn palette_picker_add_remove() {
+        let mut picker = ColorPalettePicker::new();
+        picker.add_palette("Custom", vec![
+            ("Fog".to_string(), Color::new(0.8, 0.8, 0.85, 1.0)),
+        ]);
+        assert_eq!(picker.palette_count(), 1);
+        assert!(picker.remove_palette("Custom"));
+        assert_eq!(picker.palette_count(), 0);
+        assert!(!picker.remove_palette("Nonexistent"));
+    }
+
+    #[test]
+    fn palette_picker_default_empty() {
+        let picker = ColorPalettePicker::default();
+        assert!(picker.palette_count() == 0);
+        assert_eq!(picker.total_colors(), 0);
+    }
+
+    // -- ColorFormatAutoDetector tests --
+
+    #[test]
+    fn detect_hex3() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("#f0c"),
+            Some(DetectedColorFormat::Hex3),
+        );
+    }
+
+    #[test]
+    fn detect_hex6() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("#ff0080"),
+            Some(DetectedColorFormat::Hex6),
+        );
+    }
+
+    #[test]
+    fn detect_hex8() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("#ff008080"),
+            Some(DetectedColorFormat::Hex8),
+        );
+    }
+
+    #[test]
+    fn detect_rgb_function() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("rgb(255, 0, 0)"),
+            Some(DetectedColorFormat::RgbFunction),
+        );
+        assert_eq!(
+            ColorFormatAutoDetector::detect("rgba(255, 0, 0, 0.5)"),
+            Some(DetectedColorFormat::RgbFunction),
+        );
+    }
+
+    #[test]
+    fn detect_hsl_function() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("hsl(120, 50%, 50%)"),
+            Some(DetectedColorFormat::HslFunction),
+        );
+    }
+
+    #[test]
+    fn detect_hwb_function() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("hwb(120 10% 20%)"),
+            Some(DetectedColorFormat::HwbFunction),
+        );
+    }
+
+    #[test]
+    fn detect_named_color() {
+        assert_eq!(
+            ColorFormatAutoDetector::detect("coral"),
+            Some(DetectedColorFormat::Named),
+        );
+    }
+
+    #[test]
+    fn detect_unknown() {
+        assert_eq!(ColorFormatAutoDetector::detect("notacolor"), None);
+        assert_eq!(ColorFormatAutoDetector::detect("#zzzzzz"), None);
+    }
+
+    #[test]
+    fn detect_and_parse_roundtrip() {
+        let (fmt, color) = ColorFormatAutoDetector::detect_and_parse("#FF0000").unwrap();
+        assert_eq!(fmt, DetectedColorFormat::Hex6);
+        assert!((color.r - 1.0).abs() < 1e-2);
+        assert!((color.g).abs() < 1e-2);
+    }
+
+    #[test]
+    fn suggest_output_format_mapping() {
+        assert_eq!(
+            ColorFormatAutoDetector::suggest_output_format(DetectedColorFormat::Hex6),
+            ColorFormat::Hex,
+        );
+        assert_eq!(
+            ColorFormatAutoDetector::suggest_output_format(DetectedColorFormat::RgbFunction),
+            ColorFormat::Rgb,
+        );
+        assert_eq!(
+            ColorFormatAutoDetector::suggest_output_format(DetectedColorFormat::HslFunction),
+            ColorFormat::Hsl,
+        );
+        assert_eq!(
+            ColorFormatAutoDetector::suggest_output_format(DetectedColorFormat::Named),
+            ColorFormat::Hex,
+        );
+    }
+
+    // -- ColorSwatchRenderer tests --
+
+    #[test]
+    fn swatch_renderer_default() {
+        let renderer = ColorSwatchRenderer::default();
+        let lines = renderer.render(&Color::red());
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "██");
+    }
+
+    #[test]
+    fn swatch_renderer_custom_size() {
+        let renderer = ColorSwatchRenderer::new(4, 3);
+        let lines = renderer.render(&Color::blue());
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0], "████");
+    }
+
+    #[test]
+    fn swatch_renderer_with_border() {
+        let renderer = ColorSwatchRenderer::new(3, 2).with_border(true);
+        let lines = renderer.render(&Color::green());
+        assert_eq!(lines.len(), 4); // top border + 2 rows + bottom border
+        assert_eq!(lines[0], "+---+");
+        assert_eq!(lines[1], "|███|");
+        assert_eq!(lines[3], "+---+");
+    }
+
+    #[test]
+    fn swatch_renderer_ansi_output() {
+        let renderer = ColorSwatchRenderer::new(2, 1);
+        let lines = renderer.render_ansi(&Color::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("\x1b[38;2;255;0;0m"));
+        assert!(lines[0].contains("\x1b[0m"));
+    }
+
+    #[test]
+    fn swatch_renderer_row() {
+        let renderer = ColorSwatchRenderer::new(2, 1);
+        let colors = vec![Color::red(), Color::green(), Color::blue()];
+        let row = renderer.render_row(&colors);
+        assert_eq!(row.len(), 1);
+        assert_eq!(row[0], "██ ██ ██");
+    }
+
+    #[test]
+    fn swatch_renderer_dimensions() {
+        let r = ColorSwatchRenderer::new(5, 3);
+        assert_eq!(r.swatch_width(), 5);
+        assert_eq!(r.swatch_height(), 3);
+
+        let rb = ColorSwatchRenderer::new(5, 3).with_border(true);
+        assert_eq!(rb.swatch_width(), 7);
+        assert_eq!(rb.swatch_height(), 5);
+    }
+
+    #[test]
+    fn swatch_renderer_empty_row() {
+        let renderer = ColorSwatchRenderer::default();
+        let row = renderer.render_row(&[]);
+        assert!(row.is_empty());
+    }
+
+    // -- ColorNameLookup tests --
+
+    #[test]
+    fn name_lookup_by_name() {
+        let lookup = ColorNameLookup::new();
+        let c = lookup.by_name("red").unwrap();
+        assert!((c.r - 1.0).abs() < 1e-3);
+        assert!(c.g.abs() < 1e-3);
+        assert!(c.b.abs() < 1e-3);
+    }
+
+    #[test]
+    fn name_lookup_case_insensitive() {
+        let lookup = ColorNameLookup::new();
+        assert!(lookup.by_name("RED").is_some());
+        assert!(lookup.by_name("Blue").is_some());
+        assert!(lookup.by_name("TURQUOISE").is_some());
+    }
+
+    #[test]
+    fn name_lookup_closest() {
+        let lookup = ColorNameLookup::new();
+        let almost_red = Color::new(0.98, 0.02, 0.01, 1.0);
+        let (name, dist) = lookup.closest(&almost_red);
+        assert_eq!(name, "red");
+        assert!(dist < 0.1);
+    }
+
+    #[test]
+    fn name_lookup_closest_exact() {
+        let lookup = ColorNameLookup::new();
+        let (name, dist) = lookup.closest(&Color::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(name, "black");
+        assert!(dist < 1e-10);
+    }
+
+    #[test]
+    fn name_lookup_fuzzy_search() {
+        let lookup = ColorNameLookup::new();
+        let results = lookup.fuzzy_search("re");
+        assert!(results.contains(&"red"));
+        assert!(results.contains(&"green"));
+    }
+
+    #[test]
+    fn name_lookup_fuzzy_no_match() {
+        let lookup = ColorNameLookup::new();
+        let results = lookup.fuzzy_search("zzz");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn name_lookup_sorted_names() {
+        let lookup = ColorNameLookup::new();
+        let names = lookup.sorted_names();
+        assert!(!names.is_empty());
+        // Verify actually sorted
+        for pair in names.windows(2) {
+            assert!(pair[0] <= pair[1]);
+        }
+    }
+
+    #[test]
+    fn name_lookup_len() {
+        let lookup = ColorNameLookup::new();
+        assert_eq!(lookup.len(), 28);
+        assert!(!lookup.is_empty());
+    }
+
+    #[test]
+    fn name_lookup_iter() {
+        let lookup = ColorNameLookup::new();
+        let count = lookup.iter().count();
+        assert_eq!(count, lookup.len());
+    }
+
+    #[test]
+    fn name_lookup_not_found() {
+        let lookup = ColorNameLookup::new();
+        assert!(lookup.by_name("chartreuse").is_none());
+        assert!(lookup.by_name("").is_none());
+    }
+
+
+
+    // -----------------------------------------------------------------------
+    // ColorPalettePicker additional methods
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn palette_picker_with_material_preset() {
+        let picker = ColorPalettePicker::with_material_preset();
+        assert_eq!(picker.palette_count(), 1);
+        assert!(picker.get_palette("material").is_some());
+        let colors = picker.get_palette("material").unwrap();
+        assert_eq!(colors.len(), 4);
+        let names: Vec<&str> = colors.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"red"));
+        assert!(names.contains(&"blue"));
+        assert!(names.contains(&"green"));
+        assert!(names.contains(&"yellow"));
+    }
+
+    #[test]
+    fn palette_picker_with_pastel_preset() {
+        let picker = ColorPalettePicker::with_pastel_preset();
+        assert_eq!(picker.palette_count(), 1);
+        assert!(picker.get_palette("pastel").is_some());
+        let pastel = picker.get_palette("pastel").unwrap();
+        assert_eq!(pastel.len(), 6);
+    }
+
+    #[test]
+    fn palette_picker_find_color_in_any() {
+        let picker = ColorPalettePicker::with_material_preset();
+        let found = picker.find_color_in_any("red");
+        assert!(found.is_some());
+        let red = found.unwrap();
+        assert!((red.r - 1.0).abs() < 0.01);
+
+        assert!(picker.find_color_in_any("nonexistent").is_none());
+    }
+
+    #[test]
+    fn palette_picker_find_color_case_insensitive() {
+        let picker = ColorPalettePicker::with_material_preset();
+        assert!(picker.find_color_in_any("RED").is_some());
+        assert!(picker.find_color_in_any("Red").is_some());
+    }
+
+    #[test]
+    fn palette_picker_total_color_count() {
+        let picker = ColorPalettePicker::with_material_preset();
+        assert_eq!(picker.total_color_count(), 4);
+
+        let empty = ColorPalettePicker::new();
+        assert_eq!(empty.total_color_count(), 0);
+    }
+
+    #[test]
+    fn palette_picker_multiple_palettes_total() {
+        let mut picker = ColorPalettePicker::with_material_preset();
+        let pastel = ColorPalettePicker::with_pastel_preset();
+        let pastel_colors = pastel.get_palette("pastel").unwrap().to_vec();
+        picker.add_palette("pastel", pastel_colors);
+        assert_eq!(picker.palette_count(), 2);
+        assert_eq!(picker.total_color_count(), 10);
+    }
+
+    // -----------------------------------------------------------------------
+    // ColorFormatAutoDetector additional methods
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn auto_detect_is_hex() {
+        assert!(ColorFormatAutoDetector::is_hex("#FF0000"));
+        assert!(ColorFormatAutoDetector::is_hex("#F00"));
+        assert!(ColorFormatAutoDetector::is_hex("#FF000080"));
+        assert!(!ColorFormatAutoDetector::is_hex("rgb(255,0,0)"));
+        assert!(!ColorFormatAutoDetector::is_hex("red"));
+    }
+
+    #[test]
+    fn auto_detect_is_rgb() {
+        assert!(ColorFormatAutoDetector::is_rgb("rgb(255, 0, 0)"));
+        assert!(ColorFormatAutoDetector::is_rgb("rgba(255, 0, 0, 0.5)"));
+        assert!(!ColorFormatAutoDetector::is_rgb("#FF0000"));
+        assert!(!ColorFormatAutoDetector::is_rgb("hsl(0, 100%, 50%)"));
+    }
+
+    #[test]
+    fn auto_detect_is_hsl() {
+        assert!(ColorFormatAutoDetector::is_hsl("hsl(0, 100%, 50%)"));
+        assert!(ColorFormatAutoDetector::is_hsl("hsla(0, 100%, 50%, 0.5)"));
+        assert!(!ColorFormatAutoDetector::is_hsl("#FF0000"));
+        assert!(!ColorFormatAutoDetector::is_hsl("rgb(255, 0, 0)"));
+    }
+
+    #[test]
+    fn auto_detect_is_named() {
+        assert!(ColorFormatAutoDetector::is_named("red"));
+        assert!(ColorFormatAutoDetector::is_named("blue"));
+        assert!(!ColorFormatAutoDetector::is_named("#FF0000"));
+        assert!(!ColorFormatAutoDetector::is_named("notacolor"));
+    }
+
+    #[test]
+    fn auto_detect_suggest_format_opaque() {
+        let opaque = Color::new(1.0, 0.0, 0.0, 1.0);
+        assert_eq!(ColorFormatAutoDetector::suggest_format(&opaque), ColorFormat::Hex);
+    }
+
+    #[test]
+    fn auto_detect_suggest_format_transparent() {
+        let semi = Color::new(1.0, 0.0, 0.0, 0.5);
+        assert_eq!(ColorFormatAutoDetector::suggest_format(&semi), ColorFormat::Rgb);
+    }
+
+    #[test]
+    fn auto_detect_all_in_line_hex() {
+        let line = "color: #FF0000; bg: #00FF00;";
+        let detected = ColorFormatAutoDetector::detect_all_in_line(line);
+        assert_eq!(detected.len(), 2);
+        assert_eq!(detected[0].1, DetectedColorFormat::Hex6);
+        assert_eq!(detected[1].1, DetectedColorFormat::Hex6);
+    }
+
+    #[test]
+    fn auto_detect_all_in_line_mixed() {
+        let line = "#F00 rgb(0,0,255)";
+        let detected = ColorFormatAutoDetector::detect_all_in_line(line);
+        assert!(detected.len() >= 2);
+    }
+
+    #[test]
+    fn auto_detect_all_in_line_empty() {
+        let detected = ColorFormatAutoDetector::detect_all_in_line("");
+        assert!(detected.is_empty());
+    }
+
+    #[test]
+    fn auto_detect_all_in_line_no_colors() {
+        let detected = ColorFormatAutoDetector::detect_all_in_line("no colors here at all");
+        assert!(detected.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // ColorSwatchRenderer additional methods
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn swatch_render_with_label() {
+        let renderer = ColorSwatchRenderer::new(5, 2);
+        let red = Color::new(1.0, 0.0, 0.0, 1.0);
+        let rows = renderer.render_with_label(&red, "RED");
+        // 2 swatch rows + 1 label row
+        assert_eq!(rows.len(), 3);
+        assert!(rows[2].contains("RED"));
+    }
+
+    #[test]
+    fn swatch_render_with_label_long() {
+        let renderer = ColorSwatchRenderer::new(3, 1);
+        let red = Color::new(1.0, 0.0, 0.0, 1.0);
+        let rows = renderer.render_with_label(&red, "LONGNAME");
+        // label gets truncated to width
+        assert_eq!(rows.last().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn swatch_render_palette() {
+        let mut palette = ColorPalette::new();
+        palette.add("r", Color::red());
+        palette.add("b", Color::blue());
+        let renderer = ColorSwatchRenderer::new(4, 1);
+        let output = renderer.render_palette(&palette);
+        // 2 colors * (1 swatch row + 1 label row) = 4 lines
+        assert_eq!(output.len(), 4);
+    }
+
+    #[test]
+    fn swatch_render_palette_empty() {
+        let palette = ColorPalette::new();
+        let renderer = ColorSwatchRenderer::new(4, 1);
+        let output = renderer.render_palette(&palette);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn swatch_block_char() {
+        assert_eq!(ColorSwatchRenderer::block_char(), '█');
+    }
+
+    #[test]
+    fn swatch_render_with_label_border() {
+        let renderer = ColorSwatchRenderer::new(5, 1).with_border(true);
+        let c = Color::green();
+        let rows = renderer.render_with_label(&c, "G");
+        // border top + 1 swatch row + border bottom + label = 4
+        assert_eq!(rows.len(), 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // ColorNameLookup additional methods
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn name_lookup_exact_match() {
+        let lookup = ColorNameLookup::new();
+        let red = Color::new(1.0, 0.0, 0.0, 1.0);
+        assert_eq!(lookup.lookup(&red), Some("red"));
+    }
+
+    #[test]
+    fn name_lookup_no_exact_match() {
+        let lookup = ColorNameLookup::new();
+        let custom = Color::new(0.123, 0.456, 0.789, 1.0);
+        assert!(lookup.lookup(&custom).is_none());
+    }
+
+    #[test]
+    fn name_lookup_closest_name() {
+        let lookup = ColorNameLookup::new();
+        let almost_red = Color::new(0.99, 0.01, 0.01, 1.0);
+        let name = lookup.closest_name(&almost_red);
+        assert_eq!(name, "red");
+    }
+
+    #[test]
+    fn name_lookup_all_names() {
+        let lookup = ColorNameLookup::new();
+        let names = lookup.all_names();
+        assert!(names.len() > 0);
+        assert!(names.contains(&"red"));
+        assert!(names.contains(&"blue"));
+        assert!(names.contains(&"green"));
+    }
+
+    #[test]
+    fn name_lookup_name_to_color() {
+        let lookup = ColorNameLookup::new();
+        let red = lookup.name_to_color("red").unwrap();
+        assert!((red.r - 1.0).abs() < 0.01);
+        assert!((red.g - 0.0).abs() < 0.01);
+        assert!((red.b - 0.0).abs() < 0.01);
+
+        assert!(lookup.name_to_color("notacolor").is_none());
+    }
+
+    #[test]
+    fn name_lookup_name_count() {
+        let lookup = ColorNameLookup::new();
+        assert_eq!(lookup.name_count(), lookup.len());
+        assert!(lookup.name_count() > 0);
+    }
+
+    #[test]
+    fn name_lookup_contains() {
+        let lookup = ColorNameLookup::new();
+        assert!(lookup.contains("red"));
+        assert!(lookup.contains("blue"));
+        assert!(lookup.contains("white"));
+        assert!(!lookup.contains("chartreuse"));
+        assert!(!lookup.contains(""));
+    }
+
+    #[test]
+    fn name_lookup_name_to_color_case_insensitive() {
+        let lookup = ColorNameLookup::new();
+        assert!(lookup.name_to_color("RED").is_some());
+        assert!(lookup.name_to_color("Red").is_some());
+    }
+
+    #[test]
+    fn name_lookup_contains_case_insensitive() {
+        let lookup = ColorNameLookup::new();
+        assert!(lookup.contains("RED"));
+        assert!(lookup.contains("Blue"));
+    }
+
+    #[test]
+    fn name_lookup_roundtrip() {
+        let lookup = ColorNameLookup::new();
+        for name in lookup.all_names() {
+            let color = lookup.name_to_color(name).unwrap();
+            let found_name = lookup.lookup(&color).unwrap();
+            assert_eq!(found_name, name);
+        }
+    }
+
 }

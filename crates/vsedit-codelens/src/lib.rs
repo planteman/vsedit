@@ -1347,6 +1347,312 @@ pub fn merge_adjacent_lenses(lenses: &[CodeLens]) -> Vec<MergedLensGroup> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// CodeLensClickHandler - code lens click handler
+// ---------------------------------------------------------------------------
+
+/// Severity level for code lens click handler issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CodeLensClickHandlerSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for CodeLensClickHandlerSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [CodeLensClickHandler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeLensClickHandlerEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: CodeLensClickHandlerSeverity,
+    pub detail: Option<String>,
+    pub lens_count: usize,
+    enabled: bool,
+}
+
+impl CodeLensClickHandlerEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: CodeLensClickHandlerSeverity::Low,
+            detail: None,
+            lens_count: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: CodeLensClickHandlerSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_lens_count(mut self, val: usize) -> Self {
+        self.lens_count = val;
+        self
+    }
+
+    pub fn is_clickable(&self) -> bool {
+        self.enabled && self.severity >= CodeLensClickHandlerSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.lens_count, det)
+    }
+}
+
+impl fmt::Display for CodeLensClickHandlerEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [CodeLensClickHandlerEntry] items.
+#[derive(Debug, Clone)]
+pub struct CodeLensClickHandler {
+    entries: Vec<CodeLensClickHandlerEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl CodeLensClickHandler {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: CodeLensClickHandlerEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<CodeLensClickHandlerEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&CodeLensClickHandlerEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn lens_count(&self) -> usize { self.entries.len() }
+
+    pub fn is_clickable(&self) -> bool {
+        self.entries.iter().any(|e| e.is_clickable())
+    }
+
+    pub fn entries_by_severity(&self, severity: CodeLensClickHandlerSeverity) -> Vec<&CodeLensClickHandlerEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= CodeLensClickHandlerSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&CodeLensClickHandlerEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&CodeLensClickHandlerEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CodeLensCacheInvalidator - code lens cache invalidator
+// ---------------------------------------------------------------------------
+
+/// Configuration for [CodeLensCacheInvalidator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeLensCacheInvalidatorConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub cache_size: usize,
+}
+
+impl CodeLensCacheInvalidatorConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, cache_size: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_cache_size(mut self, val: usize) -> Self { self.cache_size = val; self }
+}
+
+impl Default for CodeLensCacheInvalidatorConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [CodeLensCacheInvalidator].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeLensCacheInvalidatorItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl CodeLensCacheInvalidatorItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_cache_valid(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for CodeLensCacheInvalidatorItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [CodeLensCacheInvalidatorItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct CodeLensCacheInvalidator {
+    config: CodeLensCacheInvalidatorConfig,
+    items: Vec<CodeLensCacheInvalidatorItem>,
+}
+
+impl CodeLensCacheInvalidator {
+    pub fn new(config: CodeLensCacheInvalidatorConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: CodeLensCacheInvalidatorItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<CodeLensCacheInvalidatorItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&CodeLensCacheInvalidatorItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn cache_size(&self) -> usize { self.items.len() }
+
+    pub fn is_cache_valid(&self) -> bool {
+        self.items.iter().any(|i| i.is_cache_valid())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&CodeLensCacheInvalidatorItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&CodeLensCacheInvalidatorItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &CodeLensCacheInvalidatorConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2443,5 +2749,147 @@ mod tests {
         let groups = merge_adjacent_lenses(&lenses);
         assert_eq!(groups[0].titles(), vec!["3 references"]);
         assert!(!groups[0].all_resolved());
+    }
+
+#[test]
+    fn codelensclickhandler_severity_ordering() {
+        assert!(CodeLensClickHandlerSeverity::Critical > CodeLensClickHandlerSeverity::High);
+        assert!(CodeLensClickHandlerSeverity::High > CodeLensClickHandlerSeverity::Medium);
+        assert!(CodeLensClickHandlerSeverity::Medium > CodeLensClickHandlerSeverity::Low);
+    }
+
+    #[test]
+    fn codelensclickhandler_severity_display() {
+        assert_eq!(CodeLensClickHandlerSeverity::Low.to_string(), "low");
+        assert_eq!(CodeLensClickHandlerSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn codelensclickhandler_entry_creation() {
+        let e = CodeLensClickHandlerEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, CodeLensClickHandlerSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn codelensclickhandler_entry_builder() {
+        let e = CodeLensClickHandlerEntry::new("e2", "Entry 2")
+            .with_severity(CodeLensClickHandlerSeverity::High)
+            .with_detail("some detail")
+            .with_lens_count(42);
+        assert_eq!(e.severity, CodeLensClickHandlerSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.lens_count, 42);
+    }
+
+    #[test]
+    fn codelensclickhandler_entry_enable_disable() {
+        let mut e = CodeLensClickHandlerEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn codelensclickhandler_add_and_count() {
+        let mut mgr = CodeLensClickHandler::new("test");
+        mgr.add(CodeLensClickHandlerEntry::new("a", "A"));
+        mgr.add(CodeLensClickHandlerEntry::new("b", "B").with_severity(CodeLensClickHandlerSeverity::High));
+        assert_eq!(mgr.lens_count(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn codelensclickhandler_remove() {
+        let mut mgr = CodeLensClickHandler::new("test");
+        mgr.add(CodeLensClickHandlerEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn codelensclickhandler_capacity() {
+        let mut mgr = CodeLensClickHandler::new("test").with_capacity(1);
+        assert!(mgr.add(CodeLensClickHandlerEntry::new("a", "A")));
+        assert!(!mgr.add(CodeLensClickHandlerEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn codelensclickhandler_sorted_by_severity() {
+        let mut mgr = CodeLensClickHandler::new("test");
+        mgr.add(CodeLensClickHandlerEntry::new("lo", "Low"));
+        mgr.add(CodeLensClickHandlerEntry::new("hi", "High").with_severity(CodeLensClickHandlerSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, CodeLensClickHandlerSeverity::Critical);
+    }
+
+    #[test]
+    fn codelensclickhandler_summary() {
+        let mgr = CodeLensClickHandler::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_config_defaults() {
+        let cfg = CodeLensCacheInvalidatorConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_item_creation() {
+        let item = CodeLensCacheInvalidatorItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_add_and_get() {
+        let mut mgr = CodeLensCacheInvalidator::new(CodeLensCacheInvalidatorConfig::new("test"));
+        mgr.add(CodeLensCacheInvalidatorItem::new("k1", "v1"));
+        assert_eq!(mgr.cache_size(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_remove_item() {
+        let mut mgr = CodeLensCacheInvalidator::new(CodeLensCacheInvalidatorConfig::new("test"));
+        mgr.add(CodeLensCacheInvalidatorItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_sorted_by_priority() {
+        let mut mgr = CodeLensCacheInvalidator::new(CodeLensCacheInvalidatorConfig::new("test"));
+        mgr.add(CodeLensCacheInvalidatorItem::new("lo", "low").with_priority(1));
+        mgr.add(CodeLensCacheInvalidatorItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_items_with_tag() {
+        let mut mgr = CodeLensCacheInvalidator::new(CodeLensCacheInvalidatorConfig::new("test"));
+        mgr.add(CodeLensCacheInvalidatorItem::new("a", "1").with_tag("x"));
+        mgr.add(CodeLensCacheInvalidatorItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn codelenscacheinvalidator_report() {
+        let mgr = CodeLensCacheInvalidator::new(CodeLensCacheInvalidatorConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

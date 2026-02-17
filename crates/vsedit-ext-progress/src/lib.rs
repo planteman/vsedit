@@ -1479,6 +1479,312 @@ impl ProgressCancellationCascade {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProgressNotificationBridge - progress notification bridge
+// ---------------------------------------------------------------------------
+
+/// Severity level for progress notification bridge issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ProgressNotificationBridgeSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl fmt::Display for ProgressNotificationBridgeSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// Entry tracked by [ProgressNotificationBridge].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgressNotificationBridgeEntry {
+    pub id: String,
+    pub label: String,
+    pub severity: ProgressNotificationBridgeSeverity,
+    pub detail: Option<String>,
+    pub progress_pct: usize,
+    enabled: bool,
+}
+
+impl ProgressNotificationBridgeEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            severity: ProgressNotificationBridgeSeverity::Low,
+            detail: None,
+            progress_pct: 0,
+            enabled: true,
+        }
+    }
+
+    pub fn with_severity(mut self, severity: ProgressNotificationBridgeSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_progress_pct(mut self, val: usize) -> Self {
+        self.progress_pct = val;
+        self
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.enabled && self.severity >= ProgressNotificationBridgeSeverity::Medium
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn format_line(&self) -> String {
+        let det = self.detail.as_deref().unwrap_or("-");
+        format!("[{}] {} ({}): {}", self.severity, self.id, self.progress_pct, det)
+    }
+}
+
+impl fmt::Display for ProgressNotificationBridgeEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}]", self.label, self.severity)
+    }
+}
+
+/// Manages a collection of [ProgressNotificationBridgeEntry] items.
+#[derive(Debug, Clone)]
+pub struct ProgressNotificationBridge {
+    entries: Vec<ProgressNotificationBridgeEntry>,
+    name: String,
+    capacity: usize,
+}
+
+impl ProgressNotificationBridge {
+    pub fn new(name: &str) -> Self {
+        Self { entries: Vec::new(), name: name.to_string(), capacity: 1000 }
+    }
+
+    pub fn with_capacity(mut self, cap: usize) -> Self {
+        self.capacity = cap;
+        self
+    }
+
+    pub fn add(&mut self, entry: ProgressNotificationBridgeEntry) -> bool {
+        if self.entries.len() >= self.capacity {
+            return false;
+        }
+        self.entries.push(entry);
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> Option<ProgressNotificationBridgeEntry> {
+        if let Some(pos) = self.entries.iter().position(|e| e.id == id) {
+            Some(self.entries.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ProgressNotificationBridgeEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn progress_pct(&self) -> usize { self.entries.len() }
+
+    pub fn is_complete(&self) -> bool {
+        self.entries.iter().any(|e| e.is_complete())
+    }
+
+    pub fn entries_by_severity(&self, severity: ProgressNotificationBridgeSeverity) -> Vec<&ProgressNotificationBridgeEntry> {
+        self.entries.iter().filter(|e| e.severity == severity).collect()
+    }
+
+    pub fn high_severity_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.severity >= ProgressNotificationBridgeSeverity::High).count()
+    }
+
+    pub fn sorted_by_severity(&self) -> Vec<&ProgressNotificationBridgeEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.severity.cmp(&a.severity));
+        sorted
+    }
+
+    pub fn generate_summary(&self) -> String {
+        format!(
+            "{} | Total: {} | High+: {}",
+            self.name, self.entries.len(), self.high_severity_count()
+        )
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn enabled_entries(&self) -> Vec<&ProgressNotificationBridgeEntry> {
+        self.entries.iter().filter(|e| e.is_enabled()).collect()
+    }
+
+    pub fn disable_all(&mut self) {
+        for e in &mut self.entries { e.disable(); }
+    }
+
+    pub fn enable_all(&mut self) {
+        for e in &mut self.entries { e.enable(); }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressCancellationHandler - progress cancellation handler
+// ---------------------------------------------------------------------------
+
+/// Configuration for [ProgressCancellationHandler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgressCancellationHandlerConfig {
+    pub max_items: usize,
+    pub label: String,
+    pub auto_refresh: bool,
+    pub notification_count: usize,
+}
+
+impl ProgressCancellationHandlerConfig {
+    pub fn new(label: &str) -> Self {
+        Self { max_items: 100, label: label.to_string(), auto_refresh: true, notification_count: 0 }
+    }
+
+    pub fn with_max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn with_auto_refresh(mut self, auto: bool) -> Self { self.auto_refresh = auto; self }
+
+    pub fn with_notification_count(mut self, val: usize) -> Self { self.notification_count = val; self }
+}
+
+impl Default for ProgressCancellationHandlerConfig {
+    fn default() -> Self { Self::new("default") }
+}
+
+/// Item tracked by [ProgressCancellationHandler].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgressCancellationHandlerItem {
+    pub key: String,
+    pub value: String,
+    pub priority: u32,
+    pub tags: Vec<String>,
+}
+
+impl ProgressCancellationHandlerItem {
+    pub fn new(key: &str, value: &str) -> Self {
+        Self { key: key.to_string(), value: value.to_string(), priority: 0, tags: Vec::new() }
+    }
+
+    pub fn with_priority(mut self, p: u32) -> Self { self.priority = p; self }
+
+    pub fn with_tag(mut self, tag: &str) -> Self {
+        self.tags.push(tag.to_string());
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.priority > 0 && !self.tags.is_empty()
+    }
+}
+
+impl fmt::Display for ProgressCancellationHandlerItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Manages [ProgressCancellationHandlerItem] entries with configuration.
+#[derive(Debug, Clone)]
+pub struct ProgressCancellationHandler {
+    config: ProgressCancellationHandlerConfig,
+    items: Vec<ProgressCancellationHandlerItem>,
+}
+
+impl ProgressCancellationHandler {
+    pub fn new(config: ProgressCancellationHandlerConfig) -> Self {
+        Self { config, items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: ProgressCancellationHandlerItem) -> bool {
+        if self.items.len() >= self.config.max_items {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ProgressCancellationHandlerItem> {
+        if let Some(pos) = self.items.iter().position(|i| i.key == key) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ProgressCancellationHandlerItem> {
+        self.items.iter().find(|i| i.key == key)
+    }
+
+    pub fn notification_count(&self) -> usize { self.items.len() }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.items.iter().any(|i| i.is_cancelled())
+    }
+
+    pub fn items_with_tag(&self, tag: &str) -> Vec<&ProgressCancellationHandlerItem> {
+        self.items.iter().filter(|i| i.has_tag(tag)).collect()
+    }
+
+    pub fn sorted_by_priority(&self) -> Vec<&ProgressCancellationHandlerItem> {
+        let mut sorted: Vec<_> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn clear(&mut self) { self.items.clear(); }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn total_priority(&self) -> u64 {
+        self.items.iter().map(|i| i.priority as u64).sum()
+    }
+
+    pub fn config(&self) -> &ProgressCancellationHandlerConfig {
+        &self.config
+    }
+
+    pub fn generate_report(&self) -> String {
+        format!(
+            "{} | Items: {} | Auto-refresh: {}",
+            self.config.label, self.items.len(), self.config.auto_refresh
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2388,5 +2694,147 @@ mod tests {
         cascade.add_child(1, 2);
         cascade.add_child(1, 2);
         assert_eq!(cascade.children_of(1).len(), 1);
+    }
+
+#[test]
+    fn progressnotificationbridge_severity_ordering() {
+        assert!(ProgressNotificationBridgeSeverity::Critical > ProgressNotificationBridgeSeverity::High);
+        assert!(ProgressNotificationBridgeSeverity::High > ProgressNotificationBridgeSeverity::Medium);
+        assert!(ProgressNotificationBridgeSeverity::Medium > ProgressNotificationBridgeSeverity::Low);
+    }
+
+    #[test]
+    fn progressnotificationbridge_severity_display() {
+        assert_eq!(ProgressNotificationBridgeSeverity::Low.to_string(), "low");
+        assert_eq!(ProgressNotificationBridgeSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn progressnotificationbridge_entry_creation() {
+        let e = ProgressNotificationBridgeEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.severity, ProgressNotificationBridgeSeverity::Low);
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn progressnotificationbridge_entry_builder() {
+        let e = ProgressNotificationBridgeEntry::new("e2", "Entry 2")
+            .with_severity(ProgressNotificationBridgeSeverity::High)
+            .with_detail("some detail")
+            .with_progress_pct(42);
+        assert_eq!(e.severity, ProgressNotificationBridgeSeverity::High);
+        assert_eq!(e.detail.as_deref(), Some("some detail"));
+        assert_eq!(e.progress_pct, 42);
+    }
+
+    #[test]
+    fn progressnotificationbridge_entry_enable_disable() {
+        let mut e = ProgressNotificationBridgeEntry::new("e3", "Entry 3");
+        assert!(e.is_enabled());
+        e.disable();
+        assert!(!e.is_enabled());
+        e.enable();
+        assert!(e.is_enabled());
+    }
+
+    #[test]
+    fn progressnotificationbridge_add_and_count() {
+        let mut mgr = ProgressNotificationBridge::new("test");
+        mgr.add(ProgressNotificationBridgeEntry::new("a", "A"));
+        mgr.add(ProgressNotificationBridgeEntry::new("b", "B").with_severity(ProgressNotificationBridgeSeverity::High));
+        assert_eq!(mgr.progress_pct(), 2);
+        assert_eq!(mgr.high_severity_count(), 1);
+    }
+
+    #[test]
+    fn progressnotificationbridge_remove() {
+        let mut mgr = ProgressNotificationBridge::new("test");
+        mgr.add(ProgressNotificationBridgeEntry::new("a", "A"));
+        let removed = mgr.remove("a");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn progressnotificationbridge_capacity() {
+        let mut mgr = ProgressNotificationBridge::new("test").with_capacity(1);
+        assert!(mgr.add(ProgressNotificationBridgeEntry::new("a", "A")));
+        assert!(!mgr.add(ProgressNotificationBridgeEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn progressnotificationbridge_sorted_by_severity() {
+        let mut mgr = ProgressNotificationBridge::new("test");
+        mgr.add(ProgressNotificationBridgeEntry::new("lo", "Low"));
+        mgr.add(ProgressNotificationBridgeEntry::new("hi", "High").with_severity(ProgressNotificationBridgeSeverity::Critical));
+        let sorted = mgr.sorted_by_severity();
+        assert_eq!(sorted[0].severity, ProgressNotificationBridgeSeverity::Critical);
+    }
+
+    #[test]
+    fn progressnotificationbridge_summary() {
+        let mgr = ProgressNotificationBridge::new("test-scope");
+        let s = mgr.generate_summary();
+        assert!(s.contains("test-scope"));
+        assert!(s.contains("Total: 0"));
+    }
+
+    #[test]
+    fn progresscancellationhandler_config_defaults() {
+        let cfg = ProgressCancellationHandlerConfig::default();
+        assert_eq!(cfg.max_items, 100);
+        assert!(cfg.auto_refresh);
+    }
+
+    #[test]
+    fn progresscancellationhandler_item_creation() {
+        let item = ProgressCancellationHandlerItem::new("k1", "v1").with_priority(5).with_tag("tag1");
+        assert_eq!(item.key, "k1");
+        assert_eq!(item.priority, 5);
+        assert!(item.has_tag("tag1"));
+        assert!(!item.has_tag("tag2"));
+    }
+
+    #[test]
+    fn progresscancellationhandler_add_and_get() {
+        let mut mgr = ProgressCancellationHandler::new(ProgressCancellationHandlerConfig::new("test"));
+        mgr.add(ProgressCancellationHandlerItem::new("k1", "v1"));
+        assert_eq!(mgr.notification_count(), 1);
+        assert_eq!(mgr.get("k1").unwrap().value, "v1");
+    }
+
+    #[test]
+    fn progresscancellationhandler_remove_item() {
+        let mut mgr = ProgressCancellationHandler::new(ProgressCancellationHandlerConfig::new("test"));
+        mgr.add(ProgressCancellationHandlerItem::new("k1", "v1"));
+        let removed = mgr.remove("k1");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn progresscancellationhandler_sorted_by_priority() {
+        let mut mgr = ProgressCancellationHandler::new(ProgressCancellationHandlerConfig::new("test"));
+        mgr.add(ProgressCancellationHandlerItem::new("lo", "low").with_priority(1));
+        mgr.add(ProgressCancellationHandlerItem::new("hi", "high").with_priority(10));
+        let sorted = mgr.sorted_by_priority();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn progresscancellationhandler_items_with_tag() {
+        let mut mgr = ProgressCancellationHandler::new(ProgressCancellationHandlerConfig::new("test"));
+        mgr.add(ProgressCancellationHandlerItem::new("a", "1").with_tag("x"));
+        mgr.add(ProgressCancellationHandlerItem::new("b", "2").with_tag("y"));
+        assert_eq!(mgr.items_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn progresscancellationhandler_report() {
+        let mgr = ProgressCancellationHandler::new(ProgressCancellationHandlerConfig::new("my-label").with_auto_refresh(false));
+        let r = mgr.generate_report();
+        assert!(r.contains("my-label"));
+        assert!(r.contains("false"));
     }
 }

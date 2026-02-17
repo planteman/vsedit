@@ -1374,6 +1374,241 @@ impl RuntimeLocalizer {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LangPackDownloadProgress – tracks download progress with bytes/percentage
+// ---------------------------------------------------------------------------
+
+/// State of a language pack download.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DownloadPhase {
+    /// Waiting to start.
+    Pending,
+    /// Actively downloading.
+    Downloading,
+    /// Verifying integrity after download.
+    Verifying,
+    /// Download completed successfully.
+    Completed,
+    /// Download failed.
+    Failed,
+}
+
+/// Tracks the progress of downloading a language pack.
+#[derive(Debug, Clone)]
+pub struct LangPackDownloadProgress {
+    pack_id: String,
+    locale_id: String,
+    total_bytes: u64,
+    downloaded_bytes: u64,
+    phase: DownloadPhase,
+    error_message: Option<String>,
+    started_at: Option<u64>,
+    completed_at: Option<u64>,
+}
+
+impl LangPackDownloadProgress {
+    /// Create a new download progress tracker.
+    pub fn new(pack_id: impl Into<String>, locale_id: impl Into<String>, total_bytes: u64) -> Self {
+        Self {
+            pack_id: pack_id.into(),
+            locale_id: locale_id.into(),
+            total_bytes,
+            downloaded_bytes: 0,
+            phase: DownloadPhase::Pending,
+            error_message: None,
+            started_at: None,
+            completed_at: None,
+        }
+    }
+
+    /// Begin the download, recording the start timestamp.
+    pub fn start(&mut self, timestamp: u64) {
+        self.phase = DownloadPhase::Downloading;
+        self.started_at = Some(timestamp);
+    }
+
+    /// Record additional downloaded bytes.  Clamps to `total_bytes`.
+    pub fn advance(&mut self, bytes: u64) {
+        self.downloaded_bytes = (self.downloaded_bytes + bytes).min(self.total_bytes);
+    }
+
+    /// Percentage complete (0–100).
+    pub fn percentage(&self) -> f64 {
+        if self.total_bytes == 0 {
+            return 100.0;
+        }
+        (self.downloaded_bytes as f64 / self.total_bytes as f64) * 100.0
+    }
+
+    /// Remaining bytes to download.
+    pub fn remaining_bytes(&self) -> u64 {
+        self.total_bytes.saturating_sub(self.downloaded_bytes)
+    }
+
+    /// Transition to verification phase.
+    pub fn begin_verify(&mut self) {
+        self.phase = DownloadPhase::Verifying;
+    }
+
+    /// Mark the download as completed.
+    pub fn complete(&mut self, timestamp: u64) {
+        self.downloaded_bytes = self.total_bytes;
+        self.phase = DownloadPhase::Completed;
+        self.completed_at = Some(timestamp);
+    }
+
+    /// Mark the download as failed with an error message.
+    pub fn fail(&mut self, message: impl Into<String>) {
+        self.phase = DownloadPhase::Failed;
+        self.error_message = Some(message.into());
+    }
+
+    /// Whether the download finished (success or failure).
+    pub fn is_finished(&self) -> bool {
+        matches!(self.phase, DownloadPhase::Completed | DownloadPhase::Failed)
+    }
+
+    /// Duration in seconds if both start and end are known.
+    pub fn elapsed_secs(&self) -> Option<u64> {
+        match (self.started_at, self.completed_at) {
+            (Some(s), Some(e)) => Some(e.saturating_sub(s)),
+            _ => None,
+        }
+    }
+
+    pub fn pack_id(&self) -> &str { &self.pack_id }
+    pub fn locale_id(&self) -> &str { &self.locale_id }
+    pub fn total_bytes(&self) -> u64 { self.total_bytes }
+    pub fn downloaded_bytes(&self) -> u64 { self.downloaded_bytes }
+    pub fn phase(&self) -> DownloadPhase { self.phase }
+    pub fn error_message(&self) -> Option<&str> { self.error_message.as_deref() }
+
+    /// Render a simple text progress bar of given width.
+    pub fn render_bar(&self, width: usize) -> String {
+        let filled = if self.total_bytes == 0 {
+            width
+        } else {
+            ((self.downloaded_bytes as f64 / self.total_bytes as f64) * width as f64) as usize
+        };
+        let empty = width.saturating_sub(filled);
+        format!("[{}{}]", "#".repeat(filled), "-".repeat(empty))
+    }
+}
+
+impl fmt::Display for LangPackDownloadProgress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} ({}) {:.1}% {:?}",
+            self.pack_id,
+            self.locale_id,
+            self.percentage(),
+            self.phase,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LangPackCompatibilityChecker – checks pack compatibility with editor versions
+// ---------------------------------------------------------------------------
+
+/// Result of a compatibility check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompatibilityVerdict {
+    /// The pack is fully compatible.
+    Compatible,
+    /// The pack works but may have minor issues.
+    Degraded(String),
+    /// The pack is not compatible.
+    Incompatible(String),
+}
+
+/// A simple semantic version triple.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SemVer {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl SemVer {
+    pub fn new(major: u32, minor: u32, patch: u32) -> Self {
+        Self { major, minor, patch }
+    }
+
+    /// Parse "major.minor.patch". Returns `None` on bad input.
+    pub fn parse(s: &str) -> Option<Self> {
+        let mut parts = s.split('.');
+        let major = parts.next()?.parse().ok()?;
+        let minor = parts.next()?.parse().ok()?;
+        let patch = parts.next()?.parse().ok()?;
+        if parts.next().is_some() {
+            return None;
+        }
+        Some(Self { major, minor, patch })
+    }
+}
+
+impl fmt::Display for SemVer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+/// Checks whether a language pack is compatible with a given editor version.
+#[derive(Debug)]
+pub struct LangPackCompatibilityChecker {
+    editor_version: SemVer,
+    min_pack_api: SemVer,
+}
+
+impl LangPackCompatibilityChecker {
+    pub fn new(editor_version: SemVer, min_pack_api: SemVer) -> Self {
+        Self { editor_version, min_pack_api }
+    }
+
+    /// Check a pack that declares its own required API version and target editor version.
+    pub fn check(&self, pack_api_version: SemVer, pack_target_editor: SemVer) -> CompatibilityVerdict {
+        if pack_api_version < self.min_pack_api {
+            return CompatibilityVerdict::Incompatible(format!(
+                "pack API {pack_api_version} < minimum {}", self.min_pack_api
+            ));
+        }
+        if pack_target_editor.major != self.editor_version.major {
+            return CompatibilityVerdict::Incompatible(format!(
+                "major version mismatch: pack targets {}, editor is {}",
+                pack_target_editor.major, self.editor_version.major
+            ));
+        }
+        if pack_target_editor.minor > self.editor_version.minor {
+            return CompatibilityVerdict::Degraded(format!(
+                "pack targets newer minor {}, editor is {}",
+                pack_target_editor.minor, self.editor_version.minor
+            ));
+        }
+        CompatibilityVerdict::Compatible
+    }
+
+    /// Batch-check multiple packs, returning only compatible/degraded ones.
+    pub fn filter_compatible(&self, packs: &[(SemVer, SemVer)]) -> Vec<(usize, CompatibilityVerdict)> {
+        packs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (api, target))| {
+                let v = self.check(*api, *target);
+                if matches!(v, CompatibilityVerdict::Incompatible(_)) {
+                    None
+                } else {
+                    Some((i, v))
+                }
+            })
+            .collect()
+    }
+
+    pub fn editor_version(&self) -> SemVer { self.editor_version }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2477,4 +2712,146 @@ mod tests {
         let msg = loc.get_formatted("welcome", &[("user", "Alice"), ("count", "5")]);
         assert_eq!(msg, "Hello, Alice! You have 5 messages.");
     }
+
+    #[test]
+    fn download_progress_new() {
+        let p = LangPackDownloadProgress::new("pack1", "en-US", 1000);
+        assert_eq!(p.pack_id(), "pack1");
+        assert_eq!(p.locale_id(), "en-US");
+        assert_eq!(p.total_bytes(), 1000);
+        assert_eq!(p.downloaded_bytes(), 0);
+        assert_eq!(p.phase(), DownloadPhase::Pending);
+    }
+
+    #[test]
+    fn download_progress_advance() {
+        let mut p = LangPackDownloadProgress::new("p", "en", 500);
+        p.start(100);
+        p.advance(200);
+        assert_eq!(p.downloaded_bytes(), 200);
+        assert!((p.percentage() - 40.0).abs() < 0.01);
+        assert_eq!(p.remaining_bytes(), 300);
+    }
+
+    #[test]
+    fn download_progress_clamp() {
+        let mut p = LangPackDownloadProgress::new("p", "en", 100);
+        p.advance(9999);
+        assert_eq!(p.downloaded_bytes(), 100);
+        assert!((p.percentage() - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn download_progress_complete_and_elapsed() {
+        let mut p = LangPackDownloadProgress::new("p", "en", 100);
+        p.start(10);
+        p.advance(50);
+        p.complete(20);
+        assert!(p.is_finished());
+        assert_eq!(p.elapsed_secs(), Some(10));
+        assert_eq!(p.downloaded_bytes(), 100);
+    }
+
+    #[test]
+    fn download_progress_fail() {
+        let mut p = LangPackDownloadProgress::new("p", "en", 100);
+        p.fail("network error");
+        assert!(p.is_finished());
+        assert_eq!(p.error_message(), Some("network error"));
+    }
+
+    #[test]
+    fn download_progress_render_bar() {
+        let mut p = LangPackDownloadProgress::new("p", "en", 200);
+        p.advance(100);
+        let bar = p.render_bar(10);
+        assert_eq!(bar, "[#####-----]");
+    }
+
+    #[test]
+    fn download_progress_zero_total() {
+        let p = LangPackDownloadProgress::new("p", "en", 0);
+        assert!((p.percentage() - 100.0).abs() < 0.01);
+        assert_eq!(p.render_bar(4), "[####]");
+    }
+
+    #[test]
+    fn download_progress_display() {
+        let p = LangPackDownloadProgress::new("pack1", "fr", 1000);
+        let s = format!("{p}");
+        assert!(s.contains("pack1"));
+        assert!(s.contains("fr"));
+    }
+
+    #[test]
+    fn semver_parse_valid() {
+        let v = SemVer::parse("1.2.3").unwrap();
+        assert_eq!(v, SemVer::new(1, 2, 3));
+        assert_eq!(v.to_string(), "1.2.3");
+    }
+
+    #[test]
+    fn semver_parse_invalid() {
+        assert!(SemVer::parse("1.2").is_none());
+        assert!(SemVer::parse("a.b.c").is_none());
+        assert!(SemVer::parse("1.2.3.4").is_none());
+    }
+
+    #[test]
+    fn compatibility_checker_compatible() {
+        let checker = LangPackCompatibilityChecker::new(
+            SemVer::new(2, 5, 0),
+            SemVer::new(1, 0, 0),
+        );
+        let result = checker.check(SemVer::new(1, 0, 0), SemVer::new(2, 3, 0));
+        assert_eq!(result, CompatibilityVerdict::Compatible);
+    }
+
+    #[test]
+    fn compatibility_checker_incompatible_api() {
+        let checker = LangPackCompatibilityChecker::new(
+            SemVer::new(2, 5, 0),
+            SemVer::new(2, 0, 0),
+        );
+        let result = checker.check(SemVer::new(1, 0, 0), SemVer::new(2, 5, 0));
+        assert!(matches!(result, CompatibilityVerdict::Incompatible(_)));
+    }
+
+    #[test]
+    fn compatibility_checker_major_mismatch() {
+        let checker = LangPackCompatibilityChecker::new(
+            SemVer::new(2, 5, 0),
+            SemVer::new(1, 0, 0),
+        );
+        let result = checker.check(SemVer::new(1, 0, 0), SemVer::new(3, 0, 0));
+        assert!(matches!(result, CompatibilityVerdict::Incompatible(_)));
+    }
+
+    #[test]
+    fn compatibility_checker_degraded() {
+        let checker = LangPackCompatibilityChecker::new(
+            SemVer::new(2, 5, 0),
+            SemVer::new(1, 0, 0),
+        );
+        let result = checker.check(SemVer::new(1, 0, 0), SemVer::new(2, 8, 0));
+        assert!(matches!(result, CompatibilityVerdict::Degraded(_)));
+    }
+
+    #[test]
+    fn compatibility_filter_compatible() {
+        let checker = LangPackCompatibilityChecker::new(
+            SemVer::new(2, 5, 0),
+            SemVer::new(1, 0, 0),
+        );
+        let packs = vec![
+            (SemVer::new(1, 0, 0), SemVer::new(2, 3, 0)), // compatible
+            (SemVer::new(0, 5, 0), SemVer::new(2, 5, 0)), // incompatible (api too old)
+            (SemVer::new(1, 0, 0), SemVer::new(2, 7, 0)), // degraded
+        ];
+        let result = checker.filter_compatible(&packs);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0, 0);
+        assert_eq!(result[1].0, 2);
+    }
+
 }

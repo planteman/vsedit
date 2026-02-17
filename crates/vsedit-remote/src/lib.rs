@@ -1413,6 +1413,278 @@ pub fn is_remote_environment(vars: &[(&str, &str)]) -> bool {
     detect_authority_from_env_vars(vars).is_some()
 }
 
+// ---------------------------------------------------------------------------
+// RemoteConnectionPoolManager
+// ---------------------------------------------------------------------------
+
+/// Health status of a pooled connection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PooledConnectionHealth {
+    Healthy,
+    Degraded(String),
+    Unhealthy(String),
+}
+
+impl fmt::Display for PooledConnectionHealth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PooledConnectionHealth::Healthy => write!(f, "healthy"),
+            PooledConnectionHealth::Degraded(msg) => write!(f, "degraded: {msg}"),
+            PooledConnectionHealth::Unhealthy(msg) => write!(f, "unhealthy: {msg}"),
+        }
+    }
+}
+
+/// A single entry in the connection pool.
+#[derive(Debug, Clone)]
+pub struct PooledConnectionEntry {
+    pub id: String,
+    pub host: String,
+    pub port: u16,
+    pub health: PooledConnectionHealth,
+    pub created_at: u64,
+    pub last_used: u64,
+    pub use_count: u64,
+}
+
+impl PooledConnectionEntry {
+    pub fn new(id: impl Into<String>, host: impl Into<String>, port: u16, created_at: u64) -> Self {
+        Self {
+            id: id.into(),
+            host: host.into(),
+            port,
+            health: PooledConnectionHealth::Healthy,
+            created_at,
+            last_used: created_at,
+            use_count: 0,
+        }
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        self.health == PooledConnectionHealth::Healthy
+    }
+
+    pub fn idle_time(&self, now: u64) -> u64 {
+        now.saturating_sub(self.last_used)
+    }
+}
+
+impl fmt::Display for PooledConnectionEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{}:{} [{}] uses={}", self.id, self.host, self.port, self.health, self.use_count)
+    }
+}
+
+/// Manages a pool of remote connections with health checks and idle eviction.
+pub struct RemoteConnectionPoolManager {
+    pool: Vec<PooledConnectionEntry>,
+    max_size: usize,
+    max_idle_secs: u64,
+}
+
+impl RemoteConnectionPoolManager {
+    pub fn new(max_size: usize, max_idle_secs: u64) -> Self {
+        Self { pool: Vec::new(), max_size, max_idle_secs }
+    }
+
+    pub fn add(&mut self, entry: PooledConnectionEntry) -> Result<(), String> {
+        if self.pool.len() >= self.max_size {
+            return Err("pool is full".into());
+        }
+        if self.pool.iter().any(|e| e.id == entry.id) {
+            return Err(format!("duplicate id: {}", entry.id));
+        }
+        self.pool.push(entry);
+        Ok(())
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let before = self.pool.len();
+        self.pool.retain(|e| e.id != id);
+        self.pool.len() < before
+    }
+
+    pub fn get(&self, id: &str) -> Option<&PooledConnectionEntry> {
+        self.pool.iter().find(|e| e.id == id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut PooledConnectionEntry> {
+        self.pool.iter_mut().find(|e| e.id == id)
+    }
+
+    pub fn acquire(&mut self, id: &str, now: u64) -> Option<&PooledConnectionEntry> {
+        if let Some(entry) = self.pool.iter_mut().find(|e| e.id == id && e.is_healthy()) {
+            entry.last_used = now;
+            entry.use_count += 1;
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.pool.len()
+    }
+
+    pub fn healthy_count(&self) -> usize {
+        self.pool.iter().filter(|e| e.is_healthy()).count()
+    }
+
+    pub fn evict_idle(&mut self, now: u64) -> usize {
+        let before = self.pool.len();
+        self.pool.retain(|e| e.idle_time(now) <= self.max_idle_secs);
+        before - self.pool.len()
+    }
+
+    pub fn set_health(&mut self, id: &str, health: PooledConnectionHealth) -> bool {
+        if let Some(entry) = self.pool.iter_mut().find(|e| e.id == id) {
+            entry.health = health;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn unhealthy_entries(&self) -> Vec<&PooledConnectionEntry> {
+        self.pool.iter().filter(|e| matches!(e.health, PooledConnectionHealth::Unhealthy(_))).collect()
+    }
+
+    /// Least-recently-used healthy connection.
+    pub fn least_recently_used(&self) -> Option<&PooledConnectionEntry> {
+        self.pool.iter().filter(|e| e.is_healthy()).min_by_key(|e| e.last_used)
+    }
+}
+
+impl fmt::Display for RemoteConnectionPoolManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoteConnectionPoolManager({}/{} conns, idle_max={}s)",
+            self.pool.len(), self.max_size, self.max_idle_secs)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteHeartbeatMonitor
+// ---------------------------------------------------------------------------
+
+/// A heartbeat record.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeartbeatRecord {
+    pub connection_id: String,
+    pub timestamp: u64,
+    pub latency_ms: u32,
+    pub success: bool,
+}
+
+impl HeartbeatRecord {
+    pub fn success(conn_id: impl Into<String>, timestamp: u64, latency_ms: u32) -> Self {
+        Self { connection_id: conn_id.into(), timestamp, latency_ms, success: true }
+    }
+
+    pub fn failure(conn_id: impl Into<String>, timestamp: u64) -> Self {
+        Self { connection_id: conn_id.into(), timestamp, latency_ms: 0, success: false }
+    }
+}
+
+impl fmt::Display for HeartbeatRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.success { "ok" } else { "fail" };
+        write!(f, "heartbeat[{}] {} {}ms t={}", self.connection_id, status, self.latency_ms, self.timestamp)
+    }
+}
+
+/// Monitors remote connection health via periodic heartbeat tracking.
+pub struct RemoteHeartbeatMonitor {
+    records: Vec<HeartbeatRecord>,
+    max_records: usize,
+    failure_threshold: u32,
+}
+
+impl RemoteHeartbeatMonitor {
+    pub fn new(max_records: usize, failure_threshold: u32) -> Self {
+        Self { records: Vec::new(), max_records, failure_threshold }
+    }
+
+    pub fn record_heartbeat(&mut self, record: HeartbeatRecord) {
+        self.records.push(record);
+        if self.records.len() > self.max_records {
+            self.records.remove(0);
+        }
+    }
+
+    pub fn record_count(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Returns consecutive failure count for a connection (from most recent).
+    pub fn consecutive_failures(&self, conn_id: &str) -> u32 {
+        let mut count = 0u32;
+        for r in self.records.iter().rev() {
+            if r.connection_id != conn_id {
+                continue;
+            }
+            if r.success {
+                break;
+            }
+            count += 1;
+        }
+        count
+    }
+
+    /// Whether a connection should be considered dead (exceeded failure threshold).
+    pub fn is_connection_dead(&self, conn_id: &str) -> bool {
+        self.consecutive_failures(conn_id) >= self.failure_threshold
+    }
+
+    /// Average latency for successful heartbeats of a connection.
+    pub fn avg_latency(&self, conn_id: &str) -> Option<f64> {
+        let successes: Vec<u32> = self
+            .records
+            .iter()
+            .filter(|r| r.connection_id == conn_id && r.success)
+            .map(|r| r.latency_ms)
+            .collect();
+        if successes.is_empty() {
+            None
+        } else {
+            let sum: u32 = successes.iter().sum();
+            Some(sum as f64 / successes.len() as f64)
+        }
+    }
+
+    /// Last successful heartbeat timestamp for a connection.
+    pub fn last_success(&self, conn_id: &str) -> Option<u64> {
+        self.records
+            .iter()
+            .rev()
+            .find(|r| r.connection_id == conn_id && r.success)
+            .map(|r| r.timestamp)
+    }
+
+    /// All unique connection IDs that have been monitored.
+    pub fn monitored_connections(&self) -> Vec<String> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for r in &self.records {
+            if seen.insert(r.connection_id.clone()) {
+                result.push(r.connection_id.clone());
+            }
+        }
+        result
+    }
+
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+}
+
+impl fmt::Display for RemoteHeartbeatMonitor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RemoteHeartbeatMonitor({} records, threshold={})",
+            self.records.len(), self.failure_threshold)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2416,4 +2688,179 @@ Host ci
         assert!(is_remote_environment(&[("SSH_TTY", "/dev/pts/0")]));
         assert!(!is_remote_environment(&[("PATH", "/usr/bin")]));
     }
+
+    #[test]
+    fn pool_add_and_get() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 300);
+        let entry = PooledConnectionEntry::new("c1", "host1", 22, 100);
+        pool.add(entry).unwrap();
+        assert_eq!(pool.size(), 1);
+        assert!(pool.get("c1").is_some());
+    }
+
+    #[test]
+    fn pool_add_full() {
+        let mut pool = RemoteConnectionPoolManager::new(1, 300);
+        pool.add(PooledConnectionEntry::new("c1", "h", 22, 1)).unwrap();
+        assert!(pool.add(PooledConnectionEntry::new("c2", "h", 22, 1)).is_err());
+    }
+
+    #[test]
+    fn pool_add_duplicate() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 300);
+        pool.add(PooledConnectionEntry::new("c1", "h", 22, 1)).unwrap();
+        assert!(pool.add(PooledConnectionEntry::new("c1", "h2", 22, 2)).is_err());
+    }
+
+    #[test]
+    fn pool_remove() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 300);
+        pool.add(PooledConnectionEntry::new("c1", "h", 22, 1)).unwrap();
+        assert!(pool.remove("c1"));
+        assert_eq!(pool.size(), 0);
+        assert!(!pool.remove("c1"));
+    }
+
+    #[test]
+    fn pool_acquire() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 300);
+        pool.add(PooledConnectionEntry::new("c1", "h", 22, 100)).unwrap();
+        let entry = pool.acquire("c1", 200).unwrap();
+        assert_eq!(entry.use_count, 1);
+        assert_eq!(entry.last_used, 200);
+    }
+
+    #[test]
+    fn pool_evict_idle() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 100);
+        pool.add(PooledConnectionEntry::new("old", "h", 22, 10)).unwrap();
+        pool.add(PooledConnectionEntry::new("new", "h", 22, 500)).unwrap();
+        let evicted = pool.evict_idle(500);
+        assert_eq!(evicted, 1);
+        assert_eq!(pool.size(), 1);
+    }
+
+    #[test]
+    fn pool_health_management() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 300);
+        pool.add(PooledConnectionEntry::new("c1", "h", 22, 1)).unwrap();
+        pool.set_health("c1", PooledConnectionHealth::Unhealthy("timeout".into()));
+        assert_eq!(pool.healthy_count(), 0);
+        assert_eq!(pool.unhealthy_entries().len(), 1);
+    }
+
+    #[test]
+    fn pool_least_recently_used() {
+        let mut pool = RemoteConnectionPoolManager::new(10, 300);
+        pool.add(PooledConnectionEntry::new("c1", "h", 22, 100)).unwrap();
+        pool.add(PooledConnectionEntry::new("c2", "h", 22, 50)).unwrap();
+        let lru = pool.least_recently_used().unwrap();
+        assert_eq!(lru.id, "c2");
+    }
+
+    #[test]
+    fn pool_display() {
+        let pool = RemoteConnectionPoolManager::new(5, 60);
+        assert!(format!("{pool}").contains("0/5"));
+    }
+
+    #[test]
+    fn pooled_entry_display_and_idle() {
+        let entry = PooledConnectionEntry::new("c1", "host", 22, 100);
+        assert!(format!("{entry}").contains("c1"));
+        assert_eq!(entry.idle_time(200), 100);
+    }
+
+    #[test]
+    fn heartbeat_record_success_and_failure() {
+        let s = HeartbeatRecord::success("c1", 100, 50);
+        assert!(s.success);
+        let f = HeartbeatRecord::failure("c1", 200);
+        assert!(!f.success);
+    }
+
+    #[test]
+    fn heartbeat_consecutive_failures() {
+        let mut monitor = RemoteHeartbeatMonitor::new(100, 3);
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 1, 10));
+        monitor.record_heartbeat(HeartbeatRecord::failure("c1", 2));
+        monitor.record_heartbeat(HeartbeatRecord::failure("c1", 3));
+        assert_eq!(monitor.consecutive_failures("c1"), 2);
+        assert!(!monitor.is_connection_dead("c1"));
+    }
+
+    #[test]
+    fn heartbeat_connection_dead() {
+        let mut monitor = RemoteHeartbeatMonitor::new(100, 2);
+        monitor.record_heartbeat(HeartbeatRecord::failure("c1", 1));
+        monitor.record_heartbeat(HeartbeatRecord::failure("c1", 2));
+        assert!(monitor.is_connection_dead("c1"));
+    }
+
+    #[test]
+    fn heartbeat_avg_latency() {
+        let mut monitor = RemoteHeartbeatMonitor::new(100, 3);
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 1, 100));
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 2, 200));
+        let avg = monitor.avg_latency("c1").unwrap();
+        assert!((avg - 150.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn heartbeat_avg_latency_none() {
+        let monitor = RemoteHeartbeatMonitor::new(100, 3);
+        assert!(monitor.avg_latency("nope").is_none());
+    }
+
+    #[test]
+    fn heartbeat_last_success() {
+        let mut monitor = RemoteHeartbeatMonitor::new(100, 3);
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 100, 10));
+        monitor.record_heartbeat(HeartbeatRecord::failure("c1", 200));
+        assert_eq!(monitor.last_success("c1"), Some(100));
+    }
+
+    #[test]
+    fn heartbeat_monitored_connections() {
+        let mut monitor = RemoteHeartbeatMonitor::new(100, 3);
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 1, 10));
+        monitor.record_heartbeat(HeartbeatRecord::success("c2", 2, 20));
+        let conns = monitor.monitored_connections();
+        assert_eq!(conns.len(), 2);
+    }
+
+    #[test]
+    fn heartbeat_max_records() {
+        let mut monitor = RemoteHeartbeatMonitor::new(2, 3);
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 1, 10));
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 2, 20));
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 3, 30));
+        assert_eq!(monitor.record_count(), 2);
+    }
+
+    #[test]
+    fn heartbeat_display_and_clear() {
+        let mut monitor = RemoteHeartbeatMonitor::new(100, 3);
+        monitor.record_heartbeat(HeartbeatRecord::success("c1", 1, 10));
+        assert!(format!("{monitor}").contains("1 records"));
+        monitor.clear();
+        assert_eq!(monitor.record_count(), 0);
+    }
+
+    #[test]
+    fn heartbeat_record_display() {
+        let r = HeartbeatRecord::success("c1", 100, 50);
+        let s = format!("{r}");
+        assert!(s.contains("c1"));
+        assert!(s.contains("ok"));
+        assert!(s.contains("50ms"));
+    }
+
+    #[test]
+    fn pooled_conn_health_display() {
+        assert_eq!(format!("{}", PooledConnectionHealth::Healthy), "healthy");
+        assert!(format!("{}", PooledConnectionHealth::Degraded("slow".into())).contains("slow"));
+        assert!(format!("{}", PooledConnectionHealth::Unhealthy("down".into())).contains("down"));
+    }
+
 }

@@ -1328,6 +1328,249 @@ pub fn format_status_summary(
 // Tests
 // ===========================================================================
 
+
+// ---------------------------------------------------------------------------
+// ScmCommitMessageBuilder
+// ---------------------------------------------------------------------------
+
+/// Template tokens that can appear in a commit message template.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommitToken {
+    /// A literal string fragment.
+    Literal(String),
+    /// A placeholder that will be substituted, e.g. `{scope}`.
+    Placeholder(String),
+}
+
+/// Builds structured commit messages using a configurable template.
+///
+/// The builder supports a mini-template language where placeholders are
+/// delimited by braces: `{type}: {summary}`.  Each placeholder can have
+/// a default value; if no explicit value is set the default is used.
+#[derive(Debug, Clone)]
+pub struct ScmCommitMessageBuilder {
+    tokens: Vec<CommitToken>,
+    values: std::collections::HashMap<String, String>,
+    defaults: std::collections::HashMap<String, String>,
+    max_subject_len: usize,
+    body_lines: Vec<String>,
+    footer_trailers: Vec<(String, String)>,
+}
+
+impl ScmCommitMessageBuilder {
+    /// Parse a template string into a new builder.
+    pub fn new(template: &str) -> Self {
+        let tokens = Self::parse_template(template);
+        Self {
+            tokens,
+            values: std::collections::HashMap::new(),
+            defaults: std::collections::HashMap::new(),
+            max_subject_len: 72,
+            body_lines: Vec::new(),
+            footer_trailers: Vec::new(),
+        }
+    }
+
+    fn parse_template(template: &str) -> Vec<CommitToken> {
+        let mut tokens = Vec::new();
+        let mut buf = String::new();
+        let mut in_placeholder = false;
+        for ch in template.chars() {
+            match ch {
+                '{' if !in_placeholder => {
+                    if !buf.is_empty() {
+                        tokens.push(CommitToken::Literal(std::mem::take(&mut buf)));
+                    }
+                    in_placeholder = true;
+                }
+                '}' if in_placeholder => {
+                    tokens.push(CommitToken::Placeholder(std::mem::take(&mut buf)));
+                    in_placeholder = false;
+                }
+                _ => buf.push(ch),
+            }
+        }
+        if !buf.is_empty() {
+            tokens.push(CommitToken::Literal(buf));
+        }
+        tokens
+    }
+
+    /// Set the value for a named placeholder.
+    pub fn set(&mut self, name: &str, value: &str) -> &mut Self {
+        self.values.insert(name.to_string(), value.to_string());
+        self
+    }
+
+    /// Set the default value for a placeholder (used when no explicit value is set).
+    pub fn set_default(&mut self, name: &str, value: &str) -> &mut Self {
+        self.defaults.insert(name.to_string(), value.to_string());
+        self
+    }
+
+    /// Override the maximum subject-line length (default 72).
+    pub fn max_subject_len(&mut self, len: usize) -> &mut Self {
+        self.max_subject_len = len;
+        self
+    }
+
+    /// Append a body paragraph line.
+    pub fn add_body_line(&mut self, line: &str) -> &mut Self {
+        self.body_lines.push(line.to_string());
+        self
+    }
+
+    /// Append a `key: value` trailer (e.g. `Signed-off-by`).
+    pub fn add_trailer(&mut self, key: &str, value: &str) -> &mut Self {
+        self.footer_trailers.push((key.to_string(), value.to_string()));
+        self
+    }
+
+    /// Return the list of placeholder names found in the template.
+    pub fn placeholders(&self) -> Vec<&str> {
+        self.tokens.iter().filter_map(|t| {
+            if let CommitToken::Placeholder(name) = t { Some(name.as_str()) } else { None }
+        }).collect()
+    }
+
+    /// Build the final commit message string.
+    pub fn build(&self) -> String {
+        let mut subject = String::new();
+        for token in &self.tokens {
+            match token {
+                CommitToken::Literal(s) => subject.push_str(s),
+                CommitToken::Placeholder(name) => {
+                    if let Some(v) = self.values.get(name) {
+                        subject.push_str(v);
+                    } else if let Some(d) = self.defaults.get(name) {
+                        subject.push_str(d);
+                    } else {
+                        subject.push_str(&format!("{{{name}}}"));
+                    }
+                }
+            }
+        }
+        if subject.len() > self.max_subject_len {
+            subject.truncate(self.max_subject_len - 3);
+            subject.push_str("...");
+        }
+        let mut out = subject;
+        if !self.body_lines.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&self.body_lines.join("\n"));
+        }
+        if !self.footer_trailers.is_empty() {
+            out.push_str("\n\n");
+            for (k, v) in &self.footer_trailers {
+                out.push_str(&format!("{k}: {v}\n"));
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScmDiffStatisticsView
+// ---------------------------------------------------------------------------
+
+/// Aggregated statistics about a set of file diffs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScmDiffStatisticsView {
+    entries: Vec<DiffStatEntry>,
+}
+
+/// Per-file diff statistics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffStatEntry {
+    pub path: String,
+    pub insertions: u32,
+    pub deletions: u32,
+}
+
+impl DiffStatEntry {
+    pub fn new(path: &str, insertions: u32, deletions: u32) -> Self {
+        Self { path: path.to_string(), insertions, deletions }
+    }
+
+    /// Net change (insertions minus deletions).
+    pub fn net_change(&self) -> i64 {
+        self.insertions as i64 - self.deletions as i64
+    }
+
+    /// Total lines changed.
+    pub fn total_change(&self) -> u32 {
+        self.insertions + self.deletions
+    }
+
+    /// Return a small histogram bar, e.g. `+++--`.
+    pub fn histogram(&self, max_width: u32) -> String {
+        let total = self.total_change();
+        if total == 0 {
+            return String::new();
+        }
+        let scale = if total > max_width { max_width as f64 / total as f64 } else { 1.0 };
+        let plus_count = (self.insertions as f64 * scale).round() as usize;
+        let minus_count = (self.deletions as f64 * scale).round() as usize;
+        format!("{}{}", "+".repeat(plus_count), "-".repeat(minus_count))
+    }
+}
+
+impl ScmDiffStatisticsView {
+    /// Create a new empty statistics view.
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Add an entry.
+    pub fn add(&mut self, path: &str, insertions: u32, deletions: u32) {
+        self.entries.push(DiffStatEntry::new(path, insertions, deletions));
+    }
+
+    /// Total insertions across all files.
+    pub fn total_insertions(&self) -> u32 {
+        self.entries.iter().map(|e| e.insertions).sum()
+    }
+
+    /// Total deletions across all files.
+    pub fn total_deletions(&self) -> u32 {
+        self.entries.iter().map(|e| e.deletions).sum()
+    }
+
+    /// Number of files changed.
+    pub fn files_changed(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get the entry with the most changes.
+    pub fn most_changed(&self) -> Option<&DiffStatEntry> {
+        self.entries.iter().max_by_key(|e| e.total_change())
+    }
+
+    /// Return a summary string similar to git's `--stat` output.
+    pub fn summary(&self) -> String {
+        let mut out = String::new();
+        for e in &self.entries {
+            let bar = e.histogram(40);
+            out.push_str(&format!(" {} | {} {}\n", e.path, e.total_change(), bar));
+        }
+        out.push_str(&format!(
+            " {} file(s) changed, {} insertion(s)(+), {} deletion(s)(-)\n",
+            self.files_changed(),
+            self.total_insertions(),
+            self.total_deletions(),
+        ));
+        out
+    }
+
+    /// Return entries sorted by total change descending.
+    pub fn sorted_by_change(&self) -> Vec<&DiffStatEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.total_change().cmp(&a.total_change()));
+        sorted
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2407,4 +2650,128 @@ index abc..def 100644
         let summary = format_status_summary(Some("develop"), 0, 0, &[]);
         assert_eq!(summary, "develop");
     }
+
+    // -- ScmCommitMessageBuilder tests -----------------------------------------
+
+    #[test]
+    fn commit_builder_basic_template() {
+        let mut b = ScmCommitMessageBuilder::new("{type}: {summary}");
+        b.set("type", "feat").set("summary", "add login page");
+        assert_eq!(b.build(), "feat: add login page");
+    }
+
+    #[test]
+    fn commit_builder_placeholders_list() {
+        let b = ScmCommitMessageBuilder::new("{type}({scope}): {msg}");
+        let ph = b.placeholders();
+        assert_eq!(ph, vec!["type", "scope", "msg"]);
+    }
+
+    #[test]
+    fn commit_builder_default_values() {
+        let mut b = ScmCommitMessageBuilder::new("{type}: {summary}");
+        b.set_default("type", "chore").set("summary", "cleanup");
+        assert_eq!(b.build(), "chore: cleanup");
+    }
+
+    #[test]
+    fn commit_builder_explicit_overrides_default() {
+        let mut b = ScmCommitMessageBuilder::new("{type}: {summary}");
+        b.set_default("type", "chore").set("type", "fix").set("summary", "bug");
+        assert_eq!(b.build(), "fix: bug");
+    }
+
+    #[test]
+    fn commit_builder_truncation() {
+        let mut b = ScmCommitMessageBuilder::new("{msg}");
+        b.max_subject_len(20);
+        b.set("msg", "this is a very long commit message that should be truncated");
+        let result = b.build();
+        assert!(result.len() <= 20);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn commit_builder_with_body() {
+        let mut b = ScmCommitMessageBuilder::new("{type}: {summary}");
+        b.set("type", "feat").set("summary", "stuff");
+        b.add_body_line("First paragraph.");
+        b.add_body_line("Second paragraph.");
+        let msg = b.build();
+        assert!(msg.contains("\n\nFirst paragraph.\nSecond paragraph."));
+    }
+
+    #[test]
+    fn commit_builder_with_trailers() {
+        let mut b = ScmCommitMessageBuilder::new("{type}: {summary}");
+        b.set("type", "fix").set("summary", "typo");
+        b.add_trailer("Signed-off-by", "Alice <alice@example.com>");
+        let msg = b.build();
+        assert!(msg.contains("Signed-off-by: Alice <alice@example.com>"));
+    }
+
+    #[test]
+    fn commit_builder_unset_placeholder_kept() {
+        let b = ScmCommitMessageBuilder::new("{type}: {summary}");
+        assert_eq!(b.build(), "{type}: {summary}");
+    }
+
+    // -- ScmDiffStatisticsView tests ------------------------------------------
+
+    #[test]
+    fn diff_stat_entry_net_change() {
+        let e = DiffStatEntry::new("foo.rs", 10, 3);
+        assert_eq!(e.net_change(), 7);
+        assert_eq!(e.total_change(), 13);
+    }
+
+    #[test]
+    fn diff_stat_entry_histogram() {
+        let e = DiffStatEntry::new("bar.rs", 5, 2);
+        let h = e.histogram(40);
+        assert_eq!(h.matches('+').count(), 5);
+        assert_eq!(h.matches('-').count(), 2);
+    }
+
+    #[test]
+    fn diff_stats_view_totals() {
+        let mut v = ScmDiffStatisticsView::new();
+        v.add("a.rs", 10, 5);
+        v.add("b.rs", 20, 3);
+        assert_eq!(v.total_insertions(), 30);
+        assert_eq!(v.total_deletions(), 8);
+        assert_eq!(v.files_changed(), 2);
+    }
+
+    #[test]
+    fn diff_stats_view_most_changed() {
+        let mut v = ScmDiffStatisticsView::new();
+        v.add("small.rs", 1, 1);
+        v.add("big.rs", 100, 50);
+        let mc = v.most_changed().unwrap();
+        assert_eq!(mc.path, "big.rs");
+    }
+
+    #[test]
+    fn diff_stats_view_summary_format() {
+        let mut v = ScmDiffStatisticsView::new();
+        v.add("lib.rs", 4, 2);
+        let s = v.summary();
+        assert!(s.contains("lib.rs"));
+        assert!(s.contains("1 file(s) changed"));
+        assert!(s.contains("4 insertion(s)(+)"));
+    }
+
+    #[test]
+    fn diff_stats_view_sorted_by_change() {
+        let mut v = ScmDiffStatisticsView::new();
+        v.add("small.rs", 1, 0);
+        v.add("medium.rs", 10, 5);
+        v.add("large.rs", 50, 30);
+        let sorted = v.sorted_by_change();
+        assert_eq!(sorted[0].path, "large.rs");
+        assert_eq!(sorted[2].path, "small.rs");
+    }
+
+
 }

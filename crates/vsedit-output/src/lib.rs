@@ -1455,6 +1455,281 @@ impl fmt::Display for OutputClearConfirmation {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// OutputTimestampInjector
+// ---------------------------------------------------------------------------
+
+/// Configuration for timestamp injection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimestampInjectorConfig {
+    /// Whether timestamps are enabled.
+    pub enabled: bool,
+    /// Format style for timestamps.
+    pub style: TimestampStyle,
+    /// Separator between timestamp and content.
+    pub separator: String,
+}
+
+/// Style of timestamp display.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimestampStyle {
+    /// Elapsed time since start in seconds: "[0.123s]"
+    Elapsed,
+    /// Absolute epoch seconds: "[1700000000]"
+    Epoch,
+    /// Compact HH:MM:SS format (from epoch seconds): "[HH:MM:SS]"
+    HhMmSs,
+}
+
+impl Default for TimestampInjectorConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            style: TimestampStyle::Elapsed,
+            separator: " ".to_string(),
+        }
+    }
+}
+
+/// Injects timestamps into output entries.
+#[derive(Debug, Clone)]
+pub struct OutputTimestampInjector {
+    config: TimestampInjectorConfig,
+    start_epoch_ms: u64,
+    entries_processed: u64,
+}
+
+impl OutputTimestampInjector {
+    /// Create a new injector with the given start time.
+    pub fn new(config: TimestampInjectorConfig, start_epoch_ms: u64) -> Self {
+        Self {
+            config,
+            start_epoch_ms,
+            entries_processed: 0,
+        }
+    }
+
+    /// Create with defaults and current time approximated as 0.
+    pub fn with_defaults() -> Self {
+        Self::new(TimestampInjectorConfig::default(), 0)
+    }
+
+    /// Format a timestamp given an event time in epoch milliseconds.
+    pub fn format_timestamp(&self, event_epoch_ms: u64) -> String {
+        match self.config.style {
+            TimestampStyle::Elapsed => {
+                let elapsed_ms = event_epoch_ms.saturating_sub(self.start_epoch_ms);
+                let secs = elapsed_ms as f64 / 1000.0;
+                format!("[{secs:.3}s]")
+            }
+            TimestampStyle::Epoch => {
+                let epoch_s = event_epoch_ms / 1000;
+                format!("[{epoch_s}]")
+            }
+            TimestampStyle::HhMmSs => {
+                let total_secs = event_epoch_ms / 1000;
+                let h = (total_secs / 3600) % 24;
+                let m = (total_secs / 60) % 60;
+                let s = total_secs % 60;
+                format!("[{h:02}:{m:02}:{s:02}]")
+            }
+        }
+    }
+
+    /// Inject a timestamp into a line of text.
+    pub fn inject(&mut self, line: &str, event_epoch_ms: u64) -> String {
+        self.entries_processed += 1;
+        if !self.config.enabled {
+            return line.to_string();
+        }
+        let ts = self.format_timestamp(event_epoch_ms);
+        format!("{ts}{}{line}", self.config.separator)
+    }
+
+    /// Inject timestamps into multiple lines.
+    pub fn inject_batch(&mut self, lines: &[&str], event_epoch_ms: u64) -> Vec<String> {
+        lines.iter().enumerate().map(|(i, line)| {
+            self.inject(line, event_epoch_ms + i as u64)
+        }).collect()
+    }
+
+    /// Number of entries processed.
+    pub fn entries_processed(&self) -> u64 {
+        self.entries_processed
+    }
+
+    /// Whether injection is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.config.enabled
+    }
+
+    /// Set enabled state.
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.config.enabled = enabled;
+    }
+
+    /// Change the timestamp style.
+    pub fn set_style(&mut self, style: TimestampStyle) {
+        self.config.style = style;
+    }
+
+    /// Get current style.
+    pub fn style(&self) -> TimestampStyle {
+        self.config.style
+    }
+
+    /// Reset the entries counter.
+    pub fn reset_counter(&mut self) {
+        self.entries_processed = 0;
+    }
+}
+
+impl fmt::Display for OutputTimestampInjector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TimestampInjector({:?}, processed={})",
+            self.config.style, self.entries_processed
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputLanguageColorizer
+// ---------------------------------------------------------------------------
+
+/// Detected language for output content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DetectedLanguage {
+    Rust,
+    JavaScript,
+    Python,
+    Shell,
+    Json,
+    Xml,
+    Plain,
+}
+
+impl fmt::Display for DetectedLanguage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Rust => "Rust",
+            Self::JavaScript => "JavaScript",
+            Self::Python => "Python",
+            Self::Shell => "Shell",
+            Self::Json => "JSON",
+            Self::Xml => "XML",
+            Self::Plain => "Plain",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// Colorizes output based on heuristic language detection.
+#[derive(Debug, Clone)]
+pub struct OutputLanguageColorizer {
+    detections: Vec<(DetectedLanguage, u64)>,
+}
+
+impl OutputLanguageColorizer {
+    /// Create a new colorizer.
+    pub fn new() -> Self {
+        Self { detections: Vec::new() }
+    }
+
+    /// Detect language from a line of text using simple heuristics.
+    pub fn detect_language(&mut self, line: &str) -> DetectedLanguage {
+        let lang = Self::heuristic_detect(line);
+        self.detections.push((lang, line.len() as u64));
+        lang
+    }
+
+    fn heuristic_detect(line: &str) -> DetectedLanguage {
+        let trimmed = line.trim();
+        if trimmed.starts_with("fn ") || trimmed.starts_with("let ") || trimmed.starts_with("use ")
+            || trimmed.contains("-> ") || trimmed.starts_with("pub ") || trimmed.starts_with("impl ")
+        {
+            return DetectedLanguage::Rust;
+        }
+        if trimmed.starts_with("def ") || trimmed.starts_with("import ") || trimmed.starts_with("class ")
+            || trimmed.contains("print(")
+        {
+            return DetectedLanguage::Python;
+        }
+        if trimmed.starts_with("const ") || trimmed.starts_with("function ") || trimmed.contains("=>")
+            || trimmed.starts_with("var ") || trimmed.contains("console.log")
+        {
+            return DetectedLanguage::JavaScript;
+        }
+        if trimmed.starts_with('$') || trimmed.starts_with('#') || trimmed.starts_with("echo ")
+            || trimmed.starts_with("export ")
+        {
+            return DetectedLanguage::Shell;
+        }
+        if trimmed.starts_with('{') || trimmed.starts_with('[') {
+            return DetectedLanguage::Json;
+        }
+        if trimmed.starts_with('<') && trimmed.ends_with('>') {
+            return DetectedLanguage::Xml;
+        }
+        DetectedLanguage::Plain
+    }
+
+    /// Return a ratatui Color for a detected language.
+    pub fn color_for(lang: DetectedLanguage) -> Color {
+        match lang {
+            DetectedLanguage::Rust => Color::Rgb(255, 165, 0),
+            DetectedLanguage::JavaScript => Color::Yellow,
+            DetectedLanguage::Python => Color::Blue,
+            DetectedLanguage::Shell => Color::Green,
+            DetectedLanguage::Json => Color::Cyan,
+            DetectedLanguage::Xml => Color::Magenta,
+            DetectedLanguage::Plain => Color::White,
+        }
+    }
+
+    /// Colorize a line into a ratatui Span.
+    pub fn colorize_line(&mut self, line: &str) -> Span<'_> {
+        let lang = self.detect_language(line);
+        Span::styled("", Style::default().fg(Self::color_for(lang)))
+    }
+
+    /// Number of detections performed.
+    pub fn detection_count(&self) -> usize {
+        self.detections.len()
+    }
+
+    /// Count how many times a given language was detected.
+    pub fn count_language(&self, lang: DetectedLanguage) -> usize {
+        self.detections.iter().filter(|(l, _)| *l == lang).count()
+    }
+
+    /// Return the most frequently detected language.
+    pub fn most_frequent(&self) -> Option<DetectedLanguage> {
+        if self.detections.is_empty() {
+            return None;
+        }
+        let mut counts = std::collections::HashMap::new();
+        for (lang, _) in &self.detections {
+            *counts.entry(*lang).or_insert(0usize) += 1;
+        }
+        counts.into_iter().max_by_key(|(_, c)| *c).map(|(l, _)| l)
+    }
+
+    /// Reset all detection history.
+    pub fn reset(&mut self) {
+        self.detections.clear();
+    }
+}
+
+impl fmt::Display for OutputLanguageColorizer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LanguageColorizer({} detections)", self.detection_count())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2351,4 +2626,150 @@ mod tests {
         assert!(s.contains("Clear 10 lines"));
         assert!(s.contains("output"));
     }
+
+    #[test]
+    fn timestamp_injector_elapsed() {
+        let mut inj = OutputTimestampInjector::new(TimestampInjectorConfig::default(), 1000);
+        let result = inj.inject("hello", 2500);
+        assert!(result.starts_with("[1.500s]"));
+        assert!(result.contains("hello"));
+    }
+
+    #[test]
+    fn timestamp_injector_epoch() {
+        let config = TimestampInjectorConfig {
+            enabled: true,
+            style: TimestampStyle::Epoch,
+            separator: " ".into(),
+        };
+        let mut inj = OutputTimestampInjector::new(config, 0);
+        let result = inj.inject("test", 5000);
+        assert!(result.starts_with("[5]"));
+    }
+
+    #[test]
+    fn timestamp_injector_hhmmss() {
+        let config = TimestampInjectorConfig {
+            enabled: true,
+            style: TimestampStyle::HhMmSs,
+            separator: " ".into(),
+        };
+        let mut inj = OutputTimestampInjector::new(config, 0);
+        let result = inj.inject("line", 3661_000);
+        assert!(result.contains("[01:01:01]"));
+    }
+
+    #[test]
+    fn timestamp_injector_disabled() {
+        let config = TimestampInjectorConfig {
+            enabled: false,
+            style: TimestampStyle::Elapsed,
+            separator: " ".into(),
+        };
+        let mut inj = OutputTimestampInjector::new(config, 0);
+        let result = inj.inject("raw", 1000);
+        assert_eq!(result, "raw");
+    }
+
+    #[test]
+    fn timestamp_injector_batch() {
+        let mut inj = OutputTimestampInjector::with_defaults();
+        let result = inj.inject_batch(&["a", "b", "c"], 1000);
+        assert_eq!(result.len(), 3);
+        assert_eq!(inj.entries_processed(), 3);
+    }
+
+    #[test]
+    fn timestamp_injector_toggle_enabled() {
+        let mut inj = OutputTimestampInjector::with_defaults();
+        assert!(inj.is_enabled());
+        inj.set_enabled(false);
+        assert!(!inj.is_enabled());
+    }
+
+    #[test]
+    fn timestamp_injector_display() {
+        let inj = OutputTimestampInjector::with_defaults();
+        let s = format!("{inj}");
+        assert!(s.contains("Elapsed"));
+        assert!(s.contains("processed=0"));
+    }
+
+    #[test]
+    fn language_colorizer_detect_rust() {
+        let mut col = OutputLanguageColorizer::new();
+        assert_eq!(col.detect_language("fn main() {"), DetectedLanguage::Rust);
+    }
+
+    #[test]
+    fn language_colorizer_detect_python() {
+        let mut col = OutputLanguageColorizer::new();
+        assert_eq!(col.detect_language("def hello():"), DetectedLanguage::Python);
+    }
+
+    #[test]
+    fn language_colorizer_detect_js() {
+        let mut col = OutputLanguageColorizer::new();
+        assert_eq!(col.detect_language("const x = 5;"), DetectedLanguage::JavaScript);
+    }
+
+    #[test]
+    fn language_colorizer_detect_shell() {
+        let mut col = OutputLanguageColorizer::new();
+        assert_eq!(col.detect_language("$ ls -la"), DetectedLanguage::Shell);
+    }
+
+    #[test]
+    fn language_colorizer_detect_json() {
+        let mut col = OutputLanguageColorizer::new();
+        assert_eq!(col.detect_language("{\"key\": \"value\"}"), DetectedLanguage::Json);
+    }
+
+    #[test]
+    fn language_colorizer_detect_plain() {
+        let mut col = OutputLanguageColorizer::new();
+        assert_eq!(col.detect_language("just some text"), DetectedLanguage::Plain);
+    }
+
+    #[test]
+    fn language_colorizer_most_frequent() {
+        let mut col = OutputLanguageColorizer::new();
+        col.detect_language("fn a()");
+        col.detect_language("fn b()");
+        col.detect_language("def c():");
+        assert_eq!(col.most_frequent(), Some(DetectedLanguage::Rust));
+    }
+
+    #[test]
+    fn language_colorizer_count() {
+        let mut col = OutputLanguageColorizer::new();
+        col.detect_language("fn foo()");
+        col.detect_language("def bar():");
+        assert_eq!(col.count_language(DetectedLanguage::Rust), 1);
+        assert_eq!(col.count_language(DetectedLanguage::Python), 1);
+        assert_eq!(col.detection_count(), 2);
+    }
+
+    #[test]
+    fn language_colorizer_reset() {
+        let mut col = OutputLanguageColorizer::new();
+        col.detect_language("fn foo()");
+        col.reset();
+        assert_eq!(col.detection_count(), 0);
+    }
+
+    #[test]
+    fn language_colorizer_display() {
+        let col = OutputLanguageColorizer::new();
+        let s = format!("{col}");
+        assert!(s.contains("0 detections"));
+    }
+
+    #[test]
+    fn language_colorizer_color_for() {
+        assert_eq!(OutputLanguageColorizer::color_for(DetectedLanguage::Rust), Color::Rgb(255, 165, 0));
+        assert_eq!(OutputLanguageColorizer::color_for(DetectedLanguage::Plain), Color::White);
+    }
+
+
 }
