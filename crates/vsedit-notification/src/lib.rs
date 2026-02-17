@@ -1145,6 +1145,265 @@ impl Default for NotificationDeduplicator {
 }
 
 // ---------------------------------------------------------------------------
+// NotificationQueue – priority-ordered notification queue
+// ---------------------------------------------------------------------------
+
+/// A priority queue of notifications.
+///
+/// Error notifications have highest priority, then warnings, then info.
+#[derive(Debug)]
+pub struct NotificationQueue {
+    queue: Vec<Notification>,
+    max_size: usize,
+}
+
+impl Default for NotificationQueue {
+    fn default() -> Self {
+        Self {
+            queue: Vec::new(),
+            max_size: 100,
+        }
+    }
+}
+
+impl NotificationQueue {
+    /// Create a queue with the given maximum size.
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            queue: Vec::new(),
+            max_size,
+        }
+    }
+
+    /// Enqueue a notification, maintaining priority order.
+    pub fn push(&mut self, notification: Notification) {
+        if self.queue.len() >= self.max_size {
+            // Drop lowest-priority (last) item
+            self.queue.pop();
+        }
+        self.queue.push(notification);
+        self.queue.sort_by_key(|n| std::cmp::Reverse(Self::priority(&n.severity)));
+    }
+
+    /// Dequeue the highest-priority notification.
+    pub fn pop(&mut self) -> Option<Notification> {
+        if self.queue.is_empty() {
+            None
+        } else {
+            Some(self.queue.remove(0))
+        }
+    }
+
+    /// Peek at the highest-priority notification.
+    pub fn peek(&self) -> Option<&Notification> {
+        self.queue.first()
+    }
+
+    /// Number of queued notifications.
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Whether the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    /// Clear all notifications.
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
+
+    fn priority(severity: &NotificationSeverity) -> u8 {
+        match severity {
+            NotificationSeverity::Error => 3,
+            NotificationSeverity::Warning => 2,
+            NotificationSeverity::Info => 1,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationGroup – collapse similar notifications
+// ---------------------------------------------------------------------------
+
+/// Groups similar notifications together.
+///
+/// Notifications with the same source are collapsed into a single
+/// group with a count.
+#[derive(Debug, Clone)]
+pub struct NotificationGroup {
+    /// The representative notification.
+    pub representative: String,
+    /// Source identifier for grouping.
+    pub source: String,
+    /// Number of collapsed notifications.
+    pub count: usize,
+    /// Severity of the most severe notification in the group.
+    pub max_severity: NotificationSeverity,
+}
+
+impl NotificationGroup {
+    /// Create a new group from a notification.
+    pub fn from_notification(notification: &Notification) -> Self {
+        Self {
+            representative: notification.message.clone(),
+            source: notification.source.clone().unwrap_or_default(),
+            count: 1,
+            max_severity: notification.severity,
+        }
+    }
+
+    /// Try to absorb a notification into this group.
+    ///
+    /// Returns `true` if the notification was absorbed.
+    pub fn try_absorb(&mut self, notification: &Notification) -> bool {
+        let source = notification.source.as_deref().unwrap_or("");
+        if source == self.source && !self.source.is_empty() {
+            self.count += 1;
+            if Self::severity_ord(&notification.severity) > Self::severity_ord(&self.max_severity) {
+                self.max_severity = notification.severity;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    fn severity_ord(s: &NotificationSeverity) -> u8 {
+        match s {
+            NotificationSeverity::Info => 0,
+            NotificationSeverity::Warning => 1,
+            NotificationSeverity::Error => 2,
+        }
+    }
+}
+
+impl std::fmt::Display for NotificationGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.count > 1 {
+            write!(f, "{} (+{})", self.representative, self.count - 1)
+        } else {
+            write!(f, "{}", self.representative)
+        }
+    }
+}
+
+/// Groups a slice of notifications by source.
+pub fn group_notifications(notifications: &[Notification]) -> Vec<NotificationGroup> {
+    let mut groups: Vec<NotificationGroup> = Vec::new();
+    for n in notifications {
+        let absorbed = groups.iter_mut().any(|g| g.try_absorb(n));
+        if !absorbed {
+            groups.push(NotificationGroup::from_notification(n));
+        }
+    }
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// Notification sound mapping
+// ---------------------------------------------------------------------------
+
+/// Sound effect associated with a notification severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotificationSound {
+    /// No sound.
+    None,
+    /// Gentle chime for info notifications.
+    Chime,
+    /// Alert tone for warnings.
+    Alert,
+    /// Critical alarm for errors.
+    Alarm,
+}
+
+impl NotificationSound {
+    /// Map a severity to a default sound.
+    pub fn from_severity(severity: NotificationSeverity) -> Self {
+        match severity {
+            NotificationSeverity::Info => NotificationSound::Chime,
+            NotificationSeverity::Warning => NotificationSound::Alert,
+            NotificationSeverity::Error => NotificationSound::Alarm,
+        }
+    }
+
+    /// Terminal bell sequence for this sound (if any).
+    pub fn bell_sequence(&self) -> Option<&'static str> {
+        match self {
+            NotificationSound::None => Option::None,
+            _ => Some("\x07"),
+        }
+    }
+}
+
+impl std::fmt::Display for NotificationSound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NotificationSound::None => write!(f, "none"),
+            NotificationSound::Chime => write!(f, "chime"),
+            NotificationSound::Alert => write!(f, "alert"),
+            NotificationSound::Alarm => write!(f, "alarm"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationActionHandler – action handler chain
+// ---------------------------------------------------------------------------
+
+/// Handles notification action button clicks.
+pub struct NotificationActionHandler {
+    handlers: Vec<(String, Box<dyn Fn(&str) -> bool + Send + Sync>)>,
+}
+
+impl NotificationActionHandler {
+    /// Create a new empty handler.
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+        }
+    }
+
+    /// Register a named action handler.
+    pub fn register(
+        &mut self,
+        action_id: impl Into<String>,
+        handler: Box<dyn Fn(&str) -> bool + Send + Sync>,
+    ) {
+        self.handlers.push((action_id.into(), handler));
+    }
+
+    /// Handle an action by ID. Returns `true` if handled.
+    pub fn handle(&self, action_id: &str) -> bool {
+        for (id, handler) in &self.handlers {
+            if id == action_id {
+                return handler(action_id);
+            }
+        }
+        false
+    }
+
+    /// Number of registered handlers.
+    pub fn handler_count(&self) -> usize {
+        self.handlers.len()
+    }
+}
+
+impl Default for NotificationActionHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Debug for NotificationActionHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ids: Vec<&str> = self.handlers.iter().map(|(id, _)| id.as_str()).collect();
+        write!(f, "NotificationActionHandler({:?})", ids)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1877,5 +2136,109 @@ mod tests {
 
         dedup.reset();
         assert_eq!(dedup.unique_count(), 0);
+    }
+
+    // -- NotificationQueue tests --
+
+    #[test]
+    fn queue_priority_order() {
+        let mut q = NotificationQueue::new(10);
+        q.push(Notification::info("low"));
+        q.push(Notification::error("high"));
+        q.push(Notification::warning("mid"));
+        let first = q.pop().unwrap();
+        assert_eq!(first.severity, NotificationSeverity::Error);
+    }
+
+    #[test]
+    fn queue_capacity_limit() {
+        let mut q = NotificationQueue::new(2);
+        q.push(Notification::info("a"));
+        q.push(Notification::info("b"));
+        q.push(Notification::error("c"));
+        assert_eq!(q.len(), 2);
+    }
+
+    #[test]
+    fn queue_empty() {
+        let q = NotificationQueue::default();
+        assert!(q.is_empty());
+        assert!(q.peek().is_none());
+    }
+
+    // -- NotificationGroup tests --
+
+    #[test]
+    fn group_absorb_same_source() {
+        let n1 = Notification::info("a").with_source("build");
+        let n2 = Notification::warning("b").with_source("build");
+        let mut g = NotificationGroup::from_notification(&n1);
+        assert!(g.try_absorb(&n2));
+        assert_eq!(g.count, 2);
+        assert_eq!(g.max_severity, NotificationSeverity::Warning);
+    }
+
+    #[test]
+    fn group_no_absorb_different_source() {
+        let n1 = Notification::info("a").with_source("build");
+        let n2 = Notification::info("b").with_source("lint");
+        let mut g = NotificationGroup::from_notification(&n1);
+        assert!(!g.try_absorb(&n2));
+    }
+
+    #[test]
+    fn group_display() {
+        let mut g = NotificationGroup {
+            representative: "Error".into(),
+            source: "build".into(),
+            count: 3,
+            max_severity: NotificationSeverity::Error,
+        };
+        assert_eq!(format!("{}", g), "Error (+2)");
+        g.count = 1;
+        assert_eq!(format!("{}", g), "Error");
+    }
+
+    #[test]
+    fn group_notifications_fn() {
+        let notifs = vec![
+            Notification::info("a").with_source("build"),
+            Notification::info("b").with_source("build"),
+            Notification::error("c").with_source("lint"),
+        ];
+        let groups = group_notifications(&notifs);
+        assert_eq!(groups.len(), 2);
+    }
+
+    // -- NotificationSound tests --
+
+    #[test]
+    fn sound_from_severity() {
+        assert_eq!(NotificationSound::from_severity(NotificationSeverity::Info), NotificationSound::Chime);
+        assert_eq!(NotificationSound::from_severity(NotificationSeverity::Error), NotificationSound::Alarm);
+    }
+
+    #[test]
+    fn sound_bell() {
+        assert!(NotificationSound::None.bell_sequence().is_none());
+        assert!(NotificationSound::Chime.bell_sequence().is_some());
+    }
+
+    // -- NotificationActionHandler tests --
+
+    #[test]
+    fn action_handler_register_and_handle() {
+        let mut h = NotificationActionHandler::new();
+        h.register("retry", Box::new(|_| true));
+        assert!(h.handle("retry"));
+        assert!(!h.handle("unknown"));
+    }
+
+    #[test]
+    fn action_handler_count() {
+        let mut h = NotificationActionHandler::new();
+        h.register("a", Box::new(|_| true));
+        h.register("b", Box::new(|_| false));
+        assert_eq!(h.handler_count(), 2);
     }
 }

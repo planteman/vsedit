@@ -1044,6 +1044,276 @@ impl CompletionList {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SuggestionRanker – multi-criteria scoring
+// ---------------------------------------------------------------------------
+
+/// Ranks suggestions using recency, frequency, and relevance scores.
+#[derive(Debug, Clone)]
+pub struct SuggestionRanker {
+    /// Weight for recency (how recently the item was used).
+    pub recency_weight: f64,
+    /// Weight for frequency (how often the item was used).
+    pub frequency_weight: f64,
+    /// Weight for textual relevance.
+    pub relevance_weight: f64,
+    /// Usage counts keyed by label.
+    usage_counts: std::collections::HashMap<String, u64>,
+    /// Last-used timestamps keyed by label (epoch millis).
+    last_used: std::collections::HashMap<String, u64>,
+}
+
+impl Default for SuggestionRanker {
+    fn default() -> Self {
+        Self {
+            recency_weight: 1.0,
+            frequency_weight: 1.0,
+            relevance_weight: 2.0,
+            usage_counts: std::collections::HashMap::new(),
+            last_used: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl SuggestionRanker {
+    /// Create a ranker with custom weights.
+    pub fn new(recency: f64, frequency: f64, relevance: f64) -> Self {
+        Self {
+            recency_weight: recency,
+            frequency_weight: frequency,
+            relevance_weight: relevance,
+            ..Default::default()
+        }
+    }
+
+    /// Record that a suggestion was selected.
+    pub fn record_usage(&mut self, label: &str, timestamp: u64) {
+        *self.usage_counts.entry(label.to_string()).or_insert(0) += 1;
+        self.last_used.insert(label.to_string(), timestamp);
+    }
+
+    /// Score a single completion item.
+    ///
+    /// The relevance score is based on fuzzy match quality against the query.
+    pub fn score(&self, item: &CompletionItem, query: &str, now: u64) -> f64 {
+        let relevance = fuzzy_score(query, item.get_filter_text())
+            .map(|s| s as f64)
+            .unwrap_or(0.0);
+
+        let frequency = self
+            .usage_counts
+            .get(&item.label)
+            .copied()
+            .unwrap_or(0) as f64;
+
+        let recency = self
+            .last_used
+            .get(&item.label)
+            .map(|&ts| {
+                let age = now.saturating_sub(ts);
+                1.0 / (1.0 + age as f64 / 1000.0)
+            })
+            .unwrap_or(0.0);
+
+        relevance * self.relevance_weight
+            + frequency * self.frequency_weight
+            + recency * self.recency_weight
+    }
+
+    /// Rank a completion list by multi-criteria score.
+    pub fn rank(&self, list: &CompletionList, query: &str, now: u64) -> Vec<ScoredCompletion> {
+        let mut scored: Vec<ScoredCompletion> = list
+            .items
+            .iter()
+            .map(|item| {
+                let s = self.score(item, query, now) as i64;
+                ScoredCompletion::new(item.clone(), s)
+            })
+            .collect();
+        scored.sort_by(|a, b| b.score.cmp(&a.score));
+        scored
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestionFilter – type-based filtering
+// ---------------------------------------------------------------------------
+
+/// Filters suggestions by completion item kind.
+#[derive(Debug, Clone)]
+pub struct SuggestionFilter {
+    /// Kinds to include. If empty, all kinds are included.
+    include_kinds: Vec<CompletionItemKind>,
+    /// Kinds to exclude.
+    exclude_kinds: Vec<CompletionItemKind>,
+    /// Whether to exclude deprecated items.
+    pub hide_deprecated: bool,
+}
+
+impl Default for SuggestionFilter {
+    fn default() -> Self {
+        Self {
+            include_kinds: Vec::new(),
+            exclude_kinds: Vec::new(),
+            hide_deprecated: false,
+        }
+    }
+}
+
+impl SuggestionFilter {
+    /// Create a filter that includes only the specified kinds.
+    pub fn include(kinds: Vec<CompletionItemKind>) -> Self {
+        Self {
+            include_kinds: kinds,
+            ..Default::default()
+        }
+    }
+
+    /// Create a filter that excludes the specified kinds.
+    pub fn exclude(kinds: Vec<CompletionItemKind>) -> Self {
+        Self {
+            exclude_kinds: kinds,
+            ..Default::default()
+        }
+    }
+
+    /// Apply the filter to a completion list.
+    pub fn apply(&self, list: &CompletionList) -> CompletionList {
+        let items: Vec<CompletionItem> = list
+            .items
+            .iter()
+            .filter(|item| {
+                if self.hide_deprecated && item.deprecated {
+                    return false;
+                }
+                if !self.include_kinds.is_empty() && !self.include_kinds.contains(&item.kind) {
+                    return false;
+                }
+                if self.exclude_kinds.contains(&item.kind) {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect();
+        CompletionList {
+            items,
+            is_incomplete: list.is_incomplete,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet preview in suggestions
+// ---------------------------------------------------------------------------
+
+/// Generates a preview of a snippet by stripping placeholder markers.
+///
+/// Converts `"println!(\"$1\")"` to `"println!(\"\")"`.
+pub fn snippet_preview(snippet: &str) -> String {
+    let mut result = String::with_capacity(snippet.len());
+    let mut chars = snippet.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '$' {
+            // Skip $N or ${N:default}
+            if let Some(&next) = chars.peek() {
+                if next == '{' {
+                    chars.next(); // skip '{'
+                    // Find the colon for default, or the closing brace
+                    let mut depth = 1;
+                    let mut in_default = false;
+                    while let Some(bc) = chars.next() {
+                        if bc == '{' {
+                            depth += 1;
+                        } else if bc == '}' {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        } else if bc == ':' && depth == 1 && !in_default {
+                            in_default = true;
+                        } else if in_default {
+                            result.push(bc);
+                        }
+                    }
+                } else if next.is_ascii_digit() {
+                    // Skip $N
+                    while let Some(&d) = chars.peek() {
+                        if d.is_ascii_digit() {
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    result.push(c);
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion detail resolving
+// ---------------------------------------------------------------------------
+
+/// Resolved details for a completion item.
+#[derive(Debug, Clone)]
+pub struct ResolvedSuggestionDetail {
+    /// The original item label.
+    pub label: String,
+    /// Full documentation text.
+    pub documentation: Option<String>,
+    /// Snippet preview text.
+    pub preview: Option<String>,
+    /// Parameter hints.
+    pub parameters: Vec<String>,
+}
+
+/// Resolves additional details for a completion item.
+pub fn resolve_suggestion_detail(item: &CompletionItem) -> ResolvedSuggestionDetail {
+    let preview = item
+        .insert_text
+        .as_ref()
+        .map(|s| snippet_preview(s));
+
+    // Extract parameters from the insert text (simple heuristic: look for placeholders)
+    let parameters = item
+        .insert_text
+        .as_ref()
+        .map(|s| {
+            let mut params = Vec::new();
+            let mut chars = s.chars().peekable();
+            while let Some(c) = chars.next() {
+                if c == '$' && chars.peek() == Some(&'{') {
+                    chars.next(); // skip '{'
+                    let mut placeholder = String::new();
+                    for bc in chars.by_ref() {
+                        if bc == '}' {
+                            break;
+                        }
+                        placeholder.push(bc);
+                    }
+                    if let Some((_num, name)) = placeholder.split_once(':') {
+                        params.push(name.to_string());
+                    }
+                }
+            }
+            params
+        })
+        .unwrap_or_default();
+
+    ResolvedSuggestionDetail {
+        label: item.label.clone(),
+        documentation: item.documentation.clone(),
+        preview,
+        parameters,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1876,5 +2146,111 @@ mod tests {
         ]);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered.items[0].label, "process");
+    }
+
+    // -- SuggestionRanker tests --
+
+    #[test]
+    fn ranker_default_weights() {
+        let r = SuggestionRanker::default();
+        assert!((r.relevance_weight - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn ranker_score_with_usage() {
+        let mut r = SuggestionRanker::default();
+        r.record_usage("println", 1000);
+        r.record_usage("println", 2000);
+        let item = CompletionItem::new("println", CompletionItemKind::Function);
+        let score = r.score(&item, "print", 3000);
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn ranker_rank_list() {
+        let r = SuggestionRanker::default();
+        let list = CompletionList::new(vec![
+            CompletionItem::new("aaa", CompletionItemKind::Variable),
+            CompletionItem::new("abc", CompletionItemKind::Function),
+        ]);
+        let ranked = r.rank(&list, "a", 0);
+        assert_eq!(ranked.len(), 2);
+    }
+
+    // -- SuggestionFilter tests --
+
+    #[test]
+    fn filter_include_kinds() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("f", CompletionItemKind::Function),
+            CompletionItem::new("v", CompletionItemKind::Variable),
+        ]);
+        let f = SuggestionFilter::include(vec![CompletionItemKind::Function]);
+        let result = f.apply(&list);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.items[0].label, "f");
+    }
+
+    #[test]
+    fn filter_exclude_kinds() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("f", CompletionItemKind::Function),
+            CompletionItem::new("v", CompletionItemKind::Variable),
+        ]);
+        let f = SuggestionFilter::exclude(vec![CompletionItemKind::Variable]);
+        let result = f.apply(&list);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn filter_hide_deprecated() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("old", CompletionItemKind::Function).with_deprecated(),
+            CompletionItem::new("new", CompletionItemKind::Function),
+        ]);
+        let mut f = SuggestionFilter::default();
+        f.hide_deprecated = true;
+        let result = f.apply(&list);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.items[0].label, "new");
+    }
+
+    // -- snippet_preview tests --
+
+    #[test]
+    fn snippet_preview_simple() {
+        assert_eq!(snippet_preview("hello $1 world"), "hello  world");
+    }
+
+    #[test]
+    fn snippet_preview_with_default() {
+        assert_eq!(snippet_preview("fn ${1:name}()"), "fn name()");
+    }
+
+    #[test]
+    fn snippet_preview_no_placeholders() {
+        assert_eq!(snippet_preview("plain text"), "plain text");
+    }
+
+    // -- resolve_suggestion_detail tests --
+
+    #[test]
+    fn resolve_detail_basic() {
+        let item = CompletionItem::new("println", CompletionItemKind::Function)
+            .with_insert_text("println!(\"${1:msg}\")")
+            .with_documentation("Print to stdout");
+        let detail = resolve_suggestion_detail(&item);
+        assert_eq!(detail.label, "println");
+        assert_eq!(detail.documentation.as_deref(), Some("Print to stdout"));
+        assert_eq!(detail.parameters, vec!["msg"]);
+        assert!(detail.preview.is_some());
+    }
+
+    #[test]
+    fn resolve_detail_no_snippet() {
+        let item = CompletionItem::new("x", CompletionItemKind::Variable);
+        let detail = resolve_suggestion_detail(&item);
+        assert!(detail.preview.is_none());
+        assert!(detail.parameters.is_empty());
     }
 }

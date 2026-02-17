@@ -1213,6 +1213,390 @@ impl CellLanguageMap {
 
 use std::collections::HashMap;
 
+// ---------------------------------------------------------------------------
+// InteractiveWidgetGrid – multi-widget layout
+// ---------------------------------------------------------------------------
+
+/// A grid layout for interactive widgets.
+///
+/// Each cell in the grid can hold an optional widget ID.
+#[derive(Debug, Clone)]
+pub struct InteractiveWidgetGrid {
+    /// Number of columns.
+    pub cols: usize,
+    /// Number of rows.
+    pub rows: usize,
+    /// Grid cells (row-major order).
+    cells: Vec<Option<String>>,
+}
+
+impl InteractiveWidgetGrid {
+    /// Create a grid with the given dimensions.
+    pub fn new(cols: usize, rows: usize) -> Self {
+        Self {
+            cols,
+            rows,
+            cells: vec![None; cols * rows],
+        }
+    }
+
+    /// Place a widget at a specific cell.
+    pub fn place(&mut self, col: usize, row: usize, widget_id: impl Into<String>) -> bool {
+        if col >= self.cols || row >= self.rows {
+            return false;
+        }
+        self.cells[row * self.cols + col] = Some(widget_id.into());
+        true
+    }
+
+    /// Remove a widget from a cell.
+    pub fn remove(&mut self, col: usize, row: usize) -> Option<String> {
+        if col >= self.cols || row >= self.rows {
+            return None;
+        }
+        self.cells[row * self.cols + col].take()
+    }
+
+    /// Get the widget at a cell.
+    pub fn get(&self, col: usize, row: usize) -> Option<&str> {
+        if col >= self.cols || row >= self.rows {
+            return None;
+        }
+        self.cells[row * self.cols + col].as_deref()
+    }
+
+    /// Number of occupied cells.
+    pub fn occupied_count(&self) -> usize {
+        self.cells.iter().filter(|c| c.is_some()).count()
+    }
+
+    /// Whether the grid is fully occupied.
+    pub fn is_full(&self) -> bool {
+        self.occupied_count() == self.cols * self.rows
+    }
+
+    /// Total number of cells.
+    pub fn total_cells(&self) -> usize {
+        self.cols * self.rows
+    }
+
+    /// Clear all cells.
+    pub fn clear(&mut self) {
+        for cell in &mut self.cells {
+            *cell = None;
+        }
+    }
+
+    /// Find the first empty cell (column, row).
+    pub fn first_empty(&self) -> Option<(usize, usize)> {
+        for row in 0..self.rows {
+            for col in 0..self.cols {
+                if self.cells[row * self.cols + col].is_none() {
+                    return Some((col, row));
+                }
+            }
+        }
+        None
+    }
+}
+
+impl fmt::Display for InteractiveWidgetGrid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "WidgetGrid({}x{}, {}/{})",
+            self.cols,
+            self.rows,
+            self.occupied_count(),
+            self.total_cells()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InteractiveFormValidator – field validation rules
+// ---------------------------------------------------------------------------
+
+/// Validation rule for a form field.
+#[derive(Debug, Clone)]
+pub struct FieldRule {
+    /// Field name.
+    pub field: String,
+    /// Validation kind.
+    pub kind: ValidationKind,
+    /// Error message when validation fails.
+    pub message: String,
+}
+
+/// Kinds of field validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationKind {
+    /// Field must not be empty.
+    Required,
+    /// Field must have at least N characters.
+    MinLength(usize),
+    /// Field must have at most N characters.
+    MaxLength(usize),
+    /// Field must match a pattern (simple prefix/suffix check).
+    Pattern(String),
+}
+
+/// Result of validating a form field.
+#[derive(Debug, Clone)]
+pub struct ValidationResult {
+    /// Field name.
+    pub field: String,
+    /// Whether validation passed.
+    pub valid: bool,
+    /// Error message if invalid.
+    pub message: Option<String>,
+}
+
+/// Validates form fields against a set of rules.
+#[derive(Debug, Clone)]
+pub struct InteractiveFormValidator {
+    rules: Vec<FieldRule>,
+}
+
+impl Default for InteractiveFormValidator {
+    fn default() -> Self {
+        Self { rules: Vec::new() }
+    }
+}
+
+impl InteractiveFormValidator {
+    /// Create a new validator.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a validation rule.
+    pub fn add_rule(&mut self, field: impl Into<String>, kind: ValidationKind, message: impl Into<String>) {
+        self.rules.push(FieldRule {
+            field: field.into(),
+            kind,
+            message: message.into(),
+        });
+    }
+
+    /// Validate a single field value.
+    pub fn validate_field(&self, field: &str, value: &str) -> Vec<ValidationResult> {
+        self.rules
+            .iter()
+            .filter(|r| r.field == field)
+            .map(|rule| {
+                let valid = match &rule.kind {
+                    ValidationKind::Required => !value.is_empty(),
+                    ValidationKind::MinLength(n) => value.len() >= *n,
+                    ValidationKind::MaxLength(n) => value.len() <= *n,
+                    ValidationKind::Pattern(pat) => value.contains(pat.as_str()),
+                };
+                ValidationResult {
+                    field: field.to_string(),
+                    valid,
+                    message: if valid { None } else { Some(rule.message.clone()) },
+                }
+            })
+            .collect()
+    }
+
+    /// Validate all fields in a form (field → value map).
+    pub fn validate_all(&self, form: &HashMap<String, String>) -> Vec<ValidationResult> {
+        let mut results = Vec::new();
+        for rule in &self.rules {
+            let value = form.get(&rule.field).map(|s| s.as_str()).unwrap_or("");
+            let res = self.validate_field(&rule.field, value);
+            results.extend(res);
+        }
+        results
+    }
+
+    /// Whether all fields in the form are valid.
+    pub fn is_valid(&self, form: &HashMap<String, String>) -> bool {
+        self.validate_all(form).iter().all(|r| r.valid)
+    }
+
+    /// Number of rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Interactive drag-resize handler
+// ---------------------------------------------------------------------------
+
+/// Handles drag-to-resize for interactive panels.
+#[derive(Debug, Clone)]
+pub struct DragResizeHandler {
+    /// Minimum width.
+    pub min_width: u32,
+    /// Maximum width.
+    pub max_width: u32,
+    /// Minimum height.
+    pub min_height: u32,
+    /// Maximum height.
+    pub max_height: u32,
+    /// Current width.
+    pub width: u32,
+    /// Current height.
+    pub height: u32,
+}
+
+impl Default for DragResizeHandler {
+    fn default() -> Self {
+        Self {
+            min_width: 100,
+            max_width: 2000,
+            min_height: 50,
+            max_height: 1000,
+            width: 400,
+            height: 300,
+        }
+    }
+}
+
+impl DragResizeHandler {
+    /// Create with default constraints.
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            width,
+            height,
+            ..Default::default()
+        }
+    }
+
+    /// Resize by a delta, clamping to constraints.
+    pub fn resize(&mut self, delta_width: i32, delta_height: i32) {
+        let new_w = (self.width as i32 + delta_width).max(0) as u32;
+        let new_h = (self.height as i32 + delta_height).max(0) as u32;
+        self.width = new_w.clamp(self.min_width, self.max_width);
+        self.height = new_h.clamp(self.min_height, self.max_height);
+    }
+
+    /// Set width, clamped.
+    pub fn set_width(&mut self, width: u32) {
+        self.width = width.clamp(self.min_width, self.max_width);
+    }
+
+    /// Set height, clamped.
+    pub fn set_height(&mut self, height: u32) {
+        self.height = height.clamp(self.min_height, self.max_height);
+    }
+
+    /// Current dimensions as (width, height).
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+}
+
+impl fmt::Display for DragResizeHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}x{}", self.width, self.height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard-navigable interactive list
+// ---------------------------------------------------------------------------
+
+/// A list that supports keyboard navigation (up/down/select).
+#[derive(Debug, Clone)]
+pub struct NavigableList<T> {
+    items: Vec<T>,
+    selected_index: Option<usize>,
+}
+
+impl<T> Default for NavigableList<T> {
+    fn default() -> Self {
+        Self {
+            items: Vec::new(),
+            selected_index: None,
+        }
+    }
+}
+
+impl<T> NavigableList<T> {
+    /// Create an empty navigable list.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create from a vector of items.
+    pub fn from_items(items: Vec<T>) -> Self {
+        let selected = if items.is_empty() { None } else { Some(0) };
+        Self {
+            items,
+            selected_index: selected,
+        }
+    }
+
+    /// Move selection up.
+    pub fn move_up(&mut self) {
+        if let Some(idx) = self.selected_index {
+            if idx > 0 {
+                self.selected_index = Some(idx - 1);
+            }
+        }
+    }
+
+    /// Move selection down.
+    pub fn move_down(&mut self) {
+        if let Some(idx) = self.selected_index {
+            if idx + 1 < self.items.len() {
+                self.selected_index = Some(idx + 1);
+            }
+        }
+    }
+
+    /// Select first item.
+    pub fn select_first(&mut self) {
+        if !self.items.is_empty() {
+            self.selected_index = Some(0);
+        }
+    }
+
+    /// Select last item.
+    pub fn select_last(&mut self) {
+        if !self.items.is_empty() {
+            self.selected_index = Some(self.items.len() - 1);
+        }
+    }
+
+    /// Get the currently selected item.
+    pub fn selected(&self) -> Option<&T> {
+        self.selected_index.and_then(|idx| self.items.get(idx))
+    }
+
+    /// Get the selected index.
+    pub fn selected_index(&self) -> Option<usize> {
+        self.selected_index
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether the list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Add an item to the end.
+    pub fn push(&mut self, item: T) {
+        self.items.push(item);
+        if self.selected_index.is_none() {
+            self.selected_index = Some(0);
+        }
+    }
+
+    /// Get all items.
+    pub fn items(&self) -> &[T] {
+        &self.items
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1886,5 +2270,141 @@ mod tests {
         let map = CellLanguageMap::from_session(&s);
         assert_eq!(map.count("unknown"), 1);
         assert_eq!(map.dominant_language(), Some("unknown"));
+    }
+
+    // -- InteractiveWidgetGrid tests --
+
+    #[test]
+    fn grid_place_and_get() {
+        let mut g = InteractiveWidgetGrid::new(3, 3);
+        assert!(g.place(0, 0, "widget_a"));
+        assert_eq!(g.get(0, 0), Some("widget_a"));
+        assert_eq!(g.get(1, 1), None);
+    }
+
+    #[test]
+    fn grid_remove() {
+        let mut g = InteractiveWidgetGrid::new(2, 2);
+        g.place(0, 0, "w");
+        assert_eq!(g.remove(0, 0), Some("w".into()));
+        assert_eq!(g.occupied_count(), 0);
+    }
+
+    #[test]
+    fn grid_out_of_bounds() {
+        let mut g = InteractiveWidgetGrid::new(2, 2);
+        assert!(!g.place(5, 5, "oob"));
+        assert_eq!(g.get(5, 5), None);
+    }
+
+    #[test]
+    fn grid_first_empty() {
+        let mut g = InteractiveWidgetGrid::new(2, 2);
+        g.place(0, 0, "a");
+        assert_eq!(g.first_empty(), Some((1, 0)));
+    }
+
+    #[test]
+    fn grid_full() {
+        let mut g = InteractiveWidgetGrid::new(1, 1);
+        g.place(0, 0, "a");
+        assert!(g.is_full());
+    }
+
+    // -- InteractiveFormValidator tests --
+
+    #[test]
+    fn validator_required() {
+        let mut v = InteractiveFormValidator::new();
+        v.add_rule("name", ValidationKind::Required, "Name is required");
+        let results = v.validate_field("name", "");
+        assert!(!results[0].valid);
+        let results = v.validate_field("name", "Alice");
+        assert!(results[0].valid);
+    }
+
+    #[test]
+    fn validator_min_length() {
+        let mut v = InteractiveFormValidator::new();
+        v.add_rule("password", ValidationKind::MinLength(8), "Too short");
+        let results = v.validate_field("password", "abc");
+        assert!(!results[0].valid);
+        let results = v.validate_field("password", "abcdefgh");
+        assert!(results[0].valid);
+    }
+
+    #[test]
+    fn validator_max_length() {
+        let mut v = InteractiveFormValidator::new();
+        v.add_rule("name", ValidationKind::MaxLength(5), "Too long");
+        let results = v.validate_field("name", "abcdef");
+        assert!(!results[0].valid);
+    }
+
+    #[test]
+    fn validator_is_valid() {
+        let mut v = InteractiveFormValidator::new();
+        v.add_rule("name", ValidationKind::Required, "Required");
+        let mut form = HashMap::new();
+        form.insert("name".into(), "Alice".into());
+        assert!(v.is_valid(&form));
+        form.insert("name".into(), "".into());
+        assert!(!v.is_valid(&form));
+    }
+
+    // -- DragResizeHandler tests --
+
+    #[test]
+    fn drag_resize() {
+        let mut h = DragResizeHandler::new(400, 300);
+        h.resize(100, -50);
+        assert_eq!(h.dimensions(), (500, 250));
+    }
+
+    #[test]
+    fn drag_resize_clamp() {
+        let mut h = DragResizeHandler::new(400, 300);
+        h.resize(-500, -500);
+        assert_eq!(h.width, h.min_width);
+        assert_eq!(h.height, h.min_height);
+    }
+
+    // -- NavigableList tests --
+
+    #[test]
+    fn navigable_list_navigation() {
+        let mut list = NavigableList::from_items(vec!["a", "b", "c"]);
+        assert_eq!(list.selected(), Some(&"a"));
+        list.move_down();
+        assert_eq!(list.selected(), Some(&"b"));
+        list.move_down();
+        list.move_down(); // should stay at end
+        assert_eq!(list.selected(), Some(&"c"));
+        list.move_up();
+        assert_eq!(list.selected(), Some(&"b"));
+    }
+
+    #[test]
+    fn navigable_list_select_first_last() {
+        let mut list = NavigableList::from_items(vec![1, 2, 3]);
+        list.select_last();
+        assert_eq!(list.selected(), Some(&3));
+        list.select_first();
+        assert_eq!(list.selected(), Some(&1));
+    }
+
+    #[test]
+    fn navigable_list_empty() {
+        let list: NavigableList<i32> = NavigableList::new();
+        assert!(list.is_empty());
+        assert!(list.selected().is_none());
+    }
+
+    #[test]
+    fn navigable_list_push() {
+        let mut list = NavigableList::new();
+        list.push("a");
+        assert_eq!(list.selected(), Some(&"a"));
+        assert_eq!(list.len(), 1);
     }
 }

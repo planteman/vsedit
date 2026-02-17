@@ -1044,6 +1044,327 @@ impl GotoResultSet {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BoundedGotoHistory – tracking navigation jumps with capacity
+// ---------------------------------------------------------------------------
+
+/// Tracks navigation jumps for back/forward movement with a bounded capacity.
+///
+/// Unlike [`GotoHistory`], this variant enforces a maximum number of entries
+/// and uses separate back/forward stacks.
+#[derive(Debug, Clone)]
+pub struct BoundedGotoHistory {
+    back_stack: Vec<Location>,
+    forward_stack: Vec<Location>,
+    max_entries: usize,
+}
+
+impl Default for BoundedGotoHistory {
+    fn default() -> Self {
+        Self {
+            back_stack: Vec::new(),
+            forward_stack: Vec::new(),
+            max_entries: 100,
+        }
+    }
+}
+
+impl BoundedGotoHistory {
+    /// Create a new history with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            max_entries,
+            ..Default::default()
+        }
+    }
+
+    /// Record a navigation jump to a new location.
+    pub fn push(&mut self, location: Location) {
+        self.forward_stack.clear();
+        self.back_stack.push(location);
+        if self.back_stack.len() > self.max_entries {
+            self.back_stack.remove(0);
+        }
+    }
+
+    /// Navigate backwards. Returns the previous location if available.
+    pub fn go_back(&mut self) -> Option<Location> {
+        let loc = self.back_stack.pop()?;
+        self.forward_stack.push(loc.clone());
+        Some(loc)
+    }
+
+    /// Navigate forwards. Returns the next location if available.
+    pub fn go_forward(&mut self) -> Option<Location> {
+        let loc = self.forward_stack.pop()?;
+        self.back_stack.push(loc.clone());
+        Some(loc)
+    }
+
+    /// Whether there is a location to go back to.
+    pub fn can_go_back(&self) -> bool {
+        !self.back_stack.is_empty()
+    }
+
+    /// Whether there is a location to go forward to.
+    pub fn can_go_forward(&self) -> bool {
+        !self.forward_stack.is_empty()
+    }
+
+    /// Total number of entries across both stacks.
+    pub fn total_entries(&self) -> usize {
+        self.back_stack.len() + self.forward_stack.len()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.back_stack.clear();
+        self.forward_stack.clear();
+    }
+}
+
+impl fmt::Display for BoundedGotoHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BoundedGotoHistory(back={}, forward={})",
+            self.back_stack.len(),
+            self.forward_stack.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoSymbolMatcher – fuzzy symbol matching with ranking
+// ---------------------------------------------------------------------------
+
+/// A scored symbol match result.
+#[derive(Debug, Clone)]
+pub struct SymbolMatch {
+    /// The symbol name.
+    pub name: String,
+    /// The file where the symbol is defined.
+    pub uri: String,
+    /// Line number.
+    pub line: u32,
+    /// Match score (higher is better).
+    pub score: i64,
+}
+
+/// Matches symbols using fuzzy scoring.
+#[derive(Debug)]
+pub struct GotoSymbolMatcher {
+    symbols: Vec<(String, String, u32)>, // (name, uri, line)
+}
+
+impl GotoSymbolMatcher {
+    /// Create a new matcher with registered symbols.
+    pub fn new() -> Self {
+        Self {
+            symbols: Vec::new(),
+        }
+    }
+
+    /// Register a symbol for matching.
+    pub fn register(&mut self, name: impl Into<String>, uri: impl Into<String>, line: u32) {
+        self.symbols.push((name.into(), uri.into(), line));
+    }
+
+    /// Find symbols matching the query, sorted by score descending.
+    pub fn find(&self, query: &str) -> Vec<SymbolMatch> {
+        let query_lower = query.to_lowercase();
+        let mut matches: Vec<SymbolMatch> = self
+            .symbols
+            .iter()
+            .filter_map(|(name, uri, line)| {
+                let score = Self::fuzzy_score(&query_lower, &name.to_lowercase())?;
+                Some(SymbolMatch {
+                    name: name.clone(),
+                    uri: uri.clone(),
+                    line: *line,
+                    score,
+                })
+            })
+            .collect();
+        matches.sort_by(|a, b| b.score.cmp(&a.score));
+        matches
+    }
+
+    /// Simple fuzzy scoring: consecutive matches score higher.
+    fn fuzzy_score(query: &str, target: &str) -> Option<i64> {
+        let mut score: i64 = 0;
+        let mut target_iter = target.chars().peekable();
+        let mut consecutive = 0i64;
+        for qc in query.chars() {
+            let mut found = false;
+            while let Some(&tc) = target_iter.peek() {
+                target_iter.next();
+                if tc == qc {
+                    consecutive += 1;
+                    score += consecutive * 2;
+                    found = true;
+                    break;
+                } else {
+                    consecutive = 0;
+                }
+            }
+            if !found {
+                return None;
+            }
+        }
+        // Bonus for exact prefix match
+        if target.starts_with(query) {
+            score += 10;
+        }
+        Some(score)
+    }
+
+    /// Number of registered symbols.
+    pub fn symbol_count(&self) -> usize {
+        self.symbols.len()
+    }
+}
+
+impl Default for GotoSymbolMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoLineColumn – parse "line:column" strings
+// ---------------------------------------------------------------------------
+
+/// Error returned when parsing a goto line/column string fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GotoParseError {
+    /// Input string is empty.
+    Empty,
+    /// Line number is not a valid integer.
+    InvalidLine(String),
+    /// Column number is not a valid integer.
+    InvalidColumn(String),
+    /// Line number is zero (lines are 1-based).
+    ZeroLine,
+}
+
+impl fmt::Display for GotoParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GotoParseError::Empty => write!(f, "empty input"),
+            GotoParseError::InvalidLine(s) => write!(f, "invalid line: {}", s),
+            GotoParseError::InvalidColumn(s) => write!(f, "invalid column: {}", s),
+            GotoParseError::ZeroLine => write!(f, "line must be >= 1"),
+        }
+    }
+}
+
+/// Parsed goto target with line and optional column.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GotoLineColumn {
+    /// 1-based line number.
+    pub line: u32,
+    /// 1-based column number (default 1).
+    pub column: u32,
+}
+
+impl GotoLineColumn {
+    /// Parse a string in the format `"line"` or `"line:column"`.
+    pub fn parse(input: &str) -> Result<Self, GotoParseError> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err(GotoParseError::Empty);
+        }
+        let (line_str, col_str) = match input.split_once(':') {
+            Some((l, c)) => (l.trim(), Some(c.trim())),
+            None => (input, None),
+        };
+        let line: u32 = line_str
+            .parse()
+            .map_err(|_| GotoParseError::InvalidLine(line_str.to_string()))?;
+        if line == 0 {
+            return Err(GotoParseError::ZeroLine);
+        }
+        let column = match col_str {
+            Some(c) if !c.is_empty() => c
+                .parse()
+                .map_err(|_| GotoParseError::InvalidColumn(c.to_string()))?,
+            _ => 1,
+        };
+        Ok(Self { line, column })
+    }
+
+    /// Convert to a [`Location`] in the given file.
+    pub fn to_location(&self, uri: impl Into<String>) -> Location {
+        Location::new(uri, self.line, self.column)
+    }
+}
+
+impl fmt::Display for GotoLineColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoDefinitionFallback – chain of definition providers
+// ---------------------------------------------------------------------------
+
+/// Chains multiple definition resolution strategies.
+///
+/// Tries each strategy in order until one returns a result.
+pub struct GotoDefinitionFallback {
+    strategies: Vec<(String, Box<dyn Fn(&str, u32, u32) -> GotoResult + Send + Sync>)>,
+}
+
+impl GotoDefinitionFallback {
+    /// Create an empty fallback chain.
+    pub fn new() -> Self {
+        Self {
+            strategies: Vec::new(),
+        }
+    }
+
+    /// Add a named fallback strategy.
+    pub fn add_strategy(
+        &mut self,
+        name: impl Into<String>,
+        strategy: Box<dyn Fn(&str, u32, u32) -> GotoResult + Send + Sync>,
+    ) {
+        self.strategies.push((name.into(), strategy));
+    }
+
+    /// Resolve a definition by trying each strategy in order.
+    ///
+    /// Returns the first non-empty result, along with the strategy name.
+    pub fn resolve(&self, uri: &str, line: u32, column: u32) -> Option<(String, GotoResult)> {
+        for (name, strategy) in &self.strategies {
+            let result = strategy(uri, line, column);
+            if !result.is_empty() {
+                return Some((name.clone(), result));
+            }
+        }
+        None
+    }
+
+    /// Number of registered strategies.
+    pub fn strategy_count(&self) -> usize {
+        self.strategies.len()
+    }
+}
+
+impl Default for GotoDefinitionFallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Debug for GotoDefinitionFallback {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GotoDefinitionFallback({} strategies)", self.strategies.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1876,5 +2197,145 @@ mod tests {
         let filter = LocationFilter::new(locs);
         assert_eq!(filter.unique_files(), vec!["a.rs", "b.rs"]);
         assert_eq!(filter.count(), 3);
+    }
+
+    // -- BoundedGotoHistory tests --
+
+    #[test]
+    fn bounded_history_push_and_back() {
+        let mut h = BoundedGotoHistory::new(10);
+        h.push(Location::new("a.rs", 1, 0));
+        h.push(Location::new("b.rs", 2, 0));
+        assert!(h.can_go_back());
+        let loc = h.go_back().unwrap();
+        assert_eq!(loc.uri, "b.rs");
+    }
+
+    #[test]
+    fn bounded_history_forward_after_back() {
+        let mut h = BoundedGotoHistory::new(10);
+        h.push(Location::new("a.rs", 1, 0));
+        h.push(Location::new("b.rs", 2, 0));
+        h.go_back();
+        assert!(h.can_go_forward());
+        let loc = h.go_forward().unwrap();
+        assert_eq!(loc.uri, "b.rs");
+    }
+
+    #[test]
+    fn bounded_history_push_clears_forward() {
+        let mut h = BoundedGotoHistory::new(10);
+        h.push(Location::new("a.rs", 1, 0));
+        h.push(Location::new("b.rs", 2, 0));
+        h.go_back();
+        h.push(Location::new("c.rs", 3, 0));
+        assert!(!h.can_go_forward());
+    }
+
+    #[test]
+    fn bounded_history_capacity() {
+        let mut h = BoundedGotoHistory::new(3);
+        for i in 0..5 {
+            h.push(Location::new(format!("{}.rs", i), i, 0));
+        }
+        assert_eq!(h.total_entries(), 3);
+    }
+
+    #[test]
+    fn bounded_history_clear() {
+        let mut h = BoundedGotoHistory::new(10);
+        h.push(Location::new("a.rs", 1, 0));
+        h.clear();
+        assert!(!h.can_go_back());
+        assert!(!h.can_go_forward());
+    }
+
+    // -- GotoSymbolMatcher tests --
+
+    #[test]
+    fn symbol_matcher_exact() {
+        let mut m = GotoSymbolMatcher::new();
+        m.register("main", "main.rs", 1);
+        m.register("maintenance", "util.rs", 10);
+        let results = m.find("main");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "main");
+    }
+
+    #[test]
+    fn symbol_matcher_fuzzy() {
+        let mut m = GotoSymbolMatcher::new();
+        m.register("handleClick", "ui.rs", 5);
+        m.register("processData", "data.rs", 10);
+        let results = m.find("hclk");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "handleClick");
+    }
+
+    #[test]
+    fn symbol_matcher_no_match() {
+        let mut m = GotoSymbolMatcher::new();
+        m.register("foo", "a.rs", 1);
+        assert!(m.find("xyz").is_empty());
+    }
+
+    // -- GotoLineColumn tests --
+
+    #[test]
+    fn parse_line_only() {
+        let g = GotoLineColumn::parse("42").unwrap();
+        assert_eq!(g.line, 42);
+        assert_eq!(g.column, 1);
+    }
+
+    #[test]
+    fn parse_line_and_column() {
+        let g = GotoLineColumn::parse("10:5").unwrap();
+        assert_eq!(g.line, 10);
+        assert_eq!(g.column, 5);
+    }
+
+    #[test]
+    fn parse_empty_error() {
+        assert_eq!(GotoLineColumn::parse(""), Err(GotoParseError::Empty));
+    }
+
+    #[test]
+    fn parse_zero_line_error() {
+        assert_eq!(GotoLineColumn::parse("0"), Err(GotoParseError::ZeroLine));
+    }
+
+    #[test]
+    fn parse_invalid_line_error() {
+        assert!(matches!(GotoLineColumn::parse("abc"), Err(GotoParseError::InvalidLine(_))));
+    }
+
+    #[test]
+    fn goto_line_column_display() {
+        let g = GotoLineColumn { line: 10, column: 5 };
+        assert_eq!(format!("{}", g), "10:5");
+    }
+
+    // -- GotoDefinitionFallback tests --
+
+    #[test]
+    fn fallback_empty_returns_none() {
+        let fb = GotoDefinitionFallback::new();
+        assert!(fb.resolve("a.rs", 1, 0).is_none());
+    }
+
+    #[test]
+    fn fallback_first_match() {
+        let mut fb = GotoDefinitionFallback::new();
+        fb.add_strategy("lsp", Box::new(|_, _, _| GotoResult::None));
+        fb.add_strategy("text", Box::new(|uri, line, col| {
+            GotoResult::Single(LocationLink::new(
+                "target.rs",
+                (line, col, line, col),
+                (line, col, line, col),
+            ))
+        }));
+        let (name, _) = fb.resolve("a.rs", 1, 0).unwrap();
+        assert_eq!(name, "text");
     }
 }

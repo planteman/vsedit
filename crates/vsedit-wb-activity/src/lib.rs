@@ -1075,6 +1075,304 @@ impl ActivityBadgeCounter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DragReorderSession – extended drag reorder handler
+// ---------------------------------------------------------------------------
+
+/// Extended drag reorder handler that tracks both dragging state and
+/// the original order for revert support.
+///
+/// Unlike [`ActivityBarDragReorder`], this tracks the original order
+/// to allow undo after a drop.
+#[derive(Debug, Clone)]
+pub struct DragReorderSession {
+    /// The ID of the item being dragged.
+    dragging: Option<String>,
+    /// The original order of the item being dragged.
+    original_order: Option<i32>,
+}
+
+impl Default for DragReorderSession {
+    fn default() -> Self {
+        Self {
+            dragging: None,
+            original_order: None,
+        }
+    }
+}
+
+impl DragReorderSession {
+    /// Create a new reorder handler.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start dragging an item.
+    pub fn start_drag(&mut self, item_id: &str, current_order: i32) {
+        self.dragging = Some(item_id.to_string());
+        self.original_order = Some(current_order);
+    }
+
+    /// Whether a drag is in progress.
+    pub fn is_dragging(&self) -> bool {
+        self.dragging.is_some()
+    }
+
+    /// Get the ID of the item being dragged.
+    pub fn dragging_id(&self) -> Option<&str> {
+        self.dragging.as_deref()
+    }
+
+    /// Complete the drag by applying the new order to the activity bar.
+    pub fn drop(&mut self, bar: &mut ActivityBar, new_order: i32) -> Result<(), ActivityBarError> {
+        if let Some(id) = self.dragging.take() {
+            self.original_order = None;
+            bar.move_item(&id, new_order)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Cancel the drag operation.
+    pub fn cancel(&mut self) {
+        self.dragging = None;
+        self.original_order = None;
+    }
+
+    /// Calculate the reordered list of item IDs given a drop target index.
+    pub fn compute_reorder(items: &[ActivityBarItem], from_id: &str, to_index: usize) -> Vec<String> {
+        let mut ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
+        if let Some(pos) = ids.iter().position(|id| id == from_id) {
+            let item = ids.remove(pos);
+            let insert_at = to_index.min(ids.len());
+            ids.insert(insert_at, item);
+        }
+        ids
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityBadgeAnimator – pulse effect for badges
+// ---------------------------------------------------------------------------
+
+/// Drives a pulse animation on an activity bar badge.
+#[derive(Debug, Clone)]
+pub struct ActivityBadgeAnimator {
+    /// Items currently animating.
+    animating: std::collections::HashMap<String, BadgeAnimation>,
+}
+
+#[derive(Debug, Clone)]
+struct BadgeAnimation {
+    /// Number of pulses remaining.
+    pulses_remaining: u32,
+    /// Total pulse count.
+    total_pulses: u32,
+}
+
+impl Default for ActivityBadgeAnimator {
+    fn default() -> Self {
+        Self {
+            animating: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl ActivityBadgeAnimator {
+    /// Create a new animator.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start pulsing a badge.
+    pub fn start_pulse(&mut self, item_id: impl Into<String>, pulse_count: u32) {
+        self.animating.insert(
+            item_id.into(),
+            BadgeAnimation {
+                pulses_remaining: pulse_count,
+                total_pulses: pulse_count,
+            },
+        );
+    }
+
+    /// Advance one animation tick. Returns items that completed.
+    pub fn tick(&mut self) -> Vec<String> {
+        let mut completed = Vec::new();
+        for (id, anim) in &mut self.animating {
+            if anim.pulses_remaining > 0 {
+                anim.pulses_remaining -= 1;
+            }
+            if anim.pulses_remaining == 0 {
+                completed.push(id.clone());
+            }
+        }
+        for id in &completed {
+            self.animating.remove(id);
+        }
+        completed
+    }
+
+    /// Whether any animations are active.
+    pub fn is_animating(&self) -> bool {
+        !self.animating.is_empty()
+    }
+
+    /// Number of items currently animating.
+    pub fn animating_count(&self) -> usize {
+        self.animating.len()
+    }
+
+    /// Progress of a specific animation (0.0–1.0).
+    pub fn progress(&self, item_id: &str) -> Option<f64> {
+        self.animating.get(item_id).map(|a| {
+            if a.total_pulses == 0 {
+                1.0
+            } else {
+                1.0 - (a.pulses_remaining as f64 / a.total_pulses as f64)
+            }
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Custom activity bar item registration
+// ---------------------------------------------------------------------------
+
+/// Registry for custom (extension-contributed) activity bar items.
+#[derive(Debug, Clone)]
+pub struct CustomActivityRegistry {
+    items: Vec<CustomActivityItem>,
+}
+
+/// A custom activity bar contribution.
+#[derive(Debug, Clone)]
+pub struct CustomActivityItem {
+    /// Unique ID.
+    pub id: String,
+    /// Display title.
+    pub title: String,
+    /// Icon identifier.
+    pub icon: String,
+    /// Extension that contributed this item.
+    pub extension_id: String,
+}
+
+impl Default for CustomActivityRegistry {
+    fn default() -> Self {
+        Self { items: Vec::new() }
+    }
+}
+
+impl CustomActivityRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a custom item.
+    pub fn register(&mut self, item: CustomActivityItem) -> bool {
+        if self.items.iter().any(|i| i.id == item.id) {
+            return false;
+        }
+        self.items.push(item);
+        true
+    }
+
+    /// Unregister by ID.
+    pub fn unregister(&mut self, id: &str) -> bool {
+        let len = self.items.len();
+        self.items.retain(|i| i.id != id);
+        self.items.len() < len
+    }
+
+    /// Get all items from a specific extension.
+    pub fn by_extension(&self, extension_id: &str) -> Vec<&CustomActivityItem> {
+        self.items
+            .iter()
+            .filter(|i| i.extension_id == extension_id)
+            .collect()
+    }
+
+    /// Number of custom items.
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Activity bar context menu builder
+// ---------------------------------------------------------------------------
+
+/// Builds a context menu for an activity bar item.
+#[derive(Debug, Clone)]
+pub struct ActivityContextMenu {
+    entries: Vec<ContextMenuEntry>,
+}
+
+/// A context menu entry.
+#[derive(Debug, Clone)]
+pub struct ContextMenuEntry {
+    /// Label text.
+    pub label: String,
+    /// Action ID.
+    pub action_id: String,
+    /// Whether the entry is enabled.
+    pub enabled: bool,
+}
+
+impl Default for ActivityContextMenu {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+}
+
+impl ActivityContextMenu {
+    /// Create an empty context menu.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a menu entry.
+    pub fn add(&mut self, label: impl Into<String>, action_id: impl Into<String>) {
+        self.entries.push(ContextMenuEntry {
+            label: label.into(),
+            action_id: action_id.into(),
+            enabled: true,
+        });
+    }
+
+    /// Add a disabled entry.
+    pub fn add_disabled(&mut self, label: impl Into<String>, action_id: impl Into<String>) {
+        self.entries.push(ContextMenuEntry {
+            label: label.into(),
+            action_id: action_id.into(),
+            enabled: false,
+        });
+    }
+
+    /// Get all entries.
+    pub fn entries(&self) -> &[ContextMenuEntry] {
+        &self.entries
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the menu is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get only enabled entries.
+    pub fn enabled_entries(&self) -> Vec<&ContextMenuEntry> {
+        self.entries.iter().filter(|e| e.enabled).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1882,5 +2180,119 @@ mod tests {
         bc.set("b", 0);
         assert!(bc.has_any());
         assert_eq!(bc.active_count(), 1);
+    }
+
+    // -- DragReorderSession tests --
+
+    #[test]
+    fn session_drag_start_and_cancel() {
+        let mut dr = DragReorderSession::new();
+        dr.start_drag("explorer", 0);
+        assert!(dr.is_dragging());
+        assert_eq!(dr.dragging_id(), Some("explorer"));
+        dr.cancel();
+        assert!(!dr.is_dragging());
+    }
+
+    #[test]
+    fn session_drag_drop() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        let mut dr = DragReorderSession::new();
+        dr.start_drag("a", 0);
+        dr.drop(&mut bar, 1).unwrap();
+        assert!(!dr.is_dragging());
+    }
+
+    #[test]
+    fn compute_reorder() {
+        let items = vec![make_item("a", 0), make_item("b", 1), make_item("c", 2)];
+        let result = DragReorderSession::compute_reorder(&items, "a", 2);
+        assert_eq!(result, vec!["b", "c", "a"]);
+    }
+
+    // -- ActivityBadgeAnimator tests --
+
+    #[test]
+    fn animator_pulse() {
+        let mut anim = ActivityBadgeAnimator::new();
+        anim.start_pulse("explorer", 3);
+        assert!(anim.is_animating());
+        assert_eq!(anim.animating_count(), 1);
+        assert!(anim.progress("explorer").unwrap() < 0.01);
+
+        anim.tick();
+        let p = anim.progress("explorer").unwrap();
+        assert!(p > 0.3 && p < 0.4);
+
+        anim.tick();
+        anim.tick();
+        assert!(!anim.is_animating());
+    }
+
+    #[test]
+    fn animator_tick_returns_completed() {
+        let mut anim = ActivityBadgeAnimator::new();
+        anim.start_pulse("a", 1);
+        let completed = anim.tick();
+        assert_eq!(completed, vec!["a"]);
+    }
+
+    // -- CustomActivityRegistry tests --
+
+    #[test]
+    fn custom_registry_register() {
+        let mut reg = CustomActivityRegistry::new();
+        let item = CustomActivityItem {
+            id: "test".into(),
+            title: "Test".into(),
+            icon: "icon".into(),
+            extension_id: "ext1".into(),
+        };
+        assert!(reg.register(item));
+        assert_eq!(reg.count(), 1);
+    }
+
+    #[test]
+    fn custom_registry_duplicate() {
+        let mut reg = CustomActivityRegistry::new();
+        let item = CustomActivityItem {
+            id: "test".into(),
+            title: "Test".into(),
+            icon: "icon".into(),
+            extension_id: "ext1".into(),
+        };
+        reg.register(item.clone());
+        assert!(!reg.register(item));
+    }
+
+    #[test]
+    fn custom_registry_by_extension() {
+        let mut reg = CustomActivityRegistry::new();
+        reg.register(CustomActivityItem {
+            id: "a".into(), title: "A".into(), icon: "i".into(), extension_id: "ext1".into(),
+        });
+        reg.register(CustomActivityItem {
+            id: "b".into(), title: "B".into(), icon: "i".into(), extension_id: "ext2".into(),
+        });
+        assert_eq!(reg.by_extension("ext1").len(), 1);
+    }
+
+    // -- ActivityContextMenu tests --
+
+    #[test]
+    fn context_menu_add() {
+        let mut menu = ActivityContextMenu::new();
+        menu.add("Hide", "hide");
+        menu.add_disabled("Move", "move");
+        assert_eq!(menu.len(), 2);
+        assert_eq!(menu.enabled_entries().len(), 1);
+    }
+
+    #[test]
+    fn context_menu_empty() {
+        let menu = ActivityContextMenu::new();
+        assert!(menu.is_empty());
     }
 }

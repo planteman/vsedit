@@ -1058,6 +1058,345 @@ pub fn max_depth(items: &[TestItem]) -> usize {
     TestTreeWalker::new(items).map(|(d, _)| d).max().unwrap_or(0)
 }
 
+// ---------------------------------------------------------------------------
+// LocalTestRunProfile – test run configuration
+// ---------------------------------------------------------------------------
+
+/// Local configuration for how tests should be run.
+///
+/// Extends the basic [`TestRunProfile`] from `vsedit-ext-testing` with
+/// additional fields like environment variables and arguments.
+#[derive(Debug, Clone)]
+pub struct LocalTestRunProfile {
+    /// Profile label (e.g. "Run Tests", "Debug Tests").
+    pub label: String,
+    /// The kind of profile.
+    pub kind: TestProfileKind,
+    /// Whether this is the default profile for its kind.
+    pub is_default: bool,
+    /// Environment variables to set.
+    pub env: std::collections::HashMap<String, String>,
+    /// Arguments to pass to the test runner.
+    pub args: Vec<String>,
+}
+
+impl LocalTestRunProfile {
+    /// Create a new profile.
+    pub fn new(label: impl Into<String>, kind: TestProfileKind) -> Self {
+        Self {
+            label: label.into(),
+            kind,
+            is_default: false,
+            env: std::collections::HashMap::new(),
+            args: Vec::new(),
+        }
+    }
+
+    /// Mark as the default profile.
+    pub fn with_default(mut self) -> Self {
+        self.is_default = true;
+        self
+    }
+
+    /// Add an environment variable.
+    pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.insert(key.into(), value.into());
+        self
+    }
+
+    /// Add an argument.
+    pub fn with_arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+}
+
+impl fmt::Display for LocalTestRunProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({:?})", self.label, self.kind)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LocalTestCoverageReport – line/branch coverage stats
+// ---------------------------------------------------------------------------
+
+/// Local code coverage report for a test run.
+///
+/// Provides a higher-level view than [`FileCoverage`] from `vsedit-ext-testing`,
+/// aggregating line and branch coverage across multiple files.
+#[derive(Debug, Clone, Default)]
+pub struct LocalTestCoverageReport {
+    /// Total lines in covered files.
+    pub total_lines: u64,
+    /// Lines covered by tests.
+    pub covered_lines: u64,
+    /// Total branches.
+    pub total_branches: u64,
+    /// Branches covered.
+    pub covered_branches: u64,
+    /// Per-file coverage data.
+    pub files: Vec<LocalFileCoverage>,
+}
+
+/// Coverage data for a single file.
+#[derive(Debug, Clone)]
+pub struct LocalFileCoverage {
+    /// File path.
+    pub path: String,
+    /// Lines covered.
+    pub covered: u64,
+    /// Total lines.
+    pub total: u64,
+}
+
+impl LocalTestCoverageReport {
+    /// Line coverage percentage (0.0–100.0).
+    pub fn line_coverage_percent(&self) -> f64 {
+        if self.total_lines == 0 {
+            return 0.0;
+        }
+        self.covered_lines as f64 / self.total_lines as f64 * 100.0
+    }
+
+    /// Branch coverage percentage (0.0–100.0).
+    pub fn branch_coverage_percent(&self) -> f64 {
+        if self.total_branches == 0 {
+            return 0.0;
+        }
+        self.covered_branches as f64 / self.total_branches as f64 * 100.0
+    }
+
+    /// Add file coverage data, updating totals.
+    pub fn add_file(&mut self, path: impl Into<String>, covered: u64, total: u64) {
+        self.covered_lines += covered;
+        self.total_lines += total;
+        self.files.push(LocalFileCoverage {
+            path: path.into(),
+            covered,
+            total,
+        });
+    }
+
+    /// Get files with coverage below the given threshold.
+    pub fn files_below_threshold(&self, threshold: f64) -> Vec<&LocalFileCoverage> {
+        self.files
+            .iter()
+            .filter(|f| {
+                if f.total == 0 {
+                    return false;
+                }
+                (f.covered as f64 / f.total as f64 * 100.0) < threshold
+            })
+            .collect()
+    }
+}
+
+impl fmt::Display for LocalTestCoverageReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Coverage: {:.1}% lines, {:.1}% branches",
+            self.line_coverage_percent(),
+            self.branch_coverage_percent()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TestHistoryTracker – comparing run results
+// ---------------------------------------------------------------------------
+
+/// Compares test run results across multiple runs.
+#[derive(Debug, Clone)]
+pub struct TestHistoryTracker {
+    runs: Vec<TestRunSummary>,
+    max_history: usize,
+}
+
+/// Summary of a single test run for history tracking.
+#[derive(Debug, Clone)]
+pub struct TestRunSummary {
+    /// Run identifier.
+    pub run_id: String,
+    /// Total tests.
+    pub total: usize,
+    /// Passed tests.
+    pub passed: usize,
+    /// Failed tests.
+    pub failed: usize,
+    /// Timestamp (epoch millis).
+    pub timestamp: u64,
+}
+
+impl Default for TestHistoryTracker {
+    fn default() -> Self {
+        Self {
+            runs: Vec::new(),
+            max_history: 50,
+        }
+    }
+}
+
+impl TestHistoryTracker {
+    /// Create a tracker with the given history depth.
+    pub fn new(max_history: usize) -> Self {
+        Self {
+            max_history,
+            ..Default::default()
+        }
+    }
+
+    /// Record a run summary.
+    pub fn record(&mut self, summary: TestRunSummary) {
+        if self.runs.len() >= self.max_history {
+            self.runs.remove(0);
+        }
+        self.runs.push(summary);
+    }
+
+    /// Get the most recent run.
+    pub fn latest(&self) -> Option<&TestRunSummary> {
+        self.runs.last()
+    }
+
+    /// Get the failure trend (number of failed tests in recent runs).
+    pub fn failure_trend(&self, last_n: usize) -> Vec<usize> {
+        self.runs
+            .iter()
+            .rev()
+            .take(last_n)
+            .map(|r| r.failed)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect()
+    }
+
+    /// Whether the latest run is a regression (more failures than previous).
+    pub fn is_regression(&self) -> bool {
+        if self.runs.len() < 2 {
+            return false;
+        }
+        let current = &self.runs[self.runs.len() - 1];
+        let previous = &self.runs[self.runs.len() - 2];
+        current.failed > previous.failed
+    }
+
+    /// Number of recorded runs.
+    pub fn run_count(&self) -> usize {
+        self.runs.len()
+    }
+
+    /// Average pass rate across all recorded runs.
+    pub fn average_pass_rate(&self) -> f64 {
+        if self.runs.is_empty() {
+            return 0.0;
+        }
+        let total_rate: f64 = self
+            .runs
+            .iter()
+            .map(|r| {
+                if r.total == 0 {
+                    0.0
+                } else {
+                    r.passed as f64 / r.total as f64
+                }
+            })
+            .sum();
+        total_rate / self.runs.len() as f64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test output capture with ANSI stripping
+// ---------------------------------------------------------------------------
+
+/// Strips ANSI escape sequences from test output.
+pub fn strip_ansi(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip until 'm' or end of string (CSI sequence)
+            if chars.peek() == Some(&'[') {
+                chars.next(); // skip '['
+                while let Some(&nc) = chars.peek() {
+                    chars.next();
+                    if nc.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Captures and processes test output.
+#[derive(Debug, Clone)]
+pub struct TestOutputCapture {
+    lines: Vec<String>,
+    strip_ansi_codes: bool,
+}
+
+impl Default for TestOutputCapture {
+    fn default() -> Self {
+        Self {
+            lines: Vec::new(),
+            strip_ansi_codes: true,
+        }
+    }
+}
+
+impl TestOutputCapture {
+    /// Create a new capture buffer.
+    pub fn new(strip_ansi_codes: bool) -> Self {
+        Self {
+            strip_ansi_codes,
+            ..Default::default()
+        }
+    }
+
+    /// Append output text (may contain multiple lines).
+    pub fn append(&mut self, text: &str) {
+        for line in text.lines() {
+            let processed = if self.strip_ansi_codes {
+                strip_ansi(line)
+            } else {
+                line.to_string()
+            };
+            self.lines.push(processed);
+        }
+    }
+
+    /// Get all captured lines.
+    pub fn lines(&self) -> &[String] {
+        &self.lines
+    }
+
+    /// Total number of lines.
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Search for lines containing a keyword.
+    pub fn grep(&self, keyword: &str) -> Vec<&str> {
+        self.lines
+            .iter()
+            .filter(|l| l.contains(keyword))
+            .map(|l| l.as_str())
+            .collect()
+    }
+
+    /// Clear captured output.
+    pub fn clear(&mut self) {
+        self.lines.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1885,5 +2224,116 @@ mod tests {
         r.children = vec![c];
         assert_eq!(max_depth(&[r]), 2);
         assert_eq!(max_depth(&[test_item("solo", TestState::Passed)]), 0);
+    }
+
+    // -- LocalTestRunProfile tests --
+
+    #[test]
+    fn profile_creation() {
+        let p = LocalTestRunProfile::new("Run", TestProfileKind::Run)
+            .with_default()
+            .with_env("RUST_LOG", "debug")
+            .with_arg("--nocapture");
+        assert_eq!(p.label, "Run");
+        assert!(p.is_default);
+        assert_eq!(p.env.get("RUST_LOG").unwrap(), "debug");
+        assert_eq!(p.args, vec!["--nocapture"]);
+    }
+
+    #[test]
+    fn profile_display() {
+        let p = LocalTestRunProfile::new("Debug", TestProfileKind::Debug);
+        let s = format!("{}", p);
+        assert!(s.contains("Debug"));
+    }
+
+    // -- LocalTestCoverageReport tests --
+
+    #[test]
+    fn coverage_report() {
+        let mut report = LocalTestCoverageReport::default();
+        report.add_file("src/lib.rs", 80, 100);
+        report.add_file("src/util.rs", 10, 50);
+        assert!((report.line_coverage_percent() - 60.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn coverage_below_threshold() {
+        let mut report = LocalTestCoverageReport::default();
+        report.add_file("good.rs", 90, 100);
+        report.add_file("bad.rs", 10, 100);
+        let below = report.files_below_threshold(50.0);
+        assert_eq!(below.len(), 1);
+        assert_eq!(below[0].path, "bad.rs");
+    }
+
+    #[test]
+    fn coverage_empty() {
+        let report = LocalTestCoverageReport::default();
+        assert!((report.line_coverage_percent()).abs() < f64::EPSILON);
+    }
+
+    // -- TestHistoryTracker tests --
+
+    #[test]
+    fn history_tracker_record() {
+        let mut t = TestHistoryTracker::new(10);
+        t.record(TestRunSummary { run_id: "1".into(), total: 10, passed: 9, failed: 1, timestamp: 100 });
+        t.record(TestRunSummary { run_id: "2".into(), total: 10, passed: 8, failed: 2, timestamp: 200 });
+        assert!(t.is_regression());
+    }
+
+    #[test]
+    fn history_tracker_no_regression() {
+        let mut t = TestHistoryTracker::new(10);
+        t.record(TestRunSummary { run_id: "1".into(), total: 10, passed: 8, failed: 2, timestamp: 100 });
+        t.record(TestRunSummary { run_id: "2".into(), total: 10, passed: 9, failed: 1, timestamp: 200 });
+        assert!(!t.is_regression());
+    }
+
+    #[test]
+    fn history_tracker_failure_trend() {
+        let mut t = TestHistoryTracker::new(10);
+        t.record(TestRunSummary { run_id: "1".into(), total: 10, passed: 9, failed: 1, timestamp: 100 });
+        t.record(TestRunSummary { run_id: "2".into(), total: 10, passed: 7, failed: 3, timestamp: 200 });
+        assert_eq!(t.failure_trend(2), vec![1, 3]);
+    }
+
+    #[test]
+    fn history_average_pass_rate() {
+        let mut t = TestHistoryTracker::new(10);
+        t.record(TestRunSummary { run_id: "1".into(), total: 10, passed: 10, failed: 0, timestamp: 100 });
+        t.record(TestRunSummary { run_id: "2".into(), total: 10, passed: 8, failed: 2, timestamp: 200 });
+        assert!((t.average_pass_rate() - 0.9).abs() < f64::EPSILON);
+    }
+
+    // -- strip_ansi tests --
+
+    #[test]
+    fn strip_ansi_basic() {
+        assert_eq!(strip_ansi("\x1b[32mPASS\x1b[0m"), "PASS");
+    }
+
+    #[test]
+    fn strip_ansi_no_codes() {
+        assert_eq!(strip_ansi("plain text"), "plain text");
+    }
+
+    // -- TestOutputCapture tests --
+
+    #[test]
+    fn output_capture_append() {
+        let mut cap = TestOutputCapture::new(true);
+        cap.append("line 1\n\x1b[31mline 2\x1b[0m");
+        assert_eq!(cap.line_count(), 2);
+        assert_eq!(cap.lines()[1], "line 2");
+    }
+
+    #[test]
+    fn output_capture_grep() {
+        let mut cap = TestOutputCapture::new(false);
+        cap.append("test PASSED\ntest FAILED\ntest PASSED");
+        let failed = cap.grep("FAILED");
+        assert_eq!(failed.len(), 1);
     }
 }

@@ -1144,6 +1144,309 @@ impl From<ChatError> for String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatParticipantRegistry with slash commands
+// ---------------------------------------------------------------------------
+
+/// A slash command registered by a chat participant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlashCommand {
+    /// Command name (without leading slash).
+    pub name: String,
+    /// Description of the command.
+    pub description: String,
+}
+
+/// Registry of chat participants with their slash commands.
+#[derive(Debug, Clone)]
+pub struct ChatParticipantRegistry {
+    participants: Vec<ChatParticipant>,
+    commands: std::collections::HashMap<String, Vec<SlashCommand>>,
+}
+
+impl Default for ChatParticipantRegistry {
+    fn default() -> Self {
+        Self {
+            participants: Vec::new(),
+            commands: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl ChatParticipantRegistry {
+    /// Create a new empty registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a participant with optional slash commands.
+    pub fn register(&mut self, participant: ChatParticipant, commands: Vec<SlashCommand>) {
+        let id = participant.id.clone();
+        self.participants.push(participant);
+        if !commands.is_empty() {
+            self.commands.insert(id, commands);
+        }
+    }
+
+    /// Find a participant by ID.
+    pub fn get(&self, id: &str) -> Option<&ChatParticipant> {
+        self.participants.iter().find(|p| p.id == id)
+    }
+
+    /// Get slash commands for a participant.
+    pub fn get_commands(&self, participant_id: &str) -> &[SlashCommand] {
+        self.commands
+            .get(participant_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Find commands matching a prefix across all participants.
+    pub fn find_commands(&self, prefix: &str) -> Vec<(&str, &SlashCommand)> {
+        let prefix_lower = prefix.to_lowercase();
+        self.commands
+            .iter()
+            .flat_map(|(pid, cmds)| {
+                cmds.iter()
+                    .filter(|c| c.name.to_lowercase().starts_with(&prefix_lower))
+                    .map(move |c| (pid.as_str(), c))
+            })
+            .collect()
+    }
+
+    /// Total number of registered participants.
+    pub fn participant_count(&self) -> usize {
+        self.participants.len()
+    }
+
+    /// Total number of registered slash commands.
+    pub fn command_count(&self) -> usize {
+        self.commands.values().map(|v| v.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatResponseStream – incremental rendering
+// ---------------------------------------------------------------------------
+
+/// A stream of chat response fragments for incremental rendering.
+#[derive(Debug, Clone)]
+pub struct ChatResponseStream {
+    fragments: Vec<ResponseFragment>,
+    complete: bool,
+}
+
+/// A fragment of a chat response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResponseFragment {
+    /// A piece of markdown text.
+    Markdown(String),
+    /// A code block with optional language.
+    CodeBlock { language: Option<String>, code: String },
+    /// A progress indicator.
+    Progress(String),
+}
+
+impl Default for ChatResponseStream {
+    fn default() -> Self {
+        Self {
+            fragments: Vec::new(),
+            complete: false,
+        }
+    }
+}
+
+impl ChatResponseStream {
+    /// Create a new empty stream.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Push a markdown fragment.
+    pub fn push_markdown(&mut self, text: impl Into<String>) {
+        self.fragments.push(ResponseFragment::Markdown(text.into()));
+    }
+
+    /// Push a code block fragment.
+    pub fn push_code(&mut self, code: impl Into<String>, language: Option<String>) {
+        self.fragments.push(ResponseFragment::CodeBlock {
+            language,
+            code: code.into(),
+        });
+    }
+
+    /// Push a progress indicator.
+    pub fn push_progress(&mut self, message: impl Into<String>) {
+        self.fragments
+            .push(ResponseFragment::Progress(message.into()));
+    }
+
+    /// Mark the stream as complete.
+    pub fn finish(&mut self) {
+        self.complete = true;
+    }
+
+    /// Whether the stream is complete.
+    pub fn is_complete(&self) -> bool {
+        self.complete
+    }
+
+    /// Number of fragments.
+    pub fn fragment_count(&self) -> usize {
+        self.fragments.len()
+    }
+
+    /// Render all fragments into a single string.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for frag in &self.fragments {
+            match frag {
+                ResponseFragment::Markdown(text) => out.push_str(text),
+                ResponseFragment::CodeBlock { language, code } => {
+                    out.push_str("```");
+                    if let Some(lang) = language {
+                        out.push_str(lang);
+                    }
+                    out.push('\n');
+                    out.push_str(code);
+                    out.push_str("\n```\n");
+                }
+                ResponseFragment::Progress(msg) => {
+                    out.push_str(&format!("[{}]", msg));
+                }
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatHistoryPersistence
+// ---------------------------------------------------------------------------
+
+/// Stores chat history for persistence across sessions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatHistoryEntry {
+    /// The user's request.
+    pub request: String,
+    /// The assistant's response.
+    pub response: String,
+    /// Participant ID.
+    pub participant_id: String,
+    /// Timestamp (epoch millis).
+    pub timestamp: u64,
+}
+
+/// Manages a bounded chat history.
+#[derive(Debug, Clone)]
+pub struct ChatHistoryPersistence {
+    entries: Vec<ChatHistoryEntry>,
+    max_entries: usize,
+}
+
+impl Default for ChatHistoryPersistence {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: 100,
+        }
+    }
+}
+
+impl ChatHistoryPersistence {
+    /// Create a new history store with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            max_entries,
+            ..Default::default()
+        }
+    }
+
+    /// Add an entry to the history.
+    pub fn add(&mut self, entry: ChatHistoryEntry) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    /// Get all entries.
+    pub fn entries(&self) -> &[ChatHistoryEntry] {
+        &self.entries
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Search entries by keyword.
+    pub fn search(&self, keyword: &str) -> Vec<&ChatHistoryEntry> {
+        let kw = keyword.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.request.to_lowercase().contains(&kw)
+                    || e.response.to_lowercase().contains(&kw)
+            })
+            .collect()
+    }
+
+    /// Clear history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Chat follow-up suggestions
+// ---------------------------------------------------------------------------
+
+/// A suggested follow-up question or action.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatFollowUp {
+    /// The suggested prompt text.
+    pub prompt: String,
+    /// Optional label for display.
+    pub label: Option<String>,
+    /// The participant to route to.
+    pub participant_id: Option<String>,
+}
+
+/// Generates follow-up suggestions based on the last response.
+pub fn generate_follow_ups(response: &str, max: usize) -> Vec<ChatFollowUp> {
+    let mut suggestions = Vec::new();
+    // Heuristic: suggest elaboration if response is long
+    if response.len() > 200 {
+        suggestions.push(ChatFollowUp {
+            prompt: "Can you explain this in more detail?".into(),
+            label: Some("Explain more".into()),
+            participant_id: None,
+        });
+    }
+    // Suggest code generation if response mentions code
+    if response.contains("```") {
+        suggestions.push(ChatFollowUp {
+            prompt: "Can you add tests for this code?".into(),
+            label: Some("Add tests".into()),
+            participant_id: None,
+        });
+    }
+    // Always suggest a summary
+    suggestions.push(ChatFollowUp {
+        prompt: "Summarize the key points.".into(),
+        label: Some("Summarize".into()),
+        participant_id: None,
+    });
+    suggestions.truncate(max);
+    suggestions
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1878,5 +2181,118 @@ mod tests {
         let err = ChatError::ValidationError("bad".into());
         let s: String = err.into();
         assert_eq!(s, "validation error: bad");
+    }
+
+    // -- ChatParticipantRegistry tests --
+
+    #[test]
+    fn registry_register_and_get() {
+        let mut reg = ChatParticipantRegistry::new();
+        let p = ChatParticipant::builder("copilot", "Copilot").build().unwrap();
+        reg.register(p, vec![
+            SlashCommand { name: "explain".into(), description: "Explain code".into() },
+        ]);
+        assert_eq!(reg.participant_count(), 1);
+        assert!(reg.get("copilot").is_some());
+        assert_eq!(reg.get_commands("copilot").len(), 1);
+    }
+
+    #[test]
+    fn registry_find_commands() {
+        let mut reg = ChatParticipantRegistry::new();
+        let p = ChatParticipant::builder("copilot", "Copilot").build().unwrap();
+        reg.register(p, vec![
+            SlashCommand { name: "explain".into(), description: "".into() },
+            SlashCommand { name: "fix".into(), description: "".into() },
+        ]);
+        let matches = reg.find_commands("ex");
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].1.name, "explain");
+    }
+
+    #[test]
+    fn registry_command_count() {
+        let mut reg = ChatParticipantRegistry::new();
+        let p = ChatParticipant::builder("a", "A").build().unwrap();
+        reg.register(p, vec![
+            SlashCommand { name: "x".into(), description: "".into() },
+            SlashCommand { name: "y".into(), description: "".into() },
+        ]);
+        assert_eq!(reg.command_count(), 2);
+    }
+
+    // -- ChatResponseStream tests --
+
+    #[test]
+    fn stream_render() {
+        let mut s = ChatResponseStream::new();
+        s.push_markdown("Hello ");
+        s.push_code("let x = 1;", Some("rust".into()));
+        s.finish();
+        let output = s.render();
+        assert!(output.contains("Hello "));
+        assert!(output.contains("```rust"));
+        assert!(output.contains("let x = 1;"));
+        assert!(s.is_complete());
+    }
+
+    #[test]
+    fn stream_progress() {
+        let mut s = ChatResponseStream::new();
+        s.push_progress("Thinking...");
+        assert_eq!(s.fragment_count(), 1);
+        assert!(s.render().contains("[Thinking...]"));
+    }
+
+    // -- ChatHistoryPersistence tests --
+
+    #[test]
+    fn history_add_and_search() {
+        let mut h = ChatHistoryPersistence::new(10);
+        h.add(ChatHistoryEntry {
+            request: "How to sort?".into(),
+            response: "Use .sort()".into(),
+            participant_id: "copilot".into(),
+            timestamp: 1000,
+        });
+        assert_eq!(h.len(), 1);
+        let found = h.search("sort");
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn history_capacity() {
+        let mut h = ChatHistoryPersistence::new(2);
+        for i in 0..5 {
+            h.add(ChatHistoryEntry {
+                request: format!("q{}", i),
+                response: "a".into(),
+                participant_id: "p".into(),
+                timestamp: i,
+            });
+        }
+        assert_eq!(h.len(), 2);
+    }
+
+    // -- Follow-up suggestions tests --
+
+    #[test]
+    fn follow_ups_with_code() {
+        let response = "Here is the code:\n```rust\nfn main() {}\n```\nThat's it.";
+        let suggestions = generate_follow_ups(response, 5);
+        assert!(suggestions.iter().any(|s| s.prompt.contains("tests")));
+    }
+
+    #[test]
+    fn follow_ups_always_has_summary() {
+        let suggestions = generate_follow_ups("short", 5);
+        assert!(suggestions.iter().any(|s| s.prompt.contains("Summarize")));
+    }
+
+    #[test]
+    fn follow_ups_respects_max() {
+        let long = "x".repeat(300);
+        let suggestions = generate_follow_ups(&long, 1);
+        assert_eq!(suggestions.len(), 1);
     }
 }

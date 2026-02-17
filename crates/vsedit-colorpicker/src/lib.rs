@@ -1153,6 +1153,234 @@ pub fn color_to_hwb_string(c: &Color) -> String {
     format!("hwb({:.0} {:.0}% {:.0}%)", hsl.h, whiteness, blackness)
 }
 
+// ---------------------------------------------------------------------------
+// ColorPickerHSL – HSL color with conversion
+// ---------------------------------------------------------------------------
+
+/// An HSL color picker that supports bidirectional HSL↔RGB conversion.
+#[derive(Debug, Clone)]
+pub struct ColorPickerHSL {
+    /// Hue in degrees (0–360).
+    pub h: f64,
+    /// Saturation (0.0–1.0).
+    pub s: f64,
+    /// Lightness (0.0–1.0).
+    pub l: f64,
+}
+
+impl ColorPickerHSL {
+    /// Create from HSL values.
+    pub fn new(h: f64, s: f64, l: f64) -> Self {
+        Self {
+            h: h % 360.0,
+            s: s.clamp(0.0, 1.0),
+            l: l.clamp(0.0, 1.0),
+        }
+    }
+
+    /// Convert from an RGBA [`Color`].
+    pub fn from_rgb(color: &Color) -> Self {
+        let hsl = rgb_to_hsl(color);
+        Self {
+            h: hsl.h,
+            s: hsl.s,
+            l: hsl.l,
+        }
+    }
+
+    /// Convert to an RGBA [`Color`] with full opacity.
+    pub fn to_rgb(&self) -> Color {
+        let hsl = HslColor::new(self.h, self.s, self.l, 1.0);
+        hsl_to_rgb(&hsl)
+    }
+
+    /// Rotate hue by the given degrees.
+    pub fn rotate(&mut self, degrees: f64) {
+        self.h = (self.h + degrees) % 360.0;
+        if self.h < 0.0 {
+            self.h += 360.0;
+        }
+    }
+
+    /// Lighten by the given amount.
+    pub fn lighten(&mut self, amount: f64) {
+        self.l = (self.l + amount).clamp(0.0, 1.0);
+    }
+
+    /// Darken by the given amount.
+    pub fn darken(&mut self, amount: f64) {
+        self.l = (self.l - amount).clamp(0.0, 1.0);
+    }
+
+    /// Saturate by the given amount.
+    pub fn saturate(&mut self, amount: f64) {
+        self.s = (self.s + amount).clamp(0.0, 1.0);
+    }
+}
+
+impl fmt::Display for ColorPickerHSL {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "hsl({:.0}, {:.0}%, {:.0}%)", self.h, self.s * 100.0, self.l * 100.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorPickerAlpha – alpha channel support
+// ---------------------------------------------------------------------------
+
+/// Wraps a [`Color`] with explicit alpha manipulation.
+#[derive(Debug, Clone, Copy)]
+pub struct ColorPickerAlpha {
+    /// The base color.
+    pub color: Color,
+}
+
+impl ColorPickerAlpha {
+    /// Create from a [`Color`].
+    pub fn new(color: Color) -> Self {
+        Self { color }
+    }
+
+    /// Set the alpha channel.
+    pub fn set_alpha(&mut self, alpha: f64) {
+        self.color.a = alpha.clamp(0.0, 1.0);
+    }
+
+    /// Get the alpha channel.
+    pub fn alpha(&self) -> f64 {
+        self.color.a
+    }
+
+    /// Whether the color is fully opaque.
+    pub fn is_opaque(&self) -> bool {
+        (self.color.a - 1.0).abs() < f64::EPSILON
+    }
+
+    /// Whether the color is fully transparent.
+    pub fn is_transparent(&self) -> bool {
+        self.color.a.abs() < f64::EPSILON
+    }
+
+    /// Premultiply RGB by alpha.
+    pub fn premultiplied(&self) -> Color {
+        Color::new(
+            self.color.r * self.color.a,
+            self.color.g * self.color.a,
+            self.color.b * self.color.a,
+            self.color.a,
+        )
+    }
+}
+
+impl fmt::Display for ColorPickerAlpha {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "rgba({:.0}, {:.0}, {:.0}, {:.2})",
+            self.color.r * 255.0,
+            self.color.g * 255.0,
+            self.color.b * 255.0,
+            self.color.a
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorPickerHistory – recently used colors
+// ---------------------------------------------------------------------------
+
+/// Tracks recently used colors with a bounded history.
+#[derive(Debug, Clone)]
+pub struct ColorPickerHistory {
+    colors: Vec<String>,
+    max_entries: usize,
+}
+
+impl Default for ColorPickerHistory {
+    fn default() -> Self {
+        Self {
+            colors: Vec::new(),
+            max_entries: 20,
+        }
+    }
+}
+
+impl ColorPickerHistory {
+    /// Create a history with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            max_entries,
+            ..Default::default()
+        }
+    }
+
+    /// Record a color as recently used (hex string).
+    pub fn record(&mut self, hex: impl Into<String>) {
+        let hex = hex.into();
+        // Remove if already present (move to front)
+        self.colors.retain(|c| c != &hex);
+        self.colors.insert(0, hex);
+        self.colors.truncate(self.max_entries);
+    }
+
+    /// Get the most recently used colors.
+    pub fn recent(&self) -> &[String] {
+        &self.colors
+    }
+
+    /// Number of recorded colors.
+    pub fn len(&self) -> usize {
+        self.colors.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.colors.is_empty()
+    }
+
+    /// Clear the history.
+    pub fn clear(&mut self) {
+        self.colors.clear();
+    }
+
+    /// Check if a color has been used before.
+    pub fn contains(&self, hex: &str) -> bool {
+        self.colors.iter().any(|c| c == hex)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Color format string generation
+// ---------------------------------------------------------------------------
+
+/// Format a [`Color`] in the specified format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorFormat {
+    /// `#RRGGBB` or `#RRGGBBAA`.
+    Hex,
+    /// `rgb(r, g, b)` or `rgba(r, g, b, a)`.
+    Rgb,
+    /// `hsl(h, s%, l%)` or `hsla(h, s%, l%, a)`.
+    Hsl,
+}
+
+/// Format a color in the given format.
+pub fn format_color(color: &Color, format: ColorFormat) -> String {
+    match format {
+        ColorFormat::Hex => {
+            if (color.a - 1.0).abs() < f64::EPSILON {
+                color_to_hex(color)
+            } else {
+                let hex = color_to_hex(color);
+                let alpha_byte = (color.a * 255.0).round() as u8;
+                format!("{}{:02X}", hex, alpha_byte)
+            }
+        }
+        ColorFormat::Rgb => color_to_rgba_string(color),
+        ColorFormat::Hsl => color_to_hsl_string(color),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1881,5 +2109,123 @@ mod tests {
         assert!((inv.g - 0.7).abs() < f64::EPSILON);
         assert!((inv.b - 0.6).abs() < f64::EPSILON);
         assert!((inv.a - 0.9).abs() < f64::EPSILON);
+    }
+
+    // -- ColorPickerHSL tests --
+
+    #[test]
+    fn hsl_roundtrip() {
+        let color = Color::new(1.0, 0.0, 0.0, 1.0); // red
+        let hsl = ColorPickerHSL::from_rgb(&color);
+        assert!((hsl.h - 0.0).abs() < 1.0);
+        let back = hsl.to_rgb();
+        assert!((back.r - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn hsl_rotate() {
+        let mut hsl = ColorPickerHSL::new(0.0, 1.0, 0.5);
+        hsl.rotate(120.0);
+        assert!((hsl.h - 120.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn hsl_lighten_darken() {
+        let mut hsl = ColorPickerHSL::new(0.0, 1.0, 0.5);
+        hsl.lighten(0.2);
+        assert!((hsl.l - 0.7).abs() < f64::EPSILON);
+        hsl.darken(0.3);
+        assert!((hsl.l - 0.4).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn hsl_display() {
+        let hsl = ColorPickerHSL::new(180.0, 0.5, 0.75);
+        assert_eq!(format!("{}", hsl), "hsl(180, 50%, 75%)");
+    }
+
+    // -- ColorPickerAlpha tests --
+
+    #[test]
+    fn alpha_opaque() {
+        let c = ColorPickerAlpha::new(Color::new(1.0, 0.0, 0.0, 1.0));
+        assert!(c.is_opaque());
+        assert!(!c.is_transparent());
+    }
+
+    #[test]
+    fn alpha_set() {
+        let mut c = ColorPickerAlpha::new(Color::new(1.0, 0.0, 0.0, 1.0));
+        c.set_alpha(0.5);
+        assert!((c.alpha() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn alpha_premultiplied() {
+        let c = ColorPickerAlpha::new(Color::new(1.0, 0.5, 0.0, 0.5));
+        let pm = c.premultiplied();
+        assert!((pm.r - 0.5).abs() < f64::EPSILON);
+        assert!((pm.g - 0.25).abs() < f64::EPSILON);
+    }
+
+    // -- ColorPickerHistory tests --
+
+    #[test]
+    fn history_record() {
+        let mut h = ColorPickerHistory::new(5);
+        h.record("#ff0000");
+        h.record("#00ff00");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.recent()[0], "#00ff00");
+    }
+
+    #[test]
+    fn history_dedup() {
+        let mut h = ColorPickerHistory::new(5);
+        h.record("#ff0000");
+        h.record("#00ff00");
+        h.record("#ff0000");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.recent()[0], "#ff0000");
+    }
+
+    #[test]
+    fn history_capacity() {
+        let mut h = ColorPickerHistory::new(2);
+        h.record("#aa0000");
+        h.record("#bb0000");
+        h.record("#cc0000");
+        assert_eq!(h.len(), 2);
+    }
+
+    #[test]
+    fn history_contains() {
+        let mut h = ColorPickerHistory::new(5);
+        h.record("#ff0000");
+        assert!(h.contains("#ff0000"));
+        assert!(!h.contains("#00ff00"));
+    }
+
+    // -- format_color tests --
+
+    #[test]
+    fn format_color_hex() {
+        let c = Color::new(1.0, 0.0, 0.0, 1.0);
+        assert_eq!(format_color(&c, ColorFormat::Hex), "#FF0000");
+    }
+
+    #[test]
+    fn format_color_hex_with_alpha() {
+        let c = Color::new(1.0, 0.0, 0.0, 0.5);
+        let s = format_color(&c, ColorFormat::Hex);
+        assert!(s.starts_with("#FF0000"));
+        assert_eq!(s.len(), 9); // #RRGGBBAA
+    }
+
+    #[test]
+    fn format_color_rgb() {
+        let c = Color::new(1.0, 0.0, 0.0, 1.0);
+        let s = format_color(&c, ColorFormat::Rgb);
+        assert!(s.starts_with("rgba(") || s.starts_with("rgb("));
     }
 }

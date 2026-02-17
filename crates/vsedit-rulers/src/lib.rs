@@ -1201,6 +1201,312 @@ impl fmt::Display for RulerGuideSet {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RulerConfigParser – parse column-based ruler config strings
+// ---------------------------------------------------------------------------
+
+/// Parses ruler configuration strings like `"80,120:red,160"`.
+///
+/// Each entry is a column number optionally followed by `:color`.
+#[derive(Debug, Clone)]
+pub struct RulerConfigParser;
+
+impl RulerConfigParser {
+    /// Parse a comma-separated ruler specification string.
+    ///
+    /// Format: `"col[:color],col[:color],..."`.
+    /// Returns a [`RulersConfig`] with the parsed rulers.
+    pub fn parse(input: &str, default_color: &str) -> Result<RulersConfig, RulerError> {
+        let mut config = RulersConfig::default();
+        config.default_color = default_color.to_string();
+        for segment in input.split(',') {
+            let segment = segment.trim();
+            if segment.is_empty() {
+                continue;
+            }
+            let (col_str, color) = match segment.split_once(':') {
+                Some((c, clr)) => (c.trim(), Some(clr.trim().to_string())),
+                None => (segment, None),
+            };
+            let column: u32 = col_str
+                .parse()
+                .map_err(|_| RulerError::ColumnOutOfRange(0))?;
+            config.add_ruler_validated(column, color)?;
+        }
+        Ok(config)
+    }
+
+    /// Parse a JSON-style array of ruler objects.
+    ///
+    /// Accepts entries like `[{"column":80},{"column":120,"color":"#ff0000"}]`.
+    pub fn parse_json_array(entries: &[(u32, Option<&str>)]) -> Result<RulersConfig, RulerError> {
+        let mut config = RulersConfig::default();
+        for &(column, color) in entries {
+            config.add_ruler_validated(column, color.map(|s| s.to_string()))?;
+        }
+        Ok(config)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiRulerRenderer – render multiple rulers with styling
+// ---------------------------------------------------------------------------
+
+/// Renders multiple rulers into a line buffer.
+///
+/// Each ruler is represented by a vertical bar character at the configured
+/// column position.
+#[derive(Debug, Clone)]
+pub struct MultiRulerRenderer {
+    /// The character used for ruler lines.
+    pub ruler_char: char,
+    /// Whether to show rulers beyond the visible area.
+    pub clip_to_viewport: bool,
+    /// Viewport width in columns.
+    pub viewport_width: u32,
+}
+
+impl Default for MultiRulerRenderer {
+    fn default() -> Self {
+        Self {
+            ruler_char: '│',
+            clip_to_viewport: true,
+            viewport_width: 120,
+        }
+    }
+}
+
+impl MultiRulerRenderer {
+    /// Create a new renderer for the given viewport width.
+    pub fn new(viewport_width: u32) -> Self {
+        Self {
+            viewport_width,
+            ..Default::default()
+        }
+    }
+
+    /// Render rulers into a string buffer of the given width.
+    ///
+    /// Returns a string where ruler positions contain [`ruler_char`] and all
+    /// other positions contain spaces.
+    pub fn render_line(&self, config: &RulersConfig) -> String {
+        let width = self.viewport_width as usize;
+        let mut buf = vec![' '; width];
+        for ruler in &config.rulers {
+            let col = ruler.column as usize;
+            if col < width {
+                buf[col] = self.ruler_char;
+            } else if !self.clip_to_viewport {
+                // Extend buffer to fit
+                buf.resize(col + 1, ' ');
+                buf[col] = self.ruler_char;
+            }
+        }
+        buf.into_iter().collect()
+    }
+
+    /// Return the set of column positions that have rulers within the viewport.
+    pub fn visible_columns(&self, config: &RulersConfig) -> Vec<u32> {
+        config
+            .rulers
+            .iter()
+            .filter(|r| !self.clip_to_viewport || r.column < self.viewport_width)
+            .map(|r| r.column)
+            .collect()
+    }
+}
+
+impl fmt::Display for MultiRulerRenderer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MultiRulerRenderer(char='{}', vp={})",
+            self.ruler_char, self.viewport_width
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RulerColor – color customization for rulers
+// ---------------------------------------------------------------------------
+
+/// Represents a ruler color with optional opacity.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RulerColor {
+    /// Hex color string (e.g. `"#ff0000"`).
+    pub hex: String,
+    /// Opacity from 0.0 (transparent) to 1.0 (opaque).
+    pub opacity: f64,
+}
+
+impl RulerColor {
+    /// Create a new ruler color from a hex string.
+    pub fn new(hex: impl Into<String>) -> Self {
+        Self {
+            hex: hex.into(),
+            opacity: 1.0,
+        }
+    }
+
+    /// Create a ruler color with a specific opacity.
+    pub fn with_opacity(hex: impl Into<String>, opacity: f64) -> Self {
+        Self {
+            hex: hex.into(),
+            opacity: opacity.clamp(0.0, 1.0),
+        }
+    }
+
+    /// Validate the hex color string format.
+    pub fn is_valid_hex(&self) -> bool {
+        let h = self.hex.trim_start_matches('#');
+        (h.len() == 3 || h.len() == 6) && h.chars().all(|c| c.is_ascii_hexdigit())
+    }
+
+    /// Parse RGB components from the hex string.
+    pub fn to_rgb(&self) -> Option<(u8, u8, u8)> {
+        if !self.is_valid_hex() {
+            return None;
+        }
+        let h = self.hex.trim_start_matches('#');
+        let expanded = if h.len() == 3 {
+            let chars: Vec<char> = h.chars().collect();
+            format!(
+                "{}{}{}{}{}{}",
+                chars[0], chars[0], chars[1], chars[1], chars[2], chars[2]
+            )
+        } else {
+            h.to_string()
+        };
+        let r = u8::from_str_radix(&expanded[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&expanded[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&expanded[4..6], 16).ok()?;
+        Some((r, g, b))
+    }
+
+    /// Blend this color with another at the given factor (0.0 = self, 1.0 = other).
+    pub fn blend(&self, other: &RulerColor, factor: f64) -> Option<RulerColor> {
+        let (r1, g1, b1) = self.to_rgb()?;
+        let (r2, g2, b2) = other.to_rgb()?;
+        let f = factor.clamp(0.0, 1.0);
+        let r = (r1 as f64 * (1.0 - f) + r2 as f64 * f) as u8;
+        let g = (g1 as f64 * (1.0 - f) + g2 as f64 * f) as u8;
+        let b = (b1 as f64 * (1.0 - f) + b2 as f64 * f) as u8;
+        Some(RulerColor::new(format!("#{:02x}{:02x}{:02x}", r, g, b)))
+    }
+}
+
+impl Default for RulerColor {
+    fn default() -> Self {
+        Self::new("#d3d3d3")
+    }
+}
+
+impl fmt::Display for RulerColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if (self.opacity - 1.0).abs() < f64::EPSILON {
+            write!(f, "{}", self.hex)
+        } else {
+            write!(f, "{}@{:.0}%", self.hex, self.opacity * 100.0)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WordWrapGuideRuler – word wrap guide
+// ---------------------------------------------------------------------------
+
+/// A ruler that indicates the preferred word wrap column.
+///
+/// Unlike regular rulers which are decorative, the word wrap guide ruler
+/// has semantic meaning—it shows where text will wrap.
+#[derive(Debug, Clone)]
+pub struct WordWrapGuideRuler {
+    /// The word wrap column.
+    pub wrap_column: u32,
+    /// Color for the wrap guide.
+    pub color: RulerColor,
+    /// Whether the guide is currently active.
+    pub active: bool,
+    /// Style of the guide line.
+    pub style: WrapGuideStyle,
+}
+
+/// Visual style for the word wrap guide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WrapGuideStyle {
+    /// Solid vertical line.
+    Solid,
+    /// Dashed vertical line.
+    Dashed,
+    /// Dotted vertical line.
+    Dotted,
+}
+
+impl fmt::Display for WrapGuideStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WrapGuideStyle::Solid => write!(f, "solid"),
+            WrapGuideStyle::Dashed => write!(f, "dashed"),
+            WrapGuideStyle::Dotted => write!(f, "dotted"),
+        }
+    }
+}
+
+impl Default for WordWrapGuideRuler {
+    fn default() -> Self {
+        Self {
+            wrap_column: 80,
+            color: RulerColor::with_opacity("#808080", 0.5),
+            active: true,
+            style: WrapGuideStyle::Solid,
+        }
+    }
+}
+
+impl WordWrapGuideRuler {
+    /// Create a word wrap guide at the given column.
+    pub fn new(wrap_column: u32) -> Self {
+        Self {
+            wrap_column,
+            ..Default::default()
+        }
+    }
+
+    /// Check whether a line exceeds the wrap column.
+    pub fn exceeds_wrap(&self, line_length: u32) -> bool {
+        line_length > self.wrap_column
+    }
+
+    /// Calculate how many characters overflow past the wrap guide.
+    pub fn overflow_amount(&self, line_length: u32) -> u32 {
+        line_length.saturating_sub(self.wrap_column)
+    }
+
+    /// Return the character used to render this guide style.
+    pub fn guide_char(&self) -> char {
+        match self.style {
+            WrapGuideStyle::Solid => '│',
+            WrapGuideStyle::Dashed => '┆',
+            WrapGuideStyle::Dotted => '┊',
+        }
+    }
+
+    /// Convert this guide into a [`RulerConfig`] for unified rendering.
+    pub fn to_ruler_config(&self) -> Result<RulerConfig, RulerError> {
+        RulerConfig::new(self.wrap_column, Some(self.color.hex.clone()))
+    }
+}
+
+impl fmt::Display for WordWrapGuideRuler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "WordWrapGuide(col={}, style={}, active={})",
+            self.wrap_column, self.style, self.active
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1876,4 +2182,150 @@ mod tests {
         assert_eq!(format!("{}", GuideSeverity::Hard), "hard");
     }
 
+    // -- RulerConfigParser tests --
+
+    #[test]
+    fn parser_basic() {
+        let cfg = RulerConfigParser::parse("80,120", "#aaa").unwrap();
+        assert_eq!(cfg.len(), 2);
+        assert!(cfg.has_ruler_at(80));
+        assert!(cfg.has_ruler_at(120));
+    }
+
+    #[test]
+    fn parser_with_colors() {
+        let cfg = RulerConfigParser::parse("80:#ff0000,120:#00ff00", "#aaa").unwrap();
+        assert_eq!(cfg.rulers[0].color.as_deref(), Some("#ff0000"));
+        assert_eq!(cfg.rulers[1].color.as_deref(), Some("#00ff00"));
+    }
+
+    #[test]
+    fn parser_empty_input() {
+        let cfg = RulerConfigParser::parse("", "#aaa").unwrap();
+        assert!(cfg.is_empty());
+    }
+
+    #[test]
+    fn parser_duplicate_column_error() {
+        let result = RulerConfigParser::parse("80,80", "#aaa");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parser_json_array() {
+        let entries = vec![(80, None), (120, Some("#ff0000"))];
+        let cfg = RulerConfigParser::parse_json_array(&entries).unwrap();
+        assert_eq!(cfg.len(), 2);
+    }
+
+    // -- MultiRulerRenderer tests --
+
+    #[test]
+    fn renderer_default() {
+        let r = MultiRulerRenderer::default();
+        assert_eq!(r.ruler_char, '│');
+        assert!(r.clip_to_viewport);
+        assert_eq!(r.viewport_width, 120);
+    }
+
+    #[test]
+    fn renderer_render_line() {
+        let mut cfg = RulersConfig::default();
+        cfg.add_ruler(5, None);
+        cfg.add_ruler(10, None);
+        let r = MultiRulerRenderer::new(20);
+        let line = r.render_line(&cfg);
+        assert_eq!(line.chars().nth(5), Some('│'));
+        assert_eq!(line.chars().nth(10), Some('│'));
+        assert_eq!(line.chars().nth(0), Some(' '));
+    }
+
+    #[test]
+    fn renderer_visible_columns() {
+        let mut cfg = RulersConfig::default();
+        cfg.add_ruler(5, None);
+        cfg.add_ruler(200, None);
+        let r = MultiRulerRenderer::new(100);
+        let cols = r.visible_columns(&cfg);
+        assert_eq!(cols, vec![5]);
+    }
+
+    // -- RulerColor tests --
+
+    #[test]
+    fn ruler_color_valid_hex() {
+        assert!(RulerColor::new("#ff0000").is_valid_hex());
+        assert!(RulerColor::new("#abc").is_valid_hex());
+        assert!(!RulerColor::new("not-a-color").is_valid_hex());
+    }
+
+    #[test]
+    fn ruler_color_to_rgb() {
+        let c = RulerColor::new("#ff8000");
+        assert_eq!(c.to_rgb(), Some((255, 128, 0)));
+    }
+
+    #[test]
+    fn ruler_color_short_hex() {
+        let c = RulerColor::new("#f00");
+        assert_eq!(c.to_rgb(), Some((255, 0, 0)));
+    }
+
+    #[test]
+    fn ruler_color_opacity() {
+        let c = RulerColor::with_opacity("#fff", 0.5);
+        assert!((c.opacity - 0.5).abs() < f64::EPSILON);
+        assert_eq!(format!("{}", c), "#fff@50%");
+    }
+
+    #[test]
+    fn ruler_color_blend() {
+        let c1 = RulerColor::new("#000000");
+        let c2 = RulerColor::new("#ffffff");
+        let blended = c1.blend(&c2, 0.5).unwrap();
+        let (r, g, b) = blended.to_rgb().unwrap();
+        // Should be roughly middle gray
+        assert!((r as i16 - 127).abs() <= 1);
+        assert!((g as i16 - 127).abs() <= 1);
+        assert!((b as i16 - 127).abs() <= 1);
+    }
+
+    // -- WordWrapGuideRuler tests --
+
+    #[test]
+    fn wrap_guide_default() {
+        let g = WordWrapGuideRuler::default();
+        assert_eq!(g.wrap_column, 80);
+        assert!(g.active);
+        assert_eq!(g.style, WrapGuideStyle::Solid);
+    }
+
+    #[test]
+    fn wrap_guide_exceeds() {
+        let g = WordWrapGuideRuler::new(80);
+        assert!(!g.exceeds_wrap(80));
+        assert!(g.exceeds_wrap(81));
+        assert_eq!(g.overflow_amount(90), 10);
+        assert_eq!(g.overflow_amount(50), 0);
+    }
+
+    #[test]
+    fn wrap_guide_char() {
+        assert_eq!(WordWrapGuideRuler { style: WrapGuideStyle::Dashed, ..Default::default() }.guide_char(), '┆');
+        assert_eq!(WordWrapGuideRuler { style: WrapGuideStyle::Dotted, ..Default::default() }.guide_char(), '┊');
+    }
+
+    #[test]
+    fn wrap_guide_to_ruler_config() {
+        let g = WordWrapGuideRuler::new(100);
+        let rc = g.to_ruler_config().unwrap();
+        assert_eq!(rc.column, 100);
+    }
+
+    #[test]
+    fn wrap_guide_style_display() {
+        assert_eq!(format!("{}", WrapGuideStyle::Solid), "solid");
+        assert_eq!(format!("{}", WrapGuideStyle::Dashed), "dashed");
+        assert_eq!(format!("{}", WrapGuideStyle::Dotted), "dotted");
+    }
 }

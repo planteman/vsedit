@@ -1101,6 +1101,282 @@ impl ImageCacheTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ImageScaler – scale with aspect-ratio preservation
+// ---------------------------------------------------------------------------
+
+/// Scales image dimensions while preserving aspect ratio.
+#[derive(Debug, Clone, Copy)]
+pub struct ImageScaler {
+    /// Original width.
+    pub width: u32,
+    /// Original height.
+    pub height: u32,
+}
+
+impl ImageScaler {
+    /// Create a scaler for the given dimensions.
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+
+    /// Scale to fit within the given maximum dimensions, preserving aspect ratio.
+    pub fn fit(&self, max_width: u32, max_height: u32) -> (u32, u32) {
+        if self.width == 0 || self.height == 0 {
+            return (0, 0);
+        }
+        let ratio_w = max_width as f64 / self.width as f64;
+        let ratio_h = max_height as f64 / self.height as f64;
+        let ratio = ratio_w.min(ratio_h).min(1.0);
+        (
+            (self.width as f64 * ratio).round() as u32,
+            (self.height as f64 * ratio).round() as u32,
+        )
+    }
+
+    /// Scale to fill the given dimensions (may crop), preserving aspect ratio.
+    pub fn fill(&self, target_width: u32, target_height: u32) -> (u32, u32) {
+        if self.width == 0 || self.height == 0 {
+            return (0, 0);
+        }
+        let ratio_w = target_width as f64 / self.width as f64;
+        let ratio_h = target_height as f64 / self.height as f64;
+        let ratio = ratio_w.max(ratio_h);
+        (
+            (self.width as f64 * ratio).round() as u32,
+            (self.height as f64 * ratio).round() as u32,
+        )
+    }
+
+    /// Scale by a percentage (100 = original size).
+    pub fn scale_by_percent(&self, percent: u32) -> (u32, u32) {
+        let factor = percent as f64 / 100.0;
+        (
+            (self.width as f64 * factor).round() as u32,
+            (self.height as f64 * factor).round() as u32,
+        )
+    }
+
+    /// Aspect ratio as width/height.
+    pub fn aspect_ratio(&self) -> f64 {
+        if self.height == 0 {
+            return 0.0;
+        }
+        self.width as f64 / self.height as f64
+    }
+}
+
+impl fmt::Display for ImageScaler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}x{}", self.width, self.height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ImageColorSpace – sRGB/linear conversion
+// ---------------------------------------------------------------------------
+
+/// Color space conversion utilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageColorSpace {
+    /// Standard RGB (gamma-encoded).
+    Srgb,
+    /// Linear RGB.
+    Linear,
+}
+
+impl ImageColorSpace {
+    /// Convert a single sRGB channel value (0.0–1.0) to linear.
+    pub fn srgb_to_linear(value: f64) -> f64 {
+        if value <= 0.04045 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    /// Convert a single linear channel value to sRGB.
+    pub fn linear_to_srgb(value: f64) -> f64 {
+        if value <= 0.0031308 {
+            value * 12.92
+        } else {
+            1.055 * value.powf(1.0 / 2.4) - 0.055
+        }
+    }
+
+    /// Convert RGB channels from sRGB to linear.
+    pub fn convert_pixel_to_linear(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+        (
+            Self::srgb_to_linear(r),
+            Self::srgb_to_linear(g),
+            Self::srgb_to_linear(b),
+        )
+    }
+
+    /// Convert RGB channels from linear to sRGB.
+    pub fn convert_pixel_to_srgb(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+        (
+            Self::linear_to_srgb(r),
+            Self::linear_to_srgb(g),
+            Self::linear_to_srgb(b),
+        )
+    }
+}
+
+impl fmt::Display for ImageColorSpace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImageColorSpace::Srgb => write!(f, "sRGB"),
+            ImageColorSpace::Linear => write!(f, "Linear"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExifMetadata – basic EXIF-like metadata
+// ---------------------------------------------------------------------------
+
+/// Basic image metadata parsed from file headers (subset of EXIF).
+///
+/// Unlike [`ImageMetadata`], this is specifically for parsed header data
+/// and uses `Option` fields since not all metadata may be available.
+#[derive(Debug, Clone, Default)]
+pub struct ExifMetadata {
+    /// Width in pixels.
+    pub width: Option<u32>,
+    /// Height in pixels.
+    pub height: Option<u32>,
+    /// Bits per channel.
+    pub bit_depth: Option<u8>,
+    /// Color type description.
+    pub color_type: Option<String>,
+    /// DPI (dots per inch).
+    pub dpi: Option<u32>,
+    /// Camera or software name.
+    pub software: Option<String>,
+}
+
+impl ExifMetadata {
+    /// Parse metadata from PNG header bytes.
+    ///
+    /// Reads width and height from the IHDR chunk.
+    pub fn from_png_header(data: &[u8]) -> Option<Self> {
+        // PNG: 8-byte signature, then IHDR chunk (4 len + 4 type + 4 width + 4 height + ...)
+        if data.len() < 24 {
+            return None;
+        }
+        if &data[0..8] != b"\x89PNG\r\n\x1a\n" {
+            return None;
+        }
+        let width = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
+        let height = u32::from_be_bytes([data[20], data[21], data[22], data[23]]);
+        let bit_depth = if data.len() > 24 { Some(data[24]) } else { None };
+        Some(Self {
+            width: Some(width),
+            height: Some(height),
+            bit_depth,
+            ..Default::default()
+        })
+    }
+
+    /// Summary string for display.
+    pub fn summary(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if let (Some(w), Some(h)) = (self.width, self.height) {
+            parts.push(format!("{}×{}", w, h));
+        }
+        if let Some(d) = self.bit_depth {
+            parts.push(format!("{}bpp", d));
+        }
+        if let Some(ref ct) = self.color_type {
+            parts.push(ct.clone());
+        }
+        if parts.is_empty() {
+            "no metadata".to_string()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
+impl fmt::Display for ExifMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ImageDiffViewer – before/after comparison
+// ---------------------------------------------------------------------------
+
+/// Compares two image infos for a before/after diff.
+#[derive(Debug, Clone)]
+pub struct ImageDiffViewer {
+    /// The "before" image info.
+    pub before: ImageInfo,
+    /// The "after" image info.
+    pub after: ImageInfo,
+}
+
+impl ImageDiffViewer {
+    /// Create a diff viewer for two images.
+    pub fn new(before: ImageInfo, after: ImageInfo) -> Self {
+        Self { before, after }
+    }
+
+    /// Whether the dimensions changed.
+    pub fn dimensions_changed(&self) -> bool {
+        self.before.width != self.after.width || self.before.height != self.after.height
+    }
+
+    /// Whether the format changed.
+    pub fn format_changed(&self) -> bool {
+        self.before.format != self.after.format
+    }
+
+    /// Size difference in bytes (positive = after is larger).
+    pub fn size_diff(&self) -> i64 {
+        self.after.file_size as i64 - self.before.file_size as i64
+    }
+
+    /// Human-readable summary of changes.
+    pub fn summary(&self) -> String {
+        let mut changes = Vec::new();
+        if self.dimensions_changed() {
+            changes.push(format!(
+                "dimensions: {}×{} → {}×{}",
+                self.before.width, self.before.height, self.after.width, self.after.height
+            ));
+        }
+        if self.format_changed() {
+            changes.push(format!(
+                "format: {} → {}",
+                self.before.format, self.after.format
+            ));
+        }
+        let diff = self.size_diff();
+        if diff != 0 {
+            changes.push(format!(
+                "size: {} → {} ({:+})",
+                format_file_size(self.before.file_size),
+                format_file_size(self.after.file_size),
+                diff
+            ));
+        }
+        if changes.is_empty() {
+            "no changes".to_string()
+        } else {
+            changes.join("; ")
+        }
+    }
+}
+
+impl fmt::Display for ImageDiffViewer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1881,5 +2157,129 @@ mod tests {
         cache.clear();
         assert!(cache.is_empty());
         assert_eq!(cache.total_bytes(), 0);
+    }
+
+    // -- ImageScaler tests --
+
+    #[test]
+    fn scaler_fit() {
+        let s = ImageScaler::new(800, 600);
+        let (w, h) = s.fit(400, 400);
+        assert_eq!(w, 400);
+        assert_eq!(h, 300);
+    }
+
+    #[test]
+    fn scaler_fit_no_upscale() {
+        let s = ImageScaler::new(200, 100);
+        let (w, h) = s.fit(400, 400);
+        assert_eq!(w, 200);
+        assert_eq!(h, 100);
+    }
+
+    #[test]
+    fn scaler_fill() {
+        let s = ImageScaler::new(800, 600);
+        let (w, h) = s.fill(400, 400);
+        // fill should cover the target area
+        assert!(w >= 400 || h >= 400);
+    }
+
+    #[test]
+    fn scaler_scale_by_percent() {
+        let s = ImageScaler::new(100, 200);
+        assert_eq!(s.scale_by_percent(50), (50, 100));
+    }
+
+    #[test]
+    fn scaler_aspect_ratio() {
+        let s = ImageScaler::new(800, 400);
+        assert!((s.aspect_ratio() - 2.0).abs() < f64::EPSILON);
+    }
+
+    // -- ImageColorSpace tests --
+
+    #[test]
+    fn color_space_roundtrip() {
+        let srgb = 0.5;
+        let linear = ImageColorSpace::srgb_to_linear(srgb);
+        let back = ImageColorSpace::linear_to_srgb(linear);
+        assert!((back - srgb).abs() < 0.001);
+    }
+
+    #[test]
+    fn color_space_black_white() {
+        assert!((ImageColorSpace::srgb_to_linear(0.0)).abs() < f64::EPSILON);
+        assert!((ImageColorSpace::srgb_to_linear(1.0) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn color_space_display() {
+        assert_eq!(format!("{}", ImageColorSpace::Srgb), "sRGB");
+        assert_eq!(format!("{}", ImageColorSpace::Linear), "Linear");
+    }
+
+    // -- ExifMetadata tests --
+
+    #[test]
+    fn exif_metadata_from_png() {
+        // Minimal PNG-like header: signature + IHDR
+        let mut data = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        // IHDR chunk: length (13) + "IHDR" + width (100) + height (200) + bit_depth
+        data.extend_from_slice(&[0, 0, 0, 13]); // length
+        data.extend_from_slice(b"IHDR");
+        data.extend_from_slice(&100u32.to_be_bytes()); // width
+        data.extend_from_slice(&200u32.to_be_bytes()); // height
+        data.push(8); // bit depth
+        let meta = ExifMetadata::from_png_header(&data).unwrap();
+        assert_eq!(meta.width, Some(100));
+        assert_eq!(meta.height, Some(200));
+        assert_eq!(meta.bit_depth, Some(8));
+    }
+
+    #[test]
+    fn exif_metadata_summary() {
+        let meta = ExifMetadata {
+            width: Some(100),
+            height: Some(200),
+            bit_depth: Some(8),
+            ..Default::default()
+        };
+        assert!(meta.summary().contains("100×200"));
+    }
+
+    // -- ImageDiffViewer tests --
+
+    #[test]
+    fn diff_no_changes() {
+        let info = ImageInfo {
+            width: 100,
+            height: 100,
+            format: ImageFormat::Png,
+            file_size: 1024,
+            uri: String::new(),
+        };
+        let diff = ImageDiffViewer::new(info.clone(), info);
+        assert!(!diff.dimensions_changed());
+        assert!(!diff.format_changed());
+        assert_eq!(diff.size_diff(), 0);
+    }
+
+    #[test]
+    fn diff_dimensions_changed() {
+        let before = ImageInfo { width: 100, height: 100, format: ImageFormat::Png, file_size: 1024, uri: String::new() };
+        let after = ImageInfo { width: 200, height: 200, format: ImageFormat::Png, file_size: 4096, uri: String::new() };
+        let diff = ImageDiffViewer::new(before, after);
+        assert!(diff.dimensions_changed());
+        assert_eq!(diff.size_diff(), 3072);
+        assert!(diff.summary().contains("dimensions"));
+    }
+
+    #[test]
+    fn diff_format_changed() {
+        let before = ImageInfo { width: 100, height: 100, format: ImageFormat::Png, file_size: 1024, uri: String::new() };
+        let after = ImageInfo { width: 100, height: 100, format: ImageFormat::Jpeg, file_size: 512, uri: String::new() };
+        let diff = ImageDiffViewer::new(before, after);
+        assert!(diff.format_changed());
     }
 }

@@ -1182,6 +1182,337 @@ impl fmt::Display for PortForwardingTable {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SimpleConnectionPool – lightweight pool with health checking
+// ---------------------------------------------------------------------------
+
+/// A lightweight pool of remote connections with health checking.
+///
+/// Unlike [`RemoteConnectionPool`], this uses a simple string-based authority
+/// and has no retry policy, suitable for quick health monitoring.
+#[derive(Debug, Clone)]
+pub struct SimpleConnectionPool {
+    connections: Vec<SimplePoolEntry>,
+    max_connections: usize,
+}
+
+#[derive(Debug, Clone)]
+struct SimplePoolEntry {
+    name: String,
+    authority: String,
+    healthy: bool,
+    last_check_epoch: u64,
+}
+
+impl Default for SimpleConnectionPool {
+    fn default() -> Self {
+        Self {
+            connections: Vec::new(),
+            max_connections: 16,
+        }
+    }
+}
+
+impl SimpleConnectionPool {
+    /// Create a pool with the given maximum size.
+    pub fn new(max_connections: usize) -> Self {
+        Self {
+            max_connections,
+            ..Default::default()
+        }
+    }
+
+    /// Add a connection to the pool. Returns `false` if the pool is full.
+    pub fn add(&mut self, name: impl Into<String>, authority: impl Into<String>) -> bool {
+        if self.connections.len() >= self.max_connections {
+            return false;
+        }
+        self.connections.push(SimplePoolEntry {
+            name: name.into(),
+            authority: authority.into(),
+            healthy: true,
+            last_check_epoch: 0,
+        });
+        true
+    }
+
+    /// Remove a connection by name.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let len = self.connections.len();
+        self.connections.retain(|e| e.name != name);
+        self.connections.len() < len
+    }
+
+    /// Mark a connection as unhealthy.
+    pub fn mark_unhealthy(&mut self, name: &str) {
+        if let Some(e) = self.connections.iter_mut().find(|e| e.name == name) {
+            e.healthy = false;
+        }
+    }
+
+    /// Mark a connection as healthy.
+    pub fn mark_healthy(&mut self, name: &str) {
+        if let Some(e) = self.connections.iter_mut().find(|e| e.name == name) {
+            e.healthy = true;
+        }
+    }
+
+    /// Get all healthy connections.
+    pub fn healthy_connections(&self) -> Vec<&str> {
+        self.connections
+            .iter()
+            .filter(|e| e.healthy)
+            .map(|e| e.name.as_str())
+            .collect()
+    }
+
+    /// Get all unhealthy connections.
+    pub fn unhealthy_connections(&self) -> Vec<&str> {
+        self.connections
+            .iter()
+            .filter(|e| !e.healthy)
+            .map(|e| e.name.as_str())
+            .collect()
+    }
+
+    /// Number of connections in the pool.
+    pub fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    /// Whether the pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.connections.is_empty()
+    }
+
+    /// Check health of all connections, applying the checker function.
+    pub fn check_health(&mut self, checker: impl Fn(&str) -> bool) {
+        for entry in &mut self.connections {
+            entry.healthy = checker(&entry.authority);
+        }
+    }
+}
+
+impl fmt::Display for SimpleConnectionPool {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let healthy = self.connections.iter().filter(|e| e.healthy).count();
+        write!(
+            f,
+            "SimpleConnectionPool({}/{} healthy)",
+            healthy,
+            self.connections.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemotePortForwarding – port forwarding manager
+// ---------------------------------------------------------------------------
+
+/// Manages port forwarding rules for remote connections.
+#[derive(Debug, Clone)]
+pub struct RemotePortForwarding {
+    rules: Vec<PortForwardRule>,
+}
+
+/// A single port forwarding rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PortForwardRule {
+    /// Local port number.
+    pub local_port: u16,
+    /// Remote port number.
+    pub remote_port: u16,
+    /// Label for the forwarded port.
+    pub label: String,
+    /// Whether auto-forwarding is enabled.
+    pub auto_forward: bool,
+}
+
+impl Default for RemotePortForwarding {
+    fn default() -> Self {
+        Self { rules: Vec::new() }
+    }
+}
+
+impl RemotePortForwarding {
+    /// Create a new empty manager.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a port forwarding rule.
+    pub fn add_rule(&mut self, local_port: u16, remote_port: u16, label: impl Into<String>) {
+        self.rules.push(PortForwardRule {
+            local_port,
+            remote_port,
+            label: label.into(),
+            auto_forward: false,
+        });
+    }
+
+    /// Remove a rule by local port.
+    pub fn remove_by_local(&mut self, local_port: u16) -> bool {
+        let len = self.rules.len();
+        self.rules.retain(|r| r.local_port != local_port);
+        self.rules.len() < len
+    }
+
+    /// Find a rule by remote port.
+    pub fn find_by_remote(&self, remote_port: u16) -> Option<&PortForwardRule> {
+        self.rules.iter().find(|r| r.remote_port == remote_port)
+    }
+
+    /// Number of forwarding rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// All rules as a slice.
+    pub fn rules(&self) -> &[PortForwardRule] {
+        &self.rules
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteFileSync – cached remote file reads
+// ---------------------------------------------------------------------------
+
+/// Caches remote file contents to avoid repeated reads.
+#[derive(Debug, Clone)]
+pub struct RemoteFileSync {
+    cache: std::collections::HashMap<String, CachedFile>,
+    max_entries: usize,
+}
+
+#[derive(Debug, Clone)]
+struct CachedFile {
+    content: Vec<u8>,
+    timestamp: u64,
+}
+
+impl Default for RemoteFileSync {
+    fn default() -> Self {
+        Self {
+            cache: std::collections::HashMap::new(),
+            max_entries: 256,
+        }
+    }
+}
+
+impl RemoteFileSync {
+    /// Create a new sync cache.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            max_entries,
+            ..Default::default()
+        }
+    }
+
+    /// Store a file in the cache.
+    pub fn put(&mut self, path: impl Into<String>, content: Vec<u8>, timestamp: u64) {
+        if self.cache.len() >= self.max_entries {
+            // Evict oldest entry
+            if let Some(oldest_key) = self
+                .cache
+                .iter()
+                .min_by_key(|(_, v)| v.timestamp)
+                .map(|(k, _)| k.clone())
+            {
+                self.cache.remove(&oldest_key);
+            }
+        }
+        self.cache.insert(
+            path.into(),
+            CachedFile { content, timestamp },
+        );
+    }
+
+    /// Get a cached file if it exists and is not stale.
+    pub fn get(&self, path: &str, max_age: u64, now: u64) -> Option<&[u8]> {
+        self.cache.get(path).and_then(|entry| {
+            if now.saturating_sub(entry.timestamp) <= max_age {
+                Some(entry.content.as_slice())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Invalidate a cached file.
+    pub fn invalidate(&mut self, path: &str) -> bool {
+        self.cache.remove(path).is_some()
+    }
+
+    /// Number of cached files.
+    pub fn cached_count(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Clear the entire cache.
+    pub fn clear(&mut self) {
+        self.cache.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Remote authority resolver
+// ---------------------------------------------------------------------------
+
+/// Parses and resolves remote authority URIs.
+///
+/// Authority format: `scheme+host` (e.g. `ssh-remote+myserver`).
+/// Unlike [`RemoteAuthority`], this is a simpler parser without user/port fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteAuthorityUri {
+    /// The scheme part (e.g. `ssh-remote`).
+    pub scheme: String,
+    /// The host part (e.g. `myserver`).
+    pub host: String,
+}
+
+impl RemoteAuthorityUri {
+    /// Parse an authority string like `"ssh-remote+myserver"`.
+    pub fn parse(authority: &str) -> Result<Self, RemoteError> {
+        let authority = authority.trim();
+        if authority.is_empty() {
+            return Err(RemoteError::InvalidAuthority("empty".into()));
+        }
+        match authority.split_once('+') {
+            Some((scheme, host)) if !scheme.is_empty() && !host.is_empty() => Ok(Self {
+                scheme: scheme.to_string(),
+                host: host.to_string(),
+            }),
+            _ => Err(RemoteError::InvalidAuthority(authority.to_string())),
+        }
+    }
+
+    /// Reconstruct the authority string.
+    pub fn to_authority_string(&self) -> String {
+        format!("{}+{}", self.scheme, self.host)
+    }
+
+    /// Whether this is an SSH remote.
+    pub fn is_ssh(&self) -> bool {
+        self.scheme == "ssh-remote"
+    }
+
+    /// Whether this is a WSL remote.
+    pub fn is_wsl(&self) -> bool {
+        self.scheme == "wsl"
+    }
+
+    /// Whether this is a dev container remote.
+    pub fn is_dev_container(&self) -> bool {
+        self.scheme == "dev-container"
+    }
+}
+
+impl fmt::Display for RemoteAuthorityUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}+{}", self.scheme, self.host)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1877,5 +2208,122 @@ mod tests {
     fn forwarded_port_different_ports() {
         let port = ForwardedPort::new(3000, 8080);
         assert!(!port.is_same_port());
+    }
+
+    // -- SimpleConnectionPool tests --
+
+    #[test]
+    fn simple_pool_add_and_remove() {
+        let mut pool = SimpleConnectionPool::new(4);
+        assert!(pool.add("dev", "ssh-remote+dev"));
+        assert_eq!(pool.len(), 1);
+        assert!(pool.remove("dev"));
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn simple_pool_capacity() {
+        let mut pool = SimpleConnectionPool::new(2);
+        assert!(pool.add("a", "auth_a"));
+        assert!(pool.add("b", "auth_b"));
+        assert!(!pool.add("c", "auth_c"));
+    }
+
+    #[test]
+    fn simple_pool_health() {
+        let mut pool = SimpleConnectionPool::new(4);
+        pool.add("a", "auth_a");
+        pool.add("b", "auth_b");
+        pool.mark_unhealthy("a");
+        assert_eq!(pool.healthy_connections(), vec!["b"]);
+        assert_eq!(pool.unhealthy_connections(), vec!["a"]);
+        pool.mark_healthy("a");
+        assert_eq!(pool.healthy_connections().len(), 2);
+    }
+
+    #[test]
+    fn simple_pool_check_health() {
+        let mut pool = SimpleConnectionPool::new(4);
+        pool.add("a", "good");
+        pool.add("b", "bad");
+        pool.check_health(|auth| auth == "good");
+        assert_eq!(pool.healthy_connections(), vec!["a"]);
+    }
+
+    // -- RemotePortForwarding tests --
+
+    #[test]
+    fn port_forwarding_add_and_find() {
+        let mut pf = RemotePortForwarding::new();
+        pf.add_rule(3000, 8080, "web");
+        assert_eq!(pf.rule_count(), 1);
+        let rule = pf.find_by_remote(8080).unwrap();
+        assert_eq!(rule.local_port, 3000);
+        assert_eq!(rule.label, "web");
+    }
+
+    #[test]
+    fn port_forwarding_remove() {
+        let mut pf = RemotePortForwarding::new();
+        pf.add_rule(3000, 8080, "web");
+        assert!(pf.remove_by_local(3000));
+        assert_eq!(pf.rule_count(), 0);
+    }
+
+    // -- RemoteFileSync tests --
+
+    #[test]
+    fn file_sync_put_and_get() {
+        let mut sync = RemoteFileSync::new(10);
+        sync.put("/etc/hosts", b"127.0.0.1".to_vec(), 100);
+        assert_eq!(sync.get("/etc/hosts", 50, 120), Some(b"127.0.0.1".as_slice()));
+    }
+
+    #[test]
+    fn file_sync_stale() {
+        let mut sync = RemoteFileSync::new(10);
+        sync.put("/etc/hosts", b"data".to_vec(), 100);
+        assert!(sync.get("/etc/hosts", 10, 200).is_none());
+    }
+
+    #[test]
+    fn file_sync_invalidate() {
+        let mut sync = RemoteFileSync::new(10);
+        sync.put("/etc/hosts", b"data".to_vec(), 100);
+        assert!(sync.invalidate("/etc/hosts"));
+        assert_eq!(sync.cached_count(), 0);
+    }
+
+    // -- RemoteAuthorityUri tests --
+
+    #[test]
+    fn authority_uri_parse_ssh() {
+        let a = RemoteAuthorityUri::parse("ssh-remote+myserver").unwrap();
+        assert_eq!(a.scheme, "ssh-remote");
+        assert_eq!(a.host, "myserver");
+        assert!(a.is_ssh());
+    }
+
+    #[test]
+    fn authority_uri_parse_wsl() {
+        let a = RemoteAuthorityUri::parse("wsl+Ubuntu").unwrap();
+        assert!(a.is_wsl());
+    }
+
+    #[test]
+    fn authority_uri_parse_empty() {
+        assert!(RemoteAuthorityUri::parse("").is_err());
+    }
+
+    #[test]
+    fn authority_uri_parse_no_plus() {
+        assert!(RemoteAuthorityUri::parse("noplus").is_err());
+    }
+
+    #[test]
+    fn authority_uri_roundtrip() {
+        let a = RemoteAuthorityUri::parse("dev-container+myapp").unwrap();
+        assert_eq!(a.to_authority_string(), "dev-container+myapp");
+        assert!(a.is_dev_container());
     }
 }

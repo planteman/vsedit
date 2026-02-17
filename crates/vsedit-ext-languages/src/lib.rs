@@ -1032,6 +1032,273 @@ impl ProviderChain {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LanguageFeatureRegistry – track providers by language
+// ---------------------------------------------------------------------------
+
+/// Tracks which language feature providers are registered per language.
+#[derive(Debug, Clone)]
+pub struct LanguageFeatureRegistry {
+    /// Map of language ID to registered feature kinds.
+    features: HashMap<String, Vec<LanguageFeatureKind>>,
+}
+
+impl Default for LanguageFeatureRegistry {
+    fn default() -> Self {
+        Self {
+            features: HashMap::new(),
+        }
+    }
+}
+
+impl LanguageFeatureRegistry {
+    /// Create a new empty registry.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a feature kind for a language.
+    pub fn register(&mut self, language: &str, kind: LanguageFeatureKind) {
+        self.features
+            .entry(language.to_string())
+            .or_default()
+            .push(kind);
+    }
+
+    /// Check if a language has a specific feature.
+    pub fn has_feature(&self, language: &str, kind: LanguageFeatureKind) -> bool {
+        self.features
+            .get(language)
+            .map(|kinds| kinds.contains(&kind))
+            .unwrap_or(false)
+    }
+
+    /// Get all features for a language.
+    pub fn get_features(&self, language: &str) -> Vec<LanguageFeatureKind> {
+        self.features.get(language).cloned().unwrap_or_default()
+    }
+
+    /// Get all languages that have at least one feature.
+    pub fn languages(&self) -> Vec<&str> {
+        self.features.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Total number of feature registrations across all languages.
+    pub fn total_registrations(&self) -> usize {
+        self.features.values().map(|v| v.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageSelectorMatcher – pattern/scheme matching
+// ---------------------------------------------------------------------------
+
+/// Extended matching for language selectors with glob support.
+#[derive(Debug, Clone)]
+pub struct LanguageSelectorMatcher {
+    selector: LanguageSelector,
+}
+
+impl LanguageSelectorMatcher {
+    /// Create a matcher for the given selector.
+    pub fn new(selector: LanguageSelector) -> Self {
+        Self { selector }
+    }
+
+    /// Check if a document matches this selector.
+    ///
+    /// Matches against language, scheme, and file pattern.
+    pub fn matches(&self, language: &str, scheme: &str, file_path: &str) -> bool {
+        if let Some(ref lang) = self.selector.language {
+            if lang != language {
+                return false;
+            }
+        }
+        if let Some(ref s) = self.selector.scheme {
+            if s != scheme {
+                return false;
+            }
+        }
+        if let Some(ref pattern) = self.selector.pattern {
+            if !Self::glob_match(pattern, file_path) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Simple glob matching supporting `*` and `**`.
+    fn glob_match(pattern: &str, path: &str) -> bool {
+        if pattern == "**" {
+            return true;
+        }
+        if let Some(ext) = pattern.strip_prefix("**/*.") {
+            return path.ends_with(&format!(".{}", ext));
+        }
+        if let Some(ext) = pattern.strip_prefix("*.") {
+            let file_name = path.rsplit('/').next().unwrap_or(path);
+            return file_name.ends_with(&format!(".{}", ext));
+        }
+        pattern == path
+    }
+
+    /// Compute a match score (higher is more specific).
+    pub fn score(&self, language: &str, scheme: &str, file_path: &str) -> u32 {
+        if !self.matches(language, scheme, file_path) {
+            return 0;
+        }
+        let mut score = 0u32;
+        if self.selector.language.is_some() {
+            score += 10;
+        }
+        if self.selector.scheme.is_some() {
+            score += 5;
+        }
+        if self.selector.pattern.is_some() {
+            score += 3;
+        }
+        score
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Semantic token legend management
+// ---------------------------------------------------------------------------
+
+/// Manages semantic token types and modifiers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticTokenLegend {
+    /// Token type names (e.g. "namespace", "type", "class").
+    pub token_types: Vec<String>,
+    /// Token modifier names (e.g. "declaration", "definition").
+    pub token_modifiers: Vec<String>,
+}
+
+impl Default for SemanticTokenLegend {
+    fn default() -> Self {
+        Self {
+            token_types: vec![
+                "namespace".into(),
+                "type".into(),
+                "class".into(),
+                "enum".into(),
+                "interface".into(),
+                "struct".into(),
+                "typeParameter".into(),
+                "parameter".into(),
+                "variable".into(),
+                "property".into(),
+                "function".into(),
+                "method".into(),
+                "keyword".into(),
+                "comment".into(),
+                "string".into(),
+                "number".into(),
+                "operator".into(),
+            ],
+            token_modifiers: vec![
+                "declaration".into(),
+                "definition".into(),
+                "readonly".into(),
+                "static".into(),
+                "deprecated".into(),
+                "async".into(),
+            ],
+        }
+    }
+}
+
+impl SemanticTokenLegend {
+    /// Create an empty legend.
+    pub fn empty() -> Self {
+        Self {
+            token_types: Vec::new(),
+            token_modifiers: Vec::new(),
+        }
+    }
+
+    /// Get the index for a token type, registering it if new.
+    pub fn token_type_index(&mut self, name: &str) -> usize {
+        if let Some(idx) = self.token_types.iter().position(|t| t == name) {
+            idx
+        } else {
+            self.token_types.push(name.to_string());
+            self.token_types.len() - 1
+        }
+    }
+
+    /// Get the bitmask for a set of modifiers.
+    pub fn modifier_bitmask(&self, modifiers: &[&str]) -> u32 {
+        let mut mask = 0u32;
+        for name in modifiers {
+            if let Some(idx) = self.token_modifiers.iter().position(|m| m == name) {
+                mask |= 1 << idx;
+            }
+        }
+        mask
+    }
+
+    /// Whether a token type is registered.
+    pub fn has_token_type(&self, name: &str) -> bool {
+        self.token_types.iter().any(|t| t == name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language-specific settings overlay
+// ---------------------------------------------------------------------------
+
+/// Overlays language-specific settings on top of defaults.
+#[derive(Debug, Clone)]
+pub struct LanguageSettingsOverlay {
+    overrides: HashMap<String, HashMap<String, String>>,
+}
+
+impl Default for LanguageSettingsOverlay {
+    fn default() -> Self {
+        Self {
+            overrides: HashMap::new(),
+        }
+    }
+}
+
+impl LanguageSettingsOverlay {
+    /// Create an empty overlay.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a language-specific setting.
+    pub fn set(&mut self, language: &str, key: &str, value: &str) {
+        self.overrides
+            .entry(language.to_string())
+            .or_default()
+            .insert(key.to_string(), value.to_string());
+    }
+
+    /// Get a setting value, with a fallback default.
+    pub fn get<'a>(&'a self, language: &str, key: &str, default: &'a str) -> &'a str {
+        self.overrides
+            .get(language)
+            .and_then(|m| m.get(key))
+            .map(|s| s.as_str())
+            .unwrap_or(default)
+    }
+
+    /// Get all overridden keys for a language.
+    pub fn keys_for(&self, language: &str) -> Vec<&str> {
+        self.overrides
+            .get(language)
+            .map(|m| m.keys().map(|k| k.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Number of languages with overrides.
+    pub fn language_count(&self) -> usize {
+        self.overrides.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1878,5 +2145,121 @@ mod tests {
         assert_eq!(w, 2);
         let w2: u32 = ProviderPriority::Default.into();
         assert_eq!(w2, 0);
+    }
+
+    // -- LanguageFeatureRegistry tests --
+
+    #[test]
+    fn feature_registry_register_and_check() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register("rust", LanguageFeatureKind::Completion);
+        reg.register("rust", LanguageFeatureKind::Hover);
+        assert!(reg.has_feature("rust", LanguageFeatureKind::Completion));
+        assert!(!reg.has_feature("rust", LanguageFeatureKind::Definition));
+        assert!(!reg.has_feature("python", LanguageFeatureKind::Completion));
+    }
+
+    #[test]
+    fn feature_registry_languages() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register("rust", LanguageFeatureKind::Completion);
+        reg.register("python", LanguageFeatureKind::Hover);
+        let langs = reg.languages();
+        assert_eq!(langs.len(), 2);
+    }
+
+    #[test]
+    fn feature_registry_total() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register("rust", LanguageFeatureKind::Completion);
+        reg.register("rust", LanguageFeatureKind::Hover);
+        assert_eq!(reg.total_registrations(), 2);
+    }
+
+    // -- LanguageSelectorMatcher tests --
+
+    #[test]
+    fn selector_matcher_language_only() {
+        let sel = LanguageSelector { language: Some("rust".into()), scheme: None, pattern: None };
+        let m = LanguageSelectorMatcher::new(sel);
+        assert!(m.matches("rust", "file", "main.rs"));
+        assert!(!m.matches("python", "file", "main.py"));
+    }
+
+    #[test]
+    fn selector_matcher_pattern() {
+        let sel = LanguageSelector {
+            language: None,
+            scheme: None,
+            pattern: Some("**/*.rs".into()),
+        };
+        let m = LanguageSelectorMatcher::new(sel);
+        assert!(m.matches("rust", "file", "src/main.rs"));
+        assert!(!m.matches("rust", "file", "src/main.py"));
+    }
+
+    #[test]
+    fn selector_matcher_score() {
+        let sel = LanguageSelector {
+            language: Some("rust".into()),
+            scheme: Some("file".into()),
+            pattern: None,
+        };
+        let m = LanguageSelectorMatcher::new(sel);
+        assert_eq!(m.score("rust", "file", "main.rs"), 15);
+        assert_eq!(m.score("python", "file", "main.py"), 0);
+    }
+
+    // -- SemanticTokenLegend tests --
+
+    #[test]
+    fn legend_default_has_types() {
+        let leg = SemanticTokenLegend::default();
+        assert!(leg.has_token_type("function"));
+        assert!(leg.has_token_type("variable"));
+    }
+
+    #[test]
+    fn legend_token_type_index() {
+        let mut leg = SemanticTokenLegend::empty();
+        let idx = leg.token_type_index("custom");
+        assert_eq!(idx, 0);
+        let idx2 = leg.token_type_index("custom");
+        assert_eq!(idx2, 0);
+    }
+
+    #[test]
+    fn legend_modifier_bitmask() {
+        let leg = SemanticTokenLegend::default();
+        let mask = leg.modifier_bitmask(&["declaration", "readonly"]);
+        assert_eq!(mask, 0b101);
+    }
+
+    // -- LanguageSettingsOverlay tests --
+
+    #[test]
+    fn settings_overlay_set_get() {
+        let mut o = LanguageSettingsOverlay::new();
+        o.set("rust", "tabSize", "4");
+        assert_eq!(o.get("rust", "tabSize", "2"), "4");
+        assert_eq!(o.get("rust", "insertSpaces", "true"), "true");
+        assert_eq!(o.get("python", "tabSize", "2"), "2");
+    }
+
+    #[test]
+    fn settings_overlay_keys() {
+        let mut o = LanguageSettingsOverlay::new();
+        o.set("rust", "tabSize", "4");
+        o.set("rust", "formatOnSave", "true");
+        let keys = o.keys_for("rust");
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn settings_overlay_language_count() {
+        let mut o = LanguageSettingsOverlay::new();
+        o.set("rust", "tabSize", "4");
+        o.set("python", "tabSize", "4");
+        assert_eq!(o.language_count(), 2);
     }
 }

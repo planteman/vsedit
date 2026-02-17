@@ -1245,6 +1245,276 @@ where
 }
 
 // ---------------------------------------------------------------------------
+// OrderedMap – maintains insertion order
+// ---------------------------------------------------------------------------
+
+/// A map that maintains insertion order.
+///
+/// Like [`HashMap`] but iterates in the order keys were first inserted.
+#[derive(Debug, Clone)]
+pub struct OrderedMap<K: Eq + Hash + Clone, V> {
+    map: HashMap<K, V>,
+    order: Vec<K>,
+}
+
+impl<K: Eq + Hash + Clone, V> Default for OrderedMap<K, V> {
+    fn default() -> Self {
+        Self {
+            map: HashMap::new(),
+            order: Vec::new(),
+        }
+    }
+}
+
+impl<K: Eq + Hash + Clone, V> OrderedMap<K, V> {
+    /// Create an empty ordered map.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Insert a key-value pair. If the key exists, updates the value but
+    /// preserves insertion order.
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        let old = self.map.insert(key.clone(), value);
+        if old.is_none() {
+            self.order.push(key);
+        }
+        old
+    }
+
+    /// Get a reference to the value for a key.
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.map.get(key)
+    }
+
+    /// Remove a key, also removing it from the ordering.
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        let val = self.map.remove(key)?;
+        self.order.retain(|k| k != key);
+        Some(val)
+    }
+
+    /// Iterate in insertion order.
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+        self.order.iter().filter_map(move |k| self.map.get(k).map(|v| (k, v)))
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Whether the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// Get keys in insertion order.
+    pub fn keys(&self) -> &[K] {
+        &self.order
+    }
+
+    /// Whether the map contains the key.
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.map.contains_key(key)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BiMap – bidirectional lookup
+// ---------------------------------------------------------------------------
+
+/// A bidirectional map allowing O(1) lookup in both directions.
+///
+/// Wraps [`BidirectionalMap`] with a simpler API.
+#[derive(Debug, Clone)]
+pub struct BiMap<L: Eq + Hash + Clone, R: Eq + Hash + Clone> {
+    inner: BidirectionalMap<L, R>,
+}
+
+impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> Default for BiMap<L, R> {
+    fn default() -> Self {
+        Self {
+            inner: BidirectionalMap::new(),
+        }
+    }
+}
+
+impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> BiMap<L, R> {
+    /// Create an empty bimap.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Insert a bidirectional mapping.
+    pub fn insert(&mut self, left: L, right: R) {
+        self.inner.set(left, right);
+    }
+
+    /// Look up by left key.
+    pub fn get_left(&self, left: &L) -> Option<&R> {
+        self.inner.get_by_left(left)
+    }
+
+    /// Look up by right key.
+    pub fn get_right(&self, right: &R) -> Option<&L> {
+        self.inner.get_by_right(right)
+    }
+
+    /// Remove by left key.
+    pub fn remove_left(&mut self, left: &L) -> Option<R> {
+        self.inner.delete_by_left(left)
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Whether the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BoundedStack – stack with capacity limit
+// ---------------------------------------------------------------------------
+
+/// A stack with a maximum capacity. When full, the oldest item is dropped.
+#[derive(Debug, Clone)]
+pub struct BoundedStack<T> {
+    items: Vec<T>,
+    capacity: usize,
+}
+
+impl<T> BoundedStack<T> {
+    /// Create a bounded stack with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Push an item. If at capacity, the bottom item is dropped.
+    pub fn push(&mut self, item: T) {
+        if self.items.len() >= self.capacity {
+            self.items.remove(0);
+        }
+        self.items.push(item);
+    }
+
+    /// Pop the top item.
+    pub fn pop(&mut self) -> Option<T> {
+        self.items.pop()
+    }
+
+    /// Peek at the top item.
+    pub fn peek(&self) -> Option<&T> {
+        self.items.last()
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether the stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Whether the stack is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.items.len() >= self.capacity
+    }
+
+    /// The capacity of the stack.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CountingSet – track element frequency
+// ---------------------------------------------------------------------------
+
+/// A set that tracks how many times each element has been added.
+#[derive(Debug, Clone)]
+pub struct CountingSet<T: Eq + Hash> {
+    counts: HashMap<T, usize>,
+}
+
+impl<T: Eq + Hash> Default for CountingSet<T> {
+    fn default() -> Self {
+        Self {
+            counts: HashMap::new(),
+        }
+    }
+}
+
+impl<T: Eq + Hash> CountingSet<T> {
+    /// Create an empty counting set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add an element, incrementing its count.
+    pub fn add(&mut self, item: T) {
+        *self.counts.entry(item).or_insert(0) += 1;
+    }
+
+    /// Remove one occurrence. Returns `true` if the element was present.
+    pub fn remove(&mut self, item: &T) -> bool {
+        if let Some(count) = self.counts.get_mut(item) {
+            *count -= 1;
+            if *count == 0 {
+                self.counts.remove(item);
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the count for an element.
+    pub fn count(&self, item: &T) -> usize {
+        self.counts.get(item).copied().unwrap_or(0)
+    }
+
+    /// Number of distinct elements.
+    pub fn distinct_count(&self) -> usize {
+        self.counts.len()
+    }
+
+    /// Total count across all elements.
+    pub fn total_count(&self) -> usize {
+        self.counts.values().sum()
+    }
+
+    /// Whether the set contains the element.
+    pub fn contains(&self, item: &T) -> bool {
+        self.counts.contains_key(item)
+    }
+
+    /// Whether the set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.counts.is_empty()
+    }
+
+    /// Get the most frequent element.
+    pub fn most_frequent(&self) -> Option<(&T, usize)> {
+        self.counts.iter().max_by_key(|(_, c)| *c).map(|(k, &v)| (k, v))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1883,5 +2153,125 @@ mod tests {
         let mut pairs: Vec<_> = bm.iter().map(|(l, r)| (*l, *r)).collect();
         pairs.sort();
         assert_eq!(pairs, vec![("a", 1), ("b", 2)]);
+    }
+
+    // -- OrderedMap tests --
+
+    #[test]
+    fn ordered_map_insertion_order() {
+        let mut m = OrderedMap::new();
+        m.insert("c", 3);
+        m.insert("a", 1);
+        m.insert("b", 2);
+        let keys: Vec<&&str> = m.iter().map(|(k, _)| k).collect();
+        assert_eq!(keys, vec![&"c", &"a", &"b"]);
+    }
+
+    #[test]
+    fn ordered_map_update_preserves_order() {
+        let mut m = OrderedMap::new();
+        m.insert("a", 1);
+        m.insert("b", 2);
+        m.insert("a", 10);
+        let keys: Vec<&&str> = m.iter().map(|(k, _)| k).collect();
+        assert_eq!(keys, vec![&"a", &"b"]);
+        assert_eq!(m.get(&"a"), Some(&10));
+    }
+
+    #[test]
+    fn ordered_map_remove() {
+        let mut m = OrderedMap::new();
+        m.insert("a", 1);
+        m.insert("b", 2);
+        m.remove(&"a");
+        assert_eq!(m.len(), 1);
+        assert!(!m.contains_key(&"a"));
+    }
+
+    // -- BiMap tests --
+
+    #[test]
+    fn bimap_bidirectional() {
+        let mut bm = BiMap::new();
+        bm.insert("hello", 42);
+        assert_eq!(bm.get_left(&"hello"), Some(&42));
+        assert_eq!(bm.get_right(&42), Some(&"hello"));
+    }
+
+    #[test]
+    fn bimap_remove() {
+        let mut bm = BiMap::new();
+        bm.insert("a", 1);
+        assert_eq!(bm.remove_left(&"a"), Some(1));
+        assert!(bm.is_empty());
+    }
+
+    // -- BoundedStack tests --
+
+    #[test]
+    fn bounded_stack_push_pop() {
+        let mut s = BoundedStack::new(3);
+        s.push(1);
+        s.push(2);
+        s.push(3);
+        assert!(s.is_full());
+        assert_eq!(s.pop(), Some(3));
+        assert_eq!(s.len(), 2);
+    }
+
+    #[test]
+    fn bounded_stack_overflow() {
+        let mut s = BoundedStack::new(2);
+        s.push(1);
+        s.push(2);
+        s.push(3); // drops 1
+        assert_eq!(s.len(), 2);
+        assert_eq!(s.pop(), Some(3));
+        assert_eq!(s.pop(), Some(2));
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn bounded_stack_peek() {
+        let mut s = BoundedStack::new(5);
+        s.push(10);
+        assert_eq!(s.peek(), Some(&10));
+    }
+
+    // -- CountingSet tests --
+
+    #[test]
+    fn counting_set_add_count() {
+        let mut cs = CountingSet::new();
+        cs.add("a");
+        cs.add("a");
+        cs.add("b");
+        assert_eq!(cs.count(&"a"), 2);
+        assert_eq!(cs.count(&"b"), 1);
+        assert_eq!(cs.distinct_count(), 2);
+        assert_eq!(cs.total_count(), 3);
+    }
+
+    #[test]
+    fn counting_set_remove() {
+        let mut cs = CountingSet::new();
+        cs.add("a");
+        cs.add("a");
+        cs.remove(&"a");
+        assert_eq!(cs.count(&"a"), 1);
+        cs.remove(&"a");
+        assert!(!cs.contains(&"a"));
+    }
+
+    #[test]
+    fn counting_set_most_frequent() {
+        let mut cs = CountingSet::new();
+        cs.add("a");
+        cs.add("b");
+        cs.add("b");
+        cs.add("b");
+        let (item, count) = cs.most_frequent().unwrap();
+        assert_eq!(*item, "b");
+        assert_eq!(count, 3);
     }
 }
