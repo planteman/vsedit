@@ -3,6 +3,7 @@
 //! Provides URL and file-path detection within text, as well as a trait for
 //! language-specific document-link providers.
 
+use std::collections::HashMap;
 use std::fmt;
 // ---------------------------------------------------------------------------
 // Types
@@ -1312,6 +1313,197 @@ impl LinkTooltipPreview {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Link detection optimizer
+// ---------------------------------------------------------------------------
+
+pub struct LinkDetectionOptimizer {
+    cache: HashMap<u64, Vec<(usize, usize, String)>>,
+    hit_count: u64, miss_count: u64, max_cache: usize,
+}
+impl LinkDetectionOptimizer {
+    pub fn new(max: usize) -> Self { Self { cache: HashMap::new(), hit_count: 0, miss_count: 0, max_cache: max } }
+    fn hash_line(line: &str) -> u64 { let mut h: u64 = 5381; for b in line.bytes() { h = h.wrapping_mul(33).wrapping_add(b as u64); } h }
+    pub fn detect_cached(&mut self, line: &str) -> Vec<(usize, usize, String)> {
+        let k = Self::hash_line(line);
+        if let Some(c) = self.cache.get(&k) { self.hit_count += 1; return c.clone(); }
+        self.miss_count += 1;
+        let links = detect_urls(line);
+        if self.cache.len() < self.max_cache { self.cache.insert(k, links.clone()); }
+        links
+    }
+    pub fn invalidate(&mut self) { self.cache.clear(); }
+    pub fn cache_size(&self) -> usize { self.cache.len() }
+    pub fn hit_rate(&self) -> f64 { let t = self.hit_count + self.miss_count; if t == 0 { 0.0 } else { self.hit_count as f64 / t as f64 } }
+    pub fn hit_count(&self) -> u64 { self.hit_count }
+    pub fn miss_count(&self) -> u64 { self.miss_count }
+    pub fn reset_stats(&mut self) { self.hit_count = 0; self.miss_count = 0; }
+}
+impl Default for LinkDetectionOptimizer { fn default() -> Self { Self::new(4096) } }
+impl fmt::Display for LinkDetectionOptimizer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "LinkOptimizer(cache={}, hit={:.1}%)", self.cache.len(), self.hit_rate()*100.0) }
+}
+
+// ---------------------------------------------------------------------------
+// Link tooltip generator
+// ---------------------------------------------------------------------------
+
+pub struct LinkTooltipGenerator {
+    show_full_url: bool, max_len: usize, prefixes: HashMap<String, String>,
+}
+impl LinkTooltipGenerator {
+    pub fn new() -> Self { Self { show_full_url: true, max_len: 80, prefixes: HashMap::new() } }
+    pub fn with_max_len(mut self, m: usize) -> Self { self.max_len = m; self }
+    pub fn with_show_full(mut self, s: bool) -> Self { self.show_full_url = s; self }
+    pub fn add_prefix(&mut self, prefix: impl Into<String>, label: impl Into<String>) { self.prefixes.insert(prefix.into(), label.into()); }
+    fn truncate(s: &str, m: usize) -> String { if s.len() <= m { s.to_string() } else { format!("{}...", &s[..m.saturating_sub(3)]) } }
+    pub fn tooltip_for_url(&self, url: &str) -> String {
+        for (p, l) in &self.prefixes { if url.starts_with(p.as_str()) { return format!("{}: {}", l, Self::truncate(url, self.max_len)); } }
+        let d = Self::truncate(url, self.max_len);
+        if url.starts_with("https://") || url.starts_with("http://") { format!("Open link: {}", d) }
+        else if url.starts_with("file://") { format!("Open file: {}", d) }
+        else if url.contains('@') { format!("Send email: {}", d) }
+        else { format!("Follow: {}", d) }
+    }
+    pub fn tooltip_for_file(&self, path: &str) -> String { format!("Open file: {}", Self::truncate(path, self.max_len)) }
+    pub fn tooltip_for_email(&self, email: &str) -> String { format!("Send email to {}", email) }
+    pub fn prefix_count(&self) -> usize { self.prefixes.len() }
+}
+impl Default for LinkTooltipGenerator { fn default() -> Self { Self::new() } }
+impl fmt::Display for LinkTooltipGenerator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "TooltipGen(max={})", self.max_len) }
+}
+
+
+// ---------------------------------------------------------------------------
+// LinkDetectionOptimizerConfig — configuration for LinkDetectionOptimizer
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct LinkDetectionOptimizerConfig {
+    pub max_entries: usize,
+    pub auto_refresh: bool,
+    pub refresh_interval_ms: u64,
+    pub debounce_ms: u64,
+    pub labels: HashMap<String, String>,
+}
+
+impl LinkDetectionOptimizerConfig {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_max_entries(mut self, m: usize) -> Self { self.max_entries = m; self }
+    pub fn with_auto_refresh(mut self, a: bool) -> Self { self.auto_refresh = a; self }
+    pub fn with_refresh_interval(mut self, ms: u64) -> Self { self.refresh_interval_ms = ms; self }
+    pub fn with_debounce(mut self, ms: u64) -> Self { self.debounce_ms = ms; self }
+    pub fn set_label(&mut self, key: impl Into<String>, val: impl Into<String>) { self.labels.insert(key.into(), val.into()); }
+    pub fn get_label(&self, key: &str) -> Option<&str> { self.labels.get(key).map(|s| s.as_str()) }
+    pub fn label_count(&self) -> usize { self.labels.len() }
+    pub fn is_refresh_due(&self, elapsed_ms: u64) -> bool { self.auto_refresh && elapsed_ms >= self.refresh_interval_ms }
+}
+
+impl Default for LinkDetectionOptimizerConfig {
+    fn default() -> Self {
+        Self { max_entries: 10000, auto_refresh: true, refresh_interval_ms: 5000, debounce_ms: 100, labels: HashMap::new() }
+    }
+}
+
+impl fmt::Display for LinkDetectionOptimizerConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Config(max={}, auto_refresh={}, interval={}ms)", self.max_entries, self.auto_refresh, self.refresh_interval_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LinkTooltipGeneratorStats — statistics tracker
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+pub struct LinkTooltipGeneratorStats {
+    pub total_operations: u64,
+    pub successful: u64,
+    pub failed: u64,
+    pub total_duration_ms: u64,
+    pub peak_concurrent: usize,
+    pub current_concurrent: usize,
+}
+
+impl LinkTooltipGeneratorStats {
+    pub fn new() -> Self { Self::default() }
+    pub fn record_success(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.successful += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn record_failure(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.failed += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn success_rate(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.successful as f64 / self.total_operations as f64 } }
+    pub fn avg_duration_ms(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.total_duration_ms as f64 / self.total_operations as f64 } }
+    pub fn update_concurrent(&mut self, current: usize) {
+        self.current_concurrent = current;
+        if current > self.peak_concurrent { self.peak_concurrent = current; }
+    }
+    pub fn reset(&mut self) { *self = Self::default(); }
+    pub fn merge(&mut self, other: &Self) {
+        self.total_operations += other.total_operations;
+        self.successful += other.successful;
+        self.failed += other.failed;
+        self.total_duration_ms += other.total_duration_ms;
+        if other.peak_concurrent > self.peak_concurrent { self.peak_concurrent = other.peak_concurrent; }
+    }
+}
+
+impl fmt::Display for LinkTooltipGeneratorStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Stats(ops={}, success={:.1}%, avg={:.1}ms)", self.total_operations, self.success_rate() * 100.0, self.avg_duration_ms())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LinkDetectionOptimizerEventKind — event types for LinkDetectionOptimizer
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkDetectionOptimizerEventKind {
+    Created,
+    Updated,
+    Deleted,
+    Refreshed,
+    Error,
+}
+
+impl fmt::Display for LinkDetectionOptimizerEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Created => write!(f, "created"),
+            Self::Updated => write!(f, "updated"),
+            Self::Deleted => write!(f, "deleted"),
+            Self::Refreshed => write!(f, "refreshed"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// A recorded event in the LinkDetectionOptimizer lifecycle.
+#[derive(Debug, Clone)]
+pub struct LinkDetectionOptimizerEvent {
+    pub kind: LinkDetectionOptimizerEventKind,
+    pub timestamp: u64,
+    pub detail: Option<String>,
+}
+
+impl LinkDetectionOptimizerEvent {
+    pub fn new(kind: LinkDetectionOptimizerEventKind, timestamp: u64) -> Self {
+        Self { kind, timestamp, detail: None }
+    }
+    pub fn with_detail(mut self, d: impl Into<String>) -> Self { self.detail = Some(d.into()); self }
+    pub fn is_error(&self) -> bool { self.kind == LinkDetectionOptimizerEventKind::Error }
+}
+
+impl fmt::Display for LinkDetectionOptimizerEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Event({}, t={})", self.kind, self.timestamp)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2260,6 +2452,93 @@ mod tests {
     fn tooltip_is_external() {
         assert!(LinkTooltipPreview::is_external("https://example.com"));
         assert!(!LinkTooltipPreview::is_external("file:///tmp"));
+    }
+
+
+    #[test] fn link_opt_hit() { let mut o = LinkDetectionOptimizer::new(100); let l = "visit https://example.com today"; let r1 = o.detect_cached(l); let r2 = o.detect_cached(l); assert_eq!(r1, r2); assert_eq!(o.hit_count(), 1); }
+    #[test] fn link_opt_inv() { let mut o = LinkDetectionOptimizer::new(100); o.detect_cached("https://x.com"); o.invalidate(); assert_eq!(o.cache_size(), 0); }
+    #[test] fn link_opt_rate() { let mut o = LinkDetectionOptimizer::new(100); o.detect_cached("https://a.com"); o.detect_cached("https://a.com"); assert!(o.hit_rate() > 0.4); }
+    #[test] fn link_opt_max() { let mut o = LinkDetectionOptimizer::new(2); o.detect_cached("a"); o.detect_cached("b"); o.detect_cached("c"); assert!(o.cache_size() <= 2); }
+    #[test] fn link_opt_display() { assert!(format!("{}", LinkDetectionOptimizer::default()).contains("LinkOptimizer")); }
+    #[test] fn tt_https() { assert!(LinkTooltipGenerator::new().tooltip_for_url("https://x.com").starts_with("Open link:")); }
+    #[test] fn tt_file() { assert!(LinkTooltipGenerator::new().tooltip_for_url("file:///a").starts_with("Open file:")); }
+    #[test] fn tt_email() { assert!(LinkTooltipGenerator::new().tooltip_for_email("a@b.com").contains("a@b.com")); }
+    #[test] fn tt_trunc() { assert!(LinkTooltipGenerator::new().with_max_len(10).tooltip_for_url("https://very-long-url.example.com/path").contains("...")); }
+    #[test] fn tt_prefix() { let mut g = LinkTooltipGenerator::new(); g.add_prefix("jira://", "JIRA"); assert!(g.tooltip_for_url("jira://X-1").contains("JIRA")); }
+    #[test] fn tt_display() { assert!(format!("{}", LinkTooltipGenerator::new()).contains("max=80")); }
+    #[test] fn tt_file_path() { assert!(LinkTooltipGenerator::new().tooltip_for_file("/a/b").starts_with("Open file:")); }
+
+
+    #[test] fn linkDetectionOptimizer_cfg_default() {
+        let c = LinkDetectionOptimizerConfig::new();
+        assert_eq!(c.max_entries, 10000);
+        assert!(c.auto_refresh);
+    }
+    #[test] fn linkDetectionOptimizer_cfg_builder() {
+        let c = LinkDetectionOptimizerConfig::new().with_max_entries(500).with_auto_refresh(false);
+        assert_eq!(c.max_entries, 500);
+        assert!(!c.auto_refresh);
+    }
+    #[test] fn linkDetectionOptimizer_cfg_labels() {
+        let mut c = LinkDetectionOptimizerConfig::new();
+        c.set_label("x", "y");
+        assert_eq!(c.get_label("x"), Some("y"));
+    }
+    #[test] fn linkDetectionOptimizer_cfg_refresh_due() {
+        let c = LinkDetectionOptimizerConfig::new();
+        assert!(!c.is_refresh_due(1000));
+        assert!(c.is_refresh_due(6000));
+    }
+    #[test] fn linkDetectionOptimizer_cfg_display() {
+        assert!(format!("{}", LinkDetectionOptimizerConfig::new()).contains("Config"));
+    }
+    #[test] fn linkTooltipGenerator_stats_success() {
+        let mut st = LinkTooltipGeneratorStats::new();
+        st.record_success(10);
+        st.record_success(20);
+        st.record_failure(5);
+        assert_eq!(st.total_operations, 3);
+        assert!((st.success_rate() - 2.0/3.0).abs() < 0.01);
+    }
+    #[test] fn linkTooltipGenerator_stats_avg_dur() {
+        let mut st = LinkTooltipGeneratorStats::new();
+        st.record_success(10);
+        st.record_success(30);
+        assert!((st.avg_duration_ms() - 20.0).abs() < 1e-9);
+    }
+    #[test] fn linkTooltipGenerator_stats_merge() {
+        let mut a = LinkTooltipGeneratorStats::new();
+        a.record_success(10);
+        let mut b = LinkTooltipGeneratorStats::new();
+        b.record_success(20);
+        a.merge(&b);
+        assert_eq!(a.total_operations, 2);
+    }
+    #[test] fn linkTooltipGenerator_stats_concurrent() {
+        let mut st = LinkTooltipGeneratorStats::new();
+        st.update_concurrent(5);
+        st.update_concurrent(3);
+        assert_eq!(st.peak_concurrent, 5);
+    }
+    #[test] fn linkTooltipGenerator_stats_display() {
+        assert!(format!("{}", LinkTooltipGeneratorStats::new()).contains("Stats"));
+    }
+    #[test] fn linkDetectionOptimizer_event_new() {
+        let e = LinkDetectionOptimizerEvent::new(LinkDetectionOptimizerEventKind::Created, 100);
+        assert_eq!(e.kind, LinkDetectionOptimizerEventKind::Created);
+        assert!(!e.is_error());
+    }
+    #[test] fn linkDetectionOptimizer_event_detail() {
+        let e = LinkDetectionOptimizerEvent::new(LinkDetectionOptimizerEventKind::Error, 0).with_detail("oops");
+        assert!(e.is_error());
+        assert_eq!(e.detail.unwrap(), "oops");
+    }
+    #[test] fn linkDetectionOptimizer_event_display() {
+        let e = LinkDetectionOptimizerEvent::new(LinkDetectionOptimizerEventKind::Updated, 50);
+        assert!(format!("{}", e).contains("updated"));
+    }
+    #[test] fn linkDetectionOptimizer_event_kind_display() {
+        assert_eq!(format!("{}", LinkDetectionOptimizerEventKind::Refreshed), "refreshed");
     }
 
 }

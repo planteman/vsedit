@@ -1299,6 +1299,207 @@ impl LanguageSettingsOverlay {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Language status bar integration
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageStatusItem {
+    pub id: String, pub language_id: String, pub label: String,
+    pub detail: Option<String>, pub severity: LanguageStatusSeverity, pub busy: bool, pub command: Option<String>,
+}
+impl LanguageStatusItem {
+    pub fn new(id: impl Into<String>, lang: impl Into<String>, label: impl Into<String>) -> Self {
+        Self { id: id.into(), language_id: lang.into(), label: label.into(), detail: None, severity: LanguageStatusSeverity::Information, busy: false, command: None }
+    }
+    pub fn with_detail(mut self, d: impl Into<String>) -> Self { self.detail = Some(d.into()); self }
+    pub fn with_severity(mut self, s: LanguageStatusSeverity) -> Self { self.severity = s; self }
+    pub fn with_busy(mut self, b: bool) -> Self { self.busy = b; self }
+    pub fn is_error(&self) -> bool { self.severity == LanguageStatusSeverity::Error }
+    pub fn is_warning(&self) -> bool { self.severity == LanguageStatusSeverity::Warning }
+}
+impl fmt::Display for LanguageStatusItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "[{}] {} ({})", self.severity, self.label, self.language_id) }
+}
+
+pub struct LanguageStatusBarService { items: Vec<LanguageStatusItem> }
+impl LanguageStatusBarService {
+    pub fn new() -> Self { Self { items: Vec::new() } }
+    pub fn add_item(&mut self, item: LanguageStatusItem) { self.items.retain(|i| i.id != item.id); self.items.push(item); }
+    pub fn remove_item(&mut self, id: &str) -> bool { let b = self.items.len(); self.items.retain(|i| i.id != id); self.items.len() < b }
+    pub fn has_errors(&self) -> bool { self.items.iter().any(|i| i.is_error()) }
+    pub fn has_warnings(&self) -> bool { self.items.iter().any(|i| i.is_warning()) }
+    pub fn item_count(&self) -> usize { self.items.len() }
+    pub fn busy_count(&self) -> usize { self.items.iter().filter(|i| i.busy).count() }
+    pub fn clear(&mut self) { self.items.clear(); }
+}
+impl Default for LanguageStatusBarService { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// Language diagnostics summary
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LanguageDiagnosticsSummary {
+    pub language_id: String, pub error_count: usize, pub warning_count: usize,
+    pub info_count: usize, pub hint_count: usize, pub file_count: usize,
+}
+impl LanguageDiagnosticsSummary {
+    pub fn new(lang: impl Into<String>) -> Self { Self { language_id: lang.into(), ..Default::default() } }
+    pub fn total(&self) -> usize { self.error_count + self.warning_count + self.info_count + self.hint_count }
+    pub fn has_problems(&self) -> bool { self.error_count > 0 || self.warning_count > 0 }
+    pub fn merge(&mut self, o: &Self) { self.error_count += o.error_count; self.warning_count += o.warning_count; self.info_count += o.info_count; self.hint_count += o.hint_count; self.file_count += o.file_count; }
+    pub fn reset(&mut self) { self.error_count = 0; self.warning_count = 0; self.info_count = 0; self.hint_count = 0; self.file_count = 0; }
+}
+impl fmt::Display for LanguageDiagnosticsSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}: {} errors, {} warnings ({} files)", self.language_id, self.error_count, self.warning_count, self.file_count) }
+}
+
+pub struct DiagnosticsSummaryCollector { summaries: HashMap<String, LanguageDiagnosticsSummary> }
+impl DiagnosticsSummaryCollector {
+    pub fn new() -> Self { Self { summaries: HashMap::new() } }
+    pub fn record_error(&mut self, l: &str) { self.summaries.entry(l.to_string()).or_insert_with(|| LanguageDiagnosticsSummary::new(l)).error_count += 1; }
+    pub fn record_warning(&mut self, l: &str) { self.summaries.entry(l.to_string()).or_insert_with(|| LanguageDiagnosticsSummary::new(l)).warning_count += 1; }
+    pub fn record_info(&mut self, l: &str) { self.summaries.entry(l.to_string()).or_insert_with(|| LanguageDiagnosticsSummary::new(l)).info_count += 1; }
+    pub fn get_summary(&self, l: &str) -> Option<&LanguageDiagnosticsSummary> { self.summaries.get(l) }
+    pub fn total_errors(&self) -> usize { self.summaries.values().map(|s| s.error_count).sum() }
+    pub fn total_warnings(&self) -> usize { self.summaries.values().map(|s| s.warning_count).sum() }
+    pub fn languages_with_errors(&self) -> Vec<&str> { self.summaries.values().filter(|s| s.error_count > 0).map(|s| s.language_id.as_str()).collect() }
+    pub fn clear(&mut self) { self.summaries.clear(); }
+    pub fn language_count(&self) -> usize { self.summaries.len() }
+}
+impl Default for DiagnosticsSummaryCollector { fn default() -> Self { Self::new() } }
+
+
+// ---------------------------------------------------------------------------
+// LanguageStatusItemConfig — configuration for LanguageStatusItem
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct LanguageStatusItemConfig {
+    pub max_entries: usize,
+    pub auto_refresh: bool,
+    pub refresh_interval_ms: u64,
+    pub debounce_ms: u64,
+    pub labels: HashMap<String, String>,
+}
+
+impl LanguageStatusItemConfig {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_max_entries(mut self, m: usize) -> Self { self.max_entries = m; self }
+    pub fn with_auto_refresh(mut self, a: bool) -> Self { self.auto_refresh = a; self }
+    pub fn with_refresh_interval(mut self, ms: u64) -> Self { self.refresh_interval_ms = ms; self }
+    pub fn with_debounce(mut self, ms: u64) -> Self { self.debounce_ms = ms; self }
+    pub fn set_label(&mut self, key: impl Into<String>, val: impl Into<String>) { self.labels.insert(key.into(), val.into()); }
+    pub fn get_label(&self, key: &str) -> Option<&str> { self.labels.get(key).map(|s| s.as_str()) }
+    pub fn label_count(&self) -> usize { self.labels.len() }
+    pub fn is_refresh_due(&self, elapsed_ms: u64) -> bool { self.auto_refresh && elapsed_ms >= self.refresh_interval_ms }
+}
+
+impl Default for LanguageStatusItemConfig {
+    fn default() -> Self {
+        Self { max_entries: 10000, auto_refresh: true, refresh_interval_ms: 5000, debounce_ms: 100, labels: HashMap::new() }
+    }
+}
+
+impl fmt::Display for LanguageStatusItemConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Config(max={}, auto_refresh={}, interval={}ms)", self.max_entries, self.auto_refresh, self.refresh_interval_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiagnosticsSummaryCollectorStats — statistics tracker
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+pub struct DiagnosticsSummaryCollectorStats {
+    pub total_operations: u64,
+    pub successful: u64,
+    pub failed: u64,
+    pub total_duration_ms: u64,
+    pub peak_concurrent: usize,
+    pub current_concurrent: usize,
+}
+
+impl DiagnosticsSummaryCollectorStats {
+    pub fn new() -> Self { Self::default() }
+    pub fn record_success(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.successful += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn record_failure(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.failed += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn success_rate(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.successful as f64 / self.total_operations as f64 } }
+    pub fn avg_duration_ms(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.total_duration_ms as f64 / self.total_operations as f64 } }
+    pub fn update_concurrent(&mut self, current: usize) {
+        self.current_concurrent = current;
+        if current > self.peak_concurrent { self.peak_concurrent = current; }
+    }
+    pub fn reset(&mut self) { *self = Self::default(); }
+    pub fn merge(&mut self, other: &Self) {
+        self.total_operations += other.total_operations;
+        self.successful += other.successful;
+        self.failed += other.failed;
+        self.total_duration_ms += other.total_duration_ms;
+        if other.peak_concurrent > self.peak_concurrent { self.peak_concurrent = other.peak_concurrent; }
+    }
+}
+
+impl fmt::Display for DiagnosticsSummaryCollectorStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Stats(ops={}, success={:.1}%, avg={:.1}ms)", self.total_operations, self.success_rate() * 100.0, self.avg_duration_ms())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageStatusItemEventKind — event types for LanguageStatusItem
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LanguageStatusItemEventKind {
+    Created,
+    Updated,
+    Deleted,
+    Refreshed,
+    Error,
+}
+
+impl fmt::Display for LanguageStatusItemEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Created => write!(f, "created"),
+            Self::Updated => write!(f, "updated"),
+            Self::Deleted => write!(f, "deleted"),
+            Self::Refreshed => write!(f, "refreshed"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// A recorded event in the LanguageStatusItem lifecycle.
+#[derive(Debug, Clone)]
+pub struct LanguageStatusItemEvent {
+    pub kind: LanguageStatusItemEventKind,
+    pub timestamp: u64,
+    pub detail: Option<String>,
+}
+
+impl LanguageStatusItemEvent {
+    pub fn new(kind: LanguageStatusItemEventKind, timestamp: u64) -> Self {
+        Self { kind, timestamp, detail: None }
+    }
+    pub fn with_detail(mut self, d: impl Into<String>) -> Self { self.detail = Some(d.into()); self }
+    pub fn is_error(&self) -> bool { self.kind == LanguageStatusItemEventKind::Error }
+}
+
+impl fmt::Display for LanguageStatusItemEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Event({}, t={})", self.kind, self.timestamp)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2262,4 +2463,91 @@ mod tests {
         o.set("python", "tabSize", "4");
         assert_eq!(o.language_count(), 2);
     }
+
+    #[test] fn lang_status_create() { let i = LanguageStatusItem::new("a","rust","R"); assert_eq!(i.language_id, "rust"); }
+    #[test] fn lang_status_detail() { let i = LanguageStatusItem::new("a","r","R").with_detail("d"); assert_eq!(i.detail.unwrap(), "d"); }
+    #[test] fn lang_sev_display() { assert_eq!(format!("{}", LanguageStatusSeverity::Error), "error"); }
+    #[test] fn lang_bar_add_rm() { let mut s = LanguageStatusBarService::new(); s.add_item(LanguageStatusItem::new("a","r","t")); assert_eq!(s.item_count(), 1); s.remove_item("a"); assert_eq!(s.item_count(), 0); }
+    #[test] fn lang_bar_dedup() { let mut s = LanguageStatusBarService::new(); s.add_item(LanguageStatusItem::new("a","r","v1")); s.add_item(LanguageStatusItem::new("a","r","v2")); assert_eq!(s.item_count(), 1); }
+    #[test] fn lang_bar_errors() { let mut s = LanguageStatusBarService::new(); s.add_item(LanguageStatusItem::new("a","r","e").with_severity(LanguageStatusSeverity::Error)); assert!(s.has_errors()); }
+    #[test] fn diag_sum_total() { let mut s = LanguageDiagnosticsSummary::new("r"); s.error_count = 3; s.warning_count = 2; s.info_count = 1; assert_eq!(s.total(), 6); }
+    #[test] fn diag_sum_merge() { let mut a = LanguageDiagnosticsSummary::new("r"); a.error_count = 1; let mut b = LanguageDiagnosticsSummary::new("r"); b.error_count = 2; a.merge(&b); assert_eq!(a.error_count, 3); }
+    #[test] fn diag_collector_rec() { let mut c = DiagnosticsSummaryCollector::new(); c.record_error("r"); c.record_error("r"); c.record_warning("p"); assert_eq!(c.total_errors(), 2); assert_eq!(c.total_warnings(), 1); }
+    #[test] fn diag_collector_langs() { let mut c = DiagnosticsSummaryCollector::new(); c.record_error("r"); c.record_warning("p"); assert_eq!(c.languages_with_errors().len(), 1); }
+    #[test] fn diag_sum_display() { let mut s = LanguageDiagnosticsSummary::new("r"); s.error_count = 5; assert!(format!("{}", s).contains("5 errors")); }
+    #[test] fn lang_status_display() { assert!(format!("{}", LanguageStatusItem::new("a","rust","R")).contains("rust")); }
+
+
+    #[test] fn languageStatusItem_cfg_default() {
+        let c = LanguageStatusItemConfig::new();
+        assert_eq!(c.max_entries, 10000);
+        assert!(c.auto_refresh);
+    }
+    #[test] fn languageStatusItem_cfg_builder() {
+        let c = LanguageStatusItemConfig::new().with_max_entries(500).with_auto_refresh(false);
+        assert_eq!(c.max_entries, 500);
+        assert!(!c.auto_refresh);
+    }
+    #[test] fn languageStatusItem_cfg_labels() {
+        let mut c = LanguageStatusItemConfig::new();
+        c.set_label("x", "y");
+        assert_eq!(c.get_label("x"), Some("y"));
+    }
+    #[test] fn languageStatusItem_cfg_refresh_due() {
+        let c = LanguageStatusItemConfig::new();
+        assert!(!c.is_refresh_due(1000));
+        assert!(c.is_refresh_due(6000));
+    }
+    #[test] fn languageStatusItem_cfg_display() {
+        assert!(format!("{}", LanguageStatusItemConfig::new()).contains("Config"));
+    }
+    #[test] fn diagnosticsSummaryCollector_stats_success() {
+        let mut st = DiagnosticsSummaryCollectorStats::new();
+        st.record_success(10);
+        st.record_success(20);
+        st.record_failure(5);
+        assert_eq!(st.total_operations, 3);
+        assert!((st.success_rate() - 2.0/3.0).abs() < 0.01);
+    }
+    #[test] fn diagnosticsSummaryCollector_stats_avg_dur() {
+        let mut st = DiagnosticsSummaryCollectorStats::new();
+        st.record_success(10);
+        st.record_success(30);
+        assert!((st.avg_duration_ms() - 20.0).abs() < 1e-9);
+    }
+    #[test] fn diagnosticsSummaryCollector_stats_merge() {
+        let mut a = DiagnosticsSummaryCollectorStats::new();
+        a.record_success(10);
+        let mut b = DiagnosticsSummaryCollectorStats::new();
+        b.record_success(20);
+        a.merge(&b);
+        assert_eq!(a.total_operations, 2);
+    }
+    #[test] fn diagnosticsSummaryCollector_stats_concurrent() {
+        let mut st = DiagnosticsSummaryCollectorStats::new();
+        st.update_concurrent(5);
+        st.update_concurrent(3);
+        assert_eq!(st.peak_concurrent, 5);
+    }
+    #[test] fn diagnosticsSummaryCollector_stats_display() {
+        assert!(format!("{}", DiagnosticsSummaryCollectorStats::new()).contains("Stats"));
+    }
+    #[test] fn languageStatusItem_event_new() {
+        let e = LanguageStatusItemEvent::new(LanguageStatusItemEventKind::Created, 100);
+        assert_eq!(e.kind, LanguageStatusItemEventKind::Created);
+        assert!(!e.is_error());
+    }
+    #[test] fn languageStatusItem_event_detail() {
+        let e = LanguageStatusItemEvent::new(LanguageStatusItemEventKind::Error, 0).with_detail("oops");
+        assert!(e.is_error());
+        assert_eq!(e.detail.unwrap(), "oops");
+    }
+    #[test] fn languageStatusItem_event_display() {
+        let e = LanguageStatusItemEvent::new(LanguageStatusItemEventKind::Updated, 50);
+        assert!(format!("{}", e).contains("updated"));
+    }
+    #[test] fn languageStatusItem_event_kind_display() {
+        assert_eq!(format!("{}", LanguageStatusItemEventKind::Refreshed), "refreshed");
+    }
+
 }

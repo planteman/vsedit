@@ -1,5 +1,6 @@
 //! Dev tunnel management.
 
+use std::collections::HashMap;
 use std::fmt;
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,8 @@ pub enum TunnelError {
     InvalidName(String),
     /// The tunnel is not in the expected state for this operation.
     InvalidState { expected: TunnelStatus, actual: TunnelStatus },
+    /// Connection negotiation failed.
+    ConnectionFailed(String),
 }
 
 impl fmt::Display for TunnelError {
@@ -36,6 +39,7 @@ impl fmt::Display for TunnelError {
             TunnelError::InvalidState { expected, actual } => {
                 write!(f, "expected state {expected}, got {actual}")
             }
+            TunnelError::ConnectionFailed(reason) => write!(f, "connection failed: {reason}"),
         }
     }
 }
@@ -1405,6 +1409,203 @@ impl fmt::Display for ConnectionPool {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Tunnel metrics collector
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct TunnelMetrics {
+    pub tunnel_id: String, pub bytes_sent: u64, pub bytes_received: u64,
+    pub packets_sent: u64, pub packets_received: u64,
+    pub latency_samples_ms: Vec<u64>, pub errors: u64,
+}
+impl TunnelMetrics {
+    pub fn new(id: impl Into<String>) -> Self { Self { tunnel_id: id.into(), bytes_sent: 0, bytes_received: 0, packets_sent: 0, packets_received: 0, latency_samples_ms: Vec::new(), errors: 0 } }
+    pub fn record_send(&mut self, b: u64) { self.bytes_sent += b; self.packets_sent += 1; }
+    pub fn record_recv(&mut self, b: u64) { self.bytes_received += b; self.packets_received += 1; }
+    pub fn record_latency(&mut self, ms: u64) { self.latency_samples_ms.push(ms); }
+    pub fn record_error(&mut self) { self.errors += 1; }
+    pub fn avg_latency(&self) -> f64 { if self.latency_samples_ms.is_empty() { 0.0 } else { self.latency_samples_ms.iter().sum::<u64>() as f64 / self.latency_samples_ms.len() as f64 } }
+    pub fn max_latency(&self) -> u64 { self.latency_samples_ms.iter().copied().max().unwrap_or(0) }
+    pub fn min_latency(&self) -> u64 { self.latency_samples_ms.iter().copied().min().unwrap_or(0) }
+    pub fn total_bytes(&self) -> u64 { self.bytes_sent + self.bytes_received }
+    pub fn total_packets(&self) -> u64 { self.packets_sent + self.packets_received }
+    pub fn error_rate(&self) -> f64 { let t = self.total_packets(); if t == 0 { 0.0 } else { self.errors as f64 / t as f64 } }
+    pub fn reset(&mut self) { self.bytes_sent = 0; self.bytes_received = 0; self.packets_sent = 0; self.packets_received = 0; self.latency_samples_ms.clear(); self.errors = 0; }
+}
+impl fmt::Display for TunnelMetrics { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "Metrics({}: {}B sent, {}B recv)", self.tunnel_id, self.bytes_sent, self.bytes_received) } }
+impl Default for TunnelMetrics { fn default() -> Self { Self::new("default") } }
+
+pub struct TunnelMetricsCollector { metrics: HashMap<String, TunnelMetrics> }
+impl TunnelMetricsCollector {
+    pub fn new() -> Self { Self { metrics: HashMap::new() } }
+    pub fn get_or_create(&mut self, id: &str) -> &mut TunnelMetrics { self.metrics.entry(id.to_string()).or_insert_with(|| TunnelMetrics::new(id)) }
+    pub fn get(&self, id: &str) -> Option<&TunnelMetrics> { self.metrics.get(id) }
+    pub fn remove(&mut self, id: &str) -> Option<TunnelMetrics> { self.metrics.remove(id) }
+    pub fn total_bytes_all(&self) -> u64 { self.metrics.values().map(|m| m.total_bytes()).sum() }
+    pub fn tunnel_count(&self) -> usize { self.metrics.len() }
+    pub fn clear(&mut self) { self.metrics.clear(); }
+}
+impl Default for TunnelMetricsCollector { fn default() -> Self { Self::new() } }
+
+// ---------------------------------------------------------------------------
+// Tunnel protocol negotiator
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TunnelProtocol { WebSocket, Http2, Ssh, Raw }
+impl fmt::Display for TunnelProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { match self { Self::WebSocket => write!(f, "ws"), Self::Http2 => write!(f, "h2"), Self::Ssh => write!(f, "ssh"), Self::Raw => write!(f, "raw") } }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NegotiationResult { pub selected: TunnelProtocol, pub client_prefs: Vec<TunnelProtocol>, pub server_supported: Vec<TunnelProtocol> }
+impl fmt::Display for NegotiationResult { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "Negotiated({})", self.selected) } }
+
+pub struct TunnelProtocolNegotiator { client: Vec<TunnelProtocol> }
+impl TunnelProtocolNegotiator {
+    pub fn new(c: Vec<TunnelProtocol>) -> Self { Self { client: c } }
+    pub fn negotiate(&self, server: &[TunnelProtocol]) -> Result<NegotiationResult, TunnelError> {
+        for p in &self.client { if server.contains(p) { return Ok(NegotiationResult { selected: *p, client_prefs: self.client.clone(), server_supported: server.to_vec() }); } }
+        Err(TunnelError::ConnectionFailed("no common protocol".into()))
+    }
+    pub fn supports(&self, p: TunnelProtocol) -> bool { self.client.contains(&p) }
+    pub fn add(&mut self, p: TunnelProtocol) { if !self.client.contains(&p) { self.client.push(p); } }
+    pub fn remove(&mut self, p: TunnelProtocol) { self.client.retain(|x| *x != p); }
+    pub fn count(&self) -> usize { self.client.len() }
+}
+impl Default for TunnelProtocolNegotiator { fn default() -> Self { Self::new(vec![TunnelProtocol::WebSocket, TunnelProtocol::Http2]) } }
+
+
+// ---------------------------------------------------------------------------
+// TunnelMetricsConfig — configuration for TunnelMetrics
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct TunnelMetricsConfig {
+    pub max_entries: usize,
+    pub auto_refresh: bool,
+    pub refresh_interval_ms: u64,
+    pub debounce_ms: u64,
+    pub labels: HashMap<String, String>,
+}
+
+impl TunnelMetricsConfig {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_max_entries(mut self, m: usize) -> Self { self.max_entries = m; self }
+    pub fn with_auto_refresh(mut self, a: bool) -> Self { self.auto_refresh = a; self }
+    pub fn with_refresh_interval(mut self, ms: u64) -> Self { self.refresh_interval_ms = ms; self }
+    pub fn with_debounce(mut self, ms: u64) -> Self { self.debounce_ms = ms; self }
+    pub fn set_label(&mut self, key: impl Into<String>, val: impl Into<String>) { self.labels.insert(key.into(), val.into()); }
+    pub fn get_label(&self, key: &str) -> Option<&str> { self.labels.get(key).map(|s| s.as_str()) }
+    pub fn label_count(&self) -> usize { self.labels.len() }
+    pub fn is_refresh_due(&self, elapsed_ms: u64) -> bool { self.auto_refresh && elapsed_ms >= self.refresh_interval_ms }
+}
+
+impl Default for TunnelMetricsConfig {
+    fn default() -> Self {
+        Self { max_entries: 10000, auto_refresh: true, refresh_interval_ms: 5000, debounce_ms: 100, labels: HashMap::new() }
+    }
+}
+
+impl fmt::Display for TunnelMetricsConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Config(max={}, auto_refresh={}, interval={}ms)", self.max_entries, self.auto_refresh, self.refresh_interval_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TunnelMetricsCollectorStats — statistics tracker
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+pub struct TunnelMetricsCollectorStats {
+    pub total_operations: u64,
+    pub successful: u64,
+    pub failed: u64,
+    pub total_duration_ms: u64,
+    pub peak_concurrent: usize,
+    pub current_concurrent: usize,
+}
+
+impl TunnelMetricsCollectorStats {
+    pub fn new() -> Self { Self::default() }
+    pub fn record_success(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.successful += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn record_failure(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.failed += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn success_rate(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.successful as f64 / self.total_operations as f64 } }
+    pub fn avg_duration_ms(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.total_duration_ms as f64 / self.total_operations as f64 } }
+    pub fn update_concurrent(&mut self, current: usize) {
+        self.current_concurrent = current;
+        if current > self.peak_concurrent { self.peak_concurrent = current; }
+    }
+    pub fn reset(&mut self) { *self = Self::default(); }
+    pub fn merge(&mut self, other: &Self) {
+        self.total_operations += other.total_operations;
+        self.successful += other.successful;
+        self.failed += other.failed;
+        self.total_duration_ms += other.total_duration_ms;
+        if other.peak_concurrent > self.peak_concurrent { self.peak_concurrent = other.peak_concurrent; }
+    }
+}
+
+impl fmt::Display for TunnelMetricsCollectorStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Stats(ops={}, success={:.1}%, avg={:.1}ms)", self.total_operations, self.success_rate() * 100.0, self.avg_duration_ms())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TunnelMetricsEventKind — event types for TunnelMetrics
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TunnelMetricsEventKind {
+    Created,
+    Updated,
+    Deleted,
+    Refreshed,
+    Error,
+}
+
+impl fmt::Display for TunnelMetricsEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Created => write!(f, "created"),
+            Self::Updated => write!(f, "updated"),
+            Self::Deleted => write!(f, "deleted"),
+            Self::Refreshed => write!(f, "refreshed"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// A recorded event in the TunnelMetrics lifecycle.
+#[derive(Debug, Clone)]
+pub struct TunnelMetricsEvent {
+    pub kind: TunnelMetricsEventKind,
+    pub timestamp: u64,
+    pub detail: Option<String>,
+}
+
+impl TunnelMetricsEvent {
+    pub fn new(kind: TunnelMetricsEventKind, timestamp: u64) -> Self {
+        Self { kind, timestamp, detail: None }
+    }
+    pub fn with_detail(mut self, d: impl Into<String>) -> Self { self.detail = Some(d.into()); self }
+    pub fn is_error(&self) -> bool { self.kind == TunnelMetricsEventKind::Error }
+}
+
+impl fmt::Display for TunnelMetricsEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Event({}, t={})", self.kind, self.timestamp)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2264,4 +2465,91 @@ mod tests {
         let mut pool = ConnectionPool::new(5);
         assert!(!pool.release("nonexistent"));
     }
+
+    #[test] fn tmetrics_send() { let mut m = TunnelMetrics::new("t1"); m.record_send(100); assert_eq!(m.bytes_sent, 100); }
+    #[test] fn tmetrics_avg() { let mut m = TunnelMetrics::new("t"); m.record_latency(10); m.record_latency(20); assert!((m.avg_latency() - 15.0).abs() < 1e-9); }
+    #[test] fn tmetrics_err_rate() { let mut m = TunnelMetrics::new("t"); m.record_send(10); m.record_send(10); m.record_error(); assert!((m.error_rate() - 0.5).abs() < 1e-9); }
+    #[test] fn tmetrics_reset() { let mut m = TunnelMetrics::new("t"); m.record_send(100); m.reset(); assert_eq!(m.bytes_sent, 0); }
+    #[test] fn tmetrics_display() { assert!(format!("{}", TunnelMetrics::new("t1")).contains("t1")); }
+    #[test] fn tmetrics_coll() { let mut c = TunnelMetricsCollector::new(); c.get_or_create("a").record_send(50); c.get_or_create("b").record_send(30); assert_eq!(c.total_bytes_all(), 80); }
+    #[test] fn tproto_neg_ok() { let n = TunnelProtocolNegotiator::default(); assert!(n.negotiate(&[TunnelProtocol::Http2, TunnelProtocol::Raw]).is_ok()); }
+    #[test] fn tproto_neg_fail() { let n = TunnelProtocolNegotiator::new(vec![TunnelProtocol::Ssh]); assert!(n.negotiate(&[TunnelProtocol::Raw]).is_err()); }
+    #[test] fn tproto_add_rm() { let mut n = TunnelProtocolNegotiator::new(vec![]); n.add(TunnelProtocol::Ssh); assert!(n.supports(TunnelProtocol::Ssh)); n.remove(TunnelProtocol::Ssh); assert!(!n.supports(TunnelProtocol::Ssh)); }
+    #[test] fn tproto_display() { assert_eq!(format!("{}", TunnelProtocol::WebSocket), "ws"); }
+    #[test] fn tmetrics_minmax() { let mut m = TunnelMetrics::new("t"); m.record_latency(5); m.record_latency(15); assert_eq!(m.min_latency(), 5); assert_eq!(m.max_latency(), 15); }
+    #[test] fn tmetrics_total() { let mut m = TunnelMetrics::new("t"); m.record_send(100); m.record_recv(200); assert_eq!(m.total_bytes(), 300); }
+
+
+    #[test] fn tunnelMetrics_cfg_default() {
+        let c = TunnelMetricsConfig::new();
+        assert_eq!(c.max_entries, 10000);
+        assert!(c.auto_refresh);
+    }
+    #[test] fn tunnelMetrics_cfg_builder() {
+        let c = TunnelMetricsConfig::new().with_max_entries(500).with_auto_refresh(false);
+        assert_eq!(c.max_entries, 500);
+        assert!(!c.auto_refresh);
+    }
+    #[test] fn tunnelMetrics_cfg_labels() {
+        let mut c = TunnelMetricsConfig::new();
+        c.set_label("x", "y");
+        assert_eq!(c.get_label("x"), Some("y"));
+    }
+    #[test] fn tunnelMetrics_cfg_refresh_due() {
+        let c = TunnelMetricsConfig::new();
+        assert!(!c.is_refresh_due(1000));
+        assert!(c.is_refresh_due(6000));
+    }
+    #[test] fn tunnelMetrics_cfg_display() {
+        assert!(format!("{}", TunnelMetricsConfig::new()).contains("Config"));
+    }
+    #[test] fn tunnelMetricsCollector_stats_success() {
+        let mut st = TunnelMetricsCollectorStats::new();
+        st.record_success(10);
+        st.record_success(20);
+        st.record_failure(5);
+        assert_eq!(st.total_operations, 3);
+        assert!((st.success_rate() - 2.0/3.0).abs() < 0.01);
+    }
+    #[test] fn tunnelMetricsCollector_stats_avg_dur() {
+        let mut st = TunnelMetricsCollectorStats::new();
+        st.record_success(10);
+        st.record_success(30);
+        assert!((st.avg_duration_ms() - 20.0).abs() < 1e-9);
+    }
+    #[test] fn tunnelMetricsCollector_stats_merge() {
+        let mut a = TunnelMetricsCollectorStats::new();
+        a.record_success(10);
+        let mut b = TunnelMetricsCollectorStats::new();
+        b.record_success(20);
+        a.merge(&b);
+        assert_eq!(a.total_operations, 2);
+    }
+    #[test] fn tunnelMetricsCollector_stats_concurrent() {
+        let mut st = TunnelMetricsCollectorStats::new();
+        st.update_concurrent(5);
+        st.update_concurrent(3);
+        assert_eq!(st.peak_concurrent, 5);
+    }
+    #[test] fn tunnelMetricsCollector_stats_display() {
+        assert!(format!("{}", TunnelMetricsCollectorStats::new()).contains("Stats"));
+    }
+    #[test] fn tunnelMetrics_event_new() {
+        let e = TunnelMetricsEvent::new(TunnelMetricsEventKind::Created, 100);
+        assert_eq!(e.kind, TunnelMetricsEventKind::Created);
+        assert!(!e.is_error());
+    }
+    #[test] fn tunnelMetrics_event_detail() {
+        let e = TunnelMetricsEvent::new(TunnelMetricsEventKind::Error, 0).with_detail("oops");
+        assert!(e.is_error());
+        assert_eq!(e.detail.unwrap(), "oops");
+    }
+    #[test] fn tunnelMetrics_event_display() {
+        let e = TunnelMetricsEvent::new(TunnelMetricsEventKind::Updated, 50);
+        assert!(format!("{}", e).contains("updated"));
+    }
+    #[test] fn tunnelMetrics_event_kind_display() {
+        assert_eq!(format!("{}", TunnelMetricsEventKind::Refreshed), "refreshed");
+    }
+
 }

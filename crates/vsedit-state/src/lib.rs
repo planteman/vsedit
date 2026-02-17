@@ -1345,6 +1345,238 @@ impl StateService {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// StateSnapshotDiff
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct StateSnapshotDiff {
+    entries: Vec<String>,
+    index: usize,
+    enabled: bool,
+    config: HashMap<String, String>,
+    stats_hits: u64,
+    stats_misses: u64,
+}
+
+impl StateSnapshotDiff {
+    pub fn new() -> Self { Self::default() }
+    pub fn add_entry(&mut self, entry: impl Into<String>) { self.entries.push(entry.into()); }
+    pub fn remove_entry(&mut self, idx: usize) -> Option<String> { if idx < self.entries.len() { Some(self.entries.remove(idx)) } else { None } }
+    pub fn get_entry(&self, idx: usize) -> Option<&str> { self.entries.get(idx).map(|s| s.as_str()) }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_config(&mut self, k: impl Into<String>, v: impl Into<String>) { self.config.insert(k.into(), v.into()); }
+    pub fn get_config(&self, k: &str) -> Option<&str> { self.config.get(k).map(|s| s.as_str()) }
+    pub fn config_count(&self) -> usize { self.config.len() }
+    pub fn record_hit(&mut self) { self.stats_hits += 1; }
+    pub fn record_miss(&mut self) { self.stats_misses += 1; }
+    pub fn hit_rate(&self) -> f64 { let t = self.stats_hits + self.stats_misses; if t == 0 { 0.0 } else { self.stats_hits as f64 / t as f64 } }
+    pub fn reset_stats(&mut self) { self.stats_hits = 0; self.stats_misses = 0; }
+    pub fn select_next(&mut self) { if !self.entries.is_empty() { self.index = (self.index + 1) % self.entries.len(); } }
+    pub fn select_prev(&mut self) { if !self.entries.is_empty() { self.index = if self.index == 0 { self.entries.len() - 1 } else { self.index - 1 }; } }
+    pub fn current_index(&self) -> usize { self.index }
+    pub fn current_entry(&self) -> Option<&str> { self.entries.get(self.index).map(|s| s.as_str()) }
+    pub fn clear(&mut self) { self.entries.clear(); self.index = 0; }
+    pub fn contains(&self, s: &str) -> bool { self.entries.iter().any(|e| e == s) }
+    pub fn entries(&self) -> &[String] { &self.entries }
+    pub fn filter_entries(&self, query: &str) -> Vec<&str> { self.entries.iter().filter(|e| e.contains(query)).map(|s| s.as_str()).collect() }
+}
+
+impl Default for StateSnapshotDiff {
+    fn default() -> Self { Self { entries: Vec::new(), index: 0, enabled: true, config: HashMap::new(), stats_hits: 0, stats_misses: 0 } }
+}
+
+impl fmt::Display for StateSnapshotDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "StateSnapshotDiff({} entries, enabled={})", self.entries.len(), self.enabled) }
+}
+
+// ---------------------------------------------------------------------------
+// StateMigrationHandler
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct StateMigrationHandler {
+    items: HashMap<String, Vec<String>>,
+    active: Option<String>,
+    max_items: usize,
+    total_ops: u64,
+    last_error: Option<String>,
+}
+
+impl StateMigrationHandler {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_max(mut self, m: usize) -> Self { self.max_items = m; self }
+    pub fn add_item(&mut self, group: impl Into<String>, value: impl Into<String>) {
+        let g = group.into();
+        let entry = self.items.entry(g).or_default();
+        if entry.len() < self.max_items { entry.push(value.into()); }
+        self.total_ops += 1;
+    }
+    pub fn remove_group(&mut self, group: &str) -> bool { self.items.remove(group).is_some() }
+    pub fn get_group(&self, group: &str) -> Option<&Vec<String>> { self.items.get(group) }
+    pub fn group_count(&self) -> usize { self.items.len() }
+    pub fn total_items(&self) -> usize { self.items.values().map(|v| v.len()).sum() }
+    pub fn set_active(&mut self, a: impl Into<String>) { self.active = Some(a.into()); }
+    pub fn active(&self) -> Option<&str> { self.active.as_deref() }
+    pub fn clear_active(&mut self) { self.active = None; }
+    pub fn set_error(&mut self, e: impl Into<String>) { self.last_error = Some(e.into()); }
+    pub fn last_error(&self) -> Option<&str> { self.last_error.as_deref() }
+    pub fn clear_error(&mut self) { self.last_error = None; }
+    pub fn total_ops(&self) -> u64 { self.total_ops }
+    pub fn clear(&mut self) { self.items.clear(); self.active = None; self.total_ops = 0; self.last_error = None; }
+    pub fn groups(&self) -> Vec<&str> { self.items.keys().map(|k| k.as_str()).collect() }
+    pub fn contains_group(&self, g: &str) -> bool { self.items.contains_key(g) }
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+}
+
+impl Default for StateMigrationHandler {
+    fn default() -> Self { Self { items: HashMap::new(), active: None, max_items: 1000, total_ops: 0, last_error: None } }
+}
+
+impl fmt::Display for StateMigrationHandler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "StateMigrationHandler({} groups, {} items)", self.group_count(), self.total_items()) }
+}
+
+
+// ---------------------------------------------------------------------------
+// StateSnapshotDiffSnapshot — point-in-time snapshot of StateSnapshotDiff state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct StateSnapshotDiffSnapshot {
+    pub timestamp: u64,
+    pub entry_count: usize,
+    pub enabled: bool,
+    pub config_snapshot: Vec<(String, String)>,
+    pub hit_rate: f64,
+}
+
+impl StateSnapshotDiffSnapshot {
+    pub fn capture(source: &StateSnapshotDiff, timestamp: u64) -> Self {
+        Self {
+            timestamp,
+            entry_count: source.entry_count(),
+            enabled: source.is_enabled(),
+            config_snapshot: Vec::new(),
+            hit_rate: source.hit_rate(),
+        }
+    }
+
+    pub fn age_since(&self, now: u64) -> u64 {
+        now.saturating_sub(self.timestamp)
+    }
+
+    pub fn is_stale(&self, now: u64, max_age: u64) -> bool {
+        self.age_since(now) > max_age
+    }
+
+    pub fn diff_entry_count(&self, other: &Self) -> i64 {
+        self.entry_count as i64 - other.entry_count as i64
+    }
+}
+
+impl fmt::Display for StateSnapshotDiffSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Snapshot(t={}, entries={}, enabled={})", self.timestamp, self.entry_count, self.enabled)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StateMigrationHandlerStats — aggregate statistics for StateMigrationHandler
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+pub struct StateMigrationHandlerStats {
+    pub total_adds: u64,
+    pub total_removes: u64,
+    pub total_lookups: u64,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+    pub peak_group_count: usize,
+    pub peak_item_count: usize,
+}
+
+impl StateMigrationHandlerStats {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn record_add(&mut self) { self.total_adds += 1; }
+    pub fn record_remove(&mut self) { self.total_removes += 1; }
+    pub fn record_lookup(&mut self, hit: bool) {
+        self.total_lookups += 1;
+        if hit { self.cache_hits += 1; } else { self.cache_misses += 1; }
+    }
+
+    pub fn update_peaks(&mut self, groups: usize, items: usize) {
+        if groups > self.peak_group_count { self.peak_group_count = groups; }
+        if items > self.peak_item_count { self.peak_item_count = items; }
+    }
+
+    pub fn hit_ratio(&self) -> f64 {
+        if self.total_lookups == 0 { 0.0 } else { self.cache_hits as f64 / self.total_lookups as f64 }
+    }
+
+    pub fn net_changes(&self) -> i64 {
+        self.total_adds as i64 - self.total_removes as i64
+    }
+
+    pub fn reset(&mut self) { *self = Self::default(); }
+
+    pub fn merge(&mut self, other: &Self) {
+        self.total_adds += other.total_adds;
+        self.total_removes += other.total_removes;
+        self.total_lookups += other.total_lookups;
+        self.cache_hits += other.cache_hits;
+        self.cache_misses += other.cache_misses;
+        if other.peak_group_count > self.peak_group_count { self.peak_group_count = other.peak_group_count; }
+        if other.peak_item_count > self.peak_item_count { self.peak_item_count = other.peak_item_count; }
+    }
+}
+
+impl fmt::Display for StateMigrationHandlerStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Stats(adds={}, removes={}, hit_ratio={:.1}%)", self.total_adds, self.total_removes, self.hit_ratio() * 100.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StateSnapshotDiffConfig — configuration for StateSnapshotDiff
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct StateSnapshotDiffConfig {
+    pub max_entries: usize,
+    pub auto_cleanup: bool,
+    pub cleanup_threshold: usize,
+    pub debounce_ms: u64,
+    pub labels: HashMap<String, String>,
+}
+
+impl StateSnapshotDiffConfig {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_max_entries(mut self, m: usize) -> Self { self.max_entries = m; self }
+    pub fn with_auto_cleanup(mut self, a: bool) -> Self { self.auto_cleanup = a; self }
+    pub fn with_debounce(mut self, ms: u64) -> Self { self.debounce_ms = ms; self }
+    pub fn set_label(&mut self, key: impl Into<String>, val: impl Into<String>) { self.labels.insert(key.into(), val.into()); }
+    pub fn get_label(&self, key: &str) -> Option<&str> { self.labels.get(key).map(|s| s.as_str()) }
+    pub fn label_count(&self) -> usize { self.labels.len() }
+    pub fn needs_cleanup(&self, current: usize) -> bool { self.auto_cleanup && current > self.cleanup_threshold }
+}
+
+impl Default for StateSnapshotDiffConfig {
+    fn default() -> Self {
+        Self { max_entries: 10000, auto_cleanup: true, cleanup_threshold: 8000, debounce_ms: 100, labels: HashMap::new() }
+    }
+}
+
+impl fmt::Display for StateSnapshotDiffConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Config(max={}, auto_cleanup={}, debounce={}ms)", self.max_entries, self.auto_cleanup, self.debounce_ms)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2292,4 +2524,103 @@ mod tests {
         assert_eq!(a.get("existing"), Some("keep_me"));
         assert_eq!(a.get("new_key"), Some("added"));
     }
+
+    #[test] fn stateSnapshotDiff_new() { let s = StateSnapshotDiff::new(); assert_eq!(s.entry_count(), 0); assert!(s.is_enabled()); }
+    #[test] fn stateSnapshotDiff_add() { let mut s = StateSnapshotDiff::new(); s.add_entry("a"); s.add_entry("b"); assert_eq!(s.entry_count(), 2); }
+    #[test] fn stateSnapshotDiff_remove() { let mut s = StateSnapshotDiff::new(); s.add_entry("a"); assert!(s.remove_entry(0).is_some()); assert_eq!(s.entry_count(), 0); }
+    #[test] fn stateSnapshotDiff_config() { let mut s = StateSnapshotDiff::new(); s.set_config("k", "v"); assert_eq!(s.get_config("k"), Some("v")); }
+    #[test] fn stateSnapshotDiff_nav() { let mut s = StateSnapshotDiff::new(); s.add_entry("a"); s.add_entry("b"); s.select_next(); assert_eq!(s.current_index(), 1); s.select_prev(); assert_eq!(s.current_index(), 0); }
+    #[test] fn stateSnapshotDiff_filter() { let mut s = StateSnapshotDiff::new(); s.add_entry("hello"); s.add_entry("world"); assert_eq!(s.filter_entries("llo").len(), 1); }
+    #[test] fn stateSnapshotDiff_display() { assert!(format!("{}", StateSnapshotDiff::new()).contains("StateSnapshotDiff")); }
+    #[test] fn stateMigrationHandler_new() { let s = StateMigrationHandler::new(); assert!(s.is_empty()); }
+    #[test] fn stateMigrationHandler_add() { let mut s = StateMigrationHandler::new(); s.add_item("g1", "v1"); s.add_item("g1", "v2"); assert_eq!(s.total_items(), 2); assert_eq!(s.group_count(), 1); }
+    #[test] fn stateMigrationHandler_active() { let mut s = StateMigrationHandler::new(); s.set_active("g1"); assert_eq!(s.active(), Some("g1")); s.clear_active(); assert!(s.active().is_none()); }
+    #[test] fn stateMigrationHandler_error() { let mut s = StateMigrationHandler::new(); s.set_error("fail"); assert_eq!(s.last_error(), Some("fail")); s.clear_error(); assert!(s.last_error().is_none()); }
+    #[test] fn stateMigrationHandler_rm_group() { let mut s = StateMigrationHandler::new(); s.add_item("g", "v"); assert!(s.remove_group("g")); assert!(s.is_empty()); }
+    #[test] fn stateMigrationHandler_display() { assert!(format!("{}", StateMigrationHandler::new()).contains("StateMigrationHandler")); }
+
+
+    #[test] fn stateSnapshotDiff_snap_capture() {
+        let s = StateSnapshotDiff::new();
+        let snap = StateSnapshotDiffSnapshot::capture(&s, 1000);
+        assert_eq!(snap.entry_count, 0);
+        assert_eq!(snap.timestamp, 1000);
+    }
+    #[test] fn stateSnapshotDiff_snap_stale() {
+        let s = StateSnapshotDiff::new();
+        let snap = StateSnapshotDiffSnapshot::capture(&s, 100);
+        assert!(snap.is_stale(300, 100));
+        assert!(!snap.is_stale(150, 100));
+    }
+    #[test] fn stateSnapshotDiff_snap_diff() {
+        let s = StateSnapshotDiff::new();
+        let s1v = StateSnapshotDiffSnapshot::capture(&s, 100);
+        let mut s2v = s1v.clone();
+        s2v.entry_count = 5;
+        assert_eq!(s2v.diff_entry_count(&s1v), 5);
+    }
+    #[test] fn stateSnapshotDiff_snap_display() {
+        let s = StateSnapshotDiff::new();
+        let snap = StateSnapshotDiffSnapshot::capture(&s, 0);
+        assert!(format!("{}", snap).contains("Snapshot"));
+    }
+    #[test] fn stateMigrationHandler_stats_record() {
+        let mut st = StateMigrationHandlerStats::new();
+        st.record_add();
+        st.record_add();
+        st.record_remove();
+        assert_eq!(st.net_changes(), 1);
+    }
+    #[test] fn stateMigrationHandler_stats_hit_ratio() {
+        let mut st = StateMigrationHandlerStats::new();
+        st.record_lookup(true);
+        st.record_lookup(true);
+        st.record_lookup(false);
+        assert!((st.hit_ratio() - 2.0/3.0).abs() < 0.01);
+    }
+    #[test] fn stateMigrationHandler_stats_merge() {
+        let mut a = StateMigrationHandlerStats::new();
+        a.total_adds = 5;
+        let mut b = StateMigrationHandlerStats::new();
+        b.total_adds = 3;
+        a.merge(&b);
+        assert_eq!(a.total_adds, 8);
+    }
+    #[test] fn stateMigrationHandler_stats_display() {
+        let st = StateMigrationHandlerStats::new();
+        assert!(format!("{}", st).contains("Stats"));
+    }
+    #[test] fn stateSnapshotDiff_config_default() {
+        let c = StateSnapshotDiffConfig::new();
+        assert_eq!(c.max_entries, 10000);
+        assert!(c.auto_cleanup);
+    }
+    #[test] fn stateSnapshotDiff_config_builder() {
+        let c = StateSnapshotDiffConfig::new().with_max_entries(500).with_auto_cleanup(false).with_debounce(200);
+        assert_eq!(c.max_entries, 500);
+        assert!(!c.auto_cleanup);
+        assert_eq!(c.debounce_ms, 200);
+    }
+    #[test] fn stateSnapshotDiff_config_labels() {
+        let mut c = StateSnapshotDiffConfig::new();
+        c.set_label("a", "b");
+        assert_eq!(c.get_label("a"), Some("b"));
+        assert_eq!(c.label_count(), 1);
+    }
+    #[test] fn stateSnapshotDiff_config_cleanup_threshold() {
+        let c = StateSnapshotDiffConfig::new();
+        assert!(!c.needs_cleanup(100));
+        assert!(c.needs_cleanup(9000));
+    }
+    #[test] fn stateSnapshotDiff_config_display() {
+        assert!(format!("{}", StateSnapshotDiffConfig::new()).contains("Config"));
+    }
+    #[test] fn stateMigrationHandler_stats_peaks() {
+        let mut st = StateMigrationHandlerStats::new();
+        st.update_peaks(5, 20);
+        st.update_peaks(3, 25);
+        assert_eq!(st.peak_group_count, 5);
+        assert_eq!(st.peak_item_count, 25);
+    }
+
 }

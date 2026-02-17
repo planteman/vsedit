@@ -1309,6 +1309,216 @@ impl InlayHintVisibility {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Inlay hint animation
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationEasing { Linear, EaseIn, EaseOut, EaseInOut }
+impl Default for AnimationEasing { fn default() -> Self { Self::EaseOut } }
+impl AnimationEasing {
+    pub fn apply(self, t: f64) -> f64 {
+        let t = t.clamp(0.0, 1.0);
+        match self {
+            Self::Linear => t, Self::EaseIn => t * t,
+            Self::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
+            Self::EaseInOut => if t < 0.5 { 2.0 * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(2) / 2.0 },
+        }
+    }
+}
+impl fmt::Display for AnimationEasing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self { Self::Linear => write!(f, "linear"), Self::EaseIn => write!(f, "ease-in"), Self::EaseOut => write!(f, "ease-out"), Self::EaseInOut => write!(f, "ease-in-out") }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlayHintAnimation {
+    pub hint_id: String, pub opacity: f64, pub target_opacity: f64,
+    pub duration_ms: u64, pub elapsed_ms: u64, pub easing: AnimationEasing,
+}
+impl InlayHintAnimation {
+    pub fn fade_in(id: impl Into<String>, dur: u64) -> Self { Self { hint_id: id.into(), opacity: 0.0, target_opacity: 1.0, duration_ms: dur, elapsed_ms: 0, easing: AnimationEasing::default() } }
+    pub fn fade_out(id: impl Into<String>, dur: u64) -> Self { Self { hint_id: id.into(), opacity: 1.0, target_opacity: 0.0, duration_ms: dur, elapsed_ms: 0, easing: AnimationEasing::default() } }
+    pub fn with_easing(mut self, e: AnimationEasing) -> Self { self.easing = e; self }
+    pub fn tick(&mut self, delta: u64) {
+        self.elapsed_ms = (self.elapsed_ms + delta).min(self.duration_ms);
+        let p = if self.duration_ms == 0 { 1.0 } else { self.elapsed_ms as f64 / self.duration_ms as f64 };
+        let e = self.easing.apply(p);
+        let s = if self.target_opacity > 0.5 { 0.0 } else { 1.0 };
+        self.opacity = s + (self.target_opacity - s) * e;
+    }
+    pub fn is_complete(&self) -> bool { self.elapsed_ms >= self.duration_ms }
+    pub fn progress(&self) -> f64 { if self.duration_ms == 0 { 1.0 } else { self.elapsed_ms as f64 / self.duration_ms as f64 } }
+    pub fn reset(&mut self) { self.elapsed_ms = 0; self.opacity = if self.target_opacity > 0.5 { 0.0 } else { 1.0 }; }
+}
+impl fmt::Display for InlayHintAnimation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "Anim({}, {:.0}%->{:.0}%, {})", self.hint_id, self.opacity*100.0, self.target_opacity*100.0, self.easing) }
+}
+
+// ---------------------------------------------------------------------------
+// Inlay hint editor integration
+// ---------------------------------------------------------------------------
+
+pub struct InlayHintEditorIntegration {
+    uri: String, hints: Vec<InlayHint>, animations: Vec<InlayHintAnimation>,
+    enabled: bool, visible_range: (u32, u32), anim_dur_ms: u64,
+}
+impl InlayHintEditorIntegration {
+    pub fn new(uri: impl Into<String>) -> Self { Self { uri: uri.into(), hints: Vec::new(), animations: Vec::new(), enabled: true, visible_range: (0, 100), anim_dur_ms: 150 } }
+    pub fn uri(&self) -> &str { &self.uri }
+    pub fn set_visible_range(&mut self, s: u32, e: u32) { self.visible_range = (s, e); }
+    pub fn visible_range(&self) -> (u32, u32) { self.visible_range }
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn update_hints(&mut self, new: Vec<InlayHint>) {
+        let d = self.anim_dur_ms;
+        self.animations = new.iter().enumerate().map(|(i, h)| InlayHintAnimation::fade_in(format!("{}:{}:{}", h.position_line, h.position_col, i), d)).collect();
+        self.hints = new;
+    }
+    pub fn hints_in_range(&self) -> Vec<&InlayHint> { let (s, e) = self.visible_range; self.hints.iter().filter(|h| h.position_line >= s && h.position_line <= e).collect() }
+    pub fn hint_count(&self) -> usize { self.hints.len() }
+    pub fn visible_hint_count(&self) -> usize { self.hints_in_range().len() }
+    pub fn tick_animations(&mut self, d: u64) { for a in &mut self.animations { a.tick(d); } self.animations.retain(|a| !a.is_complete() || a.target_opacity > 0.5); }
+    pub fn active_animation_count(&self) -> usize { self.animations.iter().filter(|a| !a.is_complete()).count() }
+    pub fn set_animation_duration(&mut self, ms: u64) { self.anim_dur_ms = ms; }
+    pub fn clear(&mut self) { self.hints.clear(); self.animations.clear(); }
+}
+impl fmt::Display for InlayHintEditorIntegration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "InlayHintEditor({}, {} hints, enabled={})", self.uri, self.hints.len(), self.enabled) }
+}
+impl Default for InlayHintEditorIntegration { fn default() -> Self { Self::new("untitled") } }
+
+
+// ---------------------------------------------------------------------------
+// InlayHintAnimationConfig — configuration for InlayHintAnimation
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct InlayHintAnimationConfig {
+    pub max_entries: usize,
+    pub auto_refresh: bool,
+    pub refresh_interval_ms: u64,
+    pub debounce_ms: u64,
+    pub labels: HashMap<String, String>,
+}
+
+impl InlayHintAnimationConfig {
+    pub fn new() -> Self { Self::default() }
+    pub fn with_max_entries(mut self, m: usize) -> Self { self.max_entries = m; self }
+    pub fn with_auto_refresh(mut self, a: bool) -> Self { self.auto_refresh = a; self }
+    pub fn with_refresh_interval(mut self, ms: u64) -> Self { self.refresh_interval_ms = ms; self }
+    pub fn with_debounce(mut self, ms: u64) -> Self { self.debounce_ms = ms; self }
+    pub fn set_label(&mut self, key: impl Into<String>, val: impl Into<String>) { self.labels.insert(key.into(), val.into()); }
+    pub fn get_label(&self, key: &str) -> Option<&str> { self.labels.get(key).map(|s| s.as_str()) }
+    pub fn label_count(&self) -> usize { self.labels.len() }
+    pub fn is_refresh_due(&self, elapsed_ms: u64) -> bool { self.auto_refresh && elapsed_ms >= self.refresh_interval_ms }
+}
+
+impl Default for InlayHintAnimationConfig {
+    fn default() -> Self {
+        Self { max_entries: 10000, auto_refresh: true, refresh_interval_ms: 5000, debounce_ms: 100, labels: HashMap::new() }
+    }
+}
+
+impl fmt::Display for InlayHintAnimationConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Config(max={}, auto_refresh={}, interval={}ms)", self.max_entries, self.auto_refresh, self.refresh_interval_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintEditorIntegrationStats — statistics tracker
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+pub struct InlayHintEditorIntegrationStats {
+    pub total_operations: u64,
+    pub successful: u64,
+    pub failed: u64,
+    pub total_duration_ms: u64,
+    pub peak_concurrent: usize,
+    pub current_concurrent: usize,
+}
+
+impl InlayHintEditorIntegrationStats {
+    pub fn new() -> Self { Self::default() }
+    pub fn record_success(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.successful += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn record_failure(&mut self, duration_ms: u64) {
+        self.total_operations += 1; self.failed += 1; self.total_duration_ms += duration_ms;
+    }
+    pub fn success_rate(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.successful as f64 / self.total_operations as f64 } }
+    pub fn avg_duration_ms(&self) -> f64 { if self.total_operations == 0 { 0.0 } else { self.total_duration_ms as f64 / self.total_operations as f64 } }
+    pub fn update_concurrent(&mut self, current: usize) {
+        self.current_concurrent = current;
+        if current > self.peak_concurrent { self.peak_concurrent = current; }
+    }
+    pub fn reset(&mut self) { *self = Self::default(); }
+    pub fn merge(&mut self, other: &Self) {
+        self.total_operations += other.total_operations;
+        self.successful += other.successful;
+        self.failed += other.failed;
+        self.total_duration_ms += other.total_duration_ms;
+        if other.peak_concurrent > self.peak_concurrent { self.peak_concurrent = other.peak_concurrent; }
+    }
+}
+
+impl fmt::Display for InlayHintEditorIntegrationStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Stats(ops={}, success={:.1}%, avg={:.1}ms)", self.total_operations, self.success_rate() * 100.0, self.avg_duration_ms())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHintAnimationEventKind — event types for InlayHintAnimation
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InlayHintAnimationEventKind {
+    Created,
+    Updated,
+    Deleted,
+    Refreshed,
+    Error,
+}
+
+impl fmt::Display for InlayHintAnimationEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Created => write!(f, "created"),
+            Self::Updated => write!(f, "updated"),
+            Self::Deleted => write!(f, "deleted"),
+            Self::Refreshed => write!(f, "refreshed"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// A recorded event in the InlayHintAnimation lifecycle.
+#[derive(Debug, Clone)]
+pub struct InlayHintAnimationEvent {
+    pub kind: InlayHintAnimationEventKind,
+    pub timestamp: u64,
+    pub detail: Option<String>,
+}
+
+impl InlayHintAnimationEvent {
+    pub fn new(kind: InlayHintAnimationEventKind, timestamp: u64) -> Self {
+        Self { kind, timestamp, detail: None }
+    }
+    pub fn with_detail(mut self, d: impl Into<String>) -> Self { self.detail = Some(d.into()); self }
+    pub fn is_error(&self) -> bool { self.kind == InlayHintAnimationEventKind::Error }
+}
+
+impl fmt::Display for InlayHintAnimationEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Event({}, t={})", self.kind, self.timestamp)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2260,4 +2470,92 @@ mod tests {
         let interaction = InlayHintInteraction::click(&hint, 5);
         assert!(!interaction.has_command());
     }
+
+    #[test] fn anim_easing_linear() { assert!((AnimationEasing::Linear.apply(0.5) - 0.5).abs() < 1e-9); }
+    #[test] fn anim_easing_ease_in() { assert!((AnimationEasing::EaseIn.apply(0.5) - 0.25).abs() < 1e-9); }
+    #[test] fn anim_easing_bounds() { assert!((AnimationEasing::EaseOut.apply(0.0)).abs() < 1e-9); assert!((AnimationEasing::EaseOut.apply(1.0) - 1.0).abs() < 1e-9); }
+    #[test] fn anim_easing_clamp() { assert!((AnimationEasing::EaseInOut.apply(-1.0)).abs() < 1e-9); }
+    #[test] fn anim_tick() { let mut a = InlayHintAnimation::fade_in("h1", 100); a.tick(50); assert!(!a.is_complete()); a.tick(50); assert!(a.is_complete()); }
+    #[test] fn anim_fade_out_init() { let a = InlayHintAnimation::fade_out("h1", 200); assert!((a.opacity - 1.0).abs() < 1e-9); }
+    #[test] fn anim_reset_st() { let mut a = InlayHintAnimation::fade_in("h1", 100); a.tick(100); a.reset(); assert_eq!(a.elapsed_ms, 0); }
+    #[test] fn anim_display() { assert!(format!("{}", InlayHintAnimation::fade_in("h1", 100)).contains("h1")); }
+    #[test] fn ed_integ_update() { let mut e = InlayHintEditorIntegration::new("f"); e.update_hints(vec![InlayHint::simple(5,0,": i32",InlayHintKind::Type)]); assert_eq!(e.hint_count(), 1); }
+    #[test] fn ed_integ_range() { let mut e = InlayHintEditorIntegration::new("f"); e.update_hints(vec![InlayHint::simple(5,0,"a",InlayHintKind::Type), InlayHint::simple(200,0,"b",InlayHintKind::Type)]); e.set_visible_range(0,100); assert_eq!(e.visible_hint_count(), 1); }
+    #[test] fn ed_integ_toggle() { let mut e = InlayHintEditorIntegration::default(); e.set_enabled(false); assert!(!e.is_enabled()); }
+    #[test] fn ed_integ_clear() { let mut e = InlayHintEditorIntegration::default(); e.update_hints(vec![InlayHint::simple(0,0,"x",InlayHintKind::Other)]); e.clear(); assert_eq!(e.hint_count(), 0); }
+    #[test] fn ed_integ_display() { assert!(format!("{}", InlayHintEditorIntegration::default()).contains("untitled")); }
+
+
+    #[test] fn inlayHintAnimation_cfg_default() {
+        let c = InlayHintAnimationConfig::new();
+        assert_eq!(c.max_entries, 10000);
+        assert!(c.auto_refresh);
+    }
+    #[test] fn inlayHintAnimation_cfg_builder() {
+        let c = InlayHintAnimationConfig::new().with_max_entries(500).with_auto_refresh(false);
+        assert_eq!(c.max_entries, 500);
+        assert!(!c.auto_refresh);
+    }
+    #[test] fn inlayHintAnimation_cfg_labels() {
+        let mut c = InlayHintAnimationConfig::new();
+        c.set_label("x", "y");
+        assert_eq!(c.get_label("x"), Some("y"));
+    }
+    #[test] fn inlayHintAnimation_cfg_refresh_due() {
+        let c = InlayHintAnimationConfig::new();
+        assert!(!c.is_refresh_due(1000));
+        assert!(c.is_refresh_due(6000));
+    }
+    #[test] fn inlayHintAnimation_cfg_display() {
+        assert!(format!("{}", InlayHintAnimationConfig::new()).contains("Config"));
+    }
+    #[test] fn inlayHintEditorIntegration_stats_success() {
+        let mut st = InlayHintEditorIntegrationStats::new();
+        st.record_success(10);
+        st.record_success(20);
+        st.record_failure(5);
+        assert_eq!(st.total_operations, 3);
+        assert!((st.success_rate() - 2.0/3.0).abs() < 0.01);
+    }
+    #[test] fn inlayHintEditorIntegration_stats_avg_dur() {
+        let mut st = InlayHintEditorIntegrationStats::new();
+        st.record_success(10);
+        st.record_success(30);
+        assert!((st.avg_duration_ms() - 20.0).abs() < 1e-9);
+    }
+    #[test] fn inlayHintEditorIntegration_stats_merge() {
+        let mut a = InlayHintEditorIntegrationStats::new();
+        a.record_success(10);
+        let mut b = InlayHintEditorIntegrationStats::new();
+        b.record_success(20);
+        a.merge(&b);
+        assert_eq!(a.total_operations, 2);
+    }
+    #[test] fn inlayHintEditorIntegration_stats_concurrent() {
+        let mut st = InlayHintEditorIntegrationStats::new();
+        st.update_concurrent(5);
+        st.update_concurrent(3);
+        assert_eq!(st.peak_concurrent, 5);
+    }
+    #[test] fn inlayHintEditorIntegration_stats_display() {
+        assert!(format!("{}", InlayHintEditorIntegrationStats::new()).contains("Stats"));
+    }
+    #[test] fn inlayHintAnimation_event_new() {
+        let e = InlayHintAnimationEvent::new(InlayHintAnimationEventKind::Created, 100);
+        assert_eq!(e.kind, InlayHintAnimationEventKind::Created);
+        assert!(!e.is_error());
+    }
+    #[test] fn inlayHintAnimation_event_detail() {
+        let e = InlayHintAnimationEvent::new(InlayHintAnimationEventKind::Error, 0).with_detail("oops");
+        assert!(e.is_error());
+        assert_eq!(e.detail.unwrap(), "oops");
+    }
+    #[test] fn inlayHintAnimation_event_display() {
+        let e = InlayHintAnimationEvent::new(InlayHintAnimationEventKind::Updated, 50);
+        assert!(format!("{}", e).contains("updated"));
+    }
+    #[test] fn inlayHintAnimation_event_kind_display() {
+        assert_eq!(format!("{}", InlayHintAnimationEventKind::Refreshed), "refreshed");
+    }
+
 }
