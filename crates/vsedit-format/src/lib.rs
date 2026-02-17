@@ -1690,6 +1690,168 @@ impl std::fmt::Display for FormatProgressIndicator {
     }
 }
 
+
+// ─── FmtBld Builder & Validator ─────────────────────────────
+
+/// Builder for constructing formatter configurations.
+#[derive(Debug, Clone)]
+pub struct FmtBldBuilder {
+    name: String,
+    properties: std::collections::HashMap<String, String>,
+    tags: Vec<String>,
+    enabled: bool,
+    priority: i32,
+    max_items: usize,
+}
+
+impl FmtBldBuilder {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(), properties: std::collections::HashMap::new(),
+            tags: Vec::new(), enabled: true, priority: 0, max_items: 100,
+        }
+    }
+
+    pub fn property(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.properties.insert(key.into(), value.into()); self
+    }
+    pub fn tag(mut self, tag: impl Into<String>) -> Self { self.tags.push(tag.into()); self }
+    pub fn enabled(mut self, enabled: bool) -> Self { self.enabled = enabled; self }
+    pub fn priority(mut self, priority: i32) -> Self { self.priority = priority; self }
+    pub fn max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn build(self) -> Result<FmtBldCfg, FmtBldBuildErr> {
+        let mut errors = Vec::new();
+        if self.name.is_empty() { errors.push("name must not be empty".into()); }
+        if self.max_items == 0 { errors.push("max_items must be > 0".into()); }
+        if self.priority < -100 || self.priority > 100 {
+            errors.push(format!("priority {} out of range [-100, 100]", self.priority));
+        }
+        if !errors.is_empty() { return Err(FmtBldBuildErr { errors }); }
+        Ok(FmtBldCfg {
+            name: self.name, properties: self.properties, tags: self.tags,
+            enabled: self.enabled, priority: self.priority, max_items: self.max_items,
+        })
+    }
+}
+
+/// Validated formatter configuration.
+#[derive(Debug, Clone)]
+pub struct FmtBldCfg {
+    pub name: String,
+    pub properties: std::collections::HashMap<String, String>,
+    pub tags: Vec<String>,
+    pub enabled: bool,
+    pub priority: i32,
+    pub max_items: usize,
+}
+
+impl FmtBldCfg {
+    pub fn has_tag(&self, tag: &str) -> bool { self.tags.iter().any(|t| t == tag) }
+    pub fn get_property(&self, key: &str) -> Option<&str> {
+        self.properties.get(key).map(|s| s.as_str())
+    }
+    pub fn property_count(&self) -> usize { self.properties.len() }
+    pub fn merge_properties(&mut self, other: &FmtBldCfg) {
+        for (k, v) in &other.properties { self.properties.insert(k.clone(), v.clone()); }
+    }
+}
+
+impl fmt::Display for FmtBldCfg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FmtBldCfg({}, enabled={}, priority={}, tags={})",
+            self.name, self.enabled, self.priority, self.tags.len())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FmtBldBuildErr { pub errors: Vec<String> }
+
+impl fmt::Display for FmtBldBuildErr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FmtBldBuildErr: {}", self.errors.join("; "))
+    }
+}
+impl std::error::Error for FmtBldBuildErr {}
+
+// ─── FmtOut Formatter ───────────────────────────────────────
+
+/// Formatting options for formatter output.
+#[derive(Debug, Clone)]
+pub struct FmtOutFmtOpts {
+    pub indent: usize,
+    pub max_width: usize,
+    pub use_color: bool,
+    pub separator: String,
+    pub prefix_str: String,
+}
+
+impl Default for FmtOutFmtOpts {
+    fn default() -> Self {
+        Self { indent: 2, max_width: 120, use_color: false,
+               separator: ", ".into(), prefix_str: String::new() }
+    }
+}
+
+impl FmtOutFmtOpts {
+    pub fn with_indent(mut self, indent: usize) -> Self { self.indent = indent; self }
+    pub fn with_max_width(mut self, width: usize) -> Self { self.max_width = width; self }
+    pub fn with_color(mut self) -> Self { self.use_color = true; self }
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self { self.separator = sep.into(); self }
+    pub fn with_prefix(mut self, p: impl Into<String>) -> Self { self.prefix_str = p.into(); self }
+}
+
+/// Formatter for formatter data.
+pub struct FmtOutFmt {
+    options: FmtOutFmtOpts,
+}
+
+impl FmtOutFmt {
+    pub fn new(options: FmtOutFmtOpts) -> Self { Self { options } }
+    pub fn default_fmt() -> Self { Self { options: FmtOutFmtOpts::default() } }
+
+    pub fn format_list(&self, items: &[&str]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut result = String::new();
+        let mut line_len = 0usize;
+        for (i, item) in items.iter().enumerate() {
+            let formatted = if self.options.prefix_str.is_empty() {
+                format!("{}{}", ind, item)
+            } else {
+                format!("{}{}{}", ind, self.options.prefix_str, item)
+            };
+            if i > 0 && line_len + formatted.len() > self.options.max_width {
+                result.push('\n'); line_len = 0;
+            } else if i > 0 {
+                result.push_str(&self.options.separator);
+                line_len += self.options.separator.len();
+            }
+            line_len += formatted.len();
+            result.push_str(&formatted);
+        }
+        result
+    }
+
+    pub fn format_kv(&self, key: &str, value: &str) -> String {
+        format!("{}{} = {}", " ".repeat(self.options.indent), key, value)
+    }
+
+    pub fn format_section(&self, heading: &str, lines: &[String]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut r = format!("[{}]\n", heading);
+        for line in lines { r.push_str(&format!("{}{}\n", ind, line)); }
+        r
+    }
+
+    pub fn truncate(&self, s: &str) -> String {
+        if s.len() <= self.options.max_width { s.to_string() }
+        else {
+            let end = self.options.max_width.saturating_sub(3);
+            format!("{}...", &s[..end])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2683,4 +2845,89 @@ mod tests {
         let s = format!("{progress}");
         assert!(s.contains("0.0%"));
     }
+
+    #[test]
+    fn fmtbld_builder_valid() {
+        let cfg = FmtBldBuilder::new("test").property("key", "val")
+            .tag("important").priority(5).build();
+        assert!(cfg.is_ok());
+        let cfg = cfg.unwrap();
+        assert_eq!(cfg.name, "test");
+        assert!(cfg.has_tag("important"));
+        assert_eq!(cfg.get_property("key"), Some("val"));
+    }
+
+    #[test]
+    fn fmtbld_builder_empty_name() {
+        let r = FmtBldBuilder::new("").build();
+        assert!(r.is_err());
+        assert!(r.unwrap_err().to_string().contains("name"));
+    }
+
+    #[test]
+    fn fmtbld_builder_bad_priority() {
+        assert!(FmtBldBuilder::new("x").priority(200).build().is_err());
+    }
+
+    #[test]
+    fn fmtbld_builder_zero_max() {
+        assert!(FmtBldBuilder::new("x").max_items(0).build().is_err());
+    }
+
+    #[test]
+    fn fmtbld_cfg_merge() {
+        let mut a = FmtBldBuilder::new("a").property("x", "1").build().unwrap();
+        let b = FmtBldBuilder::new("b").property("x", "2").property("y", "3").build().unwrap();
+        a.merge_properties(&b);
+        assert_eq!(a.get_property("x"), Some("2"));
+        assert_eq!(a.get_property("y"), Some("3"));
+    }
+
+    #[test]
+    fn fmtbld_cfg_display() {
+        let cfg = FmtBldBuilder::new("test").tag("a").tag("b")
+            .enabled(false).build().unwrap();
+        let s = format!("{}", cfg);
+        assert!(s.contains("test"));
+        assert!(s.contains("false"));
+    }
+
+    #[test]
+    fn fmtout_fmt_list() {
+        let f = FmtOutFmt::new(FmtOutFmtOpts::default().with_indent(0));
+        let r = f.format_list(&["a", "b", "c"]);
+        assert!(r.contains("a") && r.contains("b") && r.contains("c"));
+    }
+
+    #[test]
+    fn fmtout_fmt_kv() {
+        let f = FmtOutFmt::default_fmt();
+        let r = f.format_kv("key", "value");
+        assert!(r.contains("key") && r.contains("=") && r.contains("value"));
+    }
+
+    #[test]
+    fn fmtout_fmt_section() {
+        let f = FmtOutFmt::new(FmtOutFmtOpts::default());
+        let r = f.format_section("Hdr", &["line1".into(), "line2".into()]);
+        assert!(r.starts_with("[Hdr]"));
+        assert!(r.contains("line1"));
+    }
+
+    #[test]
+    fn fmtout_fmt_truncate() {
+        let f = FmtOutFmt::new(FmtOutFmtOpts::default().with_max_width(10));
+        let r = f.truncate("this is a very long string");
+        assert!(r.ends_with("..."));
+        assert!(r.len() <= 10);
+    }
+
+    #[test]
+    fn fmtout_fmt_opts_defaults() {
+        let o = FmtOutFmtOpts::default();
+        assert_eq!(o.indent, 2);
+        assert_eq!(o.max_width, 120);
+        assert!(!o.use_color);
+    }
+
 }

@@ -1,6 +1,7 @@
 //! Snippets manager.
 
 use std::collections::HashMap;
+use std::fmt;
 
 /// Where a snippet originated from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1618,6 +1619,176 @@ impl std::fmt::Display for SnippetUsageStats {
     }
 }
 
+
+// ─── SnipC LRU Cache ───────────────────────────────────────
+
+/// A simple LRU cache for snippet lookups.
+#[derive(Debug)]
+pub struct SnipCLruCache<V> {
+    entries: Vec<(String, V)>,
+    capacity: usize,
+    hits: u64,
+    misses: u64,
+}
+
+impl<V: Clone> SnipCLruCache<V> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0);
+        Self { entries: Vec::with_capacity(capacity), capacity, hits: 0, misses: 0 }
+    }
+
+    pub fn insert(&mut self, key: impl Into<String>, value: V) -> Option<(String, V)> {
+        let key = key.into();
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries.remove(pos);
+            self.entries.insert(0, (key, value));
+            return None;
+        }
+        let evicted = if self.entries.len() >= self.capacity {
+            Some(self.entries.pop().unwrap())
+        } else { None };
+        self.entries.insert(0, (key, value));
+        evicted
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<&V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            self.hits += 1;
+            let entry = self.entries.remove(pos);
+            self.entries.insert(0, entry);
+            Some(&self.entries[0].1)
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    pub fn peek(&self, key: &str) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else { None }
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn hit_ratio(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+
+    pub fn hits(&self) -> u64 { self.hits }
+    pub fn misses(&self) -> u64 { self.misses }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+}
+
+impl<V: Clone + fmt::Display> fmt::Display for SnipCLruCache<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SnipCLruCache(size={}, cap={}, hits={}, misses={})",
+            self.len(), self.capacity, self.hits, self.misses)
+    }
+}
+
+// ─── SnipB Builder & Validator ─────────────────────────────
+
+/// Builder for constructing snippet configurations.
+#[derive(Debug, Clone)]
+pub struct SnipBBuilder {
+    name: String,
+    properties: std::collections::HashMap<String, String>,
+    tags: Vec<String>,
+    enabled: bool,
+    priority: i32,
+    max_items: usize,
+}
+
+impl SnipBBuilder {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(), properties: std::collections::HashMap::new(),
+            tags: Vec::new(), enabled: true, priority: 0, max_items: 100,
+        }
+    }
+
+    pub fn property(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.properties.insert(key.into(), value.into()); self
+    }
+    pub fn tag(mut self, tag: impl Into<String>) -> Self { self.tags.push(tag.into()); self }
+    pub fn enabled(mut self, enabled: bool) -> Self { self.enabled = enabled; self }
+    pub fn priority(mut self, priority: i32) -> Self { self.priority = priority; self }
+    pub fn max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn build(self) -> Result<SnipBCfg, SnipBBuildErr> {
+        let mut errors = Vec::new();
+        if self.name.is_empty() { errors.push("name must not be empty".into()); }
+        if self.max_items == 0 { errors.push("max_items must be > 0".into()); }
+        if self.priority < -100 || self.priority > 100 {
+            errors.push(format!("priority {} out of range [-100, 100]", self.priority));
+        }
+        if !errors.is_empty() { return Err(SnipBBuildErr { errors }); }
+        Ok(SnipBCfg {
+            name: self.name, properties: self.properties, tags: self.tags,
+            enabled: self.enabled, priority: self.priority, max_items: self.max_items,
+        })
+    }
+}
+
+/// Validated snippet configuration.
+#[derive(Debug, Clone)]
+pub struct SnipBCfg {
+    pub name: String,
+    pub properties: std::collections::HashMap<String, String>,
+    pub tags: Vec<String>,
+    pub enabled: bool,
+    pub priority: i32,
+    pub max_items: usize,
+}
+
+impl SnipBCfg {
+    pub fn has_tag(&self, tag: &str) -> bool { self.tags.iter().any(|t| t == tag) }
+    pub fn get_property(&self, key: &str) -> Option<&str> {
+        self.properties.get(key).map(|s| s.as_str())
+    }
+    pub fn property_count(&self) -> usize { self.properties.len() }
+    pub fn merge_properties(&mut self, other: &SnipBCfg) {
+        for (k, v) in &other.properties { self.properties.insert(k.clone(), v.clone()); }
+    }
+}
+
+impl fmt::Display for SnipBCfg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SnipBCfg({}, enabled={}, priority={}, tags={})",
+            self.name, self.enabled, self.priority, self.tags.len())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SnipBBuildErr { pub errors: Vec<String> }
+
+impl fmt::Display for SnipBBuildErr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SnipBBuildErr: {}", self.errors.join("; "))
+    }
+}
+impl std::error::Error for SnipBBuildErr {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2673,4 +2844,103 @@ mod tests {
         assert_eq!(snippets.len(), 1);
         assert_eq!(snippets[0].name, "Print");
     }
+
+    #[test]
+    fn snipc_lru_insert_get() {
+        let mut c = SnipCLruCache::new(3);
+        c.insert("a", 1); c.insert("b", 2); c.insert("c", 3);
+        assert_eq!(c.get("a"), Some(&1));
+        assert_eq!(c.get("b"), Some(&2));
+        assert_eq!(c.len(), 3);
+    }
+
+    #[test]
+    fn snipc_lru_eviction() {
+        let mut c = SnipCLruCache::new(2);
+        c.insert("a", 1); c.insert("b", 2);
+        let ev = c.insert("c", 3);
+        assert!(ev.is_some());
+        assert_eq!(ev.unwrap().0, "a");
+        assert!(!c.contains("a"));
+    }
+
+    #[test]
+    fn snipc_lru_hit_ratio() {
+        let mut c = SnipCLruCache::new(5);
+        c.insert("x", 10);
+        c.get("x"); c.get("y");
+        assert!(c.hit_ratio() > 0.4 && c.hit_ratio() < 0.6);
+    }
+
+    #[test]
+    fn snipc_lru_clear() {
+        let mut c = SnipCLruCache::new(3);
+        c.insert("a", 1); c.insert("b", 2);
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.hits(), 0);
+    }
+
+    #[test]
+    fn snipc_lru_remove() {
+        let mut c = SnipCLruCache::new(3);
+        c.insert("a", 100);
+        assert_eq!(c.remove("a"), Some(100));
+        assert!(!c.contains("a"));
+    }
+
+    #[test]
+    fn snipc_lru_peek() {
+        let mut c = SnipCLruCache::new(3);
+        c.insert("x", 42);
+        assert_eq!(c.peek("x"), Some(&42));
+        assert_eq!(c.misses(), 0);
+    }
+
+    #[test]
+    fn snipb_builder_valid() {
+        let cfg = SnipBBuilder::new("test").property("key", "val")
+            .tag("important").priority(5).build();
+        assert!(cfg.is_ok());
+        let cfg = cfg.unwrap();
+        assert_eq!(cfg.name, "test");
+        assert!(cfg.has_tag("important"));
+        assert_eq!(cfg.get_property("key"), Some("val"));
+    }
+
+    #[test]
+    fn snipb_builder_empty_name() {
+        let r = SnipBBuilder::new("").build();
+        assert!(r.is_err());
+        assert!(r.unwrap_err().to_string().contains("name"));
+    }
+
+    #[test]
+    fn snipb_builder_bad_priority() {
+        assert!(SnipBBuilder::new("x").priority(200).build().is_err());
+    }
+
+    #[test]
+    fn snipb_builder_zero_max() {
+        assert!(SnipBBuilder::new("x").max_items(0).build().is_err());
+    }
+
+    #[test]
+    fn snipb_cfg_merge() {
+        let mut a = SnipBBuilder::new("a").property("x", "1").build().unwrap();
+        let b = SnipBBuilder::new("b").property("x", "2").property("y", "3").build().unwrap();
+        a.merge_properties(&b);
+        assert_eq!(a.get_property("x"), Some("2"));
+        assert_eq!(a.get_property("y"), Some("3"));
+    }
+
+    #[test]
+    fn snipb_cfg_display() {
+        let cfg = SnipBBuilder::new("test").tag("a").tag("b")
+            .enabled(false).build().unwrap();
+        let s = format!("{}", cfg);
+        assert!(s.contains("test"));
+        assert!(s.contains("false"));
+    }
+
 }

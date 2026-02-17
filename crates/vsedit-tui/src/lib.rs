@@ -1699,6 +1699,149 @@ impl fmt::Display for TuiMouseHoverTrackerConfig {
     }
 }
 
+
+// ─── TuiBuf Ring Buffer ──────────────────────────────────────
+
+/// A fixed-capacity ring buffer for UI events.
+#[derive(Debug, Clone)]
+pub struct TuiBufRingBuffer<T> {
+    buf: Vec<Option<T>>,
+    head: usize,
+    len: usize,
+}
+
+impl<T: Clone> TuiBufRingBuffer<T> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "capacity must be > 0");
+        Self { buf: vec![None; capacity], head: 0, len: 0 }
+    }
+
+    pub fn push(&mut self, item: T) {
+        let cap = self.buf.len();
+        let idx = (self.head + self.len) % cap;
+        self.buf[idx] = Some(item);
+        if self.len == cap { self.head = (self.head + 1) % cap; }
+        else { self.len += 1; }
+    }
+
+    pub fn len(&self) -> usize { self.len }
+    pub fn is_empty(&self) -> bool { self.len == 0 }
+    pub fn is_full(&self) -> bool { self.len == self.buf.len() }
+    pub fn capacity(&self) -> usize { self.buf.len() }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index >= self.len { return None; }
+        self.buf[(self.head + index) % self.buf.len()].as_ref()
+    }
+
+    pub fn iter(&self) -> Vec<&T> {
+        let cap = self.buf.len();
+        (0..self.len).filter_map(|i| self.buf[(self.head + i) % cap].as_ref()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        for slot in &mut self.buf { *slot = None; }
+        self.head = 0;
+        self.len = 0;
+    }
+
+    pub fn to_vec(&self) -> Vec<T> { self.iter().into_iter().cloned().collect() }
+
+    pub fn newest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[(self.head + self.len - 1) % self.buf.len()].as_ref()
+    }
+
+    pub fn oldest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[self.head].as_ref()
+    }
+}
+
+impl<T: Clone + fmt::Display> fmt::Display for TuiBufRingBuffer<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TuiBufRingBuffer(len={}, cap={})", self.len, self.capacity())
+    }
+}
+
+// ─── TuiFmt Formatter ───────────────────────────────────────
+
+/// Formatting options for TUI output.
+#[derive(Debug, Clone)]
+pub struct TuiFmtFmtOpts {
+    pub indent: usize,
+    pub max_width: usize,
+    pub use_color: bool,
+    pub separator: String,
+    pub prefix_str: String,
+}
+
+impl Default for TuiFmtFmtOpts {
+    fn default() -> Self {
+        Self { indent: 2, max_width: 120, use_color: false,
+               separator: ", ".into(), prefix_str: String::new() }
+    }
+}
+
+impl TuiFmtFmtOpts {
+    pub fn with_indent(mut self, indent: usize) -> Self { self.indent = indent; self }
+    pub fn with_max_width(mut self, width: usize) -> Self { self.max_width = width; self }
+    pub fn with_color(mut self) -> Self { self.use_color = true; self }
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self { self.separator = sep.into(); self }
+    pub fn with_prefix(mut self, p: impl Into<String>) -> Self { self.prefix_str = p.into(); self }
+}
+
+/// Formatter for TUI data.
+pub struct TuiFmtFmt {
+    options: TuiFmtFmtOpts,
+}
+
+impl TuiFmtFmt {
+    pub fn new(options: TuiFmtFmtOpts) -> Self { Self { options } }
+    pub fn default_fmt() -> Self { Self { options: TuiFmtFmtOpts::default() } }
+
+    pub fn format_list(&self, items: &[&str]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut result = String::new();
+        let mut line_len = 0usize;
+        for (i, item) in items.iter().enumerate() {
+            let formatted = if self.options.prefix_str.is_empty() {
+                format!("{}{}", ind, item)
+            } else {
+                format!("{}{}{}", ind, self.options.prefix_str, item)
+            };
+            if i > 0 && line_len + formatted.len() > self.options.max_width {
+                result.push('\n'); line_len = 0;
+            } else if i > 0 {
+                result.push_str(&self.options.separator);
+                line_len += self.options.separator.len();
+            }
+            line_len += formatted.len();
+            result.push_str(&formatted);
+        }
+        result
+    }
+
+    pub fn format_kv(&self, key: &str, value: &str) -> String {
+        format!("{}{} = {}", " ".repeat(self.options.indent), key, value)
+    }
+
+    pub fn format_section(&self, heading: &str, lines: &[String]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut r = format!("[{}]\n", heading);
+        for line in lines { r.push_str(&format!("{}{}\n", ind, line)); }
+        r
+    }
+
+    pub fn truncate(&self, s: &str) -> String {
+        if s.len() <= self.options.max_width { s.to_string() }
+        else {
+            let end = self.options.max_width.saturating_sub(3);
+            format!("{}...", &s[..end])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2615,6 +2758,94 @@ mod tests {
         st.update_peaks(3, 25);
         assert_eq!(st.peak_group_count, 5);
         assert_eq!(st.peak_item_count, 25);
+    }
+
+
+    #[test]
+    fn tuibuf_ringbuf_push_get() {
+        let mut rb = TuiBufRingBuffer::new(3);
+        rb.push(10); rb.push(20); rb.push(30);
+        assert_eq!(rb.get(0), Some(&10));
+        assert_eq!(rb.get(2), Some(&30));
+        assert_eq!(rb.len(), 3);
+    }
+
+    #[test]
+    fn tuibuf_ringbuf_overflow() {
+        let mut rb = TuiBufRingBuffer::<i32>::new(2);
+        rb.push(1); rb.push(2); rb.push(3);
+        assert_eq!(rb.len(), 2);
+        assert_eq!(rb.get(0), Some(&2));
+        assert_eq!(rb.get(1), Some(&3));
+    }
+
+    #[test]
+    fn tuibuf_ringbuf_clear() {
+        let mut rb = TuiBufRingBuffer::new(5);
+        rb.push("a".to_string()); rb.push("b".to_string());
+        rb.clear();
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn tuibuf_ringbuf_newest_oldest() {
+        let mut rb = TuiBufRingBuffer::new(4);
+        rb.push(100); rb.push(200); rb.push(300);
+        assert_eq!(rb.oldest(), Some(&100));
+        assert_eq!(rb.newest(), Some(&300));
+    }
+
+    #[test]
+    fn tuibuf_ringbuf_to_vec() {
+        let mut rb = TuiBufRingBuffer::new(3);
+        rb.push(1); rb.push(2);
+        assert_eq!(rb.to_vec(), vec![1, 2]);
+    }
+
+    #[test]
+    fn tuibuf_ringbuf_is_full() {
+        let mut rb = TuiBufRingBuffer::new(2);
+        assert!(!rb.is_full());
+        rb.push(1); rb.push(2);
+        assert!(rb.is_full());
+    }
+
+    #[test]
+    fn tuifmt_fmt_list() {
+        let f = TuiFmtFmt::new(TuiFmtFmtOpts::default().with_indent(0));
+        let r = f.format_list(&["a", "b", "c"]);
+        assert!(r.contains("a") && r.contains("b") && r.contains("c"));
+    }
+
+    #[test]
+    fn tuifmt_fmt_kv() {
+        let f = TuiFmtFmt::default_fmt();
+        let r = f.format_kv("key", "value");
+        assert!(r.contains("key") && r.contains("=") && r.contains("value"));
+    }
+
+    #[test]
+    fn tuifmt_fmt_section() {
+        let f = TuiFmtFmt::new(TuiFmtFmtOpts::default());
+        let r = f.format_section("Hdr", &["line1".into(), "line2".into()]);
+        assert!(r.starts_with("[Hdr]"));
+        assert!(r.contains("line1"));
+    }
+
+    #[test]
+    fn tuifmt_fmt_truncate() {
+        let f = TuiFmtFmt::new(TuiFmtFmtOpts::default().with_max_width(10));
+        let r = f.truncate("this is a very long string");
+        assert!(r.ends_with("..."));
+        assert!(r.len() <= 10);
+    }
+
+    #[test]
+    fn tuifmt_fmt_opts_defaults() {
+        let o = TuiFmtFmtOpts::default();
+        assert_eq!(o.indent, 2);
+        assert_eq!(o.max_width, 120);
+        assert!(!o.use_color);
     }
 
 }

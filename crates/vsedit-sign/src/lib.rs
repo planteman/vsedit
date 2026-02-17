@@ -1800,6 +1800,154 @@ impl SignatureTrustChainBuilder {
 }
 
 
+
+// ─── SignBuf Ring Buffer ──────────────────────────────────────
+
+/// A fixed-capacity ring buffer for signature audit.
+#[derive(Debug, Clone)]
+pub struct SignBufRingBuffer<T> {
+    buf: Vec<Option<T>>,
+    head: usize,
+    len: usize,
+}
+
+impl<T: Clone> SignBufRingBuffer<T> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "capacity must be > 0");
+        Self { buf: vec![None; capacity], head: 0, len: 0 }
+    }
+
+    pub fn push(&mut self, item: T) {
+        let cap = self.buf.len();
+        let idx = (self.head + self.len) % cap;
+        self.buf[idx] = Some(item);
+        if self.len == cap { self.head = (self.head + 1) % cap; }
+        else { self.len += 1; }
+    }
+
+    pub fn len(&self) -> usize { self.len }
+    pub fn is_empty(&self) -> bool { self.len == 0 }
+    pub fn is_full(&self) -> bool { self.len == self.buf.len() }
+    pub fn capacity(&self) -> usize { self.buf.len() }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index >= self.len { return None; }
+        self.buf[(self.head + index) % self.buf.len()].as_ref()
+    }
+
+    pub fn iter(&self) -> Vec<&T> {
+        let cap = self.buf.len();
+        (0..self.len).filter_map(|i| self.buf[(self.head + i) % cap].as_ref()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        for slot in &mut self.buf { *slot = None; }
+        self.head = 0;
+        self.len = 0;
+    }
+
+    pub fn to_vec(&self) -> Vec<T> { self.iter().into_iter().cloned().collect() }
+
+    pub fn newest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[(self.head + self.len - 1) % self.buf.len()].as_ref()
+    }
+
+    pub fn oldest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[self.head].as_ref()
+    }
+}
+
+impl<T: Clone + fmt::Display> fmt::Display for SignBufRingBuffer<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SignBufRingBuffer(len={}, cap={})", self.len, self.capacity())
+    }
+}
+
+// ─── SignBld Builder & Validator ─────────────────────────────
+
+/// Builder for constructing signing configurations.
+#[derive(Debug, Clone)]
+pub struct SignBldBuilder {
+    name: String,
+    properties: std::collections::HashMap<String, String>,
+    tags: Vec<String>,
+    enabled: bool,
+    priority: i32,
+    max_items: usize,
+}
+
+impl SignBldBuilder {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(), properties: std::collections::HashMap::new(),
+            tags: Vec::new(), enabled: true, priority: 0, max_items: 100,
+        }
+    }
+
+    pub fn property(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.properties.insert(key.into(), value.into()); self
+    }
+    pub fn tag(mut self, tag: impl Into<String>) -> Self { self.tags.push(tag.into()); self }
+    pub fn enabled(mut self, enabled: bool) -> Self { self.enabled = enabled; self }
+    pub fn priority(mut self, priority: i32) -> Self { self.priority = priority; self }
+    pub fn max_items(mut self, max: usize) -> Self { self.max_items = max; self }
+
+    pub fn build(self) -> Result<SignBldCfg, SignBldBuildErr> {
+        let mut errors = Vec::new();
+        if self.name.is_empty() { errors.push("name must not be empty".into()); }
+        if self.max_items == 0 { errors.push("max_items must be > 0".into()); }
+        if self.priority < -100 || self.priority > 100 {
+            errors.push(format!("priority {} out of range [-100, 100]", self.priority));
+        }
+        if !errors.is_empty() { return Err(SignBldBuildErr { errors }); }
+        Ok(SignBldCfg {
+            name: self.name, properties: self.properties, tags: self.tags,
+            enabled: self.enabled, priority: self.priority, max_items: self.max_items,
+        })
+    }
+}
+
+/// Validated signing configuration.
+#[derive(Debug, Clone)]
+pub struct SignBldCfg {
+    pub name: String,
+    pub properties: std::collections::HashMap<String, String>,
+    pub tags: Vec<String>,
+    pub enabled: bool,
+    pub priority: i32,
+    pub max_items: usize,
+}
+
+impl SignBldCfg {
+    pub fn has_tag(&self, tag: &str) -> bool { self.tags.iter().any(|t| t == tag) }
+    pub fn get_property(&self, key: &str) -> Option<&str> {
+        self.properties.get(key).map(|s| s.as_str())
+    }
+    pub fn property_count(&self) -> usize { self.properties.len() }
+    pub fn merge_properties(&mut self, other: &SignBldCfg) {
+        for (k, v) in &other.properties { self.properties.insert(k.clone(), v.clone()); }
+    }
+}
+
+impl fmt::Display for SignBldCfg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SignBldCfg({}, enabled={}, priority={}, tags={})",
+            self.name, self.enabled, self.priority, self.tags.len())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SignBldBuildErr { pub errors: Vec<String> }
+
+impl fmt::Display for SignBldBuildErr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SignBldBuildErr: {}", self.errors.join("; "))
+    }
+}
+impl std::error::Error for SignBldBuildErr {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2862,5 +3010,101 @@ mod tests {
         assert!(e2.to_string().contains("5"));
     }
 
+
+
+    #[test]
+    fn signbuf_ringbuf_push_get() {
+        let mut rb = SignBufRingBuffer::new(3);
+        rb.push(10); rb.push(20); rb.push(30);
+        assert_eq!(rb.get(0), Some(&10));
+        assert_eq!(rb.get(2), Some(&30));
+        assert_eq!(rb.len(), 3);
+    }
+
+    #[test]
+    fn signbuf_ringbuf_overflow() {
+        let mut rb = SignBufRingBuffer::<i32>::new(2);
+        rb.push(1); rb.push(2); rb.push(3);
+        assert_eq!(rb.len(), 2);
+        assert_eq!(rb.get(0), Some(&2));
+        assert_eq!(rb.get(1), Some(&3));
+    }
+
+    #[test]
+    fn signbuf_ringbuf_clear() {
+        let mut rb = SignBufRingBuffer::new(5);
+        rb.push("a".to_string()); rb.push("b".to_string());
+        rb.clear();
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn signbuf_ringbuf_newest_oldest() {
+        let mut rb = SignBufRingBuffer::new(4);
+        rb.push(100); rb.push(200); rb.push(300);
+        assert_eq!(rb.oldest(), Some(&100));
+        assert_eq!(rb.newest(), Some(&300));
+    }
+
+    #[test]
+    fn signbuf_ringbuf_to_vec() {
+        let mut rb = SignBufRingBuffer::new(3);
+        rb.push(1); rb.push(2);
+        assert_eq!(rb.to_vec(), vec![1, 2]);
+    }
+
+    #[test]
+    fn signbuf_ringbuf_is_full() {
+        let mut rb = SignBufRingBuffer::new(2);
+        assert!(!rb.is_full());
+        rb.push(1); rb.push(2);
+        assert!(rb.is_full());
+    }
+
+    #[test]
+    fn signbld_builder_valid() {
+        let cfg = SignBldBuilder::new("test").property("key", "val")
+            .tag("important").priority(5).build();
+        assert!(cfg.is_ok());
+        let cfg = cfg.unwrap();
+        assert_eq!(cfg.name, "test");
+        assert!(cfg.has_tag("important"));
+        assert_eq!(cfg.get_property("key"), Some("val"));
+    }
+
+    #[test]
+    fn signbld_builder_empty_name() {
+        let r = SignBldBuilder::new("").build();
+        assert!(r.is_err());
+        assert!(r.unwrap_err().to_string().contains("name"));
+    }
+
+    #[test]
+    fn signbld_builder_bad_priority() {
+        assert!(SignBldBuilder::new("x").priority(200).build().is_err());
+    }
+
+    #[test]
+    fn signbld_builder_zero_max() {
+        assert!(SignBldBuilder::new("x").max_items(0).build().is_err());
+    }
+
+    #[test]
+    fn signbld_cfg_merge() {
+        let mut a = SignBldBuilder::new("a").property("x", "1").build().unwrap();
+        let b = SignBldBuilder::new("b").property("x", "2").property("y", "3").build().unwrap();
+        a.merge_properties(&b);
+        assert_eq!(a.get_property("x"), Some("2"));
+        assert_eq!(a.get_property("y"), Some("3"));
+    }
+
+    #[test]
+    fn signbld_cfg_display() {
+        let cfg = SignBldBuilder::new("test").tag("a").tag("b")
+            .enabled(false).build().unwrap();
+        let s = format!("{}", cfg);
+        assert!(s.contains("test"));
+        assert!(s.contains("false"));
+    }
 
 }

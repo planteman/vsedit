@@ -3,6 +3,7 @@
 //! Equivalent to VS Code's `vs/editor/contrib/hover`.
 //! Provides hover content model for displaying tooltips at cursor positions.
 
+use std::fmt;
 /// How the hover was triggered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HoverTriggerKind {
@@ -1760,6 +1761,171 @@ impl HoverWidgetAnimator {
 }
 
 
+
+// ─── Hover LRU Cache ───────────────────────────────────────
+
+/// A simple LRU cache for hover content.
+#[derive(Debug)]
+pub struct HoverLruCache<V> {
+    entries: Vec<(String, V)>,
+    capacity: usize,
+    hits: u64,
+    misses: u64,
+}
+
+impl<V: Clone> HoverLruCache<V> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0);
+        Self { entries: Vec::with_capacity(capacity), capacity, hits: 0, misses: 0 }
+    }
+
+    pub fn insert(&mut self, key: impl Into<String>, value: V) -> Option<(String, V)> {
+        let key = key.into();
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries.remove(pos);
+            self.entries.insert(0, (key, value));
+            return None;
+        }
+        let evicted = if self.entries.len() >= self.capacity {
+            Some(self.entries.pop().unwrap())
+        } else { None };
+        self.entries.insert(0, (key, value));
+        evicted
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<&V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            self.hits += 1;
+            let entry = self.entries.remove(pos);
+            self.entries.insert(0, entry);
+            Some(&self.entries[0].1)
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    pub fn peek(&self, key: &str) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else { None }
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn hit_ratio(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+
+    pub fn hits(&self) -> u64 { self.hits }
+    pub fn misses(&self) -> u64 { self.misses }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+}
+
+impl<V: Clone + fmt::Display> fmt::Display for HoverLruCache<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HoverLruCache(size={}, cap={}, hits={}, misses={})",
+            self.len(), self.capacity, self.hits, self.misses)
+    }
+}
+
+// ─── Hover Formatter ───────────────────────────────────────
+
+/// Formatting options for hover tooltip output.
+#[derive(Debug, Clone)]
+pub struct HoverFmtOpts {
+    pub indent: usize,
+    pub max_width: usize,
+    pub use_color: bool,
+    pub separator: String,
+    pub prefix_str: String,
+}
+
+impl Default for HoverFmtOpts {
+    fn default() -> Self {
+        Self { indent: 2, max_width: 120, use_color: false,
+               separator: ", ".into(), prefix_str: String::new() }
+    }
+}
+
+impl HoverFmtOpts {
+    pub fn with_indent(mut self, indent: usize) -> Self { self.indent = indent; self }
+    pub fn with_max_width(mut self, width: usize) -> Self { self.max_width = width; self }
+    pub fn with_color(mut self) -> Self { self.use_color = true; self }
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self { self.separator = sep.into(); self }
+    pub fn with_prefix(mut self, p: impl Into<String>) -> Self { self.prefix_str = p.into(); self }
+}
+
+/// Formatter for hover tooltip data.
+pub struct HoverFmt {
+    options: HoverFmtOpts,
+}
+
+impl HoverFmt {
+    pub fn new(options: HoverFmtOpts) -> Self { Self { options } }
+    pub fn default_fmt() -> Self { Self { options: HoverFmtOpts::default() } }
+
+    pub fn format_list(&self, items: &[&str]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut result = String::new();
+        let mut line_len = 0usize;
+        for (i, item) in items.iter().enumerate() {
+            let formatted = if self.options.prefix_str.is_empty() {
+                format!("{}{}", ind, item)
+            } else {
+                format!("{}{}{}", ind, self.options.prefix_str, item)
+            };
+            if i > 0 && line_len + formatted.len() > self.options.max_width {
+                result.push('\n'); line_len = 0;
+            } else if i > 0 {
+                result.push_str(&self.options.separator);
+                line_len += self.options.separator.len();
+            }
+            line_len += formatted.len();
+            result.push_str(&formatted);
+        }
+        result
+    }
+
+    pub fn format_kv(&self, key: &str, value: &str) -> String {
+        format!("{}{} = {}", " ".repeat(self.options.indent), key, value)
+    }
+
+    pub fn format_section(&self, heading: &str, lines: &[String]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut r = format!("[{}]\n", heading);
+        for line in lines { r.push_str(&format!("{}{}\n", ind, line)); }
+        r
+    }
+
+    pub fn truncate(&self, s: &str) -> String {
+        if s.len() <= self.options.max_width { s.to_string() }
+        else {
+            let end = self.options.max_width.saturating_sub(3);
+            format!("{}...", &s[..end])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2818,5 +2984,96 @@ mod tests {
         assert_eq!(format!("{}", AnimationPhase::FadingOut), "fading_out");
     }
 
+
+
+    #[test]
+    fn hover_lru_insert_get() {
+        let mut c = HoverLruCache::new(3);
+        c.insert("a", 1); c.insert("b", 2); c.insert("c", 3);
+        assert_eq!(c.get("a"), Some(&1));
+        assert_eq!(c.get("b"), Some(&2));
+        assert_eq!(c.len(), 3);
+    }
+
+    #[test]
+    fn hover_lru_eviction() {
+        let mut c = HoverLruCache::new(2);
+        c.insert("a", 1); c.insert("b", 2);
+        let ev = c.insert("c", 3);
+        assert!(ev.is_some());
+        assert_eq!(ev.unwrap().0, "a");
+        assert!(!c.contains("a"));
+    }
+
+    #[test]
+    fn hover_lru_hit_ratio() {
+        let mut c = HoverLruCache::new(5);
+        c.insert("x", 10);
+        c.get("x"); c.get("y");
+        assert!(c.hit_ratio() > 0.4 && c.hit_ratio() < 0.6);
+    }
+
+    #[test]
+    fn hover_lru_clear() {
+        let mut c = HoverLruCache::new(3);
+        c.insert("a", 1); c.insert("b", 2);
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.hits(), 0);
+    }
+
+    #[test]
+    fn hover_lru_remove() {
+        let mut c = HoverLruCache::new(3);
+        c.insert("a", 100);
+        assert_eq!(c.remove("a"), Some(100));
+        assert!(!c.contains("a"));
+    }
+
+    #[test]
+    fn hover_lru_peek() {
+        let mut c = HoverLruCache::new(3);
+        c.insert("x", 42);
+        assert_eq!(c.peek("x"), Some(&42));
+        assert_eq!(c.misses(), 0);
+    }
+
+    #[test]
+    fn hover_fmt_list() {
+        let f = HoverFmt::new(HoverFmtOpts::default().with_indent(0));
+        let r = f.format_list(&["a", "b", "c"]);
+        assert!(r.contains("a") && r.contains("b") && r.contains("c"));
+    }
+
+    #[test]
+    fn hover_fmt_kv() {
+        let f = HoverFmt::default_fmt();
+        let r = f.format_kv("key", "value");
+        assert!(r.contains("key") && r.contains("=") && r.contains("value"));
+    }
+
+    #[test]
+    fn hover_fmt_section() {
+        let f = HoverFmt::new(HoverFmtOpts::default());
+        let r = f.format_section("Hdr", &["line1".into(), "line2".into()]);
+        assert!(r.starts_with("[Hdr]"));
+        assert!(r.contains("line1"));
+    }
+
+    #[test]
+    fn hover_fmt_truncate() {
+        let f = HoverFmt::new(HoverFmtOpts::default().with_max_width(10));
+        let r = f.truncate("this is a very long string");
+        assert!(r.ends_with("..."));
+        assert!(r.len() <= 10);
+    }
+
+    #[test]
+    fn hover_fmt_opts_defaults() {
+        let o = HoverFmtOpts::default();
+        assert_eq!(o.indent, 2);
+        assert_eq!(o.max_width, 120);
+        assert!(!o.use_color);
+    }
 
 }

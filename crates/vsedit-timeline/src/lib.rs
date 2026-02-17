@@ -1723,6 +1723,149 @@ impl Default for TimelineRangeSelector {
     }
 }
 
+
+// ─── TlBuf Ring Buffer ──────────────────────────────────────
+
+/// A fixed-capacity ring buffer for timeline events.
+#[derive(Debug, Clone)]
+pub struct TlBufRingBuffer<T> {
+    buf: Vec<Option<T>>,
+    head: usize,
+    len: usize,
+}
+
+impl<T: Clone> TlBufRingBuffer<T> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "capacity must be > 0");
+        Self { buf: vec![None; capacity], head: 0, len: 0 }
+    }
+
+    pub fn push(&mut self, item: T) {
+        let cap = self.buf.len();
+        let idx = (self.head + self.len) % cap;
+        self.buf[idx] = Some(item);
+        if self.len == cap { self.head = (self.head + 1) % cap; }
+        else { self.len += 1; }
+    }
+
+    pub fn len(&self) -> usize { self.len }
+    pub fn is_empty(&self) -> bool { self.len == 0 }
+    pub fn is_full(&self) -> bool { self.len == self.buf.len() }
+    pub fn capacity(&self) -> usize { self.buf.len() }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index >= self.len { return None; }
+        self.buf[(self.head + index) % self.buf.len()].as_ref()
+    }
+
+    pub fn iter(&self) -> Vec<&T> {
+        let cap = self.buf.len();
+        (0..self.len).filter_map(|i| self.buf[(self.head + i) % cap].as_ref()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        for slot in &mut self.buf { *slot = None; }
+        self.head = 0;
+        self.len = 0;
+    }
+
+    pub fn to_vec(&self) -> Vec<T> { self.iter().into_iter().cloned().collect() }
+
+    pub fn newest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[(self.head + self.len - 1) % self.buf.len()].as_ref()
+    }
+
+    pub fn oldest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[self.head].as_ref()
+    }
+}
+
+impl<T: Clone + fmt::Display> fmt::Display for TlBufRingBuffer<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TlBufRingBuffer(len={}, cap={})", self.len, self.capacity())
+    }
+}
+
+// ─── TlFmt Formatter ───────────────────────────────────────
+
+/// Formatting options for timeline output.
+#[derive(Debug, Clone)]
+pub struct TlFmtFmtOpts {
+    pub indent: usize,
+    pub max_width: usize,
+    pub use_color: bool,
+    pub separator: String,
+    pub prefix_str: String,
+}
+
+impl Default for TlFmtFmtOpts {
+    fn default() -> Self {
+        Self { indent: 2, max_width: 120, use_color: false,
+               separator: ", ".into(), prefix_str: String::new() }
+    }
+}
+
+impl TlFmtFmtOpts {
+    pub fn with_indent(mut self, indent: usize) -> Self { self.indent = indent; self }
+    pub fn with_max_width(mut self, width: usize) -> Self { self.max_width = width; self }
+    pub fn with_color(mut self) -> Self { self.use_color = true; self }
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self { self.separator = sep.into(); self }
+    pub fn with_prefix(mut self, p: impl Into<String>) -> Self { self.prefix_str = p.into(); self }
+}
+
+/// Formatter for timeline data.
+pub struct TlFmtFmt {
+    options: TlFmtFmtOpts,
+}
+
+impl TlFmtFmt {
+    pub fn new(options: TlFmtFmtOpts) -> Self { Self { options } }
+    pub fn default_fmt() -> Self { Self { options: TlFmtFmtOpts::default() } }
+
+    pub fn format_list(&self, items: &[&str]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut result = String::new();
+        let mut line_len = 0usize;
+        for (i, item) in items.iter().enumerate() {
+            let formatted = if self.options.prefix_str.is_empty() {
+                format!("{}{}", ind, item)
+            } else {
+                format!("{}{}{}", ind, self.options.prefix_str, item)
+            };
+            if i > 0 && line_len + formatted.len() > self.options.max_width {
+                result.push('\n'); line_len = 0;
+            } else if i > 0 {
+                result.push_str(&self.options.separator);
+                line_len += self.options.separator.len();
+            }
+            line_len += formatted.len();
+            result.push_str(&formatted);
+        }
+        result
+    }
+
+    pub fn format_kv(&self, key: &str, value: &str) -> String {
+        format!("{}{} = {}", " ".repeat(self.options.indent), key, value)
+    }
+
+    pub fn format_section(&self, heading: &str, lines: &[String]) -> String {
+        let ind = " ".repeat(self.options.indent);
+        let mut r = format!("[{}]\n", heading);
+        for line in lines { r.push_str(&format!("{}{}\n", ind, line)); }
+        r
+    }
+
+    pub fn truncate(&self, s: &str) -> String {
+        if s.len() <= self.options.max_width { s.to_string() }
+        else {
+            let end = self.options.max_width.saturating_sub(3);
+            format!("{}...", &s[..end])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2835,6 +2978,94 @@ mod tests {
     fn timelineRangeSelector_priority_display() {
         assert_eq!(format!("{}", TimelineRangeSelectorPriority::High), "high");
         assert_eq!(format!("{}", TimelineRangeSelectorPriority::Low), "low");
+    }
+
+
+    #[test]
+    fn tlbuf_ringbuf_push_get() {
+        let mut rb = TlBufRingBuffer::new(3);
+        rb.push(10); rb.push(20); rb.push(30);
+        assert_eq!(rb.get(0), Some(&10));
+        assert_eq!(rb.get(2), Some(&30));
+        assert_eq!(rb.len(), 3);
+    }
+
+    #[test]
+    fn tlbuf_ringbuf_overflow() {
+        let mut rb = TlBufRingBuffer::<i32>::new(2);
+        rb.push(1); rb.push(2); rb.push(3);
+        assert_eq!(rb.len(), 2);
+        assert_eq!(rb.get(0), Some(&2));
+        assert_eq!(rb.get(1), Some(&3));
+    }
+
+    #[test]
+    fn tlbuf_ringbuf_clear() {
+        let mut rb = TlBufRingBuffer::new(5);
+        rb.push("a".to_string()); rb.push("b".to_string());
+        rb.clear();
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn tlbuf_ringbuf_newest_oldest() {
+        let mut rb = TlBufRingBuffer::new(4);
+        rb.push(100); rb.push(200); rb.push(300);
+        assert_eq!(rb.oldest(), Some(&100));
+        assert_eq!(rb.newest(), Some(&300));
+    }
+
+    #[test]
+    fn tlbuf_ringbuf_to_vec() {
+        let mut rb = TlBufRingBuffer::new(3);
+        rb.push(1); rb.push(2);
+        assert_eq!(rb.to_vec(), vec![1, 2]);
+    }
+
+    #[test]
+    fn tlbuf_ringbuf_is_full() {
+        let mut rb = TlBufRingBuffer::new(2);
+        assert!(!rb.is_full());
+        rb.push(1); rb.push(2);
+        assert!(rb.is_full());
+    }
+
+    #[test]
+    fn tlfmt_fmt_list() {
+        let f = TlFmtFmt::new(TlFmtFmtOpts::default().with_indent(0));
+        let r = f.format_list(&["a", "b", "c"]);
+        assert!(r.contains("a") && r.contains("b") && r.contains("c"));
+    }
+
+    #[test]
+    fn tlfmt_fmt_kv() {
+        let f = TlFmtFmt::default_fmt();
+        let r = f.format_kv("key", "value");
+        assert!(r.contains("key") && r.contains("=") && r.contains("value"));
+    }
+
+    #[test]
+    fn tlfmt_fmt_section() {
+        let f = TlFmtFmt::new(TlFmtFmtOpts::default());
+        let r = f.format_section("Hdr", &["line1".into(), "line2".into()]);
+        assert!(r.starts_with("[Hdr]"));
+        assert!(r.contains("line1"));
+    }
+
+    #[test]
+    fn tlfmt_fmt_truncate() {
+        let f = TlFmtFmt::new(TlFmtFmtOpts::default().with_max_width(10));
+        let r = f.truncate("this is a very long string");
+        assert!(r.ends_with("..."));
+        assert!(r.len() <= 10);
+    }
+
+    #[test]
+    fn tlfmt_fmt_opts_defaults() {
+        let o = TlFmtFmtOpts::default();
+        assert_eq!(o.indent, 2);
+        assert_eq!(o.max_width, 120);
+        assert!(!o.use_color);
     }
 
 }

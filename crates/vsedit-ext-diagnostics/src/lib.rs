@@ -1680,6 +1680,367 @@ impl DiagnosticQuickNavigator {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// vsedit-ext-diagnostics: Extended configuration, caching, and iteration utilities
+// ---------------------------------------------------------------------------
+
+/// Configuration entry with key-value metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtDiagnosticsXConfig {
+    pub key: String,
+    pub value: String,
+    pub tags: Vec<String>,
+    pub weight: u32,
+    pub active: bool,
+}
+
+impl ExtDiagnosticsXConfig {
+    pub fn new(key: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            value: String::new(),
+            tags: Vec::new(),
+            weight: 0,
+            active: true,
+        }
+    }
+
+    pub fn with_value(mut self, v: impl Into<String>) -> Self {
+        self.value = v.into();
+        self
+    }
+
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into());
+        self
+    }
+
+    pub fn with_weight(mut self, w: u32) -> Self {
+        self.weight = w;
+        self
+    }
+
+    pub fn deactivate(mut self) -> Self {
+        self.active = false;
+        self
+    }
+
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    pub fn tag_count(&self) -> usize {
+        self.tags.len()
+    }
+}
+
+impl std::fmt::Display for ExtDiagnosticsXConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+/// Registry that stores and indexes configuration entries.
+#[derive(Debug, Default)]
+pub struct ExtDiagnosticsXRegistry {
+    entries: Vec<ExtDiagnosticsXConfig>,
+    index: std::collections::HashMap<String, usize>,
+}
+
+impl ExtDiagnosticsXRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, entry: ExtDiagnosticsXConfig) -> Result<(), String> {
+        if self.index.contains_key(&entry.key) {
+            return Err(format!("duplicate key: {}", entry.key));
+        }
+        let idx = self.entries.len();
+        self.index.insert(entry.key.clone(), idx);
+        self.entries.push(entry);
+        Ok(())
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ExtDiagnosticsXConfig> {
+        self.index.get(key).map(|&i| &self.entries[i])
+    }
+
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut ExtDiagnosticsXConfig> {
+        self.index.get(key).copied().map(move |i| &mut self.entries[i])
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<ExtDiagnosticsXConfig> {
+        if let Some(&idx) = self.index.get(key) {
+            self.index.remove(key);
+            let removed = self.entries.remove(idx);
+            for val in self.index.values_mut() {
+                if *val > idx {
+                    *val -= 1;
+                }
+            }
+            Some(removed)
+        } else {
+            None
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.key.as_str()).collect()
+    }
+
+    pub fn active_entries(&self) -> Vec<&ExtDiagnosticsXConfig> {
+        self.entries.iter().filter(|e| e.active).collect()
+    }
+
+    pub fn by_weight_desc(&self) -> Vec<&ExtDiagnosticsXConfig> {
+        let mut sorted: Vec<&ExtDiagnosticsXConfig> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.weight.cmp(&a.weight));
+        sorted
+    }
+
+    pub fn entries_with_tag(&self, tag: &str) -> Vec<&ExtDiagnosticsXConfig> {
+        self.entries.iter().filter(|e| e.has_tag(tag)).collect()
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.index.contains_key(key)
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.index.clear();
+    }
+
+    pub fn total_weight(&self) -> u32 {
+        self.entries.iter().map(|e| e.weight).sum()
+    }
+
+    pub fn iter(&self) -> ExtDiagnosticsXIterator<'_> {
+        ExtDiagnosticsXIterator { inner: self.entries.iter() }
+    }
+}
+
+/// Iterator over registry entries.
+pub struct ExtDiagnosticsXIterator<'a> {
+    inner: std::slice::Iter<'a, ExtDiagnosticsXConfig>,
+}
+
+impl<'a> Iterator for ExtDiagnosticsXIterator<'a> {
+    type Item = &'a ExtDiagnosticsXConfig;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+/// LRU cache with capacity limit.
+#[derive(Debug)]
+pub struct ExtDiagnosticsXCache {
+    capacity: usize,
+    entries: Vec<(String, String)>,
+}
+
+impl ExtDiagnosticsXCache {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<&str> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(pos);
+            self.entries.push(entry);
+            self.entries.last().map(|(_, v)| v.as_str())
+        } else {
+            None
+        }
+    }
+
+    pub fn put(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        let key = key.into();
+        self.entries.retain(|(k, _)| k != &key);
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((key, value.into()));
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn most_recent(&self) -> Option<(&str, &str)> {
+        self.entries.last().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
+    pub fn least_recent(&self) -> Option<(&str, &str)> {
+        self.entries.first().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+}
+
+/// Formatter for rendering entries as text.
+pub struct ExtDiagnosticsXFormatter {
+    separator: String,
+    show_inactive: bool,
+    max_value_len: usize,
+}
+
+impl ExtDiagnosticsXFormatter {
+    pub fn new() -> Self {
+        Self {
+            separator: ", ".to_string(),
+            show_inactive: false,
+            max_value_len: 80,
+        }
+    }
+
+    pub fn separator(mut self, sep: impl Into<String>) -> Self {
+        self.separator = sep.into();
+        self
+    }
+
+    pub fn show_inactive(mut self, show: bool) -> Self {
+        self.show_inactive = show;
+        self
+    }
+
+    pub fn max_value_len(mut self, len: usize) -> Self {
+        self.max_value_len = len;
+        self
+    }
+
+    pub fn format_entry(&self, entry: &ExtDiagnosticsXConfig) -> String {
+        let val = if entry.value.len() > self.max_value_len {
+            format!("{}…", &entry.value[..self.max_value_len])
+        } else {
+            entry.value.clone()
+        };
+        let status = if entry.active { "✓" } else { "✗" };
+        format!("[{}] {}={}", status, entry.key, val)
+    }
+
+    pub fn format_list(&self, registry: &ExtDiagnosticsXRegistry) -> String {
+        let items: Vec<String> = registry.entries.iter()
+            .filter(|e| self.show_inactive || e.active)
+            .map(|e| self.format_entry(e))
+            .collect();
+        items.join(&self.separator)
+    }
+
+    pub fn format_summary(&self, registry: &ExtDiagnosticsXRegistry) -> String {
+        let active = registry.active_entries().len();
+        let total = registry.len();
+        format!("{} active / {} total (weight: {})", active, total, registry.total_weight())
+    }
+}
+
+impl Default for ExtDiagnosticsXFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Validator for configuration entries.
+pub struct ExtDiagnosticsXValidator {
+    max_key_len: usize,
+    require_value: bool,
+    allowed_tags: Option<Vec<String>>,
+}
+
+impl ExtDiagnosticsXValidator {
+    pub fn new() -> Self {
+        Self {
+            max_key_len: 256,
+            require_value: false,
+            allowed_tags: None,
+        }
+    }
+
+    pub fn max_key_len(mut self, len: usize) -> Self {
+        self.max_key_len = len;
+        self
+    }
+
+    pub fn require_value(mut self, req: bool) -> Self {
+        self.require_value = req;
+        self
+    }
+
+    pub fn allowed_tags(mut self, tags: Vec<String>) -> Self {
+        self.allowed_tags = Some(tags);
+        self
+    }
+
+    pub fn validate(&self, entry: &ExtDiagnosticsXConfig) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if entry.key.is_empty() {
+            errors.push("key must not be empty".into());
+        }
+        if entry.key.len() > self.max_key_len {
+            errors.push(format!("key exceeds max length {}", self.max_key_len));
+        }
+        if self.require_value && entry.value.is_empty() {
+            errors.push("value is required".into());
+        }
+        if let Some(ref allowed) = self.allowed_tags {
+            for tag in &entry.tags {
+                if !allowed.contains(tag) {
+                    errors.push(format!("tag '{}' is not allowed", tag));
+                }
+            }
+        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
+
+    pub fn validate_all(&self, registry: &ExtDiagnosticsXRegistry) -> Vec<(String, Vec<String>)> {
+        let mut results = Vec::new();
+        for entry in &registry.entries {
+            if let Err(errs) = self.validate(entry) {
+                results.push((entry.key.clone(), errs));
+            }
+        }
+        results
+    }
+}
+
+impl Default for ExtDiagnosticsXValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2745,4 +3106,200 @@ mod tests {
         assert!(r.contains("my-label"));
         assert!(r.contains("false"));
     }
+
+    #[test]
+    fn extDiagnostics_x_config_new() {
+        let c = ExtDiagnosticsXConfig::new("mykey");
+        assert_eq!(c.key, "mykey");
+        assert!(c.active);
+        assert_eq!(c.weight, 0);
+        assert!(c.tags.is_empty());
+    }
+
+    #[test]
+    fn extDiagnostics_x_config_builder() {
+        let c = ExtDiagnosticsXConfig::new("k")
+            .with_value("v")
+            .with_tag("t1")
+            .with_tag("t2")
+            .with_weight(5)
+            .deactivate();
+        assert_eq!(c.value, "v");
+        assert_eq!(c.tag_count(), 2);
+        assert!(c.has_tag("t1"));
+        assert_eq!(c.weight, 5);
+        assert!(!c.active);
+    }
+
+    #[test]
+    fn extDiagnostics_x_config_display() {
+        let c = ExtDiagnosticsXConfig::new("k").with_value("v");
+        assert_eq!(format!("{c}"), "k=v");
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_insert_get() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a").with_value("1")).unwrap();
+        assert_eq!(reg.get("a").unwrap().value, "1");
+        assert_eq!(reg.len(), 1);
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_duplicate() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a")).unwrap();
+        assert!(reg.insert(ExtDiagnosticsXConfig::new("a")).is_err());
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_remove() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a")).unwrap();
+        reg.insert(ExtDiagnosticsXConfig::new("b")).unwrap();
+        reg.remove("a");
+        assert!(!reg.contains("a"));
+        assert!(reg.contains("b"));
+        assert_eq!(reg.len(), 1);
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_active_entries() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a")).unwrap();
+        reg.insert(ExtDiagnosticsXConfig::new("b").deactivate()).unwrap();
+        assert_eq!(reg.active_entries().len(), 1);
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_by_weight() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("lo").with_weight(1)).unwrap();
+        reg.insert(ExtDiagnosticsXConfig::new("hi").with_weight(10)).unwrap();
+        let sorted = reg.by_weight_desc();
+        assert_eq!(sorted[0].key, "hi");
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_tags() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a").with_tag("x")).unwrap();
+        reg.insert(ExtDiagnosticsXConfig::new("b").with_tag("y")).unwrap();
+        assert_eq!(reg.entries_with_tag("x").len(), 1);
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_total_weight() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a").with_weight(3)).unwrap();
+        reg.insert(ExtDiagnosticsXConfig::new("b").with_weight(7)).unwrap();
+        assert_eq!(reg.total_weight(), 10);
+    }
+
+    #[test]
+    fn extDiagnostics_x_registry_iterator() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a")).unwrap();
+        reg.insert(ExtDiagnosticsXConfig::new("b")).unwrap();
+        let keys: Vec<&str> = reg.iter().map(|e| e.key.as_str()).collect();
+        assert_eq!(keys, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn extDiagnostics_x_cache_put_get() {
+        let mut cache = ExtDiagnosticsXCache::new(3);
+        cache.put("a", "1");
+        cache.put("b", "2");
+        assert_eq!(cache.get("a"), Some("1"));
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn extDiagnostics_x_cache_eviction() {
+        let mut cache = ExtDiagnosticsXCache::new(2);
+        cache.put("a", "1");
+        cache.put("b", "2");
+        cache.put("c", "3");
+        assert!(!cache.contains("a"));
+        assert!(cache.contains("b"));
+        assert!(cache.contains("c"));
+    }
+
+    #[test]
+    fn extDiagnostics_x_cache_lru_order() {
+        let mut cache = ExtDiagnosticsXCache::new(3);
+        cache.put("a", "1");
+        cache.put("b", "2");
+        cache.put("c", "3");
+        cache.get("a"); // promote a
+        cache.put("d", "4"); // evicts b
+        assert!(cache.contains("a"));
+        assert!(!cache.contains("b"));
+    }
+
+    #[test]
+    fn extDiagnostics_x_cache_most_least_recent() {
+        let mut cache = ExtDiagnosticsXCache::new(5);
+        cache.put("x", "1");
+        cache.put("y", "2");
+        assert_eq!(cache.most_recent().unwrap().0, "y");
+        assert_eq!(cache.least_recent().unwrap().0, "x");
+    }
+
+    #[test]
+    fn extDiagnostics_x_formatter_entry() {
+        let e = ExtDiagnosticsXConfig::new("k").with_value("v");
+        let fmt = ExtDiagnosticsXFormatter::new();
+        let output = fmt.format_entry(&e);
+        assert!(output.contains("[✓]"));
+        assert!(output.contains("k=v"));
+    }
+
+    #[test]
+    fn extDiagnostics_x_formatter_summary() {
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("a").with_weight(5)).unwrap();
+        let fmt = ExtDiagnosticsXFormatter::new();
+        let summary = fmt.format_summary(&reg);
+        assert!(summary.contains("1 active"));
+    }
+
+    #[test]
+    fn extDiagnostics_x_validator_valid() {
+        let v = ExtDiagnosticsXValidator::new();
+        let c = ExtDiagnosticsXConfig::new("ok");
+        assert!(v.validate(&c).is_ok());
+    }
+
+    #[test]
+    fn extDiagnostics_x_validator_empty_key() {
+        let v = ExtDiagnosticsXValidator::new();
+        let c = ExtDiagnosticsXConfig::new("");
+        assert!(v.validate(&c).is_err());
+    }
+
+    #[test]
+    fn extDiagnostics_x_validator_require_value() {
+        let v = ExtDiagnosticsXValidator::new().require_value(true);
+        let c = ExtDiagnosticsXConfig::new("k");
+        assert!(v.validate(&c).is_err());
+    }
+
+    #[test]
+    fn extDiagnostics_x_validator_allowed_tags() {
+        let v = ExtDiagnosticsXValidator::new()
+            .allowed_tags(vec!["ok".into()]);
+        let c = ExtDiagnosticsXConfig::new("k").with_tag("bad");
+        assert!(v.validate(&c).is_err());
+    }
+
+    #[test]
+    fn extDiagnostics_x_validator_validate_all() {
+        let v = ExtDiagnosticsXValidator::new();
+        let mut reg = ExtDiagnosticsXRegistry::new();
+        reg.insert(ExtDiagnosticsXConfig::new("ok")).unwrap();
+        let errs = v.validate_all(&reg);
+        assert!(errs.is_empty());
+    }
+
 }

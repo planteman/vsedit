@@ -1554,6 +1554,157 @@ impl HashComparisonHelper {
 }
 
 
+
+// ─── HashBuf Ring Buffer ──────────────────────────────────────
+
+/// A fixed-capacity ring buffer for hash log.
+#[derive(Debug, Clone)]
+pub struct HashBufRingBuffer<T> {
+    buf: Vec<Option<T>>,
+    head: usize,
+    len: usize,
+}
+
+impl<T: Clone> HashBufRingBuffer<T> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "capacity must be > 0");
+        Self { buf: vec![None; capacity], head: 0, len: 0 }
+    }
+
+    pub fn push(&mut self, item: T) {
+        let cap = self.buf.len();
+        let idx = (self.head + self.len) % cap;
+        self.buf[idx] = Some(item);
+        if self.len == cap { self.head = (self.head + 1) % cap; }
+        else { self.len += 1; }
+    }
+
+    pub fn len(&self) -> usize { self.len }
+    pub fn is_empty(&self) -> bool { self.len == 0 }
+    pub fn is_full(&self) -> bool { self.len == self.buf.len() }
+    pub fn capacity(&self) -> usize { self.buf.len() }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index >= self.len { return None; }
+        self.buf[(self.head + index) % self.buf.len()].as_ref()
+    }
+
+    pub fn iter(&self) -> Vec<&T> {
+        let cap = self.buf.len();
+        (0..self.len).filter_map(|i| self.buf[(self.head + i) % cap].as_ref()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        for slot in &mut self.buf { *slot = None; }
+        self.head = 0;
+        self.len = 0;
+    }
+
+    pub fn to_vec(&self) -> Vec<T> { self.iter().into_iter().cloned().collect() }
+
+    pub fn newest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[(self.head + self.len - 1) % self.buf.len()].as_ref()
+    }
+
+    pub fn oldest(&self) -> Option<&T> {
+        if self.len == 0 { return None; }
+        self.buf[self.head].as_ref()
+    }
+}
+
+impl<T: Clone + fmt::Display> fmt::Display for HashBufRingBuffer<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HashBufRingBuffer(len={}, cap={})", self.len, self.capacity())
+    }
+}
+
+// ─── HashC LRU Cache ───────────────────────────────────────
+
+/// A simple LRU cache for hash results.
+#[derive(Debug)]
+pub struct HashCLruCache<V> {
+    entries: Vec<(String, V)>,
+    capacity: usize,
+    hits: u64,
+    misses: u64,
+}
+
+impl<V: Clone> HashCLruCache<V> {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0);
+        Self { entries: Vec::with_capacity(capacity), capacity, hits: 0, misses: 0 }
+    }
+
+    pub fn insert(&mut self, key: impl Into<String>, value: V) -> Option<(String, V)> {
+        let key = key.into();
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries.remove(pos);
+            self.entries.insert(0, (key, value));
+            return None;
+        }
+        let evicted = if self.entries.len() >= self.capacity {
+            Some(self.entries.pop().unwrap())
+        } else { None };
+        self.entries.insert(0, (key, value));
+        evicted
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<&V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            self.hits += 1;
+            let entry = self.entries.remove(pos);
+            self.entries.insert(0, entry);
+            Some(&self.entries[0].1)
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    pub fn peek(&self, key: &str) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else { None }
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn hit_ratio(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+    }
+
+    pub fn hits(&self) -> u64 { self.hits }
+    pub fn misses(&self) -> u64 { self.misses }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+}
+
+impl<V: Clone + fmt::Display> fmt::Display for HashCLruCache<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HashCLruCache(size={}, cap={}, hits={}, misses={})",
+            self.len(), self.capacity, self.hits, self.misses)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2635,5 +2786,107 @@ mod tests {
         }
     }
 
+
+
+    #[test]
+    fn hashbuf_ringbuf_push_get() {
+        let mut rb = HashBufRingBuffer::new(3);
+        rb.push(10); rb.push(20); rb.push(30);
+        assert_eq!(rb.get(0), Some(&10));
+        assert_eq!(rb.get(2), Some(&30));
+        assert_eq!(rb.len(), 3);
+    }
+
+    #[test]
+    fn hashbuf_ringbuf_overflow() {
+        let mut rb = HashBufRingBuffer::<i32>::new(2);
+        rb.push(1); rb.push(2); rb.push(3);
+        assert_eq!(rb.len(), 2);
+        assert_eq!(rb.get(0), Some(&2));
+        assert_eq!(rb.get(1), Some(&3));
+    }
+
+    #[test]
+    fn hashbuf_ringbuf_clear() {
+        let mut rb = HashBufRingBuffer::new(5);
+        rb.push("a".to_string()); rb.push("b".to_string());
+        rb.clear();
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn hashbuf_ringbuf_newest_oldest() {
+        let mut rb = HashBufRingBuffer::new(4);
+        rb.push(100); rb.push(200); rb.push(300);
+        assert_eq!(rb.oldest(), Some(&100));
+        assert_eq!(rb.newest(), Some(&300));
+    }
+
+    #[test]
+    fn hashbuf_ringbuf_to_vec() {
+        let mut rb = HashBufRingBuffer::new(3);
+        rb.push(1); rb.push(2);
+        assert_eq!(rb.to_vec(), vec![1, 2]);
+    }
+
+    #[test]
+    fn hashbuf_ringbuf_is_full() {
+        let mut rb = HashBufRingBuffer::new(2);
+        assert!(!rb.is_full());
+        rb.push(1); rb.push(2);
+        assert!(rb.is_full());
+    }
+
+    #[test]
+    fn hashc_lru_insert_get() {
+        let mut c = HashCLruCache::new(3);
+        c.insert("a", 1); c.insert("b", 2); c.insert("c", 3);
+        assert_eq!(c.get("a"), Some(&1));
+        assert_eq!(c.get("b"), Some(&2));
+        assert_eq!(c.len(), 3);
+    }
+
+    #[test]
+    fn hashc_lru_eviction() {
+        let mut c = HashCLruCache::new(2);
+        c.insert("a", 1); c.insert("b", 2);
+        let ev = c.insert("c", 3);
+        assert!(ev.is_some());
+        assert_eq!(ev.unwrap().0, "a");
+        assert!(!c.contains("a"));
+    }
+
+    #[test]
+    fn hashc_lru_hit_ratio() {
+        let mut c = HashCLruCache::new(5);
+        c.insert("x", 10);
+        c.get("x"); c.get("y");
+        assert!(c.hit_ratio() > 0.4 && c.hit_ratio() < 0.6);
+    }
+
+    #[test]
+    fn hashc_lru_clear() {
+        let mut c = HashCLruCache::new(3);
+        c.insert("a", 1); c.insert("b", 2);
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.hits(), 0);
+    }
+
+    #[test]
+    fn hashc_lru_remove() {
+        let mut c = HashCLruCache::new(3);
+        c.insert("a", 100);
+        assert_eq!(c.remove("a"), Some(100));
+        assert!(!c.contains("a"));
+    }
+
+    #[test]
+    fn hashc_lru_peek() {
+        let mut c = HashCLruCache::new(3);
+        c.insert("x", 42);
+        assert_eq!(c.peek("x"), Some(&42));
+        assert_eq!(c.misses(), 0);
+    }
 
 }
