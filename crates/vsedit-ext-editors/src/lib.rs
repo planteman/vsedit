@@ -19413,6 +19413,242 @@ impl AxbConnectionState {
     }
 }
 
+
+// --- axc_ text document model and versioning ---
+
+/// Identifies a text document via URI and version.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxcTextDocumentIdentifier {
+    pub uri: String,
+}
+
+impl AxcTextDocumentIdentifier {
+    pub fn new(uri: &str) -> Self {
+        Self { uri: uri.to_string() }
+    }
+}
+
+/// Versioned text document identifier.
+#[derive(Debug, Clone)]
+pub struct AxcVersionedTextDocumentId {
+    pub uri: String,
+    pub version: i32,
+}
+
+impl AxcVersionedTextDocumentId {
+    pub fn new(uri: &str, version: i32) -> Self {
+        Self { uri: uri.to_string(), version }
+    }
+}
+
+/// A text document item (full content with metadata).
+#[derive(Debug, Clone)]
+pub struct AxcTextDocumentItem {
+    pub uri: String,
+    pub language_id: String,
+    pub version: i32,
+    pub text: String,
+}
+
+impl AxcTextDocumentItem {
+    pub fn new(uri: &str, lang: &str, version: i32, text: &str) -> Self {
+        Self {
+            uri: uri.to_string(),
+            language_id: lang.to_string(),
+            version,
+            text: text.to_string(),
+        }
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.text.lines().count().max(1)
+    }
+
+    pub fn char_count(&self) -> usize {
+        self.text.len()
+    }
+
+    pub fn line_at(&self, line: usize) -> Option<&str> {
+        self.text.lines().nth(line)
+    }
+
+    pub fn offset_of(&self, line: u32, col: u32) -> Option<usize> {
+        let mut offset = 0;
+        for (i, l) in self.text.lines().enumerate() {
+            if i == line as usize {
+                if col as usize <= l.len() {
+                    return Some(offset + col as usize);
+                }
+                return None;
+            }
+            offset += l.len() + 1; // +1 for newline
+        }
+        None
+    }
+
+    pub fn position_of(&self, offset: usize) -> Option<(u32, u32)> {
+        let mut current = 0;
+        for (i, line) in self.text.lines().enumerate() {
+            let line_end = current + line.len();
+            if offset <= line_end {
+                return Some((i as u32, (offset - current) as u32));
+            }
+            current = line_end + 1;
+        }
+        None
+    }
+}
+
+/// A content change event (incremental or full).
+#[derive(Debug, Clone)]
+pub struct AxcTextDocumentContentChange {
+    pub range: Option<AxcRange>,
+    pub text: String,
+}
+
+/// A range in a text document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxcRange {
+    pub start_line: u32,
+    pub start_character: u32,
+    pub end_line: u32,
+    pub end_character: u32,
+}
+
+impl AxcRange {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_character: sc, end_line: el, end_character: ec }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start_line == self.end_line && self.start_character == self.end_character
+    }
+
+    pub fn single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    pub fn contains(&self, line: u32, col: u32) -> bool {
+        if line < self.start_line || line > self.end_line { return false; }
+        if line == self.start_line && col < self.start_character { return false; }
+        if line == self.end_line && col > self.end_character { return false; }
+        true
+    }
+}
+
+impl AxcTextDocumentContentChange {
+    pub fn full(text: &str) -> Self {
+        Self { range: None, text: text.to_string() }
+    }
+
+    pub fn incremental(range: AxcRange, text: &str) -> Self {
+        Self { range: Some(range), text: text.to_string() }
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.range.is_none()
+    }
+}
+
+/// A managed text document that tracks version and applies changes.
+#[derive(Debug, Clone)]
+pub struct AxcManagedDocument {
+    pub uri: String,
+    pub language_id: String,
+    pub version: i32,
+    pub content: String,
+    is_open: bool,
+}
+
+impl AxcManagedDocument {
+    pub fn open(item: AxcTextDocumentItem) -> Self {
+        Self {
+            uri: item.uri,
+            language_id: item.language_id,
+            version: item.version,
+            content: item.text,
+            is_open: true,
+        }
+    }
+
+    pub fn apply_change(&mut self, change: &AxcTextDocumentContentChange, new_version: i32) {
+        if change.is_full() {
+            self.content = change.text.clone();
+        } else if let Some(range) = &change.range {
+            let item = AxcTextDocumentItem::new(&self.uri, &self.language_id, self.version, &self.content);
+            if let (Some(start), Some(end)) = (
+                item.offset_of(range.start_line, range.start_character),
+                item.offset_of(range.end_line, range.end_character),
+            ) {
+                let mut new_content = String::new();
+                new_content.push_str(&self.content[..start]);
+                new_content.push_str(&change.text);
+                if end <= self.content.len() {
+                    new_content.push_str(&self.content[end..]);
+                }
+                self.content = new_content;
+            }
+        }
+        self.version = new_version;
+    }
+
+    pub fn close(&mut self) {
+        self.is_open = false;
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.is_open
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.content.lines().count().max(1)
+    }
+}
+
+/// Document store managing multiple open documents.
+#[derive(Debug, Clone)]
+pub struct AxcDocumentStore {
+    documents: Vec<AxcManagedDocument>,
+}
+
+impl AxcDocumentStore {
+    pub fn new() -> Self {
+        Self { documents: Vec::new() }
+    }
+
+    pub fn open(&mut self, item: AxcTextDocumentItem) {
+        // Close existing if any
+        self.documents.retain(|d| d.uri != item.uri);
+        self.documents.push(AxcManagedDocument::open(item));
+    }
+
+    pub fn get(&self, uri: &str) -> Option<&AxcManagedDocument> {
+        self.documents.iter().find(|d| d.uri == uri && d.is_open())
+    }
+
+    pub fn get_mut(&mut self, uri: &str) -> Option<&mut AxcManagedDocument> {
+        self.documents.iter_mut().find(|d| d.uri == uri && d.is_open())
+    }
+
+    pub fn close(&mut self, uri: &str) {
+        if let Some(doc) = self.documents.iter_mut().find(|d| d.uri == uri) {
+            doc.close();
+        }
+    }
+
+    pub fn open_count(&self) -> usize {
+        self.documents.iter().filter(|d| d.is_open()).count()
+    }
+
+    pub fn open_uris(&self) -> Vec<&str> {
+        self.documents.iter().filter(|d| d.is_open()).map(|d| d.uri.as_str()).collect()
+    }
+
+    pub fn is_open(&self, uri: &str) -> bool {
+        self.documents.iter().any(|d| d.uri == uri && d.is_open())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -31522,6 +31758,108 @@ mod tests {
         let f = AxbWorkspaceFolder::new("file:///project", "project");
         assert_eq!(f.uri, "file:///project");
         assert_eq!(f.name, "project");
+    }
+
+
+    // --- axc_ text document model tests ---
+
+    #[test]
+    fn test_axc_text_document_item() {
+        let item = AxcTextDocumentItem::new("file:///a.rs", "rust", 1, "fn main() {\n}");
+        assert_eq!(item.line_count(), 2);
+        assert_eq!(item.line_at(0), Some("fn main() {"));
+        assert_eq!(item.line_at(1), Some("}"));
+        assert_eq!(item.line_at(2), None);
+    }
+
+    #[test]
+    fn test_axc_text_document_item_offset() {
+        let item = AxcTextDocumentItem::new("f", "r", 1, "abc\ndef");
+        assert_eq!(item.offset_of(0, 0), Some(0));
+        assert_eq!(item.offset_of(0, 3), Some(3));
+        assert_eq!(item.offset_of(1, 0), Some(4));
+        assert_eq!(item.offset_of(1, 3), Some(7));
+    }
+
+    #[test]
+    fn test_axc_text_document_item_position() {
+        let item = AxcTextDocumentItem::new("f", "r", 1, "abc\ndef");
+        assert_eq!(item.position_of(0), Some((0, 0)));
+        assert_eq!(item.position_of(3), Some((0, 3)));
+        assert_eq!(item.position_of(4), Some((1, 0)));
+    }
+
+    #[test]
+    fn test_axc_range() {
+        let r = AxcRange::new(0, 0, 0, 5);
+        assert!(r.single_line());
+        assert!(!r.is_empty());
+        assert!(r.contains(0, 3));
+        assert!(!r.contains(0, 6));
+        let empty = AxcRange::new(1, 3, 1, 3);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_axc_content_change_full() {
+        let change = AxcTextDocumentContentChange::full("new content");
+        assert!(change.is_full());
+    }
+
+    #[test]
+    fn test_axc_content_change_incremental() {
+        let change = AxcTextDocumentContentChange::incremental(
+            AxcRange::new(0, 0, 0, 3), "xyz"
+        );
+        assert!(!change.is_full());
+    }
+
+    #[test]
+    fn test_axc_managed_document() {
+        let item = AxcTextDocumentItem::new("f", "r", 1, "hello world");
+        let mut doc = AxcManagedDocument::open(item);
+        assert!(doc.is_open());
+        assert_eq!(doc.version, 1);
+        // Full replace
+        doc.apply_change(&AxcTextDocumentContentChange::full("new"), 2);
+        assert_eq!(doc.content, "new");
+        assert_eq!(doc.version, 2);
+        doc.close();
+        assert!(!doc.is_open());
+    }
+
+    #[test]
+    fn test_axc_managed_document_incremental() {
+        let item = AxcTextDocumentItem::new("f", "r", 1, "abcdef");
+        let mut doc = AxcManagedDocument::open(item);
+        // Replace "cd" with "XY"
+        doc.apply_change(
+            &AxcTextDocumentContentChange::incremental(AxcRange::new(0, 2, 0, 4), "XY"),
+            2,
+        );
+        assert_eq!(doc.content, "abXYef");
+    }
+
+    #[test]
+    fn test_axc_document_store() {
+        let mut store = AxcDocumentStore::new();
+        store.open(AxcTextDocumentItem::new("a", "r", 1, "content a"));
+        store.open(AxcTextDocumentItem::new("b", "r", 1, "content b"));
+        assert_eq!(store.open_count(), 2);
+        assert!(store.is_open("a"));
+        assert_eq!(store.get("a").unwrap().content, "content a");
+        store.close("a");
+        assert!(!store.is_open("a"));
+        assert_eq!(store.open_count(), 1);
+    }
+
+    #[test]
+    fn test_axc_document_store_uris() {
+        let mut store = AxcDocumentStore::new();
+        store.open(AxcTextDocumentItem::new("x", "r", 1, ""));
+        store.open(AxcTextDocumentItem::new("y", "r", 1, ""));
+        let uris = store.open_uris();
+        assert_eq!(uris.len(), 2);
     }
 
 }
