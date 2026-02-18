@@ -6853,6 +6853,323 @@ impl<T: Clone> XtDoublyLinkedList<T> {
     }
 }
 
+
+// --- xu_ Binomial Heap ---
+
+/// A node in a binomial heap.
+#[derive(Debug, Clone)]
+pub struct XuBinomialNode<K: Ord + Clone, V: Clone> {
+    pub xu_key: K,
+    pub xu_value: V,
+    xu_degree: usize,
+    xu_children: Vec<usize>,
+    xu_parent: Option<usize>,
+}
+
+impl<K: Ord + Clone, V: Clone> XuBinomialNode<K, V> {
+    /// Create a new binomial node.
+    pub fn xu_new(key: K, value: V) -> Self {
+        Self { xu_key: key, xu_value: value, xu_degree: 0, xu_children: Vec::new(), xu_parent: None }
+    }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone + std::fmt::Display> std::fmt::Display for XuBinomialNode<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BinNode(key={}, deg={})", self.xu_key, self.xu_degree)
+    }
+}
+
+/// Binomial heap with O(log n) insert, extract-min, and merge.
+#[derive(Debug, Clone)]
+pub struct XuBinomialHeap<K: Ord + Clone, V: Clone> {
+    xu_nodes: Vec<XuBinomialNode<K, V>>,
+    xu_roots: Vec<usize>,
+    xu_size: usize,
+}
+
+impl<K: Ord + Clone, V: Clone> Default for XuBinomialHeap<K, V> {
+    fn default() -> Self { Self::xu_new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone + std::fmt::Display> std::fmt::Display for XuBinomialHeap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BinHeap(size={}, trees={})", self.xu_size, self.xu_roots.len())
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> XuBinomialHeap<K, V> {
+    /// Create an empty binomial heap.
+    pub fn xu_new() -> Self {
+        Self { xu_nodes: Vec::new(), xu_roots: Vec::new(), xu_size: 0 }
+    }
+
+    /// Return the number of elements.
+    pub fn xu_len(&self) -> usize { self.xu_size }
+
+    /// Check if the heap is empty.
+    pub fn xu_is_empty(&self) -> bool { self.xu_size == 0 }
+
+    /// Insert a key-value pair.
+    pub fn xu_insert(&mut self, key: K, value: V) -> usize {
+        let idx = self.xu_nodes.len();
+        self.xu_nodes.push(XuBinomialNode::xu_new(key, value));
+        self.xu_add_root(idx);
+        self.xu_size += 1;
+        self.xu_consolidate();
+        idx
+    }
+
+    fn xu_add_root(&mut self, idx: usize) {
+        self.xu_nodes[idx].xu_parent = None;
+        self.xu_roots.push(idx);
+    }
+
+    fn xu_consolidate(&mut self) {
+        let max_deg = (self.xu_size as f64).log2().ceil() as usize + 2;
+        let mut table: Vec<Option<usize>> = vec![None; max_deg + 1];
+        let roots = self.xu_roots.clone();
+        self.xu_roots.clear();
+        for root in roots {
+            let mut x = root;
+            loop {
+                let d = self.xu_nodes[x].xu_degree;
+                if d >= table.len() { break; }
+                match table[d] {
+                    None => { table[d] = Some(x); break; }
+                    Some(y) => {
+                        table[d] = None;
+                        let (p, c) = if self.xu_nodes[x].xu_key <= self.xu_nodes[y].xu_key { (x, y) } else { (y, x) };
+                        self.xu_nodes[p].xu_children.push(c);
+                        self.xu_nodes[c].xu_parent = Some(p);
+                        self.xu_nodes[p].xu_degree += 1;
+                        x = p;
+                    }
+                }
+            }
+        }
+        for slot in &table {
+            if let Some(r) = slot {
+                self.xu_roots.push(*r);
+            }
+        }
+        self.xu_roots.sort_by_key(|&r| self.xu_nodes[r].xu_degree);
+    }
+
+    /// Peek at the minimum.
+    pub fn xu_find_min(&self) -> Option<(&K, &V)> {
+        self.xu_roots.iter()
+            .min_by(|&&a, &&b| self.xu_nodes[a].xu_key.cmp(&self.xu_nodes[b].xu_key))
+            .map(|&i| (&self.xu_nodes[i].xu_key, &self.xu_nodes[i].xu_value))
+    }
+
+    /// Extract the minimum element.
+    pub fn xu_extract_min(&mut self) -> Option<(K, V)> {
+        if self.xu_roots.is_empty() { return None; }
+        let min_pos = self.xu_roots.iter().enumerate()
+            .min_by(|(_, a), (_, b)| self.xu_nodes[**a].xu_key.cmp(&self.xu_nodes[**b].xu_key))
+            .map(|(pos, _)| pos)?;
+        let min_idx = self.xu_roots.remove(min_pos);
+        let children = self.xu_nodes[min_idx].xu_children.clone();
+        for &c in &children {
+            self.xu_nodes[c].xu_parent = None;
+            self.xu_roots.push(c);
+        }
+        self.xu_size -= 1;
+        if !self.xu_roots.is_empty() {
+            self.xu_consolidate();
+        }
+        let n = &self.xu_nodes[min_idx];
+        Some((n.xu_key.clone(), n.xu_value.clone()))
+    }
+
+    /// Merge another binomial heap into this one.
+    pub fn xu_merge(&mut self, other: &mut XuBinomialHeap<K, V>) {
+        let off = self.xu_nodes.len();
+        for mut n in other.xu_nodes.drain(..) {
+            n.xu_parent = n.xu_parent.map(|p| p + off);
+            n.xu_children = n.xu_children.iter().map(|&c| c + off).collect();
+            self.xu_nodes.push(n);
+        }
+        for r in other.xu_roots.drain(..) {
+            self.xu_roots.push(r + off);
+        }
+        self.xu_size += other.xu_size;
+        other.xu_size = 0;
+        self.xu_consolidate();
+    }
+
+    /// Drain all elements in sorted order.
+    pub fn xu_drain_sorted(&mut self) -> Vec<(K, V)> {
+        let mut result = Vec::with_capacity(self.xu_size);
+        while let Some(pair) = self.xu_extract_min() {
+            result.push(pair);
+        }
+        result
+    }
+
+    /// Clear the heap.
+    pub fn xu_clear(&mut self) {
+        self.xu_nodes.clear();
+        self.xu_roots.clear();
+        self.xu_size = 0;
+    }
+}
+
+// --- xu_ Disjoint Sparse Table ---
+
+/// Disjoint sparse table for O(1) range queries on static data with an associative operation.
+#[derive(Debug, Clone)]
+pub struct XuDisjointSparseTable<T: Clone> {
+    xu_table: Vec<Vec<T>>,
+    xu_data: Vec<T>,
+    xu_len: usize,
+    xu_levels: usize,
+}
+
+impl<T: Clone + std::fmt::Display> std::fmt::Display for XuDisjointSparseTable<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DST(len={}, levels={})", self.xu_len, self.xu_levels)
+    }
+}
+
+impl<T: Clone + Default + std::ops::Add<Output = T>> XuDisjointSparseTable<T> {
+    /// Build a disjoint sparse table for range-sum queries.
+    pub fn xu_build(data: &[T]) -> Self {
+        let n = data.len();
+        if n == 0 {
+            return Self { xu_table: Vec::new(), xu_data: Vec::new(), xu_len: 0, xu_levels: 0 };
+        }
+        let levels = (n as f64).log2().ceil() as usize + 1;
+        let mut table = Vec::with_capacity(levels);
+        for level in 0..levels {
+            let block = 1 << level;
+            let mut row = data.to_vec();
+            let mut mid = block;
+            while mid < n {
+                // Build prefix sums going left from mid
+                if mid > 0 && mid - 1 < n {
+                    let start = if mid >= block { mid - block } else { 0 };
+                    let mut i = mid.saturating_sub(1);
+                    loop {
+                        if i < start { break; }
+                        if i + 1 < mid && i + 1 < n {
+                            row[i] = row[i].clone() + row[i + 1].clone();
+                        }
+                        if i == start { break; }
+                        i -= 1;
+                    }
+                }
+                // Build prefix sums going right from mid
+                let end = std::cmp::min(mid + block, n);
+                for i in (mid + 1)..end {
+                    row[i] = row[i - 1].clone() + row[i].clone();
+                }
+                mid += 2 * block;
+            }
+            table.push(row);
+        }
+        Self { xu_table: table, xu_data: data.to_vec(), xu_len: n, xu_levels: levels }
+    }
+
+    /// Query the sum of elements in the range [l, r] (inclusive).
+    pub fn xu_query(&self, l: usize, r: usize) -> T {
+        if l == r {
+            return self.xu_data[l].clone();
+        }
+        if l >= self.xu_len || r >= self.xu_len || l > r {
+            return T::default();
+        }
+        // Find the highest bit where l and r differ
+        let xor = l ^ r;
+        if xor == 0 {
+            return self.xu_data[l].clone();
+        }
+        let level = (usize::BITS - xor.leading_zeros() - 1) as usize;
+        if level < self.xu_levels && l < self.xu_table[level].len() && r < self.xu_table[level].len() {
+            self.xu_table[level][l].clone() + self.xu_table[level][r].clone()
+        } else {
+            // Fallback: linear sum
+            let mut sum = self.xu_data[l].clone();
+            for i in (l + 1)..=r {
+                sum = sum + self.xu_data[i].clone();
+            }
+            sum
+        }
+    }
+
+    /// Return the length.
+    pub fn xu_len(&self) -> usize { self.xu_len }
+
+    /// Check if empty.
+    pub fn xu_is_empty(&self) -> bool { self.xu_len == 0 }
+
+    /// Get element at index.
+    pub fn xu_get(&self, idx: usize) -> Option<&T> {
+        self.xu_data.get(idx)
+    }
+}
+
+// --- xu_ Monotonic Stack ---
+
+/// Monotonic stack that maintains elements in non-decreasing or non-increasing order.
+#[derive(Debug, Clone)]
+pub struct XuMonotonicStack<T: Clone + Ord> {
+    xu_data: Vec<T>,
+    xu_increasing: bool,
+}
+
+impl<T: Clone + Ord + std::fmt::Display> std::fmt::Display for XuMonotonicStack<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MonoStack(len={}, inc={})", self.xu_data.len(), self.xu_increasing)
+    }
+}
+
+impl<T: Clone + Ord> XuMonotonicStack<T> {
+    /// Create a monotonically increasing stack.
+    pub fn xu_increasing() -> Self {
+        Self { xu_data: Vec::new(), xu_increasing: true }
+    }
+
+    /// Create a monotonically decreasing stack.
+    pub fn xu_decreasing() -> Self {
+        Self { xu_data: Vec::new(), xu_increasing: false }
+    }
+
+    /// Push a value, popping elements that violate the monotonic invariant.
+    pub fn xu_push(&mut self, value: T) -> Vec<T> {
+        let mut popped = Vec::new();
+        if self.xu_increasing {
+            while let Some(top) = self.xu_data.last() {
+                if *top > value { popped.push(self.xu_data.pop().unwrap()); } else { break; }
+            }
+        } else {
+            while let Some(top) = self.xu_data.last() {
+                if *top < value { popped.push(self.xu_data.pop().unwrap()); } else { break; }
+            }
+        }
+        self.xu_data.push(value);
+        popped
+    }
+
+    /// Peek at the top.
+    pub fn xu_peek(&self) -> Option<&T> { self.xu_data.last() }
+
+    /// Pop from top.
+    pub fn xu_pop(&mut self) -> Option<T> { self.xu_data.pop() }
+
+    /// Length.
+    pub fn xu_len(&self) -> usize { self.xu_data.len() }
+
+    /// Is empty.
+    pub fn xu_is_empty(&self) -> bool { self.xu_data.is_empty() }
+
+    /// Get all elements.
+    pub fn xu_as_slice(&self) -> &[T] { &self.xu_data }
+
+    /// Clear the stack.
+    pub fn xu_clear(&mut self) { self.xu_data.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -10820,6 +11137,190 @@ mod tests {
         assert_eq!(dll.xt_peek_back(), None);
         assert_eq!(dll.xt_head_cursor(), None);
         assert_eq!(dll.xt_tail_cursor(), None);
+    }
+
+
+    // --- xu_ Binomial Heap tests ---
+
+    #[test]
+    fn xu_bin_heap_new() {
+        let h = super::XuBinomialHeap::<i32, &str>::xu_new();
+        assert!(h.xu_is_empty());
+        assert_eq!(h.xu_len(), 0);
+    }
+
+    #[test]
+    fn xu_bin_heap_insert_find_min() {
+        let mut h = super::XuBinomialHeap::xu_new();
+        h.xu_insert(5, "five");
+        h.xu_insert(3, "three");
+        h.xu_insert(7, "seven");
+        assert_eq!(h.xu_len(), 3);
+        assert_eq!(h.xu_find_min(), Some((&3, &"three")));
+    }
+
+    #[test]
+    fn xu_bin_heap_extract_min() {
+        let mut h = super::XuBinomialHeap::xu_new();
+        h.xu_insert(10, "a");
+        h.xu_insert(2, "b");
+        h.xu_insert(8, "c");
+        h.xu_insert(1, "d");
+        assert_eq!(h.xu_extract_min(), Some((1, "d")));
+        assert_eq!(h.xu_extract_min(), Some((2, "b")));
+    }
+
+    #[test]
+    fn xu_bin_heap_sorted_drain() {
+        let mut h = super::XuBinomialHeap::xu_new();
+        for v in [5, 3, 8, 1, 9, 2, 7, 4, 6] {
+            h.xu_insert(v, v * 10);
+        }
+        let sorted = h.xu_drain_sorted();
+        let keys: Vec<i32> = sorted.iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn xu_bin_heap_merge() {
+        let mut h1 = super::XuBinomialHeap::xu_new();
+        h1.xu_insert(3, "a");
+        h1.xu_insert(7, "b");
+        let mut h2 = super::XuBinomialHeap::xu_new();
+        h2.xu_insert(1, "c");
+        h2.xu_insert(5, "d");
+        h1.xu_merge(&mut h2);
+        assert_eq!(h1.xu_len(), 4);
+        assert_eq!(h1.xu_find_min(), Some((&1, &"c")));
+    }
+
+    #[test]
+    fn xu_bin_heap_clear() {
+        let mut h = super::XuBinomialHeap::xu_new();
+        h.xu_insert(1, "a");
+        h.xu_clear();
+        assert!(h.xu_is_empty());
+    }
+
+    #[test]
+    fn xu_bin_heap_display() {
+        let mut h = super::XuBinomialHeap::xu_new();
+        h.xu_insert(1, "x");
+        assert!(format!("{}", h).contains("BinHeap"));
+    }
+
+    #[test]
+    fn xu_bin_heap_default() {
+        let h = super::XuBinomialHeap::<i32, i32>::default();
+        assert!(h.xu_is_empty());
+    }
+
+    #[test]
+    fn xu_bin_node_display() {
+        let n = super::XuBinomialNode::xu_new(5, "v");
+        assert!(format!("{}", n).contains("BinNode"));
+    }
+
+    #[test]
+    fn xu_bin_heap_single() {
+        let mut h = super::XuBinomialHeap::xu_new();
+        h.xu_insert(42, "answer");
+        assert_eq!(h.xu_extract_min(), Some((42, "answer")));
+        assert!(h.xu_is_empty());
+    }
+
+    // --- xu_ Disjoint Sparse Table tests ---
+
+    #[test]
+    fn xu_dst_build() {
+        let data = vec![1, 2, 3, 4, 5];
+        let dst = super::XuDisjointSparseTable::xu_build(&data);
+        assert_eq!(dst.xu_len(), 5);
+        assert!(!dst.xu_is_empty());
+    }
+
+    #[test]
+    fn xu_dst_single_element_query() {
+        let data = vec![10, 20, 30];
+        let dst = super::XuDisjointSparseTable::xu_build(&data);
+        assert_eq!(dst.xu_query(0, 0), 10);
+        assert_eq!(dst.xu_query(1, 1), 20);
+        assert_eq!(dst.xu_query(2, 2), 30);
+    }
+
+    #[test]
+    fn xu_dst_get() {
+        let data = vec![5, 10, 15];
+        let dst = super::XuDisjointSparseTable::xu_build(&data);
+        assert_eq!(dst.xu_get(0), Some(&5));
+        assert_eq!(dst.xu_get(2), Some(&15));
+        assert_eq!(dst.xu_get(10), None);
+    }
+
+    #[test]
+    fn xu_dst_empty() {
+        let dst = super::XuDisjointSparseTable::<i32>::xu_build(&[]);
+        assert!(dst.xu_is_empty());
+        assert_eq!(dst.xu_len(), 0);
+    }
+
+    #[test]
+    fn xu_dst_display() {
+        let data = vec![1, 2, 3];
+        let dst = super::XuDisjointSparseTable::xu_build(&data);
+        assert!(format!("{}", dst).contains("DST"));
+    }
+
+    // --- xu_ Monotonic Stack tests ---
+
+    #[test]
+    fn xu_mono_stack_increasing() {
+        let mut s = super::XuMonotonicStack::xu_increasing();
+        assert!(s.xu_is_empty());
+        let popped = s.xu_push(3);
+        assert!(popped.is_empty());
+        let popped = s.xu_push(5);
+        assert!(popped.is_empty());
+        let popped = s.xu_push(2);
+        assert_eq!(popped, vec![5, 3]);
+        assert_eq!(s.xu_as_slice(), &[2]);
+    }
+
+    #[test]
+    fn xu_mono_stack_decreasing() {
+        let mut s = super::XuMonotonicStack::xu_decreasing();
+        s.xu_push(2);
+        s.xu_push(1);
+        let popped = s.xu_push(5);
+        assert_eq!(popped, vec![1, 2]);
+        assert_eq!(s.xu_as_slice(), &[5]);
+    }
+
+    #[test]
+    fn xu_mono_stack_peek_pop() {
+        let mut s = super::XuMonotonicStack::xu_increasing();
+        s.xu_push(1);
+        s.xu_push(3);
+        s.xu_push(5);
+        assert_eq!(s.xu_peek(), Some(&5));
+        assert_eq!(s.xu_pop(), Some(5));
+        assert_eq!(s.xu_len(), 2);
+    }
+
+    #[test]
+    fn xu_mono_stack_clear() {
+        let mut s = super::XuMonotonicStack::xu_increasing();
+        s.xu_push(1);
+        s.xu_push(2);
+        s.xu_clear();
+        assert!(s.xu_is_empty());
+    }
+
+    #[test]
+    fn xu_mono_stack_display() {
+        let mut s = super::XuMonotonicStack::xu_increasing();
+        s.xu_push(1);
+        assert!(format!("{}", s).contains("MonoStack"));
     }
 
 }
