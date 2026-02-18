@@ -19160,6 +19160,295 @@ impl AxaPendingRequests {
     }
 }
 
+
+// --- axb_ LSP server capabilities and initialization ---
+
+/// Text document sync kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxbTextDocumentSyncKind {
+    None,
+    Full,
+    Incremental,
+}
+
+impl AxbTextDocumentSyncKind {
+    pub fn as_u8(&self) -> u8 {
+        match self { Self::None => 0, Self::Full => 1, Self::Incremental => 2 }
+    }
+}
+
+/// Completion trigger kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxbCompletionTriggerKind {
+    Invoked,
+    TriggerCharacter,
+    TriggerForIncomplete,
+}
+
+/// Capabilities that a server can declare.
+#[derive(Debug, Clone)]
+pub struct AxbServerCapabilities {
+    pub text_document_sync: AxbTextDocumentSyncKind,
+    pub completion_provider: Option<AxbCompletionOptions>,
+    pub hover_provider: bool,
+    pub signature_help_provider: Option<AxbSignatureHelpOptions>,
+    pub definition_provider: bool,
+    pub type_definition_provider: bool,
+    pub implementation_provider: bool,
+    pub references_provider: bool,
+    pub document_highlight_provider: bool,
+    pub document_symbol_provider: bool,
+    pub workspace_symbol_provider: bool,
+    pub code_action_provider: bool,
+    pub code_lens_provider: bool,
+    pub document_formatting_provider: bool,
+    pub document_range_formatting_provider: bool,
+    pub rename_provider: bool,
+    pub folding_range_provider: bool,
+    pub selection_range_provider: bool,
+    pub semantic_tokens_provider: bool,
+    pub inlay_hint_provider: bool,
+    pub diagnostic_provider: bool,
+}
+
+impl AxbServerCapabilities {
+    pub fn empty() -> Self {
+        Self {
+            text_document_sync: AxbTextDocumentSyncKind::None,
+            completion_provider: None,
+            hover_provider: false,
+            signature_help_provider: None,
+            definition_provider: false,
+            type_definition_provider: false,
+            implementation_provider: false,
+            references_provider: false,
+            document_highlight_provider: false,
+            document_symbol_provider: false,
+            workspace_symbol_provider: false,
+            code_action_provider: false,
+            code_lens_provider: false,
+            document_formatting_provider: false,
+            document_range_formatting_provider: false,
+            rename_provider: false,
+            folding_range_provider: false,
+            selection_range_provider: false,
+            semantic_tokens_provider: false,
+            inlay_hint_provider: false,
+            diagnostic_provider: false,
+        }
+    }
+
+    pub fn full() -> Self {
+        Self {
+            text_document_sync: AxbTextDocumentSyncKind::Incremental,
+            completion_provider: Some(AxbCompletionOptions::default()),
+            hover_provider: true,
+            signature_help_provider: Some(AxbSignatureHelpOptions::default()),
+            definition_provider: true,
+            type_definition_provider: true,
+            implementation_provider: true,
+            references_provider: true,
+            document_highlight_provider: true,
+            document_symbol_provider: true,
+            workspace_symbol_provider: true,
+            code_action_provider: true,
+            code_lens_provider: true,
+            document_formatting_provider: true,
+            document_range_formatting_provider: true,
+            rename_provider: true,
+            folding_range_provider: true,
+            selection_range_provider: true,
+            semantic_tokens_provider: true,
+            inlay_hint_provider: true,
+            diagnostic_provider: true,
+        }
+    }
+
+    pub fn capability_count(&self) -> usize {
+        let mut count = 0;
+        if self.hover_provider { count += 1; }
+        if self.definition_provider { count += 1; }
+        if self.type_definition_provider { count += 1; }
+        if self.implementation_provider { count += 1; }
+        if self.references_provider { count += 1; }
+        if self.document_highlight_provider { count += 1; }
+        if self.document_symbol_provider { count += 1; }
+        if self.workspace_symbol_provider { count += 1; }
+        if self.code_action_provider { count += 1; }
+        if self.code_lens_provider { count += 1; }
+        if self.document_formatting_provider { count += 1; }
+        if self.document_range_formatting_provider { count += 1; }
+        if self.rename_provider { count += 1; }
+        if self.folding_range_provider { count += 1; }
+        if self.selection_range_provider { count += 1; }
+        if self.semantic_tokens_provider { count += 1; }
+        if self.inlay_hint_provider { count += 1; }
+        if self.diagnostic_provider { count += 1; }
+        if self.completion_provider.is_some() { count += 1; }
+        if self.signature_help_provider.is_some() { count += 1; }
+        count
+    }
+}
+
+/// Completion provider options.
+#[derive(Debug, Clone)]
+pub struct AxbCompletionOptions {
+    pub trigger_characters: Vec<char>,
+    pub resolve_provider: bool,
+}
+
+impl AxbCompletionOptions {
+    pub fn default() -> Self {
+        Self { trigger_characters: vec!['.', ':'], resolve_provider: true }
+    }
+
+    pub fn with_triggers(mut self, chars: Vec<char>) -> Self {
+        self.trigger_characters = chars;
+        self
+    }
+}
+
+/// Signature help provider options.
+#[derive(Debug, Clone)]
+pub struct AxbSignatureHelpOptions {
+    pub trigger_characters: Vec<char>,
+    pub retrigger_characters: Vec<char>,
+}
+
+impl AxbSignatureHelpOptions {
+    pub fn default() -> Self {
+        Self { trigger_characters: vec!['(', ','], retrigger_characters: vec![')'] }
+    }
+}
+
+/// Client info sent during initialization.
+#[derive(Debug, Clone)]
+pub struct AxbClientInfo {
+    pub name: String,
+    pub version: Option<String>,
+}
+
+impl AxbClientInfo {
+    pub fn new(name: &str) -> Self {
+        Self { name: name.to_string(), version: None }
+    }
+
+    pub fn with_version(mut self, v: &str) -> Self {
+        self.version = Some(v.to_string());
+        self
+    }
+}
+
+/// LSP initialize params.
+#[derive(Debug, Clone)]
+pub struct AxbInitializeParams {
+    pub process_id: Option<u32>,
+    pub client_info: Option<AxbClientInfo>,
+    pub root_uri: Option<String>,
+    pub workspace_folders: Vec<AxbWorkspaceFolder>,
+    pub trace: AxbTraceValue,
+}
+
+/// Trace level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxbTraceValue {
+    Off,
+    Messages,
+    Verbose,
+}
+
+/// A workspace folder.
+#[derive(Debug, Clone)]
+pub struct AxbWorkspaceFolder {
+    pub uri: String,
+    pub name: String,
+}
+
+impl AxbWorkspaceFolder {
+    pub fn new(uri: &str, name: &str) -> Self {
+        Self { uri: uri.to_string(), name: name.to_string() }
+    }
+}
+
+impl AxbInitializeParams {
+    pub fn new() -> Self {
+        Self {
+            process_id: None,
+            client_info: None,
+            root_uri: None,
+            workspace_folders: Vec::new(),
+            trace: AxbTraceValue::Off,
+        }
+    }
+
+    pub fn with_root(mut self, uri: &str) -> Self {
+        self.root_uri = Some(uri.to_string());
+        self
+    }
+
+    pub fn add_folder(mut self, folder: AxbWorkspaceFolder) -> Self {
+        self.workspace_folders.push(folder);
+        self
+    }
+
+    pub fn with_client(mut self, info: AxbClientInfo) -> Self {
+        self.client_info = Some(info);
+        self
+    }
+}
+
+/// Initialize result from server.
+#[derive(Debug, Clone)]
+pub struct AxbInitializeResult {
+    pub capabilities: AxbServerCapabilities,
+    pub server_info: Option<AxbClientInfo>,
+}
+
+impl AxbInitializeResult {
+    pub fn new(capabilities: AxbServerCapabilities) -> Self {
+        Self { capabilities, server_info: None }
+    }
+
+    pub fn with_server_info(mut self, name: &str, version: &str) -> Self {
+        self.server_info = Some(AxbClientInfo::new(name).with_version(version));
+        self
+    }
+}
+
+/// LSP connection state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxbConnectionState {
+    Disconnected,
+    Connecting,
+    Initializing,
+    Ready,
+    ShuttingDown,
+}
+
+impl AxbConnectionState {
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready)
+    }
+
+    pub fn can_send_requests(&self) -> bool {
+        matches!(self, Self::Ready)
+    }
+
+    pub fn next_on_initialize_response(&self) -> Self {
+        match self {
+            Self::Initializing => Self::Ready,
+            other => *other,
+        }
+    }
+
+    pub fn next_on_shutdown_response(&self) -> Self {
+        match self {
+            Self::ShuttingDown => Self::Disconnected,
+            other => *other,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -30993,6 +31282,98 @@ mod tests {
         let timedout = pr.timed_out(1000, 500);
         assert_eq!(timedout.len(), 1);
         assert_eq!(*timedout[0], AxaRequestId::num(1));
+    }
+
+
+    // --- axb_ LSP server capabilities tests ---
+
+    #[test]
+    fn test_axb_text_document_sync_kind() {
+        assert_eq!(AxbTextDocumentSyncKind::None.as_u8(), 0);
+        assert_eq!(AxbTextDocumentSyncKind::Full.as_u8(), 1);
+        assert_eq!(AxbTextDocumentSyncKind::Incremental.as_u8(), 2);
+    }
+
+    #[test]
+    fn test_axb_server_capabilities_empty() {
+        let caps = AxbServerCapabilities::empty();
+        assert_eq!(caps.capability_count(), 0);
+        assert!(!caps.hover_provider);
+    }
+
+    #[test]
+    fn test_axb_server_capabilities_full() {
+        let caps = AxbServerCapabilities::full();
+        assert_eq!(caps.capability_count(), 20);
+        assert!(caps.hover_provider);
+        assert!(caps.completion_provider.is_some());
+        assert!(caps.rename_provider);
+    }
+
+    #[test]
+    fn test_axb_completion_options() {
+        let opts = AxbCompletionOptions::default().with_triggers(vec!['.', ':', '<']);
+        assert_eq!(opts.trigger_characters, vec!['.', ':', '<']);
+        assert!(opts.resolve_provider);
+    }
+
+    #[test]
+    fn test_axb_client_info() {
+        let ci = AxbClientInfo::new("vsedit").with_version("1.0.0");
+        assert_eq!(ci.name, "vsedit");
+        assert_eq!(ci.version.as_deref(), Some("1.0.0"));
+    }
+
+    #[test]
+    fn test_axb_initialize_params() {
+        let params = AxbInitializeParams::new()
+            .with_root("file:///workspace")
+            .with_client(AxbClientInfo::new("test"))
+            .add_folder(AxbWorkspaceFolder::new("file:///ws", "ws"));
+        assert_eq!(params.root_uri.as_deref(), Some("file:///workspace"));
+        assert_eq!(params.workspace_folders.len(), 1);
+    }
+
+    #[test]
+    fn test_axb_initialize_result() {
+        let result = AxbInitializeResult::new(AxbServerCapabilities::full())
+            .with_server_info("rust-analyzer", "0.3.0");
+        assert!(result.capabilities.hover_provider);
+        assert_eq!(result.server_info.as_ref().unwrap().name, "rust-analyzer");
+    }
+
+    #[test]
+    fn test_axb_connection_state() {
+        let state = AxbConnectionState::Disconnected;
+        assert!(!state.is_ready());
+        assert!(!state.can_send_requests());
+        let ready = AxbConnectionState::Ready;
+        assert!(ready.is_ready());
+        assert!(ready.can_send_requests());
+    }
+
+    #[test]
+    fn test_axb_connection_state_transitions() {
+        let s = AxbConnectionState::Initializing;
+        assert_eq!(s.next_on_initialize_response(), AxbConnectionState::Ready);
+        let s2 = AxbConnectionState::ShuttingDown;
+        assert_eq!(s2.next_on_shutdown_response(), AxbConnectionState::Disconnected);
+        // Non-matching states stay the same
+        let s3 = AxbConnectionState::Ready;
+        assert_eq!(s3.next_on_initialize_response(), AxbConnectionState::Ready);
+    }
+
+    #[test]
+    fn test_axb_trace_value() {
+        let params = AxbInitializeParams::new();
+        assert_eq!(params.trace, AxbTraceValue::Off);
+    }
+
+    #[test]
+    fn test_axb_workspace_folder() {
+        let f = AxbWorkspaceFolder::new("file:///project", "project");
+        assert_eq!(f.uri, "file:///project");
+        assert_eq!(f.name, "project");
     }
 
 }
