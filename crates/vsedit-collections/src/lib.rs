@@ -10210,6 +10210,192 @@ impl YfKWayMerge {
     }
 }
 
+
+// --- yg_ Persistent Stack ---
+
+/// Immutable persistent stack using a linked list of arcs.
+#[derive(Debug, Clone)]
+pub struct YgPersistentStack<T: Clone> {
+    yg_head: Option<std::sync::Arc<YgStackNode<T>>>,
+    yg_size: usize,
+}
+
+#[derive(Debug, Clone)]
+struct YgStackNode<T: Clone> {
+    yg_value: T,
+    yg_next: Option<std::sync::Arc<YgStackNode<T>>>,
+}
+
+impl<T: Clone + std::fmt::Display> std::fmt::Display for YgPersistentStack<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PStack(size={})", self.yg_size)
+    }
+}
+
+impl<T: Clone> Default for YgPersistentStack<T> {
+    fn default() -> Self { Self::yg_new() }
+}
+
+impl<T: Clone> YgPersistentStack<T> {
+    /// Create an empty persistent stack.
+    pub fn yg_new() -> Self { Self { yg_head: None, yg_size: 0 } }
+
+    /// Push returns a new stack with the element on top.
+    pub fn yg_push(&self, value: T) -> Self {
+        Self {
+            yg_head: Some(std::sync::Arc::new(YgStackNode { yg_value: value, yg_next: self.yg_head.clone() })),
+            yg_size: self.yg_size + 1,
+        }
+    }
+
+    /// Pop returns the top value and a new stack without it.
+    pub fn yg_pop(&self) -> Option<(T, Self)> {
+        self.yg_head.as_ref().map(|node| {
+            (node.yg_value.clone(), Self { yg_head: node.yg_next.clone(), yg_size: self.yg_size - 1 })
+        })
+    }
+
+    /// Peek at the top value.
+    pub fn yg_peek(&self) -> Option<&T> {
+        self.yg_head.as_ref().map(|node| &node.yg_value)
+    }
+
+    /// Size of the stack.
+    pub fn yg_len(&self) -> usize { self.yg_size }
+
+    /// Is empty.
+    pub fn yg_is_empty(&self) -> bool { self.yg_size == 0 }
+
+    /// Convert to vec (top first).
+    pub fn yg_to_vec(&self) -> Vec<T> {
+        let mut result = Vec::with_capacity(self.yg_size);
+        let mut current = &self.yg_head;
+        while let Some(node) = current {
+            result.push(node.yg_value.clone());
+            current = &node.yg_next;
+        }
+        result
+    }
+
+    /// Reverse the stack.
+    pub fn yg_reverse(&self) -> Self {
+        let mut result = Self::yg_new();
+        let mut current = &self.yg_head;
+        while let Some(node) = current {
+            result = result.yg_push(node.yg_value.clone());
+            current = &node.yg_next;
+        }
+        result
+    }
+}
+
+// --- yg_ Bitmap Index ---
+
+/// Bitmap index for fast multi-column filtering on categorical data.
+#[derive(Debug, Clone)]
+pub struct YgBitmapIndex {
+    yg_bitmaps: std::collections::HashMap<String, Vec<u64>>,
+    yg_num_rows: usize,
+}
+
+impl std::fmt::Display for YgBitmapIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BitmapIndex(rows={}, columns={})", self.yg_num_rows, self.yg_bitmaps.len())
+    }
+}
+
+impl Default for YgBitmapIndex {
+    fn default() -> Self { Self::yg_new(0) }
+}
+
+impl YgBitmapIndex {
+    /// Create a bitmap index for a given number of rows.
+    pub fn yg_new(num_rows: usize) -> Self {
+        Self { yg_bitmaps: std::collections::HashMap::new(), yg_num_rows: num_rows }
+    }
+
+    fn yg_words(n: usize) -> usize { (n + 63) / 64 }
+
+    /// Set a value for a column at a given row.
+    pub fn yg_set(&mut self, column: &str, row: usize) {
+        if row >= self.yg_num_rows { return; }
+        let words = Self::yg_words(self.yg_num_rows);
+        let bitmap = self.yg_bitmaps.entry(column.to_string()).or_insert_with(|| vec![0u64; words]);
+        bitmap[row / 64] |= 1u64 << (row % 64);
+    }
+
+    /// Check if a column is set for a row.
+    pub fn yg_get(&self, column: &str, row: usize) -> bool {
+        if row >= self.yg_num_rows { return false; }
+        self.yg_bitmaps.get(column)
+            .map(|bm| bm[row / 64] & (1u64 << (row % 64)) != 0)
+            .unwrap_or(false)
+    }
+
+    /// AND query: rows where all columns are set.
+    pub fn yg_and(&self, columns: &[&str]) -> Vec<usize> {
+        let words = Self::yg_words(self.yg_num_rows);
+        let mut result = vec![u64::MAX; words];
+        for col in columns {
+            if let Some(bm) = self.yg_bitmaps.get(*col) {
+                for (i, w) in result.iter_mut().enumerate() { *w &= bm[i]; }
+            } else {
+                return Vec::new();
+            }
+        }
+        Self::yg_bits_to_rows(&result, self.yg_num_rows)
+    }
+
+    /// OR query: rows where any column is set.
+    pub fn yg_or(&self, columns: &[&str]) -> Vec<usize> {
+        let words = Self::yg_words(self.yg_num_rows);
+        let mut result = vec![0u64; words];
+        for col in columns {
+            if let Some(bm) = self.yg_bitmaps.get(*col) {
+                for (i, w) in result.iter_mut().enumerate() { *w |= bm[i]; }
+            }
+        }
+        Self::yg_bits_to_rows(&result, self.yg_num_rows)
+    }
+
+    fn yg_bits_to_rows(bits: &[u64], max_rows: usize) -> Vec<usize> {
+        let mut rows = Vec::new();
+        for (w_idx, word) in bits.iter().enumerate() {
+            let mut bits = *word;
+            while bits != 0 {
+                let tz = bits.trailing_zeros() as usize;
+                let row = w_idx * 64 + tz;
+                if row < max_rows { rows.push(row); }
+                bits &= bits - 1;
+            }
+        }
+        rows
+    }
+
+    /// Count of rows for a column.
+    pub fn yg_count(&self, column: &str) -> usize {
+        self.yg_bitmaps.get(column)
+            .map(|bm| bm.iter().map(|w| w.count_ones() as usize).sum())
+            .unwrap_or(0)
+    }
+
+    /// Number of rows.
+    pub fn yg_num_rows(&self) -> usize { self.yg_num_rows }
+
+    /// Number of columns.
+    pub fn yg_num_columns(&self) -> usize { self.yg_bitmaps.len() }
+
+    /// List column names.
+    pub fn yg_columns(&self) -> Vec<String> {
+        let mut cols: Vec<String> = self.yg_bitmaps.keys().cloned().collect();
+        cols.sort();
+        cols
+    }
+
+    /// Clear all bitmaps.
+    pub fn yg_clear(&mut self) { self.yg_bitmaps.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -16068,6 +16254,138 @@ mod tests {
     fn yf_kmerge_default() {
         let m = super::YfKWayMerge::default();
         assert!(m.yf_is_done());
+    }
+
+
+    // --- yg_ PersistentStack tests ---
+
+    #[test]
+    fn yg_pstack_new() {
+        let s = super::YgPersistentStack::<i32>::yg_new();
+        assert!(s.yg_is_empty());
+    }
+
+    #[test]
+    fn yg_pstack_push_pop() {
+        let s = super::YgPersistentStack::yg_new();
+        let s = s.yg_push(1);
+        let s = s.yg_push(2);
+        let (v, s) = s.yg_pop().unwrap();
+        assert_eq!(v, 2);
+        let (v, _) = s.yg_pop().unwrap();
+        assert_eq!(v, 1);
+    }
+
+    #[test]
+    fn yg_pstack_persistence() {
+        let s1 = super::YgPersistentStack::yg_new().yg_push(1).yg_push(2);
+        let s2 = s1.yg_push(3);
+        assert_eq!(s1.yg_len(), 2);
+        assert_eq!(s2.yg_len(), 3);
+    }
+
+    #[test]
+    fn yg_pstack_peek() {
+        let s = super::YgPersistentStack::yg_new().yg_push(42);
+        assert_eq!(s.yg_peek(), Some(&42));
+    }
+
+    #[test]
+    fn yg_pstack_to_vec() {
+        let s = super::YgPersistentStack::yg_new().yg_push(1).yg_push(2).yg_push(3);
+        assert_eq!(s.yg_to_vec(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn yg_pstack_reverse() {
+        let s = super::YgPersistentStack::yg_new().yg_push(1).yg_push(2).yg_push(3);
+        let r = s.yg_reverse();
+        assert_eq!(r.yg_to_vec(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn yg_pstack_display() {
+        let s = super::YgPersistentStack::yg_new().yg_push(1);
+        assert!(format!("{}", s).contains("PStack"));
+    }
+
+    #[test]
+    fn yg_pstack_default() {
+        let s = super::YgPersistentStack::<i32>::default();
+        assert!(s.yg_is_empty());
+    }
+
+    // --- yg_ BitmapIndex tests ---
+
+    #[test]
+    fn yg_bitmap_new() {
+        let bi = super::YgBitmapIndex::yg_new(100);
+        assert_eq!(bi.yg_num_rows(), 100);
+    }
+
+    #[test]
+    fn yg_bitmap_set_get() {
+        let mut bi = super::YgBitmapIndex::yg_new(100);
+        bi.yg_set("color_red", 5);
+        assert!(bi.yg_get("color_red", 5));
+        assert!(!bi.yg_get("color_red", 6));
+    }
+
+    #[test]
+    fn yg_bitmap_and() {
+        let mut bi = super::YgBitmapIndex::yg_new(100);
+        bi.yg_set("a", 1);
+        bi.yg_set("a", 2);
+        bi.yg_set("b", 2);
+        bi.yg_set("b", 3);
+        let rows = bi.yg_and(&["a", "b"]);
+        assert_eq!(rows, vec![2]);
+    }
+
+    #[test]
+    fn yg_bitmap_or() {
+        let mut bi = super::YgBitmapIndex::yg_new(100);
+        bi.yg_set("a", 1);
+        bi.yg_set("b", 2);
+        let rows = bi.yg_or(&["a", "b"]);
+        assert_eq!(rows, vec![1, 2]);
+    }
+
+    #[test]
+    fn yg_bitmap_count() {
+        let mut bi = super::YgBitmapIndex::yg_new(100);
+        bi.yg_set("x", 0);
+        bi.yg_set("x", 1);
+        bi.yg_set("x", 2);
+        assert_eq!(bi.yg_count("x"), 3);
+    }
+
+    #[test]
+    fn yg_bitmap_columns() {
+        let mut bi = super::YgBitmapIndex::yg_new(10);
+        bi.yg_set("a", 0);
+        bi.yg_set("b", 0);
+        assert_eq!(bi.yg_num_columns(), 2);
+    }
+
+    #[test]
+    fn yg_bitmap_clear() {
+        let mut bi = super::YgBitmapIndex::yg_new(10);
+        bi.yg_set("a", 0);
+        bi.yg_clear();
+        assert_eq!(bi.yg_num_columns(), 0);
+    }
+
+    #[test]
+    fn yg_bitmap_display() {
+        let bi = super::YgBitmapIndex::yg_new(10);
+        assert!(format!("{}", bi).contains("BitmapIndex"));
+    }
+
+    #[test]
+    fn yg_bitmap_default() {
+        let bi = super::YgBitmapIndex::default();
+        assert_eq!(bi.yg_num_rows(), 0);
     }
 
 }
