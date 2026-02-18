@@ -9540,6 +9540,219 @@ impl YdSparseMatrix {
     }
 }
 
+
+// --- ye_ Indexed Priority Queue ---
+
+/// Indexed min-priority queue supporting decrease-key in O(log n).
+#[derive(Debug, Clone)]
+pub struct YeIndexedPQ {
+    ye_heap: Vec<(usize, i64)>,
+    ye_pos: std::collections::HashMap<usize, usize>,
+}
+
+impl std::fmt::Display for YeIndexedPQ {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IndexedPQ(size={})", self.ye_heap.len())
+    }
+}
+
+impl Default for YeIndexedPQ {
+    fn default() -> Self { Self::ye_new() }
+}
+
+impl YeIndexedPQ {
+    /// Create an empty indexed priority queue.
+    pub fn ye_new() -> Self { Self { ye_heap: Vec::new(), ye_pos: std::collections::HashMap::new() } }
+
+    /// Number of elements.
+    pub fn ye_len(&self) -> usize { self.ye_heap.len() }
+
+    /// Is empty.
+    pub fn ye_is_empty(&self) -> bool { self.ye_heap.is_empty() }
+
+    /// Insert an element with priority.
+    pub fn ye_insert(&mut self, id: usize, priority: i64) {
+        if self.ye_pos.contains_key(&id) { self.ye_decrease_key(id, priority); return; }
+        let idx = self.ye_heap.len();
+        self.ye_heap.push((id, priority));
+        self.ye_pos.insert(id, idx);
+        self.ye_sift_up(idx);
+    }
+
+    /// Peek at minimum.
+    pub fn ye_peek(&self) -> Option<(usize, i64)> { self.ye_heap.first().copied() }
+
+    /// Extract minimum.
+    pub fn ye_pop(&mut self) -> Option<(usize, i64)> {
+        if self.ye_heap.is_empty() { return None; }
+        let min = self.ye_heap[0];
+        let last = self.ye_heap.len() - 1;
+        self.ye_swap(0, last);
+        self.ye_heap.pop();
+        self.ye_pos.remove(&min.0);
+        if !self.ye_heap.is_empty() { self.ye_sift_down(0); }
+        Some(min)
+    }
+
+    /// Decrease the priority of an element.
+    pub fn ye_decrease_key(&mut self, id: usize, new_priority: i64) {
+        if let Some(&idx) = self.ye_pos.get(&id) {
+            if new_priority < self.ye_heap[idx].1 {
+                self.ye_heap[idx].1 = new_priority;
+                self.ye_sift_up(idx);
+            }
+        }
+    }
+
+    /// Check if an id is in the queue.
+    pub fn ye_contains(&self, id: usize) -> bool { self.ye_pos.contains_key(&id) }
+
+    /// Get priority of an id.
+    pub fn ye_priority(&self, id: usize) -> Option<i64> {
+        self.ye_pos.get(&id).map(|&idx| self.ye_heap[idx].1)
+    }
+
+    fn ye_swap(&mut self, i: usize, j: usize) {
+        self.ye_heap.swap(i, j);
+        self.ye_pos.insert(self.ye_heap[i].0, i);
+        self.ye_pos.insert(self.ye_heap[j].0, j);
+    }
+
+    fn ye_sift_up(&mut self, mut idx: usize) {
+        while idx > 0 {
+            let parent = (idx - 1) / 2;
+            if self.ye_heap[idx].1 < self.ye_heap[parent].1 {
+                self.ye_swap(idx, parent);
+                idx = parent;
+            } else { break; }
+        }
+    }
+
+    fn ye_sift_down(&mut self, mut idx: usize) {
+        let n = self.ye_heap.len();
+        loop {
+            let mut smallest = idx;
+            let left = 2 * idx + 1;
+            let right = 2 * idx + 2;
+            if left < n && self.ye_heap[left].1 < self.ye_heap[smallest].1 { smallest = left; }
+            if right < n && self.ye_heap[right].1 < self.ye_heap[smallest].1 { smallest = right; }
+            if smallest == idx { break; }
+            self.ye_swap(idx, smallest);
+            idx = smallest;
+        }
+    }
+
+    /// Clear the queue.
+    pub fn ye_clear(&mut self) { self.ye_heap.clear(); self.ye_pos.clear(); }
+
+    /// Drain all elements in priority order.
+    pub fn ye_drain_sorted(&mut self) -> Vec<(usize, i64)> {
+        let mut result = Vec::with_capacity(self.ye_heap.len());
+        while let Some(item) = self.ye_pop() { result.push(item); }
+        result
+    }
+}
+
+// --- ye_ Segment Tree with Lazy Propagation ---
+
+/// Segment tree with lazy propagation for range queries and updates.
+#[derive(Debug, Clone)]
+pub struct YeSegTree {
+    ye_n: usize,
+    ye_tree: Vec<i64>,
+    ye_lazy: Vec<i64>,
+}
+
+impl std::fmt::Display for YeSegTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SegTree(n={})", self.ye_n)
+    }
+}
+
+impl Default for YeSegTree {
+    fn default() -> Self { Self { ye_n: 0, ye_tree: Vec::new(), ye_lazy: Vec::new() } }
+}
+
+impl YeSegTree {
+    /// Build from an array of values.
+    pub fn ye_from_slice(data: &[i64]) -> Self {
+        let n = data.len();
+        let mut tree = vec![0i64; 4 * n];
+        let lazy = vec![0i64; 4 * n];
+        let mut st = Self { ye_n: n, ye_tree: tree.clone(), ye_lazy: lazy };
+        if n > 0 { st.ye_build(data, 1, 0, n - 1); }
+        st
+    }
+
+    fn ye_build(&mut self, data: &[i64], node: usize, start: usize, end: usize) {
+        if start == end {
+            self.ye_tree[node] = data[start];
+            return;
+        }
+        let mid = (start + end) / 2;
+        self.ye_build(data, 2 * node, start, mid);
+        self.ye_build(data, 2 * node + 1, mid + 1, end);
+        self.ye_tree[node] = self.ye_tree[2 * node] + self.ye_tree[2 * node + 1];
+    }
+
+    fn ye_push_down(&mut self, node: usize, start: usize, end: usize) {
+        if self.ye_lazy[node] != 0 {
+            let mid = (start + end) / 2;
+            self.ye_tree[2 * node] += self.ye_lazy[node] * (mid - start + 1) as i64;
+            self.ye_tree[2 * node + 1] += self.ye_lazy[node] * (end - mid) as i64;
+            self.ye_lazy[2 * node] += self.ye_lazy[node];
+            self.ye_lazy[2 * node + 1] += self.ye_lazy[node];
+            self.ye_lazy[node] = 0;
+        }
+    }
+
+    /// Range sum query [l, r].
+    pub fn ye_query(&mut self, l: usize, r: usize) -> i64 {
+        if self.ye_n == 0 || l > r || r >= self.ye_n { return 0; }
+        self.ye_query_inner(1, 0, self.ye_n - 1, l, r)
+    }
+
+    fn ye_query_inner(&mut self, node: usize, start: usize, end: usize, l: usize, r: usize) -> i64 {
+        if r < start || end < l { return 0; }
+        if l <= start && end <= r { return self.ye_tree[node]; }
+        self.ye_push_down(node, start, end);
+        let mid = (start + end) / 2;
+        self.ye_query_inner(2 * node, start, mid, l, r) +
+        self.ye_query_inner(2 * node + 1, mid + 1, end, l, r)
+    }
+
+    /// Range update: add val to all elements in [l, r].
+    pub fn ye_update(&mut self, l: usize, r: usize, val: i64) {
+        if self.ye_n == 0 || l > r || r >= self.ye_n { return; }
+        self.ye_update_inner(1, 0, self.ye_n - 1, l, r, val);
+    }
+
+    fn ye_update_inner(&mut self, node: usize, start: usize, end: usize, l: usize, r: usize, val: i64) {
+        if r < start || end < l { return; }
+        if l <= start && end <= r {
+            self.ye_tree[node] += val * (end - start + 1) as i64;
+            self.ye_lazy[node] += val;
+            return;
+        }
+        self.ye_push_down(node, start, end);
+        let mid = (start + end) / 2;
+        self.ye_update_inner(2 * node, start, mid, l, r, val);
+        self.ye_update_inner(2 * node + 1, mid + 1, end, l, r, val);
+        self.ye_tree[node] = self.ye_tree[2 * node] + self.ye_tree[2 * node + 1];
+    }
+
+    /// Point query: get value at index.
+    pub fn ye_point_query(&mut self, idx: usize) -> i64 {
+        self.ye_query(idx, idx)
+    }
+
+    /// Size of underlying array.
+    pub fn ye_len(&self) -> usize { self.ye_n }
+
+    /// Is empty.
+    pub fn ye_is_empty(&self) -> bool { self.ye_n == 0 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -15245,6 +15458,138 @@ mod tests {
         m.yd_set(0, 0, 1.0);
         m.yd_clear();
         assert_eq!(m.yd_nnz(), 0);
+    }
+
+
+    // --- ye_ IndexedPQ tests ---
+
+    #[test]
+    fn ye_ipq_new() {
+        let pq = super::YeIndexedPQ::ye_new();
+        assert!(pq.ye_is_empty());
+    }
+
+    #[test]
+    fn ye_ipq_insert_pop() {
+        let mut pq = super::YeIndexedPQ::ye_new();
+        pq.ye_insert(0, 10);
+        pq.ye_insert(1, 5);
+        pq.ye_insert(2, 15);
+        assert_eq!(pq.ye_pop(), Some((1, 5)));
+        assert_eq!(pq.ye_pop(), Some((0, 10)));
+    }
+
+    #[test]
+    fn ye_ipq_decrease_key() {
+        let mut pq = super::YeIndexedPQ::ye_new();
+        pq.ye_insert(0, 10);
+        pq.ye_insert(1, 20);
+        pq.ye_decrease_key(1, 5);
+        assert_eq!(pq.ye_peek(), Some((1, 5)));
+    }
+
+    #[test]
+    fn ye_ipq_contains() {
+        let mut pq = super::YeIndexedPQ::ye_new();
+        pq.ye_insert(42, 1);
+        assert!(pq.ye_contains(42));
+        assert!(!pq.ye_contains(99));
+    }
+
+    #[test]
+    fn ye_ipq_priority() {
+        let mut pq = super::YeIndexedPQ::ye_new();
+        pq.ye_insert(0, 7);
+        assert_eq!(pq.ye_priority(0), Some(7));
+    }
+
+    #[test]
+    fn ye_ipq_drain() {
+        let mut pq = super::YeIndexedPQ::ye_new();
+        pq.ye_insert(0, 30);
+        pq.ye_insert(1, 10);
+        pq.ye_insert(2, 20);
+        let sorted = pq.ye_drain_sorted();
+        assert_eq!(sorted, vec![(1, 10), (2, 20), (0, 30)]);
+    }
+
+    #[test]
+    fn ye_ipq_clear() {
+        let mut pq = super::YeIndexedPQ::ye_new();
+        pq.ye_insert(0, 1);
+        pq.ye_clear();
+        assert!(pq.ye_is_empty());
+    }
+
+    #[test]
+    fn ye_ipq_display() {
+        let pq = super::YeIndexedPQ::ye_new();
+        assert!(format!("{}", pq).contains("IndexedPQ"));
+    }
+
+    #[test]
+    fn ye_ipq_default() {
+        let pq = super::YeIndexedPQ::default();
+        assert!(pq.ye_is_empty());
+    }
+
+    // --- ye_ SegTree tests ---
+
+    #[test]
+    fn ye_seg_from_slice() {
+        let mut st = super::YeSegTree::ye_from_slice(&[1, 2, 3, 4, 5]);
+        assert_eq!(st.ye_len(), 5);
+        assert_eq!(st.ye_query(0, 4), 15);
+    }
+
+    #[test]
+    fn ye_seg_point_query() {
+        let mut st = super::YeSegTree::ye_from_slice(&[10, 20, 30]);
+        assert_eq!(st.ye_point_query(1), 20);
+    }
+
+    #[test]
+    fn ye_seg_range_query() {
+        let mut st = super::YeSegTree::ye_from_slice(&[1, 2, 3, 4, 5]);
+        assert_eq!(st.ye_query(1, 3), 9);
+    }
+
+    #[test]
+    fn ye_seg_update() {
+        let mut st = super::YeSegTree::ye_from_slice(&[1, 2, 3, 4, 5]);
+        st.ye_update(1, 3, 10);
+        assert_eq!(st.ye_query(0, 4), 45);
+    }
+
+    #[test]
+    fn ye_seg_single_update() {
+        let mut st = super::YeSegTree::ye_from_slice(&[1, 2, 3]);
+        st.ye_update(1, 1, 5);
+        assert_eq!(st.ye_point_query(1), 7);
+    }
+
+    #[test]
+    fn ye_seg_empty() {
+        let st = super::YeSegTree::ye_from_slice(&[]);
+        assert!(st.ye_is_empty());
+    }
+
+    #[test]
+    fn ye_seg_single() {
+        let mut st = super::YeSegTree::ye_from_slice(&[42]);
+        assert_eq!(st.ye_query(0, 0), 42);
+    }
+
+    #[test]
+    fn ye_seg_display() {
+        let st = super::YeSegTree::ye_from_slice(&[1, 2, 3]);
+        assert!(format!("{}", st).contains("SegTree"));
+    }
+
+    #[test]
+    fn ye_seg_default() {
+        let st = super::YeSegTree::default();
+        assert!(st.ye_is_empty());
     }
 
 }
