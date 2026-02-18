@@ -26511,6 +26511,84 @@ impl AzkGlyphMargin {
     pub fn total(&self) -> usize { self.decorations.len() }
 }
 
+
+// --- azl_ editor layout and ruler configuration ---
+
+/// Line number display mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzlLineNumberMode { On, Off, Relative, Interval }
+
+/// Minimap display mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzlMinimapMode { Show, Hide, Autohide }
+
+/// Editor ruler position.
+#[derive(Debug, Clone)]
+pub struct AzlRuler {
+    pub column: u32,
+    pub color: Option<String>,
+}
+
+impl AzlRuler {
+    pub fn at(col: u32) -> Self { Self { column: col, color: None } }
+    pub fn with_color(mut self, c: &str) -> Self { self.color = Some(c.to_string()); self }
+}
+
+/// Editor layout configuration.
+#[derive(Debug)]
+pub struct AzlEditorLayout {
+    pub line_numbers: AzlLineNumberMode,
+    pub minimap_mode: AzlMinimapMode,
+    pub minimap_side: AzlSide,
+    pub rulers: Vec<AzlRuler>,
+    pub word_wrap_column: u32,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub render_whitespace: AzlWhitespace,
+    pub glyph_margin: bool,
+    pub line_decorations_width: u32,
+}
+
+/// Side for minimap/panels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzlSide { Left, Right }
+
+/// Whitespace rendering mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzlWhitespace { None, Boundary, Selection, Trailing, All }
+
+impl AzlEditorLayout {
+    pub fn default_layout() -> Self {
+        Self {
+            line_numbers: AzlLineNumberMode::On, minimap_mode: AzlMinimapMode::Show,
+            minimap_side: AzlSide::Right, rulers: Vec::new(), word_wrap_column: 80,
+            tab_size: 4, insert_spaces: true, render_whitespace: AzlWhitespace::None,
+            glyph_margin: true, line_decorations_width: 2,
+        }
+    }
+    pub fn set_line_numbers(&mut self, m: AzlLineNumberMode) { self.line_numbers = m; }
+    pub fn add_ruler(&mut self, r: AzlRuler) { self.rulers.push(r); }
+    pub fn set_tab_size(&mut self, s: u32) { self.tab_size = s; }
+    pub fn set_minimap(&mut self, m: AzlMinimapMode) { self.minimap_mode = m; }
+    pub fn has_rulers(&self) -> bool { !self.rulers.is_empty() }
+    pub fn shows_line_numbers(&self) -> bool { self.line_numbers != AzlLineNumberMode::Off }
+    pub fn shows_minimap(&self) -> bool { self.minimap_mode != AzlMinimapMode::Hide }
+    pub fn compute_line_number(&self, current: u32, cursor: u32) -> String {
+        match self.line_numbers {
+            AzlLineNumberMode::On => format!("{}", current + 1),
+            AzlLineNumberMode::Off => String::new(),
+            AzlLineNumberMode::Relative => {
+                if current == cursor { format!("{}", current + 1) }
+                else { format!("{}", (current as i64 - cursor as i64).unsigned_abs()) }
+            }
+            AzlLineNumberMode::Interval => {
+                if (current + 1) % 10 == 0 || current == 0 { format!("{}", current + 1) }
+                else { String::new() }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43130,6 +43208,73 @@ goodbye";
         assert!(bp.enabled);
         bp.toggle_enabled();
         assert!(!bp.enabled);
+    }
+
+
+    #[test]
+    fn test_azl_default_layout() {
+        let l = AzlEditorLayout::default_layout();
+        assert!(l.shows_line_numbers());
+        assert!(l.shows_minimap());
+        assert!(!l.has_rulers());
+        assert_eq!(l.tab_size, 4);
+    }
+
+    #[test]
+    fn test_azl_line_number_on() {
+        let l = AzlEditorLayout::default_layout();
+        assert_eq!(l.compute_line_number(0, 5), "1");
+        assert_eq!(l.compute_line_number(9, 5), "10");
+    }
+
+    #[test]
+    fn test_azl_line_number_relative() {
+        let mut l = AzlEditorLayout::default_layout();
+        l.set_line_numbers(AzlLineNumberMode::Relative);
+        assert_eq!(l.compute_line_number(5, 5), "6");
+        assert_eq!(l.compute_line_number(3, 5), "2");
+        assert_eq!(l.compute_line_number(8, 5), "3");
+    }
+
+    #[test]
+    fn test_azl_line_number_off() {
+        let mut l = AzlEditorLayout::default_layout();
+        l.set_line_numbers(AzlLineNumberMode::Off);
+        assert_eq!(l.compute_line_number(5, 5), "");
+        assert!(!l.shows_line_numbers());
+    }
+
+    #[test]
+    fn test_azl_rulers() {
+        let mut l = AzlEditorLayout::default_layout();
+        l.add_ruler(AzlRuler::at(80));
+        l.add_ruler(AzlRuler::at(120).with_color("#ff0000"));
+        assert!(l.has_rulers());
+        assert_eq!(l.rulers.len(), 2);
+        assert_eq!(l.rulers[1].color.as_deref(), Some("#ff0000"));
+    }
+
+    #[test]
+    fn test_azl_minimap_hide() {
+        let mut l = AzlEditorLayout::default_layout();
+        l.set_minimap(AzlMinimapMode::Hide);
+        assert!(!l.shows_minimap());
+    }
+
+    #[test]
+    fn test_azl_interval_numbers() {
+        let mut l = AzlEditorLayout::default_layout();
+        l.set_line_numbers(AzlLineNumberMode::Interval);
+        assert_eq!(l.compute_line_number(0, 0), "1");
+        assert_eq!(l.compute_line_number(1, 0), "");
+        assert_eq!(l.compute_line_number(9, 0), "10");
+    }
+
+    #[test]
+    fn test_azl_tab_size() {
+        let mut l = AzlEditorLayout::default_layout();
+        l.set_tab_size(2);
+        assert_eq!(l.tab_size, 2);
     }
 
 }
