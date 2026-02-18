@@ -17338,6 +17338,268 @@ impl ZtProviderRegistration {
     }
 }
 
+
+// --- zu_ workspace trust and authentication types ---
+
+/// Trust state for a workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZuTrustState {
+    Trusted,
+    Untrusted,
+    Unknown,
+}
+
+impl ZuTrustState {
+    pub fn is_trusted(&self) -> bool {
+        matches!(self, Self::Trusted)
+    }
+}
+
+/// Workspace trust configuration.
+#[derive(Debug, Clone)]
+pub struct ZuWorkspaceTrust {
+    pub state: ZuTrustState,
+    pub parent_trusted: bool,
+    pub trusted_folders: Vec<String>,
+    pub untrusted_folders: Vec<String>,
+}
+
+impl ZuWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            state: ZuTrustState::Unknown,
+            parent_trusted: false,
+            trusted_folders: Vec::new(),
+            untrusted_folders: Vec::new(),
+        }
+    }
+
+    pub fn grant_trust(&mut self) {
+        self.state = ZuTrustState::Trusted;
+    }
+
+    pub fn revoke_trust(&mut self) {
+        self.state = ZuTrustState::Untrusted;
+    }
+
+    pub fn add_trusted_folder(&mut self, path: &str) {
+        if !self.trusted_folders.iter().any(|f| f == path) {
+            self.trusted_folders.push(path.to_string());
+        }
+    }
+
+    pub fn add_untrusted_folder(&mut self, path: &str) {
+        if !self.untrusted_folders.iter().any(|f| f == path) {
+            self.untrusted_folders.push(path.to_string());
+        }
+    }
+
+    pub fn is_folder_trusted(&self, path: &str) -> bool {
+        if self.state == ZuTrustState::Trusted {
+            return true;
+        }
+        self.trusted_folders.iter().any(|f| path.starts_with(f.as_str()))
+    }
+
+    pub fn effective_trust(&self) -> ZuTrustState {
+        if self.state == ZuTrustState::Trusted || self.parent_trusted {
+            ZuTrustState::Trusted
+        } else {
+            self.state
+        }
+    }
+}
+
+/// An authentication session from an auth provider.
+#[derive(Debug, Clone)]
+pub struct ZuAuthSession {
+    pub id: String,
+    pub access_token: String,
+    pub account_label: String,
+    pub account_id: String,
+    pub scopes: Vec<String>,
+}
+
+impl ZuAuthSession {
+    pub fn new(id: &str, token: &str, label: &str, account_id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            access_token: token.to_string(),
+            account_label: label.to_string(),
+            account_id: account_id.to_string(),
+            scopes: Vec::new(),
+        }
+    }
+
+    pub fn with_scopes(mut self, scopes: Vec<String>) -> Self {
+        self.scopes = scopes;
+        self
+    }
+
+    pub fn has_scope(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|s| s == scope)
+    }
+
+    pub fn display_name(&self) -> &str {
+        &self.account_label
+    }
+}
+
+/// Options for requesting authentication.
+#[derive(Debug, Clone)]
+pub struct ZuAuthOptions {
+    pub create_if_none: bool,
+    pub clear_session_preference: bool,
+    pub silent: bool,
+    pub force_new_session: bool,
+}
+
+impl ZuAuthOptions {
+    pub fn new() -> Self {
+        Self {
+            create_if_none: false,
+            clear_session_preference: false,
+            silent: false,
+            force_new_session: false,
+        }
+    }
+
+    pub fn interactive() -> Self {
+        Self { create_if_none: true, ..Self::new() }
+    }
+
+    pub fn silent() -> Self {
+        Self { silent: true, ..Self::new() }
+    }
+}
+
+/// An authentication provider with session management.
+#[derive(Debug, Clone)]
+pub struct ZuAuthProvider {
+    pub id: String,
+    pub label: String,
+    sessions: Vec<ZuAuthSession>,
+    supports_multiple: bool,
+}
+
+impl ZuAuthProvider {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            sessions: Vec::new(),
+            supports_multiple: false,
+        }
+    }
+
+    pub fn with_multiple_accounts(mut self) -> Self {
+        self.supports_multiple = true;
+        self
+    }
+
+    pub fn add_session(&mut self, session: ZuAuthSession) {
+        self.sessions.push(session);
+    }
+
+    pub fn remove_session(&mut self, session_id: &str) -> bool {
+        let before = self.sessions.len();
+        self.sessions.retain(|s| s.id != session_id);
+        self.sessions.len() < before
+    }
+
+    pub fn get_session(&self, scopes: &[String]) -> Option<&ZuAuthSession> {
+        self.sessions.iter().find(|s| {
+            scopes.iter().all(|scope| s.has_scope(scope))
+        })
+    }
+
+    pub fn sessions(&self) -> &[ZuAuthSession] {
+        &self.sessions
+    }
+
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+
+    pub fn supports_multiple_accounts(&self) -> bool {
+        self.supports_multiple
+    }
+}
+
+/// Registry of authentication providers.
+#[derive(Debug, Clone)]
+pub struct ZuAuthRegistry {
+    providers: Vec<ZuAuthProvider>,
+}
+
+impl ZuAuthRegistry {
+    pub fn new() -> Self {
+        Self { providers: Vec::new() }
+    }
+
+    pub fn register(&mut self, provider: ZuAuthProvider) {
+        self.providers.push(provider);
+    }
+
+    pub fn get_provider(&self, id: &str) -> Option<&ZuAuthProvider> {
+        self.providers.iter().find(|p| p.id == id)
+    }
+
+    pub fn get_provider_mut(&mut self, id: &str) -> Option<&mut ZuAuthProvider> {
+        self.providers.iter_mut().find(|p| p.id == id)
+    }
+
+    pub fn provider_ids(&self) -> Vec<&str> {
+        self.providers.iter().map(|p| p.id.as_str()).collect()
+    }
+
+    pub fn all_sessions(&self) -> Vec<&ZuAuthSession> {
+        self.providers.iter().flat_map(|p| p.sessions()).collect()
+    }
+}
+
+/// A secret stored in the secret storage API.
+#[derive(Debug, Clone)]
+pub struct ZuSecretStorage {
+    secrets: Vec<(String, String)>,
+}
+
+impl ZuSecretStorage {
+    pub fn new() -> Self {
+        Self { secrets: Vec::new() }
+    }
+
+    pub fn store(&mut self, key: &str, value: &str) {
+        if let Some(entry) = self.secrets.iter_mut().find(|(k, _)| k == key) {
+            entry.1 = value.to_string();
+        } else {
+            self.secrets.push((key.to_string(), value.to_string()));
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.secrets.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    pub fn delete(&mut self, key: &str) -> bool {
+        let before = self.secrets.len();
+        self.secrets.retain(|(k, _)| k != key);
+        self.secrets.len() < before
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.secrets.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.secrets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.secrets.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28587,6 +28849,108 @@ mod tests {
         let reg = ZtProviderRegistration::new("all");
         assert!(reg.matches_language("anything"));
         assert!(reg.matches_scheme("any"));
+    }
+
+
+    // --- zu_ workspace trust and authentication tests ---
+
+    #[test]
+    fn test_zu_trust_state() {
+        assert!(ZuTrustState::Trusted.is_trusted());
+        assert!(!ZuTrustState::Untrusted.is_trusted());
+        assert!(!ZuTrustState::Unknown.is_trusted());
+    }
+
+    #[test]
+    fn test_zu_workspace_trust_lifecycle() {
+        let mut wt = ZuWorkspaceTrust::new();
+        assert_eq!(wt.state, ZuTrustState::Unknown);
+        wt.grant_trust();
+        assert!(wt.state.is_trusted());
+        wt.revoke_trust();
+        assert!(!wt.state.is_trusted());
+    }
+
+    #[test]
+    fn test_zu_workspace_trust_folders() {
+        let mut wt = ZuWorkspaceTrust::new();
+        wt.add_trusted_folder("/home/user/project");
+        wt.add_trusted_folder("/home/user/project"); // duplicate
+        assert_eq!(wt.trusted_folders.len(), 1);
+        assert!(wt.is_folder_trusted("/home/user/project/src"));
+        assert!(!wt.is_folder_trusted("/tmp"));
+    }
+
+    #[test]
+    fn test_zu_workspace_trust_effective() {
+        let mut wt = ZuWorkspaceTrust::new();
+        assert_eq!(wt.effective_trust(), ZuTrustState::Unknown);
+        wt.parent_trusted = true;
+        assert_eq!(wt.effective_trust(), ZuTrustState::Trusted);
+    }
+
+    #[test]
+    fn test_zu_auth_session() {
+        let session = ZuAuthSession::new("s1", "tok123", "User", "u1")
+            .with_scopes(vec!["read".into(), "write".into()]);
+        assert!(session.has_scope("read"));
+        assert!(!session.has_scope("admin"));
+        assert_eq!(session.display_name(), "User");
+    }
+
+    #[test]
+    fn test_zu_auth_options() {
+        let interactive = ZuAuthOptions::interactive();
+        assert!(interactive.create_if_none);
+        let silent = ZuAuthOptions::silent();
+        assert!(silent.silent);
+    }
+
+    #[test]
+    fn test_zu_auth_provider() {
+        let mut prov = ZuAuthProvider::new("github", "GitHub")
+            .with_multiple_accounts();
+        assert!(prov.supports_multiple_accounts());
+        let s = ZuAuthSession::new("s1", "t", "U", "u1")
+            .with_scopes(vec!["repo".into()]);
+        prov.add_session(s);
+        assert_eq!(prov.session_count(), 1);
+        assert!(prov.get_session(&["repo".into()]).is_some());
+        assert!(prov.get_session(&["admin".into()]).is_none());
+        assert!(prov.remove_session("s1"));
+        assert_eq!(prov.session_count(), 0);
+    }
+
+    #[test]
+    fn test_zu_auth_registry() {
+        let mut reg = ZuAuthRegistry::new();
+        let prov = ZuAuthProvider::new("gh", "GitHub");
+        reg.register(prov);
+        assert!(reg.get_provider("gh").is_some());
+        assert!(reg.get_provider("ms").is_none());
+        assert_eq!(reg.provider_ids(), vec!["gh"]);
+    }
+
+    #[test]
+    fn test_zu_secret_storage() {
+        let mut ss = ZuSecretStorage::new();
+        assert!(ss.is_empty());
+        ss.store("token", "abc123");
+        assert_eq!(ss.get("token"), Some("abc123"));
+        ss.store("token", "updated");
+        assert_eq!(ss.get("token"), Some("updated"));
+        assert_eq!(ss.len(), 1);
+        assert!(ss.delete("token"));
+        assert!(ss.is_empty());
+    }
+
+    #[test]
+    fn test_zu_secret_storage_keys() {
+        let mut ss = ZuSecretStorage::new();
+        ss.store("a", "1");
+        ss.store("b", "2");
+        assert_eq!(ss.keys().len(), 2);
+        assert!(!ss.delete("c"));
     }
 
 }
