@@ -27263,6 +27263,81 @@ impl AzwFindState {
     }
 }
 
+
+// --- azx_ editor command registration and dispatch ---
+
+/// A registered command.
+#[derive(Debug, Clone)]
+pub struct AzxCommand {
+    pub id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub keybinding: Option<String>,
+    pub when_clause: Option<String>,
+}
+
+impl AzxCommand {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self { id: id.to_string(), title: title.to_string(), category: None, keybinding: None, when_clause: None }
+    }
+    pub fn with_category(mut self, c: &str) -> Self { self.category = Some(c.to_string()); self }
+    pub fn with_keybinding(mut self, k: &str) -> Self { self.keybinding = Some(k.to_string()); self }
+    pub fn with_when(mut self, w: &str) -> Self { self.when_clause = Some(w.to_string()); self }
+    pub fn display_label(&self) -> String {
+        if let Some(c) = &self.category { format!("{}: {}", c, self.title) } else { self.title.clone() }
+    }
+    pub fn has_keybinding(&self) -> bool { self.keybinding.is_some() }
+}
+
+/// Command registry.
+#[derive(Debug)]
+pub struct AzxCommandRegistry {
+    pub commands: Vec<AzxCommand>,
+}
+
+impl AzxCommandRegistry {
+    pub fn new() -> Self { Self { commands: Vec::new() } }
+    pub fn register(&mut self, cmd: AzxCommand) { self.commands.push(cmd); }
+    pub fn find(&self, id: &str) -> Option<&AzxCommand> { self.commands.iter().find(|c| c.id == id) }
+    pub fn by_category(&self, cat: &str) -> Vec<&AzxCommand> {
+        self.commands.iter().filter(|c| c.category.as_deref() == Some(cat)).collect()
+    }
+    pub fn with_keybindings(&self) -> Vec<&AzxCommand> { self.commands.iter().filter(|c| c.has_keybinding()).collect() }
+    pub fn search(&self, query: &str) -> Vec<&AzxCommand> {
+        let q = query.to_lowercase();
+        self.commands.iter().filter(|c| c.title.to_lowercase().contains(&q) || c.id.to_lowercase().contains(&q)).collect()
+    }
+    pub fn command_count(&self) -> usize { self.commands.len() }
+    pub fn categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self.commands.iter().filter_map(|c| c.category.as_deref()).collect();
+        cats.sort(); cats.dedup(); cats
+    }
+    pub fn find_by_keybinding(&self, kb: &str) -> Option<&AzxCommand> {
+        self.commands.iter().find(|c| c.keybinding.as_deref() == Some(kb))
+    }
+}
+
+/// Command execution context.
+#[derive(Debug)]
+pub struct AzxCommandContext {
+    pub active_editor: Option<String>,
+    pub has_selection: bool,
+    pub language_id: Option<String>,
+}
+
+impl AzxCommandContext {
+    pub fn new() -> Self { Self { active_editor: None, has_selection: false, language_id: None } }
+    pub fn with_editor(mut self, e: &str) -> Self { self.active_editor = Some(e.to_string()); self }
+    pub fn with_selection(mut self) -> Self { self.has_selection = true; self }
+    pub fn evaluate_when(&self, clause: &str) -> bool {
+        match clause {
+            "editorTextFocus" => self.active_editor.is_some(),
+            "editorHasSelection" => self.has_selection,
+            _ => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44916,6 +44991,76 @@ goodbye";
         state.close();
         assert!(!state.visible);
         assert!(!state.replace_visible);
+    }
+
+
+    #[test]
+    fn test_azx_command() {
+        let cmd = AzxCommand::new("editor.action.format", "Format Document")
+            .with_category("Editor")
+            .with_keybinding("shift+alt+f");
+        assert_eq!(cmd.display_label(), "Editor: Format Document");
+        assert!(cmd.has_keybinding());
+    }
+
+    #[test]
+    fn test_azx_command_no_category() {
+        let cmd = AzxCommand::new("workbench.action.quit", "Quit");
+        assert_eq!(cmd.display_label(), "Quit");
+    }
+
+    #[test]
+    fn test_azx_registry() {
+        let mut reg = AzxCommandRegistry::new();
+        reg.register(AzxCommand::new("a.b", "Foo").with_category("Cat1"));
+        reg.register(AzxCommand::new("a.c", "Bar").with_category("Cat1"));
+        reg.register(AzxCommand::new("b.d", "Baz").with_category("Cat2").with_keybinding("ctrl+x"));
+        assert_eq!(reg.command_count(), 3);
+        assert_eq!(reg.by_category("Cat1").len(), 2);
+        assert_eq!(reg.with_keybindings().len(), 1);
+    }
+
+    #[test]
+    fn test_azx_search() {
+        let mut reg = AzxCommandRegistry::new();
+        reg.register(AzxCommand::new("editor.format", "Format Document"));
+        reg.register(AzxCommand::new("editor.save", "Save File"));
+        let results = reg.search("format");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "editor.format");
+    }
+
+    #[test]
+    fn test_azx_find_by_keybinding() {
+        let mut reg = AzxCommandRegistry::new();
+        reg.register(AzxCommand::new("a", "A").with_keybinding("ctrl+s"));
+        reg.register(AzxCommand::new("b", "B"));
+        assert!(reg.find_by_keybinding("ctrl+s").is_some());
+        assert!(reg.find_by_keybinding("ctrl+z").is_none());
+    }
+
+    #[test]
+    fn test_azx_categories() {
+        let mut reg = AzxCommandRegistry::new();
+        reg.register(AzxCommand::new("a", "A").with_category("Z"));
+        reg.register(AzxCommand::new("b", "B").with_category("A"));
+        reg.register(AzxCommand::new("c", "C").with_category("A"));
+        let cats = reg.categories();
+        assert_eq!(cats, vec!["A", "Z"]);
+    }
+
+    #[test]
+    fn test_azx_context() {
+        let ctx = AzxCommandContext::new().with_editor("main.rs").with_selection();
+        assert!(ctx.evaluate_when("editorTextFocus"));
+        assert!(ctx.evaluate_when("editorHasSelection"));
+    }
+
+    #[test]
+    fn test_azx_context_no_editor() {
+        let ctx = AzxCommandContext::new();
+        assert!(!ctx.evaluate_when("editorTextFocus"));
+        assert!(!ctx.evaluate_when("editorHasSelection"));
     }
 
 }
