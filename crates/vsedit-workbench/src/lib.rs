@@ -12819,6 +12819,211 @@ impl YqTextLayout {
     }
 }
 
+
+// --- yr_ Undo/Redo Stack ---
+
+/// Generic undo/redo stack for command pattern implementation.
+#[derive(Debug, Clone)]
+pub struct YrUndoStack<T: Clone> {
+    yr_undo: Vec<T>,
+    yr_redo: Vec<T>,
+    yr_max_size: usize,
+}
+
+impl<T: Clone + std::fmt::Display> std::fmt::Display for YrUndoStack<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UndoStack(undo={}, redo={})", self.yr_undo.len(), self.yr_redo.len())
+    }
+}
+
+impl<T: Clone> Default for YrUndoStack<T> {
+    fn default() -> Self { Self::yr_new(1000) }
+}
+
+impl<T: Clone> YrUndoStack<T> {
+    /// Create with max size.
+    pub fn yr_new(max_size: usize) -> Self {
+        Self { yr_undo: Vec::new(), yr_redo: Vec::new(), yr_max_size: max_size.max(1) }
+    }
+
+    /// Push a new state. Clears redo stack.
+    pub fn yr_push(&mut self, state: T) {
+        self.yr_redo.clear();
+        self.yr_undo.push(state);
+        while self.yr_undo.len() > self.yr_max_size { self.yr_undo.remove(0); }
+    }
+
+    /// Undo: move last state to redo stack, return it.
+    pub fn yr_undo(&mut self) -> Option<T> {
+        let state = self.yr_undo.pop()?;
+        self.yr_redo.push(state.clone());
+        Some(state)
+    }
+
+    /// Redo: move last redo state back, return it.
+    pub fn yr_redo(&mut self) -> Option<T> {
+        let state = self.yr_redo.pop()?;
+        self.yr_undo.push(state.clone());
+        Some(state)
+    }
+
+    /// Can undo.
+    pub fn yr_can_undo(&self) -> bool { !self.yr_undo.is_empty() }
+
+    /// Can redo.
+    pub fn yr_can_redo(&self) -> bool { !self.yr_redo.is_empty() }
+
+    /// Undo stack depth.
+    pub fn yr_undo_count(&self) -> usize { self.yr_undo.len() }
+
+    /// Redo stack depth.
+    pub fn yr_redo_count(&self) -> usize { self.yr_redo.len() }
+
+    /// Peek at current (top of undo).
+    pub fn yr_current(&self) -> Option<&T> { self.yr_undo.last() }
+
+    /// Clear both stacks.
+    pub fn yr_clear(&mut self) { self.yr_undo.clear(); self.yr_redo.clear(); }
+
+    /// Max size.
+    pub fn yr_max_size(&self) -> usize { self.yr_max_size }
+}
+
+// --- yr_ Selection Model ---
+
+/// Multi-cursor selection model for text editing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct YrSelection {
+    /// Anchor position (where selection started).
+    pub yr_anchor_line: usize,
+    pub yr_anchor_col: usize,
+    /// Active position (where cursor currently is).
+    pub yr_active_line: usize,
+    pub yr_active_col: usize,
+}
+
+impl std::fmt::Display for YrSelection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Sel({}:{}-{}:{})", self.yr_anchor_line, self.yr_anchor_col, self.yr_active_line, self.yr_active_col)
+    }
+}
+
+impl Default for YrSelection {
+    fn default() -> Self { Self { yr_anchor_line: 0, yr_anchor_col: 0, yr_active_line: 0, yr_active_col: 0 } }
+}
+
+impl YrSelection {
+    /// Create a cursor (zero-width selection).
+    pub fn yr_cursor(line: usize, col: usize) -> Self {
+        Self { yr_anchor_line: line, yr_anchor_col: col, yr_active_line: line, yr_active_col: col }
+    }
+
+    /// Create a selection range.
+    pub fn yr_range(anchor_line: usize, anchor_col: usize, active_line: usize, active_col: usize) -> Self {
+        Self { yr_anchor_line: anchor_line, yr_anchor_col: anchor_col, yr_active_line: active_line, yr_active_col: active_col }
+    }
+
+    /// Is this a cursor (no selection)?
+    pub fn yr_is_cursor(&self) -> bool {
+        self.yr_anchor_line == self.yr_active_line && self.yr_anchor_col == self.yr_active_col
+    }
+
+    /// Start position (min of anchor/active).
+    pub fn yr_start(&self) -> (usize, usize) {
+        if (self.yr_anchor_line, self.yr_anchor_col) <= (self.yr_active_line, self.yr_active_col) {
+            (self.yr_anchor_line, self.yr_anchor_col)
+        } else {
+            (self.yr_active_line, self.yr_active_col)
+        }
+    }
+
+    /// End position (max of anchor/active).
+    pub fn yr_end(&self) -> (usize, usize) {
+        if (self.yr_anchor_line, self.yr_anchor_col) >= (self.yr_active_line, self.yr_active_col) {
+            (self.yr_anchor_line, self.yr_anchor_col)
+        } else {
+            (self.yr_active_line, self.yr_active_col)
+        }
+    }
+
+    /// Does this selection contain a position?
+    pub fn yr_contains(&self, line: usize, col: usize) -> bool {
+        let start = self.yr_start();
+        let end = self.yr_end();
+        (line, col) >= start && (line, col) <= end
+    }
+
+    /// Is this selection reversed (active before anchor)?
+    pub fn yr_is_reversed(&self) -> bool {
+        (self.yr_active_line, self.yr_active_col) < (self.yr_anchor_line, self.yr_anchor_col)
+    }
+
+    /// Number of lines spanned.
+    pub fn yr_line_span(&self) -> usize {
+        let (sl, _) = self.yr_start();
+        let (el, _) = self.yr_end();
+        el - sl + 1
+    }
+
+    /// Collapse to cursor at active position.
+    pub fn yr_collapse(&self) -> Self {
+        Self::yr_cursor(self.yr_active_line, self.yr_active_col)
+    }
+}
+
+/// Multi-cursor selection model.
+#[derive(Debug, Clone)]
+pub struct YrSelectionModel {
+    yr_selections: Vec<YrSelection>,
+}
+
+impl std::fmt::Display for YrSelectionModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SelectionModel(cursors={})", self.yr_selections.len())
+    }
+}
+
+impl Default for YrSelectionModel {
+    fn default() -> Self { Self::yr_new() }
+}
+
+impl YrSelectionModel {
+    /// Create with a single cursor at origin.
+    pub fn yr_new() -> Self { Self { yr_selections: vec![YrSelection::yr_cursor(0, 0)] } }
+
+    /// Set primary selection.
+    pub fn yr_set_primary(&mut self, sel: YrSelection) {
+        self.yr_selections = vec![sel];
+    }
+
+    /// Add a selection (multi-cursor).
+    pub fn yr_add(&mut self, sel: YrSelection) {
+        self.yr_selections.push(sel);
+    }
+
+    /// Get primary (first) selection.
+    pub fn yr_primary(&self) -> &YrSelection { &self.yr_selections[0] }
+
+    /// All selections.
+    pub fn yr_all(&self) -> &[YrSelection] { &self.yr_selections }
+
+    /// Number of cursors.
+    pub fn yr_cursor_count(&self) -> usize { self.yr_selections.len() }
+
+    /// Collapse all to cursors.
+    pub fn yr_collapse_all(&mut self) {
+        self.yr_selections = self.yr_selections.iter().map(|s| s.yr_collapse()).collect();
+    }
+
+    /// Clear to single cursor at origin.
+    pub fn yr_reset(&mut self) { self.yr_selections = vec![YrSelection::yr_cursor(0, 0)]; }
+
+    /// Remove duplicate selections.
+    pub fn yr_deduplicate(&mut self) {
+        self.yr_selections.dedup();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -19798,6 +20003,161 @@ mod tests {
     fn yq_layout_default() {
         let l = super::YqTextLayout::default();
         assert_eq!(l.yq_width(), 80);
+    }
+
+
+    // --- yr_ UndoStack tests ---
+
+    #[test]
+    fn yr_undo_new() {
+        let s = super::YrUndoStack::<String>::yr_new(100);
+        assert!(!s.yr_can_undo());
+    }
+
+    #[test]
+    fn yr_undo_push_undo() {
+        let mut s = super::YrUndoStack::yr_new(100);
+        s.yr_push("a".to_string());
+        s.yr_push("b".to_string());
+        assert_eq!(s.yr_undo(), Some("b".to_string()));
+        assert_eq!(s.yr_current(), Some(&"a".to_string()));
+    }
+
+    #[test]
+    fn yr_undo_redo() {
+        let mut s = super::YrUndoStack::yr_new(100);
+        s.yr_push(1);
+        s.yr_push(2);
+        s.yr_undo();
+        assert!(s.yr_can_redo());
+        assert_eq!(s.yr_redo(), Some(2));
+    }
+
+    #[test]
+    fn yr_undo_push_clears_redo() {
+        let mut s = super::YrUndoStack::yr_new(100);
+        s.yr_push(1);
+        s.yr_push(2);
+        s.yr_undo();
+        s.yr_push(3);
+        assert!(!s.yr_can_redo());
+    }
+
+    #[test]
+    fn yr_undo_max_size() {
+        let mut s = super::YrUndoStack::yr_new(3);
+        for i in 0..10 { s.yr_push(i); }
+        assert_eq!(s.yr_undo_count(), 3);
+    }
+
+    #[test]
+    fn yr_undo_clear() {
+        let mut s = super::YrUndoStack::yr_new(100);
+        s.yr_push(1);
+        s.yr_clear();
+        assert!(!s.yr_can_undo());
+    }
+
+    #[test]
+    fn yr_undo_display() {
+        let s = super::YrUndoStack::<i32>::yr_new(100);
+        assert!(format!("{}", s).contains("UndoStack"));
+    }
+
+    #[test]
+    fn yr_undo_default() {
+        let s = super::YrUndoStack::<i32>::default();
+        assert_eq!(s.yr_max_size(), 1000);
+    }
+
+    // --- yr_ Selection tests ---
+
+    #[test]
+    fn yr_sel_cursor() {
+        let s = super::YrSelection::yr_cursor(5, 10);
+        assert!(s.yr_is_cursor());
+    }
+
+    #[test]
+    fn yr_sel_range() {
+        let s = super::YrSelection::yr_range(1, 0, 3, 5);
+        assert!(!s.yr_is_cursor());
+    }
+
+    #[test]
+    fn yr_sel_start_end() {
+        let s = super::YrSelection::yr_range(3, 5, 1, 0);
+        assert_eq!(s.yr_start(), (1, 0));
+        assert_eq!(s.yr_end(), (3, 5));
+    }
+
+    #[test]
+    fn yr_sel_contains() {
+        let s = super::YrSelection::yr_range(1, 0, 3, 0);
+        assert!(s.yr_contains(2, 5));
+    }
+
+    #[test]
+    fn yr_sel_reversed() {
+        let s = super::YrSelection::yr_range(3, 0, 1, 0);
+        assert!(s.yr_is_reversed());
+    }
+
+    #[test]
+    fn yr_sel_line_span() {
+        let s = super::YrSelection::yr_range(1, 0, 5, 0);
+        assert_eq!(s.yr_line_span(), 5);
+    }
+
+    #[test]
+    fn yr_sel_collapse() {
+        let s = super::YrSelection::yr_range(1, 0, 3, 5);
+        let c = s.yr_collapse();
+        assert!(c.yr_is_cursor());
+        assert_eq!(c.yr_active_line, 3);
+    }
+
+    #[test]
+    fn yr_sel_display() {
+        let s = super::YrSelection::yr_cursor(1, 2);
+        assert!(format!("{}", s).contains("Sel"));
+    }
+
+    // --- yr_ SelectionModel tests ---
+
+    #[test]
+    fn yr_model_new() {
+        let m = super::YrSelectionModel::yr_new();
+        assert_eq!(m.yr_cursor_count(), 1);
+    }
+
+    #[test]
+    fn yr_model_multi() {
+        let mut m = super::YrSelectionModel::yr_new();
+        m.yr_add(super::YrSelection::yr_cursor(5, 0));
+        assert_eq!(m.yr_cursor_count(), 2);
+    }
+
+    #[test]
+    fn yr_model_collapse() {
+        let mut m = super::YrSelectionModel::yr_new();
+        m.yr_set_primary(super::YrSelection::yr_range(0, 0, 5, 5));
+        m.yr_collapse_all();
+        assert!(m.yr_primary().yr_is_cursor());
+    }
+
+    #[test]
+    fn yr_model_reset() {
+        let mut m = super::YrSelectionModel::yr_new();
+        m.yr_add(super::YrSelection::yr_cursor(5, 0));
+        m.yr_reset();
+        assert_eq!(m.yr_cursor_count(), 1);
+    }
+
+    #[test]
+    fn yr_model_display() {
+        let m = super::YrSelectionModel::yr_new();
+        assert!(format!("{}", m).contains("SelectionModel"));
     }
 
 }
