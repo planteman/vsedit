@@ -23910,6 +23910,102 @@ impl AyhTypeHierarchyItem {
     pub fn add_subtype(&mut self, t: &str) { self.subtypes.push(t.to_string()); }
 }
 
+
+// --- ayi_ hover and signature help provider ---
+
+/// Markup kind for hover content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyiMarkupKind { PlainText, Markdown }
+
+/// A markup content value.
+#[derive(Debug, Clone)]
+pub struct AyiMarkupContent {
+    pub kind: AyiMarkupKind,
+    pub value: String,
+}
+
+impl AyiMarkupContent {
+    pub fn plain(text: &str) -> Self { Self { kind: AyiMarkupKind::PlainText, value: text.to_string() } }
+    pub fn markdown(md: &str) -> Self { Self { kind: AyiMarkupKind::Markdown, value: md.to_string() } }
+    pub fn is_empty(&self) -> bool { self.value.is_empty() }
+}
+
+/// Hover result with content and range.
+#[derive(Debug, Clone)]
+pub struct AyiHover {
+    pub contents: Vec<AyiMarkupContent>,
+    pub range_start_line: Option<u32>,
+    pub range_start_col: Option<u32>,
+    pub range_end_line: Option<u32>,
+    pub range_end_col: Option<u32>,
+}
+
+impl AyiHover {
+    pub fn new(content: AyiMarkupContent) -> Self {
+        Self { contents: vec![content], range_start_line: None, range_start_col: None, range_end_line: None, range_end_col: None }
+    }
+    pub fn add_content(&mut self, content: AyiMarkupContent) { self.contents.push(content); }
+    pub fn with_range(mut self, sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        self.range_start_line = Some(sl); self.range_start_col = Some(sc);
+        self.range_end_line = Some(el); self.range_end_col = Some(ec); self
+    }
+    pub fn has_range(&self) -> bool { self.range_start_line.is_some() }
+    pub fn content_count(&self) -> usize { self.contents.len() }
+}
+
+/// A parameter in a signature.
+#[derive(Debug, Clone)]
+pub struct AyiParameterInfo {
+    pub label: String,
+    pub documentation: Option<AyiMarkupContent>,
+}
+
+impl AyiParameterInfo {
+    pub fn new(label: &str) -> Self { Self { label: label.to_string(), documentation: None } }
+    pub fn with_doc(mut self, doc: AyiMarkupContent) -> Self { self.documentation = Some(doc); self }
+}
+
+/// A single signature.
+#[derive(Debug, Clone)]
+pub struct AyiSignatureInfo {
+    pub label: String,
+    pub documentation: Option<AyiMarkupContent>,
+    pub parameters: Vec<AyiParameterInfo>,
+    pub active_parameter: Option<u32>,
+}
+
+impl AyiSignatureInfo {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), documentation: None, parameters: Vec::new(), active_parameter: None }
+    }
+    pub fn with_doc(mut self, doc: AyiMarkupContent) -> Self { self.documentation = Some(doc); self }
+    pub fn add_param(&mut self, param: AyiParameterInfo) { self.parameters.push(param); }
+    pub fn param_count(&self) -> usize { self.parameters.len() }
+    pub fn active_param(&self) -> Option<&AyiParameterInfo> {
+        self.active_parameter.and_then(|i| self.parameters.get(i as usize))
+    }
+}
+
+/// Signature help result.
+#[derive(Debug, Clone)]
+pub struct AyiSignatureHelp {
+    pub signatures: Vec<AyiSignatureInfo>,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+}
+
+impl AyiSignatureHelp {
+    pub fn new() -> Self { Self { signatures: Vec::new(), active_signature: 0, active_parameter: 0 } }
+    pub fn add_signature(&mut self, sig: AyiSignatureInfo) { self.signatures.push(sig); }
+    pub fn active(&self) -> Option<&AyiSignatureInfo> { self.signatures.get(self.active_signature as usize) }
+    pub fn signature_count(&self) -> usize { self.signatures.len() }
+    pub fn is_empty(&self) -> bool { self.signatures.is_empty() }
+}
+
+/// Signature help trigger kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyiSignatureTriggerKind { Invoke, TriggerCharacter, ContentChange }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38617,6 +38713,69 @@ mod tests {
     #[test]
     fn test_ayh_impl_kind() {
         assert_ne!(AyhImplKind::Class, AyhImplKind::Method);
+    }
+
+
+    #[test]
+    fn test_ayi_markup() {
+        let md = AyiMarkupContent::markdown("**bold** text");
+        assert_eq!(md.kind, AyiMarkupKind::Markdown);
+        assert!(!md.is_empty());
+        let plain = AyiMarkupContent::plain("");
+        assert!(plain.is_empty());
+    }
+
+    #[test]
+    fn test_ayi_hover() {
+        let mut hover = AyiHover::new(AyiMarkupContent::markdown("fn foo()"));
+        hover.add_content(AyiMarkupContent::plain("A function"));
+        assert_eq!(hover.content_count(), 2);
+        let hover = hover.with_range(5, 0, 5, 10);
+        assert!(hover.has_range());
+    }
+
+    #[test]
+    fn test_ayi_parameter() {
+        let p = AyiParameterInfo::new("x: i32")
+            .with_doc(AyiMarkupContent::plain("The x value"));
+        assert!(p.documentation.is_some());
+    }
+
+    #[test]
+    fn test_ayi_signature() {
+        let mut sig = AyiSignatureInfo::new("fn foo(x: i32, y: &str)");
+        sig.add_param(AyiParameterInfo::new("x: i32"));
+        sig.add_param(AyiParameterInfo::new("y: &str"));
+        sig.active_parameter = Some(1);
+        assert_eq!(sig.param_count(), 2);
+        assert_eq!(sig.active_param().unwrap().label, "y: &str");
+    }
+
+    #[test]
+    fn test_ayi_signature_help() {
+        let mut help = AyiSignatureHelp::new();
+        assert!(help.is_empty());
+        help.add_signature(AyiSignatureInfo::new("fn foo(x: i32)"));
+        help.add_signature(AyiSignatureInfo::new("fn foo(x: i32, y: i32)"));
+        assert_eq!(help.signature_count(), 2);
+        assert_eq!(help.active().unwrap().label, "fn foo(x: i32)");
+    }
+
+    #[test]
+    fn test_ayi_hover_no_range() {
+        let hover = AyiHover::new(AyiMarkupContent::plain("info"));
+        assert!(!hover.has_range());
+    }
+
+    #[test]
+    fn test_ayi_trigger_kind() {
+        assert_ne!(AyiSignatureTriggerKind::Invoke, AyiSignatureTriggerKind::TriggerCharacter);
+    }
+
+    #[test]
+    fn test_ayi_signature_doc() {
+        let sig = AyiSignatureInfo::new("fn bar()").with_doc(AyiMarkupContent::markdown("Does bar"));
+        assert!(sig.documentation.is_some());
     }
 
 }
