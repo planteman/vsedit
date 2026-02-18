@@ -2634,6 +2634,412 @@ impl Xd3EventBus {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// xf_ data structures (Trie + BloomFilter) — unique instance #1
+// ---------------------------------------------------------------------------
+
+/// A node in the prefix tree `Xf1Trie`.
+#[derive(Debug, Clone, Default)]
+pub struct Xf1TrieNode {
+    children: std::collections::HashMap<char, Xf1TrieNode>,
+    is_end: bool,
+}
+
+/// Prefix tree with insert, search, starts_with, remove, word_count,
+/// longest_prefix, all_words, and autocomplete.
+#[derive(Debug, Clone, Default)]
+pub struct Xf1Trie {
+    root: Xf1TrieNode,
+    count: usize,
+}
+
+impl Xf1Trie {
+    /// Create an empty trie.
+    pub fn xf_new() -> Self {
+        Self { root: Xf1TrieNode::default(), count: 0 }
+    }
+
+    /// Insert a word into the trie.
+    pub fn xf_insert(&mut self, word: &str) {
+        let mut node = &mut self.root;
+        for ch in word.chars() {
+            node = node.children.entry(ch).or_default();
+        }
+        if !node.is_end {
+            node.is_end = true;
+            self.count += 1;
+        }
+    }
+
+    /// Return `true` if the exact word exists in the trie.
+    pub fn xf_search(&self, word: &str) -> bool {
+        let mut node = &self.root;
+        for ch in word.chars() {
+            match node.children.get(&ch) {
+                Some(n) => node = n,
+                None => return false,
+            }
+        }
+        node.is_end
+    }
+
+    /// Return `true` if any word in the trie starts with `prefix`.
+    pub fn xf_starts_with(&self, prefix: &str) -> bool {
+        let mut node = &self.root;
+        for ch in prefix.chars() {
+            match node.children.get(&ch) {
+                Some(n) => node = n,
+                None => return false,
+            }
+        }
+        true
+    }
+
+    /// Remove a word. Returns `true` if it was present.
+    pub fn xf_remove(&mut self, word: &str) -> bool {
+        if Self::xf_remove_recursive(&mut self.root, word, 0) {
+            self.count -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn xf_remove_recursive(node: &mut Xf1TrieNode, word: &str, depth: usize) -> bool {
+        let chars: Vec<char> = word.chars().collect();
+        if depth == chars.len() {
+            if !node.is_end {
+                return false;
+            }
+            node.is_end = false;
+            return node.children.is_empty();
+        }
+        let ch = chars[depth];
+        let should_delete = {
+            if let Some(child) = node.children.get_mut(&ch) {
+                Self::xf_remove_recursive(child, word, depth + 1)
+            } else {
+                return false;
+            }
+        };
+        if should_delete {
+            node.children.remove(&ch);
+            return !node.is_end && node.children.is_empty();
+        }
+        false
+    }
+
+    /// Number of distinct words stored.
+    pub fn xf_word_count(&self) -> usize {
+        self.count
+    }
+
+    /// Return the longest prefix of `query` that exists as a word in the trie.
+    pub fn xf_longest_prefix(&self, query: &str) -> Option<String> {
+        let mut node = &self.root;
+        let mut last_match: Option<usize> = None;
+        for (i, ch) in query.chars().enumerate() {
+            match node.children.get(&ch) {
+                Some(n) => {
+                    node = n;
+                    if node.is_end {
+                        last_match = Some(i + 1);
+                    }
+                }
+                None => break,
+            }
+        }
+        last_match.map(|end| query.chars().take(end).collect())
+    }
+
+    /// Collect every word in the trie.
+    pub fn xf_all_words(&self) -> Vec<String> {
+        let mut results = Vec::new();
+        let mut buffer = String::new();
+        Self::xf_collect(&self.root, &mut buffer, &mut results);
+        results
+    }
+
+    fn xf_collect(node: &Xf1TrieNode, buf: &mut String, out: &mut Vec<String>) {
+        if node.is_end {
+            out.push(buf.clone());
+        }
+        let mut keys: Vec<char> = node.children.keys().copied().collect();
+        keys.sort();
+        for ch in keys {
+            buf.push(ch);
+            Self::xf_collect(&node.children[&ch], buf, out);
+            buf.pop();
+        }
+    }
+
+    /// Return all words that start with the given prefix.
+    pub fn xf_autocomplete(&self, prefix: &str) -> Vec<String> {
+        let mut node = &self.root;
+        for ch in prefix.chars() {
+            match node.children.get(&ch) {
+                Some(n) => node = n,
+                None => return Vec::new(),
+            }
+        }
+        let mut results = Vec::new();
+        let mut buf = prefix.to_string();
+        Self::xf_collect(node, &mut buf, &mut results);
+        results
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// Simple Bloom filter using two hash functions.
+#[derive(Debug, Clone)]
+pub struct Xf1BloomFilter {
+    bits: Vec<bool>,
+    num_hashes: usize,
+    len: usize,
+    item_count: usize,
+}
+
+impl Xf1BloomFilter {
+    /// Create a Bloom filter with `size` bits and `num_hashes` hash functions.
+    pub fn xf_new(size: usize, num_hashes: usize) -> Self {
+        Self { bits: vec![false; size], num_hashes, len: size, item_count: 0 }
+    }
+
+    fn xf_hashes(&self, item: &str) -> Vec<usize> {
+        let mut h1: u64 = 0;
+        let mut h2: u64 = 0;
+        for (i, b) in item.bytes().enumerate() {
+            h1 = h1.wrapping_mul(31).wrapping_add(b as u64);
+            h2 = h2.wrapping_mul(37).wrapping_add((b as u64).wrapping_add(i as u64));
+        }
+        (0..self.num_hashes)
+            .map(|i| (h1.wrapping_add((i as u64).wrapping_mul(h2))) as usize % self.len)
+            .collect()
+    }
+
+    /// Add an item to the filter.
+    pub fn xf_add(&mut self, item: &str) {
+        for idx in self.xf_hashes(item) {
+            self.bits[idx] = true;
+        }
+        self.item_count += 1;
+    }
+
+    /// Check if an item might be in the filter.
+    pub fn xf_might_contain(&self, item: &str) -> bool {
+        self.xf_hashes(item).iter().all(|&idx| self.bits[idx])
+    }
+
+    /// Estimated false-positive rate.
+    pub fn xf_false_positive_rate(&self) -> f64 {
+        let set_bits = self.bits.iter().filter(|&&b| b).count() as f64;
+        let ratio = set_bits / self.len as f64;
+        ratio.powi(self.num_hashes as i32)
+    }
+
+    /// Clear all bits.
+    pub fn xf_clear(&mut self) {
+        for b in self.bits.iter_mut() {
+            *b = false;
+        }
+        self.item_count = 0;
+    }
+
+    /// Bitwise OR union of two filters (must be same size).
+    pub fn xf_union(&self, other: &Self) -> Option<Self> {
+        if self.len != other.len || self.num_hashes != other.num_hashes {
+            return None;
+        }
+        let bits = self.bits.iter().zip(&other.bits).map(|(&a, &b)| a || b).collect();
+        Some(Self { bits, num_hashes: self.num_hashes, len: self.len, item_count: self.item_count + other.item_count })
+    }
+
+    /// Estimate intersection size using inclusion-exclusion on bit counts.
+    pub fn xf_intersection_estimate(&self, other: &Self) -> f64 {
+        if self.len != other.len {
+            return 0.0;
+        }
+        let both = self.bits.iter().zip(&other.bits).filter(|(a, b)| **a && **b).count();
+        both as f64
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// xg_120: Directed graph
+// ---------------------------------------------------------------------------
+
+/// A directed graph with adjacency-list representation.
+#[derive(Debug, Clone)]
+pub struct Xg120Graph {
+    adj: std::collections::HashMap<usize, Vec<usize>>,
+    edge_cnt: usize,
+}
+
+impl Xg120Graph {
+    /// Create an empty graph.
+    pub fn new() -> Self {
+        Self { adj: std::collections::HashMap::new(), edge_cnt: 0 }
+    }
+
+    /// Add a node (idempotent).
+    pub fn add_node(&mut self, id: usize) {
+        self.adj.entry(id).or_default();
+    }
+
+    /// Add a directed edge from `src` to `dst`, creating nodes if needed.
+    pub fn add_edge(&mut self, src: usize, dst: usize) {
+        self.adj.entry(dst).or_default();
+        self.adj.entry(src).or_default().push(dst);
+        self.edge_cnt += 1;
+    }
+
+    /// Return the neighbours of `node`.
+    pub fn neighbors(&self, node: usize) -> &[usize] {
+        self.adj.get(&node).map_or(&[], |v| v.as_slice())
+    }
+
+    /// BFS reachability check.
+    pub fn has_path(&self, from: usize, to: usize) -> bool {
+        if from == to { return true; }
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(from);
+        visited.insert(from);
+        while let Some(cur) = queue.pop_front() {
+            for &nb in self.neighbors(cur) {
+                if nb == to { return true; }
+                if visited.insert(nb) {
+                    queue.push_back(nb);
+                }
+            }
+        }
+        false
+    }
+
+    /// Kahn's algorithm topological sort. Returns `None` if a cycle exists.
+    pub fn topological_sort(&self) -> Option<Vec<usize>> {
+        let mut in_deg: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        for &n in self.adj.keys() { in_deg.entry(n).or_insert(0); }
+        for edges in self.adj.values() {
+            for &dst in edges { *in_deg.entry(dst).or_insert(0) += 1; }
+        }
+        let mut queue: std::collections::VecDeque<usize> = in_deg.iter()
+            .filter(|&(_, &d)| d == 0).map(|(&n, _)| n).collect();
+        let mut order = Vec::new();
+        while let Some(n) = queue.pop_front() {
+            order.push(n);
+            if let Some(edges) = self.adj.get(&n) {
+                for &dst in edges {
+                    if let Some(d) = in_deg.get_mut(&dst) {
+                        *d -= 1;
+                        if *d == 0 { queue.push_back(dst); }
+                    }
+                }
+            }
+        }
+        if order.len() == self.adj.len() { Some(order) } else { None }
+    }
+
+    /// Detect whether the graph contains a cycle.
+    pub fn cycle_detect(&self) -> bool {
+        self.topological_sort().is_none()
+    }
+
+    /// Number of nodes.
+    pub fn node_count(&self) -> usize { self.adj.len() }
+
+    /// Number of edges.
+    pub fn edge_count(&self) -> usize { self.edge_cnt }
+}
+
+impl Default for Xg120Graph {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// xg_120: Min-heap
+// ---------------------------------------------------------------------------
+
+/// A min-heap backed by a `Vec`.
+#[derive(Debug, Clone)]
+pub struct Xg120Heap<T: Ord> {
+    data: Vec<T>,
+}
+
+impl<T: Ord> Xg120Heap<T> {
+    /// Create an empty heap.
+    pub fn new() -> Self { Self { data: Vec::new() } }
+
+    /// Number of elements.
+    pub fn len(&self) -> usize { self.data.len() }
+
+    /// Whether the heap is empty.
+    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+
+    /// Push a value onto the heap.
+    pub fn push(&mut self, val: T) {
+        self.data.push(val);
+        self.sift_up(self.data.len() - 1);
+    }
+
+    /// Peek at the minimum element.
+    pub fn peek(&self) -> Option<&T> { self.data.first() }
+
+    /// Remove and return the minimum element.
+    pub fn pop(&mut self) -> Option<T> {
+        if self.data.is_empty() { return None; }
+        let last = self.data.len() - 1;
+        self.data.swap(0, last);
+        let val = self.data.pop();
+        if !self.data.is_empty() { self.sift_down(0); }
+        val
+    }
+
+    /// Drain all elements in sorted order.
+    pub fn drain_sorted(&mut self) -> Vec<T> {
+        let mut out = Vec::with_capacity(self.data.len());
+        while let Some(v) = self.pop() { out.push(v); }
+        out
+    }
+
+    /// Merge another heap into this one.
+    pub fn merge(&mut self, other: &mut Xg120Heap<T>) {
+        self.data.append(&mut other.data);
+        let n = self.data.len();
+        for i in (0..n / 2).rev() { self.sift_down(i); }
+    }
+
+    fn sift_up(&mut self, mut idx: usize) {
+        while idx > 0 {
+            let parent = (idx - 1) / 2;
+            if self.data[idx] < self.data[parent] {
+                self.data.swap(idx, parent);
+                idx = parent;
+            } else { break; }
+        }
+    }
+
+    fn sift_down(&mut self, mut idx: usize) {
+        let len = self.data.len();
+        loop {
+            let mut smallest = idx;
+            let left = 2 * idx + 1;
+            let right = 2 * idx + 2;
+            if left < len && self.data[left] < self.data[smallest] { smallest = left; }
+            if right < len && self.data[right] < self.data[smallest] { smallest = right; }
+            if smallest != idx { self.data.swap(idx, smallest); idx = smallest; }
+            else { break; }
+        }
+    }
+}
+
+impl<T: Ord> Default for Xg120Heap<T> {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4386,6 +4792,283 @@ mod tests {
         assert_eq!(sm.step_count(), 1);
         sm.transition(Xd3State::Paused).unwrap();
         assert_eq!(sm.step_count(), 2);
+    }
+
+
+    // -- xf_ trie + bloom tests for instance #1 --
+
+    #[test]
+    fn xf1_trie_insert_search() {
+        let mut t = Xf1Trie::xf_new();
+        t.xf_insert("apple");
+        t.xf_insert("app");
+        assert!(t.xf_search("apple"));
+        assert!(t.xf_search("app"));
+        assert!(!t.xf_search("ap"));
+    }
+
+    #[test]
+    fn xf1_trie_starts_with() {
+        let mut t = Xf1Trie::xf_new();
+        t.xf_insert("banana");
+        assert!(t.xf_starts_with("ban"));
+        assert!(!t.xf_starts_with("can"));
+    }
+
+    #[test]
+    fn xf1_trie_remove() {
+        let mut t = Xf1Trie::xf_new();
+        t.xf_insert("hello");
+        assert!(t.xf_remove("hello"));
+        assert!(!t.xf_search("hello"));
+        assert!(!t.xf_remove("hello"));
+    }
+
+    #[test]
+    fn xf1_trie_word_count() {
+        let mut t = Xf1Trie::xf_new();
+        assert_eq!(t.xf_word_count(), 0);
+        t.xf_insert("a");
+        t.xf_insert("b");
+        t.xf_insert("a");
+        assert_eq!(t.xf_word_count(), 2);
+    }
+
+    #[test]
+    fn xf1_trie_longest_prefix() {
+        let mut t = Xf1Trie::xf_new();
+        t.xf_insert("ab");
+        t.xf_insert("abc");
+        t.xf_insert("abcde");
+        assert_eq!(t.xf_longest_prefix("abcdef"), Some("abcde".to_string()));
+        assert_eq!(t.xf_longest_prefix("x"), None);
+    }
+
+    #[test]
+    fn xf1_trie_all_words() {
+        let mut t = Xf1Trie::xf_new();
+        t.xf_insert("cat");
+        t.xf_insert("car");
+        t.xf_insert("card");
+        let mut words = t.xf_all_words();
+        words.sort();
+        assert_eq!(words, vec!["car", "card", "cat"]);
+    }
+
+    #[test]
+    fn xf1_trie_autocomplete() {
+        let mut t = Xf1Trie::xf_new();
+        t.xf_insert("dog");
+        t.xf_insert("dot");
+        t.xf_insert("dove");
+        let mut results = t.xf_autocomplete("do");
+        results.sort();
+        assert_eq!(results, vec!["dog", "dot", "dove"]);
+    }
+
+    #[test]
+    fn xf1_trie_empty_search() {
+        let t = Xf1Trie::xf_new();
+        assert!(!t.xf_search("anything"));
+        assert_eq!(t.xf_all_words().len(), 0);
+    }
+
+    #[test]
+    fn xf1_bloom_add_contains() {
+        let mut bf = Xf1BloomFilter::xf_new(1024, 3);
+        bf.xf_add("hello");
+        bf.xf_add("world");
+        assert!(bf.xf_might_contain("hello"));
+        assert!(bf.xf_might_contain("world"));
+    }
+
+    #[test]
+    fn xf1_bloom_probably_absent() {
+        let bf = Xf1BloomFilter::xf_new(1024, 3);
+        assert!(!bf.xf_might_contain("never_added"));
+    }
+
+    #[test]
+    fn xf1_bloom_false_positive_rate() {
+        let mut bf = Xf1BloomFilter::xf_new(1024, 3);
+        let rate_empty = bf.xf_false_positive_rate();
+        assert!((rate_empty - 0.0).abs() < f64::EPSILON);
+        bf.xf_add("item");
+        let rate = bf.xf_false_positive_rate();
+        assert!(rate < 1.0);
+    }
+
+    #[test]
+    fn xf1_bloom_clear() {
+        let mut bf = Xf1BloomFilter::xf_new(512, 2);
+        bf.xf_add("data");
+        bf.xf_clear();
+        assert!(!bf.xf_might_contain("data"));
+    }
+
+    #[test]
+    fn xf1_bloom_union() {
+        let mut a = Xf1BloomFilter::xf_new(512, 2);
+        let mut b = Xf1BloomFilter::xf_new(512, 2);
+        a.xf_add("alpha");
+        b.xf_add("beta");
+        let u = a.xf_union(&b).unwrap();
+        assert!(u.xf_might_contain("alpha"));
+        assert!(u.xf_might_contain("beta"));
+    }
+
+    #[test]
+    fn xf1_bloom_intersection_estimate() {
+        let mut a = Xf1BloomFilter::xf_new(512, 2);
+        let mut b = Xf1BloomFilter::xf_new(512, 2);
+        a.xf_add("shared");
+        b.xf_add("shared");
+        let est = a.xf_intersection_estimate(&b);
+        assert!(est > 0.0);
+    }
+
+    #[test]
+    fn xf1_bloom_union_size_mismatch() {
+        let a = Xf1BloomFilter::xf_new(256, 2);
+        let b = Xf1BloomFilter::xf_new(512, 2);
+        assert!(a.xf_union(&b).is_none());
+    }
+
+
+    // -- xg_120 graph tests ------------------------------------------------
+
+    #[test]
+    fn xg_120_graph_empty() {
+        let g = super::Xg120Graph::new();
+        assert_eq!(g.node_count(), 0);
+        assert_eq!(g.edge_count(), 0);
+    }
+
+    #[test]
+    fn xg_120_graph_add_node() {
+        let mut g = super::Xg120Graph::new();
+        g.add_node(1);
+        g.add_node(2);
+        assert_eq!(g.node_count(), 2);
+    }
+
+    #[test]
+    fn xg_120_graph_add_edge() {
+        let mut g = super::Xg120Graph::new();
+        g.add_edge(0, 1);
+        assert_eq!(g.edge_count(), 1);
+        assert_eq!(g.node_count(), 2);
+    }
+
+    #[test]
+    fn xg_120_graph_neighbors() {
+        let mut g = super::Xg120Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(0, 2);
+        assert_eq!(g.neighbors(0).len(), 2);
+    }
+
+    #[test]
+    fn xg_120_graph_has_path() {
+        let mut g = super::Xg120Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        assert!(g.has_path(0, 2));
+        assert!(!g.has_path(2, 0));
+    }
+
+    #[test]
+    fn xg_120_graph_self_path() {
+        let g = super::Xg120Graph::new();
+        assert!(g.has_path(5, 5));
+    }
+
+    #[test]
+    fn xg_120_graph_topo_sort() {
+        let mut g = super::Xg120Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        let sorted = g.topological_sort().unwrap();
+        let pos: std::collections::HashMap<usize, usize> =
+            sorted.iter().enumerate().map(|(i, &n)| (n, i)).collect();
+        assert!(pos[&0] < pos[&1]);
+        assert!(pos[&1] < pos[&2]);
+    }
+
+    #[test]
+    fn xg_120_graph_cycle_detect_false() {
+        let mut g = super::Xg120Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        assert!(!g.cycle_detect());
+    }
+
+    #[test]
+    fn xg_120_graph_cycle_detect_true() {
+        let mut g = super::Xg120Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        g.add_edge(2, 0);
+        assert!(g.cycle_detect());
+    }
+
+    // -- xg_120 heap tests -------------------------------------------------
+
+    #[test]
+    fn xg_120_heap_empty() {
+        let h: super::Xg120Heap<i32> = super::Xg120Heap::new();
+        assert!(h.is_empty());
+        assert_eq!(h.len(), 0);
+    }
+
+    #[test]
+    fn xg_120_heap_push_pop() {
+        let mut h = super::Xg120Heap::new();
+        h.push(3);
+        h.push(1);
+        h.push(2);
+        assert_eq!(h.pop(), Some(1));
+        assert_eq!(h.pop(), Some(2));
+        assert_eq!(h.pop(), Some(3));
+    }
+
+    #[test]
+    fn xg_120_heap_peek() {
+        let mut h = super::Xg120Heap::new();
+        h.push(5);
+        h.push(2);
+        assert_eq!(h.peek(), Some(&2));
+    }
+
+    #[test]
+    fn xg_120_heap_drain_sorted() {
+        let mut h = super::Xg120Heap::new();
+        for v in [4, 1, 7, 2, 9] { h.push(v); }
+        assert_eq!(h.drain_sorted(), vec![1, 2, 4, 7, 9]);
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn xg_120_heap_merge() {
+        let mut a = super::Xg120Heap::new();
+        let mut b = super::Xg120Heap::new();
+        a.push(5); a.push(3);
+        b.push(4); b.push(1);
+        a.merge(&mut b);
+        assert_eq!(a.len(), 4);
+        assert_eq!(a.pop(), Some(1));
+    }
+
+    #[test]
+    fn xg_120_heap_default() {
+        let h: super::Xg120Heap<u64> = Default::default();
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn xg_120_graph_default() {
+        let g: super::Xg120Graph = Default::default();
+        assert_eq!(g.node_count(), 0);
     }
 
 }

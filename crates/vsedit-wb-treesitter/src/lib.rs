@@ -2432,6 +2432,180 @@ impl Xd97EventBus {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// xg_21: Directed graph
+// ---------------------------------------------------------------------------
+
+/// A directed graph with adjacency-list representation.
+#[derive(Debug, Clone)]
+pub struct Xg21Graph {
+    adj: std::collections::HashMap<usize, Vec<usize>>,
+    edge_cnt: usize,
+}
+
+impl Xg21Graph {
+    /// Create an empty graph.
+    pub fn new() -> Self {
+        Self { adj: std::collections::HashMap::new(), edge_cnt: 0 }
+    }
+
+    /// Add a node (idempotent).
+    pub fn add_node(&mut self, id: usize) {
+        self.adj.entry(id).or_default();
+    }
+
+    /// Add a directed edge from `src` to `dst`, creating nodes if needed.
+    pub fn add_edge(&mut self, src: usize, dst: usize) {
+        self.adj.entry(dst).or_default();
+        self.adj.entry(src).or_default().push(dst);
+        self.edge_cnt += 1;
+    }
+
+    /// Return the neighbours of `node`.
+    pub fn neighbors(&self, node: usize) -> &[usize] {
+        self.adj.get(&node).map_or(&[], |v| v.as_slice())
+    }
+
+    /// BFS reachability check.
+    pub fn has_path(&self, from: usize, to: usize) -> bool {
+        if from == to { return true; }
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(from);
+        visited.insert(from);
+        while let Some(cur) = queue.pop_front() {
+            for &nb in self.neighbors(cur) {
+                if nb == to { return true; }
+                if visited.insert(nb) {
+                    queue.push_back(nb);
+                }
+            }
+        }
+        false
+    }
+
+    /// Kahn's algorithm topological sort. Returns `None` if a cycle exists.
+    pub fn topological_sort(&self) -> Option<Vec<usize>> {
+        let mut in_deg: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        for &n in self.adj.keys() { in_deg.entry(n).or_insert(0); }
+        for edges in self.adj.values() {
+            for &dst in edges { *in_deg.entry(dst).or_insert(0) += 1; }
+        }
+        let mut queue: std::collections::VecDeque<usize> = in_deg.iter()
+            .filter(|&(_, &d)| d == 0).map(|(&n, _)| n).collect();
+        let mut order = Vec::new();
+        while let Some(n) = queue.pop_front() {
+            order.push(n);
+            if let Some(edges) = self.adj.get(&n) {
+                for &dst in edges {
+                    if let Some(d) = in_deg.get_mut(&dst) {
+                        *d -= 1;
+                        if *d == 0 { queue.push_back(dst); }
+                    }
+                }
+            }
+        }
+        if order.len() == self.adj.len() { Some(order) } else { None }
+    }
+
+    /// Detect whether the graph contains a cycle.
+    pub fn cycle_detect(&self) -> bool {
+        self.topological_sort().is_none()
+    }
+
+    /// Number of nodes.
+    pub fn node_count(&self) -> usize { self.adj.len() }
+
+    /// Number of edges.
+    pub fn edge_count(&self) -> usize { self.edge_cnt }
+}
+
+impl Default for Xg21Graph {
+    fn default() -> Self { Self::new() }
+}
+
+// ---------------------------------------------------------------------------
+// xg_21: Min-heap
+// ---------------------------------------------------------------------------
+
+/// A min-heap backed by a `Vec`.
+#[derive(Debug, Clone)]
+pub struct Xg21Heap<T: Ord> {
+    data: Vec<T>,
+}
+
+impl<T: Ord> Xg21Heap<T> {
+    /// Create an empty heap.
+    pub fn new() -> Self { Self { data: Vec::new() } }
+
+    /// Number of elements.
+    pub fn len(&self) -> usize { self.data.len() }
+
+    /// Whether the heap is empty.
+    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+
+    /// Push a value onto the heap.
+    pub fn push(&mut self, val: T) {
+        self.data.push(val);
+        self.sift_up(self.data.len() - 1);
+    }
+
+    /// Peek at the minimum element.
+    pub fn peek(&self) -> Option<&T> { self.data.first() }
+
+    /// Remove and return the minimum element.
+    pub fn pop(&mut self) -> Option<T> {
+        if self.data.is_empty() { return None; }
+        let last = self.data.len() - 1;
+        self.data.swap(0, last);
+        let val = self.data.pop();
+        if !self.data.is_empty() { self.sift_down(0); }
+        val
+    }
+
+    /// Drain all elements in sorted order.
+    pub fn drain_sorted(&mut self) -> Vec<T> {
+        let mut out = Vec::with_capacity(self.data.len());
+        while let Some(v) = self.pop() { out.push(v); }
+        out
+    }
+
+    /// Merge another heap into this one.
+    pub fn merge(&mut self, other: &mut Xg21Heap<T>) {
+        self.data.append(&mut other.data);
+        let n = self.data.len();
+        for i in (0..n / 2).rev() { self.sift_down(i); }
+    }
+
+    fn sift_up(&mut self, mut idx: usize) {
+        while idx > 0 {
+            let parent = (idx - 1) / 2;
+            if self.data[idx] < self.data[parent] {
+                self.data.swap(idx, parent);
+                idx = parent;
+            } else { break; }
+        }
+    }
+
+    fn sift_down(&mut self, mut idx: usize) {
+        let len = self.data.len();
+        loop {
+            let mut smallest = idx;
+            let left = 2 * idx + 1;
+            let right = 2 * idx + 2;
+            if left < len && self.data[left] < self.data[smallest] { smallest = left; }
+            if right < len && self.data[right] < self.data[smallest] { smallest = right; }
+            if smallest != idx { self.data.swap(idx, smallest); idx = smallest; }
+            else { break; }
+        }
+    }
+}
+
+impl<T: Ord> Default for Xg21Heap<T> {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4533,6 +4707,143 @@ mod tests {
         assert_eq!(sm.step_count(), 1);
         sm.transition(Xd97State::Paused).unwrap();
         assert_eq!(sm.step_count(), 2);
+    }
+
+
+    // -- xg_21 graph tests ------------------------------------------------
+
+    #[test]
+    fn xg_21_graph_empty() {
+        let g = super::Xg21Graph::new();
+        assert_eq!(g.node_count(), 0);
+        assert_eq!(g.edge_count(), 0);
+    }
+
+    #[test]
+    fn xg_21_graph_add_node() {
+        let mut g = super::Xg21Graph::new();
+        g.add_node(1);
+        g.add_node(2);
+        assert_eq!(g.node_count(), 2);
+    }
+
+    #[test]
+    fn xg_21_graph_add_edge() {
+        let mut g = super::Xg21Graph::new();
+        g.add_edge(0, 1);
+        assert_eq!(g.edge_count(), 1);
+        assert_eq!(g.node_count(), 2);
+    }
+
+    #[test]
+    fn xg_21_graph_neighbors() {
+        let mut g = super::Xg21Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(0, 2);
+        assert_eq!(g.neighbors(0).len(), 2);
+    }
+
+    #[test]
+    fn xg_21_graph_has_path() {
+        let mut g = super::Xg21Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        assert!(g.has_path(0, 2));
+        assert!(!g.has_path(2, 0));
+    }
+
+    #[test]
+    fn xg_21_graph_self_path() {
+        let g = super::Xg21Graph::new();
+        assert!(g.has_path(5, 5));
+    }
+
+    #[test]
+    fn xg_21_graph_topo_sort() {
+        let mut g = super::Xg21Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        let sorted = g.topological_sort().unwrap();
+        let pos: std::collections::HashMap<usize, usize> =
+            sorted.iter().enumerate().map(|(i, &n)| (n, i)).collect();
+        assert!(pos[&0] < pos[&1]);
+        assert!(pos[&1] < pos[&2]);
+    }
+
+    #[test]
+    fn xg_21_graph_cycle_detect_false() {
+        let mut g = super::Xg21Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        assert!(!g.cycle_detect());
+    }
+
+    #[test]
+    fn xg_21_graph_cycle_detect_true() {
+        let mut g = super::Xg21Graph::new();
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        g.add_edge(2, 0);
+        assert!(g.cycle_detect());
+    }
+
+    // -- xg_21 heap tests -------------------------------------------------
+
+    #[test]
+    fn xg_21_heap_empty() {
+        let h: super::Xg21Heap<i32> = super::Xg21Heap::new();
+        assert!(h.is_empty());
+        assert_eq!(h.len(), 0);
+    }
+
+    #[test]
+    fn xg_21_heap_push_pop() {
+        let mut h = super::Xg21Heap::new();
+        h.push(3);
+        h.push(1);
+        h.push(2);
+        assert_eq!(h.pop(), Some(1));
+        assert_eq!(h.pop(), Some(2));
+        assert_eq!(h.pop(), Some(3));
+    }
+
+    #[test]
+    fn xg_21_heap_peek() {
+        let mut h = super::Xg21Heap::new();
+        h.push(5);
+        h.push(2);
+        assert_eq!(h.peek(), Some(&2));
+    }
+
+    #[test]
+    fn xg_21_heap_drain_sorted() {
+        let mut h = super::Xg21Heap::new();
+        for v in [4, 1, 7, 2, 9] { h.push(v); }
+        assert_eq!(h.drain_sorted(), vec![1, 2, 4, 7, 9]);
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn xg_21_heap_merge() {
+        let mut a = super::Xg21Heap::new();
+        let mut b = super::Xg21Heap::new();
+        a.push(5); a.push(3);
+        b.push(4); b.push(1);
+        a.merge(&mut b);
+        assert_eq!(a.len(), 4);
+        assert_eq!(a.pop(), Some(1));
+    }
+
+    #[test]
+    fn xg_21_heap_default() {
+        let h: super::Xg21Heap<u64> = Default::default();
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn xg_21_graph_default() {
+        let g: super::Xg21Graph = Default::default();
+        assert_eq!(g.node_count(), 0);
     }
 
 }

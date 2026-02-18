@@ -2823,6 +2823,238 @@ impl Xd34EventBus {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// xf_ data structures (Trie + BloomFilter) — unique instance #32
+// ---------------------------------------------------------------------------
+
+/// A node in the prefix tree `Xf32Trie`.
+#[derive(Debug, Clone, Default)]
+pub struct Xf32TrieNode {
+    children: std::collections::HashMap<char, Xf32TrieNode>,
+    is_end: bool,
+}
+
+/// Prefix tree with insert, search, starts_with, remove, word_count,
+/// longest_prefix, all_words, and autocomplete.
+#[derive(Debug, Clone, Default)]
+pub struct Xf32Trie {
+    root: Xf32TrieNode,
+    count: usize,
+}
+
+impl Xf32Trie {
+    /// Create an empty trie.
+    pub fn xf_new() -> Self {
+        Self { root: Xf32TrieNode::default(), count: 0 }
+    }
+
+    /// Insert a word into the trie.
+    pub fn xf_insert(&mut self, word: &str) {
+        let mut node = &mut self.root;
+        for ch in word.chars() {
+            node = node.children.entry(ch).or_default();
+        }
+        if !node.is_end {
+            node.is_end = true;
+            self.count += 1;
+        }
+    }
+
+    /// Return `true` if the exact word exists in the trie.
+    pub fn xf_search(&self, word: &str) -> bool {
+        let mut node = &self.root;
+        for ch in word.chars() {
+            match node.children.get(&ch) {
+                Some(n) => node = n,
+                None => return false,
+            }
+        }
+        node.is_end
+    }
+
+    /// Return `true` if any word in the trie starts with `prefix`.
+    pub fn xf_starts_with(&self, prefix: &str) -> bool {
+        let mut node = &self.root;
+        for ch in prefix.chars() {
+            match node.children.get(&ch) {
+                Some(n) => node = n,
+                None => return false,
+            }
+        }
+        true
+    }
+
+    /// Remove a word. Returns `true` if it was present.
+    pub fn xf_remove(&mut self, word: &str) -> bool {
+        if Self::xf_remove_recursive(&mut self.root, word, 0) {
+            self.count -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn xf_remove_recursive(node: &mut Xf32TrieNode, word: &str, depth: usize) -> bool {
+        let chars: Vec<char> = word.chars().collect();
+        if depth == chars.len() {
+            if !node.is_end {
+                return false;
+            }
+            node.is_end = false;
+            return node.children.is_empty();
+        }
+        let ch = chars[depth];
+        let should_delete = {
+            if let Some(child) = node.children.get_mut(&ch) {
+                Self::xf_remove_recursive(child, word, depth + 1)
+            } else {
+                return false;
+            }
+        };
+        if should_delete {
+            node.children.remove(&ch);
+            return !node.is_end && node.children.is_empty();
+        }
+        false
+    }
+
+    /// Number of distinct words stored.
+    pub fn xf_word_count(&self) -> usize {
+        self.count
+    }
+
+    /// Return the longest prefix of `query` that exists as a word in the trie.
+    pub fn xf_longest_prefix(&self, query: &str) -> Option<String> {
+        let mut node = &self.root;
+        let mut last_match: Option<usize> = None;
+        for (i, ch) in query.chars().enumerate() {
+            match node.children.get(&ch) {
+                Some(n) => {
+                    node = n;
+                    if node.is_end {
+                        last_match = Some(i + 1);
+                    }
+                }
+                None => break,
+            }
+        }
+        last_match.map(|end| query.chars().take(end).collect())
+    }
+
+    /// Collect every word in the trie.
+    pub fn xf_all_words(&self) -> Vec<String> {
+        let mut results = Vec::new();
+        let mut buffer = String::new();
+        Self::xf_collect(&self.root, &mut buffer, &mut results);
+        results
+    }
+
+    fn xf_collect(node: &Xf32TrieNode, buf: &mut String, out: &mut Vec<String>) {
+        if node.is_end {
+            out.push(buf.clone());
+        }
+        let mut keys: Vec<char> = node.children.keys().copied().collect();
+        keys.sort();
+        for ch in keys {
+            buf.push(ch);
+            Self::xf_collect(&node.children[&ch], buf, out);
+            buf.pop();
+        }
+    }
+
+    /// Return all words that start with the given prefix.
+    pub fn xf_autocomplete(&self, prefix: &str) -> Vec<String> {
+        let mut node = &self.root;
+        for ch in prefix.chars() {
+            match node.children.get(&ch) {
+                Some(n) => node = n,
+                None => return Vec::new(),
+            }
+        }
+        let mut results = Vec::new();
+        let mut buf = prefix.to_string();
+        Self::xf_collect(node, &mut buf, &mut results);
+        results
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// Simple Bloom filter using two hash functions.
+#[derive(Debug, Clone)]
+pub struct Xf32BloomFilter {
+    bits: Vec<bool>,
+    num_hashes: usize,
+    len: usize,
+    item_count: usize,
+}
+
+impl Xf32BloomFilter {
+    /// Create a Bloom filter with `size` bits and `num_hashes` hash functions.
+    pub fn xf_new(size: usize, num_hashes: usize) -> Self {
+        Self { bits: vec![false; size], num_hashes, len: size, item_count: 0 }
+    }
+
+    fn xf_hashes(&self, item: &str) -> Vec<usize> {
+        let mut h1: u64 = 0;
+        let mut h2: u64 = 0;
+        for (i, b) in item.bytes().enumerate() {
+            h1 = h1.wrapping_mul(31).wrapping_add(b as u64);
+            h2 = h2.wrapping_mul(37).wrapping_add((b as u64).wrapping_add(i as u64));
+        }
+        (0..self.num_hashes)
+            .map(|i| (h1.wrapping_add((i as u64).wrapping_mul(h2))) as usize % self.len)
+            .collect()
+    }
+
+    /// Add an item to the filter.
+    pub fn xf_add(&mut self, item: &str) {
+        for idx in self.xf_hashes(item) {
+            self.bits[idx] = true;
+        }
+        self.item_count += 1;
+    }
+
+    /// Check if an item might be in the filter.
+    pub fn xf_might_contain(&self, item: &str) -> bool {
+        self.xf_hashes(item).iter().all(|&idx| self.bits[idx])
+    }
+
+    /// Estimated false-positive rate.
+    pub fn xf_false_positive_rate(&self) -> f64 {
+        let set_bits = self.bits.iter().filter(|&&b| b).count() as f64;
+        let ratio = set_bits / self.len as f64;
+        ratio.powi(self.num_hashes as i32)
+    }
+
+    /// Clear all bits.
+    pub fn xf_clear(&mut self) {
+        for b in self.bits.iter_mut() {
+            *b = false;
+        }
+        self.item_count = 0;
+    }
+
+    /// Bitwise OR union of two filters (must be same size).
+    pub fn xf_union(&self, other: &Self) -> Option<Self> {
+        if self.len != other.len || self.num_hashes != other.num_hashes {
+            return None;
+        }
+        let bits = self.bits.iter().zip(&other.bits).map(|(&a, &b)| a || b).collect();
+        Some(Self { bits, num_hashes: self.num_hashes, len: self.len, item_count: self.item_count + other.item_count })
+    }
+
+    /// Estimate intersection size using inclusion-exclusion on bit counts.
+    pub fn xf_intersection_estimate(&self, other: &Self) -> f64 {
+        if self.len != other.len {
+            return 0.0;
+        }
+        let both = self.bits.iter().zip(&other.bits).filter(|(a, b)| **a && **b).count();
+        both as f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4499,6 +4731,146 @@ mod tests {
         assert_eq!(sm.step_count(), 1);
         sm.transition(Xd34State::Paused).unwrap();
         assert_eq!(sm.step_count(), 2);
+    }
+
+
+    // -- xf_ trie + bloom tests for instance #32 --
+
+    #[test]
+    fn xf32_trie_insert_search() {
+        let mut t = Xf32Trie::xf_new();
+        t.xf_insert("apple");
+        t.xf_insert("app");
+        assert!(t.xf_search("apple"));
+        assert!(t.xf_search("app"));
+        assert!(!t.xf_search("ap"));
+    }
+
+    #[test]
+    fn xf32_trie_starts_with() {
+        let mut t = Xf32Trie::xf_new();
+        t.xf_insert("banana");
+        assert!(t.xf_starts_with("ban"));
+        assert!(!t.xf_starts_with("can"));
+    }
+
+    #[test]
+    fn xf32_trie_remove() {
+        let mut t = Xf32Trie::xf_new();
+        t.xf_insert("hello");
+        assert!(t.xf_remove("hello"));
+        assert!(!t.xf_search("hello"));
+        assert!(!t.xf_remove("hello"));
+    }
+
+    #[test]
+    fn xf32_trie_word_count() {
+        let mut t = Xf32Trie::xf_new();
+        assert_eq!(t.xf_word_count(), 0);
+        t.xf_insert("a");
+        t.xf_insert("b");
+        t.xf_insert("a");
+        assert_eq!(t.xf_word_count(), 2);
+    }
+
+    #[test]
+    fn xf32_trie_longest_prefix() {
+        let mut t = Xf32Trie::xf_new();
+        t.xf_insert("ab");
+        t.xf_insert("abc");
+        t.xf_insert("abcde");
+        assert_eq!(t.xf_longest_prefix("abcdef"), Some("abcde".to_string()));
+        assert_eq!(t.xf_longest_prefix("x"), None);
+    }
+
+    #[test]
+    fn xf32_trie_all_words() {
+        let mut t = Xf32Trie::xf_new();
+        t.xf_insert("cat");
+        t.xf_insert("car");
+        t.xf_insert("card");
+        let mut words = t.xf_all_words();
+        words.sort();
+        assert_eq!(words, vec!["car", "card", "cat"]);
+    }
+
+    #[test]
+    fn xf32_trie_autocomplete() {
+        let mut t = Xf32Trie::xf_new();
+        t.xf_insert("dog");
+        t.xf_insert("dot");
+        t.xf_insert("dove");
+        let mut results = t.xf_autocomplete("do");
+        results.sort();
+        assert_eq!(results, vec!["dog", "dot", "dove"]);
+    }
+
+    #[test]
+    fn xf32_trie_empty_search() {
+        let t = Xf32Trie::xf_new();
+        assert!(!t.xf_search("anything"));
+        assert_eq!(t.xf_all_words().len(), 0);
+    }
+
+    #[test]
+    fn xf32_bloom_add_contains() {
+        let mut bf = Xf32BloomFilter::xf_new(1024, 3);
+        bf.xf_add("hello");
+        bf.xf_add("world");
+        assert!(bf.xf_might_contain("hello"));
+        assert!(bf.xf_might_contain("world"));
+    }
+
+    #[test]
+    fn xf32_bloom_probably_absent() {
+        let bf = Xf32BloomFilter::xf_new(1024, 3);
+        assert!(!bf.xf_might_contain("never_added"));
+    }
+
+    #[test]
+    fn xf32_bloom_false_positive_rate() {
+        let mut bf = Xf32BloomFilter::xf_new(1024, 3);
+        let rate_empty = bf.xf_false_positive_rate();
+        assert!((rate_empty - 0.0).abs() < f64::EPSILON);
+        bf.xf_add("item");
+        let rate = bf.xf_false_positive_rate();
+        assert!(rate < 1.0);
+    }
+
+    #[test]
+    fn xf32_bloom_clear() {
+        let mut bf = Xf32BloomFilter::xf_new(512, 2);
+        bf.xf_add("data");
+        bf.xf_clear();
+        assert!(!bf.xf_might_contain("data"));
+    }
+
+    #[test]
+    fn xf32_bloom_union() {
+        let mut a = Xf32BloomFilter::xf_new(512, 2);
+        let mut b = Xf32BloomFilter::xf_new(512, 2);
+        a.xf_add("alpha");
+        b.xf_add("beta");
+        let u = a.xf_union(&b).unwrap();
+        assert!(u.xf_might_contain("alpha"));
+        assert!(u.xf_might_contain("beta"));
+    }
+
+    #[test]
+    fn xf32_bloom_intersection_estimate() {
+        let mut a = Xf32BloomFilter::xf_new(512, 2);
+        let mut b = Xf32BloomFilter::xf_new(512, 2);
+        a.xf_add("shared");
+        b.xf_add("shared");
+        let est = a.xf_intersection_estimate(&b);
+        assert!(est > 0.0);
+    }
+
+    #[test]
+    fn xf32_bloom_union_size_mismatch() {
+        let a = Xf32BloomFilter::xf_new(256, 2);
+        let b = Xf32BloomFilter::xf_new(512, 2);
+        assert!(a.xf_union(&b).is_none());
     }
 
 }
