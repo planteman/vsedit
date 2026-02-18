@@ -26089,6 +26089,77 @@ impl AzfColorPresentation {
     }
 }
 
+
+// --- azg_ document link and URL detection ---
+
+/// A document link in a file.
+#[derive(Debug, Clone)]
+pub struct AzgDocumentLink {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub target: Option<String>,
+    pub tooltip: Option<String>,
+}
+
+impl AzgDocumentLink {
+    pub fn new(line: u32, start: u32, end: u32) -> Self {
+        Self { line, start_col: start, end_col: end, target: None, tooltip: None }
+    }
+    pub fn with_target(mut self, t: &str) -> Self { self.target = Some(t.to_string()); self }
+    pub fn with_tooltip(mut self, t: &str) -> Self { self.tooltip = Some(t.to_string()); self }
+    pub fn is_resolved(&self) -> bool { self.target.is_some() }
+    pub fn span(&self) -> u32 { self.end_col - self.start_col }
+    pub fn contains_col(&self, col: u32) -> bool { col >= self.start_col && col < self.end_col }
+}
+
+/// URL detection result.
+#[derive(Debug, Clone)]
+pub struct AzgUrlMatch {
+    pub url: String,
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub scheme: String,
+}
+
+impl AzgUrlMatch {
+    pub fn new(url: &str, line: u32, start: u32, end: u32) -> Self {
+        let scheme = url.split("://").next().unwrap_or("").to_string();
+        Self { url: url.to_string(), line, start_col: start, end_col: end, scheme }
+    }
+    pub fn is_http(&self) -> bool { self.scheme == "http" || self.scheme == "https" }
+    pub fn is_file(&self) -> bool { self.scheme == "file" }
+}
+
+/// Document link provider state.
+#[derive(Debug)]
+pub struct AzgLinkState {
+    pub links: Vec<AzgDocumentLink>,
+    pub urls: Vec<AzgUrlMatch>,
+    pub enabled: bool,
+}
+
+impl AzgLinkState {
+    pub fn new() -> Self { Self { links: Vec::new(), urls: Vec::new(), enabled: true } }
+    pub fn set_links(&mut self, l: Vec<AzgDocumentLink>) { self.links = l; }
+    pub fn set_urls(&mut self, u: Vec<AzgUrlMatch>) { self.urls = u; }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn links_at_line(&self, line: u32) -> Vec<&AzgDocumentLink> {
+        if !self.enabled { return Vec::new(); }
+        self.links.iter().filter(|l| l.line == line).collect()
+    }
+    pub fn link_at(&self, line: u32, col: u32) -> Option<&AzgDocumentLink> {
+        if !self.enabled { return None; }
+        self.links.iter().find(|l| l.line == line && l.contains_col(col))
+    }
+    pub fn urls_at_line(&self, line: u32) -> Vec<&AzgUrlMatch> {
+        self.urls.iter().filter(|u| u.line == line).collect()
+    }
+    pub fn all_http_urls(&self) -> Vec<&AzgUrlMatch> { self.urls.iter().filter(|u| u.is_http()).collect() }
+    pub fn total_links(&self) -> usize { self.links.len() + self.urls.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42504,6 +42575,78 @@ d");
         let c = AzfColor::rgb(1.0, 0.0, 0.0);
         let p = AzfColorPresentation::rgb_fn(&c);
         assert!(p.label.contains("rgb(255"));
+    }
+
+
+    #[test]
+    fn test_azg_document_link() {
+        let l = AzgDocumentLink::new(5, 10, 20).with_target("file:///foo.rs").with_tooltip("Open file");
+        assert!(l.is_resolved());
+        assert_eq!(l.span(), 10);
+        assert!(l.contains_col(15));
+        assert!(!l.contains_col(20));
+    }
+
+    #[test]
+    fn test_azg_unresolved_link() {
+        let l = AzgDocumentLink::new(1, 0, 5);
+        assert!(!l.is_resolved());
+    }
+
+    #[test]
+    fn test_azg_url_match() {
+        let u = AzgUrlMatch::new("https://example.com", 3, 5, 24);
+        assert!(u.is_http());
+        assert!(!u.is_file());
+        assert_eq!(u.scheme, "https");
+    }
+
+    #[test]
+    fn test_azg_file_url() {
+        let u = AzgUrlMatch::new("file:///home/user/file.rs", 1, 0, 25);
+        assert!(u.is_file());
+        assert!(!u.is_http());
+    }
+
+    #[test]
+    fn test_azg_link_state() {
+        let mut state = AzgLinkState::new();
+        state.set_links(vec![
+            AzgDocumentLink::new(5, 0, 10).with_target("a"),
+            AzgDocumentLink::new(5, 15, 25).with_target("b"),
+            AzgDocumentLink::new(10, 0, 5).with_target("c"),
+        ]);
+        assert_eq!(state.links_at_line(5).len(), 2);
+        assert!(state.link_at(5, 3).is_some());
+        assert!(state.link_at(5, 12).is_none());
+    }
+
+    #[test]
+    fn test_azg_toggle() {
+        let mut state = AzgLinkState::new();
+        state.set_links(vec![AzgDocumentLink::new(1, 0, 5)]);
+        assert_eq!(state.links_at_line(1).len(), 1);
+        state.toggle();
+        assert_eq!(state.links_at_line(1).len(), 0);
+    }
+
+    #[test]
+    fn test_azg_http_urls() {
+        let mut state = AzgLinkState::new();
+        state.set_urls(vec![
+            AzgUrlMatch::new("https://a.com", 1, 0, 13),
+            AzgUrlMatch::new("file:///x", 2, 0, 9),
+            AzgUrlMatch::new("http://b.com", 3, 0, 12),
+        ]);
+        assert_eq!(state.all_http_urls().len(), 2);
+    }
+
+    #[test]
+    fn test_azg_total_links() {
+        let mut state = AzgLinkState::new();
+        state.set_links(vec![AzgDocumentLink::new(1, 0, 5)]);
+        state.set_urls(vec![AzgUrlMatch::new("https://x", 2, 0, 9)]);
+        assert_eq!(state.total_links(), 2);
     }
 
 }
