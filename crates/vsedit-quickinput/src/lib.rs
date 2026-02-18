@@ -23455,6 +23455,103 @@ impl AycMarketplace {
     }
 }
 
+
+// --- ayd_ input and keybinding dispatch system ---
+
+/// Modifier keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AydModifiers { pub ctrl: bool, pub shift: bool, pub alt: bool, pub meta: bool }
+
+impl AydModifiers {
+    pub const NONE: Self = Self { ctrl: false, shift: false, alt: false, meta: false };
+    pub fn ctrl() -> Self { Self { ctrl: true, ..Self::NONE } }
+    pub fn shift() -> Self { Self { shift: true, ..Self::NONE } }
+    pub fn alt() -> Self { Self { alt: true, ..Self::NONE } }
+    pub fn ctrl_shift() -> Self { Self { ctrl: true, shift: true, ..Self::NONE } }
+    pub fn has_modifier(&self) -> bool { self.ctrl || self.shift || self.alt || self.meta }
+}
+
+/// Key code enumeration (subset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AydKeyCode {
+    Char(char), Enter, Escape, Tab, Backspace, Delete, Home, End,
+    PageUp, PageDown, Up, Down, Left, Right, F(u8),
+}
+
+impl AydKeyCode {
+    pub fn display(&self) -> String {
+        match self {
+            Self::Char(c) => c.to_uppercase().to_string(),
+            Self::Enter => "Enter".to_string(), Self::Escape => "Escape".to_string(),
+            Self::Tab => "Tab".to_string(), Self::Backspace => "Backspace".to_string(),
+            Self::Delete => "Delete".to_string(), Self::Home => "Home".to_string(),
+            Self::End => "End".to_string(), Self::PageUp => "PageUp".to_string(),
+            Self::PageDown => "PageDown".to_string(), Self::Up => "Up".to_string(),
+            Self::Down => "Down".to_string(), Self::Left => "Left".to_string(),
+            Self::Right => "Right".to_string(), Self::F(n) => format!("F{}", n),
+        }
+    }
+}
+
+/// A keyboard shortcut (modifier + key).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AydKeybinding {
+    pub key: AydKeyCode,
+    pub modifiers: AydModifiers,
+}
+
+impl AydKeybinding {
+    pub fn new(key: AydKeyCode, modifiers: AydModifiers) -> Self { Self { key, modifiers } }
+    pub fn display(&self) -> String {
+        let mut parts = Vec::new();
+        if self.modifiers.ctrl { parts.push("Ctrl"); }
+        if self.modifiers.shift { parts.push("Shift"); }
+        if self.modifiers.alt { parts.push("Alt"); }
+        if self.modifiers.meta { parts.push("Meta"); }
+        parts.push(&"");
+        let key_str = self.key.display();
+        let prefix: String = parts[..parts.len()-1].join("+");
+        if prefix.is_empty() { key_str } else { format!("{}+{}", prefix, key_str) }
+    }
+}
+
+/// A keybinding entry mapping shortcut to command.
+#[derive(Debug, Clone)]
+pub struct AydKeybindingEntry {
+    pub keybinding: AydKeybinding,
+    pub command: String,
+    pub when: Option<String>,
+    pub args: Option<String>,
+}
+
+impl AydKeybindingEntry {
+    pub fn new(kb: AydKeybinding, command: &str) -> Self {
+        Self { keybinding: kb, command: command.to_string(), when: None, args: None }
+    }
+    pub fn with_when(mut self, when: &str) -> Self { self.when = Some(when.to_string()); self }
+}
+
+/// Keybinding resolver.
+#[derive(Debug)]
+pub struct AydKeybindingResolver {
+    pub bindings: Vec<AydKeybindingEntry>,
+}
+
+impl AydKeybindingResolver {
+    pub fn new() -> Self { Self { bindings: Vec::new() } }
+    pub fn add(&mut self, entry: AydKeybindingEntry) { self.bindings.push(entry); }
+    pub fn resolve(&self, kb: &AydKeybinding) -> Vec<&AydKeybindingEntry> {
+        self.bindings.iter().filter(|e| e.keybinding == *kb).collect()
+    }
+    pub fn command_bindings(&self, command: &str) -> Vec<&AydKeybindingEntry> {
+        self.bindings.iter().filter(|e| e.command == command).collect()
+    }
+    pub fn remove_command(&mut self, command: &str) {
+        self.bindings.retain(|e| e.command != command);
+    }
+    pub fn binding_count(&self) -> usize { self.bindings.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37736,6 +37833,85 @@ mod tests {
     fn test_ayc_display_name() {
         let ext = AycExtension::new("ms-vscode", "go");
         assert_eq!(ext.display_name(), "go (ms-vscode)");
+    }
+
+
+    #[test]
+    fn test_ayd_modifiers() {
+        assert!(!AydModifiers::NONE.has_modifier());
+        assert!(AydModifiers::ctrl().has_modifier());
+        assert!(AydModifiers::ctrl_shift().ctrl);
+        assert!(AydModifiers::ctrl_shift().shift);
+    }
+
+    #[test]
+    fn test_ayd_key_code_display() {
+        assert_eq!(AydKeyCode::Char('s').display(), "S");
+        assert_eq!(AydKeyCode::F(5).display(), "F5");
+        assert_eq!(AydKeyCode::Enter.display(), "Enter");
+    }
+
+    #[test]
+    fn test_ayd_keybinding_display() {
+        let kb = AydKeybinding::new(AydKeyCode::Char('s'), AydModifiers::ctrl());
+        assert_eq!(kb.display(), "Ctrl+S");
+        let kb2 = AydKeybinding::new(AydKeyCode::Char('p'), AydModifiers::ctrl_shift());
+        assert_eq!(kb2.display(), "Ctrl+Shift+P");
+    }
+
+    #[test]
+    fn test_ayd_resolver_basic() {
+        let mut resolver = AydKeybindingResolver::new();
+        let kb = AydKeybinding::new(AydKeyCode::Char('s'), AydModifiers::ctrl());
+        resolver.add(AydKeybindingEntry::new(kb.clone(), "workbench.action.files.save"));
+        let results = resolver.resolve(&kb);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].command, "workbench.action.files.save");
+    }
+
+    #[test]
+    fn test_ayd_resolver_command_lookup() {
+        let mut resolver = AydKeybindingResolver::new();
+        resolver.add(AydKeybindingEntry::new(
+            AydKeybinding::new(AydKeyCode::Char('p'), AydModifiers::ctrl()),
+            "workbench.action.quickOpen",
+        ));
+        resolver.add(AydKeybindingEntry::new(
+            AydKeybinding::new(AydKeyCode::Char('p'), AydModifiers::ctrl_shift()),
+            "workbench.action.showCommands",
+        ));
+        let bindings = resolver.command_bindings("workbench.action.quickOpen");
+        assert_eq!(bindings.len(), 1);
+    }
+
+    #[test]
+    fn test_ayd_resolver_remove() {
+        let mut resolver = AydKeybindingResolver::new();
+        resolver.add(AydKeybindingEntry::new(
+            AydKeybinding::new(AydKeyCode::Char('n'), AydModifiers::ctrl()),
+            "workbench.action.files.newFile",
+        ));
+        assert_eq!(resolver.binding_count(), 1);
+        resolver.remove_command("workbench.action.files.newFile");
+        assert_eq!(resolver.binding_count(), 0);
+    }
+
+    #[test]
+    fn test_ayd_when_clause() {
+        let entry = AydKeybindingEntry::new(
+            AydKeybinding::new(AydKeyCode::Enter, AydModifiers::NONE),
+            "editor.action.insertLineAfter",
+        ).with_when("editorTextFocus");
+        assert_eq!(entry.when.as_deref(), Some("editorTextFocus"));
+    }
+
+    #[test]
+    fn test_ayd_multiple_bindings() {
+        let mut resolver = AydKeybindingResolver::new();
+        let kb = AydKeybinding::new(AydKeyCode::Char('d'), AydModifiers::ctrl());
+        resolver.add(AydKeybindingEntry::new(kb.clone(), "editor.action.addSelectionToNextFindMatch"));
+        resolver.add(AydKeybindingEntry::new(kb.clone(), "editor.action.deleteLines").with_when("!editorHasSelection"));
+        assert_eq!(resolver.resolve(&kb).len(), 2);
     }
 
 }
