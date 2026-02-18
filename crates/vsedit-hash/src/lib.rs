@@ -24570,6 +24570,108 @@ impl AyoLayout {
     }
 }
 
+
+// --- ayp_ clipboard and selection model ---
+
+/// Selection direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AypSelectionDirection { LeftToRight, RightToLeft }
+
+/// A text selection range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AypSelection {
+    pub anchor_line: u32,
+    pub anchor_col: u32,
+    pub active_line: u32,
+    pub active_col: u32,
+}
+
+impl AypSelection {
+    pub fn new(al: u32, ac: u32, sl: u32, sc: u32) -> Self {
+        Self { anchor_line: al, anchor_col: ac, active_line: sl, active_col: sc }
+    }
+    pub fn cursor(line: u32, col: u32) -> Self { Self::new(line, col, line, col) }
+    pub fn is_empty(&self) -> bool { self.anchor_line == self.active_line && self.anchor_col == self.active_col }
+    pub fn direction(&self) -> AypSelectionDirection {
+        if self.active_line < self.anchor_line || (self.active_line == self.anchor_line && self.active_col < self.anchor_col) {
+            AypSelectionDirection::RightToLeft
+        } else { AypSelectionDirection::LeftToRight }
+    }
+    pub fn start(&self) -> (u32, u32) {
+        if self.direction() == AypSelectionDirection::LeftToRight { (self.anchor_line, self.anchor_col) }
+        else { (self.active_line, self.active_col) }
+    }
+    pub fn end(&self) -> (u32, u32) {
+        if self.direction() == AypSelectionDirection::LeftToRight { (self.active_line, self.active_col) }
+        else { (self.anchor_line, self.anchor_col) }
+    }
+    pub fn contains_line(&self, line: u32) -> bool {
+        let (sl, _) = self.start();
+        let (el, _) = self.end();
+        line >= sl && line <= el
+    }
+    pub fn line_count(&self) -> u32 {
+        let (sl, _) = self.start();
+        let (el, _) = self.end();
+        el - sl + 1
+    }
+    pub fn collapse_to_active(&self) -> Self { Self::cursor(self.active_line, self.active_col) }
+    pub fn reverse(&self) -> Self { Self::new(self.active_line, self.active_col, self.anchor_line, self.anchor_col) }
+}
+
+/// Selection kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AypSelectionKind { Normal, Line, Block }
+
+/// Clipboard content type.
+#[derive(Debug, Clone)]
+pub enum AypClipboardContent {
+    Text(String),
+    Lines(Vec<String>),
+    Block(Vec<String>),
+}
+
+impl AypClipboardContent {
+    pub fn text(s: &str) -> Self { Self::Text(s.to_string()) }
+    pub fn as_text(&self) -> String {
+        match self {
+            Self::Text(s) => s.clone(),
+            Self::Lines(v) => v.join("\n"),
+            Self::Block(v) => v.join("\n"),
+        }
+    }
+    pub fn line_count(&self) -> usize {
+        match self {
+            Self::Text(s) => s.lines().count().max(1),
+            Self::Lines(v) | Self::Block(v) => v.len(),
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        match self { Self::Text(s) => s.is_empty(), Self::Lines(v) | Self::Block(v) => v.is_empty() }
+    }
+}
+
+/// Clipboard with history.
+#[derive(Debug)]
+pub struct AypClipboard {
+    pub history: Vec<AypClipboardContent>,
+    pub max_history: usize,
+}
+
+impl AypClipboard {
+    pub fn new(max_history: usize) -> Self { Self { history: Vec::new(), max_history } }
+    pub fn copy(&mut self, content: AypClipboardContent) {
+        self.history.push(content);
+        if self.history.len() > self.max_history { self.history.remove(0); }
+    }
+    pub fn paste(&self) -> Option<&AypClipboardContent> { self.history.last() }
+    pub fn paste_nth(&self, n: usize) -> Option<&AypClipboardContent> {
+        if n < self.history.len() { Some(&self.history[self.history.len() - 1 - n]) } else { None }
+    }
+    pub fn history_count(&self) -> usize { self.history.len() }
+    pub fn clear(&mut self) { self.history.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39792,6 +39894,77 @@ mod tests {
         let layout = AyoLayout::new(120, 40);
         let sb = layout.sidebar_rect().unwrap();
         assert_eq!(sb.x, 2);
+    }
+
+
+    #[test]
+    fn test_ayp_selection_empty() {
+        let sel = AypSelection::cursor(5, 10);
+        assert!(sel.is_empty());
+        assert_eq!(sel.line_count(), 1);
+    }
+
+    #[test]
+    fn test_ayp_selection_range() {
+        let sel = AypSelection::new(1, 0, 3, 5);
+        assert!(!sel.is_empty());
+        assert_eq!(sel.direction(), AypSelectionDirection::LeftToRight);
+        assert_eq!(sel.start(), (1, 0));
+        assert_eq!(sel.end(), (3, 5));
+        assert!(sel.contains_line(2));
+        assert_eq!(sel.line_count(), 3);
+    }
+
+    #[test]
+    fn test_ayp_selection_reverse() {
+        let sel = AypSelection::new(5, 10, 1, 0);
+        assert_eq!(sel.direction(), AypSelectionDirection::RightToLeft);
+        assert_eq!(sel.start(), (1, 0));
+        let reversed = sel.reverse();
+        assert_eq!(reversed.direction(), AypSelectionDirection::LeftToRight);
+    }
+
+    #[test]
+    fn test_ayp_selection_collapse() {
+        let sel = AypSelection::new(1, 0, 5, 10);
+        let collapsed = sel.collapse_to_active();
+        assert!(collapsed.is_empty());
+        assert_eq!(collapsed.active_line, 5);
+    }
+
+    #[test]
+    fn test_ayp_clipboard_content() {
+        let t = AypClipboardContent::text("hello\nworld");
+        assert_eq!(t.line_count(), 2);
+        assert!(!t.is_empty());
+        assert_eq!(t.as_text(), "hello\nworld");
+    }
+
+    #[test]
+    fn test_ayp_clipboard_history() {
+        let mut cb = AypClipboard::new(3);
+        cb.copy(AypClipboardContent::text("first"));
+        cb.copy(AypClipboardContent::text("second"));
+        cb.copy(AypClipboardContent::text("third"));
+        assert_eq!(cb.paste().unwrap().as_text(), "third");
+        assert_eq!(cb.paste_nth(1).unwrap().as_text(), "second");
+        assert_eq!(cb.history_count(), 3);
+    }
+
+    #[test]
+    fn test_ayp_clipboard_overflow() {
+        let mut cb = AypClipboard::new(2);
+        cb.copy(AypClipboardContent::text("a"));
+        cb.copy(AypClipboardContent::text("b"));
+        cb.copy(AypClipboardContent::text("c"));
+        assert_eq!(cb.history_count(), 2);
+        assert_eq!(cb.paste_nth(1).unwrap().as_text(), "b");
+    }
+
+    #[test]
+    fn test_ayp_block_content() {
+        let b = AypClipboardContent::Block(vec!["abc".into(), "def".into()]);
+        assert_eq!(b.line_count(), 2);
     }
 
 }
