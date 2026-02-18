@@ -26854,6 +26854,96 @@ impl AzoSemanticTokensData {
     }
 }
 
+
+// --- azp_ whitespace rendering and indentation guides ---
+
+/// Whitespace character kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzpWhitespaceChar { Space, Tab, NonBreakingSpace, IdeographicSpace }
+
+/// A whitespace token in a line.
+#[derive(Debug, Clone)]
+pub struct AzpWhitespaceToken {
+    pub col: u32,
+    pub length: u32,
+    pub kind: AzpWhitespaceChar,
+}
+
+impl AzpWhitespaceToken {
+    pub fn space(col: u32, len: u32) -> Self { Self { col, length: len, kind: AzpWhitespaceChar::Space } }
+    pub fn tab(col: u32) -> Self { Self { col, length: 1, kind: AzpWhitespaceChar::Tab } }
+    pub fn end_col(&self) -> u32 { self.col + self.length }
+    pub fn is_tab(&self) -> bool { self.kind == AzpWhitespaceChar::Tab }
+}
+
+/// Indentation guide.
+#[derive(Debug, Clone)]
+pub struct AzpIndentGuide {
+    pub column: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub active: bool,
+    pub level: u32,
+}
+
+impl AzpIndentGuide {
+    pub fn new(col: u32, start: u32, end: u32, level: u32) -> Self {
+        Self { column: col, start_line: start, end_line: end, active: false, level }
+    }
+    pub fn set_active(&mut self, a: bool) { self.active = a; }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+    pub fn line_span(&self) -> u32 { self.end_line - self.start_line + 1 }
+}
+
+/// Whitespace rendering state for an editor.
+#[derive(Debug)]
+pub struct AzpWhitespaceRenderer {
+    pub mode: AzpRenderMode,
+    pub indent_guides_enabled: bool,
+    pub bracket_pair_guides: bool,
+    pub tab_size: u32,
+}
+
+/// Rendering mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzpRenderMode { None, Boundary, Selection, Trailing, All }
+
+impl AzpWhitespaceRenderer {
+    pub fn new(tab_size: u32) -> Self {
+        Self { mode: AzpRenderMode::Boundary, indent_guides_enabled: true, bracket_pair_guides: true, tab_size }
+    }
+    pub fn set_mode(&mut self, m: AzpRenderMode) { self.mode = m; }
+    pub fn should_render_space(&self, is_boundary: bool, in_selection: bool, is_trailing: bool) -> bool {
+        match self.mode {
+            AzpRenderMode::None => false,
+            AzpRenderMode::All => true,
+            AzpRenderMode::Boundary => is_boundary,
+            AzpRenderMode::Selection => in_selection,
+            AzpRenderMode::Trailing => is_trailing,
+        }
+    }
+    pub fn compute_indent_guides(&self, lines: &[&str]) -> Vec<AzpIndentGuide> {
+        let mut guides = Vec::new();
+        let mut i = 0;
+        while i < lines.len() {
+            let indent = lines[i].len() - lines[i].trim_start().len();
+            let levels = indent as u32 / self.tab_size;
+            for l in 0..levels {
+                let col = l * self.tab_size;
+                let mut end = i;
+                while end + 1 < lines.len() {
+                    let next_indent = lines[end + 1].len() - lines[end + 1].trim_start().len();
+                    if (next_indent as u32) <= col { break; }
+                    end += 1;
+                }
+                if end > i { guides.push(AzpIndentGuide::new(col, i as u32, end as u32, l)); }
+            }
+            i += 1;
+        }
+        guides
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43732,6 +43822,72 @@ goodbye";
         let t = AzoSemanticToken::new(0, 0, 1, 0, 0);
         assert!(!t.has_modifier(1));
         assert!(!t.has_modifier(2));
+    }
+
+
+    #[test]
+    fn test_azp_whitespace_token() {
+        let s = AzpWhitespaceToken::space(5, 3);
+        assert_eq!(s.end_col(), 8);
+        assert!(!s.is_tab());
+        let t = AzpWhitespaceToken::tab(0);
+        assert!(t.is_tab());
+    }
+
+    #[test]
+    fn test_azp_indent_guide() {
+        let mut g = AzpIndentGuide::new(4, 5, 15, 1);
+        assert!(g.contains_line(10));
+        assert!(!g.contains_line(16));
+        assert_eq!(g.line_span(), 11);
+        g.set_active(true);
+        assert!(g.active);
+    }
+
+    #[test]
+    fn test_azp_render_mode_none() {
+        let mut r = AzpWhitespaceRenderer::new(4);
+        r.set_mode(AzpRenderMode::None);
+        assert!(!r.should_render_space(true, true, true));
+    }
+
+    #[test]
+    fn test_azp_render_mode_all() {
+        let mut r = AzpWhitespaceRenderer::new(4);
+        r.set_mode(AzpRenderMode::All);
+        assert!(r.should_render_space(false, false, false));
+    }
+
+    #[test]
+    fn test_azp_render_mode_boundary() {
+        let r = AzpWhitespaceRenderer::new(4);
+        assert!(r.should_render_space(true, false, false));
+        assert!(!r.should_render_space(false, false, false));
+    }
+
+    #[test]
+    fn test_azp_render_trailing() {
+        let mut r = AzpWhitespaceRenderer::new(4);
+        r.set_mode(AzpRenderMode::Trailing);
+        assert!(r.should_render_space(false, false, true));
+        assert!(!r.should_render_space(false, false, false));
+    }
+
+    #[test]
+    fn test_azp_indent_guides() {
+        let r = AzpWhitespaceRenderer::new(4);
+        let lines = vec!["fn main() {", "    let x = 1;", "    let y = 2;", "}"];
+        let guides = r.compute_indent_guides(&lines);
+        assert!(!guides.is_empty());
+        assert_eq!(guides[0].column, 0);
+    }
+
+    #[test]
+    fn test_azp_no_guides_flat() {
+        let r = AzpWhitespaceRenderer::new(4);
+        let lines = vec!["a", "b", "c"];
+        let guides = r.compute_indent_guides(&lines);
+        assert!(guides.is_empty());
     }
 
 }
