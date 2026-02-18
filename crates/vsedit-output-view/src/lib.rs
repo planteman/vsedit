@@ -24889,6 +24889,86 @@ impl AysContributions {
     }
 }
 
+
+// --- ayt_ workspace trust and security model ---
+
+/// Trust state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AytTrustState { Trusted, Untrusted, Unknown }
+
+/// Trust request result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AytTrustRequestResult { Granted, Denied, Cancelled }
+
+/// A trusted folder entry.
+#[derive(Debug, Clone)]
+pub struct AytTrustedFolder {
+    pub uri: String,
+    pub trusted_at: u64,
+}
+
+impl AytTrustedFolder {
+    pub fn new(uri: &str, ts: u64) -> Self { Self { uri: uri.to_string(), trusted_at: ts } }
+}
+
+/// Workspace trust manager.
+#[derive(Debug)]
+pub struct AytWorkspaceTrust {
+    pub state: AytTrustState,
+    pub trusted_folders: Vec<AytTrustedFolder>,
+    pub restrict_mode_enabled: bool,
+}
+
+impl AytWorkspaceTrust {
+    pub fn new() -> Self { Self { state: AytTrustState::Unknown, trusted_folders: Vec::new(), restrict_mode_enabled: true } }
+    pub fn is_trusted(&self) -> bool { self.state == AytTrustState::Trusted }
+    pub fn grant_trust(&mut self) { self.state = AytTrustState::Trusted; }
+    pub fn revoke_trust(&mut self) { self.state = AytTrustState::Untrusted; }
+    pub fn add_trusted_folder(&mut self, uri: &str, ts: u64) {
+        if !self.trusted_folders.iter().any(|f| f.uri == uri) {
+            self.trusted_folders.push(AytTrustedFolder::new(uri, ts));
+        }
+    }
+    pub fn remove_trusted_folder(&mut self, uri: &str) { self.trusted_folders.retain(|f| f.uri != uri); }
+    pub fn is_folder_trusted(&self, uri: &str) -> bool {
+        self.trusted_folders.iter().any(|f| uri.starts_with(&f.uri))
+    }
+    pub fn trusted_folder_count(&self) -> usize { self.trusted_folders.len() }
+}
+
+/// Restricted mode feature flag.
+#[derive(Debug, Clone)]
+pub struct AytRestrictedFeature {
+    pub id: String,
+    pub description: String,
+    pub allowed_in_restricted: bool,
+}
+
+impl AytRestrictedFeature {
+    pub fn new(id: &str, desc: &str, allowed: bool) -> Self {
+        Self { id: id.to_string(), description: desc.to_string(), allowed_in_restricted: allowed }
+    }
+}
+
+/// Security policy manager.
+#[derive(Debug)]
+pub struct AytSecurityPolicy {
+    pub features: Vec<AytRestrictedFeature>,
+    pub trust: AytWorkspaceTrust,
+}
+
+impl AytSecurityPolicy {
+    pub fn new() -> Self { Self { features: Vec::new(), trust: AytWorkspaceTrust::new() } }
+    pub fn register_feature(&mut self, feature: AytRestrictedFeature) { self.features.push(feature); }
+    pub fn is_feature_allowed(&self, id: &str) -> bool {
+        if self.trust.is_trusted() { return true; }
+        self.features.iter().find(|f| f.id == id).map(|f| f.allowed_in_restricted).unwrap_or(false)
+    }
+    pub fn restricted_features(&self) -> Vec<&AytRestrictedFeature> {
+        self.features.iter().filter(|f| !f.allowed_in_restricted).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40312,6 +40392,72 @@ mod tests {
     fn test_ays_all_section_names() {
         let kinds = [AysContributionKind::Command, AysContributionKind::Debugger, AysContributionKind::Walkthrough];
         for k in &kinds { assert!(!k.section_name().is_empty()); }
+    }
+
+
+    #[test]
+    fn test_ayt_trust_state() {
+        let mut trust = AytWorkspaceTrust::new();
+        assert!(!trust.is_trusted());
+        trust.grant_trust();
+        assert!(trust.is_trusted());
+        trust.revoke_trust();
+        assert!(!trust.is_trusted());
+    }
+
+    #[test]
+    fn test_ayt_trusted_folders() {
+        let mut trust = AytWorkspaceTrust::new();
+        trust.add_trusted_folder("/home/user/proj", 1000);
+        trust.add_trusted_folder("/home/user/proj", 2000);
+        assert_eq!(trust.trusted_folder_count(), 1);
+        assert!(trust.is_folder_trusted("/home/user/proj/src/main.rs"));
+        assert!(!trust.is_folder_trusted("/home/other"));
+    }
+
+    #[test]
+    fn test_ayt_remove_trusted() {
+        let mut trust = AytWorkspaceTrust::new();
+        trust.add_trusted_folder("/proj", 100);
+        trust.remove_trusted_folder("/proj");
+        assert_eq!(trust.trusted_folder_count(), 0);
+    }
+
+    #[test]
+    fn test_ayt_restricted_feature() {
+        let f = AytRestrictedFeature::new("tasks.run", "Run tasks", false);
+        assert!(!f.allowed_in_restricted);
+    }
+
+    #[test]
+    fn test_ayt_security_policy_trusted() {
+        let mut policy = AytSecurityPolicy::new();
+        policy.register_feature(AytRestrictedFeature::new("tasks.run", "Run", false));
+        policy.register_feature(AytRestrictedFeature::new("editor.basic", "Edit", true));
+        assert!(!policy.is_feature_allowed("tasks.run"));
+        assert!(policy.is_feature_allowed("editor.basic"));
+        policy.trust.grant_trust();
+        assert!(policy.is_feature_allowed("tasks.run"));
+    }
+
+    #[test]
+    fn test_ayt_restricted_features_list() {
+        let mut policy = AytSecurityPolicy::new();
+        policy.register_feature(AytRestrictedFeature::new("a", "A", false));
+        policy.register_feature(AytRestrictedFeature::new("b", "B", true));
+        policy.register_feature(AytRestrictedFeature::new("c", "C", false));
+        assert_eq!(policy.restricted_features().len(), 2);
+    }
+
+    #[test]
+    fn test_ayt_trust_request_result() {
+        assert_ne!(AytTrustRequestResult::Granted, AytTrustRequestResult::Denied);
+    }
+
+    #[test]
+    fn test_ayt_unknown_feature() {
+        let policy = AytSecurityPolicy::new();
+        assert!(!policy.is_feature_allowed("nonexistent"));
     }
 
 }
