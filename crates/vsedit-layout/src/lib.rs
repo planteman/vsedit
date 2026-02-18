@@ -27605,6 +27605,83 @@ impl AzxCommandContext {
     }
 }
 
+
+// --- azy_ editor context menu model ---
+
+/// Context menu item kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzyMenuItemKind { Action, Separator, Submenu }
+
+/// A context menu item.
+#[derive(Debug, Clone)]
+pub struct AzyMenuItem {
+    pub kind: AzyMenuItemKind,
+    pub command_id: Option<String>,
+    pub label: Option<String>,
+    pub keybinding: Option<String>,
+    pub group: Option<String>,
+    pub order: u32,
+    pub enabled: bool,
+    pub children: Vec<AzyMenuItem>,
+}
+
+impl AzyMenuItem {
+    pub fn action(cmd: &str, label: &str) -> Self {
+        Self { kind: AzyMenuItemKind::Action, command_id: Some(cmd.to_string()), label: Some(label.to_string()), keybinding: None, group: None, order: 0, enabled: true, children: Vec::new() }
+    }
+    pub fn separator() -> Self {
+        Self { kind: AzyMenuItemKind::Separator, command_id: None, label: None, keybinding: None, group: None, order: 0, enabled: true, children: Vec::new() }
+    }
+    pub fn submenu(label: &str, children: Vec<AzyMenuItem>) -> Self {
+        Self { kind: AzyMenuItemKind::Submenu, command_id: None, label: Some(label.to_string()), keybinding: None, group: None, order: 0, enabled: true, children }
+    }
+    pub fn with_keybinding(mut self, kb: &str) -> Self { self.keybinding = Some(kb.to_string()); self }
+    pub fn with_group(mut self, g: &str, order: u32) -> Self { self.group = Some(g.to_string()); self.order = order; self }
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+    pub fn is_separator(&self) -> bool { self.kind == AzyMenuItemKind::Separator }
+    pub fn is_submenu(&self) -> bool { self.kind == AzyMenuItemKind::Submenu }
+    pub fn display_text(&self) -> String {
+        match (&self.label, &self.keybinding) {
+            (Some(l), Some(k)) => format!("{}  {}", l, k),
+            (Some(l), None) => l.clone(),
+            _ => String::new(),
+        }
+    }
+}
+
+/// Context menu.
+#[derive(Debug)]
+pub struct AzyContextMenu {
+    pub items: Vec<AzyMenuItem>,
+    pub visible: bool,
+    pub selected_index: Option<usize>,
+}
+
+impl AzyContextMenu {
+    pub fn new(items: Vec<AzyMenuItem>) -> Self { Self { items, visible: false, selected_index: None } }
+    pub fn show(&mut self) { self.visible = true; self.selected_index = Some(0); }
+    pub fn hide(&mut self) { self.visible = false; self.selected_index = None; }
+    pub fn select_next(&mut self) {
+        if let Some(idx) = self.selected_index {
+            let mut next = (idx + 1) % self.items.len();
+            while self.items[next].is_separator() && next != idx { next = (next + 1) % self.items.len(); }
+            self.selected_index = Some(next);
+        }
+    }
+    pub fn select_prev(&mut self) {
+        if let Some(idx) = self.selected_index {
+            let mut prev = if idx == 0 { self.items.len() - 1 } else { idx - 1 };
+            while self.items[prev].is_separator() && prev != idx { prev = if prev == 0 { self.items.len() - 1 } else { prev - 1 }; }
+            self.selected_index = Some(prev);
+        }
+    }
+    pub fn selected_item(&self) -> Option<&AzyMenuItem> {
+        self.selected_index.and_then(|i| self.items.get(i))
+    }
+    pub fn item_count(&self) -> usize { self.items.len() }
+    pub fn action_count(&self) -> usize { self.items.iter().filter(|i| i.kind == AzyMenuItemKind::Action).count() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45043,6 +45120,86 @@ goodbye";
         let ctx = AzxCommandContext::new();
         assert!(!ctx.evaluate_when("editorTextFocus"));
         assert!(!ctx.evaluate_when("editorHasSelection"));
+    }
+
+
+    #[test]
+    fn test_azy_menu_item_action() {
+        let item = AzyMenuItem::action("editor.copy", "Copy").with_keybinding("ctrl+c");
+        assert_eq!(item.display_text(), "Copy  ctrl+c");
+        assert!(item.enabled);
+    }
+
+    #[test]
+    fn test_azy_separator() {
+        let sep = AzyMenuItem::separator();
+        assert!(sep.is_separator());
+        assert!(sep.display_text().is_empty());
+    }
+
+    #[test]
+    fn test_azy_submenu() {
+        let sub = AzyMenuItem::submenu("More...", vec![
+            AzyMenuItem::action("a", "Action A"),
+            AzyMenuItem::action("b", "Action B"),
+        ]);
+        assert!(sub.is_submenu());
+        assert_eq!(sub.children.len(), 2);
+    }
+
+    #[test]
+    fn test_azy_context_menu() {
+        let mut menu = AzyContextMenu::new(vec![
+            AzyMenuItem::action("cut", "Cut"),
+            AzyMenuItem::action("copy", "Copy"),
+            AzyMenuItem::separator(),
+            AzyMenuItem::action("paste", "Paste"),
+        ]);
+        assert_eq!(menu.item_count(), 4);
+        assert_eq!(menu.action_count(), 3);
+        menu.show();
+        assert!(menu.visible);
+        assert_eq!(menu.selected_index, Some(0));
+    }
+
+    #[test]
+    fn test_azy_navigation() {
+        let mut menu = AzyContextMenu::new(vec![
+            AzyMenuItem::action("a", "A"),
+            AzyMenuItem::separator(),
+            AzyMenuItem::action("b", "B"),
+        ]);
+        menu.show();
+        menu.select_next();
+        assert_eq!(menu.selected_index, Some(2));
+        menu.select_prev();
+        assert_eq!(menu.selected_index, Some(0));
+    }
+
+    #[test]
+    fn test_azy_selected_item() {
+        let mut menu = AzyContextMenu::new(vec![
+            AzyMenuItem::action("x", "X"),
+        ]);
+        menu.show();
+        let sel = menu.selected_item().unwrap();
+        assert_eq!(sel.command_id.as_deref(), Some("x"));
+    }
+
+    #[test]
+    fn test_azy_hide() {
+        let mut menu = AzyContextMenu::new(vec![AzyMenuItem::action("a", "A")]);
+        menu.show();
+        menu.hide();
+        assert!(!menu.visible);
+        assert!(menu.selected_index.is_none());
+    }
+
+    #[test]
+    fn test_azy_group_order() {
+        let item = AzyMenuItem::action("a", "A").with_group("navigation", 1);
+        assert_eq!(item.group.as_deref(), Some("navigation"));
+        assert_eq!(item.order, 1);
     }
 
 }
