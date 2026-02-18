@@ -46159,3 +46159,597 @@ mod baa_tests {
         assert_eq!(grid.group(g2).unwrap().tab_count(), 1);
     }
 }
+
+
+// --- bab_: Editor diff decorations ---
+
+/// Type of change in a diff hunk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BabDiffChangeType {
+    Added,
+    Deleted,
+    Modified,
+}
+
+impl BabDiffChangeType {
+    pub fn indicator_char(self) -> char {
+        match self {
+            Self::Added => '+',
+            Self::Deleted => '-',
+            Self::Modified => '~',
+        }
+    }
+
+    pub fn gutter_symbol(self) -> &'static str {
+        match self {
+            Self::Added => "\u{258c}",    // left half block
+            Self::Deleted => "\u{25b6}",  // right triangle
+            Self::Modified => "\u{258c}", // left half block
+        }
+    }
+}
+
+/// A single line range in the diff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BabLineRange {
+    pub start: u32,
+    pub count: u32,
+}
+
+impl BabLineRange {
+    pub fn new(start: u32, count: u32) -> Self {
+        Self { start, count }
+    }
+
+    pub fn end(&self) -> u32 {
+        self.start + self.count
+    }
+
+    pub fn contains(&self, line: u32) -> bool {
+        line >= self.start && line < self.end()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+}
+
+/// A diff hunk representing a contiguous change region.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BabDiffHunk {
+    pub original: BabLineRange,
+    pub modified: BabLineRange,
+    pub change_type: BabDiffChangeType,
+}
+
+impl BabDiffHunk {
+    pub fn new(original: BabLineRange, modified: BabLineRange) -> Self {
+        let change_type = if original.is_empty() {
+            BabDiffChangeType::Added
+        } else if modified.is_empty() {
+            BabDiffChangeType::Deleted
+        } else {
+            BabDiffChangeType::Modified
+        };
+        Self { original, modified, change_type }
+    }
+
+    pub fn added(modified_start: u32, count: u32, original_line: u32) -> Self {
+        Self::new(
+            BabLineRange::new(original_line, 0),
+            BabLineRange::new(modified_start, count),
+        )
+    }
+
+    pub fn deleted(original_start: u32, count: u32, modified_line: u32) -> Self {
+        Self::new(
+            BabLineRange::new(original_start, count),
+            BabLineRange::new(modified_line, 0),
+        )
+    }
+
+    pub fn modified(original_start: u32, original_count: u32, modified_start: u32, modified_count: u32) -> Self {
+        Self::new(
+            BabLineRange::new(original_start, original_count),
+            BabLineRange::new(modified_start, modified_count),
+        )
+    }
+
+    pub fn total_lines_changed(&self) -> u32 {
+        self.original.count.max(self.modified.count)
+    }
+}
+
+/// Inline character-level change within a modified line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BabInlineChange {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub is_insertion: bool,
+}
+
+impl BabInlineChange {
+    pub fn new(line: u32, start_col: u32, end_col: u32, is_insertion: bool) -> Self {
+        Self { line, start_col, end_col, is_insertion }
+    }
+
+    pub fn char_count(&self) -> u32 {
+        self.end_col.saturating_sub(self.start_col)
+    }
+}
+
+/// Gutter decoration for a single line in the diff view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BabGutterDecoration {
+    pub line: u32,
+    pub change_type: BabDiffChangeType,
+    pub hunk_index: usize,
+}
+
+/// Complete diff decoration model for an editor.
+#[derive(Debug, Clone)]
+pub struct BabDiffDecorations {
+    pub hunks: Vec<BabDiffHunk>,
+    pub inline_changes: Vec<BabInlineChange>,
+    pub is_dirty: bool,
+    original_line_count: u32,
+    modified_line_count: u32,
+}
+
+impl BabDiffDecorations {
+    pub fn new() -> Self {
+        Self {
+            hunks: Vec::new(),
+            inline_changes: Vec::new(),
+            is_dirty: false,
+            original_line_count: 0,
+            modified_line_count: 0,
+        }
+    }
+
+    pub fn with_line_counts(original: u32, modified: u32) -> Self {
+        Self {
+            hunks: Vec::new(),
+            inline_changes: Vec::new(),
+            is_dirty: original != modified,
+            original_line_count: original,
+            modified_line_count: modified,
+        }
+    }
+
+    pub fn add_hunk(&mut self, hunk: BabDiffHunk) {
+        self.hunks.push(hunk);
+        self.is_dirty = true;
+    }
+
+    pub fn add_inline_change(&mut self, change: BabInlineChange) {
+        self.inline_changes.push(change);
+    }
+
+    pub fn hunk_count(&self) -> usize {
+        self.hunks.len()
+    }
+
+    pub fn added_line_count(&self) -> u32 {
+        self.hunks.iter()
+            .filter(|h| h.change_type == BabDiffChangeType::Added)
+            .map(|h| h.modified.count)
+            .sum()
+    }
+
+    pub fn deleted_line_count(&self) -> u32 {
+        self.hunks.iter()
+            .filter(|h| h.change_type == BabDiffChangeType::Deleted)
+            .map(|h| h.original.count)
+            .sum()
+    }
+
+    pub fn modified_line_count(&self) -> u32 {
+        self.hunks.iter()
+            .filter(|h| h.change_type == BabDiffChangeType::Modified)
+            .map(|h| h.modified.count)
+            .sum()
+    }
+
+    pub fn gutter_decorations(&self) -> Vec<BabGutterDecoration> {
+        let mut decorations = Vec::new();
+        for (i, hunk) in self.hunks.iter().enumerate() {
+            match hunk.change_type {
+                BabDiffChangeType::Added => {
+                    for line in hunk.modified.start..hunk.modified.end() {
+                        decorations.push(BabGutterDecoration {
+                            line,
+                            change_type: BabDiffChangeType::Added,
+                            hunk_index: i,
+                        });
+                    }
+                }
+                BabDiffChangeType::Deleted => {
+                    decorations.push(BabGutterDecoration {
+                        line: hunk.modified.start,
+                        change_type: BabDiffChangeType::Deleted,
+                        hunk_index: i,
+                    });
+                }
+                BabDiffChangeType::Modified => {
+                    for line in hunk.modified.start..hunk.modified.end() {
+                        decorations.push(BabGutterDecoration {
+                            line,
+                            change_type: BabDiffChangeType::Modified,
+                            hunk_index: i,
+                        });
+                    }
+                }
+            }
+        }
+        decorations
+    }
+
+    pub fn change_at_line(&self, line: u32) -> Option<BabDiffChangeType> {
+        for hunk in &self.hunks {
+            if hunk.change_type == BabDiffChangeType::Deleted && hunk.modified.start == line {
+                return Some(BabDiffChangeType::Deleted);
+            }
+            if hunk.modified.contains(line) {
+                return Some(hunk.change_type);
+            }
+        }
+        None
+    }
+
+    pub fn next_hunk_from(&self, line: u32) -> Option<&BabDiffHunk> {
+        self.hunks.iter().find(|h| h.modified.start > line)
+    }
+
+    pub fn prev_hunk_from(&self, line: u32) -> Option<&BabDiffHunk> {
+        self.hunks.iter().rev().find(|h| h.modified.start < line)
+    }
+
+    pub fn hunk_at_line(&self, line: u32) -> Option<&BabDiffHunk> {
+        self.hunks.iter().find(|h| {
+            h.modified.contains(line) ||
+            (h.change_type == BabDiffChangeType::Deleted && h.modified.start == line)
+        })
+    }
+
+    pub fn clear(&mut self) {
+        self.hunks.clear();
+        self.inline_changes.clear();
+        self.is_dirty = false;
+    }
+
+    pub fn summary(&self) -> BabDiffSummary {
+        BabDiffSummary {
+            hunks: self.hunk_count(),
+            additions: self.added_line_count(),
+            deletions: self.deleted_line_count(),
+            modifications: self.modified_line_count(),
+        }
+    }
+}
+
+/// Summary statistics for a diff.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BabDiffSummary {
+    pub hunks: usize,
+    pub additions: u32,
+    pub deletions: u32,
+    pub modifications: u32,
+}
+
+impl BabDiffSummary {
+    pub fn total_changed(&self) -> u32 {
+        self.additions + self.deletions + self.modifications
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.hunks == 0
+    }
+
+    pub fn display_short(&self) -> String {
+        format!("+{} -{} ~{}", self.additions, self.deletions, self.modifications)
+    }
+}
+
+/// Side-by-side diff view model.
+#[derive(Debug, Clone)]
+pub struct BabSideBySideLine {
+    pub left_line_num: Option<u32>,
+    pub right_line_num: Option<u32>,
+    pub left_content: String,
+    pub right_content: String,
+    pub change_type: Option<BabDiffChangeType>,
+}
+
+impl BabSideBySideLine {
+    pub fn unchanged(line_num: u32, content: &str) -> Self {
+        Self {
+            left_line_num: Some(line_num),
+            right_line_num: Some(line_num),
+            left_content: content.to_string(),
+            right_content: content.to_string(),
+            change_type: None,
+        }
+    }
+
+    pub fn added(right_num: u32, content: &str) -> Self {
+        Self {
+            left_line_num: None,
+            right_line_num: Some(right_num),
+            left_content: String::new(),
+            right_content: content.to_string(),
+            change_type: Some(BabDiffChangeType::Added),
+        }
+    }
+
+    pub fn deleted(left_num: u32, content: &str) -> Self {
+        Self {
+            left_line_num: Some(left_num),
+            right_line_num: None,
+            left_content: content.to_string(),
+            right_content: String::new(),
+            change_type: Some(BabDiffChangeType::Deleted),
+        }
+    }
+
+    pub fn modified(left_num: u32, right_num: u32, left: &str, right: &str) -> Self {
+        Self {
+            left_line_num: Some(left_num),
+            right_line_num: Some(right_num),
+            left_content: left.to_string(),
+            right_content: right.to_string(),
+            change_type: Some(BabDiffChangeType::Modified),
+        }
+    }
+
+    pub fn is_changed(&self) -> bool {
+        self.change_type.is_some()
+    }
+}
+
+/// Manages a unified or side-by-side diff view.
+#[derive(Debug, Clone)]
+pub struct BabDiffView {
+    pub lines: Vec<BabSideBySideLine>,
+    pub visible_start: usize,
+    pub visible_count: usize,
+    pub current_hunk_index: Option<usize>,
+}
+
+impl BabDiffView {
+    pub fn new() -> Self {
+        Self {
+            lines: Vec::new(),
+            visible_start: 0,
+            visible_count: 40,
+            current_hunk_index: None,
+        }
+    }
+
+    pub fn set_lines(&mut self, lines: Vec<BabSideBySideLine>) {
+        self.lines = lines;
+        self.visible_start = 0;
+    }
+
+    pub fn visible_lines(&self) -> &[BabSideBySideLine] {
+        let end = (self.visible_start + self.visible_count).min(self.lines.len());
+        &self.lines[self.visible_start..end]
+    }
+
+    pub fn scroll_down(&mut self, amount: usize) {
+        let max = self.lines.len().saturating_sub(self.visible_count);
+        self.visible_start = (self.visible_start + amount).min(max);
+    }
+
+    pub fn scroll_up(&mut self, amount: usize) {
+        self.visible_start = self.visible_start.saturating_sub(amount);
+    }
+
+    pub fn total_lines(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn changed_line_count(&self) -> usize {
+        self.lines.iter().filter(|l| l.is_changed()).count()
+    }
+
+    pub fn next_change_from(&self, line_idx: usize) -> Option<usize> {
+        self.lines.iter().enumerate().skip(line_idx + 1).find(|(_, l)| l.is_changed()).map(|(i, _)| i)
+    }
+
+    pub fn prev_change_from(&self, line_idx: usize) -> Option<usize> {
+        self.lines.iter().enumerate().take(line_idx).rev().find(|(_, l)| l.is_changed()).map(|(i, _)| i)
+    }
+}
+
+#[cfg(test)]
+mod bab_tests {
+    use super::*;
+
+    #[test]
+    fn test_bab_change_type_indicator() {
+        assert_eq!(BabDiffChangeType::Added.indicator_char(), '+');
+        assert_eq!(BabDiffChangeType::Deleted.indicator_char(), '-');
+        assert_eq!(BabDiffChangeType::Modified.indicator_char(), '~');
+    }
+
+    #[test]
+    fn test_bab_line_range() {
+        let r = BabLineRange::new(5, 3);
+        assert_eq!(r.end(), 8);
+        assert!(r.contains(5));
+        assert!(r.contains(7));
+        assert!(!r.contains(8));
+        assert!(!r.is_empty());
+
+        let empty = BabLineRange::new(5, 0);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_bab_diff_hunk_creation() {
+        let added = BabDiffHunk::added(10, 3, 9);
+        assert_eq!(added.change_type, BabDiffChangeType::Added);
+        assert_eq!(added.modified.count, 3);
+
+        let deleted = BabDiffHunk::deleted(5, 2, 4);
+        assert_eq!(deleted.change_type, BabDiffChangeType::Deleted);
+
+        let modified = BabDiffHunk::modified(5, 2, 5, 3);
+        assert_eq!(modified.change_type, BabDiffChangeType::Modified);
+        assert_eq!(modified.total_lines_changed(), 3);
+    }
+
+    #[test]
+    fn test_bab_inline_change() {
+        let ic = BabInlineChange::new(10, 5, 15, true);
+        assert_eq!(ic.char_count(), 10);
+        assert!(ic.is_insertion);
+    }
+
+    #[test]
+    fn test_bab_decorations_counts() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(10, 5, 9));
+        dec.add_hunk(BabDiffHunk::deleted(20, 3, 14));
+        dec.add_hunk(BabDiffHunk::modified(25, 2, 17, 4));
+
+        assert_eq!(dec.hunk_count(), 3);
+        assert_eq!(dec.added_line_count(), 5);
+        assert_eq!(dec.deleted_line_count(), 3);
+        assert_eq!(dec.modified_line_count(), 4);
+    }
+
+    #[test]
+    fn test_bab_gutter_decorations() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(10, 2, 9));
+        let gutters = dec.gutter_decorations();
+        assert_eq!(gutters.len(), 2);
+        assert_eq!(gutters[0].line, 10);
+        assert_eq!(gutters[1].line, 11);
+    }
+
+    #[test]
+    fn test_bab_change_at_line() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(5, 3, 4));
+        assert_eq!(dec.change_at_line(5), Some(BabDiffChangeType::Added));
+        assert_eq!(dec.change_at_line(7), Some(BabDiffChangeType::Added));
+        assert_eq!(dec.change_at_line(8), None);
+    }
+
+    #[test]
+    fn test_bab_hunk_navigation() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(5, 2, 4));
+        dec.add_hunk(BabDiffHunk::modified(20, 1, 18, 2));
+
+        let next = dec.next_hunk_from(6);
+        assert!(next.is_some());
+        assert_eq!(next.unwrap().modified.start, 20);
+
+        let prev = dec.prev_hunk_from(25);
+        assert!(prev.is_some());
+        assert_eq!(prev.unwrap().modified.start, 20);
+    }
+
+    #[test]
+    fn test_bab_summary() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(5, 10, 4));
+        dec.add_hunk(BabDiffHunk::deleted(20, 3, 14));
+        let summary = dec.summary();
+        assert_eq!(summary.total_changed(), 13);
+        assert_eq!(summary.display_short(), "+10 -3 ~0");
+        assert!(!summary.is_empty());
+    }
+
+    #[test]
+    fn test_bab_side_by_side_line() {
+        let unchanged = BabSideBySideLine::unchanged(1, "hello");
+        assert!(!unchanged.is_changed());
+        assert_eq!(unchanged.left_line_num, Some(1));
+
+        let added = BabSideBySideLine::added(5, "new line");
+        assert!(added.is_changed());
+        assert!(added.left_line_num.is_none());
+
+        let deleted = BabSideBySideLine::deleted(3, "old line");
+        assert!(deleted.is_changed());
+        assert!(deleted.right_line_num.is_none());
+
+        let modified = BabSideBySideLine::modified(2, 2, "old", "new");
+        assert!(modified.is_changed());
+    }
+
+    #[test]
+    fn test_bab_diff_view_scrolling() {
+        let mut view = BabDiffView::new();
+        let lines: Vec<BabSideBySideLine> = (0..100)
+            .map(|i| BabSideBySideLine::unchanged(i, &format!("line {}", i)))
+            .collect();
+        view.set_lines(lines);
+        assert_eq!(view.total_lines(), 100);
+        assert_eq!(view.visible_lines().len(), 40);
+
+        view.scroll_down(10);
+        assert_eq!(view.visible_start, 10);
+
+        view.scroll_up(5);
+        assert_eq!(view.visible_start, 5);
+    }
+
+    #[test]
+    fn test_bab_diff_view_navigation() {
+        let mut view = BabDiffView::new();
+        let mut lines = Vec::new();
+        for i in 0..10 {
+            lines.push(BabSideBySideLine::unchanged(i, "same"));
+        }
+        lines.push(BabSideBySideLine::added(10, "new"));
+        for i in 11..20 {
+            lines.push(BabSideBySideLine::unchanged(i, "same"));
+        }
+        view.set_lines(lines);
+        assert_eq!(view.changed_line_count(), 1);
+        assert_eq!(view.next_change_from(0), Some(10));
+        assert_eq!(view.prev_change_from(15), Some(10));
+    }
+
+    #[test]
+    fn test_bab_clear_decorations() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(5, 2, 4));
+        assert_eq!(dec.hunk_count(), 1);
+        dec.clear();
+        assert_eq!(dec.hunk_count(), 0);
+        assert!(!dec.is_dirty);
+    }
+
+    #[test]
+    fn test_bab_with_line_counts() {
+        let dec = BabDiffDecorations::with_line_counts(100, 105);
+        assert!(dec.is_dirty);
+        let dec2 = BabDiffDecorations::with_line_counts(100, 100);
+        assert!(!dec2.is_dirty);
+    }
+
+    #[test]
+    fn test_bab_hunk_at_line() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::added(5, 3, 4));
+        assert!(dec.hunk_at_line(6).is_some());
+        assert!(dec.hunk_at_line(9).is_none());
+    }
+
+    #[test]
+    fn test_bab_deleted_gutter_single_line() {
+        let mut dec = BabDiffDecorations::new();
+        dec.add_hunk(BabDiffHunk::deleted(5, 3, 4));
+        let gutters = dec.gutter_decorations();
+        assert_eq!(gutters.len(), 1); // Single marker for deletion
+        assert_eq!(gutters[0].change_type, BabDiffChangeType::Deleted);
+    }
+}
