@@ -12000,6 +12000,200 @@ impl YpCommandRegistry {
     pub fn yp_clear(&mut self) { self.yp_commands.clear(); }
 }
 
+
+// --- yq_ Layered Config Store ---
+
+/// Layered configuration store with default, user, and workspace layers.
+#[derive(Debug, Clone)]
+pub struct YqConfigStore {
+    yq_layers: Vec<(String, std::collections::HashMap<String, String>)>,
+}
+
+impl std::fmt::Display for YqConfigStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total: usize = self.yq_layers.iter().map(|(_, m)| m.len()).sum();
+        write!(f, "ConfigStore(layers={}, keys={})", self.yq_layers.len(), total)
+    }
+}
+
+impl Default for YqConfigStore {
+    fn default() -> Self { Self::yq_new() }
+}
+
+impl YqConfigStore {
+    /// Create with default layers: defaults, user, workspace.
+    pub fn yq_new() -> Self {
+        Self { yq_layers: vec![
+            ("defaults".to_string(), std::collections::HashMap::new()),
+            ("user".to_string(), std::collections::HashMap::new()),
+            ("workspace".to_string(), std::collections::HashMap::new()),
+        ] }
+    }
+
+    /// Set a value in a specific layer.
+    pub fn yq_set(&mut self, layer: &str, key: &str, value: &str) {
+        if let Some((_, map)) = self.yq_layers.iter_mut().find(|(n, _)| n == layer) {
+            map.insert(key.to_string(), value.to_string());
+        }
+    }
+
+    /// Get a value, checking layers from last (highest priority) to first.
+    pub fn yq_get(&self, key: &str) -> Option<&str> {
+        for (_, map) in self.yq_layers.iter().rev() {
+            if let Some(v) = map.get(key) { return Some(v.as_str()); }
+        }
+        None
+    }
+
+    /// Get with default.
+    pub fn yq_get_or(&self, key: &str, default: &str) -> String {
+        self.yq_get(key).unwrap_or(default).to_string()
+    }
+
+    /// Get value as i64.
+    pub fn yq_get_i64(&self, key: &str) -> Option<i64> {
+        self.yq_get(key).and_then(|v| v.parse().ok())
+    }
+
+    /// Get value as bool.
+    pub fn yq_get_bool(&self, key: &str) -> Option<bool> {
+        self.yq_get(key).and_then(|v| v.parse().ok())
+    }
+
+    /// Remove a key from a layer.
+    pub fn yq_remove(&mut self, layer: &str, key: &str) {
+        if let Some((_, map)) = self.yq_layers.iter_mut().find(|(n, _)| n == layer) {
+            map.remove(key);
+        }
+    }
+
+    /// All keys across all layers.
+    pub fn yq_all_keys(&self) -> Vec<String> {
+        let mut keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for (_, map) in &self.yq_layers { for k in map.keys() { keys.insert(k.clone()); } }
+        let mut sorted: Vec<String> = keys.into_iter().collect();
+        sorted.sort();
+        sorted
+    }
+
+    /// Add a custom layer.
+    pub fn yq_add_layer(&mut self, name: &str) {
+        self.yq_layers.push((name.to_string(), std::collections::HashMap::new()));
+    }
+
+    /// Number of layers.
+    pub fn yq_layer_count(&self) -> usize { self.yq_layers.len() }
+
+    /// Get the effective layer name for a key.
+    pub fn yq_effective_layer(&self, key: &str) -> Option<&str> {
+        for (name, map) in self.yq_layers.iter().rev() {
+            if map.contains_key(key) { return Some(name.as_str()); }
+        }
+        None
+    }
+
+    /// Clear a specific layer.
+    pub fn yq_clear_layer(&mut self, layer: &str) {
+        if let Some((_, map)) = self.yq_layers.iter_mut().find(|(n, _)| n == layer) {
+            map.clear();
+        }
+    }
+
+    /// Clear all layers.
+    pub fn yq_clear_all(&mut self) {
+        for (_, map) in &mut self.yq_layers { map.clear(); }
+    }
+}
+
+// --- yq_ Text Layout Engine ---
+
+/// Simple text line wrapping and layout engine for terminal rendering.
+#[derive(Debug, Clone)]
+pub struct YqTextLayout {
+    yq_width: usize,
+    yq_tab_size: usize,
+}
+
+impl std::fmt::Display for YqTextLayout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextLayout(w={}, tab={})", self.yq_width, self.yq_tab_size)
+    }
+}
+
+impl Default for YqTextLayout {
+    fn default() -> Self { Self { yq_width: 80, yq_tab_size: 4 } }
+}
+
+impl YqTextLayout {
+    /// Create with given width.
+    pub fn yq_new(width: usize) -> Self { Self { yq_width: width.max(1), yq_tab_size: 4 } }
+
+    /// Set tab size.
+    pub fn yq_set_tab_size(&mut self, size: usize) { self.yq_tab_size = size.max(1); }
+
+    /// Width.
+    pub fn yq_width(&self) -> usize { self.yq_width }
+
+    /// Wrap text into lines of at most width characters.
+    pub fn yq_wrap(&self, text: &str) -> Vec<String> {
+        let expanded = self.yq_expand_tabs(text);
+        let mut lines = Vec::new();
+        for line in expanded.lines() {
+            if line.len() <= self.yq_width {
+                lines.push(line.to_string());
+            } else {
+                let mut remaining = line;
+                while remaining.len() > self.yq_width {
+                    let split = Self::yq_find_break(remaining, self.yq_width);
+                    lines.push(remaining[..split].to_string());
+                    remaining = &remaining[split..];
+                    remaining = remaining.trim_start();
+                }
+                if !remaining.is_empty() { lines.push(remaining.to_string()); }
+            }
+        }
+        if lines.is_empty() { lines.push(String::new()); }
+        lines
+    }
+
+    fn yq_find_break(text: &str, max_width: usize) -> usize {
+        if let Some(pos) = text[..max_width].rfind(' ') {
+            if pos > 0 { return pos + 1; }
+        }
+        max_width
+    }
+
+    /// Expand tabs to spaces.
+    pub fn yq_expand_tabs(&self, text: &str) -> String {
+        text.replace('\t', &" ".repeat(self.yq_tab_size))
+    }
+
+    /// Truncate a line to width, adding ellipsis if needed.
+    pub fn yq_truncate(&self, text: &str, ellipsis: &str) -> String {
+        if text.len() <= self.yq_width { return text.to_string(); }
+        let avail = self.yq_width.saturating_sub(ellipsis.len());
+        format!("{}{}", &text[..avail], ellipsis)
+    }
+
+    /// Pad/align text.
+    pub fn yq_pad_right(&self, text: &str) -> String {
+        if text.len() >= self.yq_width { return text[..self.yq_width].to_string(); }
+        format!("{:width$}", text, width = self.yq_width)
+    }
+
+    /// Center text.
+    pub fn yq_center(&self, text: &str) -> String {
+        if text.len() >= self.yq_width { return text[..self.yq_width].to_string(); }
+        let pad = (self.yq_width - text.len()) / 2;
+        format!("{}{}{}", " ".repeat(pad), text, " ".repeat(self.yq_width - text.len() - pad))
+    }
+
+    /// Count visual lines needed.
+    pub fn yq_line_count(&self, text: &str) -> usize {
+        self.yq_wrap(text).len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -19337,6 +19531,144 @@ mod submod;
     fn yp_cmd_display() {
         let c = super::YpCommandEntry { yp_id: "test".into(), yp_title: "T".into(), yp_category: "C".into(), yp_keybinding: None, yp_when: None };
         assert!(format!("{}", c).contains("Cmd"));
+    }
+
+
+    // --- yq_ ConfigStore tests ---
+
+    #[test]
+    fn yq_config_new() {
+        let c = super::YqConfigStore::yq_new();
+        assert_eq!(c.yq_layer_count(), 3);
+    }
+
+    #[test]
+    fn yq_config_set_get() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("user", "theme", "dark");
+        assert_eq!(c.yq_get("theme"), Some("dark"));
+    }
+
+    #[test]
+    fn yq_config_layering() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("defaults", "font", "mono");
+        c.yq_set("user", "font", "sans");
+        assert_eq!(c.yq_get("font"), Some("sans"));
+    }
+
+    #[test]
+    fn yq_config_workspace_overrides() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("defaults", "size", "12");
+        c.yq_set("workspace", "size", "14");
+        assert_eq!(c.yq_get("size"), Some("14"));
+    }
+
+    #[test]
+    fn yq_config_get_or() {
+        let c = super::YqConfigStore::yq_new();
+        assert_eq!(c.yq_get_or("missing", "default"), "default");
+    }
+
+    #[test]
+    fn yq_config_get_i64() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("user", "port", "8080");
+        assert_eq!(c.yq_get_i64("port"), Some(8080));
+    }
+
+    #[test]
+    fn yq_config_get_bool() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("user", "debug", "true");
+        assert_eq!(c.yq_get_bool("debug"), Some(true));
+    }
+
+    #[test]
+    fn yq_config_all_keys() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("defaults", "a", "1");
+        c.yq_set("user", "b", "2");
+        assert_eq!(c.yq_all_keys().len(), 2);
+    }
+
+    #[test]
+    fn yq_config_effective() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("defaults", "x", "1");
+        c.yq_set("user", "x", "2");
+        assert_eq!(c.yq_effective_layer("x"), Some("user"));
+    }
+
+    #[test]
+    fn yq_config_clear() {
+        let mut c = super::YqConfigStore::yq_new();
+        c.yq_set("user", "a", "1");
+        c.yq_clear_layer("user");
+        assert_eq!(c.yq_get("a"), None);
+    }
+
+    #[test]
+    fn yq_config_display() {
+        let c = super::YqConfigStore::yq_new();
+        assert!(format!("{}", c).contains("ConfigStore"));
+    }
+
+    // --- yq_ TextLayout tests ---
+
+    #[test]
+    fn yq_layout_wrap_short() {
+        let l = super::YqTextLayout::yq_new(80);
+        let lines = l.yq_wrap("hello");
+        assert_eq!(lines, vec!["hello"]);
+    }
+
+    #[test]
+    fn yq_layout_wrap_long() {
+        let l = super::YqTextLayout::yq_new(10);
+        let lines = l.yq_wrap("hello world foo bar");
+        assert!(lines.len() > 1);
+    }
+
+    #[test]
+    fn yq_layout_truncate() {
+        let l = super::YqTextLayout::yq_new(10);
+        let t = l.yq_truncate("hello world foo", "...");
+        assert!(t.len() <= 10);
+        assert!(t.ends_with("..."));
+    }
+
+    #[test]
+    fn yq_layout_pad() {
+        let l = super::YqTextLayout::yq_new(10);
+        let p = l.yq_pad_right("hi");
+        assert_eq!(p.len(), 10);
+    }
+
+    #[test]
+    fn yq_layout_center() {
+        let l = super::YqTextLayout::yq_new(10);
+        let c = l.yq_center("hi");
+        assert_eq!(c.len(), 10);
+    }
+
+    #[test]
+    fn yq_layout_line_count() {
+        let l = super::YqTextLayout::yq_new(5);
+        assert!(l.yq_line_count("hello world") > 1);
+    }
+
+    #[test]
+    fn yq_layout_display() {
+        let l = super::YqTextLayout::yq_new(80);
+        assert!(format!("{}", l).contains("TextLayout"));
+    }
+
+    #[test]
+    fn yq_layout_default() {
+        let l = super::YqTextLayout::default();
+        assert_eq!(l.yq_width(), 80);
     }
 
 }
