@@ -17656,6 +17656,246 @@ impl ZuSecretStorage {
     }
 }
 
+
+// --- zv_ comments API types ---
+
+/// The mode of a comment (editing, preview, etc.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZvCommentMode {
+    Editing,
+    Preview,
+}
+
+/// Reaction on a comment (like, thumbs up, etc.)
+#[derive(Debug, Clone)]
+pub struct ZvReaction {
+    pub label: String,
+    pub icon_path: Option<String>,
+    pub count: u32,
+    pub has_reacted: bool,
+}
+
+impl ZvReaction {
+    pub fn new(label: &str, count: u32) -> Self {
+        Self { label: label.to_string(), icon_path: None, count, has_reacted: false }
+    }
+
+    pub fn toggle(&mut self) {
+        if self.has_reacted {
+            self.count = self.count.saturating_sub(1);
+            self.has_reacted = false;
+        } else {
+            self.count += 1;
+            self.has_reacted = true;
+        }
+    }
+}
+
+/// Author of a comment.
+#[derive(Debug, Clone)]
+pub struct ZvCommentAuthor {
+    pub name: String,
+    pub icon_path: Option<String>,
+}
+
+impl ZvCommentAuthor {
+    pub fn new(name: &str) -> Self {
+        Self { name: name.to_string(), icon_path: None }
+    }
+
+    pub fn with_icon(mut self, path: &str) -> Self {
+        self.icon_path = Some(path.to_string());
+        self
+    }
+}
+
+/// A single comment in a thread.
+#[derive(Debug, Clone)]
+pub struct ZvComment {
+    pub body: String,
+    pub mode: ZvCommentMode,
+    pub author: ZvCommentAuthor,
+    pub reactions: Vec<ZvReaction>,
+    pub context_value: Option<String>,
+    pub timestamp: Option<u64>,
+}
+
+impl ZvComment {
+    pub fn new(body: &str, author: ZvCommentAuthor) -> Self {
+        Self {
+            body: body.to_string(),
+            mode: ZvCommentMode::Preview,
+            author,
+            reactions: Vec::new(),
+            context_value: None,
+            timestamp: None,
+        }
+    }
+
+    pub fn with_timestamp(mut self, ts: u64) -> Self {
+        self.timestamp = Some(ts);
+        self
+    }
+
+    pub fn add_reaction(&mut self, reaction: ZvReaction) {
+        self.reactions.push(reaction);
+    }
+
+    pub fn set_mode(&mut self, mode: ZvCommentMode) {
+        self.mode = mode;
+    }
+
+    pub fn total_reactions(&self) -> u32 {
+        self.reactions.iter().map(|r| r.count).sum()
+    }
+}
+
+/// State of a comment thread (unresolved, resolved, etc.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZvThreadState {
+    Unresolved,
+    Resolved,
+}
+
+/// Collapsible state for a comment thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZvCollapsibleState {
+    Collapsed,
+    Expanded,
+}
+
+/// A thread of comments anchored to a location.
+#[derive(Debug, Clone)]
+pub struct ZvCommentThread {
+    pub uri: String,
+    pub line: u32,
+    pub comments: Vec<ZvComment>,
+    pub state: ZvThreadState,
+    pub collapsible: ZvCollapsibleState,
+    pub label: Option<String>,
+    pub can_reply: bool,
+    disposed: bool,
+}
+
+impl ZvCommentThread {
+    pub fn new(uri: &str, line: u32) -> Self {
+        Self {
+            uri: uri.to_string(),
+            line,
+            comments: Vec::new(),
+            state: ZvThreadState::Unresolved,
+            collapsible: ZvCollapsibleState::Expanded,
+            label: None,
+            can_reply: true,
+            disposed: false,
+        }
+    }
+
+    pub fn add_comment(&mut self, comment: ZvComment) {
+        self.comments.push(comment);
+    }
+
+    pub fn resolve(&mut self) {
+        self.state = ZvThreadState::Resolved;
+    }
+
+    pub fn unresolve(&mut self) {
+        self.state = ZvThreadState::Unresolved;
+    }
+
+    pub fn collapse(&mut self) {
+        self.collapsible = ZvCollapsibleState::Collapsed;
+    }
+
+    pub fn expand(&mut self) {
+        self.collapsible = ZvCollapsibleState::Expanded;
+    }
+
+    pub fn comment_count(&self) -> usize {
+        self.comments.len()
+    }
+
+    pub fn is_resolved(&self) -> bool {
+        self.state == ZvThreadState::Resolved
+    }
+
+    pub fn dispose(&mut self) {
+        self.disposed = true;
+    }
+
+    pub fn is_disposed(&self) -> bool {
+        self.disposed
+    }
+
+    pub fn set_label(&mut self, label: &str) {
+        self.label = Some(label.to_string());
+    }
+}
+
+/// A comment controller that manages threads for a resource.
+#[derive(Debug, Clone)]
+pub struct ZvCommentController {
+    pub id: String,
+    pub label: String,
+    threads: Vec<ZvCommentThread>,
+    pub commenting_range_provider: bool,
+    pub reaction_handler: bool,
+}
+
+impl ZvCommentController {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            threads: Vec::new(),
+            commenting_range_provider: false,
+            reaction_handler: false,
+        }
+    }
+
+    pub fn create_thread(&mut self, uri: &str, line: u32) -> usize {
+        let idx = self.threads.len();
+        self.threads.push(ZvCommentThread::new(uri, line));
+        idx
+    }
+
+    pub fn thread(&self, idx: usize) -> Option<&ZvCommentThread> {
+        self.threads.get(idx)
+    }
+
+    pub fn thread_mut(&mut self, idx: usize) -> Option<&mut ZvCommentThread> {
+        self.threads.get_mut(idx)
+    }
+
+    pub fn threads_for_uri(&self, uri: &str) -> Vec<&ZvCommentThread> {
+        self.threads.iter().filter(|t| t.uri == uri && !t.is_disposed()).collect()
+    }
+
+    pub fn thread_count(&self) -> usize {
+        self.threads.len()
+    }
+
+    pub fn active_thread_count(&self) -> usize {
+        self.threads.iter().filter(|t| !t.is_disposed()).count()
+    }
+
+    pub fn dispose_thread(&mut self, idx: usize) {
+        if let Some(t) = self.threads.get_mut(idx) {
+            t.dispose();
+        }
+    }
+
+    pub fn with_commenting_ranges(mut self) -> Self {
+        self.commenting_range_provider = true;
+        self
+    }
+
+    pub fn with_reaction_handler(mut self) -> Self {
+        self.reaction_handler = true;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28948,6 +29188,107 @@ mod tests {
         ss.store("b", "2");
         assert_eq!(ss.keys().len(), 2);
         assert!(!ss.delete("c"));
+    }
+
+
+    // --- zv_ comments API tests ---
+
+    #[test]
+    fn test_zv_reaction_toggle() {
+        let mut r = ZvReaction::new("👍", 5);
+        assert!(!r.has_reacted);
+        r.toggle();
+        assert!(r.has_reacted);
+        assert_eq!(r.count, 6);
+        r.toggle();
+        assert!(!r.has_reacted);
+        assert_eq!(r.count, 5);
+    }
+
+    #[test]
+    fn test_zv_comment_author() {
+        let author = ZvCommentAuthor::new("Alice").with_icon("/icons/alice.png");
+        assert_eq!(author.name, "Alice");
+        assert_eq!(author.icon_path.as_deref(), Some("/icons/alice.png"));
+    }
+
+    #[test]
+    fn test_zv_comment() {
+        let author = ZvCommentAuthor::new("Bob");
+        let mut c = ZvComment::new("Great work!", author).with_timestamp(1000);
+        assert_eq!(c.body, "Great work!");
+        assert_eq!(c.mode, ZvCommentMode::Preview);
+        assert_eq!(c.timestamp, Some(1000));
+        c.add_reaction(ZvReaction::new("❤️", 3));
+        assert_eq!(c.total_reactions(), 3);
+        c.set_mode(ZvCommentMode::Editing);
+        assert_eq!(c.mode, ZvCommentMode::Editing);
+    }
+
+    #[test]
+    fn test_zv_comment_thread() {
+        let mut thread = ZvCommentThread::new("file:///main.rs", 10);
+        assert!(!thread.is_resolved());
+        assert!(thread.can_reply);
+        let c = ZvComment::new("Fix this", ZvCommentAuthor::new("Alice"));
+        thread.add_comment(c);
+        assert_eq!(thread.comment_count(), 1);
+        thread.resolve();
+        assert!(thread.is_resolved());
+        thread.unresolve();
+        assert!(!thread.is_resolved());
+    }
+
+    #[test]
+    fn test_zv_comment_thread_collapse() {
+        let mut thread = ZvCommentThread::new("f", 0);
+        assert_eq!(thread.collapsible, ZvCollapsibleState::Expanded);
+        thread.collapse();
+        assert_eq!(thread.collapsible, ZvCollapsibleState::Collapsed);
+        thread.expand();
+        assert_eq!(thread.collapsible, ZvCollapsibleState::Expanded);
+    }
+
+    #[test]
+    fn test_zv_comment_thread_dispose() {
+        let mut thread = ZvCommentThread::new("f", 0);
+        assert!(!thread.is_disposed());
+        thread.dispose();
+        assert!(thread.is_disposed());
+    }
+
+    #[test]
+    fn test_zv_comment_thread_label() {
+        let mut thread = ZvCommentThread::new("f", 0);
+        assert!(thread.label.is_none());
+        thread.set_label("Review");
+        assert_eq!(thread.label.as_deref(), Some("Review"));
+    }
+
+    #[test]
+    fn test_zv_comment_controller() {
+        let mut ctrl = ZvCommentController::new("review", "Code Review")
+            .with_commenting_ranges()
+            .with_reaction_handler();
+        assert!(ctrl.commenting_range_provider);
+        assert!(ctrl.reaction_handler);
+        let idx = ctrl.create_thread("file:///a.rs", 5);
+        ctrl.thread_mut(idx).unwrap().add_comment(
+            ZvComment::new("Check this", ZvCommentAuthor::new("C"))
+        );
+        assert_eq!(ctrl.thread_count(), 1);
+        assert_eq!(ctrl.active_thread_count(), 1);
+        assert_eq!(ctrl.threads_for_uri("file:///a.rs").len(), 1);
+        assert!(ctrl.threads_for_uri("file:///b.rs").is_empty());
+    }
+
+    #[test]
+    fn test_zv_comment_controller_dispose_thread() {
+        let mut ctrl = ZvCommentController::new("c", "C");
+        let idx = ctrl.create_thread("f", 0);
+        ctrl.dispose_thread(idx);
+        assert!(ctrl.thread(idx).unwrap().is_disposed());
+        assert_eq!(ctrl.active_thread_count(), 0);
     }
 
 }
