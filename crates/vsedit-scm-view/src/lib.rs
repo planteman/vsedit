@@ -8678,6 +8678,321 @@ impl YaBloomFilter {
     }
 }
 
+
+// --- yb_ Ternary Search Tree ---
+
+/// Node in a ternary search tree (TST) for space-efficient string storage.
+#[derive(Debug, Clone)]
+pub struct YbTstNode<V: Clone> {
+    yb_ch: char,
+    yb_left: Option<Box<YbTstNode<V>>>,
+    yb_mid: Option<Box<YbTstNode<V>>>,
+    yb_right: Option<Box<YbTstNode<V>>>,
+    yb_value: Option<V>,
+}
+
+impl<V: Clone> YbTstNode<V> {
+    fn yb_new(ch: char) -> Self {
+        Self { yb_ch: ch, yb_left: None, yb_mid: None, yb_right: None, yb_value: None }
+    }
+}
+
+/// Ternary search tree for efficient string-keyed storage with prefix queries.
+#[derive(Debug, Clone)]
+pub struct YbTernarySearchTree<V: Clone> {
+    yb_root: Option<Box<YbTstNode<V>>>,
+    yb_size: usize,
+}
+
+impl<V: Clone> Default for YbTernarySearchTree<V> {
+    fn default() -> Self { Self { yb_root: None, yb_size: 0 } }
+}
+
+impl<V: Clone + std::fmt::Display> std::fmt::Display for YbTernarySearchTree<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TST(size={})", self.yb_size)
+    }
+}
+
+impl<V: Clone> YbTernarySearchTree<V> {
+    /// Create an empty TST.
+    pub fn yb_new() -> Self { Self { yb_root: None, yb_size: 0 } }
+
+    /// Number of stored keys.
+    pub fn yb_len(&self) -> usize { self.yb_size }
+
+    /// Is the tree empty.
+    pub fn yb_is_empty(&self) -> bool { self.yb_size == 0 }
+
+    /// Insert a key-value pair.
+    pub fn yb_insert(&mut self, key: &str, value: V) {
+        if key.is_empty() { return; }
+        let chars: Vec<char> = key.chars().collect();
+        let was_new = Self::yb_insert_node(&mut self.yb_root, &chars, 0, value);
+        if was_new { self.yb_size += 1; }
+    }
+
+    fn yb_insert_node(node: &mut Option<Box<YbTstNode<V>>>, chars: &[char], depth: usize, value: V) -> bool {
+        let ch = chars[depth];
+        if node.is_none() { *node = Some(Box::new(YbTstNode::yb_new(ch))); }
+        let n = node.as_mut().unwrap();
+        if ch < n.yb_ch {
+            Self::yb_insert_node(&mut n.yb_left, chars, depth, value)
+        } else if ch > n.yb_ch {
+            Self::yb_insert_node(&mut n.yb_right, chars, depth, value)
+        } else if depth + 1 < chars.len() {
+            Self::yb_insert_node(&mut n.yb_mid, chars, depth + 1, value)
+        } else {
+            let was_new = n.yb_value.is_none();
+            n.yb_value = Some(value);
+            was_new
+        }
+    }
+
+    /// Look up a key.
+    pub fn yb_get(&self, key: &str) -> Option<&V> {
+        if key.is_empty() { return None; }
+        let chars: Vec<char> = key.chars().collect();
+        Self::yb_get_node(self.yb_root.as_deref(), &chars, 0)
+    }
+
+    fn yb_get_node<'a>(node: Option<&'a YbTstNode<V>>, chars: &[char], depth: usize) -> Option<&'a V> {
+        let n = node?;
+        let ch = chars[depth];
+        if ch < n.yb_ch {
+            Self::yb_get_node(n.yb_left.as_deref(), chars, depth)
+        } else if ch > n.yb_ch {
+            Self::yb_get_node(n.yb_right.as_deref(), chars, depth)
+        } else if depth + 1 < chars.len() {
+            Self::yb_get_node(n.yb_mid.as_deref(), chars, depth + 1)
+        } else {
+            n.yb_value.as_ref()
+        }
+    }
+
+    /// Check if a key exists.
+    pub fn yb_contains(&self, key: &str) -> bool { self.yb_get(key).is_some() }
+
+    /// Collect all keys.
+    pub fn yb_all_keys(&self) -> Vec<String> {
+        let mut results = Vec::new();
+        let mut current = String::new();
+        Self::yb_collect(self.yb_root.as_deref(), &mut current, &mut results);
+        results
+    }
+
+    fn yb_collect(node: Option<&YbTstNode<V>>, current: &mut String, results: &mut Vec<String>) {
+        let Some(n) = node else { return };
+        Self::yb_collect(n.yb_left.as_deref(), current, results);
+        current.push(n.yb_ch);
+        if n.yb_value.is_some() { results.push(current.clone()); }
+        Self::yb_collect(n.yb_mid.as_deref(), current, results);
+        current.pop();
+        Self::yb_collect(n.yb_right.as_deref(), current, results);
+    }
+
+    /// Collect keys with a given prefix.
+    pub fn yb_keys_with_prefix(&self, prefix: &str) -> Vec<String> {
+        if prefix.is_empty() { return self.yb_all_keys(); }
+        let chars: Vec<char> = prefix.chars().collect();
+        let node = Self::yb_prefix_node(self.yb_root.as_deref(), &chars, 0);
+        let mut results = Vec::new();
+        if let Some(n) = node {
+            if n.yb_value.is_some() { results.push(prefix.to_string()); }
+            let mut current = prefix.to_string();
+            Self::yb_collect(n.yb_mid.as_deref(), &mut current, &mut results);
+        }
+        results
+    }
+
+    fn yb_prefix_node<'a>(node: Option<&'a YbTstNode<V>>, chars: &[char], depth: usize) -> Option<&'a YbTstNode<V>> {
+        let n = node?;
+        let ch = chars[depth];
+        if ch < n.yb_ch {
+            Self::yb_prefix_node(n.yb_left.as_deref(), chars, depth)
+        } else if ch > n.yb_ch {
+            Self::yb_prefix_node(n.yb_right.as_deref(), chars, depth)
+        } else if depth + 1 < chars.len() {
+            Self::yb_prefix_node(n.yb_mid.as_deref(), chars, depth + 1)
+        } else {
+            Some(n)
+        }
+    }
+
+    /// Clear the tree.
+    pub fn yb_clear(&mut self) { self.yb_root = None; self.yb_size = 0; }
+}
+
+// --- yb_ Quadtree ---
+
+/// A point in 2D space for quadtree storage.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct YbPoint {
+    pub yb_x: f64,
+    pub yb_y: f64,
+}
+
+impl std::fmt::Display for YbPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:.2}, {:.2})", self.yb_x, self.yb_y)
+    }
+}
+
+impl Default for YbPoint {
+    fn default() -> Self { Self { yb_x: 0.0, yb_y: 0.0 } }
+}
+
+impl YbPoint {
+    /// Create a new point.
+    pub fn yb_new(x: f64, y: f64) -> Self { Self { yb_x: x, yb_y: y } }
+
+    /// Distance to another point.
+    pub fn yb_distance(&self, other: &YbPoint) -> f64 {
+        ((self.yb_x - other.yb_x).powi(2) + (self.yb_y - other.yb_y).powi(2)).sqrt()
+    }
+}
+
+/// Axis-aligned bounding box for quadtree partitioning.
+#[derive(Debug, Clone, Copy)]
+pub struct YbBounds {
+    pub yb_x: f64,
+    pub yb_y: f64,
+    pub yb_w: f64,
+    pub yb_h: f64,
+}
+
+impl std::fmt::Display for YbBounds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bounds({:.1},{:.1} {}x{})", self.yb_x, self.yb_y, self.yb_w, self.yb_h)
+    }
+}
+
+impl Default for YbBounds {
+    fn default() -> Self { Self { yb_x: 0.0, yb_y: 0.0, yb_w: 100.0, yb_h: 100.0 } }
+}
+
+impl YbBounds {
+    /// Create bounds from origin and size.
+    pub fn yb_new(x: f64, y: f64, w: f64, h: f64) -> Self { Self { yb_x: x, yb_y: y, yb_w: w, yb_h: h } }
+
+    /// Check if a point is inside these bounds.
+    pub fn yb_contains(&self, p: &YbPoint) -> bool {
+        p.yb_x >= self.yb_x && p.yb_x < self.yb_x + self.yb_w &&
+        p.yb_y >= self.yb_y && p.yb_y < self.yb_y + self.yb_h
+    }
+
+    /// Check if two bounds intersect.
+    pub fn yb_intersects(&self, other: &YbBounds) -> bool {
+        !(self.yb_x + self.yb_w <= other.yb_x || other.yb_x + other.yb_w <= self.yb_x ||
+          self.yb_y + self.yb_h <= other.yb_y || other.yb_y + other.yb_h <= self.yb_y)
+    }
+}
+
+/// Quadtree for 2D spatial indexing with region queries.
+#[derive(Debug, Clone)]
+pub struct YbQuadtree {
+    yb_bounds: YbBounds,
+    yb_points: Vec<YbPoint>,
+    yb_capacity: usize,
+    yb_nw: Option<Box<YbQuadtree>>,
+    yb_ne: Option<Box<YbQuadtree>>,
+    yb_sw: Option<Box<YbQuadtree>>,
+    yb_se: Option<Box<YbQuadtree>>,
+    yb_divided: bool,
+}
+
+impl std::fmt::Display for YbQuadtree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Quadtree(points={}, bounds={})", self.yb_count(), self.yb_bounds)
+    }
+}
+
+impl Default for YbQuadtree {
+    fn default() -> Self { Self::yb_new(YbBounds::default(), 4) }
+}
+
+impl YbQuadtree {
+    /// Create a new quadtree with given bounds and node capacity.
+    pub fn yb_new(bounds: YbBounds, capacity: usize) -> Self {
+        Self {
+            yb_bounds: bounds, yb_points: Vec::new(), yb_capacity: capacity.max(1),
+            yb_nw: None, yb_ne: None, yb_sw: None, yb_se: None, yb_divided: false,
+        }
+    }
+
+    fn yb_subdivide(&mut self) {
+        let x = self.yb_bounds.yb_x;
+        let y = self.yb_bounds.yb_y;
+        let hw = self.yb_bounds.yb_w / 2.0;
+        let hh = self.yb_bounds.yb_h / 2.0;
+        self.yb_nw = Some(Box::new(YbQuadtree::yb_new(YbBounds::yb_new(x, y, hw, hh), self.yb_capacity)));
+        self.yb_ne = Some(Box::new(YbQuadtree::yb_new(YbBounds::yb_new(x + hw, y, hw, hh), self.yb_capacity)));
+        self.yb_sw = Some(Box::new(YbQuadtree::yb_new(YbBounds::yb_new(x, y + hh, hw, hh), self.yb_capacity)));
+        self.yb_se = Some(Box::new(YbQuadtree::yb_new(YbBounds::yb_new(x + hw, y + hh, hw, hh), self.yb_capacity)));
+        self.yb_divided = true;
+    }
+
+    /// Insert a point.
+    pub fn yb_insert(&mut self, point: YbPoint) -> bool {
+        if !self.yb_bounds.yb_contains(&point) { return false; }
+        if self.yb_points.len() < self.yb_capacity && !self.yb_divided {
+            self.yb_points.push(point);
+            return true;
+        }
+        if !self.yb_divided { self.yb_subdivide(); }
+        if self.yb_nw.as_mut().unwrap().yb_insert(point) { return true; }
+        if self.yb_ne.as_mut().unwrap().yb_insert(point) { return true; }
+        if self.yb_sw.as_mut().unwrap().yb_insert(point) { return true; }
+        self.yb_se.as_mut().unwrap().yb_insert(point)
+    }
+
+    /// Query all points within a rectangular region.
+    pub fn yb_query(&self, range: &YbBounds) -> Vec<YbPoint> {
+        let mut found = Vec::new();
+        self.yb_query_inner(range, &mut found);
+        found
+    }
+
+    fn yb_query_inner(&self, range: &YbBounds, found: &mut Vec<YbPoint>) {
+        if !self.yb_bounds.yb_intersects(range) { return; }
+        for p in &self.yb_points {
+            if range.yb_contains(p) { found.push(*p); }
+        }
+        if self.yb_divided {
+            self.yb_nw.as_ref().unwrap().yb_query_inner(range, found);
+            self.yb_ne.as_ref().unwrap().yb_query_inner(range, found);
+            self.yb_sw.as_ref().unwrap().yb_query_inner(range, found);
+            self.yb_se.as_ref().unwrap().yb_query_inner(range, found);
+        }
+    }
+
+    /// Count total points.
+    pub fn yb_count(&self) -> usize {
+        let mut c = self.yb_points.len();
+        if self.yb_divided {
+            c += self.yb_nw.as_ref().unwrap().yb_count();
+            c += self.yb_ne.as_ref().unwrap().yb_count();
+            c += self.yb_sw.as_ref().unwrap().yb_count();
+            c += self.yb_se.as_ref().unwrap().yb_count();
+        }
+        c
+    }
+
+    /// Is the quadtree empty.
+    pub fn yb_is_empty(&self) -> bool { self.yb_count() == 0 }
+
+    /// Get bounds.
+    pub fn yb_bounds(&self) -> &YbBounds { &self.yb_bounds }
+
+    /// Find nearest point to a target.
+    pub fn yb_nearest(&self, target: &YbPoint) -> Option<YbPoint> {
+        let all = self.yb_query(&self.yb_bounds);
+        all.into_iter().min_by(|a, b| {
+            a.yb_distance(target).partial_cmp(&b.yb_distance(target)).unwrap_or(std::cmp::Ordering::Equal)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -14096,6 +14411,157 @@ index abc..def 100644
     fn ya_bloom_default() {
         let bf = super::YaBloomFilter::default();
         assert_eq!(bf.ya_num_hashes(), 5);
+    }
+
+
+    // --- yb_ TST tests ---
+
+    #[test]
+    fn yb_tst_new() {
+        let t = super::YbTernarySearchTree::<i32>::yb_new();
+        assert!(t.yb_is_empty());
+    }
+
+    #[test]
+    fn yb_tst_insert_get() {
+        let mut t = super::YbTernarySearchTree::yb_new();
+        t.yb_insert("hello", 1);
+        t.yb_insert("world", 2);
+        assert_eq!(t.yb_get("hello"), Some(&1));
+        assert_eq!(t.yb_get("world"), Some(&2));
+        assert_eq!(t.yb_get("missing"), None);
+    }
+
+    #[test]
+    fn yb_tst_contains() {
+        let mut t = super::YbTernarySearchTree::yb_new();
+        t.yb_insert("abc", 10);
+        assert!(t.yb_contains("abc"));
+        assert!(!t.yb_contains("ab"));
+    }
+
+    #[test]
+    fn yb_tst_all_keys() {
+        let mut t = super::YbTernarySearchTree::yb_new();
+        t.yb_insert("b", 1);
+        t.yb_insert("a", 2);
+        t.yb_insert("c", 3);
+        let keys = t.yb_all_keys();
+        assert_eq!(keys.len(), 3);
+    }
+
+    #[test]
+    fn yb_tst_prefix() {
+        let mut t = super::YbTernarySearchTree::yb_new();
+        t.yb_insert("cat", 1);
+        t.yb_insert("car", 2);
+        t.yb_insert("dog", 3);
+        let keys = t.yb_keys_with_prefix("ca");
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn yb_tst_clear() {
+        let mut t = super::YbTernarySearchTree::yb_new();
+        t.yb_insert("a", 1);
+        t.yb_clear();
+        assert!(t.yb_is_empty());
+    }
+
+    #[test]
+    fn yb_tst_display() {
+        let t = super::YbTernarySearchTree::<i32>::yb_new();
+        assert!(format!("{}", t).contains("TST"));
+    }
+
+    #[test]
+    fn yb_tst_default() {
+        let t = super::YbTernarySearchTree::<i32>::default();
+        assert!(t.yb_is_empty());
+    }
+
+    #[test]
+    fn yb_tst_overwrite() {
+        let mut t = super::YbTernarySearchTree::yb_new();
+        t.yb_insert("key", 1);
+        t.yb_insert("key", 2);
+        assert_eq!(t.yb_get("key"), Some(&2));
+        assert_eq!(t.yb_len(), 1);
+    }
+
+    // --- yb_ Quadtree tests ---
+
+    #[test]
+    fn yb_quad_new() {
+        let q = super::YbQuadtree::yb_new(super::YbBounds::yb_new(0.0, 0.0, 100.0, 100.0), 4);
+        assert!(q.yb_is_empty());
+    }
+
+    #[test]
+    fn yb_quad_insert() {
+        let mut q = super::YbQuadtree::yb_new(super::YbBounds::yb_new(0.0, 0.0, 100.0, 100.0), 4);
+        assert!(q.yb_insert(super::YbPoint::yb_new(50.0, 50.0)));
+        assert_eq!(q.yb_count(), 1);
+    }
+
+    #[test]
+    fn yb_quad_query() {
+        let mut q = super::YbQuadtree::yb_new(super::YbBounds::yb_new(0.0, 0.0, 100.0, 100.0), 2);
+        q.yb_insert(super::YbPoint::yb_new(10.0, 10.0));
+        q.yb_insert(super::YbPoint::yb_new(90.0, 90.0));
+        q.yb_insert(super::YbPoint::yb_new(15.0, 15.0));
+        let found = q.yb_query(&super::YbBounds::yb_new(0.0, 0.0, 50.0, 50.0));
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn yb_quad_outside() {
+        let mut q = super::YbQuadtree::yb_new(super::YbBounds::yb_new(0.0, 0.0, 100.0, 100.0), 4);
+        assert!(!q.yb_insert(super::YbPoint::yb_new(200.0, 200.0)));
+    }
+
+    #[test]
+    fn yb_quad_nearest() {
+        let mut q = super::YbQuadtree::yb_new(super::YbBounds::yb_new(0.0, 0.0, 100.0, 100.0), 4);
+        q.yb_insert(super::YbPoint::yb_new(10.0, 10.0));
+        q.yb_insert(super::YbPoint::yb_new(90.0, 90.0));
+        let near = q.yb_nearest(&super::YbPoint::yb_new(12.0, 12.0)).unwrap();
+        assert!((near.yb_x - 10.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn yb_quad_display() {
+        let q = super::YbQuadtree::default();
+        assert!(format!("{}", q).contains("Quadtree"));
+    }
+
+    #[test]
+    fn yb_quad_default() {
+        let q = super::YbQuadtree::default();
+        assert!(q.yb_is_empty());
+    }
+
+    #[test]
+    fn yb_quad_many() {
+        let mut q = super::YbQuadtree::yb_new(super::YbBounds::yb_new(0.0, 0.0, 100.0, 100.0), 2);
+        for i in 0..20 {
+            q.yb_insert(super::YbPoint::yb_new(i as f64 * 4.0, i as f64 * 4.0));
+        }
+        assert_eq!(q.yb_count(), 20);
+    }
+
+    #[test]
+    fn yb_point_distance() {
+        let a = super::YbPoint::yb_new(0.0, 0.0);
+        let b = super::YbPoint::yb_new(3.0, 4.0);
+        assert!((a.yb_distance(&b) - 5.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn yb_bounds_intersects() {
+        let a = super::YbBounds::yb_new(0.0, 0.0, 50.0, 50.0);
+        let b = super::YbBounds::yb_new(25.0, 25.0, 50.0, 50.0);
+        assert!(a.yb_intersects(&b));
     }
 
 }
