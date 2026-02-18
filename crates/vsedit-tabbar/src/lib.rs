@@ -17137,6 +17137,250 @@ impl ZsConfigSchema {
     }
 }
 
+
+// --- zt_ language feature provider types ---
+
+/// Options for document formatting.
+#[derive(Debug, Clone)]
+pub struct ZtFormattingOptions {
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing_whitespace: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+}
+
+impl ZtFormattingOptions {
+    pub fn new(tab_size: u32, insert_spaces: bool) -> Self {
+        Self {
+            tab_size,
+            insert_spaces,
+            trim_trailing_whitespace: false,
+            insert_final_newline: false,
+            trim_final_newlines: false,
+        }
+    }
+
+    pub fn indent_str(&self) -> String {
+        if self.insert_spaces {
+            " ".repeat(self.tab_size as usize)
+        } else {
+            "\t".to_string()
+        }
+    }
+}
+
+/// A text edit returned by a formatter.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZtTextEdit {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl ZtTextEdit {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+
+    pub fn is_empty_range(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    pub fn is_insert(&self) -> bool {
+        self.is_empty_range() && !self.new_text.is_empty()
+    }
+
+    pub fn is_delete(&self) -> bool {
+        !self.is_empty_range() && self.new_text.is_empty()
+    }
+}
+
+/// Result from a document formatter.
+#[derive(Debug, Clone)]
+pub struct ZtFormatResult {
+    pub edits: Vec<ZtTextEdit>,
+}
+
+impl ZtFormatResult {
+    pub fn new() -> Self {
+        Self { edits: Vec::new() }
+    }
+
+    pub fn add(&mut self, edit: ZtTextEdit) {
+        self.edits.push(edit);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
+    pub fn sort_edits(&mut self) {
+        self.edits.sort_by(|a, b| {
+            a.start_line.cmp(&b.start_line).then(a.start_col.cmp(&b.start_col))
+        });
+    }
+}
+
+/// Kind of a document link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ZtLinkKind {
+    Url,
+    File,
+    Definition,
+    Reference,
+}
+
+/// A resolved link in a document.
+#[derive(Debug, Clone)]
+pub struct ZtDocumentLink {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub target: String,
+    pub tooltip: Option<String>,
+    pub kind: ZtLinkKind,
+}
+
+impl ZtDocumentLink {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, target: &str, kind: ZtLinkKind) -> Self {
+        Self {
+            start_line: sl, start_col: sc, end_line: el, end_col: ec,
+            target: target.to_string(), tooltip: None, kind,
+        }
+    }
+
+    pub fn with_tooltip(mut self, tip: &str) -> Self {
+        self.tooltip = Some(tip.to_string());
+        self
+    }
+}
+
+/// An on-type formatting trigger.
+#[derive(Debug, Clone)]
+pub struct ZtOnTypeFormatting {
+    pub trigger_chars: Vec<char>,
+    pub more_trigger_chars: Vec<char>,
+}
+
+impl ZtOnTypeFormatting {
+    pub fn new(first: char) -> Self {
+        Self { trigger_chars: vec![first], more_trigger_chars: Vec::new() }
+    }
+
+    pub fn add_trigger(mut self, ch: char) -> Self {
+        self.more_trigger_chars.push(ch);
+        self
+    }
+
+    pub fn all_triggers(&self) -> Vec<char> {
+        let mut all = self.trigger_chars.clone();
+        all.extend(&self.more_trigger_chars);
+        all
+    }
+
+    pub fn is_trigger(&self, ch: char) -> bool {
+        self.trigger_chars.contains(&ch) || self.more_trigger_chars.contains(&ch)
+    }
+}
+
+/// A color presentation (e.g., #ff0000, rgb(255, 0, 0)).
+#[derive(Debug, Clone)]
+pub struct ZtColorPresentation {
+    pub label: String,
+    pub text_edit: Option<ZtTextEdit>,
+    pub additional_edits: Vec<ZtTextEdit>,
+}
+
+impl ZtColorPresentation {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), text_edit: None, additional_edits: Vec::new() }
+    }
+
+    pub fn with_edit(mut self, edit: ZtTextEdit) -> Self {
+        self.text_edit = Some(edit);
+        self
+    }
+
+    pub fn add_edit(mut self, edit: ZtTextEdit) -> Self {
+        self.additional_edits.push(edit);
+        self
+    }
+}
+
+/// A color occurrence in a document.
+#[derive(Debug, Clone)]
+pub struct ZtColorInfo {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub red: f64,
+    pub green: f64,
+    pub blue: f64,
+    pub alpha: f64,
+}
+
+impl ZtColorInfo {
+    pub fn new(line: u32, sc: u32, ec: u32, r: f64, g: f64, b: f64, a: f64) -> Self {
+        Self { line, start_col: sc, end_col: ec, red: r, green: g, blue: b, alpha: a }
+    }
+
+    pub fn to_hex(&self) -> String {
+        format!("#{:02x}{:02x}{:02x}",
+            (self.red * 255.0) as u8,
+            (self.green * 255.0) as u8,
+            (self.blue * 255.0) as u8)
+    }
+
+    pub fn to_rgb_string(&self) -> String {
+        format!("rgb({}, {}, {})",
+            (self.red * 255.0) as u8,
+            (self.green * 255.0) as u8,
+            (self.blue * 255.0) as u8)
+    }
+}
+
+/// Provider registration for language features with a document selector.
+#[derive(Debug, Clone)]
+pub struct ZtProviderRegistration {
+    pub id: String,
+    pub language_ids: Vec<String>,
+    pub schemes: Vec<String>,
+    pub patterns: Vec<String>,
+}
+
+impl ZtProviderRegistration {
+    pub fn new(id: &str) -> Self {
+        Self { id: id.to_string(), language_ids: Vec::new(), schemes: Vec::new(), patterns: Vec::new() }
+    }
+
+    pub fn for_language(mut self, lang: &str) -> Self {
+        self.language_ids.push(lang.to_string());
+        self
+    }
+
+    pub fn for_scheme(mut self, scheme: &str) -> Self {
+        self.schemes.push(scheme.to_string());
+        self
+    }
+
+    pub fn for_pattern(mut self, pattern: &str) -> Self {
+        self.patterns.push(pattern.to_string());
+        self
+    }
+
+    pub fn matches_language(&self, lang: &str) -> bool {
+        self.language_ids.is_empty() || self.language_ids.iter().any(|l| l == lang)
+    }
+
+    pub fn matches_scheme(&self, scheme: &str) -> bool {
+        self.schemes.is_empty() || self.schemes.iter().any(|s| s == scheme)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28235,6 +28479,95 @@ mod tests {
         let schema = ZsConfigSchema::new("k", "boolean", ZsConfigValue::Bool(false), "desc")
             .with_scope(ZsConfigTarget::Workspace);
         assert_eq!(schema.scope, ZsConfigTarget::Workspace);
+    }
+
+
+    // --- zt_ language feature provider tests ---
+
+    #[test]
+    fn test_zt_formatting_options() {
+        let opts = ZtFormattingOptions::new(4, true);
+        assert_eq!(opts.indent_str(), "    ");
+        let opts2 = ZtFormattingOptions::new(1, false);
+        assert_eq!(opts2.indent_str(), "\t");
+    }
+
+    #[test]
+    fn test_zt_text_edit() {
+        let e = ZtTextEdit::new(0, 0, 0, 0, "hello");
+        assert!(e.is_insert());
+        assert!(!e.is_delete());
+        let d = ZtTextEdit::new(0, 0, 0, 5, "");
+        assert!(d.is_delete());
+        assert!(!d.is_insert());
+    }
+
+    #[test]
+    fn test_zt_format_result() {
+        let mut r = ZtFormatResult::new();
+        assert!(r.is_empty());
+        r.add(ZtTextEdit::new(2, 0, 2, 4, "  "));
+        r.add(ZtTextEdit::new(0, 0, 0, 2, "  "));
+        r.sort_edits();
+        assert_eq!(r.edits[0].start_line, 0);
+        assert_eq!(r.edits[1].start_line, 2);
+    }
+
+    #[test]
+    fn test_zt_document_link() {
+        let link = ZtDocumentLink::new(5, 10, 5, 30, "https://example.com", ZtLinkKind::Url)
+            .with_tooltip("Click to open");
+        assert_eq!(link.target, "https://example.com");
+        assert_eq!(link.tooltip.as_deref(), Some("Click to open"));
+        assert_eq!(link.kind, ZtLinkKind::Url);
+    }
+
+    #[test]
+    fn test_zt_on_type_formatting() {
+        let otf = ZtOnTypeFormatting::new(';').add_trigger('}').add_trigger('\n');
+        assert!(otf.is_trigger(';'));
+        assert!(otf.is_trigger('}'));
+        assert!(!otf.is_trigger('a'));
+        assert_eq!(otf.all_triggers().len(), 3);
+    }
+
+    #[test]
+    fn test_zt_color_presentation() {
+        let cp = ZtColorPresentation::new("#ff0000")
+            .with_edit(ZtTextEdit::new(1, 5, 1, 12, "#ff0000"));
+        assert_eq!(cp.label, "#ff0000");
+        assert!(cp.text_edit.is_some());
+    }
+
+    #[test]
+    fn test_zt_color_info() {
+        let ci = ZtColorInfo::new(10, 5, 12, 1.0, 0.0, 0.0, 1.0);
+        assert_eq!(ci.to_hex(), "#ff0000");
+        assert_eq!(ci.to_rgb_string(), "rgb(255, 0, 0)");
+    }
+
+    #[test]
+    fn test_zt_color_info_mixed() {
+        let ci = ZtColorInfo::new(0, 0, 7, 0.0, 0.5, 1.0, 1.0);
+        assert_eq!(ci.to_hex(), "#007fff");
+    }
+
+    #[test]
+    fn test_zt_provider_registration() {
+        let reg = ZtProviderRegistration::new("fmt")
+            .for_language("rust")
+            .for_scheme("file");
+        assert!(reg.matches_language("rust"));
+        assert!(!reg.matches_language("python"));
+        assert!(reg.matches_scheme("file"));
+        assert!(!reg.matches_scheme("untitled"));
+    }
+
+    #[test]
+    fn test_zt_provider_registration_empty_matches_all() {
+        let reg = ZtProviderRegistration::new("all");
+        assert!(reg.matches_language("anything"));
+        assert!(reg.matches_scheme("any"));
     }
 
 }
