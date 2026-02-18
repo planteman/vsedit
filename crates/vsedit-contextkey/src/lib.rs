@@ -24189,6 +24189,105 @@ impl AykRenameHistory {
     pub fn count(&self) -> usize { self.entries.len() }
 }
 
+
+// --- ayl_ document formatting provider ---
+
+/// Formatting options.
+#[derive(Debug, Clone)]
+pub struct AylFormattingOptions {
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing_whitespace: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+}
+
+impl AylFormattingOptions {
+    pub fn default_options() -> Self {
+        Self { tab_size: 4, insert_spaces: true, trim_trailing_whitespace: true,
+            insert_final_newline: true, trim_final_newlines: true }
+    }
+    pub fn indent_str(&self) -> String {
+        if self.insert_spaces { " ".repeat(self.tab_size as usize) } else { "\t".to_string() }
+    }
+}
+
+/// A formatting text edit.
+#[derive(Debug, Clone)]
+pub struct AylFormatEdit {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl AylFormatEdit {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+    pub fn whole_document(text: &str, total_lines: u32) -> Self {
+        Self { start_line: 0, start_col: 0, end_line: total_lines, end_col: 0, new_text: text.to_string() }
+    }
+}
+
+/// Formatting result.
+#[derive(Debug)]
+pub struct AylFormatResult {
+    pub edits: Vec<AylFormatEdit>,
+}
+
+impl AylFormatResult {
+    pub fn new() -> Self { Self { edits: Vec::new() } }
+    pub fn add(&mut self, edit: AylFormatEdit) { self.edits.push(edit); }
+    pub fn is_empty(&self) -> bool { self.edits.is_empty() }
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+}
+
+/// Simple whitespace formatter.
+pub struct AylWhitespaceFormatter;
+
+impl AylWhitespaceFormatter {
+    pub fn format_document(text: &str, opts: &AylFormattingOptions) -> String {
+        let mut lines: Vec<String> = text.lines().map(|l| {
+            let mut line = l.to_string();
+            if opts.trim_trailing_whitespace { line = line.trim_end().to_string(); }
+            line
+        }).collect();
+        if opts.trim_final_newlines {
+            while lines.last().map(|l| l.is_empty()).unwrap_or(false) { lines.pop(); }
+        }
+        let mut result = lines.join("\n");
+        if opts.insert_final_newline && !result.ends_with('\n') { result.push('\n'); }
+        result
+    }
+    pub fn format_range(text: &str, start_line: u32, end_line: u32, opts: &AylFormattingOptions) -> Vec<AylFormatEdit> {
+        let lines: Vec<&str> = text.lines().collect();
+        let mut edits = Vec::new();
+        for i in start_line..=end_line.min(lines.len() as u32 - 1) {
+            let line = lines[i as usize];
+            if opts.trim_trailing_whitespace {
+                let trimmed = line.trim_end();
+                if trimmed.len() != line.len() {
+                    edits.push(AylFormatEdit::new(i, trimmed.len() as u32, i, line.len() as u32, ""));
+                }
+            }
+        }
+        edits
+    }
+}
+
+/// On-type formatting trigger.
+#[derive(Debug, Clone)]
+pub struct AylOnTypeFormatting {
+    pub trigger_characters: Vec<char>,
+}
+
+impl AylOnTypeFormatting {
+    pub fn new(triggers: Vec<char>) -> Self { Self { trigger_characters: triggers } }
+    pub fn should_trigger(&self, c: char) -> bool { self.trigger_characters.contains(&c) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39075,6 +39174,69 @@ mod tests {
     fn test_ayk_valid_unicode_identifier() {
         assert!(AykRenameValidator::is_valid_identifier("_test_123"));
         assert!(!AykRenameValidator::is_valid_identifier("has space"));
+    }
+
+
+    #[test]
+    fn test_ayl_formatting_options() {
+        let opts = AylFormattingOptions::default_options();
+        assert_eq!(opts.tab_size, 4);
+        assert!(opts.insert_spaces);
+        assert_eq!(opts.indent_str(), "    ");
+    }
+
+    #[test]
+    fn test_ayl_format_document() {
+        let text = "hello   \nworld  \n\n\n";
+        let opts = AylFormattingOptions::default_options();
+        let result = AylWhitespaceFormatter::format_document(text, &opts);
+        assert!(!result.contains("   \n"));
+        assert!(result.ends_with('\n'));
+    }
+
+    #[test]
+    fn test_ayl_format_range() {
+        let text = "hello   \nworld  \nclean";
+        let opts = AylFormattingOptions::default_options();
+        let edits = AylWhitespaceFormatter::format_range(text, 0, 2, &opts);
+        assert_eq!(edits.len(), 2);
+    }
+
+    #[test]
+    fn test_ayl_format_edit() {
+        let edit = AylFormatEdit::whole_document("formatted", 10);
+        assert_eq!(edit.start_line, 0);
+        assert_eq!(edit.end_line, 10);
+    }
+
+    #[test]
+    fn test_ayl_format_result() {
+        let mut result = AylFormatResult::new();
+        assert!(result.is_empty());
+        result.add(AylFormatEdit::new(0, 0, 0, 5, "new"));
+        assert_eq!(result.edit_count(), 1);
+    }
+
+    #[test]
+    fn test_ayl_on_type() {
+        let ot = AylOnTypeFormatting::new(vec!['}', ';', '\n']);
+        assert!(ot.should_trigger('}'));
+        assert!(!ot.should_trigger('a'));
+    }
+
+    #[test]
+    fn test_ayl_no_trailing_whitespace() {
+        let text = "clean\nalso clean";
+        let opts = AylFormattingOptions::default_options();
+        let edits = AylWhitespaceFormatter::format_range(text, 0, 1, &opts);
+        assert!(edits.is_empty());
+    }
+
+    #[test]
+    fn test_ayl_tab_indent() {
+        let mut opts = AylFormattingOptions::default_options();
+        opts.insert_spaces = false;
+        assert_eq!(opts.indent_str(), "\t");
     }
 
 }
