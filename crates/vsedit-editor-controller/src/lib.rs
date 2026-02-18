@@ -25924,6 +25924,86 @@ impl AzcStickyRenderer {
     }
 }
 
+
+// --- azd_ profile management ---
+
+/// A user profile containing settings, extensions, and keybindings.
+#[derive(Debug, Clone)]
+pub struct AzdProfile {
+    pub id: String,
+    pub name: String,
+    pub settings: Vec<(String, String)>,
+    pub extensions: Vec<String>,
+    pub keybindings: Vec<(String, String)>,
+    pub is_default: bool,
+}
+
+impl AzdProfile {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self { id: id.to_string(), name: name.to_string(), settings: Vec::new(), extensions: Vec::new(), keybindings: Vec::new(), is_default: false }
+    }
+    pub fn default_profile() -> Self {
+        let mut p = Self::new("default", "Default");
+        p.is_default = true;
+        p
+    }
+    pub fn add_setting(&mut self, key: &str, val: &str) { self.settings.push((key.to_string(), val.to_string())); }
+    pub fn add_extension(&mut self, ext: &str) { self.extensions.push(ext.to_string()); }
+    pub fn add_keybinding(&mut self, key: &str, cmd: &str) { self.keybindings.push((key.to_string(), cmd.to_string())); }
+    pub fn get_setting(&self, key: &str) -> Option<&str> {
+        self.settings.iter().rev().find(|s| s.0 == key).map(|s| s.1.as_str())
+    }
+    pub fn has_extension(&self, ext: &str) -> bool { self.extensions.iter().any(|e| e == ext) }
+    pub fn extension_count(&self) -> usize { self.extensions.len() }
+}
+
+/// Profile store managing multiple profiles.
+#[derive(Debug)]
+pub struct AzdProfileStore {
+    pub profiles: Vec<AzdProfile>,
+    pub active_id: String,
+}
+
+impl AzdProfileStore {
+    pub fn new() -> Self {
+        let def = AzdProfile::default_profile();
+        let id = def.id.clone();
+        Self { profiles: vec![def], active_id: id }
+    }
+    pub fn add_profile(&mut self, p: AzdProfile) { self.profiles.push(p); }
+    pub fn switch_profile(&mut self, id: &str) -> bool {
+        if self.profiles.iter().any(|p| p.id == id) { self.active_id = id.to_string(); true } else { false }
+    }
+    pub fn active_profile(&self) -> Option<&AzdProfile> { self.profiles.iter().find(|p| p.id == self.active_id) }
+    pub fn profile_count(&self) -> usize { self.profiles.len() }
+    pub fn remove_profile(&mut self, id: &str) -> bool {
+        if id == "default" { return false; }
+        let before = self.profiles.len();
+        self.profiles.retain(|p| p.id != id);
+        if self.active_id == id { self.active_id = "default".to_string(); }
+        self.profiles.len() < before
+    }
+    pub fn profile_names(&self) -> Vec<&str> { self.profiles.iter().map(|p| p.name.as_str()).collect() }
+    pub fn find_profile(&self, id: &str) -> Option<&AzdProfile> { self.profiles.iter().find(|p| p.id == id) }
+}
+
+/// Profile export/import format.
+#[derive(Debug, Clone)]
+pub struct AzdProfileExport {
+    pub name: String,
+    pub settings_json: String,
+    pub extensions_list: Vec<String>,
+}
+
+impl AzdProfileExport {
+    pub fn from_profile(p: &AzdProfile) -> Self {
+        let json = p.settings.iter().map(|s| format!("{}={}", s.0, s.1)).collect::<Vec<_>>().join(",");
+        Self { name: p.name.clone(), settings_json: json, extensions_list: p.extensions.clone() }
+    }
+    pub fn has_settings(&self) -> bool { !self.settings_json.is_empty() }
+    pub fn has_extensions(&self) -> bool { !self.extensions_list.is_empty() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41946,6 +42026,79 @@ d");
         state.set_scopes(vec![AzcStickyScope::new("fn", 10, 50, 0, AzcScopeKind::Function)]);
         assert_eq!(state.sticky_line_count(10), 0);
         assert_eq!(state.sticky_line_count(11), 1);
+    }
+
+
+    #[test]
+    fn test_azd_profile() {
+        let mut p = AzdProfile::new("work", "Work");
+        p.add_setting("editor.fontSize", "14");
+        p.add_extension("rust-analyzer");
+        p.add_keybinding("ctrl+s", "workbench.action.files.save");
+        assert_eq!(p.get_setting("editor.fontSize"), Some("14"));
+        assert!(p.has_extension("rust-analyzer"));
+        assert!(!p.has_extension("python"));
+    }
+
+    #[test]
+    fn test_azd_default_profile() {
+        let p = AzdProfile::default_profile();
+        assert!(p.is_default);
+        assert_eq!(p.id, "default");
+    }
+
+    #[test]
+    fn test_azd_store() {
+        let mut store = AzdProfileStore::new();
+        assert_eq!(store.profile_count(), 1);
+        store.add_profile(AzdProfile::new("work", "Work"));
+        assert_eq!(store.profile_count(), 2);
+        assert!(store.switch_profile("work"));
+        assert_eq!(store.active_profile().unwrap().name, "Work");
+    }
+
+    #[test]
+    fn test_azd_remove_profile() {
+        let mut store = AzdProfileStore::new();
+        store.add_profile(AzdProfile::new("tmp", "Temp"));
+        store.switch_profile("tmp");
+        assert!(store.remove_profile("tmp"));
+        assert_eq!(store.active_id, "default");
+        assert!(!store.remove_profile("default"));
+    }
+
+    #[test]
+    fn test_azd_switch_invalid() {
+        let mut store = AzdProfileStore::new();
+        assert!(!store.switch_profile("nonexistent"));
+    }
+
+    #[test]
+    fn test_azd_profile_names() {
+        let mut store = AzdProfileStore::new();
+        store.add_profile(AzdProfile::new("a", "Alpha"));
+        let names = store.profile_names();
+        assert!(names.contains(&"Default"));
+        assert!(names.contains(&"Alpha"));
+    }
+
+    #[test]
+    fn test_azd_export() {
+        let mut p = AzdProfile::new("w", "Work");
+        p.add_setting("theme", "dark");
+        p.add_extension("ext1");
+        let ex = AzdProfileExport::from_profile(&p);
+        assert!(ex.has_settings());
+        assert!(ex.has_extensions());
+        assert!(ex.settings_json.contains("theme=dark"));
+    }
+
+    #[test]
+    fn test_azd_setting_override() {
+        let mut p = AzdProfile::new("x", "X");
+        p.add_setting("key", "old");
+        p.add_setting("key", "new");
+        assert_eq!(p.get_setting("key"), Some("new"));
     }
 
 }
