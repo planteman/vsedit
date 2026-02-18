@@ -3112,6 +3112,273 @@ impl Xh10BitSet {
     }
 }
 
+
+/// A double-ended queue backed by a ring buffer (variant 10).
+pub struct Xi10Deque<T> {
+    xi_buf: Vec<Option<T>>,
+    xi_head: usize,
+    xi_tail: usize,
+    xi_len: usize,
+}
+
+impl<T: Clone> Xi10Deque<T> {
+    /// Create a new deque with the given capacity.
+    pub fn xi_new(capacity: usize) -> Self {
+        let cap = capacity.max(4);
+        Self {
+            xi_buf: (0..cap).map(|_| None).collect(),
+            xi_head: 0,
+            xi_tail: 0,
+            xi_len: 0,
+        }
+    }
+
+    /// Return the number of elements.
+    pub fn xi_len(&self) -> usize {
+        self.xi_len
+    }
+
+    /// Return the capacity.
+    pub fn xi_capacity(&self) -> usize {
+        self.xi_buf.len()
+    }
+
+    /// Return true if empty.
+    pub fn xi_is_empty(&self) -> bool {
+        self.xi_len == 0
+    }
+
+    fn xi_grow(&mut self) {
+        let old_cap = self.xi_buf.len();
+        let new_cap = old_cap * 2;
+        let mut new_buf: Vec<Option<T>> = (0..new_cap).map(|_| None).collect();
+        for i in 0..self.xi_len {
+            let idx = (self.xi_head + i) % old_cap;
+            new_buf[i] = self.xi_buf[idx].take();
+        }
+        self.xi_buf = new_buf;
+        self.xi_head = 0;
+        self.xi_tail = self.xi_len;
+    }
+
+    /// Push an element to the back.
+    pub fn xi_push_back(&mut self, val: T) {
+        if self.xi_len == self.xi_buf.len() {
+            self.xi_grow();
+        }
+        self.xi_buf[self.xi_tail] = Some(val);
+        self.xi_tail = (self.xi_tail + 1) % self.xi_buf.len();
+        self.xi_len += 1;
+    }
+
+    /// Push an element to the front.
+    pub fn xi_push_front(&mut self, val: T) {
+        if self.xi_len == self.xi_buf.len() {
+            self.xi_grow();
+        }
+        self.xi_head = if self.xi_head == 0 {
+            self.xi_buf.len() - 1
+        } else {
+            self.xi_head - 1
+        };
+        self.xi_buf[self.xi_head] = Some(val);
+        self.xi_len += 1;
+    }
+
+    /// Pop an element from the back.
+    pub fn xi_pop_back(&mut self) -> Option<T> {
+        if self.xi_len == 0 {
+            return None;
+        }
+        self.xi_tail = if self.xi_tail == 0 {
+            self.xi_buf.len() - 1
+        } else {
+            self.xi_tail - 1
+        };
+        self.xi_len -= 1;
+        self.xi_buf[self.xi_tail].take()
+    }
+
+    /// Pop an element from the front.
+    pub fn xi_pop_front(&mut self) -> Option<T> {
+        if self.xi_len == 0 {
+            return None;
+        }
+        let val = self.xi_buf[self.xi_head].take();
+        self.xi_head = (self.xi_head + 1) % self.xi_buf.len();
+        self.xi_len -= 1;
+        val
+    }
+
+    /// Get element at index.
+    pub fn xi_get(&self, index: usize) -> Option<&T> {
+        if index >= self.xi_len {
+            return None;
+        }
+        let real = (self.xi_head + index) % self.xi_buf.len();
+        self.xi_buf[real].as_ref()
+    }
+
+    /// Rotate elements left by k positions.
+    pub fn xi_rotate_left(&mut self, k: usize) {
+        if self.xi_len <= 1 {
+            return;
+        }
+        let k = k % self.xi_len;
+        for _ in 0..k {
+            if let Some(v) = self.xi_pop_front() {
+                self.xi_push_back(v);
+            }
+        }
+    }
+
+    /// Rotate elements right by k positions.
+    pub fn xi_rotate_right(&mut self, k: usize) {
+        if self.xi_len <= 1 {
+            return;
+        }
+        let k = k % self.xi_len;
+        for _ in 0..k {
+            if let Some(v) = self.xi_pop_back() {
+                self.xi_push_front(v);
+            }
+        }
+    }
+
+    /// Collect elements into a vector.
+    pub fn xi_iter(&self) -> Vec<T> {
+        let mut out = Vec::with_capacity(self.xi_len);
+        for i in 0..self.xi_len {
+            let idx = (self.xi_head + i) % self.xi_buf.len();
+            if let Some(ref v) = self.xi_buf[idx] {
+                out.push(v.clone());
+            }
+        }
+        out
+    }
+
+    /// Split at index, returning (left, right) vectors.
+    pub fn xi_split_at(&self, mid: usize) -> (Vec<T>, Vec<T>) {
+        let all = self.xi_iter();
+        let mid = mid.min(all.len());
+        let left = all[..mid].to_vec();
+        let right = all[mid..].to_vec();
+        (left, right)
+    }
+}
+
+/// An interval represented as [low, high).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xi10Interval {
+    pub xi_low: i64,
+    pub xi_high: i64,
+}
+
+impl Xi10Interval {
+    /// Create a new interval.
+    pub fn xi_new(low: i64, high: i64) -> Self {
+        Self { xi_low: low, xi_high: high }
+    }
+
+    /// Check whether this interval overlaps with another.
+    pub fn xi_overlaps(&self, other: &Self) -> bool {
+        self.xi_low < other.xi_high && other.xi_low < self.xi_high
+    }
+
+    /// Check whether this interval contains a point.
+    pub fn xi_contains_point(&self, p: i64) -> bool {
+        p >= self.xi_low && p < self.xi_high
+    }
+}
+
+/// A simple interval tree (variant 10).
+pub struct Xi10IntervalTree {
+    xi_intervals: Vec<Xi10Interval>,
+}
+
+impl Xi10IntervalTree {
+    /// Create a new empty interval tree.
+    pub fn xi_new() -> Self {
+        Self { xi_intervals: Vec::new() }
+    }
+
+    /// Insert an interval.
+    pub fn xi_insert(&mut self, interval: Xi10Interval) {
+        self.xi_intervals.push(interval);
+        self.xi_intervals.sort_by_key(|iv| (iv.xi_low, iv.xi_high));
+    }
+
+    /// Query all intervals containing the given point.
+    pub fn xi_query_point(&self, point: i64) -> Vec<&Xi10Interval> {
+        self.xi_intervals.iter().filter(|iv| iv.xi_contains_point(point)).collect()
+    }
+
+    /// Query all intervals overlapping with the given interval.
+    pub fn xi_query_overlap(&self, query: &Xi10Interval) -> Vec<&Xi10Interval> {
+        self.xi_intervals.iter().filter(|iv| iv.xi_overlaps(query)).collect()
+    }
+
+    /// Remove the first interval matching [low, high).
+    pub fn xi_remove(&mut self, low: i64, high: i64) -> bool {
+        if let Some(pos) = self.xi_intervals.iter().position(|iv| iv.xi_low == low && iv.xi_high == high) {
+            self.xi_intervals.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return all intervals.
+    pub fn xi_all_intervals(&self) -> &[Xi10Interval] {
+        &self.xi_intervals
+    }
+
+    /// Return the number of intervals.
+    pub fn xi_count(&self) -> usize {
+        self.xi_intervals.len()
+    }
+
+    /// Compute gaps between intervals in the range [range_low, range_high).
+    pub fn xi_gaps(&self, range_low: i64, range_high: i64) -> Vec<Xi10Interval> {
+        let mut gaps = Vec::new();
+        let mut cursor = range_low;
+        for iv in &self.xi_intervals {
+            if iv.xi_high <= range_low || iv.xi_low >= range_high {
+                continue;
+            }
+            let lo = iv.xi_low.max(range_low);
+            if cursor < lo {
+                gaps.push(Xi10Interval::xi_new(cursor, lo));
+            }
+            cursor = cursor.max(iv.xi_high);
+        }
+        if cursor < range_high {
+            gaps.push(Xi10Interval::xi_new(cursor, range_high));
+        }
+        gaps
+    }
+
+    /// Merge overlapping intervals and return a new set.
+    pub fn xi_merge_overlapping(&self) -> Vec<Xi10Interval> {
+        if self.xi_intervals.is_empty() {
+            return Vec::new();
+        }
+        let mut merged: Vec<Xi10Interval> = Vec::new();
+        for iv in &self.xi_intervals {
+            if let Some(last) = merged.last_mut() {
+                if iv.xi_low <= last.xi_high {
+                    last.xi_high = last.xi_high.max(iv.xi_high);
+                } else {
+                    merged.push(iv.clone());
+                }
+            } else {
+                merged.push(iv.clone());
+            }
+        }
+        merged
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5317,6 +5584,189 @@ mod tests {
         assert_eq!(bs.xh_first_set(), None);
         assert_eq!(bs.xh_last_set(), None);
         assert!(bs.xh_iter_ones().is_empty());
+    }
+
+
+    #[test]
+    fn xi10_deque_push_pop_back() {
+        let mut dq = super::Xi10Deque::xi_new(4);
+        dq.xi_push_back(10);
+        dq.xi_push_back(20);
+        dq.xi_push_back(30);
+        assert_eq!(dq.xi_len(), 3);
+        assert_eq!(dq.xi_pop_back(), Some(30));
+        assert_eq!(dq.xi_pop_back(), Some(20));
+        assert_eq!(dq.xi_pop_back(), Some(10));
+        assert_eq!(dq.xi_pop_back(), None);
+    }
+
+    #[test]
+    fn xi10_deque_push_pop_front() {
+        let mut dq = super::Xi10Deque::xi_new(4);
+        dq.xi_push_front(1);
+        dq.xi_push_front(2);
+        dq.xi_push_front(3);
+        assert_eq!(dq.xi_pop_front(), Some(3));
+        assert_eq!(dq.xi_pop_front(), Some(2));
+        assert_eq!(dq.xi_pop_front(), Some(1));
+        assert_eq!(dq.xi_pop_front(), None);
+    }
+
+    #[test]
+    fn xi10_deque_mixed_ops() {
+        let mut dq = super::Xi10Deque::xi_new(4);
+        dq.xi_push_back(1);
+        dq.xi_push_front(0);
+        dq.xi_push_back(2);
+        assert_eq!(dq.xi_iter(), vec![0, 1, 2]);
+        assert_eq!(dq.xi_pop_front(), Some(0));
+        assert_eq!(dq.xi_pop_back(), Some(2));
+    }
+
+    #[test]
+    fn xi10_deque_get_and_split() {
+        let mut dq = super::Xi10Deque::xi_new(8);
+        for i in 0..5 {
+            dq.xi_push_back(i);
+        }
+        assert_eq!(dq.xi_get(0), Some(&0));
+        assert_eq!(dq.xi_get(4), Some(&4));
+        assert_eq!(dq.xi_get(5), None);
+        let (left, right) = dq.xi_split_at(3);
+        assert_eq!(left, vec![0, 1, 2]);
+        assert_eq!(right, vec![3, 4]);
+    }
+
+    #[test]
+    fn xi10_deque_rotate_left() {
+        let mut dq = super::Xi10Deque::xi_new(8);
+        for i in 0..5 {
+            dq.xi_push_back(i);
+        }
+        dq.xi_rotate_left(2);
+        assert_eq!(dq.xi_iter(), vec![2, 3, 4, 0, 1]);
+    }
+
+    #[test]
+    fn xi10_deque_rotate_right() {
+        let mut dq = super::Xi10Deque::xi_new(8);
+        for i in 0..5 {
+            dq.xi_push_back(i);
+        }
+        dq.xi_rotate_right(2);
+        assert_eq!(dq.xi_iter(), vec![3, 4, 0, 1, 2]);
+    }
+
+    #[test]
+    fn xi10_deque_grow() {
+        let mut dq = super::Xi10Deque::xi_new(4);
+        for i in 0..10 {
+            dq.xi_push_back(i);
+        }
+        assert_eq!(dq.xi_len(), 10);
+        assert!(dq.xi_capacity() >= 10);
+        assert_eq!(dq.xi_iter(), (0..10).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn xi10_deque_empty() {
+        let dq = super::Xi10Deque::<i32>::xi_new(4);
+        assert!(dq.xi_is_empty());
+        assert_eq!(dq.xi_len(), 0);
+        assert_eq!(dq.xi_get(0), None);
+        assert!(dq.xi_iter().is_empty());
+    }
+
+    #[test]
+    fn xi10_interval_tree_insert_query() {
+        let mut tree = super::Xi10IntervalTree::xi_new();
+        tree.xi_insert(super::Xi10Interval::xi_new(1, 5));
+        tree.xi_insert(super::Xi10Interval::xi_new(3, 8));
+        tree.xi_insert(super::Xi10Interval::xi_new(10, 15));
+        let hits = tree.xi_query_point(4);
+        assert_eq!(hits.len(), 2);
+        let hits = tree.xi_query_point(12);
+        assert_eq!(hits.len(), 1);
+        let hits = tree.xi_query_point(9);
+        assert_eq!(hits.len(), 0);
+    }
+
+    #[test]
+    fn xi10_interval_tree_overlap() {
+        let mut tree = super::Xi10IntervalTree::xi_new();
+        tree.xi_insert(super::Xi10Interval::xi_new(1, 5));
+        tree.xi_insert(super::Xi10Interval::xi_new(6, 10));
+        tree.xi_insert(super::Xi10Interval::xi_new(12, 20));
+        let q = super::Xi10Interval::xi_new(4, 7);
+        let hits = tree.xi_query_overlap(&q);
+        assert_eq!(hits.len(), 2);
+    }
+
+    #[test]
+    fn xi10_interval_tree_remove() {
+        let mut tree = super::Xi10IntervalTree::xi_new();
+        tree.xi_insert(super::Xi10Interval::xi_new(0, 10));
+        tree.xi_insert(super::Xi10Interval::xi_new(5, 15));
+        assert_eq!(tree.xi_count(), 2);
+        assert!(tree.xi_remove(0, 10));
+        assert_eq!(tree.xi_count(), 1);
+        assert!(!tree.xi_remove(0, 10));
+    }
+
+    #[test]
+    fn xi10_interval_tree_gaps() {
+        let mut tree = super::Xi10IntervalTree::xi_new();
+        tree.xi_insert(super::Xi10Interval::xi_new(2, 4));
+        tree.xi_insert(super::Xi10Interval::xi_new(6, 8));
+        let gaps = tree.xi_gaps(0, 10);
+        assert_eq!(gaps.len(), 3);
+        assert_eq!(gaps[0], super::Xi10Interval::xi_new(0, 2));
+        assert_eq!(gaps[1], super::Xi10Interval::xi_new(4, 6));
+        assert_eq!(gaps[2], super::Xi10Interval::xi_new(8, 10));
+    }
+
+    #[test]
+    fn xi10_interval_tree_merge() {
+        let mut tree = super::Xi10IntervalTree::xi_new();
+        tree.xi_insert(super::Xi10Interval::xi_new(1, 5));
+        tree.xi_insert(super::Xi10Interval::xi_new(3, 8));
+        tree.xi_insert(super::Xi10Interval::xi_new(10, 15));
+        let merged = tree.xi_merge_overlapping();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0], super::Xi10Interval::xi_new(1, 8));
+        assert_eq!(merged[1], super::Xi10Interval::xi_new(10, 15));
+    }
+
+    #[test]
+    fn xi10_interval_tree_all() {
+        let mut tree = super::Xi10IntervalTree::xi_new();
+        tree.xi_insert(super::Xi10Interval::xi_new(10, 20));
+        tree.xi_insert(super::Xi10Interval::xi_new(1, 5));
+        let all = tree.xi_all_intervals();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].xi_low, 1);
+        assert_eq!(all[1].xi_low, 10);
+    }
+
+    #[test]
+    fn xi10_interval_tree_empty() {
+        let tree = super::Xi10IntervalTree::xi_new();
+        assert_eq!(tree.xi_count(), 0);
+        assert!(tree.xi_all_intervals().is_empty());
+        assert!(tree.xi_query_point(5).is_empty());
+        assert!(tree.xi_gaps(0, 10).len() == 1);
+        assert!(tree.xi_merge_overlapping().is_empty());
+    }
+
+    #[test]
+    fn xi10_interval_tree_contains_point() {
+        let iv = super::Xi10Interval::xi_new(5, 15);
+        assert!(iv.xi_contains_point(5));
+        assert!(iv.xi_contains_point(10));
+        assert!(iv.xi_contains_point(14));
+        assert!(!iv.xi_contains_point(15));
+        assert!(!iv.xi_contains_point(4));
+        assert!(!iv.xi_contains_point(100));
     }
 
 }
