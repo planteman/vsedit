@@ -26430,6 +26430,85 @@ impl AzjFoldingState {
     pub fn range_count(&self) -> usize { self.ranges.len() }
 }
 
+
+// --- azk_ glyph margin and breakpoint decorations ---
+
+/// Glyph margin decoration kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzkGlyphKind { Breakpoint, ConditionalBreakpoint, Logpoint, DataBreakpoint, Bookmark, Error, Warning }
+
+/// A glyph margin decoration.
+#[derive(Debug, Clone)]
+pub struct AzkGlyphDecoration {
+    pub line: u32,
+    pub kind: AzkGlyphKind,
+    pub tooltip: Option<String>,
+    pub enabled: bool,
+}
+
+impl AzkGlyphDecoration {
+    pub fn breakpoint(line: u32) -> Self {
+        Self { line, kind: AzkGlyphKind::Breakpoint, tooltip: None, enabled: true }
+    }
+    pub fn conditional(line: u32, condition: &str) -> Self {
+        Self { line, kind: AzkGlyphKind::ConditionalBreakpoint, tooltip: Some(condition.to_string()), enabled: true }
+    }
+    pub fn logpoint(line: u32, msg: &str) -> Self {
+        Self { line, kind: AzkGlyphKind::Logpoint, tooltip: Some(msg.to_string()), enabled: true }
+    }
+    pub fn bookmark(line: u32) -> Self {
+        Self { line, kind: AzkGlyphKind::Bookmark, tooltip: None, enabled: true }
+    }
+    pub fn toggle_enabled(&mut self) { self.enabled = !self.enabled; }
+    pub fn is_breakpoint_type(&self) -> bool {
+        matches!(self.kind, AzkGlyphKind::Breakpoint | AzkGlyphKind::ConditionalBreakpoint | AzkGlyphKind::Logpoint | AzkGlyphKind::DataBreakpoint)
+    }
+    pub fn symbol(&self) -> &str {
+        match self.kind {
+            AzkGlyphKind::Breakpoint => "O",
+            AzkGlyphKind::ConditionalBreakpoint => "?",
+            AzkGlyphKind::Logpoint => "L",
+            AzkGlyphKind::DataBreakpoint => "D",
+            AzkGlyphKind::Bookmark => "*",
+            AzkGlyphKind::Error => "X",
+            AzkGlyphKind::Warning => "!",
+        }
+    }
+}
+
+/// Glyph margin state for a document.
+#[derive(Debug)]
+pub struct AzkGlyphMargin {
+    pub decorations: Vec<AzkGlyphDecoration>,
+}
+
+impl AzkGlyphMargin {
+    pub fn new() -> Self { Self { decorations: Vec::new() } }
+    pub fn add(&mut self, d: AzkGlyphDecoration) { self.decorations.push(d); }
+    pub fn remove_at_line(&mut self, line: u32) { self.decorations.retain(|d| d.line != line); }
+    pub fn at_line(&self, line: u32) -> Vec<&AzkGlyphDecoration> {
+        self.decorations.iter().filter(|d| d.line == line).collect()
+    }
+    pub fn toggle_breakpoint(&mut self, line: u32) {
+        if let Some(pos) = self.decorations.iter().position(|d| d.line == line && d.kind == AzkGlyphKind::Breakpoint) {
+            self.decorations.remove(pos);
+        } else {
+            self.add(AzkGlyphDecoration::breakpoint(line));
+        }
+    }
+    pub fn all_breakpoints(&self) -> Vec<&AzkGlyphDecoration> {
+        self.decorations.iter().filter(|d| d.is_breakpoint_type()).collect()
+    }
+    pub fn all_bookmarks(&self) -> Vec<&AzkGlyphDecoration> {
+        self.decorations.iter().filter(|d| d.kind == AzkGlyphKind::Bookmark).collect()
+    }
+    pub fn breakpoint_lines(&self) -> Vec<u32> {
+        self.all_breakpoints().iter().map(|d| d.line).collect()
+    }
+    pub fn clear_breakpoints(&mut self) { self.decorations.retain(|d| !d.is_breakpoint_type()); }
+    pub fn total(&self) -> usize { self.decorations.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42978,6 +43057,75 @@ goodbye";
     fn test_azj_collapsed_text() {
         let r = AzjFoldingRange::new(1, 5, AzjFoldKind::Code).with_text("...");
         assert_eq!(r.collapsed_text.as_deref(), Some("..."));
+    }
+
+
+    #[test]
+    fn test_azk_breakpoint() {
+        let bp = AzkGlyphDecoration::breakpoint(10);
+        assert!(bp.is_breakpoint_type());
+        assert!(bp.enabled);
+        assert_eq!(bp.symbol(), "O");
+    }
+
+    #[test]
+    fn test_azk_conditional() {
+        let bp = AzkGlyphDecoration::conditional(5, "x > 0");
+        assert!(bp.is_breakpoint_type());
+        assert_eq!(bp.tooltip.as_deref(), Some("x > 0"));
+        assert_eq!(bp.symbol(), "?");
+    }
+
+    #[test]
+    fn test_azk_logpoint() {
+        let lp = AzkGlyphDecoration::logpoint(3, "value={x}");
+        assert!(lp.is_breakpoint_type());
+        assert_eq!(lp.symbol(), "L");
+    }
+
+    #[test]
+    fn test_azk_bookmark() {
+        let bm = AzkGlyphDecoration::bookmark(7);
+        assert!(!bm.is_breakpoint_type());
+        assert_eq!(bm.symbol(), "*");
+    }
+
+    #[test]
+    fn test_azk_toggle_breakpoint() {
+        let mut margin = AzkGlyphMargin::new();
+        margin.toggle_breakpoint(5);
+        assert_eq!(margin.all_breakpoints().len(), 1);
+        margin.toggle_breakpoint(5);
+        assert_eq!(margin.all_breakpoints().len(), 0);
+    }
+
+    #[test]
+    fn test_azk_glyph_margin() {
+        let mut margin = AzkGlyphMargin::new();
+        margin.add(AzkGlyphDecoration::breakpoint(1));
+        margin.add(AzkGlyphDecoration::breakpoint(5));
+        margin.add(AzkGlyphDecoration::bookmark(5));
+        assert_eq!(margin.at_line(5).len(), 2);
+        assert_eq!(margin.breakpoint_lines(), vec![1, 5]);
+    }
+
+    #[test]
+    fn test_azk_clear_breakpoints() {
+        let mut margin = AzkGlyphMargin::new();
+        margin.add(AzkGlyphDecoration::breakpoint(1));
+        margin.add(AzkGlyphDecoration::bookmark(2));
+        margin.add(AzkGlyphDecoration::logpoint(3, "msg"));
+        margin.clear_breakpoints();
+        assert_eq!(margin.total(), 1);
+        assert_eq!(margin.all_bookmarks().len(), 1);
+    }
+
+    #[test]
+    fn test_azk_toggle_enabled() {
+        let mut bp = AzkGlyphDecoration::breakpoint(1);
+        assert!(bp.enabled);
+        bp.toggle_enabled();
+        assert!(!bp.enabled);
     }
 
 }
