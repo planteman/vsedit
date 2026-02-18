@@ -5840,6 +5840,415 @@ impl Xr81KDTree {
     }
 }
 
+/// A persistent (immutable) array that returns new versions on modification.
+#[derive(Debug, Clone)]
+pub struct Xs81PersistentArray<T: Clone> {
+    xs_versions: Vec<Vec<T>>,
+}
+
+impl<T: Clone + PartialEq> Xs81PersistentArray<T> {
+    /// Create a new empty persistent array.
+    pub fn xs_new() -> Self {
+        Xs81PersistentArray {
+            xs_versions: vec![Vec::new()],
+        }
+    }
+
+    /// Create from an initial vector.
+    pub fn xs_from_vec(data: Vec<T>) -> Self {
+        Xs81PersistentArray {
+            xs_versions: vec![data],
+        }
+    }
+
+    /// Set value at index, creating a new version. Returns version index.
+    pub fn xs_set(&mut self, index: usize, value: T) -> Option<usize> {
+        let current = self.xs_versions.last()?;
+        if index >= current.len() {
+            return None;
+        }
+        let mut new_ver = current.clone();
+        new_ver[index] = value;
+        self.xs_versions.push(new_ver);
+        Some(self.xs_versions.len() - 1)
+    }
+
+    /// Push a value, creating a new version.
+    pub fn xs_push(&mut self, value: T) -> usize {
+        let mut new_ver = self.xs_versions.last().cloned().unwrap_or_default();
+        new_ver.push(value);
+        self.xs_versions.push(new_ver);
+        self.xs_versions.len() - 1
+    }
+
+    /// Get value at index in the latest version.
+    pub fn xs_get(&self, index: usize) -> Option<&T> {
+        self.xs_versions.last()?.get(index)
+    }
+
+    /// Get value at index in a specific version.
+    pub fn xs_get_version(&self, version: usize, index: usize) -> Option<&T> {
+        self.xs_versions.get(version)?.get(index)
+    }
+
+    /// Return the length of the latest version.
+    pub fn xs_len(&self) -> usize {
+        self.xs_versions.last().map_or(0, |v| v.len())
+    }
+
+    /// Check if the latest version is empty.
+    pub fn xs_is_empty(&self) -> bool {
+        self.xs_len() == 0
+    }
+
+    /// Return the number of versions.
+    pub fn xs_version_count(&self) -> usize {
+        self.xs_versions.len()
+    }
+
+    /// Return the version history as a slice of slices.
+    pub fn xs_history(&self) -> Vec<&[T]> {
+        self.xs_versions.iter().map(|v| v.as_slice()).collect()
+    }
+
+    /// Compute the diff indices between two versions.
+    pub fn xs_diff(&self, v1: usize, v2: usize) -> Vec<usize> {
+        let ver1 = match self.xs_versions.get(v1) {
+            Some(v) => v,
+            None => return Vec::new(),
+        };
+        let ver2 = match self.xs_versions.get(v2) {
+            Some(v) => v,
+            None => return Vec::new(),
+        };
+        let max_len = ver1.len().max(ver2.len());
+        let mut diffs = Vec::new();
+        for i in 0..max_len {
+            let a = ver1.get(i);
+            let b = ver2.get(i);
+            if a != b {
+                diffs.push(i);
+            }
+        }
+        diffs
+    }
+
+    /// Rollback to a specific version, creating a new version with that data.
+    pub fn xs_rollback(&mut self, version: usize) -> Option<usize> {
+        let data = self.xs_versions.get(version)?.clone();
+        self.xs_versions.push(data);
+        Some(self.xs_versions.len() - 1)
+    }
+
+    /// Get the latest version data as a slice.
+    pub fn xs_as_slice(&self) -> &[T] {
+        self.xs_versions.last().map_or(&[], |v| v.as_slice())
+    }
+}
+
+/// A single-producer single-consumer queue.
+#[derive(Debug)]
+pub struct Xs81ConcurrentQueue<T> {
+    xs_buffer: Vec<Option<T>>,
+    xs_head: usize,
+    xs_tail: usize,
+    xs_count: usize,
+    xs_capacity: usize,
+}
+
+impl<T> Xs81ConcurrentQueue<T> {
+    /// Create a new queue with given capacity.
+    pub fn xs_new(capacity: usize) -> Self {
+        let cap = capacity.max(1);
+        let mut buffer = Vec::with_capacity(cap);
+        for _ in 0..cap {
+            buffer.push(None);
+        }
+        Xs81ConcurrentQueue {
+            xs_buffer: buffer,
+            xs_head: 0,
+            xs_tail: 0,
+            xs_count: 0,
+            xs_capacity: cap,
+        }
+    }
+
+    /// Push an item into the queue. Returns false if full.
+    pub fn xs_push(&mut self, item: T) -> bool {
+        if self.xs_count >= self.xs_capacity {
+            return false;
+        }
+        self.xs_buffer[self.xs_tail] = Some(item);
+        self.xs_tail = (self.xs_tail + 1) % self.xs_capacity;
+        self.xs_count += 1;
+        true
+    }
+
+    /// Pop an item from the queue.
+    pub fn xs_pop(&mut self) -> Option<T> {
+        if self.xs_count == 0 {
+            return None;
+        }
+        let item = self.xs_buffer[self.xs_head].take();
+        self.xs_head = (self.xs_head + 1) % self.xs_capacity;
+        self.xs_count -= 1;
+        item
+    }
+
+    /// Try to pop without blocking.
+    pub fn xs_try_pop(&mut self) -> Option<T> {
+        self.xs_pop()
+    }
+
+    /// Return the number of items in the queue.
+    pub fn xs_len(&self) -> usize {
+        self.xs_count
+    }
+
+    /// Check if the queue is empty.
+    pub fn xs_is_empty(&self) -> bool {
+        self.xs_count == 0
+    }
+
+    /// Return the capacity.
+    pub fn xs_capacity(&self) -> usize {
+        self.xs_capacity
+    }
+
+    /// Drain all items from the queue into a vector.
+    pub fn xs_drain(&mut self) -> Vec<T> {
+        let mut result = Vec::with_capacity(self.xs_count);
+        while let Some(item) = self.xs_pop() {
+            result.push(item);
+        }
+        result
+    }
+
+    /// Check if the queue is full.
+    pub fn xs_is_full(&self) -> bool {
+        self.xs_count >= self.xs_capacity
+    }
+
+    /// Clear the queue.
+    pub fn xs_clear(&mut self) {
+        while self.xs_pop().is_some() {}
+    }
+}
+
+/// A map from non-overlapping ranges to values.
+#[derive(Debug, Clone)]
+pub struct Xs81RangeMap<V: Clone> {
+    xs_entries: Vec<(usize, usize, V)>,
+}
+
+impl<V: Clone + PartialEq> Xs81RangeMap<V> {
+    /// Create a new empty range map.
+    pub fn xs_new() -> Self {
+        Xs81RangeMap {
+            xs_entries: Vec::new(),
+        }
+    }
+
+    /// Insert a range [start, end) with value. Removes overlapping entries.
+    pub fn xs_insert(&mut self, start: usize, end: usize, value: V) {
+        if start >= end {
+            return;
+        }
+        self.xs_entries.retain(|&(s, e, _)| e <= start || s >= end);
+        self.xs_entries.push((start, end, value));
+        self.xs_entries.sort_by_key(|&(s, _, _)| s);
+    }
+
+    /// Get the value for a point.
+    pub fn xs_get(&self, point: usize) -> Option<&V> {
+        for (s, e, v) in &self.xs_entries {
+            if point >= *s && point < *e {
+                return Some(v);
+            }
+        }
+        None
+    }
+
+    /// Remove the range containing the given point.
+    pub fn xs_remove(&mut self, point: usize) -> Option<V> {
+        let idx = self.xs_entries.iter().position(|(s, e, _)| point >= *s && point < *e)?;
+        let (_, _, v) = self.xs_entries.remove(idx);
+        Some(v)
+    }
+
+    /// Return the gaps (uncovered ranges) between min and max of entries.
+    pub fn xs_gaps(&self, range_start: usize, range_end: usize) -> Vec<(usize, usize)> {
+        let mut gaps = Vec::new();
+        let mut pos = range_start;
+        for (s, e, _) in &self.xs_entries {
+            if *s > pos && *s < range_end {
+                gaps.push((pos, *s));
+            }
+            if *e > pos {
+                pos = *e;
+            }
+        }
+        if pos < range_end {
+            gaps.push((pos, range_end));
+        }
+        gaps
+    }
+
+    /// Return all covered ranges.
+    pub fn xs_covered_ranges(&self) -> Vec<(usize, usize)> {
+        self.xs_entries.iter().map(|(s, e, _)| (*s, *e)).collect()
+    }
+
+    /// Return total coverage (sum of all range lengths).
+    pub fn xs_total_coverage(&self) -> usize {
+        self.xs_entries.iter().map(|(s, e, _)| e - s).sum()
+    }
+
+    /// Return the number of ranges.
+    pub fn xs_len(&self) -> usize {
+        self.xs_entries.len()
+    }
+
+    /// Check if the map is empty.
+    pub fn xs_is_empty(&self) -> bool {
+        self.xs_entries.is_empty()
+    }
+
+    /// Check if a point is covered.
+    pub fn xs_contains(&self, point: usize) -> bool {
+        self.xs_get(point).is_some()
+    }
+
+    /// Clear all entries.
+    pub fn xs_clear(&mut self) {
+        self.xs_entries.clear();
+    }
+}
+
+/// A fixed-size circular buffer.
+#[derive(Debug, Clone)]
+pub struct Xs81CircularBuffer<T: Clone> {
+    xs_buffer: Vec<Option<T>>,
+    xs_head: usize,
+    xs_tail: usize,
+    xs_count: usize,
+    xs_cap: usize,
+}
+
+impl<T: Clone> Xs81CircularBuffer<T> {
+    /// Create a new circular buffer with given capacity.
+    pub fn xs_new(capacity: usize) -> Self {
+        let cap = capacity.max(1);
+        let mut buffer = Vec::with_capacity(cap);
+        for _ in 0..cap {
+            buffer.push(None);
+        }
+        Xs81CircularBuffer {
+            xs_buffer: buffer,
+            xs_head: 0,
+            xs_tail: 0,
+            xs_count: 0,
+            xs_cap: cap,
+        }
+    }
+
+    /// Push an item to the back. Overwrites oldest if full.
+    pub fn xs_push_back(&mut self, item: T) {
+        if self.xs_count == self.xs_cap {
+            // Overwrite oldest
+            self.xs_buffer[self.xs_tail] = Some(item);
+            self.xs_tail = (self.xs_tail + 1) % self.xs_cap;
+            self.xs_head = (self.xs_head + 1) % self.xs_cap;
+        } else {
+            self.xs_buffer[self.xs_tail] = Some(item);
+            self.xs_tail = (self.xs_tail + 1) % self.xs_cap;
+            self.xs_count += 1;
+        }
+    }
+
+    /// Pop an item from the front.
+    pub fn xs_pop_front(&mut self) -> Option<T> {
+        if self.xs_count == 0 {
+            return None;
+        }
+        let item = self.xs_buffer[self.xs_head].take();
+        self.xs_head = (self.xs_head + 1) % self.xs_cap;
+        self.xs_count -= 1;
+        item
+    }
+
+    /// Peek at the front item.
+    pub fn xs_peek_front(&self) -> Option<&T> {
+        if self.xs_count == 0 {
+            return None;
+        }
+        self.xs_buffer[self.xs_head].as_ref()
+    }
+
+    /// Peek at the back item.
+    pub fn xs_peek_back(&self) -> Option<&T> {
+        if self.xs_count == 0 {
+            return None;
+        }
+        let idx = if self.xs_tail == 0 { self.xs_cap - 1 } else { self.xs_tail - 1 };
+        self.xs_buffer[idx].as_ref()
+    }
+
+    /// Check if the buffer is full.
+    pub fn xs_is_full(&self) -> bool {
+        self.xs_count == self.xs_cap
+    }
+
+    /// Return the number of items.
+    pub fn xs_len(&self) -> usize {
+        self.xs_count
+    }
+
+    /// Check if empty.
+    pub fn xs_is_empty(&self) -> bool {
+        self.xs_count == 0
+    }
+
+    /// Return the capacity.
+    pub fn xs_capacity(&self) -> usize {
+        self.xs_cap
+    }
+
+    /// Iterate over items from front to back.
+    pub fn xs_iter(&self) -> Vec<&T> {
+        let mut result = Vec::with_capacity(self.xs_count);
+        for i in 0..self.xs_count {
+            let idx = (self.xs_head + i) % self.xs_cap;
+            if let Some(ref item) = self.xs_buffer[idx] {
+                result.push(item);
+            }
+        }
+        result
+    }
+
+    /// Clear the buffer.
+    pub fn xs_clear(&mut self) {
+        for slot in self.xs_buffer.iter_mut() {
+            *slot = None;
+        }
+        self.xs_head = 0;
+        self.xs_tail = 0;
+        self.xs_count = 0;
+    }
+
+    /// Convert to a Vec.
+    pub fn xs_to_vec(&self) -> Vec<T> {
+        let mut result = Vec::with_capacity(self.xs_count);
+        for i in 0..self.xs_count {
+            let idx = (self.xs_head + i) % self.xs_cap;
+            if let Some(ref item) = self.xs_buffer[idx] {
+                result.push(item.clone());
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -9339,6 +9748,270 @@ mod tests {
         let bb = tree.xr_bounding_box().unwrap();
         assert!((bb.xr_min_x - 1.0).abs() < 1e-9);
         assert!((bb.xr_max_y - 8.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn xs_81_persistent_array_new() {
+        let arr = super::Xs81PersistentArray::<i32>::xs_new();
+        assert!(arr.xs_is_empty());
+        assert_eq!(arr.xs_len(), 0);
+        assert_eq!(arr.xs_version_count(), 1);
+    }
+
+    #[test]
+    fn xs_81_persistent_array_push() {
+        let mut arr = super::Xs81PersistentArray::<i32>::xs_new();
+        let v1 = arr.xs_push(10);
+        assert_eq!(v1, 1);
+        assert_eq!(arr.xs_len(), 1);
+        assert_eq!(arr.xs_get(0), Some(&10));
+    }
+
+    #[test]
+    fn xs_81_persistent_array_set() {
+        let mut arr = super::Xs81PersistentArray::xs_from_vec(vec![1, 2, 3]);
+        let v = arr.xs_set(1, 20);
+        assert!(v.is_some());
+        assert_eq!(arr.xs_get(1), Some(&20));
+        assert_eq!(arr.xs_get_version(0, 1), Some(&2));
+    }
+
+    #[test]
+    fn xs_81_persistent_array_diff() {
+        let mut arr = super::Xs81PersistentArray::xs_from_vec(vec![1, 2, 3]);
+        arr.xs_set(0, 10);
+        let diffs = arr.xs_diff(0, 1);
+        assert_eq!(diffs, vec![0]);
+    }
+
+    #[test]
+    fn xs_81_persistent_array_rollback() {
+        let mut arr = super::Xs81PersistentArray::xs_from_vec(vec![1, 2]);
+        arr.xs_push(3);
+        arr.xs_rollback(0);
+        assert_eq!(arr.xs_len(), 2);
+        assert_eq!(arr.xs_as_slice(), &[1, 2]);
+    }
+
+    #[test]
+    fn xs_81_persistent_array_history() {
+        let mut arr = super::Xs81PersistentArray::xs_from_vec(vec![1]);
+        arr.xs_push(2);
+        let hist = arr.xs_history();
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist[0], &[1]);
+        assert_eq!(hist[1], &[1, 2]);
+    }
+
+    #[test]
+    fn xs_81_persistent_array_set_out_of_bounds() {
+        let mut arr = super::Xs81PersistentArray::xs_from_vec(vec![1]);
+        assert!(arr.xs_set(5, 10).is_none());
+    }
+
+    #[test]
+    fn xs_81_persistent_array_from_vec() {
+        let arr = super::Xs81PersistentArray::xs_from_vec(vec![10, 20, 30]);
+        assert_eq!(arr.xs_len(), 3);
+        assert_eq!(arr.xs_get(2), Some(&30));
+    }
+
+    #[test]
+    fn xs_81_concurrent_queue_new() {
+        let q = super::Xs81ConcurrentQueue::<i32>::xs_new(10);
+        assert!(q.xs_is_empty());
+        assert_eq!(q.xs_capacity(), 10);
+    }
+
+    #[test]
+    fn xs_81_concurrent_queue_push_pop() {
+        let mut q = super::Xs81ConcurrentQueue::xs_new(4);
+        assert!(q.xs_push(1));
+        assert!(q.xs_push(2));
+        assert_eq!(q.xs_pop(), Some(1));
+        assert_eq!(q.xs_pop(), Some(2));
+        assert_eq!(q.xs_pop(), None);
+    }
+
+    #[test]
+    fn xs_81_concurrent_queue_full() {
+        let mut q = super::Xs81ConcurrentQueue::xs_new(2);
+        assert!(q.xs_push(1));
+        assert!(q.xs_push(2));
+        assert!(!q.xs_push(3));
+        assert!(q.xs_is_full());
+    }
+
+    #[test]
+    fn xs_81_concurrent_queue_drain() {
+        let mut q = super::Xs81ConcurrentQueue::xs_new(8);
+        q.xs_push(10);
+        q.xs_push(20);
+        q.xs_push(30);
+        let drained = q.xs_drain();
+        assert_eq!(drained, vec![10, 20, 30]);
+        assert!(q.xs_is_empty());
+    }
+
+    #[test]
+    fn xs_81_concurrent_queue_try_pop() {
+        let mut q = super::Xs81ConcurrentQueue::xs_new(4);
+        assert_eq!(q.xs_try_pop(), None);
+        q.xs_push(42);
+        assert_eq!(q.xs_try_pop(), Some(42));
+    }
+
+    #[test]
+    fn xs_81_concurrent_queue_clear() {
+        let mut q = super::Xs81ConcurrentQueue::xs_new(4);
+        q.xs_push(1);
+        q.xs_push(2);
+        q.xs_clear();
+        assert!(q.xs_is_empty());
+        assert_eq!(q.xs_len(), 0);
+    }
+
+    #[test]
+    fn xs_81_range_map_new() {
+        let rm = super::Xs81RangeMap::<String>::xs_new();
+        assert!(rm.xs_is_empty());
+        assert_eq!(rm.xs_len(), 0);
+    }
+
+    #[test]
+    fn xs_81_range_map_insert_get() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(0, 10, "a");
+        assert_eq!(rm.xs_get(5), Some(&"a"));
+        assert_eq!(rm.xs_get(10), None);
+    }
+
+    #[test]
+    fn xs_81_range_map_overlap() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(0, 10, "a");
+        rm.xs_insert(5, 15, "b");
+        assert_eq!(rm.xs_get(3), None);
+        assert_eq!(rm.xs_get(7), Some(&"b"));
+    }
+
+    #[test]
+    fn xs_81_range_map_remove() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(0, 10, "a");
+        let removed = rm.xs_remove(5);
+        assert_eq!(removed, Some("a"));
+        assert!(rm.xs_is_empty());
+    }
+
+    #[test]
+    fn xs_81_range_map_gaps() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(2, 5, "a");
+        rm.xs_insert(8, 12, "b");
+        let gaps = rm.xs_gaps(0, 15);
+        assert_eq!(gaps, vec![(0, 2), (5, 8), (12, 15)]);
+    }
+
+    #[test]
+    fn xs_81_range_map_coverage() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(0, 5, "a");
+        rm.xs_insert(10, 20, "b");
+        assert_eq!(rm.xs_total_coverage(), 15);
+        assert_eq!(rm.xs_covered_ranges().len(), 2);
+    }
+
+    #[test]
+    fn xs_81_range_map_contains() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(5, 10, 42);
+        assert!(rm.xs_contains(7));
+        assert!(!rm.xs_contains(4));
+        assert!(!rm.xs_contains(10));
+    }
+
+    #[test]
+    fn xs_81_range_map_clear() {
+        let mut rm = super::Xs81RangeMap::xs_new();
+        rm.xs_insert(0, 10, "a");
+        rm.xs_clear();
+        assert!(rm.xs_is_empty());
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_new() {
+        let buf = super::Xs81CircularBuffer::<i32>::xs_new(5);
+        assert!(buf.xs_is_empty());
+        assert_eq!(buf.xs_capacity(), 5);
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_push_pop() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(4);
+        buf.xs_push_back(1);
+        buf.xs_push_back(2);
+        assert_eq!(buf.xs_pop_front(), Some(1));
+        assert_eq!(buf.xs_pop_front(), Some(2));
+        assert_eq!(buf.xs_pop_front(), None);
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_overwrite() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(2);
+        buf.xs_push_back(1);
+        buf.xs_push_back(2);
+        buf.xs_push_back(3);
+        assert_eq!(buf.xs_len(), 2);
+        assert_eq!(buf.xs_pop_front(), Some(2));
+        assert_eq!(buf.xs_pop_front(), Some(3));
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_peek() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(4);
+        buf.xs_push_back(10);
+        buf.xs_push_back(20);
+        assert_eq!(buf.xs_peek_front(), Some(&10));
+        assert_eq!(buf.xs_peek_back(), Some(&20));
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_is_full() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(2);
+        assert!(!buf.xs_is_full());
+        buf.xs_push_back(1);
+        buf.xs_push_back(2);
+        assert!(buf.xs_is_full());
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_iter() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(4);
+        buf.xs_push_back(1);
+        buf.xs_push_back(2);
+        buf.xs_push_back(3);
+        let items: Vec<&i32> = buf.xs_iter();
+        assert_eq!(items, vec![&1, &2, &3]);
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_clear() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(4);
+        buf.xs_push_back(1);
+        buf.xs_push_back(2);
+        buf.xs_clear();
+        assert!(buf.xs_is_empty());
+        assert_eq!(buf.xs_len(), 0);
+    }
+
+    #[test]
+    fn xs_81_circular_buffer_to_vec() {
+        let mut buf = super::Xs81CircularBuffer::xs_new(4);
+        buf.xs_push_back(10);
+        buf.xs_push_back(20);
+        let v = buf.xs_to_vec();
+        assert_eq!(v, vec![10, 20]);
     }
 
 }
