@@ -23245,6 +23245,84 @@ impl AybTabGroup {
     }
 }
 
+
+// --- ayc_ extension marketplace and installation model ---
+
+/// Extension kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AycExtKind { Theme, Language, Debugger, Formatter, Linter, Snippet, Other }
+
+/// Extension state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AycExtState { NotInstalled, Installing, Installed, Disabled, Uninstalling }
+
+/// A marketplace extension.
+#[derive(Debug, Clone)]
+pub struct AycExtension {
+    pub id: String,
+    pub name: String,
+    pub publisher: String,
+    pub version: String,
+    pub description: String,
+    pub kind: AycExtKind,
+    pub state: AycExtState,
+    pub install_count: u64,
+    pub rating: f32,
+    pub dependencies: Vec<String>,
+}
+
+impl AycExtension {
+    pub fn new(publisher: &str, name: &str) -> Self {
+        Self {
+            id: format!("{}.{}", publisher, name), name: name.to_string(), publisher: publisher.to_string(),
+            version: "0.0.0".to_string(), description: String::new(), kind: AycExtKind::Other,
+            state: AycExtState::NotInstalled, install_count: 0, rating: 0.0, dependencies: Vec::new(),
+        }
+    }
+    pub fn with_version(mut self, v: &str) -> Self { self.version = v.to_string(); self }
+    pub fn with_description(mut self, d: &str) -> Self { self.description = d.to_string(); self }
+    pub fn with_kind(mut self, k: AycExtKind) -> Self { self.kind = k; self }
+    pub fn is_installed(&self) -> bool { matches!(self.state, AycExtState::Installed | AycExtState::Disabled) }
+    pub fn is_enabled(&self) -> bool { self.state == AycExtState::Installed }
+    pub fn install(&mut self) { self.state = AycExtState::Installing; }
+    pub fn complete_install(&mut self) { self.state = AycExtState::Installed; }
+    pub fn disable(&mut self) { if self.state == AycExtState::Installed { self.state = AycExtState::Disabled; } }
+    pub fn enable(&mut self) { if self.state == AycExtState::Disabled { self.state = AycExtState::Installed; } }
+    pub fn display_name(&self) -> String { format!("{} ({})", self.name, self.publisher) }
+}
+
+/// Extension marketplace search.
+#[derive(Debug)]
+pub struct AycMarketplace {
+    pub extensions: Vec<AycExtension>,
+    pub search_query: String,
+    pub category_filter: Option<AycExtKind>,
+}
+
+impl AycMarketplace {
+    pub fn new() -> Self { Self { extensions: Vec::new(), search_query: String::new(), category_filter: None } }
+    pub fn add(&mut self, ext: AycExtension) { self.extensions.push(ext); }
+    pub fn search(&self, query: &str) -> Vec<&AycExtension> {
+        let q = query.to_lowercase();
+        self.extensions.iter().filter(|e| {
+            e.name.to_lowercase().contains(&q) || e.description.to_lowercase().contains(&q)
+                || e.publisher.to_lowercase().contains(&q) || e.id.to_lowercase().contains(&q)
+        }).collect()
+    }
+    pub fn installed(&self) -> Vec<&AycExtension> { self.extensions.iter().filter(|e| e.is_installed()).collect() }
+    pub fn enabled(&self) -> Vec<&AycExtension> { self.extensions.iter().filter(|e| e.is_enabled()).collect() }
+    pub fn by_kind(&self, kind: AycExtKind) -> Vec<&AycExtension> {
+        self.extensions.iter().filter(|e| e.kind == kind).collect()
+    }
+    pub fn find_by_id(&self, id: &str) -> Option<&AycExtension> { self.extensions.iter().find(|e| e.id == id) }
+    pub fn find_by_id_mut(&mut self, id: &str) -> Option<&mut AycExtension> { self.extensions.iter_mut().find(|e| e.id == id) }
+    pub fn popular(&self) -> Vec<&AycExtension> {
+        let mut exts: Vec<_> = self.extensions.iter().collect();
+        exts.sort_by(|a, b| b.install_count.cmp(&a.install_count));
+        exts.into_iter().take(10).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37454,6 +37532,84 @@ mod tests {
         let idx2 = group.open("file:///a.rs", "a.rs");
         assert_eq!(idx2, 0);
         assert_eq!(group.active_tab().unwrap().label, "a.rs");
+    }
+
+
+    #[test]
+    fn test_ayc_extension() {
+        let mut ext = AycExtension::new("rust-lang", "rust-analyzer")
+            .with_version("0.4.0").with_description("Rust LSP").with_kind(AycExtKind::Language);
+        assert_eq!(ext.id, "rust-lang.rust-analyzer");
+        assert!(!ext.is_installed());
+        ext.install();
+        ext.complete_install();
+        assert!(ext.is_installed());
+        assert!(ext.is_enabled());
+    }
+
+    #[test]
+    fn test_ayc_disable_enable() {
+        let mut ext = AycExtension::new("pub", "ext");
+        ext.complete_install();
+        ext.disable();
+        assert!(ext.is_installed());
+        assert!(!ext.is_enabled());
+        ext.enable();
+        assert!(ext.is_enabled());
+    }
+
+    #[test]
+    fn test_ayc_marketplace_search() {
+        let mut mp = AycMarketplace::new();
+        mp.add(AycExtension::new("rust-lang", "rust-analyzer").with_description("Rust language support"));
+        mp.add(AycExtension::new("ms-python", "python").with_description("Python support"));
+        let results = mp.search("rust");
+        assert_eq!(results.len(), 1);
+        let results = mp.search("support");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_ayc_marketplace_installed() {
+        let mut mp = AycMarketplace::new();
+        let mut ext = AycExtension::new("pub", "a");
+        ext.complete_install();
+        mp.add(ext);
+        mp.add(AycExtension::new("pub", "b"));
+        assert_eq!(mp.installed().len(), 1);
+    }
+
+    #[test]
+    fn test_ayc_marketplace_by_kind() {
+        let mut mp = AycMarketplace::new();
+        mp.add(AycExtension::new("a", "theme1").with_kind(AycExtKind::Theme));
+        mp.add(AycExtension::new("b", "lang1").with_kind(AycExtKind::Language));
+        mp.add(AycExtension::new("c", "theme2").with_kind(AycExtKind::Theme));
+        assert_eq!(mp.by_kind(AycExtKind::Theme).len(), 2);
+    }
+
+    #[test]
+    fn test_ayc_find_by_id() {
+        let mut mp = AycMarketplace::new();
+        mp.add(AycExtension::new("pub", "ext"));
+        assert!(mp.find_by_id("pub.ext").is_some());
+        assert!(mp.find_by_id("no.such").is_none());
+    }
+
+    #[test]
+    fn test_ayc_popular() {
+        let mut mp = AycMarketplace::new();
+        let mut e1 = AycExtension::new("a", "x"); e1.install_count = 1000;
+        let mut e2 = AycExtension::new("b", "y"); e2.install_count = 5000;
+        mp.add(e1); mp.add(e2);
+        let pop = mp.popular();
+        assert_eq!(pop[0].install_count, 5000);
+    }
+
+    #[test]
+    fn test_ayc_display_name() {
+        let ext = AycExtension::new("ms-vscode", "go");
+        assert_eq!(ext.display_name(), "go (ms-vscode)");
     }
 
 }
