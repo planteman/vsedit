@@ -21674,6 +21674,102 @@ impl AxoOutlineModel {
     }
 }
 
+
+// --- axp_ workspace and multi-root folder management ---
+
+/// Workspace folder with URI and name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxpWorkspaceFolder {
+    pub uri: String,
+    pub name: String,
+    pub index: usize,
+}
+
+impl AxpWorkspaceFolder {
+    pub fn new(uri: &str, name: &str, index: usize) -> Self {
+        Self { uri: uri.to_string(), name: name.to_string(), index }
+    }
+    pub fn display_name(&self) -> &str { &self.name }
+}
+
+/// Event for folder changes.
+#[derive(Debug, Clone)]
+pub struct AxpFolderChangeEvent {
+    pub added: Vec<AxpWorkspaceFolder>,
+    pub removed: Vec<AxpWorkspaceFolder>,
+}
+
+impl AxpFolderChangeEvent {
+    pub fn new() -> Self { Self { added: Vec::new(), removed: Vec::new() } }
+    pub fn has_changes(&self) -> bool { !self.added.is_empty() || !self.removed.is_empty() }
+}
+
+/// Workspace state enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxpWorkspaceState { Empty, SingleFolder, MultiRoot }
+
+/// Configuration scope for settings resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxpConfigScope { Global, User, Workspace, WorkspaceFolder }
+
+impl AxpConfigScope {
+    pub fn precedence(&self) -> u8 {
+        match self { Self::Global => 0, Self::User => 1, Self::Workspace => 2, Self::WorkspaceFolder => 3 }
+    }
+    pub fn overrides(&self, other: &Self) -> bool { self.precedence() > other.precedence() }
+}
+
+/// Multi-root workspace manager.
+#[derive(Debug)]
+pub struct AxpWorkspace {
+    pub name: Option<String>,
+    pub folders: Vec<AxpWorkspaceFolder>,
+    pub config_path: Option<String>,
+}
+
+impl AxpWorkspace {
+    pub fn new() -> Self { Self { name: None, folders: Vec::new(), config_path: None } }
+    pub fn with_name(mut self, name: &str) -> Self { self.name = Some(name.to_string()); self }
+    pub fn state(&self) -> AxpWorkspaceState {
+        match self.folders.len() {
+            0 => AxpWorkspaceState::Empty,
+            1 => AxpWorkspaceState::SingleFolder,
+            _ => AxpWorkspaceState::MultiRoot,
+        }
+    }
+    pub fn add_folder(&mut self, uri: &str, name: &str) -> AxpFolderChangeEvent {
+        let idx = self.folders.len();
+        let folder = AxpWorkspaceFolder::new(uri, name, idx);
+        let mut evt = AxpFolderChangeEvent::new();
+        evt.added.push(folder.clone());
+        self.folders.push(folder);
+        evt
+    }
+    pub fn remove_folder(&mut self, uri: &str) -> AxpFolderChangeEvent {
+        let mut evt = AxpFolderChangeEvent::new();
+        if let Some(pos) = self.folders.iter().position(|f| f.uri == uri) {
+            let removed = self.folders.remove(pos);
+            evt.removed.push(removed);
+            for (i, f) in self.folders.iter_mut().enumerate() { f.index = i; }
+        }
+        evt
+    }
+    pub fn find_folder(&self, uri: &str) -> Option<&AxpWorkspaceFolder> {
+        self.folders.iter().find(|f| f.uri == uri)
+    }
+    pub fn folder_count(&self) -> usize { self.folders.len() }
+    pub fn folder_for_resource(&self, resource_uri: &str) -> Option<&AxpWorkspaceFolder> {
+        self.folders.iter().filter(|f| resource_uri.starts_with(&f.uri))
+            .max_by_key(|f| f.uri.len())
+    }
+    pub fn relative_path(&self, resource_uri: &str) -> Option<String> {
+        self.folder_for_resource(resource_uri)
+            .map(|f| resource_uri[f.uri.len()..].trim_start_matches('/').to_string())
+    }
+    pub fn set_config_path(&mut self, path: &str) { self.config_path = Some(path.to_string()); }
+    pub fn is_workspace_file(&self) -> bool { self.config_path.is_some() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35058,6 +35154,77 @@ mod tests {
         let sym = AxoOutlineSymbol::new("x", AxoBreadcrumbKind::Variable, 0, 0)
             .with_detail("i32");
         assert_eq!(sym.detail.as_deref(), Some("i32"));
+    }
+
+
+    #[test]
+    fn test_axp_workspace_folder() {
+        let f = AxpWorkspaceFolder::new("file:///proj", "proj", 0);
+        assert_eq!(f.display_name(), "proj");
+        assert_eq!(f.index, 0);
+    }
+
+    #[test]
+    fn test_axp_workspace_state() {
+        let mut ws = AxpWorkspace::new();
+        assert_eq!(ws.state(), AxpWorkspaceState::Empty);
+        ws.add_folder("file:///a", "a");
+        assert_eq!(ws.state(), AxpWorkspaceState::SingleFolder);
+        ws.add_folder("file:///b", "b");
+        assert_eq!(ws.state(), AxpWorkspaceState::MultiRoot);
+    }
+
+    #[test]
+    fn test_axp_add_remove_folder() {
+        let mut ws = AxpWorkspace::new();
+        let evt = ws.add_folder("file:///proj", "proj");
+        assert!(evt.has_changes());
+        assert_eq!(evt.added.len(), 1);
+        let evt2 = ws.remove_folder("file:///proj");
+        assert_eq!(evt2.removed.len(), 1);
+        assert_eq!(ws.folder_count(), 0);
+    }
+
+    #[test]
+    fn test_axp_folder_for_resource() {
+        let mut ws = AxpWorkspace::new();
+        ws.add_folder("file:///a", "a");
+        ws.add_folder("file:///a/sub", "sub");
+        let f = ws.folder_for_resource("file:///a/sub/file.rs");
+        assert_eq!(f.unwrap().name, "sub");
+    }
+
+    #[test]
+    fn test_axp_relative_path() {
+        let mut ws = AxpWorkspace::new();
+        ws.add_folder("file:///proj", "proj");
+        let rel = ws.relative_path("file:///proj/src/main.rs");
+        assert_eq!(rel.as_deref(), Some("src/main.rs"));
+    }
+
+    #[test]
+    fn test_axp_config_scope() {
+        assert!(AxpConfigScope::WorkspaceFolder.overrides(&AxpConfigScope::Workspace));
+        assert!(!AxpConfigScope::Global.overrides(&AxpConfigScope::User));
+    }
+
+    #[test]
+    fn test_axp_workspace_config_path() {
+        let mut ws = AxpWorkspace::new().with_name("test");
+        assert!(!ws.is_workspace_file());
+        ws.set_config_path("/path/to/test.code-workspace");
+        assert!(ws.is_workspace_file());
+    }
+
+    #[test]
+    fn test_axp_reindex_after_remove() {
+        let mut ws = AxpWorkspace::new();
+        ws.add_folder("file:///a", "a");
+        ws.add_folder("file:///b", "b");
+        ws.add_folder("file:///c", "c");
+        ws.remove_folder("file:///a");
+        assert_eq!(ws.folders[0].index, 0);
+        assert_eq!(ws.folders[1].index, 1);
     }
 
 }
