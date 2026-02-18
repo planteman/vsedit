@@ -22663,6 +22663,121 @@ impl AxuCodeLensAnnotation {
     }
 }
 
+
+// --- axv_ task runner and problem matcher ---
+
+/// Task source type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxvTaskSource { Workspace, Extension, User }
+
+/// Task group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxvTaskGroup { Build, Test, Clean, None }
+
+/// Task execution state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxvTaskState { Pending, Running, Succeeded, Failed, Cancelled }
+
+/// A task definition.
+#[derive(Debug, Clone)]
+pub struct AxvTask {
+    pub name: String,
+    pub source: AxvTaskSource,
+    pub group: AxvTaskGroup,
+    pub command: String,
+    pub args: Vec<String>,
+    pub cwd: Option<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub state: AxvTaskState,
+    pub exit_code: Option<i32>,
+}
+
+impl AxvTask {
+    pub fn new(name: &str, command: &str) -> Self {
+        Self {
+            name: name.to_string(), source: AxvTaskSource::Workspace, group: AxvTaskGroup::None,
+            command: command.to_string(), args: Vec::new(), cwd: None,
+            env: std::collections::HashMap::new(), state: AxvTaskState::Pending, exit_code: None,
+        }
+    }
+    pub fn with_group(mut self, group: AxvTaskGroup) -> Self { self.group = group; self }
+    pub fn with_args(mut self, args: Vec<String>) -> Self { self.args = args; self }
+    pub fn with_cwd(mut self, cwd: &str) -> Self { self.cwd = Some(cwd.to_string()); self }
+    pub fn full_command(&self) -> String {
+        if self.args.is_empty() { self.command.clone() }
+        else { format!("{} {}", self.command, self.args.join(" ")) }
+    }
+    pub fn start(&mut self) { self.state = AxvTaskState::Running; }
+    pub fn finish(&mut self, code: i32) {
+        self.exit_code = Some(code);
+        self.state = if code == 0 { AxvTaskState::Succeeded } else { AxvTaskState::Failed };
+    }
+    pub fn cancel(&mut self) { self.state = AxvTaskState::Cancelled; }
+    pub fn is_running(&self) -> bool { self.state == AxvTaskState::Running }
+    pub fn is_done(&self) -> bool { matches!(self.state, AxvTaskState::Succeeded | AxvTaskState::Failed | AxvTaskState::Cancelled) }
+}
+
+/// Problem severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxvProblemSeverity { Error, Warning, Info }
+
+/// A problem extracted from task output.
+#[derive(Debug, Clone)]
+pub struct AxvProblem {
+    pub file: String,
+    pub line: u32,
+    pub col: u32,
+    pub severity: AxvProblemSeverity,
+    pub message: String,
+    pub source: Option<String>,
+}
+
+impl AxvProblem {
+    pub fn new(file: &str, line: u32, col: u32, severity: AxvProblemSeverity, message: &str) -> Self {
+        Self { file: file.to_string(), line, col, severity, message: message.to_string(), source: None }
+    }
+    pub fn with_source(mut self, source: &str) -> Self { self.source = Some(source.to_string()); self }
+    pub fn location(&self) -> String { format!("{}:{}:{}", self.file, self.line, self.col) }
+}
+
+/// Problem matcher pattern (simplified regex-like).
+#[derive(Debug, Clone)]
+pub struct AxvProblemPattern {
+    pub file_group: usize,
+    pub line_group: usize,
+    pub col_group: usize,
+    pub severity_group: usize,
+    pub message_group: usize,
+    pub pattern: String,
+}
+
+impl AxvProblemPattern {
+    pub fn gcc_like() -> Self {
+        Self { file_group: 1, line_group: 2, col_group: 3, severity_group: 4, message_group: 5, pattern: "^(.+):(\\d+):(\\d+):\\s+(error|warning):\\s+(.+)$".to_string() }
+    }
+    pub fn rustc_like() -> Self {
+        Self { file_group: 1, line_group: 2, col_group: 3, severity_group: 4, message_group: 5, pattern: "^(error|warning)\\[.*\\]:\\s+(.+)$".to_string() }
+    }
+}
+
+/// Task runner managing multiple tasks.
+#[derive(Debug)]
+pub struct AxvTaskRunner {
+    pub tasks: Vec<AxvTask>,
+    pub problems: Vec<AxvProblem>,
+}
+
+impl AxvTaskRunner {
+    pub fn new() -> Self { Self { tasks: Vec::new(), problems: Vec::new() } }
+    pub fn add_task(&mut self, task: AxvTask) -> usize { self.tasks.push(task); self.tasks.len() - 1 }
+    pub fn running_count(&self) -> usize { self.tasks.iter().filter(|t| t.is_running()).count() }
+    pub fn error_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == AxvProblemSeverity::Error).count() }
+    pub fn warning_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == AxvProblemSeverity::Warning).count() }
+    pub fn add_problem(&mut self, p: AxvProblem) { self.problems.push(p); }
+    pub fn problems_for_file(&self, file: &str) -> Vec<&AxvProblem> { self.problems.iter().filter(|p| p.file == file).collect() }
+    pub fn clear_problems(&mut self) { self.problems.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36269,6 +36384,72 @@ mod tests {
         let d = AxuDecorationRange::new(0, 0, 0, 5, AxuDecorationType::Border)
             .with_hover("Error here");
         assert_eq!(d.hover_message.as_deref(), Some("Error here"));
+    }
+
+
+    #[test]
+    fn test_axv_task_lifecycle() {
+        let mut task = AxvTask::new("build", "cargo").with_group(AxvTaskGroup::Build).with_args(vec!["build".to_string()]);
+        assert_eq!(task.state, AxvTaskState::Pending);
+        assert_eq!(task.full_command(), "cargo build");
+        task.start();
+        assert!(task.is_running());
+        task.finish(0);
+        assert!(task.is_done());
+        assert_eq!(task.state, AxvTaskState::Succeeded);
+    }
+
+    #[test]
+    fn test_axv_task_failure() {
+        let mut task = AxvTask::new("test", "cargo");
+        task.start();
+        task.finish(1);
+        assert_eq!(task.state, AxvTaskState::Failed);
+        assert_eq!(task.exit_code, Some(1));
+    }
+
+    #[test]
+    fn test_axv_task_cancel() {
+        let mut task = AxvTask::new("watch", "cargo");
+        task.start();
+        task.cancel();
+        assert_eq!(task.state, AxvTaskState::Cancelled);
+    }
+
+    #[test]
+    fn test_axv_problem() {
+        let p = AxvProblem::new("src/main.rs", 10, 5, AxvProblemSeverity::Error, "unused variable")
+            .with_source("rustc");
+        assert_eq!(p.location(), "src/main.rs:10:5");
+        assert_eq!(p.source.as_deref(), Some("rustc"));
+    }
+
+    #[test]
+    fn test_axv_task_runner() {
+        let mut runner = AxvTaskRunner::new();
+        let idx = runner.add_task(AxvTask::new("build", "make"));
+        runner.tasks[idx].start();
+        assert_eq!(runner.running_count(), 1);
+        runner.add_problem(AxvProblem::new("a.c", 1, 0, AxvProblemSeverity::Error, "syntax error"));
+        runner.add_problem(AxvProblem::new("b.c", 2, 0, AxvProblemSeverity::Warning, "unused"));
+        assert_eq!(runner.error_count(), 1);
+        assert_eq!(runner.warning_count(), 1);
+        assert_eq!(runner.problems_for_file("a.c").len(), 1);
+    }
+
+    #[test]
+    fn test_axv_problem_pattern() {
+        let gcc = AxvProblemPattern::gcc_like();
+        assert_eq!(gcc.file_group, 1);
+        assert_eq!(gcc.message_group, 5);
+    }
+
+    #[test]
+    fn test_axv_task_env() {
+        let mut task = AxvTask::new("run", "node").with_cwd("/app");
+        task.env.insert("NODE_ENV".to_string(), "production".to_string());
+        assert_eq!(task.cwd.as_deref(), Some("/app"));
+        assert_eq!(task.env.get("NODE_ENV").unwrap(), "production");
     }
 
 }
