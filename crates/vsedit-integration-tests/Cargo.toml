@@ -78,5 +78,14 @@ vsedit-theme = { path = "../vsedit-theme" }
 vsedit-statusbar = { path = "../vsedit-statusbar" }
 vsedit-tui = { path = "../vsedit-tui" }
 vsedit-layout = { path = "../vsedit-layout" }
+vsedit-buffer = { path = "../vsedit-buffer" }
+vsedit-strings = { path = "../vsedit-strings" }
+vsedit-ext-api = { path = "../vsedit-ext-api" }
+vsedit-registry = { path = "../vsedit-registry" }
+vsedit-files = { path = "../vsedit-files" }
+vsedit-tokens = { path = "../vsedit-tokens" }
+vsedit-unicodehl = { path = "../vsedit-unicodehl" }
+vsedit-styles = { path = "../vsedit-styles" }
+vsedit-encryption = { path = "../vsedit-encryption" }
 serde_json.workspace = true
 tempfile.workspace = true

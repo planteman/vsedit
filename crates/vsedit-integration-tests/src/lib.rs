@@ -6519,3 +6519,885 @@ mod advanced_features {
         assert!(!merged.is_empty());
     }
 }
+
+// ─── Deep Editor Tests ──────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod deep_editor_tests {
+    use vsedit_buffer::VsBuffer;
+    use vsedit_cursor::{
+        CursorController, CursorState, move_left, move_right, move_up, move_down,
+        move_to_line_start, move_to_line_end, move_to_document_start, move_to_document_end,
+        move_word_left, move_word_right, delete_word_left, delete_word_right,
+        sort_cursors, serialize_cursors, deserialize_cursors, any_has_selection,
+        selection_count, collapse_selections, cursor_summary,
+    };
+    use vsedit_strings::{
+        display_width, equals_ignore_case, starts_with_ignore_case, to_snake_case,
+        to_camel_case, to_pascal_case, edit_distance, similarity_score, fuzzy_match_score,
+        MeasuredString, LineBuilder, extract_words, common_prefix_length, grapheme_count,
+    };
+    use vsedit_text_model::{TextModel, detect_line_ending, DetectedLineEnding};
+    use vsedit_editor_types::{ITextModel, Position};
+
+    #[test]
+    fn buffer_roundtrip_string() {
+        let buf = VsBuffer::from_string("hello world");
+        assert_eq!(buf.to_string_lossy(), "hello world");
+        assert_eq!(buf.len(), 11);
+        assert!(!buf.is_empty());
+    }
+
+    #[test]
+    fn buffer_empty_and_concat() {
+        let a = VsBuffer::from_string("foo");
+        let b = VsBuffer::from_string("bar");
+        let joined = VsBuffer::concat(&[a, b]);
+        assert_eq!(joined.to_string_lossy(), "foobar");
+        assert!(VsBuffer::empty().is_empty());
+    }
+
+    #[test]
+    fn buffer_slice_and_split() {
+        let buf = VsBuffer::from_string("abcdef");
+        let sliced = buf.try_slice(1..4).unwrap();
+        assert_eq!(sliced.to_string_lossy(), "bcd");
+        let (left, right) = buf.split_at(3).unwrap();
+        assert_eq!(left.to_string_lossy(), "abc");
+        assert_eq!(right.to_string_lossy(), "def");
+    }
+
+    #[test]
+    fn cursor_move_left_right_with_model() {
+        let model = TextModel::new("abcde");
+        let cursor = CursorState::from_position(Position::new(1, 3));
+        let moved = move_left(&model, &cursor, false, 2);
+        assert_eq!(moved.position().column, 1);
+        let moved_right = move_right(&model, &moved, false, 4);
+        assert_eq!(moved_right.position().column, 5);
+    }
+
+    #[test]
+    fn cursor_move_up_down_across_lines() {
+        let model = TextModel::new("short\na longer line\nend");
+        let cursor = CursorState::from_position(Position::new(2, 10));
+        let (up, _mem) = move_up(&model, &cursor, false, 1, None);
+        assert_eq!(up.position().line, 1);
+        let (down, _) = move_down(&model, &up, false, 2, None);
+        assert_eq!(down.position().line, 3);
+    }
+
+    #[test]
+    fn cursor_line_start_end_document_bounds() {
+        let model = TextModel::new("  hello world\nsecond line");
+        let cursor = CursorState::from_position(Position::new(1, 8));
+        let start = move_to_line_start(&model, &cursor, false);
+        assert!(start.position().column <= 3); // first non-ws or col 1
+        let end = move_to_line_end(&model, &cursor, false);
+        assert_eq!(end.position().column, model.get_line_max_column(1));
+        let doc_start = move_to_document_start(&model, &cursor, false);
+        assert_eq!(doc_start.position(), Position::new(1, 1));
+        let doc_end = move_to_document_end(&model, &cursor, false);
+        assert_eq!(doc_end.position().line, 2);
+    }
+
+    #[test]
+    fn cursor_word_movement() {
+        let model = TextModel::new("hello world fooBar");
+        let cursor = CursorState::from_position(Position::new(1, 1));
+        let right = move_word_right(&model, &cursor, false);
+        assert!(right.position().column > 1);
+        let left = move_word_left(&model, &right, false);
+        assert_eq!(left.position().column, 1);
+    }
+
+    #[test]
+    fn cursor_delete_word_boundaries() {
+        let model = TextModel::new("hello world test");
+        let cursor = CursorState::from_position(Position::new(1, 7));
+        let (start, end) = delete_word_left(&model, &cursor);
+        assert!(start.column < end.column);
+        let (start2, end2) = delete_word_right(&model, &cursor);
+        assert!(start2.column < end2.column);
+    }
+
+    #[test]
+    fn cursor_controller_multi_cursor() {
+        let mut ctrl = CursorController::new();
+        ctrl.add_cursor(Position::new(1, 1));
+        ctrl.add_cursor(Position::new(2, 1));
+        assert!(ctrl.has_multiple_cursors());
+        assert_eq!(ctrl.cursor_count(), 3); // primary + 2 added
+        let summary = cursor_summary(&ctrl);
+        assert_eq!(summary.count, 3);
+    }
+
+    #[test]
+    fn cursor_serialize_deserialize_roundtrip() {
+        let cursors = vec![
+            CursorState::from_position(Position::new(1, 5)),
+            CursorState::from_position(Position::new(3, 10)),
+        ];
+        let serialized = serialize_cursors(&cursors);
+        let deserialized = deserialize_cursors(&serialized).unwrap();
+        assert_eq!(deserialized.len(), 2);
+        assert_eq!(deserialized[0].position(), cursors[0].position());
+    }
+
+    #[test]
+    fn cursor_sort_and_selection_queries() {
+        let mut cursors = vec![
+            CursorState::from_position(Position::new(3, 1)),
+            CursorState::from_position(Position::new(1, 1)),
+        ];
+        sort_cursors(&mut cursors);
+        assert_eq!(cursors[0].position().line, 1);
+        assert!(!any_has_selection(&cursors));
+        assert_eq!(selection_count(&cursors), 0);
+        let collapsed = collapse_selections(&cursors);
+        assert_eq!(collapsed.len(), 2);
+    }
+
+    #[test]
+    fn strings_case_conversion_and_comparison() {
+        assert!(equals_ignore_case("Hello", "hello"));
+        assert!(starts_with_ignore_case("FooBar", "foo"));
+        assert_eq!(to_snake_case("fooBar"), "foo_bar");
+        assert_eq!(to_camel_case("foo_bar"), "fooBar");
+        assert_eq!(to_pascal_case("foo_bar"), "FooBar");
+    }
+
+    #[test]
+    fn strings_fuzzy_match_and_distance() {
+        assert!(fuzzy_match_score("fb", "fooBar") > 0);
+        assert_eq!(edit_distance("kitten", "sitting"), 3);
+        let score = similarity_score("hello", "hello");
+        assert!(score > 0.99);
+    }
+
+    #[test]
+    fn strings_measured_and_line_builder() {
+        let ms = MeasuredString::new("hello 世界");
+        assert!(ms.width() >= ms.text().chars().count());
+        assert_eq!(ms.grapheme_len(), grapheme_count(ms.text()));
+        let line = LineBuilder::new().separator(" | ").push("a").push("b").push("c").build();
+        assert_eq!(line, "a | b | c");
+        let words = extract_words("hello world test");
+        assert_eq!(words.len(), 3);
+        assert_eq!(common_prefix_length("abcdef", "abcxyz"), 3);
+    }
+
+    #[test]
+    fn text_model_line_endings_and_display_width() {
+        let ending = detect_line_ending("foo\r\nbar\r\n");
+        assert_eq!(ending, DetectedLineEnding::CRLF);
+        assert_eq!(display_width("hello"), 5);
+        assert!(display_width("日本語") > 3);
+    }
+}
+
+// ─── Deep Workbench Tests ───────────────────────────────────────────────────
+
+#[cfg(test)]
+mod deep_workbench_tests {
+    use vsedit_workbench::{
+        Workbench, EditorGroup, EditorGroupTab, EditorGroupManager,
+        ActivityBarItem, default_activity_bar_items, compute_breadcrumbs,
+    };
+    use vsedit_statusbar::{
+        StatusBar, StatusBarEntry, StatusBarAlignment, StatusBarGroup, StatusBarTooltip,
+    };
+    use vsedit_layout::{
+        LayoutBuilder, SplitView, Padding,
+        inset, center, contains, rect_area, apply_padding, distribute_evenly,
+    };
+    use vsedit_tui::Rect;
+
+    #[test]
+    fn workbench_lifecycle() {
+        let mut wb = Workbench::new();
+        assert!(!wb.is_started());
+        wb.start();
+        assert!(wb.is_started());
+    }
+
+    #[test]
+    fn editor_group_tab_management() {
+        let mut group = EditorGroup::new(0);
+        assert!(group.is_empty());
+        group.add_tab(EditorGroupTab {
+            title: "main.rs".into(),
+            file_path: Some("/src/main.rs".into()),
+            content: "fn main() {}".into(),
+            is_modified: false,
+        });
+        assert!(!group.is_empty());
+        assert!(group.active_tab().is_some());
+        group.close_tab(0);
+        assert!(group.is_empty());
+    }
+
+    #[test]
+    fn editor_group_manager_split() {
+        let mut mgr = EditorGroupManager::new();
+        assert_eq!(mgr.group_count(), 1);
+        mgr.split_editor(vsedit_workbench::SplitDirection::Right);
+        assert_eq!(mgr.group_count(), 2);
+    }
+
+    #[test]
+    fn activity_bar_defaults() {
+        let items = default_activity_bar_items();
+        assert!(!items.is_empty());
+        let item = ActivityBarItem::new("test", "Test", "T");
+        assert_eq!(item.display_text(), "T");
+    }
+
+    #[test]
+    fn breadcrumb_computation() {
+        let crumbs = compute_breadcrumbs("src/lib.rs", &["module".into(), "function".into()]);
+        assert!(!crumbs.is_empty());
+    }
+
+    #[test]
+    fn statusbar_entry_builder() {
+        let entry = StatusBarEntry::builder("git", "main", StatusBarAlignment::Left)
+            .tooltip("Git Branch")
+            .priority(100)
+            .command("git.checkout")
+            .build();
+        assert_eq!(entry.id, "git");
+        assert_eq!(entry.text, "main");
+        assert_eq!(entry.alignment, StatusBarAlignment::Left);
+        assert_eq!(entry.priority, 100);
+    }
+
+    #[test]
+    fn statusbar_add_remove_entries() {
+        let mut sb = StatusBar::new();
+        let entry = StatusBarEntry::builder("enc", "UTF-8", StatusBarAlignment::Right)
+            .build();
+        sb.add_entry(entry);
+        assert_eq!(sb.entry_count(), 1);
+        assert!(sb.has_entry("enc"));
+        sb.remove_entry("enc");
+        assert_eq!(sb.entry_count(), 0);
+    }
+
+    #[test]
+    fn statusbar_update_and_visibility() {
+        let mut sb = StatusBar::new();
+        sb.add_entry(StatusBarEntry::builder("lang", "Rust", StatusBarAlignment::Right).build());
+        sb.update_text("lang", "Python");
+        let visible = sb.get_visible_entries(StatusBarAlignment::Right);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].text, "Python");
+        sb.set_visibility("lang", false);
+        assert_eq!(sb.get_visible_entries(StatusBarAlignment::Right).len(), 0);
+    }
+
+    #[test]
+    fn statusbar_group_operations() {
+        let mut group = StatusBarGroup::new("test-group");
+        assert!(group.is_empty());
+        group.add("item1");
+        group.add("item2");
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("item1"));
+    }
+
+    #[test]
+    fn statusbar_tooltip_render() {
+        let tooltip = StatusBarTooltip::new("tip1", "Git Status");
+        let rendered = tooltip.render();
+        assert!(rendered.contains("Git Status"));
+    }
+
+    #[test]
+    fn layout_builder_horizontal() {
+        let node = LayoutBuilder::horizontal()
+            .fixed(20)
+            .flex(1)
+            .fixed(30)
+            .build()
+            .unwrap();
+        assert_eq!(node.len(), 3);
+        assert!(!node.is_empty());
+    }
+
+    #[test]
+    fn layout_split_view() {
+        let split = SplitView::horizontal(0.3);
+        assert!((split.ratio() - 0.3).abs() < 0.01);
+        let area = Rect::new(0, 0, 100, 50);
+        let (left, right) = split.split(area);
+        assert!(left.width > 0);
+        assert!(right.width > 0);
+        assert_eq!(left.width + right.width, area.width);
+    }
+
+    #[test]
+    fn layout_rect_utilities() {
+        let area = Rect::new(10, 10, 80, 60);
+        let inset_area = inset(area, 5);
+        assert_eq!(inset_area.x, 15);
+        assert_eq!(inset_area.width, 70);
+        let (cx, cy) = center(area);
+        assert_eq!(cx, 50);
+        assert_eq!(cy, 40);
+        assert!(contains(area, inset_area));
+    }
+
+    #[test]
+    fn layout_padding_and_area() {
+        let r = Rect::new(0, 0, 100, 50);
+        let p = Padding { top: 2, right: 3, bottom: 2, left: 3 };
+        let padded = apply_padding(&r, &p);
+        assert_eq!(padded.width, 94);
+        assert_eq!(padded.height, 46);
+        assert_eq!(rect_area(&r), 5000);
+    }
+
+    #[test]
+    fn layout_distribute_evenly_test() {
+        let dist = distribute_evenly(100, 3);
+        assert_eq!(dist.len(), 3);
+        let total: u16 = dist.iter().sum();
+        assert_eq!(total, 100);
+    }
+}
+
+// ─── Deep Extension Tests ───────────────────────────────────────────────────
+
+#[cfg(test)]
+mod deep_extension_tests {
+    use vsedit_ext_api::{
+        ApiRegistry, ApiCapabilities, ContributionPoint, all_namespaces,
+        ExtApiStats, enumerate_capabilities, count_enabled_capabilities,
+        API_VERSION,
+    };
+    use vsedit_ext_activation::{
+        ActivationEvent, ActivationEventMatcher, ExtensionActivationQueue,
+        ActivationDependencyGraph, parse_activation_event,
+        activation_event_to_string,
+    };
+    use vsedit_registry::{
+        ExtensionPointRegistry, ExtensionPointMetadata, RegistrySnapshot, merge_registries,
+    };
+
+    #[test]
+    fn api_registry_namespace_registration() {
+        let mut reg = ApiRegistry::new();
+        reg.register_namespace("commands", 1);
+        reg.register_namespace("window", 2);
+        assert!(reg.has_namespace("commands"));
+        assert_eq!(reg.get_proxy_id("commands"), Some(1));
+        assert_eq!(reg.namespace_count(), 2);
+    }
+
+    #[test]
+    fn api_registry_with_defaults() {
+        let reg = ApiRegistry::with_defaults();
+        let ns = reg.registered_namespaces();
+        assert!(!ns.is_empty());
+    }
+
+    #[test]
+    fn api_registry_contribution_points() {
+        let mut reg = ApiRegistry::new();
+        reg.register_contribution(ContributionPoint::Commands);
+        reg.register_contribution(ContributionPoint::Languages);
+        assert!(!reg.is_contribution_points_empty());
+        assert_eq!(reg.contributions().len(), 2);
+    }
+
+    #[test]
+    fn api_capabilities_and_version() {
+        assert!(!API_VERSION.is_empty());
+        let caps = ApiCapabilities::default();
+        let enabled = count_enabled_capabilities(&caps);
+        let _ = enabled; // used for side-effect check
+        let all_caps = enumerate_capabilities(&caps);
+        assert!(!all_caps.is_empty());
+    }
+
+    #[test]
+    fn api_all_namespaces() {
+        let ns = all_namespaces();
+        assert!(ns.contains(&"commands"));
+        assert!(ns.contains(&"window"));
+    }
+
+    #[test]
+    fn activation_event_parsing() {
+        assert_eq!(parse_activation_event("*"), Some(ActivationEvent::Star));
+        assert_eq!(
+            parse_activation_event("onLanguage:rust"),
+            Some(ActivationEvent::OnLanguage("rust".into()))
+        );
+        assert_eq!(parse_activation_event("onDebug"), Some(ActivationEvent::OnDebug));
+        assert!(parse_activation_event("invalid").is_none());
+    }
+
+    #[test]
+    fn activation_event_to_string_roundtrip() {
+        let events = vec![
+            ActivationEvent::Star,
+            ActivationEvent::OnLanguage("python".into()),
+            ActivationEvent::OnCommand("editor.action.format".into()),
+        ];
+        for event in &events {
+            let s = activation_event_to_string(event);
+            let parsed = parse_activation_event(&s).unwrap();
+            assert_eq!(&parsed, event);
+        }
+    }
+
+    #[test]
+    fn activation_matcher_language_trigger() {
+        let mut matcher = ActivationEventMatcher::new();
+        let event = ActivationEvent::OnLanguage("rust".into());
+        assert!(!matcher.should_activate(&event));
+        matcher.open_language("rust");
+        assert!(matcher.should_activate(&event));
+    }
+
+    #[test]
+    fn activation_queue_evaluate_and_pop() {
+        let mut queue = ExtensionActivationQueue::new();
+        queue.register("ext-a".into(), vec![ActivationEvent::Star]);
+        queue.register("ext-b".into(), vec![ActivationEvent::OnLanguage("go".into())]);
+        let matcher = ActivationEventMatcher::new();
+        let newly = queue.evaluate(&matcher);
+        assert!(newly.contains(&"ext-a".to_string()));
+        assert!(!newly.contains(&"ext-b".to_string()));
+        let popped = queue.pop_pending().unwrap();
+        assert_eq!(popped, "ext-a");
+        assert!(queue.is_activated("ext-a"));
+    }
+
+    #[test]
+    fn activation_dependency_graph() {
+        let mut graph = ActivationDependencyGraph::new();
+        graph.add_dependency("ext-b", "ext-a");
+        let mut activated = std::collections::HashSet::new();
+        assert!(!graph.can_activate("ext-b", &activated));
+        activated.insert("ext-a".into());
+        assert!(graph.can_activate("ext-b", &activated));
+    }
+
+    #[test]
+    fn extension_point_registry_crud() {
+        let mut reg = ExtensionPointRegistry::new();
+        assert!(reg.is_empty());
+        reg.register_point("commands");
+        reg.register_point("languages");
+        assert_eq!(reg.len(), 2);
+        assert!(reg.has_point("commands"));
+        reg.unregister_point("commands").unwrap();
+        assert!(!reg.has_point("commands"));
+    }
+
+    #[test]
+    fn extension_point_registry_metadata() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point_with_metadata("themes", ExtensionPointMetadata {
+            description: "Color themes".into(),
+            version: Some("1.0.0".into()),
+            deprecated: false,
+        });
+        let meta = reg.get_metadata("themes").unwrap();
+        assert_eq!(meta.description, "Color themes");
+    }
+
+    #[test]
+    fn extension_point_find_by_prefix() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("editor.commands");
+        reg.register_point("editor.languages");
+        reg.register_point("workbench.views");
+        let found = reg.find_by_prefix("editor.");
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn registry_merge_and_snapshot() {
+        let mut a = ExtensionPointRegistry::new();
+        a.register_point("commands");
+        let mut b = ExtensionPointRegistry::new();
+        b.register_point("languages");
+        let count = merge_registries(&mut a, &b);
+        assert_eq!(count, 1);
+        assert!(a.has_point("commands"));
+        assert!(a.has_point("languages"));
+        let snap = RegistrySnapshot::from_registry(&a, 0);
+        assert_eq!(snap.len(), 2);
+    }
+
+    #[test]
+    fn api_stats_tracking() {
+        let mut stats = ExtApiStats::new();
+        stats.record_success(100);
+        stats.record_success(200);
+        stats.record_failure(50);
+        assert_eq!(stats.total(), 3);
+        assert!(stats.success_rate() > 0.6);
+        assert_eq!(stats.average_time_ns(), 116); // (100+200+50)/3
+    }
+}
+
+// ─── Deep Platform Tests ────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod deep_platform_tests {
+    use vsedit_files::{
+        file_compare, diff_summary, file_similarity,
+    };
+    use vsedit_configuration::{
+        ConfigurationModel, Configuration, ConfigurationTarget, ConfigurationRegistry,
+        SettingSchema, SettingType,
+    };
+    use vsedit_storage::{Storage, StorageScope, StorageService};
+    use vsedit_encryption::{
+        derive_key, generate_salt, base64_encode, base64_decode,
+        hmac_sign, hmac_verify, EncryptionService, validate_key_strength,
+        byte_entropy, hex_encode, hex_decode,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn file_diff_identical() {
+        let old = b"hello\nworld\n";
+        let new = b"hello\nworld\n";
+        let lines = file_compare(old, new);
+        let summary = diff_summary(&lines);
+        assert_eq!(summary.added, 0);
+        assert_eq!(summary.removed, 0);
+    }
+
+    #[test]
+    fn file_diff_with_changes() {
+        let old = b"line1\nline2\nline3\n";
+        let new = b"line1\nmodified\nline3\nnew\n";
+        let lines = file_compare(old, new);
+        let summary = diff_summary(&lines);
+        assert!(summary.added > 0 || summary.removed > 0);
+    }
+
+    #[test]
+    fn file_similarity_metric() {
+        let a = b"hello world";
+        let b = b"hello world";
+        let sim = file_similarity(a, b);
+        assert!((sim - 1.0).abs() < 0.01);
+        let sim2 = file_similarity(b"abc", b"xyz");
+        assert!(sim2 < 1.0);
+    }
+
+    #[test]
+    fn configuration_model_set_get() {
+        let mut model = ConfigurationModel::new();
+        model.set_value("editor.fontSize", json!(14));
+        let val: Option<i64> = model.get_value("editor.fontSize");
+        assert_eq!(val, Some(14));
+    }
+
+    #[test]
+    fn configuration_model_merge() {
+        let mut base = ConfigurationModel::new();
+        base.set_value("editor.tabSize", json!(4));
+        let mut overlay = ConfigurationModel::new();
+        overlay.set_value("editor.tabSize", json!(2));
+        overlay.set_value("editor.wordWrap", json!("on"));
+        base.merge(&overlay);
+        let tab_size: Option<i64> = base.get_value("editor.tabSize");
+        assert_eq!(tab_size, Some(2));
+        let word_wrap: Option<String> = base.get_value("editor.wordWrap");
+        assert_eq!(word_wrap, Some("on".into()));
+    }
+
+    #[test]
+    fn configuration_layered() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.fontSize", json!(12));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.fontSize", json!(16));
+        config.set_layer(ConfigurationTarget::User, user);
+        let effective = config.get_effective_value("editor.fontSize");
+        assert_eq!(effective, Some(json!(16)));
+    }
+
+    #[test]
+    fn configuration_inspect() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.minimap.enabled", json!(true));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let inspect = config.inspect("editor.minimap.enabled");
+        assert!(inspect.merged_value().is_some());
+    }
+
+    #[test]
+    fn configuration_registry_settings() {
+        let mut registry = ConfigurationRegistry::new();
+        registry.register_setting(SettingSchema {
+            key: "editor.fontSize".into(),
+            setting_type: SettingType::Number,
+            default: json!(14),
+            description: "Font size in pixels".into(),
+            enum_values: None,
+            enum_descriptions: None,
+        });
+        assert!(!registry.is_empty());
+        assert!(registry.get_schema("editor.fontSize").is_some());
+    }
+
+    #[test]
+    fn storage_in_memory_crud() {
+        let store = Storage::in_memory().unwrap();
+        store.set("theme", "dark").unwrap();
+        assert_eq!(store.get("theme"), Some("dark".into()));
+        assert!(store.has("theme"));
+        store.set_bool("minimap", true).unwrap();
+        assert_eq!(store.get_bool("minimap"), Some(true));
+        store.set_i64("fontSize", 14).unwrap();
+        assert_eq!(store.get_i64("fontSize"), Some(14));
+        store.remove("theme").unwrap();
+        assert!(!store.has("theme"));
+    }
+
+    #[test]
+    fn storage_service_scoped() {
+        let global = Storage::in_memory().unwrap();
+        let workspace = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global).with_workspace(workspace);
+        svc.set("key1", "global_val", StorageScope::Global).unwrap();
+        svc.set("key1", "ws_val", StorageScope::Workspace).unwrap();
+        assert_eq!(svc.get("key1", StorageScope::Global), Some("global_val".into()));
+        assert_eq!(svc.get("key1", StorageScope::Workspace), Some("ws_val".into()));
+    }
+
+    #[test]
+    fn encryption_base64_roundtrip() {
+        let data = b"hello world encryption test";
+        let encoded = base64_encode(data);
+        let decoded = base64_decode(&encoded).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn encryption_hex_roundtrip() {
+        let data = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        let hex = hex_encode(&data);
+        let decoded = hex_decode(&hex).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn encryption_derive_key_and_service() {
+        let key = derive_key("my-passphrase");
+        assert!(!key.is_empty());
+        let svc = EncryptionService::from_passphrase("test-pass");
+        let encrypted = svc.encrypt_string("secret data");
+        let decrypted = svc.decrypt_string(&encrypted).unwrap();
+        assert_eq!(decrypted, "secret data");
+    }
+
+    #[test]
+    fn encryption_hmac_sign_verify() {
+        let key = derive_key("hmac-key");
+        let data = b"important message";
+        let sig = hmac_sign(&key, data);
+        assert!(hmac_verify(&key, data, &sig));
+        assert!(!hmac_verify(&key, b"tampered", &sig));
+    }
+
+    #[test]
+    fn encryption_entropy_and_validation() {
+        let random_data = generate_salt(64);
+        let entropy = byte_entropy(&random_data);
+        assert!(entropy > 0.0);
+        let strong_key = generate_salt(32);
+        assert!(validate_key_strength(&strong_key).is_ok());
+    }
+}
+
+// ─── Deep Render Tests ──────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod deep_render_tests {
+    use vsedit_theme::{
+        Color, dark_plus, light_plus, high_contrast,
+        builtin_themes, blend_colors, relative_luminance, contrast_ratio,
+        validate_contrast, WcagLevel, theme_diff,
+    };
+    use vsedit_tokens::{
+        StandardTokenType, TokenMetadata, FontStyle, Token, LineTokens,
+        TokenMetadataBuilder, TokenizationState, TokenizationCache,
+        compute_token_statistics, token_type_color_name,
+    };
+    use vsedit_unicodehl::{
+        UnicodeHighlightConfig, highlight_line,
+        count_non_ascii, is_safe_text, UnicodeAnalysis,
+    };
+    use vsedit_styles::{
+        ThemeColor, ThemeColorResolver, parse_hex_color,
+        ColorPalette as StyleColorPalette, StyleProperty, StyleRule, StyleSheet,
+        editor_style,
+    };
+
+    #[test]
+    fn theme_color_creation() {
+        let c = Color::rgb(255, 0, 0);
+        assert_eq!(c.r, 255);
+        let hex_c = Color::from_hex("#00ff00").unwrap();
+        assert_eq!(hex_c.g, 255);
+        let hex_str = c.to_hex();
+        assert!(hex_str.starts_with('#'));
+    }
+
+    #[test]
+    fn theme_dark_plus_properties() {
+        let theme = dark_plus();
+        assert!(!theme.is_high_contrast());
+        assert!(theme.get_color("editor.background").is_some());
+        assert!(theme.token_color_count() > 0);
+    }
+
+    #[test]
+    fn theme_builtin_themes_exist() {
+        let themes = builtin_themes();
+        assert!(themes.len() >= 4); // dark+, light+, monokai, solarized, etc.
+        let hc = high_contrast();
+        assert!(hc.is_high_contrast());
+    }
+
+    #[test]
+    fn theme_color_blending() {
+        let black = Color::rgb(0, 0, 0);
+        let white = Color::rgb(255, 255, 255);
+        let mid = blend_colors(&black, &white, 0.5);
+        assert!(mid.r > 100 && mid.r < 155);
+    }
+
+    #[test]
+    fn theme_contrast_ratio_wcag() {
+        let black = Color::rgb(0, 0, 0);
+        let white = Color::rgb(255, 255, 255);
+        let ratio = contrast_ratio(&black, &white);
+        assert!(ratio > 20.0);
+        assert!(validate_contrast(&black, &white, WcagLevel::AAA));
+        let lum = relative_luminance(&white);
+        assert!(lum > 0.9);
+    }
+
+    #[test]
+    fn theme_diff_detection() {
+        let dark = dark_plus();
+        let light = light_plus();
+        let changes = theme_diff(&dark, &light);
+        assert!(!changes.is_empty());
+    }
+
+    #[test]
+    fn token_metadata_builder() {
+        let meta = TokenMetadataBuilder::new()
+            .language_id(1)
+            .token_type(StandardTokenType::Comment)
+            .font_style(FontStyle::ITALIC)
+            .foreground(10)
+            .background(0)
+            .build()
+            .unwrap();
+        assert_eq!(meta.token_type(), StandardTokenType::Comment);
+        assert_eq!(meta.language_id(), 1);
+        assert!(meta.font_style().is_italic());
+    }
+
+    #[test]
+    fn token_line_tokens_operations() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 1, 0);
+        let tokens = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 5, metadata: TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::ITALIC, 2, 0) },
+        ]);
+        assert_eq!(tokens.count(), 2);
+        assert!(tokens.contains_type(StandardTokenType::Comment));
+        assert_eq!(tokens.count_type(StandardTokenType::Comment), 1);
+        let stats = compute_token_statistics(&tokens);
+        assert_eq!(stats.total_tokens, 2);
+    }
+
+    #[test]
+    fn token_cache_operations() {
+        let mut cache = TokenizationCache::new();
+        let tokens = LineTokens::empty();
+        let state = TokenizationState::initial();
+        cache.set(0, tokens, state);
+        assert_eq!(cache.cached_line_count(), 1);
+        assert!(cache.get(0).is_some());
+        cache.invalidate(0);
+        assert_eq!(cache.cached_line_count(), 0);
+    }
+
+    #[test]
+    fn token_type_names() {
+        let comment_name = token_type_color_name(StandardTokenType::Comment);
+        assert!(comment_name.contains("comment"));
+        let string_name = token_type_color_name(StandardTokenType::String);
+        assert!(string_name.contains("string"));
+    }
+
+    #[test]
+    fn unicode_highlight_detection() {
+        let config = UnicodeHighlightConfig::strict();
+        let highlights = highlight_line("hello wоrld", 1, &config); // 'о' is Cyrillic
+        assert!(!highlights.is_empty());
+        let safe = highlight_line("hello world", 1, &config);
+        assert!(safe.is_empty());
+    }
+
+    #[test]
+    fn unicode_analysis_and_safety() {
+        assert!(is_safe_text("hello world"));
+        assert!(count_non_ascii("hello") == 0);
+        assert!(count_non_ascii("héllo") == 1);
+        let analysis = UnicodeAnalysis::analyze("hello world");
+        assert!(analysis.is_safe());
+        assert!((analysis.ascii_percentage() - 100.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn styles_color_resolver() {
+        let mut resolver = ThemeColorResolver::new();
+        let color = ThemeColor::new("editor.background");
+        resolver.register(color.clone(), editor_style());
+        assert!(!resolver.is_empty());
+        assert_eq!(resolver.len(), 1);
+        let resolved = resolver.resolve(&color);
+        // Should return the registered style (not default)
+        assert_eq!(format!("{:?}", resolved), format!("{:?}", editor_style()));
+    }
+
+    #[test]
+    fn styles_parse_hex_and_palette() {
+        let c = parse_hex_color("#ff0000").unwrap();
+        assert_eq!(format!("{:?}", c), format!("{:?}", vsedit_styles::Color::Rgb(255, 0, 0)));
+        let palette = StyleColorPalette::dark_default();
+        assert!(!palette.is_empty());
+    }
+
+    #[test]
+    fn styles_stylesheet_operations() {
+        let mut sheet = StyleSheet::new();
+        let mut rule = StyleRule::new("editor");
+        rule.set("fontSize", StyleProperty::NumberValue(14.0));
+        sheet.add_rule(rule);
+        assert_eq!(sheet.rule_count(), 1);
+        assert!(sheet.find_rule("editor").is_some());
+        let selectors = sheet.selectors();
+        assert!(selectors.contains(&"editor"));
+    }
+}
