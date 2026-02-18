@@ -27191,6 +27191,72 @@ impl AzsIndentResult {
     }
 }
 
+
+// --- azt_ editor token classification and scope ---
+
+/// Token classification for syntax highlighting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AztTokenClass {
+    Keyword, Identifier, StringLiteral, NumberLiteral, Comment,
+    Operator, Punctuation, Type, Function, Variable, Parameter,
+    Property, EnumMember, Macro, Decorator, Namespace, Label,
+    RegExp, Escape, Invalid,
+}
+
+/// A classified token in a line.
+#[derive(Debug, Clone)]
+pub struct AztClassifiedToken {
+    pub start: u32,
+    pub length: u32,
+    pub class: AztTokenClass,
+    pub scopes: Vec<String>,
+}
+
+impl AztClassifiedToken {
+    pub fn new(start: u32, length: u32, class: AztTokenClass) -> Self {
+        Self { start, length, class, scopes: Vec::new() }
+    }
+    pub fn with_scope(mut self, s: &str) -> Self { self.scopes.push(s.to_string()); self }
+    pub fn end(&self) -> u32 { self.start + self.length }
+    pub fn matches_scope(&self, prefix: &str) -> bool { self.scopes.iter().any(|s| s.starts_with(prefix)) }
+    pub fn is_comment(&self) -> bool { self.class == AztTokenClass::Comment }
+    pub fn is_string(&self) -> bool { self.class == AztTokenClass::StringLiteral }
+}
+
+/// Token line result.
+#[derive(Debug)]
+pub struct AztTokenizedLine {
+    pub line_number: u32,
+    pub tokens: Vec<AztClassifiedToken>,
+    pub end_state: u32,
+}
+
+impl AztTokenizedLine {
+    pub fn new(line: u32, state: u32) -> Self { Self { line_number: line, tokens: Vec::new(), end_state: state } }
+    pub fn add_token(&mut self, t: AztClassifiedToken) { self.tokens.push(t); }
+    pub fn token_count(&self) -> usize { self.tokens.len() }
+    pub fn token_at_offset(&self, offset: u32) -> Option<&AztClassifiedToken> {
+        self.tokens.iter().find(|t| offset >= t.start && offset < t.end())
+    }
+    pub fn comments(&self) -> Vec<&AztClassifiedToken> { self.tokens.iter().filter(|t| t.is_comment()).collect() }
+    pub fn strings(&self) -> Vec<&AztClassifiedToken> { self.tokens.iter().filter(|t| t.is_string()).collect() }
+}
+
+/// Scope selector for theme matching.
+#[derive(Debug, Clone)]
+pub struct AztScopeSelector {
+    pub parts: Vec<String>,
+}
+
+impl AztScopeSelector {
+    pub fn parse(s: &str) -> Self { Self { parts: s.split('.').map(|p| p.to_string()).collect() } }
+    pub fn matches(&self, scope: &str) -> bool {
+        let scope_parts: Vec<&str> = scope.split('.').collect();
+        self.parts.iter().enumerate().all(|(i, p)| scope_parts.get(i).map_or(false, |sp| sp == p))
+    }
+    pub fn specificity(&self) -> usize { self.parts.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44379,6 +44445,76 @@ goodbye";
     fn test_azs_indent_tabs() {
         let r = AzsIndentResult::keep(3);
         assert_eq!(r.indent_string(4, false), "			");
+    }
+
+
+    #[test]
+    fn test_azt_classified_token() {
+        let t = AztClassifiedToken::new(5, 3, AztTokenClass::Keyword)
+            .with_scope("keyword.control.rust");
+        assert_eq!(t.end(), 8);
+        assert!(t.matches_scope("keyword"));
+        assert!(!t.matches_scope("string"));
+    }
+
+    #[test]
+    fn test_azt_comment_string() {
+        let c = AztClassifiedToken::new(0, 10, AztTokenClass::Comment);
+        assert!(c.is_comment());
+        assert!(!c.is_string());
+        let s = AztClassifiedToken::new(0, 5, AztTokenClass::StringLiteral);
+        assert!(s.is_string());
+    }
+
+    #[test]
+    fn test_azt_tokenized_line() {
+        let mut line = AztTokenizedLine::new(0, 0);
+        line.add_token(AztClassifiedToken::new(0, 2, AztTokenClass::Keyword));
+        line.add_token(AztClassifiedToken::new(3, 5, AztTokenClass::Identifier));
+        line.add_token(AztClassifiedToken::new(10, 8, AztTokenClass::Comment));
+        assert_eq!(line.token_count(), 3);
+        assert_eq!(line.comments().len(), 1);
+    }
+
+    #[test]
+    fn test_azt_token_at_offset() {
+        let mut line = AztTokenizedLine::new(0, 0);
+        line.add_token(AztClassifiedToken::new(0, 3, AztTokenClass::Keyword));
+        line.add_token(AztClassifiedToken::new(4, 5, AztTokenClass::Identifier));
+        assert!(line.token_at_offset(1).is_some());
+        assert!(line.token_at_offset(3).is_none());
+        assert!(line.token_at_offset(6).is_some());
+    }
+
+    #[test]
+    fn test_azt_scope_selector_match() {
+        let sel = AztScopeSelector::parse("keyword.control");
+        assert!(sel.matches("keyword.control.rust"));
+        assert!(sel.matches("keyword.control"));
+        assert!(!sel.matches("keyword.operator"));
+    }
+
+    #[test]
+    fn test_azt_scope_specificity() {
+        let s1 = AztScopeSelector::parse("keyword");
+        let s2 = AztScopeSelector::parse("keyword.control.flow");
+        assert!(s2.specificity() > s1.specificity());
+    }
+
+    #[test]
+    fn test_azt_scope_no_match() {
+        let sel = AztScopeSelector::parse("string.quoted.double");
+        assert!(!sel.matches("string.quoted.single"));
+        assert!(sel.matches("string.quoted.double.python"));
+    }
+
+    #[test]
+    fn test_azt_strings_in_line() {
+        let mut line = AztTokenizedLine::new(5, 0);
+        line.add_token(AztClassifiedToken::new(0, 3, AztTokenClass::Identifier));
+        line.add_token(AztClassifiedToken::new(5, 7, AztTokenClass::StringLiteral));
+        line.add_token(AztClassifiedToken::new(15, 4, AztTokenClass::StringLiteral));
+        assert_eq!(line.strings().len(), 2);
     }
 
 }
