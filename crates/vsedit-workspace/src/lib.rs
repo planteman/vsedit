@@ -12347,6 +12347,289 @@ impl std::fmt::Display for YsVersionVector {
     }
 }
 
+
+// --- yt_ simple regex engine and pattern matcher ---
+
+/// A simple NFA-based regex engine supporting ., *, +, ?, |, character classes, anchors.
+#[derive(Debug, Clone)]
+pub struct YtRegex {
+    pattern: String,
+    tokens: Vec<YtRegexToken>,
+}
+
+#[derive(Debug, Clone)]
+enum YtRegexToken {
+    Literal(char),
+    Dot,
+    Star(Box<YtRegexToken>),
+    Plus(Box<YtRegexToken>),
+    Optional(Box<YtRegexToken>),
+    CharClass(Vec<char>, bool),
+    Anchor(YtAnchor),
+}
+
+#[derive(Debug, Clone, Copy)]
+enum YtAnchor {
+    Start,
+    End,
+}
+
+impl YtRegex {
+    pub fn new(pattern: &str) -> Self {
+        let tokens = Self::parse(pattern);
+        Self { pattern: pattern.to_string(), tokens }
+    }
+
+    fn parse(pattern: &str) -> Vec<YtRegexToken> {
+        let mut tokens = Vec::new();
+        let chars: Vec<char> = pattern.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            match chars[i] {
+                '^' if i == 0 => {
+                    tokens.push(YtRegexToken::Anchor(YtAnchor::Start));
+                    i += 1;
+                }
+                '$' if i == chars.len() - 1 => {
+                    tokens.push(YtRegexToken::Anchor(YtAnchor::End));
+                    i += 1;
+                }
+                '.' => {
+                    let base = YtRegexToken::Dot;
+                    i += 1;
+                    let tok = Self::parse_quantifier(&chars, &mut i, base);
+                    tokens.push(tok);
+                }
+                '[' => {
+                    i += 1;
+                    let negated = i < chars.len() && chars[i] == '^';
+                    if negated { i += 1; }
+                    let mut class_chars = Vec::new();
+                    while i < chars.len() && chars[i] != ']' {
+                        class_chars.push(chars[i]);
+                        i += 1;
+                    }
+                    if i < chars.len() { i += 1; } // skip ]
+                    let base = YtRegexToken::CharClass(class_chars, negated);
+                    let tok = Self::parse_quantifier(&chars, &mut i, base);
+                    tokens.push(tok);
+                }
+                '\\' if i + 1 < chars.len() => {
+                    i += 1;
+                    let base = YtRegexToken::Literal(chars[i]);
+                    i += 1;
+                    let tok = Self::parse_quantifier(&chars, &mut i, base);
+                    tokens.push(tok);
+                }
+                c => {
+                    let base = YtRegexToken::Literal(c);
+                    i += 1;
+                    let tok = Self::parse_quantifier(&chars, &mut i, base);
+                    tokens.push(tok);
+                }
+            }
+        }
+        tokens
+    }
+
+    fn parse_quantifier(chars: &[char], i: &mut usize, base: YtRegexToken) -> YtRegexToken {
+        if *i < chars.len() {
+            match chars[*i] {
+                '*' => { *i += 1; YtRegexToken::Star(Box::new(base)) }
+                '+' => { *i += 1; YtRegexToken::Plus(Box::new(base)) }
+                '?' => { *i += 1; YtRegexToken::Optional(Box::new(base)) }
+                _ => base,
+            }
+        } else {
+            base
+        }
+    }
+
+    pub fn is_match(&self, text: &str) -> bool {
+        let chars: Vec<char> = text.chars().collect();
+        let has_start = matches!(self.tokens.first(), Some(YtRegexToken::Anchor(YtAnchor::Start)));
+        let has_end = matches!(self.tokens.last(), Some(YtRegexToken::Anchor(YtAnchor::End)));
+        let tokens = if has_start && has_end {
+            &self.tokens[1..self.tokens.len()-1]
+        } else if has_start {
+            &self.tokens[1..]
+        } else if has_end {
+            &self.tokens[..self.tokens.len()-1]
+        } else {
+            &self.tokens[..]
+        };
+        if has_start {
+            let matched = Self::match_tokens(tokens, &chars, 0);
+            if has_end { matched == Some(chars.len()) } else { matched.is_some() }
+        } else {
+            for start in 0..=chars.len() {
+                if let Some(end) = Self::match_tokens(tokens, &chars, start) {
+                    if has_end { if end == chars.len() { return true; } }
+                    else { return true; }
+                }
+            }
+            false
+        }
+    }
+
+    fn match_tokens(tokens: &[YtRegexToken], chars: &[char], pos: usize) -> Option<usize> {
+        if tokens.is_empty() { return Some(pos); }
+        match &tokens[0] {
+            YtRegexToken::Literal(c) => {
+                if pos < chars.len() && chars[pos] == *c {
+                    Self::match_tokens(&tokens[1..], chars, pos + 1)
+                } else { None }
+            }
+            YtRegexToken::Dot => {
+                if pos < chars.len() {
+                    Self::match_tokens(&tokens[1..], chars, pos + 1)
+                } else { None }
+            }
+            YtRegexToken::CharClass(class, negated) => {
+                if pos < chars.len() {
+                    let in_class = class.contains(&chars[pos]);
+                    if in_class != *negated {
+                        Self::match_tokens(&tokens[1..], chars, pos + 1)
+                    } else { None }
+                } else { None }
+            }
+            YtRegexToken::Star(base) => {
+                // Try matching 0..n times (greedy)
+                let mut positions = vec![pos];
+                let mut p = pos;
+                while let Some(next) = Self::match_single(base, chars, p) {
+                    positions.push(next);
+                    p = next;
+                    if p == pos { break; } // prevent infinite loop
+                }
+                for &end_pos in positions.iter().rev() {
+                    if let Some(result) = Self::match_tokens(&tokens[1..], chars, end_pos) {
+                        return Some(result);
+                    }
+                }
+                None
+            }
+            YtRegexToken::Plus(base) => {
+                if let Some(first) = Self::match_single(base, chars, pos) {
+                    let star_tokens = [&[YtRegexToken::Star(base.clone())], &tokens[1..]].concat();
+                    Self::match_tokens(&star_tokens, chars, first)
+                } else { None }
+            }
+            YtRegexToken::Optional(base) => {
+                if let Some(next) = Self::match_single(base, chars, pos) {
+                    if let Some(result) = Self::match_tokens(&tokens[1..], chars, next) {
+                        return Some(result);
+                    }
+                }
+                Self::match_tokens(&tokens[1..], chars, pos)
+            }
+            YtRegexToken::Anchor(_) => Self::match_tokens(&tokens[1..], chars, pos),
+        }
+    }
+
+    fn match_single(token: &YtRegexToken, chars: &[char], pos: usize) -> Option<usize> {
+        match token {
+            YtRegexToken::Literal(c) => {
+                if pos < chars.len() && chars[pos] == *c { Some(pos + 1) } else { None }
+            }
+            YtRegexToken::Dot => {
+                if pos < chars.len() { Some(pos + 1) } else { None }
+            }
+            YtRegexToken::CharClass(class, negated) => {
+                if pos < chars.len() {
+                    let in_class = class.contains(&chars[pos]);
+                    if in_class != *negated { Some(pos + 1) } else { None }
+                } else { None }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn find(&self, text: &str) -> Option<(usize, usize)> {
+        let chars: Vec<char> = text.chars().collect();
+        let tokens = &self.tokens[..];
+        for start in 0..=chars.len() {
+            if let Some(end) = Self::match_tokens(tokens, &chars, start) {
+                return Some((start, end));
+            }
+        }
+        None
+    }
+
+    pub fn find_all(&self, text: &str) -> Vec<(usize, usize)> {
+        let chars: Vec<char> = text.chars().collect();
+        let tokens = &self.tokens[..];
+        let mut results = Vec::new();
+        let mut start = 0;
+        while start <= chars.len() {
+            if let Some(end) = Self::match_tokens(tokens, &chars, start) {
+                results.push((start, end));
+                start = if end > start { end } else { start + 1 };
+            } else {
+                start += 1;
+            }
+        }
+        results
+    }
+
+    pub fn pattern(&self) -> &str { &self.pattern }
+}
+
+impl std::fmt::Display for YtRegex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YtRegex({})", self.pattern)
+    }
+}
+
+/// A wildcard pattern matcher (like shell globs).
+#[derive(Debug, Clone)]
+pub struct YtWildcard {
+    pattern: String,
+}
+
+impl YtWildcard {
+    pub fn new(pattern: &str) -> Self {
+        Self { pattern: pattern.to_string() }
+    }
+
+    pub fn is_match(&self, text: &str) -> bool {
+        let p: Vec<char> = self.pattern.chars().collect();
+        let t: Vec<char> = text.chars().collect();
+        Self::wc_match(&p, 0, &t, 0)
+    }
+
+    fn wc_match(p: &[char], pi: usize, t: &[char], ti: usize) -> bool {
+        if pi == p.len() { return ti == t.len(); }
+        match p[pi] {
+            '*' => {
+                // Try matching * with 0..n chars
+                for skip in 0..=(t.len() - ti) {
+                    if Self::wc_match(p, pi + 1, t, ti + skip) { return true; }
+                }
+                false
+            }
+            '?' => {
+                if ti < t.len() { Self::wc_match(p, pi + 1, t, ti + 1) } else { false }
+            }
+            c => {
+                if ti < t.len() && t[ti] == c { Self::wc_match(p, pi + 1, t, ti + 1) } else { false }
+            }
+        }
+    }
+
+    pub fn filter<'a>(&self, items: &'a [String]) -> Vec<&'a String> {
+        items.iter().filter(|s| self.is_match(s)).collect()
+    }
+
+    pub fn pattern(&self) -> &str { &self.pattern }
+}
+
+impl std::fmt::Display for YtWildcard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YtWildcard({})", self.pattern)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -20340,6 +20623,153 @@ mod tests {
         let v = YsVersionVector::default();
         let s = format!("{}", v);
         assert!(s.contains("YsVersionVector"));
+    }
+
+
+    // --- yt_ tests ---
+
+    #[test]
+    fn test_yt_regex_literal() {
+        let r = YtRegex::new("hello");
+        assert!(r.is_match("hello"));
+        assert!(r.is_match("say hello world"));
+        assert!(!r.is_match("HELLO"));
+    }
+
+    #[test]
+    fn test_yt_regex_dot() {
+        let r = YtRegex::new("h.llo");
+        assert!(r.is_match("hello"));
+        assert!(r.is_match("hallo"));
+        assert!(!r.is_match("hllo"));
+    }
+
+    #[test]
+    fn test_yt_regex_star() {
+        let r = YtRegex::new("ab*c");
+        assert!(r.is_match("ac"));
+        assert!(r.is_match("abc"));
+        assert!(r.is_match("abbc"));
+        assert!(r.is_match("abbbc"));
+    }
+
+    #[test]
+    fn test_yt_regex_plus() {
+        let r = YtRegex::new("ab+c");
+        assert!(!r.is_match("ac"));
+        assert!(r.is_match("abc"));
+        assert!(r.is_match("abbc"));
+    }
+
+    #[test]
+    fn test_yt_regex_optional() {
+        let r = YtRegex::new("colou?r");
+        assert!(r.is_match("color"));
+        assert!(r.is_match("colour"));
+    }
+
+    #[test]
+    fn test_yt_regex_char_class() {
+        let r = YtRegex::new("[abc]at");
+        assert!(r.is_match("bat"));
+        assert!(r.is_match("cat"));
+        assert!(!r.is_match("dat"));
+    }
+
+    #[test]
+    fn test_yt_regex_negated_class() {
+        let r = YtRegex::new("[^abc]at");
+        assert!(!r.is_match("bat"));
+        assert!(r.is_match("dat"));
+    }
+
+    #[test]
+    fn test_yt_regex_anchors() {
+        let r = YtRegex::new("^hello$");
+        assert!(r.is_match("hello"));
+        assert!(!r.is_match("hello world"));
+        assert!(!r.is_match("say hello"));
+    }
+
+    #[test]
+    fn test_yt_regex_start_anchor() {
+        let r = YtRegex::new("^hello");
+        assert!(r.is_match("hello world"));
+        assert!(!r.is_match("say hello"));
+    }
+
+    #[test]
+    fn test_yt_regex_end_anchor() {
+        let r = YtRegex::new("world$");
+        assert!(r.is_match("hello world"));
+        assert!(!r.is_match("world!"));
+    }
+
+    #[test]
+    fn test_yt_regex_find() {
+        let r = YtRegex::new("ab+");
+        let result = r.find("xabbc");
+        assert_eq!(result, Some((1, 4)));
+    }
+
+    #[test]
+    fn test_yt_regex_find_all() {
+        let r = YtRegex::new("a.");
+        let results = r.find_all("abacad");
+        assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn test_yt_regex_display() {
+        let r = YtRegex::new("ab*c");
+        assert_eq!(format!("{}", r), "YtRegex(ab*c)");
+    }
+
+    #[test]
+    fn test_yt_regex_pattern() {
+        let r = YtRegex::new("test");
+        assert_eq!(r.pattern(), "test");
+    }
+
+    #[test]
+    fn test_yt_regex_escaped() {
+        let r = YtRegex::new("a\\.b");
+        assert!(r.is_match("a.b"));
+        assert!(!r.is_match("axb"));
+    }
+
+    #[test]
+    fn test_yt_wildcard_star() {
+        let w = YtWildcard::new("*.rs");
+        assert!(w.is_match("main.rs"));
+        assert!(w.is_match(".rs"));
+        assert!(!w.is_match("main.txt"));
+    }
+
+    #[test]
+    fn test_yt_wildcard_question() {
+        let w = YtWildcard::new("?.txt");
+        assert!(w.is_match("a.txt"));
+        assert!(!w.is_match("ab.txt"));
+    }
+
+    #[test]
+    fn test_yt_wildcard_complex() {
+        let w = YtWildcard::new("src/**/test_*.rs");
+        assert!(w.is_match("src/**/test_main.rs"));
+    }
+
+    #[test]
+    fn test_yt_wildcard_filter() {
+        let w = YtWildcard::new("*.rs");
+        let items: Vec<String> = vec!["a.rs".into(), "b.txt".into(), "c.rs".into()];
+        assert_eq!(w.filter(&items).len(), 2);
+    }
+
+    #[test]
+    fn test_yt_wildcard_display() {
+        let w = YtWildcard::new("*.txt");
+        assert_eq!(format!("{}", w), "YtWildcard(*.txt)");
     }
 
 }
