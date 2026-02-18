@@ -11671,6 +11671,239 @@ impl YoDiffEngine {
     }
 }
 
+
+// --- yp_ Simple JSON Value ---
+
+/// Lightweight JSON-like value type for configuration and data exchange.
+#[derive(Debug, Clone, PartialEq)]
+pub enum YpJsonValue {
+    YpNull,
+    YpBool(bool),
+    YpNumber(f64),
+    YpString(String),
+    YpArray(Vec<YpJsonValue>),
+    YpObject(Vec<(String, YpJsonValue)>),
+}
+
+impl std::fmt::Display for YpJsonValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::YpNull => write!(f, "null"),
+            Self::YpBool(b) => write!(f, "{}", b),
+            Self::YpNumber(n) => write!(f, "{}", n),
+            Self::YpString(s) => write!(f, "\"{}\"", s),
+            Self::YpArray(a) => write!(f, "[{}]", a.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join(",")),
+            Self::YpObject(o) => write!(f, "{{{}}}", o.iter().map(|(k, v)| format!("\"{}\":{}", k, v)).collect::<Vec<_>>().join(",")),
+        }
+    }
+}
+
+impl Default for YpJsonValue {
+    fn default() -> Self { Self::YpNull }
+}
+
+impl YpJsonValue {
+    /// Create a string value.
+    pub fn yp_string(s: &str) -> Self { Self::YpString(s.to_string()) }
+
+    /// Create a number value.
+    pub fn yp_number(n: f64) -> Self { Self::YpNumber(n) }
+
+    /// Create a bool value.
+    pub fn yp_bool(b: bool) -> Self { Self::YpBool(b) }
+
+    /// Create an empty object.
+    pub fn yp_object() -> Self { Self::YpObject(Vec::new()) }
+
+    /// Create an empty array.
+    pub fn yp_array() -> Self { Self::YpArray(Vec::new()) }
+
+    /// Is null.
+    pub fn yp_is_null(&self) -> bool { matches!(self, Self::YpNull) }
+
+    /// Get as string.
+    pub fn yp_as_str(&self) -> Option<&str> {
+        if let Self::YpString(s) = self { Some(s) } else { None }
+    }
+
+    /// Get as number.
+    pub fn yp_as_f64(&self) -> Option<f64> {
+        if let Self::YpNumber(n) = self { Some(*n) } else { None }
+    }
+
+    /// Get as bool.
+    pub fn yp_as_bool(&self) -> Option<bool> {
+        if let Self::YpBool(b) = self { Some(*b) } else { None }
+    }
+
+    /// Get by key (for objects).
+    pub fn yp_get(&self, key: &str) -> Option<&YpJsonValue> {
+        if let Self::YpObject(entries) = self {
+            entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+        } else { None }
+    }
+
+    /// Get by index (for arrays).
+    pub fn yp_index(&self, idx: usize) -> Option<&YpJsonValue> {
+        if let Self::YpArray(arr) = self { arr.get(idx) } else { None }
+    }
+
+    /// Set a key on an object (mutating).
+    pub fn yp_set(&mut self, key: &str, value: YpJsonValue) {
+        if let Self::YpObject(entries) = self {
+            if let Some(entry) = entries.iter_mut().find(|(k, _)| k == key) {
+                entry.1 = value;
+            } else {
+                entries.push((key.to_string(), value));
+            }
+        }
+    }
+
+    /// Push to array.
+    pub fn yp_push(&mut self, value: YpJsonValue) {
+        if let Self::YpArray(arr) = self { arr.push(value); }
+    }
+
+    /// Object keys.
+    pub fn yp_keys(&self) -> Vec<String> {
+        if let Self::YpObject(entries) = self {
+            entries.iter().map(|(k, _)| k.clone()).collect()
+        } else { Vec::new() }
+    }
+
+    /// Array/object length.
+    pub fn yp_len(&self) -> usize {
+        match self {
+            Self::YpArray(a) => a.len(),
+            Self::YpObject(o) => o.len(),
+            Self::YpString(s) => s.len(),
+            _ => 0,
+        }
+    }
+
+    /// Deep clone with path-based access.
+    pub fn yp_path(&self, path: &str) -> Option<&YpJsonValue> {
+        let parts: Vec<&str> = path.split('.').filter(|s| !s.is_empty()).collect();
+        let mut current = self;
+        for part in parts {
+            if let Ok(idx) = part.parse::<usize>() {
+                current = current.yp_index(idx)?;
+            } else {
+                current = current.yp_get(part)?;
+            }
+        }
+        Some(current)
+    }
+
+    /// Merge two objects (other takes precedence).
+    pub fn yp_merge(&self, other: &YpJsonValue) -> YpJsonValue {
+        match (self, other) {
+            (Self::YpObject(a), Self::YpObject(b)) => {
+                let mut result = a.clone();
+                for (k, v) in b {
+                    if let Some(entry) = result.iter_mut().find(|(ek, _)| ek == k) {
+                        entry.1 = v.clone();
+                    } else {
+                        result.push((k.clone(), v.clone()));
+                    }
+                }
+                Self::YpObject(result)
+            }
+            _ => other.clone(),
+        }
+    }
+}
+
+// --- yp_ Command Registry ---
+
+/// Registry for named commands with metadata.
+#[derive(Debug, Clone)]
+pub struct YpCommandEntry {
+    pub yp_id: String,
+    pub yp_title: String,
+    pub yp_category: String,
+    pub yp_keybinding: Option<String>,
+    pub yp_when: Option<String>,
+}
+
+impl std::fmt::Display for YpCommandEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cmd({})", self.yp_id)
+    }
+}
+
+/// Command registry for command palette and keybinding resolution.
+#[derive(Debug, Clone)]
+pub struct YpCommandRegistry {
+    yp_commands: Vec<YpCommandEntry>,
+}
+
+impl std::fmt::Display for YpCommandRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmdRegistry(count={})", self.yp_commands.len())
+    }
+}
+
+impl Default for YpCommandRegistry {
+    fn default() -> Self { Self::yp_new() }
+}
+
+impl YpCommandRegistry {
+    /// Create empty registry.
+    pub fn yp_new() -> Self { Self { yp_commands: Vec::new() } }
+
+    /// Register a command.
+    pub fn yp_register(&mut self, id: &str, title: &str, category: &str) {
+        self.yp_commands.push(YpCommandEntry {
+            yp_id: id.to_string(), yp_title: title.to_string(), yp_category: category.to_string(),
+            yp_keybinding: None, yp_when: None,
+        });
+    }
+
+    /// Register with keybinding.
+    pub fn yp_register_with_key(&mut self, id: &str, title: &str, category: &str, keybinding: &str) {
+        self.yp_commands.push(YpCommandEntry {
+            yp_id: id.to_string(), yp_title: title.to_string(), yp_category: category.to_string(),
+            yp_keybinding: Some(keybinding.to_string()), yp_when: None,
+        });
+    }
+
+    /// Find command by ID.
+    pub fn yp_find(&self, id: &str) -> Option<&YpCommandEntry> {
+        self.yp_commands.iter().find(|c| c.yp_id == id)
+    }
+
+    /// Search commands by title prefix.
+    pub fn yp_search(&self, query: &str) -> Vec<&YpCommandEntry> {
+        let q = query.to_lowercase();
+        self.yp_commands.iter().filter(|c| c.yp_title.to_lowercase().contains(&q)).collect()
+    }
+
+    /// Commands in a category.
+    pub fn yp_by_category(&self, category: &str) -> Vec<&YpCommandEntry> {
+        self.yp_commands.iter().filter(|c| c.yp_category == category).collect()
+    }
+
+    /// Find command by keybinding.
+    pub fn yp_by_keybinding(&self, key: &str) -> Option<&YpCommandEntry> {
+        self.yp_commands.iter().find(|c| c.yp_keybinding.as_deref() == Some(key))
+    }
+
+    /// Number of commands.
+    pub fn yp_count(&self) -> usize { self.yp_commands.len() }
+
+    /// All categories.
+    pub fn yp_categories(&self) -> Vec<String> {
+        let mut cats: Vec<String> = self.yp_commands.iter().map(|c| c.yp_category.clone()).collect();
+        cats.sort();
+        cats.dedup();
+        cats
+    }
+
+    /// Clear.
+    pub fn yp_clear(&mut self) { self.yp_commands.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -18944,6 +19177,161 @@ mod tests {
     #[test]
     fn yo_diff_display() {
         assert!(format!("{}", super::YoDiffEngine).contains("DiffEngine"));
+    }
+
+
+    // --- yp_ JsonValue tests ---
+
+    #[test]
+    fn yp_json_null() {
+        let v = super::YpJsonValue::YpNull;
+        assert!(v.yp_is_null());
+    }
+
+    #[test]
+    fn yp_json_string() {
+        let v = super::YpJsonValue::yp_string("hello");
+        assert_eq!(v.yp_as_str(), Some("hello"));
+    }
+
+    #[test]
+    fn yp_json_number() {
+        let v = super::YpJsonValue::yp_number(42.0);
+        assert_eq!(v.yp_as_f64(), Some(42.0));
+    }
+
+    #[test]
+    fn yp_json_bool() {
+        let v = super::YpJsonValue::yp_bool(true);
+        assert_eq!(v.yp_as_bool(), Some(true));
+    }
+
+    #[test]
+    fn yp_json_object() {
+        let mut obj = super::YpJsonValue::yp_object();
+        obj.yp_set("name", super::YpJsonValue::yp_string("test"));
+        assert_eq!(obj.yp_get("name").unwrap().yp_as_str(), Some("test"));
+    }
+
+    #[test]
+    fn yp_json_array() {
+        let mut arr = super::YpJsonValue::yp_array();
+        arr.yp_push(super::YpJsonValue::yp_number(1.0));
+        arr.yp_push(super::YpJsonValue::yp_number(2.0));
+        assert_eq!(arr.yp_len(), 2);
+    }
+
+    #[test]
+    fn yp_json_path() {
+        let mut obj = super::YpJsonValue::yp_object();
+        let mut inner = super::YpJsonValue::yp_object();
+        inner.yp_set("b", super::YpJsonValue::yp_number(42.0));
+        obj.yp_set("a", inner);
+        assert_eq!(obj.yp_path("a.b").unwrap().yp_as_f64(), Some(42.0));
+    }
+
+    #[test]
+    fn yp_json_merge() {
+        let mut a = super::YpJsonValue::yp_object();
+        a.yp_set("x", super::YpJsonValue::yp_number(1.0));
+        let mut b = super::YpJsonValue::yp_object();
+        b.yp_set("y", super::YpJsonValue::yp_number(2.0));
+        let c = a.yp_merge(&b);
+        assert_eq!(c.yp_len(), 2);
+    }
+
+    #[test]
+    fn yp_json_keys() {
+        let mut obj = super::YpJsonValue::yp_object();
+        obj.yp_set("a", super::YpJsonValue::YpNull);
+        obj.yp_set("b", super::YpJsonValue::YpNull);
+        assert_eq!(obj.yp_keys().len(), 2);
+    }
+
+    #[test]
+    fn yp_json_display() {
+        let v = super::YpJsonValue::yp_string("hi");
+        assert!(format!("{}", v).contains("hi"));
+    }
+
+    #[test]
+    fn yp_json_default() {
+        let v = super::YpJsonValue::default();
+        assert!(v.yp_is_null());
+    }
+
+    // --- yp_ CommandRegistry tests ---
+
+    #[test]
+    fn yp_cmdreg_new() {
+        let r = super::YpCommandRegistry::yp_new();
+        assert_eq!(r.yp_count(), 0);
+    }
+
+    #[test]
+    fn yp_cmdreg_register() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register("editor.copy", "Copy", "Edit");
+        assert_eq!(r.yp_count(), 1);
+    }
+
+    #[test]
+    fn yp_cmdreg_find() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register("editor.copy", "Copy", "Edit");
+        assert!(r.yp_find("editor.copy").is_some());
+    }
+
+    #[test]
+    fn yp_cmdreg_search() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register("editor.copy", "Copy Selection", "Edit");
+        r.yp_register("editor.paste", "Paste", "Edit");
+        let results = r.yp_search("copy");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn yp_cmdreg_category() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register("a", "A", "Edit");
+        r.yp_register("b", "B", "View");
+        assert_eq!(r.yp_by_category("Edit").len(), 1);
+    }
+
+    #[test]
+    fn yp_cmdreg_keybinding() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register_with_key("copy", "Copy", "Edit", "Ctrl+C");
+        assert!(r.yp_by_keybinding("Ctrl+C").is_some());
+    }
+
+    #[test]
+    fn yp_cmdreg_categories() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register("a", "A", "Edit");
+        r.yp_register("b", "B", "View");
+        assert_eq!(r.yp_categories().len(), 2);
+    }
+
+    #[test]
+    fn yp_cmdreg_clear() {
+        let mut r = super::YpCommandRegistry::yp_new();
+        r.yp_register("a", "A", "X");
+        r.yp_clear();
+        assert_eq!(r.yp_count(), 0);
+    }
+
+    #[test]
+    fn yp_cmdreg_display() {
+        let r = super::YpCommandRegistry::yp_new();
+        assert!(format!("{}", r).contains("CmdRegistry"));
+    }
+
+    #[test]
+    fn yp_cmd_display() {
+        let c = super::YpCommandEntry { yp_id: "test".into(), yp_title: "T".into(), yp_category: "C".into(), yp_keybinding: None, yp_when: None };
+        assert!(format!("{}", c).contains("Cmd"));
     }
 
 }
