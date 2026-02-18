@@ -9483,6 +9483,279 @@ impl YcHashRing {
     pub fn yc_has_node(&self, node: &str) -> bool { self.yc_nodes.iter().any(|n| n == node) }
 }
 
+
+// --- yd_ Directed Acyclic Graph ---
+
+/// Directed acyclic graph with topological sorting and cycle detection.
+#[derive(Debug, Clone)]
+pub struct YdDag {
+    yd_adj: std::collections::HashMap<usize, Vec<usize>>,
+    yd_in_degree: std::collections::HashMap<usize, usize>,
+    yd_nodes: std::collections::HashSet<usize>,
+}
+
+impl std::fmt::Display for YdDag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let edges: usize = self.yd_adj.values().map(|v| v.len()).sum();
+        write!(f, "DAG(nodes={}, edges={})", self.yd_nodes.len(), edges)
+    }
+}
+
+impl Default for YdDag {
+    fn default() -> Self { Self::yd_new() }
+}
+
+impl YdDag {
+    /// Create an empty DAG.
+    pub fn yd_new() -> Self {
+        Self { yd_adj: std::collections::HashMap::new(), yd_in_degree: std::collections::HashMap::new(), yd_nodes: std::collections::HashSet::new() }
+    }
+
+    /// Add a node.
+    pub fn yd_add_node(&mut self, node: usize) {
+        self.yd_nodes.insert(node);
+        self.yd_adj.entry(node).or_default();
+        self.yd_in_degree.entry(node).or_insert(0);
+    }
+
+    /// Add a directed edge from -> to.
+    pub fn yd_add_edge(&mut self, from: usize, to: usize) {
+        self.yd_add_node(from);
+        self.yd_add_node(to);
+        self.yd_adj.entry(from).or_default().push(to);
+        *self.yd_in_degree.entry(to).or_insert(0) += 1;
+    }
+
+    /// Number of nodes.
+    pub fn yd_node_count(&self) -> usize { self.yd_nodes.len() }
+
+    /// Number of edges.
+    pub fn yd_edge_count(&self) -> usize { self.yd_adj.values().map(|v| v.len()).sum() }
+
+    /// Topological sort using Kahn's algorithm. Returns None if cycle detected.
+    pub fn yd_topological_sort(&self) -> Option<Vec<usize>> {
+        let mut in_deg: std::collections::HashMap<usize, usize> = self.yd_in_degree.clone();
+        let mut queue: std::collections::VecDeque<usize> = std::collections::VecDeque::new();
+        for (node, deg) in &in_deg {
+            if *deg == 0 { queue.push_back(*node); }
+        }
+        let mut result = Vec::new();
+        while let Some(node) = queue.pop_front() {
+            result.push(node);
+            if let Some(neighbors) = self.yd_adj.get(&node) {
+                for &next in neighbors {
+                    let d = in_deg.get_mut(&next).unwrap();
+                    *d -= 1;
+                    if *d == 0 { queue.push_back(next); }
+                }
+            }
+        }
+        if result.len() == self.yd_nodes.len() { Some(result) } else { None }
+    }
+
+    /// Check if the graph has a cycle.
+    pub fn yd_has_cycle(&self) -> bool { self.yd_topological_sort().is_none() }
+
+    /// Get all neighbors of a node.
+    pub fn yd_neighbors(&self, node: usize) -> &[usize] {
+        self.yd_adj.get(&node).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Get in-degree of a node.
+    pub fn yd_in_degree(&self, node: usize) -> usize {
+        self.yd_in_degree.get(&node).copied().unwrap_or(0)
+    }
+
+    /// Get out-degree of a node.
+    pub fn yd_out_degree(&self, node: usize) -> usize {
+        self.yd_adj.get(&node).map(|v| v.len()).unwrap_or(0)
+    }
+
+    /// Find all root nodes (in-degree 0).
+    pub fn yd_roots(&self) -> Vec<usize> {
+        let mut roots: Vec<usize> = self.yd_in_degree.iter()
+            .filter(|(_, d)| **d == 0)
+            .map(|(n, _)| *n)
+            .collect();
+        roots.sort();
+        roots
+    }
+
+    /// Find all leaf nodes (out-degree 0).
+    pub fn yd_leaves(&self) -> Vec<usize> {
+        let mut leaves: Vec<usize> = self.yd_nodes.iter()
+            .filter(|&&n| self.yd_out_degree(n) == 0)
+            .copied()
+            .collect();
+        leaves.sort();
+        leaves
+    }
+
+    /// Check if node exists.
+    pub fn yd_has_node(&self, node: usize) -> bool { self.yd_nodes.contains(&node) }
+
+    /// Clear the graph.
+    pub fn yd_clear(&mut self) {
+        self.yd_adj.clear();
+        self.yd_in_degree.clear();
+        self.yd_nodes.clear();
+    }
+
+    /// BFS traversal from a start node.
+    pub fn yd_bfs(&self, start: usize) -> Vec<usize> {
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        let mut result = Vec::new();
+        queue.push_back(start);
+        visited.insert(start);
+        while let Some(node) = queue.pop_front() {
+            result.push(node);
+            if let Some(neighbors) = self.yd_adj.get(&node) {
+                let mut sorted_n = neighbors.clone();
+                sorted_n.sort();
+                for next in sorted_n {
+                    if visited.insert(next) { queue.push_back(next); }
+                }
+            }
+        }
+        result
+    }
+
+    /// DFS traversal from a start node.
+    pub fn yd_dfs(&self, start: usize) -> Vec<usize> {
+        let mut visited = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        self.yd_dfs_inner(start, &mut visited, &mut result);
+        result
+    }
+
+    fn yd_dfs_inner(&self, node: usize, visited: &mut std::collections::HashSet<usize>, result: &mut Vec<usize>) {
+        if !visited.insert(node) { return; }
+        result.push(node);
+        if let Some(neighbors) = self.yd_adj.get(&node) {
+            let mut sorted_n = neighbors.clone();
+            sorted_n.sort();
+            for next in sorted_n {
+                self.yd_dfs_inner(next, visited, result);
+            }
+        }
+    }
+
+    /// Shortest path length (unweighted) between two nodes using BFS.
+    pub fn yd_shortest_path(&self, from: usize, to: usize) -> Option<usize> {
+        if from == to { return Some(0); }
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back((from, 0usize));
+        visited.insert(from);
+        while let Some((node, dist)) = queue.pop_front() {
+            if let Some(neighbors) = self.yd_adj.get(&node) {
+                for &next in neighbors {
+                    if next == to { return Some(dist + 1); }
+                    if visited.insert(next) { queue.push_back((next, dist + 1)); }
+                }
+            }
+        }
+        None
+    }
+}
+
+// --- yd_ Sparse Matrix ---
+
+/// Sparse matrix using coordinate (COO) format for efficient storage.
+#[derive(Debug, Clone)]
+pub struct YdSparseMatrix {
+    yd_rows: usize,
+    yd_cols: usize,
+    yd_entries: std::collections::HashMap<(usize, usize), f64>,
+}
+
+impl std::fmt::Display for YdSparseMatrix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SparseMatrix({}x{}, nnz={})", self.yd_rows, self.yd_cols, self.yd_entries.len())
+    }
+}
+
+impl Default for YdSparseMatrix {
+    fn default() -> Self { Self::yd_new(0, 0) }
+}
+
+impl YdSparseMatrix {
+    /// Create a new sparse matrix with given dimensions.
+    pub fn yd_new(rows: usize, cols: usize) -> Self {
+        Self { yd_rows: rows, yd_cols: cols, yd_entries: std::collections::HashMap::new() }
+    }
+
+    /// Set a value.
+    pub fn yd_set(&mut self, row: usize, col: usize, val: f64) {
+        if val == 0.0 { self.yd_entries.remove(&(row, col)); }
+        else { self.yd_entries.insert((row, col), val); }
+    }
+
+    /// Get a value.
+    pub fn yd_get(&self, row: usize, col: usize) -> f64 {
+        self.yd_entries.get(&(row, col)).copied().unwrap_or(0.0)
+    }
+
+    /// Number of non-zero entries.
+    pub fn yd_nnz(&self) -> usize { self.yd_entries.len() }
+
+    /// Dimensions.
+    pub fn yd_rows(&self) -> usize { self.yd_rows }
+    pub fn yd_cols(&self) -> usize { self.yd_cols }
+
+    /// Transpose.
+    pub fn yd_transpose(&self) -> YdSparseMatrix {
+        let mut t = YdSparseMatrix::yd_new(self.yd_cols, self.yd_rows);
+        for ((r, c), v) in &self.yd_entries {
+            t.yd_set(*c, *r, *v);
+        }
+        t
+    }
+
+    /// Matrix-vector multiply.
+    pub fn yd_mul_vec(&self, vec: &[f64]) -> Vec<f64> {
+        let mut result = vec![0.0; self.yd_rows];
+        for ((r, c), v) in &self.yd_entries {
+            if *c < vec.len() && *r < result.len() {
+                result[*r] += *v * vec[*c];
+            }
+        }
+        result
+    }
+
+    /// Scale all entries.
+    pub fn yd_scale(&mut self, factor: f64) {
+        for v in self.yd_entries.values_mut() { *v *= factor; }
+    }
+
+    /// Add another sparse matrix.
+    pub fn yd_add(&self, other: &YdSparseMatrix) -> YdSparseMatrix {
+        let mut result = self.clone();
+        for ((r, c), v) in &other.yd_entries {
+            let entry = result.yd_entries.entry((*r, *c)).or_insert(0.0);
+            *entry += *v;
+        }
+        result
+    }
+
+    /// Clear all entries.
+    pub fn yd_clear(&mut self) { self.yd_entries.clear(); }
+
+    /// Row sum.
+    pub fn yd_row_sum(&self, row: usize) -> f64 {
+        self.yd_entries.iter()
+            .filter(|((r, _), _)| *r == row)
+            .map(|(_, v)| *v)
+            .sum()
+    }
+
+    /// Frobenius norm squared.
+    pub fn yd_frobenius_sq(&self) -> f64 {
+        self.yd_entries.values().map(|v| *v * *v).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -14816,6 +15089,183 @@ mod tests {
         let n1 = r.yc_get_node("key1").unwrap().to_string();
         let n2 = r.yc_get_node("key1").unwrap().to_string();
         assert_eq!(n1, n2);
+    }
+
+
+    // --- yd_ DAG tests ---
+
+    #[test]
+    fn yd_dag_new() {
+        let g = super::YdDag::yd_new();
+        assert_eq!(g.yd_node_count(), 0);
+    }
+
+    #[test]
+    fn yd_dag_add_edge() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(1, 2);
+        assert_eq!(g.yd_node_count(), 3);
+        assert_eq!(g.yd_edge_count(), 2);
+    }
+
+    #[test]
+    fn yd_dag_topo_sort() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(0, 2);
+        g.yd_add_edge(1, 3);
+        g.yd_add_edge(2, 3);
+        let order = g.yd_topological_sort().unwrap();
+        assert_eq!(order.len(), 4);
+        let pos: std::collections::HashMap<usize, usize> = order.iter().enumerate().map(|(i, &n)| (n, i)).collect();
+        assert!(pos[&0] < pos[&1]);
+        assert!(pos[&0] < pos[&2]);
+    }
+
+    #[test]
+    fn yd_dag_cycle() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(1, 2);
+        g.yd_add_edge(2, 0);
+        assert!(g.yd_has_cycle());
+    }
+
+    #[test]
+    fn yd_dag_roots_leaves() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(0, 2);
+        assert_eq!(g.yd_roots(), vec![0]);
+        assert_eq!(g.yd_leaves(), vec![1, 2]);
+    }
+
+    #[test]
+    fn yd_dag_bfs() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(0, 2);
+        g.yd_add_edge(1, 3);
+        let bfs = g.yd_bfs(0);
+        assert_eq!(bfs[0], 0);
+        assert_eq!(bfs.len(), 4);
+    }
+
+    #[test]
+    fn yd_dag_dfs() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(0, 2);
+        let dfs = g.yd_dfs(0);
+        assert_eq!(dfs[0], 0);
+        assert_eq!(dfs.len(), 3);
+    }
+
+    #[test]
+    fn yd_dag_shortest_path() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(1, 2);
+        g.yd_add_edge(0, 2);
+        assert_eq!(g.yd_shortest_path(0, 2), Some(1));
+    }
+
+    #[test]
+    fn yd_dag_degrees() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_add_edge(0, 2);
+        assert_eq!(g.yd_out_degree(0), 2);
+        assert_eq!(g.yd_in_degree(1), 1);
+    }
+
+    #[test]
+    fn yd_dag_clear() {
+        let mut g = super::YdDag::yd_new();
+        g.yd_add_edge(0, 1);
+        g.yd_clear();
+        assert_eq!(g.yd_node_count(), 0);
+    }
+
+    #[test]
+    fn yd_dag_display() {
+        let g = super::YdDag::yd_new();
+        assert!(format!("{}", g).contains("DAG"));
+    }
+
+    // --- yd_ SparseMatrix tests ---
+
+    #[test]
+    fn yd_sparse_new() {
+        let m = super::YdSparseMatrix::yd_new(3, 3);
+        assert_eq!(m.yd_nnz(), 0);
+    }
+
+    #[test]
+    fn yd_sparse_set_get() {
+        let mut m = super::YdSparseMatrix::yd_new(3, 3);
+        m.yd_set(0, 1, 5.0);
+        assert_eq!(m.yd_get(0, 1), 5.0);
+        assert_eq!(m.yd_get(0, 0), 0.0);
+    }
+
+    #[test]
+    fn yd_sparse_transpose() {
+        let mut m = super::YdSparseMatrix::yd_new(2, 3);
+        m.yd_set(0, 2, 7.0);
+        let t = m.yd_transpose();
+        assert_eq!(t.yd_get(2, 0), 7.0);
+    }
+
+    #[test]
+    fn yd_sparse_mul_vec() {
+        let mut m = super::YdSparseMatrix::yd_new(2, 2);
+        m.yd_set(0, 0, 1.0);
+        m.yd_set(1, 1, 2.0);
+        let r = m.yd_mul_vec(&[3.0, 4.0]);
+        assert_eq!(r, vec![3.0, 8.0]);
+    }
+
+    #[test]
+    fn yd_sparse_add() {
+        let mut a = super::YdSparseMatrix::yd_new(2, 2);
+        let mut b = super::YdSparseMatrix::yd_new(2, 2);
+        a.yd_set(0, 0, 1.0);
+        b.yd_set(0, 0, 2.0);
+        let c = a.yd_add(&b);
+        assert_eq!(c.yd_get(0, 0), 3.0);
+    }
+
+    #[test]
+    fn yd_sparse_scale() {
+        let mut m = super::YdSparseMatrix::yd_new(1, 1);
+        m.yd_set(0, 0, 5.0);
+        m.yd_scale(2.0);
+        assert_eq!(m.yd_get(0, 0), 10.0);
+    }
+
+    #[test]
+    fn yd_sparse_row_sum() {
+        let mut m = super::YdSparseMatrix::yd_new(2, 3);
+        m.yd_set(0, 0, 1.0);
+        m.yd_set(0, 1, 2.0);
+        m.yd_set(0, 2, 3.0);
+        assert_eq!(m.yd_row_sum(0), 6.0);
+    }
+
+    #[test]
+    fn yd_sparse_display() {
+        let m = super::YdSparseMatrix::yd_new(2, 2);
+        assert!(format!("{}", m).contains("SparseMatrix"));
+    }
+
+    #[test]
+    fn yd_sparse_clear() {
+        let mut m = super::YdSparseMatrix::yd_new(2, 2);
+        m.yd_set(0, 0, 1.0);
+        m.yd_clear();
+        assert_eq!(m.yd_nnz(), 0);
     }
 
 }
