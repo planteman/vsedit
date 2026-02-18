@@ -22034,6 +22034,126 @@ impl AxrToken {
     pub fn primary_scope(&self) -> Option<&AxrScope> { self.scopes.last() }
 }
 
+
+// --- axs_ theme and token colorization engine ---
+
+/// An RGBA color value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AxsColor {
+    pub r: u8, pub g: u8, pub b: u8, pub a: u8,
+}
+
+impl AxsColor {
+    pub fn rgb(r: u8, g: u8, b: u8) -> Self { Self { r, g, b, a: 255 } }
+    pub fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self { Self { r, g, b, a } }
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        let hex = hex.trim_start_matches('#');
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            Some(Self::rgb(r, g, b))
+        } else if hex.len() == 8 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+            Some(Self::rgba(r, g, b, a))
+        } else { None }
+    }
+    pub fn to_hex(&self) -> String { format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b) }
+    pub fn blend(&self, other: &AxsColor, t: f64) -> Self {
+        let lerp = |a: u8, b: u8| -> u8 { (a as f64 + (b as f64 - a as f64) * t).round() as u8 };
+        Self::rgba(lerp(self.r, other.r), lerp(self.g, other.g), lerp(self.b, other.b), lerp(self.a, other.a))
+    }
+    pub fn luminance(&self) -> f64 {
+        0.2126 * (self.r as f64 / 255.0) + 0.7152 * (self.g as f64 / 255.0) + 0.0722 * (self.b as f64 / 255.0)
+    }
+    pub fn is_light(&self) -> bool { self.luminance() > 0.5 }
+}
+
+/// Font style flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AxsFontStyle(pub u8);
+
+impl AxsFontStyle {
+    pub const NONE: Self = Self(0);
+    pub const BOLD: Self = Self(1);
+    pub const ITALIC: Self = Self(2);
+    pub const UNDERLINE: Self = Self(4);
+    pub const STRIKETHROUGH: Self = Self(8);
+    pub fn has(&self, flag: AxsFontStyle) -> bool { self.0 & flag.0 != 0 }
+    pub fn with(self, flag: AxsFontStyle) -> Self { Self(self.0 | flag.0) }
+}
+
+/// Token color rule matching scopes.
+#[derive(Debug, Clone)]
+pub struct AxsTokenColorRule {
+    pub scope: String,
+    pub foreground: Option<AxsColor>,
+    pub background: Option<AxsColor>,
+    pub font_style: AxsFontStyle,
+}
+
+impl AxsTokenColorRule {
+    pub fn new(scope: &str) -> Self {
+        Self { scope: scope.to_string(), foreground: None, background: None, font_style: AxsFontStyle::NONE }
+    }
+    pub fn with_fg(mut self, color: AxsColor) -> Self { self.foreground = Some(color); self }
+    pub fn with_style(mut self, style: AxsFontStyle) -> Self { self.font_style = style; self }
+    pub fn matches_scope(&self, scope_path: &str) -> bool { scope_path.starts_with(&self.scope) }
+    pub fn specificity(&self) -> usize { self.scope.split('.').count() }
+}
+
+/// Theme kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxsThemeKind { Light, Dark, HighContrast, HighContrastLight }
+
+/// Complete editor theme.
+#[derive(Debug)]
+pub struct AxsTheme {
+    pub name: String,
+    pub kind: AxsThemeKind,
+    pub colors: std::collections::HashMap<String, AxsColor>,
+    pub token_rules: Vec<AxsTokenColorRule>,
+}
+
+impl AxsTheme {
+    pub fn new(name: &str, kind: AxsThemeKind) -> Self {
+        Self { name: name.to_string(), kind, colors: std::collections::HashMap::new(), token_rules: Vec::new() }
+    }
+    pub fn set_color(&mut self, key: &str, color: AxsColor) { self.colors.insert(key.to_string(), color); }
+    pub fn get_color(&self, key: &str) -> Option<&AxsColor> { self.colors.get(key) }
+    pub fn add_rule(&mut self, rule: AxsTokenColorRule) { self.token_rules.push(rule); }
+    pub fn resolve_token(&self, scope_path: &str) -> Option<&AxsTokenColorRule> {
+        self.token_rules.iter()
+            .filter(|r| r.matches_scope(scope_path))
+            .max_by_key(|r| r.specificity())
+    }
+    pub fn is_dark(&self) -> bool { matches!(self.kind, AxsThemeKind::Dark | AxsThemeKind::HighContrast) }
+    pub fn editor_bg(&self) -> Option<&AxsColor> { self.get_color("editor.background") }
+    pub fn editor_fg(&self) -> Option<&AxsColor> { self.get_color("editor.foreground") }
+}
+
+/// Theme registry for switching themes.
+#[derive(Debug)]
+pub struct AxsThemeRegistry {
+    pub themes: Vec<AxsTheme>,
+    pub active_index: usize,
+}
+
+impl AxsThemeRegistry {
+    pub fn new() -> Self { Self { themes: Vec::new(), active_index: 0 } }
+    pub fn add(&mut self, theme: AxsTheme) { self.themes.push(theme); }
+    pub fn active(&self) -> Option<&AxsTheme> { self.themes.get(self.active_index) }
+    pub fn set_active(&mut self, name: &str) -> bool {
+        if let Some(idx) = self.themes.iter().position(|t| t.name == name) {
+            self.active_index = idx; true
+        } else { false }
+    }
+    pub fn theme_names(&self) -> Vec<&str> { self.themes.iter().map(|t| t.name.as_str()).collect() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35597,6 +35717,73 @@ mod tests {
     fn test_axr_registry_language_count() {
         let reg = AxrLanguageRegistry::new();
         assert!(reg.language_count() >= 15);
+    }
+
+
+    #[test]
+    fn test_axs_color_hex() {
+        let c = AxsColor::from_hex("#ff8000").unwrap();
+        assert_eq!(c.r, 255);
+        assert_eq!(c.g, 128);
+        assert_eq!(c.b, 0);
+        assert_eq!(c.to_hex(), "#ff8000");
+    }
+
+    #[test]
+    fn test_axs_color_rgba() {
+        let c = AxsColor::from_hex("#ff800080").unwrap();
+        assert_eq!(c.a, 128);
+    }
+
+    #[test]
+    fn test_axs_color_blend() {
+        let a = AxsColor::rgb(0, 0, 0);
+        let b = AxsColor::rgb(255, 255, 255);
+        let mid = a.blend(&b, 0.5);
+        assert!(mid.r > 120 && mid.r < 135);
+    }
+
+    #[test]
+    fn test_axs_color_luminance() {
+        assert!(AxsColor::rgb(255, 255, 255).is_light());
+        assert!(!AxsColor::rgb(0, 0, 0).is_light());
+    }
+
+    #[test]
+    fn test_axs_font_style() {
+        let s = AxsFontStyle::NONE.with(AxsFontStyle::BOLD).with(AxsFontStyle::ITALIC);
+        assert!(s.has(AxsFontStyle::BOLD));
+        assert!(s.has(AxsFontStyle::ITALIC));
+        assert!(!s.has(AxsFontStyle::UNDERLINE));
+    }
+
+    #[test]
+    fn test_axs_token_rule() {
+        let rule = AxsTokenColorRule::new("keyword.control")
+            .with_fg(AxsColor::rgb(197, 134, 192));
+        assert!(rule.matches_scope("keyword.control.rust"));
+        assert!(!rule.matches_scope("string.quoted"));
+        assert_eq!(rule.specificity(), 2);
+    }
+
+    #[test]
+    fn test_axs_theme_resolve() {
+        let mut theme = AxsTheme::new("Dark+", AxsThemeKind::Dark);
+        theme.add_rule(AxsTokenColorRule::new("keyword").with_fg(AxsColor::rgb(86, 156, 214)));
+        theme.add_rule(AxsTokenColorRule::new("keyword.control").with_fg(AxsColor::rgb(197, 134, 192)));
+        let resolved = theme.resolve_token("keyword.control.rust").unwrap();
+        assert_eq!(resolved.foreground.unwrap().r, 197);
+    }
+
+    #[test]
+    fn test_axs_theme_registry() {
+        let mut reg = AxsThemeRegistry::new();
+        reg.add(AxsTheme::new("Dark+", AxsThemeKind::Dark));
+        reg.add(AxsTheme::new("Light+", AxsThemeKind::Light));
+        assert_eq!(reg.active().unwrap().name, "Dark+");
+        assert!(reg.set_active("Light+"));
+        assert_eq!(reg.active().unwrap().name, "Light+");
+        assert!(!reg.set_active("Nonexistent"));
     }
 
 }
