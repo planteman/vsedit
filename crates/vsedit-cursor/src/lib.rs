@@ -25317,6 +25317,101 @@ impl AyxLocalHistoryStore {
     pub fn latest_snapshot(&self) -> Option<&AyxLocalHistoryEntry> { self.snapshots.last() }
 }
 
+
+// --- ayy_ testing framework integration ---
+
+/// Test run state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyyTestState { Queued, Running, Passed, Failed, Skipped, Errored }
+
+/// Test item kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyyTestKind { Suite, Test, Case }
+
+/// A test item in the tree.
+#[derive(Debug, Clone)]
+pub struct AyyTestItem {
+    pub id: String,
+    pub label: String,
+    pub kind: AyyTestKind,
+    pub uri: Option<String>,
+    pub line: Option<u32>,
+    pub children: Vec<String>,
+    pub tags: Vec<String>,
+}
+
+impl AyyTestItem {
+    pub fn suite(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), kind: AyyTestKind::Suite, uri: None, line: None, children: Vec::new(), tags: Vec::new() }
+    }
+    pub fn test(id: &str, label: &str, uri: &str, line: u32) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), kind: AyyTestKind::Test, uri: Some(uri.to_string()), line: Some(line), children: Vec::new(), tags: Vec::new() }
+    }
+    pub fn add_child(&mut self, child_id: &str) { self.children.push(child_id.to_string()); }
+    pub fn add_tag(&mut self, tag: &str) { self.tags.push(tag.to_string()); }
+    pub fn has_tag(&self, tag: &str) -> bool { self.tags.iter().any(|t| t == tag) }
+    pub fn is_leaf(&self) -> bool { self.children.is_empty() }
+}
+
+/// Test run result.
+#[derive(Debug, Clone)]
+pub struct AyyTestResult {
+    pub test_id: String,
+    pub state: AyyTestState,
+    pub duration_ms: Option<u64>,
+    pub message: Option<String>,
+    pub expected: Option<String>,
+    pub actual: Option<String>,
+}
+
+impl AyyTestResult {
+    pub fn passed(id: &str, ms: u64) -> Self {
+        Self { test_id: id.to_string(), state: AyyTestState::Passed, duration_ms: Some(ms), message: None, expected: None, actual: None }
+    }
+    pub fn failed(id: &str, ms: u64, msg: &str) -> Self {
+        Self { test_id: id.to_string(), state: AyyTestState::Failed, duration_ms: Some(ms), message: Some(msg.to_string()), expected: None, actual: None }
+    }
+    pub fn with_diff(mut self, expected: &str, actual: &str) -> Self {
+        self.expected = Some(expected.to_string()); self.actual = Some(actual.to_string()); self
+    }
+    pub fn is_pass(&self) -> bool { self.state == AyyTestState::Passed }
+    pub fn has_diff(&self) -> bool { self.expected.is_some() && self.actual.is_some() }
+}
+
+/// Test run that groups results.
+#[derive(Debug)]
+pub struct AyyTestRun {
+    pub name: String,
+    pub results: Vec<AyyTestResult>,
+}
+
+impl AyyTestRun {
+    pub fn new(name: &str) -> Self { Self { name: name.to_string(), results: Vec::new() } }
+    pub fn add_result(&mut self, r: AyyTestResult) { self.results.push(r); }
+    pub fn passed_count(&self) -> usize { self.results.iter().filter(|r| r.is_pass()).count() }
+    pub fn failed_count(&self) -> usize { self.results.iter().filter(|r| r.state == AyyTestState::Failed).count() }
+    pub fn total(&self) -> usize { self.results.len() }
+    pub fn total_duration_ms(&self) -> u64 { self.results.iter().filter_map(|r| r.duration_ms).sum() }
+    pub fn all_passed(&self) -> bool { self.results.iter().all(|r| r.is_pass()) }
+    pub fn failures(&self) -> Vec<&AyyTestResult> { self.results.iter().filter(|r| r.state == AyyTestState::Failed).collect() }
+}
+
+/// Test controller that manages items and runs.
+#[derive(Debug)]
+pub struct AyyTestController {
+    pub id: String,
+    pub items: Vec<AyyTestItem>,
+    pub runs: Vec<AyyTestRun>,
+}
+
+impl AyyTestController {
+    pub fn new(id: &str) -> Self { Self { id: id.to_string(), items: Vec::new(), runs: Vec::new() } }
+    pub fn add_item(&mut self, item: AyyTestItem) { self.items.push(item); }
+    pub fn add_run(&mut self, run: AyyTestRun) { self.runs.push(run); }
+    pub fn find_item(&self, id: &str) -> Option<&AyyTestItem> { self.items.iter().find(|i| i.id == id) }
+    pub fn leaf_tests(&self) -> Vec<&AyyTestItem> { self.items.iter().filter(|i| i.is_leaf()).collect() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41102,6 +41197,80 @@ d");
         store.add_snapshot(AyxLocalHistoryEntry::new("c", 3, 0, 30));
         assert_eq!(store.snapshot_count(), 2);
         assert_eq!(store.snapshots[0].entry_id, "b");
+    }
+
+
+    #[test]
+    fn test_ayy_test_item_suite() {
+        let mut s = AyyTestItem::suite("s1", "My Suite");
+        s.add_child("t1");
+        assert_eq!(s.kind, AyyTestKind::Suite);
+        assert!(!s.is_leaf());
+    }
+
+    #[test]
+    fn test_ayy_test_item_tags() {
+        let mut t = AyyTestItem::test("t1", "test_one", "file.rs", 10);
+        t.add_tag("slow");
+        assert!(t.has_tag("slow"));
+        assert!(!t.has_tag("fast"));
+    }
+
+    #[test]
+    fn test_ayy_test_result_passed() {
+        let r = AyyTestResult::passed("t1", 50);
+        assert!(r.is_pass());
+        assert!(!r.has_diff());
+    }
+
+    #[test]
+    fn test_ayy_test_result_failed_diff() {
+        let r = AyyTestResult::failed("t1", 100, "assertion failed")
+            .with_diff("42", "43");
+        assert!(!r.is_pass());
+        assert!(r.has_diff());
+    }
+
+    #[test]
+    fn test_ayy_test_run() {
+        let mut run = AyyTestRun::new("Run #1");
+        run.add_result(AyyTestResult::passed("t1", 10));
+        run.add_result(AyyTestResult::passed("t2", 20));
+        run.add_result(AyyTestResult::failed("t3", 30, "err"));
+        assert_eq!(run.passed_count(), 2);
+        assert_eq!(run.failed_count(), 1);
+        assert_eq!(run.total(), 3);
+        assert_eq!(run.total_duration_ms(), 60);
+        assert!(!run.all_passed());
+    }
+
+    #[test]
+    fn test_ayy_test_run_all_pass() {
+        let mut run = AyyTestRun::new("ok");
+        run.add_result(AyyTestResult::passed("a", 5));
+        assert!(run.all_passed());
+    }
+
+    #[test]
+    fn test_ayy_test_controller() {
+        let mut ctrl = AyyTestController::new("ctrl1");
+        let mut suite = AyyTestItem::suite("s1", "Suite");
+        suite.add_child("t1");
+        ctrl.add_item(suite);
+        ctrl.add_item(AyyTestItem::test("t1", "test1", "f.rs", 5));
+        assert!(ctrl.find_item("t1").is_some());
+        assert_eq!(ctrl.leaf_tests().len(), 1);
+    }
+
+    #[test]
+    fn test_ayy_failures_list() {
+        let mut run = AyyTestRun::new("r");
+        run.add_result(AyyTestResult::passed("a", 1));
+        run.add_result(AyyTestResult::failed("b", 2, "e1"));
+        run.add_result(AyyTestResult::failed("c", 3, "e2"));
+        let fails = run.failures();
+        assert_eq!(fails.len(), 2);
+        assert_eq!(fails[0].test_id, "b");
     }
 
 }
