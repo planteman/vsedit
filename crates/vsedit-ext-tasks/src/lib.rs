@@ -23287,6 +23287,94 @@ impl AyaActivityBar {
     }
 }
 
+
+// --- ayb_ editor tab bar and open editors model ---
+
+/// Tab state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AybTabState { Clean, Modified, Deleted, Conflicting }
+
+/// A single editor tab.
+#[derive(Debug, Clone)]
+pub struct AybEditorTab {
+    pub uri: String,
+    pub label: String,
+    pub state: AybTabState,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub is_active: bool,
+}
+
+impl AybEditorTab {
+    pub fn new(uri: &str, label: &str) -> Self {
+        Self { uri: uri.to_string(), label: label.to_string(), state: AybTabState::Clean,
+            is_pinned: false, is_preview: true, is_active: false }
+    }
+    pub fn is_dirty(&self) -> bool { self.state == AybTabState::Modified }
+    pub fn mark_modified(&mut self) { self.state = AybTabState::Modified; self.is_preview = false; }
+    pub fn mark_saved(&mut self) { self.state = AybTabState::Clean; }
+    pub fn pin(&mut self) { self.is_pinned = true; self.is_preview = false; }
+    pub fn unpin(&mut self) { self.is_pinned = false; }
+    pub fn promote(&mut self) { self.is_preview = false; }
+}
+
+/// Editor tab group (split pane).
+#[derive(Debug)]
+pub struct AybTabGroup {
+    pub tabs: Vec<AybEditorTab>,
+    pub active_index: Option<usize>,
+}
+
+impl AybTabGroup {
+    pub fn new() -> Self { Self { tabs: Vec::new(), active_index: None } }
+    pub fn open(&mut self, uri: &str, label: &str) -> usize {
+        if let Some(idx) = self.tabs.iter().position(|t| t.uri == uri) {
+            self.activate(idx);
+            return idx;
+        }
+        if let Some(preview_idx) = self.tabs.iter().position(|t| t.is_preview && !t.is_pinned) {
+            self.tabs[preview_idx] = AybEditorTab::new(uri, label);
+            self.activate(preview_idx);
+            return preview_idx;
+        }
+        let idx = self.tabs.len();
+        self.tabs.push(AybEditorTab::new(uri, label));
+        self.activate(idx);
+        idx
+    }
+    pub fn close(&mut self, idx: usize) -> Option<AybEditorTab> {
+        if idx >= self.tabs.len() { return None; }
+        let tab = self.tabs.remove(idx);
+        if self.tabs.is_empty() { self.active_index = None; }
+        else if let Some(ai) = self.active_index {
+            if ai >= self.tabs.len() { self.active_index = Some(self.tabs.len() - 1); }
+            else if idx <= ai && ai > 0 { self.active_index = Some(ai - 1); }
+        }
+        Some(tab)
+    }
+    pub fn activate(&mut self, idx: usize) {
+        if idx < self.tabs.len() {
+            if let Some(ai) = self.active_index { self.tabs[ai].is_active = false; }
+            self.active_index = Some(idx);
+            self.tabs[idx].is_active = true;
+        }
+    }
+    pub fn active_tab(&self) -> Option<&AybEditorTab> { self.active_index.and_then(|i| self.tabs.get(i)) }
+    pub fn tab_count(&self) -> usize { self.tabs.len() }
+    pub fn dirty_count(&self) -> usize { self.tabs.iter().filter(|t| t.is_dirty()).count() }
+    pub fn close_all_saved(&mut self) {
+        self.tabs.retain(|t| t.is_dirty() || t.is_pinned);
+        if self.tabs.is_empty() { self.active_index = None; }
+        else { self.active_index = Some(0); }
+    }
+    pub fn move_tab(&mut self, from: usize, to: usize) {
+        if from < self.tabs.len() && to < self.tabs.len() {
+            let tab = self.tabs.remove(from);
+            self.tabs.insert(to, tab);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37282,6 +37370,89 @@ mod tests {
         bar.add(AyaStatusBarItem::new("pos", "Ln 1", AyaAlignment::Right));
         bar.get_mut("pos").unwrap().set_text("Ln 42, Col 10");
         assert_eq!(bar.items[0].text, "Ln 42, Col 10");
+    }
+
+
+    #[test]
+    fn test_ayb_tab_lifecycle() {
+        let mut tab = AybEditorTab::new("file:///a.rs", "a.rs");
+        assert!(!tab.is_dirty());
+        assert!(tab.is_preview);
+        tab.mark_modified();
+        assert!(tab.is_dirty());
+        assert!(!tab.is_preview);
+        tab.mark_saved();
+        assert!(!tab.is_dirty());
+    }
+
+    #[test]
+    fn test_ayb_tab_pin() {
+        let mut tab = AybEditorTab::new("file:///a.rs", "a.rs");
+        tab.pin();
+        assert!(tab.is_pinned);
+        assert!(!tab.is_preview);
+    }
+
+    #[test]
+    fn test_ayb_tab_group_open() {
+        let mut group = AybTabGroup::new();
+        group.open("file:///a.rs", "a.rs");
+        group.open("file:///b.rs", "b.rs");
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.active_tab().unwrap().label, "b.rs");
+    }
+
+    #[test]
+    fn test_ayb_tab_group_promote() {
+        let mut group = AybTabGroup::new();
+        group.open("file:///a.rs", "a.rs");
+        group.tabs[0].promote();
+        group.open("file:///b.rs", "b.rs");
+        assert_eq!(group.tab_count(), 2);
+    }
+
+    #[test]
+    fn test_ayb_close_tab() {
+        let mut group = AybTabGroup::new();
+        group.open("file:///a.rs", "a.rs");
+        group.tabs[0].promote();
+        group.open("file:///b.rs", "b.rs");
+        group.tabs[1].promote();
+        let closed = group.close(0);
+        assert_eq!(closed.unwrap().label, "a.rs");
+        assert_eq!(group.tab_count(), 1);
+    }
+
+    #[test]
+    fn test_ayb_close_all_saved() {
+        let mut group = AybTabGroup::new();
+        group.open("file:///a.rs", "a.rs"); group.tabs[0].promote();
+        group.open("file:///b.rs", "b.rs"); group.tabs[1].promote();
+        group.tabs[0].mark_modified();
+        group.close_all_saved();
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.tabs[0].label, "a.rs");
+    }
+
+    #[test]
+    fn test_ayb_dirty_count() {
+        let mut group = AybTabGroup::new();
+        group.open("file:///a.rs", "a.rs"); group.tabs[0].promote();
+        group.open("file:///b.rs", "b.rs"); group.tabs[1].promote();
+        group.tabs[0].mark_modified();
+        group.tabs[1].mark_modified();
+        assert_eq!(group.dirty_count(), 2);
+    }
+
+    #[test]
+    fn test_ayb_reopen_same() {
+        let mut group = AybTabGroup::new();
+        let idx1 = group.open("file:///a.rs", "a.rs");
+        group.tabs[idx1].promote();
+        group.open("file:///b.rs", "b.rs");
+        let idx2 = group.open("file:///a.rs", "a.rs");
+        assert_eq!(idx2, 0);
+        assert_eq!(group.active_tab().unwrap().label, "a.rs");
     }
 
 }
