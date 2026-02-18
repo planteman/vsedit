@@ -19469,6 +19469,203 @@ impl AxcDocumentStore {
     }
 }
 
+
+// --- axd_ terminal rendering primitives ---
+
+/// A terminal color.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxdColor {
+    Reset,
+    Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    White,
+    BrightBlack,
+    BrightRed,
+    BrightGreen,
+    BrightYellow,
+    BrightBlue,
+    BrightMagenta,
+    BrightCyan,
+    BrightWhite,
+    Ansi256(u8),
+    Rgb(u8, u8, u8),
+}
+
+impl AxdColor {
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        let hex = hex.strip_prefix('#').unwrap_or(hex);
+        if hex.len() != 6 { return None; }
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        Some(Self::Rgb(r, g, b))
+    }
+
+    pub fn to_ansi_fg(&self) -> String {
+        match self {
+            Self::Reset => "\x1b[39m".to_string(),
+            Self::Black => "\x1b[30m".to_string(),
+            Self::Red => "\x1b[31m".to_string(),
+            Self::Green => "\x1b[32m".to_string(),
+            Self::Yellow => "\x1b[33m".to_string(),
+            Self::Blue => "\x1b[34m".to_string(),
+            Self::Magenta => "\x1b[35m".to_string(),
+            Self::Cyan => "\x1b[36m".to_string(),
+            Self::White => "\x1b[37m".to_string(),
+            Self::BrightBlack => "\x1b[90m".to_string(),
+            Self::BrightRed => "\x1b[91m".to_string(),
+            Self::BrightGreen => "\x1b[92m".to_string(),
+            Self::BrightYellow => "\x1b[93m".to_string(),
+            Self::BrightBlue => "\x1b[94m".to_string(),
+            Self::BrightMagenta => "\x1b[95m".to_string(),
+            Self::BrightCyan => "\x1b[96m".to_string(),
+            Self::BrightWhite => "\x1b[97m".to_string(),
+            Self::Ansi256(n) => format!("\x1b[38;5;{}m", n),
+            Self::Rgb(r, g, b) => format!("\x1b[38;2;{};{};{}m", r, g, b),
+        }
+    }
+}
+
+/// Text style attributes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct AxdStyle {
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    pub strikethrough: bool,
+    pub dim: bool,
+    pub reverse: bool,
+}
+
+impl AxdStyle {
+    pub fn new() -> Self { Self::default() }
+    pub fn bold() -> Self { Self { bold: true, ..Self::default() } }
+    pub fn italic() -> Self { Self { italic: true, ..Self::default() } }
+    pub fn underline() -> Self { Self { underline: true, ..Self::default() } }
+
+    pub fn has_any(&self) -> bool {
+        self.bold || self.italic || self.underline || self.strikethrough || self.dim || self.reverse
+    }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        Self {
+            bold: self.bold || other.bold,
+            italic: self.italic || other.italic,
+            underline: self.underline || other.underline,
+            strikethrough: self.strikethrough || other.strikethrough,
+            dim: self.dim || other.dim,
+            reverse: self.reverse || other.reverse,
+        }
+    }
+}
+
+/// A styled cell in the terminal screen buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxdCell {
+    pub ch: char,
+    pub fg: AxdColor,
+    pub bg: AxdColor,
+    pub style: AxdStyle,
+}
+
+impl AxdCell {
+    pub fn new(ch: char) -> Self {
+        Self { ch, fg: AxdColor::Reset, bg: AxdColor::Reset, style: AxdStyle::new() }
+    }
+
+    pub fn blank() -> Self { Self::new(' ') }
+
+    pub fn with_fg(mut self, fg: AxdColor) -> Self { self.fg = fg; self }
+    pub fn with_bg(mut self, bg: AxdColor) -> Self { self.bg = bg; self }
+    pub fn with_style(mut self, style: AxdStyle) -> Self { self.style = style; self }
+
+    pub fn is_blank(&self) -> bool {
+        self.ch == ' ' && self.fg == AxdColor::Reset && self.bg == AxdColor::Reset && !self.style.has_any()
+    }
+}
+
+/// A screen buffer for double-buffered terminal rendering.
+#[derive(Debug, Clone)]
+pub struct AxdScreenBuffer {
+    pub width: u16,
+    pub height: u16,
+    cells: Vec<AxdCell>,
+}
+
+impl AxdScreenBuffer {
+    pub fn new(width: u16, height: u16) -> Self {
+        let size = (width as usize) * (height as usize);
+        Self { width, height, cells: vec![AxdCell::blank(); size] }
+    }
+
+    pub fn get(&self, x: u16, y: u16) -> Option<&AxdCell> {
+        if x < self.width && y < self.height {
+            Some(&self.cells[(y as usize) * (self.width as usize) + (x as usize)])
+        } else {
+            None
+        }
+    }
+
+    pub fn set(&mut self, x: u16, y: u16, cell: AxdCell) {
+        if x < self.width && y < self.height {
+            self.cells[(y as usize) * (self.width as usize) + (x as usize)] = cell;
+        }
+    }
+
+    pub fn put_str(&mut self, x: u16, y: u16, s: &str, fg: AxdColor, bg: AxdColor, style: AxdStyle) {
+        for (i, ch) in s.chars().enumerate() {
+            let col = x + i as u16;
+            if col < self.width {
+                self.set(col, y, AxdCell { ch, fg, bg, style });
+            }
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for cell in &mut self.cells {
+            *cell = AxdCell::blank();
+        }
+    }
+
+    pub fn resize(&mut self, width: u16, height: u16) {
+        let size = (width as usize) * (height as usize);
+        self.cells = vec![AxdCell::blank(); size];
+        self.width = width;
+        self.height = height;
+    }
+
+    pub fn diff(&self, other: &AxdScreenBuffer) -> Vec<(u16, u16, AxdCell)> {
+        let mut changes = Vec::new();
+        if self.width != other.width || self.height != other.height {
+            return changes;
+        }
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let idx = (y as usize) * (self.width as usize) + (x as usize);
+                if self.cells[idx] != other.cells[idx] {
+                    changes.push((x, y, self.cells[idx].clone()));
+                }
+            }
+        }
+        changes
+    }
+
+    pub fn fill_row(&mut self, y: u16, cell: &AxdCell) {
+        for x in 0..self.width {
+            self.set(x, y, cell.clone());
+        }
+    }
+
+    pub fn cell_count(&self) -> usize {
+        self.cells.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -31727,6 +31924,99 @@ mod tests {
         store.open(AxcTextDocumentItem::new("y", "r", 1, ""));
         let uris = store.open_uris();
         assert_eq!(uris.len(), 2);
+    }
+
+
+    // --- axd_ terminal rendering primitive tests ---
+
+    #[test]
+    fn test_axd_color_from_hex() {
+        assert_eq!(AxdColor::from_hex("#ff0000"), Some(AxdColor::Rgb(255, 0, 0)));
+        assert_eq!(AxdColor::from_hex("00ff00"), Some(AxdColor::Rgb(0, 255, 0)));
+        assert_eq!(AxdColor::from_hex("gg"), None);
+    }
+
+    #[test]
+    fn test_axd_color_ansi_fg() {
+        assert!(AxdColor::Red.to_ansi_fg().contains("31"));
+        assert!(AxdColor::Rgb(100, 200, 50).to_ansi_fg().contains("38;2;100;200;50"));
+        assert!(AxdColor::Ansi256(42).to_ansi_fg().contains("38;5;42"));
+    }
+
+    #[test]
+    fn test_axd_style() {
+        let s = AxdStyle::bold();
+        assert!(s.bold);
+        assert!(s.has_any());
+        let s2 = AxdStyle::new();
+        assert!(!s2.has_any());
+        let merged = s.merge(&AxdStyle::italic());
+        assert!(merged.bold && merged.italic);
+    }
+
+    #[test]
+    fn test_axd_cell() {
+        let c = AxdCell::new('A').with_fg(AxdColor::Red);
+        assert_eq!(c.ch, 'A');
+        assert_eq!(c.fg, AxdColor::Red);
+        assert!(!c.is_blank());
+        assert!(AxdCell::blank().is_blank());
+    }
+
+    #[test]
+    fn test_axd_screen_buffer_basic() {
+        let mut buf = AxdScreenBuffer::new(80, 24);
+        assert_eq!(buf.cell_count(), 80 * 24);
+        assert!(buf.get(0, 0).unwrap().is_blank());
+        buf.set(5, 3, AxdCell::new('X'));
+        assert_eq!(buf.get(5, 3).unwrap().ch, 'X');
+        assert!(buf.get(80, 0).is_none());
+    }
+
+    #[test]
+    fn test_axd_screen_buffer_put_str() {
+        let mut buf = AxdScreenBuffer::new(80, 24);
+        buf.put_str(0, 0, "Hello", AxdColor::White, AxdColor::Blue, AxdStyle::bold());
+        assert_eq!(buf.get(0, 0).unwrap().ch, 'H');
+        assert_eq!(buf.get(4, 0).unwrap().ch, 'o');
+        assert_eq!(buf.get(0, 0).unwrap().fg, AxdColor::White);
+    }
+
+    #[test]
+    fn test_axd_screen_buffer_clear() {
+        let mut buf = AxdScreenBuffer::new(10, 10);
+        buf.set(0, 0, AxdCell::new('A'));
+        buf.clear();
+        assert!(buf.get(0, 0).unwrap().is_blank());
+    }
+
+    #[test]
+    fn test_axd_screen_buffer_resize() {
+        let mut buf = AxdScreenBuffer::new(80, 24);
+        buf.resize(120, 40);
+        assert_eq!(buf.width, 120);
+        assert_eq!(buf.height, 40);
+        assert_eq!(buf.cell_count(), 120 * 40);
+    }
+
+    #[test]
+    fn test_axd_screen_buffer_diff() {
+        let buf1 = AxdScreenBuffer::new(10, 5);
+        let mut buf2 = AxdScreenBuffer::new(10, 5);
+        buf2.set(3, 2, AxdCell::new('Z'));
+        let diff = buf2.diff(&buf1);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0], (3, 2, AxdCell::new('Z')));
+    }
+
+    #[test]
+    fn test_axd_screen_buffer_fill_row() {
+        let mut buf = AxdScreenBuffer::new(5, 3);
+        let cell = AxdCell::new('-').with_fg(AxdColor::Green);
+        buf.fill_row(1, &cell);
+        for x in 0..5 {
+            assert_eq!(buf.get(x, 1).unwrap().ch, '-');
+        }
     }
 
 }
