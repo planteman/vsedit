@@ -16421,6 +16421,183 @@ impl std::fmt::Display for ZoExtensionContext {
     }
 }
 
+
+// --- zp_ task and build system types ---
+
+/// The group a task belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZpTaskGroup {
+    Build,
+    Test,
+    Clean,
+    Rebuild,
+    None,
+}
+
+impl ZpTaskGroup {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ZpTaskGroup::Build => "build",
+            ZpTaskGroup::Test => "test",
+            ZpTaskGroup::Clean => "clean",
+            ZpTaskGroup::Rebuild => "rebuild",
+            ZpTaskGroup::None => "none",
+        }
+    }
+}
+
+impl std::fmt::Display for ZpTaskGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.as_str()) }
+}
+
+/// The source of a task definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ZpTaskSource {
+    Workspace,
+    Extension(String),
+    User,
+    Auto,
+}
+
+impl std::fmt::Display for ZpTaskSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZpTaskSource::Workspace => write!(f, "workspace"),
+            ZpTaskSource::Extension(e) => write!(f, "extension:{}", e),
+            ZpTaskSource::User => write!(f, "user"),
+            ZpTaskSource::Auto => write!(f, "auto"),
+        }
+    }
+}
+
+/// A task execution — a process/shell command to run.
+#[derive(Debug, Clone)]
+pub struct ZpTaskExecution {
+    pub command: String,
+    pub args: Vec<String>,
+    pub cwd: Option<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub is_shell: bool,
+}
+
+impl ZpTaskExecution {
+    pub fn process(command: &str, args: &[&str]) -> Self {
+        Self { command: command.to_string(), args: args.iter().map(|a| a.to_string()).collect(),
+               cwd: None, env: std::collections::HashMap::new(), is_shell: false }
+    }
+
+    pub fn shell(command: &str) -> Self {
+        Self { command: command.to_string(), args: Vec::new(), cwd: None,
+               env: std::collections::HashMap::new(), is_shell: true }
+    }
+
+    pub fn with_cwd(mut self, cwd: &str) -> Self { self.cwd = Some(cwd.to_string()); self }
+    pub fn set_env(&mut self, key: &str, value: &str) { self.env.insert(key.to_string(), value.to_string()); }
+
+    pub fn command_line(&self) -> String {
+        if self.args.is_empty() { self.command.clone() }
+        else { format!("{} {}", self.command, self.args.join(" ")) }
+    }
+}
+
+impl std::fmt::Display for ZpTaskExecution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZpTaskExecution({})", self.command_line())
+    }
+}
+
+/// A task definition.
+#[derive(Debug, Clone)]
+pub struct ZpTask {
+    pub name: String,
+    pub source: ZpTaskSource,
+    pub group: ZpTaskGroup,
+    pub execution: ZpTaskExecution,
+    pub is_background: bool,
+    pub problem_matchers: Vec<String>,
+    pub detail: Option<String>,
+    pub presentation: ZpTaskPresentation,
+}
+
+/// How a task is presented in the terminal.
+#[derive(Debug, Clone)]
+pub struct ZpTaskPresentation {
+    pub reveal: ZpRevealKind,
+    pub echo: bool,
+    pub focus: bool,
+    pub panel: ZpPanelKind,
+    pub show_reuse_message: bool,
+    pub clear: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZpRevealKind { Always, Silent, Never }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZpPanelKind { Shared, Dedicated, New }
+
+impl Default for ZpTaskPresentation {
+    fn default() -> Self {
+        Self { reveal: ZpRevealKind::Always, echo: true, focus: false, panel: ZpPanelKind::Shared, show_reuse_message: true, clear: false }
+    }
+}
+
+impl ZpTask {
+    pub fn new(name: &str, source: ZpTaskSource, execution: ZpTaskExecution) -> Self {
+        Self { name: name.to_string(), source, group: ZpTaskGroup::None, execution,
+               is_background: false, problem_matchers: Vec::new(), detail: None, presentation: ZpTaskPresentation::default() }
+    }
+
+    pub fn with_group(mut self, group: ZpTaskGroup) -> Self { self.group = group; self }
+    pub fn background(mut self) -> Self { self.is_background = true; self }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn add_problem_matcher(&mut self, m: &str) { self.problem_matchers.push(m.to_string()); }
+
+    pub fn is_build(&self) -> bool { self.group == ZpTaskGroup::Build }
+    pub fn is_test(&self) -> bool { self.group == ZpTaskGroup::Test }
+}
+
+impl std::fmt::Display for ZpTask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZpTask({}: {} [{}])", self.name, self.execution.command_line(), self.group)
+    }
+}
+
+/// A running task instance.
+#[derive(Debug, Clone)]
+pub struct ZpTaskRun {
+    pub task_name: String,
+    pub exit_code: Option<i32>,
+    pub is_running: bool,
+    pub output_lines: Vec<String>,
+}
+
+impl ZpTaskRun {
+    pub fn new(name: &str) -> Self {
+        Self { task_name: name.to_string(), exit_code: None, is_running: true, output_lines: Vec::new() }
+    }
+
+    pub fn add_output(&mut self, line: &str) { self.output_lines.push(line.to_string()); }
+
+    pub fn complete(&mut self, exit_code: i32) {
+        self.exit_code = Some(exit_code);
+        self.is_running = false;
+    }
+
+    pub fn succeeded(&self) -> bool { self.exit_code == Some(0) }
+    pub fn failed(&self) -> bool { self.exit_code.map(|c| c != 0).unwrap_or(false) }
+    pub fn output_count(&self) -> usize { self.output_lines.len() }
+}
+
+impl std::fmt::Display for ZpTaskRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = if self.is_running { "running" }
+            else if self.succeeded() { "succeeded" }
+            else { "failed" };
+        write!(f, "ZpTaskRun({} [{}])", self.task_name, state)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27020,6 +27197,122 @@ mod tests {
     fn test_zo_extension_context_display() {
         let ctx = ZoExtensionContext::new("a.b", "/path");
         assert!(format!("{}", ctx).contains("inactive"));
+    }
+
+
+    // --- zp_ tests ---
+
+    #[test]
+    fn test_zp_task_group() {
+        assert_eq!(ZpTaskGroup::Build.as_str(), "build");
+        assert_eq!(ZpTaskGroup::Test.as_str(), "test");
+    }
+
+    #[test]
+    fn test_zp_task_source_display() {
+        assert_eq!(format!("{}", ZpTaskSource::Workspace), "workspace");
+        assert_eq!(format!("{}", ZpTaskSource::Extension("rust".to_string())), "extension:rust");
+    }
+
+    #[test]
+    fn test_zp_task_execution_process() {
+        let exec = ZpTaskExecution::process("cargo", &["build", "--release"]);
+        assert_eq!(exec.command_line(), "cargo build --release");
+        assert!(!exec.is_shell);
+    }
+
+    #[test]
+    fn test_zp_task_execution_shell() {
+        let exec = ZpTaskExecution::shell("npm run build");
+        assert!(exec.is_shell);
+    }
+
+    #[test]
+    fn test_zp_task_execution_cwd() {
+        let exec = ZpTaskExecution::process("make", &[]).with_cwd("/project");
+        assert_eq!(exec.cwd, Some("/project".to_string()));
+    }
+
+    #[test]
+    fn test_zp_task_execution_env() {
+        let mut exec = ZpTaskExecution::process("cmd", &[]);
+        exec.set_env("PATH", "/usr/bin");
+        assert_eq!(exec.env.get("PATH"), Some(&"/usr/bin".to_string()));
+    }
+
+    #[test]
+    fn test_zp_task_new() {
+        let exec = ZpTaskExecution::shell("cargo test");
+        let task = ZpTask::new("test", ZpTaskSource::Workspace, exec).with_group(ZpTaskGroup::Test);
+        assert!(task.is_test());
+        assert!(!task.is_build());
+        assert!(!task.is_background);
+    }
+
+    #[test]
+    fn test_zp_task_background() {
+        let exec = ZpTaskExecution::shell("tsc -w");
+        let task = ZpTask::new("watch", ZpTaskSource::Auto, exec).background();
+        assert!(task.is_background);
+    }
+
+    #[test]
+    fn test_zp_task_problem_matcher() {
+        let exec = ZpTaskExecution::shell("gcc main.c");
+        let mut task = ZpTask::new("compile", ZpTaskSource::Workspace, exec);
+        task.add_problem_matcher("$gcc");
+        assert_eq!(task.problem_matchers, vec!["$gcc"]);
+    }
+
+    #[test]
+    fn test_zp_task_display() {
+        let exec = ZpTaskExecution::shell("echo hi");
+        let task = ZpTask::new("greet", ZpTaskSource::User, exec);
+        assert!(format!("{}", task).contains("greet"));
+    }
+
+    #[test]
+    fn test_zp_task_run_new() {
+        let run = ZpTaskRun::new("build");
+        assert!(run.is_running);
+        assert!(!run.succeeded());
+        assert!(!run.failed());
+    }
+
+    #[test]
+    fn test_zp_task_run_complete() {
+        let mut run = ZpTaskRun::new("test");
+        run.add_output("test 1 passed");
+        run.add_output("test 2 passed");
+        run.complete(0);
+        assert!(!run.is_running);
+        assert!(run.succeeded());
+        assert!(!run.failed());
+        assert_eq!(run.output_count(), 2);
+    }
+
+    #[test]
+    fn test_zp_task_run_failed() {
+        let mut run = ZpTaskRun::new("build");
+        run.complete(1);
+        assert!(run.failed());
+        assert!(!run.succeeded());
+    }
+
+    #[test]
+    fn test_zp_task_run_display() {
+        let mut run = ZpTaskRun::new("x");
+        assert!(format!("{}", run).contains("running"));
+        run.complete(0);
+        assert!(format!("{}", run).contains("succeeded"));
+    }
+
+    #[test]
+    fn test_zp_presentation_default() {
+        let p = ZpTaskPresentation::default();
+        assert_eq!(p.reveal, ZpRevealKind::Always);
+        assert!(p.echo);
+        assert!(!p.focus);
     }
 
 }
