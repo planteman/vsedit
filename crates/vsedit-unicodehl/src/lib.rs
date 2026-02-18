@@ -2917,6 +2917,239 @@ impl Xf118BloomFilter {
     }
 }
 
+
+/// A probabilistic sorted list using a skip-list structure (variant 189).
+pub struct Xh189SkipList {
+    xh_levels: Vec<Vec<(i64, usize)>>,
+    xh_data: Vec<i64>,
+    xh_len: usize,
+    xh_max_level: usize,
+    xh_seed: u64,
+}
+
+impl Xh189SkipList {
+    /// Create a new skip list with the given maximum level.
+    pub fn xh_new(max_level: usize) -> Self {
+        Self {
+            xh_levels: vec![Vec::new(); max_level],
+            xh_data: Vec::new(),
+            xh_len: 0,
+            xh_max_level: max_level,
+            xh_seed: 231 as u64,
+        }
+    }
+
+    fn xh_random_level(&mut self) -> usize {
+        self.xh_seed ^= self.xh_seed << 13;
+        self.xh_seed ^= self.xh_seed >> 7;
+        self.xh_seed ^= self.xh_seed << 17;
+        let mut lvl = 1;
+        while lvl < self.xh_max_level && (self.xh_seed & 1) == 0 {
+            lvl += 1;
+            self.xh_seed ^= self.xh_seed.wrapping_mul(6364136223846793005);
+        }
+        lvl
+    }
+
+    /// Insert a value into the skip list.
+    pub fn xh_insert(&mut self, value: i64) {
+        let pos = self.xh_data.len();
+        self.xh_data.push(value);
+        let lvl = self.xh_random_level();
+        for i in 0..lvl {
+            self.xh_levels[i].push((value, pos));
+            self.xh_levels[i].sort_by_key(|&(v, _)| v);
+        }
+        self.xh_len += 1;
+    }
+
+    /// Check whether the skip list contains the given value.
+    pub fn xh_contains(&self, value: i64) -> bool {
+        if self.xh_levels.is_empty() {
+            return false;
+        }
+        self.xh_levels[0].binary_search_by_key(&value, |&(v, _)| v).is_ok()
+    }
+
+    /// Remove one occurrence of `value`. Returns `true` if found.
+    pub fn xh_remove(&mut self, value: i64) -> bool {
+        let mut found = false;
+        for level in &mut self.xh_levels {
+            if let Ok(idx) = level.binary_search_by_key(&value, |&(v, _)| v) {
+                level.remove(idx);
+                found = true;
+            }
+        }
+        if found {
+            self.xh_len -= 1;
+        }
+        found
+    }
+
+    /// Return the number of elements.
+    pub fn xh_len(&self) -> usize {
+        self.xh_len
+    }
+
+    /// Collect values in `[lo, hi]` inclusive.
+    pub fn xh_range_query(&self, lo: i64, hi: i64) -> Vec<i64> {
+        if self.xh_levels.is_empty() {
+            return Vec::new();
+        }
+        self.xh_levels[0]
+            .iter()
+            .filter(|&&(v, _)| v >= lo && v <= hi)
+            .map(|&(v, _)| v)
+            .collect()
+    }
+
+    /// Greatest value <= `value`, if any.
+    pub fn xh_floor(&self, value: i64) -> Option<i64> {
+        if self.xh_levels.is_empty() {
+            return None;
+        }
+        self.xh_levels[0]
+            .iter()
+            .rev()
+            .find(|&&(v, _)| v <= value)
+            .map(|&(v, _)| v)
+    }
+
+    /// Smallest value >= `value`, if any.
+    pub fn xh_ceiling(&self, value: i64) -> Option<i64> {
+        if self.xh_levels.is_empty() {
+            return None;
+        }
+        self.xh_levels[0]
+            .iter()
+            .find(|&&(v, _)| v >= value)
+            .map(|&(v, _)| v)
+    }
+
+    /// Number of elements strictly less than `value`.
+    pub fn xh_rank(&self, value: i64) -> usize {
+        if self.xh_levels.is_empty() {
+            return 0;
+        }
+        self.xh_levels[0]
+            .iter()
+            .take_while(|&&(v, _)| v < value)
+            .count()
+    }
+}
+
+/// A compact bit set supporting boolean operations (variant 189).
+pub struct Xh189BitSet {
+    xh_words: Vec<u64>,
+    xh_nbits: usize,
+}
+
+impl Xh189BitSet {
+    /// Create a bit set that can hold `nbits` bits.
+    pub fn xh_new(nbits: usize) -> Self {
+        let nwords = (nbits + 63) / 64;
+        Self {
+            xh_words: vec![0u64; nwords],
+            xh_nbits: nbits,
+        }
+    }
+
+    /// Set bit at `index`.
+    pub fn xh_set(&mut self, index: usize) {
+        if index < self.xh_nbits {
+            self.xh_words[index / 64] |= 1u64 << (index % 64);
+        }
+    }
+
+    /// Clear bit at `index`.
+    pub fn xh_clear(&mut self, index: usize) {
+        if index < self.xh_nbits {
+            self.xh_words[index / 64] &= !(1u64 << (index % 64));
+        }
+    }
+
+    /// Test whether bit at `index` is set.
+    pub fn xh_test(&self, index: usize) -> bool {
+        if index >= self.xh_nbits {
+            return false;
+        }
+        (self.xh_words[index / 64] >> (index % 64)) & 1 == 1
+    }
+
+    /// Count the number of set bits.
+    pub fn xh_count(&self) -> usize {
+        self.xh_words.iter().map(|w| w.count_ones() as usize).sum()
+    }
+
+    /// Bitwise AND with another bit set, returning a new one.
+    pub fn xh_and(&self, other: &Self) -> Self {
+        let len = self.xh_words.len().min(other.xh_words.len());
+        let mut result = Self::xh_new(self.xh_nbits.min(other.xh_nbits));
+        for i in 0..len {
+            result.xh_words[i] = self.xh_words[i] & other.xh_words[i];
+        }
+        result
+    }
+
+    /// Bitwise OR with another bit set, returning a new one.
+    pub fn xh_or(&self, other: &Self) -> Self {
+        let len = self.xh_words.len().max(other.xh_words.len());
+        let mut result = Self::xh_new(self.xh_nbits.max(other.xh_nbits));
+        for i in 0..len {
+            let a = if i < self.xh_words.len() { self.xh_words[i] } else { 0 };
+            let b = if i < other.xh_words.len() { other.xh_words[i] } else { 0 };
+            result.xh_words[i] = a | b;
+        }
+        result
+    }
+
+    /// Bitwise XOR with another bit set, returning a new one.
+    pub fn xh_xor(&self, other: &Self) -> Self {
+        let len = self.xh_words.len().max(other.xh_words.len());
+        let mut result = Self::xh_new(self.xh_nbits.max(other.xh_nbits));
+        for i in 0..len {
+            let a = if i < self.xh_words.len() { self.xh_words[i] } else { 0 };
+            let b = if i < other.xh_words.len() { other.xh_words[i] } else { 0 };
+            result.xh_words[i] = a ^ b;
+        }
+        result
+    }
+
+    /// Iterate over the indices of all set bits.
+    pub fn xh_iter_ones(&self) -> Vec<usize> {
+        let mut result = Vec::new();
+        for (wi, &word) in self.xh_words.iter().enumerate() {
+            let mut w = word;
+            while w != 0 {
+                let bit = w.trailing_zeros() as usize;
+                result.push(wi * 64 + bit);
+                w &= w - 1;
+            }
+        }
+        result
+    }
+
+    /// Index of the first set bit, if any.
+    pub fn xh_first_set(&self) -> Option<usize> {
+        for (wi, &word) in self.xh_words.iter().enumerate() {
+            if word != 0 {
+                return Some(wi * 64 + word.trailing_zeros() as usize);
+            }
+        }
+        None
+    }
+
+    /// Index of the last set bit, if any.
+    pub fn xh_last_set(&self) -> Option<usize> {
+        for (wi, &word) in self.xh_words.iter().enumerate().rev() {
+            if word != 0 {
+                return Some(wi * 64 + (63 - word.leading_zeros() as usize));
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4897,6 +5130,176 @@ mod tests {
         let a = Xf118BloomFilter::xf_new(256, 2);
         let b = Xf118BloomFilter::xf_new(512, 2);
         assert!(a.xf_union(&b).is_none());
+    }
+
+
+    #[test]
+    fn xh189_skip_insert_contains() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        sl.xh_insert(10);
+        sl.xh_insert(20);
+        sl.xh_insert(5);
+        assert!(sl.xh_contains(10));
+        assert!(sl.xh_contains(20));
+        assert!(sl.xh_contains(5));
+        assert!(!sl.xh_contains(15));
+    }
+
+    #[test]
+    fn xh189_skip_remove() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        sl.xh_insert(10);
+        sl.xh_insert(20);
+        assert!(sl.xh_remove(10));
+        assert!(!sl.xh_contains(10));
+        assert!(sl.xh_contains(20));
+        assert!(!sl.xh_remove(99));
+    }
+
+    #[test]
+    fn xh189_skip_len() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        assert_eq!(sl.xh_len(), 0);
+        sl.xh_insert(1);
+        sl.xh_insert(2);
+        assert_eq!(sl.xh_len(), 2);
+        sl.xh_remove(1);
+        assert_eq!(sl.xh_len(), 1);
+    }
+
+    #[test]
+    fn xh189_skip_range_query() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        for v in [3, 7, 1, 9, 5] {
+            sl.xh_insert(v);
+        }
+        let r = sl.xh_range_query(3, 7);
+        assert!(r.contains(&3));
+        assert!(r.contains(&5));
+        assert!(r.contains(&7));
+        assert!(!r.contains(&1));
+        assert!(!r.contains(&9));
+    }
+
+    #[test]
+    fn xh189_skip_floor_ceiling() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        for v in [10, 20, 30] {
+            sl.xh_insert(v);
+        }
+        assert_eq!(sl.xh_floor(25), Some(20));
+        assert_eq!(sl.xh_ceiling(25), Some(30));
+        assert_eq!(sl.xh_floor(5), None);
+        assert_eq!(sl.xh_ceiling(35), None);
+    }
+
+    #[test]
+    fn xh189_skip_rank() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        for v in [10, 20, 30, 40, 50] {
+            sl.xh_insert(v);
+        }
+        assert_eq!(sl.xh_rank(30), 2);
+        assert_eq!(sl.xh_rank(10), 0);
+        assert_eq!(sl.xh_rank(60), 5);
+    }
+
+    #[test]
+    fn xh189_skip_empty() {
+        let sl = super::Xh189SkipList::xh_new(4);
+        assert_eq!(sl.xh_len(), 0);
+        assert!(!sl.xh_contains(1));
+        assert_eq!(sl.xh_floor(1), None);
+        assert_eq!(sl.xh_ceiling(1), None);
+        assert_eq!(sl.xh_rank(1), 0);
+    }
+
+    #[test]
+    fn xh189_skip_duplicates() {
+        let mut sl = super::Xh189SkipList::xh_new(4);
+        sl.xh_insert(5);
+        sl.xh_insert(5);
+        assert_eq!(sl.xh_len(), 2);
+        sl.xh_remove(5);
+        assert_eq!(sl.xh_len(), 1);
+    }
+
+    #[test]
+    fn xh189_bitset_set_test() {
+        let mut bs = super::Xh189BitSet::xh_new(256);
+        bs.xh_set(0);
+        bs.xh_set(63);
+        bs.xh_set(64);
+        bs.xh_set(255);
+        assert!(bs.xh_test(0));
+        assert!(bs.xh_test(63));
+        assert!(bs.xh_test(64));
+        assert!(bs.xh_test(255));
+        assert!(!bs.xh_test(1));
+    }
+
+    #[test]
+    fn xh189_bitset_clear_count() {
+        let mut bs = super::Xh189BitSet::xh_new(128);
+        bs.xh_set(10);
+        bs.xh_set(20);
+        bs.xh_set(30);
+        assert_eq!(bs.xh_count(), 3);
+        bs.xh_clear(20);
+        assert_eq!(bs.xh_count(), 2);
+        assert!(!bs.xh_test(20));
+    }
+
+    #[test]
+    fn xh189_bitset_and_or_xor() {
+        let mut a = super::Xh189BitSet::xh_new(128);
+        let mut b = super::Xh189BitSet::xh_new(128);
+        a.xh_set(1);
+        a.xh_set(2);
+        b.xh_set(2);
+        b.xh_set(3);
+        let and_r = a.xh_and(&b);
+        assert!(and_r.xh_test(2));
+        assert!(!and_r.xh_test(1));
+        let or_r = a.xh_or(&b);
+        assert!(or_r.xh_test(1));
+        assert!(or_r.xh_test(2));
+        assert!(or_r.xh_test(3));
+        let xor_r = a.xh_xor(&b);
+        assert!(xor_r.xh_test(1));
+        assert!(!xor_r.xh_test(2));
+        assert!(xor_r.xh_test(3));
+    }
+
+    #[test]
+    fn xh189_bitset_iter_ones() {
+        let mut bs = super::Xh189BitSet::xh_new(256);
+        bs.xh_set(5);
+        bs.xh_set(100);
+        bs.xh_set(200);
+        let ones = bs.xh_iter_ones();
+        assert_eq!(ones, vec![5, 100, 200]);
+    }
+
+    #[test]
+    fn xh189_bitset_first_last() {
+        let mut bs = super::Xh189BitSet::xh_new(256);
+        assert_eq!(bs.xh_first_set(), None);
+        assert_eq!(bs.xh_last_set(), None);
+        bs.xh_set(50);
+        bs.xh_set(150);
+        assert_eq!(bs.xh_first_set(), Some(50));
+        assert_eq!(bs.xh_last_set(), Some(150));
+    }
+
+    #[test]
+    fn xh189_bitset_empty() {
+        let bs = super::Xh189BitSet::xh_new(64);
+        assert_eq!(bs.xh_count(), 0);
+        assert!(!bs.xh_test(0));
+        assert_eq!(bs.xh_first_set(), None);
+        assert_eq!(bs.xh_last_set(), None);
+        assert!(bs.xh_iter_ones().is_empty());
     }
 
 }
