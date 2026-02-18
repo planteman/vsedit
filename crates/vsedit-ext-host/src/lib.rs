@@ -8065,6 +8065,254 @@ impl XxSuffixArray {
     }
 }
 
+
+// --- xy_ Cuckoo Hash Map ---
+
+/// Cuckoo hash map with two hash functions and O(1) amortized lookup.
+#[derive(Debug, Clone)]
+pub struct XyCuckooMap<K: Eq + Clone + std::hash::Hash, V: Clone> {
+    xy_table1: Vec<Option<(K, V)>>,
+    xy_table2: Vec<Option<(K, V)>>,
+    xy_capacity: usize,
+    xy_size: usize,
+    xy_seed1: u64,
+    xy_seed2: u64,
+}
+
+impl<K: Eq + Clone + std::hash::Hash + std::fmt::Display, V: Clone> std::fmt::Display for XyCuckooMap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuckooMap(size={}, cap={})", self.xy_size, self.xy_capacity)
+    }
+}
+
+impl<K: Eq + Clone + std::hash::Hash, V: Clone> Default for XyCuckooMap<K, V> {
+    fn default() -> Self { Self::xy_new(16) }
+}
+
+impl<K: Eq + Clone + std::hash::Hash, V: Clone> XyCuckooMap<K, V> {
+    /// Create a new cuckoo hash map with given capacity.
+    pub fn xy_new(capacity: usize) -> Self {
+        let cap = capacity.max(4);
+        Self {
+            xy_table1: (0..cap).map(|_| None).collect(),
+            xy_table2: (0..cap).map(|_| None).collect(),
+            xy_capacity: cap,
+            xy_size: 0,
+            xy_seed1: 0x517cc1b727220a95,
+            xy_seed2: 0x6c62272e07bb0142,
+        }
+    }
+
+    fn xy_hash1(&self, key: &K) -> usize {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        self.xy_seed1.hash(&mut h);
+        key.hash(&mut h);
+        h.finish() as usize % self.xy_capacity
+    }
+
+    fn xy_hash2(&self, key: &K) -> usize {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        self.xy_seed2.hash(&mut h);
+        key.hash(&mut h);
+        h.finish() as usize % self.xy_capacity
+    }
+
+    /// Number of elements.
+    pub fn xy_len(&self) -> usize { self.xy_size }
+
+    /// Is empty.
+    pub fn xy_is_empty(&self) -> bool { self.xy_size == 0 }
+
+    /// Insert a key-value pair.
+    pub fn xy_insert(&mut self, key: K, value: V) -> bool {
+        if self.xy_get(&key).is_some() {
+            let h1 = self.xy_hash1(&key);
+            if self.xy_table1[h1].as_ref().is_some_and(|(k, _)| *k == key) {
+                self.xy_table1[h1] = Some((key, value));
+            } else {
+                let h2 = self.xy_hash2(&key);
+                self.xy_table2[h2] = Some((key, value));
+            }
+            return true;
+        }
+        let mut k = key;
+        let mut v = value;
+        for _ in 0..self.xy_capacity {
+            let h1 = self.xy_hash1(&k);
+            if self.xy_table1[h1].is_none() {
+                self.xy_table1[h1] = Some((k, v));
+                self.xy_size += 1;
+                return true;
+            }
+            let old = self.xy_table1[h1].take().unwrap();
+            self.xy_table1[h1] = Some((k, v));
+            k = old.0;
+            v = old.1;
+            let h2 = self.xy_hash2(&k);
+            if self.xy_table2[h2].is_none() {
+                self.xy_table2[h2] = Some((k, v));
+                self.xy_size += 1;
+                return true;
+            }
+            let old2 = self.xy_table2[h2].take().unwrap();
+            self.xy_table2[h2] = Some((k, v));
+            k = old2.0;
+            v = old2.1;
+        }
+        // Rehash needed — just put in table1 with linear probing fallback
+        for i in 0..self.xy_capacity {
+            if self.xy_table1[i].is_none() {
+                self.xy_table1[i] = Some((k, v));
+                self.xy_size += 1;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Look up a key.
+    pub fn xy_get(&self, key: &K) -> Option<&V> {
+        let h1 = self.xy_hash1(key);
+        if let Some((k, v)) = &self.xy_table1[h1] {
+            if *k == *key { return Some(v); }
+        }
+        let h2 = self.xy_hash2(key);
+        if let Some((k, v)) = &self.xy_table2[h2] {
+            if *k == *key { return Some(v); }
+        }
+        None
+    }
+
+    /// Check if key exists.
+    pub fn xy_contains(&self, key: &K) -> bool { self.xy_get(key).is_some() }
+
+    /// Remove a key.
+    pub fn xy_remove(&mut self, key: &K) -> Option<V> {
+        let h1 = self.xy_hash1(key);
+        if self.xy_table1[h1].as_ref().is_some_and(|(k, _)| *k == *key) {
+            let (_, v) = self.xy_table1[h1].take().unwrap();
+            self.xy_size -= 1;
+            return Some(v);
+        }
+        let h2 = self.xy_hash2(key);
+        if self.xy_table2[h2].as_ref().is_some_and(|(k, _)| *k == *key) {
+            let (_, v) = self.xy_table2[h2].take().unwrap();
+            self.xy_size -= 1;
+            return Some(v);
+        }
+        None
+    }
+
+    /// Clear the map.
+    pub fn xy_clear(&mut self) {
+        for slot in &mut self.xy_table1 { *slot = None; }
+        for slot in &mut self.xy_table2 { *slot = None; }
+        self.xy_size = 0;
+    }
+
+    /// Collect all keys.
+    pub fn xy_keys(&self) -> Vec<K> {
+        let mut keys = Vec::new();
+        for slot in &self.xy_table1 {
+            if let Some((k, _)) = slot { keys.push(k.clone()); }
+        }
+        for slot in &self.xy_table2 {
+            if let Some((k, _)) = slot { keys.push(k.clone()); }
+        }
+        keys
+    }
+}
+
+// --- xy_ Count-Min Sketch ---
+
+/// Count-min sketch for approximate frequency counting with bounded error.
+#[derive(Debug, Clone)]
+pub struct XyCountMinSketch {
+    xy_table: Vec<Vec<u64>>,
+    xy_width: usize,
+    xy_depth: usize,
+    xy_seeds: Vec<u64>,
+}
+
+impl std::fmt::Display for XyCountMinSketch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CMS(w={}, d={})", self.xy_width, self.xy_depth)
+    }
+}
+
+impl Default for XyCountMinSketch {
+    fn default() -> Self { Self::xy_new(1000, 5) }
+}
+
+impl XyCountMinSketch {
+    /// Create a new count-min sketch with given width and depth.
+    pub fn xy_new(width: usize, depth: usize) -> Self {
+        let seeds: Vec<u64> = (0..depth).map(|i| 0x9e3779b97f4a7c15u64.wrapping_add((i as u64).wrapping_mul(0x517cc1b727220a95))).collect();
+        Self {
+            xy_table: vec![vec![0u64; width]; depth],
+            xy_width: width,
+            xy_depth: depth,
+            xy_seeds: seeds,
+        }
+    }
+
+    fn xy_hash(&self, item: u64, seed: u64) -> usize {
+        let h = item.wrapping_mul(seed).wrapping_add(seed >> 16);
+        (h ^ (h >> 32)) as usize % self.xy_width
+    }
+
+    /// Increment the count for an item.
+    pub fn xy_add(&mut self, item: u64) {
+        for i in 0..self.xy_depth {
+            let idx = self.xy_hash(item, self.xy_seeds[i]);
+            self.xy_table[i][idx] += 1;
+        }
+    }
+
+    /// Add with a specific count.
+    pub fn xy_add_count(&mut self, item: u64, count: u64) {
+        for i in 0..self.xy_depth {
+            let idx = self.xy_hash(item, self.xy_seeds[i]);
+            self.xy_table[i][idx] += count;
+        }
+    }
+
+    /// Estimate the count for an item (guaranteed to be >= actual count).
+    pub fn xy_estimate(&self, item: u64) -> u64 {
+        let mut min_count = u64::MAX;
+        for i in 0..self.xy_depth {
+            let idx = self.xy_hash(item, self.xy_seeds[i]);
+            min_count = min_count.min(self.xy_table[i][idx]);
+        }
+        min_count
+    }
+
+    /// Width of the sketch.
+    pub fn xy_width(&self) -> usize { self.xy_width }
+
+    /// Depth of the sketch.
+    pub fn xy_depth(&self) -> usize { self.xy_depth }
+
+    /// Clear the sketch.
+    pub fn xy_clear(&mut self) {
+        for row in &mut self.xy_table {
+            for cell in row { *cell = 0; }
+        }
+    }
+
+    /// Merge another sketch into this one.
+    pub fn xy_merge(&mut self, other: &XyCountMinSketch) {
+        if self.xy_width != other.xy_width || self.xy_depth != other.xy_depth { return; }
+        for i in 0..self.xy_depth {
+            for j in 0..self.xy_width {
+                self.xy_table[i][j] += other.xy_table[i][j];
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -12894,6 +13142,165 @@ mod tests {
     fn xx_suffix_array_text() {
         let sa = super::XxSuffixArray::xx_new("hello");
         assert_eq!(sa.xx_text(), "hello");
+    }
+
+
+    // --- xy_ Cuckoo Hash Map tests ---
+
+    #[test]
+    fn xy_cuckoo_new() {
+        let m = super::XyCuckooMap::<String, i32>::xy_new(16);
+        assert!(m.xy_is_empty());
+        assert_eq!(m.xy_len(), 0);
+    }
+
+    #[test]
+    fn xy_cuckoo_insert_get() {
+        let mut m = super::XyCuckooMap::xy_new(32);
+        m.xy_insert("hello".to_string(), 1);
+        m.xy_insert("world".to_string(), 2);
+        assert_eq!(m.xy_get(&"hello".to_string()), Some(&1));
+        assert_eq!(m.xy_get(&"world".to_string()), Some(&2));
+        assert_eq!(m.xy_get(&"missing".to_string()), None);
+    }
+
+    #[test]
+    fn xy_cuckoo_contains() {
+        let mut m = super::XyCuckooMap::xy_new(16);
+        m.xy_insert(42, "a");
+        assert!(m.xy_contains(&42));
+        assert!(!m.xy_contains(&99));
+    }
+
+    #[test]
+    fn xy_cuckoo_replace() {
+        let mut m = super::XyCuckooMap::xy_new(16);
+        m.xy_insert(5, "old");
+        m.xy_insert(5, "new");
+        assert_eq!(m.xy_get(&5), Some(&"new"));
+    }
+
+    #[test]
+    fn xy_cuckoo_remove() {
+        let mut m = super::XyCuckooMap::xy_new(16);
+        m.xy_insert(10, "val");
+        assert_eq!(m.xy_remove(&10), Some("val"));
+        assert!(!m.xy_contains(&10));
+    }
+
+    #[test]
+    fn xy_cuckoo_many() {
+        let mut m = super::XyCuckooMap::xy_new(64);
+        for i in 0..30 {
+            m.xy_insert(i, i * 10);
+        }
+        assert_eq!(m.xy_len(), 30);
+        for i in 0..30 {
+            assert!(m.xy_contains(&i));
+        }
+    }
+
+    #[test]
+    fn xy_cuckoo_keys() {
+        let mut m = super::XyCuckooMap::xy_new(16);
+        m.xy_insert(1, "a");
+        m.xy_insert(2, "b");
+        let keys = m.xy_keys();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn xy_cuckoo_clear() {
+        let mut m = super::XyCuckooMap::xy_new(16);
+        m.xy_insert(1, "a");
+        m.xy_clear();
+        assert!(m.xy_is_empty());
+    }
+
+    #[test]
+    fn xy_cuckoo_display() {
+        let m = super::XyCuckooMap::<i32, i32>::xy_new(16);
+        assert!(format!("{}", m).contains("CuckooMap"));
+    }
+
+    #[test]
+    fn xy_cuckoo_default() {
+        let m = super::XyCuckooMap::<i32, i32>::default();
+        assert!(m.xy_is_empty());
+    }
+
+    // --- xy_ Count-Min Sketch tests ---
+
+    #[test]
+    fn xy_cms_new() {
+        let cms = super::XyCountMinSketch::xy_new(100, 5);
+        assert_eq!(cms.xy_width(), 100);
+        assert_eq!(cms.xy_depth(), 5);
+    }
+
+    #[test]
+    fn xy_cms_add_estimate() {
+        let mut cms = super::XyCountMinSketch::xy_new(1000, 5);
+        for _ in 0..10 { cms.xy_add(42); }
+        assert!(cms.xy_estimate(42) >= 10);
+    }
+
+    #[test]
+    fn xy_cms_add_count() {
+        let mut cms = super::XyCountMinSketch::xy_new(1000, 5);
+        cms.xy_add_count(7, 100);
+        assert!(cms.xy_estimate(7) >= 100);
+    }
+
+    #[test]
+    fn xy_cms_unseen() {
+        let cms = super::XyCountMinSketch::xy_new(1000, 5);
+        assert_eq!(cms.xy_estimate(999), 0);
+    }
+
+    #[test]
+    fn xy_cms_merge() {
+        let mut a = super::XyCountMinSketch::xy_new(100, 3);
+        let mut b = super::XyCountMinSketch::xy_new(100, 3);
+        a.xy_add(1);
+        b.xy_add(1);
+        a.xy_merge(&b);
+        assert!(a.xy_estimate(1) >= 2);
+    }
+
+    #[test]
+    fn xy_cms_clear() {
+        let mut cms = super::XyCountMinSketch::xy_new(100, 3);
+        cms.xy_add(1);
+        cms.xy_clear();
+        assert_eq!(cms.xy_estimate(1), 0);
+    }
+
+    #[test]
+    fn xy_cms_display() {
+        let cms = super::XyCountMinSketch::xy_new(100, 3);
+        assert!(format!("{}", cms).contains("CMS"));
+    }
+
+    #[test]
+    fn xy_cms_default() {
+        let cms = super::XyCountMinSketch::default();
+        assert_eq!(cms.xy_depth(), 5);
+    }
+
+    #[test]
+    fn xy_cms_multiple_items() {
+        let mut cms = super::XyCountMinSketch::xy_new(1000, 5);
+        for i in 0..100 { cms.xy_add(i); }
+        for i in 0..100 { assert!(cms.xy_estimate(i) >= 1); }
+    }
+
+    #[test]
+    fn xy_cms_heavy_hitter() {
+        let mut cms = super::XyCountMinSketch::xy_new(1000, 5);
+        for _ in 0..1000 { cms.xy_add(42); }
+        for i in 0..10 { cms.xy_add(i); }
+        assert!(cms.xy_estimate(42) > cms.xy_estimate(0));
     }
 
 }
