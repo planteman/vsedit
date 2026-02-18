@@ -18027,6 +18027,242 @@ impl ZwCustomDocument {
     }
 }
 
+
+// --- zx_ tree view and data provider types ---
+
+/// Collapsible state for tree items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZxTreeCollapsible {
+    None,
+    Collapsed,
+    Expanded,
+}
+
+/// Selection mode for tree views.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZxTreeSelectionMode {
+    Single,
+    Multiple,
+}
+
+/// Context value for when-clause evaluation on tree items.
+#[derive(Debug, Clone)]
+pub struct ZxTreeContext {
+    values: Vec<(String, String)>,
+}
+
+impl ZxTreeContext {
+    pub fn new() -> Self {
+        Self { values: Vec::new() }
+    }
+
+    pub fn set(&mut self, key: &str, value: &str) {
+        if let Some(entry) = self.values.iter_mut().find(|(k, _)| k == key) {
+            entry.1 = value.to_string();
+        } else {
+            self.values.push((key.to_string(), value.to_string()));
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.values.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    pub fn has(&self, key: &str) -> bool {
+        self.values.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn to_string_value(&self) -> String {
+        self.values.iter().map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(";")
+    }
+}
+
+/// A tree item with label, icon, and children references.
+#[derive(Debug, Clone)]
+pub struct ZxTreeItem {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub tooltip: Option<String>,
+    pub icon_id: Option<String>,
+    pub collapsible: ZxTreeCollapsible,
+    pub context: ZxTreeContext,
+    pub resource_uri: Option<String>,
+    pub command_id: Option<String>,
+    pub children_ids: Vec<String>,
+}
+
+impl ZxTreeItem {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            description: None,
+            tooltip: None,
+            icon_id: None,
+            collapsible: ZxTreeCollapsible::None,
+            context: ZxTreeContext::new(),
+            resource_uri: None,
+            command_id: None,
+            children_ids: Vec::new(),
+        }
+    }
+
+    pub fn with_children(mut self, collapsible: ZxTreeCollapsible) -> Self {
+        self.collapsible = collapsible;
+        self
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = Some(desc.to_string());
+        self
+    }
+
+    pub fn with_tooltip(mut self, tip: &str) -> Self {
+        self.tooltip = Some(tip.to_string());
+        self
+    }
+
+    pub fn with_icon(mut self, icon: &str) -> Self {
+        self.icon_id = Some(icon.to_string());
+        self
+    }
+
+    pub fn with_command(mut self, cmd: &str) -> Self {
+        self.command_id = Some(cmd.to_string());
+        self
+    }
+
+    pub fn with_uri(mut self, uri: &str) -> Self {
+        self.resource_uri = Some(uri.to_string());
+        self
+    }
+
+    pub fn add_child(&mut self, child_id: &str) {
+        self.children_ids.push(child_id.to_string());
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.collapsible == ZxTreeCollapsible::None
+    }
+
+    pub fn has_children(&self) -> bool {
+        !self.children_ids.is_empty()
+    }
+}
+
+/// Options for a tree view.
+#[derive(Debug, Clone)]
+pub struct ZxTreeViewOptions {
+    pub show_collapse_all: bool,
+    pub can_select_many: bool,
+    pub drag_and_drop: bool,
+    pub manage_checkboxes: bool,
+}
+
+impl ZxTreeViewOptions {
+    pub fn new() -> Self {
+        Self {
+            show_collapse_all: false,
+            can_select_many: false,
+            drag_and_drop: false,
+            manage_checkboxes: false,
+        }
+    }
+}
+
+/// A tree view that displays a hierarchical list.
+#[derive(Debug, Clone)]
+pub struct ZxTreeView {
+    pub view_id: String,
+    pub title: String,
+    pub options: ZxTreeViewOptions,
+    items: Vec<ZxTreeItem>,
+    root_ids: Vec<String>,
+    selection: Vec<String>,
+    pub is_visible: bool,
+    pub message: Option<String>,
+    pub badge_count: Option<u32>,
+}
+
+impl ZxTreeView {
+    pub fn new(view_id: &str, title: &str, options: ZxTreeViewOptions) -> Self {
+        Self {
+            view_id: view_id.to_string(),
+            title: title.to_string(),
+            options,
+            items: Vec::new(),
+            root_ids: Vec::new(),
+            selection: Vec::new(),
+            is_visible: true,
+            message: None,
+            badge_count: None,
+        }
+    }
+
+    pub fn add_root(&mut self, item: ZxTreeItem) {
+        self.root_ids.push(item.id.clone());
+        self.items.push(item);
+    }
+
+    pub fn add_child_item(&mut self, parent_id: &str, item: ZxTreeItem) {
+        let child_id = item.id.clone();
+        self.items.push(item);
+        if let Some(parent) = self.items.iter_mut().find(|i| i.id == parent_id) {
+            parent.add_child(&child_id);
+        }
+    }
+
+    pub fn get_item(&self, id: &str) -> Option<&ZxTreeItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn root_items(&self) -> Vec<&ZxTreeItem> {
+        self.root_ids.iter().filter_map(|id| self.get_item(id)).collect()
+    }
+
+    pub fn children_of(&self, parent_id: &str) -> Vec<&ZxTreeItem> {
+        if let Some(parent) = self.get_item(parent_id) {
+            parent.children_ids.iter().filter_map(|id| self.get_item(id)).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn select(&mut self, id: &str) {
+        if !self.options.can_select_many {
+            self.selection.clear();
+        }
+        if !self.selection.contains(&id.to_string()) {
+            self.selection.push(id.to_string());
+        }
+    }
+
+    pub fn deselect(&mut self, id: &str) {
+        self.selection.retain(|s| s != id);
+    }
+
+    pub fn selection(&self) -> &[String] {
+        &self.selection
+    }
+
+    pub fn set_message(&mut self, msg: &str) {
+        self.message = Some(msg.to_string());
+    }
+
+    pub fn set_badge(&mut self, count: u32) {
+        self.badge_count = Some(count);
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn reveal(&mut self, _id: &str) {
+        self.is_visible = true;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -29588,6 +29824,108 @@ mod tests {
         let undone = doc.undo().unwrap();
         assert_eq!(undone.label, "b");
         assert_eq!(doc.edit_count(), 1);
+    }
+
+
+    // --- zx_ tree view tests ---
+
+    #[test]
+    fn test_zx_tree_context() {
+        let mut ctx = ZxTreeContext::new();
+        ctx.set("type", "folder");
+        assert_eq!(ctx.get("type"), Some("folder"));
+        assert!(ctx.has("type"));
+        assert!(!ctx.has("other"));
+        assert_eq!(ctx.to_string_value(), "type=folder");
+    }
+
+    #[test]
+    fn test_zx_tree_item() {
+        let item = ZxTreeItem::new("src", "Source")
+            .with_children(ZxTreeCollapsible::Collapsed)
+            .with_description("2 files")
+            .with_tooltip("Source folder")
+            .with_icon("folder")
+            .with_command("open")
+            .with_uri("file:///src");
+        assert_eq!(item.label, "Source");
+        assert!(!item.is_leaf());
+        assert_eq!(item.description.as_deref(), Some("2 files"));
+        assert_eq!(item.icon_id.as_deref(), Some("folder"));
+    }
+
+    #[test]
+    fn test_zx_tree_item_children() {
+        let mut item = ZxTreeItem::new("root", "Root")
+            .with_children(ZxTreeCollapsible::Expanded);
+        item.add_child("child1");
+        item.add_child("child2");
+        assert!(item.has_children());
+        assert_eq!(item.children_ids.len(), 2);
+    }
+
+    #[test]
+    fn test_zx_tree_item_leaf() {
+        let item = ZxTreeItem::new("file", "main.rs");
+        assert!(item.is_leaf());
+        assert!(!item.has_children());
+    }
+
+    #[test]
+    fn test_zx_tree_view_basic() {
+        let mut tv = ZxTreeView::new("explorer", "Explorer", ZxTreeViewOptions::new());
+        let root = ZxTreeItem::new("r", "Root").with_children(ZxTreeCollapsible::Expanded);
+        tv.add_root(root);
+        assert_eq!(tv.root_items().len(), 1);
+        assert_eq!(tv.item_count(), 1);
+    }
+
+    #[test]
+    fn test_zx_tree_view_hierarchy() {
+        let mut tv = ZxTreeView::new("t", "T", ZxTreeViewOptions::new());
+        let root = ZxTreeItem::new("r", "Root").with_children(ZxTreeCollapsible::Expanded);
+        tv.add_root(root);
+        let child = ZxTreeItem::new("c1", "Child 1");
+        tv.add_child_item("r", child);
+        assert_eq!(tv.children_of("r").len(), 1);
+        assert_eq!(tv.children_of("r")[0].label, "Child 1");
+    }
+
+    #[test]
+    fn test_zx_tree_view_selection_single() {
+        let mut tv = ZxTreeView::new("t", "T", ZxTreeViewOptions::new());
+        let item1 = ZxTreeItem::new("a", "A");
+        let item2 = ZxTreeItem::new("b", "B");
+        tv.add_root(item1);
+        tv.add_root(item2);
+        tv.select("a");
+        assert_eq!(tv.selection(), &["a"]);
+        tv.select("b");
+        // Single select replaces
+        assert_eq!(tv.selection(), &["b"]);
+    }
+
+    #[test]
+    fn test_zx_tree_view_selection_multiple() {
+        let mut opts = ZxTreeViewOptions::new();
+        opts.can_select_many = true;
+        let mut tv = ZxTreeView::new("t", "T", opts);
+        tv.add_root(ZxTreeItem::new("a", "A"));
+        tv.add_root(ZxTreeItem::new("b", "B"));
+        tv.select("a");
+        tv.select("b");
+        assert_eq!(tv.selection().len(), 2);
+        tv.deselect("a");
+        assert_eq!(tv.selection(), &["b"]);
+    }
+
+    #[test]
+    fn test_zx_tree_view_message_badge() {
+        let mut tv = ZxTreeView::new("t", "T", ZxTreeViewOptions::new());
+        tv.set_message("Loading...");
+        assert_eq!(tv.message.as_deref(), Some("Loading..."));
+        tv.set_badge(5);
+        assert_eq!(tv.badge_count, Some(5));
     }
 
 }
