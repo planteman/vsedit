@@ -26948,6 +26948,80 @@ impl AzrSurroundAction {
     pub fn new_cursor_offset(&self) -> u32 { self.open.len() as u32 }
 }
 
+
+// --- azs_ auto-indent and on-enter rules ---
+
+/// Indentation action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzsIndentAction { None, Indent, IndentOutdent, Outdent }
+
+/// An on-enter rule.
+#[derive(Debug, Clone)]
+pub struct AzsOnEnterRule {
+    pub before_text_pattern: String,
+    pub after_text_pattern: Option<String>,
+    pub action: AzsIndentAction,
+    pub append_text: Option<String>,
+    pub remove_text: Option<u32>,
+}
+
+impl AzsOnEnterRule {
+    pub fn new(before: &str, action: AzsIndentAction) -> Self {
+        Self { before_text_pattern: before.to_string(), after_text_pattern: None, action, append_text: None, remove_text: None }
+    }
+    pub fn with_after(mut self, after: &str) -> Self { self.after_text_pattern = Some(after.to_string()); self }
+    pub fn with_append(mut self, text: &str) -> Self { self.append_text = Some(text.to_string()); self }
+    pub fn with_remove(mut self, n: u32) -> Self { self.remove_text = Some(n); self }
+    pub fn matches_before(&self, text: &str) -> bool { text.contains(&self.before_text_pattern) }
+    pub fn matches_after(&self, text: &str) -> bool {
+        self.after_text_pattern.as_ref().map_or(true, |p| text.contains(p))
+    }
+}
+
+/// Auto-indent configuration.
+#[derive(Debug)]
+pub struct AzsAutoIndent {
+    pub rules: Vec<AzsOnEnterRule>,
+    pub increase_pattern: Option<String>,
+    pub decrease_pattern: Option<String>,
+}
+
+impl AzsAutoIndent {
+    pub fn new() -> Self { Self { rules: Vec::new(), increase_pattern: None, decrease_pattern: None } }
+    pub fn add_rule(&mut self, r: AzsOnEnterRule) { self.rules.push(r); }
+    pub fn set_increase(&mut self, p: &str) { self.increase_pattern = Some(p.to_string()); }
+    pub fn set_decrease(&mut self, p: &str) { self.decrease_pattern = Some(p.to_string()); }
+    pub fn should_increase(&self, line: &str) -> bool {
+        self.increase_pattern.as_ref().map_or(false, |p| line.contains(p))
+    }
+    pub fn should_decrease(&self, line: &str) -> bool {
+        self.decrease_pattern.as_ref().map_or(false, |p| line.contains(p))
+    }
+    pub fn find_rule(&self, before: &str, after: &str) -> Option<&AzsOnEnterRule> {
+        self.rules.iter().find(|r| r.matches_before(before) && r.matches_after(after))
+    }
+    pub fn rule_count(&self) -> usize { self.rules.len() }
+}
+
+/// Indent computation result.
+#[derive(Debug, Clone)]
+pub struct AzsIndentResult {
+    pub action: AzsIndentAction,
+    pub indent_level: u32,
+    pub append_text: Option<String>,
+}
+
+impl AzsIndentResult {
+    pub fn keep(level: u32) -> Self { Self { action: AzsIndentAction::None, indent_level: level, append_text: None } }
+    pub fn increase(level: u32) -> Self { Self { action: AzsIndentAction::Indent, indent_level: level + 1, append_text: None } }
+    pub fn decrease(level: u32) -> Self { Self { action: AzsIndentAction::Outdent, indent_level: level.saturating_sub(1), append_text: None } }
+    pub fn with_text(mut self, t: &str) -> Self { self.append_text = Some(t.to_string()); self }
+    pub fn indent_string(&self, tab_size: u32, use_spaces: bool) -> String {
+        if use_spaces { " ".repeat((self.indent_level * tab_size) as usize) }
+        else { "	".repeat(self.indent_level as usize) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44156,6 +44230,69 @@ goodbye";
         let p = AzrAutoClosePair::new("'", "'").not_in_comment();
         assert!(!p.should_close_in("comment"));
         assert!(p.should_close_in("code"));
+    }
+
+
+    #[test]
+    fn test_azs_on_enter_rule() {
+        let rule = AzsOnEnterRule::new("{", AzsIndentAction::Indent);
+        assert!(rule.matches_before("fn main() {"));
+        assert!(!rule.matches_before("fn main()"));
+        assert!(rule.matches_after("anything"));
+    }
+
+    #[test]
+    fn test_azs_rule_with_after() {
+        let rule = AzsOnEnterRule::new("{", AzsIndentAction::IndentOutdent).with_after("}");
+        assert!(rule.matches_before("if x {"));
+        assert!(rule.matches_after("}"));
+        assert!(!rule.matches_after("x"));
+    }
+
+    #[test]
+    fn test_azs_auto_indent() {
+        let mut ai = AzsAutoIndent::new();
+        ai.set_increase("{");
+        ai.set_decrease("}");
+        assert!(ai.should_increase("fn main() {"));
+        assert!(ai.should_decrease("  }"));
+        assert!(!ai.should_increase("let x = 1;"));
+    }
+
+    #[test]
+    fn test_azs_find_rule() {
+        let mut ai = AzsAutoIndent::new();
+        ai.add_rule(AzsOnEnterRule::new("{", AzsIndentAction::Indent));
+        ai.add_rule(AzsOnEnterRule::new("//", AzsIndentAction::None).with_append("// "));
+        assert!(ai.find_rule("func {", "").is_some());
+        assert!(ai.find_rule("// comment", "").is_some());
+        assert!(ai.find_rule("plain", "").is_none());
+    }
+
+    #[test]
+    fn test_azs_indent_result_keep() {
+        let r = AzsIndentResult::keep(2);
+        assert_eq!(r.indent_level, 2);
+        assert_eq!(r.indent_string(4, true), "        ");
+    }
+
+    #[test]
+    fn test_azs_indent_result_increase() {
+        let r = AzsIndentResult::increase(1);
+        assert_eq!(r.indent_level, 2);
+        assert_eq!(r.indent_string(2, true), "    ");
+    }
+
+    #[test]
+    fn test_azs_indent_result_decrease() {
+        let r = AzsIndentResult::decrease(2);
+        assert_eq!(r.indent_level, 1);
+    }
+
+    #[test]
+    fn test_azs_indent_tabs() {
+        let r = AzsIndentResult::keep(3);
+        assert_eq!(r.indent_string(4, false), "			");
     }
 
 }
