@@ -14054,6 +14054,170 @@ impl std::fmt::Display for YzCancellationToken {
     }
 }
 
+
+// --- za_ URI parser and path utilities ---
+
+/// A parsed URI with scheme, authority, path, query, and fragment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZaUri {
+    pub scheme: String,
+    pub authority: String,
+    pub path: String,
+    pub query: String,
+    pub fragment: String,
+}
+
+impl ZaUri {
+    pub fn parse(uri: &str) -> Option<Self> {
+        let mut rest = uri;
+        let scheme;
+        if let Some(pos) = rest.find("://") {
+            scheme = rest[..pos].to_string();
+            rest = &rest[pos + 3..];
+        } else if let Some(pos) = rest.find(':') {
+            scheme = rest[..pos].to_string();
+            rest = &rest[pos + 1..];
+        } else {
+            return None;
+        }
+
+        let fragment;
+        if let Some(pos) = rest.find('#') {
+            fragment = rest[pos + 1..].to_string();
+            rest = &rest[..pos];
+        } else {
+            fragment = String::new();
+        }
+
+        let query;
+        if let Some(pos) = rest.find('?') {
+            query = rest[pos + 1..].to_string();
+            rest = &rest[..pos];
+        } else {
+            query = String::new();
+        }
+
+        let authority;
+        let path;
+        if let Some(pos) = rest.find('/') {
+            authority = rest[..pos].to_string();
+            path = rest[pos..].to_string();
+        } else {
+            authority = rest.to_string();
+            path = String::new();
+        }
+
+        Some(Self { scheme, authority, path, query, fragment })
+    }
+
+    pub fn file(path: &str) -> Self {
+        Self { scheme: "file".to_string(), authority: String::new(), path: path.to_string(), query: String::new(), fragment: String::new() }
+    }
+
+    pub fn from_parts(scheme: &str, authority: &str, path: &str, query: &str, fragment: &str) -> Self {
+        Self { scheme: scheme.to_string(), authority: authority.to_string(), path: path.to_string(), query: query.to_string(), fragment: fragment.to_string() }
+    }
+
+    pub fn is_file(&self) -> bool { self.scheme == "file" }
+
+    pub fn is_untitled(&self) -> bool { self.scheme == "untitled" }
+
+    pub fn with_path(&self, path: &str) -> Self {
+        Self { path: path.to_string(), ..self.clone() }
+    }
+
+    pub fn with_scheme(&self, scheme: &str) -> Self {
+        Self { scheme: scheme.to_string(), ..self.clone() }
+    }
+
+    pub fn with_query(&self, query: &str) -> Self {
+        Self { query: query.to_string(), ..self.clone() }
+    }
+
+    pub fn with_fragment(&self, fragment: &str) -> Self {
+        Self { fragment: fragment.to_string(), ..self.clone() }
+    }
+
+    pub fn fs_path(&self) -> &str { &self.path }
+}
+
+impl std::fmt::Display for ZaUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}://{}{}", self.scheme, self.authority, self.path)?;
+        if !self.query.is_empty() { write!(f, "?{}", self.query)?; }
+        if !self.fragment.is_empty() { write!(f, "#{}", self.fragment)?; }
+        Ok(())
+    }
+}
+
+/// Path manipulation utilities matching VS Code's path module.
+pub struct ZaPath;
+
+impl ZaPath {
+    pub fn basename(path: &str) -> &str {
+        path.rsplit('/').next().unwrap_or(path)
+    }
+
+    pub fn dirname(path: &str) -> &str {
+        if let Some(pos) = path.rfind('/') {
+            if pos == 0 { "/" } else { &path[..pos] }
+        } else {
+            "."
+        }
+    }
+
+    pub fn extname(path: &str) -> &str {
+        let base = Self::basename(path);
+        if let Some(pos) = base.rfind('.') {
+            if pos > 0 { &base[pos..] } else { "" }
+        } else {
+            ""
+        }
+    }
+
+    pub fn join(a: &str, b: &str) -> String {
+        if b.starts_with('/') { return b.to_string(); }
+        let a = a.trim_end_matches('/');
+        format!("{}/{}", a, b)
+    }
+
+    pub fn normalize(path: &str) -> String {
+        let mut parts: Vec<&str> = Vec::new();
+        for part in path.split('/') {
+            match part {
+                "." | "" => {}
+                ".." => { parts.pop(); }
+                p => parts.push(p),
+            }
+        }
+        let result = parts.join("/");
+        if path.starts_with('/') { format!("/{}", result) } else { result }
+    }
+
+    pub fn is_absolute(path: &str) -> bool {
+        path.starts_with('/')
+    }
+
+    pub fn relative(from: &str, to: &str) -> String {
+        let from_parts: Vec<&str> = from.split('/').filter(|s| !s.is_empty()).collect();
+        let to_parts: Vec<&str> = to.split('/').filter(|s| !s.is_empty()).collect();
+        let mut common = 0;
+        for (a, b) in from_parts.iter().zip(to_parts.iter()) {
+            if a == b { common += 1; } else { break; }
+        }
+        let ups = from_parts.len() - common;
+        let mut result: Vec<&str> = Vec::new();
+        for _ in 0..ups { result.push(".."); }
+        for part in &to_parts[common..] { result.push(part); }
+        result.join("/")
+    }
+
+    pub fn has_extension(path: &str, ext: &str) -> bool {
+        let e = Self::extname(path);
+        e == ext || (ext.starts_with('.') && e == ext) || (!ext.starts_with('.') && e == format!(".{}", ext))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -22980,6 +23144,103 @@ mod tests {
     fn test_yz_cancel_default() {
         let t = YzCancellationToken::default();
         assert!(!t.is_cancelled());
+    }
+
+
+    // --- za_ tests ---
+
+    #[test]
+    fn test_za_uri_parse() {
+        let u = ZaUri::parse("https://example.com/path?q=1#frag").unwrap();
+        assert_eq!(u.scheme, "https");
+        assert_eq!(u.authority, "example.com");
+        assert_eq!(u.path, "/path");
+        assert_eq!(u.query, "q=1");
+        assert_eq!(u.fragment, "frag");
+    }
+
+    #[test]
+    fn test_za_uri_file() {
+        let u = ZaUri::file("/home/user/file.txt");
+        assert!(u.is_file());
+        assert_eq!(u.fs_path(), "/home/user/file.txt");
+    }
+
+    #[test]
+    fn test_za_uri_untitled() {
+        let u = ZaUri::from_parts("untitled", "", "/Untitled-1", "", "");
+        assert!(u.is_untitled());
+    }
+
+    #[test]
+    fn test_za_uri_with_path() {
+        let u = ZaUri::file("/old").with_path("/new");
+        assert_eq!(u.path, "/new");
+    }
+
+    #[test]
+    fn test_za_uri_display() {
+        let u = ZaUri::file("/test");
+        let s = format!("{}", u);
+        assert!(s.contains("file://"));
+    }
+
+    #[test]
+    fn test_za_uri_equality() {
+        let a = ZaUri::file("/a");
+        let b = ZaUri::file("/a");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_za_path_basename() {
+        assert_eq!(ZaPath::basename("/home/user/file.txt"), "file.txt");
+        assert_eq!(ZaPath::basename("file.txt"), "file.txt");
+    }
+
+    #[test]
+    fn test_za_path_dirname() {
+        assert_eq!(ZaPath::dirname("/home/user/file.txt"), "/home/user");
+        assert_eq!(ZaPath::dirname("/file.txt"), "/");
+    }
+
+    #[test]
+    fn test_za_path_extname() {
+        assert_eq!(ZaPath::extname("file.txt"), ".txt");
+        assert_eq!(ZaPath::extname("file"), "");
+        assert_eq!(ZaPath::extname(".gitignore"), "");
+    }
+
+    #[test]
+    fn test_za_path_join() {
+        assert_eq!(ZaPath::join("/home", "file.txt"), "/home/file.txt");
+        assert_eq!(ZaPath::join("/home/", "file.txt"), "/home/file.txt");
+        assert_eq!(ZaPath::join("/home", "/absolute"), "/absolute");
+    }
+
+    #[test]
+    fn test_za_path_normalize() {
+        assert_eq!(ZaPath::normalize("/home/user/../file"), "/home/file");
+        assert_eq!(ZaPath::normalize("/home/./file"), "/home/file");
+    }
+
+    #[test]
+    fn test_za_path_is_absolute() {
+        assert!(ZaPath::is_absolute("/home"));
+        assert!(!ZaPath::is_absolute("home"));
+    }
+
+    #[test]
+    fn test_za_path_relative() {
+        assert_eq!(ZaPath::relative("/a/b/c", "/a/b/d"), "../d");
+        assert_eq!(ZaPath::relative("/a/b", "/a/c/d"), "../c/d");
+    }
+
+    #[test]
+    fn test_za_path_has_extension() {
+        assert!(ZaPath::has_extension("file.rs", ".rs"));
+        assert!(ZaPath::has_extension("file.rs", "rs"));
+        assert!(!ZaPath::has_extension("file.txt", ".rs"));
     }
 
 }
