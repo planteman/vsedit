@@ -27177,6 +27177,89 @@ impl AzvSmoothScroll {
     pub fn snap(&mut self) { self.current_offset = self.target_line as f64; self.velocity = 0.0; }
 }
 
+
+// --- azw_ find widget and match navigation ---
+
+/// Find match in a document.
+#[derive(Debug, Clone)]
+pub struct AzwFindMatch {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+}
+
+impl AzwFindMatch {
+    pub fn new(line: u32, start: u32, end: u32) -> Self { Self { line, start_col: start, end_col: end } }
+    pub fn span(&self) -> u32 { self.end_col - self.start_col }
+}
+
+/// Find widget options.
+#[derive(Debug, Clone)]
+pub struct AzwFindOptions {
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub regex: bool,
+    pub in_selection: bool,
+    pub preserve_case: bool,
+}
+
+impl AzwFindOptions {
+    pub fn default_opts() -> Self {
+        Self { case_sensitive: false, whole_word: false, regex: false, in_selection: false, preserve_case: false }
+    }
+    pub fn toggle_case(&mut self) { self.case_sensitive = !self.case_sensitive; }
+    pub fn toggle_word(&mut self) { self.whole_word = !self.whole_word; }
+    pub fn toggle_regex(&mut self) { self.regex = !self.regex; }
+}
+
+/// Find widget state.
+#[derive(Debug)]
+pub struct AzwFindState {
+    pub search_term: String,
+    pub replace_term: String,
+    pub options: AzwFindOptions,
+    pub matches: Vec<AzwFindMatch>,
+    pub current_match: Option<usize>,
+    pub visible: bool,
+    pub replace_visible: bool,
+}
+
+impl AzwFindState {
+    pub fn new() -> Self {
+        Self { search_term: String::new(), replace_term: String::new(), options: AzwFindOptions::default_opts(), matches: Vec::new(), current_match: None, visible: false, replace_visible: false }
+    }
+    pub fn set_search(&mut self, term: &str) { self.search_term = term.to_string(); }
+    pub fn set_replace(&mut self, term: &str) { self.replace_term = term.to_string(); }
+    pub fn open(&mut self) { self.visible = true; }
+    pub fn close(&mut self) { self.visible = false; self.replace_visible = false; }
+    pub fn toggle_replace(&mut self) { self.replace_visible = !self.replace_visible; }
+    pub fn set_matches(&mut self, m: Vec<AzwFindMatch>) {
+        self.matches = m;
+        self.current_match = if self.matches.is_empty() { None } else { Some(0) };
+    }
+    pub fn match_count(&self) -> usize { self.matches.len() }
+    pub fn current_match_index(&self) -> Option<usize> { self.current_match }
+    pub fn next_match(&mut self) {
+        if let Some(idx) = self.current_match {
+            self.current_match = Some((idx + 1) % self.matches.len());
+        }
+    }
+    pub fn prev_match(&mut self) {
+        if let Some(idx) = self.current_match {
+            self.current_match = Some(if idx == 0 { self.matches.len() - 1 } else { idx - 1 });
+        }
+    }
+    pub fn current(&self) -> Option<&AzwFindMatch> {
+        self.current_match.and_then(|i| self.matches.get(i))
+    }
+    pub fn status_text(&self) -> String {
+        match self.current_match {
+            Some(i) => format!("{} of {}", i + 1, self.matches.len()),
+            None => "No results".to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44752,6 +44835,94 @@ goodbye";
         ss.snap();
         assert!(!ss.is_animating());
         assert!((ss.current_offset - 50.0).abs() < 0.01);
+    }
+
+
+    #[test]
+    fn test_azw_find_match() {
+        let m = AzwFindMatch::new(5, 10, 15);
+        assert_eq!(m.span(), 5);
+    }
+
+    #[test]
+    fn test_azw_find_options() {
+        let mut opts = AzwFindOptions::default_opts();
+        assert!(!opts.case_sensitive);
+        opts.toggle_case();
+        assert!(opts.case_sensitive);
+        opts.toggle_regex();
+        assert!(opts.regex);
+    }
+
+    #[test]
+    fn test_azw_find_state_lifecycle() {
+        let mut state = AzwFindState::new();
+        state.open();
+        assert!(state.visible);
+        state.set_search("hello");
+        state.set_matches(vec![
+            AzwFindMatch::new(1, 0, 5),
+            AzwFindMatch::new(3, 10, 15),
+            AzwFindMatch::new(7, 0, 5),
+        ]);
+        assert_eq!(state.match_count(), 3);
+        assert_eq!(state.current_match_index(), Some(0));
+        assert_eq!(state.status_text(), "1 of 3");
+    }
+
+    #[test]
+    fn test_azw_next_prev() {
+        let mut state = AzwFindState::new();
+        state.set_matches(vec![
+            AzwFindMatch::new(1, 0, 5),
+            AzwFindMatch::new(2, 0, 5),
+            AzwFindMatch::new(3, 0, 5),
+        ]);
+        state.next_match();
+        assert_eq!(state.current_match_index(), Some(1));
+        state.next_match();
+        assert_eq!(state.current_match_index(), Some(2));
+        state.next_match();
+        assert_eq!(state.current_match_index(), Some(0));
+        state.prev_match();
+        assert_eq!(state.current_match_index(), Some(2));
+    }
+
+    #[test]
+    fn test_azw_no_matches() {
+        let state = AzwFindState::new();
+        assert_eq!(state.match_count(), 0);
+        assert_eq!(state.status_text(), "No results");
+        assert!(state.current().is_none());
+    }
+
+    #[test]
+    fn test_azw_current_match() {
+        let mut state = AzwFindState::new();
+        state.set_matches(vec![AzwFindMatch::new(5, 3, 8)]);
+        let c = state.current().unwrap();
+        assert_eq!(c.line, 5);
+    }
+
+    #[test]
+    fn test_azw_replace_toggle() {
+        let mut state = AzwFindState::new();
+        state.open();
+        assert!(!state.replace_visible);
+        state.toggle_replace();
+        assert!(state.replace_visible);
+        state.set_replace("world");
+        assert_eq!(state.replace_term, "world");
+    }
+
+    #[test]
+    fn test_azw_close() {
+        let mut state = AzwFindState::new();
+        state.open();
+        state.toggle_replace();
+        state.close();
+        assert!(!state.visible);
+        assert!(!state.replace_visible);
     }
 
 }
