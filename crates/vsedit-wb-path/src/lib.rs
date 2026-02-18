@@ -14878,6 +14878,159 @@ impl std::fmt::Display for ZfDocumentSymbol {
     }
 }
 
+
+// --- zg_ decoration types and theme colors ---
+
+/// A color in RGBA format.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ZgColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: f32,
+}
+
+impl ZgColor {
+    pub fn new(r: u8, g: u8, b: u8) -> Self { Self { r, g, b, a: 1.0 } }
+    pub fn rgba(r: u8, g: u8, b: u8, a: f32) -> Self { Self { r, g, b, a } }
+    pub fn transparent() -> Self { Self { r: 0, g: 0, b: 0, a: 0.0 } }
+    pub fn white() -> Self { Self::new(255, 255, 255) }
+    pub fn black() -> Self { Self::new(0, 0, 0) }
+
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        let hex = hex.trim_start_matches('#');
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            Some(Self::new(r, g, b))
+        } else if hex.len() == 8 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+            Some(Self::rgba(r, g, b, a as f32 / 255.0))
+        } else {
+            None
+        }
+    }
+
+    pub fn to_hex(&self) -> String { format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b) }
+
+    pub fn luminance(&self) -> f32 {
+        0.299 * (self.r as f32 / 255.0) + 0.587 * (self.g as f32 / 255.0) + 0.114 * (self.b as f32 / 255.0)
+    }
+
+    pub fn is_light(&self) -> bool { self.luminance() > 0.5 }
+    pub fn is_dark(&self) -> bool { !self.is_light() }
+
+    pub fn with_alpha(&self, a: f32) -> Self { Self { a, ..*self } }
+
+    pub fn blend(&self, other: &ZgColor, t: f32) -> ZgColor {
+        let t = t.clamp(0.0, 1.0);
+        ZgColor {
+            r: (self.r as f32 * (1.0 - t) + other.r as f32 * t) as u8,
+            g: (self.g as f32 * (1.0 - t) + other.g as f32 * t) as u8,
+            b: (self.b as f32 * (1.0 - t) + other.b as f32 * t) as u8,
+            a: self.a * (1.0 - t) + other.a * t,
+        }
+    }
+}
+
+impl Default for ZgColor {
+    fn default() -> Self { Self::black() }
+}
+
+impl std::fmt::Display for ZgColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+/// Text decoration style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZgDecorationStyle {
+    None,
+    Underline,
+    Strikethrough,
+    Bold,
+    Italic,
+    Dim,
+    Reverse,
+}
+
+/// A text decoration applied to a range.
+#[derive(Debug, Clone)]
+pub struct ZgDecoration {
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub foreground: Option<ZgColor>,
+    pub background: Option<ZgColor>,
+    pub style: ZgDecorationStyle,
+    pub hover_message: Option<String>,
+    pub tag: Option<String>,
+}
+
+impl ZgDecoration {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_char: sc, end_line: el, end_char: ec,
+               foreground: None, background: None, style: ZgDecorationStyle::None, hover_message: None, tag: None }
+    }
+
+    pub fn with_fg(mut self, color: ZgColor) -> Self { self.foreground = Some(color); self }
+    pub fn with_bg(mut self, color: ZgColor) -> Self { self.background = Some(color); self }
+    pub fn with_style(mut self, style: ZgDecorationStyle) -> Self { self.style = style; self }
+    pub fn with_hover(mut self, msg: &str) -> Self { self.hover_message = Some(msg.to_string()); self }
+    pub fn with_tag(mut self, tag: &str) -> Self { self.tag = Some(tag.to_string()); self }
+
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+    pub fn affects_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+    pub fn has_foreground(&self) -> bool { self.foreground.is_some() }
+    pub fn has_background(&self) -> bool { self.background.is_some() }
+}
+
+impl std::fmt::Display for ZgDecoration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZgDecoration(L{}-L{}, {:?})", self.start_line + 1, self.end_line + 1, self.style)
+    }
+}
+
+/// A collection of decorations for a document.
+#[derive(Debug, Clone)]
+pub struct ZgDecorationSet {
+    pub decorations: Vec<ZgDecoration>,
+}
+
+impl ZgDecorationSet {
+    pub fn new() -> Self { Self { decorations: Vec::new() } }
+
+    pub fn add(&mut self, dec: ZgDecoration) { self.decorations.push(dec); }
+
+    pub fn for_line(&self, line: u32) -> Vec<&ZgDecoration> {
+        self.decorations.iter().filter(|d| d.affects_line(line)).collect()
+    }
+
+    pub fn by_tag(&self, tag: &str) -> Vec<&ZgDecoration> {
+        self.decorations.iter().filter(|d| d.tag.as_deref() == Some(tag)).collect()
+    }
+
+    pub fn len(&self) -> usize { self.decorations.len() }
+    pub fn is_empty(&self) -> bool { self.decorations.is_empty() }
+    pub fn clear(&mut self) { self.decorations.clear(); }
+}
+
+impl Default for ZgDecorationSet {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for ZgDecorationSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZgDecorationSet({} items)", self.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24466,6 +24619,141 @@ mod tests {
         let a = ZfMarkedString::Plain("hello".to_string());
         let b = ZfMarkedString::Plain("hello".to_string());
         assert_eq!(a, b);
+    }
+
+
+    // --- zg_ tests ---
+
+    #[test]
+    fn test_zg_color_new() {
+        let c = ZgColor::new(255, 128, 0);
+        assert_eq!(c.r, 255);
+        assert_eq!(c.g, 128);
+        assert_eq!(c.b, 0);
+        assert_eq!(c.a, 1.0);
+    }
+
+    #[test]
+    fn test_zg_color_from_hex() {
+        let c = ZgColor::from_hex("#ff8000").unwrap();
+        assert_eq!(c.r, 255);
+        assert_eq!(c.g, 128);
+        assert_eq!(c.b, 0);
+    }
+
+    #[test]
+    fn test_zg_color_to_hex() {
+        let c = ZgColor::new(255, 128, 0);
+        assert_eq!(c.to_hex(), "#ff8000");
+    }
+
+    #[test]
+    fn test_zg_color_luminance() {
+        assert!(ZgColor::white().is_light());
+        assert!(ZgColor::black().is_dark());
+    }
+
+    #[test]
+    fn test_zg_color_blend() {
+        let a = ZgColor::black();
+        let b = ZgColor::white();
+        let m = a.blend(&b, 0.5);
+        assert!(m.r > 100 && m.r < 200);
+    }
+
+    #[test]
+    fn test_zg_color_with_alpha() {
+        let c = ZgColor::white().with_alpha(0.5);
+        assert_eq!(c.a, 0.5);
+    }
+
+    #[test]
+    fn test_zg_color_transparent() {
+        let c = ZgColor::transparent();
+        assert_eq!(c.a, 0.0);
+    }
+
+    #[test]
+    fn test_zg_color_display() {
+        let c = ZgColor::new(0, 0, 0);
+        assert_eq!(format!("{}", c), "#000000");
+    }
+
+    #[test]
+    fn test_zg_color_default() {
+        let c = ZgColor::default();
+        assert_eq!(c, ZgColor::black());
+    }
+
+    #[test]
+    fn test_zg_decoration_new() {
+        let d = ZgDecoration::new(0, 0, 0, 5);
+        assert!(d.is_single_line());
+        assert!(d.affects_line(0));
+    }
+
+    #[test]
+    fn test_zg_decoration_builder() {
+        let d = ZgDecoration::new(1, 0, 3, 10)
+            .with_fg(ZgColor::new(255, 0, 0))
+            .with_bg(ZgColor::new(0, 0, 255))
+            .with_style(ZgDecorationStyle::Underline)
+            .with_hover("error here")
+            .with_tag("error");
+        assert!(d.has_foreground());
+        assert!(d.has_background());
+        assert_eq!(d.style, ZgDecorationStyle::Underline);
+    }
+
+    #[test]
+    fn test_zg_decoration_display() {
+        let d = ZgDecoration::new(0, 0, 0, 5);
+        let s = format!("{}", d);
+        assert!(s.contains("ZgDecoration"));
+    }
+
+    #[test]
+    fn test_zg_decoration_set_new() {
+        let ds = ZgDecorationSet::new();
+        assert!(ds.is_empty());
+    }
+
+    #[test]
+    fn test_zg_decoration_set_add() {
+        let mut ds = ZgDecorationSet::new();
+        ds.add(ZgDecoration::new(0, 0, 0, 5).with_tag("warn"));
+        ds.add(ZgDecoration::new(2, 0, 2, 5).with_tag("error"));
+        assert_eq!(ds.len(), 2);
+    }
+
+    #[test]
+    fn test_zg_decoration_set_for_line() {
+        let mut ds = ZgDecorationSet::new();
+        ds.add(ZgDecoration::new(0, 0, 2, 0));
+        ds.add(ZgDecoration::new(5, 0, 5, 10));
+        assert_eq!(ds.for_line(1).len(), 1);
+        assert_eq!(ds.for_line(5).len(), 1);
+    }
+
+    #[test]
+    fn test_zg_decoration_set_by_tag() {
+        let mut ds = ZgDecorationSet::new();
+        ds.add(ZgDecoration::new(0, 0, 0, 5).with_tag("a"));
+        ds.add(ZgDecoration::new(1, 0, 1, 5).with_tag("b"));
+        assert_eq!(ds.by_tag("a").len(), 1);
+    }
+
+    #[test]
+    fn test_zg_decoration_set_display() {
+        let ds = ZgDecorationSet::new();
+        let s = format!("{}", ds);
+        assert!(s.contains("ZgDecorationSet"));
+    }
+
+    #[test]
+    fn test_zg_decoration_set_default() {
+        let ds = ZgDecorationSet::default();
+        assert!(ds.is_empty());
     }
 
 }
