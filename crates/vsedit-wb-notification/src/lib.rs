@@ -23948,6 +23948,107 @@ impl AyiSignatureHelp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AyiSignatureTriggerKind { Invoke, TriggerCharacter, ContentChange }
 
+
+// --- ayj_ code action and quick fix provider ---
+
+/// Code action kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AyjCodeActionKind {
+    QuickFix, Refactor, RefactorExtract, RefactorInline, RefactorRewrite,
+    Source, SourceOrganizeImports, SourceFixAll, Custom(String),
+}
+
+impl AyjCodeActionKind {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::QuickFix => "quickfix", Self::Refactor => "refactor",
+            Self::RefactorExtract => "refactor.extract", Self::RefactorInline => "refactor.inline",
+            Self::RefactorRewrite => "refactor.rewrite", Self::Source => "source",
+            Self::SourceOrganizeImports => "source.organizeImports",
+            Self::SourceFixAll => "source.fixAll", Self::Custom(s) => s,
+        }
+    }
+    pub fn is_quickfix(&self) -> bool { matches!(self, Self::QuickFix) }
+    pub fn is_refactor(&self) -> bool {
+        matches!(self, Self::Refactor | Self::RefactorExtract | Self::RefactorInline | Self::RefactorRewrite)
+    }
+}
+
+/// A text edit within a code action.
+#[derive(Debug, Clone)]
+pub struct AyjTextEdit {
+    pub uri: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl AyjTextEdit {
+    pub fn new(uri: &str, sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { uri: uri.to_string(), start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+    pub fn is_insert(&self) -> bool { self.start_line == self.end_line && self.start_col == self.end_col }
+    pub fn is_delete(&self) -> bool { self.new_text.is_empty() }
+}
+
+/// Workspace edit containing multiple text edits.
+#[derive(Debug, Clone)]
+pub struct AyjWorkspaceEdit {
+    pub edits: Vec<AyjTextEdit>,
+}
+
+impl AyjWorkspaceEdit {
+    pub fn new() -> Self { Self { edits: Vec::new() } }
+    pub fn add(&mut self, edit: AyjTextEdit) { self.edits.push(edit); }
+    pub fn file_count(&self) -> usize {
+        let mut files: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for e in &self.edits { files.insert(&e.uri); }
+        files.len()
+    }
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+    pub fn edits_for_file(&self, uri: &str) -> Vec<&AyjTextEdit> {
+        self.edits.iter().filter(|e| e.uri == uri).collect()
+    }
+}
+
+/// A code action.
+#[derive(Debug, Clone)]
+pub struct AyjCodeAction {
+    pub title: String,
+    pub kind: AyjCodeActionKind,
+    pub edit: Option<AyjWorkspaceEdit>,
+    pub command: Option<String>,
+    pub is_preferred: bool,
+    pub diagnostics: Vec<String>,
+}
+
+impl AyjCodeAction {
+    pub fn new(title: &str, kind: AyjCodeActionKind) -> Self {
+        Self { title: title.to_string(), kind, edit: None, command: None, is_preferred: false, diagnostics: Vec::new() }
+    }
+    pub fn with_edit(mut self, edit: AyjWorkspaceEdit) -> Self { self.edit = Some(edit); self }
+    pub fn with_command(mut self, cmd: &str) -> Self { self.command = Some(cmd.to_string()); self }
+    pub fn preferred(mut self) -> Self { self.is_preferred = true; self }
+    pub fn has_edit(&self) -> bool { self.edit.is_some() }
+}
+
+/// Code action list result.
+#[derive(Debug)]
+pub struct AyjCodeActionList {
+    pub actions: Vec<AyjCodeAction>,
+}
+
+impl AyjCodeActionList {
+    pub fn new() -> Self { Self { actions: Vec::new() } }
+    pub fn add(&mut self, action: AyjCodeAction) { self.actions.push(action); }
+    pub fn quickfixes(&self) -> Vec<&AyjCodeAction> { self.actions.iter().filter(|a| a.kind.is_quickfix()).collect() }
+    pub fn refactors(&self) -> Vec<&AyjCodeAction> { self.actions.iter().filter(|a| a.kind.is_refactor()).collect() }
+    pub fn preferred(&self) -> Option<&AyjCodeAction> { self.actions.iter().find(|a| a.is_preferred) }
+    pub fn count(&self) -> usize { self.actions.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38677,6 +38778,77 @@ mod tests {
     fn test_ayi_signature_doc() {
         let sig = AyiSignatureInfo::new("fn bar()").with_doc(AyiMarkupContent::markdown("Does bar"));
         assert!(sig.documentation.is_some());
+    }
+
+
+    #[test]
+    fn test_ayj_code_action_kind() {
+        assert!(AyjCodeActionKind::QuickFix.is_quickfix());
+        assert!(AyjCodeActionKind::RefactorExtract.is_refactor());
+        assert!(!AyjCodeActionKind::Source.is_refactor());
+        assert_eq!(AyjCodeActionKind::SourceFixAll.as_str(), "source.fixAll");
+    }
+
+    #[test]
+    fn test_ayj_text_edit() {
+        let insert = AyjTextEdit::new("a.rs", 5, 10, 5, 10, "hello");
+        assert!(insert.is_insert());
+        let delete = AyjTextEdit::new("a.rs", 5, 0, 5, 10, "");
+        assert!(delete.is_delete());
+    }
+
+    #[test]
+    fn test_ayj_workspace_edit() {
+        let mut we = AyjWorkspaceEdit::new();
+        we.add(AyjTextEdit::new("a.rs", 0, 0, 0, 5, "new"));
+        we.add(AyjTextEdit::new("b.rs", 1, 0, 1, 3, "other"));
+        we.add(AyjTextEdit::new("a.rs", 2, 0, 2, 0, "insert"));
+        assert_eq!(we.file_count(), 2);
+        assert_eq!(we.edit_count(), 3);
+        assert_eq!(we.edits_for_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_ayj_code_action() {
+        let mut edit = AyjWorkspaceEdit::new();
+        edit.add(AyjTextEdit::new("a.rs", 0, 0, 0, 5, "fixed"));
+        let action = AyjCodeAction::new("Fix typo", AyjCodeActionKind::QuickFix)
+            .with_edit(edit).preferred();
+        assert!(action.is_preferred);
+        assert!(action.has_edit());
+    }
+
+    #[test]
+    fn test_ayj_code_action_list() {
+        let mut list = AyjCodeActionList::new();
+        list.add(AyjCodeAction::new("Fix typo", AyjCodeActionKind::QuickFix).preferred());
+        list.add(AyjCodeAction::new("Extract method", AyjCodeActionKind::RefactorExtract));
+        list.add(AyjCodeAction::new("Organize imports", AyjCodeActionKind::SourceOrganizeImports));
+        assert_eq!(list.quickfixes().len(), 1);
+        assert_eq!(list.refactors().len(), 1);
+        assert!(list.preferred().is_some());
+        assert_eq!(list.count(), 3);
+    }
+
+    #[test]
+    fn test_ayj_code_action_with_command() {
+        let action = AyjCodeAction::new("Run test", AyjCodeActionKind::Custom("test.run".into()))
+            .with_command("test.runAtCursor");
+        assert_eq!(action.command.as_deref(), Some("test.runAtCursor"));
+    }
+
+    #[test]
+    fn test_ayj_empty_list() {
+        let list = AyjCodeActionList::new();
+        assert_eq!(list.count(), 0);
+        assert!(list.preferred().is_none());
+    }
+
+    #[test]
+    fn test_ayj_action_diagnostics() {
+        let mut action = AyjCodeAction::new("Fix", AyjCodeActionKind::QuickFix);
+        action.diagnostics.push("unused variable".to_string());
+        assert_eq!(action.diagnostics.len(), 1);
     }
 
 }
