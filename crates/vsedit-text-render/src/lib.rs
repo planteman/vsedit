@@ -21738,6 +21738,138 @@ impl AxnTerminalManager {
     pub fn ids(&self) -> Vec<u32> { self.terminals.iter().map(|t| t.id).collect() }
 }
 
+
+// --- axo_ breadcrumb navigation and symbol outline ---
+
+/// Kind of breadcrumb element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxoBreadcrumbKind { File, Folder, Module, Class, Method, Function, Property, Enum, Interface, Constant, Variable, Namespace }
+
+impl AxoBreadcrumbKind {
+    pub fn icon(&self) -> &str {
+        match self {
+            Self::File => "file", Self::Folder => "folder", Self::Module => "module",
+            Self::Class => "class", Self::Method => "method", Self::Function => "function",
+            Self::Property => "property", Self::Enum => "enum", Self::Interface => "interface",
+            Self::Constant => "constant", Self::Variable => "variable", Self::Namespace => "namespace",
+        }
+    }
+    pub fn is_symbol(&self) -> bool { !matches!(self, Self::File | Self::Folder) }
+}
+
+/// A single breadcrumb element.
+#[derive(Debug, Clone)]
+pub struct AxoBreadcrumb {
+    pub label: String,
+    pub kind: AxoBreadcrumbKind,
+    pub uri: Option<String>,
+    pub range_start_line: Option<u32>,
+    pub children: Vec<AxoBreadcrumb>,
+}
+
+impl AxoBreadcrumb {
+    pub fn new(label: &str, kind: AxoBreadcrumbKind) -> Self {
+        Self { label: label.to_string(), kind, uri: None, range_start_line: None, children: Vec::new() }
+    }
+    pub fn with_uri(mut self, uri: &str) -> Self { self.uri = Some(uri.to_string()); self }
+    pub fn with_line(mut self, line: u32) -> Self { self.range_start_line = Some(line); self }
+    pub fn add_child(&mut self, child: AxoBreadcrumb) { self.children.push(child); }
+    pub fn has_children(&self) -> bool { !self.children.is_empty() }
+}
+
+/// A breadcrumb trail from root to current location.
+#[derive(Debug, Clone)]
+pub struct AxoBreadcrumbTrail {
+    pub items: Vec<AxoBreadcrumb>,
+    pub focused_index: Option<usize>,
+}
+
+impl AxoBreadcrumbTrail {
+    pub fn new() -> Self { Self { items: Vec::new(), focused_index: None } }
+    pub fn push(&mut self, item: AxoBreadcrumb) { self.items.push(item); }
+    pub fn len(&self) -> usize { self.items.len() }
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+    pub fn last(&self) -> Option<&AxoBreadcrumb> { self.items.last() }
+    pub fn focus(&mut self, idx: usize) { if idx < self.items.len() { self.focused_index = Some(idx); } }
+    pub fn unfocus(&mut self) { self.focused_index = None; }
+    pub fn focused(&self) -> Option<&AxoBreadcrumb> { self.focused_index.and_then(|i| self.items.get(i)) }
+
+    pub fn from_path(path: &str, separator: char) -> Self {
+        let mut trail = Self::new();
+        let parts: Vec<&str> = path.split(separator).filter(|s| !s.is_empty()).collect();
+        for (i, part) in parts.iter().enumerate() {
+            let kind = if i == parts.len() - 1 { AxoBreadcrumbKind::File } else { AxoBreadcrumbKind::Folder };
+            trail.push(AxoBreadcrumb::new(part, kind));
+        }
+        trail
+    }
+}
+
+/// A document symbol for the outline view.
+#[derive(Debug, Clone)]
+pub struct AxoOutlineSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: AxoBreadcrumbKind,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub selection_start: u32,
+    pub children: Vec<AxoOutlineSymbol>,
+}
+
+impl AxoOutlineSymbol {
+    pub fn new(name: &str, kind: AxoBreadcrumbKind, start: u32, end: u32) -> Self {
+        Self { name: name.to_string(), detail: None, kind, range_start: start, range_end: end, selection_start: start, children: Vec::new() }
+    }
+    pub fn with_detail(mut self, detail: &str) -> Self { self.detail = Some(detail.to_string()); self }
+    pub fn add_child(&mut self, child: AxoOutlineSymbol) { self.children.push(child); }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.range_start && line <= self.range_end }
+    pub fn depth_first(&self) -> Vec<&AxoOutlineSymbol> {
+        let mut result = vec![self];
+        for child in &self.children { result.extend(child.depth_first()); }
+        result
+    }
+}
+
+/// Outline model for a document.
+#[derive(Debug, Clone)]
+pub struct AxoOutlineModel {
+    pub uri: String,
+    pub symbols: Vec<AxoOutlineSymbol>,
+}
+
+impl AxoOutlineModel {
+    pub fn new(uri: &str) -> Self { Self { uri: uri.to_string(), symbols: Vec::new() } }
+    pub fn add(&mut self, sym: AxoOutlineSymbol) { self.symbols.push(sym); }
+    pub fn symbol_count(&self) -> usize { self.symbols.iter().map(|s| s.depth_first().len()).sum() }
+    pub fn symbols_at_line(&self, line: u32) -> Vec<&AxoOutlineSymbol> {
+        let mut result = Vec::new();
+        for sym in &self.symbols {
+            for s in sym.depth_first() { if s.contains_line(line) { result.push(s); } }
+        }
+        result
+    }
+    pub fn breadcrumb_at_line(&self, line: u32) -> AxoBreadcrumbTrail {
+        let mut trail = AxoBreadcrumbTrail::new();
+        fn find_path<'a>(sym: &'a AxoOutlineSymbol, line: u32, path: &mut Vec<&'a AxoOutlineSymbol>) -> bool {
+            if sym.contains_line(line) {
+                path.push(sym);
+                for child in &sym.children { if find_path(child, line, path) { return true; } }
+                return true;
+            }
+            false
+        }
+        for sym in &self.symbols {
+            let mut path = Vec::new();
+            if find_path(sym, line, &mut path) {
+                for s in path { trail.push(AxoBreadcrumb::new(&s.name, s.kind).with_line(s.range_start)); }
+                break;
+            }
+        }
+        trail
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34861,6 +34993,80 @@ mod tests {
         assert_eq!(mgr.running_count(), 0);
         mgr.dispose(id);
         assert_eq!(mgr.count(), 0);
+    }
+
+
+    #[test]
+    fn test_axo_breadcrumb_kind() {
+        assert!(AxoBreadcrumbKind::Function.is_symbol());
+        assert!(!AxoBreadcrumbKind::File.is_symbol());
+        assert_eq!(AxoBreadcrumbKind::Class.icon(), "class");
+    }
+
+    #[test]
+    fn test_axo_breadcrumb() {
+        let mut bc = AxoBreadcrumb::new("main.rs", AxoBreadcrumbKind::File).with_uri("file:///main.rs");
+        bc.add_child(AxoBreadcrumb::new("main", AxoBreadcrumbKind::Function));
+        assert!(bc.has_children());
+        assert_eq!(bc.uri.as_deref(), Some("file:///main.rs"));
+    }
+
+    #[test]
+    fn test_axo_breadcrumb_trail_from_path() {
+        let trail = AxoBreadcrumbTrail::from_path("/src/lib/main.rs", '/');
+        assert_eq!(trail.len(), 3);
+        assert_eq!(trail.items[0].kind, AxoBreadcrumbKind::Folder);
+        assert_eq!(trail.items[2].kind, AxoBreadcrumbKind::File);
+        assert_eq!(trail.last().unwrap().label, "main.rs");
+    }
+
+    #[test]
+    fn test_axo_breadcrumb_trail_focus() {
+        let mut trail = AxoBreadcrumbTrail::from_path("/a/b", '/');
+        trail.focus(0);
+        assert_eq!(trail.focused().unwrap().label, "a");
+        trail.unfocus();
+        assert!(trail.focused().is_none());
+    }
+
+    #[test]
+    fn test_axo_outline_symbol() {
+        let mut class = AxoOutlineSymbol::new("MyClass", AxoBreadcrumbKind::Class, 0, 50);
+        class.add_child(AxoOutlineSymbol::new("method1", AxoBreadcrumbKind::Method, 5, 20));
+        class.add_child(AxoOutlineSymbol::new("method2", AxoBreadcrumbKind::Method, 25, 45));
+        assert!(class.contains_line(10));
+        assert!(!class.contains_line(60));
+        assert_eq!(class.depth_first().len(), 3);
+    }
+
+    #[test]
+    fn test_axo_outline_model() {
+        let mut model = AxoOutlineModel::new("file:///a.rs");
+        let mut class = AxoOutlineSymbol::new("Foo", AxoBreadcrumbKind::Class, 0, 30);
+        class.add_child(AxoOutlineSymbol::new("bar", AxoBreadcrumbKind::Method, 5, 15));
+        model.add(class);
+        assert_eq!(model.symbol_count(), 2);
+        let at_line = model.symbols_at_line(10);
+        assert_eq!(at_line.len(), 2);
+    }
+
+    #[test]
+    fn test_axo_outline_breadcrumb_at_line() {
+        let mut model = AxoOutlineModel::new("f");
+        let mut class = AxoOutlineSymbol::new("Cls", AxoBreadcrumbKind::Class, 0, 50);
+        class.add_child(AxoOutlineSymbol::new("meth", AxoBreadcrumbKind::Method, 10, 30));
+        model.add(class);
+        let trail = model.breadcrumb_at_line(15);
+        assert_eq!(trail.len(), 2);
+        assert_eq!(trail.items[0].label, "Cls");
+        assert_eq!(trail.items[1].label, "meth");
+    }
+
+    #[test]
+    fn test_axo_outline_symbol_detail() {
+        let sym = AxoOutlineSymbol::new("x", AxoBreadcrumbKind::Variable, 0, 0)
+            .with_detail("i32");
+        assert_eq!(sym.detail.as_deref(), Some("i32"));
     }
 
 }
