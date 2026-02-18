@@ -20271,6 +20271,177 @@ impl AxgFileWatcher {
     }
 }
 
+
+// --- axh_ output channel and logging types ---
+
+/// Log level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AxhLogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Off,
+}
+
+impl AxhLogLevel {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Trace => "trace",
+            Self::Debug => "debug",
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+            Self::Off => "off",
+        }
+    }
+}
+
+/// An output channel that collects log messages.
+#[derive(Debug, Clone)]
+pub struct AxhOutputChannel {
+    pub name: String,
+    pub language_id: Option<String>,
+    lines: Vec<String>,
+    pub is_visible: bool,
+    pub is_log_channel: bool,
+    pub log_level: AxhLogLevel,
+}
+
+impl AxhOutputChannel {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            language_id: None,
+            lines: Vec::new(),
+            is_visible: false,
+            is_log_channel: false,
+            log_level: AxhLogLevel::Info,
+        }
+    }
+
+    pub fn log_channel(name: &str, lang_id: &str) -> Self {
+        Self {
+            language_id: Some(lang_id.to_string()),
+            is_log_channel: true,
+            ..Self::new(name)
+        }
+    }
+
+    pub fn append(&mut self, text: &str) {
+        if let Some(last) = self.lines.last_mut() {
+            last.push_str(text);
+        } else {
+            self.lines.push(text.to_string());
+        }
+    }
+
+    pub fn append_line(&mut self, text: &str) {
+        self.lines.push(text.to_string());
+    }
+
+    pub fn log(&mut self, level: AxhLogLevel, message: &str) {
+        if level >= self.log_level {
+            self.append_line(&format!("[{}] {}", level.label(), message));
+        }
+    }
+
+    pub fn trace(&mut self, msg: &str) { self.log(AxhLogLevel::Trace, msg); }
+    pub fn debug(&mut self, msg: &str) { self.log(AxhLogLevel::Debug, msg); }
+    pub fn info(&mut self, msg: &str) { self.log(AxhLogLevel::Info, msg); }
+    pub fn warn(&mut self, msg: &str) { self.log(AxhLogLevel::Warning, msg); }
+    pub fn error(&mut self, msg: &str) { self.log(AxhLogLevel::Error, msg); }
+
+    pub fn clear(&mut self) { self.lines.clear(); }
+    pub fn show(&mut self) { self.is_visible = true; }
+    pub fn hide(&mut self) { self.is_visible = false; }
+
+    pub fn line_count(&self) -> usize { self.lines.len() }
+    pub fn content(&self) -> String { self.lines.join("\n") }
+    pub fn lines(&self) -> &[String] { &self.lines }
+
+    pub fn replace(&mut self, text: &str) {
+        self.lines.clear();
+        self.lines.push(text.to_string());
+    }
+}
+
+/// Registry of output channels.
+#[derive(Debug, Clone)]
+pub struct AxhOutputRegistry {
+    channels: Vec<AxhOutputChannel>,
+    active_channel: Option<usize>,
+}
+
+impl AxhOutputRegistry {
+    pub fn new() -> Self {
+        Self { channels: Vec::new(), active_channel: None }
+    }
+
+    pub fn create(&mut self, name: &str) -> usize {
+        let idx = self.channels.len();
+        self.channels.push(AxhOutputChannel::new(name));
+        idx
+    }
+
+    pub fn create_log(&mut self, name: &str, lang_id: &str) -> usize {
+        let idx = self.channels.len();
+        self.channels.push(AxhOutputChannel::log_channel(name, lang_id));
+        idx
+    }
+
+    pub fn get(&self, idx: usize) -> Option<&AxhOutputChannel> {
+        self.channels.get(idx)
+    }
+
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut AxhOutputChannel> {
+        self.channels.get_mut(idx)
+    }
+
+    pub fn find_by_name(&self, name: &str) -> Option<usize> {
+        self.channels.iter().position(|c| c.name == name)
+    }
+
+    pub fn set_active(&mut self, idx: usize) {
+        if idx < self.channels.len() {
+            if let Some(old) = self.active_channel {
+                if let Some(ch) = self.channels.get_mut(old) { ch.hide(); }
+            }
+            self.channels[idx].show();
+            self.active_channel = Some(idx);
+        }
+    }
+
+    pub fn active_channel(&self) -> Option<&AxhOutputChannel> {
+        self.active_channel.and_then(|i| self.channels.get(i))
+    }
+
+    pub fn channel_count(&self) -> usize {
+        self.channels.len()
+    }
+
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.channels.iter().map(|c| c.name.as_str()).collect()
+    }
+
+    pub fn dispose(&mut self, idx: usize) -> bool {
+        if idx < self.channels.len() {
+            self.channels.remove(idx);
+            if self.active_channel == Some(idx) {
+                self.active_channel = None;
+            } else if let Some(active) = self.active_channel {
+                if active > idx {
+                    self.active_channel = Some(active - 1);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32948,6 +33119,107 @@ mod tests {
         assert!(fw.matching_subscriptions("/x/a").is_empty());
         fw.resume_subscription(id);
         assert_eq!(fw.active_count(), 1);
+    }
+
+
+    // --- axh_ output channel and logging tests ---
+
+    #[test]
+    fn test_axh_log_level_ordering() {
+        assert!(AxhLogLevel::Error > AxhLogLevel::Warning);
+        assert!(AxhLogLevel::Warning > AxhLogLevel::Info);
+        assert!(AxhLogLevel::Info > AxhLogLevel::Debug);
+        assert!(AxhLogLevel::Debug > AxhLogLevel::Trace);
+    }
+
+    #[test]
+    fn test_axh_output_channel_basic() {
+        let mut ch = AxhOutputChannel::new("Test");
+        ch.append_line("Hello");
+        ch.append_line("World");
+        assert_eq!(ch.line_count(), 2);
+        assert_eq!(ch.content(), "Hello\nWorld");
+        ch.clear();
+        assert_eq!(ch.line_count(), 0);
+    }
+
+    #[test]
+    fn test_axh_output_channel_append() {
+        let mut ch = AxhOutputChannel::new("T");
+        ch.append("Hello ");
+        ch.append("World");
+        assert_eq!(ch.line_count(), 1);
+        assert_eq!(ch.lines()[0], "Hello World");
+    }
+
+    #[test]
+    fn test_axh_output_channel_logging() {
+        let mut ch = AxhOutputChannel::new("Log");
+        ch.log_level = AxhLogLevel::Info;
+        ch.trace("should skip");
+        ch.debug("should skip");
+        ch.info("visible");
+        ch.warn("visible");
+        ch.error("visible");
+        assert_eq!(ch.line_count(), 3);
+    }
+
+    #[test]
+    fn test_axh_output_channel_visibility() {
+        let mut ch = AxhOutputChannel::new("V");
+        assert!(!ch.is_visible);
+        ch.show();
+        assert!(ch.is_visible);
+        ch.hide();
+        assert!(!ch.is_visible);
+    }
+
+    #[test]
+    fn test_axh_log_channel() {
+        let ch = AxhOutputChannel::log_channel("LSP", "json");
+        assert!(ch.is_log_channel);
+        assert_eq!(ch.language_id.as_deref(), Some("json"));
+    }
+
+    #[test]
+    fn test_axh_output_channel_replace() {
+        let mut ch = AxhOutputChannel::new("R");
+        ch.append_line("old");
+        ch.replace("new");
+        assert_eq!(ch.line_count(), 1);
+        assert_eq!(ch.lines()[0], "new");
+    }
+
+    #[test]
+    fn test_axh_output_registry() {
+        let mut reg = AxhOutputRegistry::new();
+        let i1 = reg.create("Output");
+        let i2 = reg.create_log("LSP Log", "json");
+        assert_eq!(reg.channel_count(), 2);
+        assert_eq!(reg.channel_names(), vec!["Output", "LSP Log"]);
+        reg.set_active(i1);
+        assert!(reg.active_channel().unwrap().is_visible);
+        reg.set_active(i2);
+        assert!(!reg.get(i1).unwrap().is_visible);
+        assert!(reg.get(i2).unwrap().is_visible);
+    }
+
+    #[test]
+    fn test_axh_output_registry_find() {
+        let mut reg = AxhOutputRegistry::new();
+        reg.create("MyChannel");
+        assert_eq!(reg.find_by_name("MyChannel"), Some(0));
+        assert_eq!(reg.find_by_name("Other"), None);
+    }
+
+    #[test]
+    fn test_axh_output_registry_dispose() {
+        let mut reg = AxhOutputRegistry::new();
+        reg.create("A");
+        reg.create("B");
+        assert!(reg.dispose(0));
+        assert_eq!(reg.channel_count(), 1);
+        assert_eq!(reg.channel_names(), vec!["B"]);
     }
 
 }
