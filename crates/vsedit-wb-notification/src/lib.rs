@@ -24453,6 +24453,112 @@ impl AynEventQueue {
     pub fn clear(&mut self) { self.events.clear(); }
 }
 
+
+// --- ayo_ panel layout and view containers ---
+
+/// Panel position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyoPanelPosition { Bottom, Left, Right }
+
+/// Sidebar position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyoSidebarPosition { Left, Right }
+
+/// Layout region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyoLayoutRegion { Editor, Sidebar, Panel, ActivityBar, StatusBar }
+
+/// Rectangle for layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AyoRect { pub x: u16, pub y: u16, pub width: u16, pub height: u16 }
+
+impl AyoRect {
+    pub fn new(x: u16, y: u16, w: u16, h: u16) -> Self { Self { x, y, width: w, height: h } }
+    pub fn area(&self) -> u32 { self.width as u32 * self.height as u32 }
+    pub fn contains(&self, col: u16, row: u16) -> bool {
+        col >= self.x && col < self.x + self.width && row >= self.y && row < self.y + self.height
+    }
+    pub fn right(&self) -> u16 { self.x + self.width }
+    pub fn bottom(&self) -> u16 { self.y + self.height }
+}
+
+/// View container.
+#[derive(Debug, Clone)]
+pub struct AyoViewContainer {
+    pub id: String,
+    pub title: String,
+    pub views: Vec<String>,
+    pub is_visible: bool,
+}
+
+impl AyoViewContainer {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self { id: id.to_string(), title: title.to_string(), views: Vec::new(), is_visible: true }
+    }
+    pub fn add_view(&mut self, view_id: &str) { self.views.push(view_id.to_string()); }
+    pub fn view_count(&self) -> usize { self.views.len() }
+}
+
+/// Editor layout manager.
+#[derive(Debug)]
+pub struct AyoLayout {
+    pub total_cols: u16,
+    pub total_rows: u16,
+    pub sidebar_visible: bool,
+    pub sidebar_position: AyoSidebarPosition,
+    pub sidebar_width: u16,
+    pub panel_visible: bool,
+    pub panel_position: AyoPanelPosition,
+    pub panel_height: u16,
+    pub activity_bar_visible: bool,
+    pub status_bar_visible: bool,
+}
+
+impl AyoLayout {
+    pub fn new(cols: u16, rows: u16) -> Self {
+        Self {
+            total_cols: cols, total_rows: rows,
+            sidebar_visible: true, sidebar_position: AyoSidebarPosition::Left, sidebar_width: 30,
+            panel_visible: true, panel_position: AyoPanelPosition::Bottom, panel_height: 10,
+            activity_bar_visible: true, status_bar_visible: true,
+        }
+    }
+    pub fn toggle_sidebar(&mut self) { self.sidebar_visible = !self.sidebar_visible; }
+    pub fn toggle_panel(&mut self) { self.panel_visible = !self.panel_visible; }
+    pub fn editor_rect(&self) -> AyoRect {
+        let ab_w: u16 = if self.activity_bar_visible { 2 } else { 0 };
+        let sb_w: u16 = if self.sidebar_visible { self.sidebar_width } else { 0 };
+        let status_h: u16 = if self.status_bar_visible { 1 } else { 0 };
+        let panel_h: u16 = if self.panel_visible && self.panel_position == AyoPanelPosition::Bottom { self.panel_height } else { 0 };
+        let x = ab_w + if self.sidebar_position == AyoSidebarPosition::Left { sb_w } else { 0 };
+        let w = self.total_cols - ab_w - sb_w;
+        let h = self.total_rows - status_h - panel_h;
+        AyoRect::new(x, 0, w, h)
+    }
+    pub fn sidebar_rect(&self) -> Option<AyoRect> {
+        if !self.sidebar_visible { return None; }
+        let ab_w: u16 = if self.activity_bar_visible { 2 } else { 0 };
+        let x = if self.sidebar_position == AyoSidebarPosition::Left { ab_w } else { self.total_cols - self.sidebar_width };
+        let status_h: u16 = if self.status_bar_visible { 1 } else { 0 };
+        Some(AyoRect::new(x, 0, self.sidebar_width, self.total_rows - status_h))
+    }
+    pub fn panel_rect(&self) -> Option<AyoRect> {
+        if !self.panel_visible { return None; }
+        let status_h: u16 = if self.status_bar_visible { 1 } else { 0 };
+        let y = self.total_rows - status_h - self.panel_height;
+        let ab_w: u16 = if self.activity_bar_visible { 2 } else { 0 };
+        Some(AyoRect::new(ab_w, y, self.total_cols - ab_w, self.panel_height))
+    }
+    pub fn resize(&mut self, cols: u16, rows: u16) { self.total_cols = cols; self.total_rows = rows; }
+    pub fn region_at(&self, col: u16, row: u16) -> AyoLayoutRegion {
+        if self.status_bar_visible && row == self.total_rows - 1 { return AyoLayoutRegion::StatusBar; }
+        if self.activity_bar_visible && col < 2 { return AyoLayoutRegion::ActivityBar; }
+        if let Some(r) = self.sidebar_rect() { if r.contains(col, row) { return AyoLayoutRegion::Sidebar; } }
+        if let Some(r) = self.panel_rect() { if r.contains(col, row) { return AyoLayoutRegion::Panel; } }
+        AyoLayoutRegion::Editor
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39514,6 +39620,74 @@ mod tests {
     fn test_ayn_special_key() {
         let evt = AynInputEvent::Special(AynSpecialKey::Escape);
         assert!(!evt.is_key());
+    }
+
+
+    #[test]
+    fn test_ayo_rect() {
+        let r = AyoRect::new(5, 10, 20, 15);
+        assert_eq!(r.area(), 300);
+        assert!(r.contains(10, 15));
+        assert!(!r.contains(25, 10));
+        assert_eq!(r.right(), 25);
+        assert_eq!(r.bottom(), 25);
+    }
+
+    #[test]
+    fn test_ayo_view_container() {
+        let mut vc = AyoViewContainer::new("explorer", "Explorer");
+        vc.add_view("fileExplorer");
+        vc.add_view("outline");
+        assert_eq!(vc.view_count(), 2);
+    }
+
+    #[test]
+    fn test_ayo_layout_editor_rect() {
+        let layout = AyoLayout::new(120, 40);
+        let editor = layout.editor_rect();
+        assert!(editor.width > 0);
+        assert!(editor.height > 0);
+    }
+
+    #[test]
+    fn test_ayo_toggle_sidebar() {
+        let mut layout = AyoLayout::new(120, 40);
+        assert!(layout.sidebar_visible);
+        layout.toggle_sidebar();
+        assert!(!layout.sidebar_visible);
+        assert!(layout.sidebar_rect().is_none());
+    }
+
+    #[test]
+    fn test_ayo_toggle_panel() {
+        let mut layout = AyoLayout::new(120, 40);
+        assert!(layout.panel_visible);
+        layout.toggle_panel();
+        assert!(!layout.panel_visible);
+        assert!(layout.panel_rect().is_none());
+    }
+
+    #[test]
+    fn test_ayo_region_at() {
+        let layout = AyoLayout::new(120, 40);
+        assert_eq!(layout.region_at(60, 20), AyoLayoutRegion::Editor);
+        assert_eq!(layout.region_at(0, 20), AyoLayoutRegion::ActivityBar);
+        assert_eq!(layout.region_at(60, 39), AyoLayoutRegion::StatusBar);
+    }
+
+    #[test]
+    fn test_ayo_resize() {
+        let mut layout = AyoLayout::new(80, 24);
+        layout.resize(120, 40);
+        assert_eq!(layout.total_cols, 120);
+        assert_eq!(layout.total_rows, 40);
+    }
+
+    #[test]
+    fn test_ayo_sidebar_left() {
+        let layout = AyoLayout::new(120, 40);
+        let sb = layout.sidebar_rect().unwrap();
+        assert_eq!(sb.x, 2);
     }
 
 }
