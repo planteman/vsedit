@@ -4582,6 +4582,322 @@ impl<K: Ord + Clone, V: Clone> Xn22AVL<K, V> {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Xo22RedBlack<K,V> — red-black tree map
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Xo22Color {
+    Red,
+    Black,
+}
+
+#[derive(Debug, Clone)]
+struct Xo22RBNode<K, V> {
+    key: K,
+    value: V,
+    color: Xo22Color,
+    left: Option<Box<Xo22RBNode<K, V>>>,
+    right: Option<Box<Xo22RBNode<K, V>>>,
+}
+
+/// A red-black tree map for crate 22.
+#[derive(Debug, Clone)]
+pub struct Xo22RedBlack<K, V> {
+    root: Option<Box<Xo22RBNode<K, V>>>,
+    len: usize,
+}
+
+impl<K: Ord + Clone, V: Clone> Xo22RedBlack<K, V> {
+    pub fn xo_new() -> Self {
+        Self { root: None, len: 0 }
+    }
+
+    pub fn xo_len(&self) -> usize {
+        self.len
+    }
+
+    pub fn xo_is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn xo_insert(&mut self, key: K, value: V) {
+        self.root = Some(Self::xo_ins(self.root.take(), key, value, &mut self.len));
+        if let Some(ref mut r) = self.root {
+            r.color = Xo22Color::Black;
+        }
+    }
+
+    fn xo_ins(node: Option<Box<Xo22RBNode<K, V>>>, key: K, value: V, len: &mut usize) -> Box<Xo22RBNode<K, V>> {
+        match node {
+            None => {
+                *len += 1;
+                Box::new(Xo22RBNode {
+                    key, value, color: Xo22Color::Red, left: None, right: None,
+                })
+            }
+            Some(mut n) => {
+                use std::cmp::Ordering;
+                match key.cmp(&n.key) {
+                    Ordering::Less => n.left = Some(Self::xo_ins(n.left.take(), key, value, len)),
+                    Ordering::Greater => n.right = Some(Self::xo_ins(n.right.take(), key, value, len)),
+                    Ordering::Equal => { n.value = value; return n; }
+                }
+                Self::xo_balance(n)
+            }
+        }
+    }
+
+    fn xo_is_red(node: &Option<Box<Xo22RBNode<K, V>>>) -> bool {
+        matches!(node, Some(n) if n.color == Xo22Color::Red)
+    }
+
+    fn xo_balance(mut h: Box<Xo22RBNode<K, V>>) -> Box<Xo22RBNode<K, V>> {
+        if Self::xo_is_red(&h.right) && !Self::xo_is_red(&h.left) {
+            h = Self::xo_rotate_left(h);
+        }
+        if Self::xo_is_red(&h.left) {
+            let left_left_red = h.left.as_ref().and_then(|l| l.left.as_ref()).map_or(false, |ll| ll.color == Xo22Color::Red);
+            if left_left_red {
+                h = Self::xo_rotate_right(h);
+            }
+        }
+        if Self::xo_is_red(&h.left) && Self::xo_is_red(&h.right) {
+            Self::xo_flip_colors(&mut h);
+        }
+        h
+    }
+
+    fn xo_rotate_left(mut h: Box<Xo22RBNode<K, V>>) -> Box<Xo22RBNode<K, V>> {
+        let mut x = h.right.take().unwrap();
+        h.right = x.left.take();
+        x.color = h.color;
+        h.color = Xo22Color::Red;
+        x.left = Some(h);
+        x
+    }
+
+    fn xo_rotate_right(mut h: Box<Xo22RBNode<K, V>>) -> Box<Xo22RBNode<K, V>> {
+        let mut x = h.left.take().unwrap();
+        h.left = x.right.take();
+        x.color = h.color;
+        h.color = Xo22Color::Red;
+        x.right = Some(h);
+        x
+    }
+
+    fn xo_flip_colors(h: &mut Box<Xo22RBNode<K, V>>) {
+        h.color = Xo22Color::Red;
+        if let Some(l) = &mut h.left { l.color = Xo22Color::Black; }
+        if let Some(r) = &mut h.right { r.color = Xo22Color::Black; }
+    }
+
+    pub fn xo_get(&self, key: &K) -> Option<&V> {
+        let mut cur = &self.root;
+        while let Some(node) = cur {
+            use std::cmp::Ordering;
+            match key.cmp(&node.key) {
+                Ordering::Less => cur = &node.left,
+                Ordering::Greater => cur = &node.right,
+                Ordering::Equal => return Some(&node.value),
+            }
+        }
+        None
+    }
+
+    pub fn xo_contains(&self, key: &K) -> bool {
+        self.xo_get(key).is_some()
+    }
+
+    pub fn xo_min(&self) -> Option<&K> {
+        let mut cur = &self.root;
+        let mut result = None;
+        while let Some(node) = cur {
+            result = Some(&node.key);
+            cur = &node.left;
+        }
+        result
+    }
+
+    pub fn xo_max(&self) -> Option<&K> {
+        let mut cur = &self.root;
+        let mut result = None;
+        while let Some(node) = cur {
+            result = Some(&node.key);
+            cur = &node.right;
+        }
+        result
+    }
+
+    pub fn xo_remove(&mut self, key: &K) -> Option<V> {
+        let mut found = None;
+        self.root = Self::xo_remove_rec(self.root.take(), key, &mut found);
+        if let Some(ref mut r) = self.root {
+            r.color = Xo22Color::Black;
+        }
+        if found.is_some() { self.len -= 1; }
+        found
+    }
+
+    fn xo_remove_rec(node: Option<Box<Xo22RBNode<K, V>>>, key: &K, found: &mut Option<V>) -> Option<Box<Xo22RBNode<K, V>>> {
+        match node {
+            None => None,
+            Some(mut n) => {
+                use std::cmp::Ordering;
+                match key.cmp(&n.key) {
+                    Ordering::Less => { n.left = Self::xo_remove_rec(n.left.take(), key, found); Some(n) }
+                    Ordering::Greater => { n.right = Self::xo_remove_rec(n.right.take(), key, found); Some(n) }
+                    Ordering::Equal => {
+                        *found = Some(n.value.clone());
+                        match (n.left.take(), n.right.take()) {
+                            (None, None) => None,
+                            (Some(l), None) => Some(l),
+                            (None, Some(r)) => Some(r),
+                            (Some(l), Some(r)) => {
+                                let (min_key, min_val, new_right) = Self::xo_remove_min_node(*r);
+                                n.key = min_key; n.value = min_val;
+                                n.left = Some(l); n.right = new_right;
+                                Some(n)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn xo_remove_min_node(mut node: Xo22RBNode<K, V>) -> (K, V, Option<Box<Xo22RBNode<K, V>>>) {
+        if node.left.is_none() {
+            return (node.key, node.value, node.right);
+        }
+        let (k, v, new_left) = Self::xo_remove_min_node(*node.left.take().unwrap());
+        node.left = new_left;
+        (k, v, Some(Box::new(node)))
+    }
+
+    pub fn xo_black_height(&self) -> usize {
+        fn bh<K, V>(node: &Option<Box<Xo22RBNode<K, V>>>) -> usize {
+            match node {
+                None => 1,
+                Some(n) => {
+                    let add = if n.color == Xo22Color::Black { 1 } else { 0 };
+                    add + bh(&n.left)
+                }
+            }
+        }
+        bh(&self.root)
+    }
+
+    pub fn xo_in_order(&self) -> Vec<(K, V)> {
+        let mut result = Vec::new();
+        fn collect<K: Clone, V: Clone>(node: &Option<Box<Xo22RBNode<K, V>>>, out: &mut Vec<(K, V)>) {
+            if let Some(n) = node {
+                collect(&n.left, out);
+                out.push((n.key.clone(), n.value.clone()));
+                collect(&n.right, out);
+            }
+        }
+        collect(&self.root, &mut result);
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Xo22ConsistentHash — consistent hash ring
+// ---------------------------------------------------------------------------
+
+/// A consistent hash ring for crate 22.
+#[derive(Debug, Clone)]
+pub struct Xo22ConsistentHash {
+    ring: std::collections::BTreeMap<u64, String>,
+    nodes: std::collections::HashMap<String, usize>,
+    virtual_count: usize,
+}
+
+impl Xo22ConsistentHash {
+    pub fn xo_new(virtual_count: usize) -> Self {
+        Self {
+            ring: std::collections::BTreeMap::new(),
+            nodes: std::collections::HashMap::new(),
+            virtual_count,
+        }
+    }
+
+    fn xo_hash(data: &str) -> u64 {
+        let mut h: u64 = 5381;
+        for b in data.bytes() {
+            h = h.wrapping_mul(33).wrapping_add(b as u64);
+        }
+        h
+    }
+
+    pub fn xo_add_node(&mut self, node: &str) {
+        let vc = self.virtual_count;
+        for i in 0..vc {
+            let vkey = format!("{}#xo22#{}", node, i);
+            let hash = Self::xo_hash(&vkey);
+            self.ring.insert(hash, node.to_string());
+        }
+        *self.nodes.entry(node.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn xo_remove_node(&mut self, node: &str) {
+        let vc = self.virtual_count;
+        for i in 0..vc {
+            let vkey = format!("{}#xo22#{}", node, i);
+            let hash = Self::xo_hash(&vkey);
+            self.ring.remove(&hash);
+        }
+        self.nodes.remove(node);
+    }
+
+    pub fn xo_get_node(&self, key: &str) -> Option<&str> {
+        if self.ring.is_empty() {
+            return None;
+        }
+        let hash = Self::xo_hash(key);
+        let entry = self.ring.range(hash..).next().or_else(|| self.ring.iter().next());
+        entry.map(|(_, v)| v.as_str())
+    }
+
+    pub fn xo_node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn xo_rebalance_factor(&self) -> f64 {
+        if self.nodes.is_empty() {
+            return 0.0;
+        }
+        let total = self.ring.len() as f64;
+        let expected = total / self.nodes.len() as f64;
+        let mut max_dev: f64 = 0.0;
+        let counts: std::collections::HashMap<&str, usize> = self.ring.values().fold(
+            std::collections::HashMap::new(),
+            |mut acc, v| { *acc.entry(v.as_str()).or_insert(0) += 1; acc }
+        );
+        for &c in counts.values() {
+            let dev = ((c as f64) - expected).abs();
+            if dev > max_dev { max_dev = dev; }
+        }
+        if expected > 0.0 { max_dev / expected } else { 0.0 }
+    }
+
+    pub fn xo_virtual_nodes(&self) -> usize {
+        self.ring.len()
+    }
+
+    pub fn xo_key_distribution(&self, keys: &[&str]) -> std::collections::HashMap<String, usize> {
+        let mut dist: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for k in keys {
+            if let Some(node) = self.xo_get_node(k) {
+                *dist.entry(node.to_string()).or_insert(0) += 1;
+            }
+        }
+        dist
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -7584,4 +7900,164 @@ mod tests {
         assert_eq!(m.xn_max(), None);
         assert_eq!(m.xn_height(), 0);
     }
+
+    // --- Xo22RedBlack tests ---
+
+    #[test]
+    fn xo_22_rb_insert_and_get() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        tree.xo_insert(10, "ten");
+        tree.xo_insert(20, "twenty");
+        tree.xo_insert(5, "five");
+        assert_eq!(tree.xo_get(&10), Some(&"ten"));
+        assert_eq!(tree.xo_get(&20), Some(&"twenty"));
+        assert_eq!(tree.xo_get(&5), Some(&"five"));
+        assert_eq!(tree.xo_get(&99), None);
+    }
+
+    #[test]
+    fn xo_22_rb_len_and_empty() {
+        let mut tree = super::Xo22RedBlack::<i32, i32>::xo_new();
+        assert!(tree.xo_is_empty());
+        assert_eq!(tree.xo_len(), 0);
+        tree.xo_insert(1, 100);
+        tree.xo_insert(2, 200);
+        assert!(!tree.xo_is_empty());
+        assert_eq!(tree.xo_len(), 2);
+    }
+
+    #[test]
+    fn xo_22_rb_min_max() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        for k in [30, 10, 50, 20, 40] {
+            tree.xo_insert(k, k * 10);
+        }
+        assert_eq!(tree.xo_min(), Some(&10));
+        assert_eq!(tree.xo_max(), Some(&50));
+    }
+
+    #[test]
+    fn xo_22_rb_contains() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        tree.xo_insert(42, "answer");
+        assert!(tree.xo_contains(&42));
+        assert!(!tree.xo_contains(&43));
+    }
+
+    #[test]
+    fn xo_22_rb_remove() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        tree.xo_insert(1, "a");
+        tree.xo_insert(2, "b");
+        tree.xo_insert(3, "c");
+        assert_eq!(tree.xo_remove(&2), Some("b"));
+        assert_eq!(tree.xo_len(), 2);
+        assert!(!tree.xo_contains(&2));
+        assert_eq!(tree.xo_remove(&99), None);
+    }
+
+    #[test]
+    fn xo_22_rb_in_order() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        for k in [5, 3, 7, 1, 4] {
+            tree.xo_insert(k, k);
+        }
+        let keys: Vec<i32> = tree.xo_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, vec![1, 3, 4, 5, 7]);
+    }
+
+    #[test]
+    fn xo_22_rb_black_height() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        for k in 0..15 {
+            tree.xo_insert(k, k);
+        }
+        let bh = tree.xo_black_height();
+        assert!(bh >= 2 && bh <= 6, "black height {bh} out of range");
+    }
+
+    #[test]
+    fn xo_22_rb_overwrite() {
+        let mut tree = super::Xo22RedBlack::xo_new();
+        tree.xo_insert(1, "old");
+        tree.xo_insert(1, "new");
+        assert_eq!(tree.xo_get(&1), Some(&"new"));
+        assert_eq!(tree.xo_len(), 1);
+    }
+
+    // --- Xo22ConsistentHash tests ---
+
+    #[test]
+    fn xo_22_ch_add_and_count() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(100);
+        ring.xo_add_node("server-a");
+        ring.xo_add_node("server-b");
+        assert_eq!(ring.xo_node_count(), 2);
+        assert_eq!(ring.xo_virtual_nodes(), 200);
+    }
+
+    #[test]
+    fn xo_22_ch_remove_node() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(50);
+        ring.xo_add_node("alpha");
+        ring.xo_add_node("beta");
+        ring.xo_remove_node("alpha");
+        assert_eq!(ring.xo_node_count(), 1);
+        assert_eq!(ring.xo_virtual_nodes(), 50);
+    }
+
+    #[test]
+    fn xo_22_ch_get_node() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(50);
+        ring.xo_add_node("node-1");
+        let result = ring.xo_get_node("some-key");
+        assert_eq!(result, Some("node-1"));
+    }
+
+    #[test]
+    fn xo_22_ch_empty_ring() {
+        let ring = super::Xo22ConsistentHash::xo_new(10);
+        assert_eq!(ring.xo_get_node("key"), None);
+        assert_eq!(ring.xo_node_count(), 0);
+    }
+
+    #[test]
+    fn xo_22_ch_distribution() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(100);
+        ring.xo_add_node("s1");
+        ring.xo_add_node("s2");
+        let keys: Vec<&str> = vec!["k1", "k2", "k3", "k4", "k5", "k6"];
+        let dist = ring.xo_key_distribution(&keys);
+        let total: usize = dist.values().sum();
+        assert_eq!(total, 6);
+    }
+
+    #[test]
+    fn xo_22_ch_rebalance() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(100);
+        ring.xo_add_node("n1");
+        ring.xo_add_node("n2");
+        ring.xo_add_node("n3");
+        let rf = ring.xo_rebalance_factor();
+        assert!(rf >= 0.0, "rebalance factor should be non-negative");
+    }
+
+    #[test]
+    fn xo_22_ch_virtual_nodes() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(75);
+        ring.xo_add_node("host1");
+        ring.xo_add_node("host2");
+        assert_eq!(ring.xo_virtual_nodes(), 150);
+    }
+
+    #[test]
+    fn xo_22_ch_consistent_lookup() {
+        let mut ring = super::Xo22ConsistentHash::xo_new(50);
+        ring.xo_add_node("srv-a");
+        ring.xo_add_node("srv-b");
+        let first = ring.xo_get_node("stable-key").unwrap().to_string();
+        let second = ring.xo_get_node("stable-key").unwrap().to_string();
+        assert_eq!(first, second, "same key must map to same node");
+    }
+
 }
