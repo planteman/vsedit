@@ -1814,6 +1814,147 @@ impl std::fmt::Display for RulerPositionValidator {
 }
 
 
+/// Ruler annotation overlay manager.
+#[derive(Debug, Clone)]
+pub struct RulerAnnotationManager {
+    entries: Vec<RulerAnnotation>,
+    enabled: bool,
+    max_entries: usize,
+}
+
+/// A single ruler annotation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RulerAnnotation {
+    pub id: String,
+    pub label: String,
+    pub priority: i32,
+    pub active: bool,
+    pub metadata: Vec<(String, String)>,
+}
+
+impl RulerAnnotation {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            priority: 0,
+            active: true,
+            metadata: Vec::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, p: i32) -> Self { self.priority = p; self }
+
+    pub fn with_meta(mut self, key: &str, val: &str) -> Self {
+        self.metadata.push((key.to_string(), val.to_string())); self
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    pub fn deactivate(&mut self) { self.active = false; }
+    pub fn activate(&mut self) { self.active = true; }
+
+    pub fn has_meta(&self, key: &str) -> bool {
+        self.metadata.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn meta_count(&self) -> usize { self.metadata.len() }
+
+    pub fn remove_meta(&mut self, key: &str) -> bool {
+        let len = self.metadata.len();
+        self.metadata.retain(|(k, _)| k != key);
+        self.metadata.len() < len
+    }
+}
+
+impl RulerAnnotationManager {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), enabled: true, max_entries }
+    }
+
+    pub fn add(&mut self, entry: RulerAnnotation) -> bool {
+        if self.entries.len() >= self.max_entries { return false; }
+        self.entries.push(entry);
+        self.entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let len = self.entries.len();
+        self.entries.retain(|e| e.id != id);
+        self.entries.len() < len
+    }
+
+    pub fn get(&self, id: &str) -> Option<&RulerAnnotation> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut RulerAnnotation> {
+        self.entries.iter_mut().find(|e| e.id == id)
+    }
+
+    pub fn active_entries(&self) -> Vec<&RulerAnnotation> {
+        self.entries.iter().filter(|e| e.active).collect()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn is_full(&self) -> bool { self.entries.len() >= self.max_entries }
+    pub fn enable(&mut self) { self.enabled = true; }
+    pub fn disable(&mut self) { self.enabled = false; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn ids(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.id.as_str()).collect()
+    }
+
+    pub fn top_n(&self, n: usize) -> Vec<&RulerAnnotation> {
+        self.entries.iter().take(n).collect()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Option<&RulerAnnotation> {
+        self.entries.iter().find(|e| e.label == label)
+    }
+
+    pub fn deactivate_all(&mut self) {
+        for e in &mut self.entries { e.active = false; }
+    }
+
+    pub fn activate_all(&mut self) {
+        for e in &mut self.entries { e.active = true; }
+    }
+
+    pub fn count_active(&self) -> usize {
+        self.entries.iter().filter(|e| e.active).count()
+    }
+
+    pub fn highest_priority(&self) -> Option<i32> {
+        self.entries.first().map(|e| e.priority)
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.entries.iter().any(|e| e.id == id)
+    }
+
+    pub fn labels(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.label.as_str()).collect()
+    }
+
+    pub fn reorder_by_label(&mut self) {
+        self.entries.sort_by(|a, b| a.label.cmp(&b.label));
+    }
+
+    pub fn drain_inactive(&mut self) -> Vec<RulerAnnotation> {
+        let (inactive, active): (Vec<_>, Vec<_>) =
+            self.entries.drain(..).partition(|e| !e.active);
+        self.entries = active;
+        inactive
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2817,6 +2958,97 @@ mod tests {
         let c = RulerConstraint::default();
         let s = format!("{c}");
         assert!(s.contains("1-320"));
+    }
+
+    #[test]
+    fn ruler_annotation_creation() {
+        let e = RulerAnnotation::new("r1", "80-col");
+        assert_eq!(e.id, "r1");
+        assert!(e.active);
+    }
+
+    #[test]
+    fn ruler_annotation_priority() {
+        let e = RulerAnnotation::new("r1", "R").with_priority(5);
+        assert_eq!(e.priority, 5);
+    }
+
+    #[test]
+    fn ruler_annotation_metadata() {
+        let e = RulerAnnotation::new("r1", "R").with_meta("col", "80");
+        assert_eq!(e.get_meta("col"), Some("80"));
+        assert!(e.has_meta("col"));
+    }
+
+    #[test]
+    fn ruler_annotation_remove_meta() {
+        let mut e = RulerAnnotation::new("r1", "R").with_meta("k", "v");
+        assert!(e.remove_meta("k"));
+        assert!(!e.remove_meta("k"));
+    }
+
+    #[test]
+    fn ruler_annotation_activate_deactivate() {
+        let mut e = RulerAnnotation::new("r1", "R");
+        e.deactivate(); assert!(!e.active);
+        e.activate(); assert!(e.active);
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_add_sorted() {
+        let mut m = RulerAnnotationManager::new(10);
+        m.add(RulerAnnotation::new("lo", "Lo").with_priority(1));
+        m.add(RulerAnnotation::new("hi", "Hi").with_priority(10));
+        assert_eq!(m.ids()[0], "hi");
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_capacity() {
+        let mut m = RulerAnnotationManager::new(1);
+        assert!(m.add(RulerAnnotation::new("a", "A")));
+        assert!(!m.add(RulerAnnotation::new("b", "B")));
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_remove() {
+        let mut m = RulerAnnotationManager::new(10);
+        m.add(RulerAnnotation::new("a", "A"));
+        assert!(m.remove("a"));
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_active() {
+        let mut m = RulerAnnotationManager::new(10);
+        m.add(RulerAnnotation::new("a", "A"));
+        m.add(RulerAnnotation::new("b", "B"));
+        m.get_mut("a").unwrap().deactivate();
+        assert_eq!(m.count_active(), 1);
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_enable_disable() {
+        let mut m = RulerAnnotationManager::new(10);
+        m.disable(); assert!(!m.is_enabled());
+        m.enable(); assert!(m.is_enabled());
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_find_label() {
+        let mut m = RulerAnnotationManager::new(10);
+        m.add(RulerAnnotation::new("a", "Alpha"));
+        assert_eq!(m.find_by_label("Alpha").unwrap().id, "a");
+    }
+
+    #[test]
+    fn ruler_annotation_mgr_drain_inactive() {
+        let mut m = RulerAnnotationManager::new(10);
+        m.add(RulerAnnotation::new("a", "A"));
+        m.add(RulerAnnotation::new("b", "B"));
+        m.get_mut("a").unwrap().deactivate();
+        let d = m.drain_inactive();
+        assert_eq!(d.len(), 1);
+        assert_eq!(m.len(), 1);
     }
 
 }

@@ -1596,6 +1596,122 @@ impl fmt::Display for TimelinePageNav {
     }
 }
 
+
+/// Aggregates timeline entries by time period.
+pub struct TimelineAggregator {
+    buckets: HashMap<String, Vec<TimelineItem>>,
+}
+
+impl TimelineAggregator {
+    pub fn new() -> Self {
+        Self { buckets: HashMap::new() }
+    }
+
+    pub fn add_entry(&mut self, bucket_key: &str, entry: TimelineItem) {
+        self.buckets.entry(bucket_key.to_string()).or_default().push(entry);
+    }
+
+    pub fn bucket_count(&self) -> usize {
+        self.buckets.len()
+    }
+
+    pub fn entries_in_bucket(&self, key: &str) -> usize {
+        self.buckets.get(key).map_or(0, |v| v.len())
+    }
+
+    pub fn total_entries(&self) -> usize {
+        self.buckets.values().map(|v| v.len()).sum()
+    }
+
+    pub fn bucket_keys(&self) -> Vec<String> {
+        let mut keys: Vec<_> = self.buckets.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    pub fn clear_bucket(&mut self, key: &str) {
+        self.buckets.remove(key);
+    }
+
+    pub fn merge(&mut self, other: TimelineAggregator) {
+        for (key, entries) in other.buckets {
+            self.buckets.entry(key).or_default().extend(entries);
+        }
+    }
+}
+
+/// Tracks timeline cursor position for navigation.
+pub struct TimelineCursor {
+    position: usize,
+    total: usize,
+}
+
+impl TimelineCursor {
+    pub fn new(total: usize) -> Self {
+        Self { position: 0, total }
+    }
+
+    pub fn advance(&mut self) -> bool {
+        if self.position + 1 < self.total {
+            self.position += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn retreat(&mut self) -> bool {
+        if self.position > 0 {
+            self.position -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn position(&self) -> usize { self.position }
+    pub fn total(&self) -> usize { self.total }
+    pub fn is_at_start(&self) -> bool { self.position == 0 }
+    pub fn is_at_end(&self) -> bool { self.position + 1 >= self.total }
+    pub fn jump_to(&mut self, pos: usize) -> bool {
+        if pos < self.total { self.position = pos; true } else { false }
+    }
+
+    pub fn remaining(&self) -> usize {
+        self.total.saturating_sub(self.position + 1)
+    }
+
+    pub fn progress_percent(&self) -> f64 {
+        if self.total == 0 { return 0.0; }
+        (self.position as f64 / (self.total - 1).max(1) as f64) * 100.0
+    }
+}
+
+/// Computes diffs between timeline snapshots.
+pub struct TimelineDiff {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+    pub modified: Vec<String>,
+}
+
+impl TimelineDiff {
+    pub fn compute(before: &[String], after: &[String]) -> Self {
+        let before_set: std::collections::HashSet<_> = before.iter().cloned().collect();
+        let after_set: std::collections::HashSet<_> = after.iter().cloned().collect();
+        let added = after_set.difference(&before_set).cloned().collect();
+        let removed = before_set.difference(&after_set).cloned().collect();
+        Self { added, removed, modified: Vec::new() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.modified.is_empty()
+    }
+
+    pub fn total_changes(&self) -> usize {
+        self.added.len() + self.removed.len() + self.modified.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2870,4 +2986,111 @@ mod tests {
         let s = format!("{}", p);
         assert!(s.contains("Page 1/4"));
     }
+
+    #[test]
+    fn timeline_aggregator_add_and_count() {
+        let mut agg = TimelineAggregator::new();
+        let entry = TimelineItem { id: "e1".into(), label: "commit".into(), description: Some("init".into()), timestamp: 100, icon_id: None, command: None };
+        agg.add_entry("2024-01", entry);
+        assert_eq!(agg.bucket_count(), 1);
+        assert_eq!(agg.entries_in_bucket("2024-01"), 1);
+    }
+
+    #[test]
+    fn timeline_aggregator_total() {
+        let mut agg = TimelineAggregator::new();
+        let e1 = TimelineItem { id: "1".into(), label: "l".into(), description: None, timestamp: 1, icon_id: None, command: None };
+        let e2 = TimelineItem { id: "2".into(), label: "l".into(), description: None, timestamp: 2, icon_id: None, command: None };
+        agg.add_entry("a", e1);
+        agg.add_entry("b", e2);
+        assert_eq!(agg.total_entries(), 2);
+    }
+
+    #[test]
+    fn timeline_aggregator_clear_bucket() {
+        let mut agg = TimelineAggregator::new();
+        let e = TimelineItem { id: "1".into(), label: "l".into(), description: None, timestamp: 0, icon_id: None, command: None };
+        agg.add_entry("x", e);
+        agg.clear_bucket("x");
+        assert_eq!(agg.bucket_count(), 0);
+    }
+
+    #[test]
+    fn timeline_aggregator_merge() {
+        let mut a1 = TimelineAggregator::new();
+        let mut a2 = TimelineAggregator::new();
+        let e1 = TimelineItem { id: "1".into(), label: "l".into(), description: None, timestamp: 0, icon_id: None, command: None };
+        let e2 = TimelineItem { id: "2".into(), label: "l".into(), description: None, timestamp: 0, icon_id: None, command: None };
+        a1.add_entry("k", e1);
+        a2.add_entry("k", e2);
+        a1.merge(a2);
+        assert_eq!(a1.entries_in_bucket("k"), 2);
+    }
+
+    #[test]
+    fn timeline_cursor_navigation() {
+        let mut c = TimelineCursor::new(5);
+        assert!(c.is_at_start());
+        assert!(c.advance());
+        assert_eq!(c.position(), 1);
+        assert!(c.retreat());
+        assert_eq!(c.position(), 0);
+    }
+
+    #[test]
+    fn timeline_cursor_at_end() {
+        let mut c = TimelineCursor::new(2);
+        c.advance();
+        assert!(c.is_at_end());
+        assert!(!c.advance());
+    }
+
+    #[test]
+    fn timeline_cursor_jump() {
+        let mut c = TimelineCursor::new(10);
+        assert!(c.jump_to(5));
+        assert_eq!(c.position(), 5);
+        assert!(!c.jump_to(10));
+    }
+
+    #[test]
+    fn timeline_cursor_remaining() {
+        let mut c = TimelineCursor::new(5);
+        assert_eq!(c.remaining(), 4);
+        c.advance();
+        assert_eq!(c.remaining(), 3);
+    }
+
+    #[test]
+    fn timeline_cursor_progress() {
+        let mut c = TimelineCursor::new(5);
+        assert_eq!(c.progress_percent(), 0.0);
+        c.jump_to(4);
+        assert!((c.progress_percent() - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn timeline_diff_compute() {
+        let before = vec!["a".into(), "b".into()];
+        let after = vec!["b".into(), "c".into()];
+        let diff = TimelineDiff::compute(&before, &after);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.removed.len(), 1);
+    }
+
+    #[test]
+    fn timeline_diff_empty() {
+        let same: Vec<String> = vec!["a".into()];
+        let diff = TimelineDiff::compute(&same, &same);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn timeline_diff_total_changes() {
+        let before: Vec<String> = vec!["a".into(), "b".into(), "c".into()];
+        let after: Vec<String> = vec!["d".into()];
+        let diff = TimelineDiff::compute(&before, &after);
+        assert!(diff.total_changes() > 0);
+    }
+
 }

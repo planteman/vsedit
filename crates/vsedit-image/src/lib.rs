@@ -1766,6 +1766,125 @@ impl ImageThumbnailSpec {
     }
 }
 
+
+/// Histogram of color channels for an image.
+pub struct ImageHistogram {
+    red: [u32; 256],
+    green: [u32; 256],
+    blue: [u32; 256],
+    sample_count: u64,
+}
+
+impl ImageHistogram {
+    pub fn new() -> Self {
+        Self { red: [0; 256], green: [0; 256], blue: [0; 256], sample_count: 0 }
+    }
+
+    pub fn add_pixel(&mut self, r: u8, g: u8, b: u8) {
+        self.red[r as usize] += 1;
+        self.green[g as usize] += 1;
+        self.blue[b as usize] += 1;
+        self.sample_count += 1;
+    }
+
+    pub fn sample_count(&self) -> u64 { self.sample_count }
+
+    pub fn mean_red(&self) -> f64 {
+        if self.sample_count == 0 { return 0.0; }
+        let sum: u64 = self.red.iter().enumerate().map(|(i, &c)| i as u64 * c as u64).sum();
+        sum as f64 / self.sample_count as f64
+    }
+
+    pub fn mean_green(&self) -> f64 {
+        if self.sample_count == 0 { return 0.0; }
+        let sum: u64 = self.green.iter().enumerate().map(|(i, &c)| i as u64 * c as u64).sum();
+        sum as f64 / self.sample_count as f64
+    }
+
+    pub fn mean_blue(&self) -> f64 {
+        if self.sample_count == 0 { return 0.0; }
+        let sum: u64 = self.blue.iter().enumerate().map(|(i, &c)| i as u64 * c as u64).sum();
+        sum as f64 / self.sample_count as f64
+    }
+
+    pub fn peak_red(&self) -> u8 {
+        self.red.iter().enumerate().max_by_key(|&(_, c)| c).map(|(i, _)| i as u8).unwrap_or(0)
+    }
+
+    pub fn peak_green(&self) -> u8 {
+        self.green.iter().enumerate().max_by_key(|&(_, c)| c).map(|(i, _)| i as u8).unwrap_or(0)
+    }
+
+    pub fn peak_blue(&self) -> u8 {
+        self.blue.iter().enumerate().max_by_key(|&(_, c)| c).map(|(i, _)| i as u8).unwrap_or(0)
+    }
+}
+
+/// Color space conversion utilities.
+pub struct ColorConvert;
+
+impl ColorConvert {
+    /// Convert sRGB [0..255] to linear [0..1].
+    pub fn srgb_to_linear(value: u8) -> f64 {
+        let v = value as f64 / 255.0;
+        if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+    }
+
+    /// Convert linear [0..1] to sRGB [0..255].
+    pub fn linear_to_srgb(value: f64) -> u8 {
+        let v = value.clamp(0.0, 1.0);
+        let s = if v <= 0.0031308 { v * 12.92 } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 };
+        (s * 255.0).round() as u8
+    }
+
+    /// Compute relative luminance from sRGB values.
+    pub fn luminance(r: u8, g: u8, b: u8) -> f64 {
+        0.2126 * Self::srgb_to_linear(r)
+            + 0.7152 * Self::srgb_to_linear(g)
+            + 0.0722 * Self::srgb_to_linear(b)
+    }
+
+    /// Compute contrast ratio between two luminances (WCAG).
+    pub fn contrast_ratio(l1: f64, l2: f64) -> f64 {
+        let (lighter, darker) = if l1 > l2 { (l1, l2) } else { (l2, l1) };
+        (lighter + 0.05) / (darker + 0.05)
+    }
+}
+
+/// Image crop region specification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CropRegion {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl CropRegion {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self { x, y, width, height }
+    }
+
+    pub fn contains_point(&self, px: u32, py: u32) -> bool {
+        px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
+    }
+
+    pub fn area(&self) -> u64 { self.width as u64 * self.height as u64 }
+
+    pub fn intersects(&self, other: &CropRegion) -> bool {
+        self.x < other.x + other.width && self.x + self.width > other.x
+            && self.y < other.y + other.height && self.y + self.height > other.y
+    }
+
+    pub fn clamp_to(&self, img_w: u32, img_h: u32) -> CropRegion {
+        let x = self.x.min(img_w);
+        let y = self.y.min(img_h);
+        let w = self.width.min(img_w - x);
+        let h = self.height.min(img_h - y);
+        CropRegion::new(x, y, w, h)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2870,6 +2989,101 @@ mod tests {
         let spec = ImageThumbnailSpec::new(100, 100);
         assert!(spec.fits_within(50, 50));
         assert!(!spec.fits_within(150, 50));
+    }
+
+
+    #[test]
+    fn histogram_empty() {
+        let h = ImageHistogram::new();
+        assert_eq!(h.sample_count(), 0);
+        assert_eq!(h.mean_red(), 0.0);
+    }
+
+    #[test]
+    fn histogram_add_pixels() {
+        let mut h = ImageHistogram::new();
+        h.add_pixel(255, 0, 0);
+        h.add_pixel(255, 0, 0);
+        assert_eq!(h.sample_count(), 2);
+        assert_eq!(h.peak_red(), 255);
+    }
+
+    #[test]
+    fn histogram_mean_values() {
+        let mut h = ImageHistogram::new();
+        h.add_pixel(100, 100, 100);
+        h.add_pixel(200, 200, 200);
+        assert!((h.mean_red() - 150.0).abs() < 0.01);
+        assert!((h.mean_green() - 150.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn histogram_peak_channels() {
+        let mut h = ImageHistogram::new();
+        for _ in 0..10 { h.add_pixel(42, 99, 200); }
+        assert_eq!(h.peak_red(), 42);
+        assert_eq!(h.peak_green(), 99);
+        assert_eq!(h.peak_blue(), 200);
+    }
+
+    #[test]
+    fn color_srgb_roundtrip() {
+        for v in [0u8, 50, 128, 200, 255] {
+            let linear = ColorConvert::srgb_to_linear(v);
+            let back = ColorConvert::linear_to_srgb(linear);
+            assert!((v as i16 - back as i16).unsigned_abs() <= 1);
+        }
+    }
+
+    #[test]
+    fn color_luminance_black_white() {
+        assert!(ColorConvert::luminance(0, 0, 0) < 0.01);
+        assert!((ColorConvert::luminance(255, 255, 255) - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn color_contrast_ratio_bw() {
+        let l1 = ColorConvert::luminance(255, 255, 255);
+        let l2 = ColorConvert::luminance(0, 0, 0);
+        let ratio = ColorConvert::contrast_ratio(l1, l2);
+        assert!(ratio > 20.0);
+    }
+
+    #[test]
+    fn crop_region_contains_point() {
+        let r = CropRegion::new(10, 10, 50, 50);
+        assert!(r.contains_point(20, 20));
+        assert!(!r.contains_point(5, 5));
+    }
+
+    #[test]
+    fn crop_region_area() {
+        let r = CropRegion::new(0, 0, 100, 200);
+        assert_eq!(r.area(), 20000);
+    }
+
+    #[test]
+    fn crop_region_intersects() {
+        let a = CropRegion::new(0, 0, 50, 50);
+        let b = CropRegion::new(25, 25, 50, 50);
+        let c = CropRegion::new(100, 100, 10, 10);
+        assert!(a.intersects(&b));
+        assert!(!a.intersects(&c));
+    }
+
+    #[test]
+    fn crop_region_clamp() {
+        let r = CropRegion::new(90, 90, 50, 50);
+        let clamped = r.clamp_to(100, 100);
+        assert_eq!(clamped.width, 10);
+        assert_eq!(clamped.height, 10);
+    }
+
+    #[test]
+    fn crop_region_equality() {
+        let a = CropRegion::new(1, 2, 3, 4);
+        let b = CropRegion::new(1, 2, 3, 4);
+        assert_eq!(a, b);
     }
 
 }

@@ -11,6 +11,7 @@ pub mod launch;
 pub mod protocol;
 pub mod types;
 
+use std::collections::HashMap;
 use std::fmt;
 pub use breakpoints::{BreakpointStore, Breakpoint};
 pub use client::DapClient;
@@ -1878,6 +1879,123 @@ impl XDebugLayoutConstraint {
     }
 }
 
+/// Tracks debug adapter protocol message statistics.
+pub struct DapMessageStats {
+    requests_sent: u64,
+    responses_received: u64,
+    events_received: u64,
+    errors: u64,
+}
+
+impl DapMessageStats {
+    pub fn new() -> Self {
+        Self { requests_sent: 0, responses_received: 0, events_received: 0, errors: 0 }
+    }
+
+    pub fn record_request(&mut self) { self.requests_sent += 1; }
+    pub fn record_response(&mut self) { self.responses_received += 1; }
+    pub fn record_event(&mut self) { self.events_received += 1; }
+    pub fn record_error(&mut self) { self.errors += 1; }
+
+    pub fn requests_sent(&self) -> u64 { self.requests_sent }
+    pub fn responses_received(&self) -> u64 { self.responses_received }
+    pub fn events_received(&self) -> u64 { self.events_received }
+    pub fn errors(&self) -> u64 { self.errors }
+
+    pub fn total_messages(&self) -> u64 {
+        self.requests_sent + self.responses_received + self.events_received
+    }
+
+    pub fn error_rate(&self) -> f64 {
+        let total = self.total_messages();
+        if total == 0 { return 0.0; }
+        self.errors as f64 / total as f64
+    }
+
+    pub fn pending_responses(&self) -> u64 {
+        self.requests_sent.saturating_sub(self.responses_received)
+    }
+
+    pub fn reset(&mut self) {
+        self.requests_sent = 0;
+        self.responses_received = 0;
+        self.events_received = 0;
+        self.errors = 0;
+    }
+}
+
+/// Manages a stack of debug call frames for display.
+pub struct CallFrameStack {
+    frames: Vec<(String, String, u32)>, // (name, source, line)
+}
+
+impl CallFrameStack {
+    pub fn new() -> Self { Self { frames: Vec::new() } }
+
+    pub fn push(&mut self, name: &str, source: &str, line: u32) {
+        self.frames.push((name.to_string(), source.to_string(), line));
+    }
+
+    pub fn pop(&mut self) -> Option<(String, String, u32)> { self.frames.pop() }
+
+    pub fn depth(&self) -> usize { self.frames.len() }
+    pub fn is_empty(&self) -> bool { self.frames.is_empty() }
+
+    pub fn top(&self) -> Option<&(String, String, u32)> { self.frames.last() }
+
+    pub fn frame_at(&self, index: usize) -> Option<&(String, String, u32)> {
+        self.frames.get(index)
+    }
+
+    pub fn clear(&mut self) { self.frames.clear(); }
+
+    pub fn contains_source(&self, source: &str) -> bool {
+        self.frames.iter().any(|(_, s, _)| s == source)
+    }
+
+    pub fn sources(&self) -> Vec<String> {
+        let mut srcs: Vec<_> = self.frames.iter().map(|(_, s, _)| s.clone()).collect();
+        srcs.dedup();
+        srcs
+    }
+}
+
+/// Evaluates simple debug expressions (variable watches).
+pub struct DebugWatchEvaluator {
+    variables: HashMap<String, String>,
+}
+
+impl DebugWatchEvaluator {
+    pub fn new() -> Self { Self { variables: HashMap::new() } }
+
+    pub fn set_variable(&mut self, name: &str, value: &str) {
+        self.variables.insert(name.to_string(), value.to_string());
+    }
+
+    pub fn evaluate(&self, expr: &str) -> Option<String> {
+        // Simple variable lookup
+        self.variables.get(expr).cloned()
+    }
+
+    pub fn variable_count(&self) -> usize { self.variables.len() }
+
+    pub fn remove_variable(&mut self, name: &str) -> bool {
+        self.variables.remove(name).is_some()
+    }
+
+    pub fn clear(&mut self) { self.variables.clear(); }
+
+    pub fn variable_names(&self) -> Vec<String> {
+        let mut names: Vec<_> = self.variables.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
+    pub fn has_variable(&self, name: &str) -> bool {
+        self.variables.contains_key(name)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2994,6 +3112,135 @@ mod tests {
     fn x_debug_layout_region_eq() {
         assert_eq!(XDebugLayoutRegion::Sidebar, XDebugLayoutRegion::Sidebar);
         assert_ne!(XDebugLayoutRegion::Sidebar, XDebugLayoutRegion::Panel);
+    }
+
+    #[test]
+    fn dap_stats_initial() {
+        let s = DapMessageStats::new();
+        assert_eq!(s.total_messages(), 0);
+        assert_eq!(s.error_rate(), 0.0);
+        assert_eq!(s.pending_responses(), 0);
+    }
+
+    #[test]
+    fn dap_stats_record_and_totals() {
+        let mut s = DapMessageStats::new();
+        s.record_request();
+        s.record_response();
+        s.record_event();
+        assert_eq!(s.total_messages(), 3);
+        assert_eq!(s.pending_responses(), 0);
+    }
+
+    #[test]
+    fn dap_stats_error_rate() {
+        let mut s = DapMessageStats::new();
+        s.record_request();
+        s.record_response();
+        s.record_error();
+        assert!(s.error_rate() > 0.0);
+    }
+
+    #[test]
+    fn dap_stats_pending_responses() {
+        let mut s = DapMessageStats::new();
+        s.record_request();
+        s.record_request();
+        s.record_response();
+        assert_eq!(s.pending_responses(), 1);
+    }
+
+    #[test]
+    fn dap_stats_reset() {
+        let mut s = DapMessageStats::new();
+        s.record_request();
+        s.record_error();
+        s.reset();
+        assert_eq!(s.total_messages(), 0);
+        assert_eq!(s.errors(), 0);
+    }
+
+    #[test]
+    fn call_frame_stack_push_pop() {
+        let mut stack = CallFrameStack::new();
+        stack.push("main", "app.rs", 10);
+        assert_eq!(stack.depth(), 1);
+        let frame = stack.pop().unwrap();
+        assert_eq!(frame.0, "main");
+    }
+
+    #[test]
+    fn call_frame_stack_top() {
+        let mut stack = CallFrameStack::new();
+        stack.push("a", "a.rs", 1);
+        stack.push("b", "b.rs", 2);
+        assert_eq!(stack.top().unwrap().0, "b");
+    }
+
+    #[test]
+    fn call_frame_stack_contains_source() {
+        let mut stack = CallFrameStack::new();
+        stack.push("fn1", "lib.rs", 5);
+        assert!(stack.contains_source("lib.rs"));
+        assert!(!stack.contains_source("main.rs"));
+    }
+
+    #[test]
+    fn call_frame_stack_clear() {
+        let mut stack = CallFrameStack::new();
+        stack.push("x", "y.rs", 1);
+        stack.clear();
+        assert!(stack.is_empty());
+    }
+
+    #[test]
+    fn call_frame_stack_sources() {
+        let mut stack = CallFrameStack::new();
+        stack.push("a", "x.rs", 1);
+        stack.push("b", "y.rs", 2);
+        let sources = stack.sources();
+        assert_eq!(sources.len(), 2);
+    }
+
+    #[test]
+    fn watch_evaluator_set_get() {
+        let mut eval = DebugWatchEvaluator::new();
+        eval.set_variable("x", "42");
+        assert_eq!(eval.evaluate("x"), Some("42".into()));
+        assert_eq!(eval.evaluate("y"), None);
+    }
+
+    #[test]
+    fn watch_evaluator_remove() {
+        let mut eval = DebugWatchEvaluator::new();
+        eval.set_variable("a", "1");
+        assert!(eval.remove_variable("a"));
+        assert!(!eval.has_variable("a"));
+    }
+
+    #[test]
+    fn watch_evaluator_names_sorted() {
+        let mut eval = DebugWatchEvaluator::new();
+        eval.set_variable("z", "1");
+        eval.set_variable("a", "2");
+        assert_eq!(eval.variable_names(), vec!["a", "z"]);
+    }
+
+    #[test]
+    fn watch_evaluator_clear() {
+        let mut eval = DebugWatchEvaluator::new();
+        eval.set_variable("x", "1");
+        eval.clear();
+        assert_eq!(eval.variable_count(), 0);
+    }
+
+    #[test]
+    fn call_frame_stack_frame_at() {
+        let mut stack = CallFrameStack::new();
+        stack.push("a", "a.rs", 1);
+        stack.push("b", "b.rs", 2);
+        assert_eq!(stack.frame_at(0).unwrap().0, "a");
+        assert!(stack.frame_at(5).is_none());
     }
 
 }

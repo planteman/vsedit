@@ -1825,6 +1825,108 @@ impl fmt::Display for PlatformPathNormalizer {
 }
 
 
+
+/// Represents a platform locale with region support (detailed variant).
+pub struct PlatformLocaleDetail {
+    language: String,
+    region: Option<String>,
+}
+
+impl PlatformLocaleDetail {
+    pub fn new(language: &str) -> Self {
+        Self { language: language.to_string(), region: None }
+    }
+
+    pub fn with_region(language: &str, region: &str) -> Self {
+        Self { language: language.to_string(), region: Some(region.to_string()) }
+    }
+
+    pub fn language(&self) -> &str { &self.language }
+    pub fn region(&self) -> Option<&str> { self.region.as_deref() }
+
+    pub fn to_bcp47(&self) -> String {
+        match &self.region {
+            Some(r) => format!("{}-{}", self.language, r),
+            None => self.language.clone(),
+        }
+    }
+
+    pub fn matches(&self, tag: &str) -> bool {
+        let bcp = self.to_bcp47();
+        tag.eq_ignore_ascii_case(&bcp) || tag.eq_ignore_ascii_case(&self.language)
+    }
+}
+
+/// Platform capability flags for feature detection (detailed variant).
+#[derive(Debug, Clone, Default)]
+pub struct PlatformCapabilityFlags {
+    pub supports_clipboard: bool,
+    pub supports_drag_drop: bool,
+    pub supports_notifications: bool,
+    pub supports_file_dialogs: bool,
+    pub supports_gpu_acceleration: bool,
+    pub max_texture_size: u32,
+}
+
+impl PlatformCapabilityFlags {
+    pub fn full() -> Self {
+        Self {
+            supports_clipboard: true,
+            supports_drag_drop: true,
+            supports_notifications: true,
+            supports_file_dialogs: true,
+            supports_gpu_acceleration: true,
+            max_texture_size: 16384,
+        }
+    }
+
+    pub fn minimal() -> Self {
+        Self {
+            supports_clipboard: true,
+            supports_drag_drop: false,
+            supports_notifications: false,
+            supports_file_dialogs: false,
+            supports_gpu_acceleration: false,
+            max_texture_size: 4096,
+        }
+    }
+
+    pub fn capability_count(&self) -> u32 {
+        let mut count = 0u32;
+        if self.supports_clipboard { count += 1; }
+        if self.supports_drag_drop { count += 1; }
+        if self.supports_notifications { count += 1; }
+        if self.supports_file_dialogs { count += 1; }
+        if self.supports_gpu_acceleration { count += 1; }
+        count
+    }
+}
+
+/// Screen DPI scaling information.
+pub struct DpiScaling {
+    scale_factor: f64,
+    base_dpi: f64,
+}
+
+impl DpiScaling {
+    pub fn new(scale_factor: f64) -> Self {
+        Self { scale_factor: scale_factor.max(0.25).min(8.0), base_dpi: 96.0 }
+    }
+
+    pub fn effective_dpi(&self) -> f64 { self.base_dpi * self.scale_factor }
+    pub fn scale_factor(&self) -> f64 { self.scale_factor }
+
+    pub fn physical_pixels(&self, logical: u32) -> u32 {
+        (logical as f64 * self.scale_factor).round() as u32
+    }
+
+    pub fn logical_pixels(&self, physical: u32) -> u32 {
+        (physical as f64 / self.scale_factor).round() as u32
+    }
+
+    pub fn is_hidpi(&self) -> bool { self.scale_factor > 1.5 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2870,5 +2972,85 @@ mod tests {
         assert_eq!(norm.normalize_count(), 2);
     }
 
+
+
+    #[test]
+    fn platform_locale_bcp47() {
+        let l = PlatformLocaleDetail::with_region("en", "US");
+        assert_eq!(l.to_bcp47(), "en-US");
+    }
+
+    #[test]
+    fn platform_locale_no_region() {
+        let l = PlatformLocaleDetail::new("fr");
+        assert_eq!(l.to_bcp47(), "fr");
+        assert!(l.region().is_none());
+    }
+
+    #[test]
+    fn platform_locale_matches() {
+        let l = PlatformLocaleDetail::with_region("en", "US");
+        assert!(l.matches("en-US"));
+        assert!(l.matches("en"));
+        assert!(!l.matches("fr"));
+    }
+
+    #[test]
+    fn platform_capabilities_full() {
+        let caps = PlatformCapabilityFlags::full();
+        assert_eq!(caps.capability_count(), 5);
+        assert!(caps.supports_gpu_acceleration);
+    }
+
+    #[test]
+    fn platform_capabilities_minimal() {
+        let caps = PlatformCapabilityFlags::minimal();
+        assert_eq!(caps.capability_count(), 1);
+        assert!(!caps.supports_gpu_acceleration);
+    }
+
+    #[test]
+    fn platform_capabilities_default() {
+        let caps = PlatformCapabilityFlags::default();
+        assert_eq!(caps.capability_count(), 0);
+        assert_eq!(caps.max_texture_size, 0);
+    }
+
+    #[test]
+    fn dpi_scaling_effective() {
+        let dpi = DpiScaling::new(2.0);
+        assert_eq!(dpi.effective_dpi(), 192.0);
+        assert!(dpi.is_hidpi());
+    }
+
+    #[test]
+    fn dpi_scaling_physical_pixels() {
+        let dpi = DpiScaling::new(2.0);
+        assert_eq!(dpi.physical_pixels(100), 200);
+    }
+
+    #[test]
+    fn dpi_scaling_logical_pixels() {
+        let dpi = DpiScaling::new(2.0);
+        assert_eq!(dpi.logical_pixels(200), 100);
+    }
+
+    #[test]
+    fn dpi_scaling_clamped_low() {
+        let dpi = DpiScaling::new(0.1);
+        assert_eq!(dpi.scale_factor(), 0.25);
+    }
+
+    #[test]
+    fn dpi_scaling_not_hidpi() {
+        let dpi = DpiScaling::new(1.0);
+        assert!(!dpi.is_hidpi());
+    }
+
+    #[test]
+    fn dpi_scaling_clamped_high() {
+        let dpi = DpiScaling::new(20.0);
+        assert_eq!(dpi.scale_factor(), 8.0);
+    }
 
 }

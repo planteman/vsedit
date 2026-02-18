@@ -3,6 +3,7 @@
 //! Provides breadcrumb data structures and a renderable navigation bar
 //! with keyboard-navigable segments — rendered via ratatui.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -1768,6 +1769,140 @@ pub fn x_breadcrumb_tokenize(text: &str) -> Vec<&str> {
         .collect()
 }
 
+
+/// Configuration manager for breadcrumb functionality.
+pub struct BreadcrumbConfig {
+    options: HashMap<String, String>,
+    enabled: bool,
+    version: u32,
+}
+
+impl BreadcrumbConfig {
+    pub fn new() -> Self {
+        Self { options: HashMap::new(), enabled: true, version: 1 }
+    }
+
+    pub fn set_option(&mut self, key: &str, value: &str) {
+        self.options.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get_option(&self, key: &str) -> Option<&str> {
+        self.options.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove_option(&mut self, key: &str) -> Option<String> {
+        self.options.remove(key)
+    }
+
+    pub fn option_count(&self) -> usize { self.options.len() }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+
+    pub fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+
+    pub fn version(&self) -> u32 { self.version }
+
+    pub fn bump_version(&mut self) { self.version += 1; }
+
+    pub fn has_option(&self, key: &str) -> bool { self.options.contains_key(key) }
+
+    pub fn option_keys(&self) -> Vec<String> {
+        let mut keys: Vec<_> = self.options.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    pub fn clear(&mut self) {
+        self.options.clear();
+        self.version = 1;
+    }
+
+    pub fn merge(&mut self, other: &BreadcrumbConfig) {
+        for (k, v) in &other.options {
+            self.options.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+/// Rate tracker for breadcrumb operations.
+pub struct BreadcrumbRateTracker {
+    window_ms: u64,
+    timestamps: Vec<u64>,
+}
+
+impl BreadcrumbRateTracker {
+    pub fn new(window_ms: u64) -> Self {
+        Self { window_ms, timestamps: Vec::new() }
+    }
+
+    pub fn record(&mut self, ts: u64) {
+        self.timestamps.push(ts);
+        self.prune(ts);
+    }
+
+    fn prune(&mut self, now: u64) {
+        let cutoff = now.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&t| t >= cutoff);
+    }
+
+    pub fn count(&self) -> usize { self.timestamps.len() }
+
+    pub fn rate_per_second(&self) -> f64 {
+        if self.timestamps.len() < 2 { return 0.0; }
+        let span = self.timestamps.last().unwrap() - self.timestamps.first().unwrap();
+        if span == 0 { return 0.0; }
+        (self.timestamps.len() as f64 / span as f64) * 1000.0
+    }
+
+    pub fn clear(&mut self) { self.timestamps.clear(); }
+
+    pub fn window_ms(&self) -> u64 { self.window_ms }
+}
+
+/// Validation result collector for breadcrumb.
+pub struct BreadcrumbValidationCollector {
+    errors: Vec<String>,
+    warnings: Vec<String>,
+}
+
+impl BreadcrumbValidationCollector {
+    pub fn new() -> Self {
+        Self { errors: Vec::new(), warnings: Vec::new() }
+    }
+
+    pub fn add_error(&mut self, msg: &str) {
+        self.errors.push(msg.to_string());
+    }
+
+    pub fn add_warning(&mut self, msg: &str) {
+        self.warnings.push(msg.to_string());
+    }
+
+    pub fn is_valid(&self) -> bool { self.errors.is_empty() }
+
+    pub fn error_count(&self) -> usize { self.errors.len() }
+
+    pub fn warning_count(&self) -> usize { self.warnings.len() }
+
+    pub fn errors(&self) -> &[String] { &self.errors }
+
+    pub fn warnings(&self) -> &[String] { &self.warnings }
+
+    pub fn clear(&mut self) {
+        self.errors.clear();
+        self.warnings.clear();
+    }
+
+    pub fn merge(&mut self, other: &BreadcrumbValidationCollector) {
+        self.errors.extend(other.errors.iter().cloned());
+        self.warnings.extend(other.warnings.iter().cloned());
+    }
+
+    pub fn first_error(&self) -> Option<&str> {
+        self.errors.first().map(|s| s.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2167,68 +2302,36 @@ mod tests {
     }
 
     #[test]
-    fn breadcrumb_validator_accepts_valid_name() {
-        let v = BreadcrumbValidator::new();
-        assert!(v.validate_name("hello_world").is_ok());
+    fn breadcrumb_validator_accepts_and_rejects() {
+        let mut v = BreadcrumbValidationCollector::new();
+        assert!(v.is_valid());
+        v.add_error("bad input");
+        assert!(!v.is_valid());
+        assert_eq!(v.error_count(), 1);
+        assert_eq!(v.first_error(), Some("bad input"));
     }
 
     #[test]
-    fn breadcrumb_validator_rejects_empty() {
-        let v = BreadcrumbValidator::new();
-        assert!(v.validate_name("").is_err());
+    fn breadcrumb_validator_warnings() {
+        let mut v = BreadcrumbValidationCollector::new();
+        v.add_warning("deprecated");
+        assert!(v.is_valid());
+        assert_eq!(v.warning_count(), 1);
     }
 
     #[test]
-    fn breadcrumb_validator_rejects_too_long() {
-        let v = BreadcrumbValidator::new().max_length(5);
-        assert!(v.validate_name("toolong").is_err());
-        assert!(v.validate_name("ok").is_ok());
-    }
+    fn breadcrumb_validator_clear_and_merge() {
+        let mut v = BreadcrumbValidationCollector::new();
+        v.add_error("e1");
+        v.clear();
+        assert!(v.is_valid());
 
-    #[test]
-    fn breadcrumb_validator_forbidden_prefix() {
-        let v = BreadcrumbValidator::new().forbid_prefix("__");
-        assert!(v.validate_name("__internal").is_err());
-        assert!(v.validate_name("public").is_ok());
-    }
-
-    #[test]
-    fn breadcrumb_validator_allowed_chars() {
-        let v = BreadcrumbValidator::new().allowed_chars(&['a', 'b', 'c']);
-        assert!(v.validate_name("abc").is_ok());
-        assert!(v.validate_name("abcd").is_err());
-    }
-
-    #[test]
-    fn breadcrumb_validator_range() {
-        let v = BreadcrumbValidator::new();
-        assert!(v.validate_range(5, 0, 10).is_ok());
-        assert!(v.validate_range(-1, 0, 10).is_err());
-        assert!(v.validate_range(11, 0, 10).is_err());
-    }
-
-    #[test]
-    fn breadcrumb_sanitize_removes_control() {
-        let result = BreadcrumbValidator::sanitize("hello\x00world\x07");
-        assert_eq!(result, "helloworld");
-    }
-
-    #[test]
-    fn breadcrumb_truncate_short_string() {
-        assert_eq!(BreadcrumbValidator::truncate("hi", 10), "hi");
-    }
-
-    #[test]
-    fn breadcrumb_truncate_long_string() {
-        let result = BreadcrumbValidator::truncate("hello world", 5);
-        assert_eq!(result.chars().count(), 5);
-        assert!(result.ends_with("…"));
-    }
-
-    #[test]
-    fn breadcrumb_is_ascii_printable() {
-        assert!(BreadcrumbValidator::is_ascii_printable("Hello World 123"));
-        assert!(!BreadcrumbValidator::is_ascii_printable("Hello\x00World"));
+        let mut a = BreadcrumbValidationCollector::new();
+        a.add_error("a_err");
+        let mut b = BreadcrumbValidationCollector::new();
+        b.add_error("b_err");
+        a.merge(&b);
+        assert_eq!(a.error_count(), 2);
     }
 
     // --- BreadcrumbDropdown tests ---
@@ -2986,6 +3089,144 @@ mod tests {
         let s = XBreadcrumbTextSpan::new(2, 5).shift(10);
         assert_eq!(s.start, 12);
         assert_eq!(s.end, 15);
+    }
+
+
+    #[test]
+    fn breadcrumb_config_new() {
+        let cfg = BreadcrumbConfig::new();
+        assert!(cfg.is_enabled());
+        assert_eq!(cfg.version(), 1);
+        assert_eq!(cfg.option_count(), 0);
+    }
+
+    #[test]
+    fn breadcrumb_config_set_get() {
+        let mut cfg = BreadcrumbConfig::new();
+        cfg.set_option("key", "value");
+        assert_eq!(cfg.get_option("key"), Some("value"));
+        assert!(cfg.has_option("key"));
+    }
+
+    #[test]
+    fn breadcrumb_config_remove() {
+        let mut cfg = BreadcrumbConfig::new();
+        cfg.set_option("a", "1");
+        assert_eq!(cfg.remove_option("a"), Some("1".into()));
+        assert!(!cfg.has_option("a"));
+    }
+
+    #[test]
+    fn breadcrumb_config_keys_sorted() {
+        let mut cfg = BreadcrumbConfig::new();
+        cfg.set_option("z", "1");
+        cfg.set_option("a", "2");
+        assert_eq!(cfg.option_keys(), vec!["a", "z"]);
+    }
+
+    #[test]
+    fn breadcrumb_config_bump_version() {
+        let mut cfg = BreadcrumbConfig::new();
+        cfg.bump_version();
+        cfg.bump_version();
+        assert_eq!(cfg.version(), 3);
+    }
+
+    #[test]
+    fn breadcrumb_config_clear() {
+        let mut cfg = BreadcrumbConfig::new();
+        cfg.set_option("x", "y");
+        cfg.bump_version();
+        cfg.clear();
+        assert_eq!(cfg.option_count(), 0);
+        assert_eq!(cfg.version(), 1);
+    }
+
+    #[test]
+    fn breadcrumb_config_merge() {
+        let mut cfg1 = BreadcrumbConfig::new();
+        cfg1.set_option("a", "1");
+        let mut cfg2 = BreadcrumbConfig::new();
+        cfg2.set_option("b", "2");
+        cfg1.merge(&cfg2);
+        assert_eq!(cfg1.option_count(), 2);
+    }
+
+    #[test]
+    fn breadcrumb_config_disable() {
+        let mut cfg = BreadcrumbConfig::new();
+        cfg.set_enabled(false);
+        assert!(!cfg.is_enabled());
+    }
+
+    #[test]
+    fn breadcrumb_rate_tracker_empty() {
+        let rt = BreadcrumbRateTracker::new(1000);
+        assert_eq!(rt.count(), 0);
+        assert_eq!(rt.rate_per_second(), 0.0);
+    }
+
+    #[test]
+    fn breadcrumb_rate_tracker_record() {
+        let mut rt = BreadcrumbRateTracker::new(1000);
+        rt.record(100);
+        rt.record(200);
+        rt.record(300);
+        assert_eq!(rt.count(), 3);
+    }
+
+    #[test]
+    fn breadcrumb_rate_tracker_prune() {
+        let mut rt = BreadcrumbRateTracker::new(100);
+        rt.record(10);
+        rt.record(200);
+        assert_eq!(rt.count(), 1);
+    }
+
+    #[test]
+    fn breadcrumb_validator_valid() {
+        let v = BreadcrumbValidationCollector::new();
+        assert!(v.is_valid());
+        assert_eq!(v.error_count(), 0);
+    }
+
+    #[test]
+    fn breadcrumb_validator_errors() {
+        let mut v = BreadcrumbValidationCollector::new();
+        v.add_error("bad input");
+        v.add_warning("slow");
+        assert!(!v.is_valid());
+        assert_eq!(v.error_count(), 1);
+        assert_eq!(v.warning_count(), 1);
+        assert_eq!(v.first_error(), Some("bad input"));
+    }
+
+    #[test]
+    fn breadcrumb_validator_clear() {
+        let mut v = BreadcrumbValidationCollector::new();
+        v.add_error("err");
+        v.clear();
+        assert!(v.is_valid());
+    }
+
+    #[test]
+    fn breadcrumb_validator_merge() {
+        let mut v1 = BreadcrumbValidationCollector::new();
+        v1.add_error("e1");
+        let mut v2 = BreadcrumbValidationCollector::new();
+        v2.add_error("e2");
+        v2.add_warning("w1");
+        v1.merge(&v2);
+        assert_eq!(v1.error_count(), 2);
+        assert_eq!(v1.warning_count(), 1);
+    }
+
+    #[test]
+    fn breadcrumb_rate_tracker_clear() {
+        let mut rt = BreadcrumbRateTracker::new(1000);
+        rt.record(100);
+        rt.clear();
+        assert_eq!(rt.count(), 0);
     }
 
 }

@@ -1701,6 +1701,189 @@ impl fmt::Display for LcBldBuildErr {
 }
 impl std::error::Error for LcBldBuildErr {}
 
+
+/// Lifecycle service configuration manager.
+#[derive(Debug, Clone)]
+pub struct LifecycleSvcConfig {
+    entries: Vec<LifecycleSvcEntry>,
+    enabled: bool,
+    max_entries: usize,
+}
+
+/// A single lifecycle service entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LifecycleSvcEntry {
+    pub id: String,
+    pub label: String,
+    pub priority: i32,
+    pub active: bool,
+    pub metadata: Vec<(String, String)>,
+}
+
+impl LifecycleSvcEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            priority: 0,
+            active: true,
+            metadata: Vec::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, p: i32) -> Self {
+        self.priority = p;
+        self
+    }
+
+    pub fn with_meta(mut self, key: &str, val: &str) -> Self {
+        self.metadata.push((key.to_string(), val.to_string()));
+        self
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    pub fn deactivate(&mut self) {
+        self.active = false;
+    }
+
+    pub fn activate(&mut self) {
+        self.active = true;
+    }
+
+    pub fn has_meta(&self, key: &str) -> bool {
+        self.metadata.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn meta_count(&self) -> usize {
+        self.metadata.len()
+    }
+
+    pub fn remove_meta(&mut self, key: &str) -> bool {
+        let len = self.metadata.len();
+        self.metadata.retain(|(k, _)| k != key);
+        self.metadata.len() < len
+    }
+}
+
+impl LifecycleSvcConfig {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            enabled: true,
+            max_entries,
+        }
+    }
+
+    pub fn add(&mut self, entry: LifecycleSvcEntry) -> bool {
+        if self.entries.len() >= self.max_entries {
+            return false;
+        }
+        self.entries.push(entry);
+        self.entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let len = self.entries.len();
+        self.entries.retain(|e| e.id != id);
+        self.entries.len() < len
+    }
+
+    pub fn get(&self, id: &str) -> Option<&LifecycleSvcEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut LifecycleSvcEntry> {
+        self.entries.iter_mut().find(|e| e.id == id)
+    }
+
+    pub fn active_entries(&self) -> Vec<&LifecycleSvcEntry> {
+        self.entries.iter().filter(|e| e.active).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.entries.len() >= self.max_entries
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn ids(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.id.as_str()).collect()
+    }
+
+    pub fn top_n(&self, n: usize) -> Vec<&LifecycleSvcEntry> {
+        self.entries.iter().take(n).collect()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Option<&LifecycleSvcEntry> {
+        self.entries.iter().find(|e| e.label == label)
+    }
+
+    pub fn deactivate_all(&mut self) {
+        for e in &mut self.entries {
+            e.active = false;
+        }
+    }
+
+    pub fn activate_all(&mut self) {
+        for e in &mut self.entries {
+            e.active = true;
+        }
+    }
+
+    pub fn count_active(&self) -> usize {
+        self.entries.iter().filter(|e| e.active).count()
+    }
+
+    pub fn highest_priority(&self) -> Option<i32> {
+        self.entries.first().map(|e| e.priority)
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.entries.iter().any(|e| e.id == id)
+    }
+
+    pub fn labels(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.label.as_str()).collect()
+    }
+
+    pub fn reorder_by_label(&mut self) {
+        self.entries.sort_by(|a, b| a.label.cmp(&b.label));
+    }
+
+    pub fn drain_inactive(&mut self) -> Vec<LifecycleSvcEntry> {
+        let (inactive, active): (Vec<_>, Vec<_>) =
+            self.entries.drain(..).partition(|e| !e.active);
+        self.entries = active;
+        inactive
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2862,6 +3045,173 @@ mod tests {
         let s = format!("{}", cfg);
         assert!(s.contains("test"));
         assert!(s.contains("false"));
+    }
+
+
+    #[test]
+    fn lifecycle_svc_entry_creation() {
+        let e = LifecycleSvcEntry::new("e1", "Entry 1");
+        assert_eq!(e.id, "e1");
+        assert_eq!(e.label, "Entry 1");
+        assert!(e.active);
+        assert_eq!(e.priority, 0);
+    }
+
+    #[test]
+    fn lifecycle_svc_entry_with_priority() {
+        let e = LifecycleSvcEntry::new("e1", "E").with_priority(5);
+        assert_eq!(e.priority, 5);
+    }
+
+    #[test]
+    fn lifecycle_svc_entry_metadata() {
+        let e = LifecycleSvcEntry::new("e1", "E").with_meta("key", "val");
+        assert_eq!(e.get_meta("key"), Some("val"));
+        assert_eq!(e.get_meta("missing"), None);
+        assert!(e.has_meta("key"));
+        assert_eq!(e.meta_count(), 1);
+    }
+
+    #[test]
+    fn lifecycle_svc_entry_remove_meta() {
+        let mut e = LifecycleSvcEntry::new("e1", "E").with_meta("k", "v");
+        assert!(e.remove_meta("k"));
+        assert!(!e.remove_meta("k"));
+    }
+
+    #[test]
+    fn lifecycle_svc_entry_activate_deactivate() {
+        let mut e = LifecycleSvcEntry::new("e1", "E");
+        e.deactivate();
+        assert!(!e.active);
+        e.activate();
+        assert!(e.active);
+    }
+
+    #[test]
+    fn lifecycle_svc_config_add_sorted() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("lo", "Lo").with_priority(1));
+        c.add(LifecycleSvcEntry::new("hi", "Hi").with_priority(10));
+        assert_eq!(c.ids()[0], "hi");
+    }
+
+    #[test]
+    fn lifecycle_svc_config_capacity() {
+        let mut c = LifecycleSvcConfig::new(1);
+        assert!(c.add(LifecycleSvcEntry::new("a", "A")));
+        assert!(!c.add(LifecycleSvcEntry::new("b", "B")));
+        assert!(c.is_full());
+    }
+
+    #[test]
+    fn lifecycle_svc_config_remove() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A"));
+        assert!(c.remove("a"));
+        assert!(!c.remove("a"));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn lifecycle_svc_config_get() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("x", "X"));
+        assert!(c.get("x").is_some());
+        assert!(c.get("y").is_none());
+    }
+
+    #[test]
+    fn lifecycle_svc_config_active_entries() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A"));
+        c.add(LifecycleSvcEntry::new("b", "B"));
+        c.get_mut("a").unwrap().deactivate();
+        assert_eq!(c.active_entries().len(), 1);
+        assert_eq!(c.count_active(), 1);
+    }
+
+    #[test]
+    fn lifecycle_svc_config_enable_disable() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.disable();
+        assert!(!c.is_enabled());
+        c.enable();
+        assert!(c.is_enabled());
+    }
+
+    #[test]
+    fn lifecycle_svc_config_clear() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A"));
+        c.clear();
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn lifecycle_svc_config_find_by_label() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "Alpha"));
+        assert_eq!(c.find_by_label("Alpha").unwrap().id, "a");
+        assert!(c.find_by_label("missing").is_none());
+    }
+
+    #[test]
+    fn lifecycle_svc_config_top_n() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A").with_priority(1));
+        c.add(LifecycleSvcEntry::new("b", "B").with_priority(2));
+        c.add(LifecycleSvcEntry::new("c", "C").with_priority(3));
+        assert_eq!(c.top_n(2).len(), 2);
+    }
+
+    #[test]
+    fn lifecycle_svc_config_deactivate_activate_all() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A"));
+        c.add(LifecycleSvcEntry::new("b", "B"));
+        c.deactivate_all();
+        assert_eq!(c.count_active(), 0);
+        c.activate_all();
+        assert_eq!(c.count_active(), 2);
+    }
+
+    #[test]
+    fn lifecycle_svc_config_highest_priority() {
+        let mut c = LifecycleSvcConfig::new(10);
+        assert!(c.highest_priority().is_none());
+        c.add(LifecycleSvcEntry::new("a", "A").with_priority(7));
+        assert_eq!(c.highest_priority(), Some(7));
+    }
+
+    #[test]
+    fn lifecycle_svc_config_contains() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A"));
+        assert!(c.contains("a"));
+        assert!(!c.contains("b"));
+    }
+
+    #[test]
+    fn lifecycle_svc_config_labels() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "Alpha"));
+        c.add(LifecycleSvcEntry::new("b", "Beta"));
+        let labels = c.labels();
+        assert!(labels.contains(&"Alpha"));
+        assert!(labels.contains(&"Beta"));
+    }
+
+    #[test]
+    fn lifecycle_svc_config_drain_inactive() {
+        let mut c = LifecycleSvcConfig::new(10);
+        c.add(LifecycleSvcEntry::new("a", "A"));
+        c.add(LifecycleSvcEntry::new("b", "B"));
+        c.get_mut("a").unwrap().deactivate();
+        let drained = c.drain_inactive();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(drained[0].id, "a");
+        assert_eq!(c.len(), 1);
     }
 
 }

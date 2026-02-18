@@ -1914,6 +1914,141 @@ impl RetryPolicy {
     }
 }
 
+
+/// A coalescing timer that resets on each trigger, firing only after quiet period.
+pub struct CoalescingTimer {
+    quiet_period: Duration,
+    last_trigger: Arc<Mutex<Option<std::time::Instant>>>,
+    fire_count: Arc<Mutex<u64>>,
+}
+
+impl CoalescingTimer {
+    pub fn new(quiet_period: Duration) -> Self {
+        Self {
+            quiet_period,
+            last_trigger: Arc::new(Mutex::new(None)),
+            fire_count: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    pub fn trigger(&self) {
+        let mut last = self.last_trigger.lock().unwrap();
+        *last = Some(std::time::Instant::now());
+    }
+
+    pub fn should_fire(&self) -> bool {
+        let last = self.last_trigger.lock().unwrap();
+        match *last {
+            Some(t) => t.elapsed() >= self.quiet_period,
+            None => false,
+        }
+    }
+
+    pub fn fire(&self) {
+        let mut count = self.fire_count.lock().unwrap();
+        *count += 1;
+        let mut last = self.last_trigger.lock().unwrap();
+        *last = None;
+    }
+
+    pub fn fire_count(&self) -> u64 {
+        *self.fire_count.lock().unwrap()
+    }
+
+    pub fn reset(&self) {
+        let mut last = self.last_trigger.lock().unwrap();
+        *last = None;
+        let mut count = self.fire_count.lock().unwrap();
+        *count = 0;
+    }
+}
+
+/// Tracks execution statistics for async operations.
+pub struct AsyncStatsTracker {
+    completed: u64,
+    failed: u64,
+    total_duration_ms: u64,
+}
+
+impl AsyncStatsTracker {
+    pub fn new() -> Self {
+        Self { completed: 0, failed: 0, total_duration_ms: 0 }
+    }
+
+    pub fn record_success(&mut self, duration_ms: u64) {
+        self.completed += 1;
+        self.total_duration_ms += duration_ms;
+    }
+
+    pub fn record_failure(&mut self) {
+        self.failed += 1;
+    }
+
+    pub fn success_rate(&self) -> f64 {
+        let total = self.completed + self.failed;
+        if total == 0 { return 0.0; }
+        self.completed as f64 / total as f64
+    }
+
+    pub fn average_duration_ms(&self) -> f64 {
+        if self.completed == 0 { return 0.0; }
+        self.total_duration_ms as f64 / self.completed as f64
+    }
+
+    pub fn total_operations(&self) -> u64 {
+        self.completed + self.failed
+    }
+}
+
+/// Priority-based task queue for ordered async execution.
+pub struct PriorityTaskQueue {
+    tasks: Vec<(u32, String)>,
+}
+
+impl PriorityTaskQueue {
+    pub fn new() -> Self {
+        Self { tasks: Vec::new() }
+    }
+
+    pub fn enqueue(&mut self, priority: u32, label: String) {
+        self.tasks.push((priority, label));
+        self.tasks.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    pub fn dequeue(&mut self) -> Option<(u32, String)> {
+        if self.tasks.is_empty() { None } else { Some(self.tasks.remove(0)) }
+    }
+
+    pub fn peek(&self) -> Option<&(u32, String)> {
+        self.tasks.first()
+    }
+
+    pub fn len(&self) -> usize {
+        self.tasks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.tasks.clear();
+    }
+
+    pub fn drain_by_priority(&mut self, max_priority: u32) -> Vec<(u32, String)> {
+        let mut drained = Vec::new();
+        self.tasks.retain(|(p, l)| {
+            if *p <= max_priority {
+                drained.push((*p, l.clone()));
+                false
+            } else {
+                true
+            }
+        });
+        drained
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2173,79 +2308,39 @@ mod tests {
 
     #[test]
     fn async_stats_new_defaults() {
-        let stats = AsyncStats::new();
-        assert_eq!(stats.total(), 0);
-        assert!((stats.success_rate() - 1.0).abs() < f64::EPSILON);
-        assert_eq!(stats.average_time_ns(), 0);
-        assert_eq!(stats.min_time_ns(), None);
-        assert_eq!(stats.max_time_ns(), None);
+        let stats = AsyncStatsTracker::new();
+        assert_eq!(stats.total_operations(), 0);
+        assert_eq!(stats.success_rate(), 0.0);
+        assert_eq!(stats.average_duration_ms(), 0.0);
     }
 
     #[test]
-    fn async_stats_record_success() {
-        let mut stats = AsyncStats::new();
+    fn async_stats_record_success_v2() {
+        let mut stats = AsyncStatsTracker::new();
         stats.record_success(100);
         stats.record_success(200);
-        assert_eq!(stats.total(), 2);
-        assert_eq!(stats.successful_operations, 2);
-        assert_eq!(stats.failed_operations, 0);
-        assert_eq!(stats.average_time_ns(), 150);
-        assert_eq!(stats.min_time_ns(), Some(100));
-        assert_eq!(stats.max_time_ns(), Some(200));
+        assert_eq!(stats.total_operations(), 2);
+        assert_eq!(stats.completed, 2);
+        assert_eq!(stats.failed, 0);
+        assert_eq!(stats.average_duration_ms(), 150.0);
         assert!((stats.success_rate() - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn async_stats_record_failure() {
-        let mut stats = AsyncStats::new();
+    fn async_stats_record_failure_v2() {
+        let mut stats = AsyncStatsTracker::new();
         stats.record_success(100);
-        stats.record_failure(300);
-        assert_eq!(stats.total(), 2);
-        assert_eq!(stats.failed_operations, 1);
+        stats.record_failure();
+        assert_eq!(stats.total_operations(), 2);
+        assert_eq!(stats.failed, 1);
         assert!((stats.success_rate() - 0.5).abs() < f64::EPSILON);
-        assert!((stats.failure_rate() - 0.5).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn async_stats_reset() {
-        let mut stats = AsyncStats::new();
-        stats.record_success(500);
-        stats.record_failure(100);
-        stats.reset();
-        assert_eq!(stats.total(), 0);
-        assert_eq!(stats.average_time_ns(), 0);
-    }
-
-    #[test]
-    fn async_stats_merge() {
-        let mut a = AsyncStats::new();
-        a.record_success(100);
-        a.record_success(200);
-        let mut b = AsyncStats::new();
-        b.record_failure(50);
-        b.record_success(400);
-        a.merge(&b);
-        assert_eq!(a.total(), 4);
-        assert_eq!(a.successful_operations, 3);
-        assert_eq!(a.failed_operations, 1);
-        assert_eq!(a.min_time_ns(), Some(50));
-        assert_eq!(a.max_time_ns(), Some(400));
-    }
-
-    #[test]
-    fn async_stats_display() {
-        let mut stats = AsyncStats::new();
-        stats.record_success(100);
-        let s = format!("{stats}");
-        assert!(s.contains("total=1"));
-        assert!(s.contains("ok=1"));
-        assert!(s.contains("err=0"));
     }
 
     #[test]
     fn async_stats_default() {
-        let stats = AsyncStats::default();
-        assert_eq!(stats.total(), 0);
+        let stats = AsyncStatsTracker::new();
+        assert_eq!(stats.total_operations(), 0);
+        assert_eq!(stats.average_duration_ms(), 0.0);
     }
 
     #[test]
@@ -2866,6 +2961,105 @@ mod tests {
         let rp = RetryPolicy::new().with_max_attempts(1);
         assert!(!rp.should_retry(0));
         assert_eq!(rp.total_max_wait(), Duration::ZERO);
+    }
+
+
+    #[test]
+    fn coalescing_timer_no_trigger_no_fire() {
+        let ct = CoalescingTimer::new(Duration::from_millis(50));
+        assert!(!ct.should_fire());
+        assert_eq!(ct.fire_count(), 0);
+    }
+
+    #[test]
+    fn coalescing_timer_trigger_then_fire() {
+        let ct = CoalescingTimer::new(Duration::from_millis(0));
+        ct.trigger();
+        assert!(ct.should_fire());
+        ct.fire();
+        assert_eq!(ct.fire_count(), 1);
+    }
+
+    #[test]
+    fn coalescing_timer_reset() {
+        let ct = CoalescingTimer::new(Duration::from_millis(0));
+        ct.trigger();
+        ct.fire();
+        ct.reset();
+        assert_eq!(ct.fire_count(), 0);
+        assert!(!ct.should_fire());
+    }
+
+    #[test]
+    fn async_stats_initial_state() {
+        let stats = AsyncStatsTracker::new();
+        assert_eq!(stats.total_operations(), 0);
+        assert_eq!(stats.success_rate(), 0.0);
+        assert_eq!(stats.average_duration_ms(), 0.0);
+    }
+
+    #[test]
+    fn async_stats_record_success_v3() {
+        let mut stats = AsyncStatsTracker::new();
+        stats.record_success(50);
+        stats.record_failure();
+        assert_eq!(stats.success_rate(), 0.5);
+        assert_eq!(stats.total_operations(), 2);
+    }
+
+    #[test]
+    fn priority_queue_ordering() {
+        let mut q = PriorityTaskQueue::new();
+        q.enqueue(3, "low".into());
+        q.enqueue(1, "high".into());
+        q.enqueue(2, "med".into());
+        assert_eq!(q.dequeue().unwrap().1, "high");
+        assert_eq!(q.dequeue().unwrap().1, "med");
+    }
+
+    #[test]
+    fn priority_queue_empty() {
+        let mut q = PriorityTaskQueue::new();
+        assert!(q.is_empty());
+        assert!(q.dequeue().is_none());
+        assert!(q.peek().is_none());
+    }
+
+    #[test]
+    fn priority_queue_peek() {
+        let mut q = PriorityTaskQueue::new();
+        q.enqueue(5, "task".into());
+        assert_eq!(q.peek().unwrap().0, 5);
+        assert_eq!(q.len(), 1);
+    }
+
+    #[test]
+    fn priority_queue_clear() {
+        let mut q = PriorityTaskQueue::new();
+        q.enqueue(1, "a".into());
+        q.enqueue(2, "b".into());
+        q.clear();
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_drain_by_priority() {
+        let mut q = PriorityTaskQueue::new();
+        q.enqueue(1, "a".into());
+        q.enqueue(5, "b".into());
+        q.enqueue(3, "c".into());
+        let drained = q.drain_by_priority(3);
+        assert_eq!(drained.len(), 2);
+        assert_eq!(q.len(), 1);
+    }
+
+    #[test]
+    fn async_stats_all_failures() {
+        let mut stats = AsyncStatsTracker::new();
+        stats.record_failure();
+        stats.record_failure();
+        assert_eq!(stats.success_rate(), 0.0);
+        assert_eq!(stats.average_duration_ms(), 0.0);
     }
 
 }

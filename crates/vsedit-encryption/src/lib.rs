@@ -1789,6 +1789,151 @@ impl CryptoAuditLog {
     }
 }
 
+/// Cipher suite registry for encryption providers.
+#[derive(Debug, Clone)]
+pub struct CipherSuiteRegistry {
+    entries: Vec<CipherSuiteEntry>,
+    enabled: bool,
+    max_entries: usize,
+}
+
+/// A single cipher suite entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CipherSuiteEntry {
+    pub id: String,
+    pub label: String,
+    pub priority: i32,
+    pub active: bool,
+    pub metadata: Vec<(String, String)>,
+}
+
+impl CipherSuiteEntry {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            priority: 0,
+            active: true,
+            metadata: Vec::new(),
+        }
+    }
+
+    pub fn with_priority(mut self, p: i32) -> Self {
+        self.priority = p;
+        self
+    }
+
+    pub fn with_meta(mut self, key: &str, val: &str) -> Self {
+        self.metadata.push((key.to_string(), val.to_string()));
+        self
+    }
+
+    pub fn get_meta(&self, key: &str) -> Option<&str> {
+        self.metadata.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    pub fn deactivate(&mut self) { self.active = false; }
+    pub fn activate(&mut self) { self.active = true; }
+
+    pub fn has_meta(&self, key: &str) -> bool {
+        self.metadata.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn meta_count(&self) -> usize { self.metadata.len() }
+
+    pub fn remove_meta(&mut self, key: &str) -> bool {
+        let len = self.metadata.len();
+        self.metadata.retain(|(k, _)| k != key);
+        self.metadata.len() < len
+    }
+}
+
+impl CipherSuiteRegistry {
+    pub fn new(max_entries: usize) -> Self {
+        Self { entries: Vec::new(), enabled: true, max_entries }
+    }
+
+    pub fn add(&mut self, entry: CipherSuiteEntry) -> bool {
+        if self.entries.len() >= self.max_entries { return false; }
+        self.entries.push(entry);
+        self.entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+        true
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let len = self.entries.len();
+        self.entries.retain(|e| e.id != id);
+        self.entries.len() < len
+    }
+
+    pub fn get(&self, id: &str) -> Option<&CipherSuiteEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut CipherSuiteEntry> {
+        self.entries.iter_mut().find(|e| e.id == id)
+    }
+
+    pub fn active_entries(&self) -> Vec<&CipherSuiteEntry> {
+        self.entries.iter().filter(|e| e.active).collect()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn is_full(&self) -> bool { self.entries.len() >= self.max_entries }
+    pub fn enable(&mut self) { self.enabled = true; }
+    pub fn disable(&mut self) { self.enabled = false; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn ids(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.id.as_str()).collect()
+    }
+
+    pub fn top_n(&self, n: usize) -> Vec<&CipherSuiteEntry> {
+        self.entries.iter().take(n).collect()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Option<&CipherSuiteEntry> {
+        self.entries.iter().find(|e| e.label == label)
+    }
+
+    pub fn deactivate_all(&mut self) {
+        for e in &mut self.entries { e.active = false; }
+    }
+
+    pub fn activate_all(&mut self) {
+        for e in &mut self.entries { e.active = true; }
+    }
+
+    pub fn count_active(&self) -> usize {
+        self.entries.iter().filter(|e| e.active).count()
+    }
+
+    pub fn highest_priority(&self) -> Option<i32> {
+        self.entries.first().map(|e| e.priority)
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.entries.iter().any(|e| e.id == id)
+    }
+
+    pub fn labels(&self) -> Vec<&str> {
+        self.entries.iter().map(|e| e.label.as_str()).collect()
+    }
+
+    pub fn reorder_by_label(&mut self) {
+        self.entries.sort_by(|a, b| a.label.cmp(&b.label));
+    }
+
+    pub fn drain_inactive(&mut self) -> Vec<CipherSuiteEntry> {
+        let (inactive, active): (Vec<_>, Vec<_>) =
+            self.entries.drain(..).partition(|e| !e.active);
+        self.entries = active;
+        inactive
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2814,5 +2959,96 @@ mod tests {
         log.record(CryptoAuditKind::Decrypt, "b", 20);
         assert_eq!(log.last_operation().unwrap().key_id, "b");
         assert_eq!(log.entries_for_key("a").len(), 1);
+    }
+
+    #[test]
+    fn cipher_suite_entry_creation() {
+        let e = CipherSuiteEntry::new("aes256", "AES-256");
+        assert_eq!(e.id, "aes256");
+        assert!(e.active);
+    }
+
+    #[test]
+    fn cipher_suite_entry_priority() {
+        let e = CipherSuiteEntry::new("e1", "E").with_priority(5);
+        assert_eq!(e.priority, 5);
+    }
+
+    #[test]
+    fn cipher_suite_entry_metadata() {
+        let e = CipherSuiteEntry::new("e1", "E").with_meta("bits", "256");
+        assert_eq!(e.get_meta("bits"), Some("256"));
+        assert!(e.has_meta("bits"));
+    }
+
+    #[test]
+    fn cipher_suite_entry_remove_meta() {
+        let mut e = CipherSuiteEntry::new("e1", "E").with_meta("k", "v");
+        assert!(e.remove_meta("k"));
+        assert!(!e.remove_meta("k"));
+    }
+
+    #[test]
+    fn cipher_suite_entry_activate_deactivate() {
+        let mut e = CipherSuiteEntry::new("e1", "E");
+        e.deactivate(); assert!(!e.active);
+        e.activate(); assert!(e.active);
+    }
+
+    #[test]
+    fn cipher_suite_registry_add_sorted() {
+        let mut r = CipherSuiteRegistry::new(10);
+        r.add(CipherSuiteEntry::new("lo", "Lo").with_priority(1));
+        r.add(CipherSuiteEntry::new("hi", "Hi").with_priority(10));
+        assert_eq!(r.ids()[0], "hi");
+    }
+
+    #[test]
+    fn cipher_suite_registry_capacity() {
+        let mut r = CipherSuiteRegistry::new(1);
+        assert!(r.add(CipherSuiteEntry::new("a", "A")));
+        assert!(!r.add(CipherSuiteEntry::new("b", "B")));
+    }
+
+    #[test]
+    fn cipher_suite_registry_remove() {
+        let mut r = CipherSuiteRegistry::new(10);
+        r.add(CipherSuiteEntry::new("a", "A"));
+        assert!(r.remove("a"));
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn cipher_suite_registry_active_entries() {
+        let mut r = CipherSuiteRegistry::new(10);
+        r.add(CipherSuiteEntry::new("a", "A"));
+        r.add(CipherSuiteEntry::new("b", "B"));
+        r.get_mut("a").unwrap().deactivate();
+        assert_eq!(r.count_active(), 1);
+    }
+
+    #[test]
+    fn cipher_suite_registry_enable_disable() {
+        let mut r = CipherSuiteRegistry::new(10);
+        r.disable(); assert!(!r.is_enabled());
+        r.enable(); assert!(r.is_enabled());
+    }
+
+    #[test]
+    fn cipher_suite_registry_find_by_label() {
+        let mut r = CipherSuiteRegistry::new(10);
+        r.add(CipherSuiteEntry::new("a", "Alpha"));
+        assert_eq!(r.find_by_label("Alpha").unwrap().id, "a");
+    }
+
+    #[test]
+    fn cipher_suite_registry_drain_inactive() {
+        let mut r = CipherSuiteRegistry::new(10);
+        r.add(CipherSuiteEntry::new("a", "A"));
+        r.add(CipherSuiteEntry::new("b", "B"));
+        r.get_mut("a").unwrap().deactivate();
+        let drained = r.drain_inactive();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(r.len(), 1);
     }
 }

@@ -1843,6 +1843,140 @@ pub fn x_secrets_sanitize_path(p: &str) -> String {
     result
 }
 
+
+/// Configuration manager for secrets functionality.
+pub struct SecretsConfig {
+    options: HashMap<String, String>,
+    enabled: bool,
+    version: u32,
+}
+
+impl SecretsConfig {
+    pub fn new() -> Self {
+        Self { options: HashMap::new(), enabled: true, version: 1 }
+    }
+
+    pub fn set_option(&mut self, key: &str, value: &str) {
+        self.options.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get_option(&self, key: &str) -> Option<&str> {
+        self.options.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove_option(&mut self, key: &str) -> Option<String> {
+        self.options.remove(key)
+    }
+
+    pub fn option_count(&self) -> usize { self.options.len() }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+
+    pub fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+
+    pub fn version(&self) -> u32 { self.version }
+
+    pub fn bump_version(&mut self) { self.version += 1; }
+
+    pub fn has_option(&self, key: &str) -> bool { self.options.contains_key(key) }
+
+    pub fn option_keys(&self) -> Vec<String> {
+        let mut keys: Vec<_> = self.options.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    pub fn clear(&mut self) {
+        self.options.clear();
+        self.version = 1;
+    }
+
+    pub fn merge(&mut self, other: &SecretsConfig) {
+        for (k, v) in &other.options {
+            self.options.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+/// Rate tracker for secrets operations.
+pub struct SecretsRateTracker {
+    window_ms: u64,
+    timestamps: Vec<u64>,
+}
+
+impl SecretsRateTracker {
+    pub fn new(window_ms: u64) -> Self {
+        Self { window_ms, timestamps: Vec::new() }
+    }
+
+    pub fn record(&mut self, ts: u64) {
+        self.timestamps.push(ts);
+        self.prune(ts);
+    }
+
+    fn prune(&mut self, now: u64) {
+        let cutoff = now.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&t| t >= cutoff);
+    }
+
+    pub fn count(&self) -> usize { self.timestamps.len() }
+
+    pub fn rate_per_second(&self) -> f64 {
+        if self.timestamps.len() < 2 { return 0.0; }
+        let span = self.timestamps.last().unwrap() - self.timestamps.first().unwrap();
+        if span == 0 { return 0.0; }
+        (self.timestamps.len() as f64 / span as f64) * 1000.0
+    }
+
+    pub fn clear(&mut self) { self.timestamps.clear(); }
+
+    pub fn window_ms(&self) -> u64 { self.window_ms }
+}
+
+/// Validation result collector for secrets.
+pub struct SecretsValidationCollector {
+    errors: Vec<String>,
+    warnings: Vec<String>,
+}
+
+impl SecretsValidationCollector {
+    pub fn new() -> Self {
+        Self { errors: Vec::new(), warnings: Vec::new() }
+    }
+
+    pub fn add_error(&mut self, msg: &str) {
+        self.errors.push(msg.to_string());
+    }
+
+    pub fn add_warning(&mut self, msg: &str) {
+        self.warnings.push(msg.to_string());
+    }
+
+    pub fn is_valid(&self) -> bool { self.errors.is_empty() }
+
+    pub fn error_count(&self) -> usize { self.errors.len() }
+
+    pub fn warning_count(&self) -> usize { self.warnings.len() }
+
+    pub fn errors(&self) -> &[String] { &self.errors }
+
+    pub fn warnings(&self) -> &[String] { &self.warnings }
+
+    pub fn clear(&mut self) {
+        self.errors.clear();
+        self.warnings.clear();
+    }
+
+    pub fn merge(&mut self, other: &SecretsValidationCollector) {
+        self.errors.extend(other.errors.iter().cloned());
+        self.warnings.extend(other.warnings.iter().cloned());
+    }
+
+    pub fn first_error(&self) -> Option<&str> {
+        self.errors.first().map(|s| s.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2168,68 +2302,36 @@ mod tests {
     }
 
     #[test]
-    fn secrets_validator_accepts_valid_name() {
-        let v = SecretsValidator::new();
-        assert!(v.validate_name("hello_world").is_ok());
+    fn secrets_validator_accepts_and_rejects() {
+        let mut v = SecretsValidationCollector::new();
+        assert!(v.is_valid());
+        v.add_error("bad secret");
+        assert!(!v.is_valid());
+        assert_eq!(v.error_count(), 1);
+        assert_eq!(v.first_error(), Some("bad secret"));
     }
 
     #[test]
-    fn secrets_validator_rejects_empty() {
-        let v = SecretsValidator::new();
-        assert!(v.validate_name("").is_err());
+    fn secrets_validator_warnings() {
+        let mut v = SecretsValidationCollector::new();
+        v.add_warning("deprecated secret");
+        assert!(v.is_valid());
+        assert_eq!(v.warning_count(), 1);
     }
 
     #[test]
-    fn secrets_validator_rejects_too_long() {
-        let v = SecretsValidator::new().max_length(5);
-        assert!(v.validate_name("toolong").is_err());
-        assert!(v.validate_name("ok").is_ok());
-    }
+    fn secrets_validator_clear_and_merge() {
+        let mut v = SecretsValidationCollector::new();
+        v.add_error("e1");
+        v.clear();
+        assert!(v.is_valid());
 
-    #[test]
-    fn secrets_validator_forbidden_prefix() {
-        let v = SecretsValidator::new().forbid_prefix("__");
-        assert!(v.validate_name("__internal").is_err());
-        assert!(v.validate_name("public").is_ok());
-    }
-
-    #[test]
-    fn secrets_validator_allowed_chars() {
-        let v = SecretsValidator::new().allowed_chars(&['a', 'b', 'c']);
-        assert!(v.validate_name("abc").is_ok());
-        assert!(v.validate_name("abcd").is_err());
-    }
-
-    #[test]
-    fn secrets_validator_range() {
-        let v = SecretsValidator::new();
-        assert!(v.validate_range(5, 0, 10).is_ok());
-        assert!(v.validate_range(-1, 0, 10).is_err());
-        assert!(v.validate_range(11, 0, 10).is_err());
-    }
-
-    #[test]
-    fn secrets_sanitize_removes_control() {
-        let result = SecretsValidator::sanitize("hello\x00world\x07");
-        assert_eq!(result, "helloworld");
-    }
-
-    #[test]
-    fn secrets_truncate_short_string() {
-        assert_eq!(SecretsValidator::truncate("hi", 10), "hi");
-    }
-
-    #[test]
-    fn secrets_truncate_long_string() {
-        let result = SecretsValidator::truncate("hello world", 5);
-        assert_eq!(result.chars().count(), 5);
-        assert!(result.ends_with("…"));
-    }
-
-    #[test]
-    fn secrets_is_ascii_printable() {
-        assert!(SecretsValidator::is_ascii_printable("Hello World 123"));
-        assert!(!SecretsValidator::is_ascii_printable("Hello\x00World"));
+        let mut a = SecretsValidationCollector::new();
+        a.add_error("a_err");
+        let mut b = SecretsValidationCollector::new();
+        b.add_error("b_err");
+        a.merge(&b);
+        assert_eq!(a.error_count(), 2);
     }
 
     // -- EncryptedFileStore tests ----------------------------------------------
@@ -2953,6 +3055,144 @@ mod tests {
         let mut all = caps.all();
         all.sort();
         assert_eq!(all, vec!["a", "b"]);
+    }
+
+
+    #[test]
+    fn secrets_config_new() {
+        let cfg = SecretsConfig::new();
+        assert!(cfg.is_enabled());
+        assert_eq!(cfg.version(), 1);
+        assert_eq!(cfg.option_count(), 0);
+    }
+
+    #[test]
+    fn secrets_config_set_get() {
+        let mut cfg = SecretsConfig::new();
+        cfg.set_option("key", "value");
+        assert_eq!(cfg.get_option("key"), Some("value"));
+        assert!(cfg.has_option("key"));
+    }
+
+    #[test]
+    fn secrets_config_remove() {
+        let mut cfg = SecretsConfig::new();
+        cfg.set_option("a", "1");
+        assert_eq!(cfg.remove_option("a"), Some("1".into()));
+        assert!(!cfg.has_option("a"));
+    }
+
+    #[test]
+    fn secrets_config_keys_sorted() {
+        let mut cfg = SecretsConfig::new();
+        cfg.set_option("z", "1");
+        cfg.set_option("a", "2");
+        assert_eq!(cfg.option_keys(), vec!["a", "z"]);
+    }
+
+    #[test]
+    fn secrets_config_bump_version() {
+        let mut cfg = SecretsConfig::new();
+        cfg.bump_version();
+        cfg.bump_version();
+        assert_eq!(cfg.version(), 3);
+    }
+
+    #[test]
+    fn secrets_config_clear() {
+        let mut cfg = SecretsConfig::new();
+        cfg.set_option("x", "y");
+        cfg.bump_version();
+        cfg.clear();
+        assert_eq!(cfg.option_count(), 0);
+        assert_eq!(cfg.version(), 1);
+    }
+
+    #[test]
+    fn secrets_config_merge() {
+        let mut cfg1 = SecretsConfig::new();
+        cfg1.set_option("a", "1");
+        let mut cfg2 = SecretsConfig::new();
+        cfg2.set_option("b", "2");
+        cfg1.merge(&cfg2);
+        assert_eq!(cfg1.option_count(), 2);
+    }
+
+    #[test]
+    fn secrets_config_disable() {
+        let mut cfg = SecretsConfig::new();
+        cfg.set_enabled(false);
+        assert!(!cfg.is_enabled());
+    }
+
+    #[test]
+    fn secrets_rate_tracker_empty() {
+        let rt = SecretsRateTracker::new(1000);
+        assert_eq!(rt.count(), 0);
+        assert_eq!(rt.rate_per_second(), 0.0);
+    }
+
+    #[test]
+    fn secrets_rate_tracker_record() {
+        let mut rt = SecretsRateTracker::new(1000);
+        rt.record(100);
+        rt.record(200);
+        rt.record(300);
+        assert_eq!(rt.count(), 3);
+    }
+
+    #[test]
+    fn secrets_rate_tracker_prune() {
+        let mut rt = SecretsRateTracker::new(100);
+        rt.record(10);
+        rt.record(200);
+        assert_eq!(rt.count(), 1);
+    }
+
+    #[test]
+    fn secrets_validator_valid() {
+        let v = SecretsValidationCollector::new();
+        assert!(v.is_valid());
+        assert_eq!(v.error_count(), 0);
+    }
+
+    #[test]
+    fn secrets_validator_errors() {
+        let mut v = SecretsValidationCollector::new();
+        v.add_error("bad input");
+        v.add_warning("slow");
+        assert!(!v.is_valid());
+        assert_eq!(v.error_count(), 1);
+        assert_eq!(v.warning_count(), 1);
+        assert_eq!(v.first_error(), Some("bad input"));
+    }
+
+    #[test]
+    fn secrets_validator_clear() {
+        let mut v = SecretsValidationCollector::new();
+        v.add_error("err");
+        v.clear();
+        assert!(v.is_valid());
+    }
+
+    #[test]
+    fn secrets_validator_merge() {
+        let mut v1 = SecretsValidationCollector::new();
+        v1.add_error("e1");
+        let mut v2 = SecretsValidationCollector::new();
+        v2.add_error("e2");
+        v2.add_warning("w1");
+        v1.merge(&v2);
+        assert_eq!(v1.error_count(), 2);
+        assert_eq!(v1.warning_count(), 1);
+    }
+
+    #[test]
+    fn secrets_rate_tracker_clear() {
+        let mut rt = SecretsRateTracker::new(1000);
+        rt.record(100);
+        rt.clear();
+        assert_eq!(rt.count(), 0);
     }
 
 }

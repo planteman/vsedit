@@ -1813,6 +1813,109 @@ impl ExplorerFilterByType {
 }
 
 
+
+/// Tracks file tree expansion state for the explorer.
+pub struct ExpansionState {
+    expanded: std::collections::HashSet<String>,
+}
+
+impl ExpansionState {
+    pub fn new() -> Self {
+        Self { expanded: std::collections::HashSet::new() }
+    }
+
+    pub fn expand(&mut self, path: &str) {
+        self.expanded.insert(path.to_string());
+    }
+
+    pub fn collapse(&mut self, path: &str) {
+        self.expanded.remove(path);
+    }
+
+    pub fn toggle(&mut self, path: &str) {
+        if self.is_expanded(path) { self.collapse(path); } else { self.expand(path); }
+    }
+
+    pub fn is_expanded(&self, path: &str) -> bool {
+        self.expanded.contains(path)
+    }
+
+    pub fn expanded_count(&self) -> usize { self.expanded.len() }
+
+    pub fn collapse_all(&mut self) { self.expanded.clear(); }
+
+    pub fn expand_all(&mut self, paths: &[&str]) {
+        for p in paths { self.expanded.insert(p.to_string()); }
+    }
+
+    pub fn expanded_paths(&self) -> Vec<String> {
+        let mut v: Vec<_> = self.expanded.iter().cloned().collect();
+        v.sort();
+        v
+    }
+}
+
+/// Filters explorer entries based on glob-like patterns.
+pub struct ExplorerFilter {
+    patterns: Vec<String>,
+    exclude: bool,
+}
+
+impl ExplorerFilter {
+    pub fn new_include(patterns: Vec<String>) -> Self {
+        Self { patterns, exclude: false }
+    }
+
+    pub fn new_exclude(patterns: Vec<String>) -> Self {
+        Self { patterns, exclude: true }
+    }
+
+    pub fn matches(&self, name: &str) -> bool {
+        let matched = self.patterns.iter().any(|p| {
+            if p.starts_with("*.") {
+                name.ends_with(&p[1..])
+            } else {
+                name == p
+            }
+        });
+        if self.exclude { !matched } else { matched }
+    }
+
+    pub fn pattern_count(&self) -> usize { self.patterns.len() }
+    pub fn is_exclude(&self) -> bool { self.exclude }
+}
+
+/// Computes file tree statistics for the explorer sidebar.
+pub struct ExplorerStats {
+    pub file_count: usize,
+    pub dir_count: usize,
+    pub total_size: u64,
+    pub max_depth: usize,
+}
+
+impl ExplorerStats {
+    pub fn new() -> Self {
+        Self { file_count: 0, dir_count: 0, total_size: 0, max_depth: 0 }
+    }
+
+    pub fn add_file(&mut self, size: u64, depth: usize) {
+        self.file_count += 1;
+        self.total_size += size;
+        if depth > self.max_depth { self.max_depth = depth; }
+    }
+
+    pub fn add_dir(&mut self, depth: usize) {
+        self.dir_count += 1;
+        if depth > self.max_depth { self.max_depth = depth; }
+    }
+
+    pub fn total_items(&self) -> usize { self.file_count + self.dir_count }
+
+    pub fn average_file_size(&self) -> f64 {
+        if self.file_count == 0 { 0.0 } else { self.total_size as f64 / self.file_count as f64 }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2873,4 +2976,103 @@ mod tests {
         assert!(r.contains("my-label"));
         assert!(r.contains("false"));
     }
+
+    #[test]
+    fn expansion_state_expand_collapse() {
+        let mut es = ExpansionState::new();
+        es.expand("/src");
+        assert!(es.is_expanded("/src"));
+        es.collapse("/src");
+        assert!(!es.is_expanded("/src"));
+    }
+
+    #[test]
+    fn expansion_state_toggle() {
+        let mut es = ExpansionState::new();
+        es.toggle("/a");
+        assert!(es.is_expanded("/a"));
+        es.toggle("/a");
+        assert!(!es.is_expanded("/a"));
+    }
+
+    #[test]
+    fn expansion_state_collapse_all() {
+        let mut es = ExpansionState::new();
+        es.expand("/a");
+        es.expand("/b");
+        es.collapse_all();
+        assert_eq!(es.expanded_count(), 0);
+    }
+
+    #[test]
+    fn expansion_state_expand_all() {
+        let mut es = ExpansionState::new();
+        es.expand_all(&["/a", "/b", "/c"]);
+        assert_eq!(es.expanded_count(), 3);
+    }
+
+    #[test]
+    fn expansion_state_sorted_paths() {
+        let mut es = ExpansionState::new();
+        es.expand("/z");
+        es.expand("/a");
+        let paths = es.expanded_paths();
+        assert_eq!(paths, vec!["/a", "/z"]);
+    }
+
+    #[test]
+    fn explorer_filter_include() {
+        let f = ExplorerFilter::new_include(vec!["*.rs".into(), "*.toml".into()]);
+        assert!(f.matches("main.rs"));
+        assert!(!f.matches("main.py"));
+    }
+
+    #[test]
+    fn explorer_filter_exclude() {
+        let f = ExplorerFilter::new_exclude(vec!["*.log".into()]);
+        assert!(!f.matches("debug.log"));
+        assert!(f.matches("main.rs"));
+    }
+
+    #[test]
+    fn explorer_filter_exact_match() {
+        let f = ExplorerFilter::new_include(vec!["Cargo.toml".into()]);
+        assert!(f.matches("Cargo.toml"));
+        assert!(!f.matches("cargo.toml"));
+    }
+
+    #[test]
+    fn explorer_stats_add_files() {
+        let mut s = ExplorerStats::new();
+        s.add_file(100, 1);
+        s.add_file(200, 2);
+        assert_eq!(s.file_count, 2);
+        assert_eq!(s.total_size, 300);
+        assert_eq!(s.max_depth, 2);
+    }
+
+    #[test]
+    fn explorer_stats_add_dirs() {
+        let mut s = ExplorerStats::new();
+        s.add_dir(1);
+        s.add_dir(3);
+        assert_eq!(s.dir_count, 2);
+        assert_eq!(s.total_items(), 2);
+    }
+
+    #[test]
+    fn explorer_stats_avg_file_size() {
+        let mut s = ExplorerStats::new();
+        s.add_file(100, 0);
+        s.add_file(300, 0);
+        assert_eq!(s.average_file_size(), 200.0);
+    }
+
+    #[test]
+    fn explorer_stats_empty() {
+        let s = ExplorerStats::new();
+        assert_eq!(s.total_items(), 0);
+        assert_eq!(s.average_file_size(), 0.0);
+    }
+
 }

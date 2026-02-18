@@ -1704,6 +1704,140 @@ pub fn x_editor_render_tokenize(text: &str) -> Vec<&str> {
         .collect()
 }
 
+
+/// Configuration manager for editor_render functionality.
+pub struct EditorRenderConfig {
+    options: HashMap<String, String>,
+    enabled: bool,
+    version: u32,
+}
+
+impl EditorRenderConfig {
+    pub fn new() -> Self {
+        Self { options: HashMap::new(), enabled: true, version: 1 }
+    }
+
+    pub fn set_option(&mut self, key: &str, value: &str) {
+        self.options.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get_option(&self, key: &str) -> Option<&str> {
+        self.options.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove_option(&mut self, key: &str) -> Option<String> {
+        self.options.remove(key)
+    }
+
+    pub fn option_count(&self) -> usize { self.options.len() }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+
+    pub fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+
+    pub fn version(&self) -> u32 { self.version }
+
+    pub fn bump_version(&mut self) { self.version += 1; }
+
+    pub fn has_option(&self, key: &str) -> bool { self.options.contains_key(key) }
+
+    pub fn option_keys(&self) -> Vec<String> {
+        let mut keys: Vec<_> = self.options.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    pub fn clear(&mut self) {
+        self.options.clear();
+        self.version = 1;
+    }
+
+    pub fn merge(&mut self, other: &EditorRenderConfig) {
+        for (k, v) in &other.options {
+            self.options.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+/// Rate tracker for editor_render operations.
+pub struct EditorRenderRateTracker {
+    window_ms: u64,
+    timestamps: Vec<u64>,
+}
+
+impl EditorRenderRateTracker {
+    pub fn new(window_ms: u64) -> Self {
+        Self { window_ms, timestamps: Vec::new() }
+    }
+
+    pub fn record(&mut self, ts: u64) {
+        self.timestamps.push(ts);
+        self.prune(ts);
+    }
+
+    fn prune(&mut self, now: u64) {
+        let cutoff = now.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&t| t >= cutoff);
+    }
+
+    pub fn count(&self) -> usize { self.timestamps.len() }
+
+    pub fn rate_per_second(&self) -> f64 {
+        if self.timestamps.len() < 2 { return 0.0; }
+        let span = self.timestamps.last().unwrap() - self.timestamps.first().unwrap();
+        if span == 0 { return 0.0; }
+        (self.timestamps.len() as f64 / span as f64) * 1000.0
+    }
+
+    pub fn clear(&mut self) { self.timestamps.clear(); }
+
+    pub fn window_ms(&self) -> u64 { self.window_ms }
+}
+
+/// Validation result collector for editor_render.
+pub struct EditorRenderValidator {
+    errors: Vec<String>,
+    warnings: Vec<String>,
+}
+
+impl EditorRenderValidator {
+    pub fn new() -> Self {
+        Self { errors: Vec::new(), warnings: Vec::new() }
+    }
+
+    pub fn add_error(&mut self, msg: &str) {
+        self.errors.push(msg.to_string());
+    }
+
+    pub fn add_warning(&mut self, msg: &str) {
+        self.warnings.push(msg.to_string());
+    }
+
+    pub fn is_valid(&self) -> bool { self.errors.is_empty() }
+
+    pub fn error_count(&self) -> usize { self.errors.len() }
+
+    pub fn warning_count(&self) -> usize { self.warnings.len() }
+
+    pub fn errors(&self) -> &[String] { &self.errors }
+
+    pub fn warnings(&self) -> &[String] { &self.warnings }
+
+    pub fn clear(&mut self) {
+        self.errors.clear();
+        self.warnings.clear();
+    }
+
+    pub fn merge(&mut self, other: &EditorRenderValidator) {
+        self.errors.extend(other.errors.iter().cloned());
+        self.warnings.extend(other.warnings.iter().cloned());
+    }
+
+    pub fn first_error(&self) -> Option<&str> {
+        self.errors.first().map(|s| s.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2986,6 +3120,144 @@ mod tests {
         let s = XEditorRenderTextSpan::new(2, 5).shift(10);
         assert_eq!(s.start, 12);
         assert_eq!(s.end, 15);
+    }
+
+
+    #[test]
+    fn editor_render_config_new() {
+        let cfg = EditorRenderConfig::new();
+        assert!(cfg.is_enabled());
+        assert_eq!(cfg.version(), 1);
+        assert_eq!(cfg.option_count(), 0);
+    }
+
+    #[test]
+    fn editor_render_config_set_get() {
+        let mut cfg = EditorRenderConfig::new();
+        cfg.set_option("key", "value");
+        assert_eq!(cfg.get_option("key"), Some("value"));
+        assert!(cfg.has_option("key"));
+    }
+
+    #[test]
+    fn editor_render_config_remove() {
+        let mut cfg = EditorRenderConfig::new();
+        cfg.set_option("a", "1");
+        assert_eq!(cfg.remove_option("a"), Some("1".into()));
+        assert!(!cfg.has_option("a"));
+    }
+
+    #[test]
+    fn editor_render_config_keys_sorted() {
+        let mut cfg = EditorRenderConfig::new();
+        cfg.set_option("z", "1");
+        cfg.set_option("a", "2");
+        assert_eq!(cfg.option_keys(), vec!["a", "z"]);
+    }
+
+    #[test]
+    fn editor_render_config_bump_version() {
+        let mut cfg = EditorRenderConfig::new();
+        cfg.bump_version();
+        cfg.bump_version();
+        assert_eq!(cfg.version(), 3);
+    }
+
+    #[test]
+    fn editor_render_config_clear() {
+        let mut cfg = EditorRenderConfig::new();
+        cfg.set_option("x", "y");
+        cfg.bump_version();
+        cfg.clear();
+        assert_eq!(cfg.option_count(), 0);
+        assert_eq!(cfg.version(), 1);
+    }
+
+    #[test]
+    fn editor_render_config_merge() {
+        let mut cfg1 = EditorRenderConfig::new();
+        cfg1.set_option("a", "1");
+        let mut cfg2 = EditorRenderConfig::new();
+        cfg2.set_option("b", "2");
+        cfg1.merge(&cfg2);
+        assert_eq!(cfg1.option_count(), 2);
+    }
+
+    #[test]
+    fn editor_render_config_disable() {
+        let mut cfg = EditorRenderConfig::new();
+        cfg.set_enabled(false);
+        assert!(!cfg.is_enabled());
+    }
+
+    #[test]
+    fn editor_render_rate_tracker_empty() {
+        let rt = EditorRenderRateTracker::new(1000);
+        assert_eq!(rt.count(), 0);
+        assert_eq!(rt.rate_per_second(), 0.0);
+    }
+
+    #[test]
+    fn editor_render_rate_tracker_record() {
+        let mut rt = EditorRenderRateTracker::new(1000);
+        rt.record(100);
+        rt.record(200);
+        rt.record(300);
+        assert_eq!(rt.count(), 3);
+    }
+
+    #[test]
+    fn editor_render_rate_tracker_prune() {
+        let mut rt = EditorRenderRateTracker::new(100);
+        rt.record(10);
+        rt.record(200);
+        assert_eq!(rt.count(), 1);
+    }
+
+    #[test]
+    fn editor_render_validator_valid() {
+        let v = EditorRenderValidator::new();
+        assert!(v.is_valid());
+        assert_eq!(v.error_count(), 0);
+    }
+
+    #[test]
+    fn editor_render_validator_errors() {
+        let mut v = EditorRenderValidator::new();
+        v.add_error("bad input");
+        v.add_warning("slow");
+        assert!(!v.is_valid());
+        assert_eq!(v.error_count(), 1);
+        assert_eq!(v.warning_count(), 1);
+        assert_eq!(v.first_error(), Some("bad input"));
+    }
+
+    #[test]
+    fn editor_render_validator_clear() {
+        let mut v = EditorRenderValidator::new();
+        v.add_error("err");
+        v.clear();
+        assert!(v.is_valid());
+    }
+
+    #[test]
+    fn editor_render_validator_merge() {
+        let mut v1 = EditorRenderValidator::new();
+        v1.add_error("e1");
+        let mut v2 = EditorRenderValidator::new();
+        v2.add_error("e2");
+        v2.add_warning("w1");
+        v1.merge(&v2);
+        assert_eq!(v1.error_count(), 2);
+        assert_eq!(v1.warning_count(), 1);
+    }
+
+    #[test]
+    fn editor_render_rate_tracker_clear() {
+        let mut rt = EditorRenderRateTracker::new(1000);
+        rt.record(100);
+        rt.clear();
+        assert_eq!(rt.count(), 0);
     }
 
 }
