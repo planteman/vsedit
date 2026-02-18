@@ -20734,6 +20734,165 @@ impl AxhOutputRegistry {
     }
 }
 
+
+// --- axi_ snippet and template engine ---
+
+/// A tabstop in a snippet.
+#[derive(Debug, Clone)]
+pub struct AxiTabStop {
+    pub index: u32,
+    pub placeholder: Option<String>,
+    pub choices: Vec<String>,
+}
+
+impl AxiTabStop {
+    pub fn simple(index: u32) -> Self {
+        Self { index, placeholder: None, choices: Vec::new() }
+    }
+
+    pub fn with_placeholder(index: u32, placeholder: &str) -> Self {
+        Self { index, placeholder: Some(placeholder.to_string()), choices: Vec::new() }
+    }
+
+    pub fn with_choices(index: u32, choices: Vec<String>) -> Self {
+        Self { index, placeholder: None, choices }
+    }
+
+    pub fn default_value(&self) -> &str {
+        self.placeholder.as_deref()
+            .or_else(|| self.choices.first().map(|s| s.as_str()))
+            .unwrap_or("")
+    }
+
+    pub fn has_choices(&self) -> bool { !self.choices.is_empty() }
+}
+
+/// A parsed snippet with text and tabstops.
+#[derive(Debug, Clone)]
+pub struct AxiSnippet {
+    pub prefix: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub body: String,
+    pub scope: Option<String>,
+    tabstops: Vec<AxiTabStop>,
+}
+
+impl AxiSnippet {
+    pub fn new(name: &str, prefix: &str, body: &str) -> Self {
+        let mut snippet = Self {
+            prefix: prefix.to_string(),
+            name: name.to_string(),
+            description: None,
+            body: body.to_string(),
+            scope: None,
+            tabstops: Vec::new(),
+        };
+        snippet.parse_tabstops();
+        snippet
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = Some(desc.to_string());
+        self
+    }
+
+    pub fn with_scope(mut self, scope: &str) -> Self {
+        self.scope = Some(scope.to_string());
+        self
+    }
+
+    fn parse_tabstops(&mut self) {
+        let mut idx = 0;
+        let chars: Vec<char> = self.body.chars().collect();
+        while idx < chars.len() {
+            if chars[idx] == '$' && idx + 1 < chars.len() {
+                if chars[idx + 1].is_ascii_digit() {
+                    let n = (chars[idx + 1] as u32) - ('0' as u32);
+                    self.tabstops.push(AxiTabStop::simple(n));
+                    idx += 2;
+                    continue;
+                } else if chars[idx + 1] == '{' {
+                    if let Some(end) = chars[idx+2..].iter().position(|&c| c == '}') {
+                        let inner: String = chars[idx+2..idx+2+end].iter().collect();
+                        if let Some((num_str, rest)) = inner.split_once(':') {
+                            if let Ok(n) = num_str.parse::<u32>() {
+                                if rest.starts_with('|') && rest.ends_with('|') {
+                                    let choices: Vec<String> = rest[1..rest.len()-1].split(',').map(|s| s.to_string()).collect();
+                                    self.tabstops.push(AxiTabStop::with_choices(n, choices));
+                                } else {
+                                    self.tabstops.push(AxiTabStop::with_placeholder(n, rest));
+                                }
+                            }
+                        } else if let Ok(n) = inner.parse::<u32>() {
+                            self.tabstops.push(AxiTabStop::simple(n));
+                        }
+                        idx += end + 3;
+                        continue;
+                    }
+                }
+            }
+            idx += 1;
+        }
+    }
+
+    pub fn tabstops(&self) -> &[AxiTabStop] { &self.tabstops }
+    pub fn tabstop_count(&self) -> usize { self.tabstops.len() }
+    pub fn max_tabstop(&self) -> u32 { self.tabstops.iter().map(|t| t.index).max().unwrap_or(0) }
+
+    /// Expand the snippet, replacing tabstops with provided values.
+    pub fn expand(&self, values: &[(u32, &str)]) -> String {
+        let mut result = self.body.clone();
+        for (idx, val) in values {
+            let patterns = [
+                format!("${{{}}}", idx),
+                format!("${}", idx),
+            ];
+            for pattern in &patterns {
+                result = result.replace(pattern, val);
+            }
+            // Also replace ${idx:placeholder}
+            let prefix = format!("${{{}:", idx);
+            while let Some(start) = result.find(&prefix) {
+                if let Some(end) = result[start..].find('}') {
+                    result = format!("{}{}{}", &result[..start], val, &result[start+end+1..]);
+                } else {
+                    break;
+                }
+            }
+        }
+        result
+    }
+
+    pub fn matches_prefix(&self, input: &str) -> bool {
+        self.prefix.starts_with(input)
+    }
+}
+
+/// A collection of snippets for a language.
+#[derive(Debug, Clone)]
+pub struct AxiSnippetCollection {
+    pub language_id: String,
+    snippets: Vec<AxiSnippet>,
+}
+
+impl AxiSnippetCollection {
+    pub fn new(language_id: &str) -> Self {
+        Self { language_id: language_id.to_string(), snippets: Vec::new() }
+    }
+
+    pub fn add(&mut self, snippet: AxiSnippet) {
+        self.snippets.push(snippet);
+    }
+
+    pub fn find_by_prefix(&self, prefix: &str) -> Vec<&AxiSnippet> {
+        self.snippets.iter().filter(|s| s.matches_prefix(prefix)).collect()
+    }
+
+    pub fn all(&self) -> &[AxiSnippet] { &self.snippets }
+    pub fn count(&self) -> usize { self.snippets.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -33221,6 +33380,84 @@ mod tests {
         assert!(reg.dispose(0));
         assert_eq!(reg.channel_count(), 1);
         assert_eq!(reg.channel_names(), vec!["B"]);
+    }
+
+
+    // --- axi_ snippet and template engine tests ---
+
+    #[test]
+    fn test_axi_tabstop_simple() {
+        let ts = AxiTabStop::simple(1);
+        assert_eq!(ts.index, 1);
+        assert_eq!(ts.default_value(), "");
+    }
+
+    #[test]
+    fn test_axi_tabstop_placeholder() {
+        let ts = AxiTabStop::with_placeholder(1, "name");
+        assert_eq!(ts.default_value(), "name");
+    }
+
+    #[test]
+    fn test_axi_tabstop_choices() {
+        let ts = AxiTabStop::with_choices(1, vec!["a".into(), "b".into()]);
+        assert!(ts.has_choices());
+        assert_eq!(ts.default_value(), "a");
+    }
+
+    #[test]
+    fn test_axi_snippet_parse_simple() {
+        let s = AxiSnippet::new("For Loop", "for", "for $1 in $2 {\n\t$0\n}");
+        assert_eq!(s.tabstop_count(), 3);
+        assert_eq!(s.max_tabstop(), 2);
+    }
+
+    #[test]
+    fn test_axi_snippet_parse_placeholder() {
+        let s = AxiSnippet::new("Fn", "fn", "fn ${1:name}() {\n\t$0\n}");
+        assert_eq!(s.tabstop_count(), 2);
+        assert_eq!(s.tabstops()[0].default_value(), "name");
+    }
+
+    #[test]
+    fn test_axi_snippet_expand() {
+        let s = AxiSnippet::new("Log", "log", "println!(\"$1\");");
+        let expanded = s.expand(&[(1, "hello")]);
+        assert_eq!(expanded, "println!(\"hello\");");
+    }
+
+    #[test]
+    fn test_axi_snippet_expand_placeholder() {
+        let s = AxiSnippet::new("If", "if", "if ${1:condition} {\n\t${2:body}\n}");
+        let expanded = s.expand(&[(1, "x > 0"), (2, "return x")]);
+        assert_eq!(expanded, "if x > 0 {\n\treturn x\n}");
+    }
+
+    #[test]
+    fn test_axi_snippet_matches_prefix() {
+        let s = AxiSnippet::new("For", "for", "for");
+        assert!(s.matches_prefix("fo"));
+        assert!(s.matches_prefix("for"));
+        assert!(!s.matches_prefix("wh"));
+    }
+
+    #[test]
+    fn test_axi_snippet_metadata() {
+        let s = AxiSnippet::new("S", "s", "body")
+            .with_description("desc")
+            .with_scope("rust");
+        assert_eq!(s.description.as_deref(), Some("desc"));
+        assert_eq!(s.scope.as_deref(), Some("rust"));
+    }
+
+    #[test]
+    fn test_axi_snippet_collection() {
+        let mut coll = AxiSnippetCollection::new("rust");
+        coll.add(AxiSnippet::new("For", "for", "for $1 in $2 {}"));
+        coll.add(AxiSnippet::new("Fn", "fn", "fn $1() {}"));
+        assert_eq!(coll.count(), 2);
+        assert_eq!(coll.find_by_prefix("f").len(), 2);
+        assert_eq!(coll.find_by_prefix("fo").len(), 1);
     }
 
 }
