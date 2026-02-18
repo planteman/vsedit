@@ -25052,6 +25052,93 @@ impl AytSecurityPolicy {
     }
 }
 
+
+// --- ayu_ linked editing ranges and multi-edit ---
+
+/// A linked editing range group.
+#[derive(Debug, Clone)]
+pub struct AyuLinkedRange {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+}
+
+impl AyuLinkedRange {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self { Self { start_line: sl, start_col: sc, end_line: el, end_col: ec } }
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+    pub fn length(&self) -> u32 {
+        if self.is_single_line() { self.end_col - self.start_col } else { 0 }
+    }
+    pub fn contains_pos(&self, line: u32, col: u32) -> bool {
+        if line < self.start_line || line > self.end_line { return false; }
+        if line == self.start_line && col < self.start_col { return false; }
+        if line == self.end_line && col > self.end_col { return false; }
+        true
+    }
+}
+
+/// A group of linked ranges that edit together.
+#[derive(Debug, Clone)]
+pub struct AyuLinkedEditingGroup {
+    pub ranges: Vec<AyuLinkedRange>,
+    pub word_pattern: Option<String>,
+}
+
+impl AyuLinkedEditingGroup {
+    pub fn new(ranges: Vec<AyuLinkedRange>) -> Self { Self { ranges, word_pattern: None } }
+    pub fn with_pattern(mut self, pattern: &str) -> Self { self.word_pattern = Some(pattern.to_string()); self }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+    pub fn find_at(&self, line: u32, col: u32) -> Option<usize> {
+        self.ranges.iter().position(|r| r.contains_pos(line, col))
+    }
+    pub fn is_active_at(&self, line: u32, col: u32) -> bool { self.find_at(line, col).is_some() }
+}
+
+/// Multi-cursor linked editing session.
+#[derive(Debug)]
+pub struct AyuLinkedEditSession {
+    pub groups: Vec<AyuLinkedEditingGroup>,
+    pub active_group: Option<usize>,
+}
+
+impl AyuLinkedEditSession {
+    pub fn new() -> Self { Self { groups: Vec::new(), active_group: None } }
+    pub fn add_group(&mut self, group: AyuLinkedEditingGroup) {
+        self.groups.push(group);
+        if self.active_group.is_none() { self.active_group = Some(0); }
+    }
+    pub fn active(&self) -> Option<&AyuLinkedEditingGroup> {
+        self.active_group.and_then(|i| self.groups.get(i))
+    }
+    pub fn group_count(&self) -> usize { self.groups.len() }
+    pub fn clear(&mut self) { self.groups.clear(); self.active_group = None; }
+    pub fn find_group_at(&self, line: u32, col: u32) -> Option<usize> {
+        self.groups.iter().position(|g| g.is_active_at(line, col))
+    }
+    pub fn activate_at(&mut self, line: u32, col: u32) -> bool {
+        if let Some(idx) = self.find_group_at(line, col) { self.active_group = Some(idx); true }
+        else { false }
+    }
+}
+
+/// Color/tag pair highlighting (like HTML).
+#[derive(Debug, Clone)]
+pub struct AyuTagPair {
+    pub open_start: (u32, u32),
+    pub open_end: (u32, u32),
+    pub close_start: (u32, u32),
+    pub close_end: (u32, u32),
+    pub tag_name: String,
+}
+
+impl AyuTagPair {
+    pub fn new(name: &str, os: (u32, u32), oe: (u32, u32), cs: (u32, u32), ce: (u32, u32)) -> Self {
+        Self { open_start: os, open_end: oe, close_start: cs, close_end: ce, tag_name: name.to_string() }
+    }
+    pub fn spans_lines(&self) -> bool { self.open_start.0 != self.close_start.0 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40587,6 +40674,78 @@ mod tests {
     fn test_ayt_unknown_feature() {
         let policy = AytSecurityPolicy::new();
         assert!(!policy.is_feature_allowed("nonexistent"));
+    }
+
+
+    #[test]
+    fn test_ayu_linked_range() {
+        let r = AyuLinkedRange::new(5, 10, 5, 20);
+        assert!(r.is_single_line());
+        assert_eq!(r.length(), 10);
+        assert!(r.contains_pos(5, 15));
+        assert!(!r.contains_pos(5, 21));
+    }
+
+    #[test]
+    fn test_ayu_linked_group() {
+        let group = AyuLinkedEditingGroup::new(vec![
+            AyuLinkedRange::new(1, 5, 1, 10),
+            AyuLinkedRange::new(5, 5, 5, 10),
+        ]);
+        assert_eq!(group.range_count(), 2);
+        assert_eq!(group.find_at(1, 7), Some(0));
+        assert_eq!(group.find_at(5, 7), Some(1));
+        assert!(group.find_at(3, 0).is_none());
+    }
+
+    #[test]
+    fn test_ayu_linked_session() {
+        let mut session = AyuLinkedEditSession::new();
+        session.add_group(AyuLinkedEditingGroup::new(vec![
+            AyuLinkedRange::new(1, 0, 1, 5),
+            AyuLinkedRange::new(3, 0, 3, 5),
+        ]));
+        assert_eq!(session.group_count(), 1);
+        assert!(session.active().is_some());
+    }
+
+    #[test]
+    fn test_ayu_activate_at() {
+        let mut session = AyuLinkedEditSession::new();
+        session.add_group(AyuLinkedEditingGroup::new(vec![AyuLinkedRange::new(1, 0, 1, 5)]));
+        session.add_group(AyuLinkedEditingGroup::new(vec![AyuLinkedRange::new(10, 0, 10, 5)]));
+        assert!(session.activate_at(10, 3));
+        assert_eq!(session.active_group, Some(1));
+    }
+
+    #[test]
+    fn test_ayu_session_clear() {
+        let mut session = AyuLinkedEditSession::new();
+        session.add_group(AyuLinkedEditingGroup::new(vec![AyuLinkedRange::new(0, 0, 0, 5)]));
+        session.clear();
+        assert_eq!(session.group_count(), 0);
+        assert!(session.active().is_none());
+    }
+
+    #[test]
+    fn test_ayu_tag_pair() {
+        let pair = AyuTagPair::new("div", (1, 0), (1, 5), (10, 0), (10, 6));
+        assert!(pair.spans_lines());
+        assert_eq!(pair.tag_name, "div");
+    }
+
+    #[test]
+    fn test_ayu_word_pattern() {
+        let group = AyuLinkedEditingGroup::new(vec![AyuLinkedRange::new(0, 0, 0, 3)])
+            .with_pattern("[a-zA-Z]+");
+        assert!(group.word_pattern.is_some());
+    }
+
+    #[test]
+    fn test_ayu_multiline_range() {
+        let r = AyuLinkedRange::new(1, 0, 3, 5);
+        assert!(!r.is_single_line());
+        assert!(r.contains_pos(2, 0));
     }
 
 }
