@@ -22317,6 +22317,168 @@ impl AxsThemeRegistry {
     pub fn theme_names(&self) -> Vec<&str> { self.themes.iter().map(|t| t.name.as_str()).collect() }
 }
 
+
+// --- axt_ bracket matching and indentation engine ---
+
+/// Bracket pair kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AxtBracketKind { Paren, Square, Curly, Angle }
+
+impl AxtBracketKind {
+    pub fn open_char(&self) -> char {
+        match self { Self::Paren => '(', Self::Square => '[', Self::Curly => '{', Self::Angle => '<' }
+    }
+    pub fn close_char(&self) -> char {
+        match self { Self::Paren => ')', Self::Square => ']', Self::Curly => '}', Self::Angle => '>' }
+    }
+    pub fn from_char(c: char) -> Option<(Self, bool)> {
+        match c {
+            '(' => Some((Self::Paren, true)), ')' => Some((Self::Paren, false)),
+            '[' => Some((Self::Square, true)), ']' => Some((Self::Square, false)),
+            '{' => Some((Self::Curly, true)), '}' => Some((Self::Curly, false)),
+            '<' => Some((Self::Angle, true)), '>' => Some((Self::Angle, false)),
+            _ => None,
+        }
+    }
+}
+
+/// A bracket at a position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AxtBracketPos {
+    pub line: u32,
+    pub col: u32,
+    pub kind: AxtBracketKind,
+    pub is_open: bool,
+}
+
+/// A matched bracket pair.
+#[derive(Debug, Clone, Copy)]
+pub struct AxtBracketPair {
+    pub open: AxtBracketPos,
+    pub close: AxtBracketPos,
+}
+
+impl AxtBracketPair {
+    pub fn spans_lines(&self) -> bool { self.open.line != self.close.line }
+    pub fn nesting_depth(&self) -> u32 { 0 }
+}
+
+/// Bracket matcher using a stack-based approach.
+pub struct AxtBracketMatcher;
+
+impl AxtBracketMatcher {
+    pub fn find_matching(text: &str, line: u32, col: u32) -> Option<AxtBracketPair> {
+        let lines: Vec<&str> = text.lines().collect();
+        if line as usize >= lines.len() { return None; }
+        let target_line = lines[line as usize];
+        if col as usize >= target_line.len() { return None; }
+        let ch = target_line.as_bytes()[col as usize] as char;
+        let (kind, is_open) = AxtBracketKind::from_char(ch)?;
+        let origin = AxtBracketPos { line, col, kind, is_open };
+        if is_open {
+            Self::find_close(text, &origin)
+        } else {
+            Self::find_open(text, &origin)
+        }
+    }
+
+    fn find_close(text: &str, open: &AxtBracketPos) -> Option<AxtBracketPair> {
+        let mut depth: i32 = 0;
+        let open_c = open.kind.open_char();
+        let close_c = open.kind.close_char();
+        for (li, line) in text.lines().enumerate() {
+            for (ci, ch) in line.chars().enumerate() {
+                if li as u32 > open.line || (li as u32 == open.line && ci as u32 >= open.col) {
+                    if ch == open_c { depth += 1; }
+                    else if ch == close_c {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Some(AxtBracketPair {
+                                open: *open,
+                                close: AxtBracketPos { line: li as u32, col: ci as u32, kind: open.kind, is_open: false },
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn find_open(text: &str, close: &AxtBracketPos) -> Option<AxtBracketPair> {
+        let mut depth: i32 = 0;
+        let open_c = close.kind.open_char();
+        let close_c = close.kind.close_char();
+        let lines: Vec<&str> = text.lines().collect();
+        for li in (0..=close.line as usize).rev() {
+            let line = lines[li];
+            let chars: Vec<char> = line.chars().collect();
+            let end = if li == close.line as usize { close.col as usize } else { chars.len().saturating_sub(1) };
+            for ci in (0..=end).rev() {
+                if ci < chars.len() {
+                    let ch = chars[ci];
+                    if ch == close_c { depth += 1; }
+                    else if ch == open_c {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Some(AxtBracketPair {
+                                open: AxtBracketPos { line: li as u32, col: ci as u32, kind: close.kind, is_open: true },
+                                close: *close,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+/// Indentation style detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxtIndentStyle { Tabs, Spaces(u32) }
+
+impl AxtIndentStyle {
+    pub fn detect(text: &str) -> Self {
+        let mut tab_lines = 0u32;
+        let mut space_counts: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
+        for line in text.lines() {
+            if line.starts_with('\t') { tab_lines += 1; }
+            else {
+                let spaces = line.len() - line.trim_start_matches(' ').len();
+                if spaces > 0 { *space_counts.entry(spaces as u32).or_insert(0) += 1; }
+            }
+        }
+        let total_space_lines: u32 = space_counts.values().sum();
+        if tab_lines > total_space_lines { return Self::Tabs; }
+        let mut best_size = 4u32;
+        let mut best_count = 0u32;
+        for size in [2, 4, 8] {
+            let count: u32 = space_counts.iter()
+                .filter(|(k, _)| **k % size == 0).map(|(_, v)| *v).sum();
+            if count > best_count { best_count = count; best_size = size; }
+        }
+        Self::Spaces(best_size)
+    }
+    pub fn indent_str(&self) -> String {
+        match self { Self::Tabs => "\t".to_string(), Self::Spaces(n) => " ".repeat(*n as usize) }
+    }
+}
+
+/// Auto-indent engine.
+pub struct AxtAutoIndent;
+
+impl AxtAutoIndent {
+    pub fn compute_indent(prev_line: &str, style: AxtIndentStyle) -> String {
+        let current = prev_line.len() - prev_line.trim_start().len();
+        let trimmed = prev_line.trim_end();
+        let extra = if trimmed.ends_with('{') || trimmed.ends_with('(') || trimmed.ends_with('[') || trimmed.ends_with(':') {
+            style.indent_str()
+        } else { String::new() };
+        format!("{}{}", &prev_line[..current], extra)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35789,6 +35951,64 @@ mod tests {
         assert!(reg.set_active("Light+"));
         assert_eq!(reg.active().unwrap().name, "Light+");
         assert!(!reg.set_active("Nonexistent"));
+    }
+
+
+    #[test]
+    fn test_axt_bracket_kind() {
+        assert_eq!(AxtBracketKind::Curly.open_char(), '{');
+        assert_eq!(AxtBracketKind::Curly.close_char(), '}');
+        let (k, is_open) = AxtBracketKind::from_char('(').unwrap();
+        assert_eq!(k, AxtBracketKind::Paren);
+        assert!(is_open);
+    }
+
+    #[test]
+    fn test_axt_bracket_match_simple() {
+        let text = "fn main() { }";
+        let pair = AxtBracketMatcher::find_matching(text, 0, 10).unwrap();
+        assert_eq!(pair.close.col, 12);
+        assert!(!pair.spans_lines());
+    }
+
+    #[test]
+    fn test_axt_bracket_match_nested() {
+        let text = "((()))";
+        let pair = AxtBracketMatcher::find_matching(text, 0, 0).unwrap();
+        assert_eq!(pair.close.col, 5);
+    }
+
+    #[test]
+    fn test_axt_bracket_match_multiline() {
+        let text = "fn main() {\n    println!();\n}";
+        let pair = AxtBracketMatcher::find_matching(text, 0, 10).unwrap();
+        assert!(pair.spans_lines());
+    }
+
+    #[test]
+    fn test_axt_bracket_match_reverse() {
+        let text = "(hello)";
+        let pair = AxtBracketMatcher::find_matching(text, 0, 6).unwrap();
+        assert_eq!(pair.open.col, 0);
+    }
+
+    #[test]
+    fn test_axt_bracket_no_match() {
+        let text = "(unclosed";
+        assert!(AxtBracketMatcher::find_matching(text, 0, 0).is_none());
+    }
+
+    #[test]
+    fn test_axt_indent_style_spaces() {
+        let text = "    hello\n    world\n        nested";
+        let style = AxtIndentStyle::detect(text);
+        assert_eq!(style, AxtIndentStyle::Spaces(2));
+    }
+
+    #[test]
+    fn test_axt_auto_indent() {
+        let indent = AxtAutoIndent::compute_indent("    fn main() {", AxtIndentStyle::Spaces(4));
+        assert_eq!(indent, "        ");
     }
 
 }
