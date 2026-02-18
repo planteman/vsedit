@@ -23929,6 +23929,106 @@ impl AygSymbolIndex {
     pub fn clear(&mut self) { self.symbols.clear(); }
 }
 
+
+// --- ayh_ reference and implementation provider ---
+
+/// A reference location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AyhReference {
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_declaration: bool,
+}
+
+impl AyhReference {
+    pub fn new(uri: &str, line: u32, col: u32) -> Self {
+        Self { uri: uri.to_string(), line, col, end_line: line, end_col: col, is_declaration: false }
+    }
+    pub fn with_range(mut self, el: u32, ec: u32) -> Self { self.end_line = el; self.end_col = ec; self }
+    pub fn mark_declaration(mut self) -> Self { self.is_declaration = true; self }
+    pub fn location_str(&self) -> String { format!("{}:{}:{}", self.uri, self.line, self.col) }
+}
+
+/// Reference search context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AyhReferenceContext {
+    pub include_declaration: bool,
+}
+
+impl AyhReferenceContext {
+    pub fn new(include_declaration: bool) -> Self { Self { include_declaration } }
+}
+
+/// Reference results grouped by file.
+#[derive(Debug)]
+pub struct AyhReferenceResult {
+    pub references: Vec<AyhReference>,
+}
+
+impl AyhReferenceResult {
+    pub fn new() -> Self { Self { references: Vec::new() } }
+    pub fn add(&mut self, r: AyhReference) { self.references.push(r); }
+    pub fn count(&self) -> usize { self.references.len() }
+    pub fn by_file(&self) -> std::collections::HashMap<&str, Vec<&AyhReference>> {
+        let mut map: std::collections::HashMap<&str, Vec<&AyhReference>> = std::collections::HashMap::new();
+        for r in &self.references { map.entry(r.uri.as_str()).or_default().push(r); }
+        map
+    }
+    pub fn file_count(&self) -> usize { self.by_file().len() }
+    pub fn declarations(&self) -> Vec<&AyhReference> {
+        self.references.iter().filter(|r| r.is_declaration).collect()
+    }
+    pub fn usages(&self) -> Vec<&AyhReference> {
+        self.references.iter().filter(|r| !r.is_declaration).collect()
+    }
+    pub fn filter_by_context(&self, ctx: &AyhReferenceContext) -> Vec<&AyhReference> {
+        if ctx.include_declaration { self.references.iter().collect() }
+        else { self.usages() }
+    }
+}
+
+/// Implementation location.
+#[derive(Debug, Clone)]
+pub struct AyhImplementation {
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub name: String,
+    pub kind: AyhImplKind,
+}
+
+/// Implementation kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyhImplKind { Class, Interface, Method, Function }
+
+impl AyhImplementation {
+    pub fn new(name: &str, uri: &str, line: u32, kind: AyhImplKind) -> Self {
+        Self { uri: uri.to_string(), line, col: 0, name: name.to_string(), kind }
+    }
+}
+
+/// Type hierarchy item.
+#[derive(Debug, Clone)]
+pub struct AyhTypeHierarchyItem {
+    pub name: String,
+    pub kind: AyhImplKind,
+    pub uri: String,
+    pub line: u32,
+    pub supertypes: Vec<String>,
+    pub subtypes: Vec<String>,
+}
+
+impl AyhTypeHierarchyItem {
+    pub fn new(name: &str, kind: AyhImplKind, uri: &str, line: u32) -> Self {
+        Self { name: name.to_string(), kind, uri: uri.to_string(), line, supertypes: Vec::new(), subtypes: Vec::new() }
+    }
+    pub fn add_supertype(&mut self, t: &str) { self.supertypes.push(t.to_string()); }
+    pub fn add_subtype(&mut self, t: &str) { self.subtypes.push(t.to_string()); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38403,6 +38503,77 @@ mod tests {
         let mut link = AygLocationLink::simple("file:///a.rs", 10, 0);
         link.origin_uri = Some("file:///a.rs".to_string());
         assert!(link.is_same_file());
+    }
+
+
+    #[test]
+    fn test_ayh_reference() {
+        let r = AyhReference::new("file:///a.rs", 10, 5).with_range(10, 15).mark_declaration();
+        assert!(r.is_declaration);
+        assert_eq!(r.location_str(), "file:///a.rs:10:5");
+    }
+
+    #[test]
+    fn test_ayh_reference_result() {
+        let mut result = AyhReferenceResult::new();
+        result.add(AyhReference::new("a.rs", 1, 0).mark_declaration());
+        result.add(AyhReference::new("a.rs", 10, 0));
+        result.add(AyhReference::new("b.rs", 5, 0));
+        assert_eq!(result.count(), 3);
+        assert_eq!(result.file_count(), 2);
+        assert_eq!(result.declarations().len(), 1);
+        assert_eq!(result.usages().len(), 2);
+    }
+
+    #[test]
+    fn test_ayh_reference_context_filter() {
+        let mut result = AyhReferenceResult::new();
+        result.add(AyhReference::new("a.rs", 1, 0).mark_declaration());
+        result.add(AyhReference::new("a.rs", 10, 0));
+        let ctx_no_decl = AyhReferenceContext::new(false);
+        assert_eq!(result.filter_by_context(&ctx_no_decl).len(), 1);
+        let ctx_with_decl = AyhReferenceContext::new(true);
+        assert_eq!(result.filter_by_context(&ctx_with_decl).len(), 2);
+    }
+
+    #[test]
+    fn test_ayh_implementation() {
+        let imp = AyhImplementation::new("MyImpl", "a.rs", 20, AyhImplKind::Class);
+        assert_eq!(imp.kind, AyhImplKind::Class);
+        assert_eq!(imp.name, "MyImpl");
+    }
+
+    #[test]
+    fn test_ayh_type_hierarchy() {
+        let mut item = AyhTypeHierarchyItem::new("Animal", AyhImplKind::Interface, "a.rs", 1);
+        item.add_subtype("Dog");
+        item.add_subtype("Cat");
+        item.add_supertype("LivingThing");
+        assert_eq!(item.subtypes.len(), 2);
+        assert_eq!(item.supertypes.len(), 1);
+    }
+
+    #[test]
+    fn test_ayh_by_file() {
+        let mut result = AyhReferenceResult::new();
+        result.add(AyhReference::new("a.rs", 1, 0));
+        result.add(AyhReference::new("a.rs", 5, 0));
+        result.add(AyhReference::new("b.rs", 10, 0));
+        let grouped = result.by_file();
+        assert_eq!(grouped.get("a.rs").unwrap().len(), 2);
+        assert_eq!(grouped.get("b.rs").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_ayh_empty_result() {
+        let result = AyhReferenceResult::new();
+        assert_eq!(result.count(), 0);
+        assert_eq!(result.file_count(), 0);
+    }
+
+    #[test]
+    fn test_ayh_impl_kind() {
+        assert_ne!(AyhImplKind::Class, AyhImplKind::Method);
     }
 
 }
