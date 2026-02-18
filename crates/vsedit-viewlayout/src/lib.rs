@@ -24429,6 +24429,113 @@ impl AymWorkspaceEditBuilder {
     }
 }
 
+
+// --- ayn_ terminal input event model ---
+
+/// Mouse button.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AynMouseButton { Left, Right, Middle, ScrollUp, ScrollDown }
+
+/// Mouse event kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AynMouseEventKind { Press, Release, Drag, Move }
+
+/// Mouse event.
+#[derive(Debug, Clone, Copy)]
+pub struct AynMouseEvent {
+    pub button: AynMouseButton,
+    pub kind: AynMouseEventKind,
+    pub col: u16,
+    pub row: u16,
+    pub modifiers: u8,
+}
+
+impl AynMouseEvent {
+    pub fn press(button: AynMouseButton, col: u16, row: u16) -> Self {
+        Self { button, kind: AynMouseEventKind::Press, col, row, modifiers: 0 }
+    }
+    pub fn with_ctrl(mut self) -> Self { self.modifiers |= 1; self }
+    pub fn with_shift(mut self) -> Self { self.modifiers |= 2; self }
+    pub fn with_alt(mut self) -> Self { self.modifiers |= 4; self }
+    pub fn has_ctrl(&self) -> bool { self.modifiers & 1 != 0 }
+    pub fn has_shift(&self) -> bool { self.modifiers & 2 != 0 }
+    pub fn has_alt(&self) -> bool { self.modifiers & 4 != 0 }
+    pub fn is_click(&self) -> bool { self.kind == AynMouseEventKind::Press && matches!(self.button, AynMouseButton::Left | AynMouseButton::Right | AynMouseButton::Middle) }
+    pub fn is_scroll(&self) -> bool { matches!(self.button, AynMouseButton::ScrollUp | AynMouseButton::ScrollDown) }
+}
+
+/// Terminal resize event.
+#[derive(Debug, Clone, Copy)]
+pub struct AynResizeEvent {
+    pub cols: u16,
+    pub rows: u16,
+}
+
+impl AynResizeEvent {
+    pub fn new(cols: u16, rows: u16) -> Self { Self { cols, rows } }
+    pub fn area(&self) -> u32 { self.cols as u32 * self.rows as u32 }
+}
+
+/// Paste event.
+#[derive(Debug, Clone)]
+pub struct AynPasteEvent {
+    pub text: String,
+}
+
+impl AynPasteEvent {
+    pub fn new(text: &str) -> Self { Self { text: text.to_string() } }
+    pub fn line_count(&self) -> usize { self.text.lines().count().max(1) }
+    pub fn is_multiline(&self) -> bool { self.text.contains('\n') }
+}
+
+/// Top-level input event.
+#[derive(Debug, Clone)]
+pub enum AynInputEvent {
+    Key { code: char, ctrl: bool, alt: bool, shift: bool },
+    FunctionKey(u8),
+    Special(AynSpecialKey),
+    Mouse(AynMouseEvent),
+    Resize(AynResizeEvent),
+    Paste(AynPasteEvent),
+    FocusGained,
+    FocusLost,
+}
+
+/// Special (non-character) keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AynSpecialKey {
+    Enter, Escape, Tab, Backspace, Delete, Home, End,
+    PageUp, PageDown, Up, Down, Left, Right, Insert,
+}
+
+impl AynInputEvent {
+    pub fn is_key(&self) -> bool { matches!(self, Self::Key { .. }) }
+    pub fn is_mouse(&self) -> bool { matches!(self, Self::Mouse(_)) }
+    pub fn is_resize(&self) -> bool { matches!(self, Self::Resize(_)) }
+}
+
+/// Input event queue.
+#[derive(Debug)]
+pub struct AynEventQueue {
+    events: std::collections::VecDeque<AynInputEvent>,
+    capacity: usize,
+}
+
+impl AynEventQueue {
+    pub fn new(capacity: usize) -> Self {
+        Self { events: std::collections::VecDeque::new(), capacity }
+    }
+    pub fn push(&mut self, event: AynInputEvent) {
+        if self.events.len() >= self.capacity { self.events.pop_front(); }
+        self.events.push_back(event);
+    }
+    pub fn pop(&mut self) -> Option<AynInputEvent> { self.events.pop_front() }
+    pub fn peek(&self) -> Option<&AynInputEvent> { self.events.front() }
+    pub fn len(&self) -> usize { self.events.len() }
+    pub fn is_empty(&self) -> bool { self.events.is_empty() }
+    pub fn clear(&mut self) { self.events.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39454,6 +39561,72 @@ mod tests {
         let ch = AymTextChange::replace(0, 0, 0, 5, "new");
         assert!(!ch.is_insert());
         assert!(!ch.is_delete());
+    }
+
+
+    #[test]
+    fn test_ayn_mouse_event() {
+        let evt = AynMouseEvent::press(AynMouseButton::Left, 10, 5).with_ctrl();
+        assert!(evt.is_click());
+        assert!(evt.has_ctrl());
+        assert!(!evt.has_shift());
+    }
+
+    #[test]
+    fn test_ayn_scroll_event() {
+        let evt = AynMouseEvent::press(AynMouseButton::ScrollUp, 0, 0);
+        assert!(evt.is_scroll());
+        assert!(!evt.is_click());
+    }
+
+    #[test]
+    fn test_ayn_resize_event() {
+        let evt = AynResizeEvent::new(120, 40);
+        assert_eq!(evt.area(), 4800);
+    }
+
+    #[test]
+    fn test_ayn_paste_event() {
+        let evt = AynPasteEvent::new("line1\nline2\nline3");
+        assert!(evt.is_multiline());
+        assert_eq!(evt.line_count(), 3);
+    }
+
+    #[test]
+    fn test_ayn_input_event_types() {
+        let key = AynInputEvent::Key { code: 'a', ctrl: false, alt: false, shift: false };
+        assert!(key.is_key());
+        let mouse = AynInputEvent::Mouse(AynMouseEvent::press(AynMouseButton::Left, 0, 0));
+        assert!(mouse.is_mouse());
+        let resize = AynInputEvent::Resize(AynResizeEvent::new(80, 24));
+        assert!(resize.is_resize());
+    }
+
+    #[test]
+    fn test_ayn_event_queue() {
+        let mut q = AynEventQueue::new(3);
+        assert!(q.is_empty());
+        q.push(AynInputEvent::Key { code: 'a', ctrl: false, alt: false, shift: false });
+        q.push(AynInputEvent::Key { code: 'b', ctrl: false, alt: false, shift: false });
+        assert_eq!(q.len(), 2);
+        let evt = q.pop().unwrap();
+        assert!(evt.is_key());
+        assert_eq!(q.len(), 1);
+    }
+
+    #[test]
+    fn test_ayn_event_queue_overflow() {
+        let mut q = AynEventQueue::new(2);
+        q.push(AynInputEvent::FocusGained);
+        q.push(AynInputEvent::FocusGained);
+        q.push(AynInputEvent::FocusLost);
+        assert_eq!(q.len(), 2);
+    }
+
+    #[test]
+    fn test_ayn_special_key() {
+        let evt = AynInputEvent::Special(AynSpecialKey::Escape);
+        assert!(!evt.is_key());
     }
 
 }
