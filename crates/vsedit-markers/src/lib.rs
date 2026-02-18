@@ -14743,6 +14743,169 @@ impl std::fmt::Display for ZgDecorationSet {
     }
 }
 
+
+// --- zh_ semantic tokens and code actions ---
+
+/// A semantic token type for syntax highlighting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZhSemanticTokenType {
+    Namespace, Type, Class, Enum, Interface, Struct, TypeParameter,
+    Parameter, Variable, Property, EnumMember, Event, Function, Method,
+    Macro, Keyword, Modifier, Comment, String, Number, Regexp, Operator,
+    Decorator,
+}
+
+impl ZhSemanticTokenType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ZhSemanticTokenType::Namespace => "namespace",
+            ZhSemanticTokenType::Type => "type",
+            ZhSemanticTokenType::Class => "class",
+            ZhSemanticTokenType::Enum => "enum",
+            ZhSemanticTokenType::Interface => "interface",
+            ZhSemanticTokenType::Struct => "struct",
+            ZhSemanticTokenType::TypeParameter => "typeParameter",
+            ZhSemanticTokenType::Parameter => "parameter",
+            ZhSemanticTokenType::Variable => "variable",
+            ZhSemanticTokenType::Property => "property",
+            ZhSemanticTokenType::EnumMember => "enumMember",
+            ZhSemanticTokenType::Event => "event",
+            ZhSemanticTokenType::Function => "function",
+            ZhSemanticTokenType::Method => "method",
+            ZhSemanticTokenType::Macro => "macro",
+            ZhSemanticTokenType::Keyword => "keyword",
+            ZhSemanticTokenType::Modifier => "modifier",
+            ZhSemanticTokenType::Comment => "comment",
+            ZhSemanticTokenType::String => "string",
+            ZhSemanticTokenType::Number => "number",
+            ZhSemanticTokenType::Regexp => "regexp",
+            ZhSemanticTokenType::Operator => "operator",
+            ZhSemanticTokenType::Decorator => "decorator",
+        }
+    }
+}
+
+impl std::fmt::Display for ZhSemanticTokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.as_str()) }
+}
+
+/// A single semantic token (delta-encoded line, char, length, type, modifiers).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ZhSemanticToken {
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub length: u32,
+    pub token_type: u32,
+    pub token_modifiers: u32,
+}
+
+impl ZhSemanticToken {
+    pub fn new(dl: u32, ds: u32, len: u32, tt: u32, tm: u32) -> Self {
+        Self { delta_line: dl, delta_start: ds, length: len, token_type: tt, token_modifiers: tm }
+    }
+}
+
+impl std::fmt::Display for ZhSemanticToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SemanticToken(dl={}, ds={}, len={}, type={}, mods={})", self.delta_line, self.delta_start, self.length, self.token_type, self.token_modifiers)
+    }
+}
+
+/// A collection of semantic tokens for a document.
+#[derive(Debug, Clone)]
+pub struct ZhSemanticTokens {
+    pub result_id: Option<String>,
+    pub data: Vec<ZhSemanticToken>,
+}
+
+impl ZhSemanticTokens {
+    pub fn new() -> Self { Self { result_id: None, data: Vec::new() } }
+
+    pub fn with_result_id(mut self, id: &str) -> Self { self.result_id = Some(id.to_string()); self }
+
+    pub fn push(&mut self, token: ZhSemanticToken) { self.data.push(token); }
+
+    pub fn len(&self) -> usize { self.data.len() }
+    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+
+    pub fn to_data(&self) -> Vec<u32> {
+        self.data.iter().flat_map(|t| vec![t.delta_line, t.delta_start, t.length, t.token_type, t.token_modifiers]).collect()
+    }
+}
+
+impl Default for ZhSemanticTokens {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for ZhSemanticTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZhSemanticTokens({} tokens)", self.len())
+    }
+}
+
+/// The kind of a code action.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ZhCodeActionKind {
+    QuickFix,
+    Refactor,
+    RefactorExtract,
+    RefactorInline,
+    RefactorRewrite,
+    Source,
+    SourceOrganizeImports,
+    SourceFixAll,
+    Other(String),
+}
+
+impl ZhCodeActionKind {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ZhCodeActionKind::QuickFix => "quickfix",
+            ZhCodeActionKind::Refactor => "refactor",
+            ZhCodeActionKind::RefactorExtract => "refactor.extract",
+            ZhCodeActionKind::RefactorInline => "refactor.inline",
+            ZhCodeActionKind::RefactorRewrite => "refactor.rewrite",
+            ZhCodeActionKind::Source => "source",
+            ZhCodeActionKind::SourceOrganizeImports => "source.organizeImports",
+            ZhCodeActionKind::SourceFixAll => "source.fixAll",
+            ZhCodeActionKind::Other(s) => s,
+        }
+    }
+
+    pub fn is_quickfix(&self) -> bool { matches!(self, ZhCodeActionKind::QuickFix) }
+    pub fn is_refactor(&self) -> bool { matches!(self, ZhCodeActionKind::Refactor | ZhCodeActionKind::RefactorExtract | ZhCodeActionKind::RefactorInline | ZhCodeActionKind::RefactorRewrite) }
+}
+
+impl std::fmt::Display for ZhCodeActionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.as_str()) }
+}
+
+/// A code action (quick fix, refactoring, etc.).
+#[derive(Debug, Clone)]
+pub struct ZhCodeAction {
+    pub title: String,
+    pub kind: ZhCodeActionKind,
+    pub is_preferred: bool,
+    pub disabled_reason: Option<String>,
+}
+
+impl ZhCodeAction {
+    pub fn new(title: &str, kind: ZhCodeActionKind) -> Self {
+        Self { title: title.to_string(), kind, is_preferred: false, disabled_reason: None }
+    }
+
+    pub fn preferred(mut self) -> Self { self.is_preferred = true; self }
+    pub fn disabled(mut self, reason: &str) -> Self { self.disabled_reason = Some(reason.to_string()); self }
+
+    pub fn is_disabled(&self) -> bool { self.disabled_reason.is_some() }
+}
+
+impl std::fmt::Display for ZhCodeAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZhCodeAction({}: {})", self.kind, self.title)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24898,6 +25061,103 @@ mod tests {
     fn test_zg_decoration_set_default() {
         let ds = ZgDecorationSet::default();
         assert!(ds.is_empty());
+    }
+
+
+    // --- zh_ tests ---
+
+    #[test]
+    fn test_zh_token_type() {
+        assert_eq!(ZhSemanticTokenType::Function.as_str(), "function");
+        assert_eq!(ZhSemanticTokenType::Keyword.as_str(), "keyword");
+    }
+
+    #[test]
+    fn test_zh_token_type_display() {
+        let s = format!("{}", ZhSemanticTokenType::Variable);
+        assert_eq!(s, "variable");
+    }
+
+    #[test]
+    fn test_zh_semantic_token_new() {
+        let t = ZhSemanticToken::new(0, 5, 10, 1, 0);
+        assert_eq!(t.delta_line, 0);
+        assert_eq!(t.length, 10);
+    }
+
+    #[test]
+    fn test_zh_semantic_tokens_new() {
+        let st = ZhSemanticTokens::new();
+        assert!(st.is_empty());
+    }
+
+    #[test]
+    fn test_zh_semantic_tokens_push() {
+        let mut st = ZhSemanticTokens::new();
+        st.push(ZhSemanticToken::new(0, 0, 5, 0, 0));
+        st.push(ZhSemanticToken::new(1, 0, 3, 1, 0));
+        assert_eq!(st.len(), 2);
+    }
+
+    #[test]
+    fn test_zh_semantic_tokens_to_data() {
+        let mut st = ZhSemanticTokens::new();
+        st.push(ZhSemanticToken::new(0, 5, 10, 1, 2));
+        let data = st.to_data();
+        assert_eq!(data, vec![0, 5, 10, 1, 2]);
+    }
+
+    #[test]
+    fn test_zh_semantic_tokens_result_id() {
+        let st = ZhSemanticTokens::new().with_result_id("abc123");
+        assert_eq!(st.result_id, Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn test_zh_semantic_tokens_display() {
+        let st = ZhSemanticTokens::new();
+        let s = format!("{}", st);
+        assert!(s.contains("ZhSemanticTokens"));
+    }
+
+    #[test]
+    fn test_zh_code_action_kind() {
+        assert_eq!(ZhCodeActionKind::QuickFix.as_str(), "quickfix");
+        assert!(ZhCodeActionKind::QuickFix.is_quickfix());
+        assert!(ZhCodeActionKind::RefactorExtract.is_refactor());
+    }
+
+    #[test]
+    fn test_zh_code_action_new() {
+        let a = ZhCodeAction::new("Fix import", ZhCodeActionKind::QuickFix);
+        assert_eq!(a.title, "Fix import");
+        assert!(!a.is_disabled());
+    }
+
+    #[test]
+    fn test_zh_code_action_preferred() {
+        let a = ZhCodeAction::new("Fix", ZhCodeActionKind::QuickFix).preferred();
+        assert!(a.is_preferred);
+    }
+
+    #[test]
+    fn test_zh_code_action_disabled() {
+        let a = ZhCodeAction::new("Fix", ZhCodeActionKind::QuickFix).disabled("not applicable");
+        assert!(a.is_disabled());
+        assert_eq!(a.disabled_reason, Some("not applicable".to_string()));
+    }
+
+    #[test]
+    fn test_zh_code_action_display() {
+        let a = ZhCodeAction::new("Test", ZhCodeActionKind::Refactor);
+        let s = format!("{}", a);
+        assert!(s.contains("Test"));
+    }
+
+    #[test]
+    fn test_zh_code_action_kind_other() {
+        let k = ZhCodeActionKind::Other("custom.action".to_string());
+        assert_eq!(k.as_str(), "custom.action");
     }
 
 }
