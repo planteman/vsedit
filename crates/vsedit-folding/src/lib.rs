@@ -10550,7 +10550,7 @@ impl YjExprEval {
     pub fn yj_get_var(&self, name: &str) -> Option<f64> { self.yj_vars.get(name).copied() }
 
     /// Evaluate an expression string.
-    pub fn yj_eval(&self, expr: &str) -> Result<f64, String> {
+    pub fn yj_eval(&self, expr: &str) -> std::result::Result<f64, String> {
         let tokens = Self::yj_tokenize(expr)?;
         let mut pos = 0;
         let result = self.yj_parse_expr(&tokens, &mut pos)?;
@@ -10558,7 +10558,7 @@ impl YjExprEval {
         Ok(result)
     }
 
-    fn yj_tokenize(expr: &str) -> Result<Vec<String>, String> {
+    fn yj_tokenize(expr: &str) -> std::result::Result<Vec<String>, String> {
         let mut tokens = Vec::new();
         let mut chars = expr.chars().peekable();
         while let Some(&ch) = chars.peek() {
@@ -10585,7 +10585,7 @@ impl YjExprEval {
         Ok(tokens)
     }
 
-    fn yj_parse_expr(&self, tokens: &[String], pos: &mut usize) -> Result<f64, String> {
+    fn yj_parse_expr(&self, tokens: &[String], pos: &mut usize) -> std::result::Result<f64, String> {
         let mut result = self.yj_parse_term(tokens, pos)?;
         while *pos < tokens.len() && (tokens[*pos] == "+" || tokens[*pos] == "-") {
             let op = tokens[*pos].clone();
@@ -10596,7 +10596,7 @@ impl YjExprEval {
         Ok(result)
     }
 
-    fn yj_parse_term(&self, tokens: &[String], pos: &mut usize) -> Result<f64, String> {
+    fn yj_parse_term(&self, tokens: &[String], pos: &mut usize) -> std::result::Result<f64, String> {
         let mut result = self.yj_parse_factor(tokens, pos)?;
         while *pos < tokens.len() && (tokens[*pos] == "*" || tokens[*pos] == "/") {
             let op = tokens[*pos].clone();
@@ -10607,7 +10607,7 @@ impl YjExprEval {
         Ok(result)
     }
 
-    fn yj_parse_factor(&self, tokens: &[String], pos: &mut usize) -> Result<f64, String> {
+    fn yj_parse_factor(&self, tokens: &[String], pos: &mut usize) -> std::result::Result<f64, String> {
         if *pos >= tokens.len() { return Err("unexpected end".to_string()); }
         if tokens[*pos] == "(" {
             *pos += 1;
@@ -11320,6 +11320,191 @@ impl YmTaskScheduler {
 
     /// Clear.
     pub fn ym_clear(&mut self) { self.ym_tasks.clear(); self.ym_next_id = 0; }
+}
+
+
+// --- yn_ Immutable Map (HAMT-inspired) ---
+
+/// Persistent immutable map using a sorted vector for small maps.
+#[derive(Debug, Clone)]
+pub struct YnImmutableMap<K: Ord + Clone, V: Clone> {
+    yn_entries: Vec<(K, V)>,
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone + std::fmt::Display> std::fmt::Display for YnImmutableMap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ImmMap(size={})", self.yn_entries.len())
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> Default for YnImmutableMap<K, V> {
+    fn default() -> Self { Self::yn_new() }
+}
+
+impl<K: Ord + Clone, V: Clone> YnImmutableMap<K, V> {
+    /// Create an empty immutable map.
+    pub fn yn_new() -> Self { Self { yn_entries: Vec::new() } }
+
+    /// Insert returns a new map with the key-value pair added.
+    pub fn yn_insert(&self, key: K, value: V) -> Self {
+        let mut entries = self.yn_entries.clone();
+        match entries.binary_search_by(|(k, _)| k.cmp(&key)) {
+            Ok(idx) => entries[idx] = (key, value),
+            Err(idx) => entries.insert(idx, (key, value)),
+        }
+        Self { yn_entries: entries }
+    }
+
+    /// Remove returns a new map without the key.
+    pub fn yn_remove(&self, key: &K) -> Self {
+        let mut entries = self.yn_entries.clone();
+        if let Ok(idx) = entries.binary_search_by(|(k, _)| k.cmp(key)) {
+            entries.remove(idx);
+        }
+        Self { yn_entries: entries }
+    }
+
+    /// Look up a key.
+    pub fn yn_get(&self, key: &K) -> Option<&V> {
+        self.yn_entries.binary_search_by(|(k, _)| k.cmp(key))
+            .ok()
+            .map(|idx| &self.yn_entries[idx].1)
+    }
+
+    /// Contains key.
+    pub fn yn_contains_key(&self, key: &K) -> bool { self.yn_get(key).is_some() }
+
+    /// Number of entries.
+    pub fn yn_len(&self) -> usize { self.yn_entries.len() }
+
+    /// Is empty.
+    pub fn yn_is_empty(&self) -> bool { self.yn_entries.is_empty() }
+
+    /// All keys in sorted order.
+    pub fn yn_keys(&self) -> Vec<K> { self.yn_entries.iter().map(|(k, _)| k.clone()).collect() }
+
+    /// All values.
+    pub fn yn_values(&self) -> Vec<V> { self.yn_entries.iter().map(|(_, v)| v.clone()).collect() }
+
+    /// Merge with another map (other takes precedence).
+    pub fn yn_merge(&self, other: &Self) -> Self {
+        let mut result = self.clone();
+        for (k, v) in &other.yn_entries {
+            result = result.yn_insert(k.clone(), v.clone());
+        }
+        result
+    }
+
+    /// Map values.
+    pub fn yn_map_values<F: Fn(&V) -> V>(&self, f: F) -> Self {
+        Self { yn_entries: self.yn_entries.iter().map(|(k, v)| (k.clone(), f(v))).collect() }
+    }
+
+    /// Filter entries.
+    pub fn yn_filter<F: Fn(&K, &V) -> bool>(&self, f: F) -> Self {
+        Self { yn_entries: self.yn_entries.iter().filter(|(k, v)| f(k, v)).cloned().collect() }
+    }
+}
+
+// --- yn_ Tokenizer ---
+
+/// Simple token-based text tokenizer for parsing structured text.
+#[derive(Debug, Clone, PartialEq)]
+pub enum YnTokenKind {
+    /// A word/identifier.
+    YnWord,
+    /// A number literal.
+    YnNumber,
+    /// A string literal.
+    YnString,
+    /// An operator or punctuation.
+    YnPunct,
+    /// Whitespace.
+    YnWhitespace,
+}
+
+impl std::fmt::Display for YnTokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::YnWord => write!(f, "Word"),
+            Self::YnNumber => write!(f, "Number"),
+            Self::YnString => write!(f, "String"),
+            Self::YnPunct => write!(f, "Punct"),
+            Self::YnWhitespace => write!(f, "Whitespace"),
+        }
+    }
+}
+
+/// A token produced by the tokenizer.
+#[derive(Debug, Clone)]
+pub struct YnToken {
+    /// Token kind.
+    pub yn_kind: YnTokenKind,
+    /// Token text.
+    pub yn_text: String,
+    /// Start offset.
+    pub yn_start: usize,
+}
+
+impl std::fmt::Display for YnToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({:?}@{})", self.yn_kind, self.yn_text, self.yn_start)
+    }
+}
+
+/// Simple text tokenizer.
+#[derive(Debug, Clone)]
+pub struct YnTokenizer;
+
+impl std::fmt::Display for YnTokenizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Tokenizer")
+    }
+}
+
+impl Default for YnTokenizer {
+    fn default() -> Self { Self }
+}
+
+impl YnTokenizer {
+    /// Tokenize input text.
+    pub fn yn_tokenize(input: &str) -> Vec<YnToken> {
+        let mut tokens = Vec::new();
+        let chars: Vec<char> = input.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let start = i;
+            if chars[i].is_whitespace() {
+                while i < chars.len() && chars[i].is_whitespace() { i += 1; }
+                tokens.push(YnToken { yn_kind: YnTokenKind::YnWhitespace, yn_text: chars[start..i].iter().collect(), yn_start: start });
+            } else if chars[i].is_ascii_alphabetic() || chars[i] == '_' {
+                while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') { i += 1; }
+                tokens.push(YnToken { yn_kind: YnTokenKind::YnWord, yn_text: chars[start..i].iter().collect(), yn_start: start });
+            } else if chars[i].is_ascii_digit() {
+                while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') { i += 1; }
+                tokens.push(YnToken { yn_kind: YnTokenKind::YnNumber, yn_text: chars[start..i].iter().collect(), yn_start: start });
+            } else if chars[i] == '\"' {
+                i += 1;
+                while i < chars.len() && chars[i] != '"' { i += 1; }
+                if i < chars.len() { i += 1; }
+                tokens.push(YnToken { yn_kind: YnTokenKind::YnString, yn_text: chars[start..i].iter().collect(), yn_start: start });
+            } else {
+                i += 1;
+                tokens.push(YnToken { yn_kind: YnTokenKind::YnPunct, yn_text: chars[start..i].iter().collect(), yn_start: start });
+            }
+        }
+        tokens
+    }
+
+    /// Tokenize and filter out whitespace.
+    pub fn yn_tokenize_no_ws(input: &str) -> Vec<YnToken> {
+        Self::yn_tokenize(input).into_iter().filter(|t| t.yn_kind != YnTokenKind::YnWhitespace).collect()
+    }
+
+    /// Count tokens by kind.
+    pub fn yn_count_by_kind(tokens: &[YnToken], kind: &YnTokenKind) -> usize {
+        tokens.iter().filter(|t| t.yn_kind == *kind).count()
+    }
 }
 
 #[cfg(test)]
@@ -18511,6 +18696,136 @@ mod tests {
     fn ym_task_display() {
         let t = super::YmTask { ym_id: 0, ym_name: "test".to_string(), ym_priority: 1, ym_deps: vec![], ym_done: false };
         assert!(format!("{}", t).contains("Task"));
+    }
+
+
+    // --- yn_ ImmutableMap tests ---
+
+    #[test]
+    fn yn_imm_new() {
+        let m = super::YnImmutableMap::<i32, i32>::yn_new();
+        assert!(m.yn_is_empty());
+    }
+
+    #[test]
+    fn yn_imm_insert_get() {
+        let m = super::YnImmutableMap::yn_new();
+        let m = m.yn_insert(1, "a");
+        let m = m.yn_insert(2, "b");
+        assert_eq!(m.yn_get(&1), Some(&"a"));
+        assert_eq!(m.yn_get(&2), Some(&"b"));
+    }
+
+    #[test]
+    fn yn_imm_persistence() {
+        let m1 = super::YnImmutableMap::yn_new().yn_insert(1, 10);
+        let m2 = m1.yn_insert(2, 20);
+        assert_eq!(m1.yn_len(), 1);
+        assert_eq!(m2.yn_len(), 2);
+    }
+
+    #[test]
+    fn yn_imm_remove() {
+        let m = super::YnImmutableMap::yn_new().yn_insert(1, 10).yn_insert(2, 20);
+        let m2 = m.yn_remove(&1);
+        assert!(!m2.yn_contains_key(&1));
+        assert!(m.yn_contains_key(&1));
+    }
+
+    #[test]
+    fn yn_imm_keys() {
+        let m = super::YnImmutableMap::yn_new().yn_insert(3, 0).yn_insert(1, 0).yn_insert(2, 0);
+        assert_eq!(m.yn_keys(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn yn_imm_merge() {
+        let a = super::YnImmutableMap::yn_new().yn_insert(1, "a");
+        let b = super::YnImmutableMap::yn_new().yn_insert(2, "b");
+        let c = a.yn_merge(&b);
+        assert_eq!(c.yn_len(), 2);
+    }
+
+    #[test]
+    fn yn_imm_filter() {
+        let m = super::YnImmutableMap::yn_new().yn_insert(1, 10).yn_insert(2, 20).yn_insert(3, 30);
+        let f = m.yn_filter(|_, v| *v > 15);
+        assert_eq!(f.yn_len(), 2);
+    }
+
+    #[test]
+    fn yn_imm_display() {
+        let m = super::YnImmutableMap::<i32, i32>::yn_new();
+        assert!(format!("{}", m).contains("ImmMap"));
+    }
+
+    #[test]
+    fn yn_imm_default() {
+        let m = super::YnImmutableMap::<i32, i32>::default();
+        assert!(m.yn_is_empty());
+    }
+
+    // --- yn_ Tokenizer tests ---
+
+    #[test]
+    fn yn_tok_word() {
+        let tokens = super::YnTokenizer::yn_tokenize("hello");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].yn_kind, super::YnTokenKind::YnWord);
+    }
+
+    #[test]
+    fn yn_tok_number() {
+        let tokens = super::YnTokenizer::yn_tokenize("42");
+        assert_eq!(tokens[0].yn_kind, super::YnTokenKind::YnNumber);
+    }
+
+    #[test]
+    fn yn_tok_mixed() {
+        let tokens = super::YnTokenizer::yn_tokenize_no_ws("x + 42");
+        assert_eq!(tokens.len(), 3);
+    }
+
+    #[test]
+    fn yn_tok_string() {
+        let tokens = super::YnTokenizer::yn_tokenize("hi_world");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].yn_kind, super::YnTokenKind::YnWord);
+    }
+
+    #[test]
+    fn yn_tok_punct() {
+        let tokens = super::YnTokenizer::yn_tokenize("+");
+        assert_eq!(tokens[0].yn_kind, super::YnTokenKind::YnPunct);
+    }
+
+    #[test]
+    fn yn_tok_count_kind() {
+        let tokens = super::YnTokenizer::yn_tokenize("a + b + c");
+        let count = super::YnTokenizer::yn_count_by_kind(&tokens, &super::YnTokenKind::YnWord);
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn yn_tok_empty() {
+        let tokens = super::YnTokenizer::yn_tokenize("");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn yn_tok_display() {
+        let t = super::YnTokenizer;
+        assert!(format!("{}", t).contains("Tokenizer"));
+    }
+
+    #[test]
+    fn yn_tok_default() {
+        let _t = super::YnTokenizer::default();
+    }
+
+    #[test]
+    fn yn_tok_kind_display() {
+        assert!(format!("{}", super::YnTokenKind::YnWord).contains("Word"));
     }
 
 }
