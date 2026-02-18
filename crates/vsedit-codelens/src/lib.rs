@@ -6166,6 +6166,529 @@ impl<T: Clone> Xs15CircularBuffer<T> {
     }
 }
 
+
+// --- xt_ Fibonacci Heap ---
+
+/// A node in a Fibonacci heap, storing a key and value with parent/child/sibling pointers.
+#[derive(Debug, Clone)]
+pub struct XtFibNode<K: Ord + Clone, V: Clone> {
+    pub xt_key: K,
+    pub xt_value: V,
+    xt_degree: usize,
+    xt_marked: bool,
+    xt_children: Vec<usize>,
+    xt_parent: Option<usize>,
+}
+
+impl<K: Ord + Clone, V: Clone> XtFibNode<K, V> {
+    /// Create a new Fibonacci heap node.
+    pub fn xt_new(key: K, value: V) -> Self {
+        Self {
+            xt_key: key,
+            xt_value: value,
+            xt_degree: 0,
+            xt_marked: false,
+            xt_children: Vec::new(),
+            xt_parent: None,
+        }
+    }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone + std::fmt::Display> std::fmt::Display for XtFibNode<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FibNode(key={}, val={}, deg={})", self.xt_key, self.xt_value, self.xt_degree)
+    }
+}
+
+/// Fibonacci heap with lazy consolidation for amortized O(1) insert and decrease-key.
+#[derive(Debug, Clone)]
+pub struct XtFibonacciHeap<K: Ord + Clone, V: Clone> {
+    xt_nodes: Vec<XtFibNode<K, V>>,
+    xt_roots: Vec<usize>,
+    xt_min_idx: Option<usize>,
+    xt_size: usize,
+}
+
+impl<K: Ord + Clone, V: Clone> Default for XtFibonacciHeap<K, V> {
+    fn default() -> Self {
+        Self::xt_new()
+    }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone + std::fmt::Display> std::fmt::Display for XtFibonacciHeap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FibHeap(size={}, roots={})", self.xt_size, self.xt_roots.len())
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> XtFibonacciHeap<K, V> {
+    /// Create an empty Fibonacci heap.
+    pub fn xt_new() -> Self {
+        Self {
+            xt_nodes: Vec::new(),
+            xt_roots: Vec::new(),
+            xt_min_idx: None,
+            xt_size: 0,
+        }
+    }
+
+    /// Return the number of elements.
+    pub fn xt_len(&self) -> usize {
+        self.xt_size
+    }
+
+    /// Check if the heap is empty.
+    pub fn xt_is_empty(&self) -> bool {
+        self.xt_size == 0
+    }
+
+    /// Insert a key-value pair, returning its node index.
+    pub fn xt_insert(&mut self, key: K, value: V) -> usize {
+        let idx = self.xt_nodes.len();
+        self.xt_nodes.push(XtFibNode::xt_new(key, value));
+        self.xt_roots.push(idx);
+        match self.xt_min_idx {
+            None => self.xt_min_idx = Some(idx),
+            Some(mi) => {
+                if self.xt_nodes[idx].xt_key < self.xt_nodes[mi].xt_key {
+                    self.xt_min_idx = Some(idx);
+                }
+            }
+        }
+        self.xt_size += 1;
+        idx
+    }
+
+    /// Peek at the minimum key-value pair.
+    pub fn xt_find_min(&self) -> Option<(&K, &V)> {
+        self.xt_min_idx.map(|i| (&self.xt_nodes[i].xt_key, &self.xt_nodes[i].xt_value))
+    }
+
+    /// Extract the minimum element.
+    pub fn xt_extract_min(&mut self) -> Option<(K, V)> {
+        let mi = self.xt_min_idx?;
+        let children = self.xt_nodes[mi].xt_children.clone();
+        for &c in &children {
+            self.xt_nodes[c].xt_parent = None;
+            self.xt_roots.push(c);
+        }
+        self.xt_roots.retain(|&r| r != mi);
+        if self.xt_roots.is_empty() {
+            self.xt_min_idx = None;
+        } else {
+            self.xt_min_idx = Some(self.xt_roots[0]);
+            self.xt_consolidate();
+        }
+        self.xt_size -= 1;
+        let node = &self.xt_nodes[mi];
+        Some((node.xt_key.clone(), node.xt_value.clone()))
+    }
+
+    fn xt_consolidate(&mut self) {
+        let max_deg = (self.xt_size as f64).log2().ceil() as usize + 2;
+        let mut degree_table: Vec<Option<usize>> = vec![None; max_deg + 1];
+        let roots = self.xt_roots.clone();
+        self.xt_roots.clear();
+        for root in roots {
+            let mut x = root;
+            let mut d = self.xt_nodes[x].xt_degree;
+            while d < degree_table.len() {
+                if let Some(y) = degree_table[d] {
+                    degree_table[d] = None;
+                    let (parent, child) = if self.xt_nodes[x].xt_key <= self.xt_nodes[y].xt_key {
+                        (x, y)
+                    } else {
+                        (y, x)
+                    };
+                    self.xt_nodes[parent].xt_children.push(child);
+                    self.xt_nodes[child].xt_parent = Some(parent);
+                    self.xt_nodes[parent].xt_degree += 1;
+                    self.xt_nodes[child].xt_marked = false;
+                    x = parent;
+                    d = self.xt_nodes[x].xt_degree;
+                } else {
+                    break;
+                }
+            }
+            if d < degree_table.len() {
+                degree_table[d] = Some(x);
+            }
+            self.xt_roots.push(x);
+        }
+        self.xt_roots.sort();
+        self.xt_roots.dedup();
+        self.xt_min_idx = self.xt_roots.iter().copied()
+            .min_by(|&a, &b| self.xt_nodes[a].xt_key.cmp(&self.xt_nodes[b].xt_key));
+    }
+
+    /// Decrease the key of a node (key must be smaller than current).
+    pub fn xt_decrease_key(&mut self, idx: usize, new_key: K) {
+        if new_key >= self.xt_nodes[idx].xt_key {
+            return;
+        }
+        self.xt_nodes[idx].xt_key = new_key;
+        if let Some(p) = self.xt_nodes[idx].xt_parent {
+            if self.xt_nodes[idx].xt_key < self.xt_nodes[p].xt_key {
+                self.xt_cut(idx, p);
+                self.xt_cascading_cut(p);
+            }
+        }
+        if let Some(mi) = self.xt_min_idx {
+            if self.xt_nodes[idx].xt_key < self.xt_nodes[mi].xt_key {
+                self.xt_min_idx = Some(idx);
+            }
+        }
+    }
+
+    fn xt_cut(&mut self, x: usize, p: usize) {
+        self.xt_nodes[p].xt_children.retain(|&c| c != x);
+        self.xt_nodes[p].xt_degree = self.xt_nodes[p].xt_children.len();
+        self.xt_nodes[x].xt_parent = None;
+        self.xt_nodes[x].xt_marked = false;
+        self.xt_roots.push(x);
+    }
+
+    fn xt_cascading_cut(&mut self, idx: usize) {
+        if let Some(p) = self.xt_nodes[idx].xt_parent {
+            if !self.xt_nodes[idx].xt_marked {
+                self.xt_nodes[idx].xt_marked = true;
+            } else {
+                self.xt_cut(idx, p);
+                self.xt_cascading_cut(p);
+            }
+        }
+    }
+
+    /// Merge another Fibonacci heap into this one.
+    pub fn xt_merge(&mut self, other: &mut XtFibonacciHeap<K, V>) {
+        let offset = self.xt_nodes.len();
+        for mut node in other.xt_nodes.drain(..) {
+            node.xt_parent = node.xt_parent.map(|p| p + offset);
+            node.xt_children = node.xt_children.iter().map(|&c| c + offset).collect();
+            self.xt_nodes.push(node);
+        }
+        for r in other.xt_roots.drain(..) {
+            self.xt_roots.push(r + offset);
+        }
+        match (self.xt_min_idx, other.xt_min_idx) {
+            (None, Some(oi)) => self.xt_min_idx = Some(oi + offset),
+            (Some(si), Some(oi)) => {
+                let oi2 = oi + offset;
+                if self.xt_nodes[oi2].xt_key < self.xt_nodes[si].xt_key {
+                    self.xt_min_idx = Some(oi2);
+                }
+            }
+            _ => {}
+        }
+        self.xt_size += other.xt_size;
+        other.xt_size = 0;
+        other.xt_min_idx = None;
+    }
+
+    /// Return all keys in sorted order (destructive).
+    pub fn xt_drain_sorted(&mut self) -> Vec<(K, V)> {
+        let mut result = Vec::with_capacity(self.xt_size);
+        while let Some(pair) = self.xt_extract_min() {
+            result.push(pair);
+        }
+        result
+    }
+
+    /// Clear the heap.
+    pub fn xt_clear(&mut self) {
+        self.xt_nodes.clear();
+        self.xt_roots.clear();
+        self.xt_min_idx = None;
+        self.xt_size = 0;
+    }
+}
+
+// --- xt_ Doubly-Linked List with Cursors ---
+
+/// A node in a doubly-linked list with prev/next indices.
+#[derive(Debug, Clone)]
+pub struct XtDllNode<T: Clone> {
+    pub xt_value: T,
+    xt_prev: Option<usize>,
+    xt_next: Option<usize>,
+    xt_active: bool,
+}
+
+impl<T: Clone + std::fmt::Display> std::fmt::Display for XtDllNode<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DllNode({})", self.xt_value)
+    }
+}
+
+/// Doubly-linked list with O(1) insertion/deletion at any position via cursor indices.
+#[derive(Debug, Clone)]
+pub struct XtDoublyLinkedList<T: Clone> {
+    xt_nodes: Vec<XtDllNode<T>>,
+    xt_head: Option<usize>,
+    xt_tail: Option<usize>,
+    xt_len: usize,
+    xt_free: Vec<usize>,
+}
+
+impl<T: Clone> Default for XtDoublyLinkedList<T> {
+    fn default() -> Self {
+        Self::xt_new()
+    }
+}
+
+impl<T: Clone + std::fmt::Display> std::fmt::Display for XtDoublyLinkedList<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DLL(len={})", self.xt_len)
+    }
+}
+
+impl<T: Clone> XtDoublyLinkedList<T> {
+    /// Create an empty doubly-linked list.
+    pub fn xt_new() -> Self {
+        Self {
+            xt_nodes: Vec::new(),
+            xt_head: None,
+            xt_tail: None,
+            xt_len: 0,
+            xt_free: Vec::new(),
+        }
+    }
+
+    /// Return the length.
+    pub fn xt_len(&self) -> usize {
+        self.xt_len
+    }
+
+    /// Check if empty.
+    pub fn xt_is_empty(&self) -> bool {
+        self.xt_len == 0
+    }
+
+    fn xt_alloc(&mut self, value: T) -> usize {
+        if let Some(idx) = self.xt_free.pop() {
+            self.xt_nodes[idx] = XtDllNode {
+                xt_value: value,
+                xt_prev: None,
+                xt_next: None,
+                xt_active: true,
+            };
+            idx
+        } else {
+            let idx = self.xt_nodes.len();
+            self.xt_nodes.push(XtDllNode {
+                xt_value: value,
+                xt_prev: None,
+                xt_next: None,
+                xt_active: true,
+            });
+            idx
+        }
+    }
+
+    /// Push a value to the front, returning its index.
+    pub fn xt_push_front(&mut self, value: T) -> usize {
+        let idx = self.xt_alloc(value);
+        match self.xt_head {
+            None => {
+                self.xt_head = Some(idx);
+                self.xt_tail = Some(idx);
+            }
+            Some(old_head) => {
+                self.xt_nodes[idx].xt_next = Some(old_head);
+                self.xt_nodes[old_head].xt_prev = Some(idx);
+                self.xt_head = Some(idx);
+            }
+        }
+        self.xt_len += 1;
+        idx
+    }
+
+    /// Push a value to the back, returning its index.
+    pub fn xt_push_back(&mut self, value: T) -> usize {
+        let idx = self.xt_alloc(value);
+        match self.xt_tail {
+            None => {
+                self.xt_head = Some(idx);
+                self.xt_tail = Some(idx);
+            }
+            Some(old_tail) => {
+                self.xt_nodes[idx].xt_prev = Some(old_tail);
+                self.xt_nodes[old_tail].xt_next = Some(idx);
+                self.xt_tail = Some(idx);
+            }
+        }
+        self.xt_len += 1;
+        idx
+    }
+
+    /// Insert a value after the given index, returning the new index.
+    pub fn xt_insert_after(&mut self, after: usize, value: T) -> usize {
+        if !self.xt_nodes[after].xt_active {
+            return self.xt_push_back(value);
+        }
+        let idx = self.xt_alloc(value);
+        let next = self.xt_nodes[after].xt_next;
+        self.xt_nodes[after].xt_next = Some(idx);
+        self.xt_nodes[idx].xt_prev = Some(after);
+        self.xt_nodes[idx].xt_next = next;
+        if let Some(n) = next {
+            self.xt_nodes[n].xt_prev = Some(idx);
+        } else {
+            self.xt_tail = Some(idx);
+        }
+        self.xt_len += 1;
+        idx
+    }
+
+    /// Insert a value before the given index, returning the new index.
+    pub fn xt_insert_before(&mut self, before: usize, value: T) -> usize {
+        if !self.xt_nodes[before].xt_active {
+            return self.xt_push_front(value);
+        }
+        let idx = self.xt_alloc(value);
+        let prev = self.xt_nodes[before].xt_prev;
+        self.xt_nodes[before].xt_prev = Some(idx);
+        self.xt_nodes[idx].xt_next = Some(before);
+        self.xt_nodes[idx].xt_prev = prev;
+        if let Some(p) = prev {
+            self.xt_nodes[p].xt_next = Some(idx);
+        } else {
+            self.xt_head = Some(idx);
+        }
+        self.xt_len += 1;
+        idx
+    }
+
+    /// Remove the node at the given index.
+    pub fn xt_remove(&mut self, idx: usize) -> Option<T> {
+        if idx >= self.xt_nodes.len() || !self.xt_nodes[idx].xt_active {
+            return None;
+        }
+        let prev = self.xt_nodes[idx].xt_prev;
+        let next = self.xt_nodes[idx].xt_next;
+        match prev {
+            Some(p) => self.xt_nodes[p].xt_next = next,
+            None => self.xt_head = next,
+        }
+        match next {
+            Some(n) => self.xt_nodes[n].xt_prev = prev,
+            None => self.xt_tail = prev,
+        }
+        self.xt_nodes[idx].xt_active = false;
+        self.xt_nodes[idx].xt_prev = None;
+        self.xt_nodes[idx].xt_next = None;
+        self.xt_free.push(idx);
+        self.xt_len -= 1;
+        Some(self.xt_nodes[idx].xt_value.clone())
+    }
+
+    /// Pop from front.
+    pub fn xt_pop_front(&mut self) -> Option<T> {
+        self.xt_head.and_then(|h| self.xt_remove(h))
+    }
+
+    /// Pop from back.
+    pub fn xt_pop_back(&mut self) -> Option<T> {
+        self.xt_tail.and_then(|t| self.xt_remove(t))
+    }
+
+    /// Peek at the front value.
+    pub fn xt_peek_front(&self) -> Option<&T> {
+        self.xt_head.map(|h| &self.xt_nodes[h].xt_value)
+    }
+
+    /// Peek at the back value.
+    pub fn xt_peek_back(&self) -> Option<&T> {
+        self.xt_tail.map(|t| &self.xt_nodes[t].xt_value)
+    }
+
+    /// Get value at a given index.
+    pub fn xt_get(&self, idx: usize) -> Option<&T> {
+        if idx < self.xt_nodes.len() && self.xt_nodes[idx].xt_active {
+            Some(&self.xt_nodes[idx].xt_value)
+        } else {
+            None
+        }
+    }
+
+    /// Iterate from head to tail.
+    pub fn xt_iter_forward(&self) -> Vec<&T> {
+        let mut result = Vec::new();
+        let mut cur = self.xt_head;
+        while let Some(idx) = cur {
+            result.push(&self.xt_nodes[idx].xt_value);
+            cur = self.xt_nodes[idx].xt_next;
+        }
+        result
+    }
+
+    /// Iterate from tail to head.
+    pub fn xt_iter_backward(&self) -> Vec<&T> {
+        let mut result = Vec::new();
+        let mut cur = self.xt_tail;
+        while let Some(idx) = cur {
+            result.push(&self.xt_nodes[idx].xt_value);
+            cur = self.xt_nodes[idx].xt_prev;
+        }
+        result
+    }
+
+    /// Collect all values into a Vec (front to back).
+    pub fn xt_to_vec(&self) -> Vec<T> {
+        self.xt_iter_forward().into_iter().cloned().collect()
+    }
+
+    /// Clear the list.
+    pub fn xt_clear(&mut self) {
+        self.xt_nodes.clear();
+        self.xt_head = None;
+        self.xt_tail = None;
+        self.xt_len = 0;
+        self.xt_free.clear();
+    }
+
+    /// Return the head cursor index.
+    pub fn xt_head_cursor(&self) -> Option<usize> {
+        self.xt_head
+    }
+
+    /// Return the tail cursor index.
+    pub fn xt_tail_cursor(&self) -> Option<usize> {
+        self.xt_tail
+    }
+
+    /// Move cursor to next.
+    pub fn xt_cursor_next(&self, cursor: usize) -> Option<usize> {
+        if cursor < self.xt_nodes.len() && self.xt_nodes[cursor].xt_active {
+            self.xt_nodes[cursor].xt_next
+        } else {
+            None
+        }
+    }
+
+    /// Move cursor to prev.
+    pub fn xt_cursor_prev(&self, cursor: usize) -> Option<usize> {
+        if cursor < self.xt_nodes.len() && self.xt_nodes[cursor].xt_active {
+            self.xt_nodes[cursor].xt_prev
+        } else {
+            None
+        }
+    }
+
+    /// Reverse the list in place.
+    pub fn xt_reverse(&mut self) {
+        let mut cur = self.xt_head;
+        while let Some(idx) = cur {
+            let next = self.xt_nodes[idx].xt_next;
+            let prev = self.xt_nodes[idx].xt_prev;
+            self.xt_nodes[idx].xt_next = prev;
+            self.xt_nodes[idx].xt_prev = next;
+            cur = next;
+        }
+        std::mem::swap(&mut self.xt_head, &mut self.xt_tail);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -10002,6 +10525,294 @@ mod tests {
         buf.xs_push_back(20);
         let v = buf.xs_to_vec();
         assert_eq!(v, vec![10, 20]);
+    }
+
+
+    // --- xt_ Fibonacci Heap tests ---
+
+    #[test]
+    fn xt_fib_heap_new() {
+        let h = super::XtFibonacciHeap::<i32, &str>::xt_new();
+        assert!(h.xt_is_empty());
+        assert_eq!(h.xt_len(), 0);
+        assert_eq!(h.xt_find_min(), None);
+    }
+
+    #[test]
+    fn xt_fib_heap_insert_find_min() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        h.xt_insert(5, "five");
+        h.xt_insert(3, "three");
+        h.xt_insert(7, "seven");
+        assert_eq!(h.xt_len(), 3);
+        assert_eq!(h.xt_find_min(), Some((&3, &"three")));
+    }
+
+    #[test]
+    fn xt_fib_heap_extract_min() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        h.xt_insert(10, "ten");
+        h.xt_insert(2, "two");
+        h.xt_insert(8, "eight");
+        h.xt_insert(1, "one");
+        assert_eq!(h.xt_extract_min(), Some((1, "one")));
+        assert_eq!(h.xt_extract_min(), Some((2, "two")));
+        assert_eq!(h.xt_len(), 2);
+    }
+
+    #[test]
+    fn xt_fib_heap_extract_all_sorted() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        for v in [5, 3, 8, 1, 9, 2, 7, 4, 6] {
+            h.xt_insert(v, v * 10);
+        }
+        let sorted = h.xt_drain_sorted();
+        let keys: Vec<i32> = sorted.iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn xt_fib_heap_decrease_key() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        h.xt_insert(10, "a");
+        let idx = h.xt_insert(20, "b");
+        h.xt_insert(15, "c");
+        h.xt_decrease_key(idx, 5);
+        assert_eq!(h.xt_find_min(), Some((&5, &"b")));
+    }
+
+    #[test]
+    fn xt_fib_heap_merge() {
+        let mut h1 = super::XtFibonacciHeap::xt_new();
+        h1.xt_insert(3, "three");
+        h1.xt_insert(7, "seven");
+        let mut h2 = super::XtFibonacciHeap::xt_new();
+        h2.xt_insert(1, "one");
+        h2.xt_insert(5, "five");
+        h1.xt_merge(&mut h2);
+        assert_eq!(h1.xt_len(), 4);
+        assert_eq!(h1.xt_find_min(), Some((&1, &"one")));
+        assert!(h2.xt_is_empty());
+    }
+
+    #[test]
+    fn xt_fib_heap_clear() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        h.xt_insert(1, "a");
+        h.xt_insert(2, "b");
+        h.xt_clear();
+        assert!(h.xt_is_empty());
+        assert_eq!(h.xt_find_min(), None);
+    }
+
+    #[test]
+    fn xt_fib_heap_single_element() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        h.xt_insert(42, "answer");
+        assert_eq!(h.xt_extract_min(), Some((42, "answer")));
+        assert!(h.xt_is_empty());
+    }
+
+    #[test]
+    fn xt_fib_heap_display() {
+        let mut h = super::XtFibonacciHeap::xt_new();
+        h.xt_insert(1, "one");
+        let s = format!("{}", h);
+        assert!(s.contains("FibHeap"));
+    }
+
+    #[test]
+    fn xt_fib_heap_default() {
+        let h = super::XtFibonacciHeap::<i32, i32>::default();
+        assert!(h.xt_is_empty());
+    }
+
+    #[test]
+    fn xt_fib_node_display() {
+        let n = super::XtFibNode::xt_new(10, "ten");
+        let s = format!("{}", n);
+        assert!(s.contains("FibNode"));
+    }
+
+    // --- xt_ Doubly-Linked List tests ---
+
+    #[test]
+    fn xt_dll_new() {
+        let dll = super::XtDoublyLinkedList::<i32>::xt_new();
+        assert!(dll.xt_is_empty());
+        assert_eq!(dll.xt_len(), 0);
+    }
+
+    #[test]
+    fn xt_dll_push_front() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_front(1);
+        dll.xt_push_front(2);
+        dll.xt_push_front(3);
+        assert_eq!(dll.xt_to_vec(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn xt_dll_push_back() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        dll.xt_push_back(2);
+        dll.xt_push_back(3);
+        assert_eq!(dll.xt_to_vec(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn xt_dll_pop_front() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(10);
+        dll.xt_push_back(20);
+        assert_eq!(dll.xt_pop_front(), Some(10));
+        assert_eq!(dll.xt_len(), 1);
+    }
+
+    #[test]
+    fn xt_dll_pop_back() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(10);
+        dll.xt_push_back(20);
+        assert_eq!(dll.xt_pop_back(), Some(20));
+        assert_eq!(dll.xt_len(), 1);
+    }
+
+    #[test]
+    fn xt_dll_insert_after() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        let a = dll.xt_push_back(1);
+        dll.xt_push_back(3);
+        dll.xt_insert_after(a, 2);
+        assert_eq!(dll.xt_to_vec(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn xt_dll_insert_before() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        let b = dll.xt_push_back(3);
+        dll.xt_insert_before(b, 2);
+        assert_eq!(dll.xt_to_vec(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn xt_dll_remove_middle() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        let mid = dll.xt_push_back(2);
+        dll.xt_push_back(3);
+        dll.xt_remove(mid);
+        assert_eq!(dll.xt_to_vec(), vec![1, 3]);
+    }
+
+    #[test]
+    fn xt_dll_peek() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(10);
+        dll.xt_push_back(20);
+        assert_eq!(dll.xt_peek_front(), Some(&10));
+        assert_eq!(dll.xt_peek_back(), Some(&20));
+    }
+
+    #[test]
+    fn xt_dll_get() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        let idx = dll.xt_push_back(42);
+        assert_eq!(dll.xt_get(idx), Some(&42));
+        assert_eq!(dll.xt_get(999), None);
+    }
+
+    #[test]
+    fn xt_dll_iter_backward() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        dll.xt_push_back(2);
+        dll.xt_push_back(3);
+        let rev: Vec<&i32> = dll.xt_iter_backward();
+        assert_eq!(rev, vec![&3, &2, &1]);
+    }
+
+    #[test]
+    fn xt_dll_cursor_navigation() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(10);
+        dll.xt_push_back(20);
+        dll.xt_push_back(30);
+        let c = dll.xt_head_cursor().unwrap();
+        assert_eq!(dll.xt_get(c), Some(&10));
+        let c2 = dll.xt_cursor_next(c).unwrap();
+        assert_eq!(dll.xt_get(c2), Some(&20));
+        let c3 = dll.xt_cursor_next(c2).unwrap();
+        assert_eq!(dll.xt_get(c3), Some(&30));
+        assert_eq!(dll.xt_cursor_next(c3), None);
+        let c2b = dll.xt_cursor_prev(c3).unwrap();
+        assert_eq!(dll.xt_get(c2b), Some(&20));
+    }
+
+    #[test]
+    fn xt_dll_reverse() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        dll.xt_push_back(2);
+        dll.xt_push_back(3);
+        dll.xt_reverse();
+        assert_eq!(dll.xt_to_vec(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn xt_dll_clear() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        dll.xt_push_back(2);
+        dll.xt_clear();
+        assert!(dll.xt_is_empty());
+    }
+
+    #[test]
+    fn xt_dll_default() {
+        let dll = super::XtDoublyLinkedList::<i32>::default();
+        assert!(dll.xt_is_empty());
+    }
+
+    #[test]
+    fn xt_dll_display() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        let s = format!("{}", dll);
+        assert!(s.contains("DLL"));
+    }
+
+    #[test]
+    fn xt_dll_reuse_freed_slots() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        let a = dll.xt_push_back(1);
+        dll.xt_push_back(2);
+        dll.xt_remove(a);
+        let c = dll.xt_push_back(3);
+        assert_eq!(c, a);
+        assert_eq!(dll.xt_to_vec(), vec![2, 3]);
+    }
+
+    #[test]
+    fn xt_dll_tail_cursor() {
+        let mut dll = super::XtDoublyLinkedList::xt_new();
+        dll.xt_push_back(1);
+        dll.xt_push_back(2);
+        let tc = dll.xt_tail_cursor().unwrap();
+        assert_eq!(dll.xt_get(tc), Some(&2));
+    }
+
+    #[test]
+    fn xt_dll_empty_operations() {
+        let mut dll = super::XtDoublyLinkedList::<i32>::xt_new();
+        assert_eq!(dll.xt_pop_front(), None);
+        assert_eq!(dll.xt_pop_back(), None);
+        assert_eq!(dll.xt_peek_front(), None);
+        assert_eq!(dll.xt_peek_back(), None);
+        assert_eq!(dll.xt_head_cursor(), None);
+        assert_eq!(dll.xt_tail_cursor(), None);
     }
 
 }
