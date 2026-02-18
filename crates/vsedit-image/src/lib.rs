@@ -18368,6 +18368,216 @@ impl ZxTreeView {
     }
 }
 
+
+// --- zy_ keybinding and input handling types ---
+
+/// Modifier keys for keybindings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ZyModifiers {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
+impl ZyModifiers {
+    pub fn none() -> Self {
+        Self { ctrl: false, shift: false, alt: false, meta: false }
+    }
+
+    pub fn ctrl() -> Self {
+        Self { ctrl: true, shift: false, alt: false, meta: false }
+    }
+
+    pub fn ctrl_shift() -> Self {
+        Self { ctrl: true, shift: true, alt: false, meta: false }
+    }
+
+    pub fn alt() -> Self {
+        Self { ctrl: false, shift: false, alt: true, meta: false }
+    }
+
+    pub fn has_any(&self) -> bool {
+        self.ctrl || self.shift || self.alt || self.meta
+    }
+
+    pub fn to_string_repr(&self) -> String {
+        let mut parts = Vec::new();
+        if self.ctrl { parts.push("Ctrl"); }
+        if self.shift { parts.push("Shift"); }
+        if self.alt { parts.push("Alt"); }
+        if self.meta { parts.push("Meta"); }
+        parts.join("+")
+    }
+}
+
+/// A key code.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ZyKeyCode {
+    Char(char),
+    Enter,
+    Escape,
+    Tab,
+    Backspace,
+    Delete,
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    F(u8),
+    Space,
+}
+
+impl ZyKeyCode {
+    pub fn label(&self) -> String {
+        match self {
+            Self::Char(c) => c.to_uppercase().to_string(),
+            Self::Enter => "Enter".to_string(),
+            Self::Escape => "Escape".to_string(),
+            Self::Tab => "Tab".to_string(),
+            Self::Backspace => "Backspace".to_string(),
+            Self::Delete => "Delete".to_string(),
+            Self::Up => "Up".to_string(),
+            Self::Down => "Down".to_string(),
+            Self::Left => "Left".to_string(),
+            Self::Right => "Right".to_string(),
+            Self::Home => "Home".to_string(),
+            Self::End => "End".to_string(),
+            Self::PageUp => "PageUp".to_string(),
+            Self::PageDown => "PageDown".to_string(),
+            Self::F(n) => format!("F{}", n),
+            Self::Space => "Space".to_string(),
+        }
+    }
+}
+
+/// A complete key combination (modifiers + key).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZyKeyCombination {
+    pub modifiers: ZyModifiers,
+    pub key: ZyKeyCode,
+}
+
+impl ZyKeyCombination {
+    pub fn new(modifiers: ZyModifiers, key: ZyKeyCode) -> Self {
+        Self { modifiers, key }
+    }
+
+    pub fn simple(key: ZyKeyCode) -> Self {
+        Self { modifiers: ZyModifiers::none(), key }
+    }
+
+    pub fn ctrl(key: ZyKeyCode) -> Self {
+        Self { modifiers: ZyModifiers::ctrl(), key }
+    }
+
+    pub fn label(&self) -> String {
+        let mods = self.modifiers.to_string_repr();
+        if mods.is_empty() {
+            self.key.label()
+        } else {
+            format!("{}+{}", mods, self.key.label())
+        }
+    }
+}
+
+/// A keybinding that maps a key combination to a command.
+#[derive(Debug, Clone)]
+pub struct ZyKeybinding {
+    pub key: ZyKeyCombination,
+    pub command: String,
+    pub when: Option<String>,
+    pub args: Option<String>,
+    pub source: ZyKeybindingSource,
+}
+
+/// Source of a keybinding (default, user, extension).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZyKeybindingSource {
+    Default,
+    User,
+    Extension,
+}
+
+impl ZyKeybinding {
+    pub fn new(key: ZyKeyCombination, command: &str) -> Self {
+        Self {
+            key,
+            command: command.to_string(),
+            when: None,
+            args: None,
+            source: ZyKeybindingSource::Default,
+        }
+    }
+
+    pub fn with_when(mut self, when: &str) -> Self {
+        self.when = Some(when.to_string());
+        self
+    }
+
+    pub fn with_source(mut self, source: ZyKeybindingSource) -> Self {
+        self.source = source;
+        self
+    }
+
+    pub fn matches_context(&self, context_keys: &[(&str, bool)]) -> bool {
+        match &self.when {
+            None => true,
+            Some(when) => {
+                // Simple single-key when-clause evaluation
+                if let Some(negated) = when.strip_prefix('!') {
+                    context_keys.iter().find(|(k, _)| *k == negated).map_or(true, |(_, v)| !v)
+                } else {
+                    context_keys.iter().find(|(k, _)| *k == when.as_str()).map_or(false, |(_, v)| *v)
+                }
+            }
+        }
+    }
+}
+
+/// A keybinding resolver that finds the matching command for a key press.
+#[derive(Debug, Clone)]
+pub struct ZyKeybindingResolver {
+    bindings: Vec<ZyKeybinding>,
+}
+
+impl ZyKeybindingResolver {
+    pub fn new() -> Self {
+        Self { bindings: Vec::new() }
+    }
+
+    pub fn add(&mut self, binding: ZyKeybinding) {
+        self.bindings.push(binding);
+    }
+
+    pub fn resolve(&self, key: &ZyKeyCombination, context: &[(&str, bool)]) -> Option<&str> {
+        // Later bindings (user/extension) override earlier ones (default)
+        self.bindings.iter().rev()
+            .find(|b| b.key == *key && b.matches_context(context))
+            .map(|b| b.command.as_str())
+    }
+
+    pub fn bindings_for_command(&self, command: &str) -> Vec<&ZyKeybinding> {
+        self.bindings.iter().filter(|b| b.command == command).collect()
+    }
+
+    pub fn all_bindings(&self) -> &[ZyKeybinding] {
+        &self.bindings
+    }
+
+    pub fn remove_command(&mut self, command: &str) {
+        self.bindings.retain(|b| b.command != command);
+    }
+
+    pub fn binding_count(&self) -> usize {
+        self.bindings.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -29998,6 +30208,114 @@ mod tests {
         assert_eq!(tv.message.as_deref(), Some("Loading..."));
         tv.set_badge(5);
         assert_eq!(tv.badge_count, Some(5));
+    }
+
+
+    // --- zy_ keybinding and input handling tests ---
+
+    #[test]
+    fn test_zy_modifiers() {
+        let m = ZyModifiers::ctrl_shift();
+        assert!(m.ctrl);
+        assert!(m.shift);
+        assert!(m.has_any());
+        assert_eq!(m.to_string_repr(), "Ctrl+Shift");
+        assert!(!ZyModifiers::none().has_any());
+    }
+
+    #[test]
+    fn test_zy_key_code_label() {
+        assert_eq!(ZyKeyCode::Char('s').label(), "S");
+        assert_eq!(ZyKeyCode::F(5).label(), "F5");
+        assert_eq!(ZyKeyCode::Enter.label(), "Enter");
+        assert_eq!(ZyKeyCode::Space.label(), "Space");
+    }
+
+    #[test]
+    fn test_zy_key_combination() {
+        let kc = ZyKeyCombination::ctrl(ZyKeyCode::Char('s'));
+        assert_eq!(kc.label(), "Ctrl+S");
+        let simple = ZyKeyCombination::simple(ZyKeyCode::Escape);
+        assert_eq!(simple.label(), "Escape");
+    }
+
+    #[test]
+    fn test_zy_keybinding_when_clause() {
+        let kb = ZyKeybinding::new(
+            ZyKeyCombination::ctrl(ZyKeyCode::Char('b')),
+            "toggleSidebar"
+        ).with_when("sidebarVisible");
+        assert!(kb.matches_context(&[("sidebarVisible", true)]));
+        assert!(!kb.matches_context(&[("sidebarVisible", false)]));
+        assert!(!kb.matches_context(&[]));
+    }
+
+    #[test]
+    fn test_zy_keybinding_negated_when() {
+        let kb = ZyKeybinding::new(
+            ZyKeyCombination::simple(ZyKeyCode::Escape),
+            "closePanel"
+        ).with_when("!editorFocus");
+        assert!(kb.matches_context(&[("editorFocus", false)]));
+        assert!(!kb.matches_context(&[("editorFocus", true)]));
+        // Missing key treated as false, so !false = true
+        assert!(kb.matches_context(&[]));
+    }
+
+    #[test]
+    fn test_zy_keybinding_no_when() {
+        let kb = ZyKeybinding::new(
+            ZyKeyCombination::ctrl(ZyKeyCode::Char('p')),
+            "quickOpen"
+        );
+        assert!(kb.matches_context(&[]));
+        assert!(kb.matches_context(&[("anything", true)]));
+    }
+
+    #[test]
+    fn test_zy_keybinding_source() {
+        let kb = ZyKeybinding::new(ZyKeyCombination::simple(ZyKeyCode::Tab), "indent")
+            .with_source(ZyKeybindingSource::User);
+        assert_eq!(kb.source, ZyKeybindingSource::User);
+    }
+
+    #[test]
+    fn test_zy_resolver_basic() {
+        let mut r = ZyKeybindingResolver::new();
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('s')), "save"));
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('z')), "undo"));
+        let key = ZyKeyCombination::ctrl(ZyKeyCode::Char('s'));
+        assert_eq!(r.resolve(&key, &[]), Some("save"));
+        assert_eq!(r.binding_count(), 2);
+    }
+
+    #[test]
+    fn test_zy_resolver_override() {
+        let mut r = ZyKeybindingResolver::new();
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('s')), "save")
+            .with_source(ZyKeybindingSource::Default));
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('s')), "customSave")
+            .with_source(ZyKeybindingSource::User));
+        let key = ZyKeyCombination::ctrl(ZyKeyCode::Char('s'));
+        // User binding should override default (later wins)
+        assert_eq!(r.resolve(&key, &[]), Some("customSave"));
+    }
+
+    #[test]
+    fn test_zy_resolver_bindings_for_command() {
+        let mut r = ZyKeybindingResolver::new();
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('c')), "copy"));
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('x')), "cut"));
+        assert_eq!(r.bindings_for_command("copy").len(), 1);
+        assert_eq!(r.bindings_for_command("paste").len(), 0);
+    }
+
+    #[test]
+    fn test_zy_resolver_remove() {
+        let mut r = ZyKeybindingResolver::new();
+        r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('a')), "selectAll"));
+        r.remove_command("selectAll");
+        assert_eq!(r.binding_count(), 0);
     }
 
 }
