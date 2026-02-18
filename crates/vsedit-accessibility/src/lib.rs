@@ -16789,6 +16789,282 @@ impl std::fmt::Display for ZqTestRun {
     }
 }
 
+
+// --- zr_ webview and panel types ---
+
+/// Represents how a webview retains its context when hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZrWebviewRetention {
+    /// Webview content is destroyed when hidden.
+    Destroy,
+    /// Webview content is kept in memory when hidden.
+    Retain,
+}
+
+/// Options for creating or showing a webview panel.
+#[derive(Debug, Clone)]
+pub struct ZrWebviewOptions {
+    pub enable_scripts: bool,
+    pub enable_forms: bool,
+    pub local_resource_roots: Vec<String>,
+    pub port_mapping: Vec<(u16, u16)>,
+}
+
+impl ZrWebviewOptions {
+    pub fn new() -> Self {
+        Self {
+            enable_scripts: false,
+            enable_forms: false,
+            local_resource_roots: Vec::new(),
+            port_mapping: Vec::new(),
+        }
+    }
+
+    pub fn with_scripts(mut self) -> Self {
+        self.enable_scripts = true;
+        self
+    }
+
+    pub fn with_forms(mut self) -> Self {
+        self.enable_forms = true;
+        self
+    }
+
+    pub fn add_local_root(mut self, root: &str) -> Self {
+        self.local_resource_roots.push(root.to_string());
+        self
+    }
+
+    pub fn add_port_mapping(mut self, from: u16, to: u16) -> Self {
+        self.port_mapping.push((from, to));
+        self
+    }
+}
+
+/// A webview that displays HTML content.
+#[derive(Debug, Clone)]
+pub struct ZrWebview {
+    pub html: String,
+    pub options: ZrWebviewOptions,
+    messages_out: Vec<String>,
+    messages_in: Vec<String>,
+}
+
+impl ZrWebview {
+    pub fn new(options: ZrWebviewOptions) -> Self {
+        Self {
+            html: String::new(),
+            options,
+            messages_out: Vec::new(),
+            messages_in: Vec::new(),
+        }
+    }
+
+    pub fn set_html(&mut self, html: &str) {
+        self.html = html.to_string();
+    }
+
+    pub fn post_message(&mut self, msg: &str) {
+        self.messages_out.push(msg.to_string());
+    }
+
+    pub fn receive_message(&mut self, msg: &str) {
+        self.messages_in.push(msg.to_string());
+    }
+
+    pub fn pending_messages(&self) -> &[String] {
+        &self.messages_out
+    }
+
+    pub fn received_messages(&self) -> &[String] {
+        &self.messages_in
+    }
+
+    pub fn drain_outgoing(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.messages_out)
+    }
+
+    pub fn as_uri(&self, base: &str, path: &str) -> String {
+        format!("{}/{}", base.trim_end_matches('/'), path.trim_start_matches('/'))
+    }
+}
+
+/// Which column a webview panel occupies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZrViewColumn {
+    Active,
+    Beside,
+    One,
+    Two,
+    Three,
+}
+
+impl ZrViewColumn {
+    pub fn index(&self) -> Option<usize> {
+        match self {
+            Self::One => Some(0),
+            Self::Two => Some(1),
+            Self::Three => Some(2),
+            _ => None,
+        }
+    }
+}
+
+/// A webview panel shown in an editor tab.
+#[derive(Debug, Clone)]
+pub struct ZrWebviewPanel {
+    pub view_type: String,
+    pub title: String,
+    pub column: ZrViewColumn,
+    pub webview: ZrWebview,
+    pub is_active: bool,
+    pub is_visible: bool,
+    pub retention: ZrWebviewRetention,
+    disposed: bool,
+}
+
+impl ZrWebviewPanel {
+    pub fn new(view_type: &str, title: &str, column: ZrViewColumn, options: ZrWebviewOptions) -> Self {
+        Self {
+            view_type: view_type.to_string(),
+            title: title.to_string(),
+            column,
+            webview: ZrWebview::new(options),
+            is_active: true,
+            is_visible: true,
+            retention: ZrWebviewRetention::Destroy,
+            disposed: false,
+        }
+    }
+
+    pub fn set_title(&mut self, title: &str) {
+        self.title = title.to_string();
+    }
+
+    pub fn reveal(&mut self, column: ZrViewColumn) {
+        self.column = column;
+        self.is_visible = true;
+        self.is_active = true;
+    }
+
+    pub fn hide(&mut self) {
+        self.is_visible = false;
+        self.is_active = false;
+    }
+
+    pub fn dispose(&mut self) {
+        self.disposed = true;
+        self.is_visible = false;
+        self.is_active = false;
+    }
+
+    pub fn is_disposed(&self) -> bool {
+        self.disposed
+    }
+
+    pub fn with_retention(mut self, r: ZrWebviewRetention) -> Self {
+        self.retention = r;
+        self
+    }
+}
+
+/// A webview view shown in the sidebar or panel area.
+#[derive(Debug, Clone)]
+pub struct ZrWebviewView {
+    pub view_type: String,
+    pub webview: ZrWebview,
+    pub is_visible: bool,
+    pub badge_value: Option<String>,
+    pub badge_tooltip: Option<String>,
+    pub description: Option<String>,
+}
+
+impl ZrWebviewView {
+    pub fn new(view_type: &str, options: ZrWebviewOptions) -> Self {
+        Self {
+            view_type: view_type.to_string(),
+            webview: ZrWebview::new(options),
+            is_visible: true,
+            badge_value: None,
+            badge_tooltip: None,
+            description: None,
+        }
+    }
+
+    pub fn set_badge(&mut self, value: &str, tooltip: &str) {
+        self.badge_value = Some(value.to_string());
+        self.badge_tooltip = Some(tooltip.to_string());
+    }
+
+    pub fn clear_badge(&mut self) {
+        self.badge_value = None;
+        self.badge_tooltip = None;
+    }
+
+    pub fn set_description(&mut self, desc: &str) {
+        self.description = Some(desc.to_string());
+    }
+}
+
+/// Registry that tracks active webview panels and views.
+#[derive(Debug, Clone)]
+pub struct ZrWebviewRegistry {
+    panels: Vec<ZrWebviewPanel>,
+    views: Vec<ZrWebviewView>,
+}
+
+impl ZrWebviewRegistry {
+    pub fn new() -> Self {
+        Self { panels: Vec::new(), views: Vec::new() }
+    }
+
+    pub fn register_panel(&mut self, panel: ZrWebviewPanel) -> usize {
+        let id = self.panels.len();
+        self.panels.push(panel);
+        id
+    }
+
+    pub fn register_view(&mut self, view: ZrWebviewView) -> usize {
+        let id = self.views.len();
+        self.views.push(view);
+        id
+    }
+
+    pub fn panel(&self, id: usize) -> Option<&ZrWebviewPanel> {
+        self.panels.get(id)
+    }
+
+    pub fn panel_mut(&mut self, id: usize) -> Option<&mut ZrWebviewPanel> {
+        self.panels.get_mut(id)
+    }
+
+    pub fn view(&self, id: usize) -> Option<&ZrWebviewView> {
+        self.views.get(id)
+    }
+
+    pub fn view_mut(&mut self, id: usize) -> Option<&mut ZrWebviewView> {
+        self.views.get_mut(id)
+    }
+
+    pub fn active_panels(&self) -> Vec<&ZrWebviewPanel> {
+        self.panels.iter().filter(|p| !p.is_disposed() && p.is_visible).collect()
+    }
+
+    pub fn panel_count(&self) -> usize {
+        self.panels.len()
+    }
+
+    pub fn view_count(&self) -> usize {
+        self.views.len()
+    }
+
+    pub fn dispose_panel(&mut self, id: usize) {
+        if let Some(p) = self.panels.get_mut(id) {
+            p.dispose();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27485,6 +27761,136 @@ mod tests {
     fn test_zq_test_run_display() {
         let run = ZqTestRun::new("r1", "Suite");
         assert!(format!("{}", run).contains("Suite"));
+    }
+
+
+    // --- zr_ webview and panel tests ---
+
+    #[test]
+    fn test_zr_webview_options_default() {
+        let opts = ZrWebviewOptions::new();
+        assert!(!opts.enable_scripts);
+        assert!(!opts.enable_forms);
+        assert!(opts.local_resource_roots.is_empty());
+        assert!(opts.port_mapping.is_empty());
+    }
+
+    #[test]
+    fn test_zr_webview_options_builder() {
+        let opts = ZrWebviewOptions::new()
+            .with_scripts()
+            .with_forms()
+            .add_local_root("/workspace")
+            .add_port_mapping(3000, 3001);
+        assert!(opts.enable_scripts);
+        assert!(opts.enable_forms);
+        assert_eq!(opts.local_resource_roots, vec!["/workspace"]);
+        assert_eq!(opts.port_mapping, vec![(3000, 3001)]);
+    }
+
+    #[test]
+    fn test_zr_webview_html_and_messages() {
+        let mut wv = ZrWebview::new(ZrWebviewOptions::new());
+        wv.set_html("<h1>Hello</h1>");
+        assert_eq!(wv.html, "<h1>Hello</h1>");
+        wv.post_message("ping");
+        wv.receive_message("pong");
+        assert_eq!(wv.pending_messages(), &["ping"]);
+        assert_eq!(wv.received_messages(), &["pong"]);
+        let drained = wv.drain_outgoing();
+        assert_eq!(drained, vec!["ping"]);
+        assert!(wv.pending_messages().is_empty());
+    }
+
+    #[test]
+    fn test_zr_webview_as_uri() {
+        let wv = ZrWebview::new(ZrWebviewOptions::new());
+        assert_eq!(wv.as_uri("https://ext/", "/style.css"), "https://ext/style.css");
+        assert_eq!(wv.as_uri("https://ext", "style.css"), "https://ext/style.css");
+    }
+
+    #[test]
+    fn test_zr_view_column_index() {
+        assert_eq!(ZrViewColumn::One.index(), Some(0));
+        assert_eq!(ZrViewColumn::Two.index(), Some(1));
+        assert_eq!(ZrViewColumn::Three.index(), Some(2));
+        assert_eq!(ZrViewColumn::Active.index(), None);
+        assert_eq!(ZrViewColumn::Beside.index(), None);
+    }
+
+    #[test]
+    fn test_zr_webview_panel_lifecycle() {
+        let opts = ZrWebviewOptions::new().with_scripts();
+        let mut panel = ZrWebviewPanel::new("preview", "Preview", ZrViewColumn::One, opts);
+        assert!(panel.is_active);
+        assert!(panel.is_visible);
+        assert!(!panel.is_disposed());
+        panel.set_title("New Title");
+        assert_eq!(panel.title, "New Title");
+        panel.hide();
+        assert!(!panel.is_visible);
+        panel.reveal(ZrViewColumn::Two);
+        assert!(panel.is_visible);
+        assert_eq!(panel.column, ZrViewColumn::Two);
+        panel.dispose();
+        assert!(panel.is_disposed());
+    }
+
+    #[test]
+    fn test_zr_webview_panel_retention() {
+        let opts = ZrWebviewOptions::new();
+        let panel = ZrWebviewPanel::new("md", "Markdown", ZrViewColumn::One, opts)
+            .with_retention(ZrWebviewRetention::Retain);
+        assert_eq!(panel.retention, ZrWebviewRetention::Retain);
+    }
+
+    #[test]
+    fn test_zr_webview_view_badge() {
+        let mut view = ZrWebviewView::new("explorer", ZrWebviewOptions::new());
+        assert!(view.badge_value.is_none());
+        view.set_badge("3", "3 items");
+        assert_eq!(view.badge_value.as_deref(), Some("3"));
+        assert_eq!(view.badge_tooltip.as_deref(), Some("3 items"));
+        view.clear_badge();
+        assert!(view.badge_value.is_none());
+    }
+
+    #[test]
+    fn test_zr_webview_view_description() {
+        let mut view = ZrWebviewView::new("sidebar", ZrWebviewOptions::new());
+        assert!(view.description.is_none());
+        view.set_description("Source Control");
+        assert_eq!(view.description.as_deref(), Some("Source Control"));
+    }
+
+    #[test]
+    fn test_zr_webview_registry() {
+        let mut reg = ZrWebviewRegistry::new();
+        let opts = ZrWebviewOptions::new().with_scripts();
+        let panel = ZrWebviewPanel::new("html", "HTML", ZrViewColumn::One, opts);
+        let pid = reg.register_panel(panel);
+        assert_eq!(reg.panel_count(), 1);
+        assert_eq!(reg.active_panels().len(), 1);
+        let view = ZrWebviewView::new("tree", ZrWebviewOptions::new());
+        let vid = reg.register_view(view);
+        assert_eq!(reg.view_count(), 1);
+        reg.dispose_panel(pid);
+        assert!(reg.panel(pid).unwrap().is_disposed());
+        assert_eq!(reg.active_panels().len(), 0);
+        assert!(reg.view(vid).is_some());
+    }
+
+    #[test]
+    fn test_zr_webview_registry_mut_access() {
+        let mut reg = ZrWebviewRegistry::new();
+        let panel = ZrWebviewPanel::new("p", "P", ZrViewColumn::Active, ZrWebviewOptions::new());
+        let pid = reg.register_panel(panel);
+        reg.panel_mut(pid).unwrap().set_title("Updated");
+        assert_eq!(reg.panel(pid).unwrap().title, "Updated");
+        let view = ZrWebviewView::new("v", ZrWebviewOptions::new());
+        let vid = reg.register_view(view);
+        reg.view_mut(vid).unwrap().set_description("Desc");
+        assert_eq!(reg.view(vid).unwrap().description.as_deref(), Some("Desc"));
     }
 
 }
