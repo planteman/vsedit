@@ -26567,6 +26567,78 @@ impl AzmCallHierarchy {
     pub fn callees(&self) -> Vec<&str> { self.outgoing.iter().map(|c| c.to.name.as_str()).collect() }
 }
 
+
+// --- azn_ type hierarchy model ---
+
+/// Type hierarchy item.
+#[derive(Debug, Clone)]
+pub struct AznTypeHierarchyItem {
+    pub name: String,
+    pub kind: AznTypeKind,
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub detail: Option<String>,
+    pub tags: Vec<String>,
+}
+
+/// Type kind in hierarchy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AznTypeKind { Class, Interface, Struct, Enum, Trait, TypeAlias }
+
+impl AznTypeHierarchyItem {
+    pub fn new(name: &str, kind: AznTypeKind, uri: &str, line: u32, col: u32) -> Self {
+        Self { name: name.to_string(), kind, uri: uri.to_string(), line, col, detail: None, tags: Vec::new() }
+    }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn add_tag(&mut self, t: &str) { self.tags.push(t.to_string()); }
+    pub fn is_deprecated(&self) -> bool { self.tags.iter().any(|t| t == "deprecated") }
+}
+
+/// Supertype (parent) relationship.
+#[derive(Debug, Clone)]
+pub struct AznSupertype {
+    pub item: AznTypeHierarchyItem,
+}
+
+/// Subtype (child) relationship.
+#[derive(Debug, Clone)]
+pub struct AznSubtype {
+    pub item: AznTypeHierarchyItem,
+}
+
+/// Type hierarchy tree.
+#[derive(Debug)]
+pub struct AznTypeHierarchy {
+    pub root: AznTypeHierarchyItem,
+    pub supertypes: Vec<AznSupertype>,
+    pub subtypes: Vec<AznSubtype>,
+}
+
+impl AznTypeHierarchy {
+    pub fn new(root: AznTypeHierarchyItem) -> Self {
+        Self { root, supertypes: Vec::new(), subtypes: Vec::new() }
+    }
+    pub fn add_supertype(&mut self, item: AznTypeHierarchyItem) {
+        self.supertypes.push(AznSupertype { item });
+    }
+    pub fn add_subtype(&mut self, item: AznTypeHierarchyItem) {
+        self.subtypes.push(AznSubtype { item });
+    }
+    pub fn supertype_count(&self) -> usize { self.supertypes.len() }
+    pub fn subtype_count(&self) -> usize { self.subtypes.len() }
+    pub fn supertype_names(&self) -> Vec<&str> { self.supertypes.iter().map(|s| s.item.name.as_str()).collect() }
+    pub fn subtype_names(&self) -> Vec<&str> { self.subtypes.iter().map(|s| s.item.name.as_str()).collect() }
+    pub fn has_supertypes(&self) -> bool { !self.supertypes.is_empty() }
+    pub fn has_subtypes(&self) -> bool { !self.subtypes.is_empty() }
+    pub fn find_supertype(&self, name: &str) -> Option<&AznTypeHierarchyItem> {
+        self.supertypes.iter().find(|s| s.item.name == name).map(|s| &s.item)
+    }
+    pub fn find_subtype(&self, name: &str) -> Option<&AznTypeHierarchyItem> {
+        self.subtypes.iter().find(|s| s.item.name == name).map(|s| &s.item)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43433,6 +43505,76 @@ goodbye";
         assert_eq!(f.kind, AzmSymbolKind::Constructor);
         let m = AzmCallHierarchyItem::new("b", AzmSymbolKind::Class, "b.rs", 0, 0);
         assert_eq!(m.kind, AzmSymbolKind::Class);
+    }
+
+
+    #[test]
+    fn test_azn_type_item() {
+        let item = AznTypeHierarchyItem::new("Foo", AznTypeKind::Class, "f.rs", 5, 0)
+            .with_detail("mod::Foo");
+        assert_eq!(item.name, "Foo");
+        assert_eq!(item.detail.as_deref(), Some("mod::Foo"));
+    }
+
+    #[test]
+    fn test_azn_deprecated() {
+        let mut item = AznTypeHierarchyItem::new("Old", AznTypeKind::Class, "f.rs", 1, 0);
+        assert!(!item.is_deprecated());
+        item.add_tag("deprecated");
+        assert!(item.is_deprecated());
+    }
+
+    #[test]
+    fn test_azn_hierarchy_supertypes() {
+        let root = AznTypeHierarchyItem::new("Dog", AznTypeKind::Class, "d.rs", 1, 0);
+        let mut h = AznTypeHierarchy::new(root);
+        h.add_supertype(AznTypeHierarchyItem::new("Animal", AznTypeKind::Class, "a.rs", 1, 0));
+        h.add_supertype(AznTypeHierarchyItem::new("LivingThing", AznTypeKind::Interface, "l.rs", 1, 0));
+        assert_eq!(h.supertype_count(), 2);
+        assert!(h.has_supertypes());
+        assert_eq!(h.supertype_names(), vec!["Animal", "LivingThing"]);
+    }
+
+    #[test]
+    fn test_azn_hierarchy_subtypes() {
+        let root = AznTypeHierarchyItem::new("Animal", AznTypeKind::Class, "a.rs", 1, 0);
+        let mut h = AznTypeHierarchy::new(root);
+        h.add_subtype(AznTypeHierarchyItem::new("Dog", AznTypeKind::Class, "d.rs", 1, 0));
+        h.add_subtype(AznTypeHierarchyItem::new("Cat", AznTypeKind::Class, "c.rs", 1, 0));
+        assert_eq!(h.subtype_count(), 2);
+        assert!(h.has_subtypes());
+        assert_eq!(h.subtype_names(), vec!["Dog", "Cat"]);
+    }
+
+    #[test]
+    fn test_azn_find_types() {
+        let root = AznTypeHierarchyItem::new("X", AznTypeKind::Struct, "x.rs", 0, 0);
+        let mut h = AznTypeHierarchy::new(root);
+        h.add_supertype(AznTypeHierarchyItem::new("Parent", AznTypeKind::Trait, "p.rs", 0, 0));
+        h.add_subtype(AznTypeHierarchyItem::new("Child", AznTypeKind::Struct, "c.rs", 0, 0));
+        assert!(h.find_supertype("Parent").is_some());
+        assert!(h.find_supertype("Missing").is_none());
+        assert!(h.find_subtype("Child").is_some());
+    }
+
+    #[test]
+    fn test_azn_empty_hierarchy() {
+        let root = AznTypeHierarchyItem::new("X", AznTypeKind::Enum, "x.rs", 0, 0);
+        let h = AznTypeHierarchy::new(root);
+        assert!(!h.has_supertypes());
+        assert!(!h.has_subtypes());
+    }
+
+    #[test]
+    fn test_azn_type_kinds() {
+        let t = AznTypeHierarchyItem::new("T", AznTypeKind::TypeAlias, "t.rs", 0, 0);
+        assert_eq!(t.kind, AznTypeKind::TypeAlias);
+    }
+
+    #[test]
+    fn test_azn_trait_kind() {
+        let t = AznTypeHierarchyItem::new("Display", AznTypeKind::Trait, "d.rs", 0, 0);
+        assert_eq!(t.kind, AznTypeKind::Trait);
     }
 
 }
