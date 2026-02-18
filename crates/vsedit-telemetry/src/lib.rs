@@ -23521,6 +23521,92 @@ impl AydKeybindingResolver {
     pub fn binding_count(&self) -> usize { self.bindings.len() }
 }
 
+
+// --- aye_ undo/redo and edit operations ---
+
+/// Edit operation kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AyeEditKind { Insert, Delete, Replace }
+
+/// A single edit operation.
+#[derive(Debug, Clone)]
+pub struct AyeEditOp {
+    pub kind: AyeEditKind,
+    pub offset: usize,
+    pub old_text: String,
+    pub new_text: String,
+    pub timestamp: u64,
+}
+
+impl AyeEditOp {
+    pub fn insert(offset: usize, text: &str, ts: u64) -> Self {
+        Self { kind: AyeEditKind::Insert, offset, old_text: String::new(), new_text: text.to_string(), timestamp: ts }
+    }
+    pub fn delete(offset: usize, text: &str, ts: u64) -> Self {
+        Self { kind: AyeEditKind::Delete, offset, old_text: text.to_string(), new_text: String::new(), timestamp: ts }
+    }
+    pub fn replace(offset: usize, old: &str, new: &str, ts: u64) -> Self {
+        Self { kind: AyeEditKind::Replace, offset, old_text: old.to_string(), new_text: new.to_string(), timestamp: ts }
+    }
+    pub fn inverse(&self) -> Self {
+        Self { kind: self.kind.clone(), offset: self.offset, old_text: self.new_text.clone(), new_text: self.old_text.clone(), timestamp: self.timestamp }
+    }
+    pub fn can_merge(&self, other: &AyeEditOp) -> bool {
+        if self.kind != other.kind { return false; }
+        if other.timestamp.saturating_sub(self.timestamp) > 500 { return false; }
+        match self.kind {
+            AyeEditKind::Insert => other.offset == self.offset + self.new_text.len(),
+            AyeEditKind::Delete => other.offset + other.old_text.len() == self.offset,
+            AyeEditKind::Replace => false,
+        }
+    }
+    pub fn merge_with(&mut self, other: &AyeEditOp) {
+        match self.kind {
+            AyeEditKind::Insert => self.new_text.push_str(&other.new_text),
+            AyeEditKind::Delete => { self.old_text = format!("{}{}", other.old_text, self.old_text); self.offset = other.offset; },
+            AyeEditKind::Replace => {},
+        }
+        self.timestamp = other.timestamp;
+    }
+}
+
+/// Undo/redo stack.
+#[derive(Debug)]
+pub struct AyeUndoStack {
+    pub undo_stack: Vec<AyeEditOp>,
+    pub redo_stack: Vec<AyeEditOp>,
+    pub save_point: Option<usize>,
+}
+
+impl AyeUndoStack {
+    pub fn new() -> Self { Self { undo_stack: Vec::new(), redo_stack: Vec::new(), save_point: None } }
+    pub fn push(&mut self, op: AyeEditOp) {
+        if let Some(last) = self.undo_stack.last_mut() {
+            if last.can_merge(&op) { last.merge_with(&op); self.redo_stack.clear(); return; }
+        }
+        self.undo_stack.push(op);
+        self.redo_stack.clear();
+    }
+    pub fn undo(&mut self) -> Option<AyeEditOp> {
+        let op = self.undo_stack.pop()?;
+        let inv = op.inverse();
+        self.redo_stack.push(op);
+        Some(inv)
+    }
+    pub fn redo(&mut self) -> Option<AyeEditOp> {
+        let op = self.redo_stack.pop()?;
+        self.undo_stack.push(op.clone());
+        Some(op)
+    }
+    pub fn can_undo(&self) -> bool { !self.undo_stack.is_empty() }
+    pub fn can_redo(&self) -> bool { !self.redo_stack.is_empty() }
+    pub fn mark_save_point(&mut self) { self.save_point = Some(self.undo_stack.len()); }
+    pub fn is_at_save_point(&self) -> bool { self.save_point == Some(self.undo_stack.len()) }
+    pub fn undo_count(&self) -> usize { self.undo_stack.len() }
+    pub fn redo_count(&self) -> usize { self.redo_stack.len() }
+    pub fn clear(&mut self) { self.undo_stack.clear(); self.redo_stack.clear(); self.save_point = None; }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37855,6 +37941,87 @@ mod tests {
         resolver.add(AydKeybindingEntry::new(kb.clone(), "editor.action.addSelectionToNextFindMatch"));
         resolver.add(AydKeybindingEntry::new(kb.clone(), "editor.action.deleteLines").with_when("!editorHasSelection"));
         assert_eq!(resolver.resolve(&kb).len(), 2);
+    }
+
+
+    #[test]
+    fn test_aye_edit_ops() {
+        let ins = AyeEditOp::insert(0, "hello", 100);
+        assert_eq!(ins.kind, AyeEditKind::Insert);
+        let inv = ins.inverse();
+        assert_eq!(inv.old_text, "hello");
+        assert_eq!(inv.new_text, "");
+    }
+
+    #[test]
+    fn test_aye_undo_redo() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::insert(0, "a", 100));
+        stack.push(AyeEditOp::insert(5, "b", 700));
+        assert!(stack.can_undo());
+        let op = stack.undo().unwrap();
+        assert_eq!(op.old_text, "b");
+        assert!(stack.can_redo());
+        let redo_op = stack.redo().unwrap();
+        assert_eq!(redo_op.new_text, "b");
+    }
+
+    #[test]
+    fn test_aye_merge_inserts() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::insert(0, "h", 100));
+        stack.push(AyeEditOp::insert(1, "e", 200));
+        stack.push(AyeEditOp::insert(2, "l", 300));
+        assert_eq!(stack.undo_count(), 1);
+        let op = stack.undo().unwrap();
+        assert_eq!(op.old_text, "hel");
+    }
+
+    #[test]
+    fn test_aye_merge_timeout() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::insert(0, "a", 100));
+        stack.push(AyeEditOp::insert(1, "b", 700));
+        assert_eq!(stack.undo_count(), 2);
+    }
+
+    #[test]
+    fn test_aye_save_point() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::insert(0, "a", 1000));
+        stack.mark_save_point();
+        assert!(stack.is_at_save_point());
+        stack.push(AyeEditOp::insert(5, "b", 2000));
+        assert!(!stack.is_at_save_point());
+        stack.undo();
+        assert!(stack.is_at_save_point());
+    }
+
+    #[test]
+    fn test_aye_redo_cleared_on_push() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::insert(0, "a", 1000));
+        stack.push(AyeEditOp::insert(5, "b", 2000));
+        stack.undo();
+        assert!(stack.can_redo());
+        stack.push(AyeEditOp::insert(5, "c", 3000));
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn test_aye_delete_merge() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::delete(3, "d", 100));
+        stack.push(AyeEditOp::delete(2, "c", 200));
+        assert_eq!(stack.undo_count(), 1);
+    }
+
+    #[test]
+    fn test_aye_clear() {
+        let mut stack = AyeUndoStack::new();
+        stack.push(AyeEditOp::insert(0, "x", 100));
+        stack.clear();
+        assert!(!stack.can_undo());
     }
 
 }
