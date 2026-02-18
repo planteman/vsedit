@@ -15976,6 +15976,177 @@ impl std::fmt::Display for ZmDebugSession {
     }
 }
 
+
+// --- zn_ source control and status bar types ---
+
+/// A source control change status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZnChangeStatus {
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Copied,
+    Untracked,
+    Ignored,
+    Conflicted,
+}
+
+impl ZnChangeStatus {
+    pub fn letter(&self) -> char {
+        match self {
+            ZnChangeStatus::Modified => 'M',
+            ZnChangeStatus::Added => 'A',
+            ZnChangeStatus::Deleted => 'D',
+            ZnChangeStatus::Renamed => 'R',
+            ZnChangeStatus::Copied => 'C',
+            ZnChangeStatus::Untracked => '?',
+            ZnChangeStatus::Ignored => '!',
+            ZnChangeStatus::Conflicted => 'U',
+        }
+    }
+
+    pub fn is_staged_change(&self) -> bool {
+        matches!(self, ZnChangeStatus::Modified | ZnChangeStatus::Added | ZnChangeStatus::Deleted | ZnChangeStatus::Renamed | ZnChangeStatus::Copied)
+    }
+}
+
+impl std::fmt::Display for ZnChangeStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.letter())
+    }
+}
+
+/// A file change in a source control group.
+#[derive(Debug, Clone)]
+pub struct ZnResourceChange {
+    pub uri: String,
+    pub status: ZnChangeStatus,
+    pub original_uri: Option<String>,
+}
+
+impl ZnResourceChange {
+    pub fn new(uri: &str, status: ZnChangeStatus) -> Self {
+        Self { uri: uri.to_string(), status, original_uri: None }
+    }
+
+    pub fn renamed(old_uri: &str, new_uri: &str) -> Self {
+        Self { uri: new_uri.to_string(), status: ZnChangeStatus::Renamed, original_uri: Some(old_uri.to_string()) }
+    }
+
+    pub fn is_rename(&self) -> bool { self.status == ZnChangeStatus::Renamed }
+    pub fn filename(&self) -> &str { self.uri.rsplit('/').next().unwrap_or(&self.uri) }
+}
+
+impl std::fmt::Display for ZnResourceChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.status, self.filename())
+    }
+}
+
+/// A source control resource group (staged, unstaged, untracked, etc.).
+#[derive(Debug, Clone)]
+pub struct ZnResourceGroup {
+    pub id: String,
+    pub label: String,
+    pub resources: Vec<ZnResourceChange>,
+}
+
+impl ZnResourceGroup {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), resources: Vec::new() }
+    }
+
+    pub fn add(&mut self, change: ZnResourceChange) { self.resources.push(change); }
+    pub fn len(&self) -> usize { self.resources.len() }
+    pub fn is_empty(&self) -> bool { self.resources.is_empty() }
+
+    pub fn by_status(&self, status: ZnChangeStatus) -> Vec<&ZnResourceChange> {
+        self.resources.iter().filter(|r| r.status == status).collect()
+    }
+}
+
+impl std::fmt::Display for ZnResourceGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZnResourceGroup({}: {} changes)", self.label, self.len())
+    }
+}
+
+/// A source control provider (Git, SVN, etc.).
+#[derive(Debug, Clone)]
+pub struct ZnSourceControl {
+    pub id: String,
+    pub label: String,
+    pub root_uri: Option<String>,
+    pub groups: Vec<ZnResourceGroup>,
+    pub count: usize,
+    pub commit_template: Option<String>,
+}
+
+impl ZnSourceControl {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), root_uri: None, groups: Vec::new(), count: 0, commit_template: None }
+    }
+
+    pub fn with_root(mut self, uri: &str) -> Self { self.root_uri = Some(uri.to_string()); self }
+
+    pub fn add_group(&mut self, group: ZnResourceGroup) {
+        self.count += group.len();
+        self.groups.push(group);
+    }
+
+    pub fn total_changes(&self) -> usize { self.count }
+    pub fn group_count(&self) -> usize { self.groups.len() }
+}
+
+impl std::fmt::Display for ZnSourceControl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZnSourceControl({}: {} changes)", self.label, self.total_changes())
+    }
+}
+
+/// A status bar item.
+#[derive(Debug, Clone)]
+pub struct ZnStatusBarItem {
+    pub id: String,
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub command: Option<String>,
+    pub alignment: ZnStatusBarAlignment,
+    pub priority: i32,
+    pub is_visible: bool,
+    pub background_color: Option<String>,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZnStatusBarAlignment {
+    Left,
+    Right,
+}
+
+impl ZnStatusBarItem {
+    pub fn new(id: &str, text: &str) -> Self {
+        Self { id: id.to_string(), text: text.to_string(), tooltip: None, command: None,
+               alignment: ZnStatusBarAlignment::Left, priority: 0, is_visible: true, background_color: None, color: None }
+    }
+
+    pub fn right(mut self) -> Self { self.alignment = ZnStatusBarAlignment::Right; self }
+    pub fn with_priority(mut self, p: i32) -> Self { self.priority = p; self }
+    pub fn with_command(mut self, cmd: &str) -> Self { self.command = Some(cmd.to_string()); self }
+    pub fn with_tooltip(mut self, tip: &str) -> Self { self.tooltip = Some(tip.to_string()); self }
+
+    pub fn hide(&mut self) { self.is_visible = false; }
+    pub fn show(&mut self) { self.is_visible = true; }
+    pub fn set_text(&mut self, text: &str) { self.text = text.to_string(); }
+}
+
+impl std::fmt::Display for ZnStatusBarItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZnStatusBarItem({}: {})", self.id, self.text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -26423,6 +26594,103 @@ mod tests {
     fn test_zm_debug_session_display() {
         let s = ZmDebugSession::new("s1", "test", "lldb");
         assert!(format!("{}", s).contains("ZmDebugSession"));
+    }
+
+
+    // --- zn_ tests ---
+
+    #[test]
+    fn test_zn_change_status() {
+        assert_eq!(ZnChangeStatus::Modified.letter(), 'M');
+        assert_eq!(ZnChangeStatus::Untracked.letter(), '?');
+        assert!(ZnChangeStatus::Added.is_staged_change());
+        assert!(!ZnChangeStatus::Untracked.is_staged_change());
+    }
+
+    #[test]
+    fn test_zn_resource_change() {
+        let c = ZnResourceChange::new("src/main.rs", ZnChangeStatus::Modified);
+        assert_eq!(c.filename(), "main.rs");
+        assert!(!c.is_rename());
+    }
+
+    #[test]
+    fn test_zn_resource_change_rename() {
+        let c = ZnResourceChange::renamed("old.rs", "new.rs");
+        assert!(c.is_rename());
+        assert_eq!(c.original_uri, Some("old.rs".to_string()));
+    }
+
+    #[test]
+    fn test_zn_resource_change_display() {
+        let c = ZnResourceChange::new("test.rs", ZnChangeStatus::Added);
+        let s = format!("{}", c);
+        assert!(s.contains("A"));
+    }
+
+    #[test]
+    fn test_zn_resource_group() {
+        let mut g = ZnResourceGroup::new("staged", "Staged Changes");
+        g.add(ZnResourceChange::new("a.rs", ZnChangeStatus::Modified));
+        g.add(ZnResourceChange::new("b.rs", ZnChangeStatus::Added));
+        assert_eq!(g.len(), 2);
+        assert_eq!(g.by_status(ZnChangeStatus::Modified).len(), 1);
+    }
+
+    #[test]
+    fn test_zn_resource_group_display() {
+        let g = ZnResourceGroup::new("idx", "Index");
+        assert!(format!("{}", g).contains("ZnResourceGroup"));
+    }
+
+    #[test]
+    fn test_zn_source_control() {
+        let mut sc = ZnSourceControl::new("git", "Git").with_root("/repo");
+        let mut staged = ZnResourceGroup::new("staged", "Staged");
+        staged.add(ZnResourceChange::new("x.rs", ZnChangeStatus::Modified));
+        sc.add_group(staged);
+        assert_eq!(sc.total_changes(), 1);
+        assert_eq!(sc.group_count(), 1);
+    }
+
+    #[test]
+    fn test_zn_source_control_display() {
+        let sc = ZnSourceControl::new("git", "Git");
+        assert!(format!("{}", sc).contains("Git"));
+    }
+
+    #[test]
+    fn test_zn_status_bar_item() {
+        let item = ZnStatusBarItem::new("branch", "main")
+            .right()
+            .with_priority(100)
+            .with_command("git.checkout")
+            .with_tooltip("Current branch");
+        assert_eq!(item.alignment, ZnStatusBarAlignment::Right);
+        assert_eq!(item.priority, 100);
+        assert!(item.is_visible);
+    }
+
+    #[test]
+    fn test_zn_status_bar_visibility() {
+        let mut item = ZnStatusBarItem::new("test", "text");
+        item.hide();
+        assert!(!item.is_visible);
+        item.show();
+        assert!(item.is_visible);
+    }
+
+    #[test]
+    fn test_zn_status_bar_set_text() {
+        let mut item = ZnStatusBarItem::new("x", "old");
+        item.set_text("new");
+        assert_eq!(item.text, "new");
+    }
+
+    #[test]
+    fn test_zn_status_bar_display() {
+        let item = ZnStatusBarItem::new("id", "text");
+        assert!(format!("{}", item).contains("ZnStatusBarItem"));
     }
 
 }
