@@ -19960,6 +19960,240 @@ impl AxeCommandPalette {
     }
 }
 
+
+// --- axf_ extension host process management and IPC ---
+
+/// Extension host process state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxfHostState {
+    NotStarted,
+    Starting,
+    Running,
+    Crashed,
+    Terminated,
+}
+
+impl AxfHostState {
+    pub fn is_running(&self) -> bool { matches!(self, Self::Running) }
+    pub fn is_alive(&self) -> bool { matches!(self, Self::Starting | Self::Running) }
+}
+
+/// IPC message types between main process and extension host.
+#[derive(Debug, Clone)]
+pub enum AxfIpcMessage {
+    Request { id: u64, method: String, args: String },
+    Response { id: u64, result: std::result::Result<String, String> },
+    Event { event: String, data: String },
+    Cancel { id: u64 },
+}
+
+impl AxfIpcMessage {
+    pub fn request(id: u64, method: &str, args: &str) -> Self {
+        Self::Request { id, method: method.to_string(), args: args.to_string() }
+    }
+
+    pub fn success(id: u64, result: &str) -> Self {
+        Self::Response { id, result: Ok(result.to_string()) }
+    }
+
+    pub fn failure(id: u64, error: &str) -> Self {
+        Self::Response { id, result: Err(error.to_string()) }
+    }
+
+    pub fn event(event: &str, data: &str) -> Self {
+        Self::Event { event: event.to_string(), data: data.to_string() }
+    }
+
+    pub fn cancel(id: u64) -> Self {
+        Self::Cancel { id }
+    }
+
+    pub fn is_request(&self) -> bool { matches!(self, Self::Request { .. }) }
+    pub fn is_response(&self) -> bool { matches!(self, Self::Response { .. }) }
+    pub fn is_event(&self) -> bool { matches!(self, Self::Event { .. }) }
+}
+
+/// An IPC channel that queues messages.
+#[derive(Debug, Clone)]
+pub struct AxfIpcChannel {
+    outgoing: Vec<AxfIpcMessage>,
+    incoming: Vec<AxfIpcMessage>,
+    next_id: u64,
+}
+
+impl AxfIpcChannel {
+    pub fn new() -> Self {
+        Self { outgoing: Vec::new(), incoming: Vec::new(), next_id: 1 }
+    }
+
+    pub fn send_request(&mut self, method: &str, args: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.outgoing.push(AxfIpcMessage::request(id, method, args));
+        id
+    }
+
+    pub fn send_event(&mut self, event: &str, data: &str) {
+        self.outgoing.push(AxfIpcMessage::event(event, data));
+    }
+
+    pub fn send_response(&mut self, id: u64, result: &str) {
+        self.outgoing.push(AxfIpcMessage::success(id, result));
+    }
+
+    pub fn send_error(&mut self, id: u64, error: &str) {
+        self.outgoing.push(AxfIpcMessage::failure(id, error));
+    }
+
+    pub fn receive(&mut self, msg: AxfIpcMessage) {
+        self.incoming.push(msg);
+    }
+
+    pub fn drain_outgoing(&mut self) -> Vec<AxfIpcMessage> {
+        std::mem::take(&mut self.outgoing)
+    }
+
+    pub fn drain_incoming(&mut self) -> Vec<AxfIpcMessage> {
+        std::mem::take(&mut self.incoming)
+    }
+
+    pub fn pending_outgoing(&self) -> usize {
+        self.outgoing.len()
+    }
+
+    pub fn pending_incoming(&self) -> usize {
+        self.incoming.len()
+    }
+}
+
+/// An extension host process descriptor.
+#[derive(Debug, Clone)]
+pub struct AxfExtensionHost {
+    pub id: String,
+    pub kind: AxfHostKind,
+    pub state: AxfHostState,
+    pub pid: Option<u32>,
+    pub channel: AxfIpcChannel,
+    pub extensions: Vec<String>,
+    pub start_time: Option<u64>,
+    pub crash_count: u32,
+}
+
+/// Kind of extension host.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxfHostKind {
+    Local,
+    Remote,
+    Web,
+}
+
+impl AxfExtensionHost {
+    pub fn new(id: &str, kind: AxfHostKind) -> Self {
+        Self {
+            id: id.to_string(),
+            kind,
+            state: AxfHostState::NotStarted,
+            pid: None,
+            channel: AxfIpcChannel::new(),
+            extensions: Vec::new(),
+            start_time: None,
+            crash_count: 0,
+        }
+    }
+
+    pub fn start(&mut self, pid: u32, time: u64) {
+        self.state = AxfHostState::Starting;
+        self.pid = Some(pid);
+        self.start_time = Some(time);
+    }
+
+    pub fn mark_ready(&mut self) {
+        self.state = AxfHostState::Running;
+    }
+
+    pub fn crash(&mut self) {
+        self.state = AxfHostState::Crashed;
+        self.crash_count += 1;
+    }
+
+    pub fn terminate(&mut self) {
+        self.state = AxfHostState::Terminated;
+        self.pid = None;
+    }
+
+    pub fn register_extension(&mut self, ext_id: &str) {
+        if !self.extensions.contains(&ext_id.to_string()) {
+            self.extensions.push(ext_id.to_string());
+        }
+    }
+
+    pub fn extension_count(&self) -> usize {
+        self.extensions.len()
+    }
+
+    pub fn should_restart(&self) -> bool {
+        self.state == AxfHostState::Crashed && self.crash_count < 3
+    }
+
+    pub fn uptime(&self, now: u64) -> Option<u64> {
+        self.start_time.map(|t| now.saturating_sub(t))
+    }
+}
+
+/// Extension host manager that oversees multiple hosts.
+#[derive(Debug, Clone)]
+pub struct AxfHostManager {
+    hosts: Vec<AxfExtensionHost>,
+}
+
+impl AxfHostManager {
+    pub fn new() -> Self {
+        Self { hosts: Vec::new() }
+    }
+
+    pub fn create_host(&mut self, id: &str, kind: AxfHostKind) -> usize {
+        let idx = self.hosts.len();
+        self.hosts.push(AxfExtensionHost::new(id, kind));
+        idx
+    }
+
+    pub fn host(&self, idx: usize) -> Option<&AxfExtensionHost> {
+        self.hosts.get(idx)
+    }
+
+    pub fn host_mut(&mut self, idx: usize) -> Option<&mut AxfExtensionHost> {
+        self.hosts.get_mut(idx)
+    }
+
+    pub fn running_hosts(&self) -> Vec<&AxfExtensionHost> {
+        self.hosts.iter().filter(|h| h.state.is_running()).collect()
+    }
+
+    pub fn crashed_hosts(&self) -> Vec<&AxfExtensionHost> {
+        self.hosts.iter().filter(|h| h.state == AxfHostState::Crashed).collect()
+    }
+
+    pub fn host_count(&self) -> usize {
+        self.hosts.len()
+    }
+
+    pub fn total_extensions(&self) -> usize {
+        self.hosts.iter().map(|h| h.extension_count()).sum()
+    }
+
+    pub fn find_host_for_extension(&self, ext_id: &str) -> Option<usize> {
+        self.hosts.iter().position(|h| h.extensions.contains(&ext_id.to_string()))
+    }
+
+    pub fn terminate_all(&mut self) {
+        for host in &mut self.hosts {
+            if host.state.is_alive() {
+                host.terminate();
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32373,6 +32607,108 @@ mod tests {
         cp.register(AxeCommand::new("test.run", "Run Tests"));
         assert!(cp.execute("test.run").is_some());
         assert!(cp.execute("nonexistent").is_none());
+    }
+
+
+    // --- axf_ extension host process tests ---
+
+    #[test]
+    fn test_axf_host_state() {
+        assert!(AxfHostState::Running.is_running());
+        assert!(AxfHostState::Starting.is_alive());
+        assert!(!AxfHostState::Crashed.is_alive());
+    }
+
+    #[test]
+    fn test_axf_ipc_message() {
+        let req = AxfIpcMessage::request(1, "activate", "{}");
+        assert!(req.is_request());
+        let resp = AxfIpcMessage::success(1, "ok");
+        assert!(resp.is_response());
+        let evt = AxfIpcMessage::event("change", "{}");
+        assert!(evt.is_event());
+    }
+
+    #[test]
+    fn test_axf_ipc_channel() {
+        let mut ch = AxfIpcChannel::new();
+        let id = ch.send_request("activate", "{}");
+        assert_eq!(id, 1);
+        ch.send_event("changed", "{}");
+        assert_eq!(ch.pending_outgoing(), 2);
+        let msgs = ch.drain_outgoing();
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(ch.pending_outgoing(), 0);
+    }
+
+    #[test]
+    fn test_axf_ipc_channel_incoming() {
+        let mut ch = AxfIpcChannel::new();
+        ch.receive(AxfIpcMessage::success(1, "result"));
+        assert_eq!(ch.pending_incoming(), 1);
+        let msgs = ch.drain_incoming();
+        assert_eq!(msgs.len(), 1);
+    }
+
+    #[test]
+    fn test_axf_extension_host_lifecycle() {
+        let mut host = AxfExtensionHost::new("local-1", AxfHostKind::Local);
+        assert_eq!(host.state, AxfHostState::NotStarted);
+        host.start(1234, 1000);
+        assert_eq!(host.state, AxfHostState::Starting);
+        assert_eq!(host.pid, Some(1234));
+        host.mark_ready();
+        assert!(host.state.is_running());
+        assert_eq!(host.uptime(2000), Some(1000));
+        host.crash();
+        assert_eq!(host.state, AxfHostState::Crashed);
+        assert!(host.should_restart());
+    }
+
+    #[test]
+    fn test_axf_extension_host_extensions() {
+        let mut host = AxfExtensionHost::new("h1", AxfHostKind::Local);
+        host.register_extension("ext.a");
+        host.register_extension("ext.b");
+        host.register_extension("ext.a"); // duplicate
+        assert_eq!(host.extension_count(), 2);
+    }
+
+    #[test]
+    fn test_axf_extension_host_crash_limit() {
+        let mut host = AxfExtensionHost::new("h", AxfHostKind::Local);
+        host.crash();
+        assert!(host.should_restart());
+        host.crash();
+        assert!(host.should_restart());
+        host.crash();
+        assert!(!host.should_restart()); // 3 crashes, no more restarts
+    }
+
+    #[test]
+    fn test_axf_host_manager() {
+        let mut mgr = AxfHostManager::new();
+        let idx = mgr.create_host("local", AxfHostKind::Local);
+        mgr.host_mut(idx).unwrap().start(100, 0);
+        mgr.host_mut(idx).unwrap().mark_ready();
+        mgr.host_mut(idx).unwrap().register_extension("ext.a");
+        assert_eq!(mgr.running_hosts().len(), 1);
+        assert_eq!(mgr.total_extensions(), 1);
+        assert_eq!(mgr.find_host_for_extension("ext.a"), Some(0));
+        assert_eq!(mgr.find_host_for_extension("ext.z"), None);
+    }
+
+    #[test]
+    fn test_axf_host_manager_terminate_all() {
+        let mut mgr = AxfHostManager::new();
+        let i1 = mgr.create_host("a", AxfHostKind::Local);
+        let i2 = mgr.create_host("b", AxfHostKind::Remote);
+        mgr.host_mut(i1).unwrap().start(1, 0);
+        mgr.host_mut(i1).unwrap().mark_ready();
+        mgr.host_mut(i2).unwrap().start(2, 0);
+        mgr.host_mut(i2).unwrap().mark_ready();
+        mgr.terminate_all();
+        assert!(mgr.running_hosts().is_empty());
     }
 
 }
