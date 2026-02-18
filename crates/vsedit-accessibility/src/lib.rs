@@ -7622,6 +7622,346 @@ impl<K: Ord + Clone, V: Clone> XvWeightBalancedTree<K, V> {
     }
 }
 
+
+// --- xw_ Scapegoat Tree ---
+
+/// A node in a scapegoat tree.
+#[derive(Debug, Clone)]
+pub struct XwScapegoatNode<K: Ord + Clone, V: Clone> {
+    pub xw_key: K,
+    pub xw_value: V,
+    xw_left: Option<Box<XwScapegoatNode<K, V>>>,
+    xw_right: Option<Box<XwScapegoatNode<K, V>>>,
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for XwScapegoatNode<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SGNode(k={})", self.xw_key)
+    }
+}
+
+/// Scapegoat tree — a BST that rebuilds subtrees when they become too unbalanced.
+#[derive(Debug, Clone)]
+pub struct XwScapegoatTree<K: Ord + Clone, V: Clone> {
+    xw_root: Option<Box<XwScapegoatNode<K, V>>>,
+    xw_size: usize,
+    xw_max_size: usize,
+    xw_alpha: f64,
+}
+
+impl<K: Ord + Clone, V: Clone> Default for XwScapegoatTree<K, V> {
+    fn default() -> Self { Self::xw_new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for XwScapegoatTree<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SGTree(size={}, alpha={:.2})", self.xw_size, self.xw_alpha)
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> XwScapegoatTree<K, V> {
+    /// Create an empty scapegoat tree with default α = 0.7.
+    pub fn xw_new() -> Self {
+        Self { xw_root: None, xw_size: 0, xw_max_size: 0, xw_alpha: 0.7 }
+    }
+
+    /// Create with custom alpha (0.5 < α < 1.0).
+    pub fn xw_with_alpha(alpha: f64) -> Self {
+        let a = alpha.clamp(0.51, 0.99);
+        Self { xw_root: None, xw_size: 0, xw_max_size: 0, xw_alpha: a }
+    }
+
+    /// Number of elements.
+    pub fn xw_len(&self) -> usize { self.xw_size }
+
+    /// Is empty.
+    pub fn xw_is_empty(&self) -> bool { self.xw_size == 0 }
+
+    fn xw_node_size(node: &Option<Box<XwScapegoatNode<K, V>>>) -> usize {
+        match node {
+            None => 0,
+            Some(n) => 1 + Self::xw_node_size(&n.xw_left) + Self::xw_node_size(&n.xw_right),
+        }
+    }
+
+    /// Insert a key-value pair.
+    pub fn xw_insert(&mut self, key: K, value: V) {
+        let (new_root, depth, inserted) = Self::xw_insert_node(self.xw_root.take(), key, value, 0);
+        self.xw_root = new_root;
+        if inserted {
+            self.xw_size += 1;
+            self.xw_max_size = std::cmp::max(self.xw_max_size, self.xw_size);
+            let h_alpha = -(self.xw_size as f64).log(1.0 / self.xw_alpha);
+            if depth as f64 > h_alpha {
+                self.xw_root = Self::xw_rebuild(self.xw_root.take());
+            }
+        }
+    }
+
+    fn xw_insert_node(
+        node: Option<Box<XwScapegoatNode<K, V>>>, key: K, value: V, depth: usize,
+    ) -> (Option<Box<XwScapegoatNode<K, V>>>, usize, bool) {
+        match node {
+            None => {
+                let n = Box::new(XwScapegoatNode { xw_key: key, xw_value: value, xw_left: None, xw_right: None });
+                (Some(n), depth, true)
+            }
+            Some(mut n) => {
+                if key < n.xw_key {
+                    let (l, d, ins) = Self::xw_insert_node(n.xw_left.take(), key, value, depth + 1);
+                    n.xw_left = l;
+                    if ins {
+                        let ls = Self::xw_node_size(&n.xw_left);
+                        let total = 1 + ls + Self::xw_node_size(&n.xw_right);
+                        if ls as f64 > 0.7 * total as f64 {
+                            return (Self::xw_rebuild(Some(n)), d, true);
+                        }
+                    }
+                    (Some(n), d, ins)
+                } else if key > n.xw_key {
+                    let (r, d, ins) = Self::xw_insert_node(n.xw_right.take(), key, value, depth + 1);
+                    n.xw_right = r;
+                    if ins {
+                        let rs = Self::xw_node_size(&n.xw_right);
+                        let total = 1 + Self::xw_node_size(&n.xw_left) + rs;
+                        if rs as f64 > 0.7 * total as f64 {
+                            return (Self::xw_rebuild(Some(n)), d, true);
+                        }
+                    }
+                    (Some(n), d, ins)
+                } else {
+                    n.xw_value = value;
+                    (Some(n), depth, false)
+                }
+            }
+        }
+    }
+
+    fn xw_flatten(node: Option<Box<XwScapegoatNode<K, V>>>, out: &mut Vec<(K, V)>) {
+        if let Some(n) = node {
+            Self::xw_flatten(n.xw_left, out);
+            out.push((n.xw_key, n.xw_value));
+            Self::xw_flatten(n.xw_right, out);
+        }
+    }
+
+    fn xw_build_balanced(sorted: &[(K, V)]) -> Option<Box<XwScapegoatNode<K, V>>> {
+        if sorted.is_empty() { return None; }
+        let mid = sorted.len() / 2;
+        let (k, v) = sorted[mid].clone();
+        Some(Box::new(XwScapegoatNode {
+            xw_key: k,
+            xw_value: v,
+            xw_left: Self::xw_build_balanced(&sorted[..mid]),
+            xw_right: Self::xw_build_balanced(&sorted[mid + 1..]),
+        }))
+    }
+
+    fn xw_rebuild(node: Option<Box<XwScapegoatNode<K, V>>>) -> Option<Box<XwScapegoatNode<K, V>>> {
+        let mut flat = Vec::new();
+        Self::xw_flatten(node, &mut flat);
+        Self::xw_build_balanced(&flat)
+    }
+
+    /// Look up a key.
+    pub fn xw_get(&self, key: &K) -> Option<&V> {
+        Self::xw_search(&self.xw_root, key)
+    }
+
+    fn xw_search<'a>(node: &'a Option<Box<XwScapegoatNode<K, V>>>, key: &K) -> Option<&'a V> {
+        match node {
+            None => None,
+            Some(n) => {
+                if *key == n.xw_key { Some(&n.xw_value) }
+                else if *key < n.xw_key { Self::xw_search(&n.xw_left, key) }
+                else { Self::xw_search(&n.xw_right, key) }
+            }
+        }
+    }
+
+    /// Check if key exists.
+    pub fn xw_contains(&self, key: &K) -> bool { self.xw_get(key).is_some() }
+
+    /// In-order keys.
+    pub fn xw_keys(&self) -> Vec<K> {
+        let mut result = Vec::new();
+        Self::xw_collect_keys(&self.xw_root, &mut result);
+        result
+    }
+
+    fn xw_collect_keys(node: &Option<Box<XwScapegoatNode<K, V>>>, result: &mut Vec<K>) {
+        if let Some(n) = node {
+            Self::xw_collect_keys(&n.xw_left, result);
+            result.push(n.xw_key.clone());
+            Self::xw_collect_keys(&n.xw_right, result);
+        }
+    }
+
+    /// Clear the tree.
+    pub fn xw_clear(&mut self) {
+        self.xw_root = None;
+        self.xw_size = 0;
+        self.xw_max_size = 0;
+    }
+
+    /// Height.
+    pub fn xw_height(&self) -> usize {
+        Self::xw_node_height(&self.xw_root)
+    }
+
+    fn xw_node_height(node: &Option<Box<XwScapegoatNode<K, V>>>) -> usize {
+        match node {
+            None => 0,
+            Some(n) => 1 + std::cmp::max(Self::xw_node_height(&n.xw_left), Self::xw_node_height(&n.xw_right)),
+        }
+    }
+}
+
+// --- xw_ Rope (String Rope) ---
+
+/// A rope node — either a leaf with text or an internal node concatenating two children.
+#[derive(Debug, Clone)]
+pub enum XwRopeNode {
+    Leaf(String),
+    Internal {
+        xw_left: Box<XwRopeNode>,
+        xw_right: Box<XwRopeNode>,
+        xw_len: usize,
+    },
+}
+
+impl std::fmt::Display for XwRopeNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            XwRopeNode::Leaf(s) => write!(f, "RopeLeaf({})", s.len()),
+            XwRopeNode::Internal { xw_len, .. } => write!(f, "RopeInt({})", xw_len),
+        }
+    }
+}
+
+/// Rope data structure for efficient string editing with O(log n) split/concat.
+#[derive(Debug, Clone)]
+pub struct XwRope {
+    xw_root: Option<Box<XwRopeNode>>,
+}
+
+impl Default for XwRope {
+    fn default() -> Self { Self::xw_new() }
+}
+
+impl std::fmt::Display for XwRope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Rope(len={})", self.xw_len())
+    }
+}
+
+impl XwRope {
+    /// Create an empty rope.
+    pub fn xw_new() -> Self { Self { xw_root: None } }
+
+    /// Create a rope from a string.
+    pub fn xw_from_str(s: &str) -> Self {
+        if s.is_empty() {
+            Self { xw_root: None }
+        } else {
+            Self { xw_root: Some(Box::new(XwRopeNode::Leaf(s.to_string()))) }
+        }
+    }
+
+    /// Total length in bytes.
+    pub fn xw_len(&self) -> usize {
+        Self::xw_node_len(&self.xw_root)
+    }
+
+    fn xw_node_len(node: &Option<Box<XwRopeNode>>) -> usize {
+        match node {
+            None => 0,
+            Some(n) => match n.as_ref() {
+                XwRopeNode::Leaf(s) => s.len(),
+                XwRopeNode::Internal { xw_len, .. } => *xw_len,
+            },
+        }
+    }
+
+    /// Is empty.
+    pub fn xw_is_empty(&self) -> bool { self.xw_len() == 0 }
+
+    /// Concatenate two ropes.
+    pub fn xw_concat(left: XwRope, right: XwRope) -> XwRope {
+        match (left.xw_root, right.xw_root) {
+            (None, r) => XwRope { xw_root: r },
+            (l, None) => XwRope { xw_root: l },
+            (Some(l), Some(r)) => {
+                let len = Self::xw_node_len(&Some(l.clone())) + Self::xw_node_len(&Some(r.clone()));
+                XwRope {
+                    xw_root: Some(Box::new(XwRopeNode::Internal { xw_left: l, xw_right: r, xw_len: len })),
+                }
+            }
+        }
+    }
+
+    /// Convert to string.
+    pub fn xw_to_string(&self) -> String {
+        let mut result = String::new();
+        Self::xw_collect(&self.xw_root, &mut result);
+        result
+    }
+
+    fn xw_collect(node: &Option<Box<XwRopeNode>>, result: &mut String) {
+        match node {
+            None => {}
+            Some(n) => match n.as_ref() {
+                XwRopeNode::Leaf(s) => result.push_str(s),
+                XwRopeNode::Internal { xw_left, xw_right, .. } => {
+                    Self::xw_collect(&Some(xw_left.clone()), result);
+                    Self::xw_collect(&Some(xw_right.clone()), result);
+                }
+            },
+        }
+    }
+
+    /// Get character at byte index.
+    pub fn xw_char_at(&self, idx: usize) -> Option<char> {
+        let s = self.xw_to_string();
+        s.as_bytes().get(idx).map(|&b| b as char)
+    }
+
+    /// Insert a string at byte index.
+    pub fn xw_insert(&mut self, idx: usize, text: &str) {
+        let s = self.xw_to_string();
+        let (left, right) = s.split_at(idx.min(s.len()));
+        let new_s = format!("{}{}{}", left, text, right);
+        *self = Self::xw_from_str(&new_s);
+    }
+
+    /// Delete bytes in range [start, end).
+    pub fn xw_delete(&mut self, start: usize, end: usize) {
+        let s = self.xw_to_string();
+        let end = end.min(s.len());
+        let start = start.min(end);
+        let new_s = format!("{}{}", &s[..start], &s[end..]);
+        *self = Self::xw_from_str(&new_s);
+    }
+
+    /// Append text.
+    pub fn xw_append(&mut self, text: &str) {
+        let other = Self::xw_from_str(text);
+        let old = std::mem::take(self);
+        *self = Self::xw_concat(old, other);
+    }
+
+    /// Substring [start, end).
+    pub fn xw_substring(&self, start: usize, end: usize) -> String {
+        let s = self.xw_to_string();
+        let end = end.min(s.len());
+        let start = start.min(end);
+        s[start..end].to_string()
+    }
+
+    /// Clear the rope.
+    pub fn xw_clear(&mut self) { self.xw_root = None; }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -11802,6 +12142,173 @@ mod tests {
     fn xv_wb_node_display() {
         let n = super::XvWBNode { xv_key: 1, xv_value: "a", xv_left: None, xv_right: None, xv_weight: 2 };
         assert!(format!("{}", n).contains("WBNode"));
+    }
+
+
+    // --- xw_ Scapegoat Tree tests ---
+
+    #[test]
+    fn xw_sg_tree_new() {
+        let t = super::XwScapegoatTree::<i32, &str>::xw_new();
+        assert!(t.xw_is_empty());
+        assert_eq!(t.xw_len(), 0);
+    }
+
+    #[test]
+    fn xw_sg_tree_insert_get() {
+        let mut t = super::XwScapegoatTree::xw_new();
+        t.xw_insert(5, "five");
+        t.xw_insert(3, "three");
+        t.xw_insert(7, "seven");
+        assert_eq!(t.xw_get(&5), Some(&"five"));
+        assert_eq!(t.xw_get(&3), Some(&"three"));
+        assert_eq!(t.xw_get(&4), None);
+    }
+
+    #[test]
+    fn xw_sg_tree_contains() {
+        let mut t = super::XwScapegoatTree::xw_new();
+        t.xw_insert(10, "a");
+        assert!(t.xw_contains(&10));
+        assert!(!t.xw_contains(&20));
+    }
+
+    #[test]
+    fn xw_sg_tree_keys_sorted() {
+        let mut t = super::XwScapegoatTree::xw_new();
+        for k in [5, 3, 8, 1, 9, 2, 7, 4, 6] {
+            t.xw_insert(k, k * 10);
+        }
+        assert_eq!(t.xw_keys(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn xw_sg_tree_sequential_inserts() {
+        let mut t = super::XwScapegoatTree::xw_new();
+        for k in 1..=20 {
+            t.xw_insert(k, k);
+        }
+        assert_eq!(t.xw_len(), 20);
+        assert!(t.xw_height() <= 15);
+    }
+
+    #[test]
+    fn xw_sg_tree_replace_value() {
+        let mut t = super::XwScapegoatTree::xw_new();
+        t.xw_insert(5, "old");
+        t.xw_insert(5, "new");
+        assert_eq!(t.xw_get(&5), Some(&"new"));
+        assert_eq!(t.xw_len(), 1);
+    }
+
+    #[test]
+    fn xw_sg_tree_clear() {
+        let mut t = super::XwScapegoatTree::xw_new();
+        t.xw_insert(1, "a");
+        t.xw_clear();
+        assert!(t.xw_is_empty());
+    }
+
+    #[test]
+    fn xw_sg_tree_display() {
+        let t = super::XwScapegoatTree::<i32, i32>::xw_new();
+        assert!(format!("{}", t).contains("SGTree"));
+    }
+
+    #[test]
+    fn xw_sg_tree_default() {
+        let t = super::XwScapegoatTree::<i32, i32>::default();
+        assert!(t.xw_is_empty());
+    }
+
+    #[test]
+    fn xw_sg_node_display() {
+        let n = super::XwScapegoatNode { xw_key: 1, xw_value: "a", xw_left: None, xw_right: None };
+        assert!(format!("{}", n).contains("SGNode"));
+    }
+
+    // --- xw_ Rope tests ---
+
+    #[test]
+    fn xw_rope_new() {
+        let r = super::XwRope::xw_new();
+        assert!(r.xw_is_empty());
+        assert_eq!(r.xw_len(), 0);
+    }
+
+    #[test]
+    fn xw_rope_from_str() {
+        let r = super::XwRope::xw_from_str("hello");
+        assert_eq!(r.xw_len(), 5);
+        assert_eq!(r.xw_to_string(), "hello");
+    }
+
+    #[test]
+    fn xw_rope_concat() {
+        let a = super::XwRope::xw_from_str("hello ");
+        let b = super::XwRope::xw_from_str("world");
+        let c = super::XwRope::xw_concat(a, b);
+        assert_eq!(c.xw_to_string(), "hello world");
+    }
+
+    #[test]
+    fn xw_rope_insert() {
+        let mut r = super::XwRope::xw_from_str("helo");
+        r.xw_insert(3, "l");
+        assert_eq!(r.xw_to_string(), "hello");
+    }
+
+    #[test]
+    fn xw_rope_delete() {
+        let mut r = super::XwRope::xw_from_str("hello world");
+        r.xw_delete(5, 11);
+        assert_eq!(r.xw_to_string(), "hello");
+    }
+
+    #[test]
+    fn xw_rope_append() {
+        let mut r = super::XwRope::xw_from_str("hello");
+        r.xw_append(" world");
+        assert_eq!(r.xw_to_string(), "hello world");
+    }
+
+    #[test]
+    fn xw_rope_substring() {
+        let r = super::XwRope::xw_from_str("hello world");
+        assert_eq!(r.xw_substring(6, 11), "world");
+    }
+
+    #[test]
+    fn xw_rope_char_at() {
+        let r = super::XwRope::xw_from_str("abc");
+        assert_eq!(r.xw_char_at(0), Some('a'));
+        assert_eq!(r.xw_char_at(2), Some('c'));
+    }
+
+    #[test]
+    fn xw_rope_clear() {
+        let mut r = super::XwRope::xw_from_str("text");
+        r.xw_clear();
+        assert!(r.xw_is_empty());
+    }
+
+    #[test]
+    fn xw_rope_display() {
+        let r = super::XwRope::xw_from_str("test");
+        assert!(format!("{}", r).contains("Rope"));
+    }
+
+    #[test]
+    fn xw_rope_default() {
+        let r = super::XwRope::default();
+        assert!(r.xw_is_empty());
+    }
+
+    #[test]
+    fn xw_rope_empty_ops() {
+        let r = super::XwRope::xw_new();
+        assert_eq!(r.xw_to_string(), "");
+        assert_eq!(r.xw_substring(0, 5), "");
     }
 
 }
