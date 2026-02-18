@@ -20045,6 +20045,171 @@ impl AxfHostManager {
     }
 }
 
+
+// --- axg_ workspace file watcher and event system ---
+
+/// File system event type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxgFsEventKind {
+    Created,
+    Changed,
+    Deleted,
+    Renamed,
+}
+
+/// A file system event.
+#[derive(Debug, Clone)]
+pub struct AxgFsEvent {
+    pub kind: AxgFsEventKind,
+    pub path: String,
+    pub old_path: Option<String>,
+    pub timestamp: u64,
+    pub is_directory: bool,
+}
+
+impl AxgFsEvent {
+    pub fn created(path: &str, ts: u64, is_dir: bool) -> Self {
+        Self { kind: AxgFsEventKind::Created, path: path.to_string(), old_path: None, timestamp: ts, is_directory: is_dir }
+    }
+
+    pub fn changed(path: &str, ts: u64) -> Self {
+        Self { kind: AxgFsEventKind::Changed, path: path.to_string(), old_path: None, timestamp: ts, is_directory: false }
+    }
+
+    pub fn deleted(path: &str, ts: u64, is_dir: bool) -> Self {
+        Self { kind: AxgFsEventKind::Deleted, path: path.to_string(), old_path: None, timestamp: ts, is_directory: is_dir }
+    }
+
+    pub fn renamed(old_path: &str, new_path: &str, ts: u64) -> Self {
+        Self { kind: AxgFsEventKind::Renamed, path: new_path.to_string(), old_path: Some(old_path.to_string()), timestamp: ts, is_directory: false }
+    }
+}
+
+/// A glob pattern for watching.
+#[derive(Debug, Clone)]
+pub struct AxgWatchPattern {
+    pub base_path: String,
+    pub include_pattern: String,
+    pub exclude_patterns: Vec<String>,
+    pub recursive: bool,
+}
+
+impl AxgWatchPattern {
+    pub fn new(base: &str, include: &str) -> Self {
+        Self { base_path: base.to_string(), include_pattern: include.to_string(), exclude_patterns: Vec::new(), recursive: true }
+    }
+
+    pub fn exclude(mut self, pattern: &str) -> Self {
+        self.exclude_patterns.push(pattern.to_string());
+        self
+    }
+
+    pub fn non_recursive(mut self) -> Self {
+        self.recursive = false;
+        self
+    }
+
+    /// Simple matching: checks if path starts with base and the filename matches the include pattern.
+    pub fn matches(&self, path: &str) -> bool {
+        if !path.starts_with(&self.base_path) { return false; }
+        let relative = &path[self.base_path.len()..].trim_start_matches('/');
+        if !self.recursive && relative.contains('/') { return false; }
+        for ex in &self.exclude_patterns {
+            if relative.contains(ex.as_str()) { return false; }
+        }
+        // Simple glob: * matches anything
+        if self.include_pattern == "**" || self.include_pattern == "*" { return true; }
+        if let Some(ext) = self.include_pattern.strip_prefix("*.") {
+            return relative.ends_with(&format!(".{}", ext));
+        }
+        relative.contains(&self.include_pattern)
+    }
+}
+
+/// A file watcher subscription.
+#[derive(Debug, Clone)]
+pub struct AxgWatchSubscription {
+    pub id: u64,
+    pub pattern: AxgWatchPattern,
+    pub active: bool,
+}
+
+impl AxgWatchSubscription {
+    pub fn new(id: u64, pattern: AxgWatchPattern) -> Self {
+        Self { id, pattern, active: true }
+    }
+
+    pub fn pause(&mut self) { self.active = false; }
+    pub fn resume(&mut self) { self.active = true; }
+}
+
+/// File watcher service managing subscriptions and dispatching events.
+#[derive(Debug, Clone)]
+pub struct AxgFileWatcher {
+    subscriptions: Vec<AxgWatchSubscription>,
+    event_queue: Vec<AxgFsEvent>,
+    next_id: u64,
+    debounce_ms: u64,
+}
+
+impl AxgFileWatcher {
+    pub fn new(debounce_ms: u64) -> Self {
+        Self { subscriptions: Vec::new(), event_queue: Vec::new(), next_id: 1, debounce_ms }
+    }
+
+    pub fn watch(&mut self, pattern: AxgWatchPattern) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.subscriptions.push(AxgWatchSubscription::new(id, pattern));
+        id
+    }
+
+    pub fn unwatch(&mut self, id: u64) -> bool {
+        let before = self.subscriptions.len();
+        self.subscriptions.retain(|s| s.id != id);
+        self.subscriptions.len() < before
+    }
+
+    pub fn push_event(&mut self, event: AxgFsEvent) {
+        self.event_queue.push(event);
+    }
+
+    pub fn drain_events(&mut self) -> Vec<AxgFsEvent> {
+        std::mem::take(&mut self.event_queue)
+    }
+
+    pub fn matching_subscriptions(&self, path: &str) -> Vec<u64> {
+        self.subscriptions.iter()
+            .filter(|s| s.active && s.pattern.matches(path))
+            .map(|s| s.id)
+            .collect()
+    }
+
+    pub fn subscription_count(&self) -> usize {
+        self.subscriptions.len()
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.subscriptions.iter().filter(|s| s.active).count()
+    }
+
+    pub fn debounce_ms(&self) -> u64 {
+        self.debounce_ms
+    }
+
+    pub fn pause_subscription(&mut self, id: u64) {
+        if let Some(s) = self.subscriptions.iter_mut().find(|s| s.id == id) {
+            s.pause();
+        }
+    }
+
+    pub fn resume_subscription(&mut self, id: u64) {
+        if let Some(s) = self.subscriptions.iter_mut().find(|s| s.id == id) {
+            s.resume();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32714,6 +32879,82 @@ mod tests {
         mgr.host_mut(i2).unwrap().mark_ready();
         mgr.terminate_all();
         assert!(mgr.running_hosts().is_empty());
+    }
+
+
+    // --- axg_ file watcher tests ---
+
+    #[test]
+    fn test_axg_fs_event_types() {
+        let c = AxgFsEvent::created("/a.rs", 100, false);
+        assert_eq!(c.kind, AxgFsEventKind::Created);
+        assert!(!c.is_directory);
+        let r = AxgFsEvent::renamed("/old.rs", "/new.rs", 200);
+        assert_eq!(r.kind, AxgFsEventKind::Renamed);
+        assert_eq!(r.old_path.as_deref(), Some("/old.rs"));
+    }
+
+    #[test]
+    fn test_axg_watch_pattern_simple() {
+        let p = AxgWatchPattern::new("/project", "*.rs");
+        assert!(p.matches("/project/src/main.rs"));
+        assert!(!p.matches("/project/src/main.py"));
+        assert!(!p.matches("/other/main.rs"));
+    }
+
+    #[test]
+    fn test_axg_watch_pattern_exclude() {
+        let p = AxgWatchPattern::new("/project", "**").exclude("node_modules");
+        assert!(p.matches("/project/src/main.rs"));
+        assert!(!p.matches("/project/node_modules/x.js"));
+    }
+
+    #[test]
+    fn test_axg_watch_pattern_non_recursive() {
+        let p = AxgWatchPattern::new("/project", "*.rs").non_recursive();
+        assert!(p.matches("/project/main.rs"));
+        assert!(!p.matches("/project/src/main.rs"));
+    }
+
+    #[test]
+    fn test_axg_file_watcher() {
+        let mut fw = AxgFileWatcher::new(100);
+        let id = fw.watch(AxgWatchPattern::new("/src", "*.rs"));
+        assert_eq!(fw.subscription_count(), 1);
+        assert_eq!(fw.active_count(), 1);
+        let matching = fw.matching_subscriptions("/src/lib.rs");
+        assert_eq!(matching, vec![id]);
+        assert!(fw.matching_subscriptions("/src/lib.py").is_empty());
+    }
+
+    #[test]
+    fn test_axg_file_watcher_events() {
+        let mut fw = AxgFileWatcher::new(50);
+        fw.push_event(AxgFsEvent::changed("/a.rs", 1));
+        fw.push_event(AxgFsEvent::created("/b.rs", 2, false));
+        let events = fw.drain_events();
+        assert_eq!(events.len(), 2);
+        assert!(fw.drain_events().is_empty());
+    }
+
+    #[test]
+    fn test_axg_file_watcher_unwatch() {
+        let mut fw = AxgFileWatcher::new(50);
+        let id = fw.watch(AxgWatchPattern::new("/x", "*"));
+        assert!(fw.unwatch(id));
+        assert_eq!(fw.subscription_count(), 0);
+        assert!(!fw.unwatch(id)); // already removed
+    }
+
+    #[test]
+    fn test_axg_file_watcher_pause_resume() {
+        let mut fw = AxgFileWatcher::new(50);
+        let id = fw.watch(AxgWatchPattern::new("/x", "*"));
+        fw.pause_subscription(id);
+        assert_eq!(fw.active_count(), 0);
+        assert!(fw.matching_subscriptions("/x/a").is_empty());
+        fw.resume_subscription(id);
+        assert_eq!(fw.active_count(), 1);
     }
 
 }
