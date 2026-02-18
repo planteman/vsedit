@@ -15889,6 +15889,165 @@ impl std::fmt::Display for ZlTerminalLink {
     }
 }
 
+
+// --- zm_ debug adapter protocol types ---
+
+/// A debug breakpoint.
+#[derive(Debug, Clone)]
+pub struct ZmBreakpoint {
+    pub id: u32,
+    pub verified: bool,
+    pub line: u32,
+    pub column: Option<u32>,
+    pub source_path: Option<String>,
+    pub condition: Option<String>,
+    pub hit_condition: Option<String>,
+    pub log_message: Option<String>,
+}
+
+impl ZmBreakpoint {
+    pub fn new(id: u32, line: u32) -> Self {
+        Self { id, verified: true, line, column: None, source_path: None, condition: None, hit_condition: None, log_message: None }
+    }
+
+    pub fn with_condition(mut self, cond: &str) -> Self { self.condition = Some(cond.to_string()); self }
+    pub fn with_hit_condition(mut self, cond: &str) -> Self { self.hit_condition = Some(cond.to_string()); self }
+    pub fn with_log_message(mut self, msg: &str) -> Self { self.log_message = Some(msg.to_string()); self }
+    pub fn with_source(mut self, path: &str) -> Self { self.source_path = Some(path.to_string()); self }
+    pub fn unverified(mut self) -> Self { self.verified = false; self }
+
+    pub fn is_conditional(&self) -> bool { self.condition.is_some() }
+    pub fn is_logpoint(&self) -> bool { self.log_message.is_some() }
+}
+
+impl std::fmt::Display for ZmBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let status = if self.verified { "verified" } else { "pending" };
+        write!(f, "ZmBreakpoint(id={}, L{}, {})", self.id, self.line, status)
+    }
+}
+
+/// A stack frame in a debug session.
+#[derive(Debug, Clone)]
+pub struct ZmStackFrame {
+    pub id: u32,
+    pub name: String,
+    pub source_path: Option<String>,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: Option<u32>,
+    pub module_id: Option<String>,
+}
+
+impl ZmStackFrame {
+    pub fn new(id: u32, name: &str, line: u32, column: u32) -> Self {
+        Self { id, name: name.to_string(), source_path: None, line, column, end_line: None, module_id: None }
+    }
+
+    pub fn with_source(mut self, path: &str) -> Self { self.source_path = Some(path.to_string()); self }
+    pub fn with_module(mut self, m: &str) -> Self { self.module_id = Some(m.to_string()); self }
+
+    pub fn has_source(&self) -> bool { self.source_path.is_some() }
+}
+
+impl std::fmt::Display for ZmStackFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZmStackFrame(#{}: {} at L{}:{})", self.id, self.name, self.line, self.column)
+    }
+}
+
+/// A debug variable or watch expression value.
+#[derive(Debug, Clone)]
+pub struct ZmVariable {
+    pub name: String,
+    pub value: String,
+    pub var_type: Option<String>,
+    pub variables_reference: u32,
+    pub named_variables: Option<u32>,
+    pub indexed_variables: Option<u32>,
+}
+
+impl ZmVariable {
+    pub fn new(name: &str, value: &str) -> Self {
+        Self { name: name.to_string(), value: value.to_string(), var_type: None, variables_reference: 0, named_variables: None, indexed_variables: None }
+    }
+
+    pub fn with_type(mut self, t: &str) -> Self { self.var_type = Some(t.to_string()); self }
+    pub fn with_ref(mut self, r: u32) -> Self { self.variables_reference = r; self }
+
+    pub fn has_children(&self) -> bool { self.variables_reference > 0 }
+    pub fn is_structured(&self) -> bool { self.has_children() }
+}
+
+impl std::fmt::Display for ZmVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(t) = &self.var_type {
+            write!(f, "{}: {} = {}", self.name, t, self.value)
+        } else {
+            write!(f, "{} = {}", self.name, self.value)
+        }
+    }
+}
+
+/// A debug thread.
+#[derive(Debug, Clone)]
+pub struct ZmThread {
+    pub id: u32,
+    pub name: String,
+    pub is_stopped: bool,
+}
+
+impl ZmThread {
+    pub fn new(id: u32, name: &str) -> Self {
+        Self { id, name: name.to_string(), is_stopped: false }
+    }
+
+    pub fn stopped(mut self) -> Self { self.is_stopped = true; self }
+}
+
+impl std::fmt::Display for ZmThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = if self.is_stopped { "stopped" } else { "running" };
+        write!(f, "ZmThread(#{}: {} [{}])", self.id, self.name, state)
+    }
+}
+
+/// A debug session managing the state of a debugging run.
+#[derive(Debug, Clone)]
+pub struct ZmDebugSession {
+    pub session_id: String,
+    pub name: String,
+    pub debug_type: String,
+    pub threads: Vec<ZmThread>,
+    pub breakpoints: Vec<ZmBreakpoint>,
+    pub is_running: bool,
+}
+
+impl ZmDebugSession {
+    pub fn new(id: &str, name: &str, debug_type: &str) -> Self {
+        Self { session_id: id.to_string(), name: name.to_string(), debug_type: debug_type.to_string(),
+               threads: Vec::new(), breakpoints: Vec::new(), is_running: false }
+    }
+
+    pub fn start(&mut self) { self.is_running = true; }
+    pub fn stop(&mut self) { self.is_running = false; }
+
+    pub fn add_thread(&mut self, thread: ZmThread) { self.threads.push(thread); }
+    pub fn add_breakpoint(&mut self, bp: ZmBreakpoint) { self.breakpoints.push(bp); }
+
+    pub fn thread_count(&self) -> usize { self.threads.len() }
+    pub fn breakpoint_count(&self) -> usize { self.breakpoints.len() }
+    pub fn stopped_threads(&self) -> Vec<&ZmThread> { self.threads.iter().filter(|t| t.is_stopped).collect() }
+    pub fn verified_breakpoints(&self) -> Vec<&ZmBreakpoint> { self.breakpoints.iter().filter(|b| b.verified).collect() }
+}
+
+impl std::fmt::Display for ZmDebugSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = if self.is_running { "running" } else { "stopped" };
+        write!(f, "ZmDebugSession({}: {} [{}])", self.session_id, self.name, state)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -26272,6 +26431,129 @@ mod tests {
     fn test_zl_terminal_link_display() {
         let l = ZlTerminalLink::new(5, 10);
         assert!(format!("{}", l).contains("ZlTerminalLink"));
+    }
+
+
+    // --- zm_ tests ---
+
+    #[test]
+    fn test_zm_breakpoint_new() {
+        let bp = ZmBreakpoint::new(1, 10);
+        assert!(bp.verified);
+        assert_eq!(bp.line, 10);
+        assert!(!bp.is_conditional());
+        assert!(!bp.is_logpoint());
+    }
+
+    #[test]
+    fn test_zm_breakpoint_conditional() {
+        let bp = ZmBreakpoint::new(1, 5).with_condition("x > 0");
+        assert!(bp.is_conditional());
+    }
+
+    #[test]
+    fn test_zm_breakpoint_logpoint() {
+        let bp = ZmBreakpoint::new(1, 5).with_log_message("value: {x}");
+        assert!(bp.is_logpoint());
+    }
+
+    #[test]
+    fn test_zm_breakpoint_unverified() {
+        let bp = ZmBreakpoint::new(1, 5).unverified();
+        assert!(!bp.verified);
+    }
+
+    #[test]
+    fn test_zm_breakpoint_display() {
+        let bp = ZmBreakpoint::new(1, 10);
+        assert!(format!("{}", bp).contains("verified"));
+    }
+
+    #[test]
+    fn test_zm_stack_frame() {
+        let sf = ZmStackFrame::new(0, "main", 10, 0).with_source("main.rs");
+        assert!(sf.has_source());
+        assert_eq!(sf.name, "main");
+    }
+
+    #[test]
+    fn test_zm_stack_frame_display() {
+        let sf = ZmStackFrame::new(0, "test", 5, 0);
+        assert!(format!("{}", sf).contains("test"));
+    }
+
+    #[test]
+    fn test_zm_variable_simple() {
+        let v = ZmVariable::new("x", "42").with_type("i32");
+        assert!(!v.has_children());
+        assert_eq!(v.var_type, Some("i32".to_string()));
+    }
+
+    #[test]
+    fn test_zm_variable_structured() {
+        let v = ZmVariable::new("obj", "{...}").with_ref(5);
+        assert!(v.has_children());
+        assert!(v.is_structured());
+    }
+
+    #[test]
+    fn test_zm_variable_display() {
+        let v = ZmVariable::new("x", "42").with_type("i32");
+        assert_eq!(format!("{}", v), "x: i32 = 42");
+    }
+
+    #[test]
+    fn test_zm_thread() {
+        let t = ZmThread::new(1, "main");
+        assert!(!t.is_stopped);
+        let t2 = ZmThread::new(2, "worker").stopped();
+        assert!(t2.is_stopped);
+    }
+
+    #[test]
+    fn test_zm_thread_display() {
+        let t = ZmThread::new(1, "main");
+        assert!(format!("{}", t).contains("running"));
+    }
+
+    #[test]
+    fn test_zm_debug_session_new() {
+        let s = ZmDebugSession::new("s1", "My Debug", "lldb");
+        assert!(!s.is_running);
+        assert_eq!(s.thread_count(), 0);
+    }
+
+    #[test]
+    fn test_zm_debug_session_start_stop() {
+        let mut s = ZmDebugSession::new("s1", "test", "gdb");
+        s.start();
+        assert!(s.is_running);
+        s.stop();
+        assert!(!s.is_running);
+    }
+
+    #[test]
+    fn test_zm_debug_session_threads() {
+        let mut s = ZmDebugSession::new("s1", "test", "lldb");
+        s.add_thread(ZmThread::new(1, "main").stopped());
+        s.add_thread(ZmThread::new(2, "worker"));
+        assert_eq!(s.thread_count(), 2);
+        assert_eq!(s.stopped_threads().len(), 1);
+    }
+
+    #[test]
+    fn test_zm_debug_session_breakpoints() {
+        let mut s = ZmDebugSession::new("s1", "test", "lldb");
+        s.add_breakpoint(ZmBreakpoint::new(1, 10));
+        s.add_breakpoint(ZmBreakpoint::new(2, 20).unverified());
+        assert_eq!(s.breakpoint_count(), 2);
+        assert_eq!(s.verified_breakpoints().len(), 1);
+    }
+
+    #[test]
+    fn test_zm_debug_session_display() {
+        let s = ZmDebugSession::new("s1", "test", "lldb");
+        assert!(format!("{}", s).contains("ZmDebugSession"));
     }
 
 }
