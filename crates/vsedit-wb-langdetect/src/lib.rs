@@ -12549,6 +12549,160 @@ impl YrSelectionModel {
     }
 }
 
+
+// --- ys_ CRDT counter and version vector ---
+
+/// A grow-only counter CRDT (G-Counter).
+/// Each replica has its own counter; the merged value is the sum of all replicas.
+#[derive(Debug, Clone)]
+pub struct YsGCounter {
+    counts: std::collections::HashMap<String, u64>,
+}
+
+impl YsGCounter {
+    pub fn new() -> Self {
+        Self { counts: std::collections::HashMap::new() }
+    }
+
+    pub fn increment(&mut self, replica_id: &str) {
+        let entry = self.counts.entry(replica_id.to_string()).or_insert(0);
+        *entry += 1;
+    }
+
+    pub fn increment_by(&mut self, replica_id: &str, amount: u64) {
+        let entry = self.counts.entry(replica_id.to_string()).or_insert(0);
+        *entry += amount;
+    }
+
+    pub fn value(&self) -> u64 {
+        self.counts.values().sum()
+    }
+
+    pub fn local_value(&self, replica_id: &str) -> u64 {
+        self.counts.get(replica_id).copied().unwrap_or(0)
+    }
+
+    pub fn merge(&mut self, other: &YsGCounter) {
+        for (k, v) in &other.counts {
+            let entry = self.counts.entry(k.clone()).or_insert(0);
+            if *v > *entry {
+                *entry = *v;
+            }
+        }
+    }
+
+    pub fn replicas(&self) -> Vec<String> {
+        let mut r: Vec<String> = self.counts.keys().cloned().collect();
+        r.sort();
+        r
+    }
+
+    pub fn replica_count(&self) -> usize {
+        self.counts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.counts.is_empty() || self.value() == 0
+    }
+}
+
+impl Default for YsGCounter {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for YsGCounter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YsGCounter(value={}, replicas={})", self.value(), self.replica_count())
+    }
+}
+
+/// A version vector for tracking causality across distributed replicas.
+#[derive(Debug, Clone)]
+pub struct YsVersionVector {
+    versions: std::collections::HashMap<String, u64>,
+}
+
+impl YsVersionVector {
+    pub fn new() -> Self {
+        Self { versions: std::collections::HashMap::new() }
+    }
+
+    pub fn increment(&mut self, replica_id: &str) -> u64 {
+        let entry = self.versions.entry(replica_id.to_string()).or_insert(0);
+        *entry += 1;
+        *entry
+    }
+
+    pub fn get(&self, replica_id: &str) -> u64 {
+        self.versions.get(replica_id).copied().unwrap_or(0)
+    }
+
+    pub fn set(&mut self, replica_id: &str, version: u64) {
+        self.versions.insert(replica_id.to_string(), version);
+    }
+
+    pub fn merge(&mut self, other: &YsVersionVector) {
+        for (k, v) in &other.versions {
+            let entry = self.versions.entry(k.clone()).or_insert(0);
+            if *v > *entry {
+                *entry = *v;
+            }
+        }
+    }
+
+    /// Returns true if self dominates other (all versions >= other's).
+    pub fn dominates(&self, other: &YsVersionVector) -> bool {
+        for (k, v) in &other.versions {
+            if self.get(k) < *v {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns true if self and other are concurrent (neither dominates).
+    pub fn is_concurrent(&self, other: &YsVersionVector) -> bool {
+        !self.dominates(other) && !other.dominates(self)
+    }
+
+    /// Returns true if the vectors are identical.
+    pub fn is_equal(&self, other: &YsVersionVector) -> bool {
+        self.dominates(other) && other.dominates(self)
+    }
+
+    pub fn replicas(&self) -> Vec<String> {
+        let mut r: Vec<String> = self.versions.keys().cloned().collect();
+        r.sort();
+        r
+    }
+
+    pub fn len(&self) -> usize {
+        self.versions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.versions.is_empty()
+    }
+
+    pub fn max_version(&self) -> u64 {
+        self.versions.values().copied().max().unwrap_or(0)
+    }
+
+    pub fn sum_versions(&self) -> u64 {
+        self.versions.values().sum()
+    }
+}
+
+impl Default for YsVersionVector {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for YsVersionVector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YsVersionVector(replicas={}, max={})", self.len(), self.max_version())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -20056,6 +20210,172 @@ mod tests {
     fn yr_model_display() {
         let m = super::YrSelectionModel::yr_new();
         assert!(format!("{}", m).contains("SelectionModel"));
+    }
+
+
+    // --- ys_ tests ---
+
+    #[test]
+    fn test_ys_gcounter_new() {
+        let c = YsGCounter::new();
+        assert_eq!(c.value(), 0);
+        assert!(c.is_empty());
+        assert_eq!(c.replica_count(), 0);
+    }
+
+    #[test]
+    fn test_ys_gcounter_increment() {
+        let mut c = YsGCounter::new();
+        c.increment("a");
+        c.increment("a");
+        c.increment("b");
+        assert_eq!(c.value(), 3);
+        assert_eq!(c.local_value("a"), 2);
+        assert_eq!(c.local_value("b"), 1);
+        assert_eq!(c.local_value("c"), 0);
+    }
+
+    #[test]
+    fn test_ys_gcounter_increment_by() {
+        let mut c = YsGCounter::new();
+        c.increment_by("x", 10);
+        c.increment_by("y", 5);
+        assert_eq!(c.value(), 15);
+        assert!(!c.is_empty());
+    }
+
+    #[test]
+    fn test_ys_gcounter_merge() {
+        let mut a = YsGCounter::new();
+        a.increment_by("r1", 3);
+        a.increment_by("r2", 1);
+        let mut b = YsGCounter::new();
+        b.increment_by("r1", 2);
+        b.increment_by("r2", 5);
+        b.increment_by("r3", 4);
+        a.merge(&b);
+        assert_eq!(a.local_value("r1"), 3); // max(3, 2)
+        assert_eq!(a.local_value("r2"), 5); // max(1, 5)
+        assert_eq!(a.local_value("r3"), 4); // new
+        assert_eq!(a.value(), 12);
+    }
+
+    #[test]
+    fn test_ys_gcounter_replicas() {
+        let mut c = YsGCounter::new();
+        c.increment("b");
+        c.increment("a");
+        assert_eq!(c.replicas(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_ys_gcounter_display() {
+        let c = YsGCounter::new();
+        let s = format!("{}", c);
+        assert!(s.contains("YsGCounter"));
+    }
+
+    #[test]
+    fn test_ys_gcounter_default() {
+        let c = YsGCounter::default();
+        assert_eq!(c.value(), 0);
+    }
+
+    #[test]
+    fn test_ys_version_vector_new() {
+        let v = YsVersionVector::new();
+        assert!(v.is_empty());
+        assert_eq!(v.len(), 0);
+        assert_eq!(v.max_version(), 0);
+    }
+
+    #[test]
+    fn test_ys_version_vector_increment() {
+        let mut v = YsVersionVector::new();
+        assert_eq!(v.increment("a"), 1);
+        assert_eq!(v.increment("a"), 2);
+        assert_eq!(v.increment("b"), 1);
+        assert_eq!(v.get("a"), 2);
+        assert_eq!(v.get("b"), 1);
+        assert_eq!(v.get("c"), 0);
+    }
+
+    #[test]
+    fn test_ys_version_vector_set() {
+        let mut v = YsVersionVector::new();
+        v.set("x", 10);
+        assert_eq!(v.get("x"), 10);
+    }
+
+    #[test]
+    fn test_ys_version_vector_merge() {
+        let mut a = YsVersionVector::new();
+        a.set("r1", 3);
+        a.set("r2", 1);
+        let mut b = YsVersionVector::new();
+        b.set("r1", 2);
+        b.set("r2", 5);
+        b.set("r3", 4);
+        a.merge(&b);
+        assert_eq!(a.get("r1"), 3);
+        assert_eq!(a.get("r2"), 5);
+        assert_eq!(a.get("r3"), 4);
+    }
+
+    #[test]
+    fn test_ys_version_vector_dominates() {
+        let mut a = YsVersionVector::new();
+        a.set("r1", 3);
+        a.set("r2", 2);
+        let mut b = YsVersionVector::new();
+        b.set("r1", 2);
+        b.set("r2", 1);
+        assert!(a.dominates(&b));
+        assert!(!b.dominates(&a));
+    }
+
+    #[test]
+    fn test_ys_version_vector_concurrent() {
+        let mut a = YsVersionVector::new();
+        a.set("r1", 3);
+        a.set("r2", 1);
+        let mut b = YsVersionVector::new();
+        b.set("r1", 2);
+        b.set("r2", 5);
+        assert!(a.is_concurrent(&b));
+    }
+
+    #[test]
+    fn test_ys_version_vector_equal() {
+        let mut a = YsVersionVector::new();
+        a.set("r1", 3);
+        let mut b = YsVersionVector::new();
+        b.set("r1", 3);
+        assert!(a.is_equal(&b));
+    }
+
+    #[test]
+    fn test_ys_version_vector_replicas() {
+        let mut v = YsVersionVector::new();
+        v.set("b", 1);
+        v.set("a", 2);
+        assert_eq!(v.replicas(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_ys_version_vector_max_sum() {
+        let mut v = YsVersionVector::new();
+        v.set("a", 5);
+        v.set("b", 3);
+        assert_eq!(v.max_version(), 5);
+        assert_eq!(v.sum_versions(), 8);
+    }
+
+    #[test]
+    fn test_ys_version_vector_display() {
+        let v = YsVersionVector::default();
+        let s = format!("{}", v);
+        assert!(s.contains("YsVersionVector"));
     }
 
 }
