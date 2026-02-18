@@ -11554,6 +11554,173 @@ impl YnTokenizer {
     }
 }
 
+
+// --- yo_ Levenshtein Distance ---
+
+/// Levenshtein (edit) distance calculator for fuzzy string matching.
+#[derive(Debug, Clone)]
+pub struct YoLevenshtein;
+
+impl std::fmt::Display for YoLevenshtein {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Levenshtein")
+    }
+}
+
+impl Default for YoLevenshtein {
+    fn default() -> Self { Self }
+}
+
+impl YoLevenshtein {
+    /// Compute edit distance between two strings.
+    pub fn yo_distance(a: &str, b: &str) -> usize {
+        let a_chars: Vec<char> = a.chars().collect();
+        let b_chars: Vec<char> = b.chars().collect();
+        let m = a_chars.len();
+        let n = b_chars.len();
+        if m == 0 { return n; }
+        if n == 0 { return m; }
+        let mut prev = (0..=n).collect::<Vec<_>>();
+        let mut curr = vec![0; n + 1];
+        for i in 1..=m {
+            curr[0] = i;
+            for j in 1..=n {
+                let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+                curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+            }
+            std::mem::swap(&mut prev, &mut curr);
+        }
+        prev[n]
+    }
+
+    /// Normalized similarity [0.0, 1.0].
+    pub fn yo_similarity(a: &str, b: &str) -> f64 {
+        let max_len = a.chars().count().max(b.chars().count());
+        if max_len == 0 { return 1.0; }
+        1.0 - (Self::yo_distance(a, b) as f64 / max_len as f64)
+    }
+
+    /// Find closest match from candidates.
+    pub fn yo_closest<'a>(target: &str, candidates: &[&'a str]) -> Option<&'a str> {
+        candidates.iter().min_by_key(|c| Self::yo_distance(target, c)).copied()
+    }
+
+    /// Filter candidates within a max distance.
+    pub fn yo_within_distance<'a>(target: &str, candidates: &[&'a str], max_dist: usize) -> Vec<&'a str> {
+        candidates.iter().filter(|c| Self::yo_distance(target, c) <= max_dist).copied().collect()
+    }
+
+    /// Rank candidates by distance (closest first).
+    pub fn yo_rank<'a>(target: &str, candidates: &[&'a str]) -> Vec<(&'a str, usize)> {
+        let mut ranked: Vec<_> = candidates.iter().map(|c| (*c, Self::yo_distance(target, c))).collect();
+        ranked.sort_by_key(|(_, d)| *d);
+        ranked
+    }
+}
+
+// --- yo_ Diff Engine ---
+
+/// Line-based diff engine using longest common subsequence.
+#[derive(Debug, Clone, PartialEq)]
+pub enum YoDiffOp {
+    /// Line exists in both.
+    YoEqual(String),
+    /// Line added in new version.
+    YoInsert(String),
+    /// Line removed from old version.
+    YoDelete(String),
+}
+
+impl std::fmt::Display for YoDiffOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::YoEqual(s) => write!(f, "  {}", s),
+            Self::YoInsert(s) => write!(f, "+ {}", s),
+            Self::YoDelete(s) => write!(f, "- {}", s),
+        }
+    }
+}
+
+/// Line-based diff engine.
+#[derive(Debug, Clone)]
+pub struct YoDiffEngine;
+
+impl std::fmt::Display for YoDiffEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiffEngine")
+    }
+}
+
+impl Default for YoDiffEngine {
+    fn default() -> Self { Self }
+}
+
+impl YoDiffEngine {
+    /// Compute diff between two texts (split by lines).
+    pub fn yo_diff(old: &str, new: &str) -> Vec<YoDiffOp> {
+        let old_lines: Vec<&str> = old.lines().collect();
+        let new_lines: Vec<&str> = new.lines().collect();
+        let lcs = Self::yo_lcs(&old_lines, &new_lines);
+        let mut result = Vec::new();
+        let mut oi = 0;
+        let mut ni = 0;
+        let mut li = 0;
+        while oi < old_lines.len() || ni < new_lines.len() {
+            if li < lcs.len() && oi < old_lines.len() && ni < new_lines.len() && old_lines[oi] == lcs[li] && new_lines[ni] == lcs[li] {
+                result.push(YoDiffOp::YoEqual(lcs[li].to_string()));
+                oi += 1; ni += 1; li += 1;
+            } else if ni < new_lines.len() && (li >= lcs.len() || new_lines[ni] != lcs[li]) {
+                result.push(YoDiffOp::YoInsert(new_lines[ni].to_string()));
+                ni += 1;
+            } else if oi < old_lines.len() && (li >= lcs.len() || old_lines[oi] != lcs[li]) {
+                result.push(YoDiffOp::YoDelete(old_lines[oi].to_string()));
+                oi += 1;
+            }
+        }
+        result
+    }
+
+    fn yo_lcs<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<&'a str> {
+        let m = a.len();
+        let n = b.len();
+        let mut dp = vec![vec![0usize; n + 1]; m + 1];
+        for i in 1..=m {
+            for j in 1..=n {
+                dp[i][j] = if a[i - 1] == b[j - 1] { dp[i - 1][j - 1] + 1 } else { dp[i - 1][j].max(dp[i][j - 1]) };
+            }
+        }
+        let mut result = Vec::new();
+        let (mut i, mut j) = (m, n);
+        while i > 0 && j > 0 {
+            if a[i - 1] == b[j - 1] { result.push(a[i - 1]); i -= 1; j -= 1; }
+            else if dp[i - 1][j] > dp[i][j - 1] { i -= 1; }
+            else { j -= 1; }
+        }
+        result.reverse();
+        result
+    }
+
+    /// Count insertions in a diff.
+    pub fn yo_count_insertions(ops: &[YoDiffOp]) -> usize {
+        ops.iter().filter(|op| matches!(op, YoDiffOp::YoInsert(_))).count()
+    }
+
+    /// Count deletions in a diff.
+    pub fn yo_count_deletions(ops: &[YoDiffOp]) -> usize {
+        ops.iter().filter(|op| matches!(op, YoDiffOp::YoDelete(_))).count()
+    }
+
+    /// Count equal lines.
+    pub fn yo_count_equal(ops: &[YoDiffOp]) -> usize {
+        ops.iter().filter(|op| matches!(op, YoDiffOp::YoEqual(_))).count()
+    }
+
+    /// Format diff as unified diff string.
+    pub fn yo_format(ops: &[YoDiffOp]) -> String {
+        ops.iter().map(|op| format!("{}", op)).collect::<Vec<_>>().join("\n")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -18685,6 +18852,110 @@ mod tests {
     #[test]
     fn yn_tok_kind_display() {
         assert!(format!("{}", super::YnTokenKind::YnWord).contains("Word"));
+    }
+
+
+    // --- yo_ Levenshtein tests ---
+
+    #[test]
+    fn yo_lev_identical() {
+        assert_eq!(super::YoLevenshtein::yo_distance("hello", "hello"), 0);
+    }
+
+    #[test]
+    fn yo_lev_empty() {
+        assert_eq!(super::YoLevenshtein::yo_distance("", "abc"), 3);
+        assert_eq!(super::YoLevenshtein::yo_distance("abc", ""), 3);
+    }
+
+    #[test]
+    fn yo_lev_basic() {
+        assert_eq!(super::YoLevenshtein::yo_distance("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn yo_lev_single_char() {
+        assert_eq!(super::YoLevenshtein::yo_distance("a", "b"), 1);
+    }
+
+    #[test]
+    fn yo_lev_similarity() {
+        let s = super::YoLevenshtein::yo_similarity("hello", "hello");
+        assert!((s - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn yo_lev_closest() {
+        let c = super::YoLevenshtein::yo_closest("cat", &["bat", "car", "dog"]);
+        assert!(c == Some("bat") || c == Some("car"));
+    }
+
+    #[test]
+    fn yo_lev_within() {
+        let r = super::YoLevenshtein::yo_within_distance("cat", &["bat", "car", "dog"], 1);
+        assert!(r.contains(&"bat"));
+        assert!(r.contains(&"car"));
+    }
+
+    #[test]
+    fn yo_lev_rank() {
+        let r = super::YoLevenshtein::yo_rank("cat", &["dog", "bat", "cat"]);
+        assert_eq!(r[0].0, "cat");
+    }
+
+    #[test]
+    fn yo_lev_display() {
+        assert!(format!("{}", super::YoLevenshtein).contains("Levenshtein"));
+    }
+
+    // --- yo_ DiffEngine tests ---
+
+    #[test]
+    fn yo_diff_identical() {
+        let ops = super::YoDiffEngine::yo_diff("a\nb", "a\nb");
+        assert_eq!(super::YoDiffEngine::yo_count_equal(&ops), 2);
+    }
+
+    #[test]
+    fn yo_diff_insert() {
+        let ops = super::YoDiffEngine::yo_diff("a", "a\nb");
+        assert_eq!(super::YoDiffEngine::yo_count_insertions(&ops), 1);
+    }
+
+    #[test]
+    fn yo_diff_delete() {
+        let ops = super::YoDiffEngine::yo_diff("a\nb", "a");
+        assert_eq!(super::YoDiffEngine::yo_count_deletions(&ops), 1);
+    }
+
+    #[test]
+    fn yo_diff_replace() {
+        let ops = super::YoDiffEngine::yo_diff("a", "b");
+        assert!(super::YoDiffEngine::yo_count_insertions(&ops) > 0 || super::YoDiffEngine::yo_count_deletions(&ops) > 0);
+    }
+
+    #[test]
+    fn yo_diff_empty() {
+        let ops = super::YoDiffEngine::yo_diff("", "");
+        assert!(ops.is_empty());
+    }
+
+    #[test]
+    fn yo_diff_format() {
+        let ops = super::YoDiffEngine::yo_diff("a", "b");
+        let s = super::YoDiffEngine::yo_format(&ops);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn yo_diff_op_display() {
+        let op = super::YoDiffOp::YoInsert("line".to_string());
+        assert!(format!("{}", op).contains("+"));
+    }
+
+    #[test]
+    fn yo_diff_display() {
+        assert!(format!("{}", super::YoDiffEngine).contains("DiffEngine"));
     }
 
 }
