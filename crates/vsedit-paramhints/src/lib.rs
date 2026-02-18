@@ -14058,6 +14058,138 @@ impl ZaPath {
     }
 }
 
+
+// --- zb_ position, range, and location types ---
+
+/// A line/column position in a text document (0-based).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ZbPosition {
+    pub line: u32,
+    pub character: u32,
+}
+
+impl ZbPosition {
+    pub fn new(line: u32, character: u32) -> Self {
+        Self { line, character }
+    }
+
+    pub fn origin() -> Self { Self { line: 0, character: 0 } }
+
+    pub fn is_before(&self, other: &ZbPosition) -> bool { self < other }
+
+    pub fn is_after(&self, other: &ZbPosition) -> bool { self > other }
+
+    pub fn is_before_or_equal(&self, other: &ZbPosition) -> bool { self <= other }
+
+    pub fn min(a: ZbPosition, b: ZbPosition) -> ZbPosition { if a <= b { a } else { b } }
+
+    pub fn max(a: ZbPosition, b: ZbPosition) -> ZbPosition { if a >= b { a } else { b } }
+
+    pub fn translate(&self, line_delta: i32, char_delta: i32) -> ZbPosition {
+        ZbPosition {
+            line: (self.line as i32 + line_delta).max(0) as u32,
+            character: (self.character as i32 + char_delta).max(0) as u32,
+        }
+    }
+
+    pub fn with_line(&self, line: u32) -> ZbPosition { ZbPosition { line, ..*self } }
+    pub fn with_character(&self, character: u32) -> ZbPosition { ZbPosition { character, ..*self } }
+}
+
+impl Default for ZbPosition {
+    fn default() -> Self { Self::origin() }
+}
+
+impl std::fmt::Display for ZbPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.line + 1, self.character + 1)
+    }
+}
+
+/// A range in a text document defined by start and end positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ZbRange {
+    pub start: ZbPosition,
+    pub end: ZbPosition,
+}
+
+impl ZbRange {
+    pub fn new(start: ZbPosition, end: ZbPosition) -> Self {
+        if start <= end { Self { start, end } } else { Self { start: end, end: start } }
+    }
+
+    pub fn from_coords(start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Self {
+        Self::new(ZbPosition::new(start_line, start_char), ZbPosition::new(end_line, end_char))
+    }
+
+    pub fn empty(pos: ZbPosition) -> Self { Self { start: pos, end: pos } }
+
+    pub fn is_empty(&self) -> bool { self.start == self.end }
+
+    pub fn is_single_line(&self) -> bool { self.start.line == self.end.line }
+
+    pub fn contains(&self, pos: ZbPosition) -> bool { pos >= self.start && pos <= self.end }
+
+    pub fn contains_range(&self, other: &ZbRange) -> bool {
+        self.contains(other.start) && self.contains(other.end)
+    }
+
+    pub fn intersects(&self, other: &ZbRange) -> bool {
+        self.start <= other.end && other.start <= self.end
+    }
+
+    pub fn intersection(&self, other: &ZbRange) -> Option<ZbRange> {
+        let start = ZbPosition::max(self.start, other.start);
+        let end = ZbPosition::min(self.end, other.end);
+        if start <= end { Some(ZbRange { start, end }) } else { None }
+    }
+
+    pub fn union(&self, other: &ZbRange) -> ZbRange {
+        ZbRange {
+            start: ZbPosition::min(self.start, other.start),
+            end: ZbPosition::max(self.end, other.end),
+        }
+    }
+
+    pub fn line_count(&self) -> u32 { self.end.line - self.start.line + 1 }
+
+    pub fn with_start(&self, start: ZbPosition) -> ZbRange { ZbRange::new(start, self.end) }
+    pub fn with_end(&self, end: ZbPosition) -> ZbRange { ZbRange::new(self.start, end) }
+}
+
+impl Default for ZbRange {
+    fn default() -> Self { Self::empty(ZbPosition::origin()) }
+}
+
+impl std::fmt::Display for ZbRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}-{}]", self.start, self.end)
+    }
+}
+
+/// A location combining a URI with a range.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZbLocation {
+    pub uri: String,
+    pub range: ZbRange,
+}
+
+impl ZbLocation {
+    pub fn new(uri: &str, range: ZbRange) -> Self {
+        Self { uri: uri.to_string(), range }
+    }
+
+    pub fn from_position(uri: &str, pos: ZbPosition) -> Self {
+        Self { uri: uri.to_string(), range: ZbRange::empty(pos) }
+    }
+}
+
+impl std::fmt::Display for ZbLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.uri, self.range)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -23241,6 +23373,133 @@ mod tests {
         assert!(ZaPath::has_extension("file.rs", ".rs"));
         assert!(ZaPath::has_extension("file.rs", "rs"));
         assert!(!ZaPath::has_extension("file.txt", ".rs"));
+    }
+
+
+    // --- zb_ tests ---
+
+    #[test]
+    fn test_zb_position_new() {
+        let p = ZbPosition::new(5, 10);
+        assert_eq!(p.line, 5);
+        assert_eq!(p.character, 10);
+    }
+
+    #[test]
+    fn test_zb_position_origin() {
+        let p = ZbPosition::origin();
+        assert_eq!(p.line, 0);
+        assert_eq!(p.character, 0);
+    }
+
+    #[test]
+    fn test_zb_position_compare() {
+        let a = ZbPosition::new(1, 5);
+        let b = ZbPosition::new(1, 10);
+        let c = ZbPosition::new(2, 0);
+        assert!(a.is_before(&b));
+        assert!(b.is_before(&c));
+        assert!(c.is_after(&a));
+    }
+
+    #[test]
+    fn test_zb_position_min_max() {
+        let a = ZbPosition::new(1, 5);
+        let b = ZbPosition::new(2, 0);
+        assert_eq!(ZbPosition::min(a, b), a);
+        assert_eq!(ZbPosition::max(a, b), b);
+    }
+
+    #[test]
+    fn test_zb_position_translate() {
+        let p = ZbPosition::new(5, 10);
+        let q = p.translate(1, -3);
+        assert_eq!(q.line, 6);
+        assert_eq!(q.character, 7);
+    }
+
+    #[test]
+    fn test_zb_position_display() {
+        let p = ZbPosition::new(0, 0);
+        assert_eq!(format!("{}", p), "1:1");
+    }
+
+    #[test]
+    fn test_zb_range_new() {
+        let r = ZbRange::from_coords(1, 0, 1, 10);
+        assert_eq!(r.start.line, 1);
+        assert_eq!(r.end.character, 10);
+    }
+
+    #[test]
+    fn test_zb_range_empty() {
+        let r = ZbRange::empty(ZbPosition::new(5, 5));
+        assert!(r.is_empty());
+        assert!(r.is_single_line());
+    }
+
+    #[test]
+    fn test_zb_range_contains() {
+        let r = ZbRange::from_coords(1, 0, 3, 10);
+        assert!(r.contains(ZbPosition::new(2, 5)));
+        assert!(!r.contains(ZbPosition::new(0, 0)));
+    }
+
+    #[test]
+    fn test_zb_range_intersects() {
+        let a = ZbRange::from_coords(1, 0, 3, 0);
+        let b = ZbRange::from_coords(2, 0, 5, 0);
+        assert!(a.intersects(&b));
+    }
+
+    #[test]
+    fn test_zb_range_intersection() {
+        let a = ZbRange::from_coords(1, 0, 3, 0);
+        let b = ZbRange::from_coords(2, 0, 5, 0);
+        let i = a.intersection(&b).unwrap();
+        assert_eq!(i.start.line, 2);
+        assert_eq!(i.end.line, 3);
+    }
+
+    #[test]
+    fn test_zb_range_union() {
+        let a = ZbRange::from_coords(1, 0, 3, 0);
+        let b = ZbRange::from_coords(2, 0, 5, 0);
+        let u = a.union(&b);
+        assert_eq!(u.start.line, 1);
+        assert_eq!(u.end.line, 5);
+    }
+
+    #[test]
+    fn test_zb_range_line_count() {
+        let r = ZbRange::from_coords(1, 0, 5, 0);
+        assert_eq!(r.line_count(), 5);
+    }
+
+    #[test]
+    fn test_zb_range_display() {
+        let r = ZbRange::from_coords(0, 0, 0, 5);
+        let s = format!("{}", r);
+        assert!(s.contains("["));
+    }
+
+    #[test]
+    fn test_zb_location_new() {
+        let loc = ZbLocation::new("file:///test.rs", ZbRange::from_coords(0, 0, 0, 5));
+        assert_eq!(loc.uri, "file:///test.rs");
+    }
+
+    #[test]
+    fn test_zb_location_from_pos() {
+        let loc = ZbLocation::from_position("file:///a.rs", ZbPosition::new(10, 5));
+        assert!(loc.range.is_empty());
+    }
+
+    #[test]
+    fn test_zb_location_display() {
+        let loc = ZbLocation::new("file.rs", ZbRange::default());
+        let s = format!("{}", loc);
+        assert!(s.contains("file.rs"));
     }
 
 }
