@@ -25509,6 +25509,105 @@ impl AyyTestController {
     pub fn leaf_tests(&self) -> Vec<&AyyTestItem> { self.items.iter().filter(|i| i.is_leaf()).collect() }
 }
 
+
+// --- ayz_ accessibility and screen reader ---
+
+/// Accessibility role for UI elements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyzAccessRole { Editor, TreeItem, Button, List, ListItem, Menu, MenuItem, Tab, StatusBar, Dialog, Alert, Label }
+
+/// Accessibility announcement urgency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyzUrgency { Polite, Assertive }
+
+/// An accessible element description.
+#[derive(Debug, Clone)]
+pub struct AyzAccessNode {
+    pub role: AyzAccessRole,
+    pub label: String,
+    pub value: Option<String>,
+    pub description: Option<String>,
+    pub focused: bool,
+    pub children: Vec<AyzAccessNode>,
+}
+
+impl AyzAccessNode {
+    pub fn new(role: AyzAccessRole, label: &str) -> Self {
+        Self { role, label: label.to_string(), value: None, description: None, focused: false, children: Vec::new() }
+    }
+    pub fn with_value(mut self, v: &str) -> Self { self.value = Some(v.to_string()); self }
+    pub fn with_desc(mut self, d: &str) -> Self { self.description = Some(d.to_string()); self }
+    pub fn set_focused(&mut self, f: bool) { self.focused = f; }
+    pub fn add_child(&mut self, c: AyzAccessNode) { self.children.push(c); }
+    pub fn child_count(&self) -> usize { self.children.len() }
+    pub fn announce_text(&self) -> String {
+        let mut parts = vec![self.label.clone()];
+        if let Some(v) = &self.value { parts.push(v.clone()); }
+        if let Some(d) = &self.description { parts.push(d.clone()); }
+        parts.join(", ")
+    }
+}
+
+/// Screen reader announcement.
+#[derive(Debug, Clone)]
+pub struct AyzAnnouncement {
+    pub message: String,
+    pub urgency: AyzUrgency,
+}
+
+impl AyzAnnouncement {
+    pub fn polite(msg: &str) -> Self { Self { message: msg.to_string(), urgency: AyzUrgency::Polite } }
+    pub fn assertive(msg: &str) -> Self { Self { message: msg.to_string(), urgency: AyzUrgency::Assertive } }
+}
+
+/// Accessibility state manager.
+#[derive(Debug)]
+pub struct AyzAccessibilityState {
+    pub screen_reader_active: bool,
+    pub high_contrast: bool,
+    pub reduce_motion: bool,
+    pub announcements: Vec<AyzAnnouncement>,
+    pub focus_path: Vec<String>,
+}
+
+impl AyzAccessibilityState {
+    pub fn new() -> Self {
+        Self { screen_reader_active: false, high_contrast: false, reduce_motion: false, announcements: Vec::new(), focus_path: Vec::new() }
+    }
+    pub fn enable_screen_reader(&mut self) { self.screen_reader_active = true; }
+    pub fn set_high_contrast(&mut self, on: bool) { self.high_contrast = on; }
+    pub fn announce(&mut self, a: AyzAnnouncement) { self.announcements.push(a); }
+    pub fn announce_polite(&mut self, msg: &str) { self.announce(AyzAnnouncement::polite(msg)); }
+    pub fn announce_assertive(&mut self, msg: &str) { self.announce(AyzAnnouncement::assertive(msg)); }
+    pub fn set_focus(&mut self, path: Vec<String>) { self.focus_path = path; }
+    pub fn current_focus(&self) -> Option<&str> { self.focus_path.last().map(|s| s.as_str()) }
+    pub fn pending_announcements(&self) -> usize { self.announcements.len() }
+    pub fn drain_announcements(&mut self) -> Vec<AyzAnnouncement> { std::mem::take(&mut self.announcements) }
+}
+
+/// Tab-stop manager for keyboard navigation.
+#[derive(Debug)]
+pub struct AyzTabStopList {
+    pub stops: Vec<String>,
+    pub current: usize,
+}
+
+impl AyzTabStopList {
+    pub fn new(stops: Vec<String>) -> Self { Self { stops, current: 0 } }
+    pub fn next(&mut self) -> Option<&str> {
+        if self.stops.is_empty() { return None; }
+        self.current = (self.current + 1) % self.stops.len();
+        Some(&self.stops[self.current])
+    }
+    pub fn prev(&mut self) -> Option<&str> {
+        if self.stops.is_empty() { return None; }
+        self.current = if self.current == 0 { self.stops.len() - 1 } else { self.current - 1 };
+        Some(&self.stops[self.current])
+    }
+    pub fn current_stop(&self) -> Option<&str> { self.stops.get(self.current).map(|s| s.as_str()) }
+    pub fn stop_count(&self) -> usize { self.stops.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41373,6 +41472,79 @@ d");
         let fails = run.failures();
         assert_eq!(fails.len(), 2);
         assert_eq!(fails[0].test_id, "b");
+    }
+
+
+    #[test]
+    fn test_ayz_access_node() {
+        let mut node = AyzAccessNode::new(AyzAccessRole::Button, "Save");
+        assert_eq!(node.role, AyzAccessRole::Button);
+        assert_eq!(node.announce_text(), "Save");
+        node.set_focused(true);
+        assert!(node.focused);
+    }
+
+    #[test]
+    fn test_ayz_node_with_value() {
+        let node = AyzAccessNode::new(AyzAccessRole::Editor, "Line 5")
+            .with_value("hello world")
+            .with_desc("Python file");
+        assert!(node.announce_text().contains("hello world"));
+        assert!(node.announce_text().contains("Python file"));
+    }
+
+    #[test]
+    fn test_ayz_node_children() {
+        let mut parent = AyzAccessNode::new(AyzAccessRole::List, "Files");
+        parent.add_child(AyzAccessNode::new(AyzAccessRole::ListItem, "file1.rs"));
+        parent.add_child(AyzAccessNode::new(AyzAccessRole::ListItem, "file2.rs"));
+        assert_eq!(parent.child_count(), 2);
+    }
+
+    #[test]
+    fn test_ayz_announcement() {
+        let p = AyzAnnouncement::polite("Saved");
+        assert_eq!(p.urgency, AyzUrgency::Polite);
+        let a = AyzAnnouncement::assertive("Error!");
+        assert_eq!(a.urgency, AyzUrgency::Assertive);
+    }
+
+    #[test]
+    fn test_ayz_accessibility_state() {
+        let mut state = AyzAccessibilityState::new();
+        assert!(!state.screen_reader_active);
+        state.enable_screen_reader();
+        assert!(state.screen_reader_active);
+        state.announce_polite("File saved");
+        state.announce_assertive("Build failed");
+        assert_eq!(state.pending_announcements(), 2);
+        let drained = state.drain_announcements();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(state.pending_announcements(), 0);
+    }
+
+    #[test]
+    fn test_ayz_focus_path() {
+        let mut state = AyzAccessibilityState::new();
+        state.set_focus(vec!["editor".to_string(), "line5".to_string()]);
+        assert_eq!(state.current_focus(), Some("line5"));
+    }
+
+    #[test]
+    fn test_ayz_tab_stops() {
+        let mut tabs = AyzTabStopList::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(tabs.current_stop(), Some("a"));
+        assert_eq!(tabs.next(), Some("b"));
+        assert_eq!(tabs.next(), Some("c"));
+        assert_eq!(tabs.next(), Some("a"));
+        assert_eq!(tabs.prev(), Some("c"));
+    }
+
+    #[test]
+    fn test_ayz_high_contrast() {
+        let mut state = AyzAccessibilityState::new();
+        state.set_high_contrast(true);
+        assert!(state.high_contrast);
     }
 
 }
