@@ -24927,6 +24927,98 @@ impl AyuTagPair {
     pub fn spans_lines(&self) -> bool { self.open_start.0 != self.close_start.0 }
 }
 
+
+// --- ayv_ inline values and debug decorations ---
+
+/// Inline value kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyvInlineValueKind { Text, Expression, Variable }
+
+/// An inline value shown during debugging.
+#[derive(Debug, Clone)]
+pub struct AyvInlineValue {
+    pub line: u32,
+    pub col: u32,
+    pub end_col: u32,
+    pub kind: AyvInlineValueKind,
+    pub text: String,
+}
+
+impl AyvInlineValue {
+    pub fn text_value(line: u32, col: u32, end: u32, text: &str) -> Self {
+        Self { line, col, end_col: end, kind: AyvInlineValueKind::Text, text: text.to_string() }
+    }
+    pub fn variable(line: u32, col: u32, end: u32, name: &str, value: &str) -> Self {
+        Self { line, col, end_col: end, kind: AyvInlineValueKind::Variable, text: format!("{} = {}", name, value) }
+    }
+    pub fn expression(line: u32, col: u32, end: u32, expr: &str, result: &str) -> Self {
+        Self { line, col, end_col: end, kind: AyvInlineValueKind::Expression, text: format!("{} => {}", expr, result) }
+    }
+    pub fn display_text(&self) -> &str { &self.text }
+}
+
+/// Debug decoration on a line.
+#[derive(Debug, Clone)]
+pub struct AyvDebugDecoration {
+    pub line: u32,
+    pub kind: AyvDebugDecoKind,
+    pub message: Option<String>,
+}
+
+/// Debug decoration kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyvDebugDecoKind { CurrentLine, BreakpointHit, Exception, LogPoint }
+
+impl AyvDebugDecoration {
+    pub fn current_line(line: u32) -> Self { Self { line, kind: AyvDebugDecoKind::CurrentLine, message: None } }
+    pub fn exception(line: u32, msg: &str) -> Self { Self { line, kind: AyvDebugDecoKind::Exception, message: Some(msg.to_string()) } }
+    pub fn breakpoint_hit(line: u32) -> Self { Self { line, kind: AyvDebugDecoKind::BreakpointHit, message: None } }
+    pub fn has_message(&self) -> bool { self.message.is_some() }
+}
+
+/// Inline value provider context.
+#[derive(Debug, Clone)]
+pub struct AyvInlineValueContext {
+    pub stopped_line: u32,
+    pub frame_id: u32,
+}
+
+impl AyvInlineValueContext {
+    pub fn new(line: u32, frame: u32) -> Self { Self { stopped_line: line, frame_id: frame } }
+}
+
+/// Debug session visual state.
+#[derive(Debug)]
+pub struct AyvDebugVisuals {
+    pub inline_values: Vec<AyvInlineValue>,
+    pub decorations: Vec<AyvDebugDecoration>,
+    pub exception_widget_line: Option<u32>,
+    pub exception_message: Option<String>,
+}
+
+impl AyvDebugVisuals {
+    pub fn new() -> Self {
+        Self { inline_values: Vec::new(), decorations: Vec::new(), exception_widget_line: None, exception_message: None }
+    }
+    pub fn add_inline(&mut self, v: AyvInlineValue) { self.inline_values.push(v); }
+    pub fn add_decoration(&mut self, d: AyvDebugDecoration) { self.decorations.push(d); }
+    pub fn show_exception(&mut self, line: u32, msg: &str) {
+        self.exception_widget_line = Some(line);
+        self.exception_message = Some(msg.to_string());
+    }
+    pub fn clear(&mut self) {
+        self.inline_values.clear(); self.decorations.clear();
+        self.exception_widget_line = None; self.exception_message = None;
+    }
+    pub fn values_at_line(&self, line: u32) -> Vec<&AyvInlineValue> {
+        self.inline_values.iter().filter(|v| v.line == line).collect()
+    }
+    pub fn decoration_at_line(&self, line: u32) -> Option<&AyvDebugDecoration> {
+        self.decorations.iter().find(|d| d.line == line)
+    }
+    pub fn has_exception(&self) -> bool { self.exception_widget_line.is_some() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40612,6 +40704,75 @@ mod tests {
         let r = AyuLinkedRange::new(1, 0, 3, 5);
         assert!(!r.is_single_line());
         assert!(r.contains_pos(2, 0));
+    }
+
+
+    #[test]
+    fn test_ayv_inline_value_text() {
+        let v = AyvInlineValue::text_value(5, 10, 20, "hello");
+        assert_eq!(v.kind, AyvInlineValueKind::Text);
+        assert_eq!(v.display_text(), "hello");
+    }
+
+    #[test]
+    fn test_ayv_inline_variable() {
+        let v = AyvInlineValue::variable(10, 0, 5, "x", "42");
+        assert_eq!(v.kind, AyvInlineValueKind::Variable);
+        assert!(v.display_text().contains("x = 42"));
+    }
+
+    #[test]
+    fn test_ayv_inline_expression() {
+        let v = AyvInlineValue::expression(10, 0, 5, "arr.len()", "3");
+        assert_eq!(v.kind, AyvInlineValueKind::Expression);
+        assert!(v.display_text().contains("=>"));
+    }
+
+    #[test]
+    fn test_ayv_debug_decoration() {
+        let d = AyvDebugDecoration::current_line(42);
+        assert_eq!(d.kind, AyvDebugDecoKind::CurrentLine);
+        assert!(!d.has_message());
+        let e = AyvDebugDecoration::exception(10, "null pointer");
+        assert!(e.has_message());
+    }
+
+    #[test]
+    fn test_ayv_debug_visuals() {
+        let mut vis = AyvDebugVisuals::new();
+        vis.add_inline(AyvInlineValue::variable(5, 0, 3, "x", "10"));
+        vis.add_inline(AyvInlineValue::variable(5, 5, 8, "y", "20"));
+        vis.add_inline(AyvInlineValue::variable(10, 0, 3, "z", "30"));
+        vis.add_decoration(AyvDebugDecoration::current_line(5));
+        assert_eq!(vis.values_at_line(5).len(), 2);
+        assert!(vis.decoration_at_line(5).is_some());
+        assert!(vis.decoration_at_line(99).is_none());
+    }
+
+    #[test]
+    fn test_ayv_exception_widget() {
+        let mut vis = AyvDebugVisuals::new();
+        assert!(!vis.has_exception());
+        vis.show_exception(42, "IndexOutOfBounds");
+        assert!(vis.has_exception());
+        assert_eq!(vis.exception_widget_line, Some(42));
+    }
+
+    #[test]
+    fn test_ayv_clear() {
+        let mut vis = AyvDebugVisuals::new();
+        vis.add_inline(AyvInlineValue::text_value(0, 0, 5, "val"));
+        vis.show_exception(10, "err");
+        vis.clear();
+        assert!(vis.inline_values.is_empty());
+        assert!(!vis.has_exception());
+    }
+
+    #[test]
+    fn test_ayv_context() {
+        let ctx = AyvInlineValueContext::new(42, 1);
+        assert_eq!(ctx.stopped_line, 42);
+        assert_eq!(ctx.frame_id, 1);
     }
 
 }
