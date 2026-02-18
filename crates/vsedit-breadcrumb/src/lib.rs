@@ -24694,6 +24694,79 @@ impl AypClipboard {
     pub fn clear(&mut self) { self.history.clear(); }
 }
 
+
+// --- ayq_ editor zooming and font scaling ---
+
+/// Zoom level (percentage-based).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AyqZoomLevel {
+    pub percentage: f32,
+}
+
+impl AyqZoomLevel {
+    pub const DEFAULT: Self = Self { percentage: 100.0 };
+    pub const MIN: f32 = 50.0;
+    pub const MAX: f32 = 300.0;
+    pub const STEP: f32 = 10.0;
+
+    pub fn new(pct: f32) -> Self { Self { percentage: pct.clamp(Self::MIN, Self::MAX) } }
+    pub fn zoom_in(&self) -> Self { Self::new(self.percentage + Self::STEP) }
+    pub fn zoom_out(&self) -> Self { Self::new(self.percentage - Self::STEP) }
+    pub fn reset(&self) -> Self { Self::DEFAULT }
+    pub fn scale_factor(&self) -> f32 { self.percentage / 100.0 }
+    pub fn is_default(&self) -> bool { (self.percentage - 100.0).abs() < 0.01 }
+    pub fn apply_to(&self, value: u32) -> u32 { (value as f32 * self.scale_factor()).round() as u32 }
+}
+
+/// Font size configuration.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AyqFontSize {
+    pub base_size: f32,
+    pub line_height_ratio: f32,
+    pub letter_spacing: f32,
+}
+
+impl AyqFontSize {
+    pub fn new(base: f32) -> Self { Self { base_size: base, line_height_ratio: 1.5, letter_spacing: 0.0 } }
+    pub fn with_line_height(mut self, ratio: f32) -> Self { self.line_height_ratio = ratio; self }
+    pub fn effective_size(&self, zoom: &AyqZoomLevel) -> f32 { self.base_size * zoom.scale_factor() }
+    pub fn line_height(&self, zoom: &AyqZoomLevel) -> f32 { self.effective_size(zoom) * self.line_height_ratio }
+    pub fn terminal_cols_for_width(&self, width_px: u32, zoom: &AyqZoomLevel) -> u32 {
+        let char_width = self.effective_size(zoom) * 0.6 + self.letter_spacing;
+        if char_width <= 0.0 { return 80; }
+        (width_px as f32 / char_width).floor() as u32
+    }
+}
+
+/// Editor zoom state.
+#[derive(Debug)]
+pub struct AyqZoomState {
+    pub editor_zoom: AyqZoomLevel,
+    pub terminal_zoom: AyqZoomLevel,
+    pub font: AyqFontSize,
+    pub zoom_per_editor: std::collections::HashMap<String, AyqZoomLevel>,
+}
+
+impl AyqZoomState {
+    pub fn new(font_size: f32) -> Self {
+        Self {
+            editor_zoom: AyqZoomLevel::DEFAULT, terminal_zoom: AyqZoomLevel::DEFAULT,
+            font: AyqFontSize::new(font_size), zoom_per_editor: std::collections::HashMap::new(),
+        }
+    }
+    pub fn zoom_in(&mut self) { self.editor_zoom = self.editor_zoom.zoom_in(); }
+    pub fn zoom_out(&mut self) { self.editor_zoom = self.editor_zoom.zoom_out(); }
+    pub fn reset_zoom(&mut self) { self.editor_zoom = AyqZoomLevel::DEFAULT; }
+    pub fn effective_font_size(&self) -> f32 { self.font.effective_size(&self.editor_zoom) }
+    pub fn effective_line_height(&self) -> f32 { self.font.line_height(&self.editor_zoom) }
+    pub fn set_editor_zoom(&mut self, uri: &str, zoom: AyqZoomLevel) {
+        self.zoom_per_editor.insert(uri.to_string(), zoom);
+    }
+    pub fn editor_zoom_for(&self, uri: &str) -> AyqZoomLevel {
+        self.zoom_per_editor.get(uri).copied().unwrap_or(self.editor_zoom)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39962,6 +40035,73 @@ mod tests {
     fn test_ayp_block_content() {
         let b = AypClipboardContent::Block(vec!["abc".into(), "def".into()]);
         assert_eq!(b.line_count(), 2);
+    }
+
+
+    #[test]
+    fn test_ayq_zoom_level() {
+        let z = AyqZoomLevel::DEFAULT;
+        assert!(z.is_default());
+        assert_eq!(z.scale_factor(), 1.0);
+        let zoomed = z.zoom_in().zoom_in();
+        assert!(!zoomed.is_default());
+        assert_eq!(zoomed.percentage, 120.0);
+    }
+
+    #[test]
+    fn test_ayq_zoom_clamp() {
+        let z = AyqZoomLevel::new(10.0);
+        assert_eq!(z.percentage, AyqZoomLevel::MIN);
+        let z = AyqZoomLevel::new(500.0);
+        assert_eq!(z.percentage, AyqZoomLevel::MAX);
+    }
+
+    #[test]
+    fn test_ayq_zoom_apply() {
+        let z = AyqZoomLevel::new(200.0);
+        assert_eq!(z.apply_to(10), 20);
+    }
+
+    #[test]
+    fn test_ayq_font_size() {
+        let f = AyqFontSize::new(14.0);
+        let z = AyqZoomLevel::DEFAULT;
+        assert_eq!(f.effective_size(&z), 14.0);
+        let z2 = AyqZoomLevel::new(150.0);
+        assert_eq!(f.effective_size(&z2), 21.0);
+    }
+
+    #[test]
+    fn test_ayq_line_height() {
+        let f = AyqFontSize::new(14.0).with_line_height(1.5);
+        let z = AyqZoomLevel::DEFAULT;
+        assert_eq!(f.line_height(&z), 21.0);
+    }
+
+    #[test]
+    fn test_ayq_zoom_state() {
+        let mut state = AyqZoomState::new(14.0);
+        assert_eq!(state.effective_font_size(), 14.0);
+        state.zoom_in();
+        assert!(state.effective_font_size() > 14.0);
+        state.reset_zoom();
+        assert_eq!(state.effective_font_size(), 14.0);
+    }
+
+    #[test]
+    fn test_ayq_per_editor_zoom() {
+        let mut state = AyqZoomState::new(14.0);
+        state.set_editor_zoom("file:///a.rs", AyqZoomLevel::new(150.0));
+        assert_eq!(state.editor_zoom_for("file:///a.rs").percentage, 150.0);
+        assert!(state.editor_zoom_for("file:///b.rs").is_default());
+    }
+
+    #[test]
+    fn test_ayq_terminal_cols() {
+        let f = AyqFontSize::new(14.0);
+        let z = AyqZoomLevel::DEFAULT;
+        let cols = f.terminal_cols_for_width(1000, &z);
+        assert!(cols > 0 && cols < 200);
     }
 
 }
