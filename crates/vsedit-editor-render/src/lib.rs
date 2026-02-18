@@ -25078,6 +25078,101 @@ impl AyvDebugVisuals {
     pub fn has_exception(&self) -> bool { self.exception_widget_line.is_some() }
 }
 
+
+// --- ayw_ notebook and cell model ---
+
+/// Notebook cell kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AywCellKind { Code, Markup }
+
+/// A single notebook cell.
+#[derive(Debug, Clone)]
+pub struct AywNotebookCell {
+    pub kind: AywCellKind,
+    pub source: String,
+    pub language: String,
+    pub outputs: Vec<AywCellOutput>,
+    pub metadata: Vec<(String, String)>,
+}
+
+/// Cell output.
+#[derive(Debug, Clone)]
+pub struct AywCellOutput {
+    pub mime: String,
+    pub data: Vec<u8>,
+}
+
+impl AywCellOutput {
+    pub fn text(s: &str) -> Self { Self { mime: "text/plain".to_string(), data: s.as_bytes().to_vec() } }
+    pub fn as_text(&self) -> Option<String> {
+        if self.mime == "text/plain" { String::from_utf8(self.data.clone()).ok() } else { None }
+    }
+}
+
+impl AywNotebookCell {
+    pub fn code(lang: &str, src: &str) -> Self {
+        Self { kind: AywCellKind::Code, source: src.to_string(), language: lang.to_string(), outputs: Vec::new(), metadata: Vec::new() }
+    }
+    pub fn markup(src: &str) -> Self {
+        Self { kind: AywCellKind::Markup, source: src.to_string(), language: "markdown".to_string(), outputs: Vec::new(), metadata: Vec::new() }
+    }
+    pub fn add_output(&mut self, o: AywCellOutput) { self.outputs.push(o); }
+    pub fn is_code(&self) -> bool { self.kind == AywCellKind::Code }
+    pub fn line_count(&self) -> usize { self.source.lines().count().max(1) }
+}
+
+/// A notebook document.
+#[derive(Debug)]
+pub struct AywNotebookDocument {
+    pub cells: Vec<AywNotebookCell>,
+    pub metadata: Vec<(String, String)>,
+    pub notebook_type: String,
+}
+
+impl AywNotebookDocument {
+    pub fn new(ntype: &str) -> Self {
+        Self { cells: Vec::new(), metadata: Vec::new(), notebook_type: ntype.to_string() }
+    }
+    pub fn add_cell(&mut self, c: AywNotebookCell) { self.cells.push(c); }
+    pub fn cell_count(&self) -> usize { self.cells.len() }
+    pub fn code_cells(&self) -> Vec<&AywNotebookCell> { self.cells.iter().filter(|c| c.is_code()).collect() }
+    pub fn markup_cells(&self) -> Vec<&AywNotebookCell> { self.cells.iter().filter(|c| !c.is_code()).collect() }
+    pub fn swap_cells(&mut self, a: usize, b: usize) {
+        if a < self.cells.len() && b < self.cells.len() { self.cells.swap(a, b); }
+    }
+    pub fn remove_cell(&mut self, idx: usize) -> Option<AywNotebookCell> {
+        if idx < self.cells.len() { Some(self.cells.remove(idx)) } else { None }
+    }
+    pub fn insert_cell(&mut self, idx: usize, cell: AywNotebookCell) {
+        let idx = idx.min(self.cells.len());
+        self.cells.insert(idx, cell);
+    }
+    pub fn total_lines(&self) -> usize { self.cells.iter().map(|c| c.line_count()).sum() }
+}
+
+/// Notebook execution state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AywExecState { Idle, Running, Succeeded, Failed }
+
+/// Cell execution order tracker.
+#[derive(Debug)]
+pub struct AywCellExecution {
+    pub cell_index: usize,
+    pub state: AywExecState,
+    pub order: Option<u32>,
+    pub duration_ms: Option<u64>,
+}
+
+impl AywCellExecution {
+    pub fn start(idx: usize) -> Self { Self { cell_index: idx, state: AywExecState::Running, order: None, duration_ms: None } }
+    pub fn finish(&mut self, success: bool, order: u32, ms: u64) {
+        self.state = if success { AywExecState::Succeeded } else { AywExecState::Failed };
+        self.order = Some(order);
+        self.duration_ms = Some(ms);
+    }
+    pub fn is_running(&self) -> bool { self.state == AywExecState::Running }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40777,6 +40872,84 @@ mod tests {
         let ctx = AyvInlineValueContext::new(42, 1);
         assert_eq!(ctx.stopped_line, 42);
         assert_eq!(ctx.frame_id, 1);
+    }
+
+
+    #[test]
+    fn test_ayw_cell_kinds() {
+        let c = AywNotebookCell::code("python", "print(1)");
+        assert!(c.is_code());
+        let m = AywNotebookCell::markup("# Hello");
+        assert!(!m.is_code());
+    }
+
+    #[test]
+    fn test_ayw_cell_output() {
+        let mut c = AywNotebookCell::code("python", "x = 1");
+        c.add_output(AywCellOutput::text("1"));
+        assert_eq!(c.outputs[0].as_text().unwrap(), "1");
+    }
+
+    #[test]
+    fn test_ayw_notebook_doc() {
+        let mut nb = AywNotebookDocument::new("jupyter-notebook");
+        nb.add_cell(AywNotebookCell::markup("# Title"));
+        nb.add_cell(AywNotebookCell::code("python", "x = 1"));
+        nb.add_cell(AywNotebookCell::code("python", "y = 2"));
+        assert_eq!(nb.cell_count(), 3);
+        assert_eq!(nb.code_cells().len(), 2);
+        assert_eq!(nb.markup_cells().len(), 1);
+    }
+
+    #[test]
+    fn test_ayw_notebook_swap() {
+        let mut nb = AywNotebookDocument::new("nb");
+        nb.add_cell(AywNotebookCell::markup("A"));
+        nb.add_cell(AywNotebookCell::code("py", "B"));
+        nb.swap_cells(0, 1);
+        assert!(nb.cells[0].is_code());
+    }
+
+    #[test]
+    fn test_ayw_remove_insert() {
+        let mut nb = AywNotebookDocument::new("nb");
+        nb.add_cell(AywNotebookCell::code("py", "a"));
+        nb.add_cell(AywNotebookCell::code("py", "b"));
+        let removed = nb.remove_cell(0).unwrap();
+        assert_eq!(removed.source, "a");
+        nb.insert_cell(0, AywNotebookCell::markup("m"));
+        assert!(!nb.cells[0].is_code());
+    }
+
+    #[test]
+    fn test_ayw_total_lines() {
+        let mut nb = AywNotebookDocument::new("nb");
+        nb.add_cell(AywNotebookCell::code("py", "a
+b
+c"));
+        nb.add_cell(AywNotebookCell::code("py", "x"));
+        assert_eq!(nb.total_lines(), 4);
+    }
+
+    #[test]
+    fn test_ayw_cell_execution() {
+        let mut ex = AywCellExecution::start(0);
+        assert!(ex.is_running());
+        ex.finish(true, 1, 500);
+        assert!(!ex.is_running());
+        assert_eq!(ex.state, AywExecState::Succeeded);
+        assert_eq!(ex.order, Some(1));
+    }
+
+    #[test]
+    fn test_ayw_cell_line_count() {
+        let c = AywNotebookCell::code("py", "a
+b
+c
+d");
+        assert_eq!(c.line_count(), 4);
+        let empty = AywNotebookCell::code("py", "");
+        assert_eq!(empty.line_count(), 1);
     }
 
 }
