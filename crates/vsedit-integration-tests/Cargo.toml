@@ -87,5 +87,6 @@ vsedit-tokens = { path = "../vsedit-tokens" }
 vsedit-unicodehl = { path = "../vsedit-unicodehl" }
 vsedit-styles = { path = "../vsedit-styles" }
 vsedit-encryption = { path = "../vsedit-encryption" }
+vsedit-errors = { path = "../vsedit-errors" }
 serde_json.workspace = true
 tempfile.workspace = true

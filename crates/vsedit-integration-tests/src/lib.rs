@@ -8202,3 +8202,1079 @@ mod deep_render_tests {
     }
 
 }
+
+// ─── Cross-Crate Integration Tests (100 new tests) ─────────────────────────
+
+#[cfg(test)]
+mod data_structure_integration {
+    use vsedit_buffer::{VsBuffer, BufferBuilder, BufferError};
+    use vsedit_text_model::{TextModel, TextModelSearcher, TextModelBracketTracker};
+    use vsedit_collections::{
+        ResourceMap, LruCache, BidirectionalMap, Trie, CountingSet, PriorityQueue,
+        OrderedMap, BoundedStack, IntervalMap,
+    };
+    use vsedit_uri::{VsUri, UriBuilder, QueryParams, UriTemplate, UriNormalizer};
+    use vsedit_configuration::{ConfigurationModel, Configuration, ConfigurationTarget};
+    use vsedit_json::JsonPath;
+
+    #[test]
+    fn buffer_content_feeds_text_model() {
+        let buf = VsBuffer::from_string("line1\nline2\nline3");
+        let content = buf.try_to_string().unwrap();
+        let model = TextModel::new(&content);
+        assert_eq!(model.get_value(), "line1\nline2\nline3");
+    }
+
+    #[test]
+    fn buffer_builder_to_text_model_search() {
+        let mut bb = BufferBuilder::new();
+        bb.append_str("fn main() {}\nfn helper() {}\nfn main() {}");
+        let buf = bb.build();
+        let content = buf.try_to_string().unwrap();
+        let searcher = TextModelSearcher::new();
+        let matches = searcher.search_literal(&content, "fn main");
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn buffer_lines_into_bracket_tracker() {
+        let buf = VsBuffer::from_string("if (x) {\n  foo()\n}");
+        let content = buf.try_to_string().unwrap();
+        let mut tracker = TextModelBracketTracker::new();
+        for line in content.lines() {
+            tracker.process_line(line);
+        }
+        assert!(tracker.is_balanced());
+    }
+
+    #[test]
+    fn resource_map_with_uris() {
+        let mut map = ResourceMap::<VsUri>::new(false);
+        let uri = VsUri::file("/home/user/file.rs");
+        map.set("file.rs", uri.clone());
+        assert!(map.has("file.rs"));
+        assert_eq!(map.get("file.rs").unwrap().path, uri.path);
+    }
+
+    #[test]
+    fn lru_cache_with_configuration_models() {
+        let mut cache = LruCache::<String, ConfigurationModel>::new(3);
+        let mut m = ConfigurationModel::new();
+        m.set_value("editor.fontSize", serde_json::json!(14));
+        cache.set("user".into(), m);
+        let retrieved = cache.get(&"user".into()).unwrap();
+        let val: Option<i64> = retrieved.get_value("editor.fontSize");
+        assert_eq!(val, Some(14));
+    }
+
+    #[test]
+    fn bidirectional_map_uri_to_language() {
+        let mut bimap = BidirectionalMap::<String, String>::new();
+        bimap.set("file:///main.rs".into(), "rust".into());
+        bimap.set("file:///app.ts".into(), "typescript".into());
+        assert_eq!(bimap.get_by_left(&"file:///main.rs".into()), Some(&"rust".into()));
+        assert_eq!(bimap.get_by_right(&"typescript".into()), Some(&"file:///app.ts".into()));
+    }
+
+    #[test]
+    fn trie_stores_uri_paths() {
+        let mut trie = Trie::new();
+        trie.insert("/src/main.rs");
+        trie.insert("/src/lib.rs");
+        trie.insert("/tests/test.rs");
+        assert!(trie.has_prefix("/src/"));
+        assert_eq!(trie.words_with_prefix("/src/").len(), 2);
+    }
+
+    #[test]
+    fn counting_set_tracks_buffer_operations() {
+        let mut cs = CountingSet::new();
+        cs.add("read");
+        cs.add("read");
+        cs.add("write");
+        assert_eq!(cs.count(&"read"), 2);
+        assert_eq!(cs.total_count(), 3);
+        assert_eq!(cs.most_frequent().unwrap().0, &"read");
+    }
+
+    #[test]
+    fn priority_queue_with_buffer_sizes() {
+        let mut pq = PriorityQueue::new();
+        pq.push(100usize);
+        pq.push(10usize);
+        pq.push(50usize);
+        assert_eq!(pq.pop(), Some(10));
+        assert_eq!(pq.pop(), Some(50));
+    }
+
+    #[test]
+    fn ordered_map_preserves_config_insertion_order() {
+        let mut om = OrderedMap::new();
+        om.insert("editor.fontSize", serde_json::json!(14));
+        om.insert("editor.tabSize", serde_json::json!(4));
+        om.insert("editor.wordWrap", serde_json::json!("on"));
+        let keys = om.keys();
+        assert_eq!(keys, &["editor.fontSize", "editor.tabSize", "editor.wordWrap"]);
+    }
+
+    #[test]
+    fn bounded_stack_for_undo_buffer_references() {
+        let mut stack = BoundedStack::new(3);
+        stack.push(VsBuffer::from_string("v1"));
+        stack.push(VsBuffer::from_string("v2"));
+        stack.push(VsBuffer::from_string("v3"));
+        stack.push(VsBuffer::from_string("v4"));
+        assert_eq!(stack.len(), 3);
+        assert_eq!(stack.peek().unwrap().try_to_string().unwrap(), "v4");
+    }
+
+    #[test]
+    fn interval_map_for_text_decorations() {
+        let mut imap = IntervalMap::new();
+        imap.insert(0, 10, "highlight");
+        imap.insert(15, 25, "underline");
+        assert_eq!(imap.query(5), Some(&"highlight"));
+        assert_eq!(imap.query(12), None);
+        assert_eq!(imap.query(20), Some(&"underline"));
+    }
+
+    #[test]
+    fn uri_builder_with_query_params() {
+        let uri = UriBuilder::new()
+            .scheme("file")
+            .path("/workspace/settings.json")
+            .build();
+        assert!(uri.is_file());
+        let params = QueryParams::from_uri(&uri);
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn uri_template_expansion_for_api() {
+        let tpl = UriTemplate::new("vscode://{publisher}.{extension}/{path}");
+        let expanded = tpl.expand(&[
+            ("publisher", "ms-vscode"),
+            ("extension", "cpptools"),
+            ("path", "activate"),
+        ]);
+        assert!(expanded.contains("ms-vscode"));
+        assert!(expanded.contains("cpptools"));
+    }
+
+    #[test]
+    fn uri_normalizer_equivalence() {
+        let a = VsUri::file("/home/user/project/FILE.rs");
+        let b = VsUri::file("/home/user/project/FILE.rs");
+        let na = UriNormalizer::normalize(&a);
+        let nb = UriNormalizer::normalize(&b);
+        assert!(UriNormalizer::are_equivalent(&na, &nb));
+    }
+
+    #[test]
+    fn buffer_slice_into_text_model_edit() {
+        let buf = VsBuffer::from_string("Hello World");
+        let slice = buf.slice(0..5);
+        let content = slice.try_to_string().unwrap();
+        let mut model = TextModel::new(&content);
+        model.insert(vsedit_editor_types::Position::new(1, 6), " Goodbye");
+        assert!(model.get_value().contains("Goodbye"));
+    }
+
+    #[test]
+    fn json_path_navigates_configuration() {
+        let mut model = ConfigurationModel::new();
+        model.set_value("editor.fontSize", serde_json::json!(14));
+        let path = JsonPath::parse("editor.fontSize");
+        let raw = model.get_raw_value("editor.fontSize");
+        assert_eq!(raw, Some(&serde_json::json!(14)));
+        assert_eq!(path.depth(), 2);
+    }
+
+    #[test]
+    fn configuration_layers_with_collection_cache() {
+        let mut config = Configuration::new();
+        let mut user_model = ConfigurationModel::new();
+        user_model.set_value("editor.fontSize", serde_json::json!(16));
+        config.set_layer(ConfigurationTarget::User, user_model);
+
+        let mut cache = LruCache::<String, serde_json::Value>::new(10);
+        if let Some(val) = config.get_effective_value("editor.fontSize") {
+            cache.set("editor.fontSize".into(), val.clone());
+        }
+        assert_eq!(cache.get(&"editor.fontSize".into()), Some(&serde_json::json!(16)));
+    }
+
+    #[test]
+    fn resource_map_case_insensitive_uri_lookup() {
+        let mut map = ResourceMap::<String>::new(true);
+        map.set("FILE.RS", "rust".to_string());
+        assert_eq!(map.get("file.rs"), Some(&"rust".to_string()));
+    }
+
+    #[test]
+    fn buffer_concat_and_model_word_count() {
+        let b1 = VsBuffer::from_string("hello world ");
+        let b2 = VsBuffer::from_string("foo bar baz");
+        let combined = VsBuffer::concat(&[b1, b2]);
+        let content = combined.try_to_string().unwrap();
+        let model = TextModel::new(&content);
+        assert_eq!(model.get_word_count(), 5);
+    }
+}
+
+#[cfg(test)]
+mod event_system_integration {
+    use vsedit_events::{Emitter, Event, EventReplayBuffer, EventFilter, EventCounter};
+    use vsedit_lifecycle::{
+        LifecyclePhase, LifecycleHookRegistry, LifecyclePhaseTiming,
+        ShutdownCoordinator, ShutdownBlocker, LifecyclePhaseTracker,
+        HealthStatus, HealthCheckAggregator, DisposableStore, to_disposable,
+    };
+    use vsedit_ext_activation::{
+        ActivationEvent, ActivationEventMatcher, ExtensionActivationQueue,
+        ActivationDependencyGraph,
+    };
+    use vsedit_notification_svc::{
+        NotificationService, NotificationSeverity, NotificationProgress,
+    };
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn emitter_fires_to_listener() {
+        let emitter = Emitter::<String>::new();
+        let event = emitter.event();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _sub = event.on(move |val| {
+            r.lock().unwrap().push(val.clone());
+        });
+        emitter.fire(&"hello".to_string());
+        assert_eq!(received.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn event_filter_with_severity() {
+        let filter = EventFilter::new(|s: &String| s.starts_with("ERROR"));
+        assert!(filter.matches(&"ERROR: something".to_string()));
+        assert!(!filter.matches(&"INFO: something".to_string()));
+    }
+
+    #[test]
+    fn event_replay_buffer_captures_events() {
+        let mut buf = EventReplayBuffer::new(5);
+        buf.push("event1".to_string());
+        buf.push("event2".to_string());
+        assert_eq!(buf.len(), 2);
+        assert_eq!(buf.last(), Some(&"event2".to_string()));
+    }
+
+    #[test]
+    fn lifecycle_phase_ordering() {
+        assert!(LifecyclePhase::Starting < LifecyclePhase::Ready);
+        assert!(LifecyclePhase::Ready < LifecyclePhase::Restored);
+        assert!(LifecyclePhase::Restored < LifecyclePhase::Eventually);
+        assert!(LifecyclePhase::Eventually < LifecyclePhase::ShuttingDown);
+    }
+
+    #[test]
+    fn lifecycle_hook_registry_advances_phases() {
+        let mut registry = LifecycleHookRegistry::new();
+        assert_eq!(registry.current_phase(), LifecyclePhase::Starting);
+        registry.advance_to(LifecyclePhase::Ready);
+        assert_eq!(registry.current_phase(), LifecyclePhase::Ready);
+    }
+
+    #[test]
+    fn lifecycle_phase_timing_tracks_durations() {
+        let mut timing = LifecyclePhaseTiming::new();
+        timing.mark(LifecyclePhase::Starting);
+        timing.mark(LifecyclePhase::Ready);
+        assert!(timing.phase_count() >= 2);
+    }
+
+    #[test]
+    fn shutdown_coordinator_tracks_subsystems() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("editor");
+        coord.register("extensions");
+        assert_eq!(coord.pending_count(), 2);
+        coord.mark_complete("editor");
+        assert_eq!(coord.pending_count(), 1);
+        assert!(!coord.is_complete());
+        coord.mark_complete("extensions");
+        assert!(coord.is_complete());
+    }
+
+    #[test]
+    fn shutdown_blocker_prevents_shutdown() {
+        let mut blocker = ShutdownBlocker::new();
+        blocker.add_blocker("unsaved-files", "Files not saved");
+        assert!(blocker.is_blocked());
+        assert_eq!(blocker.blocker_count(), 1);
+        blocker.remove_blocker("unsaved-files");
+        assert!(!blocker.is_blocked());
+    }
+
+    #[test]
+    fn activation_event_matcher_language() {
+        let matcher = ActivationEventMatcher::new();
+        assert!(matcher.should_activate(&ActivationEvent::Star));
+    }
+
+    #[test]
+    fn extension_activation_queue_register_and_evaluate() {
+        let mut queue = ExtensionActivationQueue::new();
+        queue.register(
+            "rust-analyzer".into(),
+            vec![ActivationEvent::Star],
+        );
+        let matcher = ActivationEventMatcher::new();
+        let newly_queued = queue.evaluate(&matcher);
+        assert_eq!(newly_queued.len(), 1);
+        assert!(!queue.is_activated("rust-analyzer"));
+        assert_eq!(queue.pending_count(), 1);
+    }
+
+    #[test]
+    fn activation_dependency_graph_ordering() {
+        let mut graph = ActivationDependencyGraph::new();
+        graph.add_dependency("ext-b", "ext-a");
+        let empty = std::collections::HashSet::new();
+        assert!(!graph.can_activate("ext-b", &empty));
+        let mut activated = std::collections::HashSet::new();
+        activated.insert("ext-a".to_string());
+        assert!(graph.can_activate("ext-b", &activated));
+    }
+
+    #[test]
+    fn notification_service_info_and_dismiss() {
+        let mut svc = NotificationService::new();
+        let id = svc.info("Build succeeded");
+        assert!(svc.has_pending());
+        svc.dismiss(id);
+        assert!(!svc.has_pending());
+    }
+
+    #[test]
+    fn notification_severity_filtering() {
+        let mut svc = NotificationService::new();
+        svc.info("Info msg");
+        svc.warn("Warn msg");
+        svc.error("Error msg");
+        let errors = svc.get_by_severity(NotificationSeverity::Error);
+        assert_eq!(errors.len(), 1);
+        let warnings = svc.get_by_severity(NotificationSeverity::Warning);
+        assert_eq!(warnings.len(), 1);
+    }
+
+    #[test]
+    fn notification_progress_tracking() {
+        let mut progress = NotificationProgress::new(100);
+        assert!(!progress.is_complete());
+        progress.worked = 100;
+        assert!(progress.is_complete());
+    }
+
+    #[test]
+    fn lifecycle_phase_tracker_transitions() {
+        let mut tracker = LifecyclePhaseTracker::new();
+        tracker.transition(LifecyclePhase::Ready, 150);
+        assert_eq!(tracker.current_phase(), LifecyclePhase::Ready);
+        assert_eq!(tracker.transition_count(), 2);
+        assert_eq!(tracker.phase_duration_ms(LifecyclePhase::Starting), Some(150));
+    }
+
+    #[test]
+    fn health_check_aggregator_mixed() {
+        let mut agg = HealthCheckAggregator::new();
+        agg.add("editor", HealthStatus::Healthy);
+        agg.add("extensions", HealthStatus::Degraded("slow".into()));
+        assert!(!agg.is_healthy());
+        assert_eq!(agg.entry_count(), 2);
+        assert_eq!(agg.healthy_count(), 1);
+    }
+
+    #[test]
+    fn disposable_store_cleanup() {
+        let mut store = DisposableStore::new();
+        let disposed = Arc::new(Mutex::new(false));
+        let d = disposed.clone();
+        store.add(to_disposable(move || {
+            *d.lock().unwrap() = true;
+        }));
+        assert_eq!(store.len(), 1);
+        store.clear();
+        assert!(*disposed.lock().unwrap());
+    }
+
+    #[test]
+    fn event_chain_emitter_to_notification() {
+        let emitter = Emitter::<String>::new();
+        let event = emitter.event();
+        let mut svc = NotificationService::new();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _sub = event.on(move |val| {
+            r.lock().unwrap().push(val.clone());
+        });
+        emitter.fire(&"extension crashed".to_string());
+        svc.error("extension crashed");
+        assert_eq!(received.lock().unwrap().len(), 1);
+        assert_eq!(svc.notification_count(), 1);
+    }
+
+    #[test]
+    fn shutdown_coordinator_progress() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("a");
+        coord.register("b");
+        coord.register("c");
+        coord.register("d");
+        coord.mark_complete("a");
+        coord.mark_complete("b");
+        let progress = coord.progress();
+        assert!((progress - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn replay_buffer_capacity_overflow() {
+        let mut buf = EventReplayBuffer::new(3);
+        buf.push(1u32);
+        buf.push(2);
+        buf.push(3);
+        buf.push(4);
+        assert!(buf.is_full());
+        assert_eq!(buf.len(), 3);
+    }
+}
+
+#[cfg(test)]
+mod provider_chain_integration {
+    use vsedit_languages::{LanguageFeature, LanguageFeatureRegistry, LanguageIdNormalizer};
+    use vsedit_suggest::{CompletionItem, CompletionItemKind, CompletionList};
+    use vsedit_hover::{Hover, HoverContent, HoverContentBuilder, HoverRange};
+    use vsedit_ext_diagnostics::{
+        Diagnostic, DiagnosticSeverity, DiagnosticBuilder, DiagnosticCollection,
+        DiagnosticBridge, DiagnosticTag, SeverityAggregation,
+    };
+    use vsedit_ext_api::{ApiRegistry, ApiCapabilities, ApiMockProvider};
+    use vsedit_uri::VsUri;
+
+    #[test]
+    fn language_feature_registration_for_completion() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("rust", LanguageFeature::Completion);
+        reg.register_feature("rust", LanguageFeature::Hover);
+        assert!(reg.has_feature("rust", &LanguageFeature::Completion));
+        assert_eq!(reg.feature_count("rust"), 2);
+    }
+
+    #[test]
+    fn language_normalizer_resolves_aliases() {
+        let norm = LanguageIdNormalizer::new();
+        assert_eq!(norm.normalize("rs"), "rust");
+        assert_eq!(norm.normalize("js"), "javascript");
+        assert!(norm.are_equivalent("py", "python"));
+    }
+
+    #[test]
+    fn completion_list_filter_by_query() {
+        let items = vec![
+            CompletionItem::new("println", CompletionItemKind::Function),
+            CompletionItem::new("print", CompletionItemKind::Function),
+            CompletionItem::new("format", CompletionItemKind::Function),
+        ];
+        let list = CompletionList::new(items);
+        let filtered = list.filter("pri");
+        assert_eq!(filtered.items.len(), 2);
+    }
+
+    #[test]
+    fn completion_item_with_details() {
+        let item = CompletionItem::new("HashMap", CompletionItemKind::Struct)
+            .with_detail("std::collections::HashMap")
+            .with_documentation("A hash map implementation");
+        assert_eq!(item.detail.as_deref(), Some("std::collections::HashMap"));
+        assert_eq!(item.kind, CompletionItemKind::Struct);
+    }
+
+    #[test]
+    fn completion_list_sort_by_relevance() {
+        let items = vec![
+            CompletionItem::new("zebra", CompletionItemKind::Variable),
+            CompletionItem::new("alpha", CompletionItemKind::Variable),
+        ];
+        let mut list = CompletionList::new(items);
+        list.sort_by_relevance();
+        assert_eq!(list.items[0].label, "alpha");
+    }
+
+    #[test]
+    fn hover_text_creation() {
+        let hover = Hover::text("This is a variable");
+        assert!(!hover.is_empty());
+        assert_eq!(hover.content_count(), 1);
+    }
+
+    #[test]
+    fn hover_markdown_with_range() {
+        let hover = Hover::markdown("**bold** description").with_range(HoverRange {
+            start_line: 1,
+            start_column: 0,
+            end_line: 1,
+            end_column: 10,
+        });
+        assert!(hover.range.is_some());
+    }
+
+    #[test]
+    fn hover_content_builder_multi_block() {
+        let hover = HoverContentBuilder::new()
+            .add_text("Variable: x")
+            .add_code("let x = 42;", Some("rust"))
+            .add_markdown("*Defined in main.rs*")
+            .build();
+        assert_eq!(hover.content_count(), 3);
+        assert!(hover.has_code_content());
+    }
+
+    #[test]
+    fn diagnostic_builder_creates_valid_diagnostic() {
+        let diag = DiagnosticBuilder::new("unused variable", DiagnosticSeverity::Warning)
+            .span(1, 0, 1, 10)
+            .code("W001")
+            .source("rustc")
+            .tag(DiagnosticTag::Unnecessary)
+            .build();
+        assert!(diag.is_ok());
+        let d = diag.unwrap();
+        assert_eq!(d.severity, DiagnosticSeverity::Warning);
+    }
+
+    #[test]
+    fn diagnostic_collection_aggregation() {
+        let mut coll = DiagnosticCollection::new("test");
+        coll.entries.insert(
+            "file:///main.rs".into(),
+            vec![
+                DiagnosticBuilder::new("error1", DiagnosticSeverity::Error)
+                    .span(1, 0, 1, 5)
+                    .build()
+                    .unwrap(),
+                DiagnosticBuilder::new("warn1", DiagnosticSeverity::Warning)
+                    .span(2, 0, 2, 5)
+                    .build()
+                    .unwrap(),
+            ],
+        );
+        assert_eq!(coll.diagnostic_count(), 2);
+        assert!(coll.has_errors());
+        assert_eq!(coll.worst_severity(), Some(DiagnosticSeverity::Error));
+    }
+
+    #[test]
+    fn diagnostic_severity_ordering() {
+        assert!(DiagnosticSeverity::Error < DiagnosticSeverity::Warning);
+        assert!(DiagnosticSeverity::Warning < DiagnosticSeverity::Information);
+        assert!(DiagnosticSeverity::Information < DiagnosticSeverity::Hint);
+    }
+
+    #[test]
+    fn diagnostic_filter_by_severity() {
+        let mut coll = DiagnosticCollection::new("lint");
+        coll.entries.insert(
+            "file:///lib.rs".into(),
+            vec![
+                DiagnosticBuilder::new("err", DiagnosticSeverity::Error)
+                    .span(1, 0, 1, 1)
+                    .build()
+                    .unwrap(),
+                DiagnosticBuilder::new("hint", DiagnosticSeverity::Hint)
+                    .span(2, 0, 2, 1)
+                    .build()
+                    .unwrap(),
+            ],
+        );
+        let errors = coll.filter_by_severity(DiagnosticSeverity::Error);
+        assert_eq!(errors.len(), 1);
+    }
+
+    #[test]
+    fn api_registry_namespace_registration() {
+        let mut reg = ApiRegistry::new();
+        reg.register_namespace("vscode.languages", 1);
+        reg.register_namespace("vscode.workspace", 2);
+        assert!(reg.has_namespace("vscode.languages"));
+        assert_eq!(reg.get_proxy_id("vscode.languages"), Some(1));
+    }
+
+    #[test]
+    fn api_capabilities_feature_flags() {
+        let caps = ApiCapabilities {
+            supports_proposed_api: false,
+            supports_webview: true,
+            supports_terminal: true,
+            supports_debug: true,
+            supports_notebook: false,
+            supports_chat: false,
+            supports_language_models: false,
+            supports_testing: true,
+            supports_authentication: false,
+            supports_custom_editors: false,
+        };
+        assert!(caps.supports_terminal);
+        assert!(!caps.supports_proposed_api);
+    }
+
+    #[test]
+    fn api_mock_provider_records_calls() {
+        let mut mock = ApiMockProvider::new();
+        mock.register_response("languages.getLanguages", vec!["rust".into(), "python".into()]);
+        let result = mock.call("languages", "getLanguages", vec![]);
+        assert!(result.is_some());
+        assert_eq!(mock.call_count(), 1);
+        assert!(mock.was_called("languages", "getLanguages"));
+    }
+
+    #[test]
+    fn language_features_cross_language() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("rust", LanguageFeature::Completion);
+        reg.register_feature("python", LanguageFeature::Completion);
+        reg.register_feature("rust", LanguageFeature::Hover);
+        let langs = reg.languages_with_feature(&LanguageFeature::Completion);
+        assert_eq!(langs.len(), 2);
+    }
+
+    #[test]
+    fn severity_aggregation_from_diagnostics() {
+        let diags = vec![
+            DiagnosticBuilder::new("e1", DiagnosticSeverity::Error).span(1, 0, 1, 1).build().unwrap(),
+            DiagnosticBuilder::new("w1", DiagnosticSeverity::Warning).span(2, 0, 2, 1).build().unwrap(),
+            DiagnosticBuilder::new("w2", DiagnosticSeverity::Warning).span(3, 0, 3, 1).build().unwrap(),
+        ];
+        let agg = SeverityAggregation::from_diagnostics(&diags);
+        assert_eq!(agg.errors, 1);
+        assert_eq!(agg.warnings, 2);
+        assert_eq!(agg.total(), 3);
+    }
+
+    #[test]
+    fn completion_list_incomplete_flag() {
+        let items = vec![CompletionItem::new("a", CompletionItemKind::Text)];
+        let list = CompletionList::incomplete(items);
+        assert!(list.is_incomplete);
+        assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn diagnostic_bridge_manages_collections() {
+        let bridge = DiagnosticBridge::new();
+        assert_eq!(bridge.collection_count(), 0);
+        assert_eq!(bridge.total_diagnostics(), 0);
+    }
+
+    #[test]
+    fn hover_code_with_language_detection() {
+        let norm = LanguageIdNormalizer::new();
+        let lang = norm.normalize("rs");
+        let hover = Hover::code("let x = 42;", Some(&lang));
+        assert!(!hover.is_empty());
+        assert!(hover.has_code_content());
+    }
+}
+
+#[cfg(test)]
+mod serialization_integration {
+    use vsedit_configuration::{
+        ConfigurationModel, Configuration, ConfigurationTarget, InspectResult,
+    };
+    use vsedit_json::{JsonPath, JsonPatchApplier, JsonMinifier};
+    use vsedit_keybindings::{
+        Keybinding, SimpleResolvedKeybinding, ResolvedKeybinding,
+        CategorizedKeybinding, KeybindingCategory, KeybindingExporter,
+        parse_keybinding, ChordNormalizer,
+    };
+    use vsedit_keycodes::{KeyCodeChord, KeyCode};
+    use vsedit_platform::Platform;
+    use vsedit_theme::{Color, ColorTheme, ThemeType, dark_plus, light_plus, TokenColor, TokenSettings};
+    use vsedit_workspace::{Workspace, WorkspaceType};
+    use vsedit_uri::VsUri;
+
+    #[test]
+    fn configuration_model_jsonc_roundtrip() {
+        let json = r#"{ "editor": { "fontSize": 14, "tabSize": 4 } }"#;
+        let model = ConfigurationModel::from_jsonc(json).unwrap();
+        let val: Option<i64> = model.get_value("editor.fontSize");
+        assert_eq!(val, Some(14));
+        let val2: Option<i64> = model.get_value("editor.tabSize");
+        assert_eq!(val2, Some(4));
+    }
+
+    #[test]
+    fn configuration_model_set_and_get() {
+        let mut model = ConfigurationModel::new();
+        model.set_value("theme", serde_json::json!("dark+"));
+        model.set_value("fontSize", serde_json::json!(16));
+        let theme: Option<String> = model.get_value("theme");
+        assert_eq!(theme, Some("dark+".into()));
+    }
+
+    #[test]
+    fn configuration_model_merge() {
+        let mut base = ConfigurationModel::new();
+        base.set_value("a", serde_json::json!(1));
+        base.set_value("b", serde_json::json!(2));
+        let mut overlay = ConfigurationModel::new();
+        overlay.set_value("b", serde_json::json!(20));
+        overlay.set_value("c", serde_json::json!(30));
+        base.merge(&overlay);
+        let b: Option<i64> = base.get_value("b");
+        assert_eq!(b, Some(20));
+        let c: Option<i64> = base.get_value("c");
+        assert_eq!(c, Some(30));
+    }
+
+    #[test]
+    fn configuration_layers_user_overrides_default() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.fontSize", serde_json::json!(12));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.fontSize", serde_json::json!(16));
+        config.set_layer(ConfigurationTarget::User, user);
+
+        let effective = config.get_effective_value("editor.fontSize");
+        assert_eq!(effective, Some(serde_json::json!(16)));
+    }
+
+    #[test]
+    fn configuration_inspect_shows_layers() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.wordWrap", serde_json::json!("off"));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.wordWrap", serde_json::json!("on"));
+        config.set_layer(ConfigurationTarget::User, user);
+        let inspect = config.inspect("editor.wordWrap");
+        assert!(inspect.default_value.is_some());
+        assert!(inspect.user_value.is_some());
+    }
+
+    #[test]
+    fn json_patch_applier_roundtrip() {
+        let value = serde_json::json!({"name": "vsedit", "version": "1.0"});
+        let patched = JsonPatchApplier::new()
+            .replace("version", serde_json::json!("2.0"))
+            .add("author", serde_json::json!("team"))
+            .apply_all(value);
+        assert_eq!(patched["version"], serde_json::json!("2.0"));
+        assert_eq!(patched["author"], serde_json::json!("team"));
+    }
+
+    #[test]
+    fn json_path_set_and_get() {
+        let mut root = serde_json::json!({"editor": {"fontSize": 12}});
+        let path = JsonPath::parse("editor.fontSize");
+        assert_eq!(path.get(&root), Some(&serde_json::json!(12)));
+        path.set(&mut root, serde_json::json!(16));
+        assert_eq!(path.get(&root), Some(&serde_json::json!(16)));
+    }
+
+    #[test]
+    fn keybinding_single_chord_serialize() {
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        let kb = Keybinding::new(chord);
+        let resolved = SimpleResolvedKeybinding::new(kb, Platform::Linux);
+        let label = resolved.get_label();
+        assert!(label.contains("Ctrl"));
+        assert!(label.contains("S"));
+    }
+
+    #[test]
+    fn keybinding_two_chord_serialize() {
+        let first = KeyCodeChord::new(true, false, false, false, KeyCode::KeyK);
+        let second = KeyCodeChord::new(true, false, false, false, KeyCode::KeyC);
+        let kb = Keybinding::two_chords(first, second);
+        assert!(kb.is_chord());
+        assert_eq!(kb.chord_count(), 2);
+        let resolved = SimpleResolvedKeybinding::new(kb, Platform::Linux);
+        let label = resolved.get_label();
+        assert!(label.contains(" "));
+    }
+
+    #[test]
+    fn keybinding_platform_specific_labels() {
+        let chord = KeyCodeChord::new(false, false, false, true, KeyCode::KeyC);
+        let kb = Keybinding::new(chord);
+        let mac_label = SimpleResolvedKeybinding::new(kb.clone(), Platform::MacOS).get_label();
+        let linux_label = SimpleResolvedKeybinding::new(kb, Platform::Linux).get_label();
+        assert!(mac_label.contains("⌘"));
+        assert!(linux_label.contains("Win"));
+    }
+
+    #[test]
+    fn keybinding_dispatch_chords() {
+        let chord = KeyCodeChord::new(true, true, false, false, KeyCode::KeyP);
+        let kb = Keybinding::new(chord);
+        let resolved = SimpleResolvedKeybinding::new(kb, Platform::Linux);
+        let dispatch = resolved.get_dispatch_chords();
+        assert_eq!(dispatch.len(), 1);
+        assert!(dispatch[0].contains("ctrl"));
+        assert!(dispatch[0].contains("shift"));
+    }
+
+    #[test]
+    fn keybinding_exporter_summary() {
+        let bindings = vec![
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            Keybinding::two_chords(
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+            ),
+        ];
+        let (total, chord, single) = KeybindingExporter::binding_summary(&bindings);
+        assert_eq!(total, 2);
+        assert_eq!(chord, 1);
+        assert_eq!(single, 1);
+    }
+
+    #[test]
+    fn chord_normalizer_canonical_form() {
+        let chord = KeyCodeChord::new(true, true, false, false, KeyCode::KeyA);
+        let canonical = ChordNormalizer::canonical_form(&chord);
+        assert!(canonical.starts_with("ctrl"));
+    }
+
+    #[test]
+    fn color_hex_roundtrip() {
+        let color = Color::from_hex("#ff5733").unwrap();
+        let hex = color.to_hex();
+        assert_eq!(hex.to_lowercase(), "#ff5733");
+    }
+
+    #[test]
+    fn dark_plus_theme_has_colors() {
+        let theme = dark_plus();
+        assert!(theme.color_keys().len() > 0);
+    }
+
+    #[test]
+    fn light_plus_theme_differs_from_dark() {
+        let dark = dark_plus();
+        let light = light_plus();
+        let dark_bg = dark.get_color("editor.background");
+        let light_bg = light.get_color("editor.background");
+        assert_ne!(dark_bg, light_bg);
+    }
+
+    #[test]
+    fn color_theme_from_json_roundtrip() {
+        let json = serde_json::json!({
+            "type": "dark",
+            "colors": {
+                "editor.background": "#1e1e1e",
+                "editor.foreground": "#d4d4d4"
+            },
+            "tokenColors": []
+        });
+        let theme = ColorTheme::from_json(&json.to_string());
+        assert!(theme.is_ok());
+        let t = theme.unwrap();
+        assert!(t.get_color("editor.background").is_some());
+    }
+
+    #[test]
+    fn workspace_single_folder_type() {
+        let uri = VsUri::file("/home/user/project");
+        let ws = Workspace::single_folder(uri);
+        assert_eq!(ws.get_folders().len(), 1);
+    }
+
+    #[test]
+    fn workspace_empty_type() {
+        let ws = Workspace::empty();
+        assert!(ws.get_folders().is_empty());
+        assert_eq!(ws.get_workspace_type(), WorkspaceType::Empty);
+    }
+
+    #[test]
+    fn json_minifier_reduces_size() {
+        let input = r#"{
+            "editor.fontSize": 14,
+            "editor.tabSize": 4
+        }"#;
+        let minified = JsonMinifier::minify(input).unwrap();
+        assert!(minified.len() < input.len());
+        assert!(!minified.contains('\n'));
+    }
+}
+
+#[cfg(test)]
+mod error_handling_integration {
+    use vsedit_errors::{
+        VsError, ErrorSeverity, ErrorRecord, ErrorAccumulator, ErrorChain,
+        ErrorClassifier, ErrorCategory,
+        is_cancelled, format_error_chain, user_error,
+        recovery_suggestion,
+    };
+    use vsedit_files::FileError;
+    use vsedit_ext_diagnostics::DiagnosticError;
+    use vsedit_configuration::ConfigurationModel;
+
+    #[test]
+    fn vs_error_severity_classification() {
+        assert_eq!(VsError::Cancelled.severity(), ErrorSeverity::Info);
+        assert_eq!(VsError::NotFound("x".into()).severity(), ErrorSeverity::Error);
+        assert_eq!(VsError::NotSupported("x".into()).severity(), ErrorSeverity::Warning);
+    }
+
+    #[test]
+    fn vs_error_user_facing() {
+        assert!(VsError::User("msg".into()).is_user_facing());
+        assert!(!VsError::Cancelled.is_user_facing());
+    }
+
+    #[test]
+    fn vs_error_code_strings() {
+        assert_eq!(VsError::Cancelled.code(), "CANCELLED");
+        assert_eq!(VsError::NotFound("x".into()).code(), "NOT_FOUND");
+        assert_eq!(VsError::IllegalArgument("x".into()).code(), "ILLEGAL_ARGUMENT");
+    }
+
+    #[test]
+    fn vs_error_message_extraction() {
+        assert_eq!(VsError::NotFound("missing".into()).message(), Some("missing"));
+        assert_eq!(VsError::Cancelled.message(), None);
+    }
+
+    #[test]
+    fn error_accumulator_collects_multiple() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotFound("a".into()));
+        acc.push(VsError::User("b".into()));
+        assert_eq!(acc.len(), 2);
+        assert!(!acc.is_empty());
+    }
+
+    #[test]
+    fn error_accumulator_hard_errors() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotSupported("warning-level".into()));
+        assert!(!acc.has_hard_errors());
+        acc.push(VsError::NotFound("error-level".into()));
+        assert!(acc.has_hard_errors());
+    }
+
+    #[test]
+    fn error_accumulator_combined_error() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotFound("a".into()));
+        acc.push(VsError::IllegalState("b".into()));
+        let combined = acc.into_combined_error();
+        assert!(combined.is_some());
+    }
+
+    #[test]
+    fn error_record_with_metadata() {
+        let record = ErrorRecord::new(VsError::NotFound("file.rs".into()))
+            .with_source_location("editor.rs:42")
+            .with_timestamp(1234.5);
+        assert_eq!(record.source_location, Some("editor.rs:42".into()));
+        assert_eq!(record.timestamp, 1234.5);
+    }
+
+    #[test]
+    fn error_chain_tracks_context() {
+        let chain = ErrorChain::new(VsError::NotFound("config.json".into()))
+            .with_context("loading configuration", VsError::IllegalState("parse failed".into()));
+        assert_eq!(chain.depth(), 2);
+        assert_eq!(chain.root_cause().unwrap().code(), "NOT_FOUND");
+    }
+
+    #[test]
+    fn error_chain_highest_severity() {
+        let chain = ErrorChain::new(VsError::User("warn".into()))
+            .with_context("escalated", VsError::NotFound("err".into()));
+        assert_eq!(chain.highest_severity(), ErrorSeverity::Error);
+    }
+
+    #[test]
+    fn error_classifier_categorizes() {
+        assert_eq!(ErrorClassifier::classify(&VsError::User("x".into())), ErrorCategory::User);
+        assert_eq!(ErrorClassifier::classify(&VsError::Cancelled), ErrorCategory::Transient);
+        assert_eq!(ErrorClassifier::classify(&VsError::IllegalState("x".into())), ErrorCategory::Internal);
+    }
+
+    #[test]
+    fn error_classifier_retriable() {
+        assert!(ErrorClassifier::is_retriable(&VsError::Cancelled));
+        assert!(!ErrorClassifier::is_retriable(&VsError::NotFound("x".into())));
+        assert!(!ErrorClassifier::is_retriable(&VsError::IllegalArgument("x".into())));
+    }
+
+    #[test]
+    fn is_cancelled_check() {
+        assert!(is_cancelled(&VsError::Cancelled));
+        assert!(!is_cancelled(&VsError::NotFound("x".into())));
+    }
+
+    #[test]
+    fn user_error_convenience() {
+        let err = user_error("something went wrong");
+        assert!(matches!(err, VsError::User(_)));
+        assert_eq!(err.message(), Some("something went wrong"));
+    }
+
+    #[test]
+    fn format_error_chain_output() {
+        let chain = ErrorChain::new(VsError::NotFound("root.rs".into()))
+            .with_context("opening file", VsError::IllegalState("broken".into()));
+        let formatted = format_error_chain(&chain);
+        assert!(!formatted.is_empty());
+        assert!(formatted.contains("root.rs") || formatted.contains("NOT_FOUND") || formatted.contains("Not found"));
+    }
+
+    #[test]
+    fn recovery_suggestion_for_errors() {
+        let suggestion = recovery_suggestion(&VsError::NotFound("x".into()));
+        assert!(!suggestion.is_empty());
+    }
+
+    #[test]
+    fn file_error_variants_exist() {
+        let err = FileError::NotFound("/missing/path".into());
+        assert!(matches!(err, FileError::NotFound(_)));
+        let err2 = FileError::PermissionDenied("/root/secret".into());
+        assert!(matches!(err2, FileError::PermissionDenied(_)));
+    }
+
+    #[test]
+    fn diagnostic_error_variants() {
+        let err = DiagnosticError::EmptyMessage;
+        assert!(matches!(err, DiagnosticError::EmptyMessage));
+        let err2 = DiagnosticError::EmptyCollectionName;
+        let msg = format!("{}", err2);
+        assert!(!msg.is_empty());
+    }
+
+    #[test]
+    fn configuration_parse_error_handling() {
+        let result = ConfigurationModel::from_jsonc("{ invalid json }");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn error_accumulator_severity_counting() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotFound("a".into()));
+        acc.push(VsError::NotFound("b".into()));
+        acc.push(VsError::NotSupported("c".into()));
+        let error_count = acc.count_at_severity(ErrorSeverity::Error);
+        assert_eq!(error_count, 2);
+    }
+
+}
