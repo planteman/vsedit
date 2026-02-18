@@ -21173,6 +21173,218 @@ impl AxkMultiCursor {
     }
 }
 
+
+// --- axl_ search and replace engine ---
+
+/// Search options flags.
+#[derive(Debug, Clone)]
+pub struct AxlSearchOptions {
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub is_regex: bool,
+    pub preserve_case: bool,
+    pub multiline: bool,
+}
+
+impl AxlSearchOptions {
+    pub fn new() -> Self {
+        Self { case_sensitive: false, whole_word: false, is_regex: false, preserve_case: false, multiline: false }
+    }
+
+    pub fn case_sensitive(mut self) -> Self { self.case_sensitive = true; self }
+    pub fn whole_word(mut self) -> Self { self.whole_word = true; self }
+    pub fn regex(mut self) -> Self { self.is_regex = true; self }
+}
+
+/// A match found in text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxlSearchMatch {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub matched_text: String,
+}
+
+impl AxlSearchMatch {
+    pub fn new(line: u32, start_col: u32, end_col: u32, text: &str) -> Self {
+        Self { line, start_col, end_col, matched_text: text.to_string() }
+    }
+
+    pub fn length(&self) -> u32 { self.end_col - self.start_col }
+}
+
+/// Core text search engine.
+#[derive(Debug, Clone)]
+pub struct AxlSearchEngine {
+    pub pattern: String,
+    pub options: AxlSearchOptions,
+}
+
+impl AxlSearchEngine {
+    pub fn new(pattern: &str, options: AxlSearchOptions) -> Self {
+        Self { pattern: pattern.to_string(), options }
+    }
+
+    /// Search within a single line. Returns all matches.
+    pub fn search_line(&self, line_num: u32, text: &str) -> Vec<AxlSearchMatch> {
+        let mut matches = Vec::new();
+        if self.pattern.is_empty() { return matches; }
+
+        let (search_text, search_pattern) = if self.options.case_sensitive {
+            (text.to_string(), self.pattern.clone())
+        } else {
+            (text.to_lowercase(), self.pattern.to_lowercase())
+        };
+
+        let mut start = 0;
+        while let Some(pos) = search_text[start..].find(&search_pattern) {
+            let abs_pos = start + pos;
+            let end_pos = abs_pos + search_pattern.len();
+
+            if self.options.whole_word {
+                let before_ok = abs_pos == 0 || !search_text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
+                let after_ok = end_pos >= search_text.len() || !search_text.as_bytes()[end_pos].is_ascii_alphanumeric();
+                if !before_ok || !after_ok {
+                    start = abs_pos + 1;
+                    continue;
+                }
+            }
+
+            let matched = &text[abs_pos..abs_pos + self.pattern.len()];
+            matches.push(AxlSearchMatch::new(line_num, abs_pos as u32, end_pos as u32, matched));
+            start = end_pos;
+        }
+        matches
+    }
+
+    /// Search all lines.
+    pub fn search_all(&self, lines: &[&str]) -> Vec<AxlSearchMatch> {
+        let mut all = Vec::new();
+        for (i, line) in lines.iter().enumerate() {
+            all.extend(self.search_line(i as u32, line));
+        }
+        all
+    }
+
+    pub fn match_count(&self, lines: &[&str]) -> usize {
+        self.search_all(lines).len()
+    }
+}
+
+/// Result of a replace operation.
+#[derive(Debug, Clone)]
+pub struct AxlReplaceResult {
+    pub original: String,
+    pub replacement: String,
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+}
+
+/// Search and replace engine.
+#[derive(Debug, Clone)]
+pub struct AxlSearchReplace {
+    pub search: AxlSearchEngine,
+    pub replace_pattern: String,
+}
+
+impl AxlSearchReplace {
+    pub fn new(search: &str, replace: &str, options: AxlSearchOptions) -> Self {
+        Self {
+            search: AxlSearchEngine::new(search, options),
+            replace_pattern: replace.to_string(),
+        }
+    }
+
+    pub fn replace_in_line(&self, line_num: u32, text: &str) -> (String, Vec<AxlReplaceResult>) {
+        let matches = self.search.search_line(line_num, text);
+        if matches.is_empty() {
+            return (text.to_string(), Vec::new());
+        }
+
+        let mut result = String::new();
+        let mut results = Vec::new();
+        let mut last_end = 0usize;
+
+        for m in &matches {
+            result.push_str(&text[last_end..m.start_col as usize]);
+            result.push_str(&self.replace_pattern);
+            results.push(AxlReplaceResult {
+                original: m.matched_text.clone(),
+                replacement: self.replace_pattern.clone(),
+                line: line_num,
+                start_col: m.start_col,
+                end_col: m.end_col,
+            });
+            last_end = m.end_col as usize;
+        }
+        result.push_str(&text[last_end..]);
+        (result, results)
+    }
+
+    pub fn replace_first_in_line(&self, line_num: u32, text: &str) -> (String, Option<AxlReplaceResult>) {
+        let matches = self.search.search_line(line_num, text);
+        if let Some(m) = matches.first() {
+            let mut result = String::new();
+            result.push_str(&text[..m.start_col as usize]);
+            result.push_str(&self.replace_pattern);
+            result.push_str(&text[m.end_col as usize..]);
+            let rr = AxlReplaceResult {
+                original: m.matched_text.clone(),
+                replacement: self.replace_pattern.clone(),
+                line: line_num,
+                start_col: m.start_col,
+                end_col: m.end_col,
+            };
+            (result, Some(rr))
+        } else {
+            (text.to_string(), None)
+        }
+    }
+}
+
+/// File-level search result.
+#[derive(Debug, Clone)]
+pub struct AxlFileSearchResult {
+    pub uri: String,
+    pub matches: Vec<AxlSearchMatch>,
+}
+
+impl AxlFileSearchResult {
+    pub fn new(uri: &str, matches: Vec<AxlSearchMatch>) -> Self {
+        Self { uri: uri.to_string(), matches }
+    }
+
+    pub fn match_count(&self) -> usize { self.matches.len() }
+    pub fn line_count(&self) -> usize {
+        let mut lines: Vec<u32> = self.matches.iter().map(|m| m.line).collect();
+        lines.sort();
+        lines.dedup();
+        lines.len()
+    }
+}
+
+/// Workspace-level search results.
+#[derive(Debug, Clone)]
+pub struct AxlWorkspaceSearchResults {
+    pub results: Vec<AxlFileSearchResult>,
+    pub query: String,
+}
+
+impl AxlWorkspaceSearchResults {
+    pub fn new(query: &str) -> Self {
+        Self { results: Vec::new(), query: query.to_string() }
+    }
+
+    pub fn add(&mut self, result: AxlFileSearchResult) {
+        self.results.push(result);
+    }
+
+    pub fn total_matches(&self) -> usize { self.results.iter().map(|r| r.match_count()).sum() }
+    pub fn file_count(&self) -> usize { self.results.len() }
+    pub fn has_results(&self) -> bool { !self.results.is_empty() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34126,6 +34338,111 @@ mod tests {
         mc.select_all_right(&[20]);
         assert!(!mc.selections[0].is_empty());
         assert!(mc.has_selection());
+    }
+
+
+    // --- axl_ search and replace tests ---
+
+    #[test]
+    fn test_axl_search_basic() {
+        let engine = AxlSearchEngine::new("hello", AxlSearchOptions::new());
+        let matches = engine.search_line(0, "say hello to hello world");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].start_col, 4);
+        assert_eq!(matches[1].start_col, 13);
+    }
+
+    #[test]
+    fn test_axl_search_case_insensitive() {
+        let engine = AxlSearchEngine::new("Hello", AxlSearchOptions::new());
+        let matches = engine.search_line(0, "hello HELLO Hello");
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn test_axl_search_case_sensitive() {
+        let engine = AxlSearchEngine::new("Hello", AxlSearchOptions::new().case_sensitive());
+        let matches = engine.search_line(0, "hello HELLO Hello");
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].matched_text, "Hello");
+    }
+
+    #[test]
+    fn test_axl_search_whole_word() {
+        let engine = AxlSearchEngine::new("or", AxlSearchOptions::new().whole_word());
+        let matches = engine.search_line(0, "for or world or more");
+        assert_eq!(matches.len(), 2); // only standalone "or"
+    }
+
+    #[test]
+    fn test_axl_search_empty_pattern() {
+        let engine = AxlSearchEngine::new("", AxlSearchOptions::new());
+        let matches = engine.search_line(0, "anything");
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_axl_search_all_lines() {
+        let engine = AxlSearchEngine::new("fn", AxlSearchOptions::new());
+        let lines = vec!["fn main() {", "  let x = 1;", "fn helper() {"]; 
+        let matches = engine.search_all(&lines);
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].line, 0);
+        assert_eq!(matches[1].line, 2);
+    }
+
+    #[test]
+    fn test_axl_search_match_length() {
+        let m = AxlSearchMatch::new(0, 5, 10, "world");
+        assert_eq!(m.length(), 5);
+    }
+
+    #[test]
+    fn test_axl_replace_all() {
+        let sr = AxlSearchReplace::new("foo", "bar", AxlSearchOptions::new());
+        let (result, replacements) = sr.replace_in_line(0, "foo and foo");
+        assert_eq!(result, "bar and bar");
+        assert_eq!(replacements.len(), 2);
+    }
+
+    #[test]
+    fn test_axl_replace_first() {
+        let sr = AxlSearchReplace::new("x", "y", AxlSearchOptions::new());
+        let (result, rr) = sr.replace_first_in_line(0, "x x x");
+        assert_eq!(result, "y x x");
+        assert!(rr.is_some());
+    }
+
+    #[test]
+    fn test_axl_replace_no_match() {
+        let sr = AxlSearchReplace::new("zzz", "aaa", AxlSearchOptions::new());
+        let (result, replacements) = sr.replace_in_line(0, "hello world");
+        assert_eq!(result, "hello world");
+        assert!(replacements.is_empty());
+    }
+
+    #[test]
+    fn test_axl_file_search_result() {
+        let fsr = AxlFileSearchResult::new("file:///a.rs", vec![
+            AxlSearchMatch::new(0, 0, 3, "foo"),
+            AxlSearchMatch::new(0, 10, 13, "foo"),
+            AxlSearchMatch::new(5, 0, 3, "foo"),
+        ]);
+        assert_eq!(fsr.match_count(), 3);
+        assert_eq!(fsr.line_count(), 2);
+    }
+
+    #[test]
+    fn test_axl_workspace_results() {
+        let mut wsr = AxlWorkspaceSearchResults::new("todo");
+        wsr.add(AxlFileSearchResult::new("a", vec![AxlSearchMatch::new(0, 0, 4, "todo")]));
+        wsr.add(AxlFileSearchResult::new("b", vec![
+            AxlSearchMatch::new(1, 0, 4, "todo"),
+            AxlSearchMatch::new(5, 0, 4, "todo"),
+        ]));
+        assert_eq!(wsr.total_matches(), 3);
+        assert_eq!(wsr.file_count(), 2);
+        assert!(wsr.has_results());
     }
 
 }
