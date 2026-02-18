@@ -15231,6 +15231,204 @@ impl std::fmt::Display for ZhCodeAction {
     }
 }
 
+
+// --- zi_ document links and code lenses ---
+
+/// A clickable link in a document.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZiDocumentLink {
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub target: Option<String>,
+    pub tooltip: Option<String>,
+}
+
+impl ZiDocumentLink {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_char: sc, end_line: el, end_char: ec, target: None, tooltip: None }
+    }
+
+    pub fn with_target(mut self, target: &str) -> Self { self.target = Some(target.to_string()); self }
+    pub fn with_tooltip(mut self, tip: &str) -> Self { self.tooltip = Some(tip.to_string()); self }
+
+    pub fn is_resolved(&self) -> bool { self.target.is_some() }
+    pub fn affects_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+}
+
+impl std::fmt::Display for ZiDocumentLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZiDocumentLink(L{}:{}-L{}:{})", self.start_line + 1, self.start_char, self.end_line + 1, self.end_char)
+    }
+}
+
+/// A collection of document links.
+#[derive(Debug, Clone, Default)]
+pub struct ZiDocumentLinks {
+    pub links: Vec<ZiDocumentLink>,
+}
+
+impl ZiDocumentLinks {
+    pub fn new() -> Self { Self { links: Vec::new() } }
+    pub fn add(&mut self, link: ZiDocumentLink) { self.links.push(link); }
+    pub fn len(&self) -> usize { self.links.len() }
+    pub fn is_empty(&self) -> bool { self.links.is_empty() }
+    pub fn for_line(&self, line: u32) -> Vec<&ZiDocumentLink> {
+        self.links.iter().filter(|l| l.affects_line(line)).collect()
+    }
+    pub fn resolved_count(&self) -> usize { self.links.iter().filter(|l| l.is_resolved()).count() }
+    pub fn clear(&mut self) { self.links.clear(); }
+}
+
+impl std::fmt::Display for ZiDocumentLinks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZiDocumentLinks({} links)", self.len())
+    }
+}
+
+/// A code lens — an actionable annotation above a code block.
+#[derive(Debug, Clone)]
+pub struct ZiCodeLens {
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub command_id: Option<String>,
+    pub command_title: Option<String>,
+    pub command_args: Vec<String>,
+}
+
+impl ZiCodeLens {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_char: sc, end_line: el, end_char: ec, command_id: None, command_title: None, command_args: Vec::new() }
+    }
+
+    pub fn with_command(mut self, id: &str, title: &str) -> Self {
+        self.command_id = Some(id.to_string()); self.command_title = Some(title.to_string()); self
+    }
+
+    pub fn add_arg(&mut self, arg: &str) { self.command_args.push(arg.to_string()); }
+
+    pub fn is_resolved(&self) -> bool { self.command_id.is_some() }
+    pub fn title(&self) -> &str { self.command_title.as_deref().unwrap_or("") }
+}
+
+impl std::fmt::Display for ZiCodeLens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(title) = &self.command_title {
+            write!(f, "ZiCodeLens(L{}: {})", self.start_line + 1, title)
+        } else {
+            write!(f, "ZiCodeLens(L{}: unresolved)", self.start_line + 1)
+        }
+    }
+}
+
+/// A collection of code lenses for a document.
+#[derive(Debug, Clone, Default)]
+pub struct ZiCodeLenses {
+    pub lenses: Vec<ZiCodeLens>,
+}
+
+impl ZiCodeLenses {
+    pub fn new() -> Self { Self { lenses: Vec::new() } }
+    pub fn add(&mut self, lens: ZiCodeLens) { self.lenses.push(lens); }
+    pub fn len(&self) -> usize { self.lenses.len() }
+    pub fn is_empty(&self) -> bool { self.lenses.is_empty() }
+
+    pub fn for_line(&self, line: u32) -> Vec<&ZiCodeLens> {
+        self.lenses.iter().filter(|l| l.start_line == line).collect()
+    }
+
+    pub fn resolved_count(&self) -> usize { self.lenses.iter().filter(|l| l.is_resolved()).count() }
+
+    pub fn sort_by_line(&mut self) {
+        self.lenses.sort_by_key(|l| (l.start_line, l.start_char));
+    }
+
+    pub fn clear(&mut self) { self.lenses.clear(); }
+}
+
+impl std::fmt::Display for ZiCodeLenses {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZiCodeLenses({} lenses)", self.len())
+    }
+}
+
+/// A folding range in a document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ZiFoldingRange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: ZiFoldingKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZiFoldingKind {
+    Comment,
+    Imports,
+    Region,
+}
+
+impl ZiFoldingRange {
+    pub fn new(start: u32, end: u32, kind: ZiFoldingKind) -> Self {
+        Self { start_line: start, end_line: end, kind }
+    }
+
+    pub fn comment(start: u32, end: u32) -> Self { Self::new(start, end, ZiFoldingKind::Comment) }
+    pub fn imports(start: u32, end: u32) -> Self { Self::new(start, end, ZiFoldingKind::Imports) }
+    pub fn region(start: u32, end: u32) -> Self { Self::new(start, end, ZiFoldingKind::Region) }
+
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+}
+
+impl std::fmt::Display for ZiFoldingRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZiFoldingRange(L{}-L{}, {:?})", self.start_line + 1, self.end_line + 1, self.kind)
+    }
+}
+
+/// A selection range (smart select) with parent chain.
+#[derive(Debug, Clone)]
+pub struct ZiSelectionRange {
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub parent: Option<Box<ZiSelectionRange>>,
+}
+
+impl ZiSelectionRange {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_char: sc, end_line: el, end_char: ec, parent: None }
+    }
+
+    pub fn with_parent(mut self, parent: ZiSelectionRange) -> Self {
+        self.parent = Some(Box::new(parent)); self
+    }
+
+    pub fn depth(&self) -> usize {
+        let mut d = 0;
+        let mut cur = self.parent.as_ref();
+        while let Some(p) = cur { d += 1; cur = p.parent.as_ref(); }
+        d
+    }
+
+    pub fn outermost(&self) -> &ZiSelectionRange {
+        let mut cur = self;
+        while let Some(p) = &cur.parent { cur = p; }
+        cur
+    }
+}
+
+impl std::fmt::Display for ZiSelectionRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZiSelectionRange(L{}:{}-L{}:{}, depth={})", self.start_line + 1, self.start_char, self.end_line + 1, self.end_char, self.depth())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -25017,6 +25215,141 @@ mod tests {
     fn test_zh_code_action_kind_other() {
         let k = ZhCodeActionKind::Other("custom.action".to_string());
         assert_eq!(k.as_str(), "custom.action");
+    }
+
+
+    // --- zi_ tests ---
+
+    #[test]
+    fn test_zi_doc_link_new() {
+        let l = ZiDocumentLink::new(0, 5, 0, 20);
+        assert!(!l.is_resolved());
+        assert!(l.is_single_line());
+    }
+
+    #[test]
+    fn test_zi_doc_link_with_target() {
+        let l = ZiDocumentLink::new(0, 0, 0, 10).with_target("https://example.com");
+        assert!(l.is_resolved());
+    }
+
+    #[test]
+    fn test_zi_doc_link_affects_line() {
+        let l = ZiDocumentLink::new(2, 0, 4, 10);
+        assert!(l.affects_line(3));
+        assert!(!l.affects_line(5));
+    }
+
+    #[test]
+    fn test_zi_doc_link_display() {
+        let l = ZiDocumentLink::new(0, 0, 0, 5);
+        assert!(format!("{}", l).contains("ZiDocumentLink"));
+    }
+
+    #[test]
+    fn test_zi_doc_links_collection() {
+        let mut links = ZiDocumentLinks::new();
+        links.add(ZiDocumentLink::new(0, 0, 0, 10).with_target("x"));
+        links.add(ZiDocumentLink::new(1, 0, 1, 5));
+        assert_eq!(links.len(), 2);
+        assert_eq!(links.resolved_count(), 1);
+        assert_eq!(links.for_line(0).len(), 1);
+    }
+
+    #[test]
+    fn test_zi_code_lens_new() {
+        let cl = ZiCodeLens::new(5, 0, 5, 10);
+        assert!(!cl.is_resolved());
+        assert_eq!(cl.title(), "");
+    }
+
+    #[test]
+    fn test_zi_code_lens_with_command() {
+        let cl = ZiCodeLens::new(0, 0, 0, 10).with_command("run", "Run Test");
+        assert!(cl.is_resolved());
+        assert_eq!(cl.title(), "Run Test");
+    }
+
+    #[test]
+    fn test_zi_code_lens_args() {
+        let mut cl = ZiCodeLens::new(0, 0, 0, 5).with_command("cmd", "Go");
+        cl.add_arg("arg1");
+        assert_eq!(cl.command_args.len(), 1);
+    }
+
+    #[test]
+    fn test_zi_code_lens_display() {
+        let cl = ZiCodeLens::new(0, 0, 0, 5).with_command("x", "Title");
+        assert!(format!("{}", cl).contains("Title"));
+    }
+
+    #[test]
+    fn test_zi_code_lenses_collection() {
+        let mut cls = ZiCodeLenses::new();
+        cls.add(ZiCodeLens::new(0, 0, 0, 5).with_command("a", "A"));
+        cls.add(ZiCodeLens::new(5, 0, 5, 5));
+        assert_eq!(cls.len(), 2);
+        assert_eq!(cls.resolved_count(), 1);
+        assert_eq!(cls.for_line(0).len(), 1);
+    }
+
+    #[test]
+    fn test_zi_code_lenses_sort() {
+        let mut cls = ZiCodeLenses::new();
+        cls.add(ZiCodeLens::new(5, 0, 5, 5));
+        cls.add(ZiCodeLens::new(1, 0, 1, 5));
+        cls.sort_by_line();
+        assert_eq!(cls.lenses[0].start_line, 1);
+    }
+
+    #[test]
+    fn test_zi_folding_range() {
+        let fr = ZiFoldingRange::comment(5, 15);
+        assert_eq!(fr.line_count(), 11);
+        assert!(fr.contains_line(10));
+        assert!(!fr.contains_line(16));
+        assert_eq!(fr.kind, ZiFoldingKind::Comment);
+    }
+
+    #[test]
+    fn test_zi_folding_kinds() {
+        let _ = ZiFoldingRange::imports(0, 5);
+        let _ = ZiFoldingRange::region(10, 20);
+    }
+
+    #[test]
+    fn test_zi_folding_display() {
+        let fr = ZiFoldingRange::region(0, 10);
+        assert!(format!("{}", fr).contains("ZiFoldingRange"));
+    }
+
+    #[test]
+    fn test_zi_selection_range_new() {
+        let sr = ZiSelectionRange::new(1, 0, 1, 10);
+        assert_eq!(sr.depth(), 0);
+    }
+
+    #[test]
+    fn test_zi_selection_range_parent() {
+        let outer = ZiSelectionRange::new(0, 0, 10, 0);
+        let inner = ZiSelectionRange::new(3, 5, 3, 15).with_parent(outer);
+        assert_eq!(inner.depth(), 1);
+    }
+
+    #[test]
+    fn test_zi_selection_range_outermost() {
+        let outer = ZiSelectionRange::new(0, 0, 100, 0);
+        let mid = ZiSelectionRange::new(5, 0, 50, 0).with_parent(outer);
+        let inner = ZiSelectionRange::new(10, 5, 10, 15).with_parent(mid);
+        let om = inner.outermost();
+        assert_eq!(om.start_line, 0);
+        assert_eq!(om.end_line, 100);
+    }
+
+    #[test]
+    fn test_zi_selection_range_display() {
+        let sr = ZiSelectionRange::new(5, 0, 5, 10);
+        assert!(format!("{}", sr).contains("ZiSelectionRange"));
     }
 
 }
