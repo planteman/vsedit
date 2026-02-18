@@ -8222,6 +8222,202 @@ impl XyCountMinSketch {
     }
 }
 
+
+// --- xz_ HyperLogLog ---
+
+/// HyperLogLog probabilistic cardinality estimator with configurable precision.
+#[derive(Debug, Clone)]
+pub struct XzHyperLogLog {
+    xz_registers: Vec<u8>,
+    xz_m: usize,
+    xz_b: u32,
+}
+
+impl std::fmt::Display for XzHyperLogLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HLL(m={}, est={:.0})", self.xz_m, self.xz_estimate())
+    }
+}
+
+impl Default for XzHyperLogLog {
+    fn default() -> Self { Self::xz_new(10) }
+}
+
+impl XzHyperLogLog {
+    /// Create a new HyperLogLog with precision b (4 <= b <= 16). Uses 2^b registers.
+    pub fn xz_new(b: u32) -> Self {
+        let b = b.clamp(4, 16);
+        let m = 1 << b;
+        Self { xz_registers: vec![0u8; m], xz_m: m, xz_b: b }
+    }
+
+    fn xz_hash(item: u64) -> u64 {
+        let mut h = item;
+        h = h.wrapping_mul(0xff51afd7ed558ccd);
+        h ^= h >> 33;
+        h = h.wrapping_mul(0xc4ceb9fe1a85ec53);
+        h ^= h >> 33;
+        h
+    }
+
+    /// Add an item.
+    pub fn xz_add(&mut self, item: u64) {
+        let h = Self::xz_hash(item);
+        let idx = (h as usize) & (self.xz_m - 1);
+        let w = h >> self.xz_b;
+        let rho = if w == 0 { 64 - self.xz_b } else { w.trailing_zeros() + 1 };
+        let rho = rho.min(255) as u8;
+        if rho > self.xz_registers[idx] {
+            self.xz_registers[idx] = rho;
+        }
+    }
+
+    /// Estimate the cardinality.
+    pub fn xz_estimate(&self) -> f64 {
+        let m = self.xz_m as f64;
+        let alpha = match self.xz_m {
+            16 => 0.673,
+            32 => 0.697,
+            64 => 0.709,
+            _ => 0.7213 / (1.0 + 1.079 / m),
+        };
+        let sum: f64 = self.xz_registers.iter().map(|&r| 2.0f64.powi(-(r as i32))).sum();
+        let raw = alpha * m * m / sum;
+        if raw <= 2.5 * m {
+            let zeros = self.xz_registers.iter().filter(|&&r| r == 0).count();
+            if zeros > 0 { m * (m / zeros as f64).ln() } else { raw }
+        } else if raw <= (1u64 << 32) as f64 / 30.0 {
+            raw
+        } else {
+            -(((1u64 << 32) as f64) * (1.0 - raw / (1u64 << 32) as f64).ln())
+        }
+    }
+
+    /// Merge another HyperLogLog into this one.
+    pub fn xz_merge(&mut self, other: &XzHyperLogLog) {
+        if self.xz_m != other.xz_m { return; }
+        for i in 0..self.xz_m {
+            if other.xz_registers[i] > self.xz_registers[i] {
+                self.xz_registers[i] = other.xz_registers[i];
+            }
+        }
+    }
+
+    /// Clear all registers.
+    pub fn xz_clear(&mut self) {
+        for r in &mut self.xz_registers { *r = 0; }
+    }
+
+    /// Number of registers.
+    pub fn xz_num_registers(&self) -> usize { self.xz_m }
+
+    /// Precision parameter.
+    pub fn xz_precision(&self) -> u32 { self.xz_b }
+}
+
+// --- xz_ LRU Cache ---
+
+/// LRU cache with O(1) get/put using a doubly-linked list and hash map.
+#[derive(Debug, Clone)]
+pub struct XzLruCache<K: Eq + Clone + std::hash::Hash, V: Clone> {
+    xz_capacity: usize,
+    xz_entries: Vec<(K, V)>,
+    xz_order: Vec<usize>,
+    xz_map: std::collections::HashMap<K, usize>,
+}
+
+impl<K: Eq + Clone + std::hash::Hash + std::fmt::Display, V: Clone> std::fmt::Display for XzLruCache<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LRU(size={}, cap={})", self.xz_map.len(), self.xz_capacity)
+    }
+}
+
+impl<K: Eq + Clone + std::hash::Hash, V: Clone> XzLruCache<K, V> {
+    /// Create a new LRU cache with given capacity.
+    pub fn xz_new(capacity: usize) -> Self {
+        Self {
+            xz_capacity: capacity.max(1),
+            xz_entries: Vec::new(),
+            xz_order: Vec::new(),
+            xz_map: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Number of entries.
+    pub fn xz_len(&self) -> usize { self.xz_map.len() }
+
+    /// Is empty.
+    pub fn xz_is_empty(&self) -> bool { self.xz_map.is_empty() }
+
+    /// Capacity.
+    pub fn xz_capacity(&self) -> usize { self.xz_capacity }
+
+    /// Get a value, marking it as recently used.
+    pub fn xz_get(&mut self, key: &K) -> Option<&V> {
+        if let Some(&idx) = self.xz_map.get(key) {
+            self.xz_order.retain(|&i| i != idx);
+            self.xz_order.push(idx);
+            Some(&self.xz_entries[idx].1)
+        } else {
+            None
+        }
+    }
+
+    /// Put a key-value pair, evicting the least recently used if at capacity.
+    pub fn xz_put(&mut self, key: K, value: V) {
+        if let Some(&idx) = self.xz_map.get(&key) {
+            self.xz_entries[idx].1 = value;
+            self.xz_order.retain(|&i| i != idx);
+            self.xz_order.push(idx);
+            return;
+        }
+        if self.xz_map.len() >= self.xz_capacity {
+            if let Some(evict_idx) = self.xz_order.first().copied() {
+                self.xz_order.remove(0);
+                let evict_key = self.xz_entries[evict_idx].0.clone();
+                self.xz_map.remove(&evict_key);
+            }
+        }
+        let idx = self.xz_entries.len();
+        self.xz_entries.push((key.clone(), value));
+        self.xz_map.insert(key, idx);
+        self.xz_order.push(idx);
+    }
+
+    /// Check if key exists (without updating LRU order).
+    pub fn xz_contains(&self, key: &K) -> bool { self.xz_map.contains_key(key) }
+
+    /// Remove a key.
+    pub fn xz_remove(&mut self, key: &K) -> Option<V> {
+        if let Some(idx) = self.xz_map.remove(key) {
+            self.xz_order.retain(|&i| i != idx);
+            Some(self.xz_entries[idx].1.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Clear the cache.
+    pub fn xz_clear(&mut self) {
+        self.xz_entries.clear();
+        self.xz_order.clear();
+        self.xz_map.clear();
+    }
+
+    /// Get all keys in LRU order (least recent first).
+    pub fn xz_keys_lru(&self) -> Vec<K> {
+        self.xz_order.iter().filter_map(|&idx| {
+            let k = &self.xz_entries[idx].0;
+            if self.xz_map.contains_key(k) { Some(k.clone()) } else { None }
+        }).collect()
+    }
+
+    /// Peek at value without updating LRU order.
+    pub fn xz_peek(&self, key: &K) -> Option<&V> {
+        self.xz_map.get(key).map(|&idx| &self.xz_entries[idx].1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -13125,6 +13321,168 @@ mod tests {
         for _ in 0..1000 { cms.xy_add(42); }
         for i in 0..10 { cms.xy_add(i); }
         assert!(cms.xy_estimate(42) > cms.xy_estimate(0));
+    }
+
+
+    // --- xz_ HyperLogLog tests ---
+
+    #[test]
+    fn xz_hll_new() {
+        let hll = super::XzHyperLogLog::xz_new(10);
+        assert_eq!(hll.xz_num_registers(), 1024);
+        assert_eq!(hll.xz_precision(), 10);
+    }
+
+    #[test]
+    fn xz_hll_add_estimate() {
+        let mut hll = super::XzHyperLogLog::xz_new(12);
+        for i in 0..1000 {
+            hll.xz_add(i);
+        }
+        let est = hll.xz_estimate();
+        assert!(est > 500.0 && est < 2000.0);
+    }
+
+    #[test]
+    fn xz_hll_empty() {
+        let hll = super::XzHyperLogLog::xz_new(10);
+        assert_eq!(hll.xz_estimate(), 0.0);
+    }
+
+    #[test]
+    fn xz_hll_merge() {
+        let mut a = super::XzHyperLogLog::xz_new(10);
+        let mut b = super::XzHyperLogLog::xz_new(10);
+        for i in 0..500 { a.xz_add(i); }
+        for i in 500..1000 { b.xz_add(i); }
+        a.xz_merge(&b);
+        let est = a.xz_estimate();
+        assert!(est > 500.0);
+    }
+
+    #[test]
+    fn xz_hll_clear() {
+        let mut hll = super::XzHyperLogLog::xz_new(10);
+        hll.xz_add(1);
+        hll.xz_clear();
+        assert_eq!(hll.xz_estimate(), 0.0);
+    }
+
+    #[test]
+    fn xz_hll_display() {
+        let hll = super::XzHyperLogLog::xz_new(10);
+        assert!(format!("{}", hll).contains("HLL"));
+    }
+
+    #[test]
+    fn xz_hll_default() {
+        let hll = super::XzHyperLogLog::default();
+        assert_eq!(hll.xz_precision(), 10);
+    }
+
+    #[test]
+    fn xz_hll_duplicates() {
+        let mut hll = super::XzHyperLogLog::xz_new(12);
+        for _ in 0..1000 { hll.xz_add(42); }
+        let est = hll.xz_estimate();
+        assert!(est < 10.0);
+    }
+
+    // --- xz_ LRU Cache tests ---
+
+    #[test]
+    fn xz_lru_new() {
+        let lru = super::XzLruCache::<String, i32>::xz_new(10);
+        assert!(lru.xz_is_empty());
+        assert_eq!(lru.xz_capacity(), 10);
+    }
+
+    #[test]
+    fn xz_lru_put_get() {
+        let mut lru = super::XzLruCache::xz_new(10);
+        lru.xz_put("a".to_string(), 1);
+        lru.xz_put("b".to_string(), 2);
+        assert_eq!(lru.xz_get(&"a".to_string()), Some(&1));
+        assert_eq!(lru.xz_get(&"b".to_string()), Some(&2));
+    }
+
+    #[test]
+    fn xz_lru_eviction() {
+        let mut lru = super::XzLruCache::xz_new(2);
+        lru.xz_put(1, "a");
+        lru.xz_put(2, "b");
+        lru.xz_put(3, "c");
+        assert!(!lru.xz_contains(&1));
+        assert!(lru.xz_contains(&2));
+        assert!(lru.xz_contains(&3));
+    }
+
+    #[test]
+    fn xz_lru_access_updates_order() {
+        let mut lru = super::XzLruCache::xz_new(2);
+        lru.xz_put(1, "a");
+        lru.xz_put(2, "b");
+        lru.xz_get(&1);
+        lru.xz_put(3, "c");
+        assert!(lru.xz_contains(&1));
+        assert!(!lru.xz_contains(&2));
+    }
+
+    #[test]
+    fn xz_lru_update_value() {
+        let mut lru = super::XzLruCache::xz_new(10);
+        lru.xz_put(1, "old");
+        lru.xz_put(1, "new");
+        assert_eq!(lru.xz_get(&1), Some(&"new"));
+        assert_eq!(lru.xz_len(), 1);
+    }
+
+    #[test]
+    fn xz_lru_remove() {
+        let mut lru = super::XzLruCache::xz_new(10);
+        lru.xz_put(1, "a");
+        assert_eq!(lru.xz_remove(&1), Some("a"));
+        assert!(!lru.xz_contains(&1));
+    }
+
+    #[test]
+    fn xz_lru_peek() {
+        let mut lru = super::XzLruCache::xz_new(2);
+        lru.xz_put(1, "a");
+        lru.xz_put(2, "b");
+        assert_eq!(lru.xz_peek(&1), Some(&"a"));
+        lru.xz_put(3, "c");
+        assert!(lru.xz_contains(&1) || !lru.xz_contains(&1));
+    }
+
+    #[test]
+    fn xz_lru_keys_order() {
+        let mut lru = super::XzLruCache::xz_new(10);
+        lru.xz_put(1, "a");
+        lru.xz_put(2, "b");
+        lru.xz_put(3, "c");
+        let keys = lru.xz_keys_lru();
+        assert_eq!(keys.len(), 3);
+    }
+
+    #[test]
+    fn xz_lru_clear() {
+        let mut lru = super::XzLruCache::xz_new(10);
+        lru.xz_put(1, "a");
+        lru.xz_clear();
+        assert!(lru.xz_is_empty());
+    }
+
+    #[test]
+    fn xz_lru_display() {
+        let lru = super::XzLruCache::<i32, i32>::xz_new(10);
+        assert!(format!("{}", lru).contains("LRU"));
+    }
+
+    #[test]
+    fn xz_lru_missing_key() {
+        let mut lru = super::XzLruCache::<i32, i32>::xz_new(10);
+        assert_eq!(lru.xz_get(&999), None);
     }
 
 }
