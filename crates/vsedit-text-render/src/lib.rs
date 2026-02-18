@@ -26282,6 +26282,99 @@ impl AzhWordFinder {
     }
 }
 
+
+// --- azi_ snippet variables and transforms ---
+
+/// Snippet variable kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AziVarKind { BuiltIn, Selection, Clipboard, DateTime, Random, Comment, Workspace }
+
+/// A snippet variable.
+#[derive(Debug, Clone)]
+pub struct AziSnippetVar {
+    pub name: String,
+    pub kind: AziVarKind,
+    pub default_value: Option<String>,
+}
+
+impl AziSnippetVar {
+    pub fn built_in(name: &str) -> Self { Self { name: name.to_string(), kind: AziVarKind::BuiltIn, default_value: None } }
+    pub fn with_default(mut self, d: &str) -> Self { self.default_value = Some(d.to_string()); self }
+    pub fn resolve(&self, ctx: &AziVarContext) -> String {
+        ctx.get(&self.name).unwrap_or_else(|| self.default_value.clone().unwrap_or_default())
+    }
+}
+
+/// Variable resolution context.
+#[derive(Debug)]
+pub struct AziVarContext {
+    pub values: Vec<(String, String)>,
+}
+
+impl AziVarContext {
+    pub fn new() -> Self { Self { values: Vec::new() } }
+    pub fn set(&mut self, name: &str, val: &str) { self.values.push((name.to_string(), val.to_string())); }
+    pub fn get(&self, name: &str) -> Option<String> {
+        self.values.iter().rev().find(|v| v.0 == name).map(|v| v.1.clone())
+    }
+    pub fn with_file_info(mut self, filename: &str, dir: &str) -> Self {
+        self.set("TM_FILENAME", filename);
+        self.set("TM_DIRECTORY", dir);
+        if let Some(base) = filename.split('.').next() { self.set("TM_FILENAME_BASE", base); }
+        self
+    }
+}
+
+/// Snippet text transform.
+#[derive(Debug, Clone)]
+pub struct AziTransform {
+    pub kind: AziTransformKind,
+}
+
+/// Transform kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AziTransformKind { Upcase, Downcase, Capitalize, CamelCase, PascalCase, SnakeCase }
+
+impl AziTransform {
+    pub fn new(kind: AziTransformKind) -> Self { Self { kind } }
+    pub fn apply(&self, input: &str) -> String {
+        match self.kind {
+            AziTransformKind::Upcase => input.to_uppercase(),
+            AziTransformKind::Downcase => input.to_lowercase(),
+            AziTransformKind::Capitalize => {
+                let mut c = input.chars();
+                match c.next() { None => String::new(), Some(f) => f.to_uppercase().to_string() + &c.as_str().to_lowercase() }
+            }
+            AziTransformKind::CamelCase => {
+                let parts: Vec<&str> = input.split(|c: char| c == '_' || c == '-' || c == ' ').collect();
+                let mut r = String::new();
+                for (i, p) in parts.iter().enumerate() {
+                    if i == 0 { r.push_str(&p.to_lowercase()); }
+                    else {
+                        let mut cs = p.chars();
+                        if let Some(f) = cs.next() { r.push(f.to_uppercase().next().unwrap_or(f)); r.push_str(&cs.as_str().to_lowercase()); }
+                    }
+                }
+                r
+            }
+            AziTransformKind::PascalCase => {
+                input.split(|c: char| c == '_' || c == '-' || c == ' ').map(|p| {
+                    let mut cs = p.chars();
+                    match cs.next() { None => String::new(), Some(f) => f.to_uppercase().to_string() + &cs.as_str().to_lowercase() }
+                }).collect()
+            }
+            AziTransformKind::SnakeCase => {
+                let mut r = String::new();
+                for (i, c) in input.chars().enumerate() {
+                    if c.is_uppercase() && i > 0 { r.push('_'); }
+                    r.push(c.to_lowercase().next().unwrap_or(c));
+                }
+                r
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42677,6 +42770,60 @@ goodbye";
         let h = AzhHighlightRange::selection(3, 5, 10);
         assert_eq!(h.kind, AzhHighlightKind::SelectionHighlight);
         assert_eq!(h.span(), 5);
+    }
+
+
+    #[test]
+    fn test_azi_var_resolve() {
+        let var = AziSnippetVar::built_in("TM_FILENAME").with_default("untitled");
+        let mut ctx = AziVarContext::new();
+        assert_eq!(var.resolve(&ctx), "untitled");
+        ctx.set("TM_FILENAME", "main.rs");
+        assert_eq!(var.resolve(&ctx), "main.rs");
+    }
+
+    #[test]
+    fn test_azi_context_file_info() {
+        let ctx = AziVarContext::new().with_file_info("main.rs", "/src");
+        assert_eq!(ctx.get("TM_FILENAME"), Some("main.rs".to_string()));
+        assert_eq!(ctx.get("TM_FILENAME_BASE"), Some("main".to_string()));
+        assert_eq!(ctx.get("TM_DIRECTORY"), Some("/src".to_string()));
+    }
+
+    #[test]
+    fn test_azi_transform_upcase() {
+        let t = AziTransform::new(AziTransformKind::Upcase);
+        assert_eq!(t.apply("hello"), "HELLO");
+    }
+
+    #[test]
+    fn test_azi_transform_downcase() {
+        let t = AziTransform::new(AziTransformKind::Downcase);
+        assert_eq!(t.apply("HELLO"), "hello");
+    }
+
+    #[test]
+    fn test_azi_transform_capitalize() {
+        let t = AziTransform::new(AziTransformKind::Capitalize);
+        assert_eq!(t.apply("hello world"), "Hello world");
+    }
+
+    #[test]
+    fn test_azi_transform_camel() {
+        let t = AziTransform::new(AziTransformKind::CamelCase);
+        assert_eq!(t.apply("hello_world"), "helloWorld");
+    }
+
+    #[test]
+    fn test_azi_transform_pascal() {
+        let t = AziTransform::new(AziTransformKind::PascalCase);
+        assert_eq!(t.apply("hello_world"), "HelloWorld");
+    }
+
+    #[test]
+    fn test_azi_transform_snake() {
+        let t = AziTransform::new(AziTransformKind::SnakeCase);
+        assert_eq!(t.apply("HelloWorld"), "hello_world");
     }
 
 }
