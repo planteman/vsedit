@@ -15495,6 +15495,178 @@ impl std::fmt::Display for ZjRenameEdit {
     }
 }
 
+
+// --- zk_ workspace symbols and call hierarchy ---
+
+/// A workspace symbol returned from workspace symbol search.
+#[derive(Debug, Clone)]
+pub struct ZkWorkspaceSymbol {
+    pub name: String,
+    pub kind: u8,
+    pub uri: String,
+    pub start_line: u32,
+    pub start_char: u32,
+    pub container_name: Option<String>,
+}
+
+impl ZkWorkspaceSymbol {
+    pub fn new(name: &str, kind: u8, uri: &str, line: u32, ch: u32) -> Self {
+        Self { name: name.to_string(), kind, uri: uri.to_string(), start_line: line, start_char: ch, container_name: None }
+    }
+
+    pub fn with_container(mut self, c: &str) -> Self { self.container_name = Some(c.to_string()); self }
+
+    pub fn matches_query(&self, query: &str) -> bool {
+        let name_lower = self.name.to_lowercase();
+        let q_lower = query.to_lowercase();
+        name_lower.contains(&q_lower)
+    }
+
+    pub fn qualified_name(&self) -> String {
+        if let Some(c) = &self.container_name {
+            format!("{}.{}", c, self.name)
+        } else {
+            self.name.clone()
+        }
+    }
+}
+
+impl std::fmt::Display for ZkWorkspaceSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZkWorkspaceSymbol({} in {})", self.name, self.uri)
+    }
+}
+
+/// A workspace symbol search result set.
+#[derive(Debug, Clone, Default)]
+pub struct ZkWorkspaceSymbols {
+    pub symbols: Vec<ZkWorkspaceSymbol>,
+}
+
+impl ZkWorkspaceSymbols {
+    pub fn new() -> Self { Self { symbols: Vec::new() } }
+    pub fn add(&mut self, sym: ZkWorkspaceSymbol) { self.symbols.push(sym); }
+    pub fn len(&self) -> usize { self.symbols.len() }
+    pub fn is_empty(&self) -> bool { self.symbols.is_empty() }
+
+    pub fn search(&self, query: &str) -> Vec<&ZkWorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.matches_query(query)).collect()
+    }
+
+    pub fn in_file(&self, uri: &str) -> Vec<&ZkWorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.uri == uri).collect()
+    }
+}
+
+impl std::fmt::Display for ZkWorkspaceSymbols {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZkWorkspaceSymbols({} symbols)", self.len())
+    }
+}
+
+/// A call hierarchy item — a function/method that can be called or calls others.
+#[derive(Debug, Clone)]
+pub struct ZkCallHierarchyItem {
+    pub name: String,
+    pub kind: u8,
+    pub uri: String,
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub detail: Option<String>,
+}
+
+impl ZkCallHierarchyItem {
+    pub fn new(name: &str, kind: u8, uri: &str, sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { name: name.to_string(), kind, uri: uri.to_string(), start_line: sl, start_char: sc, end_line: el, end_char: ec, detail: None }
+    }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+}
+
+impl std::fmt::Display for ZkCallHierarchyItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZkCallHierarchyItem({}, L{}-L{})", self.name, self.start_line + 1, self.end_line + 1)
+    }
+}
+
+/// An incoming call — who calls a given function.
+#[derive(Debug, Clone)]
+pub struct ZkIncomingCall {
+    pub from: ZkCallHierarchyItem,
+    pub from_ranges: Vec<(u32, u32, u32, u32)>,
+}
+
+impl ZkIncomingCall {
+    pub fn new(from: ZkCallHierarchyItem) -> Self {
+        Self { from, from_ranges: Vec::new() }
+    }
+
+    pub fn add_range(&mut self, sl: u32, sc: u32, el: u32, ec: u32) {
+        self.from_ranges.push((sl, sc, el, ec));
+    }
+
+    pub fn call_count(&self) -> usize { self.from_ranges.len() }
+}
+
+impl std::fmt::Display for ZkIncomingCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZkIncomingCall(from={}, calls={})", self.from.name, self.call_count())
+    }
+}
+
+/// An outgoing call — what a given function calls.
+#[derive(Debug, Clone)]
+pub struct ZkOutgoingCall {
+    pub to: ZkCallHierarchyItem,
+    pub from_ranges: Vec<(u32, u32, u32, u32)>,
+}
+
+impl ZkOutgoingCall {
+    pub fn new(to: ZkCallHierarchyItem) -> Self {
+        Self { to, from_ranges: Vec::new() }
+    }
+
+    pub fn add_range(&mut self, sl: u32, sc: u32, el: u32, ec: u32) {
+        self.from_ranges.push((sl, sc, el, ec));
+    }
+
+    pub fn call_count(&self) -> usize { self.from_ranges.len() }
+}
+
+impl std::fmt::Display for ZkOutgoingCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZkOutgoingCall(to={}, calls={})", self.to.name, self.call_count())
+    }
+}
+
+/// Type hierarchy item for class/interface inheritance.
+#[derive(Debug, Clone)]
+pub struct ZkTypeHierarchyItem {
+    pub name: String,
+    pub kind: u8,
+    pub uri: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub detail: Option<String>,
+}
+
+impl ZkTypeHierarchyItem {
+    pub fn new(name: &str, kind: u8, uri: &str, sl: u32, el: u32) -> Self {
+        Self { name: name.to_string(), kind, uri: uri.to_string(), start_line: sl, end_line: el, detail: None }
+    }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+}
+
+impl std::fmt::Display for ZkTypeHierarchyItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZkTypeHierarchyItem({})", self.name)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -25751,6 +25923,102 @@ mod tests {
         assert!(s.contains("ZjRenameEdit"));
         assert!(s.contains("x"));
         assert!(s.contains("y"));
+    }
+
+
+    // --- zk_ tests ---
+
+    #[test]
+    fn test_zk_workspace_symbol() {
+        let s = ZkWorkspaceSymbol::new("main", 12, "file.rs", 0, 0);
+        assert_eq!(s.name, "main");
+        assert!(s.matches_query("mai"));
+        assert!(!s.matches_query("xyz"));
+    }
+
+    #[test]
+    fn test_zk_workspace_symbol_container() {
+        let s = ZkWorkspaceSymbol::new("test", 6, "lib.rs", 5, 0).with_container("MyModule");
+        assert_eq!(s.qualified_name(), "MyModule.test");
+    }
+
+    #[test]
+    fn test_zk_workspace_symbol_display() {
+        let s = ZkWorkspaceSymbol::new("x", 0, "f.rs", 0, 0);
+        assert!(format!("{}", s).contains("ZkWorkspaceSymbol"));
+    }
+
+    #[test]
+    fn test_zk_workspace_symbols_search() {
+        let mut ws = ZkWorkspaceSymbols::new();
+        ws.add(ZkWorkspaceSymbol::new("handleClick", 12, "a.rs", 0, 0));
+        ws.add(ZkWorkspaceSymbol::new("handleSubmit", 12, "b.rs", 0, 0));
+        ws.add(ZkWorkspaceSymbol::new("render", 12, "a.rs", 5, 0));
+        assert_eq!(ws.search("handle").len(), 2);
+        assert_eq!(ws.in_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_zk_workspace_symbols_display() {
+        let ws = ZkWorkspaceSymbols::new();
+        assert!(format!("{}", ws).contains("ZkWorkspaceSymbols"));
+    }
+
+    #[test]
+    fn test_zk_call_hierarchy_item() {
+        let item = ZkCallHierarchyItem::new("process", 12, "main.rs", 10, 0, 30, 0).with_detail("pub fn");
+        assert_eq!(item.line_count(), 21);
+        assert_eq!(item.detail, Some("pub fn".to_string()));
+    }
+
+    #[test]
+    fn test_zk_call_hierarchy_display() {
+        let item = ZkCallHierarchyItem::new("x", 0, "f.rs", 0, 0, 5, 0);
+        assert!(format!("{}", item).contains("ZkCallHierarchyItem"));
+    }
+
+    #[test]
+    fn test_zk_incoming_call() {
+        let from = ZkCallHierarchyItem::new("caller", 12, "a.rs", 0, 0, 10, 0);
+        let mut ic = ZkIncomingCall::new(from);
+        ic.add_range(5, 0, 5, 10);
+        ic.add_range(8, 0, 8, 10);
+        assert_eq!(ic.call_count(), 2);
+    }
+
+    #[test]
+    fn test_zk_incoming_call_display() {
+        let from = ZkCallHierarchyItem::new("fn_a", 12, "x.rs", 0, 0, 5, 0);
+        let ic = ZkIncomingCall::new(from);
+        assert!(format!("{}", ic).contains("fn_a"));
+    }
+
+    #[test]
+    fn test_zk_outgoing_call() {
+        let to = ZkCallHierarchyItem::new("callee", 12, "b.rs", 0, 0, 5, 0);
+        let mut oc = ZkOutgoingCall::new(to);
+        oc.add_range(3, 10, 3, 20);
+        assert_eq!(oc.call_count(), 1);
+    }
+
+    #[test]
+    fn test_zk_outgoing_call_display() {
+        let to = ZkCallHierarchyItem::new("fn_b", 12, "y.rs", 0, 0, 3, 0);
+        let oc = ZkOutgoingCall::new(to);
+        assert!(format!("{}", oc).contains("fn_b"));
+    }
+
+    #[test]
+    fn test_zk_type_hierarchy_item() {
+        let item = ZkTypeHierarchyItem::new("MyClass", 5, "cls.rs", 0, 50).with_detail("class");
+        assert_eq!(item.name, "MyClass");
+        assert_eq!(item.detail, Some("class".to_string()));
+    }
+
+    #[test]
+    fn test_zk_type_hierarchy_display() {
+        let item = ZkTypeHierarchyItem::new("Trait", 0, "t.rs", 0, 10);
+        assert!(format!("{}", item).contains("Trait"));
     }
 
 }
