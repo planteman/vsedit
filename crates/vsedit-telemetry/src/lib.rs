@@ -13641,6 +13641,153 @@ impl<V: Clone + std::fmt::Debug> std::fmt::Display for YxLfuCache<V> {
     }
 }
 
+
+// --- yy_ event emitter and observable value ---
+
+/// A typed event emitter that tracks listener IDs and supports emit/clear.
+#[derive(Debug, Clone)]
+pub struct YyEventEmitter {
+    listeners: Vec<(usize, String, bool)>, // id, event_name, once
+    next_id: usize,
+    emit_count: usize,
+}
+
+impl YyEventEmitter {
+    pub fn new() -> Self {
+        Self { listeners: Vec::new(), next_id: 0, emit_count: 0 }
+    }
+
+    pub fn on(&mut self, event: &str) -> usize {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.listeners.push((id, event.to_string(), false));
+        id
+    }
+
+    pub fn once(&mut self, event: &str) -> usize {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.listeners.push((id, event.to_string(), true));
+        id
+    }
+
+    pub fn off(&mut self, id: usize) -> bool {
+        let len = self.listeners.len();
+        self.listeners.retain(|(lid, _, _)| *lid != id);
+        self.listeners.len() < len
+    }
+
+    pub fn emit(&mut self, event: &str) -> usize {
+        let count = self.listeners.iter().filter(|(_, e, _)| e == event).count();
+        self.listeners.retain(|(_, e, once)| !(e == event && *once));
+        self.emit_count += 1;
+        count
+    }
+
+    pub fn listener_count(&self, event: &str) -> usize {
+        self.listeners.iter().filter(|(_, e, _)| e == event).count()
+    }
+
+    pub fn total_listeners(&self) -> usize { self.listeners.len() }
+
+    pub fn events(&self) -> Vec<String> {
+        let mut evts: Vec<String> = self.listeners.iter().map(|(_, e, _)| e.clone()).collect();
+        evts.sort();
+        evts.dedup();
+        evts
+    }
+
+    pub fn has_listeners(&self, event: &str) -> bool {
+        self.listeners.iter().any(|(_, e, _)| e == event)
+    }
+
+    pub fn clear(&mut self) {
+        self.listeners.clear();
+    }
+
+    pub fn clear_event(&mut self, event: &str) {
+        self.listeners.retain(|(_, e, _)| e != event);
+    }
+
+    pub fn emit_count(&self) -> usize { self.emit_count }
+}
+
+impl Default for YyEventEmitter {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for YyEventEmitter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YyEventEmitter(listeners={}, events={})", self.total_listeners(), self.events().len())
+    }
+}
+
+/// An observable value that tracks changes and notifies watchers.
+#[derive(Debug, Clone)]
+pub struct YyObservable<T: Clone + PartialEq> {
+    value: T,
+    version: usize,
+    watchers: usize,
+    change_count: usize,
+}
+
+impl<T: Clone + PartialEq> YyObservable<T> {
+    pub fn new(value: T) -> Self {
+        Self { value, version: 0, watchers: 0, change_count: 0 }
+    }
+
+    pub fn get(&self) -> &T { &self.value }
+
+    pub fn set(&mut self, value: T) -> bool {
+        if self.value != value {
+            self.value = value;
+            self.version += 1;
+            self.change_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn force_set(&mut self, value: T) {
+        self.value = value;
+        self.version += 1;
+        self.change_count += 1;
+    }
+
+    pub fn version(&self) -> usize { self.version }
+
+    pub fn change_count(&self) -> usize { self.change_count }
+
+    pub fn add_watcher(&mut self) -> usize {
+        self.watchers += 1;
+        self.watchers
+    }
+
+    pub fn remove_watcher(&mut self) -> usize {
+        if self.watchers > 0 { self.watchers -= 1; }
+        self.watchers
+    }
+
+    pub fn watcher_count(&self) -> usize { self.watchers }
+
+    pub fn has_watchers(&self) -> bool { self.watchers > 0 }
+
+    pub fn map<U: Clone + PartialEq, F: FnOnce(&T) -> U>(&self, f: F) -> YyObservable<U> {
+        YyObservable::new(f(&self.value))
+    }
+}
+
+impl<T: Clone + PartialEq + Default> Default for YyObservable<T> {
+    fn default() -> Self { Self::new(T::default()) }
+}
+
+impl<T: Clone + PartialEq + std::fmt::Debug> std::fmt::Display for YyObservable<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YyObservable(v{}, watchers={})", self.version, self.watchers)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -22279,6 +22426,162 @@ mod tests {
         let c: YxLfuCache<i32> = YxLfuCache::new(3);
         let s = format!("{}", c);
         assert!(s.contains("YxLfuCache"));
+    }
+
+
+    // --- yy_ tests ---
+
+    #[test]
+    fn test_yy_emitter_new() {
+        let e = YyEventEmitter::new();
+        assert_eq!(e.total_listeners(), 0);
+        assert_eq!(e.emit_count(), 0);
+    }
+
+    #[test]
+    fn test_yy_emitter_on() {
+        let mut e = YyEventEmitter::new();
+        let id = e.on("click");
+        assert_eq!(e.listener_count("click"), 1);
+        assert!(e.has_listeners("click"));
+        assert!(id < 100);
+    }
+
+    #[test]
+    fn test_yy_emitter_emit() {
+        let mut e = YyEventEmitter::new();
+        e.on("click");
+        e.on("click");
+        assert_eq!(e.emit("click"), 2);
+        assert_eq!(e.listener_count("click"), 2); // not once, so still there
+    }
+
+    #[test]
+    fn test_yy_emitter_once() {
+        let mut e = YyEventEmitter::new();
+        e.once("click");
+        assert_eq!(e.listener_count("click"), 1);
+        e.emit("click");
+        assert_eq!(e.listener_count("click"), 0);
+    }
+
+    #[test]
+    fn test_yy_emitter_off() {
+        let mut e = YyEventEmitter::new();
+        let id = e.on("click");
+        assert!(e.off(id));
+        assert_eq!(e.total_listeners(), 0);
+    }
+
+    #[test]
+    fn test_yy_emitter_events() {
+        let mut e = YyEventEmitter::new();
+        e.on("click");
+        e.on("hover");
+        let events = e.events();
+        assert!(events.contains(&"click".to_string()));
+        assert!(events.contains(&"hover".to_string()));
+    }
+
+    #[test]
+    fn test_yy_emitter_clear() {
+        let mut e = YyEventEmitter::new();
+        e.on("click");
+        e.on("hover");
+        e.clear();
+        assert_eq!(e.total_listeners(), 0);
+    }
+
+    #[test]
+    fn test_yy_emitter_clear_event() {
+        let mut e = YyEventEmitter::new();
+        e.on("click");
+        e.on("hover");
+        e.clear_event("click");
+        assert!(!e.has_listeners("click"));
+        assert!(e.has_listeners("hover"));
+    }
+
+    #[test]
+    fn test_yy_emitter_display() {
+        let e = YyEventEmitter::new();
+        let s = format!("{}", e);
+        assert!(s.contains("YyEventEmitter"));
+    }
+
+    #[test]
+    fn test_yy_emitter_default() {
+        let e = YyEventEmitter::default();
+        assert_eq!(e.total_listeners(), 0);
+    }
+
+    #[test]
+    fn test_yy_observable_new() {
+        let o = YyObservable::new(42);
+        assert_eq!(*o.get(), 42);
+        assert_eq!(o.version(), 0);
+    }
+
+    #[test]
+    fn test_yy_observable_set() {
+        let mut o = YyObservable::new(1);
+        assert!(o.set(2));
+        assert_eq!(*o.get(), 2);
+        assert_eq!(o.version(), 1);
+    }
+
+    #[test]
+    fn test_yy_observable_no_change() {
+        let mut o = YyObservable::new(1);
+        assert!(!o.set(1));
+        assert_eq!(o.version(), 0);
+    }
+
+    #[test]
+    fn test_yy_observable_force_set() {
+        let mut o = YyObservable::new(1);
+        o.force_set(1);
+        assert_eq!(o.version(), 1);
+    }
+
+    #[test]
+    fn test_yy_observable_watchers() {
+        let mut o = YyObservable::new(0);
+        o.add_watcher();
+        o.add_watcher();
+        assert_eq!(o.watcher_count(), 2);
+        assert!(o.has_watchers());
+        o.remove_watcher();
+        assert_eq!(o.watcher_count(), 1);
+    }
+
+    #[test]
+    fn test_yy_observable_map() {
+        let o = YyObservable::new(5);
+        let doubled = o.map(|x| x * 2);
+        assert_eq!(*doubled.get(), 10);
+    }
+
+    #[test]
+    fn test_yy_observable_change_count() {
+        let mut o = YyObservable::new(0);
+        o.set(1);
+        o.set(2);
+        o.set(2); // no change
+        assert_eq!(o.change_count(), 2);
+    }
+
+    #[test]
+    fn test_yy_observable_display() {
+        let o = YyObservable::new(42);
+        let s = format!("{}", o);
+        assert!(s.contains("YyObservable"));
+    }
+
+    #[test]
+    fn test_yy_observable_default() {
+        let o: YyObservable<i32> = YyObservable::default();
+        assert_eq!(*o.get(), 0);
     }
 
 }
