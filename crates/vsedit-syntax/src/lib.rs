@@ -22387,6 +22387,110 @@ impl AxtAutoIndent {
     }
 }
 
+
+// --- axu_ editor decorations and gutter annotations ---
+
+/// Decoration range type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxuDecorationType { Highlight, Underline, Border, GutterIcon, InlineText, WholeLine }
+
+/// A decoration range in the editor.
+#[derive(Debug, Clone)]
+pub struct AxuDecorationRange {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub decoration_type: AxuDecorationType,
+    pub color: Option<(u8, u8, u8)>,
+    pub hover_message: Option<String>,
+}
+
+impl AxuDecorationRange {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, dtype: AxuDecorationType) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, decoration_type: dtype, color: None, hover_message: None }
+    }
+    pub fn with_color(mut self, r: u8, g: u8, b: u8) -> Self { self.color = Some((r, g, b)); self }
+    pub fn with_hover(mut self, msg: &str) -> Self { self.hover_message = Some(msg.to_string()); self }
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+    pub fn contains_pos(&self, line: u32, col: u32) -> bool {
+        if line < self.start_line || line > self.end_line { return false; }
+        if line == self.start_line && col < self.start_col { return false; }
+        if line == self.end_line && col > self.end_col { return false; }
+        true
+    }
+}
+
+/// Gutter indicator type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxuGutterKind { Breakpoint, Bookmark, Error, Warning, Info, GitAdded, GitModified, GitDeleted, FoldOpen, FoldClosed }
+
+/// A gutter annotation for a line.
+#[derive(Debug, Clone)]
+pub struct AxuGutterAnnotation {
+    pub line: u32,
+    pub kind: AxuGutterKind,
+    pub tooltip: Option<String>,
+}
+
+impl AxuGutterAnnotation {
+    pub fn new(line: u32, kind: AxuGutterKind) -> Self { Self { line, kind, tooltip: None } }
+    pub fn with_tooltip(mut self, tip: &str) -> Self { self.tooltip = Some(tip.to_string()); self }
+    pub fn symbol(&self) -> &str {
+        match self.kind {
+            AxuGutterKind::Breakpoint => "BP", AxuGutterKind::Bookmark => "BM",
+            AxuGutterKind::Error => "E!", AxuGutterKind::Warning => "W!",
+            AxuGutterKind::Info => "i", AxuGutterKind::GitAdded => "+",
+            AxuGutterKind::GitModified => "~", AxuGutterKind::GitDeleted => "-",
+            AxuGutterKind::FoldOpen => "v", AxuGutterKind::FoldClosed => ">",
+        }
+    }
+}
+
+/// Decoration collection for an editor.
+#[derive(Debug)]
+pub struct AxuDecorationCollection {
+    pub decorations: Vec<AxuDecorationRange>,
+    pub gutter: Vec<AxuGutterAnnotation>,
+}
+
+impl AxuDecorationCollection {
+    pub fn new() -> Self { Self { decorations: Vec::new(), gutter: Vec::new() } }
+    pub fn add_decoration(&mut self, d: AxuDecorationRange) { self.decorations.push(d); }
+    pub fn add_gutter(&mut self, g: AxuGutterAnnotation) { self.gutter.push(g); }
+    pub fn decorations_at_line(&self, line: u32) -> Vec<&AxuDecorationRange> {
+        self.decorations.iter().filter(|d| d.contains_line(line)).collect()
+    }
+    pub fn gutter_at_line(&self, line: u32) -> Vec<&AxuGutterAnnotation> {
+        self.gutter.iter().filter(|g| g.line == line).collect()
+    }
+    pub fn clear_decorations(&mut self) { self.decorations.clear(); }
+    pub fn clear_gutter(&mut self) { self.gutter.clear(); }
+    pub fn decoration_count(&self) -> usize { self.decorations.len() }
+    pub fn gutter_count(&self) -> usize { self.gutter.len() }
+    pub fn remove_decorations_of_type(&mut self, dtype: AxuDecorationType) {
+        self.decorations.retain(|d| d.decoration_type != dtype);
+    }
+    pub fn decorations_at_pos(&self, line: u32, col: u32) -> Vec<&AxuDecorationRange> {
+        self.decorations.iter().filter(|d| d.contains_pos(line, col)).collect()
+    }
+}
+
+/// Inline code lens annotation.
+#[derive(Debug, Clone)]
+pub struct AxuCodeLensAnnotation {
+    pub line: u32,
+    pub title: String,
+    pub command_id: String,
+}
+
+impl AxuCodeLensAnnotation {
+    pub fn new(line: u32, title: &str, cmd: &str) -> Self {
+        Self { line, title: title.to_string(), command_id: cmd.to_string() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36007,6 +36111,72 @@ mod tests {
     fn test_axt_auto_indent() {
         let indent = AxtAutoIndent::compute_indent("    fn main() {", AxtIndentStyle::Spaces(4));
         assert_eq!(indent, "        ");
+    }
+
+
+    #[test]
+    fn test_axu_decoration_range() {
+        let d = AxuDecorationRange::new(5, 0, 5, 10, AxuDecorationType::Highlight).with_color(255, 0, 0);
+        assert!(d.is_single_line());
+        assert!(d.contains_line(5));
+        assert!(!d.contains_line(6));
+        assert!(d.contains_pos(5, 5));
+        assert!(!d.contains_pos(5, 11));
+    }
+
+    #[test]
+    fn test_axu_decoration_multiline() {
+        let d = AxuDecorationRange::new(3, 0, 7, 20, AxuDecorationType::Underline);
+        assert!(!d.is_single_line());
+        assert!(d.contains_line(5));
+    }
+
+    #[test]
+    fn test_axu_gutter_annotation() {
+        let g = AxuGutterAnnotation::new(10, AxuGutterKind::Breakpoint).with_tooltip("Hit here");
+        assert_eq!(g.symbol(), "BP");
+        assert_eq!(g.tooltip.as_deref(), Some("Hit here"));
+    }
+
+    #[test]
+    fn test_axu_gutter_symbols() {
+        assert_eq!(AxuGutterAnnotation::new(0, AxuGutterKind::Error).symbol(), "E!");
+        assert_eq!(AxuGutterAnnotation::new(0, AxuGutterKind::GitAdded).symbol(), "+");
+        assert_eq!(AxuGutterAnnotation::new(0, AxuGutterKind::FoldOpen).symbol(), "v");
+    }
+
+    #[test]
+    fn test_axu_decoration_collection() {
+        let mut col = AxuDecorationCollection::new();
+        col.add_decoration(AxuDecorationRange::new(5, 0, 5, 10, AxuDecorationType::Highlight));
+        col.add_decoration(AxuDecorationRange::new(5, 3, 5, 8, AxuDecorationType::Underline));
+        col.add_gutter(AxuGutterAnnotation::new(5, AxuGutterKind::Warning));
+        assert_eq!(col.decorations_at_line(5).len(), 2);
+        assert_eq!(col.gutter_at_line(5).len(), 1);
+        assert_eq!(col.decoration_count(), 2);
+    }
+
+    #[test]
+    fn test_axu_remove_by_type() {
+        let mut col = AxuDecorationCollection::new();
+        col.add_decoration(AxuDecorationRange::new(0, 0, 0, 5, AxuDecorationType::Highlight));
+        col.add_decoration(AxuDecorationRange::new(1, 0, 1, 5, AxuDecorationType::Underline));
+        col.remove_decorations_of_type(AxuDecorationType::Highlight);
+        assert_eq!(col.decoration_count(), 1);
+    }
+
+    #[test]
+    fn test_axu_code_lens() {
+        let cl = AxuCodeLensAnnotation::new(10, "Run Test", "test.run");
+        assert_eq!(cl.line, 10);
+        assert_eq!(cl.command_id, "test.run");
+    }
+
+    #[test]
+    fn test_axu_decoration_hover() {
+        let d = AxuDecorationRange::new(0, 0, 0, 5, AxuDecorationType::Border)
+            .with_hover("Error here");
+        assert_eq!(d.hover_message.as_deref(), Some("Error here"));
     }
 
 }
