@@ -18905,6 +18905,277 @@ impl ZzEditorLayout {
     }
 }
 
+
+// --- axa_ LSP protocol message types ---
+
+/// JSON-RPC message ID.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AxaRequestId {
+    Number(i64),
+    String(String),
+}
+
+impl AxaRequestId {
+    pub fn num(n: i64) -> Self { Self::Number(n) }
+    pub fn str(s: &str) -> Self { Self::String(s.to_string()) }
+}
+
+/// A JSON-RPC request message.
+#[derive(Debug, Clone)]
+pub struct AxaRequest {
+    pub id: AxaRequestId,
+    pub method: String,
+    pub params: Option<String>,
+}
+
+impl AxaRequest {
+    pub fn new(id: AxaRequestId, method: &str) -> Self {
+        Self { id, method: method.to_string(), params: None }
+    }
+
+    pub fn with_params(mut self, params: &str) -> Self {
+        self.params = Some(params.to_string());
+        self
+    }
+
+    pub fn is_initialize(&self) -> bool {
+        self.method == "initialize"
+    }
+
+    pub fn is_shutdown(&self) -> bool {
+        self.method == "shutdown"
+    }
+
+    pub fn to_header(&self) -> String {
+        let body = self.to_json();
+        format!("Content-Length: {}\r\n\r\n{}", body.len(), body)
+    }
+
+    pub fn to_json(&self) -> String {
+        match &self.params {
+            Some(p) => format!(
+                r#"{{"jsonrpc":"2.0","id":{},"method":"{}","params":{}}}"#,
+                self.id_json(), self.method, p
+            ),
+            None => format!(
+                r#"{{"jsonrpc":"2.0","id":{},"method":"{}"}}"#,
+                self.id_json(), self.method
+            ),
+        }
+    }
+
+    fn id_json(&self) -> String {
+        match &self.id {
+            AxaRequestId::Number(n) => n.to_string(),
+            AxaRequestId::String(s) => format!(r#""{}""#, s),
+        }
+    }
+}
+
+/// A JSON-RPC response.
+#[derive(Debug, Clone)]
+pub struct AxaResponse {
+    pub id: AxaRequestId,
+    pub result: Option<String>,
+    pub error: Option<AxaResponseError>,
+}
+
+/// An error in a JSON-RPC response.
+#[derive(Debug, Clone)]
+pub struct AxaResponseError {
+    pub code: i32,
+    pub message: String,
+    pub data: Option<String>,
+}
+
+impl AxaResponseError {
+    pub fn new(code: i32, message: &str) -> Self {
+        Self { code, message: message.to_string(), data: None }
+    }
+
+    pub fn parse_error() -> Self { Self::new(-32700, "Parse error") }
+    pub fn invalid_request() -> Self { Self::new(-32600, "Invalid Request") }
+    pub fn method_not_found() -> Self { Self::new(-32601, "Method not found") }
+    pub fn invalid_params() -> Self { Self::new(-32602, "Invalid params") }
+    pub fn internal_error() -> Self { Self::new(-32603, "Internal error") }
+    pub fn server_not_initialized() -> Self { Self::new(-32002, "Server not initialized") }
+    pub fn request_cancelled() -> Self { Self::new(-32800, "Request cancelled") }
+}
+
+impl AxaResponse {
+    pub fn success(id: AxaRequestId, result: &str) -> Self {
+        Self { id, result: Some(result.to_string()), error: None }
+    }
+
+    pub fn error(id: AxaRequestId, err: AxaResponseError) -> Self {
+        Self { id, result: None, error: Some(err) }
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.error.is_none()
+    }
+
+    pub fn to_json(&self) -> String {
+        let id_json = match &self.id {
+            AxaRequestId::Number(n) => n.to_string(),
+            AxaRequestId::String(s) => format!(r#""{}""#, s),
+        };
+        if let Some(err) = &self.error {
+            format!(
+                r#"{{"jsonrpc":"2.0","id":{},"error":{{"code":{},"message":"{}"}}}}"#,
+                id_json, err.code, err.message
+            )
+        } else {
+            format!(
+                r#"{{"jsonrpc":"2.0","id":{},"result":{}}}"#,
+                id_json, self.result.as_deref().unwrap_or("null")
+            )
+        }
+    }
+}
+
+/// A JSON-RPC notification (no id, no response expected).
+#[derive(Debug, Clone)]
+pub struct AxaNotification {
+    pub method: String,
+    pub params: Option<String>,
+}
+
+impl AxaNotification {
+    pub fn new(method: &str) -> Self {
+        Self { method: method.to_string(), params: None }
+    }
+
+    pub fn with_params(mut self, params: &str) -> Self {
+        self.params = Some(params.to_string());
+        self
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        self.method == "initialized"
+    }
+
+    pub fn is_exit(&self) -> bool {
+        self.method == "exit"
+    }
+
+    pub fn is_did_open(&self) -> bool {
+        self.method == "textDocument/didOpen"
+    }
+
+    pub fn is_did_change(&self) -> bool {
+        self.method == "textDocument/didChange"
+    }
+
+    pub fn is_did_save(&self) -> bool {
+        self.method == "textDocument/didSave"
+    }
+
+    pub fn is_did_close(&self) -> bool {
+        self.method == "textDocument/didClose"
+    }
+
+    pub fn to_json(&self) -> String {
+        match &self.params {
+            Some(p) => format!(r#"{{"jsonrpc":"2.0","method":"{}","params":{}}}"#, self.method, p),
+            None => format!(r#"{{"jsonrpc":"2.0","method":"{}"}}"#, self.method),
+        }
+    }
+
+    pub fn to_header(&self) -> String {
+        let body = self.to_json();
+        format!("Content-Length: {}\r\n\r\n{}", body.len(), body)
+    }
+}
+
+/// Parse a Content-Length header from LSP stream bytes.
+pub fn axa_parse_content_length(header: &str) -> Option<usize> {
+    for line in header.lines() {
+        let lower = line.to_lowercase();
+        if lower.starts_with("content-length:") {
+            let val = line.split(':').nth(1)?.trim();
+            return val.parse().ok();
+        }
+    }
+    None
+}
+
+/// LSP message dispatcher that routes methods to handlers.
+#[derive(Debug, Clone)]
+pub struct AxaDispatcher {
+    handlers: Vec<(String, bool)>, // (method, is_notification)
+}
+
+impl AxaDispatcher {
+    pub fn new() -> Self {
+        Self { handlers: Vec::new() }
+    }
+
+    pub fn register_request(&mut self, method: &str) {
+        self.handlers.push((method.to_string(), false));
+    }
+
+    pub fn register_notification(&mut self, method: &str) {
+        self.handlers.push((method.to_string(), true));
+    }
+
+    pub fn can_handle(&self, method: &str) -> bool {
+        self.handlers.iter().any(|(m, _)| m == method)
+    }
+
+    pub fn is_notification_handler(&self, method: &str) -> Option<bool> {
+        self.handlers.iter().find(|(m, _)| m == method).map(|(_, is_notif)| *is_notif)
+    }
+
+    pub fn registered_methods(&self) -> Vec<&str> {
+        self.handlers.iter().map(|(m, _)| m.as_str()).collect()
+    }
+
+    pub fn handler_count(&self) -> usize {
+        self.handlers.len()
+    }
+}
+
+/// Tracks pending requests awaiting responses.
+#[derive(Debug, Clone)]
+pub struct AxaPendingRequests {
+    pending: Vec<(AxaRequestId, String, u64)>, // (id, method, timestamp)
+}
+
+impl AxaPendingRequests {
+    pub fn new() -> Self {
+        Self { pending: Vec::new() }
+    }
+
+    pub fn add(&mut self, id: AxaRequestId, method: &str, timestamp: u64) {
+        self.pending.push((id, method.to_string(), timestamp));
+    }
+
+    pub fn remove(&mut self, id: &AxaRequestId) -> Option<(String, u64)> {
+        if let Some(idx) = self.pending.iter().position(|(pid, _, _)| pid == id) {
+            let (_, method, ts) = self.pending.remove(idx);
+            Some((method, ts))
+        } else {
+            None
+        }
+    }
+
+    pub fn is_pending(&self, id: &AxaRequestId) -> bool {
+        self.pending.iter().any(|(pid, _, _)| pid == id)
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub fn timed_out(&self, now: u64, timeout_ms: u64) -> Vec<&AxaRequestId> {
+        self.pending.iter()
+            .filter(|(_, _, ts)| now.saturating_sub(*ts) > timeout_ms)
+            .map(|(id, _, _)| id)
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -30606,6 +30877,138 @@ mod tests {
         let mut layout = ZzEditorLayout::new();
         layout.set_direction(ZzLayoutDirection::Vertical);
         assert_eq!(layout.direction(), ZzLayoutDirection::Vertical);
+    }
+
+
+    // --- axa_ LSP protocol message tests ---
+
+    #[test]
+    fn test_axa_request_id() {
+        let n = AxaRequestId::num(42);
+        let s = AxaRequestId::str("abc");
+        assert_ne!(n, s);
+        assert_eq!(n, AxaRequestId::Number(42));
+    }
+
+    #[test]
+    fn test_axa_request_basic() {
+        let req = AxaRequest::new(AxaRequestId::num(1), "initialize");
+        assert!(req.is_initialize());
+        assert!(!req.is_shutdown());
+        let json = req.to_json();
+        assert!(json.contains("initialize"));
+        assert!(json.contains("jsonrpc"));
+    }
+
+    #[test]
+    fn test_axa_request_with_params() {
+        let req = AxaRequest::new(AxaRequestId::num(1), "textDocument/completion")
+            .with_params(r#"{"textDocument":{"uri":"file:///a.rs"}}"#);
+        assert!(req.params.is_some());
+        let json = req.to_json();
+        assert!(json.contains("textDocument/completion"));
+        assert!(json.contains("params"));
+    }
+
+    #[test]
+    fn test_axa_request_header() {
+        let req = AxaRequest::new(AxaRequestId::num(1), "shutdown");
+        let header = req.to_header();
+        assert!(header.starts_with("Content-Length:"));
+        assert!(header.contains("\r\n\r\n"));
+    }
+
+    #[test]
+    fn test_axa_response_success() {
+        let resp = AxaResponse::success(AxaRequestId::num(1), r#"{"capabilities":{}}"#);
+        assert!(resp.is_success());
+        let json = resp.to_json();
+        assert!(json.contains("result"));
+        assert!(!json.contains("error"));
+    }
+
+    #[test]
+    fn test_axa_response_error() {
+        let resp = AxaResponse::error(
+            AxaRequestId::num(1),
+            AxaResponseError::method_not_found(),
+        );
+        assert!(!resp.is_success());
+        let json = resp.to_json();
+        assert!(json.contains("error"));
+        assert!(json.contains("-32601"));
+    }
+
+    #[test]
+    fn test_axa_response_error_variants() {
+        assert_eq!(AxaResponseError::parse_error().code, -32700);
+        assert_eq!(AxaResponseError::invalid_request().code, -32600);
+        assert_eq!(AxaResponseError::invalid_params().code, -32602);
+        assert_eq!(AxaResponseError::internal_error().code, -32603);
+        assert_eq!(AxaResponseError::server_not_initialized().code, -32002);
+        assert_eq!(AxaResponseError::request_cancelled().code, -32800);
+    }
+
+    #[test]
+    fn test_axa_notification() {
+        let n = AxaNotification::new("initialized");
+        assert!(n.is_initialized());
+        assert!(!n.is_exit());
+        let json = n.to_json();
+        assert!(json.contains("initialized"));
+        assert!(!json.contains("id"));
+    }
+
+    #[test]
+    fn test_axa_notification_did_methods() {
+        assert!(AxaNotification::new("textDocument/didOpen").is_did_open());
+        assert!(AxaNotification::new("textDocument/didChange").is_did_change());
+        assert!(AxaNotification::new("textDocument/didSave").is_did_save());
+        assert!(AxaNotification::new("textDocument/didClose").is_did_close());
+    }
+
+    #[test]
+    fn test_axa_parse_content_length() {
+        assert_eq!(axa_parse_content_length("Content-Length: 42"), Some(42));
+        assert_eq!(axa_parse_content_length("content-length: 100"), Some(100));
+        assert_eq!(axa_parse_content_length("X-Custom: 5"), None);
+        assert_eq!(axa_parse_content_length(""), None);
+    }
+
+    #[test]
+    fn test_axa_dispatcher() {
+        let mut d = AxaDispatcher::new();
+        d.register_request("textDocument/completion");
+        d.register_notification("textDocument/didOpen");
+        assert!(d.can_handle("textDocument/completion"));
+        assert!(d.can_handle("textDocument/didOpen"));
+        assert!(!d.can_handle("unknown"));
+        assert_eq!(d.is_notification_handler("textDocument/didOpen"), Some(true));
+        assert_eq!(d.is_notification_handler("textDocument/completion"), Some(false));
+        assert_eq!(d.handler_count(), 2);
+    }
+
+    #[test]
+    fn test_axa_pending_requests() {
+        let mut pr = AxaPendingRequests::new();
+        pr.add(AxaRequestId::num(1), "initialize", 1000);
+        pr.add(AxaRequestId::num(2), "completion", 2000);
+        assert!(pr.is_pending(&AxaRequestId::num(1)));
+        assert_eq!(pr.pending_count(), 2);
+        let (method, ts) = pr.remove(&AxaRequestId::num(1)).unwrap();
+        assert_eq!(method, "initialize");
+        assert_eq!(ts, 1000);
+        assert_eq!(pr.pending_count(), 1);
+    }
+
+    #[test]
+    fn test_axa_pending_timeout() {
+        let mut pr = AxaPendingRequests::new();
+        pr.add(AxaRequestId::num(1), "slow", 100);
+        pr.add(AxaRequestId::num(2), "fast", 900);
+        let timedout = pr.timed_out(1000, 500);
+        assert_eq!(timedout.len(), 1);
+        assert_eq!(*timedout[0], AxaRequestId::num(1));
     }
 
 }
