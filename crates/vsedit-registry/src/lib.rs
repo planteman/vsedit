@@ -11042,6 +11042,196 @@ impl YlStateMachine {
     pub fn yl_reset(&mut self) { self.yl_current = 0; }
 }
 
+
+// --- ym_ Sorted Multi-Map ---
+
+/// Sorted multi-map allowing multiple values per key, stored in a BTreeMap.
+#[derive(Debug, Clone)]
+pub struct YmSortedMultiMap<K: Ord + Clone, V: Clone> {
+    ym_data: std::collections::BTreeMap<K, Vec<V>>,
+    ym_count: usize,
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone + std::fmt::Display> std::fmt::Display for YmSortedMultiMap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SortedMultiMap(keys={}, total={})", self.ym_data.len(), self.ym_count)
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> Default for YmSortedMultiMap<K, V> {
+    fn default() -> Self { Self::ym_new() }
+}
+
+impl<K: Ord + Clone, V: Clone> YmSortedMultiMap<K, V> {
+    /// Create empty sorted multi-map.
+    pub fn ym_new() -> Self { Self { ym_data: std::collections::BTreeMap::new(), ym_count: 0 } }
+
+    /// Insert a key-value pair.
+    pub fn ym_insert(&mut self, key: K, value: V) {
+        self.ym_data.entry(key).or_default().push(value);
+        self.ym_count += 1;
+    }
+
+    /// Get all values for a key.
+    pub fn ym_get(&self, key: &K) -> &[V] {
+        self.ym_data.get(key).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Number of unique keys.
+    pub fn ym_key_count(&self) -> usize { self.ym_data.len() }
+
+    /// Total number of values.
+    pub fn ym_total_count(&self) -> usize { self.ym_count }
+
+    /// Is empty.
+    pub fn ym_is_empty(&self) -> bool { self.ym_count == 0 }
+
+    /// Contains key.
+    pub fn ym_contains_key(&self, key: &K) -> bool { self.ym_data.contains_key(key) }
+
+    /// Remove all values for a key.
+    pub fn ym_remove_key(&mut self, key: &K) -> Vec<V> {
+        if let Some(vals) = self.ym_data.remove(key) {
+            self.ym_count -= vals.len();
+            vals
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get all keys in sorted order.
+    pub fn ym_keys(&self) -> Vec<K> {
+        self.ym_data.keys().cloned().collect()
+    }
+
+    /// Get keys in a range.
+    pub fn ym_range(&self, lo: &K, hi: &K) -> Vec<K> {
+        self.ym_data.range(lo..=hi).map(|(k, _)| k.clone()).collect()
+    }
+
+    /// First key.
+    pub fn ym_first_key(&self) -> Option<K> {
+        self.ym_data.keys().next().cloned()
+    }
+
+    /// Last key.
+    pub fn ym_last_key(&self) -> Option<K> {
+        self.ym_data.keys().next_back().cloned()
+    }
+
+    /// Clear.
+    pub fn ym_clear(&mut self) { self.ym_data.clear(); self.ym_count = 0; }
+
+    /// Count values for a key.
+    pub fn ym_count_for(&self, key: &K) -> usize {
+        self.ym_data.get(key).map(|v| v.len()).unwrap_or(0)
+    }
+}
+
+// --- ym_ Task Scheduler ---
+
+/// Priority-based task scheduler with dependencies.
+#[derive(Debug, Clone)]
+pub struct YmTaskScheduler {
+    ym_tasks: Vec<YmTask>,
+    ym_next_id: usize,
+}
+
+/// A scheduled task.
+#[derive(Debug, Clone)]
+pub struct YmTask {
+    /// Task ID.
+    pub ym_id: usize,
+    /// Task name.
+    pub ym_name: String,
+    /// Priority (lower = higher priority).
+    pub ym_priority: i32,
+    /// Dependencies (task IDs that must complete first).
+    pub ym_deps: Vec<usize>,
+    /// Is completed.
+    pub ym_done: bool,
+}
+
+impl std::fmt::Display for YmTask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Task({}: {}, pri={}, done={})", self.ym_id, self.ym_name, self.ym_priority, self.ym_done)
+    }
+}
+
+impl std::fmt::Display for YmTaskScheduler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Scheduler(tasks={}, pending={})", self.ym_tasks.len(), self.ym_pending_count())
+    }
+}
+
+impl Default for YmTaskScheduler {
+    fn default() -> Self { Self::ym_new() }
+}
+
+impl YmTaskScheduler {
+    /// Create an empty scheduler.
+    pub fn ym_new() -> Self { Self { ym_tasks: Vec::new(), ym_next_id: 0 } }
+
+    /// Add a task. Returns task ID.
+    pub fn ym_add_task(&mut self, name: &str, priority: i32, deps: Vec<usize>) -> usize {
+        let id = self.ym_next_id;
+        self.ym_next_id += 1;
+        self.ym_tasks.push(YmTask { ym_id: id, ym_name: name.to_string(), ym_priority: priority, ym_deps: deps, ym_done: false });
+        id
+    }
+
+    /// Mark a task as done.
+    pub fn ym_complete(&mut self, id: usize) {
+        if let Some(t) = self.ym_tasks.iter_mut().find(|t| t.ym_id == id) {
+            t.ym_done = true;
+        }
+    }
+
+    /// Get the next ready task (all deps done, highest priority).
+    pub fn ym_next_ready(&self) -> Option<&YmTask> {
+        let done_set: std::collections::HashSet<usize> = self.ym_tasks.iter()
+            .filter(|t| t.ym_done).map(|t| t.ym_id).collect();
+        self.ym_tasks.iter()
+            .filter(|t| !t.ym_done && t.ym_deps.iter().all(|d| done_set.contains(d)))
+            .min_by_key(|t| t.ym_priority)
+    }
+
+    /// Get all ready tasks.
+    pub fn ym_all_ready(&self) -> Vec<&YmTask> {
+        let done_set: std::collections::HashSet<usize> = self.ym_tasks.iter()
+            .filter(|t| t.ym_done).map(|t| t.ym_id).collect();
+        let mut ready: Vec<&YmTask> = self.ym_tasks.iter()
+            .filter(|t| !t.ym_done && t.ym_deps.iter().all(|d| done_set.contains(d)))
+            .collect();
+        ready.sort_by_key(|t| t.ym_priority);
+        ready
+    }
+
+    /// Number of pending tasks.
+    pub fn ym_pending_count(&self) -> usize {
+        self.ym_tasks.iter().filter(|t| !t.ym_done).count()
+    }
+
+    /// Number of completed tasks.
+    pub fn ym_done_count(&self) -> usize {
+        self.ym_tasks.iter().filter(|t| t.ym_done).count()
+    }
+
+    /// Total tasks.
+    pub fn ym_total(&self) -> usize { self.ym_tasks.len() }
+
+    /// Is all done.
+    pub fn ym_is_all_done(&self) -> bool { self.ym_pending_count() == 0 }
+
+    /// Get task by ID.
+    pub fn ym_get_task(&self, id: usize) -> Option<&YmTask> {
+        self.ym_tasks.iter().find(|t| t.ym_id == id)
+    }
+
+    /// Clear.
+    pub fn ym_clear(&mut self) { self.ym_tasks.clear(); self.ym_next_id = 0; }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -18029,6 +18219,162 @@ mod tests {
     fn yl_fsm_default() {
         let m = super::YlStateMachine::default();
         assert_eq!(m.yl_state_count(), 0);
+    }
+
+
+    // --- ym_ SortedMultiMap tests ---
+
+    #[test]
+    fn ym_smm_new() {
+        let m = super::YmSortedMultiMap::<i32, i32>::ym_new();
+        assert!(m.ym_is_empty());
+    }
+
+    #[test]
+    fn ym_smm_insert_get() {
+        let mut m = super::YmSortedMultiMap::ym_new();
+        m.ym_insert(1, "a");
+        m.ym_insert(1, "b");
+        m.ym_insert(2, "c");
+        assert_eq!(m.ym_get(&1).len(), 2);
+        assert_eq!(m.ym_total_count(), 3);
+    }
+
+    #[test]
+    fn ym_smm_keys() {
+        let mut m = super::YmSortedMultiMap::ym_new();
+        m.ym_insert(3, 1);
+        m.ym_insert(1, 2);
+        m.ym_insert(2, 3);
+        assert_eq!(m.ym_keys(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn ym_smm_remove() {
+        let mut m = super::YmSortedMultiMap::ym_new();
+        m.ym_insert(1, "x");
+        m.ym_insert(1, "y");
+        let removed = m.ym_remove_key(&1);
+        assert_eq!(removed.len(), 2);
+        assert!(m.ym_is_empty());
+    }
+
+    #[test]
+    fn ym_smm_range() {
+        let mut m = super::YmSortedMultiMap::ym_new();
+        for i in 0..10 { m.ym_insert(i, i * 10); }
+        let r = m.ym_range(&3, &7);
+        assert_eq!(r, vec![3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn ym_smm_first_last() {
+        let mut m = super::YmSortedMultiMap::ym_new();
+        m.ym_insert(5, 0);
+        m.ym_insert(1, 0);
+        m.ym_insert(9, 0);
+        assert_eq!(m.ym_first_key(), Some(1));
+        assert_eq!(m.ym_last_key(), Some(9));
+    }
+
+    #[test]
+    fn ym_smm_clear() {
+        let mut m = super::YmSortedMultiMap::ym_new();
+        m.ym_insert(1, 1);
+        m.ym_clear();
+        assert!(m.ym_is_empty());
+    }
+
+    #[test]
+    fn ym_smm_display() {
+        let m = super::YmSortedMultiMap::<i32, i32>::ym_new();
+        assert!(format!("{}", m).contains("SortedMultiMap"));
+    }
+
+    #[test]
+    fn ym_smm_default() {
+        let m = super::YmSortedMultiMap::<i32, i32>::default();
+        assert!(m.ym_is_empty());
+    }
+
+    // --- ym_ TaskScheduler tests ---
+
+    #[test]
+    fn ym_sched_new() {
+        let s = super::YmTaskScheduler::ym_new();
+        assert_eq!(s.ym_total(), 0);
+    }
+
+    #[test]
+    fn ym_sched_add() {
+        let mut s = super::YmTaskScheduler::ym_new();
+        let id = s.ym_add_task("build", 1, vec![]);
+        assert_eq!(id, 0);
+        assert_eq!(s.ym_total(), 1);
+    }
+
+    #[test]
+    fn ym_sched_next_ready() {
+        let mut s = super::YmTaskScheduler::ym_new();
+        s.ym_add_task("low", 10, vec![]);
+        s.ym_add_task("high", 1, vec![]);
+        let next = s.ym_next_ready().unwrap();
+        assert_eq!(next.ym_name, "high");
+    }
+
+    #[test]
+    fn ym_sched_deps() {
+        let mut s = super::YmTaskScheduler::ym_new();
+        let t0 = s.ym_add_task("first", 1, vec![]);
+        let _t1 = s.ym_add_task("second", 1, vec![t0]);
+        let ready = s.ym_all_ready();
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].ym_name, "first");
+    }
+
+    #[test]
+    fn ym_sched_complete() {
+        let mut s = super::YmTaskScheduler::ym_new();
+        let t0 = s.ym_add_task("a", 1, vec![]);
+        let _t1 = s.ym_add_task("b", 1, vec![t0]);
+        s.ym_complete(t0);
+        let ready = s.ym_all_ready();
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].ym_name, "b");
+    }
+
+    #[test]
+    fn ym_sched_all_done() {
+        let mut s = super::YmTaskScheduler::ym_new();
+        let t0 = s.ym_add_task("a", 1, vec![]);
+        s.ym_complete(t0);
+        assert!(s.ym_is_all_done());
+    }
+
+    #[test]
+    fn ym_sched_clear() {
+        let mut s = super::YmTaskScheduler::ym_new();
+        s.ym_add_task("x", 1, vec![]);
+        s.ym_clear();
+        assert_eq!(s.ym_total(), 0);
+    }
+
+    #[test]
+    fn ym_sched_display() {
+        let s = super::YmTaskScheduler::ym_new();
+        assert!(format!("{}", s).contains("Scheduler"));
+    }
+
+    #[test]
+    fn ym_sched_default() {
+        let s = super::YmTaskScheduler::default();
+        assert!(s.ym_is_all_done());
+    }
+
+    #[test]
+    fn ym_task_display() {
+        let t = super::YmTask { ym_id: 0, ym_name: "test".to_string(), ym_priority: 1, ym_deps: vec![], ym_done: false };
+        assert!(format!("{}", t).contains("Task"));
     }
 
 }
