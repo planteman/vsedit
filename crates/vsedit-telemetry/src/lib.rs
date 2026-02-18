@@ -25657,6 +25657,106 @@ impl AyzTabStopList {
     pub fn stop_count(&self) -> usize { self.stops.len() }
 }
 
+
+// --- aza_ comment threads and annotations ---
+
+/// Comment thread state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzaThreadState { Active, Resolved, Archived }
+
+/// A comment in a thread.
+#[derive(Debug, Clone)]
+pub struct AzaComment {
+    pub id: String,
+    pub author: String,
+    pub body: String,
+    pub timestamp: u64,
+    pub reactions: Vec<(String, u32)>,
+}
+
+impl AzaComment {
+    pub fn new(id: &str, author: &str, body: &str, ts: u64) -> Self {
+        Self { id: id.to_string(), author: author.to_string(), body: body.to_string(), timestamp: ts, reactions: Vec::new() }
+    }
+    pub fn add_reaction(&mut self, emoji: &str) {
+        if let Some(r) = self.reactions.iter_mut().find(|r| r.0 == emoji) { r.1 += 1; }
+        else { self.reactions.push((emoji.to_string(), 1)); }
+    }
+    pub fn total_reactions(&self) -> u32 { self.reactions.iter().map(|r| r.1).sum() }
+    pub fn body_preview(&self, max: usize) -> String {
+        if self.body.len() <= max { self.body.clone() } else { format!("{}...", &self.body[..max]) }
+    }
+}
+
+/// A comment thread attached to a file location.
+#[derive(Debug)]
+pub struct AzaCommentThread {
+    pub id: String,
+    pub uri: String,
+    pub line: u32,
+    pub state: AzaThreadState,
+    pub comments: Vec<AzaComment>,
+    pub label: Option<String>,
+}
+
+impl AzaCommentThread {
+    pub fn new(id: &str, uri: &str, line: u32) -> Self {
+        Self { id: id.to_string(), uri: uri.to_string(), line, state: AzaThreadState::Active, comments: Vec::new(), label: None }
+    }
+    pub fn add_comment(&mut self, c: AzaComment) { self.comments.push(c); }
+    pub fn resolve(&mut self) { self.state = AzaThreadState::Resolved; }
+    pub fn archive(&mut self) { self.state = AzaThreadState::Archived; }
+    pub fn is_active(&self) -> bool { self.state == AzaThreadState::Active }
+    pub fn comment_count(&self) -> usize { self.comments.len() }
+    pub fn latest_comment(&self) -> Option<&AzaComment> { self.comments.last() }
+    pub fn set_label(&mut self, l: &str) { self.label = Some(l.to_string()); }
+}
+
+/// Comment controller managing multiple threads.
+#[derive(Debug)]
+pub struct AzaCommentController {
+    pub id: String,
+    pub label: String,
+    pub threads: Vec<AzaCommentThread>,
+}
+
+impl AzaCommentController {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), threads: Vec::new() }
+    }
+    pub fn add_thread(&mut self, t: AzaCommentThread) { self.threads.push(t); }
+    pub fn threads_for_uri(&self, uri: &str) -> Vec<&AzaCommentThread> {
+        self.threads.iter().filter(|t| t.uri == uri).collect()
+    }
+    pub fn active_threads(&self) -> Vec<&AzaCommentThread> {
+        self.threads.iter().filter(|t| t.is_active()).collect()
+    }
+    pub fn resolved_threads(&self) -> Vec<&AzaCommentThread> {
+        self.threads.iter().filter(|t| t.state == AzaThreadState::Resolved).collect()
+    }
+    pub fn total_comments(&self) -> usize { self.threads.iter().map(|t| t.comment_count()).sum() }
+    pub fn find_thread(&self, id: &str) -> Option<&AzaCommentThread> {
+        self.threads.iter().find(|t| t.id == id)
+    }
+}
+
+/// Document annotation.
+#[derive(Debug, Clone)]
+pub struct AzaAnnotation {
+    pub line: u32,
+    pub message: String,
+    pub kind: AzaAnnotationKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzaAnnotationKind { Info, Warning, Error, Suggestion }
+
+impl AzaAnnotation {
+    pub fn info(line: u32, msg: &str) -> Self { Self { line, message: msg.to_string(), kind: AzaAnnotationKind::Info } }
+    pub fn warning(line: u32, msg: &str) -> Self { Self { line, message: msg.to_string(), kind: AzaAnnotationKind::Warning } }
+    pub fn error(line: u32, msg: &str) -> Self { Self { line, message: msg.to_string(), kind: AzaAnnotationKind::Error } }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41519,6 +41619,86 @@ d");
         let mut state = AyzAccessibilityState::new();
         state.set_high_contrast(true);
         assert!(state.high_contrast);
+    }
+
+
+    #[test]
+    fn test_aza_comment() {
+        let mut c = AzaComment::new("c1", "alice", "Looks good!", 1000);
+        assert_eq!(c.total_reactions(), 0);
+        c.add_reaction("+1");
+        c.add_reaction("+1");
+        assert_eq!(c.total_reactions(), 2);
+    }
+
+    #[test]
+    fn test_aza_comment_preview() {
+        let c = AzaComment::new("c1", "bob", "This is a long comment text", 100);
+        let p = c.body_preview(10);
+        assert!(p.ends_with("..."));
+        assert!(p.len() <= 13);
+    }
+
+    #[test]
+    fn test_aza_thread_lifecycle() {
+        let mut t = AzaCommentThread::new("t1", "file.rs", 10);
+        assert!(t.is_active());
+        t.add_comment(AzaComment::new("c1", "alice", "Fix this", 100));
+        t.add_comment(AzaComment::new("c2", "bob", "Done", 200));
+        assert_eq!(t.comment_count(), 2);
+        assert_eq!(t.latest_comment().unwrap().author, "bob");
+        t.resolve();
+        assert!(!t.is_active());
+    }
+
+    #[test]
+    fn test_aza_controller() {
+        let mut ctrl = AzaCommentController::new("github", "GitHub PR Comments");
+        let mut t1 = AzaCommentThread::new("t1", "a.rs", 5);
+        t1.add_comment(AzaComment::new("c1", "a", "hi", 1));
+        let mut t2 = AzaCommentThread::new("t2", "a.rs", 10);
+        t2.add_comment(AzaComment::new("c2", "b", "hey", 2));
+        t2.resolve();
+        ctrl.add_thread(t1);
+        ctrl.add_thread(t2);
+        assert_eq!(ctrl.threads_for_uri("a.rs").len(), 2);
+        assert_eq!(ctrl.active_threads().len(), 1);
+        assert_eq!(ctrl.resolved_threads().len(), 1);
+        assert_eq!(ctrl.total_comments(), 2);
+    }
+
+    #[test]
+    fn test_aza_find_thread() {
+        let mut ctrl = AzaCommentController::new("c", "C");
+        ctrl.add_thread(AzaCommentThread::new("t1", "f.rs", 1));
+        assert!(ctrl.find_thread("t1").is_some());
+        assert!(ctrl.find_thread("t99").is_none());
+    }
+
+    #[test]
+    fn test_aza_thread_label() {
+        let mut t = AzaCommentThread::new("t1", "f.rs", 5);
+        assert!(t.label.is_none());
+        t.set_label("Review feedback");
+        assert_eq!(t.label.as_deref(), Some("Review feedback"));
+    }
+
+    #[test]
+    fn test_aza_annotation() {
+        let a = AzaAnnotation::info(5, "Consider refactoring");
+        assert_eq!(a.kind, AzaAnnotationKind::Info);
+        let w = AzaAnnotation::warning(10, "Unused variable");
+        assert_eq!(w.kind, AzaAnnotationKind::Warning);
+    }
+
+    #[test]
+    fn test_aza_multiple_reactions() {
+        let mut c = AzaComment::new("c1", "a", "nice", 1);
+        c.add_reaction("+1");
+        c.add_reaction("heart");
+        c.add_reaction("+1");
+        assert_eq!(c.total_reactions(), 3);
+        assert_eq!(c.reactions.len(), 2);
     }
 
 }
