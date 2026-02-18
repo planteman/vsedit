@@ -26350,6 +26350,85 @@ impl AzgLinkState {
     pub fn total_links(&self) -> usize { self.links.len() + self.urls.len() }
 }
 
+
+// --- azh_ selection highlight and word highlight ---
+
+/// A highlight range in a document.
+#[derive(Debug, Clone)]
+pub struct AzhHighlightRange {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub kind: AzhHighlightKind,
+}
+
+/// Highlight kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzhHighlightKind { Read, Write, Text, SearchMatch, SelectionHighlight }
+
+impl AzhHighlightRange {
+    pub fn new(line: u32, start: u32, end: u32, kind: AzhHighlightKind) -> Self {
+        Self { line, start_col: start, end_col: end, kind }
+    }
+    pub fn read(line: u32, start: u32, end: u32) -> Self { Self::new(line, start, end, AzhHighlightKind::Read) }
+    pub fn write(line: u32, start: u32, end: u32) -> Self { Self::new(line, start, end, AzhHighlightKind::Write) }
+    pub fn selection(line: u32, start: u32, end: u32) -> Self { Self::new(line, start, end, AzhHighlightKind::SelectionHighlight) }
+    pub fn span(&self) -> u32 { self.end_col - self.start_col }
+    pub fn is_write(&self) -> bool { self.kind == AzhHighlightKind::Write }
+}
+
+/// Document highlight state.
+#[derive(Debug)]
+pub struct AzhHighlightState {
+    pub word_highlights: Vec<AzhHighlightRange>,
+    pub selection_highlights: Vec<AzhHighlightRange>,
+    pub search_highlights: Vec<AzhHighlightRange>,
+    pub enabled: bool,
+}
+
+impl AzhHighlightState {
+    pub fn new() -> Self {
+        Self { word_highlights: Vec::new(), selection_highlights: Vec::new(), search_highlights: Vec::new(), enabled: true }
+    }
+    pub fn set_word_highlights(&mut self, h: Vec<AzhHighlightRange>) { self.word_highlights = h; }
+    pub fn set_selection_highlights(&mut self, h: Vec<AzhHighlightRange>) { self.selection_highlights = h; }
+    pub fn set_search_highlights(&mut self, h: Vec<AzhHighlightRange>) { self.search_highlights = h; }
+    pub fn clear_all(&mut self) {
+        self.word_highlights.clear(); self.selection_highlights.clear(); self.search_highlights.clear();
+    }
+    pub fn all_at_line(&self, line: u32) -> Vec<&AzhHighlightRange> {
+        if !self.enabled { return Vec::new(); }
+        let mut result: Vec<&AzhHighlightRange> = self.word_highlights.iter()
+            .chain(self.selection_highlights.iter())
+            .chain(self.search_highlights.iter())
+            .filter(|h| h.line == line).collect();
+        result.sort_by_key(|h| h.start_col);
+        result
+    }
+    pub fn word_highlight_count(&self) -> usize { self.word_highlights.len() }
+    pub fn write_references(&self) -> Vec<&AzhHighlightRange> { self.word_highlights.iter().filter(|h| h.is_write()).collect() }
+    pub fn search_match_count(&self) -> usize { self.search_highlights.len() }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+}
+
+/// Word occurrence finder.
+pub struct AzhWordFinder;
+
+impl AzhWordFinder {
+    pub fn find_occurrences(text: &str, word: &str) -> Vec<(u32, u32, u32)> {
+        let mut results = Vec::new();
+        for (line_idx, line) in text.lines().enumerate() {
+            let mut start = 0;
+            while let Some(pos) = line[start..].find(word) {
+                let col = (start + pos) as u32;
+                results.push((line_idx as u32, col, col + word.len() as u32));
+                start += pos + word.len();
+            }
+        }
+        results
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42653,6 +42732,88 @@ d");
         state.set_links(vec![AzgDocumentLink::new(1, 0, 5)]);
         state.set_urls(vec![AzgUrlMatch::new("https://x", 2, 0, 9)]);
         assert_eq!(state.total_links(), 2);
+    }
+
+
+    #[test]
+    fn test_azh_highlight_range() {
+        let h = AzhHighlightRange::read(5, 10, 15);
+        assert_eq!(h.kind, AzhHighlightKind::Read);
+        assert_eq!(h.span(), 5);
+        assert!(!h.is_write());
+        let w = AzhHighlightRange::write(5, 10, 15);
+        assert!(w.is_write());
+    }
+
+    #[test]
+    fn test_azh_state_at_line() {
+        let mut state = AzhHighlightState::new();
+        state.set_word_highlights(vec![
+            AzhHighlightRange::read(5, 0, 3),
+            AzhHighlightRange::write(5, 10, 13),
+        ]);
+        state.set_search_highlights(vec![
+            AzhHighlightRange::new(5, 20, 25, AzhHighlightKind::SearchMatch),
+        ]);
+        let at5 = state.all_at_line(5);
+        assert_eq!(at5.len(), 3);
+        assert_eq!(at5[0].start_col, 0);
+        assert_eq!(at5[2].start_col, 20);
+    }
+
+    #[test]
+    fn test_azh_toggle() {
+        let mut state = AzhHighlightState::new();
+        state.set_word_highlights(vec![AzhHighlightRange::read(1, 0, 5)]);
+        assert_eq!(state.all_at_line(1).len(), 1);
+        state.toggle();
+        assert_eq!(state.all_at_line(1).len(), 0);
+    }
+
+    #[test]
+    fn test_azh_write_refs() {
+        let mut state = AzhHighlightState::new();
+        state.set_word_highlights(vec![
+            AzhHighlightRange::read(1, 0, 3),
+            AzhHighlightRange::write(2, 0, 3),
+            AzhHighlightRange::write(5, 0, 3),
+        ]);
+        assert_eq!(state.write_references().len(), 2);
+    }
+
+    #[test]
+    fn test_azh_clear() {
+        let mut state = AzhHighlightState::new();
+        state.set_word_highlights(vec![AzhHighlightRange::read(1, 0, 3)]);
+        state.set_search_highlights(vec![AzhHighlightRange::new(2, 0, 3, AzhHighlightKind::SearchMatch)]);
+        state.clear_all();
+        assert_eq!(state.word_highlight_count(), 0);
+        assert_eq!(state.search_match_count(), 0);
+    }
+
+    #[test]
+    fn test_azh_word_finder() {
+        let text = "hello world
+hello rust
+goodbye";
+        let occ = AzhWordFinder::find_occurrences(text, "hello");
+        assert_eq!(occ.len(), 2);
+        assert_eq!(occ[0], (0, 0, 5));
+        assert_eq!(occ[1], (1, 0, 5));
+    }
+
+    #[test]
+    fn test_azh_word_finder_multiple() {
+        let text = "abcabc";
+        let occ = AzhWordFinder::find_occurrences(text, "abc");
+        assert_eq!(occ.len(), 2);
+    }
+
+    #[test]
+    fn test_azh_selection_highlight() {
+        let h = AzhHighlightRange::selection(3, 5, 10);
+        assert_eq!(h.kind, AzhHighlightKind::SelectionHighlight);
+        assert_eq!(h.span(), 5);
     }
 
 }
