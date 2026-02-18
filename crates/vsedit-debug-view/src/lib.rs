@@ -24489,6 +24489,107 @@ impl AylOnTypeFormatting {
     pub fn should_trigger(&self, c: char) -> bool { self.trigger_characters.contains(&c) }
 }
 
+
+// --- aym_ workspace edit builder and document change application ---
+
+/// A versioned text document identifier.
+#[derive(Debug, Clone)]
+pub struct AymDocumentId {
+    pub uri: String,
+    pub version: Option<u32>,
+}
+
+impl AymDocumentId {
+    pub fn new(uri: &str) -> Self { Self { uri: uri.to_string(), version: None } }
+    pub fn versioned(uri: &str, version: u32) -> Self { Self { uri: uri.to_string(), version: Some(version) } }
+}
+
+/// A single text change (position + new text).
+#[derive(Debug, Clone)]
+pub struct AymTextChange {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl AymTextChange {
+    pub fn insert(line: u32, col: u32, text: &str) -> Self {
+        Self { start_line: line, start_col: col, end_line: line, end_col: col, new_text: text.to_string() }
+    }
+    pub fn replace(sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+    pub fn delete(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: String::new() }
+    }
+    pub fn is_insert(&self) -> bool { self.start_line == self.end_line && self.start_col == self.end_col && !self.new_text.is_empty() }
+    pub fn is_delete(&self) -> bool { self.new_text.is_empty() }
+}
+
+/// File operation kind.
+#[derive(Debug, Clone)]
+pub enum AymFileOperation {
+    Create { uri: String, overwrite: bool },
+    Delete { uri: String, recursive: bool },
+    Rename { old_uri: String, new_uri: String, overwrite: bool },
+}
+
+impl AymFileOperation {
+    pub fn target_uri(&self) -> &str {
+        match self { Self::Create { uri, .. } => uri, Self::Delete { uri, .. } => uri, Self::Rename { new_uri, .. } => new_uri }
+    }
+}
+
+/// Workspace edit builder (fluent API).
+#[derive(Debug)]
+pub struct AymWorkspaceEditBuilder {
+    text_changes: std::collections::HashMap<String, Vec<AymTextChange>>,
+    file_ops: Vec<AymFileOperation>,
+    label: Option<String>,
+}
+
+impl AymWorkspaceEditBuilder {
+    pub fn new() -> Self { Self { text_changes: std::collections::HashMap::new(), file_ops: Vec::new(), label: None } }
+    pub fn with_label(mut self, label: &str) -> Self { self.label = Some(label.to_string()); self }
+    pub fn insert(mut self, uri: &str, line: u32, col: u32, text: &str) -> Self {
+        self.text_changes.entry(uri.to_string()).or_default().push(AymTextChange::insert(line, col, text));
+        self
+    }
+    pub fn replace(mut self, uri: &str, sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        self.text_changes.entry(uri.to_string()).or_default().push(AymTextChange::replace(sl, sc, el, ec, text));
+        self
+    }
+    pub fn delete_range(mut self, uri: &str, sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        self.text_changes.entry(uri.to_string()).or_default().push(AymTextChange::delete(sl, sc, el, ec));
+        self
+    }
+    pub fn create_file(mut self, uri: &str, overwrite: bool) -> Self {
+        self.file_ops.push(AymFileOperation::Create { uri: uri.to_string(), overwrite });
+        self
+    }
+    pub fn delete_file(mut self, uri: &str, recursive: bool) -> Self {
+        self.file_ops.push(AymFileOperation::Delete { uri: uri.to_string(), recursive });
+        self
+    }
+    pub fn rename_file(mut self, old: &str, new_uri: &str, overwrite: bool) -> Self {
+        self.file_ops.push(AymFileOperation::Rename { old_uri: old.to_string(), new_uri: new_uri.to_string(), overwrite });
+        self
+    }
+    pub fn text_change_count(&self) -> usize { self.text_changes.values().map(|v| v.len()).sum() }
+    pub fn file_op_count(&self) -> usize { self.file_ops.len() }
+    pub fn affected_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.text_changes.keys().map(|s| s.as_str()).collect();
+        files.sort(); files.dedup(); files
+    }
+    pub fn has_changes(&self) -> bool { !self.text_changes.is_empty() || !self.file_ops.is_empty() }
+    pub fn label(&self) -> Option<&str> { self.label.as_deref() }
+    pub fn changes_for(&self, uri: &str) -> Vec<&AymTextChange> {
+        self.text_changes.get(uri).map(|v| v.iter().collect()).unwrap_or_default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39287,6 +39388,73 @@ mod tests {
         let mut opts = AylFormattingOptions::default_options();
         opts.insert_spaces = false;
         assert_eq!(opts.indent_str(), "\t");
+    }
+
+
+    #[test]
+    fn test_aym_document_id() {
+        let doc = AymDocumentId::versioned("file:///a.rs", 3);
+        assert_eq!(doc.version, Some(3));
+    }
+
+    #[test]
+    fn test_aym_text_change() {
+        let ins = AymTextChange::insert(5, 10, "hello");
+        assert!(ins.is_insert());
+        let del = AymTextChange::delete(0, 0, 0, 5);
+        assert!(del.is_delete());
+    }
+
+    #[test]
+    fn test_aym_builder_text_edits() {
+        let builder = AymWorkspaceEditBuilder::new()
+            .with_label("Fix imports")
+            .insert("a.rs", 0, 0, "use std::io;\n")
+            .replace("a.rs", 5, 0, 5, 10, "new_text")
+            .delete_range("b.rs", 10, 0, 10, 20);
+        assert_eq!(builder.text_change_count(), 3);
+        assert_eq!(builder.affected_files().len(), 2);
+        assert_eq!(builder.label(), Some("Fix imports"));
+    }
+
+    #[test]
+    fn test_aym_builder_file_ops() {
+        let builder = AymWorkspaceEditBuilder::new()
+            .create_file("new.rs", false)
+            .rename_file("old.rs", "renamed.rs", true)
+            .delete_file("temp.rs", false);
+        assert_eq!(builder.file_op_count(), 3);
+    }
+
+    #[test]
+    fn test_aym_builder_has_changes() {
+        let empty = AymWorkspaceEditBuilder::new();
+        assert!(!empty.has_changes());
+        let with_edit = empty.insert("a.rs", 0, 0, "x");
+        assert!(with_edit.has_changes());
+    }
+
+    #[test]
+    fn test_aym_file_operation_target() {
+        let op = AymFileOperation::Rename { old_uri: "a.rs".into(), new_uri: "b.rs".into(), overwrite: false };
+        assert_eq!(op.target_uri(), "b.rs");
+    }
+
+    #[test]
+    fn test_aym_changes_for_file() {
+        let builder = AymWorkspaceEditBuilder::new()
+            .insert("a.rs", 0, 0, "x")
+            .insert("a.rs", 1, 0, "y")
+            .insert("b.rs", 0, 0, "z");
+        assert_eq!(builder.changes_for("a.rs").len(), 2);
+        assert_eq!(builder.changes_for("c.rs").len(), 0);
+    }
+
+    #[test]
+    fn test_aym_replace_change() {
+        let ch = AymTextChange::replace(0, 0, 0, 5, "new");
+        assert!(!ch.is_insert());
+        assert!(!ch.is_delete());
     }
 
 }
