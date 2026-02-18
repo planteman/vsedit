@@ -13305,6 +13305,177 @@ pub fn yw_future_race<T: Clone>(futures: &[YwFuture<T>]) -> YwFuture<T> {
     YwFuture::Pending
 }
 
+
+// --- yx_ LRU cache and LFU cache ---
+
+/// A Least Recently Used (LRU) cache with fixed capacity.
+#[derive(Debug, Clone)]
+pub struct YxLruCache<V: Clone> {
+    capacity: usize,
+    entries: Vec<(String, V)>,
+}
+
+impl<V: Clone> YxLruCache<V> {
+    pub fn new(capacity: usize) -> Self {
+        Self { capacity: std::cmp::max(1, capacity), entries: Vec::new() }
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<&V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(pos);
+            self.entries.push(entry);
+            self.entries.last().map(|(_, v)| v)
+        } else {
+            None
+        }
+    }
+
+    pub fn peek(&self, key: &str) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    pub fn put(&mut self, key: &str, value: V) {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            self.entries.remove(pos);
+        }
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((key.to_string(), value));
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else {
+            None
+        }
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn capacity(&self) -> usize { self.capacity }
+
+    pub fn is_full(&self) -> bool { self.entries.len() >= self.capacity }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn most_recent(&self) -> Option<(&str, &V)> {
+        self.entries.last().map(|(k, v)| (k.as_str(), v))
+    }
+
+    pub fn least_recent(&self) -> Option<(&str, &V)> {
+        self.entries.first().map(|(k, v)| (k.as_str(), v))
+    }
+
+    pub fn resize(&mut self, new_capacity: usize) {
+        self.capacity = std::cmp::max(1, new_capacity);
+        while self.entries.len() > self.capacity {
+            self.entries.remove(0);
+        }
+    }
+}
+
+impl<V: Clone + std::fmt::Debug> std::fmt::Display for YxLruCache<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YxLruCache(len={}, cap={})", self.len(), self.capacity)
+    }
+}
+
+/// A Least Frequently Used (LFU) cache with fixed capacity.
+#[derive(Debug, Clone)]
+pub struct YxLfuCache<V: Clone> {
+    capacity: usize,
+    entries: Vec<(String, V, usize)>, // key, value, frequency
+}
+
+impl<V: Clone> YxLfuCache<V> {
+    pub fn new(capacity: usize) -> Self {
+        Self { capacity: std::cmp::max(1, capacity), entries: Vec::new() }
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<&V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _, _)| k == key) {
+            self.entries[pos].2 += 1;
+            Some(&self.entries[pos].1)
+        } else {
+            None
+        }
+    }
+
+    pub fn peek(&self, key: &str) -> Option<&V> {
+        self.entries.iter().find(|(k, _, _)| k == key).map(|(_, v, _)| v)
+    }
+
+    pub fn put(&mut self, key: &str, value: V) {
+        if let Some(pos) = self.entries.iter().position(|(k, _, _)| k == key) {
+            self.entries[pos].1 = value;
+            self.entries[pos].2 += 1;
+            return;
+        }
+        if self.entries.len() >= self.capacity {
+            // Evict least frequently used
+            let min_freq = self.entries.iter().map(|(_, _, f)| *f).min().unwrap_or(0);
+            if let Some(pos) = self.entries.iter().position(|(_, _, f)| *f == min_freq) {
+                self.entries.remove(pos);
+            }
+        }
+        self.entries.push((key.to_string(), value, 1));
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else {
+            None
+        }
+    }
+
+    pub fn frequency(&self, key: &str) -> usize {
+        self.entries.iter().find(|(k, _, _)| k == key).map(|(_, _, f)| *f).unwrap_or(0)
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _, _)| k == key)
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn capacity(&self) -> usize { self.capacity }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _, _)| k.as_str()).collect()
+    }
+
+    pub fn most_frequent(&self) -> Option<(&str, &V)> {
+        self.entries.iter().max_by_key(|(_, _, f)| *f).map(|(k, v, _)| (k.as_str(), v))
+    }
+
+    pub fn least_frequent(&self) -> Option<(&str, &V)> {
+        self.entries.iter().min_by_key(|(_, _, f)| *f).map(|(k, v, _)| (k.as_str(), v))
+    }
+}
+
+impl<V: Clone + std::fmt::Debug> std::fmt::Display for YxLfuCache<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YxLfuCache(len={}, cap={})", self.len(), self.capacity)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -21876,6 +22047,152 @@ mod tests {
     fn test_yw_future_default() {
         let f: YwFuture<i32> = YwFuture::default();
         assert!(f.is_pending());
+    }
+
+
+    // --- yx_ tests ---
+
+    #[test]
+    fn test_yx_lru_new() {
+        let c: YxLruCache<i32> = YxLruCache::new(3);
+        assert!(c.is_empty());
+        assert_eq!(c.capacity(), 3);
+    }
+
+    #[test]
+    fn test_yx_lru_put_get() {
+        let mut c = YxLruCache::new(3);
+        c.put("a", 1);
+        c.put("b", 2);
+        assert_eq!(c.get("a"), Some(&1));
+        assert_eq!(c.get("b"), Some(&2));
+        assert_eq!(c.get("c"), None);
+    }
+
+    #[test]
+    fn test_yx_lru_eviction() {
+        let mut c = YxLruCache::new(2);
+        c.put("a", 1);
+        c.put("b", 2);
+        c.put("c", 3); // evicts "a"
+        assert!(!c.contains("a"));
+        assert!(c.contains("b"));
+        assert!(c.contains("c"));
+    }
+
+    #[test]
+    fn test_yx_lru_access_refresh() {
+        let mut c = YxLruCache::new(2);
+        c.put("a", 1);
+        c.put("b", 2);
+        c.get("a"); // refresh "a"
+        c.put("c", 3); // evicts "b" not "a"
+        assert!(c.contains("a"));
+        assert!(!c.contains("b"));
+    }
+
+    #[test]
+    fn test_yx_lru_remove() {
+        let mut c = YxLruCache::new(3);
+        c.put("a", 1);
+        assert_eq!(c.remove("a"), Some(1));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn test_yx_lru_update() {
+        let mut c = YxLruCache::new(3);
+        c.put("a", 1);
+        c.put("a", 2);
+        assert_eq!(c.peek("a"), Some(&2));
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn test_yx_lru_most_least_recent() {
+        let mut c = YxLruCache::new(3);
+        c.put("a", 1);
+        c.put("b", 2);
+        assert_eq!(c.most_recent().unwrap().0, "b");
+        assert_eq!(c.least_recent().unwrap().0, "a");
+    }
+
+    #[test]
+    fn test_yx_lru_resize() {
+        let mut c = YxLruCache::new(5);
+        for i in 0..5 { c.put(&format!("k{}", i), i); }
+        c.resize(2);
+        assert_eq!(c.len(), 2);
+    }
+
+    #[test]
+    fn test_yx_lru_display() {
+        let c: YxLruCache<i32> = YxLruCache::new(3);
+        let s = format!("{}", c);
+        assert!(s.contains("YxLruCache"));
+    }
+
+    #[test]
+    fn test_yx_lfu_new() {
+        let c: YxLfuCache<i32> = YxLfuCache::new(3);
+        assert!(c.is_empty());
+        assert_eq!(c.capacity(), 3);
+    }
+
+    #[test]
+    fn test_yx_lfu_put_get() {
+        let mut c = YxLfuCache::new(3);
+        c.put("a", 1);
+        c.put("b", 2);
+        assert_eq!(c.get("a"), Some(&1));
+        assert_eq!(c.get("b"), Some(&2));
+    }
+
+    #[test]
+    fn test_yx_lfu_eviction() {
+        let mut c = YxLfuCache::new(2);
+        c.put("a", 1);
+        c.put("b", 2);
+        c.get("a"); // freq(a)=2, freq(b)=1
+        c.put("c", 3); // evicts "b" (least frequent)
+        assert!(c.contains("a"));
+        assert!(!c.contains("b"));
+        assert!(c.contains("c"));
+    }
+
+    #[test]
+    fn test_yx_lfu_frequency() {
+        let mut c = YxLfuCache::new(3);
+        c.put("a", 1);
+        c.get("a");
+        c.get("a");
+        assert_eq!(c.frequency("a"), 3); // 1 from put + 2 from get
+    }
+
+    #[test]
+    fn test_yx_lfu_remove() {
+        let mut c = YxLfuCache::new(3);
+        c.put("a", 1);
+        assert_eq!(c.remove("a"), Some(1));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn test_yx_lfu_most_least_frequent() {
+        let mut c = YxLfuCache::new(3);
+        c.put("a", 1);
+        c.put("b", 2);
+        c.get("a");
+        c.get("a");
+        assert_eq!(c.most_frequent().unwrap().0, "a");
+        assert_eq!(c.least_frequent().unwrap().0, "b");
+    }
+
+    #[test]
+    fn test_yx_lfu_display() {
+        let c: YxLfuCache<i32> = YxLfuCache::new(3);
+        let s = format!("{}", c);
+        assert!(s.contains("YxLfuCache"));
     }
 
 }
