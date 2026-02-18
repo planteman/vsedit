@@ -27002,6 +27002,85 @@ impl AzpWhitespaceRenderer {
     }
 }
 
+
+// --- azq_ editor cursor blinking and style ---
+
+/// Cursor style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzqCursorStyle { Line, Block, Underline, LineThin, BlockOutline, UnderlineThin }
+
+/// Cursor blink mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzqBlinkMode { Blink, Smooth, Phase, Expand, Solid, Hidden }
+
+/// Cursor state model.
+#[derive(Debug)]
+pub struct AzqCursorState {
+    pub style: AzqCursorStyle,
+    pub blink: AzqBlinkMode,
+    pub blink_interval_ms: u32,
+    pub visible: bool,
+    pub smooth_caret: bool,
+    pub width: u32,
+}
+
+impl AzqCursorState {
+    pub fn new() -> Self {
+        Self { style: AzqCursorStyle::Line, blink: AzqBlinkMode::Blink, blink_interval_ms: 530, visible: true, smooth_caret: true, width: 2 }
+    }
+    pub fn set_style(&mut self, s: AzqCursorStyle) { self.style = s; }
+    pub fn set_blink(&mut self, b: AzqBlinkMode) { self.blink = b; }
+    pub fn set_interval(&mut self, ms: u32) { self.blink_interval_ms = ms; }
+    pub fn is_blinking(&self) -> bool { self.blink != AzqBlinkMode::Solid && self.blink != AzqBlinkMode::Hidden }
+    pub fn is_visible(&self) -> bool { self.visible && self.blink != AzqBlinkMode::Hidden }
+    pub fn toggle_blink(&mut self) { if self.is_blinking() { self.visible = !self.visible; } }
+    pub fn reset_blink(&mut self) { self.visible = true; }
+    pub fn is_block(&self) -> bool { matches!(self.style, AzqCursorStyle::Block | AzqCursorStyle::BlockOutline) }
+    pub fn is_line(&self) -> bool { matches!(self.style, AzqCursorStyle::Line | AzqCursorStyle::LineThin) }
+    pub fn is_underline(&self) -> bool { matches!(self.style, AzqCursorStyle::Underline | AzqCursorStyle::UnderlineThin) }
+    pub fn terminal_cursor_shape(&self) -> &str {
+        match self.style {
+            AzqCursorStyle::Line | AzqCursorStyle::LineThin => "bar",
+            AzqCursorStyle::Block | AzqCursorStyle::BlockOutline => "block",
+            AzqCursorStyle::Underline | AzqCursorStyle::UnderlineThin => "underline",
+        }
+    }
+}
+
+/// Multi-cursor position.
+#[derive(Debug, Clone)]
+pub struct AzqCursorPosition {
+    pub line: u32,
+    pub col: u32,
+    pub desired_col: Option<u32>,
+}
+
+impl AzqCursorPosition {
+    pub fn new(line: u32, col: u32) -> Self { Self { line, col, desired_col: None } }
+    pub fn with_desired(mut self, c: u32) -> Self { self.desired_col = Some(c); self }
+    pub fn effective_col(&self) -> u32 { self.desired_col.unwrap_or(self.col) }
+}
+
+/// Multi-cursor manager.
+#[derive(Debug)]
+pub struct AzqMultiCursor {
+    pub cursors: Vec<AzqCursorPosition>,
+    pub primary: usize,
+}
+
+impl AzqMultiCursor {
+    pub fn single(line: u32, col: u32) -> Self { Self { cursors: vec![AzqCursorPosition::new(line, col)], primary: 0 } }
+    pub fn add_cursor(&mut self, line: u32, col: u32) { self.cursors.push(AzqCursorPosition::new(line, col)); }
+    pub fn cursor_count(&self) -> usize { self.cursors.len() }
+    pub fn primary_cursor(&self) -> &AzqCursorPosition { &self.cursors[self.primary] }
+    pub fn is_multi(&self) -> bool { self.cursors.len() > 1 }
+    pub fn collapse_to_primary(&mut self) {
+        let p = self.cursors[self.primary].clone();
+        self.cursors = vec![p];
+        self.primary = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43876,6 +43955,79 @@ goodbye";
         let lines = vec!["a", "b", "c"];
         let guides = r.compute_indent_guides(&lines);
         assert!(guides.is_empty());
+    }
+
+
+    #[test]
+    fn test_azq_cursor_state() {
+        let mut c = AzqCursorState::new();
+        assert!(c.is_visible());
+        assert!(c.is_blinking());
+        assert!(c.is_line());
+        c.toggle_blink();
+        assert!(!c.visible);
+        c.reset_blink();
+        assert!(c.visible);
+    }
+
+    #[test]
+    fn test_azq_solid_no_blink() {
+        let mut c = AzqCursorState::new();
+        c.set_blink(AzqBlinkMode::Solid);
+        assert!(!c.is_blinking());
+        assert!(c.is_visible());
+    }
+
+    #[test]
+    fn test_azq_hidden() {
+        let mut c = AzqCursorState::new();
+        c.set_blink(AzqBlinkMode::Hidden);
+        assert!(!c.is_visible());
+    }
+
+    #[test]
+    fn test_azq_block_style() {
+        let mut c = AzqCursorState::new();
+        c.set_style(AzqCursorStyle::Block);
+        assert!(c.is_block());
+        assert!(!c.is_line());
+        assert_eq!(c.terminal_cursor_shape(), "block");
+    }
+
+    #[test]
+    fn test_azq_underline_style() {
+        let mut c = AzqCursorState::new();
+        c.set_style(AzqCursorStyle::Underline);
+        assert!(c.is_underline());
+        assert_eq!(c.terminal_cursor_shape(), "underline");
+    }
+
+    #[test]
+    fn test_azq_cursor_position() {
+        let p = AzqCursorPosition::new(10, 5).with_desired(20);
+        assert_eq!(p.effective_col(), 20);
+        let p2 = AzqCursorPosition::new(10, 5);
+        assert_eq!(p2.effective_col(), 5);
+    }
+
+    #[test]
+    fn test_azq_multi_cursor() {
+        let mut mc = AzqMultiCursor::single(0, 0);
+        assert!(!mc.is_multi());
+        mc.add_cursor(5, 10);
+        mc.add_cursor(10, 0);
+        assert!(mc.is_multi());
+        assert_eq!(mc.cursor_count(), 3);
+        assert_eq!(mc.primary_cursor().line, 0);
+    }
+
+    #[test]
+    fn test_azq_collapse() {
+        let mut mc = AzqMultiCursor::single(0, 0);
+        mc.add_cursor(5, 5);
+        mc.collapse_to_primary();
+        assert_eq!(mc.cursor_count(), 1);
+        assert!(!mc.is_multi());
     }
 
 }
