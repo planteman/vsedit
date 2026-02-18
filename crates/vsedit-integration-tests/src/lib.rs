@@ -12438,3 +12438,1233 @@ mod error_handling_integration {
     }
 
 }
+
+// ─── Advanced Data Structures ───────────────────────────────────────────────
+
+#[cfg(test)]
+mod advanced_data_structures {
+    use vsedit_collections::{
+        Trie, PriorityQueue, IntervalMap, OrderedMap, BoundedStack,
+        LruCache, CountingSet, BidirectionalMap,
+    };
+    use vsedit_buffer::{VsBuffer, BufferBuilder};
+    use vsedit_text_model::{TextModel, TextModelSearcher, TextModelBracketTracker};
+    use vsedit_editor_types::{ITextModel, Position};
+    use vsedit_strings::{MeasuredString, display_width};
+
+    #[test]
+    fn trie_spell_check_suggestions() {
+        let mut trie = Trie::new();
+        for word in ["hello", "help", "helmet", "hero", "heap"] {
+            trie.insert(word);
+        }
+        let suggestions = trie.words_with_prefix("hel");
+        assert_eq!(suggestions.len(), 3);
+        assert!(suggestions.contains(&"hello".to_string()));
+        assert!(suggestions.contains(&"help".to_string()));
+        assert!(suggestions.contains(&"helmet".to_string()));
+    }
+
+    #[test]
+    fn trie_search_combined_with_text_model() {
+        let model = TextModel::new("fn main() {}\nfn helper() {}\nfn handle() {}");
+        let mut trie = Trie::new();
+        for line_num in 1..=model.get_line_count() {
+            let content = model.get_line_content(line_num);
+            for word in content.split_whitespace() {
+                trie.insert(word);
+            }
+        }
+        assert!(trie.contains("fn"));
+        assert!(trie.has_prefix("main"));
+        assert!(trie.has_prefix("hel"));
+    }
+
+    #[test]
+    fn priority_queue_with_buffer_lines() {
+        let buf = VsBuffer::from_string("short\nmedium line\na very long line indeed");
+        let content = buf.try_to_string().unwrap();
+        let mut pq = PriorityQueue::new();
+        for line in content.lines() {
+            pq.push(line.len());
+        }
+        let shortest = pq.pop().unwrap();
+        assert_eq!(shortest, 5); // "short"
+    }
+
+    #[test]
+    fn interval_map_text_range_queries() {
+        let model = TextModel::new("line1\nline2\nline3\nline4\nline5");
+        let mut imap = IntervalMap::new();
+        let mut offset = 0u64;
+        for line_num in 1..=model.get_line_count() {
+            let len = model.get_line_length(line_num) as u64;
+            imap.insert(offset, offset + len, line_num);
+            offset += len + 1; // +1 for newline
+        }
+        assert_eq!(imap.query(0), Some(&1));
+        assert_eq!(imap.query(6), Some(&2));
+    }
+
+    #[test]
+    fn ordered_map_tracks_edit_sequence() {
+        let mut omap = OrderedMap::new();
+        omap.insert(1u32, "insert 'hello'".to_string());
+        omap.insert(2, "delete line 3".to_string());
+        omap.insert(3, "move cursor down".to_string());
+        let keys: Vec<&u32> = omap.keys().iter().collect();
+        assert_eq!(keys, vec![&1, &2, &3]);
+        assert_eq!(omap.len(), 3);
+    }
+
+    #[test]
+    fn bounded_stack_undo_history() {
+        let mut stack = BoundedStack::new(3);
+        stack.push("edit1".to_string());
+        stack.push("edit2".to_string());
+        stack.push("edit3".to_string());
+        stack.push("edit4".to_string()); // oldest dropped
+        assert_eq!(stack.len(), 3);
+        assert_eq!(stack.pop(), Some("edit4".to_string()));
+        assert_eq!(stack.pop(), Some("edit3".to_string()));
+    }
+
+    #[test]
+    fn lru_cache_text_model_snapshots() {
+        let mut cache = LruCache::<String, String>::new(2);
+        let m1 = TextModel::new("version1");
+        let m2 = TextModel::new("version2");
+        let m3 = TextModel::new("version3");
+        cache.set("v1".into(), m1.get_value());
+        cache.set("v2".into(), m2.get_value());
+        cache.set("v3".into(), m3.get_value()); // v1 evicted
+        assert!(cache.get(&"v1".into()).is_none());
+        assert_eq!(cache.get(&"v2".into()), Some(&"version2".to_string()));
+    }
+
+    #[test]
+    fn counting_set_word_frequency() {
+        let buf = VsBuffer::from_string("the cat sat on the mat the");
+        let content = buf.try_to_string().unwrap();
+        let mut cs = CountingSet::new();
+        for word in content.split_whitespace() {
+            cs.add(word.to_string());
+        }
+        assert_eq!(cs.count(&"the".to_string()), 3);
+        assert_eq!(cs.count(&"cat".to_string()), 1);
+        let (most, count) = cs.most_frequent().unwrap();
+        assert_eq!(most, &"the".to_string());
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn bidirectional_map_uri_to_language_ids() {
+        let mut bimap = BidirectionalMap::<String, String>::new();
+        bimap.set("file:///main.rs".into(), "rust".into());
+        bimap.set("file:///app.py".into(), "python".into());
+        assert_eq!(bimap.get_by_left(&"file:///main.rs".into()), Some(&"rust".into()));
+        assert_eq!(bimap.get_by_right(&"python".into()), Some(&"file:///app.py".into()));
+        assert_eq!(bimap.len(), 2);
+    }
+
+    #[test]
+    fn trie_prefix_filter_model_lines() {
+        let model = TextModel::new("import os\nimport sys\nfrom collections import deque\ndef main():");
+        let mut trie = Trie::new();
+        for line_num in 1..=model.get_line_count() {
+            trie.insert(model.get_line_content(line_num));
+        }
+        let imports = trie.words_with_prefix("import");
+        assert_eq!(imports.len(), 2);
+    }
+
+    #[test]
+    fn interval_map_overlapping_ranges() {
+        let mut imap = IntervalMap::new();
+        assert!(imap.insert(0, 10, "first"));
+        // Overlapping insert should fail
+        assert!(!imap.insert(5, 15, "overlap"));
+        assert_eq!(imap.len(), 1);
+        assert_eq!(imap.query(5), Some(&"first"));
+    }
+
+    #[test]
+    fn priority_queue_drain_sorted() {
+        let mut pq = PriorityQueue::new();
+        for val in [5, 1, 3, 2, 4] {
+            pq.push(val);
+        }
+        let sorted = pq.drain_sorted();
+        assert_eq!(sorted, vec![1, 2, 3, 4, 5]);
+        assert!(pq.is_empty());
+    }
+
+    #[test]
+    fn lru_cache_eviction_under_pressure() {
+        let mut cache = LruCache::<u32, String>::new(3);
+        cache.set(1, "a".into());
+        cache.set(2, "b".into());
+        cache.set(3, "c".into());
+        // Access key 1 to make it recent
+        let _ = cache.get(&1);
+        // Insert key 4, key 2 should be evicted (LRU)
+        cache.set(4, "d".into());
+        assert!(cache.contains_key(&1));
+        assert!(!cache.contains_key(&2));
+        assert!(cache.contains_key(&3));
+        assert!(cache.contains_key(&4));
+    }
+
+    #[test]
+    fn trie_combined_with_searcher() {
+        let mut trie = Trie::new();
+        for word in ["function", "functional", "functor", "format", "for"] {
+            trie.insert(word);
+        }
+        let candidates = trie.words_with_prefix("fun");
+        let text = "The function is functional but the functor is different";
+        let searcher = TextModelSearcher::new();
+        let mut found_count = 0;
+        for candidate in &candidates {
+            found_count += searcher.count_matches(text, candidate);
+        }
+        assert!(found_count >= 3); // at least function, functional, functor
+    }
+
+    #[test]
+    fn bounded_stack_with_text_edits() {
+        let mut stack = BoundedStack::new(2);
+        let mut model = TextModel::new("initial");
+        stack.push(model.get_value());
+        model.insert(vsedit_editor_types::Position { line: 1, column: 8 }, " text");
+        stack.push(model.get_value());
+        model.insert(vsedit_editor_types::Position { line: 1, column: 13 }, " more");
+        stack.push(model.get_value()); // "initial" dropped
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.peek(), Some(&"initial text more".to_string()));
+    }
+
+    #[test]
+    fn ordered_map_preserves_insert_order() {
+        let mut omap = OrderedMap::<String, i32>::new();
+        omap.insert("zebra".into(), 1);
+        omap.insert("apple".into(), 2);
+        omap.insert("mango".into(), 3);
+        let keys = omap.keys();
+        assert_eq!(keys[0], "zebra");
+        assert_eq!(keys[1], "apple");
+        assert_eq!(keys[2], "mango");
+    }
+
+    #[test]
+    fn counting_set_buffer_operation_tracking() {
+        let mut cs = CountingSet::new();
+        cs.add("insert");
+        cs.add("insert");
+        cs.add("delete");
+        cs.add("insert");
+        cs.add("move");
+        assert_eq!(cs.count(&"insert"), 3);
+        assert_eq!(cs.count(&"delete"), 1);
+        assert_eq!(cs.distinct_count(), 3);
+        assert_eq!(cs.total_count(), 5);
+    }
+
+    #[test]
+    fn interval_map_query_range_multiple() {
+        let mut imap = IntervalMap::new();
+        imap.insert(0, 10, "a");
+        imap.insert(20, 30, "b");
+        imap.insert(40, 50, "c");
+        let results = imap.query_range(0, 50);
+        assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn trie_empty_prefix_returns_all() {
+        let mut trie = Trie::new();
+        trie.insert("alpha");
+        trie.insert("beta");
+        trie.insert("gamma");
+        let all = trie.words_with_prefix("");
+        assert_eq!(all.len(), 3);
+    }
+
+    #[test]
+    fn priority_queue_text_model_line_priority() {
+        let model = TextModel::new("short\nmedium length\nthe longest line here");
+        let mut pq = PriorityQueue::new();
+        for line_num in 1..=model.get_line_count() {
+            pq.push(model.get_line_length(line_num));
+        }
+        assert_eq!(pq.pop(), Some(5)); // shortest first (min-heap)
+    }
+
+    #[test]
+    fn bidirectional_map_extension_language_mapping() {
+        let mut bimap = BidirectionalMap::<String, String>::new();
+        bimap.set(".rs".into(), "rust".into());
+        bimap.set(".py".into(), "python".into());
+        bimap.set(".ts".into(), "typescript".into());
+        assert_eq!(bimap.get_by_right(&"rust".into()), Some(&".rs".into()));
+        bimap.delete_by_left(&".py".into());
+        assert!(bimap.get_by_right(&"python".into()).is_none());
+        assert_eq!(bimap.len(), 2);
+    }
+
+    #[test]
+    fn lru_cache_peek_vs_get_behavior() {
+        let mut cache = LruCache::<u32, String>::new(2);
+        cache.set(1, "a".into());
+        cache.set(2, "b".into());
+        // Peek at 1 - should NOT update access order
+        let _ = cache.peek(&1);
+        cache.set(3, "c".into());
+        // Key 1 should be evicted since peek doesn't update access
+        assert!(cache.get(&1).is_none());
+        assert!(cache.contains_key(&2));
+        assert!(cache.contains_key(&3));
+    }
+
+    #[test]
+    fn bounded_stack_overflow_drops_oldest() {
+        let mut stack = BoundedStack::new(2);
+        stack.push(1);
+        stack.push(2);
+        assert!(stack.is_full());
+        stack.push(3); // 1 is dropped
+        assert_eq!(stack.len(), 2);
+        let a = stack.pop().unwrap();
+        let b = stack.pop().unwrap();
+        assert!(a == 3 || b == 3);
+        assert!(a == 2 || b == 2);
+    }
+
+    #[test]
+    fn interval_map_clear_and_rebuild() {
+        let mut imap = IntervalMap::new();
+        imap.insert(0, 10, "old");
+        imap.insert(20, 30, "old");
+        assert_eq!(imap.len(), 2);
+        imap.clear();
+        assert!(imap.is_empty());
+        imap.insert(0, 5, "new");
+        assert_eq!(imap.query(3), Some(&"new"));
+    }
+
+    #[test]
+    fn combined_data_structures_pipeline() {
+        let buf = VsBuffer::from_string("fn parse() {}\nfn process() {}\nfn print() {}\nfn run() {}");
+        let content = buf.try_to_string().unwrap();
+        let model = TextModel::new(&content);
+
+        // Build trie from function names
+        let mut trie = Trie::new();
+        let searcher = TextModelSearcher::new();
+        for line_num in 1..=model.get_line_count() {
+            let line = model.get_line_content(line_num);
+            if let Some(name) = line.strip_prefix("fn ").and_then(|s| s.split('(').next()) {
+                trie.insert(name);
+            }
+        }
+
+        // Track function name lengths in priority queue
+        let mut pq = PriorityQueue::new();
+        let p_funcs = trie.words_with_prefix("p");
+        assert_eq!(p_funcs.len(), 3); // parse, process, print
+        for name in &p_funcs {
+            pq.push(name.len());
+        }
+        assert_eq!(pq.pop(), Some(5)); // "parse" or "print" (5 chars)
+
+        // Count occurrences
+        let mut cs = CountingSet::new();
+        for line_num in 1..=model.get_line_count() {
+            cs.add("fn_definition");
+        }
+        assert_eq!(cs.count(&"fn_definition"), 4);
+    }
+}
+
+// ─── Workbench Workflow ─────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod workbench_workflow {
+    use vsedit_text_model::TextModel;
+    use vsedit_editor_types::{ITextModel, Position, Range};
+    use vsedit_editor_controller::{EditorAction, EditorController};
+    use vsedit_commands::{CommandRegistry, CommandHistory, CommandPalette};
+    use vsedit_find::{FindState, FindReplaceState, FindOptions, FindHistory};
+    use vsedit_clipboard::{InMemoryClipboard, ClipboardHistory, ClipboardItem};
+    use vsedit_buffer::{VsBuffer, BufferBuilder};
+    use vsedit_ext_activation::{
+        ActivationEvent, ActivationEventMatcher, ExtensionActivationQueue,
+        ActivationDependencyGraph,
+    };
+    use vsedit_workspace::Workspace;
+
+    #[test]
+    fn open_file_edit_save_workflow() {
+        let mut model = TextModel::new("hello world");
+        model.insert(Position { line: 1, column: 6 }, " beautiful");
+        assert_eq!(model.get_value(), "hello beautiful world");
+        model.undo();
+        assert_eq!(model.get_value(), "hello world");
+        model.redo();
+        assert_eq!(model.get_value(), "hello beautiful world");
+    }
+
+    #[test]
+    fn find_replace_across_buffer() {
+        let mut model = TextModel::new("foo bar foo baz foo");
+        let count = model.replace_all("foo", "qux");
+        assert_eq!(count, 3);
+        assert_eq!(model.get_value(), "qux bar qux baz qux");
+    }
+
+    #[test]
+    fn command_palette_execute_undo() {
+        let registry = CommandRegistry::new();
+        let _reg = registry.register("editor.action.format", Box::new(|_| Ok(None)));
+        let mut palette = CommandPalette::new();
+        palette.add("editor.action.format", Some("Format Document".into()));
+        let matches = palette.filter_commands("format");
+        assert!(!matches.is_empty());
+        assert!(registry.has("editor.action.format"));
+        let result = registry.execute("editor.action.format", vec![]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn extension_install_activate_contribute() {
+        let mut queue = ExtensionActivationQueue::new();
+        queue.register("rust-analyzer".into(), vec![ActivationEvent::Star]);
+        queue.register("python-ext".into(), vec![ActivationEvent::OnLanguage("python".into())]);
+        let matcher = ActivationEventMatcher::new();
+        let newly_queued = queue.evaluate(&matcher);
+        // Star events should match the default matcher
+        assert!(newly_queued.contains(&"rust-analyzer".to_string()));
+        assert_eq!(queue.pending_count(), 1);
+        // python-ext not activated since OnLanguage("python") not matched
+        assert!(!newly_queued.contains(&"python-ext".to_string()));
+    }
+
+    #[test]
+    fn multi_buffer_editing() {
+        let mut model1 = TextModel::new("buffer one");
+        let mut model2 = TextModel::new("buffer two");
+        model1.insert(Position { line: 1, column: 11 }, " edited");
+        model2.insert(Position { line: 1, column: 11 }, " modified");
+        assert_eq!(model1.get_value(), "buffer one edited");
+        assert_eq!(model2.get_value(), "buffer two modified");
+    }
+
+    #[test]
+    fn clipboard_copy_paste_workflow() {
+        let mut ctrl = EditorController::new("hello world");
+        ctrl.execute_action(EditorAction::SelectAll);
+        ctrl.execute_action(EditorAction::Copy);
+        let copied = ctrl.clipboard.clone();
+        let mut ctrl2 = EditorController::new("");
+        ctrl2.execute_action(EditorAction::Paste(copied));
+        assert_eq!(ctrl2.text(), "hello world");
+    }
+
+    #[test]
+    fn find_history_navigation() {
+        let mut history = FindHistory::new(10);
+        history.push("first search");
+        history.push("second search");
+        history.push("third search");
+        assert_eq!(history.most_recent(), Some("third search"));
+        assert_eq!(history.len(), 3);
+        let results = history.search("second");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn command_history_most_frequent() {
+        let mut history = CommandHistory::new();
+        history.record("editor.action.format", 100);
+        history.record("editor.action.format", 200);
+        history.record("editor.action.format", 300);
+        history.record("editor.action.save", 150);
+        let freq = history.most_frequent(1);
+        assert_eq!(freq[0].0, "editor.action.format");
+        assert_eq!(freq[0].1, 3);
+    }
+
+    #[test]
+    fn undo_redo_grouped_operations() {
+        let mut model = TextModel::new("start");
+        model.open_undo_group(None);
+        model.insert(Position { line: 1, column: 6 }, " middle");
+        model.insert(Position { line: 1, column: 13 }, " end");
+        model.close_undo_group(None);
+        assert_eq!(model.get_value(), "start middle end");
+        model.undo();
+        model.undo(); // undo both edits in the group
+        assert_eq!(model.get_value(), "start");
+    }
+
+    #[test]
+    fn find_replace_with_regex() {
+        let model = TextModel::new("foo123 bar456 baz789");
+        let matches = model.find_matches("\\d+", true, true);
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn workspace_folder_operations() {
+        let ws = Workspace::empty();
+        assert!(ws.get_folders().is_empty());
+        let ws2 = Workspace::single_folder(vsedit_uri::VsUri::file("/home/user/project"));
+        assert_eq!(ws2.get_folders().len(), 1);
+    }
+
+    #[test]
+    fn activation_dependency_resolution() {
+        let mut graph = ActivationDependencyGraph::new();
+        graph.add_dependency("ext-b", "ext-a");
+        graph.add_dependency("ext-c", "ext-b");
+        let mut activated = std::collections::HashSet::new();
+        assert!(!graph.can_activate("ext-b", &activated));
+        activated.insert("ext-a".to_string());
+        assert!(graph.can_activate("ext-b", &activated));
+        assert!(!graph.can_activate("ext-c", &activated));
+    }
+
+    #[test]
+    fn multi_cursor_editing_workflow() {
+        let mut ctrl = EditorController::new("line one\nline two\nline three");
+        ctrl.execute_action(EditorAction::AddCursorBelow);
+        assert!(ctrl.has_multiple_cursors());
+        ctrl.execute_action(EditorAction::RemoveSecondaryCursors);
+        assert!(!ctrl.has_multiple_cursors());
+    }
+
+    #[test]
+    fn find_state_navigation() {
+        let mut state = FindState::new();
+        state.options = FindOptions::new("line");
+        state.search("line one\nline two\nline three");
+        assert_eq!(state.match_count(), 3);
+        state.next_match();
+        assert!(state.current().is_some());
+        state.next_match();
+        state.previous_match();
+    }
+
+    #[test]
+    fn command_registry_register_execute() {
+        let registry = CommandRegistry::new();
+        let _r1 = registry.register("test.hello", Box::new(|_| Ok(None)));
+        let _r2 = registry.register("test.world", Box::new(|_| Ok(None)));
+        assert!(registry.has("test.hello"));
+        assert!(registry.has("test.world"));
+        assert!(!registry.has("test.missing"));
+        let cmds = registry.get_commands();
+        assert!(cmds.len() >= 2);
+    }
+
+    #[test]
+    fn buffer_builder_to_text_model_edit() {
+        let mut bb = BufferBuilder::new();
+        bb.append_str("line one\n");
+        bb.append_str("line two\n");
+        bb.append_str("line three");
+        let buf = bb.build();
+        let content = buf.try_to_string().unwrap();
+        let mut model = TextModel::new(&content);
+        assert_eq!(model.get_line_count(), 3);
+        model.insert(Position { line: 2, column: 9 }, " and a half");
+        assert_eq!(model.get_line_content(2), "line two and a half");
+    }
+
+    #[test]
+    fn find_replace_state_toggles() {
+        let mut state = FindReplaceState::new();
+        state.set_search("hello");
+        assert!(!state.use_regex);
+        state.toggle_regex();
+        assert!(state.use_regex);
+        state.toggle_case();
+        assert!(state.match_case);
+        state.toggle_whole_word();
+        assert!(state.match_whole_word);
+        let opts = state.to_find_options();
+        assert!(opts.is_regex);
+        assert!(opts.case_sensitive);
+        assert!(opts.whole_word);
+    }
+
+    #[test]
+    fn clipboard_history_workflow() {
+        let mut history = ClipboardHistory::new(5);
+        history.push(ClipboardItem::new("first", 100, None));
+        history.push(ClipboardItem::new("second", 200, None));
+        history.push(ClipboardItem::new("third", 300, None));
+        assert_eq!(history.len(), 3);
+        let recent = history.most_recent().unwrap();
+        assert_eq!(recent.text, "third");
+        assert_eq!(history.get_at(0).unwrap().text, "first");
+    }
+
+    #[test]
+    fn text_model_snapshot_comparison() {
+        let mut model = TextModel::new("original content");
+        let v1 = model.get_version_id();
+        model.insert(Position { line: 1, column: 17 }, " updated");
+        let v2 = model.get_version_id();
+        assert_ne!(v1, v2);
+        model.undo();
+        assert_eq!(model.get_value(), "original content");
+    }
+
+    #[test]
+    fn activation_event_matching() {
+        let mut matcher = ActivationEventMatcher::new();
+        assert!(matcher.should_activate(&ActivationEvent::Star));
+        matcher.open_language("rust");
+        assert!(matcher.should_activate(&ActivationEvent::OnLanguage("rust".into())));
+    }
+
+    #[test]
+    fn find_highlight_all_management() {
+        use vsedit_find::FindHighlightAll;
+        let mut highlight = FindHighlightAll::new();
+        highlight.add_entry("fn main");
+        highlight.add_entry("fn helper");
+        highlight.add_entry("struct Foo");
+        assert_eq!(highlight.entry_count(), 3);
+        assert!(highlight.contains("fn main"));
+        let filtered = highlight.filter_entries("fn");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn model_apply_multiple_edits() {
+        let mut model = TextModel::new("aaa bbb ccc");
+        model.push_edit_operations(&[
+            (Range::new(1, 1, 1, 4), "xxx".into()),
+        ]);
+        assert!(model.get_value().contains("xxx"));
+    }
+
+    #[test]
+    fn command_palette_filter() {
+        let mut palette = CommandPalette::new();
+        palette.add("editor.action.formatDocument", Some("Format Document".into()));
+        palette.add("editor.action.quickFix", Some("Quick Fix".into()));
+        palette.add("workbench.action.openSettings", Some("Open Settings".into()));
+        let matches = palette.filter_commands("format");
+        assert!(!matches.is_empty());
+        let settings = palette.filter_commands("settings");
+        assert!(!settings.is_empty());
+    }
+
+    #[test]
+    fn buffer_concat_and_search() {
+        let buf1 = VsBuffer::from_string("hello ");
+        let buf2 = VsBuffer::from_string("world");
+        let combined = VsBuffer::concat(&[buf1, buf2]);
+        let content = combined.try_to_string().unwrap();
+        let searcher = vsedit_text_model::TextModelSearcher::new();
+        let matches = searcher.search_literal(&content, "world");
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn workspace_path_resolution() {
+        let ws = Workspace::single_folder(vsedit_uri::VsUri::file("/home/user/project"));
+        let folders = ws.get_folders();
+        assert_eq!(folders.len(), 1);
+        let resolved = ws.resolve_path("src/main.rs");
+        assert!(resolved.is_some());
+    }
+}
+
+// ─── Configuration System ───────────────────────────────────────────────────
+
+#[cfg(test)]
+mod configuration_system {
+    use vsedit_configuration::{
+        ConfigurationModel, Configuration, ConfigurationTarget,
+        ConfigurationRegistry, SettingSchema, SettingType,
+    };
+    use vsedit_keybinding_svc::{
+        KeybindingRule, KeybindingResolver, KeybindingWeight, KeybindingSource,
+    };
+    use vsedit_keybindings::{
+        Keybinding, parse_keybinding, serialize_keybinding, detect_conflicts,
+    };
+    use vsedit_keycodes::{KeyCode, KeyMod, key_chord};
+    use vsedit_contextkey::{
+        ContextKeyService, ContextKeyValue, ContextKeyExpr, evaluate_expression,
+    };
+    use vsedit_theme::{
+        Color, ColorTheme, ThemeInheritance, TokenColor, TokenSettings,
+        dark_plus, light_plus,
+    };
+    use vsedit_languages::{LanguageIdNormalizer, LanguageDetector, LanguageAutoDetector};
+    use vsedit_platform::Platform;
+    use std::collections::HashMap;
+
+    #[test]
+    fn default_to_user_cascade() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.fontSize", serde_json::json!(14));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.fontSize", serde_json::json!(16));
+        config.set_layer(ConfigurationTarget::User, user);
+        let val: Option<i64> = config.get_value("editor.fontSize");
+        assert_eq!(val, Some(16));
+    }
+
+    #[test]
+    fn user_to_workspace_cascade() {
+        let mut config = Configuration::new();
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.tabSize", serde_json::json!(4));
+        config.set_layer(ConfigurationTarget::User, user);
+        let mut ws = ConfigurationModel::new();
+        ws.set_value("editor.tabSize", serde_json::json!(2));
+        config.set_layer(ConfigurationTarget::Workspace, ws);
+        let val: Option<i64> = config.get_value("editor.tabSize");
+        assert_eq!(val, Some(2));
+    }
+
+    #[test]
+    fn workspace_to_folder_cascade() {
+        let mut config = Configuration::new();
+        let mut ws = ConfigurationModel::new();
+        ws.set_value("editor.wordWrap", serde_json::json!("off"));
+        config.set_layer(ConfigurationTarget::Workspace, ws);
+        let mut folder = ConfigurationModel::new();
+        folder.set_value("editor.wordWrap", serde_json::json!("on"));
+        config.set_layer(ConfigurationTarget::WorkspaceFolder, folder);
+        let val: Option<String> = config.get_value("editor.wordWrap");
+        assert_eq!(val, Some("on".to_string()));
+    }
+
+    #[test]
+    fn full_cascade_chain() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.fontSize", serde_json::json!(12));
+        defaults.set_value("editor.tabSize", serde_json::json!(4));
+        defaults.set_value("editor.wordWrap", serde_json::json!("off"));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.fontSize", serde_json::json!(14));
+        config.set_layer(ConfigurationTarget::User, user);
+        let mut ws = ConfigurationModel::new();
+        ws.set_value("editor.tabSize", serde_json::json!(2));
+        config.set_layer(ConfigurationTarget::Workspace, ws);
+        let font: Option<i64> = config.get_value("editor.fontSize");
+        let tab: Option<i64> = config.get_value("editor.tabSize");
+        let wrap: Option<String> = config.get_value("editor.wordWrap");
+        assert_eq!(font, Some(14));
+        assert_eq!(tab, Some(2));
+        assert_eq!(wrap, Some("off".to_string()));
+    }
+
+    #[test]
+    fn inspect_reveals_all_layers() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.fontSize", serde_json::json!(12));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.fontSize", serde_json::json!(14));
+        config.set_layer(ConfigurationTarget::User, user);
+        let result = config.inspect("editor.fontSize");
+        assert!(result.default_value.is_some());
+        assert!(result.user_value.is_some());
+        assert!(result.effective_value.is_some());
+    }
+
+    #[test]
+    fn update_at_specific_target() {
+        let mut config = Configuration::new();
+        let changed = config.update("editor.fontSize", serde_json::json!(16), ConfigurationTarget::User);
+        assert!(changed.contains(&"editor.fontSize".to_string()));
+        let val: Option<i64> = config.get_value("editor.fontSize");
+        assert_eq!(val, Some(16));
+    }
+
+    #[test]
+    fn configuration_model_merge() {
+        let mut m1 = ConfigurationModel::new();
+        m1.set_value("a.b", serde_json::json!(1));
+        let mut m2 = ConfigurationModel::new();
+        m2.set_value("c.d", serde_json::json!(2));
+        m1.merge(&m2);
+        let v1: Option<i64> = m1.get_value("a.b");
+        let v2: Option<i64> = m1.get_value("c.d");
+        assert_eq!(v1, Some(1));
+        assert_eq!(v2, Some(2));
+    }
+
+    #[test]
+    fn keybinding_resolution_basic() {
+        let mut resolver = KeybindingResolver::new();
+        let chord = vsedit_keycodes::KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        let binding = Keybinding::new(chord);
+        let rule = KeybindingRule {
+            keybinding: binding,
+            command: "workbench.action.files.save".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        };
+        resolver.add_rule(rule);
+        assert!(resolver.has_command("workbench.action.files.save"));
+    }
+
+    #[test]
+    fn keybinding_when_clause_evaluation() {
+        let ctx = ContextKeyService::new();
+        ctx.set_context("editorTextFocus", ContextKeyValue::Bool(true));
+        let result = evaluate_expression("editorTextFocus", &ctx);
+        assert!(result);
+        let result2 = evaluate_expression("editorTextFocus && terminalFocus", &ctx);
+        assert!(!result2); // terminalFocus not set
+    }
+
+    #[test]
+    fn context_key_defined_check() {
+        let ctx = ContextKeyService::new();
+        ctx.set_context("isLinux", ContextKeyValue::Bool(true));
+        let expr = ContextKeyExpr::parse("isLinux").unwrap();
+        assert!(expr.evaluate(&ctx));
+        let expr2 = ContextKeyExpr::parse("isMac").unwrap();
+        assert!(!expr2.evaluate(&ctx));
+    }
+
+    #[test]
+    fn context_key_expression_and() {
+        let ctx = ContextKeyService::new();
+        ctx.set_context("editorFocus", ContextKeyValue::Bool(true));
+        ctx.set_context("editorHasSelection", ContextKeyValue::Bool(true));
+        let expr = ContextKeyExpr::parse("editorFocus && editorHasSelection").unwrap();
+        assert!(expr.evaluate(&ctx));
+    }
+
+    #[test]
+    fn context_key_expression_or() {
+        let ctx = ContextKeyService::new();
+        ctx.set_context("editorFocus", ContextKeyValue::Bool(true));
+        let expr = ContextKeyExpr::parse("editorFocus || terminalFocus").unwrap();
+        assert!(expr.evaluate(&ctx));
+    }
+
+    #[test]
+    fn theme_inheritance_color_override() {
+        let parent = dark_plus();
+        let mut inheritance = ThemeInheritance::new("dark-plus");
+        inheritance.set_color("editor.background", Color::rgb(30, 30, 30));
+        let child = inheritance.apply(&parent, "my-dark-theme", "My Dark Theme");
+        let bg = child.get_color("editor.background").unwrap();
+        assert_eq!(bg.r, 30);
+        assert_eq!(bg.g, 30);
+    }
+
+    #[test]
+    fn theme_inheritance_token_override() {
+        let parent = dark_plus();
+        let mut inheritance = ThemeInheritance::new("dark-plus");
+        inheritance.add_token_override(TokenColor {
+            name: Some("Comment".to_string()),
+            scope: vec!["comment".to_string()],
+            settings: TokenSettings {
+                foreground: Some(Color::rgb(100, 200, 100)),
+                background: None,
+                font_style: Some("italic".to_string()),
+            },
+        });
+        let child = inheritance.apply(&parent, "my-theme", "My Theme");
+        assert!(child.token_color_count() > 0);
+    }
+
+    #[test]
+    fn language_specific_settings() {
+        let mut config = Configuration::new();
+        let mut user = ConfigurationModel::new();
+        user.set_value("[rust].editor.tabSize", serde_json::json!(4));
+        user.set_value("[python].editor.tabSize", serde_json::json!(4));
+        user.set_value("editor.tabSize", serde_json::json!(2));
+        config.set_layer(ConfigurationTarget::User, user);
+        let general: Option<i64> = config.get_value("editor.tabSize");
+        assert_eq!(general, Some(2));
+    }
+
+    #[test]
+    fn configuration_registry_defaults() {
+        let mut registry = ConfigurationRegistry::new();
+        registry.register_setting(SettingSchema {
+            key: "editor.fontSize".into(),
+            setting_type: SettingType::Number,
+            default: serde_json::json!(14),
+            description: "Font size".into(),
+            enum_values: None,
+            enum_descriptions: None,
+        });
+        let defaults = registry.get_defaults();
+        let val: Option<i64> = defaults.get_value("editor.fontSize");
+        assert_eq!(val, Some(14));
+    }
+
+    #[test]
+    fn keybinding_conflict_detection() {
+        let binding1 = parse_keybinding("ctrl+p", Platform::Linux).unwrap();
+        let binding2 = parse_keybinding("ctrl+p", Platform::Linux).unwrap();
+        let conflicts = detect_conflicts(&[binding1, binding2]);
+        assert!(!conflicts.is_empty());
+    }
+
+    #[test]
+    fn context_key_scoped_service() {
+        use std::sync::Arc;
+        let root = Arc::new(ContextKeyService::new());
+        root.set_context("isLinux", ContextKeyValue::Bool(true));
+        let scoped = root.create_scoped();
+        scoped.set_context("editorFocus", ContextKeyValue::Bool(true));
+        // Scoped should see parent keys
+        assert!(evaluate_expression("isLinux", scoped.as_ref()));
+        assert!(evaluate_expression("editorFocus", scoped.as_ref()));
+    }
+
+    #[test]
+    fn keybinding_parse_and_serialize() {
+        let binding = parse_keybinding("ctrl+shift+p", Platform::Linux).unwrap();
+        let serialized = serialize_keybinding(&binding);
+        assert!(serialized.to_lowercase().contains("ctrl"));
+        assert!(serialized.to_lowercase().contains("shift"));
+    }
+
+    #[test]
+    fn language_id_normalization() {
+        let normalizer = LanguageIdNormalizer::new();
+        assert_eq!(normalizer.normalize("JS"), "javascript");
+        assert_eq!(normalizer.normalize("ts"), "typescript");
+        assert_eq!(normalizer.normalize("py"), "python");
+        assert!(normalizer.are_equivalent("js", "javascript"));
+    }
+
+    #[test]
+    fn language_detection_by_content() {
+        let detector = LanguageDetector::new();
+        let content = "#!/usr/bin/env python3\nimport os\nprint('hello')";
+        let lang = detector.detect_from_content(content);
+        assert!(lang.is_some());
+    }
+
+    #[test]
+    fn theme_dark_plus_configuration() {
+        let theme = dark_plus();
+        assert!(theme.get_color("editor.background").is_some());
+        assert!(theme.get_color("editor.foreground").is_some());
+        assert!(!theme.is_high_contrast());
+        assert!(theme.token_color_count() > 0);
+    }
+
+    #[test]
+    fn memory_target_overrides_all() {
+        let mut config = Configuration::new();
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.fontSize", serde_json::json!(12));
+        config.set_layer(ConfigurationTarget::Default, defaults);
+        let mut user = ConfigurationModel::new();
+        user.set_value("editor.fontSize", serde_json::json!(14));
+        config.set_layer(ConfigurationTarget::User, user);
+        let mut memory = ConfigurationModel::new();
+        memory.set_value("editor.fontSize", serde_json::json!(20));
+        config.set_layer(ConfigurationTarget::Memory, memory);
+        let val: Option<i64> = config.get_value("editor.fontSize");
+        assert_eq!(val, Some(20));
+    }
+
+    #[test]
+    fn configuration_model_from_jsonc() {
+        let jsonc = r#"
+        {
+            // This is a comment
+            "editor": {
+                "fontSize": 16,
+                "tabSize": 2
+            }
+        }
+        "#;
+        let model = ConfigurationModel::from_jsonc(jsonc).unwrap();
+        let font: Option<i64> = model.get_value("editor.fontSize");
+        assert_eq!(font, Some(16));
+    }
+
+    #[test]
+    fn language_auto_detection_by_first_line() {
+        let detector = LanguageAutoDetector::new();
+        let result = detector.detect_by_first_line("#!/usr/bin/env node");
+        assert!(result.is_some());
+    }
+}
+
+// ─── Terminal Rendering ─────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod terminal_rendering {
+    use vsedit_terminal::{TerminalBuffer, AnsiParser, TerminalCell, AnsiAction};
+    use vsedit_tui::{RenderRegion, RenderTracker, RenderStats};
+    use vsedit_styles::{
+        ThemeColor, ThemeDefaults, ThemeColorResolver, StyleBuilder,
+        parse_hex_color, editor_style, line_number_style, statusbar_style,
+        Color, Modifier, Style,
+    };
+    use vsedit_strings::{
+        MeasuredString, LineBuilder, display_width, is_fullwidth_char,
+        truncate_to_width, grapheme_count,
+    };
+
+    #[test]
+    fn style_builder_basic() {
+        let style = StyleBuilder::new()
+            .fg(Color::Rgb(255, 255, 255))
+            .bg(Color::Rgb(30, 30, 30))
+            .build();
+        assert_ne!(format!("{:?}", style), "");
+    }
+
+    #[test]
+    fn theme_color_resolver_registration() {
+        let mut resolver = ThemeColorResolver::new();
+        let color = ThemeColor::new("editor.background");
+        resolver.register(color.clone(), editor_style());
+        assert_eq!(resolver.len(), 1);
+        let resolved = resolver.resolve(&color);
+        assert_eq!(format!("{:?}", resolved), format!("{:?}", editor_style()));
+    }
+
+    #[test]
+    fn measured_string_basic_width() {
+        let ms = MeasuredString::new("hello world");
+        assert_eq!(ms.width(), 11);
+        assert_eq!(ms.text(), "hello world");
+        assert!(!ms.is_empty());
+        assert!(ms.is_ascii());
+    }
+
+    #[test]
+    fn measured_string_cjk_width() {
+        let ms = MeasuredString::new("你好世界"); // 4 CJK chars, each 2 wide
+        assert_eq!(ms.width(), 8);
+        assert!(!ms.is_ascii());
+        assert_eq!(ms.grapheme_len(), 4);
+    }
+
+    #[test]
+    fn line_builder_concatenation() {
+        let line = LineBuilder::new()
+            .separator(" | ")
+            .push("main.rs")
+            .push("line 42")
+            .push("col 10")
+            .build();
+        assert_eq!(line, "main.rs | line 42 | col 10");
+    }
+
+    #[test]
+    fn text_wrapping_truncation() {
+        let truncated = truncate_to_width("hello beautiful world", 10);
+        assert!(display_width(&truncated) <= 10);
+    }
+
+    #[test]
+    fn terminal_buffer_write_and_read() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("hello world");
+        assert!(buf.contains_text("hello"));
+        let text = buf.line_text(0);
+        assert!(text.is_some());
+        assert!(text.unwrap().contains("hello"));
+    }
+
+    #[test]
+    fn ansi_parser_basic_sequences() {
+        let mut parser = AnsiParser::new();
+        let actions = parser.parse(b"Hello\n");
+        assert!(!actions.is_empty());
+        let has_print = actions.iter().any(|a| matches!(a, AnsiAction::Print(_)));
+        assert!(has_print);
+    }
+
+    #[test]
+    fn terminal_buffer_cursor_positioning() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        assert_eq!(buf.cursor_row(), 0);
+        assert_eq!(buf.cursor_col(), 0);
+        buf.write_str("hello");
+        assert_eq!(buf.cursor_col(), 5);
+    }
+
+    #[test]
+    fn render_region_dirty_tracking() {
+        let mut region = RenderRegion::new(0, 0, 80, 24);
+        region.mark_dirty();
+        assert!(region.is_dirty());
+        region.mark_clean();
+        assert!(!region.is_dirty());
+    }
+
+    #[test]
+    fn render_region_overlap_detection() {
+        let r1 = RenderRegion::new(0, 0, 40, 24);
+        let r2 = RenderRegion::new(20, 0, 40, 24);
+        let r3 = RenderRegion::new(50, 0, 30, 24);
+        assert!(r1.overlaps(&r2));
+        assert!(!r1.overlaps(&r3));
+    }
+
+    #[test]
+    fn render_tracker_frame_recording() {
+        let mut tracker = RenderTracker::new();
+        tracker.record(RenderStats {
+            frame_number: 1,
+            render_time_us: 1000,
+            widget_count: 5,
+        });
+        tracker.record(RenderStats {
+            frame_number: 2,
+            render_time_us: 2000,
+            widget_count: 5,
+        });
+        assert_eq!(tracker.frame_count(), 2);
+        assert_eq!(tracker.average_render_time_us(), 1500);
+    }
+
+    #[test]
+    fn theme_defaults_colors_exist() {
+        let bg = ThemeDefaults::editor_background();
+        let fg = ThemeDefaults::editor_foreground();
+        let cursor = ThemeDefaults::editor_cursor();
+        // These should all return valid Color values
+        assert_ne!(format!("{:?}", bg), "");
+        assert_ne!(format!("{:?}", fg), "");
+        assert_ne!(format!("{:?}", cursor), "");
+    }
+
+    #[test]
+    fn display_width_function_test() {
+        assert_eq!(display_width("hello"), 5);
+        assert_eq!(display_width(""), 0);
+        assert_eq!(display_width("你好"), 4); // 2 CJK chars = 4 cells
+    }
+
+    #[test]
+    fn fullwidth_char_detection() {
+        assert!(is_fullwidth_char('你'));
+        assert!(is_fullwidth_char('世'));
+        assert!(!is_fullwidth_char('a'));
+        assert!(!is_fullwidth_char('1'));
+    }
+
+    #[test]
+    fn grapheme_count_function_test() {
+        assert_eq!(grapheme_count("hello"), 5);
+        assert_eq!(grapheme_count(""), 0);
+        assert_eq!(grapheme_count("café"), 4);
+    }
+
+    #[test]
+    fn terminal_buffer_scrolling() {
+        let mut buf = TerminalBuffer::new(80, 5);
+        for i in 0..10 {
+            buf.write_str(&format!("line {}\n", i));
+        }
+        let initial_offset = buf.scroll_offset();
+        buf.scroll_up(2);
+        assert!(buf.scroll_offset() != initial_offset || buf.line_count() > 5);
+    }
+
+    #[test]
+    fn terminal_buffer_resize() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("hello world");
+        buf.resize(40, 12);
+        assert_eq!(buf.cols(), 40);
+        assert_eq!(buf.rows(), 12);
+    }
+
+    #[test]
+    fn ansi_parser_sgr_sequences() {
+        let mut parser = AnsiParser::new();
+        // ESC[31m = red foreground
+        let actions = parser.parse(b"\x1b[31mRed Text\x1b[0m");
+        let has_sgr = actions.iter().any(|a| matches!(a, AnsiAction::Sgr(_)));
+        assert!(has_sgr);
+        let has_print = actions.iter().any(|a| matches!(a, AnsiAction::Print('R')));
+        assert!(has_print);
+    }
+
+    #[test]
+    fn render_region_line_content() {
+        let mut region = RenderRegion::new(0, 0, 80, 10);
+        region.set_line(0, "First line".into());
+        region.set_line(1, "Second line".into());
+        assert_eq!(region.get_line(0), Some("First line"));
+        assert_eq!(region.get_line(1), Some("Second line"));
+        // Row beyond region height
+        assert!(region.get_line(20).is_none());
+    }
+
+    #[test]
+    fn render_region_point_containment() {
+        let region = RenderRegion::new(10, 10, 20, 20);
+        assert!(region.contains_point(15, 15));
+        assert!(region.contains_point(10, 10));
+        assert!(!region.contains_point(5, 5));
+        assert!(!region.contains_point(35, 35));
+    }
+
+    #[test]
+    fn style_builder_modifiers() {
+        let style = StyleBuilder::new()
+            .fg(Color::Rgb(200, 200, 200))
+            .modifier(Modifier::BOLD)
+            .build();
+        assert_ne!(format!("{:?}", style), "");
+    }
+
+    #[test]
+    fn terminal_buffer_visible_text() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("line one\n");
+        buf.write_str("line two\n");
+        let visible = buf.visible_text();
+        assert!(visible.contains("line one"));
+        assert!(visible.contains("line two"));
+    }
+
+    #[test]
+    fn measured_string_truncation() {
+        let ms = MeasuredString::new("hello beautiful world");
+        let truncated = ms.truncated(10);
+        assert!(display_width(&truncated) <= 10);
+    }
+
+    #[test]
+    fn decoration_layering_with_resolver() {
+        let mut resolver = ThemeColorResolver::new();
+        let bg_color = ThemeColor::new("editor.background");
+        let ln_color = ThemeColor::new("editorLineNumber.foreground");
+        let sb_color = ThemeColor::new("statusBar.background");
+        resolver.register(bg_color.clone(), editor_style());
+        resolver.register(ln_color.clone(), line_number_style());
+        resolver.register(sb_color.clone(), statusbar_style());
+        assert_eq!(resolver.len(), 3);
+        let tokens = resolver.tokens();
+        assert_eq!(tokens.len(), 3);
+    }
+}
