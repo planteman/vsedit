@@ -3604,6 +3604,203 @@ impl<K: Ord + Clone, V: Clone> Xj169BTree<K, V> {
     }
 }
 
+
+// --- xk_169 segment tree and disjoint intervals ---
+
+/// Segment tree for range queries over `i64` values.
+pub struct Xk169SegmentTree {
+    xk_n: usize,
+    xk_tree: Vec<i64>,
+    xk_min_tree: Vec<i64>,
+    xk_max_tree: Vec<i64>,
+}
+
+impl Xk169SegmentTree {
+    /// Build a segment tree from the given slice.
+    pub fn xk_build(data: &[i64]) -> Self {
+        let n = data.len();
+        let tree = vec![0i64; 4 * n.max(1)];
+        let min_tree = vec![i64::MAX; 4 * n.max(1)];
+        let max_tree = vec![i64::MIN; 4 * n.max(1)];
+        let mut st = Self { xk_n: n, xk_tree: tree, xk_min_tree: min_tree, xk_max_tree: max_tree };
+        if n > 0 {
+            st.xk_build_rec(data, 1, 0, n - 1);
+        }
+        st
+    }
+
+    fn xk_build_rec(&mut self, data: &[i64], node: usize, start: usize, end: usize) {
+        if start == end {
+            self.xk_tree[node] = data[start];
+            self.xk_min_tree[node] = data[start];
+            self.xk_max_tree[node] = data[start];
+        } else {
+            let mid = (start + end) / 2;
+            self.xk_build_rec(data, 2 * node, start, mid);
+            self.xk_build_rec(data, 2 * node + 1, mid + 1, end);
+            self.xk_tree[node] = self.xk_tree[2 * node] + self.xk_tree[2 * node + 1];
+            self.xk_min_tree[node] = self.xk_min_tree[2 * node].min(self.xk_min_tree[2 * node + 1]);
+            self.xk_max_tree[node] = self.xk_max_tree[2 * node].max(self.xk_max_tree[2 * node + 1]);
+        }
+    }
+
+    /// Query the sum of elements in the range `[l, r]` (inclusive).
+    pub fn xk_query(&self, l: usize, r: usize) -> i64 {
+        if l > r || r >= self.xk_n { return 0; }
+        self.xk_query_rec(1, 0, self.xk_n - 1, l, r)
+    }
+
+    fn xk_query_rec(&self, node: usize, start: usize, end: usize, l: usize, r: usize) -> i64 {
+        if r < start || end < l { return 0; }
+        if l <= start && end <= r { return self.xk_tree[node]; }
+        let mid = (start + end) / 2;
+        self.xk_query_rec(2 * node, start, mid, l, r)
+            + self.xk_query_rec(2 * node + 1, mid + 1, end, l, r)
+    }
+
+    /// Update the value at index `idx` to `val`.
+    pub fn xk_update(&mut self, idx: usize, val: i64) {
+        if idx >= self.xk_n { return; }
+        self.xk_update_rec(1, 0, self.xk_n - 1, idx, val);
+    }
+
+    fn xk_update_rec(&mut self, node: usize, start: usize, end: usize, idx: usize, val: i64) {
+        if start == end {
+            self.xk_tree[node] = val;
+            self.xk_min_tree[node] = val;
+            self.xk_max_tree[node] = val;
+        } else {
+            let mid = (start + end) / 2;
+            if idx <= mid {
+                self.xk_update_rec(2 * node, start, mid, idx, val);
+            } else {
+                self.xk_update_rec(2 * node + 1, mid + 1, end, idx, val);
+            }
+            self.xk_tree[node] = self.xk_tree[2 * node] + self.xk_tree[2 * node + 1];
+            self.xk_min_tree[node] = self.xk_min_tree[2 * node].min(self.xk_min_tree[2 * node + 1]);
+            self.xk_max_tree[node] = self.xk_max_tree[2 * node].max(self.xk_max_tree[2 * node + 1]);
+        }
+    }
+
+    /// Return the minimum value in the range `[l, r]` (inclusive).
+    pub fn xk_range_min(&self, l: usize, r: usize) -> i64 {
+        if l > r || r >= self.xk_n { return i64::MAX; }
+        self.xk_min_rec(1, 0, self.xk_n - 1, l, r)
+    }
+
+    fn xk_min_rec(&self, node: usize, start: usize, end: usize, l: usize, r: usize) -> i64 {
+        if r < start || end < l { return i64::MAX; }
+        if l <= start && end <= r { return self.xk_min_tree[node]; }
+        let mid = (start + end) / 2;
+        self.xk_min_rec(2 * node, start, mid, l, r)
+            .min(self.xk_min_rec(2 * node + 1, mid + 1, end, l, r))
+    }
+
+    /// Return the maximum value in the range `[l, r]` (inclusive).
+    pub fn xk_range_max(&self, l: usize, r: usize) -> i64 {
+        if l > r || r >= self.xk_n { return i64::MIN; }
+        self.xk_max_rec(1, 0, self.xk_n - 1, l, r)
+    }
+
+    fn xk_max_rec(&self, node: usize, start: usize, end: usize, l: usize, r: usize) -> i64 {
+        if r < start || end < l { return i64::MIN; }
+        if l <= start && end <= r { return self.xk_max_tree[node]; }
+        let mid = (start + end) / 2;
+        self.xk_max_rec(2 * node, start, mid, l, r)
+            .max(self.xk_max_rec(2 * node + 1, mid + 1, end, l, r))
+    }
+
+    /// Return the number of elements.
+    pub fn xk_len(&self) -> usize {
+        self.xk_n
+    }
+}
+
+/// A set of non-overlapping intervals over `i64`.
+pub struct Xk169DisjointIntervals {
+    xk_intervals: Vec<(i64, i64)>,
+}
+
+impl Xk169DisjointIntervals {
+    /// Create an empty interval set.
+    pub fn xk_new() -> Self {
+        Self { xk_intervals: Vec::new() }
+    }
+
+    /// Add interval `[lo, hi]` and merge any overlaps.
+    pub fn xk_add_interval(&mut self, lo: i64, hi: i64) {
+        if lo > hi { return; }
+        let mut new_lo = lo;
+        let mut new_hi = hi;
+        let mut merged = Vec::new();
+        for &(a, b) in &self.xk_intervals {
+            if b < new_lo - 1 || a > new_hi + 1 {
+                merged.push((a, b));
+            } else {
+                new_lo = new_lo.min(a);
+                new_hi = new_hi.max(b);
+            }
+        }
+        merged.push((new_lo, new_hi));
+        merged.sort();
+        self.xk_intervals = merged;
+    }
+
+    /// Remove interval `[lo, hi]` from the set.
+    pub fn xk_remove_interval(&mut self, lo: i64, hi: i64) {
+        if lo > hi { return; }
+        let mut result = Vec::new();
+        for &(a, b) in &self.xk_intervals {
+            if b < lo || a > hi {
+                result.push((a, b));
+            } else {
+                if a < lo { result.push((a, lo - 1)); }
+                if b > hi { result.push((hi + 1, b)); }
+            }
+        }
+        self.xk_intervals = result;
+    }
+
+    /// Check if a point is contained in any interval.
+    pub fn xk_contains_point(&self, p: i64) -> bool {
+        self.xk_intervals.iter().any(|&(a, b)| a <= p && p <= b)
+    }
+
+    /// Return the total length covered by all intervals.
+    pub fn xk_covered_length(&self) -> i64 {
+        self.xk_intervals.iter().map(|&(a, b)| b - a + 1).sum()
+    }
+
+    /// Return the gaps between intervals as a vec of `(start, end)`.
+    pub fn xk_gaps(&self) -> Vec<(i64, i64)> {
+        let mut gaps = Vec::new();
+        for w in self.xk_intervals.windows(2) {
+            gaps.push((w[0].1 + 1, w[1].0 - 1));
+        }
+        gaps
+    }
+
+    /// Merge adjacent intervals that are exactly contiguous.
+    pub fn xk_merge_adjacent(&mut self) {
+        if self.xk_intervals.len() < 2 { return; }
+        let mut merged = vec![self.xk_intervals[0]];
+        for &(a, b) in &self.xk_intervals[1..] {
+            let last = merged.last_mut().unwrap();
+            if a <= last.1 + 1 {
+                last.1 = last.1.max(b);
+            } else {
+                merged.push((a, b));
+            }
+        }
+        self.xk_intervals = merged;
+    }
+
+    /// Return the number of disjoint intervals.
+    pub fn xk_interval_count(&self) -> usize {
+        self.xk_intervals.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6170,6 +6367,149 @@ mod tests {
         for i in 0..100 { assert_eq!(bt.xj_get(&i), Some(&(i * 3))); }
         assert_eq!(bt.xj_min_key(), Some(&0));
         assert_eq!(bt.xj_max_key(), Some(&99));
+    }
+
+
+    // --- xk_169 segment tree tests ---
+
+    #[test]
+    fn xk_169_st_build_query() {
+        let data = vec![1, 3, 5, 7, 9, 11];
+        let st = super::Xk169SegmentTree::xk_build(&data);
+        assert_eq!(st.xk_query(0, 5), 36);
+        assert_eq!(st.xk_query(1, 3), 15);
+    }
+
+    #[test]
+    fn xk_169_st_update() {
+        let data = vec![2, 4, 6, 8];
+        let mut st = super::Xk169SegmentTree::xk_build(&data);
+        st.xk_update(2, 10);
+        assert_eq!(st.xk_query(0, 3), 24);
+        assert_eq!(st.xk_query(2, 2), 10);
+    }
+
+    #[test]
+    fn xk_169_st_range_min() {
+        let data = vec![5, 2, 8, 1, 9];
+        let st = super::Xk169SegmentTree::xk_build(&data);
+        assert_eq!(st.xk_range_min(0, 4), 1);
+        assert_eq!(st.xk_range_min(0, 2), 2);
+    }
+
+    #[test]
+    fn xk_169_st_range_max() {
+        let data = vec![5, 2, 8, 1, 9];
+        let st = super::Xk169SegmentTree::xk_build(&data);
+        assert_eq!(st.xk_range_max(0, 4), 9);
+        assert_eq!(st.xk_range_max(1, 3), 8);
+    }
+
+    #[test]
+    fn xk_169_st_len() {
+        let data = vec![10, 20, 30];
+        let st = super::Xk169SegmentTree::xk_build(&data);
+        assert_eq!(st.xk_len(), 3);
+    }
+
+    #[test]
+    fn xk_169_st_single_element() {
+        let data = vec![42];
+        let st = super::Xk169SegmentTree::xk_build(&data);
+        assert_eq!(st.xk_query(0, 0), 42);
+        assert_eq!(st.xk_range_min(0, 0), 42);
+        assert_eq!(st.xk_range_max(0, 0), 42);
+    }
+
+    #[test]
+    fn xk_169_st_update_and_min_max() {
+        let data = vec![3, 1, 4, 1, 5];
+        let mut st = super::Xk169SegmentTree::xk_build(&data);
+        st.xk_update(1, 10);
+        assert_eq!(st.xk_range_max(0, 4), 10);
+        assert_eq!(st.xk_range_min(0, 4), 1);
+    }
+
+    #[test]
+    fn xk_169_st_empty() {
+        let data: Vec<i64> = vec![];
+        let st = super::Xk169SegmentTree::xk_build(&data);
+        assert_eq!(st.xk_len(), 0);
+        assert_eq!(st.xk_query(0, 0), 0);
+    }
+
+    // --- xk_169 disjoint intervals tests ---
+
+    #[test]
+    fn xk_169_di_add_and_count() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(1, 5);
+        di.xk_add_interval(10, 15);
+        assert_eq!(di.xk_interval_count(), 2);
+    }
+
+    #[test]
+    fn xk_169_di_merge_overlap() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(1, 5);
+        di.xk_add_interval(3, 8);
+        assert_eq!(di.xk_interval_count(), 1);
+        assert_eq!(di.xk_covered_length(), 8);
+    }
+
+    #[test]
+    fn xk_169_di_contains() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(10, 20);
+        assert!(di.xk_contains_point(15));
+        assert!(!di.xk_contains_point(9));
+        assert!(!di.xk_contains_point(21));
+    }
+
+    #[test]
+    fn xk_169_di_remove() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(1, 10);
+        di.xk_remove_interval(4, 6);
+        assert_eq!(di.xk_interval_count(), 2);
+        assert!(!di.xk_contains_point(5));
+        assert!(di.xk_contains_point(3));
+        assert!(di.xk_contains_point(7));
+    }
+
+    #[test]
+    fn xk_169_di_covered_length() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(0, 4);
+        di.xk_add_interval(10, 14);
+        assert_eq!(di.xk_covered_length(), 10);
+    }
+
+    #[test]
+    fn xk_169_di_gaps() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(1, 3);
+        di.xk_add_interval(7, 9);
+        let gaps = di.xk_gaps();
+        assert_eq!(gaps, vec![(4, 6)]);
+    }
+
+    #[test]
+    fn xk_169_di_merge_adjacent() {
+        let mut di = super::Xk169DisjointIntervals::xk_new();
+        di.xk_add_interval(1, 5);
+        di.xk_add_interval(6, 10);
+        di.xk_merge_adjacent();
+        assert_eq!(di.xk_interval_count(), 1);
+        assert_eq!(di.xk_covered_length(), 10);
+    }
+
+    #[test]
+    fn xk_169_di_empty() {
+        let di = super::Xk169DisjointIntervals::xk_new();
+        assert_eq!(di.xk_interval_count(), 0);
+        assert_eq!(di.xk_covered_length(), 0);
+        assert!(!di.xk_contains_point(0));
     }
 
 }
