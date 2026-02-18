@@ -16445,6 +16445,150 @@ impl std::fmt::Display for ZpTaskRun {
     }
 }
 
+
+// --- zq_ testing framework types ---
+
+/// The state of a test run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZqTestRunState {
+    Queued,
+    Running,
+    Passed,
+    Failed,
+    Errored,
+    Skipped,
+}
+
+impl ZqTestRunState {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, ZqTestRunState::Passed | ZqTestRunState::Failed | ZqTestRunState::Errored | ZqTestRunState::Skipped)
+    }
+
+    pub fn is_success(&self) -> bool { *self == ZqTestRunState::Passed }
+    pub fn is_failure(&self) -> bool { matches!(self, ZqTestRunState::Failed | ZqTestRunState::Errored) }
+    pub fn icon(&self) -> &str {
+        match self {
+            ZqTestRunState::Queued => "◌",
+            ZqTestRunState::Running => "◑",
+            ZqTestRunState::Passed => "✓",
+            ZqTestRunState::Failed => "✗",
+            ZqTestRunState::Errored => "⚠",
+            ZqTestRunState::Skipped => "○",
+        }
+    }
+}
+
+impl std::fmt::Display for ZqTestRunState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self) }
+}
+
+/// A test item in the test explorer tree.
+#[derive(Debug, Clone)]
+pub struct ZqTestItem {
+    pub id: String,
+    pub label: String,
+    pub uri: Option<String>,
+    pub line: Option<u32>,
+    pub children: Vec<ZqTestItem>,
+    pub tags: Vec<String>,
+    pub state: ZqTestRunState,
+    pub duration_ms: Option<u64>,
+    pub error_message: Option<String>,
+}
+
+impl ZqTestItem {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), uri: None, line: None,
+               children: Vec::new(), tags: Vec::new(), state: ZqTestRunState::Queued,
+               duration_ms: None, error_message: None }
+    }
+
+    pub fn with_location(mut self, uri: &str, line: u32) -> Self {
+        self.uri = Some(uri.to_string()); self.line = Some(line); self
+    }
+
+    pub fn add_child(&mut self, child: ZqTestItem) { self.children.push(child); }
+    pub fn add_tag(&mut self, tag: &str) { self.tags.push(tag.to_string()); }
+
+    pub fn pass(&mut self, duration_ms: u64) {
+        self.state = ZqTestRunState::Passed; self.duration_ms = Some(duration_ms);
+    }
+
+    pub fn fail(&mut self, message: &str, duration_ms: u64) {
+        self.state = ZqTestRunState::Failed; self.error_message = Some(message.to_string()); self.duration_ms = Some(duration_ms);
+    }
+
+    pub fn skip(&mut self) { self.state = ZqTestRunState::Skipped; }
+    pub fn run(&mut self) { self.state = ZqTestRunState::Running; }
+
+    pub fn has_children(&self) -> bool { !self.children.is_empty() }
+    pub fn child_count(&self) -> usize { self.children.len() }
+    pub fn has_tag(&self, tag: &str) -> bool { self.tags.iter().any(|t| t == tag) }
+
+    pub fn flat_count(&self) -> usize {
+        1 + self.children.iter().map(|c| c.flat_count()).sum::<usize>()
+    }
+
+    pub fn passed_count(&self) -> usize {
+        let me = if self.state.is_success() { 1 } else { 0 };
+        me + self.children.iter().map(|c| c.passed_count()).sum::<usize>()
+    }
+
+    pub fn failed_count(&self) -> usize {
+        let me = if self.state.is_failure() { 1 } else { 0 };
+        me + self.children.iter().map(|c| c.failed_count()).sum::<usize>()
+    }
+}
+
+impl std::fmt::Display for ZqTestItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.state.icon(), self.label)?;
+        if let Some(ms) = self.duration_ms { write!(f, " ({}ms)", ms)?; }
+        Ok(())
+    }
+}
+
+/// A test run containing results for a set of test items.
+#[derive(Debug, Clone)]
+pub struct ZqTestRun {
+    pub id: String,
+    pub name: String,
+    pub items: Vec<ZqTestItem>,
+    pub started_at: Option<u64>,
+    pub completed_at: Option<u64>,
+}
+
+impl ZqTestRun {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self { id: id.to_string(), name: name.to_string(), items: Vec::new(), started_at: None, completed_at: None }
+    }
+
+    pub fn add_item(&mut self, item: ZqTestItem) { self.items.push(item); }
+    pub fn item_count(&self) -> usize { self.items.len() }
+    pub fn total_flat_count(&self) -> usize { self.items.iter().map(|i| i.flat_count()).sum() }
+    pub fn total_passed(&self) -> usize { self.items.iter().map(|i| i.passed_count()).sum() }
+    pub fn total_failed(&self) -> usize { self.items.iter().map(|i| i.failed_count()).sum() }
+    pub fn is_complete(&self) -> bool { self.completed_at.is_some() }
+
+    pub fn all_passed(&self) -> bool { self.total_failed() == 0 && self.total_passed() > 0 }
+
+    pub fn start(&mut self, ts: u64) { self.started_at = Some(ts); }
+    pub fn complete(&mut self, ts: u64) { self.completed_at = Some(ts); }
+
+    pub fn duration_ms(&self) -> Option<u64> {
+        match (self.started_at, self.completed_at) {
+            (Some(s), Some(e)) => Some(e - s),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ZqTestRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZqTestRun({}: {}/{} passed)", self.name, self.total_passed(), self.total_flat_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27390,6 +27534,132 @@ mod tests {
         assert_eq!(p.reveal, ZpRevealKind::Always);
         assert!(p.echo);
         assert!(!p.focus);
+    }
+
+
+    // --- zq_ tests ---
+
+    #[test]
+    fn test_zq_test_run_state() {
+        assert!(ZqTestRunState::Passed.is_terminal());
+        assert!(ZqTestRunState::Passed.is_success());
+        assert!(ZqTestRunState::Failed.is_failure());
+        assert!(!ZqTestRunState::Running.is_terminal());
+        assert_eq!(ZqTestRunState::Passed.icon(), "✓");
+    }
+
+    #[test]
+    fn test_zq_test_item_new() {
+        let item = ZqTestItem::new("test1", "Test One");
+        assert_eq!(item.state, ZqTestRunState::Queued);
+        assert!(!item.has_children());
+    }
+
+    #[test]
+    fn test_zq_test_item_pass() {
+        let mut item = ZqTestItem::new("t1", "test");
+        item.run();
+        assert_eq!(item.state, ZqTestRunState::Running);
+        item.pass(150);
+        assert!(item.state.is_success());
+        assert_eq!(item.duration_ms, Some(150));
+    }
+
+    #[test]
+    fn test_zq_test_item_fail() {
+        let mut item = ZqTestItem::new("t1", "test");
+        item.fail("assertion failed", 200);
+        assert!(item.state.is_failure());
+        assert_eq!(item.error_message, Some("assertion failed".to_string()));
+    }
+
+    #[test]
+    fn test_zq_test_item_skip() {
+        let mut item = ZqTestItem::new("t1", "test");
+        item.skip();
+        assert_eq!(item.state, ZqTestRunState::Skipped);
+    }
+
+    #[test]
+    fn test_zq_test_item_children() {
+        let mut parent = ZqTestItem::new("suite", "Suite");
+        let mut child1 = ZqTestItem::new("t1", "Test 1");
+        child1.pass(10);
+        let mut child2 = ZqTestItem::new("t2", "Test 2");
+        child2.fail("err", 20);
+        parent.add_child(child1);
+        parent.add_child(child2);
+        assert_eq!(parent.child_count(), 2);
+        assert_eq!(parent.flat_count(), 3);
+        assert_eq!(parent.passed_count(), 1);
+        assert_eq!(parent.failed_count(), 1);
+    }
+
+    #[test]
+    fn test_zq_test_item_tags() {
+        let mut item = ZqTestItem::new("t1", "test");
+        item.add_tag("slow");
+        assert!(item.has_tag("slow"));
+        assert!(!item.has_tag("fast"));
+    }
+
+    #[test]
+    fn test_zq_test_item_location() {
+        let item = ZqTestItem::new("t1", "test").with_location("test.rs", 42);
+        assert_eq!(item.uri, Some("test.rs".to_string()));
+        assert_eq!(item.line, Some(42));
+    }
+
+    #[test]
+    fn test_zq_test_item_display() {
+        let mut item = ZqTestItem::new("t1", "My Test");
+        item.pass(100);
+        let s = format!("{}", item);
+        assert!(s.contains("My Test"));
+        assert!(s.contains("100ms"));
+    }
+
+    #[test]
+    fn test_zq_test_run_new() {
+        let run = ZqTestRun::new("r1", "Unit Tests");
+        assert_eq!(run.item_count(), 0);
+        assert!(!run.is_complete());
+    }
+
+    #[test]
+    fn test_zq_test_run_results() {
+        let mut run = ZqTestRun::new("r1", "Tests");
+        run.start(1000);
+        let mut t1 = ZqTestItem::new("t1", "a");
+        t1.pass(10);
+        let mut t2 = ZqTestItem::new("t2", "b");
+        t2.pass(20);
+        let mut t3 = ZqTestItem::new("t3", "c");
+        t3.fail("err", 30);
+        run.add_item(t1);
+        run.add_item(t2);
+        run.add_item(t3);
+        run.complete(1060);
+        assert!(run.is_complete());
+        assert_eq!(run.total_passed(), 2);
+        assert_eq!(run.total_failed(), 1);
+        assert!(!run.all_passed());
+        assert_eq!(run.duration_ms(), Some(60));
+    }
+
+    #[test]
+    fn test_zq_test_run_all_passed() {
+        let mut run = ZqTestRun::new("r1", "Tests");
+        let mut t1 = ZqTestItem::new("t1", "a");
+        t1.pass(5);
+        run.add_item(t1);
+        assert!(run.all_passed());
+    }
+
+    #[test]
+    fn test_zq_test_run_display() {
+        let run = ZqTestRun::new("r1", "Suite");
+        assert!(format!("{}", run).contains("Suite"));
     }
 
 }
