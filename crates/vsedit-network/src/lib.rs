@@ -5701,6 +5701,230 @@ impl Xq126VEBTree {
     pub fn xq_count(&self) -> usize { self.count }
 }
 
+
+/// A 2D point for the k-d tree.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Xr126KDPoint {
+    pub xr_x: f64,
+    pub xr_y: f64,
+}
+
+impl Xr126KDPoint {
+    pub fn xr_new(xr_x: f64, xr_y: f64) -> Self {
+        Self { xr_x, xr_y }
+    }
+
+    fn xr_dist_sq(&self, other: &Self) -> f64 {
+        let dx = self.xr_x - other.xr_x;
+        let dy = self.xr_y - other.xr_y;
+        dx * dx + dy * dy
+    }
+}
+
+/// Bounding box result.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Xr126BoundingBox {
+    pub xr_min_x: f64,
+    pub xr_min_y: f64,
+    pub xr_max_x: f64,
+    pub xr_max_y: f64,
+}
+
+struct Xr126KDNode {
+    xr_point: Xr126KDPoint,
+    xr_left: Option<Box<Xr126KDNode>>,
+    xr_right: Option<Box<Xr126KDNode>>,
+}
+
+/// K-d tree for 2D point queries.
+pub struct Xr126KDTree {
+    xr_root: Option<Box<Xr126KDNode>>,
+    xr_size: usize,
+}
+
+impl Xr126KDTree {
+    /// Creates an empty k-d tree.
+    pub fn xr_new() -> Self {
+        Self { xr_root: None, xr_size: 0 }
+    }
+
+    /// Inserts a point into the tree.
+    pub fn xr_insert(&mut self, point: Xr126KDPoint) {
+        self.xr_root = Some(Self::xr_insert_rec(self.xr_root.take(), point, 0));
+        self.xr_size += 1;
+    }
+
+    fn xr_insert_rec(
+        node: Option<Box<Xr126KDNode>>,
+        point: Xr126KDPoint,
+        depth: usize,
+    ) -> Box<Xr126KDNode> {
+        match node {
+            None => Box::new(Xr126KDNode {
+                xr_point: point,
+                xr_left: None,
+                xr_right: None,
+            }),
+            Some(mut n) => {
+                let go_left = if depth % 2 == 0 {
+                    point.xr_x < n.xr_point.xr_x
+                } else {
+                    point.xr_y < n.xr_point.xr_y
+                };
+                if go_left {
+                    n.xr_left = Some(Self::xr_insert_rec(n.xr_left.take(), point, depth + 1));
+                } else {
+                    n.xr_right = Some(Self::xr_insert_rec(n.xr_right.take(), point, depth + 1));
+                }
+                n
+            }
+        }
+    }
+
+    /// Finds the nearest neighbor to the query point.
+    pub fn xr_nearest_neighbor(&self, query: &Xr126KDPoint) -> Option<Xr126KDPoint> {
+        self.xr_root.as_ref().map(|root| {
+            let mut best = root.xr_point;
+            let mut best_dist = query.xr_dist_sq(&best);
+            Self::xr_nn_rec(root, query, 0, &mut best, &mut best_dist);
+            best
+        })
+    }
+
+    fn xr_nn_rec(
+        node: &Box<Xr126KDNode>,
+        query: &Xr126KDPoint,
+        depth: usize,
+        best: &mut Xr126KDPoint,
+        best_dist: &mut f64,
+    ) {
+        let d = query.xr_dist_sq(&node.xr_point);
+        if d < *best_dist {
+            *best_dist = d;
+            *best = node.xr_point;
+        }
+        let axis_val = if depth % 2 == 0 { query.xr_x - node.xr_point.xr_x } else { query.xr_y - node.xr_point.xr_y };
+        let (first, second) = if axis_val < 0.0 {
+            (&node.xr_left, &node.xr_right)
+        } else {
+            (&node.xr_right, &node.xr_left)
+        };
+        if let Some(child) = first.as_ref() {
+            Self::xr_nn_rec(child, query, depth + 1, best, best_dist);
+        }
+        if axis_val * axis_val < *best_dist {
+            if let Some(child) = second.as_ref() {
+                Self::xr_nn_rec(child, query, depth + 1, best, best_dist);
+            }
+        }
+    }
+
+    /// Returns all points within the given rectangular range.
+    pub fn xr_range_search(
+        &self,
+        xr_min_x: f64,
+        xr_min_y: f64,
+        xr_max_x: f64,
+        xr_max_y: f64,
+    ) -> Vec<Xr126KDPoint> {
+        let mut result = Vec::new();
+        if let Some(root) = &self.xr_root {
+            Self::xr_range_rec(root, xr_min_x, xr_min_y, xr_max_x, xr_max_y, 0, &mut result);
+        }
+        result
+    }
+
+    fn xr_range_rec(
+        node: &Box<Xr126KDNode>,
+        xr_min_x: f64,
+        xr_min_y: f64,
+        xr_max_x: f64,
+        xr_max_y: f64,
+        depth: usize,
+        result: &mut Vec<Xr126KDPoint>,
+    ) {
+        let p = &node.xr_point;
+        if p.xr_x >= xr_min_x && p.xr_x <= xr_max_x && p.xr_y >= xr_min_y && p.xr_y <= xr_max_y {
+            result.push(*p);
+        }
+        let (val, lo, hi) = if depth % 2 == 0 {
+            (p.xr_x, xr_min_x, xr_max_x)
+        } else {
+            (p.xr_y, xr_min_y, xr_max_y)
+        };
+        if lo <= val {
+            if let Some(left) = &node.xr_left {
+                Self::xr_range_rec(left, xr_min_x, xr_min_y, xr_max_x, xr_max_y, depth + 1, result);
+            }
+        }
+        if hi >= val {
+            if let Some(right) = &node.xr_right {
+                Self::xr_range_rec(right, xr_min_x, xr_min_y, xr_max_x, xr_max_y, depth + 1, result);
+            }
+        }
+    }
+
+    /// Number of points in the tree.
+    pub fn xr_len(&self) -> usize {
+        self.xr_size
+    }
+
+    /// Whether the tree is empty.
+    pub fn xr_is_empty(&self) -> bool {
+        self.xr_size == 0
+    }
+
+    /// Collects all points in the tree.
+    pub fn xr_all_points(&self) -> Vec<Xr126KDPoint> {
+        let mut pts = Vec::new();
+        Self::xr_collect(&self.xr_root, &mut pts);
+        pts
+    }
+
+    fn xr_collect(node: &Option<Box<Xr126KDNode>>, pts: &mut Vec<Xr126KDPoint>) {
+        if let Some(n) = node {
+            pts.push(n.xr_point);
+            Self::xr_collect(&n.xr_left, pts);
+            Self::xr_collect(&n.xr_right, pts);
+        }
+    }
+
+    /// Returns the depth of the tree.
+    pub fn xr_depth(&self) -> usize {
+        Self::xr_depth_rec(&self.xr_root)
+    }
+
+    fn xr_depth_rec(node: &Option<Box<Xr126KDNode>>) -> usize {
+        match node {
+            None => 0,
+            Some(n) => {
+                let l = Self::xr_depth_rec(&n.xr_left);
+                let r = Self::xr_depth_rec(&n.xr_right);
+                1 + l.max(r)
+            }
+        }
+    }
+
+    /// Returns the bounding box of all points, or None if empty.
+    pub fn xr_bounding_box(&self) -> Option<Xr126BoundingBox> {
+        if self.xr_is_empty() {
+            return None;
+        }
+        let pts = self.xr_all_points();
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        for p in &pts {
+            if p.xr_x < min_x { min_x = p.xr_x; }
+            if p.xr_y < min_y { min_y = p.xr_y; }
+            if p.xr_x > max_x { max_x = p.xr_x; }
+            if p.xr_y > max_y { max_y = p.xr_y; }
+        }
+        Some(Xr126BoundingBox { xr_min_x: min_x, xr_min_y: min_y, xr_max_x: max_x, xr_max_y: max_y })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -9031,6 +9255,93 @@ mod tests {
         let c1 = v.xq_count();
         v.xq_insert(4);
         assert_eq!(v.xq_count(), c1);
+    }
+
+
+    #[test]
+    fn xr_126_kdtree_empty() {
+        let tree = super::Xr126KDTree::xr_new();
+        assert!(tree.xr_is_empty());
+        assert_eq!(tree.xr_len(), 0);
+    }
+
+    #[test]
+    fn xr_126_kdtree_insert_one() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        tree.xr_insert(super::Xr126KDPoint::xr_new(1.0, 2.0));
+        assert_eq!(tree.xr_len(), 1);
+        assert!(!tree.xr_is_empty());
+    }
+
+    #[test]
+    fn xr_126_kdtree_insert_multiple() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        for i in 0..5 {
+            tree.xr_insert(super::Xr126KDPoint::xr_new(i as f64, (i * 2) as f64));
+        }
+        assert_eq!(tree.xr_len(), 5);
+    }
+
+    #[test]
+    fn xr_126_kdtree_nearest_neighbor() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        tree.xr_insert(super::Xr126KDPoint::xr_new(0.0, 0.0));
+        tree.xr_insert(super::Xr126KDPoint::xr_new(10.0, 10.0));
+        let nn = tree.xr_nearest_neighbor(&super::Xr126KDPoint::xr_new(1.0, 1.0)).unwrap();
+        assert!((nn.xr_x - 0.0).abs() < 1e-9);
+        assert!((nn.xr_y - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn xr_126_kdtree_nn_empty() {
+        let tree = super::Xr126KDTree::xr_new();
+        assert!(tree.xr_nearest_neighbor(&super::Xr126KDPoint::xr_new(0.0, 0.0)).is_none());
+    }
+
+    #[test]
+    fn xr_126_kdtree_range_search() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        tree.xr_insert(super::Xr126KDPoint::xr_new(1.0, 1.0));
+        tree.xr_insert(super::Xr126KDPoint::xr_new(5.0, 5.0));
+        tree.xr_insert(super::Xr126KDPoint::xr_new(9.0, 9.0));
+        let result = tree.xr_range_search(0.0, 0.0, 6.0, 6.0);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn xr_126_kdtree_range_empty() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        tree.xr_insert(super::Xr126KDPoint::xr_new(1.0, 1.0));
+        let result = tree.xr_range_search(5.0, 5.0, 10.0, 10.0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn xr_126_kdtree_all_points() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        tree.xr_insert(super::Xr126KDPoint::xr_new(3.0, 4.0));
+        tree.xr_insert(super::Xr126KDPoint::xr_new(7.0, 8.0));
+        let pts = tree.xr_all_points();
+        assert_eq!(pts.len(), 2);
+    }
+
+    #[test]
+    fn xr_126_kdtree_depth() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        assert_eq!(tree.xr_depth(), 0);
+        tree.xr_insert(super::Xr126KDPoint::xr_new(5.0, 5.0));
+        assert_eq!(tree.xr_depth(), 1);
+    }
+
+    #[test]
+    fn xr_126_kdtree_bounding_box() {
+        let mut tree = super::Xr126KDTree::xr_new();
+        assert!(tree.xr_bounding_box().is_none());
+        tree.xr_insert(super::Xr126KDPoint::xr_new(1.0, 2.0));
+        tree.xr_insert(super::Xr126KDPoint::xr_new(5.0, 8.0));
+        let bb = tree.xr_bounding_box().unwrap();
+        assert!((bb.xr_min_x - 1.0).abs() < 1e-9);
+        assert!((bb.xr_max_y - 8.0).abs() < 1e-9);
     }
 
 }
