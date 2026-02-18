@@ -10895,6 +10895,165 @@ impl<V: Clone> YjTtlCache<V> {
     pub fn yj_set_ttl(&mut self, ttl: u64) { self.yj_ttl = ttl; }
 }
 
+
+// --- yk_ Glob Pattern Matcher ---
+
+/// Simple glob pattern matcher supporting *, ?, and character classes.
+#[derive(Debug, Clone)]
+pub struct YkGlobMatcher {
+    yk_pattern: String,
+}
+
+impl std::fmt::Display for YkGlobMatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Glob({})", self.yk_pattern)
+    }
+}
+
+impl Default for YkGlobMatcher {
+    fn default() -> Self { Self { yk_pattern: String::new() } }
+}
+
+impl YkGlobMatcher {
+    /// Create a glob matcher from a pattern.
+    pub fn yk_new(pattern: &str) -> Self { Self { yk_pattern: pattern.to_string() } }
+
+    /// Get the pattern.
+    pub fn yk_pattern(&self) -> &str { &self.yk_pattern }
+
+    /// Check if a string matches the glob pattern.
+    pub fn yk_matches(&self, text: &str) -> bool {
+        Self::yk_match_impl(self.yk_pattern.as_bytes(), text.as_bytes())
+    }
+
+    fn yk_match_impl(pattern: &[u8], text: &[u8]) -> bool {
+        let mut pi = 0;
+        let mut ti = 0;
+        let mut star_pi = usize::MAX;
+        let mut star_ti = 0;
+        while ti < text.len() {
+            if pi < pattern.len() && (pattern[pi] == b'?' || pattern[pi] == text[ti]) {
+                pi += 1;
+                ti += 1;
+            } else if pi < pattern.len() && pattern[pi] == b'*' {
+                star_pi = pi;
+                star_ti = ti;
+                pi += 1;
+            } else if star_pi != usize::MAX {
+                pi = star_pi + 1;
+                star_ti += 1;
+                ti = star_ti;
+            } else {
+                return false;
+            }
+        }
+        while pi < pattern.len() && pattern[pi] == b'*' { pi += 1; }
+        pi == pattern.len()
+    }
+
+    /// Match multiple patterns (any match).
+    pub fn yk_matches_any(patterns: &[&str], text: &str) -> bool {
+        patterns.iter().any(|p| YkGlobMatcher::yk_new(p).yk_matches(text))
+    }
+
+    /// Match multiple patterns (all match).
+    pub fn yk_matches_all(patterns: &[&str], text: &str) -> bool {
+        patterns.iter().all(|p| YkGlobMatcher::yk_new(p).yk_matches(text))
+    }
+
+    /// Filter a list of strings by this pattern.
+    pub fn yk_filter<'a>(&self, items: &[&'a str]) -> Vec<&'a str> {
+        items.iter().filter(|s| self.yk_matches(s)).copied().collect()
+    }
+}
+
+// --- yk_ Event Bus ---
+
+/// Simple typed event bus with subscriber IDs.
+#[derive(Debug, Clone)]
+pub struct YkEventBus {
+    yk_events: Vec<(String, Vec<(usize, String)>)>,
+    yk_next_id: usize,
+}
+
+impl std::fmt::Display for YkEventBus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total: usize = self.yk_events.iter().map(|(_, subs)| subs.len()).sum();
+        write!(f, "EventBus(topics={}, subs={})", self.yk_events.len(), total)
+    }
+}
+
+impl Default for YkEventBus {
+    fn default() -> Self { Self::yk_new() }
+}
+
+impl YkEventBus {
+    /// Create a new event bus.
+    pub fn yk_new() -> Self { Self { yk_events: Vec::new(), yk_next_id: 0 } }
+
+    /// Subscribe to a topic. Returns subscription ID.
+    pub fn yk_subscribe(&mut self, topic: &str, handler_name: &str) -> usize {
+        let id = self.yk_next_id;
+        self.yk_next_id += 1;
+        if let Some((_, subs)) = self.yk_events.iter_mut().find(|(t, _)| t == topic) {
+            subs.push((id, handler_name.to_string()));
+        } else {
+            self.yk_events.push((topic.to_string(), vec![(id, handler_name.to_string())]));
+        }
+        id
+    }
+
+    /// Unsubscribe by ID.
+    pub fn yk_unsubscribe(&mut self, id: usize) {
+        for (_, subs) in &mut self.yk_events {
+            subs.retain(|(sid, _)| *sid != id);
+        }
+    }
+
+    /// Emit an event, returns list of handler names that were notified.
+    pub fn yk_emit(&self, topic: &str) -> Vec<String> {
+        self.yk_events.iter()
+            .filter(|(t, _)| t == topic)
+            .flat_map(|(_, subs)| subs.iter().map(|(_, name)| name.clone()))
+            .collect()
+    }
+
+    /// Number of topics.
+    pub fn yk_topic_count(&self) -> usize { self.yk_events.len() }
+
+    /// Number of subscribers for a topic.
+    pub fn yk_subscriber_count(&self, topic: &str) -> usize {
+        self.yk_events.iter().find(|(t, _)| t == topic).map(|(_, s)| s.len()).unwrap_or(0)
+    }
+
+    /// Total subscribers across all topics.
+    pub fn yk_total_subscribers(&self) -> usize {
+        self.yk_events.iter().map(|(_, subs)| subs.len()).sum()
+    }
+
+    /// List all topics.
+    pub fn yk_topics(&self) -> Vec<String> {
+        self.yk_events.iter().map(|(t, _)| t.clone()).collect()
+    }
+
+    /// Clear all subscriptions.
+    pub fn yk_clear(&mut self) { self.yk_events.clear(); self.yk_next_id = 0; }
+
+    /// Check if a topic has subscribers.
+    pub fn yk_has_subscribers(&self, topic: &str) -> bool {
+        self.yk_subscriber_count(topic) > 0
+    }
+
+    /// Emit to topics matching a glob pattern.
+    pub fn yk_emit_pattern(&self, pattern: &str) -> Vec<(String, Vec<String>)> {
+        let matcher = YkGlobMatcher::yk_new(pattern);
+        self.yk_events.iter()
+            .filter(|(t, _)| matcher.yk_matches(t))
+            .map(|(t, subs)| (t.clone(), subs.iter().map(|(_, n)| n.clone()).collect()))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -17462,6 +17621,147 @@ mod tests {
     fn yj_ttl_default() {
         let c = super::YjTtlCache::<i32>::default();
         assert_eq!(c.yj_ttl(), 60);
+    }
+
+
+    // --- yk_ GlobMatcher tests ---
+
+    #[test]
+    fn yk_glob_exact() {
+        let g = super::YkGlobMatcher::yk_new("hello");
+        assert!(g.yk_matches("hello"));
+        assert!(!g.yk_matches("world"));
+    }
+
+    #[test]
+    fn yk_glob_star() {
+        let g = super::YkGlobMatcher::yk_new("*.rs");
+        assert!(g.yk_matches("main.rs"));
+        assert!(!g.yk_matches("main.py"));
+    }
+
+    #[test]
+    fn yk_glob_question() {
+        let g = super::YkGlobMatcher::yk_new("?.txt");
+        assert!(g.yk_matches("a.txt"));
+        assert!(!g.yk_matches("ab.txt"));
+    }
+
+    #[test]
+    fn yk_glob_complex() {
+        let g = super::YkGlobMatcher::yk_new("src/*.rs");
+        assert!(g.yk_matches("src/main.rs"));
+        assert!(g.yk_matches("src/sub/main.rs"));
+    }
+
+    #[test]
+    fn yk_glob_empty() {
+        let g = super::YkGlobMatcher::yk_new("*");
+        assert!(g.yk_matches("anything"));
+        assert!(g.yk_matches(""));
+    }
+
+    #[test]
+    fn yk_glob_matches_any() {
+        assert!(super::YkGlobMatcher::yk_matches_any(&["*.rs", "*.py"], "main.rs"));
+        assert!(!super::YkGlobMatcher::yk_matches_any(&["*.rs", "*.py"], "main.js"));
+    }
+
+    #[test]
+    fn yk_glob_filter() {
+        let g = super::YkGlobMatcher::yk_new("*.rs");
+        let files = vec!["main.rs", "lib.rs", "main.py"];
+        assert_eq!(g.yk_filter(&files), vec!["main.rs", "lib.rs"]);
+    }
+
+    #[test]
+    fn yk_glob_display() {
+        let g = super::YkGlobMatcher::yk_new("*.txt");
+        assert!(format!("{}", g).contains("Glob"));
+    }
+
+    #[test]
+    fn yk_glob_default() {
+        let g = super::YkGlobMatcher::default();
+        assert!(g.yk_matches(""));
+    }
+
+    // --- yk_ EventBus tests ---
+
+    #[test]
+    fn yk_bus_new() {
+        let b = super::YkEventBus::yk_new();
+        assert_eq!(b.yk_topic_count(), 0);
+    }
+
+    #[test]
+    fn yk_bus_subscribe() {
+        let mut b = super::YkEventBus::yk_new();
+        b.yk_subscribe("click", "handler_a");
+        assert_eq!(b.yk_subscriber_count("click"), 1);
+    }
+
+    #[test]
+    fn yk_bus_emit() {
+        let mut b = super::YkEventBus::yk_new();
+        b.yk_subscribe("click", "handler_a");
+        b.yk_subscribe("click", "handler_b");
+        let notified = b.yk_emit("click");
+        assert_eq!(notified.len(), 2);
+    }
+
+    #[test]
+    fn yk_bus_unsubscribe() {
+        let mut b = super::YkEventBus::yk_new();
+        let id = b.yk_subscribe("click", "handler_a");
+        b.yk_unsubscribe(id);
+        assert_eq!(b.yk_subscriber_count("click"), 0);
+    }
+
+    #[test]
+    fn yk_bus_topics() {
+        let mut b = super::YkEventBus::yk_new();
+        b.yk_subscribe("click", "a");
+        b.yk_subscribe("keypress", "b");
+        assert_eq!(b.yk_topics().len(), 2);
+    }
+
+    #[test]
+    fn yk_bus_emit_pattern() {
+        let mut b = super::YkEventBus::yk_new();
+        b.yk_subscribe("mouse.click", "a");
+        b.yk_subscribe("mouse.move", "b");
+        b.yk_subscribe("key.press", "c");
+        let notified = b.yk_emit_pattern("mouse.*");
+        assert_eq!(notified.len(), 2);
+    }
+
+    #[test]
+    fn yk_bus_clear() {
+        let mut b = super::YkEventBus::yk_new();
+        b.yk_subscribe("x", "a");
+        b.yk_clear();
+        assert_eq!(b.yk_total_subscribers(), 0);
+    }
+
+    #[test]
+    fn yk_bus_has_subscribers() {
+        let mut b = super::YkEventBus::yk_new();
+        assert!(!b.yk_has_subscribers("x"));
+        b.yk_subscribe("x", "a");
+        assert!(b.yk_has_subscribers("x"));
+    }
+
+    #[test]
+    fn yk_bus_display() {
+        let b = super::YkEventBus::yk_new();
+        assert!(format!("{}", b).contains("EventBus"));
+    }
+
+    #[test]
+    fn yk_bus_default() {
+        let b = super::YkEventBus::default();
+        assert_eq!(b.yk_topic_count(), 0);
     }
 
 }
