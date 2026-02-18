@@ -10074,6 +10074,231 @@ impl YgBitmapIndex {
     pub fn yg_clear(&mut self) { self.yg_bitmaps.clear(); }
 }
 
+
+// --- yh_ Order Statistics Tree ---
+
+/// Order statistics tree supporting rank queries and selection.
+/// Implemented as an augmented BST with subtree sizes.
+#[derive(Debug, Clone)]
+pub struct YhOrderStatTree {
+    yh_root: Option<Box<YhOstNode>>,
+}
+
+#[derive(Debug, Clone)]
+struct YhOstNode {
+    yh_key: i64,
+    yh_left: Option<Box<YhOstNode>>,
+    yh_right: Option<Box<YhOstNode>>,
+    yh_size: usize,
+}
+
+impl YhOstNode {
+    fn yh_new(key: i64) -> Self {
+        Self { yh_key: key, yh_left: None, yh_right: None, yh_size: 1 }
+    }
+
+    fn yh_left_size(&self) -> usize {
+        self.yh_left.as_ref().map_or(0, |n| n.yh_size)
+    }
+
+    fn yh_update_size(&mut self) {
+        self.yh_size = 1 + self.yh_left.as_ref().map_or(0, |n| n.yh_size)
+            + self.yh_right.as_ref().map_or(0, |n| n.yh_size);
+    }
+}
+
+impl std::fmt::Display for YhOrderStatTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OSTree(size={})", self.yh_len())
+    }
+}
+
+impl Default for YhOrderStatTree {
+    fn default() -> Self { Self::yh_new() }
+}
+
+impl YhOrderStatTree {
+    /// Create an empty order statistics tree.
+    pub fn yh_new() -> Self { Self { yh_root: None } }
+
+    /// Number of elements.
+    pub fn yh_len(&self) -> usize { self.yh_root.as_ref().map_or(0, |n| n.yh_size) }
+
+    /// Is empty.
+    pub fn yh_is_empty(&self) -> bool { self.yh_root.is_none() }
+
+    /// Insert a key.
+    pub fn yh_insert(&mut self, key: i64) {
+        Self::yh_insert_node(&mut self.yh_root, key);
+    }
+
+    fn yh_insert_node(node: &mut Option<Box<YhOstNode>>, key: i64) {
+        match node {
+            None => { *node = Some(Box::new(YhOstNode::yh_new(key))); }
+            Some(n) => {
+                if key < n.yh_key { Self::yh_insert_node(&mut n.yh_left, key); }
+                else if key > n.yh_key { Self::yh_insert_node(&mut n.yh_right, key); }
+                n.yh_update_size();
+            }
+        }
+    }
+
+    /// Check if a key exists.
+    pub fn yh_contains(&self, key: i64) -> bool {
+        let mut current = &self.yh_root;
+        while let Some(n) = current {
+            if key < n.yh_key { current = &n.yh_left; }
+            else if key > n.yh_key { current = &n.yh_right; }
+            else { return true; }
+        }
+        false
+    }
+
+    /// Rank of a key (0-indexed, number of elements < key).
+    pub fn yh_rank(&self, key: i64) -> usize {
+        Self::yh_rank_node(&self.yh_root, key)
+    }
+
+    fn yh_rank_node(node: &Option<Box<YhOstNode>>, key: i64) -> usize {
+        match node {
+            None => 0,
+            Some(n) => {
+                if key < n.yh_key { Self::yh_rank_node(&n.yh_left, key) }
+                else if key > n.yh_key { n.yh_left_size() + 1 + Self::yh_rank_node(&n.yh_right, key) }
+                else { n.yh_left_size() }
+            }
+        }
+    }
+
+    /// Select the k-th smallest element (0-indexed).
+    pub fn yh_select(&self, k: usize) -> Option<i64> {
+        Self::yh_select_node(&self.yh_root, k)
+    }
+
+    fn yh_select_node(node: &Option<Box<YhOstNode>>, k: usize) -> Option<i64> {
+        let n = node.as_ref()?;
+        let left_size = n.yh_left_size();
+        if k < left_size { Self::yh_select_node(&n.yh_left, k) }
+        else if k > left_size { Self::yh_select_node(&n.yh_right, k - left_size - 1) }
+        else { Some(n.yh_key) }
+    }
+
+    /// Minimum key.
+    pub fn yh_min(&self) -> Option<i64> {
+        let mut current = &self.yh_root;
+        let mut min = None;
+        while let Some(n) = current {
+            min = Some(n.yh_key);
+            current = &n.yh_left;
+        }
+        min
+    }
+
+    /// Maximum key.
+    pub fn yh_max(&self) -> Option<i64> {
+        let mut current = &self.yh_root;
+        let mut max = None;
+        while let Some(n) = current {
+            max = Some(n.yh_key);
+            current = &n.yh_right;
+        }
+        max
+    }
+
+    /// In-order traversal.
+    pub fn yh_inorder(&self) -> Vec<i64> {
+        let mut result = Vec::new();
+        Self::yh_inorder_node(&self.yh_root, &mut result);
+        result
+    }
+
+    fn yh_inorder_node(node: &Option<Box<YhOstNode>>, result: &mut Vec<i64>) {
+        if let Some(n) = node {
+            Self::yh_inorder_node(&n.yh_left, result);
+            result.push(n.yh_key);
+            Self::yh_inorder_node(&n.yh_right, result);
+        }
+    }
+
+    /// Count elements in range [lo, hi].
+    pub fn yh_count_range(&self, lo: i64, hi: i64) -> usize {
+        if lo > hi { return 0; }
+        let rank_hi = self.yh_rank(hi + 1);
+        let rank_lo = self.yh_rank(lo);
+        rank_hi - rank_lo
+    }
+}
+
+// --- yh_ Reservoir Sampler ---
+
+/// Reservoir sampling for uniformly random samples from a stream.
+#[derive(Debug, Clone)]
+pub struct YhReservoirSampler {
+    yh_reservoir: Vec<i64>,
+    yh_k: usize,
+    yh_count: usize,
+    yh_seed: u64,
+}
+
+impl std::fmt::Display for YhReservoirSampler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Reservoir(k={}, seen={})", self.yh_k, self.yh_count)
+    }
+}
+
+impl Default for YhReservoirSampler {
+    fn default() -> Self { Self::yh_new(10, 42) }
+}
+
+impl YhReservoirSampler {
+    /// Create a reservoir sampler for k items.
+    pub fn yh_new(k: usize, seed: u64) -> Self {
+        Self { yh_reservoir: Vec::with_capacity(k), yh_k: k, yh_count: 0, yh_seed: seed }
+    }
+
+    fn yh_next_rand(&mut self) -> u64 {
+        self.yh_seed ^= self.yh_seed << 13;
+        self.yh_seed ^= self.yh_seed >> 7;
+        self.yh_seed ^= self.yh_seed << 17;
+        self.yh_seed
+    }
+
+    /// Feed a new item from the stream.
+    pub fn yh_add(&mut self, item: i64) {
+        self.yh_count += 1;
+        if self.yh_reservoir.len() < self.yh_k {
+            self.yh_reservoir.push(item);
+        } else {
+            let j = (self.yh_next_rand() % self.yh_count as u64) as usize;
+            if j < self.yh_k {
+                self.yh_reservoir[j] = item;
+            }
+        }
+    }
+
+    /// Get the current sample.
+    pub fn yh_sample(&self) -> &[i64] { &self.yh_reservoir }
+
+    /// Number of items seen.
+    pub fn yh_count(&self) -> usize { self.yh_count }
+
+    /// Sample size.
+    pub fn yh_k(&self) -> usize { self.yh_k }
+
+    /// Reset the sampler.
+    pub fn yh_reset(&mut self, seed: u64) {
+        self.yh_reservoir.clear();
+        self.yh_count = 0;
+        self.yh_seed = seed;
+    }
+
+    /// Is the reservoir full.
+    pub fn yh_is_full(&self) -> bool { self.yh_reservoir.len() == self.yh_k }
+
+    /// Current reservoir size.
+    pub fn yh_len(&self) -> usize { self.yh_reservoir.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -16221,6 +16446,139 @@ mod tests {
     fn yg_bitmap_default() {
         let bi = super::YgBitmapIndex::default();
         assert_eq!(bi.yg_num_rows(), 0);
+    }
+
+
+    // --- yh_ OSTree tests ---
+
+    #[test]
+    fn yh_ost_new() {
+        let t = super::YhOrderStatTree::yh_new();
+        assert!(t.yh_is_empty());
+    }
+
+    #[test]
+    fn yh_ost_insert_contains() {
+        let mut t = super::YhOrderStatTree::yh_new();
+        t.yh_insert(10);
+        t.yh_insert(5);
+        t.yh_insert(15);
+        assert!(t.yh_contains(10));
+        assert!(!t.yh_contains(7));
+    }
+
+    #[test]
+    fn yh_ost_rank() {
+        let mut t = super::YhOrderStatTree::yh_new();
+        for v in [10, 5, 15, 3, 7] { t.yh_insert(v); }
+        assert_eq!(t.yh_rank(5), 1);
+        assert_eq!(t.yh_rank(10), 3);
+    }
+
+    #[test]
+    fn yh_ost_select() {
+        let mut t = super::YhOrderStatTree::yh_new();
+        for v in [10, 5, 15, 3, 7] { t.yh_insert(v); }
+        assert_eq!(t.yh_select(0), Some(3));
+        assert_eq!(t.yh_select(2), Some(7));
+        assert_eq!(t.yh_select(4), Some(15));
+    }
+
+    #[test]
+    fn yh_ost_min_max() {
+        let mut t = super::YhOrderStatTree::yh_new();
+        t.yh_insert(10);
+        t.yh_insert(5);
+        t.yh_insert(15);
+        assert_eq!(t.yh_min(), Some(5));
+        assert_eq!(t.yh_max(), Some(15));
+    }
+
+    #[test]
+    fn yh_ost_inorder() {
+        let mut t = super::YhOrderStatTree::yh_new();
+        for v in [5, 3, 7, 1, 4] { t.yh_insert(v); }
+        assert_eq!(t.yh_inorder(), vec![1, 3, 4, 5, 7]);
+    }
+
+    #[test]
+    fn yh_ost_count_range() {
+        let mut t = super::YhOrderStatTree::yh_new();
+        for v in [1, 3, 5, 7, 9] { t.yh_insert(v); }
+        assert_eq!(t.yh_count_range(3, 7), 3);
+    }
+
+    #[test]
+    fn yh_ost_display() {
+        let t = super::YhOrderStatTree::yh_new();
+        assert!(format!("{}", t).contains("OSTree"));
+    }
+
+    #[test]
+    fn yh_ost_default() {
+        let t = super::YhOrderStatTree::default();
+        assert!(t.yh_is_empty());
+    }
+
+    // --- yh_ Reservoir tests ---
+
+    #[test]
+    fn yh_reservoir_new() {
+        let r = super::YhReservoirSampler::yh_new(5, 42);
+        assert_eq!(r.yh_k(), 5);
+        assert_eq!(r.yh_count(), 0);
+    }
+
+    #[test]
+    fn yh_reservoir_add() {
+        let mut r = super::YhReservoirSampler::yh_new(3, 42);
+        for i in 0..10 { r.yh_add(i); }
+        assert_eq!(r.yh_len(), 3);
+        assert_eq!(r.yh_count(), 10);
+    }
+
+    #[test]
+    fn yh_reservoir_underfill() {
+        let mut r = super::YhReservoirSampler::yh_new(10, 42);
+        r.yh_add(1);
+        r.yh_add(2);
+        assert_eq!(r.yh_len(), 2);
+        assert!(!r.yh_is_full());
+    }
+
+    #[test]
+    fn yh_reservoir_full() {
+        let mut r = super::YhReservoirSampler::yh_new(3, 42);
+        r.yh_add(1); r.yh_add(2); r.yh_add(3);
+        assert!(r.yh_is_full());
+    }
+
+    #[test]
+    fn yh_reservoir_reset() {
+        let mut r = super::YhReservoirSampler::yh_new(3, 42);
+        r.yh_add(1);
+        r.yh_reset(99);
+        assert_eq!(r.yh_count(), 0);
+        assert_eq!(r.yh_len(), 0);
+    }
+
+    #[test]
+    fn yh_reservoir_display() {
+        let r = super::YhReservoirSampler::yh_new(5, 42);
+        assert!(format!("{}", r).contains("Reservoir"));
+    }
+
+    #[test]
+    fn yh_reservoir_default() {
+        let r = super::YhReservoirSampler::default();
+        assert_eq!(r.yh_k(), 10);
+    }
+
+    #[test]
+    fn yh_reservoir_sample() {
+        let mut r = super::YhReservoirSampler::yh_new(5, 42);
+        for i in 0..100 { r.yh_add(i); }
+        assert_eq!(r.yh_sample().len(), 5);
     }
 
 }
