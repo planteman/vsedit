@@ -17019,6 +17019,239 @@ impl ZrWebviewRegistry {
     }
 }
 
+
+// --- zs_ configuration and settings types ---
+
+/// Target scope for a configuration value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZsConfigTarget {
+    /// Default/global settings.
+    Global,
+    /// User-level settings.
+    User,
+    /// Workspace-level settings.
+    Workspace,
+    /// Workspace folder-level settings.
+    WorkspaceFolder,
+}
+
+impl ZsConfigTarget {
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::Global => 0,
+            Self::User => 1,
+            Self::Workspace => 2,
+            Self::WorkspaceFolder => 3,
+        }
+    }
+
+    pub fn overrides(&self, other: &Self) -> bool {
+        self.priority() > other.priority()
+    }
+}
+
+/// A single configuration entry with its value and metadata.
+#[derive(Debug, Clone)]
+pub struct ZsConfigEntry {
+    pub key: String,
+    pub value: ZsConfigValue,
+    pub target: ZsConfigTarget,
+    pub description: Option<String>,
+    pub default_value: Option<ZsConfigValue>,
+}
+
+/// JSON-like value for configuration.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ZsConfigValue {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Str(String),
+    Array(Vec<ZsConfigValue>),
+    Object(Vec<(String, ZsConfigValue)>),
+}
+
+impl ZsConfigValue {
+    pub fn as_bool(&self) -> Option<bool> {
+        if let Self::Bool(b) = self { Some(*b) } else { None }
+    }
+
+    pub fn as_i64(&self) -> Option<i64> {
+        if let Self::Int(n) = self { Some(*n) } else { None }
+    }
+
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Self::Float(f) => Some(*f),
+            Self::Int(n) => Some(*n as f64),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        if let Self::Str(s) = self { Some(s) } else { None }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Self::Null => "null",
+            Self::Bool(_) => "boolean",
+            Self::Int(_) => "integer",
+            Self::Float(_) => "number",
+            Self::Str(_) => "string",
+            Self::Array(_) => "array",
+            Self::Object(_) => "object",
+        }
+    }
+}
+
+/// A layered configuration store supporting Global, User, Workspace, WorkspaceFolder.
+#[derive(Debug, Clone)]
+pub struct ZsConfigStore {
+    entries: Vec<ZsConfigEntry>,
+}
+
+impl ZsConfigStore {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn set(&mut self, key: &str, value: ZsConfigValue, target: ZsConfigTarget) {
+        if let Some(e) = self.entries.iter_mut().find(|e| e.key == key && e.target == target) {
+            e.value = value;
+        } else {
+            self.entries.push(ZsConfigEntry {
+                key: key.to_string(),
+                value,
+                target,
+                description: None,
+                default_value: None,
+            });
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&ZsConfigValue> {
+        self.entries.iter()
+            .filter(|e| e.key == key)
+            .max_by_key(|e| e.target.priority())
+            .map(|e| &e.value)
+    }
+
+    pub fn get_at(&self, key: &str, target: ZsConfigTarget) -> Option<&ZsConfigValue> {
+        self.entries.iter()
+            .find(|e| e.key == key && e.target == target)
+            .map(|e| &e.value)
+    }
+
+    pub fn remove(&mut self, key: &str, target: ZsConfigTarget) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|e| !(e.key == key && e.target == target));
+        self.entries.len() < before
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        let mut seen = Vec::new();
+        for e in &self.entries {
+            if !seen.contains(&e.key.as_str()) {
+                seen.push(&e.key);
+            }
+        }
+        seen
+    }
+
+    pub fn entries_for_target(&self, target: ZsConfigTarget) -> Vec<&ZsConfigEntry> {
+        self.entries.iter().filter(|e| e.target == target).collect()
+    }
+
+    pub fn has(&self, key: &str) -> bool {
+        self.entries.iter().any(|e| e.key == key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Merge another store, with the other store's entries overriding on conflict.
+    pub fn merge(&mut self, other: &ZsConfigStore) {
+        for entry in &other.entries {
+            self.set(&entry.key, entry.value.clone(), entry.target);
+        }
+    }
+
+    /// Get the effective value respecting layered overrides.
+    pub fn effective(&self, key: &str, default: ZsConfigValue) -> ZsConfigValue {
+        self.get(key).cloned().unwrap_or(default)
+    }
+
+    pub fn inspect(&self, key: &str) -> Vec<(ZsConfigTarget, &ZsConfigValue)> {
+        self.entries.iter()
+            .filter(|e| e.key == key)
+            .map(|e| (e.target, &e.value))
+            .collect()
+    }
+}
+
+/// Schema for a configuration property.
+#[derive(Debug, Clone)]
+pub struct ZsConfigSchema {
+    pub key: String,
+    pub type_name: String,
+    pub default: ZsConfigValue,
+    pub description: String,
+    pub enum_values: Vec<String>,
+    pub scope: ZsConfigTarget,
+}
+
+impl ZsConfigSchema {
+    pub fn new(key: &str, type_name: &str, default: ZsConfigValue, description: &str) -> Self {
+        Self {
+            key: key.to_string(),
+            type_name: type_name.to_string(),
+            default,
+            description: description.to_string(),
+            enum_values: Vec::new(),
+            scope: ZsConfigTarget::User,
+        }
+    }
+
+    pub fn with_enum(mut self, values: Vec<String>) -> Self {
+        self.enum_values = values;
+        self
+    }
+
+    pub fn with_scope(mut self, scope: ZsConfigTarget) -> Self {
+        self.scope = scope;
+        self
+    }
+
+    pub fn validate(&self, value: &ZsConfigValue) -> bool {
+        if !self.enum_values.is_empty() {
+            if let ZsConfigValue::Str(s) = value {
+                return self.enum_values.contains(s);
+            }
+            return false;
+        }
+        match self.type_name.as_str() {
+            "boolean" => matches!(value, ZsConfigValue::Bool(_)),
+            "integer" => matches!(value, ZsConfigValue::Int(_)),
+            "number" => matches!(value, ZsConfigValue::Int(_) | ZsConfigValue::Float(_)),
+            "string" => matches!(value, ZsConfigValue::Str(_)),
+            "array" => matches!(value, ZsConfigValue::Array(_)),
+            "object" => matches!(value, ZsConfigValue::Object(_)),
+            _ => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27892,6 +28125,118 @@ mod tests {
         let vid = reg.register_view(view);
         reg.view_mut(vid).unwrap().set_description("Desc");
         assert_eq!(reg.view(vid).unwrap().description.as_deref(), Some("Desc"));
+    }
+
+
+    // --- zs_ configuration and settings tests ---
+
+    #[test]
+    fn test_zs_config_target_priority() {
+        assert!(ZsConfigTarget::WorkspaceFolder.overrides(&ZsConfigTarget::Workspace));
+        assert!(ZsConfigTarget::Workspace.overrides(&ZsConfigTarget::User));
+        assert!(ZsConfigTarget::User.overrides(&ZsConfigTarget::Global));
+        assert!(!ZsConfigTarget::Global.overrides(&ZsConfigTarget::User));
+    }
+
+    #[test]
+    fn test_zs_config_value_types() {
+        assert_eq!(ZsConfigValue::Bool(true).as_bool(), Some(true));
+        assert_eq!(ZsConfigValue::Int(42).as_i64(), Some(42));
+        assert_eq!(ZsConfigValue::Float(3.14).as_f64(), Some(3.14));
+        assert_eq!(ZsConfigValue::Int(5).as_f64(), Some(5.0));
+        assert_eq!(ZsConfigValue::Str("hi".into()).as_str(), Some("hi"));
+        assert!(ZsConfigValue::Null.is_null());
+        assert_eq!(ZsConfigValue::Bool(false).type_name(), "boolean");
+        assert_eq!(ZsConfigValue::Array(vec![]).type_name(), "array");
+    }
+
+    #[test]
+    fn test_zs_config_store_set_get() {
+        let mut store = ZsConfigStore::new();
+        store.set("editor.fontSize", ZsConfigValue::Int(14), ZsConfigTarget::User);
+        assert_eq!(store.get("editor.fontSize"), Some(&ZsConfigValue::Int(14)));
+        assert!(store.has("editor.fontSize"));
+        assert!(!store.has("nonexistent"));
+    }
+
+    #[test]
+    fn test_zs_config_store_layered() {
+        let mut store = ZsConfigStore::new();
+        store.set("tabSize", ZsConfigValue::Int(4), ZsConfigTarget::User);
+        store.set("tabSize", ZsConfigValue::Int(2), ZsConfigTarget::Workspace);
+        // Workspace overrides User
+        assert_eq!(store.get("tabSize"), Some(&ZsConfigValue::Int(2)));
+        assert_eq!(store.get_at("tabSize", ZsConfigTarget::User), Some(&ZsConfigValue::Int(4)));
+    }
+
+    #[test]
+    fn test_zs_config_store_remove() {
+        let mut store = ZsConfigStore::new();
+        store.set("k", ZsConfigValue::Bool(true), ZsConfigTarget::User);
+        assert!(store.remove("k", ZsConfigTarget::User));
+        assert!(!store.has("k"));
+        assert!(!store.remove("k", ZsConfigTarget::User));
+    }
+
+    #[test]
+    fn test_zs_config_store_keys_and_entries() {
+        let mut store = ZsConfigStore::new();
+        store.set("a", ZsConfigValue::Int(1), ZsConfigTarget::User);
+        store.set("b", ZsConfigValue::Int(2), ZsConfigTarget::Workspace);
+        store.set("a", ZsConfigValue::Int(3), ZsConfigTarget::Workspace);
+        assert_eq!(store.keys().len(), 2);
+        assert_eq!(store.entries_for_target(ZsConfigTarget::Workspace).len(), 2);
+        assert_eq!(store.len(), 3);
+    }
+
+    #[test]
+    fn test_zs_config_store_merge() {
+        let mut s1 = ZsConfigStore::new();
+        s1.set("x", ZsConfigValue::Int(1), ZsConfigTarget::User);
+        let mut s2 = ZsConfigStore::new();
+        s2.set("x", ZsConfigValue::Int(2), ZsConfigTarget::User);
+        s2.set("y", ZsConfigValue::Bool(true), ZsConfigTarget::User);
+        s1.merge(&s2);
+        assert_eq!(s1.get_at("x", ZsConfigTarget::User), Some(&ZsConfigValue::Int(2)));
+        assert!(s1.has("y"));
+    }
+
+    #[test]
+    fn test_zs_config_store_effective() {
+        let store = ZsConfigStore::new();
+        let v = store.effective("missing", ZsConfigValue::Str("default".into()));
+        assert_eq!(v, ZsConfigValue::Str("default".into()));
+    }
+
+    #[test]
+    fn test_zs_config_store_inspect() {
+        let mut store = ZsConfigStore::new();
+        store.set("k", ZsConfigValue::Int(1), ZsConfigTarget::User);
+        store.set("k", ZsConfigValue::Int(2), ZsConfigTarget::Workspace);
+        let layers = store.inspect("k");
+        assert_eq!(layers.len(), 2);
+    }
+
+    #[test]
+    fn test_zs_config_schema_validate() {
+        let schema = ZsConfigSchema::new("fontSize", "integer", ZsConfigValue::Int(14), "Font size");
+        assert!(schema.validate(&ZsConfigValue::Int(12)));
+        assert!(!schema.validate(&ZsConfigValue::Str("big".into())));
+    }
+
+    #[test]
+    fn test_zs_config_schema_enum_validate() {
+        let schema = ZsConfigSchema::new("eol", "string", ZsConfigValue::Str("\n".into()), "EOL")
+            .with_enum(vec!["\n".into(), "\r\n".into()]);
+        assert!(schema.validate(&ZsConfigValue::Str("\n".into())));
+        assert!(!schema.validate(&ZsConfigValue::Str("\r".into())));
+    }
+
+    #[test]
+    fn test_zs_config_schema_scope() {
+        let schema = ZsConfigSchema::new("k", "boolean", ZsConfigValue::Bool(false), "desc")
+            .with_scope(ZsConfigTarget::Workspace);
+        assert_eq!(schema.scope, ZsConfigTarget::Workspace);
     }
 
 }
