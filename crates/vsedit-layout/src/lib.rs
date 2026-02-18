@@ -22762,6 +22762,134 @@ impl AxvTaskRunner {
     pub fn clear_problems(&mut self) { self.problems.clear(); }
 }
 
+
+// --- axw_ debug adapter protocol types ---
+
+/// DAP message type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxwDapMessageKind { Request, Response, Event }
+
+/// DAP request command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AxwDapCommand {
+    Initialize, Launch, Attach, Disconnect, SetBreakpoints, SetExceptionBreakpoints,
+    Continue, Next, StepIn, StepOut, Pause, Threads, StackTrace, Scopes, Variables,
+    Evaluate, Source, Completions, ConfigurationDone, Terminate, Custom(String),
+}
+
+impl AxwDapCommand {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Initialize => "initialize", Self::Launch => "launch", Self::Attach => "attach",
+            Self::Disconnect => "disconnect", Self::SetBreakpoints => "setBreakpoints",
+            Self::SetExceptionBreakpoints => "setExceptionBreakpoints",
+            Self::Continue => "continue", Self::Next => "next", Self::StepIn => "stepIn",
+            Self::StepOut => "stepOut", Self::Pause => "pause", Self::Threads => "threads",
+            Self::StackTrace => "stackTrace", Self::Scopes => "scopes", Self::Variables => "variables",
+            Self::Evaluate => "evaluate", Self::Source => "source", Self::Completions => "completions",
+            Self::ConfigurationDone => "configurationDone", Self::Terminate => "disconnect",
+            Self::Custom(s) => s,
+        }
+    }
+}
+
+/// Thread in the debuggee.
+#[derive(Debug, Clone)]
+pub struct AxwThread { pub id: u32, pub name: String }
+
+/// Stack frame.
+#[derive(Debug, Clone)]
+pub struct AxwStackFrame {
+    pub id: u32,
+    pub name: String,
+    pub source_path: Option<String>,
+    pub line: u32,
+    pub col: u32,
+}
+
+impl AxwStackFrame {
+    pub fn new(id: u32, name: &str, line: u32) -> Self {
+        Self { id, name: name.to_string(), source_path: None, line, col: 0 }
+    }
+    pub fn with_source(mut self, path: &str) -> Self { self.source_path = Some(path.to_string()); self }
+    pub fn location_str(&self) -> String {
+        match &self.source_path {
+            Some(p) => format!("{}:{}", p, self.line),
+            None => format!("<unknown>:{}", self.line),
+        }
+    }
+}
+
+/// Variable scope.
+#[derive(Debug, Clone)]
+pub struct AxwScope { pub name: String, pub variables_ref: u32, pub expensive: bool }
+
+/// A debug variable.
+#[derive(Debug, Clone)]
+pub struct AxwVariable {
+    pub name: String,
+    pub value: String,
+    pub var_type: Option<String>,
+    pub variables_ref: u32,
+}
+
+impl AxwVariable {
+    pub fn new(name: &str, value: &str) -> Self {
+        Self { name: name.to_string(), value: value.to_string(), var_type: None, variables_ref: 0 }
+    }
+    pub fn with_type(mut self, t: &str) -> Self { self.var_type = Some(t.to_string()); self }
+    pub fn has_children(&self) -> bool { self.variables_ref > 0 }
+}
+
+/// Breakpoint state.
+#[derive(Debug, Clone)]
+pub struct AxwBreakpoint {
+    pub id: Option<u32>,
+    pub verified: bool,
+    pub line: u32,
+    pub source_path: String,
+    pub condition: Option<String>,
+    pub hit_condition: Option<String>,
+    pub log_message: Option<String>,
+}
+
+impl AxwBreakpoint {
+    pub fn new(path: &str, line: u32) -> Self {
+        Self { id: None, verified: false, line, source_path: path.to_string(), condition: None, hit_condition: None, log_message: None }
+    }
+    pub fn with_condition(mut self, cond: &str) -> Self { self.condition = Some(cond.to_string()); self }
+    pub fn is_conditional(&self) -> bool { self.condition.is_some() || self.hit_condition.is_some() }
+    pub fn is_logpoint(&self) -> bool { self.log_message.is_some() }
+}
+
+/// Debug session state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxwSessionState { Initializing, Running, Stopped, Terminated }
+
+/// Debug session.
+#[derive(Debug)]
+pub struct AxwDebugSession {
+    pub id: String,
+    pub name: String,
+    pub state: AxwSessionState,
+    pub threads: Vec<AxwThread>,
+    pub breakpoints: Vec<AxwBreakpoint>,
+    pub seq: u32,
+}
+
+impl AxwDebugSession {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self { id: id.to_string(), name: name.to_string(), state: AxwSessionState::Initializing, threads: Vec::new(), breakpoints: Vec::new(), seq: 0 }
+    }
+    pub fn next_seq(&mut self) -> u32 { self.seq += 1; self.seq }
+    pub fn set_state(&mut self, state: AxwSessionState) { self.state = state; }
+    pub fn add_breakpoint(&mut self, bp: AxwBreakpoint) { self.breakpoints.push(bp); }
+    pub fn breakpoints_for_file(&self, path: &str) -> Vec<&AxwBreakpoint> {
+        self.breakpoints.iter().filter(|b| b.source_path == path).collect()
+    }
+    pub fn is_active(&self) -> bool { matches!(self.state, AxwSessionState::Running | AxwSessionState::Stopped) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36341,6 +36469,66 @@ mod tests {
         task.env.insert("NODE_ENV".to_string(), "production".to_string());
         assert_eq!(task.cwd.as_deref(), Some("/app"));
         assert_eq!(task.env.get("NODE_ENV").unwrap(), "production");
+    }
+
+
+    #[test]
+    fn test_axw_dap_command() {
+        assert_eq!(AxwDapCommand::Initialize.as_str(), "initialize");
+        assert_eq!(AxwDapCommand::StackTrace.as_str(), "stackTrace");
+        assert_eq!(AxwDapCommand::Custom("myCmd".to_string()).as_str(), "myCmd");
+    }
+
+    #[test]
+    fn test_axw_stack_frame() {
+        let frame = AxwStackFrame::new(1, "main", 42).with_source("/src/main.rs");
+        assert_eq!(frame.location_str(), "/src/main.rs:42");
+    }
+
+    #[test]
+    fn test_axw_variable() {
+        let v = AxwVariable::new("x", "42").with_type("i32");
+        assert!(!v.has_children());
+        assert_eq!(v.var_type.as_deref(), Some("i32"));
+    }
+
+    #[test]
+    fn test_axw_breakpoint() {
+        let bp = AxwBreakpoint::new("/src/main.rs", 10).with_condition("x > 5");
+        assert!(bp.is_conditional());
+        assert!(!bp.is_logpoint());
+        assert!(!bp.verified);
+    }
+
+    #[test]
+    fn test_axw_debug_session() {
+        let mut session = AxwDebugSession::new("s1", "Debug");
+        assert_eq!(session.state, AxwSessionState::Initializing);
+        session.set_state(AxwSessionState::Running);
+        assert!(session.is_active());
+        assert_eq!(session.next_seq(), 1);
+        assert_eq!(session.next_seq(), 2);
+    }
+
+    #[test]
+    fn test_axw_session_breakpoints() {
+        let mut session = AxwDebugSession::new("s1", "Debug");
+        session.add_breakpoint(AxwBreakpoint::new("/a.rs", 10));
+        session.add_breakpoint(AxwBreakpoint::new("/b.rs", 20));
+        session.add_breakpoint(AxwBreakpoint::new("/a.rs", 30));
+        assert_eq!(session.breakpoints_for_file("/a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_axw_thread() {
+        let t = AxwThread { id: 1, name: "main".to_string() };
+        assert_eq!(t.id, 1);
+    }
+
+    #[test]
+    fn test_axw_scope() {
+        let s = AxwScope { name: "Locals".to_string(), variables_ref: 1000, expensive: false };
+        assert!(!s.expensive);
     }
 
 }
