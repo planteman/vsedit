@@ -2202,6 +2202,236 @@ pub fn xb_lerp_51(a: f64, b: f64, t: f64) -> f64 {
     a + (b - a) * t
 }
 
+
+// ---------------------------------------------------------------------------
+// xc_ pool and scheduler – generated block 209
+// ---------------------------------------------------------------------------
+
+/// Generic object pool `Xc209Pool<T>`.
+pub struct Xc209Pool<T> {
+    items: Vec<T>,
+    capacity: usize,
+    acquired: usize,
+}
+
+/// Statistics snapshot returned by [`Xc209Pool::stats`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xc209PoolStats {
+    pub capacity: usize,
+    pub len: usize,
+    pub acquired: usize,
+    pub available: usize,
+}
+
+impl<T> Xc209Pool<T> {
+    /// Create a pool with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            capacity,
+            acquired: 0,
+        }
+    }
+
+    /// Try to acquire an item from the pool.
+    pub fn acquire(&mut self) -> Option<T> {
+        if let Some(item) = self.items.pop() {
+            self.acquired += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    /// Release an item back into the pool.
+    pub fn release(&mut self, item: T) {
+        if self.items.len() < self.capacity {
+            self.items.push(item);
+            if self.acquired > 0 {
+                self.acquired -= 1;
+            }
+        }
+    }
+
+    /// Number of items currently stored in the pool.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Maximum capacity of the pool.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Number of items available for acquisition.
+    pub fn available(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Drain all items from the pool.
+    pub fn drain(&mut self) -> Vec<T> {
+        self.acquired = 0;
+        self.items.drain(..).collect()
+    }
+
+    /// Whether the pool is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.items.len() >= self.capacity
+    }
+
+    /// Whether the pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Return a statistics snapshot.
+    pub fn stats(&self) -> Xc209PoolStats {
+        Xc209PoolStats {
+            capacity: self.capacity,
+            len: self.items.len(),
+            acquired: self.acquired,
+            available: self.items.len(),
+        }
+    }
+
+    /// Remove all items and reset counters.
+    pub fn clear(&mut self) {
+        self.items.clear();
+        self.acquired = 0;
+    }
+
+    /// Shrink internal storage to fit current length.
+    pub fn shrink_to_fit(&mut self) {
+        self.items.shrink_to_fit();
+    }
+
+    /// Extend pool with an iterator of items (up to remaining capacity).
+    pub fn extend_from<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for item in iter {
+            if self.items.len() >= self.capacity {
+                break;
+            }
+            self.items.push(item);
+        }
+    }
+
+    /// Retain only items matching a predicate.
+    pub fn retain<F: FnMut(&T) -> bool>(&mut self, f: F) {
+        self.items.retain(f);
+    }
+}
+
+impl<T> Default for Xc209Pool<T> {
+    fn default() -> Self {
+        Self::new(16)
+    }
+}
+
+/// Round-robin scheduler `Xc209Scheduler`.
+pub struct Xc209Scheduler {
+    targets: Vec<String>,
+    index: usize,
+    dispatched: usize,
+}
+
+impl Xc209Scheduler {
+    /// Create a scheduler with the given targets.
+    pub fn new(targets: Vec<String>) -> Self {
+        Self {
+            targets,
+            index: 0,
+            dispatched: 0,
+        }
+    }
+
+    /// Get the next target in round-robin order.
+    pub fn next(&mut self) -> Option<&str> {
+        if self.targets.is_empty() {
+            return None;
+        }
+        let target = &self.targets[self.index % self.targets.len()];
+        self.index += 1;
+        self.dispatched += 1;
+        Some(target)
+    }
+
+    /// Number of targets.
+    pub fn len(&self) -> usize {
+        self.targets.len()
+    }
+
+    /// Whether there are no targets.
+    pub fn is_empty(&self) -> bool {
+        self.targets.is_empty()
+    }
+
+    /// Total number of dispatches so far.
+    pub fn dispatched(&self) -> usize {
+        self.dispatched
+    }
+
+    /// Current index position.
+    pub fn position(&self) -> usize {
+        if self.targets.is_empty() {
+            0
+        } else {
+            self.index % self.targets.len()
+        }
+    }
+
+    /// Reset the scheduler to the beginning.
+    pub fn reset(&mut self) {
+        self.index = 0;
+        self.dispatched = 0;
+    }
+
+    /// Add a target.
+    pub fn add_target(&mut self, target: String) {
+        self.targets.push(target);
+    }
+
+    /// Remove a target by name (first occurrence).
+    pub fn remove_target(&mut self, name: &str) -> bool {
+        if let Some(pos) = self.targets.iter().position(|t| t == name) {
+            self.targets.remove(pos);
+            if !self.targets.is_empty() {
+                self.index %= self.targets.len();
+            } else {
+                self.index = 0;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get all targets.
+    pub fn targets(&self) -> &[String] {
+        &self.targets
+    }
+}
+
+impl Default for Xc209Scheduler {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
+
+/// Computes a simple xc_209 hash for the given byte slice.
+pub fn xc_209_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 5381;
+    for &b in data {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Reverses a string using xc_209 convention.
+pub fn xc_209_reverse(s: &str) -> String {
+    s.chars().rev().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3809,6 +4039,174 @@ mod tests {
         assert_eq!(rb.len(), 2);
         assert_eq!(rb.get(0), Some(4));
         assert_eq!(rb.get(1), Some(5));
+    }
+
+
+    // ---- xc_ pool / scheduler tests – block 209 ----
+
+    #[test]
+    fn xc_209_pool_new_empty() {
+        let pool: super::Xc209Pool<i32> = super::Xc209Pool::new(4);
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+        assert_eq!(pool.capacity(), 4);
+        assert!(!pool.is_full());
+    }
+
+    #[test]
+    fn xc_209_pool_release_acquire() {
+        let mut pool = super::Xc209Pool::new(4);
+        pool.release(10);
+        pool.release(20);
+        assert_eq!(pool.len(), 2);
+        assert_eq!(pool.available(), 2);
+        let v = pool.acquire().unwrap();
+        assert_eq!(v, 20);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn xc_209_pool_acquire_empty() {
+        let mut pool: super::Xc209Pool<i32> = super::Xc209Pool::new(2);
+        assert!(pool.acquire().is_none());
+    }
+
+    #[test]
+    fn xc_209_pool_full() {
+        let mut pool = super::Xc209Pool::new(2);
+        pool.release(1);
+        pool.release(2);
+        assert!(pool.is_full());
+        pool.release(3); // over capacity – ignored
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn xc_209_pool_drain() {
+        let mut pool = super::Xc209Pool::new(4);
+        pool.release(1);
+        pool.release(2);
+        let items = pool.drain();
+        assert_eq!(items.len(), 2);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn xc_209_pool_stats() {
+        let mut pool = super::Xc209Pool::new(8);
+        pool.release(1);
+        pool.release(2);
+        let _ = pool.acquire();
+        let s = pool.stats();
+        assert_eq!(s.capacity, 8);
+        assert_eq!(s.len, 1);
+        assert_eq!(s.acquired, 1);
+        assert_eq!(s.available, 1);
+    }
+
+    #[test]
+    fn xc_209_pool_clear() {
+        let mut pool = super::Xc209Pool::new(4);
+        pool.release(1);
+        pool.release(2);
+        pool.clear();
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+    }
+
+    #[test]
+    fn xc_209_pool_shrink() {
+        let mut pool = super::Xc209Pool::new(100);
+        pool.release(1);
+        pool.shrink_to_fit();
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn xc_209_pool_default() {
+        let pool: super::Xc209Pool<String> = super::Xc209Pool::default();
+        assert_eq!(pool.capacity(), 16);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn xc_209_pool_extend() {
+        let mut pool = super::Xc209Pool::new(3);
+        pool.extend_from(vec![10, 20, 30, 40]);
+        assert_eq!(pool.len(), 3);
+    }
+
+    #[test]
+    fn xc_209_pool_retain() {
+        let mut pool = super::Xc209Pool::new(8);
+        pool.extend_from(vec![1, 2, 3, 4, 5]);
+        pool.retain(|x| x % 2 == 0);
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn xc_209_scheduler_round_robin() {
+        let mut sched = super::Xc209Scheduler::new(vec![
+            "a".into(), "b".into(), "c".into(),
+        ]);
+        assert_eq!(sched.next().unwrap(), "a");
+        assert_eq!(sched.next().unwrap(), "b");
+        assert_eq!(sched.next().unwrap(), "c");
+        assert_eq!(sched.next().unwrap(), "a");
+        assert_eq!(sched.dispatched(), 4);
+    }
+
+    #[test]
+    fn xc_209_scheduler_empty() {
+        let mut sched = super::Xc209Scheduler::new(vec![]);
+        assert!(sched.next().is_none());
+        assert!(sched.is_empty());
+    }
+
+    #[test]
+    fn xc_209_scheduler_reset() {
+        let mut sched = super::Xc209Scheduler::new(vec!["x".into()]);
+        sched.next();
+        sched.next();
+        sched.reset();
+        assert_eq!(sched.dispatched(), 0);
+        assert_eq!(sched.position(), 0);
+    }
+
+    #[test]
+    fn xc_209_scheduler_add_remove() {
+        let mut sched = super::Xc209Scheduler::new(vec!["a".into()]);
+        sched.add_target("b".into());
+        assert_eq!(sched.len(), 2);
+        assert!(sched.remove_target("a"));
+        assert_eq!(sched.len(), 1);
+        assert!(!sched.remove_target("z"));
+    }
+
+    #[test]
+    fn xc_209_scheduler_targets() {
+        let sched = super::Xc209Scheduler::new(vec!["t1".into(), "t2".into()]);
+        assert_eq!(sched.targets(), &["t1".to_string(), "t2".to_string()]);
+        assert_eq!(sched.len(), 2);
+    }
+
+
+    #[test]
+    fn xc_209_hash_empty() {
+        assert_eq!(super::xc_209_hash(b""), 5381);
+    }
+
+    #[test]
+    fn xc_209_hash_data() {
+        let h = super::xc_209_hash(b"hello");
+        assert_ne!(h, 0);
+        assert_eq!(super::xc_209_hash(b"hello"), h);
+    }
+
+    #[test]
+    fn xc_209_reverse_str() {
+        assert_eq!(super::xc_209_reverse("abc"), "cba");
+        assert_eq!(super::xc_209_reverse(""), "");
     }
 
 }

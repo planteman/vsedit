@@ -1657,6 +1657,236 @@ impl Default for XaKeybindingSvcCounter {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// xc_ pool and scheduler – generated block 102
+// ---------------------------------------------------------------------------
+
+/// Generic object pool `Xc102Pool<T>`.
+pub struct Xc102Pool<T> {
+    items: Vec<T>,
+    capacity: usize,
+    acquired: usize,
+}
+
+/// Statistics snapshot returned by [`Xc102Pool::stats`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xc102PoolStats {
+    pub capacity: usize,
+    pub len: usize,
+    pub acquired: usize,
+    pub available: usize,
+}
+
+impl<T> Xc102Pool<T> {
+    /// Create a pool with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            capacity,
+            acquired: 0,
+        }
+    }
+
+    /// Try to acquire an item from the pool.
+    pub fn acquire(&mut self) -> Option<T> {
+        if let Some(item) = self.items.pop() {
+            self.acquired += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    /// Release an item back into the pool.
+    pub fn release(&mut self, item: T) {
+        if self.items.len() < self.capacity {
+            self.items.push(item);
+            if self.acquired > 0 {
+                self.acquired -= 1;
+            }
+        }
+    }
+
+    /// Number of items currently stored in the pool.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Maximum capacity of the pool.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Number of items available for acquisition.
+    pub fn available(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Drain all items from the pool.
+    pub fn drain(&mut self) -> Vec<T> {
+        self.acquired = 0;
+        self.items.drain(..).collect()
+    }
+
+    /// Whether the pool is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.items.len() >= self.capacity
+    }
+
+    /// Whether the pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Return a statistics snapshot.
+    pub fn stats(&self) -> Xc102PoolStats {
+        Xc102PoolStats {
+            capacity: self.capacity,
+            len: self.items.len(),
+            acquired: self.acquired,
+            available: self.items.len(),
+        }
+    }
+
+    /// Remove all items and reset counters.
+    pub fn clear(&mut self) {
+        self.items.clear();
+        self.acquired = 0;
+    }
+
+    /// Shrink internal storage to fit current length.
+    pub fn shrink_to_fit(&mut self) {
+        self.items.shrink_to_fit();
+    }
+
+    /// Extend pool with an iterator of items (up to remaining capacity).
+    pub fn extend_from<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for item in iter {
+            if self.items.len() >= self.capacity {
+                break;
+            }
+            self.items.push(item);
+        }
+    }
+
+    /// Retain only items matching a predicate.
+    pub fn retain<F: FnMut(&T) -> bool>(&mut self, f: F) {
+        self.items.retain(f);
+    }
+}
+
+impl<T> Default for Xc102Pool<T> {
+    fn default() -> Self {
+        Self::new(16)
+    }
+}
+
+/// Round-robin scheduler `Xc102Scheduler`.
+pub struct Xc102Scheduler {
+    targets: Vec<String>,
+    index: usize,
+    dispatched: usize,
+}
+
+impl Xc102Scheduler {
+    /// Create a scheduler with the given targets.
+    pub fn new(targets: Vec<String>) -> Self {
+        Self {
+            targets,
+            index: 0,
+            dispatched: 0,
+        }
+    }
+
+    /// Get the next target in round-robin order.
+    pub fn next(&mut self) -> Option<&str> {
+        if self.targets.is_empty() {
+            return None;
+        }
+        let target = &self.targets[self.index % self.targets.len()];
+        self.index += 1;
+        self.dispatched += 1;
+        Some(target)
+    }
+
+    /// Number of targets.
+    pub fn len(&self) -> usize {
+        self.targets.len()
+    }
+
+    /// Whether there are no targets.
+    pub fn is_empty(&self) -> bool {
+        self.targets.is_empty()
+    }
+
+    /// Total number of dispatches so far.
+    pub fn dispatched(&self) -> usize {
+        self.dispatched
+    }
+
+    /// Current index position.
+    pub fn position(&self) -> usize {
+        if self.targets.is_empty() {
+            0
+        } else {
+            self.index % self.targets.len()
+        }
+    }
+
+    /// Reset the scheduler to the beginning.
+    pub fn reset(&mut self) {
+        self.index = 0;
+        self.dispatched = 0;
+    }
+
+    /// Add a target.
+    pub fn add_target(&mut self, target: String) {
+        self.targets.push(target);
+    }
+
+    /// Remove a target by name (first occurrence).
+    pub fn remove_target(&mut self, name: &str) -> bool {
+        if let Some(pos) = self.targets.iter().position(|t| t == name) {
+            self.targets.remove(pos);
+            if !self.targets.is_empty() {
+                self.index %= self.targets.len();
+            } else {
+                self.index = 0;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get all targets.
+    pub fn targets(&self) -> &[String] {
+        &self.targets
+    }
+}
+
+impl Default for Xc102Scheduler {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
+
+/// Computes a simple xc_102 hash for the given byte slice.
+pub fn xc_102_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 5381;
+    for &b in data {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Reverses a string using xc_102 convention.
+pub fn xc_102_reverse(s: &str) -> String {
+    s.chars().rev().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3717,6 +3947,174 @@ mod tests {
         let c = super::XaKeybindingSvcCounter::default();
         assert_eq!(c.total(), 0);
         assert_eq!(c.num_keys(), 0);
+    }
+
+
+    // ---- xc_ pool / scheduler tests – block 102 ----
+
+    #[test]
+    fn xc_102_pool_new_empty() {
+        let pool: super::Xc102Pool<i32> = super::Xc102Pool::new(4);
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+        assert_eq!(pool.capacity(), 4);
+        assert!(!pool.is_full());
+    }
+
+    #[test]
+    fn xc_102_pool_release_acquire() {
+        let mut pool = super::Xc102Pool::new(4);
+        pool.release(10);
+        pool.release(20);
+        assert_eq!(pool.len(), 2);
+        assert_eq!(pool.available(), 2);
+        let v = pool.acquire().unwrap();
+        assert_eq!(v, 20);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn xc_102_pool_acquire_empty() {
+        let mut pool: super::Xc102Pool<i32> = super::Xc102Pool::new(2);
+        assert!(pool.acquire().is_none());
+    }
+
+    #[test]
+    fn xc_102_pool_full() {
+        let mut pool = super::Xc102Pool::new(2);
+        pool.release(1);
+        pool.release(2);
+        assert!(pool.is_full());
+        pool.release(3); // over capacity – ignored
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn xc_102_pool_drain() {
+        let mut pool = super::Xc102Pool::new(4);
+        pool.release(1);
+        pool.release(2);
+        let items = pool.drain();
+        assert_eq!(items.len(), 2);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn xc_102_pool_stats() {
+        let mut pool = super::Xc102Pool::new(8);
+        pool.release(1);
+        pool.release(2);
+        let _ = pool.acquire();
+        let s = pool.stats();
+        assert_eq!(s.capacity, 8);
+        assert_eq!(s.len, 1);
+        assert_eq!(s.acquired, 1);
+        assert_eq!(s.available, 1);
+    }
+
+    #[test]
+    fn xc_102_pool_clear() {
+        let mut pool = super::Xc102Pool::new(4);
+        pool.release(1);
+        pool.release(2);
+        pool.clear();
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+    }
+
+    #[test]
+    fn xc_102_pool_shrink() {
+        let mut pool = super::Xc102Pool::new(100);
+        pool.release(1);
+        pool.shrink_to_fit();
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn xc_102_pool_default() {
+        let pool: super::Xc102Pool<String> = super::Xc102Pool::default();
+        assert_eq!(pool.capacity(), 16);
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn xc_102_pool_extend() {
+        let mut pool = super::Xc102Pool::new(3);
+        pool.extend_from(vec![10, 20, 30, 40]);
+        assert_eq!(pool.len(), 3);
+    }
+
+    #[test]
+    fn xc_102_pool_retain() {
+        let mut pool = super::Xc102Pool::new(8);
+        pool.extend_from(vec![1, 2, 3, 4, 5]);
+        pool.retain(|x| x % 2 == 0);
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn xc_102_scheduler_round_robin() {
+        let mut sched = super::Xc102Scheduler::new(vec![
+            "a".into(), "b".into(), "c".into(),
+        ]);
+        assert_eq!(sched.next().unwrap(), "a");
+        assert_eq!(sched.next().unwrap(), "b");
+        assert_eq!(sched.next().unwrap(), "c");
+        assert_eq!(sched.next().unwrap(), "a");
+        assert_eq!(sched.dispatched(), 4);
+    }
+
+    #[test]
+    fn xc_102_scheduler_empty() {
+        let mut sched = super::Xc102Scheduler::new(vec![]);
+        assert!(sched.next().is_none());
+        assert!(sched.is_empty());
+    }
+
+    #[test]
+    fn xc_102_scheduler_reset() {
+        let mut sched = super::Xc102Scheduler::new(vec!["x".into()]);
+        sched.next();
+        sched.next();
+        sched.reset();
+        assert_eq!(sched.dispatched(), 0);
+        assert_eq!(sched.position(), 0);
+    }
+
+    #[test]
+    fn xc_102_scheduler_add_remove() {
+        let mut sched = super::Xc102Scheduler::new(vec!["a".into()]);
+        sched.add_target("b".into());
+        assert_eq!(sched.len(), 2);
+        assert!(sched.remove_target("a"));
+        assert_eq!(sched.len(), 1);
+        assert!(!sched.remove_target("z"));
+    }
+
+    #[test]
+    fn xc_102_scheduler_targets() {
+        let sched = super::Xc102Scheduler::new(vec!["t1".into(), "t2".into()]);
+        assert_eq!(sched.targets(), &["t1".to_string(), "t2".to_string()]);
+        assert_eq!(sched.len(), 2);
+    }
+
+
+    #[test]
+    fn xc_102_hash_empty() {
+        assert_eq!(super::xc_102_hash(b""), 5381);
+    }
+
+    #[test]
+    fn xc_102_hash_data() {
+        let h = super::xc_102_hash(b"hello");
+        assert_ne!(h, 0);
+        assert_eq!(super::xc_102_hash(b"hello"), h);
+    }
+
+    #[test]
+    fn xc_102_reverse_str() {
+        assert_eq!(super::xc_102_reverse("abc"), "cba");
+        assert_eq!(super::xc_102_reverse(""), "");
     }
 
 }
