@@ -24668,6 +24668,109 @@ impl AyqZoomState {
     }
 }
 
+
+// --- ayr_ integrated terminal session model ---
+
+/// Terminal profile.
+#[derive(Debug, Clone)]
+pub struct AyrTerminalProfile {
+    pub name: String,
+    pub shell_path: String,
+    pub shell_args: Vec<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub cwd: Option<String>,
+    pub icon: Option<String>,
+}
+
+impl AyrTerminalProfile {
+    pub fn new(name: &str, shell: &str) -> Self {
+        Self { name: name.to_string(), shell_path: shell.to_string(), shell_args: Vec::new(),
+            env: std::collections::HashMap::new(), cwd: None, icon: None }
+    }
+    pub fn with_args(mut self, args: Vec<String>) -> Self { self.shell_args = args; self }
+    pub fn with_cwd(mut self, cwd: &str) -> Self { self.cwd = Some(cwd.to_string()); self }
+}
+
+/// Terminal session state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyrTerminalState { Starting, Running, Exited(i32) }
+
+/// A terminal session.
+#[derive(Debug)]
+pub struct AyrTerminalSession {
+    pub id: u32,
+    pub name: String,
+    pub profile: AyrTerminalProfile,
+    pub state: AyrTerminalState,
+    pub scroll_back_lines: Vec<String>,
+    pub visible_lines: Vec<String>,
+    pub cursor_row: u32,
+    pub cursor_col: u32,
+    pub cols: u16,
+    pub rows: u16,
+}
+
+impl AyrTerminalSession {
+    pub fn new(id: u32, profile: AyrTerminalProfile) -> Self {
+        let name = profile.name.clone();
+        Self { id, name, profile, state: AyrTerminalState::Starting,
+            scroll_back_lines: Vec::new(), visible_lines: Vec::new(),
+            cursor_row: 0, cursor_col: 0, cols: 80, rows: 24 }
+    }
+    pub fn start(&mut self) { self.state = AyrTerminalState::Running; }
+    pub fn exit(&mut self, code: i32) { self.state = AyrTerminalState::Exited(code); }
+    pub fn is_running(&self) -> bool { self.state == AyrTerminalState::Running }
+    pub fn is_exited(&self) -> bool { matches!(self.state, AyrTerminalState::Exited(_)) }
+    pub fn write_line(&mut self, line: &str) {
+        self.visible_lines.push(line.to_string());
+        if self.visible_lines.len() > self.rows as usize {
+            let removed = self.visible_lines.remove(0);
+            self.scroll_back_lines.push(removed);
+        }
+    }
+    pub fn resize(&mut self, cols: u16, rows: u16) { self.cols = cols; self.rows = rows; }
+    pub fn total_lines(&self) -> usize { self.scroll_back_lines.len() + self.visible_lines.len() }
+    pub fn clear(&mut self) {
+        self.scroll_back_lines.extend(self.visible_lines.drain(..));
+    }
+}
+
+/// Terminal session manager.
+#[derive(Debug)]
+pub struct AyrTerminalManager {
+    pub sessions: Vec<AyrTerminalSession>,
+    pub active_id: Option<u32>,
+    pub next_id: u32,
+    pub default_profile: AyrTerminalProfile,
+}
+
+impl AyrTerminalManager {
+    pub fn new(default_profile: AyrTerminalProfile) -> Self {
+        Self { sessions: Vec::new(), active_id: None, next_id: 1, default_profile }
+    }
+    pub fn create_session(&mut self, profile: Option<AyrTerminalProfile>) -> u32 {
+        let id = self.next_id;
+        self.next_id += 1;
+        let p = profile.unwrap_or_else(|| self.default_profile.clone());
+        let mut session = AyrTerminalSession::new(id, p);
+        session.start();
+        self.sessions.push(session);
+        self.active_id = Some(id);
+        id
+    }
+    pub fn active_session(&self) -> Option<&AyrTerminalSession> {
+        self.active_id.and_then(|id| self.sessions.iter().find(|s| s.id == id))
+    }
+    pub fn active_session_mut(&mut self) -> Option<&mut AyrTerminalSession> {
+        let id = self.active_id?;
+        self.sessions.iter_mut().find(|s| s.id == id)
+    }
+    pub fn set_active(&mut self, id: u32) { if self.sessions.iter().any(|s| s.id == id) { self.active_id = Some(id); } }
+    pub fn session_count(&self) -> usize { self.sessions.len() }
+    pub fn running_count(&self) -> usize { self.sessions.iter().filter(|s| s.is_running()).count() }
+    pub fn remove_exited(&mut self) { self.sessions.retain(|s| !s.is_exited()); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39962,6 +40065,90 @@ mod tests {
         let z = AyqZoomLevel::DEFAULT;
         let cols = f.terminal_cols_for_width(1000, &z);
         assert!(cols > 0 && cols < 200);
+    }
+
+
+    #[test]
+    fn test_ayr_terminal_profile() {
+        let p = AyrTerminalProfile::new("bash", "/bin/bash")
+            .with_args(vec!["-l".into()]).with_cwd("/home");
+        assert_eq!(p.shell_path, "/bin/bash");
+        assert_eq!(p.cwd.as_deref(), Some("/home"));
+    }
+
+    #[test]
+    fn test_ayr_terminal_session() {
+        let p = AyrTerminalProfile::new("sh", "/bin/sh");
+        let mut session = AyrTerminalSession::new(1, p);
+        session.start();
+        assert!(session.is_running());
+        session.write_line("$ hello");
+        assert_eq!(session.total_lines(), 1);
+        session.exit(0);
+        assert!(session.is_exited());
+    }
+
+    #[test]
+    fn test_ayr_session_scrollback() {
+        let p = AyrTerminalProfile::new("sh", "/bin/sh");
+        let mut session = AyrTerminalSession::new(1, p);
+        session.rows = 3;
+        session.start();
+        for i in 0..5 { session.write_line(&format!("line {}", i)); }
+        assert_eq!(session.visible_lines.len(), 3);
+        assert_eq!(session.scroll_back_lines.len(), 2);
+    }
+
+    #[test]
+    fn test_ayr_terminal_manager() {
+        let p = AyrTerminalProfile::new("bash", "/bin/bash");
+        let mut mgr = AyrTerminalManager::new(p);
+        let id1 = mgr.create_session(None);
+        let id2 = mgr.create_session(None);
+        assert_eq!(mgr.session_count(), 2);
+        assert_eq!(mgr.running_count(), 2);
+        assert_eq!(mgr.active_id, Some(id2));
+        mgr.set_active(id1);
+        assert_eq!(mgr.active_session().unwrap().id, id1);
+    }
+
+    #[test]
+    fn test_ayr_remove_exited() {
+        let p = AyrTerminalProfile::new("sh", "/bin/sh");
+        let mut mgr = AyrTerminalManager::new(p);
+        mgr.create_session(None);
+        mgr.create_session(None);
+        mgr.sessions[0].exit(0);
+        mgr.remove_exited();
+        assert_eq!(mgr.session_count(), 1);
+    }
+
+    #[test]
+    fn test_ayr_session_resize() {
+        let p = AyrTerminalProfile::new("sh", "/bin/sh");
+        let mut session = AyrTerminalSession::new(1, p);
+        session.resize(120, 40);
+        assert_eq!(session.cols, 120);
+        assert_eq!(session.rows, 40);
+    }
+
+    #[test]
+    fn test_ayr_session_clear() {
+        let p = AyrTerminalProfile::new("sh", "/bin/sh");
+        let mut session = AyrTerminalSession::new(1, p);
+        session.start();
+        session.write_line("hello");
+        session.clear();
+        assert!(session.visible_lines.is_empty());
+        assert_eq!(session.scroll_back_lines.len(), 1);
+    }
+
+    #[test]
+    fn test_ayr_custom_profile() {
+        let p = AyrTerminalProfile::new("zsh", "/bin/zsh");
+        let mut mgr = AyrTerminalManager::new(AyrTerminalProfile::new("bash", "/bin/bash"));
+        mgr.create_session(Some(p));
+        assert_eq!(mgr.active_session().unwrap().profile.shell_path, "/bin/zsh");
     }
 
 }
