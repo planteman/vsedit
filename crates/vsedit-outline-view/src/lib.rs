@@ -23467,6 +23467,123 @@ impl AyfLineHeightMap {
     }
 }
 
+
+// --- ayg_ workspace symbol search and go-to-definition ---
+
+/// Symbol kind for workspace symbols.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AygSymbolKind {
+    File, Module, Namespace, Package, Class, Method, Property, Field,
+    Constructor, Enum, Interface, Function, Variable, Constant, Str,
+    Number, Boolean, Array, Object, Key, Null, EnumMember, Struct, Event,
+    Operator, TypeParameter,
+}
+
+impl AygSymbolKind {
+    pub fn icon(&self) -> &str {
+        match self {
+            Self::File => "F", Self::Module => "M", Self::Namespace => "N", Self::Package => "P",
+            Self::Class => "C", Self::Method => "m", Self::Property => "p", Self::Field => "f",
+            Self::Constructor => "c", Self::Enum => "E", Self::Interface => "I", Self::Function => "fn",
+            Self::Variable => "v", Self::Constant => "K", Self::Str => "S", Self::Number => "#",
+            Self::Boolean => "B", Self::Array => "[]", Self::Object => "{}", Self::Key => "k",
+            Self::Null => "0", Self::EnumMember => "e", Self::Struct => "S", Self::Event => "ev",
+            Self::Operator => "op", Self::TypeParameter => "T",
+        }
+    }
+}
+
+/// A workspace symbol result.
+#[derive(Debug, Clone)]
+pub struct AygWorkspaceSymbol {
+    pub name: String,
+    pub kind: AygSymbolKind,
+    pub container_name: Option<String>,
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+}
+
+impl AygWorkspaceSymbol {
+    pub fn new(name: &str, kind: AygSymbolKind, uri: &str, line: u32) -> Self {
+        Self { name: name.to_string(), kind, container_name: None, uri: uri.to_string(), line, col: 0 }
+    }
+    pub fn with_container(mut self, c: &str) -> Self { self.container_name = Some(c.to_string()); self }
+    pub fn qualified_name(&self) -> String {
+        match &self.container_name {
+            Some(c) => format!("{}.{}", c, self.name),
+            None => self.name.clone(),
+        }
+    }
+}
+
+/// Location link for go-to-definition.
+#[derive(Debug, Clone)]
+pub struct AygLocationLink {
+    pub origin_uri: Option<String>,
+    pub origin_start: Option<(u32, u32)>,
+    pub origin_end: Option<(u32, u32)>,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub target_end_line: u32,
+    pub target_end_col: u32,
+}
+
+impl AygLocationLink {
+    pub fn simple(uri: &str, line: u32, col: u32) -> Self {
+        Self { origin_uri: None, origin_start: None, origin_end: None,
+            target_uri: uri.to_string(), target_line: line, target_col: col,
+            target_end_line: line, target_end_col: col }
+    }
+    pub fn with_range(mut self, end_line: u32, end_col: u32) -> Self {
+        self.target_end_line = end_line; self.target_end_col = end_col; self
+    }
+    pub fn is_same_file(&self) -> bool {
+        self.origin_uri.as_ref().map(|u| u == &self.target_uri).unwrap_or(false)
+    }
+}
+
+/// Definition result (single or multiple).
+#[derive(Debug, Clone)]
+pub enum AygDefinitionResult {
+    Single(AygLocationLink),
+    Multiple(Vec<AygLocationLink>),
+    None,
+}
+
+impl AygDefinitionResult {
+    pub fn count(&self) -> usize {
+        match self { Self::Single(_) => 1, Self::Multiple(v) => v.len(), Self::None => 0 }
+    }
+    pub fn first(&self) -> Option<&AygLocationLink> {
+        match self { Self::Single(l) => Some(l), Self::Multiple(v) => v.first(), Self::None => None }
+    }
+}
+
+/// Symbol search index.
+#[derive(Debug)]
+pub struct AygSymbolIndex {
+    pub symbols: Vec<AygWorkspaceSymbol>,
+}
+
+impl AygSymbolIndex {
+    pub fn new() -> Self { Self { symbols: Vec::new() } }
+    pub fn add(&mut self, sym: AygWorkspaceSymbol) { self.symbols.push(sym); }
+    pub fn search(&self, query: &str) -> Vec<&AygWorkspaceSymbol> {
+        let q = query.to_lowercase();
+        self.symbols.iter().filter(|s| s.name.to_lowercase().contains(&q)).collect()
+    }
+    pub fn by_kind(&self, kind: AygSymbolKind) -> Vec<&AygWorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.kind == kind).collect()
+    }
+    pub fn by_file(&self, uri: &str) -> Vec<&AygWorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.uri == uri).collect()
+    }
+    pub fn total(&self) -> usize { self.symbols.len() }
+    pub fn clear(&mut self) { self.symbols.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38133,6 +38250,71 @@ mod tests {
         assert_eq!(line, 1);
         assert_eq!(offset, 1);
         assert_eq!(map.logical_to_visual(2), 4);
+    }
+
+
+    #[test]
+    fn test_ayg_symbol_kind() {
+        assert_eq!(AygSymbolKind::Function.icon(), "fn");
+        assert_eq!(AygSymbolKind::Class.icon(), "C");
+    }
+
+    #[test]
+    fn test_ayg_workspace_symbol() {
+        let sym = AygWorkspaceSymbol::new("MyClass", AygSymbolKind::Class, "file:///a.rs", 10)
+            .with_container("module");
+        assert_eq!(sym.qualified_name(), "module.MyClass");
+    }
+
+    #[test]
+    fn test_ayg_location_link() {
+        let link = AygLocationLink::simple("file:///a.rs", 10, 5).with_range(10, 15);
+        assert_eq!(link.target_end_col, 15);
+    }
+
+    #[test]
+    fn test_ayg_definition_result() {
+        let single = AygDefinitionResult::Single(AygLocationLink::simple("f", 0, 0));
+        assert_eq!(single.count(), 1);
+        let none = AygDefinitionResult::None;
+        assert_eq!(none.count(), 0);
+    }
+
+    #[test]
+    fn test_ayg_symbol_index_search() {
+        let mut idx = AygSymbolIndex::new();
+        idx.add(AygWorkspaceSymbol::new("MyClass", AygSymbolKind::Class, "a.rs", 1));
+        idx.add(AygWorkspaceSymbol::new("my_func", AygSymbolKind::Function, "b.rs", 5));
+        idx.add(AygWorkspaceSymbol::new("other", AygSymbolKind::Variable, "a.rs", 10));
+        assert_eq!(idx.search("my").len(), 2);
+        assert_eq!(idx.by_kind(AygSymbolKind::Class).len(), 1);
+        assert_eq!(idx.by_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_ayg_definition_multiple() {
+        let result = AygDefinitionResult::Multiple(vec![
+            AygLocationLink::simple("a.rs", 1, 0),
+            AygLocationLink::simple("b.rs", 2, 0),
+        ]);
+        assert_eq!(result.count(), 2);
+        assert_eq!(result.first().unwrap().target_uri, "a.rs");
+    }
+
+    #[test]
+    fn test_ayg_symbol_index_clear() {
+        let mut idx = AygSymbolIndex::new();
+        idx.add(AygWorkspaceSymbol::new("x", AygSymbolKind::Variable, "f", 0));
+        assert_eq!(idx.total(), 1);
+        idx.clear();
+        assert_eq!(idx.total(), 0);
+    }
+
+    #[test]
+    fn test_ayg_same_file() {
+        let mut link = AygLocationLink::simple("file:///a.rs", 10, 0);
+        link.origin_uri = Some("file:///a.rs".to_string());
+        assert!(link.is_same_file());
     }
 
 }
