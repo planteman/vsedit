@@ -25880,6 +25880,75 @@ impl AzbCommitGraph {
     pub fn latest(&self) -> Option<&AzbGraphNode> { self.nodes.iter().max_by_key(|n| n.timestamp) }
 }
 
+
+// --- azc_ editor sticky scroll ---
+
+/// A sticky scroll scope (function, class, block).
+#[derive(Debug, Clone)]
+pub struct AzcStickyScope {
+    pub label: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub depth: u32,
+    pub kind: AzcScopeKind,
+}
+
+/// Scope kind for sticky scroll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzcScopeKind { Function, Class, Module, Block, Struct, Enum, Interface, Namespace }
+
+impl AzcStickyScope {
+    pub fn new(label: &str, start: u32, end: u32, depth: u32, kind: AzcScopeKind) -> Self {
+        Self { label: label.to_string(), start_line: start, end_line: end, depth, kind }
+    }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+    pub fn line_span(&self) -> u32 { self.end_line.saturating_sub(self.start_line) + 1 }
+}
+
+/// Sticky scroll state for the editor.
+#[derive(Debug)]
+pub struct AzcStickyScrollState {
+    pub scopes: Vec<AzcStickyScope>,
+    pub max_lines: u32,
+    pub enabled: bool,
+}
+
+impl AzcStickyScrollState {
+    pub fn new(max: u32) -> Self { Self { scopes: Vec::new(), max_lines: max, enabled: true } }
+    pub fn set_scopes(&mut self, s: Vec<AzcStickyScope>) { self.scopes = s; }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn visible_scopes_at(&self, cursor_line: u32) -> Vec<&AzcStickyScope> {
+        if !self.enabled { return Vec::new(); }
+        let mut active: Vec<&AzcStickyScope> = self.scopes.iter()
+            .filter(|s| s.contains_line(cursor_line) && s.start_line < cursor_line)
+            .collect();
+        active.sort_by_key(|s| s.depth);
+        active.truncate(self.max_lines as usize);
+        active
+    }
+    pub fn sticky_line_count(&self, cursor_line: u32) -> usize { self.visible_scopes_at(cursor_line).len() }
+    pub fn deepest_scope_at(&self, line: u32) -> Option<&AzcStickyScope> {
+        self.scopes.iter().filter(|s| s.contains_line(line)).max_by_key(|s| s.depth)
+    }
+}
+
+/// Sticky scroll renderer producing display lines.
+#[derive(Debug)]
+pub struct AzcStickyRenderer {
+    pub indent_size: u32,
+}
+
+impl AzcStickyRenderer {
+    pub fn new(indent: u32) -> Self { Self { indent_size: indent } }
+    pub fn render_line(&self, scope: &AzcStickyScope) -> String {
+        let indent = " ".repeat((scope.depth * self.indent_size) as usize);
+        format!("{}{}", indent, scope.label)
+    }
+    pub fn render_all(&self, scopes: &[&AzcStickyScope]) -> Vec<String> {
+        scopes.iter().map(|s| self.render_line(s)).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41938,6 +42007,88 @@ d");
     fn test_azb_blame_short_hash() {
         let e = AzbBlameEntry::new(1, "abc", "a", "d", "m");
         assert_eq!(e.short_hash(), "abc");
+    }
+
+
+    #[test]
+    fn test_azc_sticky_scope() {
+        let s = AzcStickyScope::new("fn main()", 10, 50, 0, AzcScopeKind::Function);
+        assert!(s.contains_line(10));
+        assert!(s.contains_line(30));
+        assert!(!s.contains_line(51));
+        assert_eq!(s.line_span(), 41);
+    }
+
+    #[test]
+    fn test_azc_visible_scopes() {
+        let mut state = AzcStickyScrollState::new(3);
+        state.set_scopes(vec![
+            AzcStickyScope::new("mod foo", 1, 100, 0, AzcScopeKind::Module),
+            AzcStickyScope::new("fn bar()", 10, 80, 1, AzcScopeKind::Function),
+            AzcStickyScope::new("if cond", 20, 40, 2, AzcScopeKind::Block),
+        ]);
+        let vis = state.visible_scopes_at(30);
+        assert_eq!(vis.len(), 3);
+        assert_eq!(vis[0].depth, 0);
+    }
+
+    #[test]
+    fn test_azc_max_lines() {
+        let mut state = AzcStickyScrollState::new(1);
+        state.set_scopes(vec![
+            AzcStickyScope::new("a", 1, 100, 0, AzcScopeKind::Module),
+            AzcStickyScope::new("b", 5, 90, 1, AzcScopeKind::Function),
+        ]);
+        assert_eq!(state.sticky_line_count(50), 1);
+    }
+
+    #[test]
+    fn test_azc_toggle() {
+        let mut state = AzcStickyScrollState::new(3);
+        state.set_scopes(vec![AzcStickyScope::new("a", 1, 100, 0, AzcScopeKind::Module)]);
+        assert_eq!(state.sticky_line_count(50), 1);
+        state.toggle();
+        assert_eq!(state.sticky_line_count(50), 0);
+    }
+
+    #[test]
+    fn test_azc_deepest_scope() {
+        let mut state = AzcStickyScrollState::new(5);
+        state.set_scopes(vec![
+            AzcStickyScope::new("mod", 1, 100, 0, AzcScopeKind::Module),
+            AzcStickyScope::new("fn", 10, 80, 1, AzcScopeKind::Function),
+            AzcStickyScope::new("if", 20, 40, 2, AzcScopeKind::Block),
+        ]);
+        let d = state.deepest_scope_at(30).unwrap();
+        assert_eq!(d.depth, 2);
+        let d2 = state.deepest_scope_at(5).unwrap();
+        assert_eq!(d2.depth, 0);
+    }
+
+    #[test]
+    fn test_azc_renderer() {
+        let r = AzcStickyRenderer::new(2);
+        let scope = AzcStickyScope::new("fn foo()", 1, 10, 2, AzcScopeKind::Function);
+        let line = r.render_line(&scope);
+        assert_eq!(line, "    fn foo()");
+    }
+
+    #[test]
+    fn test_azc_render_all() {
+        let r = AzcStickyRenderer::new(4);
+        let s0 = AzcStickyScope::new("mod", 1, 100, 0, AzcScopeKind::Module);
+        let s1 = AzcStickyScope::new("fn", 5, 80, 1, AzcScopeKind::Function);
+        let lines = r.render_all(&[&s0, &s1]);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[1].starts_with("    "));
+    }
+
+    #[test]
+    fn test_azc_cursor_at_start() {
+        let mut state = AzcStickyScrollState::new(5);
+        state.set_scopes(vec![AzcStickyScope::new("fn", 10, 50, 0, AzcScopeKind::Function)]);
+        assert_eq!(state.sticky_line_count(10), 0);
+        assert_eq!(state.sticky_line_count(11), 1);
     }
 
 }
