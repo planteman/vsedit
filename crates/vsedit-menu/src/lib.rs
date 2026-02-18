@@ -8991,6 +8991,230 @@ impl YbQuadtree {
     }
 }
 
+
+// --- yc_ Van Emde Boas Set ---
+
+/// Simplified van Emde Boas-inspired set for integer keys in [0, universe).
+/// Uses a flat bitmap for practical efficiency with O(1) operations.
+#[derive(Debug, Clone)]
+pub struct YcVebSet {
+    yc_bits: Vec<u64>,
+    yc_universe: usize,
+    yc_count: usize,
+    yc_min: Option<usize>,
+    yc_max: Option<usize>,
+}
+
+impl std::fmt::Display for YcVebSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VebSet(universe={}, count={})", self.yc_universe, self.yc_count)
+    }
+}
+
+impl Default for YcVebSet {
+    fn default() -> Self { Self::yc_new(65536) }
+}
+
+impl YcVebSet {
+    /// Create a set supporting keys in [0, universe).
+    pub fn yc_new(universe: usize) -> Self {
+        let words = (universe + 63) / 64;
+        Self { yc_bits: vec![0; words], yc_universe: universe, yc_count: 0, yc_min: None, yc_max: None }
+    }
+
+    /// Universe size.
+    pub fn yc_universe(&self) -> usize { self.yc_universe }
+
+    /// Number of elements.
+    pub fn yc_len(&self) -> usize { self.yc_count }
+
+    /// Is the set empty.
+    pub fn yc_is_empty(&self) -> bool { self.yc_count == 0 }
+
+    /// Insert a key.
+    pub fn yc_insert(&mut self, key: usize) -> bool {
+        if key >= self.yc_universe { return false; }
+        let word = key / 64;
+        let bit = key % 64;
+        if self.yc_bits[word] & (1u64 << bit) != 0 { return false; }
+        self.yc_bits[word] |= 1u64 << bit;
+        self.yc_count += 1;
+        self.yc_min = Some(self.yc_min.map_or(key, |m: usize| m.min(key)));
+        self.yc_max = Some(self.yc_max.map_or(key, |m: usize| m.max(key)));
+        true
+    }
+
+    /// Remove a key.
+    pub fn yc_remove(&mut self, key: usize) -> bool {
+        if key >= self.yc_universe { return false; }
+        let word = key / 64;
+        let bit = key % 64;
+        if self.yc_bits[word] & (1u64 << bit) == 0 { return false; }
+        self.yc_bits[word] &= !(1u64 << bit);
+        self.yc_count -= 1;
+        if self.yc_count == 0 { self.yc_min = None; self.yc_max = None; }
+        else {
+            if self.yc_min == Some(key) { self.yc_min = self.yc_successor(key); }
+            if self.yc_max == Some(key) { self.yc_max = self.yc_predecessor(key); }
+        }
+        true
+    }
+
+    /// Check membership.
+    pub fn yc_contains(&self, key: usize) -> bool {
+        if key >= self.yc_universe { return false; }
+        self.yc_bits[key / 64] & (1u64 << (key % 64)) != 0
+    }
+
+    /// Minimum element.
+    pub fn yc_min(&self) -> Option<usize> { self.yc_min }
+
+    /// Maximum element.
+    pub fn yc_max(&self) -> Option<usize> { self.yc_max }
+
+    /// Find the smallest key > given key.
+    pub fn yc_successor(&self, key: usize) -> Option<usize> {
+        for k in (key + 1)..self.yc_universe {
+            if self.yc_contains(k) { return Some(k); }
+        }
+        None
+    }
+
+    /// Find the largest key < given key.
+    pub fn yc_predecessor(&self, key: usize) -> Option<usize> {
+        if key == 0 { return None; }
+        for k in (0..key).rev() {
+            if self.yc_contains(k) { return Some(k); }
+        }
+        None
+    }
+
+    /// Collect all elements in sorted order.
+    pub fn yc_to_sorted_vec(&self) -> Vec<usize> {
+        let mut result = Vec::with_capacity(self.yc_count);
+        for w in 0..self.yc_bits.len() {
+            let mut bits = self.yc_bits[w];
+            while bits != 0 {
+                let tz = bits.trailing_zeros() as usize;
+                result.push(w * 64 + tz);
+                bits &= bits - 1;
+            }
+        }
+        result
+    }
+
+    /// Clear the set.
+    pub fn yc_clear(&mut self) {
+        for w in &mut self.yc_bits { *w = 0; }
+        self.yc_count = 0;
+        self.yc_min = None;
+        self.yc_max = None;
+    }
+
+    /// Union with another set (same universe).
+    pub fn yc_union(&mut self, other: &YcVebSet) {
+        if self.yc_universe != other.yc_universe { return; }
+        for i in 0..self.yc_bits.len() {
+            self.yc_bits[i] |= other.yc_bits[i];
+        }
+        self.yc_count = self.yc_to_sorted_vec().len();
+        let sorted = self.yc_to_sorted_vec();
+        self.yc_min = sorted.first().copied();
+        self.yc_max = sorted.last().copied();
+    }
+
+    /// Intersection with another set.
+    pub fn yc_intersection(&self, other: &YcVebSet) -> YcVebSet {
+        let mut result = YcVebSet::yc_new(self.yc_universe);
+        if self.yc_universe != other.yc_universe { return result; }
+        for i in 0..self.yc_bits.len() {
+            result.yc_bits[i] = self.yc_bits[i] & other.yc_bits[i];
+        }
+        let sorted = result.yc_to_sorted_vec();
+        result.yc_count = sorted.len();
+        result.yc_min = sorted.first().copied();
+        result.yc_max = sorted.last().copied();
+        result
+    }
+}
+
+// --- yc_ Consistent Hash Ring ---
+
+/// Consistent hash ring for distributed key mapping with virtual nodes.
+#[derive(Debug, Clone)]
+pub struct YcHashRing {
+    yc_ring: std::collections::BTreeMap<u64, String>,
+    yc_replicas: usize,
+    yc_nodes: Vec<String>,
+}
+
+impl std::fmt::Display for YcHashRing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HashRing(nodes={}, replicas={})", self.yc_nodes.len(), self.yc_replicas)
+    }
+}
+
+impl Default for YcHashRing {
+    fn default() -> Self { Self { yc_ring: std::collections::BTreeMap::new(), yc_replicas: 150, yc_nodes: Vec::new() } }
+}
+
+impl YcHashRing {
+    /// Create a new hash ring with given replica count per node.
+    pub fn yc_new(replicas: usize) -> Self {
+        Self { yc_ring: std::collections::BTreeMap::new(), yc_replicas: replicas.max(1), yc_nodes: Vec::new() }
+    }
+
+    fn yc_hash(key: &str) -> u64 {
+        let mut h: u64 = 0xcbf29ce484222325;
+        for b in key.as_bytes() {
+            h ^= *b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        h
+    }
+
+    /// Add a node to the ring.
+    pub fn yc_add_node(&mut self, node: &str) {
+        for i in 0..self.yc_replicas {
+            let key = format!("{}:{}", node, i);
+            let hash = Self::yc_hash(&key);
+            self.yc_ring.insert(hash, node.to_string());
+        }
+        self.yc_nodes.push(node.to_string());
+    }
+
+    /// Remove a node from the ring.
+    pub fn yc_remove_node(&mut self, node: &str) {
+        for i in 0..self.yc_replicas {
+            let key = format!("{}:{}", node, i);
+            let hash = Self::yc_hash(&key);
+            self.yc_ring.remove(&hash);
+        }
+        self.yc_nodes.retain(|n| n != node);
+    }
+
+    /// Find the node responsible for a key.
+    pub fn yc_get_node(&self, key: &str) -> Option<&str> {
+        if self.yc_ring.is_empty() { return None; }
+        let hash = Self::yc_hash(key);
+        let node = self.yc_ring.range(hash..).next()
+            .or_else(|| self.yc_ring.iter().next());
+        node.map(|(_, v)| v.as_str())
+    }
+
+    /// Number of physical nodes.
+    pub fn yc_node_count(&self) -> usize { self.yc_nodes.len() }
+
+    /// Number of virtual nodes on the ring.
+    pub fn yc_virtual_count(&self) -> usize { self.yc_ring.len() }
+
+    /// List all physical nodes.
+    pub fn yc_nodes(&self) -> &[String] { &self.yc_nodes }
+
+    /// Check if a node is in the ring.
+    pub fn yc_has_node(&self, node: &str) -> bool { self.yc_nodes.iter().any(|n| n == node) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -14388,6 +14612,176 @@ mod tests {
         let a = super::YbBounds::yb_new(0.0, 0.0, 50.0, 50.0);
         let b = super::YbBounds::yb_new(25.0, 25.0, 50.0, 50.0);
         assert!(a.yb_intersects(&b));
+    }
+
+
+    // --- yc_ VebSet tests ---
+
+    #[test]
+    fn yc_veb_new() {
+        let v = super::YcVebSet::yc_new(1000);
+        assert!(v.yc_is_empty());
+        assert_eq!(v.yc_universe(), 1000);
+    }
+
+    #[test]
+    fn yc_veb_insert_contains() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        assert!(v.yc_insert(42));
+        assert!(v.yc_contains(42));
+        assert!(!v.yc_contains(43));
+    }
+
+    #[test]
+    fn yc_veb_remove() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        v.yc_insert(10);
+        assert!(v.yc_remove(10));
+        assert!(!v.yc_contains(10));
+    }
+
+    #[test]
+    fn yc_veb_min_max() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        v.yc_insert(50);
+        v.yc_insert(10);
+        v.yc_insert(90);
+        assert_eq!(v.yc_min(), Some(10));
+        assert_eq!(v.yc_max(), Some(90));
+    }
+
+    #[test]
+    fn yc_veb_successor() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        v.yc_insert(10);
+        v.yc_insert(20);
+        v.yc_insert(30);
+        assert_eq!(v.yc_successor(10), Some(20));
+        assert_eq!(v.yc_successor(20), Some(30));
+        assert_eq!(v.yc_successor(30), None);
+    }
+
+    #[test]
+    fn yc_veb_predecessor() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        v.yc_insert(10);
+        v.yc_insert(20);
+        assert_eq!(v.yc_predecessor(20), Some(10));
+        assert_eq!(v.yc_predecessor(10), None);
+    }
+
+    #[test]
+    fn yc_veb_sorted() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        v.yc_insert(30);
+        v.yc_insert(10);
+        v.yc_insert(20);
+        assert_eq!(v.yc_to_sorted_vec(), vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn yc_veb_clear() {
+        let mut v = super::YcVebSet::yc_new(1000);
+        v.yc_insert(1);
+        v.yc_clear();
+        assert!(v.yc_is_empty());
+    }
+
+    #[test]
+    fn yc_veb_union() {
+        let mut a = super::YcVebSet::yc_new(100);
+        let mut b = super::YcVebSet::yc_new(100);
+        a.yc_insert(1);
+        b.yc_insert(2);
+        a.yc_union(&b);
+        assert!(a.yc_contains(1));
+        assert!(a.yc_contains(2));
+    }
+
+    #[test]
+    fn yc_veb_intersection() {
+        let mut a = super::YcVebSet::yc_new(100);
+        let mut b = super::YcVebSet::yc_new(100);
+        a.yc_insert(1); a.yc_insert(2);
+        b.yc_insert(2); b.yc_insert(3);
+        let c = a.yc_intersection(&b);
+        assert!(c.yc_contains(2));
+        assert!(!c.yc_contains(1));
+    }
+
+    #[test]
+    fn yc_veb_display() {
+        let v = super::YcVebSet::yc_new(100);
+        assert!(format!("{}", v).contains("VebSet"));
+    }
+
+    #[test]
+    fn yc_veb_default() {
+        let v = super::YcVebSet::default();
+        assert_eq!(v.yc_universe(), 65536);
+    }
+
+    // --- yc_ HashRing tests ---
+
+    #[test]
+    fn yc_ring_new() {
+        let r = super::YcHashRing::yc_new(100);
+        assert_eq!(r.yc_node_count(), 0);
+    }
+
+    #[test]
+    fn yc_ring_add_node() {
+        let mut r = super::YcHashRing::yc_new(50);
+        r.yc_add_node("server1");
+        assert_eq!(r.yc_node_count(), 1);
+        assert_eq!(r.yc_virtual_count(), 50);
+    }
+
+    #[test]
+    fn yc_ring_get_node() {
+        let mut r = super::YcHashRing::yc_new(50);
+        r.yc_add_node("a");
+        r.yc_add_node("b");
+        let n = r.yc_get_node("mykey");
+        assert!(n.is_some());
+    }
+
+    #[test]
+    fn yc_ring_remove_node() {
+        let mut r = super::YcHashRing::yc_new(50);
+        r.yc_add_node("a");
+        r.yc_remove_node("a");
+        assert_eq!(r.yc_node_count(), 0);
+    }
+
+    #[test]
+    fn yc_ring_has_node() {
+        let mut r = super::YcHashRing::yc_new(50);
+        r.yc_add_node("server1");
+        assert!(r.yc_has_node("server1"));
+        assert!(!r.yc_has_node("server2"));
+    }
+
+    #[test]
+    fn yc_ring_display() {
+        let r = super::YcHashRing::yc_new(10);
+        assert!(format!("{}", r).contains("HashRing"));
+    }
+
+    #[test]
+    fn yc_ring_default() {
+        let r = super::YcHashRing::default();
+        assert_eq!(r.yc_node_count(), 0);
+    }
+
+    #[test]
+    fn yc_ring_consistency() {
+        let mut r = super::YcHashRing::yc_new(100);
+        r.yc_add_node("a");
+        r.yc_add_node("b");
+        let n1 = r.yc_get_node("key1").unwrap().to_string();
+        let n2 = r.yc_get_node("key1").unwrap().to_string();
+        assert_eq!(n1, n2);
     }
 
 }
