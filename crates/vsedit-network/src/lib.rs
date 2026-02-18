@@ -17923,6 +17923,214 @@ impl ZvCommentController {
     }
 }
 
+
+// --- zw_ custom editor and file system provider types ---
+
+/// File type in a virtual file system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZwFileType {
+    Unknown,
+    File,
+    Directory,
+    SymbolicLink,
+}
+
+/// File stat returned by a file system provider.
+#[derive(Debug, Clone)]
+pub struct ZwFileStat {
+    pub file_type: ZwFileType,
+    pub ctime: u64,
+    pub mtime: u64,
+    pub size: u64,
+    pub permissions: Option<u32>,
+}
+
+impl ZwFileStat {
+    pub fn file(size: u64, mtime: u64) -> Self {
+        Self { file_type: ZwFileType::File, ctime: mtime, mtime, size, permissions: None }
+    }
+
+    pub fn directory(mtime: u64) -> Self {
+        Self { file_type: ZwFileType::Directory, ctime: mtime, mtime, size: 0, permissions: None }
+    }
+
+    pub fn is_file(&self) -> bool {
+        self.file_type == ZwFileType::File
+    }
+
+    pub fn is_directory(&self) -> bool {
+        self.file_type == ZwFileType::Directory
+    }
+
+    pub fn with_permissions(mut self, perms: u32) -> Self {
+        self.permissions = Some(perms);
+        self
+    }
+
+    pub fn is_readonly(&self) -> bool {
+        self.permissions.map_or(false, |p| p & 0o200 == 0)
+    }
+}
+
+/// File change type for watching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZwFileChangeType {
+    Changed,
+    Created,
+    Deleted,
+}
+
+/// A file change event.
+#[derive(Debug, Clone)]
+pub struct ZwFileChangeEvent {
+    pub uri: String,
+    pub change_type: ZwFileChangeType,
+}
+
+impl ZwFileChangeEvent {
+    pub fn new(uri: &str, change_type: ZwFileChangeType) -> Self {
+        Self { uri: uri.to_string(), change_type }
+    }
+}
+
+/// Directory entry returned by readDirectory.
+#[derive(Debug, Clone)]
+pub struct ZwDirectoryEntry {
+    pub name: String,
+    pub file_type: ZwFileType,
+}
+
+impl ZwDirectoryEntry {
+    pub fn new(name: &str, ft: ZwFileType) -> Self {
+        Self { name: name.to_string(), file_type: ft }
+    }
+}
+
+/// In-memory file system implementation.
+#[derive(Debug, Clone)]
+pub struct ZwMemoryFs {
+    files: Vec<(String, Vec<u8>, ZwFileStat)>,
+}
+
+impl ZwMemoryFs {
+    pub fn new() -> Self {
+        Self { files: Vec::new() }
+    }
+
+    pub fn write_file(&mut self, uri: &str, content: &[u8], mtime: u64) {
+        if let Some(entry) = self.files.iter_mut().find(|(u, _, _)| u == uri) {
+            entry.1 = content.to_vec();
+            entry.2.mtime = mtime;
+            entry.2.size = content.len() as u64;
+        } else {
+            self.files.push((
+                uri.to_string(),
+                content.to_vec(),
+                ZwFileStat::file(content.len() as u64, mtime),
+            ));
+        }
+    }
+
+    pub fn read_file(&self, uri: &str) -> Option<&[u8]> {
+        self.files.iter().find(|(u, _, _)| u == uri).map(|(_, c, _)| c.as_slice())
+    }
+
+    pub fn stat(&self, uri: &str) -> Option<&ZwFileStat> {
+        self.files.iter().find(|(u, _, _)| u == uri).map(|(_, _, s)| s)
+    }
+
+    pub fn delete(&mut self, uri: &str) -> bool {
+        let before = self.files.len();
+        self.files.retain(|(u, _, _)| u != uri);
+        self.files.len() < before
+    }
+
+    pub fn rename(&mut self, old_uri: &str, new_uri: &str) -> bool {
+        if let Some(entry) = self.files.iter_mut().find(|(u, _, _)| u == old_uri) {
+            entry.0 = new_uri.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn list(&self, prefix: &str) -> Vec<ZwDirectoryEntry> {
+        self.files.iter()
+            .filter(|(u, _, _)| u.starts_with(prefix) && u != prefix)
+            .map(|(u, _, s)| {
+                let name = u.strip_prefix(prefix).unwrap_or(u);
+                let name = name.trim_start_matches('/');
+                ZwDirectoryEntry::new(name, s.file_type)
+            })
+            .collect()
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    pub fn exists(&self, uri: &str) -> bool {
+        self.files.iter().any(|(u, _, _)| u == uri)
+    }
+}
+
+/// Undo/redo edit for custom editors.
+#[derive(Debug, Clone)]
+pub struct ZwCustomEdit {
+    pub label: String,
+    pub data: Vec<u8>,
+}
+
+impl ZwCustomEdit {
+    pub fn new(label: &str, data: Vec<u8>) -> Self {
+        Self { label: label.to_string(), data }
+    }
+}
+
+/// A custom document model for custom editors.
+#[derive(Debug, Clone)]
+pub struct ZwCustomDocument {
+    pub uri: String,
+    pub is_dirty: bool,
+    edits: Vec<ZwCustomEdit>,
+    saved_version: usize,
+}
+
+impl ZwCustomDocument {
+    pub fn new(uri: &str) -> Self {
+        Self { uri: uri.to_string(), is_dirty: false, edits: Vec::new(), saved_version: 0 }
+    }
+
+    pub fn apply_edit(&mut self, edit: ZwCustomEdit) {
+        self.edits.push(edit);
+        self.is_dirty = true;
+    }
+
+    pub fn save(&mut self) {
+        self.saved_version = self.edits.len();
+        self.is_dirty = false;
+    }
+
+    pub fn revert(&mut self) {
+        self.edits.truncate(self.saved_version);
+        self.is_dirty = false;
+    }
+
+    pub fn undo(&mut self) -> Option<ZwCustomEdit> {
+        let edit = self.edits.pop();
+        self.is_dirty = self.edits.len() != self.saved_version;
+        edit
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.edits.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -29290,6 +29498,108 @@ mod tests {
         ctrl.dispose_thread(idx);
         assert!(ctrl.thread(idx).unwrap().is_disposed());
         assert_eq!(ctrl.active_thread_count(), 0);
+    }
+
+
+    // --- zw_ custom editor and file system tests ---
+
+    #[test]
+    fn test_zw_file_stat() {
+        let stat = ZwFileStat::file(1024, 5000);
+        assert!(stat.is_file());
+        assert!(!stat.is_directory());
+        assert!(!stat.is_readonly());
+        let ro = stat.with_permissions(0o444);
+        assert!(ro.is_readonly());
+    }
+
+    #[test]
+    fn test_zw_file_stat_directory() {
+        let stat = ZwFileStat::directory(1000);
+        assert!(stat.is_directory());
+        assert!(!stat.is_file());
+        assert_eq!(stat.size, 0);
+    }
+
+    #[test]
+    fn test_zw_file_change_event() {
+        let ev = ZwFileChangeEvent::new("file:///a.txt", ZwFileChangeType::Created);
+        assert_eq!(ev.change_type, ZwFileChangeType::Created);
+    }
+
+    #[test]
+    fn test_zw_directory_entry() {
+        let de = ZwDirectoryEntry::new("hello.rs", ZwFileType::File);
+        assert_eq!(de.name, "hello.rs");
+        assert_eq!(de.file_type, ZwFileType::File);
+    }
+
+    #[test]
+    fn test_zw_memory_fs_write_read() {
+        let mut fs = ZwMemoryFs::new();
+        fs.write_file("file:///a.txt", b"hello", 100);
+        assert_eq!(fs.read_file("file:///a.txt"), Some(b"hello".as_slice()));
+        assert!(fs.exists("file:///a.txt"));
+        assert_eq!(fs.file_count(), 1);
+    }
+
+    #[test]
+    fn test_zw_memory_fs_overwrite() {
+        let mut fs = ZwMemoryFs::new();
+        fs.write_file("f", b"v1", 100);
+        fs.write_file("f", b"v2", 200);
+        assert_eq!(fs.read_file("f"), Some(b"v2".as_slice()));
+        assert_eq!(fs.stat("f").unwrap().mtime, 200);
+        assert_eq!(fs.file_count(), 1);
+    }
+
+    #[test]
+    fn test_zw_memory_fs_delete_rename() {
+        let mut fs = ZwMemoryFs::new();
+        fs.write_file("a", b"data", 1);
+        assert!(fs.rename("a", "b"));
+        assert!(!fs.exists("a"));
+        assert!(fs.exists("b"));
+        assert!(fs.delete("b"));
+        assert!(!fs.exists("b"));
+        assert!(!fs.delete("b"));
+    }
+
+    #[test]
+    fn test_zw_memory_fs_list() {
+        let mut fs = ZwMemoryFs::new();
+        fs.write_file("/dir/a.txt", b"a", 1);
+        fs.write_file("/dir/b.txt", b"b", 1);
+        fs.write_file("/other/c.txt", b"c", 1);
+        let entries = fs.list("/dir");
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn test_zw_custom_document_lifecycle() {
+        let mut doc = ZwCustomDocument::new("file:///img.png");
+        assert!(!doc.is_dirty);
+        doc.apply_edit(ZwCustomEdit::new("draw", vec![1, 2, 3]));
+        assert!(doc.is_dirty);
+        assert_eq!(doc.edit_count(), 1);
+        doc.save();
+        assert!(!doc.is_dirty);
+        doc.apply_edit(ZwCustomEdit::new("erase", vec![4, 5]));
+        assert!(doc.is_dirty);
+        doc.revert();
+        assert!(!doc.is_dirty);
+        assert_eq!(doc.edit_count(), 1);
+    }
+
+    #[test]
+    fn test_zw_custom_document_undo() {
+        let mut doc = ZwCustomDocument::new("f");
+        doc.apply_edit(ZwCustomEdit::new("a", vec![]));
+        doc.apply_edit(ZwCustomEdit::new("b", vec![]));
+        assert!(doc.can_undo());
+        let undone = doc.undo().unwrap();
+        assert_eq!(undone.label, "b");
+        assert_eq!(doc.edit_count(), 1);
     }
 
 }
