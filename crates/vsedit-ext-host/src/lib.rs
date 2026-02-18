@@ -45568,3 +45568,737 @@ goodbye";
     }
 
 }
+
+
+// --- baa_: Editor split/group model ---
+
+/// Direction for splitting an editor group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaaSplitDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+impl BaaSplitDirection {
+    pub fn is_horizontal(self) -> bool {
+        matches!(self, Self::Left | Self::Right)
+    }
+
+    pub fn is_vertical(self) -> bool {
+        matches!(self, Self::Up | Self::Down)
+    }
+
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+        }
+    }
+}
+
+/// Identifies an editor group within the workbench grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BaaGroupId(pub u32);
+
+/// Identifies a single editor (tab) within a group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BaaEditorId(pub u64);
+
+/// Represents a single editor tab within a group.
+#[derive(Debug, Clone)]
+pub struct BaaEditorTab {
+    pub id: BaaEditorId,
+    pub label: String,
+    pub resource_path: Option<String>,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub is_active: bool,
+}
+
+impl BaaEditorTab {
+    pub fn new(id: BaaEditorId, label: &str) -> Self {
+        Self {
+            id,
+            label: label.to_string(),
+            resource_path: None,
+            is_dirty: false,
+            is_pinned: false,
+            is_preview: false,
+            is_active: false,
+        }
+    }
+
+    pub fn with_resource(mut self, path: &str) -> Self {
+        self.resource_path = Some(path.to_string());
+        self
+    }
+
+    pub fn pin(&mut self) {
+        self.is_pinned = true;
+        self.is_preview = false;
+    }
+
+    pub fn unpin(&mut self) {
+        self.is_pinned = false;
+    }
+
+    pub fn mark_dirty(&mut self) {
+        self.is_dirty = true;
+    }
+
+    pub fn mark_clean(&mut self) {
+        self.is_dirty = false;
+    }
+
+    pub fn set_preview(&mut self, preview: bool) {
+        if !self.is_pinned {
+            self.is_preview = preview;
+        }
+    }
+}
+
+/// An editor group holds a list of editor tabs and tracks the active one.
+#[derive(Debug, Clone)]
+pub struct BaaEditorGroup {
+    pub id: BaaGroupId,
+    pub tabs: Vec<BaaEditorTab>,
+    pub active_index: Option<usize>,
+    pub is_active_group: bool,
+    next_editor_id: u64,
+}
+
+impl BaaEditorGroup {
+    pub fn new(id: BaaGroupId) -> Self {
+        Self {
+            id,
+            tabs: Vec::new(),
+            active_index: None,
+            is_active_group: false,
+            next_editor_id: 1,
+        }
+    }
+
+    fn alloc_editor_id(&mut self) -> BaaEditorId {
+        let id = BaaEditorId(self.next_editor_id);
+        self.next_editor_id += 1;
+        id
+    }
+
+    pub fn open_editor(&mut self, label: &str, resource: Option<&str>, preview: bool) -> BaaEditorId {
+        if preview {
+            if let Some(idx) = self.tabs.iter().position(|t| t.is_preview) {
+                let id = self.alloc_editor_id();
+                let mut tab = BaaEditorTab::new(id, label);
+                tab.is_preview = true;
+                if let Some(r) = resource {
+                    tab = tab.with_resource(r);
+                }
+                tab.is_active = true;
+                for t in &mut self.tabs {
+                    t.is_active = false;
+                }
+                self.tabs[idx] = tab;
+                self.active_index = Some(idx);
+                return id;
+            }
+        }
+
+        if let Some(r) = resource {
+            if let Some(idx) = self.tabs.iter().position(|t| {
+                t.resource_path.as_deref() == Some(r)
+            }) {
+                self.set_active(idx);
+                return self.tabs[idx].id;
+            }
+        }
+
+        let id = self.alloc_editor_id();
+        let mut tab = BaaEditorTab::new(id, label);
+        if let Some(r) = resource {
+            tab = tab.with_resource(r);
+        }
+        if preview {
+            tab.is_preview = true;
+        }
+        for t in &mut self.tabs {
+            t.is_active = false;
+        }
+        tab.is_active = true;
+        self.tabs.push(tab);
+        self.active_index = Some(self.tabs.len() - 1);
+        id
+    }
+
+    pub fn close_editor(&mut self, editor_id: BaaEditorId) -> bool {
+        if let Some(idx) = self.tabs.iter().position(|t| t.id == editor_id) {
+            self.tabs.remove(idx);
+            if self.tabs.is_empty() {
+                self.active_index = None;
+            } else if let Some(ai) = self.active_index {
+                if ai == idx {
+                    let new_idx = if idx >= self.tabs.len() { self.tabs.len() - 1 } else { idx };
+                    self.set_active(new_idx);
+                } else if ai > idx {
+                    self.active_index = Some(ai - 1);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn close_all(&mut self) {
+        self.tabs.clear();
+        self.active_index = None;
+    }
+
+    pub fn close_saved(&mut self) {
+        self.tabs.retain(|t| t.is_dirty);
+        if self.tabs.is_empty() {
+            self.active_index = None;
+        } else {
+            self.active_index = Some(0);
+            self.tabs[0].is_active = true;
+        }
+    }
+
+    pub fn set_active(&mut self, index: usize) {
+        if index < self.tabs.len() {
+            for t in &mut self.tabs {
+                t.is_active = false;
+            }
+            self.tabs[index].is_active = true;
+            self.active_index = Some(index);
+            if self.tabs[index].is_preview {
+                self.tabs[index].is_preview = false;
+            }
+        }
+    }
+
+    pub fn active_tab(&self) -> Option<&BaaEditorTab> {
+        self.active_index.and_then(|i| self.tabs.get(i))
+    }
+
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+
+    pub fn dirty_count(&self) -> usize {
+        self.tabs.iter().filter(|t| t.is_dirty).count()
+    }
+
+    pub fn move_tab(&mut self, from: usize, to: usize) {
+        if from < self.tabs.len() && to < self.tabs.len() && from != to {
+            let tab = self.tabs.remove(from);
+            self.tabs.insert(to, tab);
+            if let Some(ai) = self.active_index {
+                if ai == from {
+                    self.active_index = Some(to);
+                } else if from < ai && ai <= to {
+                    self.active_index = Some(ai - 1);
+                } else if to <= ai && ai < from {
+                    self.active_index = Some(ai + 1);
+                }
+            }
+        }
+    }
+
+    pub fn pinned_tabs(&self) -> Vec<&BaaEditorTab> {
+        self.tabs.iter().filter(|t| t.is_pinned).collect()
+    }
+}
+
+/// Orientation of a grid layout split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BaaOrientation {
+    Horizontal,
+    Vertical,
+}
+
+/// A node in the editor grid layout tree.
+#[derive(Debug, Clone)]
+pub enum BaaGridNode {
+    Leaf(BaaGroupId),
+    Branch {
+        orientation: BaaOrientation,
+        children: Vec<BaaGridNode>,
+        ratios: Vec<f64>,
+    },
+}
+
+impl BaaGridNode {
+    pub fn leaf(group_id: BaaGroupId) -> Self {
+        Self::Leaf(group_id)
+    }
+
+    pub fn branch(orientation: BaaOrientation, children: Vec<BaaGridNode>) -> Self {
+        let n = children.len();
+        let ratio = 1.0 / n as f64;
+        Self::Branch {
+            orientation,
+            children,
+            ratios: vec![ratio; n],
+        }
+    }
+
+    pub fn group_ids(&self) -> Vec<BaaGroupId> {
+        match self {
+            Self::Leaf(id) => vec![*id],
+            Self::Branch { children, .. } => {
+                children.iter().flat_map(|c| c.group_ids()).collect()
+            }
+        }
+    }
+
+    pub fn group_count(&self) -> usize {
+        match self {
+            Self::Leaf(_) => 1,
+            Self::Branch { children, .. } => {
+                children.iter().map(|c| c.group_count()).sum()
+            }
+        }
+    }
+
+    pub fn contains_group(&self, id: BaaGroupId) -> bool {
+        match self {
+            Self::Leaf(gid) => *gid == id,
+            Self::Branch { children, .. } => children.iter().any(|c| c.contains_group(id)),
+        }
+    }
+
+    pub fn set_ratio(&mut self, index: usize, ratio: f64) {
+        if let Self::Branch { ratios, .. } = self {
+            if index < ratios.len() {
+                ratios[index] = ratio.clamp(0.1, 0.9);
+            }
+        }
+    }
+}
+
+/// The editor group grid manages the full layout of all editor groups.
+#[derive(Debug, Clone)]
+pub struct BaaEditorGrid {
+    pub root: BaaGridNode,
+    pub groups: Vec<BaaEditorGroup>,
+    pub active_group_id: Option<BaaGroupId>,
+    next_group_id: u32,
+}
+
+impl BaaEditorGrid {
+    pub fn new() -> Self {
+        let group_id = BaaGroupId(1);
+        let group = BaaEditorGroup::new(group_id);
+        Self {
+            root: BaaGridNode::leaf(group_id),
+            groups: vec![group],
+            active_group_id: Some(group_id),
+            next_group_id: 2,
+        }
+    }
+
+    fn alloc_group_id(&mut self) -> BaaGroupId {
+        let id = BaaGroupId(self.next_group_id);
+        self.next_group_id += 1;
+        id
+    }
+
+    pub fn active_group(&self) -> Option<&BaaEditorGroup> {
+        self.active_group_id.and_then(|id| {
+            self.groups.iter().find(|g| g.id == id)
+        })
+    }
+
+    pub fn active_group_mut(&mut self) -> Option<&mut BaaEditorGroup> {
+        let id = self.active_group_id?;
+        self.groups.iter_mut().find(|g| g.id == id)
+    }
+
+    pub fn group(&self, id: BaaGroupId) -> Option<&BaaEditorGroup> {
+        self.groups.iter().find(|g| g.id == id)
+    }
+
+    pub fn group_mut(&mut self, id: BaaGroupId) -> Option<&mut BaaEditorGroup> {
+        self.groups.iter_mut().find(|g| g.id == id)
+    }
+
+    pub fn set_active_group(&mut self, id: BaaGroupId) {
+        for g in &mut self.groups {
+            g.is_active_group = g.id == id;
+        }
+        self.active_group_id = Some(id);
+    }
+
+    pub fn split_group(&mut self, source_id: BaaGroupId, direction: BaaSplitDirection) -> BaaGroupId {
+        let new_id = self.alloc_group_id();
+        let new_group = BaaEditorGroup::new(new_id);
+        self.groups.push(new_group);
+
+        let orientation = if direction.is_horizontal() {
+            BaaOrientation::Horizontal
+        } else {
+            BaaOrientation::Vertical
+        };
+
+        fn split_node(node: &mut BaaGridNode, source: BaaGroupId, new_id: BaaGroupId, orientation: BaaOrientation, direction: BaaSplitDirection) -> bool {
+            match node {
+                BaaGridNode::Leaf(id) if *id == source => {
+                    let left = BaaGridNode::leaf(source);
+                    let right = BaaGridNode::leaf(new_id);
+                    let children = if matches!(direction, BaaSplitDirection::Right | BaaSplitDirection::Down) {
+                        vec![left, right]
+                    } else {
+                        vec![right, left]
+                    };
+                    *node = BaaGridNode::branch(orientation, children);
+                    true
+                }
+                BaaGridNode::Branch { children, .. } => {
+                    for child in children.iter_mut() {
+                        if split_node(child, source, new_id, orientation, direction) {
+                            return true;
+                        }
+                    }
+                    false
+                }
+                _ => false,
+            }
+        }
+
+        split_node(&mut self.root, source_id, new_id, orientation, direction);
+        self.set_active_group(new_id);
+        new_id
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn total_tab_count(&self) -> usize {
+        self.groups.iter().map(|g| g.tab_count()).sum()
+    }
+
+    pub fn close_group(&mut self, id: BaaGroupId) -> bool {
+        if self.groups.len() <= 1 {
+            return false;
+        }
+
+        if let Some(idx) = self.groups.iter().position(|g| g.id == id) {
+            self.groups.remove(idx);
+
+            fn remove_leaf(node: &mut BaaGridNode, id: BaaGroupId) -> bool {
+                if let BaaGridNode::Branch { children, ratios, .. } = node {
+                    if let Some(pos) = children.iter().position(|c| matches!(c, BaaGridNode::Leaf(gid) if *gid == id)) {
+                        children.remove(pos);
+                        ratios.remove(pos);
+                        if children.len() == 1 {
+                            let remaining = children.remove(0);
+                            *node = remaining;
+                        } else {
+                            let n = ratios.len();
+                            let ratio = 1.0 / n as f64;
+                            for r in ratios.iter_mut() {
+                                *r = ratio;
+                            }
+                        }
+                        return true;
+                    }
+                    for child in children.iter_mut() {
+                        if remove_leaf(child, id) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+
+            remove_leaf(&mut self.root, id);
+
+            if self.active_group_id == Some(id) {
+                self.active_group_id = self.groups.first().map(|g| g.id);
+                if let Some(aid) = self.active_group_id {
+                    self.set_active_group(aid);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn move_editor_between_groups(&mut self, editor_label: &str, from: BaaGroupId, to: BaaGroupId) -> bool {
+        let tab_info = {
+            let from_group = match self.groups.iter().find(|g| g.id == from) {
+                Some(g) => g,
+                None => return false,
+            };
+            from_group.tabs.iter().find(|t| t.label == editor_label).map(|t| {
+                (t.label.clone(), t.resource_path.clone(), t.is_dirty, t.is_pinned)
+            })
+        };
+
+        let (label, resource, dirty, pinned) = match tab_info {
+            Some(info) => info,
+            None => return false,
+        };
+
+        // Remove from source
+        if let Some(from_group) = self.groups.iter_mut().find(|g| g.id == from) {
+            if let Some(idx) = from_group.tabs.iter().position(|t| t.label == label) {
+                from_group.tabs.remove(idx);
+                if from_group.tabs.is_empty() {
+                    from_group.active_index = None;
+                } else {
+                    let new_active = idx.min(from_group.tabs.len() - 1);
+                    from_group.set_active(new_active);
+                }
+            }
+        }
+
+        // Add to target
+        if let Some(to_group) = self.groups.iter_mut().find(|g| g.id == to) {
+            let id = to_group.open_editor(&label, resource.as_deref(), false);
+            if let Some(tab) = to_group.tabs.iter_mut().find(|t| t.id == id) {
+                if dirty { tab.mark_dirty(); }
+                if pinned { tab.pin(); }
+            }
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod baa_tests {
+    use super::*;
+
+    #[test]
+    fn test_baa_split_direction_properties() {
+        assert!(BaaSplitDirection::Left.is_horizontal());
+        assert!(BaaSplitDirection::Right.is_horizontal());
+        assert!(BaaSplitDirection::Up.is_vertical());
+        assert!(BaaSplitDirection::Down.is_vertical());
+        assert_eq!(BaaSplitDirection::Left.opposite(), BaaSplitDirection::Right);
+        assert_eq!(BaaSplitDirection::Up.opposite(), BaaSplitDirection::Down);
+    }
+
+    #[test]
+    fn test_baa_editor_tab_creation() {
+        let tab = BaaEditorTab::new(BaaEditorId(1), "test.rs");
+        assert_eq!(tab.label, "test.rs");
+        assert!(!tab.is_dirty);
+        assert!(!tab.is_pinned);
+        assert!(!tab.is_preview);
+
+        let tab = tab.with_resource("/src/test.rs");
+        assert_eq!(tab.resource_path.as_deref(), Some("/src/test.rs"));
+    }
+
+    #[test]
+    fn test_baa_tab_pin_unpin() {
+        let mut tab = BaaEditorTab::new(BaaEditorId(1), "file.rs");
+        tab.is_preview = true;
+        tab.pin();
+        assert!(tab.is_pinned);
+        assert!(!tab.is_preview);
+        tab.unpin();
+        assert!(!tab.is_pinned);
+    }
+
+    #[test]
+    fn test_baa_tab_dirty_clean() {
+        let mut tab = BaaEditorTab::new(BaaEditorId(1), "file.rs");
+        tab.mark_dirty();
+        assert!(tab.is_dirty);
+        tab.mark_clean();
+        assert!(!tab.is_dirty);
+    }
+
+    #[test]
+    fn test_baa_group_open_close() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        assert_eq!(group.tab_count(), 0);
+
+        let id1 = group.open_editor("a.rs", Some("/a.rs"), false);
+        assert_eq!(group.tab_count(), 1);
+        assert!(group.active_tab().is_some());
+        assert_eq!(group.active_tab().unwrap().id, id1);
+
+        let id2 = group.open_editor("b.rs", Some("/b.rs"), false);
+        assert_eq!(group.tab_count(), 2);
+        assert_eq!(group.active_tab().unwrap().id, id2);
+
+        group.close_editor(id2);
+        assert_eq!(group.tab_count(), 1);
+    }
+
+    #[test]
+    fn test_baa_group_preview_replacement() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        group.open_editor("a.rs", Some("/a.rs"), true);
+        assert_eq!(group.tab_count(), 1);
+        assert!(group.tabs[0].is_preview);
+
+        group.open_editor("b.rs", Some("/b.rs"), true);
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.tabs[0].label, "b.rs");
+    }
+
+    #[test]
+    fn test_baa_group_reopen_existing() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        let id1 = group.open_editor("a.rs", Some("/a.rs"), false);
+        group.open_editor("b.rs", Some("/b.rs"), false);
+        let id_reopen = group.open_editor("a.rs", Some("/a.rs"), false);
+        assert_eq!(id1, id_reopen);
+        assert_eq!(group.tab_count(), 2);
+    }
+
+    #[test]
+    fn test_baa_group_close_all_and_saved() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        group.open_editor("a.rs", Some("/a.rs"), false);
+        let id2 = group.open_editor("b.rs", Some("/b.rs"), false);
+        if let Some(tab) = group.tabs.iter_mut().find(|t| t.id == id2) {
+            tab.mark_dirty();
+        }
+        group.close_saved();
+        assert_eq!(group.tab_count(), 1);
+
+        group.close_all();
+        assert_eq!(group.tab_count(), 0);
+    }
+
+    #[test]
+    fn test_baa_group_move_tab() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        group.open_editor("a.rs", None, false);
+        group.open_editor("b.rs", None, false);
+        group.open_editor("c.rs", None, false);
+        assert_eq!(group.tabs[0].label, "a.rs");
+        group.move_tab(2, 0);
+        assert_eq!(group.tabs[0].label, "c.rs");
+        assert_eq!(group.tabs[1].label, "a.rs");
+    }
+
+    #[test]
+    fn test_baa_grid_node_operations() {
+        let node = BaaGridNode::branch(
+            BaaOrientation::Horizontal,
+            vec![BaaGridNode::leaf(BaaGroupId(1)), BaaGridNode::leaf(BaaGroupId(2))],
+        );
+        assert_eq!(node.group_count(), 2);
+        assert!(node.contains_group(BaaGroupId(1)));
+        assert!(!node.contains_group(BaaGroupId(99)));
+        let ids = node.group_ids();
+        assert_eq!(ids, vec![BaaGroupId(1), BaaGroupId(2)]);
+    }
+
+    #[test]
+    fn test_baa_editor_grid_creation() {
+        let grid = BaaEditorGrid::new();
+        assert_eq!(grid.group_count(), 1);
+        assert!(grid.active_group().is_some());
+    }
+
+    #[test]
+    fn test_baa_grid_split() {
+        let mut grid = BaaEditorGrid::new();
+        let initial = grid.active_group_id.unwrap();
+        let new_id = grid.split_group(initial, BaaSplitDirection::Right);
+        assert_eq!(grid.group_count(), 2);
+        assert_eq!(grid.active_group_id, Some(new_id));
+        assert_eq!(grid.root.group_count(), 2);
+    }
+
+    #[test]
+    fn test_baa_grid_close_group() {
+        let mut grid = BaaEditorGrid::new();
+        let initial = grid.active_group_id.unwrap();
+        let new_id = grid.split_group(initial, BaaSplitDirection::Right);
+        assert!(grid.close_group(new_id));
+        assert_eq!(grid.group_count(), 1);
+        assert!(!grid.close_group(initial));
+    }
+
+    #[test]
+    fn test_baa_grid_total_tabs() {
+        let mut grid = BaaEditorGrid::new();
+        let g1 = grid.active_group_id.unwrap();
+        grid.group_mut(g1).unwrap().open_editor("a.rs", None, false);
+        grid.group_mut(g1).unwrap().open_editor("b.rs", None, false);
+        let g2 = grid.split_group(g1, BaaSplitDirection::Down);
+        grid.group_mut(g2).unwrap().open_editor("c.rs", None, false);
+        assert_eq!(grid.total_tab_count(), 3);
+    }
+
+    #[test]
+    fn test_baa_group_dirty_count() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        group.open_editor("a.rs", None, false);
+        group.open_editor("b.rs", None, false);
+        group.tabs[0].mark_dirty();
+        assert_eq!(group.dirty_count(), 1);
+        group.tabs[1].mark_dirty();
+        assert_eq!(group.dirty_count(), 2);
+    }
+
+    #[test]
+    fn test_baa_group_pinned_tabs() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        group.open_editor("a.rs", None, false);
+        group.open_editor("b.rs", None, false);
+        group.tabs[0].pin();
+        let pinned = group.pinned_tabs();
+        assert_eq!(pinned.len(), 1);
+        assert_eq!(pinned[0].label, "a.rs");
+    }
+
+    #[test]
+    fn test_baa_set_preview_on_pinned() {
+        let mut tab = BaaEditorTab::new(BaaEditorId(1), "file.rs");
+        tab.pin();
+        tab.set_preview(true);
+        assert!(!tab.is_preview);
+    }
+
+    #[test]
+    fn test_baa_activate_promotes_preview() {
+        let mut group = BaaEditorGroup::new(BaaGroupId(1));
+        group.open_editor("a.rs", None, false);
+        group.open_editor("b.rs", None, true);
+        assert!(group.tabs[1].is_preview);
+        group.set_active(0);
+        group.set_active(1);
+        assert!(!group.tabs[1].is_preview);
+    }
+
+    #[test]
+    fn test_baa_grid_set_ratio() {
+        let mut node = BaaGridNode::branch(
+            BaaOrientation::Horizontal,
+            vec![BaaGridNode::leaf(BaaGroupId(1)), BaaGridNode::leaf(BaaGroupId(2))],
+        );
+        node.set_ratio(0, 0.7);
+        if let BaaGridNode::Branch { ratios, .. } = &node {
+            assert!((ratios[0] - 0.7).abs() < 0.01);
+        }
+    }
+
+    #[test]
+    fn test_baa_move_editor_between_groups() {
+        let mut grid = BaaEditorGrid::new();
+        let g1 = grid.active_group_id.unwrap();
+        grid.group_mut(g1).unwrap().open_editor("a.rs", Some("/a.rs"), false);
+        let g2 = grid.split_group(g1, BaaSplitDirection::Right);
+        assert!(grid.move_editor_between_groups("a.rs", g1, g2));
+        assert_eq!(grid.group(g1).unwrap().tab_count(), 0);
+        assert_eq!(grid.group(g2).unwrap().tab_count(), 1);
+    }
+}
