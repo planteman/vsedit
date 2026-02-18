@@ -25684,6 +25684,88 @@ impl AzaAnnotation {
     pub fn error(line: u32, msg: &str) -> Self { Self { line, message: msg.to_string(), kind: AzaAnnotationKind::Error } }
 }
 
+
+// --- azb_ source control graph and blame ---
+
+/// SCM blame annotation for a single line.
+#[derive(Debug, Clone)]
+pub struct AzbBlameEntry {
+    pub line: u32,
+    pub commit_hash: String,
+    pub author: String,
+    pub date: String,
+    pub message: String,
+}
+
+impl AzbBlameEntry {
+    pub fn new(line: u32, hash: &str, author: &str, date: &str, msg: &str) -> Self {
+        Self { line, commit_hash: hash.to_string(), author: author.to_string(), date: date.to_string(), message: msg.to_string() }
+    }
+    pub fn short_hash(&self) -> &str {
+        if self.commit_hash.len() >= 7 { &self.commit_hash[..7] } else { &self.commit_hash }
+    }
+    pub fn summary(&self) -> String { format!("{} {} {}", self.short_hash(), self.author, self.message) }
+}
+
+/// Blame result for a file.
+#[derive(Debug)]
+pub struct AzbBlameResult {
+    pub file_path: String,
+    pub entries: Vec<AzbBlameEntry>,
+}
+
+impl AzbBlameResult {
+    pub fn new(path: &str) -> Self { Self { file_path: path.to_string(), entries: Vec::new() } }
+    pub fn add(&mut self, e: AzbBlameEntry) { self.entries.push(e); }
+    pub fn entry_for_line(&self, line: u32) -> Option<&AzbBlameEntry> { self.entries.iter().find(|e| e.line == line) }
+    pub fn unique_authors(&self) -> Vec<&str> {
+        let mut authors: Vec<&str> = self.entries.iter().map(|e| e.author.as_str()).collect();
+        authors.sort(); authors.dedup(); authors
+    }
+    pub fn unique_commits(&self) -> Vec<&str> {
+        let mut commits: Vec<&str> = self.entries.iter().map(|e| e.commit_hash.as_str()).collect();
+        commits.sort(); commits.dedup(); commits
+    }
+}
+
+/// A node in the SCM commit graph.
+#[derive(Debug, Clone)]
+pub struct AzbGraphNode {
+    pub commit_hash: String,
+    pub parents: Vec<String>,
+    pub author: String,
+    pub message: String,
+    pub timestamp: u64,
+    pub branch: Option<String>,
+}
+
+impl AzbGraphNode {
+    pub fn new(hash: &str, author: &str, msg: &str, ts: u64) -> Self {
+        Self { commit_hash: hash.to_string(), parents: Vec::new(), author: author.to_string(), message: msg.to_string(), timestamp: ts, branch: None }
+    }
+    pub fn add_parent(&mut self, p: &str) { self.parents.push(p.to_string()); }
+    pub fn is_merge(&self) -> bool { self.parents.len() > 1 }
+    pub fn is_root(&self) -> bool { self.parents.is_empty() }
+    pub fn set_branch(&mut self, b: &str) { self.branch = Some(b.to_string()); }
+}
+
+/// SCM commit graph.
+#[derive(Debug)]
+pub struct AzbCommitGraph {
+    pub nodes: Vec<AzbGraphNode>,
+}
+
+impl AzbCommitGraph {
+    pub fn new() -> Self { Self { nodes: Vec::new() } }
+    pub fn add_node(&mut self, n: AzbGraphNode) { self.nodes.push(n); }
+    pub fn find_node(&self, hash: &str) -> Option<&AzbGraphNode> { self.nodes.iter().find(|n| n.commit_hash == hash) }
+    pub fn node_count(&self) -> usize { self.nodes.len() }
+    pub fn merge_commits(&self) -> Vec<&AzbGraphNode> { self.nodes.iter().filter(|n| n.is_merge()).collect() }
+    pub fn root_commits(&self) -> Vec<&AzbGraphNode> { self.nodes.iter().filter(|n| n.is_root()).collect() }
+    pub fn by_author(&self, author: &str) -> Vec<&AzbGraphNode> { self.nodes.iter().filter(|n| n.author == author).collect() }
+    pub fn latest(&self) -> Option<&AzbGraphNode> { self.nodes.iter().max_by_key(|n| n.timestamp) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41759,6 +41841,87 @@ d");
         c.add_reaction("+1");
         assert_eq!(c.total_reactions(), 3);
         assert_eq!(c.reactions.len(), 2);
+    }
+
+
+    #[test]
+    fn test_azb_blame_entry() {
+        let e = AzbBlameEntry::new(10, "abc1234def", "alice", "2024-01-01", "fix bug");
+        assert_eq!(e.short_hash(), "abc1234");
+        assert!(e.summary().contains("alice"));
+    }
+
+    #[test]
+    fn test_azb_blame_result() {
+        let mut br = AzbBlameResult::new("src/main.rs");
+        br.add(AzbBlameEntry::new(1, "aaa", "alice", "d1", "m1"));
+        br.add(AzbBlameEntry::new(2, "bbb", "bob", "d2", "m2"));
+        br.add(AzbBlameEntry::new(3, "aaa", "alice", "d3", "m3"));
+        assert_eq!(br.unique_authors().len(), 2);
+        assert_eq!(br.unique_commits().len(), 2);
+        assert!(br.entry_for_line(2).is_some());
+        assert!(br.entry_for_line(99).is_none());
+    }
+
+    #[test]
+    fn test_azb_graph_node() {
+        let mut n = AzbGraphNode::new("abc", "alice", "init", 1000);
+        assert!(n.is_root());
+        assert!(!n.is_merge());
+        n.add_parent("parent1");
+        n.add_parent("parent2");
+        assert!(n.is_merge());
+        assert!(!n.is_root());
+    }
+
+    #[test]
+    fn test_azb_commit_graph() {
+        let mut g = AzbCommitGraph::new();
+        let mut root = AzbGraphNode::new("r", "alice", "init", 100);
+        root.set_branch("main");
+        g.add_node(root);
+        let mut c1 = AzbGraphNode::new("c1", "bob", "feat", 200);
+        c1.add_parent("r");
+        g.add_node(c1);
+        let mut merge = AzbGraphNode::new("m", "alice", "merge", 300);
+        merge.add_parent("c1");
+        merge.add_parent("r");
+        g.add_node(merge);
+        assert_eq!(g.node_count(), 3);
+        assert_eq!(g.merge_commits().len(), 1);
+        assert_eq!(g.root_commits().len(), 1);
+        assert_eq!(g.by_author("alice").len(), 2);
+    }
+
+    #[test]
+    fn test_azb_graph_latest() {
+        let mut g = AzbCommitGraph::new();
+        g.add_node(AzbGraphNode::new("a", "x", "old", 100));
+        g.add_node(AzbGraphNode::new("b", "y", "new", 500));
+        g.add_node(AzbGraphNode::new("c", "z", "mid", 300));
+        assert_eq!(g.latest().unwrap().commit_hash, "b");
+    }
+
+    #[test]
+    fn test_azb_find_node() {
+        let mut g = AzbCommitGraph::new();
+        g.add_node(AzbGraphNode::new("abc", "a", "m", 1));
+        assert!(g.find_node("abc").is_some());
+        assert!(g.find_node("xyz").is_none());
+    }
+
+    #[test]
+    fn test_azb_branch_annotation() {
+        let mut n = AzbGraphNode::new("x", "a", "m", 1);
+        assert!(n.branch.is_none());
+        n.set_branch("feature/foo");
+        assert_eq!(n.branch.as_deref(), Some("feature/foo"));
+    }
+
+    #[test]
+    fn test_azb_blame_short_hash() {
+        let e = AzbBlameEntry::new(1, "abc", "a", "d", "m");
+        assert_eq!(e.short_hash(), "abc");
     }
 
 }
