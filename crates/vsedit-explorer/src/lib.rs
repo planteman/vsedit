@@ -21678,6 +21678,95 @@ impl AxmGitRepo {
     }
 }
 
+
+// --- axn_ terminal multiplexer and PTY types ---
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AxnShellType { Bash, Zsh, Fish, Powershell, Cmd, Custom(String) }
+
+impl AxnShellType {
+    pub fn default_path(&self) -> &str {
+        match self { Self::Bash => "/bin/bash", Self::Zsh => "/bin/zsh", Self::Fish => "/usr/bin/fish", Self::Powershell => "pwsh", Self::Cmd => "cmd.exe", Self::Custom(p) => p }
+    }
+    pub fn label(&self) -> &str {
+        match self { Self::Bash => "bash", Self::Zsh => "zsh", Self::Fish => "fish", Self::Powershell => "PowerShell", Self::Cmd => "Command Prompt", Self::Custom(_) => "Custom" }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AxnTerminalSize { pub cols: u16, pub rows: u16 }
+
+impl AxnTerminalSize {
+    pub fn new(cols: u16, rows: u16) -> Self { Self { cols, rows } }
+    pub fn default_size() -> Self { Self { cols: 80, rows: 24 } }
+    pub fn cell_count(&self) -> u32 { self.cols as u32 * self.rows as u32 }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxnTerminalState { Starting, Running, Exited(i32) }
+
+impl AxnTerminalState {
+    pub fn is_running(&self) -> bool { matches!(self, Self::Running) }
+    pub fn exit_code(&self) -> Option<i32> { if let Self::Exited(c) = self { Some(*c) } else { None } }
+}
+
+#[derive(Debug, Clone)]
+pub struct AxnTerminalInstance {
+    pub id: u32, pub name: String, pub shell: AxnShellType, pub cwd: String,
+    pub size: AxnTerminalSize, pub state: AxnTerminalState, pub pid: Option<u32>,
+    output_buffer: Vec<String>, input_buffer: Vec<String>,
+    pub icon: Option<String>, pub color: Option<String>,
+}
+
+impl AxnTerminalInstance {
+    pub fn new(id: u32, name: &str, shell: AxnShellType, cwd: &str) -> Self {
+        Self { id, name: name.to_string(), shell, cwd: cwd.to_string(), size: AxnTerminalSize::default_size(), state: AxnTerminalState::Starting, pid: None, output_buffer: Vec::new(), input_buffer: Vec::new(), icon: None, color: None }
+    }
+    pub fn start(&mut self, pid: u32) { self.pid = Some(pid); self.state = AxnTerminalState::Running; }
+    pub fn write_output(&mut self, data: &str) { self.output_buffer.push(data.to_string()); }
+    pub fn send_input(&mut self, data: &str) { self.input_buffer.push(data.to_string()); }
+    pub fn drain_output(&mut self) -> Vec<String> { std::mem::take(&mut self.output_buffer) }
+    pub fn drain_input(&mut self) -> Vec<String> { std::mem::take(&mut self.input_buffer) }
+    pub fn resize(&mut self, size: AxnTerminalSize) { self.size = size; }
+    pub fn exit(&mut self, code: i32) { self.state = AxnTerminalState::Exited(code); self.pid = None; }
+    pub fn is_running(&self) -> bool { self.state.is_running() }
+    pub fn set_name(&mut self, name: &str) { self.name = name.to_string(); }
+    pub fn set_icon(&mut self, icon: &str) { self.icon = Some(icon.to_string()); }
+    pub fn set_color(&mut self, color: &str) { self.color = Some(color.to_string()); }
+}
+
+#[derive(Debug, Clone)]
+pub struct AxnTerminalManager {
+    terminals: Vec<AxnTerminalInstance>, active_id: Option<u32>, next_id: u32,
+    default_shell: AxnShellType, default_cwd: String,
+}
+
+impl AxnTerminalManager {
+    pub fn new(default_shell: AxnShellType, default_cwd: &str) -> Self {
+        Self { terminals: Vec::new(), active_id: None, next_id: 1, default_shell, default_cwd: default_cwd.to_string() }
+    }
+    pub fn create(&mut self, name: Option<&str>) -> u32 {
+        let id = self.next_id; self.next_id += 1;
+        let n = name.unwrap_or_else(|| self.default_shell.label());
+        let term = AxnTerminalInstance::new(id, n, self.default_shell.clone(), &self.default_cwd);
+        self.terminals.push(term);
+        if self.active_id.is_none() { self.active_id = Some(id); }
+        id
+    }
+    pub fn get(&self, id: u32) -> Option<&AxnTerminalInstance> { self.terminals.iter().find(|t| t.id == id) }
+    pub fn get_mut(&mut self, id: u32) -> Option<&mut AxnTerminalInstance> { self.terminals.iter_mut().find(|t| t.id == id) }
+    pub fn set_active(&mut self, id: u32) { self.active_id = Some(id); }
+    pub fn active(&self) -> Option<&AxnTerminalInstance> { self.active_id.and_then(|id| self.get(id)) }
+    pub fn terminate(&mut self, id: u32) { if let Some(t) = self.get_mut(id) { t.exit(-1); } }
+    pub fn dispose(&mut self, id: u32) {
+        self.terminals.retain(|t| t.id != id);
+        if self.active_id == Some(id) { self.active_id = self.terminals.first().map(|t| t.id); }
+    }
+    pub fn count(&self) -> usize { self.terminals.len() }
+    pub fn running_count(&self) -> usize { self.terminals.iter().filter(|t| t.is_running()).count() }
+    pub fn ids(&self) -> Vec<u32> { self.terminals.iter().map(|t| t.id).collect() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34760,6 +34849,74 @@ mod tests {
         assert!(!repo.is_in_progress());
         repo.is_rebasing = true;
         assert!(repo.is_in_progress());
+    }
+
+
+    #[test]
+    fn test_axn_shell_type() {
+        assert_eq!(AxnShellType::Bash.default_path(), "/bin/bash");
+        assert_eq!(AxnShellType::Zsh.label(), "zsh");
+    }
+
+    #[test]
+    fn test_axn_terminal_size() {
+        let s = AxnTerminalSize::default_size();
+        assert_eq!(s.cell_count(), 1920);
+    }
+
+    #[test]
+    fn test_axn_terminal_state() {
+        assert!(AxnTerminalState::Running.is_running());
+        assert_eq!(AxnTerminalState::Exited(0).exit_code(), Some(0));
+    }
+
+    #[test]
+    fn test_axn_terminal_instance() {
+        let mut t = AxnTerminalInstance::new(1, "bash", AxnShellType::Bash, "/home");
+        t.start(1234);
+        assert!(t.is_running());
+        t.write_output("hello");
+        assert_eq!(t.drain_output(), vec!["hello"]);
+    }
+
+    #[test]
+    fn test_axn_terminal_io() {
+        let mut t = AxnTerminalInstance::new(1, "t", AxnShellType::Bash, "/");
+        t.send_input("ls");
+        assert_eq!(t.drain_input().len(), 1);
+    }
+
+    #[test]
+    fn test_axn_terminal_resize_exit() {
+        let mut t = AxnTerminalInstance::new(1, "t", AxnShellType::Bash, "/");
+        t.start(100);
+        t.resize(AxnTerminalSize::new(120, 40));
+        assert_eq!(t.size.cols, 120);
+        t.exit(0);
+        assert!(!t.is_running());
+    }
+
+    #[test]
+    fn test_axn_terminal_manager() {
+        let mut mgr = AxnTerminalManager::new(AxnShellType::Bash, "/home");
+        let id1 = mgr.create(Some("T1"));
+        let id2 = mgr.create(None);
+        assert_eq!(mgr.count(), 2);
+        assert_eq!(mgr.active().unwrap().id, id1);
+        mgr.set_active(id2);
+        assert_eq!(mgr.active().unwrap().id, id2);
+    }
+
+    #[test]
+    fn test_axn_terminal_manager_lifecycle() {
+        let mut mgr = AxnTerminalManager::new(AxnShellType::Zsh, "/");
+        let id = mgr.create(Some("test"));
+        mgr.get_mut(id).unwrap().start(999);
+        assert_eq!(mgr.running_count(), 1);
+        mgr.terminate(id);
+        assert_eq!(mgr.running_count(), 0);
+        mgr.dispose(id);
+        assert_eq!(mgr.count(), 0);
     }
 
 }
