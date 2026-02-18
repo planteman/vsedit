@@ -25419,6 +25419,95 @@ impl AywCellExecution {
     pub fn is_running(&self) -> bool { self.state == AywExecState::Running }
 }
 
+
+// --- ayx_ timeline and local history ---
+
+/// Timeline entry source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyxTimelineSource { LocalHistory, Git, Extension }
+
+/// A timeline entry.
+#[derive(Debug, Clone)]
+pub struct AyxTimelineEntry {
+    pub id: String,
+    pub timestamp: u64,
+    pub label: String,
+    pub source: AyxTimelineSource,
+    pub detail: Option<String>,
+}
+
+impl AyxTimelineEntry {
+    pub fn local_history(id: &str, ts: u64, label: &str) -> Self {
+        Self { id: id.to_string(), timestamp: ts, label: label.to_string(), source: AyxTimelineSource::LocalHistory, detail: None }
+    }
+    pub fn git_commit(id: &str, ts: u64, msg: &str) -> Self {
+        Self { id: id.to_string(), timestamp: ts, label: msg.to_string(), source: AyxTimelineSource::Git, detail: None }
+    }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn is_git(&self) -> bool { self.source == AyxTimelineSource::Git }
+}
+
+/// Local history snapshot.
+#[derive(Debug, Clone)]
+pub struct AyxLocalHistoryEntry {
+    pub entry_id: String,
+    pub timestamp: u64,
+    pub content_hash: u64,
+    pub size_bytes: u64,
+}
+
+impl AyxLocalHistoryEntry {
+    pub fn new(id: &str, ts: u64, hash: u64, size: u64) -> Self {
+        Self { entry_id: id.to_string(), timestamp: ts, content_hash: hash, size_bytes: size }
+    }
+}
+
+/// Timeline provider for a file.
+#[derive(Debug)]
+pub struct AyxTimeline {
+    pub entries: Vec<AyxTimelineEntry>,
+    pub file_path: String,
+    pub max_entries: usize,
+}
+
+impl AyxTimeline {
+    pub fn new(path: &str, max: usize) -> Self {
+        Self { entries: Vec::new(), file_path: path.to_string(), max_entries: max }
+    }
+    pub fn add_entry(&mut self, e: AyxTimelineEntry) {
+        self.entries.push(e);
+        self.entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        if self.entries.len() > self.max_entries { self.entries.truncate(self.max_entries); }
+    }
+    pub fn latest(&self) -> Option<&AyxTimelineEntry> { self.entries.first() }
+    pub fn by_source(&self, src: AyxTimelineSource) -> Vec<&AyxTimelineEntry> {
+        self.entries.iter().filter(|e| e.source == src).collect()
+    }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn clear(&mut self) { self.entries.clear(); }
+    pub fn entries_between(&self, start: u64, end: u64) -> Vec<&AyxTimelineEntry> {
+        self.entries.iter().filter(|e| e.timestamp >= start && e.timestamp <= end).collect()
+    }
+}
+
+/// Local history store.
+#[derive(Debug)]
+pub struct AyxLocalHistoryStore {
+    pub snapshots: Vec<AyxLocalHistoryEntry>,
+    pub max_snapshots: usize,
+}
+
+impl AyxLocalHistoryStore {
+    pub fn new(max: usize) -> Self { Self { snapshots: Vec::new(), max_snapshots: max } }
+    pub fn add_snapshot(&mut self, s: AyxLocalHistoryEntry) {
+        self.snapshots.push(s);
+        if self.snapshots.len() > self.max_snapshots { self.snapshots.remove(0); }
+    }
+    pub fn snapshot_count(&self) -> usize { self.snapshots.len() }
+    pub fn total_bytes(&self) -> u64 { self.snapshots.iter().map(|s| s.size_bytes).sum() }
+    pub fn latest_snapshot(&self) -> Option<&AyxLocalHistoryEntry> { self.snapshots.last() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40944,6 +41033,79 @@ d");
         assert_eq!(c.line_count(), 4);
         let empty = AywNotebookCell::code("py", "");
         assert_eq!(empty.line_count(), 1);
+    }
+
+
+    #[test]
+    fn test_ayx_timeline_entry() {
+        let e = AyxTimelineEntry::local_history("lh1", 1000, "Saved");
+        assert_eq!(e.source, AyxTimelineSource::LocalHistory);
+        assert!(!e.is_git());
+        let g = AyxTimelineEntry::git_commit("abc123", 2000, "fix bug");
+        assert!(g.is_git());
+    }
+
+    #[test]
+    fn test_ayx_entry_detail() {
+        let e = AyxTimelineEntry::git_commit("a", 100, "msg").with_detail("SHA: abc");
+        assert_eq!(e.detail.as_deref(), Some("SHA: abc"));
+    }
+
+    #[test]
+    fn test_ayx_timeline_ordering() {
+        let mut tl = AyxTimeline::new("file.rs", 10);
+        tl.add_entry(AyxTimelineEntry::local_history("a", 100, "old"));
+        tl.add_entry(AyxTimelineEntry::local_history("b", 300, "new"));
+        tl.add_entry(AyxTimelineEntry::git_commit("c", 200, "mid"));
+        assert_eq!(tl.latest().unwrap().timestamp, 300);
+        assert_eq!(tl.entry_count(), 3);
+    }
+
+    #[test]
+    fn test_ayx_timeline_max() {
+        let mut tl = AyxTimeline::new("f.rs", 2);
+        tl.add_entry(AyxTimelineEntry::local_history("a", 1, "1"));
+        tl.add_entry(AyxTimelineEntry::local_history("b", 2, "2"));
+        tl.add_entry(AyxTimelineEntry::local_history("c", 3, "3"));
+        assert_eq!(tl.entry_count(), 2);
+        assert_eq!(tl.latest().unwrap().timestamp, 3);
+    }
+
+    #[test]
+    fn test_ayx_by_source() {
+        let mut tl = AyxTimeline::new("f.rs", 10);
+        tl.add_entry(AyxTimelineEntry::local_history("a", 1, "s"));
+        tl.add_entry(AyxTimelineEntry::git_commit("b", 2, "c"));
+        assert_eq!(tl.by_source(AyxTimelineSource::Git).len(), 1);
+    }
+
+    #[test]
+    fn test_ayx_entries_between() {
+        let mut tl = AyxTimeline::new("f.rs", 10);
+        tl.add_entry(AyxTimelineEntry::local_history("a", 100, "x"));
+        tl.add_entry(AyxTimelineEntry::local_history("b", 200, "y"));
+        tl.add_entry(AyxTimelineEntry::local_history("c", 300, "z"));
+        assert_eq!(tl.entries_between(150, 250).len(), 1);
+    }
+
+    #[test]
+    fn test_ayx_local_history_store() {
+        let mut store = AyxLocalHistoryStore::new(3);
+        store.add_snapshot(AyxLocalHistoryEntry::new("s1", 100, 111, 500));
+        store.add_snapshot(AyxLocalHistoryEntry::new("s2", 200, 222, 600));
+        assert_eq!(store.snapshot_count(), 2);
+        assert_eq!(store.total_bytes(), 1100);
+        assert_eq!(store.latest_snapshot().unwrap().entry_id, "s2");
+    }
+
+    #[test]
+    fn test_ayx_local_history_eviction() {
+        let mut store = AyxLocalHistoryStore::new(2);
+        store.add_snapshot(AyxLocalHistoryEntry::new("a", 1, 0, 10));
+        store.add_snapshot(AyxLocalHistoryEntry::new("b", 2, 0, 20));
+        store.add_snapshot(AyxLocalHistoryEntry::new("c", 3, 0, 30));
+        assert_eq!(store.snapshot_count(), 2);
+        assert_eq!(store.snapshots[0].entry_id, "b");
     }
 
 }
