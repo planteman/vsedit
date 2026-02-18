@@ -46717,3 +46717,465 @@ mod bab_tests {
         assert_eq!(gutters[0].change_type, BabDiffChangeType::Deleted);
     }
 }
+
+
+// --- bac_: Output channel model ---
+
+/// Output channel severity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BacOutputLevel {
+    Trace,
+    Debug,
+    Info,
+    Warning,
+    Error,
+}
+
+impl BacOutputLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Trace => "trace",
+            Self::Debug => "debug",
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            Self::Trace => "[TRACE]",
+            Self::Debug => "[DEBUG]",
+            Self::Info => "[INFO]",
+            Self::Warning => "[WARN]",
+            Self::Error => "[ERROR]",
+        }
+    }
+
+    pub fn from_str_level(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "trace" => Some(Self::Trace),
+            "debug" => Some(Self::Debug),
+            "info" => Some(Self::Info),
+            "warning" | "warn" => Some(Self::Warning),
+            "error" | "err" => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
+
+/// A single output line with timestamp and level.
+#[derive(Debug, Clone)]
+pub struct BacOutputLine {
+    pub timestamp_ms: u64,
+    pub level: BacOutputLevel,
+    pub text: String,
+    pub source: Option<String>,
+}
+
+impl BacOutputLine {
+    pub fn new(level: BacOutputLevel, text: &str, timestamp_ms: u64) -> Self {
+        Self {
+            timestamp_ms,
+            level,
+            text: text.to_string(),
+            source: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self {
+        self.source = Some(source.to_string());
+        self
+    }
+
+    pub fn formatted(&self) -> String {
+        format!("{} {}", self.level.prefix(), self.text)
+    }
+
+    pub fn formatted_with_time(&self) -> String {
+        let secs = self.timestamp_ms / 1000;
+        let ms = self.timestamp_ms % 1000;
+        format!("[{}.{:03}] {} {}", secs, ms, self.level.prefix(), self.text)
+    }
+}
+
+/// An output channel that accumulates log lines.
+#[derive(Debug, Clone)]
+pub struct BacOutputChannel {
+    pub name: String,
+    pub language_id: Option<String>,
+    lines: Vec<BacOutputLine>,
+    max_lines: usize,
+    is_visible: bool,
+    is_log_channel: bool,
+    filter_level: Option<BacOutputLevel>,
+}
+
+impl BacOutputChannel {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            language_id: None,
+            lines: Vec::new(),
+            max_lines: 10_000,
+            is_visible: false,
+            is_log_channel: false,
+            filter_level: None,
+        }
+    }
+
+    pub fn log_channel(name: &str) -> Self {
+        let mut ch = Self::new(name);
+        ch.is_log_channel = true;
+        ch.language_id = Some("log".to_string());
+        ch
+    }
+
+    pub fn append(&mut self, text: &str, level: BacOutputLevel, timestamp_ms: u64) {
+        let line = BacOutputLine::new(level, text, timestamp_ms);
+        self.lines.push(line);
+        self.trim_lines();
+    }
+
+    pub fn append_line(&mut self, text: &str, level: BacOutputLevel, timestamp_ms: u64) {
+        self.append(text, level, timestamp_ms);
+    }
+
+    fn trim_lines(&mut self) {
+        if self.lines.len() > self.max_lines {
+            let excess = self.lines.len() - self.max_lines;
+            self.lines.drain(0..excess);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.lines.clear();
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn lines(&self) -> &[BacOutputLine] {
+        &self.lines
+    }
+
+    pub fn filtered_lines(&self) -> Vec<&BacOutputLine> {
+        match self.filter_level {
+            Some(level) => self.lines.iter().filter(|l| l.level >= level).collect(),
+            None => self.lines.iter().collect(),
+        }
+    }
+
+    pub fn set_filter_level(&mut self, level: Option<BacOutputLevel>) {
+        self.filter_level = level;
+    }
+
+    pub fn show(&mut self) {
+        self.is_visible = true;
+    }
+
+    pub fn hide(&mut self) {
+        self.is_visible = false;
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    pub fn is_log_channel(&self) -> bool {
+        self.is_log_channel
+    }
+
+    pub fn search(&self, query: &str) -> Vec<usize> {
+        let query_lower = query.to_lowercase();
+        self.lines.iter().enumerate()
+            .filter(|(_, l)| l.text.to_lowercase().contains(&query_lower))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.lines.iter().filter(|l| l.level == BacOutputLevel::Error).count()
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.lines.iter().filter(|l| l.level == BacOutputLevel::Warning).count()
+    }
+
+    pub fn last_line(&self) -> Option<&BacOutputLine> {
+        self.lines.last()
+    }
+
+    pub fn tail(&self, n: usize) -> &[BacOutputLine] {
+        let start = self.lines.len().saturating_sub(n);
+        &self.lines[start..]
+    }
+}
+
+/// Manager for all output channels in the workbench.
+#[derive(Debug, Clone)]
+pub struct BacOutputChannelManager {
+    pub channels: Vec<BacOutputChannel>,
+    pub active_channel: Option<usize>,
+}
+
+impl BacOutputChannelManager {
+    pub fn new() -> Self {
+        Self {
+            channels: Vec::new(),
+            active_channel: None,
+        }
+    }
+
+    pub fn create_channel(&mut self, name: &str) -> usize {
+        if let Some(idx) = self.channel_index(name) {
+            return idx;
+        }
+        self.channels.push(BacOutputChannel::new(name));
+        self.channels.len() - 1
+    }
+
+    pub fn create_log_channel(&mut self, name: &str) -> usize {
+        if let Some(idx) = self.channel_index(name) {
+            return idx;
+        }
+        self.channels.push(BacOutputChannel::log_channel(name));
+        self.channels.len() - 1
+    }
+
+    pub fn channel_index(&self, name: &str) -> Option<usize> {
+        self.channels.iter().position(|c| c.name == name)
+    }
+
+    pub fn channel(&self, name: &str) -> Option<&BacOutputChannel> {
+        self.channels.iter().find(|c| c.name == name)
+    }
+
+    pub fn channel_mut(&mut self, name: &str) -> Option<&mut BacOutputChannel> {
+        self.channels.iter_mut().find(|c| c.name == name)
+    }
+
+    pub fn set_active(&mut self, name: &str) -> bool {
+        if let Some(idx) = self.channel_index(name) {
+            self.active_channel = Some(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn active_channel(&self) -> Option<&BacOutputChannel> {
+        self.active_channel.and_then(|idx| self.channels.get(idx))
+    }
+
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.channels.iter().map(|c| c.name.as_str()).collect()
+    }
+
+    pub fn channel_count(&self) -> usize {
+        self.channels.len()
+    }
+
+    pub fn remove_channel(&mut self, name: &str) -> bool {
+        if let Some(idx) = self.channel_index(name) {
+            self.channels.remove(idx);
+            if self.active_channel == Some(idx) {
+                self.active_channel = if self.channels.is_empty() { None } else { Some(0) };
+            } else if let Some(ai) = self.active_channel {
+                if ai > idx {
+                    self.active_channel = Some(ai - 1);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn total_error_count(&self) -> usize {
+        self.channels.iter().map(|c| c.error_count()).sum()
+    }
+}
+
+#[cfg(test)]
+mod bac_tests {
+    use super::*;
+
+    #[test]
+    fn test_bac_output_level_ordering() {
+        assert!(BacOutputLevel::Trace < BacOutputLevel::Debug);
+        assert!(BacOutputLevel::Debug < BacOutputLevel::Info);
+        assert!(BacOutputLevel::Info < BacOutputLevel::Warning);
+        assert!(BacOutputLevel::Warning < BacOutputLevel::Error);
+    }
+
+    #[test]
+    fn test_bac_level_from_str() {
+        assert_eq!(BacOutputLevel::from_str_level("info"), Some(BacOutputLevel::Info));
+        assert_eq!(BacOutputLevel::from_str_level("WARN"), Some(BacOutputLevel::Warning));
+        assert_eq!(BacOutputLevel::from_str_level("err"), Some(BacOutputLevel::Error));
+        assert_eq!(BacOutputLevel::from_str_level("unknown"), None);
+    }
+
+    #[test]
+    fn test_bac_output_line_formatting() {
+        let line = BacOutputLine::new(BacOutputLevel::Info, "hello world", 1500);
+        assert_eq!(line.formatted(), "[INFO] hello world");
+        assert_eq!(line.formatted_with_time(), "[1.500] [INFO] hello world");
+    }
+
+    #[test]
+    fn test_bac_output_line_with_source() {
+        let line = BacOutputLine::new(BacOutputLevel::Error, "fail", 0)
+            .with_source("extension.js");
+        assert_eq!(line.source.as_deref(), Some("extension.js"));
+    }
+
+    #[test]
+    fn test_bac_channel_append_and_count() {
+        let mut ch = BacOutputChannel::new("Test");
+        ch.append("line 1", BacOutputLevel::Info, 100);
+        ch.append("line 2", BacOutputLevel::Warning, 200);
+        ch.append("line 3", BacOutputLevel::Error, 300);
+        assert_eq!(ch.line_count(), 3);
+        assert_eq!(ch.error_count(), 1);
+        assert_eq!(ch.warning_count(), 1);
+    }
+
+    #[test]
+    fn test_bac_channel_trim() {
+        let mut ch = BacOutputChannel::new("Test");
+        ch.max_lines = 5;
+        for i in 0..10 {
+            ch.append(&format!("line {}", i), BacOutputLevel::Info, i as u64 * 100);
+        }
+        assert_eq!(ch.line_count(), 5);
+        assert_eq!(ch.lines[0].text, "line 5");
+    }
+
+    #[test]
+    fn test_bac_channel_filter() {
+        let mut ch = BacOutputChannel::new("Test");
+        ch.append("trace", BacOutputLevel::Trace, 100);
+        ch.append("info", BacOutputLevel::Info, 200);
+        ch.append("error", BacOutputLevel::Error, 300);
+
+        ch.set_filter_level(Some(BacOutputLevel::Info));
+        let filtered = ch.filtered_lines();
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_bac_channel_search() {
+        let mut ch = BacOutputChannel::new("Test");
+        ch.append("hello world", BacOutputLevel::Info, 100);
+        ch.append("goodbye world", BacOutputLevel::Info, 200);
+        ch.append("hello again", BacOutputLevel::Info, 300);
+
+        let results = ch.search("hello");
+        assert_eq!(results, vec![0, 2]);
+    }
+
+    #[test]
+    fn test_bac_channel_visibility() {
+        let mut ch = BacOutputChannel::new("Test");
+        assert!(!ch.is_visible());
+        ch.show();
+        assert!(ch.is_visible());
+        ch.hide();
+        assert!(!ch.is_visible());
+    }
+
+    #[test]
+    fn test_bac_channel_tail() {
+        let mut ch = BacOutputChannel::new("Test");
+        for i in 0..10 {
+            ch.append(&format!("line {}", i), BacOutputLevel::Info, i as u64 * 100);
+        }
+        let tail = ch.tail(3);
+        assert_eq!(tail.len(), 3);
+        assert_eq!(tail[0].text, "line 7");
+    }
+
+    #[test]
+    fn test_bac_log_channel() {
+        let ch = BacOutputChannel::log_channel("Git");
+        assert!(ch.is_log_channel());
+        assert_eq!(ch.language_id.as_deref(), Some("log"));
+    }
+
+    #[test]
+    fn test_bac_manager_create_and_find() {
+        let mut mgr = BacOutputChannelManager::new();
+        let idx1 = mgr.create_channel("Output");
+        let idx2 = mgr.create_channel("Git");
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(mgr.channel_count(), 2);
+
+        // Duplicate returns existing
+        let idx3 = mgr.create_channel("Output");
+        assert_eq!(idx3, 0);
+        assert_eq!(mgr.channel_count(), 2);
+    }
+
+    #[test]
+    fn test_bac_manager_active() {
+        let mut mgr = BacOutputChannelManager::new();
+        mgr.create_channel("A");
+        mgr.create_channel("B");
+        assert!(mgr.set_active("B"));
+        assert_eq!(mgr.active_channel().unwrap().name, "B");
+        assert!(!mgr.set_active("C"));
+    }
+
+    #[test]
+    fn test_bac_manager_remove() {
+        let mut mgr = BacOutputChannelManager::new();
+        mgr.create_channel("A");
+        mgr.create_channel("B");
+        mgr.set_active("A");
+        assert!(mgr.remove_channel("A"));
+        assert_eq!(mgr.channel_count(), 1);
+        assert_eq!(mgr.active_channel().unwrap().name, "B");
+    }
+
+    #[test]
+    fn test_bac_manager_names() {
+        let mut mgr = BacOutputChannelManager::new();
+        mgr.create_channel("Alpha");
+        mgr.create_channel("Beta");
+        let names = mgr.channel_names();
+        assert_eq!(names, vec!["Alpha", "Beta"]);
+    }
+
+    #[test]
+    fn test_bac_manager_total_errors() {
+        let mut mgr = BacOutputChannelManager::new();
+        mgr.create_channel("A");
+        mgr.create_channel("B");
+        mgr.channel_mut("A").unwrap().append("err1", BacOutputLevel::Error, 100);
+        mgr.channel_mut("B").unwrap().append("err2", BacOutputLevel::Error, 200);
+        mgr.channel_mut("B").unwrap().append("info", BacOutputLevel::Info, 300);
+        assert_eq!(mgr.total_error_count(), 2);
+    }
+
+    #[test]
+    fn test_bac_channel_clear() {
+        let mut ch = BacOutputChannel::new("Test");
+        ch.append("line", BacOutputLevel::Info, 100);
+        assert_eq!(ch.line_count(), 1);
+        ch.clear();
+        assert_eq!(ch.line_count(), 0);
+    }
+
+    #[test]
+    fn test_bac_channel_last_line() {
+        let mut ch = BacOutputChannel::new("Test");
+        assert!(ch.last_line().is_none());
+        ch.append("first", BacOutputLevel::Info, 100);
+        ch.append("second", BacOutputLevel::Info, 200);
+        assert_eq!(ch.last_line().unwrap().text, "second");
+    }
+}
