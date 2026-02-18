@@ -27249,6 +27249,102 @@ impl AzyContextMenu {
     pub fn action_count(&self) -> usize { self.items.iter().filter(|i| i.kind == AzyMenuItemKind::Action).count() }
 }
 
+
+// --- azz_ editor quick input and pick model ---
+
+/// Quick pick item.
+#[derive(Debug, Clone)]
+pub struct AzzQuickPickItem {
+    pub label: String,
+    pub description: Option<String>,
+    pub detail: Option<String>,
+    pub picked: bool,
+    pub always_show: bool,
+    pub value: Option<String>,
+}
+
+impl AzzQuickPickItem {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), description: None, detail: None, picked: false, always_show: false, value: None }
+    }
+    pub fn with_description(mut self, d: &str) -> Self { self.description = Some(d.to_string()); self }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn with_value(mut self, v: &str) -> Self { self.value = Some(v.to_string()); self }
+    pub fn set_picked(&mut self, p: bool) { self.picked = p; }
+    pub fn display_text(&self) -> String {
+        if let Some(d) = &self.description { format!("{} - {}", self.label, d) } else { self.label.clone() }
+    }
+}
+
+/// Quick pick state.
+#[derive(Debug)]
+pub struct AzzQuickPick {
+    pub items: Vec<AzzQuickPickItem>,
+    pub filter: String,
+    pub placeholder: String,
+    pub title: Option<String>,
+    pub selected_index: usize,
+    pub multi_select: bool,
+    pub visible: bool,
+}
+
+impl AzzQuickPick {
+    pub fn new(placeholder: &str) -> Self {
+        Self { items: Vec::new(), filter: String::new(), placeholder: placeholder.to_string(), title: None, selected_index: 0, multi_select: false, visible: false }
+    }
+    pub fn set_items(&mut self, items: Vec<AzzQuickPickItem>) { self.items = items; self.selected_index = 0; }
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); }
+    pub fn set_title(&mut self, t: &str) { self.title = Some(t.to_string()); }
+    pub fn show(&mut self) { self.visible = true; }
+    pub fn hide(&mut self) { self.visible = false; }
+    pub fn filtered_items(&self) -> Vec<(usize, &AzzQuickPickItem)> {
+        if self.filter.is_empty() { return self.items.iter().enumerate().collect(); }
+        let f = self.filter.to_lowercase();
+        self.items.iter().enumerate().filter(|(_, i)| i.always_show || i.label.to_lowercase().contains(&f) || i.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&f))).collect()
+    }
+    pub fn select_next(&mut self) {
+        let count = self.filtered_items().len();
+        if count > 0 { self.selected_index = (self.selected_index + 1) % count; }
+    }
+    pub fn select_prev(&mut self) {
+        let count = self.filtered_items().len();
+        if count > 0 { self.selected_index = if self.selected_index == 0 { count - 1 } else { self.selected_index - 1 }; }
+    }
+    pub fn toggle_pick(&mut self) {
+        if self.multi_select {
+            let filtered = self.filtered_items();
+            if let Some((orig_idx, _)) = filtered.get(self.selected_index) {
+                let idx = *orig_idx;
+                self.items[idx].picked = !self.items[idx].picked;
+            }
+        }
+    }
+    pub fn picked_items(&self) -> Vec<&AzzQuickPickItem> { self.items.iter().filter(|i| i.picked).collect() }
+    pub fn item_count(&self) -> usize { self.items.len() }
+}
+
+/// Quick input box.
+#[derive(Debug)]
+pub struct AzzInputBox {
+    pub value: String,
+    pub placeholder: String,
+    pub title: Option<String>,
+    pub password: bool,
+    pub validation_message: Option<String>,
+    pub visible: bool,
+}
+
+impl AzzInputBox {
+    pub fn new(placeholder: &str) -> Self {
+        Self { value: String::new(), placeholder: placeholder.to_string(), title: None, password: false, validation_message: None, visible: false }
+    }
+    pub fn set_value(&mut self, v: &str) { self.value = v.to_string(); }
+    pub fn set_password(&mut self, p: bool) { self.password = p; }
+    pub fn set_validation(&mut self, msg: Option<&str>) { self.validation_message = msg.map(|s| s.to_string()); }
+    pub fn is_valid(&self) -> bool { self.validation_message.is_none() }
+    pub fn display_value(&self) -> String { if self.password { "*".repeat(self.value.len()) } else { self.value.clone() } }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45219,6 +45315,94 @@ goodbye";
         let item = AzyMenuItem::action("a", "A").with_group("navigation", 1);
         assert_eq!(item.group.as_deref(), Some("navigation"));
         assert_eq!(item.order, 1);
+    }
+
+
+    #[test]
+    fn test_azz_quick_pick_item() {
+        let item = AzzQuickPickItem::new("Open File").with_description("main.rs");
+        assert_eq!(item.display_text(), "Open File - main.rs");
+    }
+
+    #[test]
+    fn test_azz_quick_pick() {
+        let mut qp = AzzQuickPick::new("Select item...");
+        qp.set_items(vec![
+            AzzQuickPickItem::new("Alpha"),
+            AzzQuickPickItem::new("Beta"),
+            AzzQuickPickItem::new("Gamma"),
+        ]);
+        assert_eq!(qp.item_count(), 3);
+        assert_eq!(qp.filtered_items().len(), 3);
+        qp.set_filter("bet");
+        assert_eq!(qp.filtered_items().len(), 1);
+    }
+
+    #[test]
+    fn test_azz_navigation() {
+        let mut qp = AzzQuickPick::new("Pick");
+        qp.set_items(vec![
+            AzzQuickPickItem::new("A"),
+            AzzQuickPickItem::new("B"),
+            AzzQuickPickItem::new("C"),
+        ]);
+        qp.select_next();
+        assert_eq!(qp.selected_index, 1);
+        qp.select_next();
+        assert_eq!(qp.selected_index, 2);
+        qp.select_next();
+        assert_eq!(qp.selected_index, 0);
+    }
+
+    #[test]
+    fn test_azz_multi_select() {
+        let mut qp = AzzQuickPick::new("Multi");
+        qp.multi_select = true;
+        qp.set_items(vec![
+            AzzQuickPickItem::new("A"),
+            AzzQuickPickItem::new("B"),
+        ]);
+        qp.toggle_pick();
+        assert_eq!(qp.picked_items().len(), 1);
+        qp.select_next();
+        qp.toggle_pick();
+        assert_eq!(qp.picked_items().len(), 2);
+    }
+
+    #[test]
+    fn test_azz_input_box() {
+        let mut ib = AzzInputBox::new("Enter name...");
+        ib.set_value("hello");
+        assert!(ib.is_valid());
+        assert_eq!(ib.display_value(), "hello");
+    }
+
+    #[test]
+    fn test_azz_password_input() {
+        let mut ib = AzzInputBox::new("Password");
+        ib.set_password(true);
+        ib.set_value("secret");
+        assert_eq!(ib.display_value(), "******");
+    }
+
+    #[test]
+    fn test_azz_validation() {
+        let mut ib = AzzInputBox::new("Name");
+        assert!(ib.is_valid());
+        ib.set_validation(Some("Name is required"));
+        assert!(!ib.is_valid());
+        ib.set_validation(None);
+        assert!(ib.is_valid());
+    }
+
+    #[test]
+    fn test_azz_always_show() {
+        let mut qp = AzzQuickPick::new("Pick");
+        let mut item = AzzQuickPickItem::new("Special");
+        item.always_show = true;
+        qp.set_items(vec![item, AzzQuickPickItem::new("Normal")]);
+        qp.set_filter("zzzzz");
+        assert_eq!(qp.filtered_items().len(), 1);
     }
 
 }
