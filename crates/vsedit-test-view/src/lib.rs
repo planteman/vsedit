@@ -21048,6 +21048,246 @@ impl AxjNotificationCenter {
     pub fn active_count(&self) -> usize { self.notifications.iter().filter(|n| !n.is_dismissed()).count() }
 }
 
+
+// --- axk_ editor cursor model and selection logic ---
+
+/// A cursor position in a document (line, column).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AxkCursorPosition {
+    pub line: u32,
+    pub column: u32,
+}
+
+impl AxkCursorPosition {
+    pub fn new(line: u32, column: u32) -> Self {
+        Self { line, column }
+    }
+
+    pub fn origin() -> Self { Self { line: 0, column: 0 } }
+
+    pub fn move_right(&self, max_col: u32) -> Self {
+        if self.column < max_col {
+            Self { line: self.line, column: self.column + 1 }
+        } else {
+            *self
+        }
+    }
+
+    pub fn move_left(&self) -> Self {
+        Self { line: self.line, column: self.column.saturating_sub(1) }
+    }
+
+    pub fn move_up(&self) -> Self {
+        Self { line: self.line.saturating_sub(1), column: self.column }
+    }
+
+    pub fn move_down(&self, max_line: u32) -> Self {
+        if self.line < max_line {
+            Self { line: self.line + 1, column: self.column }
+        } else {
+            *self
+        }
+    }
+
+    pub fn start_of_line(&self) -> Self {
+        Self { line: self.line, column: 0 }
+    }
+
+    pub fn end_of_line(&self, line_len: u32) -> Self {
+        Self { line: self.line, column: line_len }
+    }
+
+    pub fn clamp_column(&self, line_len: u32) -> Self {
+        Self { line: self.line, column: self.column.min(line_len) }
+    }
+}
+
+/// A selection range with anchor and active positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxkSelection {
+    pub anchor: AxkCursorPosition,
+    pub active: AxkCursorPosition,
+}
+
+impl AxkSelection {
+    pub fn new(anchor: AxkCursorPosition, active: AxkCursorPosition) -> Self {
+        Self { anchor, active }
+    }
+
+    pub fn caret(pos: AxkCursorPosition) -> Self {
+        Self { anchor: pos, active: pos }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.anchor == self.active
+    }
+
+    pub fn is_reversed(&self) -> bool {
+        self.anchor > self.active
+    }
+
+    pub fn start(&self) -> AxkCursorPosition {
+        if self.anchor <= self.active { self.anchor } else { self.active }
+    }
+
+    pub fn end(&self) -> AxkCursorPosition {
+        if self.anchor >= self.active { self.anchor } else { self.active }
+    }
+
+    pub fn line_count(&self) -> u32 {
+        let s = self.start();
+        let e = self.end();
+        e.line - s.line + 1
+    }
+
+    pub fn contains(&self, pos: AxkCursorPosition) -> bool {
+        pos >= self.start() && pos <= self.end()
+    }
+
+    pub fn extend_to(&self, pos: AxkCursorPosition) -> Self {
+        Self { anchor: self.anchor, active: pos }
+    }
+
+    pub fn select_line(line: u32, line_len: u32) -> Self {
+        Self {
+            anchor: AxkCursorPosition::new(line, 0),
+            active: AxkCursorPosition::new(line, line_len),
+        }
+    }
+}
+
+/// Cursor style/shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxkCursorStyle {
+    Line,
+    Block,
+    Underline,
+    LineThin,
+    BlockOutline,
+    UnderlineThin,
+}
+
+/// Multi-cursor state (VS Code supports multiple cursors).
+#[derive(Debug, Clone)]
+pub struct AxkMultiCursor {
+    pub selections: Vec<AxkSelection>,
+    pub style: AxkCursorStyle,
+    pub desired_column: Option<u32>,
+}
+
+impl AxkMultiCursor {
+    pub fn new(pos: AxkCursorPosition) -> Self {
+        Self {
+            selections: vec![AxkSelection::caret(pos)],
+            style: AxkCursorStyle::Line,
+            desired_column: None,
+        }
+    }
+
+    pub fn primary(&self) -> AxkSelection {
+        self.selections.last().cloned().unwrap_or_else(|| AxkSelection::caret(AxkCursorPosition::origin()))
+    }
+
+    pub fn primary_position(&self) -> AxkCursorPosition {
+        self.primary().active
+    }
+
+    pub fn set_position(&mut self, pos: AxkCursorPosition) {
+        self.selections = vec![AxkSelection::caret(pos)];
+        self.desired_column = Some(pos.column);
+    }
+
+    pub fn set_selection(&mut self, sel: AxkSelection) {
+        self.selections = vec![sel];
+    }
+
+    pub fn add_cursor(&mut self, pos: AxkCursorPosition) {
+        // Don't add duplicate
+        if !self.selections.iter().any(|s| s.active == pos && s.is_empty()) {
+            self.selections.push(AxkSelection::caret(pos));
+        }
+    }
+
+    pub fn add_selection(&mut self, sel: AxkSelection) {
+        self.selections.push(sel);
+    }
+
+    pub fn remove_cursor(&mut self, idx: usize) {
+        if self.selections.len() > 1 && idx < self.selections.len() {
+            self.selections.remove(idx);
+        }
+    }
+
+    pub fn cursor_count(&self) -> usize {
+        self.selections.len()
+    }
+
+    pub fn has_multiple(&self) -> bool {
+        self.selections.len() > 1
+    }
+
+    pub fn has_selection(&self) -> bool {
+        self.selections.iter().any(|s| !s.is_empty())
+    }
+
+    pub fn collapse_to_single(&mut self) {
+        if let Some(last) = self.selections.last().cloned() {
+            self.selections = vec![last];
+        }
+    }
+
+    pub fn move_all_right(&mut self, max_cols: &[u32]) {
+        for (i, sel) in self.selections.iter_mut().enumerate() {
+            let max = max_cols.get(sel.active.line as usize).copied().unwrap_or(0);
+            let new_pos = sel.active.move_right(max);
+            *sel = AxkSelection::caret(new_pos);
+        }
+        self.desired_column = self.selections.last().map(|s| s.active.column);
+    }
+
+    pub fn move_all_left(&mut self) {
+        for sel in &mut self.selections {
+            let new_pos = sel.active.move_left();
+            *sel = AxkSelection::caret(new_pos);
+        }
+        self.desired_column = self.selections.last().map(|s| s.active.column);
+    }
+
+    pub fn move_all_up(&mut self) {
+        for sel in &mut self.selections {
+            let mut new_pos = sel.active.move_up();
+            if let Some(dc) = self.desired_column {
+                new_pos.column = dc;
+            }
+            *sel = AxkSelection::caret(new_pos);
+        }
+    }
+
+    pub fn move_all_down(&mut self, max_line: u32) {
+        for sel in &mut self.selections {
+            let mut new_pos = sel.active.move_down(max_line);
+            if let Some(dc) = self.desired_column {
+                new_pos.column = dc;
+            }
+            *sel = AxkSelection::caret(new_pos);
+        }
+    }
+
+    pub fn select_all_right(&mut self, max_cols: &[u32]) {
+        for sel in &mut self.selections {
+            let max = max_cols.get(sel.active.line as usize).copied().unwrap_or(0);
+            let new_active = sel.active.move_right(max);
+            sel.active = new_active;
+        }
+    }
+
+    pub fn select_all_left(&mut self) {
+        for sel in &mut self.selections {
+            sel.active = sel.active.move_left();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -33829,6 +34069,133 @@ mod tests {
         nc.show(AxjNotification::info("3"));
         assert_eq!(nc.visible().len(), 2); // capped at max_visible
         assert_eq!(nc.total_count(), 3);
+    }
+
+
+    // --- axk_ cursor model and selection tests ---
+
+    #[test]
+    fn test_axk_cursor_position_movement() {
+        let p = AxkCursorPosition::new(5, 10);
+        assert_eq!(p.move_right(20), AxkCursorPosition::new(5, 11));
+        assert_eq!(p.move_right(10), AxkCursorPosition::new(5, 10)); // at max
+        assert_eq!(p.move_left(), AxkCursorPosition::new(5, 9));
+        assert_eq!(p.move_up(), AxkCursorPosition::new(4, 10));
+        assert_eq!(p.move_down(100), AxkCursorPosition::new(6, 10));
+    }
+
+    #[test]
+    fn test_axk_cursor_position_boundaries() {
+        let p = AxkCursorPosition::origin();
+        assert_eq!(p.move_left(), AxkCursorPosition::origin());
+        assert_eq!(p.move_up(), AxkCursorPosition::origin());
+        let bottom = AxkCursorPosition::new(10, 5);
+        assert_eq!(bottom.move_down(10), AxkCursorPosition::new(10, 5)); // at max
+    }
+
+    #[test]
+    fn test_axk_cursor_line_ops() {
+        let p = AxkCursorPosition::new(3, 7);
+        assert_eq!(p.start_of_line(), AxkCursorPosition::new(3, 0));
+        assert_eq!(p.end_of_line(20), AxkCursorPosition::new(3, 20));
+        assert_eq!(p.clamp_column(5), AxkCursorPosition::new(3, 5));
+    }
+
+    #[test]
+    fn test_axk_selection_empty() {
+        let sel = AxkSelection::caret(AxkCursorPosition::new(1, 5));
+        assert!(sel.is_empty());
+        assert_eq!(sel.line_count(), 1);
+    }
+
+    #[test]
+    fn test_axk_selection_range() {
+        let sel = AxkSelection::new(
+            AxkCursorPosition::new(1, 0),
+            AxkCursorPosition::new(3, 10),
+        );
+        assert!(!sel.is_empty());
+        assert!(!sel.is_reversed());
+        assert_eq!(sel.start(), AxkCursorPosition::new(1, 0));
+        assert_eq!(sel.end(), AxkCursorPosition::new(3, 10));
+        assert_eq!(sel.line_count(), 3);
+    }
+
+    #[test]
+    fn test_axk_selection_reversed() {
+        let sel = AxkSelection::new(
+            AxkCursorPosition::new(5, 0),
+            AxkCursorPosition::new(2, 0),
+        );
+        assert!(sel.is_reversed());
+        assert_eq!(sel.start(), AxkCursorPosition::new(2, 0));
+        assert_eq!(sel.end(), AxkCursorPosition::new(5, 0));
+    }
+
+    #[test]
+    fn test_axk_selection_contains() {
+        let sel = AxkSelection::new(
+            AxkCursorPosition::new(1, 5),
+            AxkCursorPosition::new(3, 10),
+        );
+        assert!(sel.contains(AxkCursorPosition::new(2, 0)));
+        assert!(!sel.contains(AxkCursorPosition::new(0, 0)));
+    }
+
+    #[test]
+    fn test_axk_selection_extend() {
+        let sel = AxkSelection::caret(AxkCursorPosition::new(1, 0));
+        let extended = sel.extend_to(AxkCursorPosition::new(3, 5));
+        assert_eq!(extended.anchor, AxkCursorPosition::new(1, 0));
+        assert_eq!(extended.active, AxkCursorPosition::new(3, 5));
+    }
+
+    #[test]
+    fn test_axk_selection_select_line() {
+        let sel = AxkSelection::select_line(5, 40);
+        assert_eq!(sel.anchor, AxkCursorPosition::new(5, 0));
+        assert_eq!(sel.active, AxkCursorPosition::new(5, 40));
+    }
+
+    #[test]
+    fn test_axk_multi_cursor() {
+        let mut mc = AxkMultiCursor::new(AxkCursorPosition::new(0, 0));
+        assert_eq!(mc.cursor_count(), 1);
+        assert!(!mc.has_multiple());
+        mc.add_cursor(AxkCursorPosition::new(1, 0));
+        assert_eq!(mc.cursor_count(), 2);
+        assert!(mc.has_multiple());
+        mc.add_cursor(AxkCursorPosition::new(1, 0)); // duplicate
+        assert_eq!(mc.cursor_count(), 2);
+    }
+
+    #[test]
+    fn test_axk_multi_cursor_movement() {
+        let mut mc = AxkMultiCursor::new(AxkCursorPosition::new(0, 5));
+        mc.add_cursor(AxkCursorPosition::new(1, 5));
+        mc.move_all_right(&[10, 10]);
+        assert_eq!(mc.selections[0].active.column, 6);
+        assert_eq!(mc.selections[1].active.column, 6);
+        mc.move_all_left();
+        assert_eq!(mc.selections[0].active.column, 5);
+    }
+
+    #[test]
+    fn test_axk_multi_cursor_collapse() {
+        let mut mc = AxkMultiCursor::new(AxkCursorPosition::new(0, 0));
+        mc.add_cursor(AxkCursorPosition::new(1, 0));
+        mc.add_cursor(AxkCursorPosition::new(2, 0));
+        mc.collapse_to_single();
+        assert_eq!(mc.cursor_count(), 1);
+        assert_eq!(mc.primary_position(), AxkCursorPosition::new(2, 0));
+    }
+
+    #[test]
+    fn test_axk_multi_cursor_selection() {
+        let mut mc = AxkMultiCursor::new(AxkCursorPosition::new(0, 0));
+        mc.select_all_right(&[20]);
+        assert!(!mc.selections[0].is_empty());
+        assert!(mc.has_selection());
     }
 
 }
