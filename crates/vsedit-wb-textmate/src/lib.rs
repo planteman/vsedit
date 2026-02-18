@@ -21985,6 +21985,115 @@ impl AxpWorkspace {
     pub fn is_workspace_file(&self) -> bool { self.config_path.is_some() }
 }
 
+
+// --- axq_ editor minimap and scroll management ---
+
+/// Scroll position in the editor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AxqScrollPosition {
+    pub top_line: u32,
+    pub left_col: u32,
+    pub viewport_height: u32,
+    pub viewport_width: u32,
+}
+
+impl AxqScrollPosition {
+    pub fn new(height: u32, width: u32) -> Self {
+        Self { top_line: 0, left_col: 0, viewport_height: height, viewport_width: width }
+    }
+    pub fn bottom_line(&self) -> u32 { self.top_line + self.viewport_height.saturating_sub(1) }
+    pub fn is_line_visible(&self, line: u32) -> bool { line >= self.top_line && line <= self.bottom_line() }
+    pub fn scroll_to(&mut self, line: u32) { self.top_line = line; }
+    pub fn scroll_by(&mut self, delta: i32) {
+        self.top_line = (self.top_line as i64 + delta as i64).max(0) as u32;
+    }
+    pub fn ensure_visible(&mut self, line: u32, margin: u32) {
+        if line < self.top_line + margin { self.top_line = line.saturating_sub(margin); }
+        else if line > self.bottom_line().saturating_sub(margin) {
+            self.top_line = line.saturating_sub(self.viewport_height.saturating_sub(1).saturating_sub(margin));
+        }
+    }
+    pub fn center_on(&mut self, line: u32) {
+        self.top_line = line.saturating_sub(self.viewport_height / 2);
+    }
+    pub fn page_up(&mut self) { self.scroll_by(-(self.viewport_height as i32)); }
+    pub fn page_down(&mut self) { self.scroll_by(self.viewport_height as i32); }
+    pub fn half_page_up(&mut self) { self.scroll_by(-(self.viewport_height as i32 / 2)); }
+    pub fn half_page_down(&mut self) { self.scroll_by(self.viewport_height as i32 / 2); }
+}
+
+/// Minimap rendering mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxqMinimapMode { Proportional, Fill, Fit }
+
+/// A minimap slider tracking current viewport position.
+#[derive(Debug, Clone)]
+pub struct AxqMinimapSlider {
+    pub top_ratio: f64,
+    pub height_ratio: f64,
+}
+
+impl AxqMinimapSlider {
+    pub fn compute(scroll: &AxqScrollPosition, total_lines: u32) -> Self {
+        if total_lines == 0 { return Self { top_ratio: 0.0, height_ratio: 1.0 }; }
+        let top_ratio = scroll.top_line as f64 / total_lines as f64;
+        let height_ratio = (scroll.viewport_height as f64 / total_lines as f64).min(1.0);
+        Self { top_ratio, height_ratio }
+    }
+    pub fn bottom_ratio(&self) -> f64 { (self.top_ratio + self.height_ratio).min(1.0) }
+}
+
+/// Minimap model for rendering a compressed view.
+#[derive(Debug)]
+pub struct AxqMinimap {
+    pub enabled: bool,
+    pub mode: AxqMinimapMode,
+    pub width: u32,
+    pub line_colors: Vec<(u8, u8, u8)>,
+}
+
+impl AxqMinimap {
+    pub fn new(width: u32) -> Self {
+        Self { enabled: true, mode: AxqMinimapMode::Proportional, width, line_colors: Vec::new() }
+    }
+    pub fn set_mode(&mut self, mode: AxqMinimapMode) { self.mode = mode; }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn set_line_colors(&mut self, colors: Vec<(u8, u8, u8)>) { self.line_colors = colors; }
+    pub fn color_for_line(&self, line: usize) -> Option<(u8, u8, u8)> { self.line_colors.get(line).copied() }
+    pub fn visible_lines(&self, scroll: &AxqScrollPosition, total_lines: u32) -> (u32, u32) {
+        match self.mode {
+            AxqMinimapMode::Fill => (0, total_lines),
+            AxqMinimapMode::Fit => (0, total_lines),
+            AxqMinimapMode::Proportional => (scroll.top_line, scroll.bottom_line().min(total_lines)),
+        }
+    }
+}
+
+/// Smooth scroll animation state.
+#[derive(Debug, Clone)]
+pub struct AxqSmoothScroll {
+    pub target_line: u32,
+    pub current_line: f64,
+    pub duration_ms: u32,
+    pub elapsed_ms: u32,
+}
+
+impl AxqSmoothScroll {
+    pub fn new(from: u32, to: u32, duration_ms: u32) -> Self {
+        Self { target_line: to, current_line: from as f64, duration_ms, elapsed_ms: 0 }
+    }
+    pub fn is_complete(&self) -> bool { self.elapsed_ms >= self.duration_ms }
+    pub fn tick(&mut self, delta_ms: u32) {
+        self.elapsed_ms = (self.elapsed_ms + delta_ms).min(self.duration_ms);
+        let t = self.elapsed_ms as f64 / self.duration_ms as f64;
+        let eased = t * t * (3.0 - 2.0 * t);
+        let start = self.current_line;
+        let target = self.target_line as f64;
+        self.current_line = start + (target - start) * eased;
+    }
+    pub fn current_position(&self) -> u32 { self.current_line.round() as u32 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35363,6 +35472,81 @@ mod tests {
         ws.remove_folder("file:///a");
         assert_eq!(ws.folders[0].index, 0);
         assert_eq!(ws.folders[1].index, 1);
+    }
+
+
+    #[test]
+    fn test_axq_scroll_position_basic() {
+        let mut sp = AxqScrollPosition::new(40, 80);
+        assert_eq!(sp.top_line, 0);
+        assert_eq!(sp.bottom_line(), 39);
+        assert!(sp.is_line_visible(0));
+        assert!(!sp.is_line_visible(40));
+        sp.scroll_to(10);
+        assert_eq!(sp.top_line, 10);
+    }
+
+    #[test]
+    fn test_axq_scroll_ensure_visible() {
+        let mut sp = AxqScrollPosition::new(20, 80);
+        sp.ensure_visible(25, 3);
+        assert!(sp.is_line_visible(25));
+    }
+
+    #[test]
+    fn test_axq_scroll_center_and_page() {
+        let mut sp = AxqScrollPosition::new(40, 80);
+        sp.center_on(100);
+        assert!(sp.is_line_visible(100));
+        let top = sp.top_line;
+        sp.page_down();
+        assert_eq!(sp.top_line, top + 40);
+        sp.page_up();
+        assert_eq!(sp.top_line, top);
+    }
+
+    #[test]
+    fn test_axq_minimap_slider() {
+        let sp = AxqScrollPosition { top_line: 50, left_col: 0, viewport_height: 40, viewport_width: 80 };
+        let slider = AxqMinimapSlider::compute(&sp, 1000);
+        assert!(slider.top_ratio > 0.0);
+        assert!(slider.height_ratio > 0.0);
+        assert!(slider.bottom_ratio() <= 1.0);
+    }
+
+    #[test]
+    fn test_axq_minimap_toggle() {
+        let mut mm = AxqMinimap::new(10);
+        assert!(mm.enabled);
+        mm.toggle();
+        assert!(!mm.enabled);
+    }
+
+    #[test]
+    fn test_axq_minimap_colors() {
+        let mut mm = AxqMinimap::new(10);
+        mm.set_line_colors(vec![(255, 0, 0), (0, 255, 0)]);
+        assert_eq!(mm.color_for_line(0), Some((255, 0, 0)));
+        assert_eq!(mm.color_for_line(2), None);
+    }
+
+    #[test]
+    fn test_axq_smooth_scroll() {
+        let mut ss = AxqSmoothScroll::new(0, 100, 200);
+        assert!(!ss.is_complete());
+        ss.tick(100);
+        assert!(!ss.is_complete());
+        ss.tick(100);
+        assert!(ss.is_complete());
+    }
+
+    #[test]
+    fn test_axq_half_page() {
+        let mut sp = AxqScrollPosition::new(40, 80);
+        sp.half_page_down();
+        assert_eq!(sp.top_line, 20);
+        sp.half_page_up();
+        assert_eq!(sp.top_line, 0);
     }
 
 }
