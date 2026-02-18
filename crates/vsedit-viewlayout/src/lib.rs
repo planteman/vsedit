@@ -16199,6 +16199,157 @@ impl std::fmt::Display for ZnStatusBarItem {
     }
 }
 
+
+// --- zo_ extension manifest and context types ---
+
+/// An extension activation event.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ZoActivationEvent {
+    OnLanguage(String),
+    OnCommand(String),
+    OnDebug,
+    OnDebugResolve(String),
+    OnUri,
+    WorkspaceContains(String),
+    OnFileSystem(String),
+    OnView(String),
+    OnStartupFinished,
+    Star,
+}
+
+impl ZoActivationEvent {
+    pub fn parse(s: &str) -> Option<Self> {
+        if s == "*" { return Some(ZoActivationEvent::Star); }
+        if s == "onDebug" { return Some(ZoActivationEvent::OnDebug); }
+        if s == "onUri" { return Some(ZoActivationEvent::OnUri); }
+        if s == "onStartupFinished" { return Some(ZoActivationEvent::OnStartupFinished); }
+        if let Some(lang) = s.strip_prefix("onLanguage:") { return Some(ZoActivationEvent::OnLanguage(lang.to_string())); }
+        if let Some(cmd) = s.strip_prefix("onCommand:") { return Some(ZoActivationEvent::OnCommand(cmd.to_string())); }
+        if let Some(dt) = s.strip_prefix("onDebugResolve:") { return Some(ZoActivationEvent::OnDebugResolve(dt.to_string())); }
+        if let Some(glob) = s.strip_prefix("workspaceContains:") { return Some(ZoActivationEvent::WorkspaceContains(glob.to_string())); }
+        if let Some(scheme) = s.strip_prefix("onFileSystem:") { return Some(ZoActivationEvent::OnFileSystem(scheme.to_string())); }
+        if let Some(view) = s.strip_prefix("onView:") { return Some(ZoActivationEvent::OnView(view.to_string())); }
+        None
+    }
+
+    pub fn is_eager(&self) -> bool { matches!(self, ZoActivationEvent::Star) }
+}
+
+impl std::fmt::Display for ZoActivationEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZoActivationEvent::OnLanguage(l) => write!(f, "onLanguage:{}", l),
+            ZoActivationEvent::OnCommand(c) => write!(f, "onCommand:{}", c),
+            ZoActivationEvent::OnDebug => write!(f, "onDebug"),
+            ZoActivationEvent::OnDebugResolve(d) => write!(f, "onDebugResolve:{}", d),
+            ZoActivationEvent::OnUri => write!(f, "onUri"),
+            ZoActivationEvent::WorkspaceContains(g) => write!(f, "workspaceContains:{}", g),
+            ZoActivationEvent::OnFileSystem(s) => write!(f, "onFileSystem:{}", s),
+            ZoActivationEvent::OnView(v) => write!(f, "onView:{}", v),
+            ZoActivationEvent::OnStartupFinished => write!(f, "onStartupFinished"),
+            ZoActivationEvent::Star => write!(f, "*"),
+        }
+    }
+}
+
+/// An extension contribution point.
+#[derive(Debug, Clone)]
+pub struct ZoContribution {
+    pub kind: String,
+    pub id: String,
+    pub title: Option<String>,
+}
+
+impl ZoContribution {
+    pub fn new(kind: &str, id: &str) -> Self {
+        Self { kind: kind.to_string(), id: id.to_string(), title: None }
+    }
+
+    pub fn with_title(mut self, t: &str) -> Self { self.title = Some(t.to_string()); self }
+}
+
+impl std::fmt::Display for ZoContribution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZoContribution({}: {})", self.kind, self.id)
+    }
+}
+
+/// An extension manifest (package.json equivalent).
+#[derive(Debug, Clone)]
+pub struct ZoExtensionManifest {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub publisher: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub categories: Vec<String>,
+    pub activation_events: Vec<ZoActivationEvent>,
+    pub contributions: Vec<ZoContribution>,
+    pub dependencies: Vec<String>,
+    pub main: Option<String>,
+    pub engines_vscode: Option<String>,
+}
+
+impl ZoExtensionManifest {
+    pub fn new(publisher: &str, name: &str, version: &str) -> Self {
+        Self {
+            id: format!("{}.{}", publisher, name),
+            name: name.to_string(), version: version.to_string(), publisher: publisher.to_string(),
+            display_name: None, description: None, categories: Vec::new(),
+            activation_events: Vec::new(), contributions: Vec::new(),
+            dependencies: Vec::new(), main: None, engines_vscode: None,
+        }
+    }
+
+    pub fn add_activation(&mut self, event: ZoActivationEvent) { self.activation_events.push(event); }
+    pub fn add_contribution(&mut self, contrib: ZoContribution) { self.contributions.push(contrib); }
+    pub fn add_category(&mut self, cat: &str) { self.categories.push(cat.to_string()); }
+
+    pub fn is_eager(&self) -> bool { self.activation_events.iter().any(|e| e.is_eager()) }
+    pub fn activates_on_language(&self, lang: &str) -> bool {
+        self.activation_events.iter().any(|e| matches!(e, ZoActivationEvent::OnLanguage(l) if l == lang))
+    }
+}
+
+impl std::fmt::Display for ZoExtensionManifest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZoExtensionManifest({} v{})", self.id, self.version)
+    }
+}
+
+/// Extension runtime context provided on activation.
+#[derive(Debug, Clone)]
+pub struct ZoExtensionContext {
+    pub extension_id: String,
+    pub extension_path: String,
+    pub storage_path: Option<String>,
+    pub global_storage_path: Option<String>,
+    pub log_path: Option<String>,
+    pub subscriptions: Vec<String>,
+    pub is_active: bool,
+}
+
+impl ZoExtensionContext {
+    pub fn new(id: &str, path: &str) -> Self {
+        Self { extension_id: id.to_string(), extension_path: path.to_string(),
+               storage_path: None, global_storage_path: None, log_path: None,
+               subscriptions: Vec::new(), is_active: false }
+    }
+
+    pub fn activate(&mut self) { self.is_active = true; }
+    pub fn deactivate(&mut self) { self.is_active = false; }
+    pub fn add_subscription(&mut self, sub: &str) { self.subscriptions.push(sub.to_string()); }
+    pub fn subscription_count(&self) -> usize { self.subscriptions.len() }
+}
+
+impl std::fmt::Display for ZoExtensionContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = if self.is_active { "active" } else { "inactive" };
+        write!(f, "ZoExtensionContext({} [{}])", self.extension_id, state)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -26840,6 +26991,99 @@ mod tests {
     fn test_zn_status_bar_display() {
         let item = ZnStatusBarItem::new("id", "text");
         assert!(format!("{}", item).contains("ZnStatusBarItem"));
+    }
+
+
+    // --- zo_ tests ---
+
+    #[test]
+    fn test_zo_activation_event_parse() {
+        assert_eq!(ZoActivationEvent::parse("*"), Some(ZoActivationEvent::Star));
+        assert_eq!(ZoActivationEvent::parse("onLanguage:rust"), Some(ZoActivationEvent::OnLanguage("rust".to_string())));
+        assert_eq!(ZoActivationEvent::parse("onCommand:ext.cmd"), Some(ZoActivationEvent::OnCommand("ext.cmd".to_string())));
+        assert_eq!(ZoActivationEvent::parse("onDebug"), Some(ZoActivationEvent::OnDebug));
+        assert_eq!(ZoActivationEvent::parse("onStartupFinished"), Some(ZoActivationEvent::OnStartupFinished));
+        assert_eq!(ZoActivationEvent::parse("garbage"), None);
+    }
+
+    #[test]
+    fn test_zo_activation_event_eager() {
+        assert!(ZoActivationEvent::Star.is_eager());
+        assert!(!ZoActivationEvent::OnDebug.is_eager());
+    }
+
+    #[test]
+    fn test_zo_activation_event_display() {
+        assert_eq!(format!("{}", ZoActivationEvent::OnLanguage("ts".to_string())), "onLanguage:ts");
+    }
+
+    #[test]
+    fn test_zo_contribution() {
+        let c = ZoContribution::new("commands", "ext.hello").with_title("Hello World");
+        assert_eq!(c.kind, "commands");
+        assert_eq!(c.title, Some("Hello World".to_string()));
+    }
+
+    #[test]
+    fn test_zo_contribution_display() {
+        let c = ZoContribution::new("views", "myView");
+        assert!(format!("{}", c).contains("views"));
+    }
+
+    #[test]
+    fn test_zo_manifest_new() {
+        let m = ZoExtensionManifest::new("ms-vscode", "go", "0.1.0");
+        assert_eq!(m.id, "ms-vscode.go");
+        assert_eq!(m.version, "0.1.0");
+    }
+
+    #[test]
+    fn test_zo_manifest_activation() {
+        let mut m = ZoExtensionManifest::new("pub", "ext", "1.0.0");
+        m.add_activation(ZoActivationEvent::OnLanguage("rust".to_string()));
+        assert!(m.activates_on_language("rust"));
+        assert!(!m.activates_on_language("go"));
+        assert!(!m.is_eager());
+    }
+
+    #[test]
+    fn test_zo_manifest_eager() {
+        let mut m = ZoExtensionManifest::new("pub", "ext", "1.0.0");
+        m.add_activation(ZoActivationEvent::Star);
+        assert!(m.is_eager());
+    }
+
+    #[test]
+    fn test_zo_manifest_contributions() {
+        let mut m = ZoExtensionManifest::new("pub", "ext", "1.0.0");
+        m.add_contribution(ZoContribution::new("commands", "hello"));
+        m.add_category("Linters");
+        assert_eq!(m.contributions.len(), 1);
+        assert_eq!(m.categories, vec!["Linters"]);
+    }
+
+    #[test]
+    fn test_zo_manifest_display() {
+        let m = ZoExtensionManifest::new("pub", "ext", "1.0.0");
+        assert!(format!("{}", m).contains("pub.ext"));
+    }
+
+    #[test]
+    fn test_zo_extension_context() {
+        let mut ctx = ZoExtensionContext::new("pub.ext", "/extensions/pub.ext");
+        assert!(!ctx.is_active);
+        ctx.activate();
+        assert!(ctx.is_active);
+        ctx.add_subscription("disposable1");
+        assert_eq!(ctx.subscription_count(), 1);
+        ctx.deactivate();
+        assert!(!ctx.is_active);
+    }
+
+    #[test]
+    fn test_zo_extension_context_display() {
+        let ctx = ZoExtensionContext::new("a.b", "/path");
+        assert!(format!("{}", ctx).contains("inactive"));
     }
 
 }
