@@ -26895,6 +26895,87 @@ impl AzqMultiCursor {
     }
 }
 
+
+// --- azr_ auto-closing pairs and surround ---
+
+/// An auto-closing pair.
+#[derive(Debug, Clone)]
+pub struct AzrAutoClosePair {
+    pub open: String,
+    pub close: String,
+    pub not_in: Vec<String>,
+}
+
+impl AzrAutoClosePair {
+    pub fn new(open: &str, close: &str) -> Self { Self { open: open.to_string(), close: close.to_string(), not_in: Vec::new() } }
+    pub fn not_in_string(mut self) -> Self { self.not_in.push("string".to_string()); self }
+    pub fn not_in_comment(mut self) -> Self { self.not_in.push("comment".to_string()); self }
+    pub fn is_symmetric(&self) -> bool { self.open == self.close }
+    pub fn should_close_in(&self, context: &str) -> bool { !self.not_in.iter().any(|n| n == context) }
+}
+
+/// Language bracket configuration.
+#[derive(Debug)]
+pub struct AzrBracketConfig {
+    pub auto_closing_pairs: Vec<AzrAutoClosePair>,
+    pub surrounding_pairs: Vec<(String, String)>,
+    pub colorized_brackets: Vec<(String, String)>,
+}
+
+impl AzrBracketConfig {
+    pub fn default_config() -> Self {
+        Self {
+            auto_closing_pairs: vec![
+                AzrAutoClosePair::new("(", ")"),
+                AzrAutoClosePair::new("[", "]"),
+                AzrAutoClosePair::new("{", "}"),
+                AzrAutoClosePair::new("\"", "\"").not_in_string(),
+                AzrAutoClosePair::new("'", "'").not_in_string().not_in_comment(),
+            ],
+            surrounding_pairs: vec![
+                ("(".to_string(), ")".to_string()),
+                ("[".to_string(), "]".to_string()),
+                ("{".to_string(), "}".to_string()),
+                ("\"".to_string(), "\"".to_string()),
+            ],
+            colorized_brackets: vec![
+                ("(".to_string(), ")".to_string()),
+                ("[".to_string(), "]".to_string()),
+                ("{".to_string(), "}".to_string()),
+            ],
+        }
+    }
+    pub fn find_closing(&self, open: &str) -> Option<&str> {
+        self.auto_closing_pairs.iter().find(|p| p.open == open).map(|p| p.close.as_str())
+    }
+    pub fn find_opening(&self, close: &str) -> Option<&str> {
+        self.auto_closing_pairs.iter().find(|p| p.close == close).map(|p| p.open.as_str())
+    }
+    pub fn is_open_bracket(&self, c: &str) -> bool { self.auto_closing_pairs.iter().any(|p| p.open == c) }
+    pub fn is_close_bracket(&self, c: &str) -> bool { self.auto_closing_pairs.iter().any(|p| p.close == c) }
+    pub fn pair_count(&self) -> usize { self.auto_closing_pairs.len() }
+    pub fn is_surround_pair(&self, open: &str, close: &str) -> bool {
+        self.surrounding_pairs.iter().any(|p| p.0 == open && p.1 == close)
+    }
+}
+
+/// Auto-surround action.
+#[derive(Debug)]
+pub struct AzrSurroundAction {
+    pub open: String,
+    pub close: String,
+    pub selection_start: u32,
+    pub selection_end: u32,
+}
+
+impl AzrSurroundAction {
+    pub fn new(open: &str, close: &str, start: u32, end: u32) -> Self {
+        Self { open: open.to_string(), close: close.to_string(), selection_start: start, selection_end: end }
+    }
+    pub fn result_text(&self, selected: &str) -> String { format!("{}{}{}", self.open, selected, self.close) }
+    pub fn new_cursor_offset(&self) -> u32 { self.open.len() as u32 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44050,6 +44131,69 @@ goodbye";
         mc.collapse_to_primary();
         assert_eq!(mc.cursor_count(), 1);
         assert!(!mc.is_multi());
+    }
+
+
+    #[test]
+    fn test_azr_auto_close_pair() {
+        let p = AzrAutoClosePair::new("(", ")");
+        assert!(!p.is_symmetric());
+        assert!(p.should_close_in("string"));
+        let q = AzrAutoClosePair::new("\"", "\"").not_in_string();
+        assert!(q.is_symmetric());
+        assert!(!q.should_close_in("string"));
+        assert!(q.should_close_in("code"));
+    }
+
+    #[test]
+    fn test_azr_default_config() {
+        let cfg = AzrBracketConfig::default_config();
+        assert_eq!(cfg.pair_count(), 5);
+        assert_eq!(cfg.find_closing("("), Some(")"));
+        assert_eq!(cfg.find_closing("{"), Some("}"));
+        assert!(cfg.find_closing("@").is_none());
+    }
+
+    #[test]
+    fn test_azr_bracket_check() {
+        let cfg = AzrBracketConfig::default_config();
+        assert!(cfg.is_open_bracket("("));
+        assert!(cfg.is_close_bracket(")"));
+        assert!(!cfg.is_open_bracket(")"));
+    }
+
+    #[test]
+    fn test_azr_find_opening() {
+        let cfg = AzrBracketConfig::default_config();
+        assert_eq!(cfg.find_opening("}"), Some("{"));
+        assert_eq!(cfg.find_opening("]"), Some("["));
+    }
+
+    #[test]
+    fn test_azr_surround_pair() {
+        let cfg = AzrBracketConfig::default_config();
+        assert!(cfg.is_surround_pair("(", ")"));
+        assert!(!cfg.is_surround_pair("(", "]"));
+    }
+
+    #[test]
+    fn test_azr_surround_action() {
+        let action = AzrSurroundAction::new("(", ")", 5, 10);
+        assert_eq!(action.result_text("hello"), "(hello)");
+        assert_eq!(action.new_cursor_offset(), 1);
+    }
+
+    #[test]
+    fn test_azr_surround_quotes() {
+        let action = AzrSurroundAction::new("\"", "\"", 0, 5);
+        assert_eq!(action.result_text("text"), "\"text\"");
+    }
+
+    #[test]
+    fn test_azr_not_in_comment() {
+        let p = AzrAutoClosePair::new("'", "'").not_in_comment();
+        assert!(!p.should_close_in("comment"));
+        assert!(p.should_close_in("code"));
     }
 
 }
