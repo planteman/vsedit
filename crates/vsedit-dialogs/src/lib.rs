@@ -2133,6 +2133,143 @@ impl XhLruCache {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// xb_ utilities – batch 25
+// ---------------------------------------------------------------------------
+
+/// A bounded ring buffer that stores up to `cap` items.
+pub struct XbRingBuffer25 {
+    buf: Vec<i64>,
+    cap: usize,
+    head: usize,
+    len: usize,
+}
+
+impl XbRingBuffer25 {
+    /// Create a new ring buffer with the given capacity.
+    pub fn new(cap: usize) -> Self {
+        Self {
+            buf: vec![0i64; cap],
+            cap,
+            head: 0,
+            len: 0,
+        }
+    }
+
+    /// Push a value into the buffer, overwriting the oldest if full.
+    pub fn push(&mut self, val: i64) {
+        let pos = (self.head + self.len) % self.cap;
+        self.buf[pos] = val;
+        if self.len == self.cap {
+            self.head = (self.head + 1) % self.cap;
+        } else {
+            self.len += 1;
+        }
+    }
+
+    /// Return the number of elements currently stored.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Return whether the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Get element at logical index (0 = oldest).
+    pub fn get(&self, index: usize) -> Option<i64> {
+        if index >= self.len {
+            return None;
+        }
+        Some(self.buf[(self.head + index) % self.cap])
+    }
+
+    /// Drain all elements oldest-first.
+    pub fn drain_all(&mut self) -> Vec<i64> {
+        let mut out = Vec::with_capacity(self.len);
+        for i in 0..self.len {
+            out.push(self.buf[(self.head + i) % self.cap]);
+        }
+        self.head = 0;
+        self.len = 0;
+        out
+    }
+
+    /// Peek at the oldest element.
+    pub fn peek_front(&self) -> Option<i64> {
+        self.get(0)
+    }
+
+    /// Peek at the newest element.
+    pub fn peek_back(&self) -> Option<i64> {
+        if self.len == 0 {
+            None
+        } else {
+            self.get(self.len - 1)
+        }
+    }
+
+    /// Clear the buffer.
+    pub fn clear(&mut self) {
+        self.head = 0;
+        self.len = 0;
+    }
+
+    /// Return capacity.
+    pub fn capacity(&self) -> usize {
+        self.cap
+    }
+}
+
+/// Compute a simple FNV-1a 64-bit hash over bytes.
+pub fn xb_fnv1a_25(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Run-length encode a slice of items.
+pub fn xb_rle_encode_25<T: Eq + Clone>(items: &[T]) -> Vec<(T, usize)> {
+    let mut result = Vec::new();
+    let mut i = 0;
+    while i < items.len() {
+        let val = &items[i];
+        let mut count = 1;
+        while i + count < items.len() && items[i + count] == *val {
+            count += 1;
+        }
+        result.push((val.clone(), count));
+        i += count;
+    }
+    result
+}
+
+/// Decode an RLE-encoded sequence.
+pub fn xb_rle_decode_25<T: Clone>(encoded: &[(T, usize)]) -> Vec<T> {
+    let mut out = Vec::new();
+    for (val, count) in encoded {
+        for _ in 0..*count {
+            out.push(val.clone());
+        }
+    }
+    out
+}
+
+/// Clamp a value to [lo, hi].
+pub fn xb_clamp_25(val: f64, lo: f64, hi: f64) -> f64 {
+    if val < lo { lo } else if val > hi { hi } else { val }
+}
+
+/// Linear interpolation between a and b.
+pub fn xb_lerp_25(a: f64, b: f64, t: f64) -> f64 {
+    a + (b - a) * t
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3508,6 +3645,132 @@ mod tests {
         c.clear();
         assert!(c.is_empty());
         assert_eq!(c.len(), 0);
+    }
+
+
+    #[test]
+    fn xb_ring_buffer_25_push_and_len() {
+        let mut rb = super::XbRingBuffer25::new(4);
+        assert!(rb.is_empty());
+        rb.push(10);
+        rb.push(20);
+        assert_eq!(rb.len(), 2);
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_overwrite() {
+        let mut rb = super::XbRingBuffer25::new(3);
+        rb.push(1);
+        rb.push(2);
+        rb.push(3);
+        rb.push(4);
+        assert_eq!(rb.len(), 3);
+        assert_eq!(rb.get(0), Some(2));
+        assert_eq!(rb.get(2), Some(4));
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_get_out_of_bounds() {
+        let rb = super::XbRingBuffer25::new(3);
+        assert_eq!(rb.get(0), None);
+        assert_eq!(rb.get(99), None);
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_drain_all() {
+        let mut rb = super::XbRingBuffer25::new(5);
+        rb.push(1);
+        rb.push(2);
+        rb.push(3);
+        let v = rb.drain_all();
+        assert_eq!(v, vec![1, 2, 3]);
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_peek_front_back() {
+        let mut rb = super::XbRingBuffer25::new(4);
+        assert_eq!(rb.peek_front(), None);
+        assert_eq!(rb.peek_back(), None);
+        rb.push(5);
+        rb.push(10);
+        assert_eq!(rb.peek_front(), Some(5));
+        assert_eq!(rb.peek_back(), Some(10));
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_clear() {
+        let mut rb = super::XbRingBuffer25::new(4);
+        rb.push(1);
+        rb.push(2);
+        rb.clear();
+        assert!(rb.is_empty());
+        assert_eq!(rb.len(), 0);
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_capacity() {
+        let rb = super::XbRingBuffer25::new(7);
+        assert_eq!(rb.capacity(), 7);
+    }
+
+    #[test]
+    fn xb_fnv1a_25_basic() {
+        let h = super::xb_fnv1a_25(b"hello");
+        assert_ne!(h, 0);
+        let h2 = super::xb_fnv1a_25(b"hello");
+        assert_eq!(h, h2);
+    }
+
+    #[test]
+    fn xb_fnv1a_25_different_inputs() {
+        let h1 = super::xb_fnv1a_25(b"abc");
+        let h2 = super::xb_fnv1a_25(b"def");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn xb_rle_25_round_trip() {
+        let data = vec![1, 1, 2, 2, 2, 3];
+        let enc = super::xb_rle_encode_25(&data);
+        let dec = super::xb_rle_decode_25(&enc);
+        assert_eq!(dec, data);
+    }
+
+    #[test]
+    fn xb_rle_25_empty() {
+        let data: Vec<i32> = vec![];
+        let enc = super::xb_rle_encode_25(&data);
+        assert!(enc.is_empty());
+        let dec = super::xb_rle_decode_25(&enc);
+        assert!(dec.is_empty());
+    }
+
+    #[test]
+    fn xb_clamp_25_values() {
+        assert!((super::xb_clamp_25(5.0, 0.0, 10.0) - 5.0).abs() < f64::EPSILON);
+        assert!((super::xb_clamp_25(-1.0, 0.0, 10.0) - 0.0).abs() < f64::EPSILON);
+        assert!((super::xb_clamp_25(99.0, 0.0, 10.0) - 10.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn xb_lerp_25_values() {
+        assert!((super::xb_lerp_25(0.0, 10.0, 0.5) - 5.0).abs() < f64::EPSILON);
+        assert!((super::xb_lerp_25(0.0, 10.0, 0.0) - 0.0).abs() < f64::EPSILON);
+        assert!((super::xb_lerp_25(0.0, 10.0, 1.0) - 10.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn xb_ring_buffer_25_wrap_around_twice() {
+        let mut rb = super::XbRingBuffer25::new(2);
+        rb.push(1);
+        rb.push(2);
+        rb.push(3);
+        rb.push(4);
+        rb.push(5);
+        assert_eq!(rb.len(), 2);
+        assert_eq!(rb.get(0), Some(4));
+        assert_eq!(rb.get(1), Some(5));
     }
 
 }

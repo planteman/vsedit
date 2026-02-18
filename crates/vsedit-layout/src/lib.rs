@@ -2211,6 +2211,160 @@ impl ZvLruCache {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// xa_ extended helpers for layout
+// ---------------------------------------------------------------------------
+
+/// A bounded ring-buffer that stores `xa_` metric samples.
+pub struct XaLayoutRingBuf {
+    buf: Vec<f64>,
+    cap: usize,
+    head: usize,
+    len: usize,
+}
+
+impl XaLayoutRingBuf {
+    /// Create a new ring buffer with the given capacity.
+    pub fn new(cap: usize) -> Self {
+        assert!(cap > 0, "capacity must be > 0");
+        Self {
+            buf: vec![0.0; cap],
+            cap,
+            head: 0,
+            len: 0,
+        }
+    }
+
+    /// Push a value into the ring buffer.
+    pub fn push(&mut self, v: f64) {
+        let idx = (self.head + self.len) % self.cap;
+        self.buf[idx] = v;
+        if self.len == self.cap {
+            self.head = (self.head + 1) % self.cap;
+        } else {
+            self.len += 1;
+        }
+    }
+
+    /// Return the number of items currently stored.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Whether the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Return the arithmetic mean, or `None` if empty.
+    pub fn mean(&self) -> Option<f64> {
+        if self.len == 0 {
+            return None;
+        }
+        let sum: f64 = (0..self.len)
+            .map(|i| self.buf[(self.head + i) % self.cap])
+            .sum();
+        Some(sum / self.len as f64)
+    }
+
+    /// Return the minimum value, or `None` if empty.
+    pub fn min_val(&self) -> Option<f64> {
+        if self.len == 0 {
+            return None;
+        }
+        Some(
+            (0..self.len)
+                .map(|i| self.buf[(self.head + i) % self.cap])
+                .fold(f64::INFINITY, f64::min),
+        )
+    }
+
+    /// Return the maximum value, or `None` if empty.
+    pub fn max_val(&self) -> Option<f64> {
+        if self.len == 0 {
+            return None;
+        }
+        Some(
+            (0..self.len)
+                .map(|i| self.buf[(self.head + i) % self.cap])
+                .fold(f64::NEG_INFINITY, f64::max),
+        )
+    }
+
+    /// Drain all elements as a `Vec` in insertion order.
+    pub fn drain_to_vec(&mut self) -> Vec<f64> {
+        let v: Vec<f64> = (0..self.len)
+            .map(|i| self.buf[(self.head + i) % self.cap])
+            .collect();
+        self.head = 0;
+        self.len = 0;
+        v
+    }
+
+    /// Iterate over elements in insertion order.
+    pub fn iter(&self) -> impl Iterator<Item = f64> + '_ {
+        (0..self.len).map(move |i| self.buf[(self.head + i) % self.cap])
+    }
+}
+
+/// Simple string-keyed counter map used by `xa_` utilities.
+pub struct XaLayoutCounter {
+    counts: std::collections::HashMap<String, u64>,
+}
+
+impl XaLayoutCounter {
+    /// Create an empty counter.
+    pub fn new() -> Self {
+        Self {
+            counts: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Increment key by one.
+    pub fn inc(&mut self, key: &str) {
+        *self.counts.entry(key.to_owned()).or_insert(0) += 1;
+    }
+
+    /// Increment key by an arbitrary delta.
+    pub fn inc_by(&mut self, key: &str, delta: u64) {
+        *self.counts.entry(key.to_owned()).or_insert(0) += delta;
+    }
+
+    /// Get the current count (0 if absent).
+    pub fn get(&self, key: &str) -> u64 {
+        self.counts.get(key).copied().unwrap_or(0)
+    }
+
+    /// Return the total across all keys.
+    pub fn total(&self) -> u64 {
+        self.counts.values().sum()
+    }
+
+    /// Return the number of distinct keys.
+    pub fn num_keys(&self) -> usize {
+        self.counts.len()
+    }
+
+    /// Reset all counts to zero (keeps keys).
+    pub fn reset(&mut self) {
+        for v in self.counts.values_mut() {
+            *v = 0;
+        }
+    }
+
+    /// Remove all keys.
+    pub fn clear(&mut self) {
+        self.counts.clear();
+    }
+}
+
+impl Default for XaLayoutCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3441,6 +3595,121 @@ mod tests {
         c.clear();
         assert!(c.is_empty());
         assert_eq!(c.len(), 0);
+    }
+
+
+    // xa_ extended tests for layout
+    #[test]
+    fn xa_layout_ring_new() {
+        let rb = super::XaLayoutRingBuf::new(4);
+        assert_eq!(rb.len(), 0);
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn xa_layout_ring_push_len() {
+        let mut rb = super::XaLayoutRingBuf::new(3);
+        rb.push(1.0);
+        rb.push(2.0);
+        assert_eq!(rb.len(), 2);
+    }
+
+    #[test]
+    fn xa_layout_ring_wrap() {
+        let mut rb = super::XaLayoutRingBuf::new(2);
+        rb.push(1.0);
+        rb.push(2.0);
+        rb.push(3.0);
+        assert_eq!(rb.len(), 2);
+        let v = rb.drain_to_vec();
+        assert_eq!(v, vec![2.0, 3.0]);
+    }
+
+    #[test]
+    fn xa_layout_ring_mean_empty() {
+        let rb = super::XaLayoutRingBuf::new(5);
+        assert!(rb.mean().is_none());
+    }
+
+    #[test]
+    fn xa_layout_ring_mean_values() {
+        let mut rb = super::XaLayoutRingBuf::new(4);
+        rb.push(2.0);
+        rb.push(4.0);
+        let m = rb.mean().unwrap();
+        assert!((m - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn xa_layout_ring_min_max() {
+        let mut rb = super::XaLayoutRingBuf::new(5);
+        rb.push(7.0);
+        rb.push(2.0);
+        rb.push(9.0);
+        assert_eq!(rb.min_val().unwrap(), 2.0);
+        assert_eq!(rb.max_val().unwrap(), 9.0);
+    }
+
+    #[test]
+    fn xa_layout_ring_iter() {
+        let mut rb = super::XaLayoutRingBuf::new(3);
+        rb.push(10.0);
+        rb.push(20.0);
+        let collected: Vec<f64> = rb.iter().collect();
+        assert_eq!(collected, vec![10.0, 20.0]);
+    }
+
+    #[test]
+    fn xa_layout_counter_new() {
+        let c = super::XaLayoutCounter::new();
+        assert_eq!(c.get("x"), 0);
+        assert_eq!(c.total(), 0);
+    }
+
+    #[test]
+    fn xa_layout_counter_inc() {
+        let mut c = super::XaLayoutCounter::new();
+        c.inc("a");
+        c.inc("a");
+        c.inc("b");
+        assert_eq!(c.get("a"), 2);
+        assert_eq!(c.get("b"), 1);
+        assert_eq!(c.total(), 3);
+    }
+
+    #[test]
+    fn xa_layout_counter_inc_by() {
+        let mut c = super::XaLayoutCounter::new();
+        c.inc_by("k", 10);
+        c.inc_by("k", 5);
+        assert_eq!(c.get("k"), 15);
+    }
+
+    #[test]
+    fn xa_layout_counter_reset() {
+        let mut c = super::XaLayoutCounter::new();
+        c.inc("a");
+        c.inc("b");
+        c.reset();
+        assert_eq!(c.get("a"), 0);
+        assert_eq!(c.get("b"), 0);
+        assert_eq!(c.num_keys(), 2);
+    }
+
+    #[test]
+    fn xa_layout_counter_clear() {
+        let mut c = super::XaLayoutCounter::new();
+        c.inc("a");
+        c.clear();
+        assert_eq!(c.num_keys(), 0);
+        assert_eq!(c.total(), 0);
+    }
+
+    #[test]
+    fn xa_layout_counter_default() {
+        let c = super::XaLayoutCounter::default();
+        assert_eq!(c.total(), 0);
+        assert_eq!(c.num_keys(), 0);
     }
 
 }
