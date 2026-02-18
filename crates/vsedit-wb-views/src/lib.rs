@@ -27360,6 +27360,87 @@ impl AzuDragDropState {
     pub fn has_files(&self) -> bool { self.items.iter().any(|i| i.is_files()) }
 }
 
+
+// --- azv_ editor scroll and viewport state ---
+
+/// Scroll direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzvScrollDir { Up, Down, Left, Right }
+
+/// Editor viewport state.
+#[derive(Debug)]
+pub struct AzvViewport {
+    pub top_line: u32,
+    pub left_col: u32,
+    pub visible_lines: u32,
+    pub visible_cols: u32,
+    pub total_lines: u32,
+    pub max_line_length: u32,
+}
+
+impl AzvViewport {
+    pub fn new(visible_lines: u32, visible_cols: u32) -> Self {
+        Self { top_line: 0, left_col: 0, visible_lines, visible_cols, total_lines: 0, max_line_length: 0 }
+    }
+    pub fn set_content(&mut self, total_lines: u32, max_len: u32) {
+        self.total_lines = total_lines; self.max_line_length = max_len;
+    }
+    pub fn bottom_line(&self) -> u32 { (self.top_line + self.visible_lines).min(self.total_lines) }
+    pub fn right_col(&self) -> u32 { self.left_col + self.visible_cols }
+    pub fn is_line_visible(&self, line: u32) -> bool { line >= self.top_line && line < self.bottom_line() }
+    pub fn scroll_to_line(&mut self, line: u32) {
+        if line < self.top_line { self.top_line = line; }
+        else if line >= self.bottom_line() { self.top_line = line.saturating_sub(self.visible_lines - 1); }
+    }
+    pub fn scroll_by(&mut self, dir: AzvScrollDir, amount: u32) {
+        match dir {
+            AzvScrollDir::Up => self.top_line = self.top_line.saturating_sub(amount),
+            AzvScrollDir::Down => {
+                let max = self.total_lines.saturating_sub(self.visible_lines);
+                self.top_line = (self.top_line + amount).min(max);
+            }
+            AzvScrollDir::Left => self.left_col = self.left_col.saturating_sub(amount),
+            AzvScrollDir::Right => self.left_col = (self.left_col + amount).min(self.max_line_length),
+        }
+    }
+    pub fn page_up(&mut self) { self.scroll_by(AzvScrollDir::Up, self.visible_lines); }
+    pub fn page_down(&mut self) { self.scroll_by(AzvScrollDir::Down, self.visible_lines); }
+    pub fn scroll_fraction(&self) -> f64 {
+        if self.total_lines <= self.visible_lines { 1.0 }
+        else { self.top_line as f64 / (self.total_lines - self.visible_lines) as f64 }
+    }
+    pub fn scrollbar_size(&self) -> u32 {
+        if self.total_lines == 0 { return self.visible_lines; }
+        ((self.visible_lines as f64 / self.total_lines as f64) * self.visible_lines as f64).max(1.0) as u32
+    }
+    pub fn scrollbar_position(&self) -> u32 {
+        if self.total_lines <= self.visible_lines { return 0; }
+        let track = self.visible_lines.saturating_sub(self.scrollbar_size());
+        ((self.scroll_fraction() * track as f64) as u32).min(track)
+    }
+}
+
+/// Smooth scroll animation state.
+#[derive(Debug)]
+pub struct AzvSmoothScroll {
+    pub enabled: bool,
+    pub target_line: u32,
+    pub current_offset: f64,
+    pub velocity: f64,
+}
+
+impl AzvSmoothScroll {
+    pub fn new() -> Self { Self { enabled: true, target_line: 0, current_offset: 0.0, velocity: 0.0 } }
+    pub fn set_target(&mut self, line: u32) { self.target_line = line; }
+    pub fn is_animating(&self) -> bool { self.enabled && (self.current_offset - self.target_line as f64).abs() > 0.5 }
+    pub fn step(&mut self, dt: f64) {
+        let diff = self.target_line as f64 - self.current_offset;
+        self.velocity = diff * 8.0 * dt;
+        self.current_offset += self.velocity;
+    }
+    pub fn snap(&mut self) { self.current_offset = self.target_line as f64; self.velocity = 0.0; }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44733,6 +44814,83 @@ goodbye";
     fn test_azu_complete_inactive() {
         let mut state = AzuDragDropState::new();
         assert!(state.complete().is_none());
+    }
+
+
+    #[test]
+    fn test_azv_viewport_basic() {
+        let mut vp = AzvViewport::new(30, 80);
+        vp.set_content(100, 120);
+        assert_eq!(vp.bottom_line(), 30);
+        assert!(vp.is_line_visible(0));
+        assert!(vp.is_line_visible(29));
+        assert!(!vp.is_line_visible(30));
+    }
+
+    #[test]
+    fn test_azv_scroll_to_line() {
+        let mut vp = AzvViewport::new(10, 80);
+        vp.set_content(100, 80);
+        vp.scroll_to_line(50);
+        assert!(vp.is_line_visible(50));
+        assert_eq!(vp.top_line, 41);
+    }
+
+    #[test]
+    fn test_azv_scroll_by() {
+        let mut vp = AzvViewport::new(10, 80);
+        vp.set_content(100, 80);
+        vp.scroll_by(AzvScrollDir::Down, 5);
+        assert_eq!(vp.top_line, 5);
+        vp.scroll_by(AzvScrollDir::Up, 3);
+        assert_eq!(vp.top_line, 2);
+    }
+
+    #[test]
+    fn test_azv_page_up_down() {
+        let mut vp = AzvViewport::new(10, 80);
+        vp.set_content(100, 80);
+        vp.page_down();
+        assert_eq!(vp.top_line, 10);
+        vp.page_up();
+        assert_eq!(vp.top_line, 0);
+    }
+
+    #[test]
+    fn test_azv_scroll_limits() {
+        let mut vp = AzvViewport::new(10, 80);
+        vp.set_content(20, 80);
+        vp.scroll_by(AzvScrollDir::Down, 100);
+        assert_eq!(vp.top_line, 10);
+        vp.scroll_by(AzvScrollDir::Up, 100);
+        assert_eq!(vp.top_line, 0);
+    }
+
+    #[test]
+    fn test_azv_scroll_fraction() {
+        let mut vp = AzvViewport::new(10, 80);
+        vp.set_content(100, 80);
+        assert!((vp.scroll_fraction() - 0.0).abs() < 0.01);
+        vp.top_line = 90;
+        assert!((vp.scroll_fraction() - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_azv_scrollbar() {
+        let mut vp = AzvViewport::new(10, 80);
+        vp.set_content(100, 80);
+        assert!(vp.scrollbar_size() >= 1);
+        assert!(vp.scrollbar_size() <= 10);
+    }
+
+    #[test]
+    fn test_azv_smooth_scroll() {
+        let mut ss = AzvSmoothScroll::new();
+        ss.set_target(50);
+        assert!(ss.is_animating());
+        ss.snap();
+        assert!(!ss.is_animating());
+        assert!((ss.current_offset - 50.0).abs() < 0.01);
     }
 
 }
