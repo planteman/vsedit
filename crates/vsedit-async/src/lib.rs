@@ -7314,6 +7314,333 @@ impl<T: Clone + Ord> XuMonotonicStack<T> {
     pub fn xu_clear(&mut self) { self.xu_data.clear(); }
 }
 
+
+// --- xv_ Cartesian Tree ---
+
+/// A node in a Cartesian tree (BST by key, heap by priority).
+#[derive(Debug, Clone)]
+pub struct XvCartesianNode<K: Ord + Clone, P: Ord + Clone> {
+    pub xv_key: K,
+    pub xv_priority: P,
+    xv_left: Option<Box<XvCartesianNode<K, P>>>,
+    xv_right: Option<Box<XvCartesianNode<K, P>>>,
+}
+
+impl<K: Ord + Clone + std::fmt::Display, P: Ord + Clone + std::fmt::Display> std::fmt::Display for XvCartesianNode<K, P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CartNode(k={}, p={})", self.xv_key, self.xv_priority)
+    }
+}
+
+/// Cartesian tree — BST by key, min-heap by priority. Used for range-minimum queries.
+#[derive(Debug, Clone)]
+pub struct XvCartesianTree<K: Ord + Clone, P: Ord + Clone> {
+    xv_root: Option<Box<XvCartesianNode<K, P>>>,
+    xv_size: usize,
+}
+
+impl<K: Ord + Clone, P: Ord + Clone> Default for XvCartesianTree<K, P> {
+    fn default() -> Self { Self::xv_new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, P: Ord + Clone + std::fmt::Display> std::fmt::Display for XvCartesianTree<K, P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CartTree(size={})", self.xv_size)
+    }
+}
+
+impl<K: Ord + Clone, P: Ord + Clone> XvCartesianTree<K, P> {
+    /// Create an empty Cartesian tree.
+    pub fn xv_new() -> Self { Self { xv_root: None, xv_size: 0 } }
+
+    /// Return the number of elements.
+    pub fn xv_len(&self) -> usize { self.xv_size }
+
+    /// Check if empty.
+    pub fn xv_is_empty(&self) -> bool { self.xv_size == 0 }
+
+    /// Insert a (key, priority) pair maintaining BST-by-key and min-heap-by-priority.
+    pub fn xv_insert(&mut self, key: K, priority: P) {
+        self.xv_root = Self::xv_insert_node(self.xv_root.take(), key, priority);
+        self.xv_size += 1;
+    }
+
+    fn xv_insert_node(node: Option<Box<XvCartesianNode<K, P>>>, key: K, priority: P) -> Option<Box<XvCartesianNode<K, P>>> {
+        match node {
+            None => Some(Box::new(XvCartesianNode { xv_key: key, xv_priority: priority, xv_left: None, xv_right: None })),
+            Some(mut n) => {
+                if key < n.xv_key {
+                    n.xv_left = Self::xv_insert_node(n.xv_left.take(), key.clone(), priority.clone());
+                    if n.xv_left.as_ref().is_some_and(|l| l.xv_priority < n.xv_priority) {
+                        n = Self::xv_rotate_right(n);
+                    }
+                    Some(n)
+                } else {
+                    n.xv_right = Self::xv_insert_node(n.xv_right.take(), key.clone(), priority.clone());
+                    if n.xv_right.as_ref().is_some_and(|r| r.xv_priority < n.xv_priority) {
+                        n = Self::xv_rotate_left(n);
+                    }
+                    Some(n)
+                }
+            }
+        }
+    }
+
+    fn xv_rotate_right(mut node: Box<XvCartesianNode<K, P>>) -> Box<XvCartesianNode<K, P>> {
+        let mut left = node.xv_left.take().unwrap();
+        node.xv_left = left.xv_right.take();
+        left.xv_right = Some(node);
+        left
+    }
+
+    fn xv_rotate_left(mut node: Box<XvCartesianNode<K, P>>) -> Box<XvCartesianNode<K, P>> {
+        let mut right = node.xv_right.take().unwrap();
+        node.xv_right = right.xv_left.take();
+        right.xv_left = Some(node);
+        right
+    }
+
+    /// Search for a key.
+    pub fn xv_contains(&self, key: &K) -> bool {
+        Self::xv_search(&self.xv_root, key)
+    }
+
+    fn xv_search(node: &Option<Box<XvCartesianNode<K, P>>>, key: &K) -> bool {
+        match node {
+            None => false,
+            Some(n) => {
+                if *key == n.xv_key { true }
+                else if *key < n.xv_key { Self::xv_search(&n.xv_left, key) }
+                else { Self::xv_search(&n.xv_right, key) }
+            }
+        }
+    }
+
+    /// In-order traversal returning keys.
+    pub fn xv_inorder(&self) -> Vec<K> {
+        let mut result = Vec::new();
+        Self::xv_inorder_walk(&self.xv_root, &mut result);
+        result
+    }
+
+    fn xv_inorder_walk(node: &Option<Box<XvCartesianNode<K, P>>>, result: &mut Vec<K>) {
+        if let Some(n) = node {
+            Self::xv_inorder_walk(&n.xv_left, result);
+            result.push(n.xv_key.clone());
+            Self::xv_inorder_walk(&n.xv_right, result);
+        }
+    }
+
+    /// Get the root priority (minimum priority).
+    pub fn xv_min_priority(&self) -> Option<&P> {
+        self.xv_root.as_ref().map(|n| &n.xv_priority)
+    }
+
+    /// Clear the tree.
+    pub fn xv_clear(&mut self) { self.xv_root = None; self.xv_size = 0; }
+
+    /// Build from a sequence of (key, priority) pairs.
+    pub fn xv_from_pairs(pairs: &[(K, P)]) -> Self {
+        let mut tree = Self::xv_new();
+        for (k, p) in pairs { tree.xv_insert(k.clone(), p.clone()); }
+        tree
+    }
+
+    /// Height of the tree.
+    pub fn xv_height(&self) -> usize {
+        Self::xv_node_height(&self.xv_root)
+    }
+
+    fn xv_node_height(node: &Option<Box<XvCartesianNode<K, P>>>) -> usize {
+        match node {
+            None => 0,
+            Some(n) => 1 + std::cmp::max(
+                Self::xv_node_height(&n.xv_left),
+                Self::xv_node_height(&n.xv_right),
+            ),
+        }
+    }
+}
+
+// --- xv_ Weight-Balanced Tree ---
+
+/// A node in a weight-balanced tree (BB[α] tree).
+#[derive(Debug, Clone)]
+pub struct XvWBNode<K: Ord + Clone, V: Clone> {
+    pub xv_key: K,
+    pub xv_value: V,
+    xv_left: Option<Box<XvWBNode<K, V>>>,
+    xv_right: Option<Box<XvWBNode<K, V>>>,
+    xv_weight: usize,
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for XvWBNode<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WBNode(k={}, w={})", self.xv_key, self.xv_weight)
+    }
+}
+
+/// Weight-balanced tree (BB[α] tree) with α = 0.29 for balanced operations.
+#[derive(Debug, Clone)]
+pub struct XvWeightBalancedTree<K: Ord + Clone, V: Clone> {
+    xv_root: Option<Box<XvWBNode<K, V>>>,
+    xv_size: usize,
+}
+
+impl<K: Ord + Clone, V: Clone> Default for XvWeightBalancedTree<K, V> {
+    fn default() -> Self { Self::xv_new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for XvWeightBalancedTree<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WBTree(size={})", self.xv_size)
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> XvWeightBalancedTree<K, V> {
+    const ALPHA: f64 = 0.29;
+
+    /// Create an empty weight-balanced tree.
+    pub fn xv_new() -> Self { Self { xv_root: None, xv_size: 0 } }
+
+    /// Number of elements.
+    pub fn xv_len(&self) -> usize { self.xv_size }
+
+    /// Is the tree empty.
+    pub fn xv_is_empty(&self) -> bool { self.xv_size == 0 }
+
+    fn xv_weight(node: &Option<Box<XvWBNode<K, V>>>) -> usize {
+        match node { None => 1, Some(n) => n.xv_weight }
+    }
+
+    fn xv_update_weight(node: &mut Box<XvWBNode<K, V>>) {
+        node.xv_weight = Self::xv_weight(&node.xv_left) + Self::xv_weight(&node.xv_right);
+    }
+
+    fn xv_is_balanced(node: &Box<XvWBNode<K, V>>) -> bool {
+        let lw = Self::xv_weight(&node.xv_left) as f64;
+        let rw = Self::xv_weight(&node.xv_right) as f64;
+        let total = node.xv_weight as f64;
+        lw >= Self::ALPHA * total && rw >= Self::ALPHA * total
+    }
+
+    /// Insert a key-value pair.
+    pub fn xv_insert(&mut self, key: K, value: V) {
+        let inserted = Self::xv_insert_node(self.xv_root.take(), key, value);
+        self.xv_root = inserted.0;
+        if inserted.1 { self.xv_size += 1; }
+    }
+
+    fn xv_insert_node(node: Option<Box<XvWBNode<K, V>>>, key: K, value: V) -> (Option<Box<XvWBNode<K, V>>>, bool) {
+        match node {
+            None => {
+                let n = Box::new(XvWBNode { xv_key: key, xv_value: value, xv_left: None, xv_right: None, xv_weight: 2 });
+                (Some(n), true)
+            }
+            Some(mut n) => {
+                let inserted;
+                if key < n.xv_key {
+                    let r = Self::xv_insert_node(n.xv_left.take(), key, value);
+                    n.xv_left = r.0;
+                    inserted = r.1;
+                } else if key > n.xv_key {
+                    let r = Self::xv_insert_node(n.xv_right.take(), key, value);
+                    n.xv_right = r.0;
+                    inserted = r.1;
+                } else {
+                    n.xv_value = value;
+                    return (Some(n), false);
+                }
+                Self::xv_update_weight(&mut n);
+                let n = Self::xv_rebalance(n);
+                (Some(n), inserted)
+            }
+        }
+    }
+
+    fn xv_rebalance(mut node: Box<XvWBNode<K, V>>) -> Box<XvWBNode<K, V>> {
+        if !Self::xv_is_balanced(&node) {
+            let lw = Self::xv_weight(&node.xv_left);
+            let rw = Self::xv_weight(&node.xv_right);
+            if lw < rw {
+                node = Self::xv_rotate_left_wb(node);
+            } else {
+                node = Self::xv_rotate_right_wb(node);
+            }
+        }
+        node
+    }
+
+    fn xv_rotate_left_wb(mut node: Box<XvWBNode<K, V>>) -> Box<XvWBNode<K, V>> {
+        if node.xv_right.is_none() { return node; }
+        let mut right = node.xv_right.take().unwrap();
+        node.xv_right = right.xv_left.take();
+        Self::xv_update_weight(&mut node);
+        right.xv_left = Some(node);
+        Self::xv_update_weight(&mut right);
+        right
+    }
+
+    fn xv_rotate_right_wb(mut node: Box<XvWBNode<K, V>>) -> Box<XvWBNode<K, V>> {
+        if node.xv_left.is_none() { return node; }
+        let mut left = node.xv_left.take().unwrap();
+        node.xv_left = left.xv_right.take();
+        Self::xv_update_weight(&mut node);
+        left.xv_right = Some(node);
+        Self::xv_update_weight(&mut left);
+        left
+    }
+
+    /// Look up a key.
+    pub fn xv_get(&self, key: &K) -> Option<&V> {
+        Self::xv_search(&self.xv_root, key)
+    }
+
+    fn xv_search<'a>(node: &'a Option<Box<XvWBNode<K, V>>>, key: &K) -> Option<&'a V> {
+        match node {
+            None => None,
+            Some(n) => {
+                if *key == n.xv_key { Some(&n.xv_value) }
+                else if *key < n.xv_key { Self::xv_search(&n.xv_left, key) }
+                else { Self::xv_search(&n.xv_right, key) }
+            }
+        }
+    }
+
+    /// Check if key exists.
+    pub fn xv_contains(&self, key: &K) -> bool { self.xv_get(key).is_some() }
+
+    /// In-order traversal.
+    pub fn xv_keys(&self) -> Vec<K> {
+        let mut result = Vec::new();
+        Self::xv_inorder(&self.xv_root, &mut result);
+        result
+    }
+
+    fn xv_inorder(node: &Option<Box<XvWBNode<K, V>>>, result: &mut Vec<K>) {
+        if let Some(n) = node {
+            Self::xv_inorder(&n.xv_left, result);
+            result.push(n.xv_key.clone());
+            Self::xv_inorder(&n.xv_right, result);
+        }
+    }
+
+    /// Clear the tree.
+    pub fn xv_clear(&mut self) { self.xv_root = None; self.xv_size = 0; }
+
+    /// Height.
+    pub fn xv_height(&self) -> usize {
+        Self::xv_node_height(&self.xv_root)
+    }
+
+    fn xv_node_height(node: &Option<Box<XvWBNode<K, V>>>) -> usize {
+        match node {
+            None => 0,
+            Some(n) => 1 + std::cmp::max(Self::xv_node_height(&n.xv_left), Self::xv_node_height(&n.xv_right)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -11356,6 +11683,170 @@ mod tests {
         let mut s = super::XuMonotonicStack::xu_increasing();
         s.xu_push(1);
         assert!(format!("{}", s).contains("MonoStack"));
+    }
+
+
+    // --- xv_ Cartesian Tree tests ---
+
+    #[test]
+    fn xv_cart_tree_new() {
+        let t = super::XvCartesianTree::<i32, i32>::xv_new();
+        assert!(t.xv_is_empty());
+        assert_eq!(t.xv_len(), 0);
+    }
+
+    #[test]
+    fn xv_cart_tree_insert_contains() {
+        let mut t = super::XvCartesianTree::xv_new();
+        t.xv_insert(5, 1);
+        t.xv_insert(3, 2);
+        t.xv_insert(7, 3);
+        assert!(t.xv_contains(&5));
+        assert!(t.xv_contains(&3));
+        assert!(t.xv_contains(&7));
+        assert!(!t.xv_contains(&4));
+        assert_eq!(t.xv_len(), 3);
+    }
+
+    #[test]
+    fn xv_cart_tree_inorder() {
+        let mut t = super::XvCartesianTree::xv_new();
+        for (k, p) in [(5, 3), (3, 1), (7, 2), (1, 5), (9, 4)] {
+            t.xv_insert(k, p);
+        }
+        let keys = t.xv_inorder();
+        assert_eq!(keys, vec![1, 3, 5, 7, 9]);
+    }
+
+    #[test]
+    fn xv_cart_tree_min_priority() {
+        let mut t = super::XvCartesianTree::xv_new();
+        t.xv_insert(5, 10);
+        t.xv_insert(3, 2);
+        t.xv_insert(7, 5);
+        assert_eq!(t.xv_min_priority(), Some(&2));
+    }
+
+    #[test]
+    fn xv_cart_tree_from_pairs() {
+        let t = super::XvCartesianTree::xv_from_pairs(&[(3, 1), (1, 3), (5, 2)]);
+        assert_eq!(t.xv_len(), 3);
+        assert!(t.xv_contains(&1));
+    }
+
+    #[test]
+    fn xv_cart_tree_height() {
+        let mut t = super::XvCartesianTree::xv_new();
+        t.xv_insert(5, 1);
+        assert!(t.xv_height() >= 1);
+    }
+
+    #[test]
+    fn xv_cart_tree_clear() {
+        let mut t = super::XvCartesianTree::xv_new();
+        t.xv_insert(1, 1);
+        t.xv_clear();
+        assert!(t.xv_is_empty());
+    }
+
+    #[test]
+    fn xv_cart_tree_display() {
+        let t = super::XvCartesianTree::<i32, i32>::xv_new();
+        assert!(format!("{}", t).contains("CartTree"));
+    }
+
+    #[test]
+    fn xv_cart_tree_default() {
+        let t = super::XvCartesianTree::<i32, i32>::default();
+        assert!(t.xv_is_empty());
+    }
+
+    #[test]
+    fn xv_cart_node_display() {
+        let n = super::XvCartesianNode { xv_key: 1, xv_priority: 2, xv_left: None, xv_right: None };
+        assert!(format!("{}", n).contains("CartNode"));
+    }
+
+    // --- xv_ Weight-Balanced Tree tests ---
+
+    #[test]
+    fn xv_wb_tree_new() {
+        let t = super::XvWeightBalancedTree::<i32, &str>::xv_new();
+        assert!(t.xv_is_empty());
+        assert_eq!(t.xv_len(), 0);
+    }
+
+    #[test]
+    fn xv_wb_tree_insert_get() {
+        let mut t = super::XvWeightBalancedTree::xv_new();
+        t.xv_insert(5, "five");
+        t.xv_insert(3, "three");
+        t.xv_insert(7, "seven");
+        assert_eq!(t.xv_get(&5), Some(&"five"));
+        assert_eq!(t.xv_get(&3), Some(&"three"));
+        assert_eq!(t.xv_get(&7), Some(&"seven"));
+        assert_eq!(t.xv_get(&4), None);
+    }
+
+    #[test]
+    fn xv_wb_tree_contains() {
+        let mut t = super::XvWeightBalancedTree::xv_new();
+        t.xv_insert(10, "a");
+        assert!(t.xv_contains(&10));
+        assert!(!t.xv_contains(&20));
+    }
+
+    #[test]
+    fn xv_wb_tree_keys_sorted() {
+        let mut t = super::XvWeightBalancedTree::xv_new();
+        for k in [5, 3, 8, 1, 9, 2, 7, 4, 6] {
+            t.xv_insert(k, k * 10);
+        }
+        assert_eq!(t.xv_keys(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn xv_wb_tree_replace_value() {
+        let mut t = super::XvWeightBalancedTree::xv_new();
+        t.xv_insert(5, "old");
+        t.xv_insert(5, "new");
+        assert_eq!(t.xv_get(&5), Some(&"new"));
+        assert_eq!(t.xv_len(), 1);
+    }
+
+    #[test]
+    fn xv_wb_tree_height() {
+        let mut t = super::XvWeightBalancedTree::xv_new();
+        for k in 1..=15 {
+            t.xv_insert(k, k);
+        }
+        assert!(t.xv_height() <= 20);
+    }
+
+    #[test]
+    fn xv_wb_tree_clear() {
+        let mut t = super::XvWeightBalancedTree::xv_new();
+        t.xv_insert(1, "a");
+        t.xv_clear();
+        assert!(t.xv_is_empty());
+    }
+
+    #[test]
+    fn xv_wb_tree_display() {
+        let t = super::XvWeightBalancedTree::<i32, i32>::xv_new();
+        assert!(format!("{}", t).contains("WBTree"));
+    }
+
+    #[test]
+    fn xv_wb_tree_default() {
+        let t = super::XvWeightBalancedTree::<i32, i32>::default();
+        assert!(t.xv_is_empty());
+    }
+
+    #[test]
+    fn xv_wb_node_display() {
+        let n = super::XvWBNode { xv_key: 1, xv_value: "a", xv_left: None, xv_right: None, xv_weight: 2 };
+        assert!(format!("{}", n).contains("WBNode"));
     }
 
 }
