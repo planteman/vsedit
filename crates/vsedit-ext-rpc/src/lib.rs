@@ -14519,6 +14519,180 @@ impl std::fmt::Display for ZdDiagnosticCollection {
     }
 }
 
+
+// --- ze_ completion items and signature help ---
+
+/// The kind of a completion item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZeCompletionKind {
+    Text, Method, Function, Constructor, Field, Variable, Class, Interface,
+    Module, Property, Unit, Value, Enum, Keyword, Snippet, Color, File,
+    Reference, Folder, EnumMember, Constant, Struct, Event, Operator, TypeParameter,
+}
+
+impl ZeCompletionKind {
+    pub fn icon(&self) -> &str {
+        match self {
+            ZeCompletionKind::Method => "m",
+            ZeCompletionKind::Function => "f",
+            ZeCompletionKind::Variable => "v",
+            ZeCompletionKind::Class => "C",
+            ZeCompletionKind::Interface => "I",
+            ZeCompletionKind::Module => "M",
+            ZeCompletionKind::Keyword => "k",
+            ZeCompletionKind::Snippet => "s",
+            ZeCompletionKind::Field => "F",
+            ZeCompletionKind::Property => "P",
+            ZeCompletionKind::Enum => "E",
+            ZeCompletionKind::Struct => "S",
+            _ => " ",
+        }
+    }
+}
+
+impl std::fmt::Display for ZeCompletionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+/// A completion item offered by IntelliSense.
+#[derive(Debug, Clone)]
+pub struct ZeCompletionItem {
+    pub label: String,
+    pub kind: ZeCompletionKind,
+    pub detail: Option<String>,
+    pub documentation: Option<String>,
+    pub insert_text: Option<String>,
+    pub sort_text: Option<String>,
+    pub filter_text: Option<String>,
+    pub preselect: bool,
+    pub deprecated: bool,
+}
+
+impl ZeCompletionItem {
+    pub fn new(label: &str, kind: ZeCompletionKind) -> Self {
+        Self { label: label.to_string(), kind, detail: None, documentation: None, insert_text: None,
+               sort_text: None, filter_text: None, preselect: false, deprecated: false }
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self { self.detail = Some(detail.to_string()); self }
+    pub fn with_doc(mut self, doc: &str) -> Self { self.documentation = Some(doc.to_string()); self }
+    pub fn with_insert_text(mut self, text: &str) -> Self { self.insert_text = Some(text.to_string()); self }
+    pub fn with_sort_text(mut self, text: &str) -> Self { self.sort_text = Some(text.to_string()); self }
+    pub fn preselected(mut self) -> Self { self.preselect = true; self }
+
+    pub fn effective_insert_text(&self) -> &str {
+        self.insert_text.as_deref().unwrap_or(&self.label)
+    }
+
+    pub fn effective_sort_text(&self) -> &str {
+        self.sort_text.as_deref().unwrap_or(&self.label)
+    }
+
+    pub fn effective_filter_text(&self) -> &str {
+        self.filter_text.as_deref().unwrap_or(&self.label)
+    }
+
+    pub fn matches_filter(&self, prefix: &str) -> bool {
+        let filter = self.effective_filter_text().to_lowercase();
+        let prefix = prefix.to_lowercase();
+        filter.starts_with(&prefix) || filter.contains(&prefix)
+    }
+}
+
+impl std::fmt::Display for ZeCompletionItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}", self.kind.icon(), self.label)
+    }
+}
+
+/// A list of completion items with metadata.
+#[derive(Debug, Clone)]
+pub struct ZeCompletionList {
+    pub items: Vec<ZeCompletionItem>,
+    pub is_incomplete: bool,
+}
+
+impl ZeCompletionList {
+    pub fn new(items: Vec<ZeCompletionItem>, is_incomplete: bool) -> Self {
+        Self { items, is_incomplete }
+    }
+
+    pub fn empty() -> Self { Self { items: Vec::new(), is_incomplete: false } }
+
+    pub fn len(&self) -> usize { self.items.len() }
+
+    pub fn is_empty(&self) -> bool { self.items.is_empty() }
+
+    pub fn filter(&self, prefix: &str) -> Vec<&ZeCompletionItem> {
+        self.items.iter().filter(|i| i.matches_filter(prefix)).collect()
+    }
+
+    pub fn sorted(&mut self) {
+        self.items.sort_by(|a, b| a.effective_sort_text().cmp(b.effective_sort_text()));
+    }
+}
+
+impl std::fmt::Display for ZeCompletionList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZeCompletionList({} items, incomplete={})", self.len(), self.is_incomplete)
+    }
+}
+
+/// A parameter in a signature.
+#[derive(Debug, Clone)]
+pub struct ZeParameterInfo {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+/// Signature help information.
+#[derive(Debug, Clone)]
+pub struct ZeSignatureHelp {
+    pub signatures: Vec<ZeSignatureInfo>,
+    pub active_signature: usize,
+    pub active_parameter: usize,
+}
+
+/// A single signature.
+#[derive(Debug, Clone)]
+pub struct ZeSignatureInfo {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<ZeParameterInfo>,
+}
+
+impl ZeSignatureHelp {
+    pub fn new() -> Self {
+        Self { signatures: Vec::new(), active_signature: 0, active_parameter: 0 }
+    }
+
+    pub fn add_signature(&mut self, label: &str, params: Vec<ZeParameterInfo>) {
+        self.signatures.push(ZeSignatureInfo { label: label.to_string(), documentation: None, parameters: params });
+    }
+
+    pub fn active(&self) -> Option<&ZeSignatureInfo> { self.signatures.get(self.active_signature) }
+
+    pub fn active_param_label(&self) -> Option<&str> {
+        self.active().and_then(|s| s.parameters.get(self.active_parameter)).map(|p| p.label.as_str())
+    }
+
+    pub fn signature_count(&self) -> usize { self.signatures.len() }
+
+    pub fn is_empty(&self) -> bool { self.signatures.is_empty() }
+}
+
+impl Default for ZeSignatureHelp {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for ZeSignatureHelp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZeSignatureHelp({} sigs, active={})", self.signatures.len(), self.active_signature)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24101,6 +24275,123 @@ mod tests {
         let c = ZdDiagnosticCollection::new("test.rs");
         let s = format!("{}", c);
         assert!(s.contains("ZdDiagnosticCollection"));
+    }
+
+
+    // --- ze_ tests ---
+
+    #[test]
+    fn test_ze_completion_kind_icon() {
+        assert_eq!(ZeCompletionKind::Function.icon(), "f");
+        assert_eq!(ZeCompletionKind::Class.icon(), "C");
+        assert_eq!(ZeCompletionKind::Keyword.icon(), "k");
+    }
+
+    #[test]
+    fn test_ze_completion_item_new() {
+        let item = ZeCompletionItem::new("println", ZeCompletionKind::Function);
+        assert_eq!(item.label, "println");
+        assert_eq!(item.kind, ZeCompletionKind::Function);
+    }
+
+    #[test]
+    fn test_ze_completion_item_builder() {
+        let item = ZeCompletionItem::new("test", ZeCompletionKind::Method)
+            .with_detail("detail")
+            .with_doc("doc")
+            .with_insert_text("test()")
+            .preselected();
+        assert_eq!(item.detail, Some("detail".to_string()));
+        assert!(item.preselect);
+        assert_eq!(item.effective_insert_text(), "test()");
+    }
+
+    #[test]
+    fn test_ze_completion_item_filter() {
+        let item = ZeCompletionItem::new("println", ZeCompletionKind::Function);
+        assert!(item.matches_filter("print"));
+        assert!(item.matches_filter("PRINT"));
+        assert!(!item.matches_filter("xyz"));
+    }
+
+    #[test]
+    fn test_ze_completion_item_display() {
+        let item = ZeCompletionItem::new("test", ZeCompletionKind::Function);
+        let s = format!("{}", item);
+        assert!(s.contains("test"));
+    }
+
+    #[test]
+    fn test_ze_completion_list_new() {
+        let items = vec![
+            ZeCompletionItem::new("a", ZeCompletionKind::Variable),
+            ZeCompletionItem::new("b", ZeCompletionKind::Function),
+        ];
+        let list = ZeCompletionList::new(items, false);
+        assert_eq!(list.len(), 2);
+        assert!(!list.is_incomplete);
+    }
+
+    #[test]
+    fn test_ze_completion_list_empty() {
+        let list = ZeCompletionList::empty();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn test_ze_completion_list_filter() {
+        let items = vec![
+            ZeCompletionItem::new("apple", ZeCompletionKind::Variable),
+            ZeCompletionItem::new("banana", ZeCompletionKind::Variable),
+            ZeCompletionItem::new("apricot", ZeCompletionKind::Variable),
+        ];
+        let list = ZeCompletionList::new(items, false);
+        assert_eq!(list.filter("ap").len(), 2);
+    }
+
+    #[test]
+    fn test_ze_completion_list_display() {
+        let list = ZeCompletionList::empty();
+        let s = format!("{}", list);
+        assert!(s.contains("ZeCompletionList"));
+    }
+
+    #[test]
+    fn test_ze_signature_help_new() {
+        let sh = ZeSignatureHelp::new();
+        assert!(sh.is_empty());
+        assert_eq!(sh.signature_count(), 0);
+    }
+
+    #[test]
+    fn test_ze_signature_help_add() {
+        let mut sh = ZeSignatureHelp::new();
+        sh.add_signature("fn test(a: i32, b: &str)", vec![
+            ZeParameterInfo { label: "a: i32".to_string(), documentation: None },
+            ZeParameterInfo { label: "b: &str".to_string(), documentation: None },
+        ]);
+        assert_eq!(sh.signature_count(), 1);
+        assert_eq!(sh.active_param_label(), Some("a: i32"));
+    }
+
+    #[test]
+    fn test_ze_signature_help_active() {
+        let mut sh = ZeSignatureHelp::new();
+        sh.add_signature("test()", vec![]);
+        assert!(sh.active().is_some());
+    }
+
+    #[test]
+    fn test_ze_signature_help_display() {
+        let sh = ZeSignatureHelp::new();
+        let s = format!("{}", sh);
+        assert!(s.contains("ZeSignatureHelp"));
+    }
+
+    #[test]
+    fn test_ze_signature_help_default() {
+        let sh = ZeSignatureHelp::default();
+        assert!(sh.is_empty());
     }
 
 }
