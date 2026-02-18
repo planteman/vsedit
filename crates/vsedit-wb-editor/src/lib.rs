@@ -26171,6 +26171,79 @@ impl AzeInlayHintSet {
     pub fn clear(&mut self) { self.hints.clear(); }
 }
 
+
+// --- azf_ color picker and color decorations ---
+
+/// An RGBA color value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AzfColor {
+    pub r: f64, pub g: f64, pub b: f64, pub a: f64,
+}
+
+impl AzfColor {
+    pub fn rgba(r: f64, g: f64, b: f64, a: f64) -> Self { Self { r, g, b, a } }
+    pub fn rgb(r: f64, g: f64, b: f64) -> Self { Self { r, g, b, a: 1.0 } }
+    pub fn to_hex(&self) -> String {
+        format!("#{:02x}{:02x}{:02x}", (self.r * 255.0) as u8, (self.g * 255.0) as u8, (self.b * 255.0) as u8)
+    }
+    pub fn luminance(&self) -> f64 { 0.2126 * self.r + 0.7152 * self.g + 0.0722 * self.b }
+    pub fn is_dark(&self) -> bool { self.luminance() < 0.5 }
+    pub fn with_alpha(self, a: f64) -> Self { Self { a, ..self } }
+    pub fn blend(&self, other: &AzfColor, t: f64) -> AzfColor {
+        AzfColor { r: self.r + (other.r - self.r) * t, g: self.g + (other.g - self.g) * t, b: self.b + (other.b - self.b) * t, a: self.a + (other.a - self.a) * t }
+    }
+}
+
+/// A color occurrence in a document.
+#[derive(Debug, Clone)]
+pub struct AzfColorInfo {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub color: AzfColor,
+}
+
+impl AzfColorInfo {
+    pub fn new(line: u32, start: u32, end: u32, color: AzfColor) -> Self {
+        Self { line, start_col: start, end_col: end, color }
+    }
+    pub fn span(&self) -> u32 { self.end_col - self.start_col }
+}
+
+/// Document color provider state.
+#[derive(Debug)]
+pub struct AzfColorDecorations {
+    pub colors: Vec<AzfColorInfo>,
+    pub enabled: bool,
+}
+
+impl AzfColorDecorations {
+    pub fn new() -> Self { Self { colors: Vec::new(), enabled: true } }
+    pub fn set_colors(&mut self, c: Vec<AzfColorInfo>) { self.colors = c; }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn colors_at_line(&self, line: u32) -> Vec<&AzfColorInfo> {
+        if !self.enabled { return Vec::new(); }
+        self.colors.iter().filter(|c| c.line == line).collect()
+    }
+    pub fn total(&self) -> usize { self.colors.len() }
+    pub fn clear(&mut self) { self.colors.clear(); }
+}
+
+/// Color presentation (how to display a chosen color).
+#[derive(Debug, Clone)]
+pub struct AzfColorPresentation {
+    pub label: String,
+    pub text_edit: Option<String>,
+}
+
+impl AzfColorPresentation {
+    pub fn hex(color: &AzfColor) -> Self { Self { label: color.to_hex(), text_edit: Some(color.to_hex()) } }
+    pub fn rgb_fn(color: &AzfColor) -> Self {
+        let label = format!("rgb({}, {}, {})", (color.r * 255.0) as u8, (color.g * 255.0) as u8, (color.b * 255.0) as u8);
+        Self { label: label.clone(), text_edit: Some(label) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42263,6 +42336,71 @@ d");
         let h = AzeInlayHint::new(3, 5, AzeHintPosition::Parameter);
         assert!(h.is_parameter_hint());
         assert!(!h.is_type_hint());
+    }
+
+
+    #[test]
+    fn test_azf_color_basic() {
+        let c = AzfColor::rgb(1.0, 0.0, 0.0);
+        assert_eq!(c.to_hex(), "#ff0000");
+        assert!(c.is_dark());
+    }
+
+    #[test]
+    fn test_azf_luminance() {
+        let black = AzfColor::rgb(0.0, 0.0, 0.0);
+        assert!(black.is_dark());
+        let white = AzfColor::rgb(1.0, 1.0, 1.0);
+        assert!(!white.is_dark());
+    }
+
+    #[test]
+    fn test_azf_blend() {
+        let a = AzfColor::rgb(0.0, 0.0, 0.0);
+        let b = AzfColor::rgb(1.0, 1.0, 1.0);
+        let mid = a.blend(&b, 0.5);
+        assert!((mid.r - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_azf_alpha() {
+        let c = AzfColor::rgb(1.0, 0.0, 0.0).with_alpha(0.5);
+        assert!((c.a - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_azf_color_info() {
+        let ci = AzfColorInfo::new(5, 10, 17, AzfColor::rgb(0.0, 1.0, 0.0));
+        assert_eq!(ci.span(), 7);
+        assert_eq!(ci.color.to_hex(), "#00ff00");
+    }
+
+    #[test]
+    fn test_azf_decorations() {
+        let mut d = AzfColorDecorations::new();
+        d.set_colors(vec![
+            AzfColorInfo::new(1, 0, 7, AzfColor::rgb(1.0, 0.0, 0.0)),
+            AzfColorInfo::new(1, 10, 17, AzfColor::rgb(0.0, 1.0, 0.0)),
+            AzfColorInfo::new(3, 0, 7, AzfColor::rgb(0.0, 0.0, 1.0)),
+        ]);
+        assert_eq!(d.colors_at_line(1).len(), 2);
+        assert_eq!(d.total(), 3);
+        d.toggle();
+        assert_eq!(d.colors_at_line(1).len(), 0);
+    }
+
+    #[test]
+    fn test_azf_presentation_hex() {
+        let c = AzfColor::rgb(1.0, 0.5, 0.0);
+        let p = AzfColorPresentation::hex(&c);
+        assert!(p.label.starts_with('#'));
+    }
+
+    #[test]
+    fn test_azf_presentation_rgb() {
+        let c = AzfColor::rgb(1.0, 0.0, 0.0);
+        let p = AzfColorPresentation::rgb_fn(&c);
+        assert!(p.label.contains("rgb(255"));
     }
 
 }
