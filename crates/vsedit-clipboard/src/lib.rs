@@ -21568,6 +21568,184 @@ impl AxlWorkspaceSearchResults {
     pub fn has_results(&self) -> bool { !self.results.is_empty() }
 }
 
+
+// --- axm_ Git integration types ---
+
+/// Git file status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxmGitStatus {
+    Unmodified,
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Copied,
+    Untracked,
+    Ignored,
+    Conflicted,
+}
+
+impl AxmGitStatus {
+    pub fn letter(&self) -> char {
+        match self {
+            Self::Unmodified => ' ',
+            Self::Modified => 'M',
+            Self::Added => 'A',
+            Self::Deleted => 'D',
+            Self::Renamed => 'R',
+            Self::Copied => 'C',
+            Self::Untracked => '?',
+            Self::Ignored => '!',
+            Self::Conflicted => 'U',
+        }
+    }
+
+    pub fn is_changed(&self) -> bool {
+        !matches!(self, Self::Unmodified | Self::Ignored)
+    }
+}
+
+/// A file in the git status.
+#[derive(Debug, Clone)]
+pub struct AxmStatusEntry {
+    pub path: String,
+    pub index_status: AxmGitStatus,
+    pub working_status: AxmGitStatus,
+    pub original_path: Option<String>,
+}
+
+impl AxmStatusEntry {
+    pub fn new(path: &str, index: AxmGitStatus, working: AxmGitStatus) -> Self {
+        Self { path: path.to_string(), index_status: index, working_status: working, original_path: None }
+    }
+
+    pub fn renamed(old_path: &str, new_path: &str) -> Self {
+        Self {
+            path: new_path.to_string(),
+            index_status: AxmGitStatus::Renamed,
+            working_status: AxmGitStatus::Unmodified,
+            original_path: Some(old_path.to_string()),
+        }
+    }
+
+    pub fn is_staged(&self) -> bool { self.index_status.is_changed() }
+    pub fn is_unstaged(&self) -> bool { self.working_status.is_changed() }
+    pub fn is_untracked(&self) -> bool { self.index_status == AxmGitStatus::Untracked }
+}
+
+/// A diff hunk.
+#[derive(Debug, Clone)]
+pub struct AxmDiffHunk {
+    pub old_start: u32,
+    pub old_count: u32,
+    pub new_start: u32,
+    pub new_count: u32,
+    pub header: String,
+    pub lines: Vec<AxmDiffLine>,
+}
+
+impl AxmDiffHunk {
+    pub fn new(old_start: u32, old_count: u32, new_start: u32, new_count: u32) -> Self {
+        Self {
+            old_start, old_count, new_start, new_count,
+            header: format!("@@ -{},{} +{},{} @@", old_start, old_count, new_start, new_count),
+            lines: Vec::new(),
+        }
+    }
+
+    pub fn add_line(&mut self, line: AxmDiffLine) { self.lines.push(line); }
+    pub fn added_count(&self) -> usize { self.lines.iter().filter(|l| l.is_added()).count() }
+    pub fn removed_count(&self) -> usize { self.lines.iter().filter(|l| l.is_removed()).count() }
+}
+
+/// A line in a diff.
+#[derive(Debug, Clone)]
+pub struct AxmDiffLine {
+    pub kind: AxmDiffLineKind,
+    pub content: String,
+    pub old_line_num: Option<u32>,
+    pub new_line_num: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxmDiffLineKind { Context, Added, Removed }
+
+impl AxmDiffLine {
+    pub fn context(content: &str, old: u32, new: u32) -> Self {
+        Self { kind: AxmDiffLineKind::Context, content: content.to_string(), old_line_num: Some(old), new_line_num: Some(new) }
+    }
+    pub fn added(content: &str, new: u32) -> Self {
+        Self { kind: AxmDiffLineKind::Added, content: content.to_string(), old_line_num: None, new_line_num: Some(new) }
+    }
+    pub fn removed(content: &str, old: u32) -> Self {
+        Self { kind: AxmDiffLineKind::Removed, content: content.to_string(), old_line_num: Some(old), new_line_num: None }
+    }
+    pub fn is_added(&self) -> bool { self.kind == AxmDiffLineKind::Added }
+    pub fn is_removed(&self) -> bool { self.kind == AxmDiffLineKind::Removed }
+    pub fn prefix(&self) -> char {
+        match self.kind { AxmDiffLineKind::Context => ' ', AxmDiffLineKind::Added => '+', AxmDiffLineKind::Removed => '-' }
+    }
+}
+
+/// A blame entry for a line.
+#[derive(Debug, Clone)]
+pub struct AxmBlameLine {
+    pub commit_hash: String,
+    pub author: String,
+    pub date: String,
+    pub line_number: u32,
+    pub content: String,
+}
+
+impl AxmBlameLine {
+    pub fn new(hash: &str, author: &str, date: &str, line: u32, content: &str) -> Self {
+        Self { commit_hash: hash.to_string(), author: author.to_string(), date: date.to_string(), line_number: line, content: content.to_string() }
+    }
+
+    pub fn short_hash(&self) -> &str {
+        if self.commit_hash.len() >= 7 { &self.commit_hash[..7] } else { &self.commit_hash }
+    }
+}
+
+/// Git repository state.
+#[derive(Debug, Clone)]
+pub struct AxmGitRepo {
+    pub root_path: String,
+    pub branch: String,
+    pub remote_branch: Option<String>,
+    pub ahead: u32,
+    pub behind: u32,
+    pub status: Vec<AxmStatusEntry>,
+    pub is_rebasing: bool,
+    pub is_merging: bool,
+}
+
+impl AxmGitRepo {
+    pub fn new(root: &str, branch: &str) -> Self {
+        Self {
+            root_path: root.to_string(),
+            branch: branch.to_string(),
+            remote_branch: None, ahead: 0, behind: 0,
+            status: Vec::new(), is_rebasing: false, is_merging: false,
+        }
+    }
+
+    pub fn staged_count(&self) -> usize { self.status.iter().filter(|s| s.is_staged()).count() }
+    pub fn unstaged_count(&self) -> usize { self.status.iter().filter(|s| s.is_unstaged()).count() }
+    pub fn untracked_count(&self) -> usize { self.status.iter().filter(|s| s.is_untracked()).count() }
+    pub fn has_changes(&self) -> bool { !self.status.is_empty() }
+    pub fn is_clean(&self) -> bool { self.status.is_empty() }
+    pub fn is_in_progress(&self) -> bool { self.is_rebasing || self.is_merging }
+    pub fn sync_status(&self) -> String {
+        match (self.ahead, self.behind) {
+            (0, 0) => "synced".to_string(),
+            (a, 0) => format!("{}↑", a),
+            (0, b) => format!("{}↓", b),
+            (a, b) => format!("{}↑ {}↓", a, b),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34596,6 +34774,91 @@ mod tests {
         assert_eq!(wsr.total_matches(), 3);
         assert_eq!(wsr.file_count(), 2);
         assert!(wsr.has_results());
+    }
+
+
+    // --- axm_ Git integration tests ---
+
+    #[test]
+    fn test_axm_git_status_letter() {
+        assert_eq!(AxmGitStatus::Modified.letter(), 'M');
+        assert_eq!(AxmGitStatus::Added.letter(), 'A');
+        assert_eq!(AxmGitStatus::Untracked.letter(), '?');
+        assert!(AxmGitStatus::Modified.is_changed());
+        assert!(!AxmGitStatus::Unmodified.is_changed());
+    }
+
+    #[test]
+    fn test_axm_status_entry() {
+        let e = AxmStatusEntry::new("src/main.rs", AxmGitStatus::Modified, AxmGitStatus::Unmodified);
+        assert!(e.is_staged());
+        assert!(!e.is_unstaged());
+        let r = AxmStatusEntry::renamed("old.rs", "new.rs");
+        assert!(r.is_staged());
+        assert_eq!(r.original_path.as_deref(), Some("old.rs"));
+    }
+
+    #[test]
+    fn test_axm_diff_hunk() {
+        let mut hunk = AxmDiffHunk::new(10, 5, 10, 7);
+        hunk.add_line(AxmDiffLine::context("same", 10, 10));
+        hunk.add_line(AxmDiffLine::removed("old", 11));
+        hunk.add_line(AxmDiffLine::added("new1", 11));
+        hunk.add_line(AxmDiffLine::added("new2", 12));
+        assert_eq!(hunk.added_count(), 2);
+        assert_eq!(hunk.removed_count(), 1);
+    }
+
+    #[test]
+    fn test_axm_diff_line() {
+        let ctx = AxmDiffLine::context("text", 5, 5);
+        assert_eq!(ctx.prefix(), ' ');
+        let add = AxmDiffLine::added("new", 6);
+        assert!(add.is_added());
+        assert_eq!(add.prefix(), '+');
+        let rem = AxmDiffLine::removed("old", 5);
+        assert!(rem.is_removed());
+        assert_eq!(rem.prefix(), '-');
+    }
+
+    #[test]
+    fn test_axm_blame_line() {
+        let bl = AxmBlameLine::new("abc1234567890", "Alice", "2024-01-01", 42, "let x = 1;");
+        assert_eq!(bl.short_hash(), "abc1234");
+        assert_eq!(bl.line_number, 42);
+    }
+
+    #[test]
+    fn test_axm_git_repo() {
+        let mut repo = AxmGitRepo::new("/project", "main");
+        assert!(repo.is_clean());
+        repo.status.push(AxmStatusEntry::new("a.rs", AxmGitStatus::Modified, AxmGitStatus::Unmodified));
+        repo.status.push(AxmStatusEntry::new("b.rs", AxmGitStatus::Unmodified, AxmGitStatus::Modified));
+        repo.status.push(AxmStatusEntry::new("c.rs", AxmGitStatus::Untracked, AxmGitStatus::Untracked));
+        assert!(repo.has_changes());
+        assert_eq!(repo.staged_count(), 2); // a.rs modified + c.rs untracked in index
+        assert_eq!(repo.unstaged_count(), 2); // b.rs modified + c.rs untracked
+        assert_eq!(repo.untracked_count(), 1);
+    }
+
+    #[test]
+    fn test_axm_git_repo_sync() {
+        let mut repo = AxmGitRepo::new("/p", "main");
+        assert_eq!(repo.sync_status(), "synced");
+        repo.ahead = 3;
+        assert_eq!(repo.sync_status(), "3↑");
+        repo.behind = 2;
+        assert_eq!(repo.sync_status(), "3↑ 2↓");
+        repo.ahead = 0;
+        assert_eq!(repo.sync_status(), "2↓");
+    }
+
+    #[test]
+    fn test_axm_git_repo_in_progress() {
+        let mut repo = AxmGitRepo::new("/p", "main");
+        assert!(!repo.is_in_progress());
+        repo.is_rebasing = true;
+        assert!(repo.is_in_progress());
     }
 
 }
