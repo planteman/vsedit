@@ -1737,6 +1737,331 @@ impl XWbMcpLayoutConstraint {
     }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// wb_mcp – Extended domain helpers
+// ---------------------------------------------------------------------------
+
+/// Extended mode for MCP protocol handling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YWbMcpMcpConnectionState {
+    Disconnected,
+    Connecting,
+    Connected,
+    Error,
+}
+
+impl YWbMcpMcpConnectionState {
+    /// Return an index for this variant (0-based).
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Disconnected => 0,
+            Self::Connecting => 1,
+            Self::Connected => 2,
+            Self::Error => 3,
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Disconnected => "Disconnected",
+            Self::Connecting => "Connecting",
+            Self::Connected => "Connected",
+            Self::Error => "Error",
+        }
+    }
+
+    /// List all variants.
+    pub fn all() -> &'static [YWbMcpMcpConnectionState] {
+        &[
+            YWbMcpMcpConnectionState::Disconnected,
+            YWbMcpMcpConnectionState::Connecting,
+            YWbMcpMcpConnectionState::Connected,
+            YWbMcpMcpConnectionState::Error,
+        ]
+    }
+
+    /// Check if this is the first variant.
+    pub fn is_default(&self) -> bool {
+        self.index() == 0
+    }
+}
+
+impl fmt::Display for YWbMcpMcpConnectionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks MCP message queue data.
+#[derive(Debug, Clone)]
+pub struct YWbMcpMcpMessageQueue {
+    pub messages: Vec<(u64, String)>,
+    pub capacity: usize,
+    pub dropped: u64,
+}
+
+impl YWbMcpMcpMessageQueue {
+    /// Create a new instance with default values.
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+            capacity: 0,
+            dropped: 0,
+        }
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Whether the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.messages.clear();
+    }
+
+    /// Summary string for debugging.
+    pub fn summary(&self) -> String {
+        format!("YWbMcpMcpMessageQueue({}: {:?})", "messages", self.messages)
+    }
+}
+
+/// Compute a hash-like fingerprint from a label string.
+pub fn y_wb_mcp_fingerprint(label: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in label.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Truncate a string to at most `max_len` characters, appending '…' if truncated.
+pub fn y_wb_mcp_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut t = s[..max_len].to_string();
+        t.push('…');
+        t
+    }
+}
+
+/// Normalize a key string: lowercase and replace spaces with underscores.
+pub fn y_wb_mcp_normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(' ', "_")
+}
+
+/// Split a dotted path into segments.
+pub fn y_wb_mcp_split_path(path: &str) -> Vec<&str> {
+    path.split('.').collect()
+}
+
+/// Count occurrences of `needle` in `haystack`.
+pub fn y_wb_mcp_count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Check whether `value` is within `[lo, hi]` inclusive.
+pub fn y_wb_mcp_in_range(value: i64, lo: i64, hi: i64) -> bool {
+    value >= lo && value <= hi
+}
+
+/// Deduplicate a sorted slice, returning a new Vec.
+pub fn y_wb_mcp_dedup_sorted(items: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for item in items {
+        if result.last().map_or(true, |last: &String| last != item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Interleave two slices of strings.
+pub fn y_wb_mcp_interleave<'a>(a: &'a [String], b: &'a [String]) -> Vec<&'a String> {
+    let mut out = Vec::new();
+    let max = a.len().max(b.len());
+    for i in 0..max {
+        if i < a.len() { out.push(&a[i]); }
+        if i < b.len() { out.push(&b[i]); }
+    }
+    out
+}
+
+
+
+// ---------------------------------------------------------------------------
+// wb_mcp – Extended MCP tool registry helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for MCP tool registry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZWbMcpPriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZWbMcpPriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZWbMcpPriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZWbMcpPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks MCP tool registry data.
+#[derive(Debug, Clone)]
+pub struct ZWbMcpMcpToolRegistry {
+    pub tools: Vec<(String, bool)>,
+    pub version: u32,
+    pub locked: bool,
+}
+
+impl ZWbMcpMcpToolRegistry {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            tools: Vec::new(),
+            version: 0,
+            locked: false,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.tools.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.tools.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZWbMcpMcpToolRegistry[version={:?}, locked={:?}]", self.version, self.locked)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let mut c = self.clone();
+        c.locked = !c.locked;
+        c
+    }
+}
+
+/// Compute a simple rolling hash for MCP tool registry.
+pub fn z_wb_mcp_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_wb_mcp_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_wb_mcp_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_wb_mcp_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_wb_mcp_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_wb_mcp_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_wb_mcp_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3017,4 +3342,235 @@ mod tests {
         assert_ne!(XWbMcpLayoutRegion::Sidebar, XWbMcpLayoutRegion::Panel);
     }
 
+
+    // -- wb_mcp extended domain tests ----------------------------------------
+
+    #[test]
+    fn y_wb_mcp_enum_index() {
+        assert_eq!(YWbMcpMcpConnectionState::Disconnected.index(), 0);
+        assert_eq!(YWbMcpMcpConnectionState::Connecting.index(), 1);
+        assert_eq!(YWbMcpMcpConnectionState::Connected.index(), 2);
+        assert_eq!(YWbMcpMcpConnectionState::Error.index(), 3);
+    }
+
+    #[test]
+    fn y_wb_mcp_enum_label() {
+        assert_eq!(YWbMcpMcpConnectionState::Disconnected.label(), "Disconnected");
+        assert_eq!(YWbMcpMcpConnectionState::Connecting.label(), "Connecting");
+        assert_eq!(YWbMcpMcpConnectionState::Connected.label(), "Connected");
+        assert_eq!(YWbMcpMcpConnectionState::Error.label(), "Error");
+    }
+
+    #[test]
+    fn y_wb_mcp_enum_all() {
+        let all = YWbMcpMcpConnectionState::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn y_wb_mcp_enum_is_default() {
+        assert!(YWbMcpMcpConnectionState::Disconnected.is_default());
+        assert!(!YWbMcpMcpConnectionState::Error.is_default());
+    }
+
+    #[test]
+    fn y_wb_mcp_enum_display() {
+        assert_eq!(format!("{}", YWbMcpMcpConnectionState::Disconnected), "Disconnected");
+    }
+
+    #[test]
+    fn y_wb_mcp_struct_new() {
+        let s = YWbMcpMcpMessageQueue::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn y_wb_mcp_struct_clear() {
+        let mut s = YWbMcpMcpMessageQueue::new();
+        s.messages.push(Default::default());
+        assert!(!s.is_empty());
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn y_wb_mcp_fingerprint_deterministic() {
+        let h1 = y_wb_mcp_fingerprint("hello");
+        let h2 = y_wb_mcp_fingerprint("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(y_wb_mcp_fingerprint("a"), y_wb_mcp_fingerprint("b"));
+    }
+
+    #[test]
+    fn y_wb_mcp_truncate_short() {
+        assert_eq!(y_wb_mcp_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn y_wb_mcp_truncate_long() {
+        let r = y_wb_mcp_truncate("abcdef", 3);
+        assert!(r.starts_with("abc"));
+        assert_eq!(r.len(), 3 + '…'.len_utf8());
+    }
+
+    #[test]
+    fn y_wb_mcp_normalize_key_basic() {
+        assert_eq!(y_wb_mcp_normalize_key("Hello World"), "hello_world");
+    }
+
+    #[test]
+    fn y_wb_mcp_split_path_basic() {
+        let parts = y_wb_mcp_split_path("a.b.c");
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn y_wb_mcp_count_occurrences_basic() {
+        assert_eq!(y_wb_mcp_count_occurrences("abcabc", "abc"), 2);
+        assert_eq!(y_wb_mcp_count_occurrences("abc", "xyz"), 0);
+        assert_eq!(y_wb_mcp_count_occurrences("abc", ""), 0);
+    }
+
+    #[test]
+    fn y_wb_mcp_in_range_basic() {
+        assert!(y_wb_mcp_in_range(5, 1, 10));
+        assert!(y_wb_mcp_in_range(1, 1, 10));
+        assert!(y_wb_mcp_in_range(10, 1, 10));
+        assert!(!y_wb_mcp_in_range(0, 1, 10));
+        assert!(!y_wb_mcp_in_range(11, 1, 10));
+    }
+
+    #[test]
+    fn y_wb_mcp_dedup_sorted_basic() {
+        let items: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "c".into(), "c".into()];
+        let deduped = y_wb_mcp_dedup_sorted(&items);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0], "a");
+    }
+
+    #[test]
+    fn y_wb_mcp_interleave_basic() {
+        let a: Vec<String> = vec!["a".into(), "b".into()];
+        let b: Vec<String> = vec!["1".into(), "2".into(), "3".into()];
+        let r = y_wb_mcp_interleave(&a, &b);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], "a");
+        assert_eq!(r[1], "1");
+    }
+
+    // -- wb_mcp Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_wb_mcp_priority_weight() {
+        assert_eq!(ZWbMcpPriority::Idle.weight(), 0);
+        assert_eq!(ZWbMcpPriority::Normal.weight(), 2);
+        assert_eq!(ZWbMcpPriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_wb_mcp_priority_label() {
+        assert_eq!(ZWbMcpPriority::Low.label(), "low");
+        assert_eq!(ZWbMcpPriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_wb_mcp_priority_is_elevated() {
+        assert!(!ZWbMcpPriority::Normal.is_elevated());
+        assert!(ZWbMcpPriority::High.is_elevated());
+        assert!(ZWbMcpPriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_wb_mcp_priority_display() {
+        assert_eq!(format!("{}", ZWbMcpPriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_wb_mcp_priority_all_asc() {
+        let all = ZWbMcpPriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZWbMcpPriority::Idle);
+        assert_eq!(all[4], ZWbMcpPriority::Realtime);
+    }
+
+    #[test]
+    fn z_wb_mcp_struct_new() {
+        let s = ZWbMcpMcpToolRegistry::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_wb_mcp_struct_toggled_clone() {
+        let s = ZWbMcpMcpToolRegistry::new();
+        let t = s.toggled_clone();
+        assert_ne!(s.locked, t.locked);
+    }
+
+    #[test]
+    fn z_wb_mcp_rolling_hash_deterministic() {
+        let h1 = z_wb_mcp_rolling_hash(b"test");
+        let h2 = z_wb_mcp_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_wb_mcp_rolling_hash(b"a"), z_wb_mcp_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_wb_mcp_pad_to_basic() {
+        assert_eq!(z_wb_mcp_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_wb_mcp_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_wb_mcp_is_identifier_basic() {
+        assert!(z_wb_mcp_is_identifier("foo_bar"));
+        assert!(z_wb_mcp_is_identifier("abc123"));
+        assert!(!z_wb_mcp_is_identifier(""));
+        assert!(!z_wb_mcp_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_wb_mcp_levenshtein_basic() {
+        assert_eq!(z_wb_mcp_levenshtein("", ""), 0);
+        assert_eq!(z_wb_mcp_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_wb_mcp_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_wb_mcp_unique_words_basic() {
+        let w = z_wb_mcp_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_wb_mcp_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_wb_mcp_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_wb_mcp_common_prefix_basic() {
+        assert_eq!(z_wb_mcp_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_wb_mcp_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_wb_mcp_struct_clear() {
+        let mut s = ZWbMcpMcpToolRegistry::new();
+        s.tools.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_wb_mcp_rolling_hash_empty() {
+        let h = z_wb_mcp_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
 }

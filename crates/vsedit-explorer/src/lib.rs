@@ -1916,6 +1916,315 @@ impl ExplorerStats {
     }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// explorer – Extended domain helpers
+// ---------------------------------------------------------------------------
+
+/// Extended mode for file explorer view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YExplorerExplorerSortBy {
+    Name,
+    Modified,
+    Type,
+    Size,
+}
+
+impl YExplorerExplorerSortBy {
+    /// Return an index for this variant (0-based).
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Name => 0,
+            Self::Modified => 1,
+            Self::Type => 2,
+            Self::Size => 3,
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Name => "Name",
+            Self::Modified => "Modified",
+            Self::Type => "Type",
+            Self::Size => "Size",
+        }
+    }
+
+    /// List all variants.
+    pub fn all() -> &'static [YExplorerExplorerSortBy] {
+        &[
+            YExplorerExplorerSortBy::Name,
+            YExplorerExplorerSortBy::Modified,
+            YExplorerExplorerSortBy::Type,
+            YExplorerExplorerSortBy::Size,
+        ]
+    }
+
+    /// Check if this is the first variant.
+    pub fn is_default(&self) -> bool {
+        self.index() == 0
+    }
+}
+
+impl fmt::Display for YExplorerExplorerSortBy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks explorer node data.
+#[derive(Debug, Clone)]
+pub struct YExplorerExplorerNode {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
+impl YExplorerExplorerNode {
+    /// Create a new instance with default values.
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            is_dir: false,
+            size: 0,
+        }
+    }
+
+    /// Summary string for debugging.
+    pub fn summary(&self) -> String {
+        format!("YExplorerExplorerNode({}: {:?})", "name", self.name)
+    }
+}
+
+/// Compute a hash-like fingerprint from a label string.
+pub fn y_explorer_fingerprint(label: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in label.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Truncate a string to at most `max_len` characters, appending '…' if truncated.
+pub fn y_explorer_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut t = s[..max_len].to_string();
+        t.push('…');
+        t
+    }
+}
+
+/// Normalize a key string: lowercase and replace spaces with underscores.
+pub fn y_explorer_normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(' ', "_")
+}
+
+/// Split a dotted path into segments.
+pub fn y_explorer_split_path(path: &str) -> Vec<&str> {
+    path.split('.').collect()
+}
+
+/// Count occurrences of `needle` in `haystack`.
+pub fn y_explorer_count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Check whether `value` is within `[lo, hi]` inclusive.
+pub fn y_explorer_in_range(value: i64, lo: i64, hi: i64) -> bool {
+    value >= lo && value <= hi
+}
+
+/// Deduplicate a sorted slice, returning a new Vec.
+pub fn y_explorer_dedup_sorted(items: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for item in items {
+        if result.last().map_or(true, |last: &String| last != item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Interleave two slices of strings.
+pub fn y_explorer_interleave<'a>(a: &'a [String], b: &'a [String]) -> Vec<&'a String> {
+    let mut out = Vec::new();
+    let max = a.len().max(b.len());
+    for i in 0..max {
+        if i < a.len() { out.push(&a[i]); }
+        if i < b.len() { out.push(&b[i]); }
+    }
+    out
+}
+
+
+
+// ---------------------------------------------------------------------------
+// explorer – Extended explorer filter helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for explorer filter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZExplorerPriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZExplorerPriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZExplorerPriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZExplorerPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks explorer filter data.
+#[derive(Debug, Clone)]
+pub struct ZExplorerExplorerFilter {
+    pub glob_patterns: Vec<String>,
+    pub show_hidden: bool,
+    pub max_depth: usize,
+}
+
+impl ZExplorerExplorerFilter {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            glob_patterns: Vec::new(),
+            show_hidden: false,
+            max_depth: 0,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.glob_patterns.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.glob_patterns.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.glob_patterns.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZExplorerExplorerFilter[show_hidden={:?}, max_depth={:?}]", self.show_hidden, self.max_depth)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let c = self.clone();
+        c
+    }
+}
+
+/// Compute a simple rolling hash for explorer filter.
+pub fn z_explorer_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_explorer_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_explorer_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_explorer_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_explorer_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_explorer_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_explorer_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3075,4 +3384,225 @@ mod tests {
         assert_eq!(s.average_file_size(), 0.0);
     }
 
+
+    // -- explorer extended domain tests ----------------------------------------
+
+    #[test]
+    fn y_explorer_enum_index() {
+        assert_eq!(YExplorerExplorerSortBy::Name.index(), 0);
+        assert_eq!(YExplorerExplorerSortBy::Modified.index(), 1);
+        assert_eq!(YExplorerExplorerSortBy::Type.index(), 2);
+        assert_eq!(YExplorerExplorerSortBy::Size.index(), 3);
+    }
+
+    #[test]
+    fn y_explorer_enum_label() {
+        assert_eq!(YExplorerExplorerSortBy::Name.label(), "Name");
+        assert_eq!(YExplorerExplorerSortBy::Modified.label(), "Modified");
+        assert_eq!(YExplorerExplorerSortBy::Type.label(), "Type");
+        assert_eq!(YExplorerExplorerSortBy::Size.label(), "Size");
+    }
+
+    #[test]
+    fn y_explorer_enum_all() {
+        let all = YExplorerExplorerSortBy::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn y_explorer_enum_is_default() {
+        assert!(YExplorerExplorerSortBy::Name.is_default());
+        assert!(!YExplorerExplorerSortBy::Size.is_default());
+    }
+
+    #[test]
+    fn y_explorer_enum_display() {
+        assert_eq!(format!("{}", YExplorerExplorerSortBy::Name), "Name");
+    }
+
+    #[test]
+    fn y_explorer_struct_new() {
+        let s = YExplorerExplorerNode::new();
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn y_explorer_fingerprint_deterministic() {
+        let h1 = y_explorer_fingerprint("hello");
+        let h2 = y_explorer_fingerprint("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(y_explorer_fingerprint("a"), y_explorer_fingerprint("b"));
+    }
+
+    #[test]
+    fn y_explorer_truncate_short() {
+        assert_eq!(y_explorer_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn y_explorer_truncate_long() {
+        let r = y_explorer_truncate("abcdef", 3);
+        assert!(r.starts_with("abc"));
+        assert_eq!(r.len(), 3 + '…'.len_utf8());
+    }
+
+    #[test]
+    fn y_explorer_normalize_key_basic() {
+        assert_eq!(y_explorer_normalize_key("Hello World"), "hello_world");
+    }
+
+    #[test]
+    fn y_explorer_split_path_basic() {
+        let parts = y_explorer_split_path("a.b.c");
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn y_explorer_count_occurrences_basic() {
+        assert_eq!(y_explorer_count_occurrences("abcabc", "abc"), 2);
+        assert_eq!(y_explorer_count_occurrences("abc", "xyz"), 0);
+        assert_eq!(y_explorer_count_occurrences("abc", ""), 0);
+    }
+
+    #[test]
+    fn y_explorer_in_range_basic() {
+        assert!(y_explorer_in_range(5, 1, 10));
+        assert!(y_explorer_in_range(1, 1, 10));
+        assert!(y_explorer_in_range(10, 1, 10));
+        assert!(!y_explorer_in_range(0, 1, 10));
+        assert!(!y_explorer_in_range(11, 1, 10));
+    }
+
+    #[test]
+    fn y_explorer_dedup_sorted_basic() {
+        let items: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "c".into(), "c".into()];
+        let deduped = y_explorer_dedup_sorted(&items);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0], "a");
+    }
+
+    #[test]
+    fn y_explorer_interleave_basic() {
+        let a: Vec<String> = vec!["a".into(), "b".into()];
+        let b: Vec<String> = vec!["1".into(), "2".into(), "3".into()];
+        let r = y_explorer_interleave(&a, &b);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], "a");
+        assert_eq!(r[1], "1");
+    }
+
+    // -- explorer Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_explorer_priority_weight() {
+        assert_eq!(ZExplorerPriority::Idle.weight(), 0);
+        assert_eq!(ZExplorerPriority::Normal.weight(), 2);
+        assert_eq!(ZExplorerPriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_explorer_priority_label() {
+        assert_eq!(ZExplorerPriority::Low.label(), "low");
+        assert_eq!(ZExplorerPriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_explorer_priority_is_elevated() {
+        assert!(!ZExplorerPriority::Normal.is_elevated());
+        assert!(ZExplorerPriority::High.is_elevated());
+        assert!(ZExplorerPriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_explorer_priority_display() {
+        assert_eq!(format!("{}", ZExplorerPriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_explorer_priority_all_asc() {
+        let all = ZExplorerPriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZExplorerPriority::Idle);
+        assert_eq!(all[4], ZExplorerPriority::Realtime);
+    }
+
+    #[test]
+    fn z_explorer_struct_new() {
+        let s = ZExplorerExplorerFilter::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_explorer_struct_toggled_clone() {
+        let s = ZExplorerExplorerFilter::new();
+        let t = s.toggled_clone();
+        let _ = t.max_depth;
+    }
+
+    #[test]
+    fn z_explorer_rolling_hash_deterministic() {
+        let h1 = z_explorer_rolling_hash(b"test");
+        let h2 = z_explorer_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_explorer_rolling_hash(b"a"), z_explorer_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_explorer_pad_to_basic() {
+        assert_eq!(z_explorer_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_explorer_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_explorer_is_identifier_basic() {
+        assert!(z_explorer_is_identifier("foo_bar"));
+        assert!(z_explorer_is_identifier("abc123"));
+        assert!(!z_explorer_is_identifier(""));
+        assert!(!z_explorer_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_explorer_levenshtein_basic() {
+        assert_eq!(z_explorer_levenshtein("", ""), 0);
+        assert_eq!(z_explorer_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_explorer_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_explorer_unique_words_basic() {
+        let w = z_explorer_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_explorer_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_explorer_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_explorer_common_prefix_basic() {
+        assert_eq!(z_explorer_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_explorer_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_explorer_struct_clear() {
+        let mut s = ZExplorerExplorerFilter::new();
+        s.glob_patterns.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_explorer_rolling_hash_empty() {
+        let h = z_explorer_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
 }

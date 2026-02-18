@@ -1867,6 +1867,330 @@ pub fn x_notification_svc_sanitize_path(p: &str) -> String {
     result
 }
 
+
+
+// ---------------------------------------------------------------------------
+// notification_svc – Extended domain helpers
+// ---------------------------------------------------------------------------
+
+/// Extended mode for notification service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YNotificationSvcNotificationLevel {
+    Info,
+    Warning,
+    Error,
+    Silent,
+}
+
+impl YNotificationSvcNotificationLevel {
+    /// Return an index for this variant (0-based).
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Info => 0,
+            Self::Warning => 1,
+            Self::Error => 2,
+            Self::Silent => 3,
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Info => "Info",
+            Self::Warning => "Warning",
+            Self::Error => "Error",
+            Self::Silent => "Silent",
+        }
+    }
+
+    /// List all variants.
+    pub fn all() -> &'static [YNotificationSvcNotificationLevel] {
+        &[
+            YNotificationSvcNotificationLevel::Info,
+            YNotificationSvcNotificationLevel::Warning,
+            YNotificationSvcNotificationLevel::Error,
+            YNotificationSvcNotificationLevel::Silent,
+        ]
+    }
+
+    /// Check if this is the first variant.
+    pub fn is_default(&self) -> bool {
+        self.index() == 0
+    }
+}
+
+impl fmt::Display for YNotificationSvcNotificationLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks notification queue data.
+#[derive(Debug, Clone)]
+pub struct YNotificationSvcNotificationQueue {
+    pub items: Vec<(String, u64)>,
+    pub max_visible: usize,
+    pub dismissed: u64,
+}
+
+impl YNotificationSvcNotificationQueue {
+    /// Create a new instance with default values.
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            max_visible: 0,
+            dismissed: 0,
+        }
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    /// Summary string for debugging.
+    pub fn summary(&self) -> String {
+        format!("YNotificationSvcNotificationQueue({}: {:?})", "items", self.items)
+    }
+}
+
+/// Compute a hash-like fingerprint from a label string.
+pub fn y_notification_svc_fingerprint(label: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in label.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Truncate a string to at most `max_len` characters, appending '…' if truncated.
+pub fn y_notification_svc_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut t = s[..max_len].to_string();
+        t.push('…');
+        t
+    }
+}
+
+/// Normalize a key string: lowercase and replace spaces with underscores.
+pub fn y_notification_svc_normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(' ', "_")
+}
+
+/// Split a dotted path into segments.
+pub fn y_notification_svc_split_path(path: &str) -> Vec<&str> {
+    path.split('.').collect()
+}
+
+/// Count occurrences of `needle` in `haystack`.
+pub fn y_notification_svc_count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Check whether `value` is within `[lo, hi]` inclusive.
+pub fn y_notification_svc_in_range(value: i64, lo: i64, hi: i64) -> bool {
+    value >= lo && value <= hi
+}
+
+/// Deduplicate a sorted slice, returning a new Vec.
+pub fn y_notification_svc_dedup_sorted(items: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for item in items {
+        if result.last().map_or(true, |last: &String| last != item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Interleave two slices of strings.
+pub fn y_notification_svc_interleave<'a>(a: &'a [String], b: &'a [String]) -> Vec<&'a String> {
+    let mut out = Vec::new();
+    let max = a.len().max(b.len());
+    for i in 0..max {
+        if i < a.len() { out.push(&a[i]); }
+        if i < b.len() { out.push(&b[i]); }
+    }
+    out
+}
+
+
+
+// ---------------------------------------------------------------------------
+// notification_svc – Extended notification throttle helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for notification throttle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZNotificationSvcPriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZNotificationSvcPriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZNotificationSvcPriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZNotificationSvcPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks notification throttle data.
+#[derive(Debug, Clone)]
+pub struct ZNotificationSvcNotificationThrottle {
+    pub recent_ids: Vec<(u64, u64)>,
+    pub window_ms: u64,
+    pub suppressed: u64,
+}
+
+impl ZNotificationSvcNotificationThrottle {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            recent_ids: Vec::new(),
+            window_ms: 0,
+            suppressed: 0,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.recent_ids.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.recent_ids.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.recent_ids.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZNotificationSvcNotificationThrottle[window_ms={:?}, suppressed={:?}]", self.window_ms, self.suppressed)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let c = self.clone();
+        c
+    }
+}
+
+/// Compute a simple rolling hash for notification throttle.
+pub fn z_notification_svc_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_notification_svc_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_notification_svc_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_notification_svc_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_notification_svc_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_notification_svc_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_notification_svc_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3023,4 +3347,235 @@ mod tests {
         assert_eq!(all, vec!["a", "b"]);
     }
 
+
+    // -- notification_svc extended domain tests ----------------------------------------
+
+    #[test]
+    fn y_notification_svc_enum_index() {
+        assert_eq!(YNotificationSvcNotificationLevel::Info.index(), 0);
+        assert_eq!(YNotificationSvcNotificationLevel::Warning.index(), 1);
+        assert_eq!(YNotificationSvcNotificationLevel::Error.index(), 2);
+        assert_eq!(YNotificationSvcNotificationLevel::Silent.index(), 3);
+    }
+
+    #[test]
+    fn y_notification_svc_enum_label() {
+        assert_eq!(YNotificationSvcNotificationLevel::Info.label(), "Info");
+        assert_eq!(YNotificationSvcNotificationLevel::Warning.label(), "Warning");
+        assert_eq!(YNotificationSvcNotificationLevel::Error.label(), "Error");
+        assert_eq!(YNotificationSvcNotificationLevel::Silent.label(), "Silent");
+    }
+
+    #[test]
+    fn y_notification_svc_enum_all() {
+        let all = YNotificationSvcNotificationLevel::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn y_notification_svc_enum_is_default() {
+        assert!(YNotificationSvcNotificationLevel::Info.is_default());
+        assert!(!YNotificationSvcNotificationLevel::Silent.is_default());
+    }
+
+    #[test]
+    fn y_notification_svc_enum_display() {
+        assert_eq!(format!("{}", YNotificationSvcNotificationLevel::Info), "Info");
+    }
+
+    #[test]
+    fn y_notification_svc_struct_new() {
+        let s = YNotificationSvcNotificationQueue::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn y_notification_svc_struct_clear() {
+        let mut s = YNotificationSvcNotificationQueue::new();
+        s.items.push(Default::default());
+        assert!(!s.is_empty());
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn y_notification_svc_fingerprint_deterministic() {
+        let h1 = y_notification_svc_fingerprint("hello");
+        let h2 = y_notification_svc_fingerprint("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(y_notification_svc_fingerprint("a"), y_notification_svc_fingerprint("b"));
+    }
+
+    #[test]
+    fn y_notification_svc_truncate_short() {
+        assert_eq!(y_notification_svc_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn y_notification_svc_truncate_long() {
+        let r = y_notification_svc_truncate("abcdef", 3);
+        assert!(r.starts_with("abc"));
+        assert_eq!(r.len(), 3 + '…'.len_utf8());
+    }
+
+    #[test]
+    fn y_notification_svc_normalize_key_basic() {
+        assert_eq!(y_notification_svc_normalize_key("Hello World"), "hello_world");
+    }
+
+    #[test]
+    fn y_notification_svc_split_path_basic() {
+        let parts = y_notification_svc_split_path("a.b.c");
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn y_notification_svc_count_occurrences_basic() {
+        assert_eq!(y_notification_svc_count_occurrences("abcabc", "abc"), 2);
+        assert_eq!(y_notification_svc_count_occurrences("abc", "xyz"), 0);
+        assert_eq!(y_notification_svc_count_occurrences("abc", ""), 0);
+    }
+
+    #[test]
+    fn y_notification_svc_in_range_basic() {
+        assert!(y_notification_svc_in_range(5, 1, 10));
+        assert!(y_notification_svc_in_range(1, 1, 10));
+        assert!(y_notification_svc_in_range(10, 1, 10));
+        assert!(!y_notification_svc_in_range(0, 1, 10));
+        assert!(!y_notification_svc_in_range(11, 1, 10));
+    }
+
+    #[test]
+    fn y_notification_svc_dedup_sorted_basic() {
+        let items: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "c".into(), "c".into()];
+        let deduped = y_notification_svc_dedup_sorted(&items);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0], "a");
+    }
+
+    #[test]
+    fn y_notification_svc_interleave_basic() {
+        let a: Vec<String> = vec!["a".into(), "b".into()];
+        let b: Vec<String> = vec!["1".into(), "2".into(), "3".into()];
+        let r = y_notification_svc_interleave(&a, &b);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], "a");
+        assert_eq!(r[1], "1");
+    }
+
+    // -- notification_svc Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_notification_svc_priority_weight() {
+        assert_eq!(ZNotificationSvcPriority::Idle.weight(), 0);
+        assert_eq!(ZNotificationSvcPriority::Normal.weight(), 2);
+        assert_eq!(ZNotificationSvcPriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_notification_svc_priority_label() {
+        assert_eq!(ZNotificationSvcPriority::Low.label(), "low");
+        assert_eq!(ZNotificationSvcPriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_notification_svc_priority_is_elevated() {
+        assert!(!ZNotificationSvcPriority::Normal.is_elevated());
+        assert!(ZNotificationSvcPriority::High.is_elevated());
+        assert!(ZNotificationSvcPriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_notification_svc_priority_display() {
+        assert_eq!(format!("{}", ZNotificationSvcPriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_notification_svc_priority_all_asc() {
+        let all = ZNotificationSvcPriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZNotificationSvcPriority::Idle);
+        assert_eq!(all[4], ZNotificationSvcPriority::Realtime);
+    }
+
+    #[test]
+    fn z_notification_svc_struct_new() {
+        let s = ZNotificationSvcNotificationThrottle::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_notification_svc_struct_toggled_clone() {
+        let s = ZNotificationSvcNotificationThrottle::new();
+        let t = s.toggled_clone();
+        let _ = t.suppressed;
+    }
+
+    #[test]
+    fn z_notification_svc_rolling_hash_deterministic() {
+        let h1 = z_notification_svc_rolling_hash(b"test");
+        let h2 = z_notification_svc_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_notification_svc_rolling_hash(b"a"), z_notification_svc_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_notification_svc_pad_to_basic() {
+        assert_eq!(z_notification_svc_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_notification_svc_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_notification_svc_is_identifier_basic() {
+        assert!(z_notification_svc_is_identifier("foo_bar"));
+        assert!(z_notification_svc_is_identifier("abc123"));
+        assert!(!z_notification_svc_is_identifier(""));
+        assert!(!z_notification_svc_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_notification_svc_levenshtein_basic() {
+        assert_eq!(z_notification_svc_levenshtein("", ""), 0);
+        assert_eq!(z_notification_svc_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_notification_svc_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_notification_svc_unique_words_basic() {
+        let w = z_notification_svc_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_notification_svc_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_notification_svc_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_notification_svc_common_prefix_basic() {
+        assert_eq!(z_notification_svc_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_notification_svc_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_notification_svc_struct_clear() {
+        let mut s = ZNotificationSvcNotificationThrottle::new();
+        s.recent_ids.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_notification_svc_rolling_hash_empty() {
+        let h = z_notification_svc_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
 }

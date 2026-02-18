@@ -1916,6 +1916,180 @@ impl fmt::Display for TabBarBuildErr {
 }
 impl std::error::Error for TabBarBuildErr {}
 
+
+// ---------------------------------------------------------------------------
+// Tab bar state and ordering — extended utilities (zw)
+// ---------------------------------------------------------------------------
+
+/// Metric accumulator for tabbar operations.
+#[derive(Debug, Clone)]
+pub struct ZwMetrics {
+    samples: Vec<f64>,
+    label: String,
+}
+
+impl ZwMetrics {
+    pub fn new(label: &str) -> Self {
+        Self { samples: Vec::new(), label: label.to_string() }
+    }
+
+    pub fn record(&mut self, value: f64) {
+        self.samples.push(value);
+    }
+
+    pub fn mean(&self) -> f64 {
+        if self.samples.is_empty() { return 0.0; }
+        self.samples.iter().sum::<f64>() / self.samples.len() as f64
+    }
+
+    pub fn max_val(&self) -> f64 {
+        self.samples.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+    }
+
+    pub fn min_val(&self) -> f64 {
+        self.samples.iter().cloned().fold(f64::INFINITY, f64::min)
+    }
+
+    pub fn count(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn reset(&mut self) {
+        self.samples.clear();
+    }
+
+    pub fn variance(&self) -> f64 {
+        if self.samples.len() < 2 { return 0.0; }
+        let m = self.mean();
+        let sq: f64 = self.samples.iter().map(|v| (v - m).powi(2)).sum();
+        sq / (self.samples.len() as f64 - 1.0)
+    }
+
+    pub fn std_dev(&self) -> f64 {
+        self.variance().sqrt()
+    }
+
+    pub fn percentile(&self, p: f64) -> f64 {
+        if self.samples.is_empty() { return 0.0; }
+        let mut sorted = self.samples.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let idx = ((p / 100.0) * (sorted.len() as f64 - 1.0)).round() as usize;
+        sorted[idx.min(sorted.len() - 1)]
+    }
+
+    pub fn sum(&self) -> f64 {
+        self.samples.iter().sum()
+    }
+
+    pub fn merge(&mut self, other: &Self) {
+        self.samples.extend_from_slice(&other.samples);
+    }
+}
+
+/// Sliding-window rate counter for tabbar.
+#[derive(Debug, Clone)]
+pub struct ZwRateWindow {
+    timestamps: Vec<u64>,
+    window_ms: u64,
+}
+
+impl ZwRateWindow {
+    pub fn new(window_ms: u64) -> Self {
+        Self { timestamps: Vec::new(), window_ms }
+    }
+
+    pub fn tick(&mut self, now_ms: u64) {
+        self.timestamps.push(now_ms);
+        self.prune(now_ms);
+    }
+
+    fn prune(&mut self, now_ms: u64) {
+        let cutoff = now_ms.saturating_sub(self.window_ms);
+        self.timestamps.retain(|&t| t >= cutoff);
+    }
+
+    pub fn rate(&mut self, now_ms: u64) -> usize {
+        self.prune(now_ms);
+        self.timestamps.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.timestamps.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.timestamps.is_empty()
+    }
+
+    pub fn window_ms(&self) -> u64 {
+        self.window_ms
+    }
+}
+
+/// A small LRU-style cache for tabbar lookups.
+#[derive(Debug, Clone)]
+pub struct ZwLruCache {
+    entries: Vec<(String, String)>,
+    capacity: usize,
+}
+
+impl ZwLruCache {
+    pub fn new(capacity: usize) -> Self {
+        Self { entries: Vec::new(), capacity }
+    }
+
+    pub fn get(&mut self, key: &str) -> Option<String> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(pos);
+            let val = entry.1.clone();
+            self.entries.push(entry);
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    pub fn put(&mut self, key: String, value: String) {
+        self.entries.retain(|(k, _)| k != &key);
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((key, value));
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3127,6 +3301,149 @@ mod tests {
         let s = format!("{}", cfg);
         assert!(s.contains("test"));
         assert!(s.contains("false"));
+    }
+
+
+    #[test]
+    fn zw_metrics_empty() {
+        let m = ZwMetrics::new("tabbar");
+        assert_eq!(m.count(), 0);
+        assert!((m.mean() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn zw_metrics_record_and_mean() {
+        let mut m = ZwMetrics::new("tabbar");
+        m.record(10.0);
+        m.record(20.0);
+        m.record(30.0);
+        assert_eq!(m.count(), 3);
+        assert!((m.mean() - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn zw_metrics_min_max() {
+        let mut m = ZwMetrics::new("test");
+        m.record(5.0);
+        m.record(15.0);
+        m.record(10.0);
+        assert!((m.min_val() - 5.0).abs() < f64::EPSILON);
+        assert!((m.max_val() - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn zw_metrics_variance_and_std() {
+        let mut m = ZwMetrics::new("v");
+        m.record(2.0);
+        m.record(4.0);
+        m.record(4.0);
+        m.record(4.0);
+        m.record(5.0);
+        m.record(5.0);
+        m.record(7.0);
+        m.record(9.0);
+        assert!(m.variance() > 0.0);
+        assert!(m.std_dev() > 0.0);
+    }
+
+    #[test]
+    fn zw_metrics_percentile() {
+        let mut m = ZwMetrics::new("p");
+        for i in 1..=100 {
+            m.record(i as f64);
+        }
+        let p50 = m.percentile(50.0);
+        assert!(p50 >= 49.0 && p50 <= 51.0);
+    }
+
+    #[test]
+    fn zw_metrics_merge() {
+        let mut a = ZwMetrics::new("a");
+        a.record(1.0);
+        let mut b = ZwMetrics::new("b");
+        b.record(2.0);
+        b.record(3.0);
+        a.merge(&b);
+        assert_eq!(a.count(), 3);
+    }
+
+    #[test]
+    fn zw_metrics_reset() {
+        let mut m = ZwMetrics::new("r");
+        m.record(42.0);
+        m.reset();
+        assert_eq!(m.count(), 0);
+    }
+
+    #[test]
+    fn zw_rate_window_empty() {
+        let rw = ZwRateWindow::new(1000);
+        assert!(rw.is_empty());
+        assert_eq!(rw.window_ms(), 1000);
+    }
+
+    #[test]
+    fn zw_rate_window_tick_and_rate() {
+        let mut rw = ZwRateWindow::new(1000);
+        rw.tick(100);
+        rw.tick(200);
+        rw.tick(300);
+        assert_eq!(rw.rate(500), 3);
+        assert_eq!(rw.rate(1500), 0);
+    }
+
+    #[test]
+    fn zw_lru_cache_basic() {
+        let mut c = ZwLruCache::new(2);
+        c.put("a".into(), "1".into());
+        c.put("b".into(), "2".into());
+        assert_eq!(c.get("a"), Some("1".to_string()));
+        c.put("c".into(), "3".into());
+        assert_eq!(c.get("b"), None);
+    }
+
+    #[test]
+    fn zw_lru_cache_contains_and_keys() {
+        let mut c = ZwLruCache::new(3);
+        c.put("x".into(), "10".into());
+        c.put("y".into(), "20".into());
+        assert!(c.contains_key("x"));
+        assert!(!c.contains_key("z"));
+        assert_eq!(c.keys().len(), 2);
+    }
+
+    #[test]
+    fn zw_lru_cache_remove() {
+        let mut c = ZwLruCache::new(3);
+        c.put("k".into(), "v".into());
+        assert_eq!(c.remove("k"), Some("v".to_string()));
+        assert!(c.is_empty());
+        assert_eq!(c.remove("k"), None);
+    }
+
+    #[test]
+    fn zw_metrics_sum() {
+        let mut m = ZwMetrics::new("s");
+        m.record(1.0);
+        m.record(2.0);
+        m.record(3.0);
+        assert!((m.sum() - 6.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn zw_metrics_label() {
+        let m = ZwMetrics::new("my_label");
+        assert_eq!(m.label(), "my_label");
+    }
+
+    #[test]
+    fn zw_lru_cache_clear() {
+        let mut c = ZwLruCache::new(5);
+        c.put("a".into(), "1".into());
+        c.put("b".into(), "2".into());
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.len(), 0);
     }
 
 }

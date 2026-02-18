@@ -1666,6 +1666,330 @@ pub fn x_editor_viewparts_tokenize(text: &str) -> Vec<&str> {
         .collect()
 }
 
+
+
+// ---------------------------------------------------------------------------
+// editor_viewparts – Extended domain helpers
+// ---------------------------------------------------------------------------
+
+/// Extended mode for editor view parts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YEditorViewpartsViewPartZone {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+impl YEditorViewpartsViewPartZone {
+    /// Return an index for this variant (0-based).
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Top => 0,
+            Self::Bottom => 1,
+            Self::Left => 2,
+            Self::Right => 3,
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Top => "Top",
+            Self::Bottom => "Bottom",
+            Self::Left => "Left",
+            Self::Right => "Right",
+        }
+    }
+
+    /// List all variants.
+    pub fn all() -> &'static [YEditorViewpartsViewPartZone] {
+        &[
+            YEditorViewpartsViewPartZone::Top,
+            YEditorViewpartsViewPartZone::Bottom,
+            YEditorViewpartsViewPartZone::Left,
+            YEditorViewpartsViewPartZone::Right,
+        ]
+    }
+
+    /// Check if this is the first variant.
+    pub fn is_default(&self) -> bool {
+        self.index() == 0
+    }
+}
+
+impl fmt::Display for YEditorViewpartsViewPartZone {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks view parts data.
+#[derive(Debug, Clone)]
+pub struct YEditorViewpartsViewPartRegistry {
+    pub parts: Vec<(String, bool)>,
+    pub visible_count: usize,
+    pub layout_version: u32,
+}
+
+impl YEditorViewpartsViewPartRegistry {
+    /// Create a new instance with default values.
+    pub fn new() -> Self {
+        Self {
+            parts: Vec::new(),
+            visible_count: 0,
+            layout_version: 0,
+        }
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.parts.len()
+    }
+
+    /// Whether the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.parts.is_empty()
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.parts.clear();
+    }
+
+    /// Summary string for debugging.
+    pub fn summary(&self) -> String {
+        format!("YEditorViewpartsViewPartRegistry({}: {:?})", "parts", self.parts)
+    }
+}
+
+/// Compute a hash-like fingerprint from a label string.
+pub fn y_editor_viewparts_fingerprint(label: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in label.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Truncate a string to at most `max_len` characters, appending '…' if truncated.
+pub fn y_editor_viewparts_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut t = s[..max_len].to_string();
+        t.push('…');
+        t
+    }
+}
+
+/// Normalize a key string: lowercase and replace spaces with underscores.
+pub fn y_editor_viewparts_normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(' ', "_")
+}
+
+/// Split a dotted path into segments.
+pub fn y_editor_viewparts_split_path(path: &str) -> Vec<&str> {
+    path.split('.').collect()
+}
+
+/// Count occurrences of `needle` in `haystack`.
+pub fn y_editor_viewparts_count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Check whether `value` is within `[lo, hi]` inclusive.
+pub fn y_editor_viewparts_in_range(value: i64, lo: i64, hi: i64) -> bool {
+    value >= lo && value <= hi
+}
+
+/// Deduplicate a sorted slice, returning a new Vec.
+pub fn y_editor_viewparts_dedup_sorted(items: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for item in items {
+        if result.last().map_or(true, |last: &String| last != item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Interleave two slices of strings.
+pub fn y_editor_viewparts_interleave<'a>(a: &'a [String], b: &'a [String]) -> Vec<&'a String> {
+    let mut out = Vec::new();
+    let max = a.len().max(b.len());
+    for i in 0..max {
+        if i < a.len() { out.push(&a[i]); }
+        if i < b.len() { out.push(&b[i]); }
+    }
+    out
+}
+
+
+
+// ---------------------------------------------------------------------------
+// editor_viewparts – Extended view part snapshot helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for view part snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZEditorViewpartsPriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZEditorViewpartsPriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZEditorViewpartsPriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZEditorViewpartsPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks view part snapshot data.
+#[derive(Debug, Clone)]
+pub struct ZEditorViewpartsViewPartSnapshot {
+    pub part_ids: Vec<String>,
+    pub timestamp_ms: u64,
+    pub layout_hash: u64,
+}
+
+impl ZEditorViewpartsViewPartSnapshot {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            part_ids: Vec::new(),
+            timestamp_ms: 0,
+            layout_hash: 0,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.part_ids.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.part_ids.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.part_ids.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZEditorViewpartsViewPartSnapshot[timestamp_ms={:?}, layout_hash={:?}]", self.timestamp_ms, self.layout_hash)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let c = self.clone();
+        c
+    }
+}
+
+/// Compute a simple rolling hash for view part snapshot.
+pub fn z_editor_viewparts_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_editor_viewparts_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_editor_viewparts_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_editor_viewparts_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_editor_viewparts_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_editor_viewparts_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_editor_viewparts_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3021,4 +3345,235 @@ mod tests {
         assert_eq!(s.end, 15);
     }
 
+
+    // -- editor_viewparts extended domain tests ----------------------------------------
+
+    #[test]
+    fn y_editor_viewparts_enum_index() {
+        assert_eq!(YEditorViewpartsViewPartZone::Top.index(), 0);
+        assert_eq!(YEditorViewpartsViewPartZone::Bottom.index(), 1);
+        assert_eq!(YEditorViewpartsViewPartZone::Left.index(), 2);
+        assert_eq!(YEditorViewpartsViewPartZone::Right.index(), 3);
+    }
+
+    #[test]
+    fn y_editor_viewparts_enum_label() {
+        assert_eq!(YEditorViewpartsViewPartZone::Top.label(), "Top");
+        assert_eq!(YEditorViewpartsViewPartZone::Bottom.label(), "Bottom");
+        assert_eq!(YEditorViewpartsViewPartZone::Left.label(), "Left");
+        assert_eq!(YEditorViewpartsViewPartZone::Right.label(), "Right");
+    }
+
+    #[test]
+    fn y_editor_viewparts_enum_all() {
+        let all = YEditorViewpartsViewPartZone::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn y_editor_viewparts_enum_is_default() {
+        assert!(YEditorViewpartsViewPartZone::Top.is_default());
+        assert!(!YEditorViewpartsViewPartZone::Right.is_default());
+    }
+
+    #[test]
+    fn y_editor_viewparts_enum_display() {
+        assert_eq!(format!("{}", YEditorViewpartsViewPartZone::Top), "Top");
+    }
+
+    #[test]
+    fn y_editor_viewparts_struct_new() {
+        let s = YEditorViewpartsViewPartRegistry::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn y_editor_viewparts_struct_clear() {
+        let mut s = YEditorViewpartsViewPartRegistry::new();
+        s.parts.push(Default::default());
+        assert!(!s.is_empty());
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn y_editor_viewparts_fingerprint_deterministic() {
+        let h1 = y_editor_viewparts_fingerprint("hello");
+        let h2 = y_editor_viewparts_fingerprint("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(y_editor_viewparts_fingerprint("a"), y_editor_viewparts_fingerprint("b"));
+    }
+
+    #[test]
+    fn y_editor_viewparts_truncate_short() {
+        assert_eq!(y_editor_viewparts_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn y_editor_viewparts_truncate_long() {
+        let r = y_editor_viewparts_truncate("abcdef", 3);
+        assert!(r.starts_with("abc"));
+        assert_eq!(r.len(), 3 + '…'.len_utf8());
+    }
+
+    #[test]
+    fn y_editor_viewparts_normalize_key_basic() {
+        assert_eq!(y_editor_viewparts_normalize_key("Hello World"), "hello_world");
+    }
+
+    #[test]
+    fn y_editor_viewparts_split_path_basic() {
+        let parts = y_editor_viewparts_split_path("a.b.c");
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn y_editor_viewparts_count_occurrences_basic() {
+        assert_eq!(y_editor_viewparts_count_occurrences("abcabc", "abc"), 2);
+        assert_eq!(y_editor_viewparts_count_occurrences("abc", "xyz"), 0);
+        assert_eq!(y_editor_viewparts_count_occurrences("abc", ""), 0);
+    }
+
+    #[test]
+    fn y_editor_viewparts_in_range_basic() {
+        assert!(y_editor_viewparts_in_range(5, 1, 10));
+        assert!(y_editor_viewparts_in_range(1, 1, 10));
+        assert!(y_editor_viewparts_in_range(10, 1, 10));
+        assert!(!y_editor_viewparts_in_range(0, 1, 10));
+        assert!(!y_editor_viewparts_in_range(11, 1, 10));
+    }
+
+    #[test]
+    fn y_editor_viewparts_dedup_sorted_basic() {
+        let items: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "c".into(), "c".into()];
+        let deduped = y_editor_viewparts_dedup_sorted(&items);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0], "a");
+    }
+
+    #[test]
+    fn y_editor_viewparts_interleave_basic() {
+        let a: Vec<String> = vec!["a".into(), "b".into()];
+        let b: Vec<String> = vec!["1".into(), "2".into(), "3".into()];
+        let r = y_editor_viewparts_interleave(&a, &b);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], "a");
+        assert_eq!(r[1], "1");
+    }
+
+    // -- editor_viewparts Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_editor_viewparts_priority_weight() {
+        assert_eq!(ZEditorViewpartsPriority::Idle.weight(), 0);
+        assert_eq!(ZEditorViewpartsPriority::Normal.weight(), 2);
+        assert_eq!(ZEditorViewpartsPriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_editor_viewparts_priority_label() {
+        assert_eq!(ZEditorViewpartsPriority::Low.label(), "low");
+        assert_eq!(ZEditorViewpartsPriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_editor_viewparts_priority_is_elevated() {
+        assert!(!ZEditorViewpartsPriority::Normal.is_elevated());
+        assert!(ZEditorViewpartsPriority::High.is_elevated());
+        assert!(ZEditorViewpartsPriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_editor_viewparts_priority_display() {
+        assert_eq!(format!("{}", ZEditorViewpartsPriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_editor_viewparts_priority_all_asc() {
+        let all = ZEditorViewpartsPriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZEditorViewpartsPriority::Idle);
+        assert_eq!(all[4], ZEditorViewpartsPriority::Realtime);
+    }
+
+    #[test]
+    fn z_editor_viewparts_struct_new() {
+        let s = ZEditorViewpartsViewPartSnapshot::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_editor_viewparts_struct_toggled_clone() {
+        let s = ZEditorViewpartsViewPartSnapshot::new();
+        let t = s.toggled_clone();
+        let _ = t.layout_hash;
+    }
+
+    #[test]
+    fn z_editor_viewparts_rolling_hash_deterministic() {
+        let h1 = z_editor_viewparts_rolling_hash(b"test");
+        let h2 = z_editor_viewparts_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_editor_viewparts_rolling_hash(b"a"), z_editor_viewparts_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_editor_viewparts_pad_to_basic() {
+        assert_eq!(z_editor_viewparts_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_editor_viewparts_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_editor_viewparts_is_identifier_basic() {
+        assert!(z_editor_viewparts_is_identifier("foo_bar"));
+        assert!(z_editor_viewparts_is_identifier("abc123"));
+        assert!(!z_editor_viewparts_is_identifier(""));
+        assert!(!z_editor_viewparts_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_editor_viewparts_levenshtein_basic() {
+        assert_eq!(z_editor_viewparts_levenshtein("", ""), 0);
+        assert_eq!(z_editor_viewparts_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_editor_viewparts_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_editor_viewparts_unique_words_basic() {
+        let w = z_editor_viewparts_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_editor_viewparts_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_editor_viewparts_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_editor_viewparts_common_prefix_basic() {
+        assert_eq!(z_editor_viewparts_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_editor_viewparts_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_editor_viewparts_struct_clear() {
+        let mut s = ZEditorViewpartsViewPartSnapshot::new();
+        s.part_ids.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_editor_viewparts_rolling_hash_empty() {
+        let h = z_editor_viewparts_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
 }

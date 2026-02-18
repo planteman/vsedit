@@ -1712,6 +1712,316 @@ impl TimelineDiff {
     }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// ext_timeline – Extended domain helpers
+// ---------------------------------------------------------------------------
+
+/// Extended mode for extension timeline provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YExtTimelineTimelineProviderState {
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+impl YExtTimelineTimelineProviderState {
+    /// Return an index for this variant (0-based).
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Idle => 0,
+            Self::Loading => 1,
+            Self::Loaded => 2,
+            Self::Error => 3,
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "Idle",
+            Self::Loading => "Loading",
+            Self::Loaded => "Loaded",
+            Self::Error => "Error",
+        }
+    }
+
+    /// List all variants.
+    pub fn all() -> &'static [YExtTimelineTimelineProviderState] {
+        &[
+            YExtTimelineTimelineProviderState::Idle,
+            YExtTimelineTimelineProviderState::Loading,
+            YExtTimelineTimelineProviderState::Loaded,
+            YExtTimelineTimelineProviderState::Error,
+        ]
+    }
+
+    /// Check if this is the first variant.
+    pub fn is_default(&self) -> bool {
+        self.index() == 0
+    }
+}
+
+impl fmt::Display for YExtTimelineTimelineProviderState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks timeline query data.
+#[derive(Debug, Clone)]
+pub struct YExtTimelineTimelineQuery {
+    pub uri: String,
+    pub limit: usize,
+    pub cursor: Option<String>,
+}
+
+impl YExtTimelineTimelineQuery {
+    /// Create a new instance with default values.
+    pub fn new() -> Self {
+        Self {
+            uri: String::new(),
+            limit: 0,
+            cursor: None,
+        }
+    }
+
+    /// Summary string for debugging.
+    pub fn summary(&self) -> String {
+        format!("YExtTimelineTimelineQuery({}: {:?})", "uri", self.uri)
+    }
+}
+
+/// Compute a hash-like fingerprint from a label string.
+pub fn y_ext_timeline_fingerprint(label: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in label.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Truncate a string to at most `max_len` characters, appending '…' if truncated.
+pub fn y_ext_timeline_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut t = s[..max_len].to_string();
+        t.push('…');
+        t
+    }
+}
+
+/// Normalize a key string: lowercase and replace spaces with underscores.
+pub fn y_ext_timeline_normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(' ', "_")
+}
+
+/// Split a dotted path into segments.
+pub fn y_ext_timeline_split_path(path: &str) -> Vec<&str> {
+    path.split('.').collect()
+}
+
+/// Count occurrences of `needle` in `haystack`.
+pub fn y_ext_timeline_count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Check whether `value` is within `[lo, hi]` inclusive.
+pub fn y_ext_timeline_in_range(value: i64, lo: i64, hi: i64) -> bool {
+    value >= lo && value <= hi
+}
+
+/// Deduplicate a sorted slice, returning a new Vec.
+pub fn y_ext_timeline_dedup_sorted(items: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for item in items {
+        if result.last().map_or(true, |last: &String| last != item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Interleave two slices of strings.
+pub fn y_ext_timeline_interleave<'a>(a: &'a [String], b: &'a [String]) -> Vec<&'a String> {
+    let mut out = Vec::new();
+    let max = a.len().max(b.len());
+    for i in 0..max {
+        if i < a.len() { out.push(&a[i]); }
+        if i < b.len() { out.push(&b[i]); }
+    }
+    out
+}
+
+
+
+// ---------------------------------------------------------------------------
+// ext_timeline – Extended timeline paginator helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for timeline paginator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZExtTimelinePriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZExtTimelinePriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZExtTimelinePriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZExtTimelinePriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks timeline paginator data.
+#[derive(Debug, Clone)]
+pub struct ZExtTimelineTimelinePaginator {
+    pub page_cursors: Vec<String>,
+    pub page_size: usize,
+    pub has_more: bool,
+}
+
+impl ZExtTimelineTimelinePaginator {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            page_cursors: Vec::new(),
+            page_size: 0,
+            has_more: false,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.page_cursors.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.page_cursors.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.page_cursors.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZExtTimelineTimelinePaginator[page_size={:?}, has_more={:?}]", self.page_size, self.has_more)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let mut c = self.clone();
+        c.has_more = !c.has_more;
+        c
+    }
+}
+
+/// Compute a simple rolling hash for timeline paginator.
+pub fn z_ext_timeline_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_ext_timeline_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_ext_timeline_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_ext_timeline_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_ext_timeline_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_ext_timeline_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_ext_timeline_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3093,4 +3403,225 @@ mod tests {
         assert!(diff.total_changes() > 0);
     }
 
+
+    // -- ext_timeline extended domain tests ----------------------------------------
+
+    #[test]
+    fn y_ext_timeline_enum_index() {
+        assert_eq!(YExtTimelineTimelineProviderState::Idle.index(), 0);
+        assert_eq!(YExtTimelineTimelineProviderState::Loading.index(), 1);
+        assert_eq!(YExtTimelineTimelineProviderState::Loaded.index(), 2);
+        assert_eq!(YExtTimelineTimelineProviderState::Error.index(), 3);
+    }
+
+    #[test]
+    fn y_ext_timeline_enum_label() {
+        assert_eq!(YExtTimelineTimelineProviderState::Idle.label(), "Idle");
+        assert_eq!(YExtTimelineTimelineProviderState::Loading.label(), "Loading");
+        assert_eq!(YExtTimelineTimelineProviderState::Loaded.label(), "Loaded");
+        assert_eq!(YExtTimelineTimelineProviderState::Error.label(), "Error");
+    }
+
+    #[test]
+    fn y_ext_timeline_enum_all() {
+        let all = YExtTimelineTimelineProviderState::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn y_ext_timeline_enum_is_default() {
+        assert!(YExtTimelineTimelineProviderState::Idle.is_default());
+        assert!(!YExtTimelineTimelineProviderState::Error.is_default());
+    }
+
+    #[test]
+    fn y_ext_timeline_enum_display() {
+        assert_eq!(format!("{}", YExtTimelineTimelineProviderState::Idle), "Idle");
+    }
+
+    #[test]
+    fn y_ext_timeline_struct_new() {
+        let s = YExtTimelineTimelineQuery::new();
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn y_ext_timeline_fingerprint_deterministic() {
+        let h1 = y_ext_timeline_fingerprint("hello");
+        let h2 = y_ext_timeline_fingerprint("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(y_ext_timeline_fingerprint("a"), y_ext_timeline_fingerprint("b"));
+    }
+
+    #[test]
+    fn y_ext_timeline_truncate_short() {
+        assert_eq!(y_ext_timeline_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn y_ext_timeline_truncate_long() {
+        let r = y_ext_timeline_truncate("abcdef", 3);
+        assert!(r.starts_with("abc"));
+        assert_eq!(r.len(), 3 + '…'.len_utf8());
+    }
+
+    #[test]
+    fn y_ext_timeline_normalize_key_basic() {
+        assert_eq!(y_ext_timeline_normalize_key("Hello World"), "hello_world");
+    }
+
+    #[test]
+    fn y_ext_timeline_split_path_basic() {
+        let parts = y_ext_timeline_split_path("a.b.c");
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn y_ext_timeline_count_occurrences_basic() {
+        assert_eq!(y_ext_timeline_count_occurrences("abcabc", "abc"), 2);
+        assert_eq!(y_ext_timeline_count_occurrences("abc", "xyz"), 0);
+        assert_eq!(y_ext_timeline_count_occurrences("abc", ""), 0);
+    }
+
+    #[test]
+    fn y_ext_timeline_in_range_basic() {
+        assert!(y_ext_timeline_in_range(5, 1, 10));
+        assert!(y_ext_timeline_in_range(1, 1, 10));
+        assert!(y_ext_timeline_in_range(10, 1, 10));
+        assert!(!y_ext_timeline_in_range(0, 1, 10));
+        assert!(!y_ext_timeline_in_range(11, 1, 10));
+    }
+
+    #[test]
+    fn y_ext_timeline_dedup_sorted_basic() {
+        let items: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "c".into(), "c".into()];
+        let deduped = y_ext_timeline_dedup_sorted(&items);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0], "a");
+    }
+
+    #[test]
+    fn y_ext_timeline_interleave_basic() {
+        let a: Vec<String> = vec!["a".into(), "b".into()];
+        let b: Vec<String> = vec!["1".into(), "2".into(), "3".into()];
+        let r = y_ext_timeline_interleave(&a, &b);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], "a");
+        assert_eq!(r[1], "1");
+    }
+
+    // -- ext_timeline Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_ext_timeline_priority_weight() {
+        assert_eq!(ZExtTimelinePriority::Idle.weight(), 0);
+        assert_eq!(ZExtTimelinePriority::Normal.weight(), 2);
+        assert_eq!(ZExtTimelinePriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_ext_timeline_priority_label() {
+        assert_eq!(ZExtTimelinePriority::Low.label(), "low");
+        assert_eq!(ZExtTimelinePriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_ext_timeline_priority_is_elevated() {
+        assert!(!ZExtTimelinePriority::Normal.is_elevated());
+        assert!(ZExtTimelinePriority::High.is_elevated());
+        assert!(ZExtTimelinePriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_ext_timeline_priority_display() {
+        assert_eq!(format!("{}", ZExtTimelinePriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_ext_timeline_priority_all_asc() {
+        let all = ZExtTimelinePriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZExtTimelinePriority::Idle);
+        assert_eq!(all[4], ZExtTimelinePriority::Realtime);
+    }
+
+    #[test]
+    fn z_ext_timeline_struct_new() {
+        let s = ZExtTimelineTimelinePaginator::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_ext_timeline_struct_toggled_clone() {
+        let s = ZExtTimelineTimelinePaginator::new();
+        let t = s.toggled_clone();
+        assert_ne!(s.has_more, t.has_more);
+    }
+
+    #[test]
+    fn z_ext_timeline_rolling_hash_deterministic() {
+        let h1 = z_ext_timeline_rolling_hash(b"test");
+        let h2 = z_ext_timeline_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_ext_timeline_rolling_hash(b"a"), z_ext_timeline_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_ext_timeline_pad_to_basic() {
+        assert_eq!(z_ext_timeline_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_ext_timeline_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_ext_timeline_is_identifier_basic() {
+        assert!(z_ext_timeline_is_identifier("foo_bar"));
+        assert!(z_ext_timeline_is_identifier("abc123"));
+        assert!(!z_ext_timeline_is_identifier(""));
+        assert!(!z_ext_timeline_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_ext_timeline_levenshtein_basic() {
+        assert_eq!(z_ext_timeline_levenshtein("", ""), 0);
+        assert_eq!(z_ext_timeline_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_ext_timeline_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_ext_timeline_unique_words_basic() {
+        let w = z_ext_timeline_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_ext_timeline_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_ext_timeline_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_ext_timeline_common_prefix_basic() {
+        assert_eq!(z_ext_timeline_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_ext_timeline_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_ext_timeline_struct_clear() {
+        let mut s = ZExtTimelineTimelinePaginator::new();
+        s.page_cursors.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_ext_timeline_rolling_hash_empty() {
+        let h = z_ext_timeline_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
 }

@@ -1832,6 +1832,301 @@ impl Default for IpcXValidator {
     }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// ipc – Extended IPC flow control helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for IPC flow control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZIpcPriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZIpcPriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZIpcPriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZIpcPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks IPC flow control data.
+#[derive(Debug, Clone)]
+pub struct ZIpcIpcFlowControl {
+    pub window_sizes: Vec<u32>,
+    pub paused: bool,
+    pub credits: u64,
+}
+
+impl ZIpcIpcFlowControl {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            window_sizes: Vec::new(),
+            paused: false,
+            credits: 0,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.window_sizes.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.window_sizes.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.window_sizes.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZIpcIpcFlowControl[paused={:?}, credits={:?}]", self.paused, self.credits)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let c = self.clone();
+        c
+    }
+}
+
+/// Compute a simple rolling hash for IPC flow control.
+pub fn z_ipc_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_ipc_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_ipc_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_ipc_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_ipc_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_ipc_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_ipc_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
+
+// ── zq extended utilities ──
+
+/// A lightweight tagged-value store for zq operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZqStore {
+    entries: Vec<(String, String)>,
+    capacity: usize,
+}
+
+impl ZqStore {
+    /// Create a new store with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Insert a key-value pair, evicting the oldest if at capacity.
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) -> bool {
+        let key = key.into();
+        let value = value.into();
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((key, value));
+        true
+    }
+
+    /// Look up a value by key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Remove all entries matching the given key, returning how many were removed.
+    pub fn remove(&mut self, key: &str) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|(k, _)| k != key);
+        before - self.entries.len()
+    }
+
+    /// Return the number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Check whether the store is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Collect all keys in insertion order.
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    /// Collect all values in insertion order.
+    pub fn values(&self) -> Vec<&str> {
+        self.entries.iter().map(|(_, v)| v.as_str()).collect()
+    }
+
+    /// Drain entries whose key starts with the given prefix.
+    pub fn drain_prefix(&mut self, pfx: &str) -> Vec<(String, String)> {
+        let mut drained = Vec::new();
+        let mut i = 0;
+        while i < self.entries.len() {
+            if self.entries[i].0.starts_with(pfx) {
+                drained.push(self.entries.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+        drained
+    }
+
+    /// Retain only entries satisfying the predicate.
+    pub fn retain<F: Fn(&str, &str) -> bool>(&mut self, f: F) {
+        self.entries.retain(|(k, v)| f(k, v));
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return remaining capacity.
+    pub fn remaining(&self) -> usize {
+        self.capacity.saturating_sub(self.entries.len())
+    }
+
+    /// Merge another store into this one, respecting capacity.
+    pub fn merge(&mut self, other: &ZqStore) {
+        for (k, v) in &other.entries {
+            if self.entries.len() >= self.capacity {
+                break;
+            }
+            self.entries.push((k.clone(), v.clone()));
+        }
+    }
+}
+
+/// Format a byte count as a human-readable string for zq display.
+pub fn zq_format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Truncate a string to `max_len` characters, appending an ellipsis if needed.
+pub fn zq_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut result = s[..max_len.saturating_sub(3)].to_string();
+        result.push_str("...");
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3055,6 +3350,235 @@ mod tests {
         reg.insert(IpcXConfig::new("ok")).unwrap();
         let errs = v.validate_all(&reg);
         assert!(errs.is_empty());
+    }
+
+
+    // -- ipc Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_ipc_priority_weight() {
+        assert_eq!(ZIpcPriority::Idle.weight(), 0);
+        assert_eq!(ZIpcPriority::Normal.weight(), 2);
+        assert_eq!(ZIpcPriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_ipc_priority_label() {
+        assert_eq!(ZIpcPriority::Low.label(), "low");
+        assert_eq!(ZIpcPriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_ipc_priority_is_elevated() {
+        assert!(!ZIpcPriority::Normal.is_elevated());
+        assert!(ZIpcPriority::High.is_elevated());
+        assert!(ZIpcPriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_ipc_priority_display() {
+        assert_eq!(format!("{}", ZIpcPriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_ipc_priority_all_asc() {
+        let all = ZIpcPriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZIpcPriority::Idle);
+        assert_eq!(all[4], ZIpcPriority::Realtime);
+    }
+
+    #[test]
+    fn z_ipc_struct_new() {
+        let s = ZIpcIpcFlowControl::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_ipc_struct_toggled_clone() {
+        let s = ZIpcIpcFlowControl::new();
+        let t = s.toggled_clone();
+        let _ = t.credits;
+    }
+
+    #[test]
+    fn z_ipc_rolling_hash_deterministic() {
+        let h1 = z_ipc_rolling_hash(b"test");
+        let h2 = z_ipc_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_ipc_rolling_hash(b"a"), z_ipc_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_ipc_pad_to_basic() {
+        assert_eq!(z_ipc_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_ipc_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_ipc_is_identifier_basic() {
+        assert!(z_ipc_is_identifier("foo_bar"));
+        assert!(z_ipc_is_identifier("abc123"));
+        assert!(!z_ipc_is_identifier(""));
+        assert!(!z_ipc_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_ipc_levenshtein_basic() {
+        assert_eq!(z_ipc_levenshtein("", ""), 0);
+        assert_eq!(z_ipc_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_ipc_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_ipc_unique_words_basic() {
+        let w = z_ipc_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_ipc_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_ipc_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_ipc_common_prefix_basic() {
+        assert_eq!(z_ipc_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_ipc_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_ipc_struct_clear() {
+        let mut s = ZIpcIpcFlowControl::new();
+        s.window_sizes.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_ipc_rolling_hash_empty() {
+        let h = z_ipc_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
+
+    #[test]
+    fn zq_store_new_empty() {
+        let store = super::ZqStore::new(8);
+        assert!(store.is_empty());
+        assert_eq!(store.len(), 0);
+        assert_eq!(store.remaining(), 8);
+    }
+
+    #[test]
+    fn zq_store_insert_and_get() {
+        let mut store = super::ZqStore::new(8);
+        assert!(store.insert("color", "red"));
+        assert_eq!(store.get("color"), Some("red"));
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn zq_store_eviction() {
+        let mut store = super::ZqStore::new(2);
+        store.insert("a", "1");
+        store.insert("b", "2");
+        store.insert("c", "3");
+        assert_eq!(store.len(), 2);
+        assert!(store.get("a").is_none());
+        assert_eq!(store.get("b"), Some("2"));
+        assert_eq!(store.get("c"), Some("3"));
+    }
+
+    #[test]
+    fn zq_store_remove() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("x", "10");
+        store.insert("x", "20");
+        store.insert("y", "30");
+        let removed = store.remove("x");
+        assert_eq!(removed, 2);
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn zq_store_keys_values() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("k1", "v1");
+        store.insert("k2", "v2");
+        assert_eq!(store.keys(), vec!["k1", "k2"]);
+        assert_eq!(store.values(), vec!["v1", "v2"]);
+    }
+
+    #[test]
+    fn zq_store_drain_prefix() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("pre_a", "1");
+        store.insert("pre_b", "2");
+        store.insert("other", "3");
+        let drained = store.drain_prefix("pre_");
+        assert_eq!(drained.len(), 2);
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn zq_store_retain() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("a", "keep");
+        store.insert("b", "drop");
+        store.insert("c", "keep");
+        store.retain(|_k, v| v == "keep");
+        assert_eq!(store.len(), 2);
+    }
+
+    #[test]
+    fn zq_store_clear() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("a", "1");
+        store.insert("b", "2");
+        store.clear();
+        assert!(store.is_empty());
+        assert_eq!(store.remaining(), 8);
+    }
+
+    #[test]
+    fn zq_store_merge() {
+        let mut s1 = super::ZqStore::new(3);
+        s1.insert("a", "1");
+        let mut s2 = super::ZqStore::new(8);
+        s2.insert("b", "2");
+        s2.insert("c", "3");
+        s2.insert("d", "4");
+        s1.merge(&s2);
+        assert_eq!(s1.len(), 3);
+        assert!(s1.get("d").is_none());
+    }
+
+    #[test]
+    fn zq_format_bytes_units() {
+        assert_eq!(super::zq_format_bytes(500), "500 B");
+        assert_eq!(super::zq_format_bytes(2048), "2.00 KB");
+        assert_eq!(super::zq_format_bytes(5 * 1024 * 1024), "5.00 MB");
+        assert_eq!(super::zq_format_bytes(3 * 1024 * 1024 * 1024), "3.00 GB");
+    }
+
+    #[test]
+    fn zq_truncate_short() {
+        assert_eq!(super::zq_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn zq_truncate_long() {
+        let long = "abcdefghijklmnop";
+        let t = super::zq_truncate(long, 10);
+        assert!(t.ends_with("..."));
+        assert!(t.len() <= 10);
     }
 
 }

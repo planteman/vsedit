@@ -1751,6 +1751,330 @@ impl XWbConfigLayoutConstraint {
     }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// wb_config – Extended domain helpers
+// ---------------------------------------------------------------------------
+
+/// Extended mode for workbench configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YWbConfigConfigMergeStrategy {
+    Replace,
+    Merge,
+    Append,
+    Ignore,
+}
+
+impl YWbConfigConfigMergeStrategy {
+    /// Return an index for this variant (0-based).
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Replace => 0,
+            Self::Merge => 1,
+            Self::Append => 2,
+            Self::Ignore => 3,
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Replace => "Replace",
+            Self::Merge => "Merge",
+            Self::Append => "Append",
+            Self::Ignore => "Ignore",
+        }
+    }
+
+    /// List all variants.
+    pub fn all() -> &'static [YWbConfigConfigMergeStrategy] {
+        &[
+            YWbConfigConfigMergeStrategy::Replace,
+            YWbConfigConfigMergeStrategy::Merge,
+            YWbConfigConfigMergeStrategy::Append,
+            YWbConfigConfigMergeStrategy::Ignore,
+        ]
+    }
+
+    /// Check if this is the first variant.
+    pub fn is_default(&self) -> bool {
+        self.index() == 0
+    }
+}
+
+impl fmt::Display for YWbConfigConfigMergeStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks config snapshot data.
+#[derive(Debug, Clone)]
+pub struct YWbConfigConfigSnapshot {
+    pub entries: Vec<(String, String)>,
+    pub timestamp: u64,
+    pub label: String,
+}
+
+impl YWbConfigConfigSnapshot {
+    /// Create a new instance with default values.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            timestamp: 0,
+            label: String::new(),
+        }
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Summary string for debugging.
+    pub fn summary(&self) -> String {
+        format!("YWbConfigConfigSnapshot({}: {:?})", "entries", self.entries)
+    }
+}
+
+/// Compute a hash-like fingerprint from a label string.
+pub fn y_wb_config_fingerprint(label: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in label.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
+}
+
+/// Truncate a string to at most `max_len` characters, appending '…' if truncated.
+pub fn y_wb_config_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut t = s[..max_len].to_string();
+        t.push('…');
+        t
+    }
+}
+
+/// Normalize a key string: lowercase and replace spaces with underscores.
+pub fn y_wb_config_normalize_key(key: &str) -> String {
+    key.to_lowercase().replace(' ', "_")
+}
+
+/// Split a dotted path into segments.
+pub fn y_wb_config_split_path(path: &str) -> Vec<&str> {
+    path.split('.').collect()
+}
+
+/// Count occurrences of `needle` in `haystack`.
+pub fn y_wb_config_count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Check whether `value` is within `[lo, hi]` inclusive.
+pub fn y_wb_config_in_range(value: i64, lo: i64, hi: i64) -> bool {
+    value >= lo && value <= hi
+}
+
+/// Deduplicate a sorted slice, returning a new Vec.
+pub fn y_wb_config_dedup_sorted(items: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for item in items {
+        if result.last().map_or(true, |last: &String| last != item) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+/// Interleave two slices of strings.
+pub fn y_wb_config_interleave<'a>(a: &'a [String], b: &'a [String]) -> Vec<&'a String> {
+    let mut out = Vec::new();
+    let max = a.len().max(b.len());
+    for i in 0..max {
+        if i < a.len() { out.push(&a[i]); }
+        if i < b.len() { out.push(&b[i]); }
+    }
+    out
+}
+
+
+
+// ---------------------------------------------------------------------------
+// wb_config – Extended config diff report helpers
+// ---------------------------------------------------------------------------
+
+/// Priority levels for config diff report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZWbConfigPriority {
+    Idle,
+    Low,
+    Normal,
+    High,
+    Realtime,
+}
+
+impl ZWbConfigPriority {
+    /// Numeric weight (0–4).
+    pub fn weight(&self) -> u8 {
+        match self {
+            Self::Idle => 0,
+            Self::Low => 1,
+            Self::Normal => 2,
+            Self::High => 3,
+            Self::Realtime => 4,
+        }
+    }
+
+    /// Human-readable label for this priority.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Low => "low",
+            Self::Normal => "normal",
+            Self::High => "high",
+            Self::Realtime => "realtime",
+        }
+    }
+
+    /// Whether this priority is above Normal.
+    pub fn is_elevated(&self) -> bool {
+        self.weight() > 2
+    }
+
+    /// All variants in ascending order.
+    pub fn all_asc() -> [ZWbConfigPriority; 5] {
+        [Self::Idle, Self::Low, Self::Normal, Self::High, Self::Realtime]
+    }
+}
+
+impl fmt::Display for ZWbConfigPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+/// Tracks config diff report data.
+#[derive(Debug, Clone)]
+pub struct ZWbConfigConfigDiffReport {
+    pub changed_keys: Vec<String>,
+    pub added_count: usize,
+    pub removed_count: usize,
+}
+
+impl ZWbConfigConfigDiffReport {
+    /// Create with default values.
+    pub fn new() -> Self {
+        Self {
+            changed_keys: Vec::new(),
+            added_count: 0,
+            removed_count: 0,
+        }
+    }
+
+    /// Number of items in the primary collection.
+    pub fn len(&self) -> usize {
+        self.changed_keys.len()
+    }
+
+    /// Whether the primary collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.changed_keys.is_empty()
+    }
+
+    /// Clear the primary collection.
+    pub fn clear(&mut self) {
+        self.changed_keys.clear();
+    }
+
+    /// Produce a debug summary string.
+    pub fn summary(&self) -> String {
+        format!("ZWbConfigConfigDiffReport[added_count={:?}, removed_count={:?}]", self.added_count, self.removed_count)
+    }
+
+    /// Clone with the third field toggled (if bool) or kept as-is.
+    pub fn toggled_clone(&self) -> Self {
+        let c = self.clone();
+        c
+    }
+}
+
+/// Compute a simple rolling hash for config diff report.
+pub fn z_wb_config_rolling_hash(data: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Pad `s` to exactly `width` chars, truncating or right-padding with spaces.
+pub fn z_wb_config_pad_to(s: &str, width: usize) -> String {
+    if s.len() >= width {
+        s[..width].to_string()
+    } else {
+        format!("{:<width$}", s, width = width)
+    }
+}
+
+/// Check whether all characters in `s` are ASCII alphanumeric or underscore.
+pub fn z_wb_config_is_identifier(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// Compute the Levenshtein distance between two strings (simple O(n*m) impl).
+pub fn z_wb_config_levenshtein(a: &str, b: &str) -> usize {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Extract unique words from a whitespace-separated string.
+pub fn z_wb_config_unique_words(text: &str) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    text.split_whitespace().filter(|w| seen.insert(*w)).collect()
+}
+
+/// Chunk a slice into groups of `size`.
+pub fn z_wb_config_chunk_slice<T>(slice: &[T], size: usize) -> Vec<&[T]> {
+    if size == 0 { return vec![]; }
+    slice.chunks(size).collect()
+}
+
+/// Return the longest common prefix of two strings.
+pub fn z_wb_config_common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let end = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    &a[..end]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3006,4 +3330,235 @@ mod tests {
         assert_ne!(XWbConfigLayoutRegion::Sidebar, XWbConfigLayoutRegion::Panel);
     }
 
+
+    // -- wb_config extended domain tests ----------------------------------------
+
+    #[test]
+    fn y_wb_config_enum_index() {
+        assert_eq!(YWbConfigConfigMergeStrategy::Replace.index(), 0);
+        assert_eq!(YWbConfigConfigMergeStrategy::Merge.index(), 1);
+        assert_eq!(YWbConfigConfigMergeStrategy::Append.index(), 2);
+        assert_eq!(YWbConfigConfigMergeStrategy::Ignore.index(), 3);
+    }
+
+    #[test]
+    fn y_wb_config_enum_label() {
+        assert_eq!(YWbConfigConfigMergeStrategy::Replace.label(), "Replace");
+        assert_eq!(YWbConfigConfigMergeStrategy::Merge.label(), "Merge");
+        assert_eq!(YWbConfigConfigMergeStrategy::Append.label(), "Append");
+        assert_eq!(YWbConfigConfigMergeStrategy::Ignore.label(), "Ignore");
+    }
+
+    #[test]
+    fn y_wb_config_enum_all() {
+        let all = YWbConfigConfigMergeStrategy::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn y_wb_config_enum_is_default() {
+        assert!(YWbConfigConfigMergeStrategy::Replace.is_default());
+        assert!(!YWbConfigConfigMergeStrategy::Ignore.is_default());
+    }
+
+    #[test]
+    fn y_wb_config_enum_display() {
+        assert_eq!(format!("{}", YWbConfigConfigMergeStrategy::Replace), "Replace");
+    }
+
+    #[test]
+    fn y_wb_config_struct_new() {
+        let s = YWbConfigConfigSnapshot::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn y_wb_config_struct_clear() {
+        let mut s = YWbConfigConfigSnapshot::new();
+        s.entries.push(Default::default());
+        assert!(!s.is_empty());
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn y_wb_config_fingerprint_deterministic() {
+        let h1 = y_wb_config_fingerprint("hello");
+        let h2 = y_wb_config_fingerprint("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(y_wb_config_fingerprint("a"), y_wb_config_fingerprint("b"));
+    }
+
+    #[test]
+    fn y_wb_config_truncate_short() {
+        assert_eq!(y_wb_config_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn y_wb_config_truncate_long() {
+        let r = y_wb_config_truncate("abcdef", 3);
+        assert!(r.starts_with("abc"));
+        assert_eq!(r.len(), 3 + '…'.len_utf8());
+    }
+
+    #[test]
+    fn y_wb_config_normalize_key_basic() {
+        assert_eq!(y_wb_config_normalize_key("Hello World"), "hello_world");
+    }
+
+    #[test]
+    fn y_wb_config_split_path_basic() {
+        let parts = y_wb_config_split_path("a.b.c");
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn y_wb_config_count_occurrences_basic() {
+        assert_eq!(y_wb_config_count_occurrences("abcabc", "abc"), 2);
+        assert_eq!(y_wb_config_count_occurrences("abc", "xyz"), 0);
+        assert_eq!(y_wb_config_count_occurrences("abc", ""), 0);
+    }
+
+    #[test]
+    fn y_wb_config_in_range_basic() {
+        assert!(y_wb_config_in_range(5, 1, 10));
+        assert!(y_wb_config_in_range(1, 1, 10));
+        assert!(y_wb_config_in_range(10, 1, 10));
+        assert!(!y_wb_config_in_range(0, 1, 10));
+        assert!(!y_wb_config_in_range(11, 1, 10));
+    }
+
+    #[test]
+    fn y_wb_config_dedup_sorted_basic() {
+        let items: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "c".into(), "c".into()];
+        let deduped = y_wb_config_dedup_sorted(&items);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0], "a");
+    }
+
+    #[test]
+    fn y_wb_config_interleave_basic() {
+        let a: Vec<String> = vec!["a".into(), "b".into()];
+        let b: Vec<String> = vec!["1".into(), "2".into(), "3".into()];
+        let r = y_wb_config_interleave(&a, &b);
+        assert_eq!(r.len(), 5);
+        assert_eq!(r[0], "a");
+        assert_eq!(r[1], "1");
+    }
+
+    // -- wb_config Z-extended tests -----------------------------------------------
+
+    #[test]
+    fn z_wb_config_priority_weight() {
+        assert_eq!(ZWbConfigPriority::Idle.weight(), 0);
+        assert_eq!(ZWbConfigPriority::Normal.weight(), 2);
+        assert_eq!(ZWbConfigPriority::Realtime.weight(), 4);
+    }
+
+    #[test]
+    fn z_wb_config_priority_label() {
+        assert_eq!(ZWbConfigPriority::Low.label(), "low");
+        assert_eq!(ZWbConfigPriority::High.label(), "high");
+    }
+
+    #[test]
+    fn z_wb_config_priority_is_elevated() {
+        assert!(!ZWbConfigPriority::Normal.is_elevated());
+        assert!(ZWbConfigPriority::High.is_elevated());
+        assert!(ZWbConfigPriority::Realtime.is_elevated());
+    }
+
+    #[test]
+    fn z_wb_config_priority_display() {
+        assert_eq!(format!("{}", ZWbConfigPriority::Idle), "idle");
+    }
+
+    #[test]
+    fn z_wb_config_priority_all_asc() {
+        let all = ZWbConfigPriority::all_asc();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0], ZWbConfigPriority::Idle);
+        assert_eq!(all[4], ZWbConfigPriority::Realtime);
+    }
+
+    #[test]
+    fn z_wb_config_struct_new() {
+        let s = ZWbConfigConfigDiffReport::new();
+        assert!(s.is_empty());
+        let _ = s.summary();
+    }
+
+    #[test]
+    fn z_wb_config_struct_toggled_clone() {
+        let s = ZWbConfigConfigDiffReport::new();
+        let t = s.toggled_clone();
+        let _ = t.removed_count;
+    }
+
+    #[test]
+    fn z_wb_config_rolling_hash_deterministic() {
+        let h1 = z_wb_config_rolling_hash(b"test");
+        let h2 = z_wb_config_rolling_hash(b"test");
+        assert_eq!(h1, h2);
+        assert_ne!(z_wb_config_rolling_hash(b"a"), z_wb_config_rolling_hash(b"b"));
+    }
+
+    #[test]
+    fn z_wb_config_pad_to_basic() {
+        assert_eq!(z_wb_config_pad_to("hi", 5), "hi   ");
+        assert_eq!(z_wb_config_pad_to("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn z_wb_config_is_identifier_basic() {
+        assert!(z_wb_config_is_identifier("foo_bar"));
+        assert!(z_wb_config_is_identifier("abc123"));
+        assert!(!z_wb_config_is_identifier(""));
+        assert!(!z_wb_config_is_identifier("has space"));
+    }
+
+    #[test]
+    fn z_wb_config_levenshtein_basic() {
+        assert_eq!(z_wb_config_levenshtein("", ""), 0);
+        assert_eq!(z_wb_config_levenshtein("abc", "abc"), 0);
+        assert_eq!(z_wb_config_levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn z_wb_config_unique_words_basic() {
+        let w = z_wb_config_unique_words("the cat sat on the mat");
+        assert_eq!(w.len(), 5);
+        assert_eq!(w[0], "the");
+    }
+
+    #[test]
+    fn z_wb_config_chunk_slice_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        let chunks = z_wb_config_chunk_slice(&data, 2);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2]);
+        assert_eq!(chunks[2], &[5]);
+    }
+
+    #[test]
+    fn z_wb_config_common_prefix_basic() {
+        assert_eq!(z_wb_config_common_prefix("abcdef", "abcxyz"), "abc");
+        assert_eq!(z_wb_config_common_prefix("xyz", "abc"), "");
+    }
+
+    #[test]
+    fn z_wb_config_struct_clear() {
+        let mut s = ZWbConfigConfigDiffReport::new();
+        s.changed_keys.push(Default::default());
+        assert_eq!(s.len(), 1);
+        s.clear();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn z_wb_config_rolling_hash_empty() {
+        let h = z_wb_config_rolling_hash(b"");
+        assert_eq!(h, 0xcbf29ce484222325);
+    }
 }

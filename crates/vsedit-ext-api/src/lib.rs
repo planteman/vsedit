@@ -2072,6 +2072,139 @@ impl ExtApiValidationCollector {
     }
 }
 
+
+// ── zq extended utilities ──
+
+/// A lightweight tagged-value store for zq operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZqStore {
+    entries: Vec<(String, String)>,
+    capacity: usize,
+}
+
+impl ZqStore {
+    /// Create a new store with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Insert a key-value pair, evicting the oldest if at capacity.
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) -> bool {
+        let key = key.into();
+        let value = value.into();
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((key, value));
+        true
+    }
+
+    /// Look up a value by key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Remove all entries matching the given key, returning how many were removed.
+    pub fn remove(&mut self, key: &str) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|(k, _)| k != key);
+        before - self.entries.len()
+    }
+
+    /// Return the number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Check whether the store is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Collect all keys in insertion order.
+    pub fn keys(&self) -> Vec<&str> {
+        self.entries.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    /// Collect all values in insertion order.
+    pub fn values(&self) -> Vec<&str> {
+        self.entries.iter().map(|(_, v)| v.as_str()).collect()
+    }
+
+    /// Drain entries whose key starts with the given prefix.
+    pub fn drain_prefix(&mut self, pfx: &str) -> Vec<(String, String)> {
+        let mut drained = Vec::new();
+        let mut i = 0;
+        while i < self.entries.len() {
+            if self.entries[i].0.starts_with(pfx) {
+                drained.push(self.entries.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+        drained
+    }
+
+    /// Retain only entries satisfying the predicate.
+    pub fn retain<F: Fn(&str, &str) -> bool>(&mut self, f: F) {
+        self.entries.retain(|(k, v)| f(k, v));
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return remaining capacity.
+    pub fn remaining(&self) -> usize {
+        self.capacity.saturating_sub(self.entries.len())
+    }
+
+    /// Merge another store into this one, respecting capacity.
+    pub fn merge(&mut self, other: &ZqStore) {
+        for (k, v) in &other.entries {
+            if self.entries.len() >= self.capacity {
+                break;
+            }
+            self.entries.push((k.clone(), v.clone()));
+        }
+    }
+}
+
+/// Format a byte count as a human-readable string for zq display.
+pub fn zq_format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// Truncate a string to `max_len` characters, appending an ellipsis if needed.
+pub fn zq_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut result = s[..max_len.saturating_sub(3)].to_string();
+        result.push_str("...");
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3199,6 +3332,120 @@ mod tests {
         rt.record(100);
         rt.clear();
         assert_eq!(rt.count(), 0);
+    }
+
+
+    #[test]
+    fn zq_store_new_empty() {
+        let store = super::ZqStore::new(8);
+        assert!(store.is_empty());
+        assert_eq!(store.len(), 0);
+        assert_eq!(store.remaining(), 8);
+    }
+
+    #[test]
+    fn zq_store_insert_and_get() {
+        let mut store = super::ZqStore::new(8);
+        assert!(store.insert("color", "red"));
+        assert_eq!(store.get("color"), Some("red"));
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn zq_store_eviction() {
+        let mut store = super::ZqStore::new(2);
+        store.insert("a", "1");
+        store.insert("b", "2");
+        store.insert("c", "3");
+        assert_eq!(store.len(), 2);
+        assert!(store.get("a").is_none());
+        assert_eq!(store.get("b"), Some("2"));
+        assert_eq!(store.get("c"), Some("3"));
+    }
+
+    #[test]
+    fn zq_store_remove() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("x", "10");
+        store.insert("x", "20");
+        store.insert("y", "30");
+        let removed = store.remove("x");
+        assert_eq!(removed, 2);
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn zq_store_keys_values() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("k1", "v1");
+        store.insert("k2", "v2");
+        assert_eq!(store.keys(), vec!["k1", "k2"]);
+        assert_eq!(store.values(), vec!["v1", "v2"]);
+    }
+
+    #[test]
+    fn zq_store_drain_prefix() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("pre_a", "1");
+        store.insert("pre_b", "2");
+        store.insert("other", "3");
+        let drained = store.drain_prefix("pre_");
+        assert_eq!(drained.len(), 2);
+        assert_eq!(store.len(), 1);
+    }
+
+    #[test]
+    fn zq_store_retain() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("a", "keep");
+        store.insert("b", "drop");
+        store.insert("c", "keep");
+        store.retain(|_k, v| v == "keep");
+        assert_eq!(store.len(), 2);
+    }
+
+    #[test]
+    fn zq_store_clear() {
+        let mut store = super::ZqStore::new(8);
+        store.insert("a", "1");
+        store.insert("b", "2");
+        store.clear();
+        assert!(store.is_empty());
+        assert_eq!(store.remaining(), 8);
+    }
+
+    #[test]
+    fn zq_store_merge() {
+        let mut s1 = super::ZqStore::new(3);
+        s1.insert("a", "1");
+        let mut s2 = super::ZqStore::new(8);
+        s2.insert("b", "2");
+        s2.insert("c", "3");
+        s2.insert("d", "4");
+        s1.merge(&s2);
+        assert_eq!(s1.len(), 3);
+        assert!(s1.get("d").is_none());
+    }
+
+    #[test]
+    fn zq_format_bytes_units() {
+        assert_eq!(super::zq_format_bytes(500), "500 B");
+        assert_eq!(super::zq_format_bytes(2048), "2.00 KB");
+        assert_eq!(super::zq_format_bytes(5 * 1024 * 1024), "5.00 MB");
+        assert_eq!(super::zq_format_bytes(3 * 1024 * 1024 * 1024), "3.00 GB");
+    }
+
+    #[test]
+    fn zq_truncate_short() {
+        assert_eq!(super::zq_truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn zq_truncate_long() {
+        let long = "abcdefghijklmnop";
+        let t = super::zq_truncate(long, 10);
+        assert!(t.ends_with("..."));
+        assert!(t.len() <= 10);
     }
 
 }
