@@ -12769,6 +12769,258 @@ impl std::fmt::Display for YtWildcard {
     }
 }
 
+
+// --- yu_ rope tree and piece table ---
+
+/// A rope-based string for efficient large text operations.
+/// Stores text in a balanced binary tree of chunks.
+#[derive(Debug, Clone)]
+pub struct YuRope {
+    chunks: Vec<String>,
+    total_len: usize,
+}
+
+impl YuRope {
+    pub fn new() -> Self {
+        Self { chunks: Vec::new(), total_len: 0 }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        if s.is_empty() {
+            return Self::new();
+        }
+        let chunk_size = 256;
+        let mut chunks = Vec::new();
+        let mut i = 0;
+        while i < s.len() {
+            let end = std::cmp::min(i + chunk_size, s.len());
+            // Ensure we don't split in the middle of a char
+            let end = if end < s.len() {
+                let mut e = end;
+                while e > i && !s.is_char_boundary(e) { e -= 1; }
+                if e == i { end } else { e }
+            } else { end };
+            chunks.push(s[i..end].to_string());
+            i = end;
+        }
+        let total_len = s.len();
+        Self { chunks, total_len }
+    }
+
+    pub fn len(&self) -> usize { self.total_len }
+
+    pub fn is_empty(&self) -> bool { self.total_len == 0 }
+
+    pub fn text(&self) -> String {
+        self.chunks.join("")
+    }
+
+    pub fn char_at(&self, index: usize) -> Option<char> {
+        self.text().chars().nth(index)
+    }
+
+    pub fn insert(&mut self, pos: usize, text: &str) {
+        if text.is_empty() { return; }
+        let full = self.text();
+        let byte_pos = full.char_indices()
+            .nth(pos)
+            .map(|(i, _)| i)
+            .unwrap_or(full.len());
+        let new_text = format!("{}{}{}", &full[..byte_pos], text, &full[byte_pos..]);
+        *self = Self::from_str(&new_text);
+    }
+
+    pub fn delete(&mut self, start: usize, end: usize) {
+        let full = self.text();
+        let chars: Vec<char> = full.chars().collect();
+        let s = std::cmp::min(start, chars.len());
+        let e = std::cmp::min(end, chars.len());
+        if s >= e { return; }
+        let new_text: String = chars[..s].iter().chain(chars[e..].iter()).collect();
+        *self = Self::from_str(&new_text);
+    }
+
+    pub fn substr(&self, start: usize, end: usize) -> String {
+        let full = self.text();
+        let chars: Vec<char> = full.chars().collect();
+        let s = std::cmp::min(start, chars.len());
+        let e = std::cmp::min(end, chars.len());
+        chars[s..e].iter().collect()
+    }
+
+    pub fn char_count(&self) -> usize {
+        self.text().chars().count()
+    }
+
+    pub fn line_count(&self) -> usize {
+        let text = self.text();
+        if text.is_empty() { return 0; }
+        text.lines().count()
+    }
+
+    pub fn line(&self, n: usize) -> Option<String> {
+        self.text().lines().nth(n).map(|s| s.to_string())
+    }
+
+    pub fn append(&mut self, other: &YuRope) {
+        self.chunks.extend(other.chunks.iter().cloned());
+        self.total_len += other.total_len;
+    }
+
+    pub fn chunk_count(&self) -> usize { self.chunks.len() }
+}
+
+impl Default for YuRope {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for YuRope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YuRope(len={}, chunks={})", self.total_len, self.chunks.len())
+    }
+}
+
+/// A piece table for efficient text editing with undo-friendly operations.
+/// Uses original + add buffers with a piece descriptor table.
+#[derive(Debug, Clone)]
+pub struct YuPieceTable {
+    original: String,
+    add_buffer: String,
+    pieces: Vec<YuPiece>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct YuPiece {
+    source: YuPieceSource,
+    start: usize,
+    length: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum YuPieceSource {
+    Original,
+    Add,
+}
+
+impl YuPieceTable {
+    pub fn new(text: &str) -> Self {
+        let pieces = if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![YuPiece { source: YuPieceSource::Original, start: 0, length: text.len() }]
+        };
+        Self {
+            original: text.to_string(),
+            add_buffer: String::new(),
+            pieces,
+        }
+    }
+
+    pub fn text(&self) -> String {
+        let mut result = String::new();
+        for piece in &self.pieces {
+            let buf = match piece.source {
+                YuPieceSource::Original => &self.original,
+                YuPieceSource::Add => &self.add_buffer,
+            };
+            result.push_str(&buf[piece.start..piece.start + piece.length]);
+        }
+        result
+    }
+
+    pub fn len(&self) -> usize {
+        self.pieces.iter().map(|p| p.length).sum()
+    }
+
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+
+    pub fn insert(&mut self, pos: usize, text: &str) {
+        if text.is_empty() { return; }
+        let add_start = self.add_buffer.len();
+        self.add_buffer.push_str(text);
+        let new_piece = YuPiece { source: YuPieceSource::Add, start: add_start, length: text.len() };
+
+        if self.pieces.is_empty() {
+            self.pieces.push(new_piece);
+            return;
+        }
+
+        let mut offset = 0;
+        let mut new_pieces = Vec::new();
+        let mut inserted = false;
+
+        for piece in &self.pieces {
+            if !inserted && offset + piece.length >= pos {
+                let split = pos - offset;
+                if split > 0 {
+                    new_pieces.push(YuPiece { source: piece.source, start: piece.start, length: split });
+                }
+                new_pieces.push(new_piece);
+                if split < piece.length {
+                    new_pieces.push(YuPiece { source: piece.source, start: piece.start + split, length: piece.length - split });
+                }
+                inserted = true;
+            } else {
+                new_pieces.push(*piece);
+            }
+            offset += piece.length;
+        }
+
+        if !inserted {
+            new_pieces.push(new_piece);
+        }
+
+        self.pieces = new_pieces;
+    }
+
+    pub fn delete(&mut self, start: usize, length: usize) {
+        if length == 0 { return; }
+        let end = start + length;
+        let mut offset = 0;
+        let mut new_pieces = Vec::new();
+
+        for piece in &self.pieces {
+            let piece_start = offset;
+            let piece_end = offset + piece.length;
+
+            if piece_end <= start || piece_start >= end {
+                new_pieces.push(*piece);
+            } else {
+                // Partial overlap
+                if piece_start < start {
+                    let keep = start - piece_start;
+                    new_pieces.push(YuPiece { source: piece.source, start: piece.start, length: keep });
+                }
+                if piece_end > end {
+                    let skip = end - piece_start;
+                    new_pieces.push(YuPiece { source: piece.source, start: piece.start + skip, length: piece.length - skip });
+                }
+            }
+            offset += piece.length;
+        }
+
+        self.pieces = new_pieces;
+    }
+
+    pub fn piece_count(&self) -> usize { self.pieces.len() }
+
+    pub fn line_count(&self) -> usize {
+        let text = self.text();
+        if text.is_empty() { return 0; }
+        text.lines().count()
+    }
+}
+
+impl Default for YuPieceTable {
+    fn default() -> Self { Self::new("") }
+}
+
+impl std::fmt::Display for YuPieceTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YuPieceTable(len={}, pieces={})", self.len(), self.piece_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -20788,6 +21040,152 @@ mod tests {
     fn test_yt_wildcard_display() {
         let w = YtWildcard::new("*.txt");
         assert_eq!(format!("{}", w), "YtWildcard(*.txt)");
+    }
+
+
+    // --- yu_ tests ---
+
+    #[test]
+    fn test_yu_rope_new() {
+        let r = YuRope::new();
+        assert!(r.is_empty());
+        assert_eq!(r.len(), 0);
+        assert_eq!(r.char_count(), 0);
+    }
+
+    #[test]
+    fn test_yu_rope_from_str() {
+        let r = YuRope::from_str("hello");
+        assert_eq!(r.len(), 5);
+        assert_eq!(r.text(), "hello");
+    }
+
+    #[test]
+    fn test_yu_rope_insert() {
+        let mut r = YuRope::from_str("hllo");
+        r.insert(1, "e");
+        assert_eq!(r.text(), "hello");
+    }
+
+    #[test]
+    fn test_yu_rope_delete() {
+        let mut r = YuRope::from_str("hello");
+        r.delete(1, 3);
+        assert_eq!(r.text(), "hlo");
+    }
+
+    #[test]
+    fn test_yu_rope_substr() {
+        let r = YuRope::from_str("hello world");
+        assert_eq!(r.substr(0, 5), "hello");
+        assert_eq!(r.substr(6, 11), "world");
+    }
+
+    #[test]
+    fn test_yu_rope_char_at() {
+        let r = YuRope::from_str("abcde");
+        assert_eq!(r.char_at(0), Some('a'));
+        assert_eq!(r.char_at(4), Some('e'));
+        assert_eq!(r.char_at(5), None);
+    }
+
+    #[test]
+    fn test_yu_rope_lines() {
+        let r = YuRope::from_str("line1\nline2\nline3");
+        assert_eq!(r.line_count(), 3);
+        assert_eq!(r.line(0), Some("line1".to_string()));
+        assert_eq!(r.line(2), Some("line3".to_string()));
+    }
+
+    #[test]
+    fn test_yu_rope_append() {
+        let mut a = YuRope::from_str("hello ");
+        let b = YuRope::from_str("world");
+        a.append(&b);
+        assert_eq!(a.text(), "hello world");
+    }
+
+    #[test]
+    fn test_yu_rope_display() {
+        let r = YuRope::from_str("test");
+        let s = format!("{}", r);
+        assert!(s.contains("YuRope"));
+    }
+
+    #[test]
+    fn test_yu_rope_default() {
+        let r = YuRope::default();
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn test_yu_piece_table_new() {
+        let pt = YuPieceTable::new("hello");
+        assert_eq!(pt.text(), "hello");
+        assert_eq!(pt.len(), 5);
+        assert!(!pt.is_empty());
+    }
+
+    #[test]
+    fn test_yu_piece_table_insert() {
+        let mut pt = YuPieceTable::new("hllo");
+        pt.insert(1, "e");
+        assert_eq!(pt.text(), "hello");
+    }
+
+    #[test]
+    fn test_yu_piece_table_insert_at_end() {
+        let mut pt = YuPieceTable::new("hello");
+        pt.insert(5, " world");
+        assert_eq!(pt.text(), "hello world");
+    }
+
+    #[test]
+    fn test_yu_piece_table_delete() {
+        let mut pt = YuPieceTable::new("hello world");
+        pt.delete(5, 6);
+        assert_eq!(pt.text(), "hello");
+    }
+
+    #[test]
+    fn test_yu_piece_table_delete_middle() {
+        let mut pt = YuPieceTable::new("abcdef");
+        pt.delete(2, 2);
+        assert_eq!(pt.text(), "abef");
+    }
+
+    #[test]
+    fn test_yu_piece_table_multiple_ops() {
+        let mut pt = YuPieceTable::new("hello");
+        pt.insert(5, " world");
+        pt.insert(0, "say ");
+        assert_eq!(pt.text(), "say hello world");
+    }
+
+    #[test]
+    fn test_yu_piece_table_empty() {
+        let pt = YuPieceTable::new("");
+        assert!(pt.is_empty());
+        assert_eq!(pt.len(), 0);
+    }
+
+    #[test]
+    fn test_yu_piece_table_lines() {
+        let pt = YuPieceTable::new("a\nb\nc");
+        assert_eq!(pt.line_count(), 3);
+    }
+
+    #[test]
+    fn test_yu_piece_table_display() {
+        let pt = YuPieceTable::new("test");
+        let s = format!("{}", pt);
+        assert!(s.contains("YuPieceTable"));
+    }
+
+    #[test]
+    fn test_yu_piece_table_default() {
+        let pt = YuPieceTable::default();
+        assert!(pt.is_empty());
     }
 
 }
