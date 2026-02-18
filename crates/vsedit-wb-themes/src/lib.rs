@@ -26659,6 +26659,93 @@ impl AznTypeHierarchy {
     }
 }
 
+
+// --- azo_ semantic token modifiers and legend ---
+
+/// Semantic token type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AzoTokenType {
+    Namespace, Type, Class, Enum, Interface, Struct, TypeParameter,
+    Parameter, Variable, Property, EnumMember, Event, Function, Method,
+    Macro, Keyword, Modifier, Comment, String, Number, Regexp, Operator,
+    Decorator,
+}
+
+/// Semantic token modifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AzoTokenModifier {
+    Declaration, Definition, Readonly, Static, Deprecated,
+    Abstract, Async, Modification, Documentation, DefaultLibrary,
+}
+
+/// Semantic token legend mapping types/modifiers to IDs.
+#[derive(Debug)]
+pub struct AzoSemanticTokensLegend {
+    pub token_types: Vec<AzoTokenType>,
+    pub token_modifiers: Vec<AzoTokenModifier>,
+}
+
+impl AzoSemanticTokensLegend {
+    pub fn default_legend() -> Self {
+        Self {
+            token_types: vec![
+                AzoTokenType::Namespace, AzoTokenType::Type, AzoTokenType::Class,
+                AzoTokenType::Enum, AzoTokenType::Interface, AzoTokenType::Struct,
+                AzoTokenType::TypeParameter, AzoTokenType::Parameter, AzoTokenType::Variable,
+                AzoTokenType::Property, AzoTokenType::EnumMember, AzoTokenType::Function,
+                AzoTokenType::Method, AzoTokenType::Macro, AzoTokenType::Keyword,
+                AzoTokenType::Comment, AzoTokenType::String, AzoTokenType::Number,
+                AzoTokenType::Operator,
+            ],
+            token_modifiers: vec![
+                AzoTokenModifier::Declaration, AzoTokenModifier::Definition,
+                AzoTokenModifier::Readonly, AzoTokenModifier::Static,
+                AzoTokenModifier::Deprecated, AzoTokenModifier::Async,
+            ],
+        }
+    }
+    pub fn type_id(&self, t: AzoTokenType) -> Option<u32> { self.token_types.iter().position(|x| *x == t).map(|i| i as u32) }
+    pub fn modifier_bit(&self, m: AzoTokenModifier) -> Option<u32> { self.token_modifiers.iter().position(|x| *x == m).map(|i| 1u32 << i) }
+    pub fn type_count(&self) -> usize { self.token_types.len() }
+    pub fn modifier_count(&self) -> usize { self.token_modifiers.len() }
+}
+
+/// A single semantic token (delta-encoded).
+#[derive(Debug, Clone)]
+pub struct AzoSemanticToken {
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub length: u32,
+    pub token_type: u32,
+    pub token_modifiers: u32,
+}
+
+impl AzoSemanticToken {
+    pub fn new(dl: u32, ds: u32, len: u32, tt: u32, tm: u32) -> Self {
+        Self { delta_line: dl, delta_start: ds, length: len, token_type: tt, token_modifiers: tm }
+    }
+    pub fn has_modifier(&self, bit: u32) -> bool { self.token_modifiers & bit != 0 }
+}
+
+/// Semantic tokens data for a document.
+#[derive(Debug)]
+pub struct AzoSemanticTokensData {
+    pub tokens: Vec<AzoSemanticToken>,
+    pub result_id: Option<String>,
+}
+
+impl AzoSemanticTokensData {
+    pub fn new() -> Self { Self { tokens: Vec::new(), result_id: None } }
+    pub fn add(&mut self, t: AzoSemanticToken) { self.tokens.push(t); }
+    pub fn token_count(&self) -> usize { self.tokens.len() }
+    pub fn set_result_id(&mut self, id: &str) { self.result_id = Some(id.to_string()); }
+    pub fn to_flat(&self) -> Vec<u32> {
+        let mut v = Vec::with_capacity(self.tokens.len() * 5);
+        for t in &self.tokens { v.extend_from_slice(&[t.delta_line, t.delta_start, t.length, t.token_type, t.token_modifiers]); }
+        v
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43567,6 +43654,73 @@ goodbye";
     fn test_azn_trait_kind() {
         let t = AznTypeHierarchyItem::new("Display", AznTypeKind::Trait, "d.rs", 0, 0);
         assert_eq!(t.kind, AznTypeKind::Trait);
+    }
+
+
+    #[test]
+    fn test_azo_legend() {
+        let legend = AzoSemanticTokensLegend::default_legend();
+        assert!(legend.type_count() > 10);
+        assert!(legend.modifier_count() > 3);
+        assert_eq!(legend.type_id(AzoTokenType::Namespace), Some(0));
+        assert!(legend.type_id(AzoTokenType::Function).is_some());
+    }
+
+    #[test]
+    fn test_azo_modifier_bit() {
+        let legend = AzoSemanticTokensLegend::default_legend();
+        let decl = legend.modifier_bit(AzoTokenModifier::Declaration).unwrap();
+        assert_eq!(decl, 1);
+        let def = legend.modifier_bit(AzoTokenModifier::Definition).unwrap();
+        assert_eq!(def, 2);
+    }
+
+    #[test]
+    fn test_azo_token() {
+        let t = AzoSemanticToken::new(0, 5, 3, 8, 0b101);
+        assert!(t.has_modifier(1));
+        assert!(!t.has_modifier(2));
+        assert!(t.has_modifier(4));
+    }
+
+    #[test]
+    fn test_azo_tokens_data() {
+        let mut data = AzoSemanticTokensData::new();
+        data.add(AzoSemanticToken::new(0, 0, 5, 1, 0));
+        data.add(AzoSemanticToken::new(1, 3, 4, 2, 1));
+        assert_eq!(data.token_count(), 2);
+        let flat = data.to_flat();
+        assert_eq!(flat.len(), 10);
+        assert_eq!(flat[0], 0);
+        assert_eq!(flat[5], 1);
+    }
+
+    #[test]
+    fn test_azo_result_id() {
+        let mut data = AzoSemanticTokensData::new();
+        assert!(data.result_id.is_none());
+        data.set_result_id("abc123");
+        assert_eq!(data.result_id.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_azo_empty_flat() {
+        let data = AzoSemanticTokensData::new();
+        assert!(data.to_flat().is_empty());
+    }
+
+    #[test]
+    fn test_azo_token_type_lookup() {
+        let legend = AzoSemanticTokensLegend::default_legend();
+        assert!(legend.type_id(AzoTokenType::Decorator).is_none());
+        assert!(legend.type_id(AzoTokenType::Keyword).is_some());
+    }
+
+    #[test]
+    fn test_azo_no_modifiers() {
+        let t = AzoSemanticToken::new(0, 0, 1, 0, 0);
+        assert!(!t.has_modifier(1));
+        assert!(!t.has_modifier(2));
     }
 
 }
