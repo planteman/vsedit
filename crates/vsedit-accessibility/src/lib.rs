@@ -14847,6 +14847,141 @@ impl std::fmt::Display for ZeSignatureHelp {
     }
 }
 
+
+// --- zf_ hover info and symbol types ---
+
+/// Hover information displayed when hovering over code.
+#[derive(Debug, Clone)]
+pub struct ZfHover {
+    pub contents: Vec<ZfMarkedString>,
+    pub range_start_line: Option<u32>,
+    pub range_start_char: Option<u32>,
+    pub range_end_line: Option<u32>,
+    pub range_end_char: Option<u32>,
+}
+
+/// A string with optional language for syntax highlighting.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ZfMarkedString {
+    Plain(String),
+    Code { language: String, value: String },
+}
+
+impl ZfHover {
+    pub fn plain(text: &str) -> Self {
+        Self { contents: vec![ZfMarkedString::Plain(text.to_string())], range_start_line: None, range_start_char: None, range_end_line: None, range_end_char: None }
+    }
+
+    pub fn code(language: &str, value: &str) -> Self {
+        Self { contents: vec![ZfMarkedString::Code { language: language.to_string(), value: value.to_string() }],
+            range_start_line: None, range_start_char: None, range_end_line: None, range_end_char: None }
+    }
+
+    pub fn with_range(mut self, sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        self.range_start_line = Some(sl); self.range_start_char = Some(sc);
+        self.range_end_line = Some(el); self.range_end_char = Some(ec);
+        self
+    }
+
+    pub fn add_plain(&mut self, text: &str) { self.contents.push(ZfMarkedString::Plain(text.to_string())); }
+    pub fn add_code(&mut self, lang: &str, val: &str) { self.contents.push(ZfMarkedString::Code { language: lang.to_string(), value: val.to_string() }); }
+
+    pub fn is_empty(&self) -> bool { self.contents.is_empty() }
+    pub fn has_range(&self) -> bool { self.range_start_line.is_some() }
+    pub fn content_count(&self) -> usize { self.contents.len() }
+}
+
+impl std::fmt::Display for ZfHover {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZfHover({} parts)", self.contents.len())
+    }
+}
+
+/// The kind of a document symbol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ZfSymbolKind {
+    File, Module, Namespace, Package, Class, Method, Property, Field,
+    Constructor, Enum, Interface, Function, Variable, Constant, String,
+    Number, Boolean, Array, Object, Key, Null, EnumMember, Struct,
+    Event, Operator, TypeParameter,
+}
+
+impl ZfSymbolKind {
+    pub fn icon(&self) -> &str {
+        match self {
+            ZfSymbolKind::Function => "fn",
+            ZfSymbolKind::Method => "me",
+            ZfSymbolKind::Class => "cl",
+            ZfSymbolKind::Interface => "if",
+            ZfSymbolKind::Struct => "st",
+            ZfSymbolKind::Enum => "en",
+            ZfSymbolKind::Module => "mo",
+            ZfSymbolKind::Variable => "va",
+            ZfSymbolKind::Constant => "co",
+            ZfSymbolKind::Field => "fi",
+            _ => "  ",
+        }
+    }
+}
+
+impl std::fmt::Display for ZfSymbolKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self) }
+}
+
+/// A symbol in a document (function, class, variable, etc.).
+#[derive(Debug, Clone)]
+pub struct ZfDocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: ZfSymbolKind,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub children: Vec<ZfDocumentSymbol>,
+    pub deprecated: bool,
+}
+
+impl ZfDocumentSymbol {
+    pub fn new(name: &str, kind: ZfSymbolKind, start: u32, end: u32) -> Self {
+        Self { name: name.to_string(), detail: None, kind, range_start_line: start, range_end_line: end, children: Vec::new(), deprecated: false }
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self { self.detail = Some(detail.to_string()); self }
+    pub fn with_child(mut self, child: ZfDocumentSymbol) -> Self { self.children.push(child); self }
+
+    pub fn add_child(&mut self, child: ZfDocumentSymbol) { self.children.push(child); }
+
+    pub fn child_count(&self) -> usize { self.children.len() }
+    pub fn has_children(&self) -> bool { !self.children.is_empty() }
+    pub fn line_count(&self) -> u32 { self.range_end_line - self.range_start_line + 1 }
+
+    pub fn flat_symbols(&self) -> Vec<&ZfDocumentSymbol> {
+        let mut result = vec![self];
+        for child in &self.children {
+            result.extend(child.flat_symbols());
+        }
+        result
+    }
+
+    pub fn find_at_line(&self, line: u32) -> Option<&ZfDocumentSymbol> {
+        if line >= self.range_start_line && line <= self.range_end_line {
+            for child in &self.children {
+                if let Some(found) = child.find_at_line(line) {
+                    return Some(found);
+                }
+            }
+            Some(self)
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Display for ZfDocumentSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {} (L{}-L{})", self.kind.icon(), self.name, self.range_start_line + 1, self.range_end_line + 1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24219,6 +24354,102 @@ mod tests {
     fn test_ze_signature_help_default() {
         let sh = ZeSignatureHelp::default();
         assert!(sh.is_empty());
+    }
+
+
+    // --- zf_ tests ---
+
+    #[test]
+    fn test_zf_hover_plain() {
+        let h = ZfHover::plain("hello");
+        assert_eq!(h.content_count(), 1);
+        assert!(!h.has_range());
+    }
+
+    #[test]
+    fn test_zf_hover_code() {
+        let h = ZfHover::code("rust", "fn main() {}");
+        assert_eq!(h.content_count(), 1);
+    }
+
+    #[test]
+    fn test_zf_hover_with_range() {
+        let h = ZfHover::plain("x").with_range(1, 0, 1, 5);
+        assert!(h.has_range());
+    }
+
+    #[test]
+    fn test_zf_hover_add_parts() {
+        let mut h = ZfHover::plain("intro");
+        h.add_code("rust", "let x = 1;");
+        h.add_plain("explanation");
+        assert_eq!(h.content_count(), 3);
+    }
+
+    #[test]
+    fn test_zf_hover_display() {
+        let h = ZfHover::plain("test");
+        let s = format!("{}", h);
+        assert!(s.contains("ZfHover"));
+    }
+
+    #[test]
+    fn test_zf_symbol_kind_icon() {
+        assert_eq!(ZfSymbolKind::Function.icon(), "fn");
+        assert_eq!(ZfSymbolKind::Class.icon(), "cl");
+        assert_eq!(ZfSymbolKind::Struct.icon(), "st");
+    }
+
+    #[test]
+    fn test_zf_document_symbol_new() {
+        let s = ZfDocumentSymbol::new("main", ZfSymbolKind::Function, 0, 10);
+        assert_eq!(s.name, "main");
+        assert_eq!(s.line_count(), 11);
+        assert!(!s.has_children());
+    }
+
+    #[test]
+    fn test_zf_document_symbol_children() {
+        let child = ZfDocumentSymbol::new("inner", ZfSymbolKind::Variable, 2, 2);
+        let parent = ZfDocumentSymbol::new("main", ZfSymbolKind::Function, 0, 10)
+            .with_child(child);
+        assert_eq!(parent.child_count(), 1);
+    }
+
+    #[test]
+    fn test_zf_document_symbol_flat() {
+        let child = ZfDocumentSymbol::new("x", ZfSymbolKind::Variable, 2, 2);
+        let parent = ZfDocumentSymbol::new("fn", ZfSymbolKind::Function, 0, 5).with_child(child);
+        assert_eq!(parent.flat_symbols().len(), 2);
+    }
+
+    #[test]
+    fn test_zf_document_symbol_find_at_line() {
+        let child = ZfDocumentSymbol::new("x", ZfSymbolKind::Variable, 3, 3);
+        let parent = ZfDocumentSymbol::new("fn", ZfSymbolKind::Function, 0, 10).with_child(child);
+        let found = parent.find_at_line(3).unwrap();
+        assert_eq!(found.name, "x");
+    }
+
+    #[test]
+    fn test_zf_document_symbol_display() {
+        let s = ZfDocumentSymbol::new("test", ZfSymbolKind::Function, 0, 5);
+        let d = format!("{}", s);
+        assert!(d.contains("test"));
+        assert!(d.contains("fn"));
+    }
+
+    #[test]
+    fn test_zf_document_symbol_detail() {
+        let s = ZfDocumentSymbol::new("x", ZfSymbolKind::Variable, 0, 0).with_detail("i32");
+        assert_eq!(s.detail, Some("i32".to_string()));
+    }
+
+    #[test]
+    fn test_zf_marked_string_eq() {
+        let a = ZfMarkedString::Plain("hello".to_string());
+        let b = ZfMarkedString::Plain("hello".to_string());
+        assert_eq!(a, b);
     }
 
 }
