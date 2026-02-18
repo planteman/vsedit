@@ -23007,6 +23007,118 @@ impl AxzExplorer {
     pub fn total_files(&self) -> usize { self.roots.iter().map(|r| r.total_file_count()).sum() }
 }
 
+
+// --- aya_ status bar and activity bar model ---
+
+/// Status bar item alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyaAlignment { Left, Right }
+
+/// Status bar item priority (higher = more towards edge).
+#[derive(Debug, Clone)]
+pub struct AyaStatusBarItem {
+    pub id: String,
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub command: Option<String>,
+    pub alignment: AyaAlignment,
+    pub priority: i32,
+    pub visible: bool,
+    pub color: Option<(u8, u8, u8)>,
+    pub bg_color: Option<(u8, u8, u8)>,
+}
+
+impl AyaStatusBarItem {
+    pub fn new(id: &str, text: &str, alignment: AyaAlignment) -> Self {
+        Self { id: id.to_string(), text: text.to_string(), tooltip: None, command: None,
+            alignment, priority: 0, visible: true, color: None, bg_color: None }
+    }
+    pub fn with_tooltip(mut self, t: &str) -> Self { self.tooltip = Some(t.to_string()); self }
+    pub fn with_command(mut self, cmd: &str) -> Self { self.command = Some(cmd.to_string()); self }
+    pub fn with_priority(mut self, p: i32) -> Self { self.priority = p; self }
+    pub fn set_text(&mut self, text: &str) { self.text = text.to_string(); }
+    pub fn show(&mut self) { self.visible = true; }
+    pub fn hide(&mut self) { self.visible = false; }
+}
+
+/// Status bar model.
+#[derive(Debug)]
+pub struct AyaStatusBar {
+    pub items: Vec<AyaStatusBarItem>,
+}
+
+impl AyaStatusBar {
+    pub fn new() -> Self { Self { items: Vec::new() } }
+    pub fn add(&mut self, item: AyaStatusBarItem) { self.items.push(item); }
+    pub fn remove(&mut self, id: &str) { self.items.retain(|i| i.id != id); }
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut AyaStatusBarItem> {
+        self.items.iter_mut().find(|i| i.id == id)
+    }
+    pub fn left_items(&self) -> Vec<&AyaStatusBarItem> {
+        let mut items: Vec<_> = self.items.iter().filter(|i| i.visible && i.alignment == AyaAlignment::Left).collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+    pub fn right_items(&self) -> Vec<&AyaStatusBarItem> {
+        let mut items: Vec<_> = self.items.iter().filter(|i| i.visible && i.alignment == AyaAlignment::Right).collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+    pub fn visible_count(&self) -> usize { self.items.iter().filter(|i| i.visible).count() }
+}
+
+/// Activity bar view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyaActivityView { Explorer, Search, SourceControl, Debug, Extensions, Custom }
+
+/// Activity bar entry.
+#[derive(Debug, Clone)]
+pub struct AyaActivityBarEntry {
+    pub view: AyaActivityView,
+    pub label: String,
+    pub icon: String,
+    pub badge: Option<u32>,
+}
+
+impl AyaActivityBarEntry {
+    pub fn new(view: AyaActivityView, label: &str, icon: &str) -> Self {
+        Self { view, label: label.to_string(), icon: icon.to_string(), badge: None }
+    }
+    pub fn set_badge(&mut self, count: u32) { self.badge = Some(count); }
+    pub fn clear_badge(&mut self) { self.badge = None; }
+    pub fn has_badge(&self) -> bool { self.badge.is_some() }
+}
+
+/// Activity bar model.
+#[derive(Debug)]
+pub struct AyaActivityBar {
+    pub entries: Vec<AyaActivityBarEntry>,
+    pub active: Option<AyaActivityView>,
+}
+
+impl AyaActivityBar {
+    pub fn new() -> Self {
+        Self {
+            entries: vec![
+                AyaActivityBarEntry::new(AyaActivityView::Explorer, "Explorer", "files"),
+                AyaActivityBarEntry::new(AyaActivityView::Search, "Search", "search"),
+                AyaActivityBarEntry::new(AyaActivityView::SourceControl, "Source Control", "git"),
+                AyaActivityBarEntry::new(AyaActivityView::Debug, "Run and Debug", "debug"),
+                AyaActivityBarEntry::new(AyaActivityView::Extensions, "Extensions", "extensions"),
+            ],
+            active: Some(AyaActivityView::Explorer),
+        }
+    }
+    pub fn activate(&mut self, view: AyaActivityView) {
+        if self.active == Some(view) { self.active = None; } else { self.active = Some(view); }
+    }
+    pub fn is_active(&self, view: AyaActivityView) -> bool { self.active == Some(view) }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn set_badge(&mut self, view: AyaActivityView, count: u32) {
+        if let Some(e) = self.entries.iter_mut().find(|e| e.view == view) { e.set_badge(count); }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37117,6 +37229,75 @@ mod tests {
         root.add_child(AxzFileNode::dir("a", "/r/a"));
         root.sort_children();
         assert!(root.children[0].is_dir());
+    }
+
+
+    #[test]
+    fn test_aya_status_bar_item() {
+        let item = AyaStatusBarItem::new("git", "main", AyaAlignment::Left)
+            .with_tooltip("Branch: main").with_command("git.checkout").with_priority(100);
+        assert_eq!(item.priority, 100);
+        assert!(item.visible);
+    }
+
+    #[test]
+    fn test_aya_status_bar() {
+        let mut bar = AyaStatusBar::new();
+        bar.add(AyaStatusBarItem::new("branch", "main", AyaAlignment::Left).with_priority(100));
+        bar.add(AyaStatusBarItem::new("line", "Ln 1, Col 1", AyaAlignment::Right).with_priority(50));
+        bar.add(AyaStatusBarItem::new("encoding", "UTF-8", AyaAlignment::Right).with_priority(40));
+        assert_eq!(bar.left_items().len(), 1);
+        assert_eq!(bar.right_items().len(), 2);
+        assert_eq!(bar.visible_count(), 3);
+    }
+
+    #[test]
+    fn test_aya_status_bar_hide() {
+        let mut bar = AyaStatusBar::new();
+        bar.add(AyaStatusBarItem::new("a", "A", AyaAlignment::Left));
+        bar.get_mut("a").unwrap().hide();
+        assert_eq!(bar.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_aya_status_bar_remove() {
+        let mut bar = AyaStatusBar::new();
+        bar.add(AyaStatusBarItem::new("a", "A", AyaAlignment::Left));
+        bar.remove("a");
+        assert_eq!(bar.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_aya_activity_bar() {
+        let mut bar = AyaActivityBar::new();
+        assert!(bar.is_active(AyaActivityView::Explorer));
+        assert_eq!(bar.entry_count(), 5);
+        bar.activate(AyaActivityView::Search);
+        assert!(bar.is_active(AyaActivityView::Search));
+        assert!(!bar.is_active(AyaActivityView::Explorer));
+    }
+
+    #[test]
+    fn test_aya_activity_bar_toggle() {
+        let mut bar = AyaActivityBar::new();
+        bar.activate(AyaActivityView::Explorer);
+        assert!(bar.active.is_none());
+    }
+
+    #[test]
+    fn test_aya_activity_badge() {
+        let mut bar = AyaActivityBar::new();
+        bar.set_badge(AyaActivityView::SourceControl, 3);
+        let entry = bar.entries.iter().find(|e| e.view == AyaActivityView::SourceControl).unwrap();
+        assert_eq!(entry.badge, Some(3));
+    }
+
+    #[test]
+    fn test_aya_status_update_text() {
+        let mut bar = AyaStatusBar::new();
+        bar.add(AyaStatusBarItem::new("pos", "Ln 1", AyaAlignment::Right));
+        bar.get_mut("pos").unwrap().set_text("Ln 42, Col 10");
+        assert_eq!(bar.items[0].text, "Ln 42, Col 10");
     }
 
 }
