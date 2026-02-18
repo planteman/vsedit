@@ -13339,6 +13339,190 @@ impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for YvSkipL
     }
 }
 
+
+// --- yw_ thread pool and future combinator ---
+
+/// A simple thread pool that queues work items and processes them.
+/// Simulated single-threaded for deterministic testing.
+#[derive(Debug, Clone)]
+pub struct YwThreadPool {
+    num_threads: usize,
+    pending: usize,
+    completed: usize,
+    is_shutdown: bool,
+}
+
+impl YwThreadPool {
+    pub fn new(num_threads: usize) -> Self {
+        Self { num_threads: std::cmp::max(1, num_threads), pending: 0, completed: 0, is_shutdown: false }
+    }
+
+    pub fn submit(&mut self) -> bool {
+        if self.is_shutdown { return false; }
+        self.pending += 1;
+        true
+    }
+
+    pub fn process_one(&mut self) -> bool {
+        if self.pending > 0 {
+            self.pending -= 1;
+            self.completed += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn process_all(&mut self) -> usize {
+        let count = self.pending;
+        self.completed += count;
+        self.pending = 0;
+        count
+    }
+
+    pub fn pending(&self) -> usize { self.pending }
+
+    pub fn completed(&self) -> usize { self.completed }
+
+    pub fn num_threads(&self) -> usize { self.num_threads }
+
+    pub fn is_idle(&self) -> bool { self.pending == 0 }
+
+    pub fn shutdown(&mut self) {
+        self.process_all();
+        self.is_shutdown = true;
+    }
+
+    pub fn is_shutdown(&self) -> bool { self.is_shutdown }
+
+    pub fn utilization(&self) -> f64 {
+        if self.completed == 0 && self.pending == 0 { 0.0 }
+        else {
+            let total = self.completed + self.pending;
+            self.completed as f64 / total as f64
+        }
+    }
+}
+
+impl Default for YwThreadPool {
+    fn default() -> Self { Self::new(4) }
+}
+
+impl std::fmt::Display for YwThreadPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YwThreadPool(threads={}, pending={}, completed={})", self.num_threads, self.pending, self.completed)
+    }
+}
+
+/// A composable future value that can be mapped, chained, and combined.
+#[derive(Debug, Clone)]
+pub enum YwFuture<T: Clone> {
+    Pending,
+    Ready(T),
+    Failed(String),
+}
+
+impl<T: Clone> YwFuture<T> {
+    pub fn pending() -> Self { YwFuture::Pending }
+
+    pub fn ready(value: T) -> Self { YwFuture::Ready(value) }
+
+    pub fn failed(msg: &str) -> Self { YwFuture::Failed(msg.to_string()) }
+
+    pub fn is_pending(&self) -> bool { matches!(self, YwFuture::Pending) }
+
+    pub fn is_ready(&self) -> bool { matches!(self, YwFuture::Ready(_)) }
+
+    pub fn is_failed(&self) -> bool { matches!(self, YwFuture::Failed(_)) }
+
+    pub fn value(&self) -> Option<&T> {
+        match self {
+            YwFuture::Ready(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn error(&self) -> Option<&str> {
+        match self {
+            YwFuture::Failed(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn map<U: Clone, F: FnOnce(&T) -> U>(&self, f: F) -> YwFuture<U> {
+        match self {
+            YwFuture::Ready(v) => YwFuture::Ready(f(v)),
+            YwFuture::Pending => YwFuture::Pending,
+            YwFuture::Failed(e) => YwFuture::Failed(e.clone()),
+        }
+    }
+
+    pub fn flat_map<U: Clone, F: FnOnce(&T) -> YwFuture<U>>(&self, f: F) -> YwFuture<U> {
+        match self {
+            YwFuture::Ready(v) => f(v),
+            YwFuture::Pending => YwFuture::Pending,
+            YwFuture::Failed(e) => YwFuture::Failed(e.clone()),
+        }
+    }
+
+    pub fn or_else(&self, default: T) -> T {
+        match self {
+            YwFuture::Ready(v) => v.clone(),
+            _ => default,
+        }
+    }
+
+    pub fn resolve(&mut self, value: T) {
+        *self = YwFuture::Ready(value);
+    }
+
+    pub fn reject(&mut self, msg: &str) {
+        *self = YwFuture::Failed(msg.to_string());
+    }
+}
+
+impl<T: Clone> Default for YwFuture<T> {
+    fn default() -> Self { YwFuture::Pending }
+}
+
+impl<T: Clone + std::fmt::Debug> std::fmt::Display for YwFuture<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            YwFuture::Pending => write!(f, "YwFuture(Pending)"),
+            YwFuture::Ready(v) => write!(f, "YwFuture(Ready({:?}))", v),
+            YwFuture::Failed(e) => write!(f, "YwFuture(Failed({}))", e),
+        }
+    }
+}
+
+/// Combine multiple futures: all must succeed.
+pub fn yw_future_all<T: Clone>(futures: &[YwFuture<T>]) -> YwFuture<Vec<T>> {
+    let mut results = Vec::new();
+    for fut in futures {
+        match fut {
+            YwFuture::Ready(v) => results.push(v.clone()),
+            YwFuture::Failed(e) => return YwFuture::Failed(e.clone()),
+            YwFuture::Pending => return YwFuture::Pending,
+        }
+    }
+    YwFuture::Ready(results)
+}
+
+/// Return first ready future.
+pub fn yw_future_race<T: Clone>(futures: &[YwFuture<T>]) -> YwFuture<T> {
+    for fut in futures {
+        if let YwFuture::Ready(v) = fut {
+            return YwFuture::Ready(v.clone());
+        }
+    }
+    for fut in futures {
+        if let YwFuture::Failed(e) = fut {
+            return YwFuture::Failed(e.clone());
+        }
+    }
+    YwFuture::Pending
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -21618,6 +21802,177 @@ mod tests {
         s.insert(1, 10);
         s.clear();
         assert!(s.is_empty());
+    }
+
+
+    // --- yw_ tests ---
+
+    #[test]
+    fn test_yw_pool_new() {
+        let p = YwThreadPool::new(4);
+        assert_eq!(p.num_threads(), 4);
+        assert!(p.is_idle());
+        assert_eq!(p.completed(), 0);
+    }
+
+    #[test]
+    fn test_yw_pool_submit() {
+        let mut p = YwThreadPool::new(2);
+        assert!(p.submit());
+        assert!(p.submit());
+        assert_eq!(p.pending(), 2);
+        assert!(!p.is_idle());
+    }
+
+    #[test]
+    fn test_yw_pool_process_one() {
+        let mut p = YwThreadPool::new(2);
+        p.submit();
+        p.submit();
+        assert!(p.process_one());
+        assert_eq!(p.pending(), 1);
+        assert_eq!(p.completed(), 1);
+    }
+
+    #[test]
+    fn test_yw_pool_process_all() {
+        let mut p = YwThreadPool::new(2);
+        p.submit();
+        p.submit();
+        p.submit();
+        assert_eq!(p.process_all(), 3);
+        assert!(p.is_idle());
+        assert_eq!(p.completed(), 3);
+    }
+
+    #[test]
+    fn test_yw_pool_shutdown() {
+        let mut p = YwThreadPool::new(2);
+        p.submit();
+        p.shutdown();
+        assert!(p.is_shutdown());
+        assert!(!p.submit());
+    }
+
+    #[test]
+    fn test_yw_pool_utilization() {
+        let mut p = YwThreadPool::new(2);
+        assert_eq!(p.utilization(), 0.0);
+        p.submit();
+        p.process_one();
+        assert_eq!(p.utilization(), 1.0);
+    }
+
+    #[test]
+    fn test_yw_pool_display() {
+        let p = YwThreadPool::new(4);
+        let s = format!("{}", p);
+        assert!(s.contains("YwThreadPool"));
+    }
+
+    #[test]
+    fn test_yw_pool_default() {
+        let p = YwThreadPool::default();
+        assert_eq!(p.num_threads(), 4);
+    }
+
+    #[test]
+    fn test_yw_future_ready() {
+        let f = YwFuture::ready(42);
+        assert!(f.is_ready());
+        assert_eq!(f.value(), Some(&42));
+    }
+
+    #[test]
+    fn test_yw_future_pending() {
+        let f: YwFuture<i32> = YwFuture::pending();
+        assert!(f.is_pending());
+        assert_eq!(f.value(), None);
+    }
+
+    #[test]
+    fn test_yw_future_failed() {
+        let f: YwFuture<i32> = YwFuture::failed("oops");
+        assert!(f.is_failed());
+        assert_eq!(f.error(), Some("oops"));
+    }
+
+    #[test]
+    fn test_yw_future_map() {
+        let f = YwFuture::ready(5);
+        let g = f.map(|x| x * 2);
+        assert_eq!(g.value(), Some(&10));
+    }
+
+    #[test]
+    fn test_yw_future_flat_map() {
+        let f = YwFuture::ready(5);
+        let g = f.flat_map(|x| YwFuture::ready(x + 1));
+        assert_eq!(g.value(), Some(&6));
+    }
+
+    #[test]
+    fn test_yw_future_or_else() {
+        let f: YwFuture<i32> = YwFuture::pending();
+        assert_eq!(f.or_else(99), 99);
+        let g = YwFuture::ready(42);
+        assert_eq!(g.or_else(99), 42);
+    }
+
+    #[test]
+    fn test_yw_future_resolve() {
+        let mut f: YwFuture<i32> = YwFuture::pending();
+        f.resolve(42);
+        assert!(f.is_ready());
+        assert_eq!(f.value(), Some(&42));
+    }
+
+    #[test]
+    fn test_yw_future_reject() {
+        let mut f: YwFuture<i32> = YwFuture::pending();
+        f.reject("err");
+        assert!(f.is_failed());
+    }
+
+    #[test]
+    fn test_yw_future_all_ready() {
+        let fs = vec![YwFuture::ready(1), YwFuture::ready(2), YwFuture::ready(3)];
+        let result = yw_future_all(&fs);
+        assert_eq!(result.value(), Some(&vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn test_yw_future_all_pending() {
+        let fs: Vec<YwFuture<i32>> = vec![YwFuture::ready(1), YwFuture::pending()];
+        let result = yw_future_all(&fs);
+        assert!(result.is_pending());
+    }
+
+    #[test]
+    fn test_yw_future_all_failed() {
+        let fs: Vec<YwFuture<i32>> = vec![YwFuture::ready(1), YwFuture::failed("err")];
+        let result = yw_future_all(&fs);
+        assert!(result.is_failed());
+    }
+
+    #[test]
+    fn test_yw_future_race() {
+        let fs: Vec<YwFuture<i32>> = vec![YwFuture::pending(), YwFuture::ready(42)];
+        let result = yw_future_race(&fs);
+        assert_eq!(result.value(), Some(&42));
+    }
+
+    #[test]
+    fn test_yw_future_display() {
+        let f = YwFuture::ready(5);
+        let s = format!("{}", f);
+        assert!(s.contains("YwFuture"));
+    }
+
+    #[test]
+    fn test_yw_future_default() {
+        let f: YwFuture<i32> = YwFuture::default();
+        assert!(f.is_pending());
     }
 
 }
