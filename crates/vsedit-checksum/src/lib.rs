@@ -26341,6 +26341,80 @@ impl AziTransform {
     }
 }
 
+
+// --- azj_ editor folding strategies ---
+
+/// Folding range kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzjFoldKind { Comment, Imports, Region, Code }
+
+/// A folding range.
+#[derive(Debug, Clone)]
+pub struct AzjFoldingRange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: AzjFoldKind,
+    pub collapsed_text: Option<String>,
+}
+
+impl AzjFoldingRange {
+    pub fn new(start: u32, end: u32, kind: AzjFoldKind) -> Self {
+        Self { start_line: start, end_line: end, kind, collapsed_text: None }
+    }
+    pub fn with_text(mut self, t: &str) -> Self { self.collapsed_text = Some(t.to_string()); self }
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+    pub fn is_comment(&self) -> bool { self.kind == AzjFoldKind::Comment }
+    pub fn is_region(&self) -> bool { self.kind == AzjFoldKind::Region }
+}
+
+/// Folding state for a document.
+#[derive(Debug)]
+pub struct AzjFoldingState {
+    pub ranges: Vec<AzjFoldingRange>,
+    pub collapsed: Vec<u32>,
+}
+
+impl AzjFoldingState {
+    pub fn new() -> Self { Self { ranges: Vec::new(), collapsed: Vec::new() } }
+    pub fn set_ranges(&mut self, r: Vec<AzjFoldingRange>) { self.ranges = r; self.collapsed.clear(); }
+    pub fn toggle_fold(&mut self, start_line: u32) {
+        if let Some(pos) = self.collapsed.iter().position(|l| *l == start_line) {
+            self.collapsed.remove(pos);
+        } else if self.ranges.iter().any(|r| r.start_line == start_line) {
+            self.collapsed.push(start_line);
+        }
+    }
+    pub fn is_collapsed(&self, start_line: u32) -> bool { self.collapsed.contains(&start_line) }
+    pub fn fold_all(&mut self) {
+        self.collapsed = self.ranges.iter().map(|r| r.start_line).collect();
+    }
+    pub fn unfold_all(&mut self) { self.collapsed.clear(); }
+    pub fn fold_comments(&mut self) {
+        for r in &self.ranges {
+            if r.is_comment() && !self.collapsed.contains(&r.start_line) { self.collapsed.push(r.start_line); }
+        }
+    }
+    pub fn fold_regions(&mut self) {
+        for r in &self.ranges {
+            if r.is_region() && !self.collapsed.contains(&r.start_line) { self.collapsed.push(r.start_line); }
+        }
+    }
+    pub fn is_line_hidden(&self, line: u32) -> bool {
+        for start in &self.collapsed {
+            if let Some(r) = self.ranges.iter().find(|r| r.start_line == *start) {
+                if line > r.start_line && line <= r.end_line { return true; }
+            }
+        }
+        false
+    }
+    pub fn visible_line_count(&self, total: u32) -> u32 {
+        (0..total).filter(|l| !self.is_line_hidden(*l)).count() as u32
+    }
+    pub fn collapsed_count(&self) -> usize { self.collapsed.len() }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42806,6 +42880,89 @@ goodbye";
     fn test_azi_transform_snake() {
         let t = AziTransform::new(AziTransformKind::SnakeCase);
         assert_eq!(t.apply("HelloWorld"), "hello_world");
+    }
+
+
+    #[test]
+    fn test_azj_folding_range() {
+        let r = AzjFoldingRange::new(5, 15, AzjFoldKind::Code);
+        assert_eq!(r.line_count(), 11);
+        assert!(r.contains_line(10));
+        assert!(!r.contains_line(16));
+        assert!(!r.is_comment());
+    }
+
+    #[test]
+    fn test_azj_toggle_fold() {
+        let mut state = AzjFoldingState::new();
+        state.set_ranges(vec![AzjFoldingRange::new(5, 15, AzjFoldKind::Code)]);
+        assert!(!state.is_collapsed(5));
+        state.toggle_fold(5);
+        assert!(state.is_collapsed(5));
+        state.toggle_fold(5);
+        assert!(!state.is_collapsed(5));
+    }
+
+    #[test]
+    fn test_azj_fold_all() {
+        let mut state = AzjFoldingState::new();
+        state.set_ranges(vec![
+            AzjFoldingRange::new(1, 5, AzjFoldKind::Code),
+            AzjFoldingRange::new(10, 20, AzjFoldKind::Comment),
+        ]);
+        state.fold_all();
+        assert_eq!(state.collapsed_count(), 2);
+        state.unfold_all();
+        assert_eq!(state.collapsed_count(), 0);
+    }
+
+    #[test]
+    fn test_azj_fold_comments() {
+        let mut state = AzjFoldingState::new();
+        state.set_ranges(vec![
+            AzjFoldingRange::new(1, 5, AzjFoldKind::Code),
+            AzjFoldingRange::new(10, 15, AzjFoldKind::Comment),
+        ]);
+        state.fold_comments();
+        assert!(!state.is_collapsed(1));
+        assert!(state.is_collapsed(10));
+    }
+
+    #[test]
+    fn test_azj_hidden_lines() {
+        let mut state = AzjFoldingState::new();
+        state.set_ranges(vec![AzjFoldingRange::new(5, 10, AzjFoldKind::Code)]);
+        state.toggle_fold(5);
+        assert!(!state.is_line_hidden(5));
+        assert!(state.is_line_hidden(6));
+        assert!(state.is_line_hidden(10));
+        assert!(!state.is_line_hidden(11));
+    }
+
+    #[test]
+    fn test_azj_visible_count() {
+        let mut state = AzjFoldingState::new();
+        state.set_ranges(vec![AzjFoldingRange::new(2, 4, AzjFoldKind::Code)]);
+        state.toggle_fold(2);
+        assert_eq!(state.visible_line_count(10), 8);
+    }
+
+    #[test]
+    fn test_azj_region_fold() {
+        let mut state = AzjFoldingState::new();
+        state.set_ranges(vec![
+            AzjFoldingRange::new(1, 5, AzjFoldKind::Region),
+            AzjFoldingRange::new(10, 15, AzjFoldKind::Code),
+        ]);
+        state.fold_regions();
+        assert!(state.is_collapsed(1));
+        assert!(!state.is_collapsed(10));
+    }
+
+    #[test]
+    fn test_azj_collapsed_text() {
+        let r = AzjFoldingRange::new(1, 5, AzjFoldKind::Code).with_text("...");
+        assert_eq!(r.collapsed_text.as_deref(), Some("..."));
     }
 
 }
