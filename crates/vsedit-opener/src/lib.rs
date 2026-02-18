@@ -9895,6 +9895,183 @@ impl YeSegTree {
     pub fn ye_is_empty(&self) -> bool { self.ye_n == 0 }
 }
 
+
+// --- yf_ Disjoint Interval Set ---
+
+/// Set of non-overlapping intervals with automatic merging.
+#[derive(Debug, Clone)]
+pub struct YfIntervalSet {
+    yf_intervals: std::collections::BTreeMap<i64, i64>,
+}
+
+impl std::fmt::Display for YfIntervalSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IntervalSet(count={})", self.yf_intervals.len())
+    }
+}
+
+impl Default for YfIntervalSet {
+    fn default() -> Self { Self::yf_new() }
+}
+
+impl YfIntervalSet {
+    /// Create an empty interval set.
+    pub fn yf_new() -> Self { Self { yf_intervals: std::collections::BTreeMap::new() } }
+
+    /// Number of disjoint intervals.
+    pub fn yf_len(&self) -> usize { self.yf_intervals.len() }
+
+    /// Is empty.
+    pub fn yf_is_empty(&self) -> bool { self.yf_intervals.is_empty() }
+
+    /// Add an interval [lo, hi]. Merges with overlapping/adjacent intervals.
+    pub fn yf_add(&mut self, lo: i64, hi: i64) {
+        if lo > hi { return; }
+        let mut new_lo = lo;
+        let mut new_hi = hi;
+        let to_remove: Vec<i64> = self.yf_intervals.range(..=hi + 1)
+            .filter(|(start, end)| **end >= lo - 1)
+            .map(|(s, _)| *s)
+            .collect();
+        for s in &to_remove {
+            let e = self.yf_intervals[s];
+            new_lo = new_lo.min(*s);
+            new_hi = new_hi.max(e);
+            self.yf_intervals.remove(s);
+        }
+        self.yf_intervals.insert(new_lo, new_hi);
+    }
+
+    /// Check if a value is covered by any interval.
+    pub fn yf_contains(&self, val: i64) -> bool {
+        if let Some((_, end)) = self.yf_intervals.range(..=val).next_back() {
+            *end >= val
+        } else {
+            false
+        }
+    }
+
+    /// Remove a point, splitting intervals if needed.
+    pub fn yf_remove_point(&mut self, val: i64) {
+        let covering = self.yf_intervals.range(..=val)
+            .filter(|(_, end)| **end >= val)
+            .map(|(s, e)| (*s, *e))
+            .next_back();
+        if let Some((s, e)) = covering {
+            self.yf_intervals.remove(&s);
+            if s < val { self.yf_intervals.insert(s, val - 1); }
+            if val < e { self.yf_intervals.insert(val + 1, e); }
+        }
+    }
+
+    /// Get all intervals as sorted vec.
+    pub fn yf_intervals(&self) -> Vec<(i64, i64)> {
+        self.yf_intervals.iter().map(|(s, e)| (*s, *e)).collect()
+    }
+
+    /// Total covered length.
+    pub fn yf_total_length(&self) -> i64 {
+        self.yf_intervals.iter().map(|(s, e)| e - s + 1).sum()
+    }
+
+    /// Clear all intervals.
+    pub fn yf_clear(&mut self) { self.yf_intervals.clear(); }
+
+    /// Check if two interval sets overlap.
+    pub fn yf_overlaps(&self, other: &YfIntervalSet) -> bool {
+        for (s, e) in &self.yf_intervals {
+            for (os, oe) in &other.yf_intervals {
+                if s <= oe && os <= e { return true; }
+            }
+        }
+        false
+    }
+}
+
+// --- yf_ K-way Merge ---
+
+/// K-way merge iterator that merges multiple sorted sequences.
+#[derive(Debug, Clone)]
+pub struct YfKWayMerge {
+    yf_sources: Vec<Vec<i64>>,
+    yf_indices: Vec<usize>,
+}
+
+impl std::fmt::Display for YfKWayMerge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KWayMerge(sources={})", self.yf_sources.len())
+    }
+}
+
+impl Default for YfKWayMerge {
+    fn default() -> Self { Self::yf_new() }
+}
+
+impl YfKWayMerge {
+    /// Create an empty k-way merge.
+    pub fn yf_new() -> Self { Self { yf_sources: Vec::new(), yf_indices: Vec::new() } }
+
+    /// Add a sorted source.
+    pub fn yf_add_source(&mut self, source: Vec<i64>) {
+        self.yf_sources.push(source);
+        self.yf_indices.push(0);
+    }
+
+    /// Number of sources.
+    pub fn yf_source_count(&self) -> usize { self.yf_sources.len() }
+
+    /// Merge all sources into a single sorted vec.
+    pub fn yf_merge(&mut self) -> Vec<i64> {
+        let mut result = Vec::new();
+        loop {
+            let mut min_val: Option<i64> = None;
+            let mut min_src = 0;
+            for (i, (src, idx)) in self.yf_sources.iter().zip(self.yf_indices.iter()).enumerate() {
+                if *idx < src.len() {
+                    let v = src[*idx];
+                    if min_val.is_none() || v < min_val.unwrap() {
+                        min_val = Some(v);
+                        min_src = i;
+                    }
+                }
+            }
+            match min_val {
+                Some(v) => { result.push(v); self.yf_indices[min_src] += 1; }
+                None => break,
+            }
+        }
+        result
+    }
+
+    /// Total remaining elements across all sources.
+    pub fn yf_remaining(&self) -> usize {
+        self.yf_sources.iter().zip(self.yf_indices.iter())
+            .map(|(src, idx)| src.len().saturating_sub(*idx))
+            .sum()
+    }
+
+    /// Reset all indices.
+    pub fn yf_reset(&mut self) {
+        for idx in &mut self.yf_indices { *idx = 0; }
+    }
+
+    /// Clear all sources.
+    pub fn yf_clear(&mut self) { self.yf_sources.clear(); self.yf_indices.clear(); }
+
+    /// Check if merge is complete.
+    pub fn yf_is_done(&self) -> bool { self.yf_remaining() == 0 }
+
+    /// Merge and deduplicate.
+    pub fn yf_merge_unique(&mut self) -> Vec<i64> {
+        let merged = self.yf_merge();
+        let mut unique = Vec::new();
+        for v in merged {
+            if unique.last() != Some(&v) { unique.push(v); }
+        }
+        unique
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -15592,6 +15769,160 @@ mod tests {
     fn ye_seg_default() {
         let st = super::YeSegTree::default();
         assert!(st.ye_is_empty());
+    }
+
+
+    // --- yf_ IntervalSet tests ---
+
+    #[test]
+    fn yf_interval_new() {
+        let s = super::YfIntervalSet::yf_new();
+        assert!(s.yf_is_empty());
+    }
+
+    #[test]
+    fn yf_interval_add() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 5);
+        assert_eq!(s.yf_len(), 1);
+        assert!(s.yf_contains(3));
+    }
+
+    #[test]
+    fn yf_interval_merge() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 5);
+        s.yf_add(3, 8);
+        assert_eq!(s.yf_len(), 1);
+        assert_eq!(s.yf_intervals(), vec![(1, 8)]);
+    }
+
+    #[test]
+    fn yf_interval_adjacent() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 5);
+        s.yf_add(6, 10);
+        assert_eq!(s.yf_len(), 1);
+    }
+
+    #[test]
+    fn yf_interval_disjoint() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 3);
+        s.yf_add(10, 15);
+        assert_eq!(s.yf_len(), 2);
+    }
+
+    #[test]
+    fn yf_interval_remove_point() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 10);
+        s.yf_remove_point(5);
+        assert!(!s.yf_contains(5));
+        assert!(s.yf_contains(4));
+        assert!(s.yf_contains(6));
+    }
+
+    #[test]
+    fn yf_interval_length() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 5);
+        s.yf_add(10, 14);
+        assert_eq!(s.yf_total_length(), 10);
+    }
+
+    #[test]
+    fn yf_interval_clear() {
+        let mut s = super::YfIntervalSet::yf_new();
+        s.yf_add(1, 5);
+        s.yf_clear();
+        assert!(s.yf_is_empty());
+    }
+
+    #[test]
+    fn yf_interval_display() {
+        let s = super::YfIntervalSet::yf_new();
+        assert!(format!("{}", s).contains("IntervalSet"));
+    }
+
+    #[test]
+    fn yf_interval_overlaps() {
+        let mut a = super::YfIntervalSet::yf_new();
+        let mut b = super::YfIntervalSet::yf_new();
+        a.yf_add(1, 5);
+        b.yf_add(3, 8);
+        assert!(a.yf_overlaps(&b));
+    }
+
+    // --- yf_ KWayMerge tests ---
+
+    #[test]
+    fn yf_kmerge_new() {
+        let m = super::YfKWayMerge::yf_new();
+        assert_eq!(m.yf_source_count(), 0);
+    }
+
+    #[test]
+    fn yf_kmerge_merge() {
+        let mut m = super::YfKWayMerge::yf_new();
+        m.yf_add_source(vec![1, 4, 7]);
+        m.yf_add_source(vec![2, 5, 8]);
+        m.yf_add_source(vec![3, 6, 9]);
+        let result = m.yf_merge();
+        assert_eq!(result, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn yf_kmerge_single() {
+        let mut m = super::YfKWayMerge::yf_new();
+        m.yf_add_source(vec![1, 2, 3]);
+        let result = m.yf_merge();
+        assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn yf_kmerge_empty() {
+        let mut m = super::YfKWayMerge::yf_new();
+        let result = m.yf_merge();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn yf_kmerge_remaining() {
+        let mut m = super::YfKWayMerge::yf_new();
+        m.yf_add_source(vec![1, 2]);
+        m.yf_add_source(vec![3, 4]);
+        assert_eq!(m.yf_remaining(), 4);
+    }
+
+    #[test]
+    fn yf_kmerge_reset() {
+        let mut m = super::YfKWayMerge::yf_new();
+        m.yf_add_source(vec![1, 2]);
+        let _ = m.yf_merge();
+        m.yf_reset();
+        assert_eq!(m.yf_remaining(), 2);
+    }
+
+    #[test]
+    fn yf_kmerge_unique() {
+        let mut m = super::YfKWayMerge::yf_new();
+        m.yf_add_source(vec![1, 2, 3]);
+        m.yf_add_source(vec![2, 3, 4]);
+        let result = m.yf_merge_unique();
+        assert_eq!(result, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn yf_kmerge_display() {
+        let m = super::YfKWayMerge::yf_new();
+        assert!(format!("{}", m).contains("KWayMerge"));
+    }
+
+    #[test]
+    fn yf_kmerge_default() {
+        let m = super::YfKWayMerge::default();
+        assert!(m.yf_is_done());
     }
 
 }
