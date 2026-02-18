@@ -14093,6 +14093,164 @@ impl std::fmt::Display for ZbLocation {
     }
 }
 
+
+// --- zc_ text edit and document change ---
+
+/// A single text edit operation replacing a range with new text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZcTextEdit {
+    pub range_start_line: u32,
+    pub range_start_char: u32,
+    pub range_end_line: u32,
+    pub range_end_char: u32,
+    pub new_text: String,
+}
+
+impl ZcTextEdit {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { range_start_line: sl, range_start_char: sc, range_end_line: el, range_end_char: ec, new_text: text.to_string() }
+    }
+
+    pub fn insert(line: u32, character: u32, text: &str) -> Self {
+        Self::new(line, character, line, character, text)
+    }
+
+    pub fn delete(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self::new(sl, sc, el, ec, "")
+    }
+
+    pub fn replace_line(line: u32, text: &str) -> Self {
+        Self::new(line, 0, line, u32::MAX, text)
+    }
+
+    pub fn is_insert(&self) -> bool {
+        self.range_start_line == self.range_end_line && self.range_start_char == self.range_end_char
+    }
+
+    pub fn is_delete(&self) -> bool {
+        self.new_text.is_empty()
+    }
+
+    pub fn is_replace(&self) -> bool {
+        !self.is_insert() && !self.is_delete()
+    }
+
+    pub fn affects_line(&self, line: u32) -> bool {
+        line >= self.range_start_line && line <= self.range_end_line
+    }
+}
+
+impl std::fmt::Display for ZcTextEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = if self.is_insert() { "insert" }
+            else if self.is_delete() { "delete" }
+            else { "replace" };
+        write!(f, "ZcTextEdit({} at {}:{}-{}:{})", kind, self.range_start_line, self.range_start_char, self.range_end_line, self.range_end_char)
+    }
+}
+
+/// A collection of text edits to be applied atomically to a document.
+#[derive(Debug, Clone)]
+pub struct ZcDocumentChange {
+    pub uri: String,
+    pub version: u64,
+    pub edits: Vec<ZcTextEdit>,
+}
+
+impl ZcDocumentChange {
+    pub fn new(uri: &str, version: u64) -> Self {
+        Self { uri: uri.to_string(), version, edits: Vec::new() }
+    }
+
+    pub fn add_edit(&mut self, edit: ZcTextEdit) {
+        self.edits.push(edit);
+    }
+
+    pub fn add_insert(&mut self, line: u32, character: u32, text: &str) {
+        self.edits.push(ZcTextEdit::insert(line, character, text));
+    }
+
+    pub fn add_delete(&mut self, sl: u32, sc: u32, el: u32, ec: u32) {
+        self.edits.push(ZcTextEdit::delete(sl, sc, el, ec));
+    }
+
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+
+    pub fn is_empty(&self) -> bool { self.edits.is_empty() }
+
+    pub fn has_inserts(&self) -> bool { self.edits.iter().any(|e| e.is_insert()) }
+
+    pub fn has_deletes(&self) -> bool { self.edits.iter().any(|e| e.is_delete()) }
+
+    pub fn has_replaces(&self) -> bool { self.edits.iter().any(|e| e.is_replace()) }
+
+    pub fn affected_lines(&self) -> Vec<u32> {
+        let mut lines: Vec<u32> = self.edits.iter().flat_map(|e| e.range_start_line..=e.range_end_line).collect();
+        lines.sort();
+        lines.dedup();
+        lines
+    }
+
+    pub fn sort_edits(&mut self) {
+        self.edits.sort_by(|a, b| {
+            a.range_start_line.cmp(&b.range_start_line)
+                .then(a.range_start_char.cmp(&b.range_start_char))
+        });
+    }
+
+    pub fn reverse_edits(&mut self) {
+        self.edits.reverse();
+    }
+
+    pub fn clear(&mut self) { self.edits.clear(); }
+}
+
+impl std::fmt::Display for ZcDocumentChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZcDocumentChange(uri={}, v{}, edits={})", self.uri, self.version, self.edits.len())
+    }
+}
+
+/// A workspace edit containing changes to multiple documents.
+#[derive(Debug, Clone)]
+pub struct ZcWorkspaceEdit {
+    pub changes: Vec<ZcDocumentChange>,
+}
+
+impl ZcWorkspaceEdit {
+    pub fn new() -> Self { Self { changes: Vec::new() } }
+
+    pub fn add_change(&mut self, change: ZcDocumentChange) {
+        self.changes.push(change);
+    }
+
+    pub fn document_count(&self) -> usize { self.changes.len() }
+
+    pub fn total_edits(&self) -> usize {
+        self.changes.iter().map(|c| c.edit_count()).sum()
+    }
+
+    pub fn is_empty(&self) -> bool { self.changes.is_empty() }
+
+    pub fn uris(&self) -> Vec<&str> {
+        self.changes.iter().map(|c| c.uri.as_str()).collect()
+    }
+
+    pub fn get_changes(&self, uri: &str) -> Option<&ZcDocumentChange> {
+        self.changes.iter().find(|c| c.uri == uri)
+    }
+}
+
+impl Default for ZcWorkspaceEdit {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for ZcWorkspaceEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZcWorkspaceEdit(docs={}, edits={})", self.document_count(), self.total_edits())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -23377,6 +23535,139 @@ mod tests {
         let loc = ZbLocation::new("file.rs", ZbRange::default());
         let s = format!("{}", loc);
         assert!(s.contains("file.rs"));
+    }
+
+
+    // --- zc_ tests ---
+
+    #[test]
+    fn test_zc_edit_insert() {
+        let e = ZcTextEdit::insert(5, 10, "hello");
+        assert!(e.is_insert());
+        assert!(!e.is_delete());
+        assert!(!e.is_replace());
+    }
+
+    #[test]
+    fn test_zc_edit_delete() {
+        let e = ZcTextEdit::delete(1, 0, 1, 5);
+        assert!(e.is_delete());
+        assert!(!e.is_insert());
+    }
+
+    #[test]
+    fn test_zc_edit_replace() {
+        let e = ZcTextEdit::new(1, 0, 1, 5, "new");
+        assert!(e.is_replace());
+    }
+
+    #[test]
+    fn test_zc_edit_replace_line() {
+        let e = ZcTextEdit::replace_line(3, "new content");
+        assert_eq!(e.range_start_line, 3);
+        assert_eq!(e.new_text, "new content");
+    }
+
+    #[test]
+    fn test_zc_edit_affects_line() {
+        let e = ZcTextEdit::new(2, 0, 5, 10, "x");
+        assert!(e.affects_line(3));
+        assert!(!e.affects_line(1));
+        assert!(!e.affects_line(6));
+    }
+
+    #[test]
+    fn test_zc_edit_display() {
+        let e = ZcTextEdit::insert(0, 0, "hi");
+        let s = format!("{}", e);
+        assert!(s.contains("insert"));
+    }
+
+    #[test]
+    fn test_zc_doc_change_new() {
+        let dc = ZcDocumentChange::new("file:///test.rs", 1);
+        assert!(dc.is_empty());
+        assert_eq!(dc.version, 1);
+    }
+
+    #[test]
+    fn test_zc_doc_change_add_edits() {
+        let mut dc = ZcDocumentChange::new("file.rs", 1);
+        dc.add_insert(0, 0, "hello");
+        dc.add_delete(1, 0, 1, 5);
+        assert_eq!(dc.edit_count(), 2);
+        assert!(dc.has_inserts());
+        assert!(dc.has_deletes());
+    }
+
+    #[test]
+    fn test_zc_doc_change_affected_lines() {
+        let mut dc = ZcDocumentChange::new("f", 1);
+        dc.add_edit(ZcTextEdit::new(2, 0, 4, 0, "x"));
+        let lines = dc.affected_lines();
+        assert_eq!(lines, vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn test_zc_doc_change_sort() {
+        let mut dc = ZcDocumentChange::new("f", 1);
+        dc.add_insert(5, 0, "b");
+        dc.add_insert(1, 0, "a");
+        dc.sort_edits();
+        assert_eq!(dc.edits[0].range_start_line, 1);
+    }
+
+    #[test]
+    fn test_zc_doc_change_display() {
+        let dc = ZcDocumentChange::new("test", 1);
+        let s = format!("{}", dc);
+        assert!(s.contains("ZcDocumentChange"));
+    }
+
+    #[test]
+    fn test_zc_workspace_edit_new() {
+        let we = ZcWorkspaceEdit::new();
+        assert!(we.is_empty());
+        assert_eq!(we.document_count(), 0);
+    }
+
+    #[test]
+    fn test_zc_workspace_edit_add() {
+        let mut we = ZcWorkspaceEdit::new();
+        let mut dc = ZcDocumentChange::new("a.rs", 1);
+        dc.add_insert(0, 0, "x");
+        we.add_change(dc);
+        assert_eq!(we.document_count(), 1);
+        assert_eq!(we.total_edits(), 1);
+    }
+
+    #[test]
+    fn test_zc_workspace_edit_uris() {
+        let mut we = ZcWorkspaceEdit::new();
+        we.add_change(ZcDocumentChange::new("a.rs", 1));
+        we.add_change(ZcDocumentChange::new("b.rs", 1));
+        assert_eq!(we.uris(), vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn test_zc_workspace_edit_get() {
+        let mut we = ZcWorkspaceEdit::new();
+        we.add_change(ZcDocumentChange::new("a.rs", 1));
+        assert!(we.get_changes("a.rs").is_some());
+        assert!(we.get_changes("b.rs").is_none());
+    }
+
+    #[test]
+    fn test_zc_workspace_edit_display() {
+        let we = ZcWorkspaceEdit::new();
+        let s = format!("{}", we);
+        assert!(s.contains("ZcWorkspaceEdit"));
+    }
+
+    #[test]
+    fn test_zc_workspace_edit_default() {
+        let we = ZcWorkspaceEdit::default();
+        assert!(we.is_empty());
     }
 
 }
