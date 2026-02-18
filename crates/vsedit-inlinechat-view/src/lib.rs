@@ -26494,6 +26494,79 @@ impl AzlEditorLayout {
     }
 }
 
+
+// --- azm_ call hierarchy model ---
+
+/// Call hierarchy item kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzmSymbolKind { Function, Method, Constructor, Class, Interface, Module, Property, Variable }
+
+/// A call hierarchy item.
+#[derive(Debug, Clone)]
+pub struct AzmCallHierarchyItem {
+    pub name: String,
+    pub kind: AzmSymbolKind,
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub detail: Option<String>,
+}
+
+impl AzmCallHierarchyItem {
+    pub fn new(name: &str, kind: AzmSymbolKind, uri: &str, line: u32, col: u32) -> Self {
+        Self { name: name.to_string(), kind, uri: uri.to_string(), line, col, detail: None }
+    }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn display_name(&self) -> String {
+        if let Some(d) = &self.detail { format!("{} - {}", self.name, d) } else { self.name.clone() }
+    }
+}
+
+/// An incoming call.
+#[derive(Debug, Clone)]
+pub struct AzmIncomingCall {
+    pub from: AzmCallHierarchyItem,
+    pub from_ranges: Vec<(u32, u32, u32)>,
+}
+
+impl AzmIncomingCall {
+    pub fn new(from: AzmCallHierarchyItem) -> Self { Self { from, from_ranges: Vec::new() } }
+    pub fn add_range(&mut self, line: u32, start: u32, end: u32) { self.from_ranges.push((line, start, end)); }
+    pub fn call_count(&self) -> usize { self.from_ranges.len() }
+}
+
+/// An outgoing call.
+#[derive(Debug, Clone)]
+pub struct AzmOutgoingCall {
+    pub to: AzmCallHierarchyItem,
+    pub from_ranges: Vec<(u32, u32, u32)>,
+}
+
+impl AzmOutgoingCall {
+    pub fn new(to: AzmCallHierarchyItem) -> Self { Self { to, from_ranges: Vec::new() } }
+    pub fn add_range(&mut self, line: u32, start: u32, end: u32) { self.from_ranges.push((line, start, end)); }
+    pub fn call_count(&self) -> usize { self.from_ranges.len() }
+}
+
+/// Call hierarchy tree.
+#[derive(Debug)]
+pub struct AzmCallHierarchy {
+    pub root: AzmCallHierarchyItem,
+    pub incoming: Vec<AzmIncomingCall>,
+    pub outgoing: Vec<AzmOutgoingCall>,
+}
+
+impl AzmCallHierarchy {
+    pub fn new(root: AzmCallHierarchyItem) -> Self { Self { root, incoming: Vec::new(), outgoing: Vec::new() } }
+    pub fn set_incoming(&mut self, calls: Vec<AzmIncomingCall>) { self.incoming = calls; }
+    pub fn set_outgoing(&mut self, calls: Vec<AzmOutgoingCall>) { self.outgoing = calls; }
+    pub fn incoming_count(&self) -> usize { self.incoming.len() }
+    pub fn outgoing_count(&self) -> usize { self.outgoing.len() }
+    pub fn total_incoming_refs(&self) -> usize { self.incoming.iter().map(|c| c.call_count()).sum() }
+    pub fn callers(&self) -> Vec<&str> { self.incoming.iter().map(|c| c.from.name.as_str()).collect() }
+    pub fn callees(&self) -> Vec<&str> { self.outgoing.iter().map(|c| c.to.name.as_str()).collect() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43285,6 +43358,81 @@ goodbye";
         let mut l = AzlEditorLayout::default_layout();
         l.set_tab_size(2);
         assert_eq!(l.tab_size, 2);
+    }
+
+
+    #[test]
+    fn test_azm_hierarchy_item() {
+        let item = AzmCallHierarchyItem::new("foo", AzmSymbolKind::Function, "file.rs", 10, 5)
+            .with_detail("mod::foo");
+        assert_eq!(item.display_name(), "foo - mod::foo");
+    }
+
+    #[test]
+    fn test_azm_item_no_detail() {
+        let item = AzmCallHierarchyItem::new("bar", AzmSymbolKind::Method, "f.rs", 1, 0);
+        assert_eq!(item.display_name(), "bar");
+    }
+
+    #[test]
+    fn test_azm_incoming_call() {
+        let caller = AzmCallHierarchyItem::new("main", AzmSymbolKind::Function, "m.rs", 1, 0);
+        let mut ic = AzmIncomingCall::new(caller);
+        ic.add_range(5, 10, 13);
+        ic.add_range(8, 10, 13);
+        assert_eq!(ic.call_count(), 2);
+    }
+
+    #[test]
+    fn test_azm_outgoing_call() {
+        let callee = AzmCallHierarchyItem::new("helper", AzmSymbolKind::Function, "h.rs", 1, 0);
+        let mut oc = AzmOutgoingCall::new(callee);
+        oc.add_range(15, 5, 11);
+        assert_eq!(oc.call_count(), 1);
+    }
+
+    #[test]
+    fn test_azm_hierarchy() {
+        let root = AzmCallHierarchyItem::new("target", AzmSymbolKind::Function, "t.rs", 10, 0);
+        let mut h = AzmCallHierarchy::new(root);
+        let caller1 = AzmCallHierarchyItem::new("a", AzmSymbolKind::Function, "a.rs", 1, 0);
+        let caller2 = AzmCallHierarchyItem::new("b", AzmSymbolKind::Method, "b.rs", 1, 0);
+        let mut ic1 = AzmIncomingCall::new(caller1);
+        ic1.add_range(5, 0, 6);
+        ic1.add_range(10, 0, 6);
+        let ic2 = AzmIncomingCall::new(caller2);
+        h.set_incoming(vec![ic1, ic2]);
+        assert_eq!(h.incoming_count(), 2);
+        assert_eq!(h.total_incoming_refs(), 2);
+        assert_eq!(h.callers(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_azm_callees() {
+        let root = AzmCallHierarchyItem::new("main", AzmSymbolKind::Function, "m.rs", 1, 0);
+        let mut h = AzmCallHierarchy::new(root);
+        let c1 = AzmOutgoingCall::new(AzmCallHierarchyItem::new("foo", AzmSymbolKind::Function, "f.rs", 1, 0));
+        let c2 = AzmOutgoingCall::new(AzmCallHierarchyItem::new("bar", AzmSymbolKind::Function, "b.rs", 1, 0));
+        h.set_outgoing(vec![c1, c2]);
+        assert_eq!(h.outgoing_count(), 2);
+        assert_eq!(h.callees(), vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn test_azm_empty_hierarchy() {
+        let root = AzmCallHierarchyItem::new("x", AzmSymbolKind::Function, "x.rs", 0, 0);
+        let h = AzmCallHierarchy::new(root);
+        assert_eq!(h.incoming_count(), 0);
+        assert_eq!(h.outgoing_count(), 0);
+        assert_eq!(h.total_incoming_refs(), 0);
+    }
+
+    #[test]
+    fn test_azm_symbol_kinds() {
+        let f = AzmCallHierarchyItem::new("a", AzmSymbolKind::Constructor, "a.rs", 0, 0);
+        assert_eq!(f.kind, AzmSymbolKind::Constructor);
+        let m = AzmCallHierarchyItem::new("b", AzmSymbolKind::Class, "b.rs", 0, 0);
+        assert_eq!(m.kind, AzmSymbolKind::Class);
     }
 
 }
