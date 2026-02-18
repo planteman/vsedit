@@ -1136,6 +1136,437 @@ impl Xm96Tokenizer {
     }
 }
 
+
+// --------------- Xq96Treap ---------------
+
+use std::cmp::Ordering as Xq96Ord;
+
+struct Xq96TreapNode<K, V> {
+    key: K,
+    value: V,
+    priority: u64,
+    left: Option<Box<Xq96TreapNode<K, V>>>,
+    right: Option<Box<Xq96TreapNode<K, V>>>,
+    size: usize,
+}
+
+pub struct Xq96Treap<K, V> {
+    root: Option<Box<Xq96TreapNode<K, V>>>,
+    seed: u64,
+}
+
+impl<K, V> Xq96TreapNode<K, V> {
+    fn new(key: K, value: V, priority: u64) -> Self {
+        Self { key, value, priority, left: None, right: None, size: 1 }
+    }
+}
+
+fn xq_96_size<K, V>(node: &Option<Box<Xq96TreapNode<K, V>>>) -> usize {
+    node.as_ref().map_or(0, |n| n.size)
+}
+
+fn xq_96_update_size<K, V>(node: &mut Xq96TreapNode<K, V>) {
+    node.size = 1 + xq_96_size(&node.left) + xq_96_size(&node.right);
+}
+
+fn xq_96_rotate_right<K, V>(mut node: Box<Xq96TreapNode<K, V>>) -> Box<Xq96TreapNode<K, V>> {
+    let mut left = node.left.take().unwrap();
+    node.left = left.right.take();
+    xq_96_update_size(&mut node);
+    left.right = Some(node);
+    xq_96_update_size(&mut left);
+    left
+}
+
+fn xq_96_rotate_left<K, V>(mut node: Box<Xq96TreapNode<K, V>>) -> Box<Xq96TreapNode<K, V>> {
+    let mut right = node.right.take().unwrap();
+    node.right = right.left.take();
+    xq_96_update_size(&mut node);
+    right.left = Some(node);
+    xq_96_update_size(&mut right);
+    right
+}
+
+fn xq_96_insert_node<K: Ord, V>(
+    node: Option<Box<Xq96TreapNode<K, V>>>,
+    key: K,
+    value: V,
+    priority: u64,
+) -> (Option<Box<Xq96TreapNode<K, V>>>, Option<V>) {
+    match node {
+        None => (Some(Box::new(Xq96TreapNode::new(key, value, priority))), None),
+        Some(mut n) => match key.cmp(&n.key) {
+            Xq96Ord::Equal => {
+                let old = std::mem::replace(&mut n.value, value);
+                (Some(n), Some(old))
+            }
+            Xq96Ord::Less => {
+                let (new_left, old) = xq_96_insert_node(n.left.take(), key, value, priority);
+                n.left = new_left;
+                xq_96_update_size(&mut n);
+                if n.left.as_ref().unwrap().priority > n.priority {
+                    (Some(xq_96_rotate_right(n)), old)
+                } else {
+                    (Some(n), old)
+                }
+            }
+            Xq96Ord::Greater => {
+                let (new_right, old) = xq_96_insert_node(n.right.take(), key, value, priority);
+                n.right = new_right;
+                xq_96_update_size(&mut n);
+                if n.right.as_ref().unwrap().priority > n.priority {
+                    (Some(xq_96_rotate_left(n)), old)
+                } else {
+                    (Some(n), old)
+                }
+            }
+        },
+    }
+}
+
+fn xq_96_remove_node<K: Ord, V>(
+    node: Option<Box<Xq96TreapNode<K, V>>>,
+    key: &K,
+) -> (Option<Box<Xq96TreapNode<K, V>>>, Option<V>) {
+    match node {
+        None => (None, None),
+        Some(mut n) => match key.cmp(&n.key) {
+            Xq96Ord::Less => {
+                let (new_left, old) = xq_96_remove_node(n.left.take(), key);
+                n.left = new_left;
+                xq_96_update_size(&mut n);
+                (Some(n), old)
+            }
+            Xq96Ord::Greater => {
+                let (new_right, old) = xq_96_remove_node(n.right.take(), key);
+                n.right = new_right;
+                xq_96_update_size(&mut n);
+                (Some(n), old)
+            }
+            Xq96Ord::Equal => {
+                let has_left = n.left.is_some();
+                let has_right = n.right.is_some();
+                if !has_left && !has_right {
+                    (None, Some(n.value))
+                } else if !has_right
+                    || (has_left
+                        && n.left.as_ref().unwrap().priority > n.right.as_ref().unwrap().priority)
+                {
+                    let mut rotated = xq_96_rotate_right(n);
+                    let (new_right, old) = xq_96_remove_node(rotated.right.take(), key);
+                    rotated.right = new_right;
+                    xq_96_update_size(&mut rotated);
+                    (Some(rotated), old)
+                } else {
+                    let mut rotated = xq_96_rotate_left(n);
+                    let (new_left, old) = xq_96_remove_node(rotated.left.take(), key);
+                    rotated.left = new_left;
+                    xq_96_update_size(&mut rotated);
+                    (Some(rotated), old)
+                }
+            }
+        },
+    }
+}
+
+fn xq_96_find_min<K, V>(node: &Option<Box<Xq96TreapNode<K, V>>>) -> Option<&K> {
+    node.as_ref().map(|n| {
+        if n.left.is_some() { xq_96_find_min(&n.left) } else { Some(&n.key) }
+    }).flatten()
+}
+
+fn xq_96_find_max<K, V>(node: &Option<Box<Xq96TreapNode<K, V>>>) -> Option<&K> {
+    node.as_ref().map(|n| {
+        if n.right.is_some() { xq_96_find_max(&n.right) } else { Some(&n.key) }
+    }).flatten()
+}
+
+fn xq_96_rank<K: Ord, V>(node: &Option<Box<Xq96TreapNode<K, V>>>, key: &K) -> usize {
+    match node {
+        None => 0,
+        Some(n) => match key.cmp(&n.key) {
+            Xq96Ord::Less => xq_96_rank(&n.left, key),
+            Xq96Ord::Equal => xq_96_size(&n.left),
+            Xq96Ord::Greater => 1 + xq_96_size(&n.left) + xq_96_rank(&n.right, key),
+        },
+    }
+}
+
+fn xq_96_kth<K, V>(node: &Option<Box<Xq96TreapNode<K, V>>>, k: usize) -> Option<&K> {
+    node.as_ref().and_then(|n| {
+        let left_size = xq_96_size(&n.left);
+        if k < left_size {
+            xq_96_kth(&n.left, k)
+        } else if k == left_size {
+            Some(&n.key)
+        } else {
+            xq_96_kth(&n.right, k - left_size - 1)
+        }
+    })
+}
+
+fn xq_96_in_order<K: Clone, V>(node: &Option<Box<Xq96TreapNode<K, V>>>, out: &mut Vec<K>) {
+    if let Some(n) = node {
+        xq_96_in_order(&n.left, out);
+        out.push(n.key.clone());
+        xq_96_in_order(&n.right, out);
+    }
+}
+
+impl<K: Ord + Clone, V> Xq96Treap<K, V> {
+    pub fn xq_new() -> Self {
+        Self { root: None, seed: 12345 + 96 as u64 }
+    }
+    fn xq_next_priority(&mut self) -> u64 {
+        self.seed ^= self.seed << 13;
+        self.seed ^= self.seed >> 7;
+        self.seed ^= self.seed << 17;
+        self.seed
+    }
+    pub fn xq_insert(&mut self, key: K, value: V) -> Option<V> {
+        let p = self.xq_next_priority();
+        let (new_root, old) = xq_96_insert_node(self.root.take(), key, value, p);
+        self.root = new_root;
+        old
+    }
+    pub fn xq_get(&self, key: &K) -> Option<&V> {
+        let mut cur = &self.root;
+        while let Some(n) = cur {
+            match key.cmp(&n.key) {
+                Xq96Ord::Equal => return Some(&n.value),
+                Xq96Ord::Less => cur = &n.left,
+                Xq96Ord::Greater => cur = &n.right,
+            }
+        }
+        None
+    }
+    pub fn xq_remove(&mut self, key: &K) -> Option<V> {
+        let (new_root, old) = xq_96_remove_node(self.root.take(), key);
+        self.root = new_root;
+        old
+    }
+    pub fn xq_len(&self) -> usize { xq_96_size(&self.root) }
+    pub fn xq_min(&self) -> Option<&K> { xq_96_find_min(&self.root) }
+    pub fn xq_max(&self) -> Option<&K> { xq_96_find_max(&self.root) }
+    pub fn xq_rank(&self, key: &K) -> usize { xq_96_rank(&self.root, key) }
+    pub fn xq_kth_element(&self, k: usize) -> Option<&K> { xq_96_kth(&self.root, k) }
+    pub fn xq_in_order(&self) -> Vec<K> {
+        let mut v = Vec::new();
+        xq_96_in_order(&self.root, &mut v);
+        v
+    }
+}
+
+// --------------- Xq96VEBTree ---------------
+
+pub struct Xq96VEBTree {
+    universe: usize,
+    min_val: Option<usize>,
+    max_val: Option<usize>,
+    count: usize,
+    summary: Option<Box<Xq96VEBTree>>,
+    clusters: Vec<Option<Box<Xq96VEBTree>>>,
+    sqrt_hi: usize,
+    sqrt_lo: usize,
+}
+
+impl Xq96VEBTree {
+    pub fn xq_new(universe: usize) -> Self {
+        let u = universe.max(2);
+        let sqrt_hi = (1usize << ((u as f64).log2().ceil() as u32 / 2 + (u as f64).log2().ceil() as u32 % 2)).max(2);
+        let sqrt_lo = (1usize << ((u as f64).log2().ceil() as u32 / 2)).max(2);
+        let clusters = if u <= 2 {
+            Vec::new()
+        } else {
+            (0..sqrt_hi).map(|_| None).collect()
+        };
+        let summary = if u <= 2 { None } else { Some(Box::new(Xq96VEBTree::xq_new(sqrt_hi))) };
+        Self { universe: u, min_val: None, max_val: None, count: 0, summary, clusters, sqrt_hi, sqrt_lo }
+    }
+
+    fn xq_high(&self, x: usize) -> usize { x / self.sqrt_lo }
+    fn xq_low(&self, x: usize) -> usize { x % self.sqrt_lo }
+    fn xq_index(&self, hi: usize, lo: usize) -> usize { hi * self.sqrt_lo + lo }
+
+    pub fn xq_insert(&mut self, x: usize) {
+        if self.min_val.is_none() {
+            self.min_val = Some(x);
+            self.max_val = Some(x);
+            self.count = 1;
+            return;
+        }
+        let mut val = x;
+        if val == self.min_val.unwrap() { return; }
+        if val < self.min_val.unwrap() {
+            std::mem::swap(&mut val, self.min_val.as_mut().unwrap());
+        }
+        if self.universe > 2 {
+            let hi = self.xq_high(val);
+            let lo = self.xq_low(val);
+            if hi < self.clusters.len() {
+                let need_summary = self.clusters[hi].is_none();
+                if need_summary {
+                    self.clusters[hi] = Some(Box::new(Xq96VEBTree::xq_new(self.sqrt_lo)));
+                }
+                let before = self.clusters[hi].as_ref().unwrap().count;
+                self.clusters[hi].as_mut().unwrap().xq_insert(lo);
+                let after = self.clusters[hi].as_ref().unwrap().count;
+                if after > before {
+                    self.count += 1;
+                    if need_summary {
+                        if let Some(ref mut s) = self.summary { s.xq_insert(hi); }
+                    }
+                }
+            }
+        } else if val != self.min_val.unwrap() {
+            self.count += 1;
+        }
+        if val > self.max_val.unwrap() { self.max_val = Some(val); }
+    }
+
+    pub fn xq_contains(&self, x: usize) -> bool {
+        if self.min_val == Some(x) || self.max_val == Some(x) { return true; }
+        if self.universe <= 2 { return false; }
+        let hi = self.xq_high(x);
+        let lo = self.xq_low(x);
+        if hi < self.clusters.len() {
+            self.clusters[hi].as_ref().map_or(false, |c| c.xq_contains(lo))
+        } else {
+            false
+        }
+    }
+
+    pub fn xq_delete(&mut self, x: usize) {
+        if self.min_val.is_none() { return; }
+        if self.min_val == self.max_val {
+            if self.min_val == Some(x) {
+                self.min_val = None;
+                self.max_val = None;
+                self.count = 0;
+            }
+            return;
+        }
+        if !self.xq_contains(x) && self.min_val != Some(x) { return; }
+        self.count = self.count.saturating_sub(1);
+        if self.universe <= 2 {
+            if x == 0 { self.min_val = Some(1); } else { self.min_val = Some(0); }
+            self.max_val = self.min_val;
+            return;
+        }
+        let mut val = x;
+        if val == self.min_val.unwrap() {
+            if let Some(ref s) = self.summary {
+                if let Some(first_cluster) = s.min_val {
+                    if let Some(ref c) = self.clusters[first_cluster] {
+                        if let Some(lo) = c.min_val {
+                            val = self.xq_index(first_cluster, lo);
+                            self.min_val = Some(val);
+                        }
+                    }
+                } else { return; }
+            } else { return; }
+        }
+        let hi = self.xq_high(val);
+        let lo = self.xq_low(val);
+        if hi < self.clusters.len() {
+            if let Some(ref mut c) = self.clusters[hi] {
+                c.xq_delete(lo);
+                if c.min_val.is_none() {
+                    if let Some(ref mut s) = self.summary { s.xq_delete(hi); }
+                }
+            }
+        }
+        if Some(val) == self.max_val {
+            if let Some(ref s) = self.summary {
+                if let Some(last) = s.max_val {
+                    if let Some(ref c) = self.clusters[last] {
+                        if let Some(m) = c.max_val {
+                            self.max_val = Some(self.xq_index(last, m));
+                        }
+                    }
+                } else {
+                    self.max_val = self.min_val;
+                }
+            } else {
+                self.max_val = self.min_val;
+            }
+        }
+    }
+
+    pub fn xq_successor(&self, x: usize) -> Option<usize> {
+        if self.min_val.is_none() { return None; }
+        if x < self.min_val.unwrap() { return self.min_val; }
+        if self.universe <= 2 {
+            if x == 0 && self.max_val == Some(1) { return Some(1); }
+            return None;
+        }
+        let hi = self.xq_high(x);
+        let lo = self.xq_low(x);
+        if hi < self.clusters.len() {
+            if let Some(ref c) = self.clusters[hi] {
+                if let Some(m) = c.max_val {
+                    if lo < m {
+                        if let Some(offset) = c.xq_successor(lo) {
+                            return Some(self.xq_index(hi, offset));
+                        }
+                    }
+                }
+            }
+            if let Some(ref s) = self.summary {
+                if let Some(next_hi) = s.xq_successor(hi) {
+                    if next_hi < self.clusters.len() {
+                        if let Some(ref nc) = self.clusters[next_hi] {
+                            if let Some(lo2) = nc.min_val {
+                                return Some(self.xq_index(next_hi, lo2));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn xq_predecessor(&self, x: usize) -> Option<usize> {
+        if self.min_val.is_none() { return None; }
+        if x > self.max_val.unwrap() { return self.max_val; }
+        if self.universe <= 2 {
+            if x == 1 && self.min_val == Some(0) { return Some(0); }
+            return None;
+        }
+        let hi = self.xq_high(x);
+        let lo = self.xq_low(x);
+        if hi < self.clusters.len() {
+            if let Some(ref c) = self.clusters[hi] {
+                if let Some(m) = c.min_val {
+                    if lo > m {
+                        if let Some(offset) = c.xq_predecessor(lo) {
+                            return Some(self.xq_index(hi, offset));
+                        }
+                    }
+                }
+            }
+            if let Some(ref s) = self.summary {
+                if let Some(prev_hi) = s.xq_predecessor(hi) {
+                    if prev_hi < self.clusters.len() {
+                        if let Some(ref pc) = self.clusters[prev_hi] {
+                            if let Some(m) = pc.max_val {
+                                return Some(self.xq_index(prev_hi, m));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if self.min_val.is_some() && x > self.min_val.unwrap() { return self.min_val; }
+        None
+    }
+
+    pub fn xq_min(&self) -> Option<usize> { self.min_val }
+    pub fn xq_max(&self) -> Option<usize> { self.max_val }
+    pub fn xq_count(&self) -> usize { self.count }
+}
+
 #[cfg(test)]
 mod editor {
     use vsedit_text_model::TextModel;
@@ -13667,4 +14098,150 @@ mod terminal_rendering {
         let tokens = resolver.tokens();
         assert_eq!(tokens.len(), 3);
     }
+
+    // ---- xq_96 treap tests ----
+    #[test]
+    fn xq_96_treap_empty() {
+        let t = super::Xq96Treap::<i32, i32>::xq_new();
+        assert_eq!(t.xq_len(), 0);
+        assert!(t.xq_min().is_none());
+        assert!(t.xq_max().is_none());
+    }
+
+    #[test]
+    fn xq_96_treap_insert_get() {
+        let mut t = super::Xq96Treap::xq_new();
+        assert!(t.xq_insert(10, "ten").is_none());
+        assert_eq!(t.xq_get(&10), Some(&"ten"));
+        assert_eq!(t.xq_len(), 1);
+    }
+
+    #[test]
+    fn xq_96_treap_overwrite() {
+        let mut t = super::Xq96Treap::xq_new();
+        t.xq_insert(5, "old");
+        assert_eq!(t.xq_insert(5, "new"), Some("old"));
+        assert_eq!(t.xq_get(&5), Some(&"new"));
+    }
+
+    #[test]
+    fn xq_96_treap_remove() {
+        let mut t = super::Xq96Treap::xq_new();
+        t.xq_insert(1, "a");
+        t.xq_insert(2, "b");
+        assert_eq!(t.xq_remove(&1), Some("a"));
+        assert!(t.xq_get(&1).is_none());
+        assert_eq!(t.xq_len(), 1);
+    }
+
+    #[test]
+    fn xq_96_treap_min_max() {
+        let mut t = super::Xq96Treap::xq_new();
+        t.xq_insert(30, "x");
+        t.xq_insert(10, "y");
+        t.xq_insert(50, "z");
+        assert_eq!(t.xq_min(), Some(&10));
+        assert_eq!(t.xq_max(), Some(&50));
+    }
+
+    #[test]
+    fn xq_96_treap_rank() {
+        let mut t = super::Xq96Treap::xq_new();
+        for i in 0..5 { t.xq_insert(i * 10, i); }
+        assert_eq!(t.xq_rank(&20), 2);
+        assert_eq!(t.xq_rank(&0), 0);
+    }
+
+    #[test]
+    fn xq_96_treap_kth() {
+        let mut t = super::Xq96Treap::xq_new();
+        for i in [30, 10, 50, 20, 40] { t.xq_insert(i, i); }
+        assert_eq!(t.xq_kth_element(0), Some(&10));
+        assert_eq!(t.xq_kth_element(4), Some(&50));
+    }
+
+    #[test]
+    fn xq_96_treap_in_order() {
+        let mut t = super::Xq96Treap::xq_new();
+        for i in [5, 3, 8, 1, 4] { t.xq_insert(i, i); }
+        assert_eq!(t.xq_in_order(), vec![1, 3, 4, 5, 8]);
+    }
+
+    // ---- xq_96 VEB tree tests ----
+    #[test]
+    fn xq_96_veb_empty() {
+        let v = super::Xq96VEBTree::xq_new(16);
+        assert!(v.xq_min().is_none());
+        assert!(v.xq_max().is_none());
+        assert_eq!(v.xq_count(), 0);
+    }
+
+    #[test]
+    fn xq_96_veb_insert_contains() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(5);
+        v.xq_insert(10);
+        assert!(v.xq_contains(5));
+        assert!(v.xq_contains(10));
+        assert!(!v.xq_contains(7));
+    }
+
+    #[test]
+    fn xq_96_veb_min_max() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(3);
+        v.xq_insert(12);
+        v.xq_insert(7);
+        assert_eq!(v.xq_min(), Some(3));
+        assert_eq!(v.xq_max(), Some(12));
+    }
+
+    #[test]
+    fn xq_96_veb_delete() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(5);
+        v.xq_insert(10);
+        v.xq_delete(5);
+        assert!(!v.xq_contains(5));
+        assert!(v.xq_contains(10));
+    }
+
+    #[test]
+    fn xq_96_veb_successor() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(2);
+        v.xq_insert(5);
+        v.xq_insert(9);
+        assert_eq!(v.xq_successor(2), Some(5));
+        assert_eq!(v.xq_successor(5), Some(9));
+    }
+
+    #[test]
+    fn xq_96_veb_predecessor() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(2);
+        v.xq_insert(5);
+        v.xq_insert(9);
+        assert_eq!(v.xq_predecessor(9), Some(5));
+        assert_eq!(v.xq_predecessor(5), Some(2));
+    }
+
+    #[test]
+    fn xq_96_veb_count() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(1);
+        v.xq_insert(3);
+        v.xq_insert(7);
+        assert!(v.xq_count() >= 2);
+    }
+
+    #[test]
+    fn xq_96_veb_duplicate_insert() {
+        let mut v = super::Xq96VEBTree::xq_new(16);
+        v.xq_insert(4);
+        let c1 = v.xq_count();
+        v.xq_insert(4);
+        assert_eq!(v.xq_count(), c1);
+    }
+
 }
