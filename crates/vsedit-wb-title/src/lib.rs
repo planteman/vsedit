@@ -22060,6 +22060,128 @@ impl AxqSmoothScroll {
     pub fn current_position(&self) -> u32 { self.current_line.round() as u32 }
 }
 
+
+// --- axr_ language detection and grammar types ---
+
+/// A language identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AxrLanguageId(pub String);
+
+impl AxrLanguageId {
+    pub fn new(id: &str) -> Self { Self(id.to_lowercase()) }
+    pub fn as_str(&self) -> &str { &self.0 }
+}
+
+/// File extension to language mapping.
+#[derive(Debug)]
+pub struct AxrLanguageRegistry {
+    by_ext: std::collections::HashMap<String, AxrLanguageId>,
+    by_filename: std::collections::HashMap<String, AxrLanguageId>,
+    by_pattern: Vec<(String, AxrLanguageId)>,
+    aliases: std::collections::HashMap<String, AxrLanguageId>,
+}
+
+impl AxrLanguageRegistry {
+    pub fn new() -> Self {
+        let mut r = Self {
+            by_ext: std::collections::HashMap::new(),
+            by_filename: std::collections::HashMap::new(),
+            by_pattern: Vec::new(),
+            aliases: std::collections::HashMap::new(),
+        };
+        r.register_defaults();
+        r
+    }
+    fn register_defaults(&mut self) {
+        let mappings = [
+            ("rs", "rust"), ("py", "python"), ("js", "javascript"), ("ts", "typescript"),
+            ("json", "json"), ("toml", "toml"), ("yaml", "yaml"), ("yml", "yaml"),
+            ("md", "markdown"), ("html", "html"), ("css", "css"), ("go", "go"),
+            ("c", "c"), ("cpp", "cpp"), ("h", "c"), ("hpp", "cpp"),
+            ("java", "java"), ("rb", "ruby"), ("sh", "shellscript"), ("bash", "shellscript"),
+            ("xml", "xml"), ("sql", "sql"), ("lua", "lua"), ("php", "php"),
+        ];
+        for (ext, lang) in mappings { self.by_ext.insert(ext.to_string(), AxrLanguageId::new(lang)); }
+        self.by_filename.insert("Makefile".to_string(), AxrLanguageId::new("makefile"));
+        self.by_filename.insert("Dockerfile".to_string(), AxrLanguageId::new("dockerfile"));
+        self.by_filename.insert("Cargo.toml".to_string(), AxrLanguageId::new("toml"));
+        self.aliases.insert("js".to_string(), AxrLanguageId::new("javascript"));
+        self.aliases.insert("ts".to_string(), AxrLanguageId::new("typescript"));
+        self.aliases.insert("py".to_string(), AxrLanguageId::new("python"));
+    }
+    pub fn register_extension(&mut self, ext: &str, lang: AxrLanguageId) {
+        self.by_ext.insert(ext.to_string(), lang);
+    }
+    pub fn register_filename(&mut self, name: &str, lang: AxrLanguageId) {
+        self.by_filename.insert(name.to_string(), lang);
+    }
+    pub fn register_pattern(&mut self, pattern: &str, lang: AxrLanguageId) {
+        self.by_pattern.push((pattern.to_string(), lang));
+    }
+    pub fn detect(&self, filename: &str) -> Option<&AxrLanguageId> {
+        if let Some(lang) = self.by_filename.get(filename) { return Some(lang); }
+        if let Some(ext) = filename.rsplit('.').next() {
+            if let Some(lang) = self.by_ext.get(ext) { return Some(lang); }
+        }
+        for (pat, lang) in &self.by_pattern {
+            if filename.contains(pat) { return Some(lang); }
+        }
+        None
+    }
+    pub fn resolve_alias(&self, alias: &str) -> Option<&AxrLanguageId> { self.aliases.get(alias) }
+    pub fn language_count(&self) -> usize {
+        let mut langs: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for lang in self.by_ext.values() { langs.insert(lang.as_str()); }
+        for lang in self.by_filename.values() { langs.insert(lang.as_str()); }
+        langs.len()
+    }
+}
+
+/// A TextMate grammar scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxrScope(pub String);
+
+impl AxrScope {
+    pub fn new(s: &str) -> Self { Self(s.to_string()) }
+    pub fn parts(&self) -> Vec<&str> { self.0.split('.').collect() }
+    pub fn depth(&self) -> usize { self.parts().len() }
+    pub fn is_prefix_of(&self, other: &AxrScope) -> bool { other.0.starts_with(&self.0) }
+}
+
+/// A scope stack for nested grammar contexts.
+#[derive(Debug, Clone)]
+pub struct AxrScopeStack {
+    pub scopes: Vec<AxrScope>,
+}
+
+impl AxrScopeStack {
+    pub fn new() -> Self { Self { scopes: Vec::new() } }
+    pub fn push(&mut self, scope: AxrScope) { self.scopes.push(scope); }
+    pub fn pop(&mut self) -> Option<AxrScope> { self.scopes.pop() }
+    pub fn top(&self) -> Option<&AxrScope> { self.scopes.last() }
+    pub fn depth(&self) -> usize { self.scopes.len() }
+    pub fn contains(&self, scope: &AxrScope) -> bool {
+        self.scopes.iter().any(|s| scope.is_prefix_of(s))
+    }
+    pub fn to_string_path(&self) -> String {
+        self.scopes.iter().map(|s| s.0.as_str()).collect::<Vec<_>>().join(" ")
+    }
+}
+
+/// Token type from grammar tokenization.
+#[derive(Debug, Clone)]
+pub struct AxrToken {
+    pub start: u32,
+    pub end: u32,
+    pub scopes: Vec<AxrScope>,
+}
+
+impl AxrToken {
+    pub fn new(start: u32, end: u32, scopes: Vec<AxrScope>) -> Self { Self { start, end, scopes } }
+    pub fn len(&self) -> u32 { self.end - self.start }
+    pub fn primary_scope(&self) -> Option<&AxrScope> { self.scopes.last() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35578,6 +35700,68 @@ mod tests {
         assert_eq!(sp.top_line, 20);
         sp.half_page_up();
         assert_eq!(sp.top_line, 0);
+    }
+
+
+    #[test]
+    fn test_axr_language_id() {
+        let lang = AxrLanguageId::new("JavaScript");
+        assert_eq!(lang.as_str(), "javascript");
+    }
+
+    #[test]
+    fn test_axr_registry_detect() {
+        let reg = AxrLanguageRegistry::new();
+        assert_eq!(reg.detect("main.rs").unwrap().as_str(), "rust");
+        assert_eq!(reg.detect("app.py").unwrap().as_str(), "python");
+        assert_eq!(reg.detect("Dockerfile").unwrap().as_str(), "dockerfile");
+        assert!(reg.detect("unknown.xyz").is_none());
+    }
+
+    #[test]
+    fn test_axr_registry_custom() {
+        let mut reg = AxrLanguageRegistry::new();
+        reg.register_extension("svelte", AxrLanguageId::new("svelte"));
+        assert_eq!(reg.detect("App.svelte").unwrap().as_str(), "svelte");
+    }
+
+    #[test]
+    fn test_axr_registry_alias() {
+        let reg = AxrLanguageRegistry::new();
+        assert_eq!(reg.resolve_alias("js").unwrap().as_str(), "javascript");
+        assert!(reg.resolve_alias("xyz").is_none());
+    }
+
+    #[test]
+    fn test_axr_scope() {
+        let s = AxrScope::new("source.rust.keyword");
+        assert_eq!(s.depth(), 3);
+        let parent = AxrScope::new("source.rust");
+        assert!(parent.is_prefix_of(&s));
+    }
+
+    #[test]
+    fn test_axr_scope_stack() {
+        let mut stack = AxrScopeStack::new();
+        stack.push(AxrScope::new("source.rust"));
+        stack.push(AxrScope::new("keyword.control"));
+        assert_eq!(stack.depth(), 2);
+        assert_eq!(stack.top().unwrap().0, "keyword.control");
+        let path = stack.to_string_path();
+        assert!(path.contains("source.rust"));
+    }
+
+    #[test]
+    fn test_axr_token() {
+        let tok = AxrToken::new(0, 5, vec![AxrScope::new("source.rust"), AxrScope::new("keyword.fn")]);
+        assert_eq!(tok.len(), 5);
+        assert_eq!(tok.primary_scope().unwrap().0, "keyword.fn");
+    }
+
+    #[test]
+    fn test_axr_registry_language_count() {
+        let reg = AxrLanguageRegistry::new();
+        assert!(reg.language_count() >= 15);
     }
 
 }
