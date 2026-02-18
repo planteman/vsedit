@@ -23060,6 +23060,108 @@ impl AxySettingsEditor {
     pub fn modified_count(&self) -> usize { self.values.len() }
 }
 
+
+// --- axz_ file explorer and tree widget ---
+
+/// File entry type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxzFileKind { File, Directory, Symlink }
+
+/// A file tree node.
+#[derive(Debug, Clone)]
+pub struct AxzFileNode {
+    pub name: String,
+    pub path: String,
+    pub kind: AxzFileKind,
+    pub children: Vec<AxzFileNode>,
+    pub is_expanded: bool,
+    pub is_selected: bool,
+    pub size: Option<u64>,
+    pub modified: Option<u64>,
+}
+
+impl AxzFileNode {
+    pub fn file(name: &str, path: &str) -> Self {
+        Self { name: name.to_string(), path: path.to_string(), kind: AxzFileKind::File,
+            children: Vec::new(), is_expanded: false, is_selected: false, size: None, modified: None }
+    }
+    pub fn dir(name: &str, path: &str) -> Self {
+        Self { name: name.to_string(), path: path.to_string(), kind: AxzFileKind::Directory,
+            children: Vec::new(), is_expanded: false, is_selected: false, size: None, modified: None }
+    }
+    pub fn is_dir(&self) -> bool { self.kind == AxzFileKind::Directory }
+    pub fn is_file(&self) -> bool { self.kind == AxzFileKind::File }
+    pub fn add_child(&mut self, child: AxzFileNode) { self.children.push(child); }
+    pub fn sort_children(&mut self) {
+        self.children.sort_by(|a, b| {
+            match (a.is_dir(), b.is_dir()) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            }
+        });
+    }
+    pub fn toggle_expand(&mut self) { if self.is_dir() { self.is_expanded = !self.is_expanded; } }
+    pub fn child_count(&self) -> usize { self.children.len() }
+    pub fn extension(&self) -> Option<&str> { self.name.rsplit('.').next() }
+    pub fn find_by_path(&self, path: &str) -> Option<&AxzFileNode> {
+        if self.path == path { return Some(self); }
+        for child in &self.children {
+            if let Some(found) = child.find_by_path(path) { return Some(found); }
+        }
+        None
+    }
+    pub fn flatten_visible(&self) -> Vec<(&AxzFileNode, u32)> {
+        let mut result = Vec::new();
+        self.flatten_inner(&mut result, 0);
+        result
+    }
+    fn flatten_inner<'a>(&'a self, result: &mut Vec<(&'a AxzFileNode, u32)>, depth: u32) {
+        result.push((self, depth));
+        if self.is_expanded {
+            for child in &self.children { child.flatten_inner(result, depth + 1); }
+        }
+    }
+    pub fn total_file_count(&self) -> usize {
+        let mut count = if self.is_file() { 1 } else { 0 };
+        for child in &self.children { count += child.total_file_count(); }
+        count
+    }
+}
+
+/// File explorer state.
+#[derive(Debug)]
+pub struct AxzExplorer {
+    pub roots: Vec<AxzFileNode>,
+    pub focused_index: Option<usize>,
+    pub filter: Option<String>,
+}
+
+impl AxzExplorer {
+    pub fn new() -> Self { Self { roots: Vec::new(), focused_index: None, filter: None } }
+    pub fn add_root(&mut self, root: AxzFileNode) { self.roots.push(root); }
+    pub fn root_count(&self) -> usize { self.roots.len() }
+    pub fn visible_items(&self) -> Vec<(&AxzFileNode, u32)> {
+        let mut items = Vec::new();
+        for root in &self.roots { items.extend(root.flatten_visible()); }
+        if let Some(ref filter) = self.filter {
+            let f = filter.to_lowercase();
+            items.retain(|(node, _)| node.name.to_lowercase().contains(&f));
+        }
+        items
+    }
+    pub fn set_filter(&mut self, f: &str) { self.filter = if f.is_empty() { None } else { Some(f.to_string()) }; }
+    pub fn clear_filter(&mut self) { self.filter = None; }
+    pub fn focus_next(&mut self) {
+        let count = self.visible_items().len();
+        self.focused_index = Some(self.focused_index.map(|i| (i + 1).min(count.saturating_sub(1))).unwrap_or(0));
+    }
+    pub fn focus_prev(&mut self) {
+        self.focused_index = Some(self.focused_index.map(|i| i.saturating_sub(1)).unwrap_or(0));
+    }
+    pub fn total_files(&self) -> usize { self.roots.iter().map(|r| r.total_file_count()).sum() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36896,6 +36998,90 @@ mod tests {
     fn test_axy_enum_value() {
         let val = AxySettingValue::Enum("off".into(), vec!["off".into(), "on".into(), "auto".into()]);
         assert_eq!(val.type_name(), "enum");
+    }
+
+
+    #[test]
+    fn test_axz_file_node() {
+        let mut dir = AxzFileNode::dir("src", "/proj/src");
+        dir.add_child(AxzFileNode::file("main.rs", "/proj/src/main.rs"));
+        dir.add_child(AxzFileNode::file("lib.rs", "/proj/src/lib.rs"));
+        assert!(dir.is_dir());
+        assert_eq!(dir.child_count(), 2);
+        dir.sort_children();
+        assert_eq!(dir.children[0].name, "lib.rs");
+    }
+
+    #[test]
+    fn test_axz_toggle_expand() {
+        let mut dir = AxzFileNode::dir("src", "/src");
+        assert!(!dir.is_expanded);
+        dir.toggle_expand();
+        assert!(dir.is_expanded);
+        dir.toggle_expand();
+        assert!(!dir.is_expanded);
+    }
+
+    #[test]
+    fn test_axz_flatten_visible() {
+        let mut root = AxzFileNode::dir("root", "/root");
+        root.is_expanded = true;
+        root.add_child(AxzFileNode::file("a.rs", "/root/a.rs"));
+        let mut sub = AxzFileNode::dir("sub", "/root/sub");
+        sub.add_child(AxzFileNode::file("b.rs", "/root/sub/b.rs"));
+        root.add_child(sub);
+        let flat = root.flatten_visible();
+        assert_eq!(flat.len(), 3);
+        assert_eq!(flat[0].1, 0);
+        assert_eq!(flat[1].1, 1);
+    }
+
+    #[test]
+    fn test_axz_find_by_path() {
+        let mut root = AxzFileNode::dir("root", "/root");
+        root.add_child(AxzFileNode::file("a.rs", "/root/a.rs"));
+        let found = root.find_by_path("/root/a.rs");
+        assert!(found.is_some());
+        assert!(root.find_by_path("/nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_axz_explorer() {
+        let mut explorer = AxzExplorer::new();
+        let mut root = AxzFileNode::dir("proj", "/proj");
+        root.is_expanded = true;
+        root.add_child(AxzFileNode::file("main.rs", "/proj/main.rs"));
+        root.add_child(AxzFileNode::file("test.rs", "/proj/test.rs"));
+        explorer.add_root(root);
+        assert_eq!(explorer.total_files(), 2);
+        assert_eq!(explorer.visible_items().len(), 3);
+    }
+
+    #[test]
+    fn test_axz_explorer_filter() {
+        let mut explorer = AxzExplorer::new();
+        let mut root = AxzFileNode::dir("proj", "/proj");
+        root.is_expanded = true;
+        root.add_child(AxzFileNode::file("main.rs", "/proj/main.rs"));
+        root.add_child(AxzFileNode::file("test.py", "/proj/test.py"));
+        explorer.add_root(root);
+        explorer.set_filter("main");
+        assert_eq!(explorer.visible_items().len(), 1);
+    }
+
+    #[test]
+    fn test_axz_file_extension() {
+        let f = AxzFileNode::file("main.rs", "/main.rs");
+        assert_eq!(f.extension(), Some("rs"));
+    }
+
+    #[test]
+    fn test_axz_sort_dirs_first() {
+        let mut root = AxzFileNode::dir("r", "/r");
+        root.add_child(AxzFileNode::file("z.rs", "/r/z.rs"));
+        root.add_child(AxzFileNode::dir("a", "/r/a"));
+        root.sort_children();
+        assert!(root.children[0].is_dir());
     }
 
 }
