@@ -10753,6 +10753,202 @@ impl YiWeightedGraph {
     }
 }
 
+
+// --- yj_ Expression Evaluator ---
+
+/// Simple arithmetic expression evaluator supporting +, -, *, /, parentheses.
+#[derive(Debug, Clone)]
+pub struct YjExprEval {
+    yj_vars: std::collections::HashMap<String, f64>,
+}
+
+impl std::fmt::Display for YjExprEval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExprEval(vars={})", self.yj_vars.len())
+    }
+}
+
+impl Default for YjExprEval {
+    fn default() -> Self { Self::yj_new() }
+}
+
+impl YjExprEval {
+    /// Create a new expression evaluator.
+    pub fn yj_new() -> Self { Self { yj_vars: std::collections::HashMap::new() } }
+
+    /// Set a variable.
+    pub fn yj_set_var(&mut self, name: &str, value: f64) { self.yj_vars.insert(name.to_string(), value); }
+
+    /// Get a variable.
+    pub fn yj_get_var(&self, name: &str) -> Option<f64> { self.yj_vars.get(name).copied() }
+
+    /// Evaluate an expression string.
+    pub fn yj_eval(&self, expr: &str) -> Result<f64, String> {
+        let tokens = Self::yj_tokenize(expr)?;
+        let mut pos = 0;
+        let result = self.yj_parse_expr(&tokens, &mut pos)?;
+        if pos != tokens.len() { return Err("unexpected token".to_string()); }
+        Ok(result)
+    }
+
+    fn yj_tokenize(expr: &str) -> Result<Vec<String>, String> {
+        let mut tokens = Vec::new();
+        let mut chars = expr.chars().peekable();
+        while let Some(&ch) = chars.peek() {
+            if ch.is_whitespace() { chars.next(); continue; }
+            if ch.is_ascii_digit() || ch == '.' {
+                let mut num = String::new();
+                while let Some(&c) = chars.peek() {
+                    if c.is_ascii_digit() || c == '.' { num.push(c); chars.next(); } else { break; }
+                }
+                tokens.push(num);
+            } else if ch.is_ascii_alphabetic() || ch == '_' {
+                let mut name = String::new();
+                while let Some(&c) = chars.peek() {
+                    if c.is_ascii_alphanumeric() || c == '_' { name.push(c); chars.next(); } else { break; }
+                }
+                tokens.push(name);
+            } else if "+-*/()".contains(ch) {
+                tokens.push(ch.to_string());
+                chars.next();
+            } else {
+                return Err(format!("unexpected character: {}", ch));
+            }
+        }
+        Ok(tokens)
+    }
+
+    fn yj_parse_expr(&self, tokens: &[String], pos: &mut usize) -> Result<f64, String> {
+        let mut result = self.yj_parse_term(tokens, pos)?;
+        while *pos < tokens.len() && (tokens[*pos] == "+" || tokens[*pos] == "-") {
+            let op = tokens[*pos].clone();
+            *pos += 1;
+            let right = self.yj_parse_term(tokens, pos)?;
+            result = if op == "+" { result + right } else { result - right };
+        }
+        Ok(result)
+    }
+
+    fn yj_parse_term(&self, tokens: &[String], pos: &mut usize) -> Result<f64, String> {
+        let mut result = self.yj_parse_factor(tokens, pos)?;
+        while *pos < tokens.len() && (tokens[*pos] == "*" || tokens[*pos] == "/") {
+            let op = tokens[*pos].clone();
+            *pos += 1;
+            let right = self.yj_parse_factor(tokens, pos)?;
+            result = if op == "*" { result * right } else { result / right };
+        }
+        Ok(result)
+    }
+
+    fn yj_parse_factor(&self, tokens: &[String], pos: &mut usize) -> Result<f64, String> {
+        if *pos >= tokens.len() { return Err("unexpected end".to_string()); }
+        if tokens[*pos] == "(" {
+            *pos += 1;
+            let result = self.yj_parse_expr(tokens, pos)?;
+            if *pos >= tokens.len() || tokens[*pos] != ")" { return Err("missing )".to_string()); }
+            *pos += 1;
+            return Ok(result);
+        }
+        if tokens[*pos] == "-" {
+            *pos += 1;
+            let val = self.yj_parse_factor(tokens, pos)?;
+            return Ok(-val);
+        }
+        if let Ok(num) = tokens[*pos].parse::<f64>() {
+            *pos += 1;
+            return Ok(num);
+        }
+        if let Some(val) = self.yj_vars.get(&tokens[*pos]) {
+            *pos += 1;
+            return Ok(*val);
+        }
+        Err(format!("unknown token: {}", tokens[*pos]))
+    }
+
+    /// Clear all variables.
+    pub fn yj_clear(&mut self) { self.yj_vars.clear(); }
+
+    /// Number of variables.
+    pub fn yj_var_count(&self) -> usize { self.yj_vars.len() }
+}
+
+// --- yj_ TTL Cache ---
+
+/// Cache with time-to-live expiration for entries.
+#[derive(Debug, Clone)]
+pub struct YjTtlCache<V: Clone> {
+    yj_entries: std::collections::HashMap<String, (V, u64)>,
+    yj_ttl: u64,
+    yj_clock: u64,
+}
+
+impl<V: Clone + std::fmt::Display> std::fmt::Display for YjTtlCache<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TtlCache(entries={}, ttl={})", self.yj_entries.len(), self.yj_ttl)
+    }
+}
+
+impl<V: Clone> Default for YjTtlCache<V> {
+    fn default() -> Self { Self::yj_new(60) }
+}
+
+impl<V: Clone> YjTtlCache<V> {
+    /// Create a TTL cache with given TTL in ticks.
+    pub fn yj_new(ttl: u64) -> Self {
+        Self { yj_entries: std::collections::HashMap::new(), yj_ttl: ttl, yj_clock: 0 }
+    }
+
+    /// Advance the clock by a given number of ticks.
+    pub fn yj_tick(&mut self, ticks: u64) { self.yj_clock += ticks; }
+
+    /// Current clock value.
+    pub fn yj_clock(&self) -> u64 { self.yj_clock }
+
+    /// Insert a key-value pair.
+    pub fn yj_put(&mut self, key: &str, value: V) {
+        self.yj_entries.insert(key.to_string(), (value, self.yj_clock));
+    }
+
+    /// Get a value if not expired.
+    pub fn yj_get(&self, key: &str) -> Option<&V> {
+        self.yj_entries.get(key).and_then(|(v, ts)| {
+            if self.yj_clock - ts <= self.yj_ttl { Some(v) } else { None }
+        })
+    }
+
+    /// Check if a key exists and is not expired.
+    pub fn yj_contains(&self, key: &str) -> bool { self.yj_get(key).is_some() }
+
+    /// Remove expired entries.
+    pub fn yj_evict_expired(&mut self) {
+        let clock = self.yj_clock;
+        let ttl = self.yj_ttl;
+        self.yj_entries.retain(|_, (_, ts)| clock - *ts <= ttl);
+    }
+
+    /// Number of entries (including possibly expired).
+    pub fn yj_len(&self) -> usize { self.yj_entries.len() }
+
+    /// Number of valid (non-expired) entries.
+    pub fn yj_valid_count(&self) -> usize {
+        self.yj_entries.values().filter(|(_, ts)| self.yj_clock - *ts <= self.yj_ttl).count()
+    }
+
+    /// Remove a key.
+    pub fn yj_remove(&mut self, key: &str) -> Option<V> {
+        self.yj_entries.remove(key).map(|(v, _)| v)
+    }
+
+    /// Clear the cache.
+    pub fn yj_clear(&mut self) { self.yj_entries.clear(); }
+
+    /// TTL value.
+    pub fn yj_ttl(&self) -> u64 { self.yj_ttl }
+
+    /// Set new TTL.
+    pub fn yj_set_ttl(&mut self, ttl: u64) { self.yj_ttl = ttl; }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -17034,6 +17230,149 @@ mod tests {
     fn yi_wgraph_default() {
         let g = super::YiWeightedGraph::default();
         assert_eq!(g.yi_node_count(), 0);
+    }
+
+
+    // --- yj_ ExprEval tests ---
+
+    #[test]
+    fn yj_expr_simple() {
+        let e = super::YjExprEval::yj_new();
+        assert_eq!(e.yj_eval("2 + 3").unwrap(), 5.0);
+    }
+
+    #[test]
+    fn yj_expr_precedence() {
+        let e = super::YjExprEval::yj_new();
+        assert_eq!(e.yj_eval("2 + 3 * 4").unwrap(), 14.0);
+    }
+
+    #[test]
+    fn yj_expr_parens() {
+        let e = super::YjExprEval::yj_new();
+        assert_eq!(e.yj_eval("(2 + 3) * 4").unwrap(), 20.0);
+    }
+
+    #[test]
+    fn yj_expr_neg() {
+        let e = super::YjExprEval::yj_new();
+        assert_eq!(e.yj_eval("-5 + 3").unwrap(), -2.0);
+    }
+
+    #[test]
+    fn yj_expr_var() {
+        let mut e = super::YjExprEval::yj_new();
+        e.yj_set_var("x", 10.0);
+        assert_eq!(e.yj_eval("x * 2").unwrap(), 20.0);
+    }
+
+    #[test]
+    fn yj_expr_div() {
+        let e = super::YjExprEval::yj_new();
+        assert_eq!(e.yj_eval("10 / 4").unwrap(), 2.5);
+    }
+
+    #[test]
+    fn yj_expr_complex() {
+        let e = super::YjExprEval::yj_new();
+        assert_eq!(e.yj_eval("(1 + 2) * (3 + 4)").unwrap(), 21.0);
+    }
+
+    #[test]
+    fn yj_expr_error() {
+        let e = super::YjExprEval::yj_new();
+        assert!(e.yj_eval("2 +").is_err());
+    }
+
+    #[test]
+    fn yj_expr_display() {
+        let e = super::YjExprEval::yj_new();
+        assert!(format!("{}", e).contains("ExprEval"));
+    }
+
+    #[test]
+    fn yj_expr_clear() {
+        let mut e = super::YjExprEval::yj_new();
+        e.yj_set_var("x", 1.0);
+        e.yj_clear();
+        assert_eq!(e.yj_var_count(), 0);
+    }
+
+    // --- yj_ TtlCache tests ---
+
+    #[test]
+    fn yj_ttl_new() {
+        let c = super::YjTtlCache::<i32>::yj_new(100);
+        assert_eq!(c.yj_ttl(), 100);
+    }
+
+    #[test]
+    fn yj_ttl_put_get() {
+        let mut c = super::YjTtlCache::yj_new(100);
+        c.yj_put("a", 42);
+        assert_eq!(c.yj_get("a"), Some(&42));
+    }
+
+    #[test]
+    fn yj_ttl_expired() {
+        let mut c = super::YjTtlCache::yj_new(10);
+        c.yj_put("a", 1);
+        c.yj_tick(20);
+        assert_eq!(c.yj_get("a"), None);
+    }
+
+    #[test]
+    fn yj_ttl_not_expired() {
+        let mut c = super::YjTtlCache::yj_new(100);
+        c.yj_put("a", 1);
+        c.yj_tick(50);
+        assert_eq!(c.yj_get("a"), Some(&1));
+    }
+
+    #[test]
+    fn yj_ttl_evict() {
+        let mut c = super::YjTtlCache::yj_new(10);
+        c.yj_put("a", 1);
+        c.yj_tick(20);
+        c.yj_evict_expired();
+        assert_eq!(c.yj_len(), 0);
+    }
+
+    #[test]
+    fn yj_ttl_valid_count() {
+        let mut c = super::YjTtlCache::yj_new(10);
+        c.yj_put("a", 1);
+        c.yj_tick(5);
+        c.yj_put("b", 2);
+        c.yj_tick(8);
+        assert_eq!(c.yj_valid_count(), 1);
+    }
+
+    #[test]
+    fn yj_ttl_remove() {
+        let mut c = super::YjTtlCache::yj_new(100);
+        c.yj_put("a", 42);
+        assert_eq!(c.yj_remove("a"), Some(42));
+    }
+
+    #[test]
+    fn yj_ttl_clear() {
+        let mut c = super::YjTtlCache::yj_new(100);
+        c.yj_put("a", 1);
+        c.yj_clear();
+        assert_eq!(c.yj_len(), 0);
+    }
+
+    #[test]
+    fn yj_ttl_display() {
+        let c = super::YjTtlCache::<i32>::yj_new(10);
+        assert!(format!("{}", c).contains("TtlCache"));
+    }
+
+    #[test]
+    fn yj_ttl_default() {
+        let c = super::YjTtlCache::<i32>::default();
+        assert_eq!(c.yj_ttl(), 60);
     }
 
 }
