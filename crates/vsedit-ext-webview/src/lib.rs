@@ -4145,6 +4145,171 @@ impl Xl77SuffixArray {
     }
 }
 
+
+/// Sparse matrix storing non-zero entries in coordinate format.
+pub struct Xm77MatrixSparse {
+    rows: usize,
+    cols: usize,
+    entries: Vec<(usize, usize, f64)>,
+}
+
+impl Xm77MatrixSparse {
+    /// Create a new sparse matrix with the given dimensions.
+    pub fn xm_new(rows: usize, cols: usize) -> Self {
+        Self { rows, cols, entries: Vec::new() }
+    }
+
+    /// Set the value at `(row, col)`. Overwrites if already present.
+    pub fn xm_set(&mut self, row: usize, col: usize, value: f64) {
+        if row >= self.rows || col >= self.cols {
+            return;
+        }
+        if let Some(pos) = self.entries.iter().position(|e| e.0 == row && e.1 == col) {
+            if value == 0.0 {
+                self.entries.remove(pos);
+            } else {
+                self.entries[pos].2 = value;
+            }
+        } else if value != 0.0 {
+            self.entries.push((row, col, value));
+        }
+    }
+
+    /// Get the value at `(row, col)`, returning 0 for absent entries.
+    pub fn xm_get(&self, row: usize, col: usize) -> f64 {
+        self.entries.iter()
+            .find(|e| e.0 == row && e.1 == col)
+            .map_or(0.0, |e| e.2)
+    }
+
+    /// Return all non-zero entries in the given row as `(col, value)` pairs.
+    pub fn xm_row(&self, row: usize) -> Vec<(usize, f64)> {
+        self.entries.iter()
+            .filter(|e| e.0 == row)
+            .map(|e| (e.1, e.2))
+            .collect()
+    }
+
+    /// Return all non-zero entries in the given column as `(row, value)` pairs.
+    pub fn xm_col(&self, col: usize) -> Vec<(usize, f64)> {
+        self.entries.iter()
+            .filter(|e| e.1 == col)
+            .map(|e| (e.0, e.2))
+            .collect()
+    }
+
+    /// Return a new sparse matrix that is the transpose of this one.
+    pub fn xm_transpose(&self) -> Self {
+        let mut t = Self::xm_new(self.cols, self.rows);
+        for &(r, c, v) in &self.entries {
+            t.entries.push((c, r, v));
+        }
+        t
+    }
+
+    /// Multiply this matrix by a dense vector, returning the result vector.
+    pub fn xm_multiply_vec(&self, vec: &[f64]) -> Vec<f64> {
+        let mut result = vec![0.0; self.rows];
+        for &(r, c, v) in &self.entries {
+            if c < vec.len() {
+                result[r] += v * vec[c];
+            }
+        }
+        result
+    }
+
+    /// Return the number of stored non-zero entries.
+    pub fn xm_nnz(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return the density (nnz / total_elements).
+    pub fn xm_density(&self) -> f64 {
+        let total = self.rows * self.cols;
+        if total == 0 { return 0.0; }
+        self.entries.len() as f64 / total as f64
+    }
+
+    /// Remove all entries, keeping dimensions.
+    pub fn xm_clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return the matrix dimensions as `(rows, cols)`.
+    pub fn xm_dims(&self) -> (usize, usize) {
+        (self.rows, self.cols)
+    }
+}
+
+/// Simple tokenizer for splitting text into tokens.
+pub struct Xm77Tokenizer {
+    text: String,
+}
+
+impl Xm77Tokenizer {
+    /// Create a new tokenizer from the given text.
+    pub fn xm_new(text: &str) -> Self {
+        Self { text: text.to_string() }
+    }
+
+    /// Tokenize the text by splitting on whitespace and filtering empties.
+    pub fn xm_tokenize(&self) -> Vec<String> {
+        self.text.split_whitespace().map(String::from).collect()
+    }
+
+    /// Split by whitespace, preserving the raw split results.
+    pub fn xm_split_by_whitespace(&self) -> Vec<String> {
+        self.text.split(' ')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    }
+
+    /// Split the text using a custom single-character delimiter.
+    pub fn xm_split_by_delimiter(&self, delim: char) -> Vec<String> {
+        self.text.split(delim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    }
+
+    /// Return the number of whitespace-delimited tokens.
+    pub fn xm_token_count(&self) -> usize {
+        self.xm_tokenize().len()
+    }
+
+    /// Return the set of unique tokens.
+    pub fn xm_unique_tokens(&self) -> Vec<String> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for tok in self.xm_tokenize() {
+            if seen.insert(tok.clone()) {
+                result.push(tok);
+            }
+        }
+        result
+    }
+
+    /// Build a frequency map of each token.
+    pub fn xm_frequency_map(&self) -> std::collections::HashMap<String, usize> {
+        let mut map = std::collections::HashMap::new();
+        for tok in self.xm_tokenize() {
+            *map.entry(tok).or_insert(0) += 1;
+        }
+        map
+    }
+
+    /// Return the underlying text.
+    pub fn xm_text(&self) -> &str {
+        &self.text
+    }
+
+    /// Return whether the text is empty.
+    pub fn xm_is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6940,4 +7105,121 @@ mod tests {
         let pos = sa.xl_search("hello");
         assert_eq!(pos, Some(0));
     }
+
+    #[test]
+    fn xm_77_sparse_set_get() {
+        let mut m = super::Xm77MatrixSparse::xm_new(3, 3);
+        m.xm_set(0, 1, 5.0);
+        assert!((m.xm_get(0, 1) - 5.0).abs() < f64::EPSILON);
+        assert!((m.xm_get(0, 0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn xm_77_sparse_row_col() {
+        let mut m = super::Xm77MatrixSparse::xm_new(4, 4);
+        m.xm_set(1, 2, 3.0);
+        m.xm_set(1, 3, 7.0);
+        let row = m.xm_row(1);
+        assert_eq!(row.len(), 2);
+        let col = m.xm_col(2);
+        assert_eq!(col.len(), 1);
+    }
+
+    #[test]
+    fn xm_77_sparse_transpose() {
+        let mut m = super::Xm77MatrixSparse::xm_new(2, 3);
+        m.xm_set(0, 2, 9.0);
+        let t = m.xm_transpose();
+        assert!((t.xm_get(2, 0) - 9.0).abs() < f64::EPSILON);
+        assert_eq!(t.xm_dims(), (3, 2));
+    }
+
+    #[test]
+    fn xm_77_sparse_multiply_vec() {
+        let mut m = super::Xm77MatrixSparse::xm_new(2, 2);
+        m.xm_set(0, 0, 1.0);
+        m.xm_set(1, 1, 2.0);
+        let result = m.xm_multiply_vec(&[3.0, 4.0]);
+        assert!((result[0] - 3.0).abs() < f64::EPSILON);
+        assert!((result[1] - 8.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn xm_77_sparse_nnz_density() {
+        let mut m = super::Xm77MatrixSparse::xm_new(10, 10);
+        m.xm_set(0, 0, 1.0);
+        m.xm_set(5, 5, 2.0);
+        assert_eq!(m.xm_nnz(), 2);
+        assert!((m.xm_density() - 0.02).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn xm_77_sparse_clear() {
+        let mut m = super::Xm77MatrixSparse::xm_new(3, 3);
+        m.xm_set(0, 0, 1.0);
+        m.xm_set(1, 1, 2.0);
+        m.xm_clear();
+        assert_eq!(m.xm_nnz(), 0);
+        assert!((m.xm_get(0, 0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn xm_77_sparse_overwrite_zero() {
+        let mut m = super::Xm77MatrixSparse::xm_new(2, 2);
+        m.xm_set(0, 0, 5.0);
+        assert_eq!(m.xm_nnz(), 1);
+        m.xm_set(0, 0, 0.0);
+        assert_eq!(m.xm_nnz(), 0);
+    }
+
+    #[test]
+    fn xm_77_tokenizer_basic() {
+        let t = super::Xm77Tokenizer::xm_new("hello world foo");
+        let tokens = t.xm_tokenize();
+        assert_eq!(tokens, vec!["hello", "world", "foo"]);
+    }
+
+    #[test]
+    fn xm_77_tokenizer_count() {
+        let t = super::Xm77Tokenizer::xm_new("a b c d e");
+        assert_eq!(t.xm_token_count(), 5);
+    }
+
+    #[test]
+    fn xm_77_tokenizer_unique() {
+        let t = super::Xm77Tokenizer::xm_new("a b a c b");
+        let u = t.xm_unique_tokens();
+        assert_eq!(u.len(), 3);
+    }
+
+    #[test]
+    fn xm_77_tokenizer_frequency() {
+        let t = super::Xm77Tokenizer::xm_new("x y x x y z");
+        let freq = t.xm_frequency_map();
+        assert_eq!(freq.get("x"), Some(&3));
+        assert_eq!(freq.get("y"), Some(&2));
+        assert_eq!(freq.get("z"), Some(&1));
+    }
+
+    #[test]
+    fn xm_77_tokenizer_delimiter() {
+        let t = super::Xm77Tokenizer::xm_new("a,b,,c");
+        let parts = t.xm_split_by_delimiter(',');
+        assert_eq!(parts, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn xm_77_tokenizer_whitespace() {
+        let t = super::Xm77Tokenizer::xm_new("one  two  three");
+        let parts = t.xm_split_by_whitespace();
+        assert_eq!(parts, vec!["one", "two", "three"]);
+    }
+
+    #[test]
+    fn xm_77_tokenizer_empty() {
+        let t = super::Xm77Tokenizer::xm_new("");
+        assert!(t.xm_is_empty());
+        assert_eq!(t.xm_token_count(), 0);
+    }
+
 }
