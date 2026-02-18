@@ -25933,6 +25933,72 @@ impl AzdProfileExport {
     pub fn has_extensions(&self) -> bool { !self.extensions_list.is_empty() }
 }
 
+
+// --- aze_ editor inlay hint resolution ---
+
+/// Inlay hint position kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzeHintPosition { Before, After, Parameter, Type }
+
+/// A part of an inlay hint label.
+#[derive(Debug, Clone)]
+pub struct AzeHintLabelPart {
+    pub value: String,
+    pub tooltip: Option<String>,
+    pub command: Option<String>,
+}
+
+impl AzeHintLabelPart {
+    pub fn text(v: &str) -> Self { Self { value: v.to_string(), tooltip: None, command: None } }
+    pub fn with_tooltip(mut self, t: &str) -> Self { self.tooltip = Some(t.to_string()); self }
+    pub fn with_command(mut self, c: &str) -> Self { self.command = Some(c.to_string()); self }
+    pub fn is_clickable(&self) -> bool { self.command.is_some() }
+}
+
+/// A resolved inlay hint.
+#[derive(Debug, Clone)]
+pub struct AzeInlayHint {
+    pub line: u32,
+    pub col: u32,
+    pub position: AzeHintPosition,
+    pub parts: Vec<AzeHintLabelPart>,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+impl AzeInlayHint {
+    pub fn new(line: u32, col: u32, pos: AzeHintPosition) -> Self {
+        Self { line, col, position: pos, parts: Vec::new(), padding_left: false, padding_right: false }
+    }
+    pub fn add_part(&mut self, p: AzeHintLabelPart) { self.parts.push(p); }
+    pub fn with_padding(mut self, left: bool, right: bool) -> Self { self.padding_left = left; self.padding_right = right; self }
+    pub fn full_label(&self) -> String { self.parts.iter().map(|p| p.value.as_str()).collect::<Vec<_>>().join("") }
+    pub fn has_command(&self) -> bool { self.parts.iter().any(|p| p.is_clickable()) }
+    pub fn is_type_hint(&self) -> bool { self.position == AzeHintPosition::Type }
+    pub fn is_parameter_hint(&self) -> bool { self.position == AzeHintPosition::Parameter }
+}
+
+/// Inlay hint set for a document.
+#[derive(Debug)]
+pub struct AzeInlayHintSet {
+    pub hints: Vec<AzeInlayHint>,
+    pub enabled: bool,
+}
+
+impl AzeInlayHintSet {
+    pub fn new() -> Self { Self { hints: Vec::new(), enabled: true } }
+    pub fn set_hints(&mut self, h: Vec<AzeInlayHint>) { self.hints = h; }
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn hints_at_line(&self, line: u32) -> Vec<&AzeInlayHint> {
+        if !self.enabled { return Vec::new(); }
+        self.hints.iter().filter(|h| h.line == line).collect()
+    }
+    pub fn type_hints(&self) -> Vec<&AzeInlayHint> { self.hints.iter().filter(|h| h.is_type_hint()).collect() }
+    pub fn param_hints(&self) -> Vec<&AzeInlayHint> { self.hints.iter().filter(|h| h.is_parameter_hint()).collect() }
+    pub fn total_hints(&self) -> usize { self.hints.len() }
+    pub fn clear(&mut self) { self.hints.clear(); }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42119,6 +42185,81 @@ d");
         p.add_setting("key", "old");
         p.add_setting("key", "new");
         assert_eq!(p.get_setting("key"), Some("new"));
+    }
+
+
+    #[test]
+    fn test_aze_label_part() {
+        let p = AzeHintLabelPart::text(": i32").with_tooltip("type annotation");
+        assert_eq!(p.value, ": i32");
+        assert!(!p.is_clickable());
+        let p2 = AzeHintLabelPart::text("i32").with_command("goto");
+        assert!(p2.is_clickable());
+    }
+
+    #[test]
+    fn test_aze_inlay_hint() {
+        let mut h = AzeInlayHint::new(5, 10, AzeHintPosition::Type);
+        h.add_part(AzeHintLabelPart::text(": "));
+        h.add_part(AzeHintLabelPart::text("String"));
+        assert_eq!(h.full_label(), ": String");
+        assert!(h.is_type_hint());
+        assert!(!h.is_parameter_hint());
+    }
+
+    #[test]
+    fn test_aze_padding() {
+        let h = AzeInlayHint::new(1, 1, AzeHintPosition::Before).with_padding(true, false);
+        assert!(h.padding_left);
+        assert!(!h.padding_right);
+    }
+
+    #[test]
+    fn test_aze_hint_set() {
+        let mut set = AzeInlayHintSet::new();
+        let mut h1 = AzeInlayHint::new(5, 0, AzeHintPosition::Type);
+        h1.add_part(AzeHintLabelPart::text(": i32"));
+        let mut h2 = AzeInlayHint::new(5, 10, AzeHintPosition::Parameter);
+        h2.add_part(AzeHintLabelPart::text("name:"));
+        let mut h3 = AzeInlayHint::new(10, 0, AzeHintPosition::Type);
+        h3.add_part(AzeHintLabelPart::text(": bool"));
+        set.set_hints(vec![h1, h2, h3]);
+        assert_eq!(set.hints_at_line(5).len(), 2);
+        assert_eq!(set.type_hints().len(), 2);
+        assert_eq!(set.param_hints().len(), 1);
+    }
+
+    #[test]
+    fn test_aze_toggle() {
+        let mut set = AzeInlayHintSet::new();
+        set.set_hints(vec![AzeInlayHint::new(1, 0, AzeHintPosition::Type)]);
+        assert_eq!(set.hints_at_line(1).len(), 1);
+        set.toggle();
+        assert_eq!(set.hints_at_line(1).len(), 0);
+    }
+
+    #[test]
+    fn test_aze_clear() {
+        let mut set = AzeInlayHintSet::new();
+        set.set_hints(vec![AzeInlayHint::new(1, 0, AzeHintPosition::Type)]);
+        set.clear();
+        assert_eq!(set.total_hints(), 0);
+    }
+
+    #[test]
+    fn test_aze_has_command() {
+        let mut h = AzeInlayHint::new(1, 0, AzeHintPosition::After);
+        h.add_part(AzeHintLabelPart::text("plain"));
+        assert!(!h.has_command());
+        h.add_part(AzeHintLabelPart::text("link").with_command("go"));
+        assert!(h.has_command());
+    }
+
+    #[test]
+    fn test_aze_param_hint() {
+        let h = AzeInlayHint::new(3, 5, AzeHintPosition::Parameter);
+        assert!(h.is_parameter_hint());
+        assert!(!h.is_type_hint());
     }
 
 }
