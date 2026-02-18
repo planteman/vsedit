@@ -19904,6 +19904,260 @@ impl AxdScreenBuffer {
     }
 }
 
+
+// --- axe_ command palette and quick pick types ---
+
+/// A registered command with handler info.
+#[derive(Debug, Clone)]
+pub struct AxeCommand {
+    pub id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub keybinding: Option<String>,
+    pub enabled: bool,
+    pub when: Option<String>,
+}
+
+impl AxeCommand {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            title: title.to_string(),
+            category: None,
+            keybinding: None,
+            enabled: true,
+            when: None,
+        }
+    }
+
+    pub fn with_category(mut self, cat: &str) -> Self {
+        self.category = Some(cat.to_string());
+        self
+    }
+
+    pub fn with_keybinding(mut self, kb: &str) -> Self {
+        self.keybinding = Some(kb.to_string());
+        self
+    }
+
+    pub fn with_when(mut self, when: &str) -> Self {
+        self.when = Some(when.to_string());
+        self
+    }
+
+    pub fn display_label(&self) -> String {
+        match &self.category {
+            Some(cat) => format!("{}: {}", cat, self.title),
+            None => self.title.clone(),
+        }
+    }
+
+    pub fn matches_query(&self, query: &str) -> bool {
+        if query.is_empty() { return true; }
+        let q = query.to_lowercase();
+        self.title.to_lowercase().contains(&q)
+            || self.id.to_lowercase().contains(&q)
+            || self.category.as_ref().map_or(false, |c| c.to_lowercase().contains(&q))
+    }
+
+    pub fn fuzzy_score(&self, query: &str) -> u32 {
+        if query.is_empty() { return 0; }
+        let q = query.to_lowercase();
+        let label = self.display_label().to_lowercase();
+        let mut score = 0u32;
+        let mut qi = 0;
+        let q_chars: Vec<char> = q.chars().collect();
+        for (i, ch) in label.chars().enumerate() {
+            if qi < q_chars.len() && ch == q_chars[qi] {
+                score += if i == 0 || label.as_bytes().get(i.wrapping_sub(1)) == Some(&b' ') { 10 } else { 1 };
+                qi += 1;
+            }
+        }
+        if qi == q_chars.len() { score } else { 0 }
+    }
+}
+
+/// A quick pick item.
+#[derive(Debug, Clone)]
+pub struct AxeQuickPickItem {
+    pub label: String,
+    pub description: Option<String>,
+    pub detail: Option<String>,
+    pub picked: bool,
+    pub always_show: bool,
+    pub kind: AxeQuickPickItemKind,
+}
+
+/// Kind of quick pick item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxeQuickPickItemKind {
+    Default,
+    Separator,
+}
+
+impl AxeQuickPickItem {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            description: None,
+            detail: None,
+            picked: false,
+            always_show: false,
+            kind: AxeQuickPickItemKind::Default,
+        }
+    }
+
+    pub fn separator(label: &str) -> Self {
+        Self { kind: AxeQuickPickItemKind::Separator, ..Self::new(label) }
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = Some(desc.to_string());
+        self
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn is_separator(&self) -> bool {
+        self.kind == AxeQuickPickItemKind::Separator
+    }
+}
+
+/// Quick pick options.
+#[derive(Debug, Clone)]
+pub struct AxeQuickPickOptions {
+    pub placeholder: Option<String>,
+    pub title: Option<String>,
+    pub can_pick_many: bool,
+    pub match_on_description: bool,
+    pub match_on_detail: bool,
+    pub ignore_focus_out: bool,
+}
+
+impl AxeQuickPickOptions {
+    pub fn new() -> Self {
+        Self {
+            placeholder: None,
+            title: None,
+            can_pick_many: false,
+            match_on_description: false,
+            match_on_detail: false,
+            ignore_focus_out: false,
+        }
+    }
+
+    pub fn with_placeholder(mut self, ph: &str) -> Self {
+        self.placeholder = Some(ph.to_string());
+        self
+    }
+
+    pub fn with_title(mut self, t: &str) -> Self {
+        self.title = Some(t.to_string());
+        self
+    }
+
+    pub fn multi_select(mut self) -> Self {
+        self.can_pick_many = true;
+        self
+    }
+}
+
+/// A quick pick session with filtered items.
+#[derive(Debug, Clone)]
+pub struct AxeQuickPick {
+    pub items: Vec<AxeQuickPickItem>,
+    pub options: AxeQuickPickOptions,
+    pub filter: String,
+    pub selected_index: usize,
+    pub is_active: bool,
+}
+
+impl AxeQuickPick {
+    pub fn new(items: Vec<AxeQuickPickItem>, options: AxeQuickPickOptions) -> Self {
+        Self { items, options, filter: String::new(), selected_index: 0, is_active: true }
+    }
+
+    pub fn set_filter(&mut self, filter: &str) {
+        self.filter = filter.to_string();
+        self.selected_index = 0;
+    }
+
+    pub fn filtered_items(&self) -> Vec<(usize, &AxeQuickPickItem)> {
+        if self.filter.is_empty() {
+            return self.items.iter().enumerate().collect();
+        }
+        let q = self.filter.to_lowercase();
+        self.items.iter().enumerate().filter(|(_, item)| {
+            if item.is_separator() { return item.always_show; }
+            item.label.to_lowercase().contains(&q)
+                || (self.options.match_on_description
+                    && item.description.as_ref().map_or(false, |d| d.to_lowercase().contains(&q)))
+                || (self.options.match_on_detail
+                    && item.detail.as_ref().map_or(false, |d| d.to_lowercase().contains(&q)))
+        }).collect()
+    }
+
+    pub fn move_up(&mut self) {
+        self.selected_index = self.selected_index.saturating_sub(1);
+    }
+
+    pub fn move_down(&mut self) {
+        let max = self.filtered_items().len().saturating_sub(1);
+        if self.selected_index < max {
+            self.selected_index += 1;
+        }
+    }
+
+    pub fn accept(&self) -> Option<&AxeQuickPickItem> {
+        self.filtered_items().get(self.selected_index).map(|(_, item)| *item)
+    }
+
+    pub fn dismiss(&mut self) {
+        self.is_active = false;
+    }
+}
+
+/// Command palette (> prefix in quick pick).
+#[derive(Debug, Clone)]
+pub struct AxeCommandPalette {
+    commands: Vec<AxeCommand>,
+    pub filter: String,
+}
+
+impl AxeCommandPalette {
+    pub fn new() -> Self {
+        Self { commands: Vec::new(), filter: String::new() }
+    }
+
+    pub fn register(&mut self, cmd: AxeCommand) {
+        self.commands.push(cmd);
+    }
+
+    pub fn set_filter(&mut self, filter: &str) {
+        self.filter = filter.to_string();
+    }
+
+    pub fn filtered_commands(&self) -> Vec<&AxeCommand> {
+        let mut matched: Vec<(&AxeCommand, u32)> = self.commands.iter()
+            .filter(|c| c.enabled && c.matches_query(&self.filter))
+            .map(|c| (c, c.fuzzy_score(&self.filter)))
+            .collect();
+        matched.sort_by(|a, b| b.1.cmp(&a.1));
+        matched.into_iter().map(|(c, _)| c).collect()
+    }
+
+    pub fn execute(&self, id: &str) -> Option<&AxeCommand> {
+        self.commands.iter().find(|c| c.id == id && c.enabled)
+    }
+
+    pub fn command_count(&self) -> usize {
+        self.commands.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32012,6 +32266,109 @@ mod tests {
         for x in 0..5 {
             assert_eq!(buf.get(x, 1).unwrap().ch, '-');
         }
+    }
+
+
+    // --- axe_ command palette and quick pick tests ---
+
+    #[test]
+    fn test_axe_command_display() {
+        let cmd = AxeCommand::new("editor.action.format", "Format Document")
+            .with_category("Editor")
+            .with_keybinding("Shift+Alt+F");
+        assert_eq!(cmd.display_label(), "Editor: Format Document");
+        assert!(cmd.matches_query("format"));
+        assert!(cmd.matches_query("editor"));
+        assert!(!cmd.matches_query("xyz"));
+    }
+
+    #[test]
+    fn test_axe_command_fuzzy_score() {
+        let cmd = AxeCommand::new("x", "Format Document");
+        assert!(cmd.fuzzy_score("fd") > 0);
+        assert!(cmd.fuzzy_score("format") > 0);
+        assert!(cmd.fuzzy_score("fd") > 0);
+        assert_eq!(cmd.fuzzy_score("xyz"), 0);
+    }
+
+    #[test]
+    fn test_axe_quick_pick_item() {
+        let item = AxeQuickPickItem::new("Open File")
+            .with_description("recent")
+            .with_detail("/path/to/file");
+        assert_eq!(item.label, "Open File");
+        assert!(!item.is_separator());
+        let sep = AxeQuickPickItem::separator("---");
+        assert!(sep.is_separator());
+    }
+
+    #[test]
+    fn test_axe_quick_pick_filter() {
+        let items = vec![
+            AxeQuickPickItem::new("Apple"),
+            AxeQuickPickItem::new("Banana"),
+            AxeQuickPickItem::new("Avocado"),
+        ];
+        let mut qp = AxeQuickPick::new(items, AxeQuickPickOptions::new());
+        assert_eq!(qp.filtered_items().len(), 3);
+        qp.set_filter("av");
+        let filtered = qp.filtered_items();
+        assert_eq!(filtered.len(), 1); // Avocado
+    }
+
+    #[test]
+    fn test_axe_quick_pick_navigation() {
+        let items = vec![
+            AxeQuickPickItem::new("A"),
+            AxeQuickPickItem::new("B"),
+            AxeQuickPickItem::new("C"),
+        ];
+        let mut qp = AxeQuickPick::new(items, AxeQuickPickOptions::new());
+        assert_eq!(qp.selected_index, 0);
+        qp.move_down();
+        assert_eq!(qp.selected_index, 1);
+        qp.move_up();
+        assert_eq!(qp.selected_index, 0);
+        qp.move_up(); // can't go below 0
+        assert_eq!(qp.selected_index, 0);
+    }
+
+    #[test]
+    fn test_axe_quick_pick_accept() {
+        let items = vec![AxeQuickPickItem::new("X")];
+        let qp = AxeQuickPick::new(items, AxeQuickPickOptions::new());
+        let accepted = qp.accept().unwrap();
+        assert_eq!(accepted.label, "X");
+    }
+
+    #[test]
+    fn test_axe_quick_pick_options() {
+        let opts = AxeQuickPickOptions::new()
+            .with_placeholder("Type here...")
+            .with_title("Pick one")
+            .multi_select();
+        assert_eq!(opts.placeholder.as_deref(), Some("Type here..."));
+        assert!(opts.can_pick_many);
+    }
+
+    #[test]
+    fn test_axe_command_palette() {
+        let mut cp = AxeCommandPalette::new();
+        cp.register(AxeCommand::new("file.save", "Save File").with_category("File"));
+        cp.register(AxeCommand::new("file.open", "Open File").with_category("File"));
+        cp.register(AxeCommand::new("edit.undo", "Undo").with_category("Edit"));
+        assert_eq!(cp.command_count(), 3);
+        cp.set_filter("file");
+        let results = cp.filtered_commands();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_axe_command_palette_execute() {
+        let mut cp = AxeCommandPalette::new();
+        cp.register(AxeCommand::new("test.run", "Run Tests"));
+        assert!(cp.execute("test.run").is_some());
+        assert!(cp.execute("nonexistent").is_none());
     }
 
 }
