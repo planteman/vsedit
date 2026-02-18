@@ -22846,6 +22846,112 @@ impl AxxMergeEditor {
     pub fn conflict_count(&self) -> usize { self.conflicts.len() }
 }
 
+
+// --- axy_ settings editor and configuration UI ---
+
+/// Setting value type.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AxySettingValue {
+    Bool(bool), Int(i64), Float(f64), Str(String), Array(Vec<AxySettingValue>),
+    Enum(String, Vec<String>), Null,
+}
+
+impl AxySettingValue {
+    pub fn as_bool(&self) -> Option<bool> { if let Self::Bool(b) = self { Some(*b) } else { None } }
+    pub fn as_int(&self) -> Option<i64> { if let Self::Int(i) = self { Some(*i) } else { None } }
+    pub fn as_str(&self) -> Option<&str> { if let Self::Str(s) = self { Some(s) } else { None } }
+    pub fn type_name(&self) -> &str {
+        match self { Self::Bool(_) => "boolean", Self::Int(_) => "integer", Self::Float(_) => "number",
+            Self::Str(_) => "string", Self::Array(_) => "array", Self::Enum(..) => "enum", Self::Null => "null" }
+    }
+}
+
+/// Setting definition metadata.
+#[derive(Debug, Clone)]
+pub struct AxySettingDef {
+    pub key: String,
+    pub title: String,
+    pub description: String,
+    pub default_value: AxySettingValue,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub deprecation_message: Option<String>,
+}
+
+impl AxySettingDef {
+    pub fn new(key: &str, title: &str, default: AxySettingValue) -> Self {
+        Self { key: key.to_string(), title: title.to_string(), description: String::new(),
+            default_value: default, category: "General".to_string(), tags: Vec::new(), deprecation_message: None }
+    }
+    pub fn with_description(mut self, d: &str) -> Self { self.description = d.to_string(); self }
+    pub fn with_category(mut self, c: &str) -> Self { self.category = c.to_string(); self }
+    pub fn with_tag(mut self, t: &str) -> Self { self.tags.push(t.to_string()); self }
+    pub fn is_deprecated(&self) -> bool { self.deprecation_message.is_some() }
+    pub fn matches_search(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.key.to_lowercase().contains(&q) || self.title.to_lowercase().contains(&q)
+            || self.description.to_lowercase().contains(&q) || self.tags.iter().any(|t| t.to_lowercase().contains(&q))
+    }
+}
+
+/// Override scope for a setting value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AxySettingScope { Default, Global, User, Workspace, WorkspaceFolder, Language }
+
+/// A resolved setting with its effective value and source.
+#[derive(Debug, Clone)]
+pub struct AxyResolvedSetting {
+    pub key: String,
+    pub value: AxySettingValue,
+    pub scope: AxySettingScope,
+    pub overridden_by: Vec<AxySettingScope>,
+}
+
+impl AxyResolvedSetting {
+    pub fn is_modified(&self) -> bool { self.scope != AxySettingScope::Default }
+    pub fn is_overridden(&self) -> bool { !self.overridden_by.is_empty() }
+}
+
+/// Settings editor model.
+#[derive(Debug)]
+pub struct AxySettingsEditor {
+    pub definitions: Vec<AxySettingDef>,
+    pub values: std::collections::HashMap<String, (AxySettingValue, AxySettingScope)>,
+    pub search_query: String,
+    pub active_category: Option<String>,
+}
+
+impl AxySettingsEditor {
+    pub fn new() -> Self {
+        Self { definitions: Vec::new(), values: std::collections::HashMap::new(), search_query: String::new(), active_category: None }
+    }
+    pub fn register(&mut self, def: AxySettingDef) { self.definitions.push(def); }
+    pub fn set_value(&mut self, key: &str, value: AxySettingValue, scope: AxySettingScope) {
+        self.values.insert(key.to_string(), (value, scope));
+    }
+    pub fn get_value(&self, key: &str) -> Option<&AxySettingValue> {
+        self.values.get(key).map(|(v, _)| v)
+    }
+    pub fn resolve(&self, key: &str) -> Option<AxyResolvedSetting> {
+        let def = self.definitions.iter().find(|d| d.key == key)?;
+        let (value, scope) = self.values.get(key)
+            .map(|(v, s)| (v.clone(), *s))
+            .unwrap_or_else(|| (def.default_value.clone(), AxySettingScope::Default));
+        Some(AxyResolvedSetting { key: key.to_string(), value, scope, overridden_by: Vec::new() })
+    }
+    pub fn search(&self, query: &str) -> Vec<&AxySettingDef> {
+        self.definitions.iter().filter(|d| d.matches_search(query)).collect()
+    }
+    pub fn categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self.definitions.iter().map(|d| d.category.as_str()).collect();
+        cats.sort(); cats.dedup(); cats
+    }
+    pub fn by_category(&self, cat: &str) -> Vec<&AxySettingDef> {
+        self.definitions.iter().filter(|d| d.category == cat).collect()
+    }
+    pub fn modified_count(&self) -> usize { self.values.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36770,6 +36876,77 @@ mod tests {
         assert_eq!(added, 0);
         assert_eq!(deleted, 0);
         assert_eq!(unchanged, 2);
+    }
+
+
+    #[test]
+    fn test_axy_setting_value() {
+        assert_eq!(AxySettingValue::Bool(true).as_bool(), Some(true));
+        assert_eq!(AxySettingValue::Int(42).as_int(), Some(42));
+        assert_eq!(AxySettingValue::Str("hello".into()).as_str(), Some("hello"));
+        assert_eq!(AxySettingValue::Float(3.14).type_name(), "number");
+    }
+
+    #[test]
+    fn test_axy_setting_def() {
+        let def = AxySettingDef::new("editor.fontSize", "Font Size", AxySettingValue::Int(14))
+            .with_description("Controls font size").with_category("Editor").with_tag("appearance");
+        assert!(def.matches_search("font"));
+        assert!(def.matches_search("appearance"));
+        assert!(!def.matches_search("terminal"));
+    }
+
+    #[test]
+    fn test_axy_settings_editor() {
+        let mut editor = AxySettingsEditor::new();
+        editor.register(AxySettingDef::new("editor.fontSize", "Font Size", AxySettingValue::Int(14)).with_category("Editor"));
+        editor.register(AxySettingDef::new("editor.tabSize", "Tab Size", AxySettingValue::Int(4)).with_category("Editor"));
+        editor.register(AxySettingDef::new("files.autoSave", "Auto Save", AxySettingValue::Bool(false)).with_category("Files"));
+        assert_eq!(editor.categories().len(), 2);
+        assert_eq!(editor.by_category("Editor").len(), 2);
+    }
+
+    #[test]
+    fn test_axy_resolve_setting() {
+        let mut editor = AxySettingsEditor::new();
+        editor.register(AxySettingDef::new("editor.fontSize", "Font Size", AxySettingValue::Int(14)));
+        let resolved = editor.resolve("editor.fontSize").unwrap();
+        assert!(!resolved.is_modified());
+        editor.set_value("editor.fontSize", AxySettingValue::Int(16), AxySettingScope::User);
+        let resolved = editor.resolve("editor.fontSize").unwrap();
+        assert!(resolved.is_modified());
+        assert_eq!(resolved.value, AxySettingValue::Int(16));
+    }
+
+    #[test]
+    fn test_axy_search_settings() {
+        let mut editor = AxySettingsEditor::new();
+        editor.register(AxySettingDef::new("editor.fontSize", "Font Size", AxySettingValue::Int(14)));
+        editor.register(AxySettingDef::new("terminal.fontSize", "Terminal Font Size", AxySettingValue::Int(12)));
+        let results = editor.search("font");
+        assert_eq!(results.len(), 2);
+        let results = editor.search("terminal");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_axy_setting_scope() {
+        assert!(AxySettingScope::User > AxySettingScope::Default);
+        assert!(AxySettingScope::Workspace > AxySettingScope::User);
+    }
+
+    #[test]
+    fn test_axy_deprecated_setting() {
+        let mut def = AxySettingDef::new("old.setting", "Old", AxySettingValue::Null);
+        assert!(!def.is_deprecated());
+        def.deprecation_message = Some("Use new.setting".into());
+        assert!(def.is_deprecated());
+    }
+
+    #[test]
+    fn test_axy_enum_value() {
+        let val = AxySettingValue::Enum("off".into(), vec!["off".into(), "on".into(), "auto".into()]);
+        assert_eq!(val.type_name(), "enum");
     }
 
 }
