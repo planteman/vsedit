@@ -2580,6 +2580,234 @@ pub fn xc_70_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// --- xd_90 deepening: state machine + event bus ---
+
+/// States for the Xd90 state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Xd90State {
+    Idle,
+    Running,
+    Paused,
+    Done,
+}
+
+impl std::fmt::Display for Xd90State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Done => write!(f, "Done"),
+        }
+    }
+}
+
+/// Transition record for history tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xd90Transition {
+    pub from: Xd90State,
+    pub to: Xd90State,
+    pub step: usize,
+}
+
+/// State machine with history tracking and serialization.
+pub struct Xd90StateMachine {
+    current: Xd90State,
+    history: Vec<Xd90Transition>,
+    step_counter: usize,
+}
+
+impl Xd90StateMachine {
+    pub fn new() -> Self {
+        Self {
+            current: Xd90State::Idle,
+            history: Vec::new(),
+            step_counter: 0,
+        }
+    }
+
+    pub fn current_state(&self) -> Xd90State {
+        self.current
+    }
+
+    pub fn history(&self) -> &[Xd90Transition] {
+        &self.history
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.step_counter
+    }
+
+    /// Attempt a state transition. Returns Ok(new_state) or Err with reason.
+    pub fn transition(&mut self, target: Xd90State) -> Result<Xd90State, String> {
+        let allowed = match (self.current, target) {
+            (Xd90State::Idle, Xd90State::Running) => true,
+            (Xd90State::Running, Xd90State::Paused) => true,
+            (Xd90State::Running, Xd90State::Done) => true,
+            (Xd90State::Paused, Xd90State::Running) => true,
+            (Xd90State::Paused, Xd90State::Done) => true,
+            (Xd90State::Done, Xd90State::Idle) => true,
+            _ => false,
+        };
+        if !allowed {
+            return Err(format!(
+                "xd_90: invalid transition {} -> {}",
+                self.current, target
+            ));
+        }
+        let t = Xd90Transition {
+            from: self.current,
+            to: target,
+            step: self.step_counter,
+        };
+        self.step_counter += 1;
+        self.current = target;
+        self.history.push(t);
+        Ok(self.current)
+    }
+
+    /// Serialize state machine to a simple string representation.
+    pub fn serialize(&self) -> String {
+        let hist: Vec<String> = self
+            .history
+            .iter()
+            .map(|t| format!("{}->{}@{}", t.from, t.to, t.step))
+            .collect();
+        format!(
+            "Xd90SM[current={},steps={},history=[{}]]",
+            self.current,
+            self.step_counter,
+            hist.join(";")
+        )
+    }
+
+    /// Deserialize from the serialized string, recovering current state.
+    pub fn deserialize_current(s: &str) -> Option<Xd90State> {
+        let prefix = "Xd90SM[current=";
+        if !s.starts_with(prefix) {
+            return None;
+        }
+        let rest = &s[prefix.len()..];
+        let end = rest.find(',')?;
+        match &rest[..end] {
+            "Idle" => Some(Xd90State::Idle),
+            "Running" => Some(Xd90State::Running),
+            "Paused" => Some(Xd90State::Paused),
+            "Done" => Some(Xd90State::Done),
+            _ => None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current = Xd90State::Idle;
+        self.history.clear();
+        self.step_counter = 0;
+    }
+}
+
+/// Typed events for the Xd90 event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Xd90Event {
+    Started(String),
+    Stopped(String),
+    Error(String),
+    Custom(String, String),
+}
+
+impl Xd90Event {
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Started(_) => "started",
+            Self::Stopped(_) => "stopped",
+            Self::Error(_) => "error",
+            Self::Custom(k, _) => k.as_str(),
+        }
+    }
+
+    pub fn payload(&self) -> &str {
+        match self {
+            Self::Started(p) | Self::Stopped(p) | Self::Error(p) => p.as_str(),
+            Self::Custom(_, p) => p.as_str(),
+        }
+    }
+}
+
+type Xd90HandlerFn = Box<dyn Fn(&Xd90Event) + Send + Sync>;
+
+/// Event bus with subscribe/publish/unsubscribe and filtering.
+pub struct Xd90EventBus {
+    handlers: Vec<(usize, Option<String>, Xd90HandlerFn)>,
+    next_id: usize,
+    published: Vec<Xd90Event>,
+}
+
+impl Xd90EventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            next_id: 0,
+            published: Vec::new(),
+        }
+    }
+
+    /// Subscribe to all events. Returns a subscription id.
+    pub fn subscribe<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&Xd90Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers.push((id, None, Box::new(handler)));
+        id
+    }
+
+    /// Subscribe only to events matching a specific kind filter.
+    pub fn subscribe_filtered<F>(&mut self, kind_filter: &str, handler: F) -> usize
+    where
+        F: Fn(&Xd90Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers
+            .push((id, Some(kind_filter.to_string()), Box::new(handler)));
+        id
+    }
+
+    /// Unsubscribe by subscription id.
+    pub fn unsubscribe(&mut self, sub_id: usize) -> bool {
+        let before = self.handlers.len();
+        self.handlers.retain(|(id, _, _)| *id != sub_id);
+        self.handlers.len() < before
+    }
+
+    /// Publish an event to all matching subscribers.
+    pub fn publish(&mut self, event: Xd90Event) {
+        for (_, filter, handler) in &self.handlers {
+            let matched = match filter {
+                None => true,
+                Some(f) => event.kind() == f.as_str(),
+            };
+            if matched {
+                handler(&event);
+            }
+        }
+        self.published.push(event);
+    }
+
+    pub fn published_events(&self) -> &[Xd90Event] {
+        &self.published
+    }
+
+    pub fn subscriber_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.published.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4136,6 +4364,169 @@ mod tests {
     fn xc_70_reverse_str() {
         assert_eq!(super::xc_70_reverse("abc"), "cba");
         assert_eq!(super::xc_70_reverse(""), "");
+    }
+
+
+    // --- xd_90 deepening tests ---
+
+    #[test]
+    fn xd_90_sm_initial_state() {
+        let sm = Xd90StateMachine::new();
+        assert_eq!(sm.current_state(), Xd90State::Idle);
+        assert!(sm.history().is_empty());
+        assert_eq!(sm.step_count(), 0);
+    }
+
+    #[test]
+    fn xd_90_sm_valid_idle_to_running() {
+        let mut sm = Xd90StateMachine::new();
+        assert!(sm.transition(Xd90State::Running).is_ok());
+        assert_eq!(sm.current_state(), Xd90State::Running);
+    }
+
+    #[test]
+    fn xd_90_sm_valid_running_to_paused() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        assert!(sm.transition(Xd90State::Paused).is_ok());
+        assert_eq!(sm.current_state(), Xd90State::Paused);
+    }
+
+    #[test]
+    fn xd_90_sm_valid_running_to_done() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        assert!(sm.transition(Xd90State::Done).is_ok());
+        assert_eq!(sm.current_state(), Xd90State::Done);
+    }
+
+    #[test]
+    fn xd_90_sm_valid_paused_to_running() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        sm.transition(Xd90State::Paused).unwrap();
+        assert!(sm.transition(Xd90State::Running).is_ok());
+    }
+
+    #[test]
+    fn xd_90_sm_valid_done_to_idle() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        sm.transition(Xd90State::Done).unwrap();
+        assert!(sm.transition(Xd90State::Idle).is_ok());
+        assert_eq!(sm.current_state(), Xd90State::Idle);
+    }
+
+    #[test]
+    fn xd_90_sm_invalid_idle_to_done() {
+        let mut sm = Xd90StateMachine::new();
+        assert!(sm.transition(Xd90State::Done).is_err());
+    }
+
+    #[test]
+    fn xd_90_sm_invalid_idle_to_paused() {
+        let mut sm = Xd90StateMachine::new();
+        assert!(sm.transition(Xd90State::Paused).is_err());
+    }
+
+    #[test]
+    fn xd_90_sm_history_tracking() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        sm.transition(Xd90State::Paused).unwrap();
+        sm.transition(Xd90State::Done).unwrap();
+        assert_eq!(sm.history().len(), 3);
+        assert_eq!(sm.history()[0].from, Xd90State::Idle);
+        assert_eq!(sm.history()[0].to, Xd90State::Running);
+        assert_eq!(sm.history()[1].from, Xd90State::Running);
+        assert_eq!(sm.history()[2].to, Xd90State::Done);
+    }
+
+    #[test]
+    fn xd_90_sm_serialize_deserialize() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        let s = sm.serialize();
+        assert!(s.contains("current=Running"));
+        let recovered = Xd90StateMachine::deserialize_current(&s);
+        assert_eq!(recovered, Some(Xd90State::Running));
+    }
+
+    #[test]
+    fn xd_90_sm_deserialize_invalid() {
+        assert_eq!(Xd90StateMachine::deserialize_current("garbage"), None);
+    }
+
+    #[test]
+    fn xd_90_sm_reset() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        sm.reset();
+        assert_eq!(sm.current_state(), Xd90State::Idle);
+        assert!(sm.history().is_empty());
+    }
+
+    #[test]
+    fn xd_90_bus_publish_and_receive() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd90EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe(move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd90Event::Started("go".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(bus.published_events().len(), 1);
+    }
+
+    #[test]
+    fn xd_90_bus_filtered_subscribe() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd90EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe_filtered("error", move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd90Event::Started("a".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        bus.publish(Xd90Event::Error("fail".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn xd_90_bus_unsubscribe() {
+        let mut bus = Xd90EventBus::new();
+        let id = bus.subscribe(|_| {});
+        assert_eq!(bus.subscriber_count(), 1);
+        assert!(bus.unsubscribe(id));
+        assert_eq!(bus.subscriber_count(), 0);
+        assert!(!bus.unsubscribe(id));
+    }
+
+    #[test]
+    fn xd_90_event_kind_and_payload() {
+        let e = Xd90Event::Custom("mytype".into(), "mydata".into());
+        assert_eq!(e.kind(), "mytype");
+        assert_eq!(e.payload(), "mydata");
+        let e2 = Xd90Event::Started("hello".into());
+        assert_eq!(e2.kind(), "started");
+        assert_eq!(e2.payload(), "hello");
+    }
+
+    #[test]
+    fn xd_90_bus_clear_history() {
+        let mut bus = Xd90EventBus::new();
+        bus.publish(Xd90Event::Stopped("x".into()));
+        assert_eq!(bus.published_events().len(), 1);
+        bus.clear_history();
+        assert!(bus.published_events().is_empty());
+    }
+
+    #[test]
+    fn xd_90_sm_step_counter_increments() {
+        let mut sm = Xd90StateMachine::new();
+        sm.transition(Xd90State::Running).unwrap();
+        assert_eq!(sm.step_count(), 1);
+        sm.transition(Xd90State::Paused).unwrap();
+        assert_eq!(sm.step_count(), 2);
     }
 
 }

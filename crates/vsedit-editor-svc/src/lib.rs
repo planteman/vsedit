@@ -2460,6 +2460,234 @@ pub fn xc_38_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// --- xd_73 deepening: state machine + event bus ---
+
+/// States for the Xd73 state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Xd73State {
+    Idle,
+    Running,
+    Paused,
+    Done,
+}
+
+impl std::fmt::Display for Xd73State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Done => write!(f, "Done"),
+        }
+    }
+}
+
+/// Transition record for history tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xd73Transition {
+    pub from: Xd73State,
+    pub to: Xd73State,
+    pub step: usize,
+}
+
+/// State machine with history tracking and serialization.
+pub struct Xd73StateMachine {
+    current: Xd73State,
+    history: Vec<Xd73Transition>,
+    step_counter: usize,
+}
+
+impl Xd73StateMachine {
+    pub fn new() -> Self {
+        Self {
+            current: Xd73State::Idle,
+            history: Vec::new(),
+            step_counter: 0,
+        }
+    }
+
+    pub fn current_state(&self) -> Xd73State {
+        self.current
+    }
+
+    pub fn history(&self) -> &[Xd73Transition] {
+        &self.history
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.step_counter
+    }
+
+    /// Attempt a state transition. Returns Ok(new_state) or Err with reason.
+    pub fn transition(&mut self, target: Xd73State) -> Result<Xd73State, String> {
+        let allowed = match (self.current, target) {
+            (Xd73State::Idle, Xd73State::Running) => true,
+            (Xd73State::Running, Xd73State::Paused) => true,
+            (Xd73State::Running, Xd73State::Done) => true,
+            (Xd73State::Paused, Xd73State::Running) => true,
+            (Xd73State::Paused, Xd73State::Done) => true,
+            (Xd73State::Done, Xd73State::Idle) => true,
+            _ => false,
+        };
+        if !allowed {
+            return Err(format!(
+                "xd_73: invalid transition {} -> {}",
+                self.current, target
+            ));
+        }
+        let t = Xd73Transition {
+            from: self.current,
+            to: target,
+            step: self.step_counter,
+        };
+        self.step_counter += 1;
+        self.current = target;
+        self.history.push(t);
+        Ok(self.current)
+    }
+
+    /// Serialize state machine to a simple string representation.
+    pub fn serialize(&self) -> String {
+        let hist: Vec<String> = self
+            .history
+            .iter()
+            .map(|t| format!("{}->{}@{}", t.from, t.to, t.step))
+            .collect();
+        format!(
+            "Xd73SM[current={},steps={},history=[{}]]",
+            self.current,
+            self.step_counter,
+            hist.join(";")
+        )
+    }
+
+    /// Deserialize from the serialized string, recovering current state.
+    pub fn deserialize_current(s: &str) -> Option<Xd73State> {
+        let prefix = "Xd73SM[current=";
+        if !s.starts_with(prefix) {
+            return None;
+        }
+        let rest = &s[prefix.len()..];
+        let end = rest.find(',')?;
+        match &rest[..end] {
+            "Idle" => Some(Xd73State::Idle),
+            "Running" => Some(Xd73State::Running),
+            "Paused" => Some(Xd73State::Paused),
+            "Done" => Some(Xd73State::Done),
+            _ => None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current = Xd73State::Idle;
+        self.history.clear();
+        self.step_counter = 0;
+    }
+}
+
+/// Typed events for the Xd73 event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Xd73Event {
+    Started(String),
+    Stopped(String),
+    Error(String),
+    Custom(String, String),
+}
+
+impl Xd73Event {
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Started(_) => "started",
+            Self::Stopped(_) => "stopped",
+            Self::Error(_) => "error",
+            Self::Custom(k, _) => k.as_str(),
+        }
+    }
+
+    pub fn payload(&self) -> &str {
+        match self {
+            Self::Started(p) | Self::Stopped(p) | Self::Error(p) => p.as_str(),
+            Self::Custom(_, p) => p.as_str(),
+        }
+    }
+}
+
+type Xd73HandlerFn = Box<dyn Fn(&Xd73Event) + Send + Sync>;
+
+/// Event bus with subscribe/publish/unsubscribe and filtering.
+pub struct Xd73EventBus {
+    handlers: Vec<(usize, Option<String>, Xd73HandlerFn)>,
+    next_id: usize,
+    published: Vec<Xd73Event>,
+}
+
+impl Xd73EventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            next_id: 0,
+            published: Vec::new(),
+        }
+    }
+
+    /// Subscribe to all events. Returns a subscription id.
+    pub fn subscribe<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&Xd73Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers.push((id, None, Box::new(handler)));
+        id
+    }
+
+    /// Subscribe only to events matching a specific kind filter.
+    pub fn subscribe_filtered<F>(&mut self, kind_filter: &str, handler: F) -> usize
+    where
+        F: Fn(&Xd73Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers
+            .push((id, Some(kind_filter.to_string()), Box::new(handler)));
+        id
+    }
+
+    /// Unsubscribe by subscription id.
+    pub fn unsubscribe(&mut self, sub_id: usize) -> bool {
+        let before = self.handlers.len();
+        self.handlers.retain(|(id, _, _)| *id != sub_id);
+        self.handlers.len() < before
+    }
+
+    /// Publish an event to all matching subscribers.
+    pub fn publish(&mut self, event: Xd73Event) {
+        for (_, filter, handler) in &self.handlers {
+            let matched = match filter {
+                None => true,
+                Some(f) => event.kind() == f.as_str(),
+            };
+            if matched {
+                handler(&event);
+            }
+        }
+        self.published.push(event);
+    }
+
+    pub fn published_events(&self) -> &[Xd73Event] {
+        &self.published
+    }
+
+    pub fn subscriber_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.published.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4128,6 +4356,169 @@ mod tests {
     fn xc_38_reverse_str() {
         assert_eq!(super::xc_38_reverse("abc"), "cba");
         assert_eq!(super::xc_38_reverse(""), "");
+    }
+
+
+    // --- xd_73 deepening tests ---
+
+    #[test]
+    fn xd_73_sm_initial_state() {
+        let sm = Xd73StateMachine::new();
+        assert_eq!(sm.current_state(), Xd73State::Idle);
+        assert!(sm.history().is_empty());
+        assert_eq!(sm.step_count(), 0);
+    }
+
+    #[test]
+    fn xd_73_sm_valid_idle_to_running() {
+        let mut sm = Xd73StateMachine::new();
+        assert!(sm.transition(Xd73State::Running).is_ok());
+        assert_eq!(sm.current_state(), Xd73State::Running);
+    }
+
+    #[test]
+    fn xd_73_sm_valid_running_to_paused() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        assert!(sm.transition(Xd73State::Paused).is_ok());
+        assert_eq!(sm.current_state(), Xd73State::Paused);
+    }
+
+    #[test]
+    fn xd_73_sm_valid_running_to_done() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        assert!(sm.transition(Xd73State::Done).is_ok());
+        assert_eq!(sm.current_state(), Xd73State::Done);
+    }
+
+    #[test]
+    fn xd_73_sm_valid_paused_to_running() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        sm.transition(Xd73State::Paused).unwrap();
+        assert!(sm.transition(Xd73State::Running).is_ok());
+    }
+
+    #[test]
+    fn xd_73_sm_valid_done_to_idle() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        sm.transition(Xd73State::Done).unwrap();
+        assert!(sm.transition(Xd73State::Idle).is_ok());
+        assert_eq!(sm.current_state(), Xd73State::Idle);
+    }
+
+    #[test]
+    fn xd_73_sm_invalid_idle_to_done() {
+        let mut sm = Xd73StateMachine::new();
+        assert!(sm.transition(Xd73State::Done).is_err());
+    }
+
+    #[test]
+    fn xd_73_sm_invalid_idle_to_paused() {
+        let mut sm = Xd73StateMachine::new();
+        assert!(sm.transition(Xd73State::Paused).is_err());
+    }
+
+    #[test]
+    fn xd_73_sm_history_tracking() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        sm.transition(Xd73State::Paused).unwrap();
+        sm.transition(Xd73State::Done).unwrap();
+        assert_eq!(sm.history().len(), 3);
+        assert_eq!(sm.history()[0].from, Xd73State::Idle);
+        assert_eq!(sm.history()[0].to, Xd73State::Running);
+        assert_eq!(sm.history()[1].from, Xd73State::Running);
+        assert_eq!(sm.history()[2].to, Xd73State::Done);
+    }
+
+    #[test]
+    fn xd_73_sm_serialize_deserialize() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        let s = sm.serialize();
+        assert!(s.contains("current=Running"));
+        let recovered = Xd73StateMachine::deserialize_current(&s);
+        assert_eq!(recovered, Some(Xd73State::Running));
+    }
+
+    #[test]
+    fn xd_73_sm_deserialize_invalid() {
+        assert_eq!(Xd73StateMachine::deserialize_current("garbage"), None);
+    }
+
+    #[test]
+    fn xd_73_sm_reset() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        sm.reset();
+        assert_eq!(sm.current_state(), Xd73State::Idle);
+        assert!(sm.history().is_empty());
+    }
+
+    #[test]
+    fn xd_73_bus_publish_and_receive() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd73EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe(move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd73Event::Started("go".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(bus.published_events().len(), 1);
+    }
+
+    #[test]
+    fn xd_73_bus_filtered_subscribe() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd73EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe_filtered("error", move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd73Event::Started("a".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        bus.publish(Xd73Event::Error("fail".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn xd_73_bus_unsubscribe() {
+        let mut bus = Xd73EventBus::new();
+        let id = bus.subscribe(|_| {});
+        assert_eq!(bus.subscriber_count(), 1);
+        assert!(bus.unsubscribe(id));
+        assert_eq!(bus.subscriber_count(), 0);
+        assert!(!bus.unsubscribe(id));
+    }
+
+    #[test]
+    fn xd_73_event_kind_and_payload() {
+        let e = Xd73Event::Custom("mytype".into(), "mydata".into());
+        assert_eq!(e.kind(), "mytype");
+        assert_eq!(e.payload(), "mydata");
+        let e2 = Xd73Event::Started("hello".into());
+        assert_eq!(e2.kind(), "started");
+        assert_eq!(e2.payload(), "hello");
+    }
+
+    #[test]
+    fn xd_73_bus_clear_history() {
+        let mut bus = Xd73EventBus::new();
+        bus.publish(Xd73Event::Stopped("x".into()));
+        assert_eq!(bus.published_events().len(), 1);
+        bus.clear_history();
+        assert!(bus.published_events().is_empty());
+    }
+
+    #[test]
+    fn xd_73_sm_step_counter_increments() {
+        let mut sm = Xd73StateMachine::new();
+        sm.transition(Xd73State::Running).unwrap();
+        assert_eq!(sm.step_count(), 1);
+        sm.transition(Xd73State::Paused).unwrap();
+        assert_eq!(sm.step_count(), 2);
     }
 
 }

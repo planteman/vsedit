@@ -2270,6 +2270,234 @@ pub fn xc_76_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// --- xd_10 deepening: state machine + event bus ---
+
+/// States for the Xd10 state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Xd10State {
+    Idle,
+    Running,
+    Paused,
+    Done,
+}
+
+impl std::fmt::Display for Xd10State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Done => write!(f, "Done"),
+        }
+    }
+}
+
+/// Transition record for history tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xd10Transition {
+    pub from: Xd10State,
+    pub to: Xd10State,
+    pub step: usize,
+}
+
+/// State machine with history tracking and serialization.
+pub struct Xd10StateMachine {
+    current: Xd10State,
+    history: Vec<Xd10Transition>,
+    step_counter: usize,
+}
+
+impl Xd10StateMachine {
+    pub fn new() -> Self {
+        Self {
+            current: Xd10State::Idle,
+            history: Vec::new(),
+            step_counter: 0,
+        }
+    }
+
+    pub fn current_state(&self) -> Xd10State {
+        self.current
+    }
+
+    pub fn history(&self) -> &[Xd10Transition] {
+        &self.history
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.step_counter
+    }
+
+    /// Attempt a state transition. Returns Ok(new_state) or Err with reason.
+    pub fn transition(&mut self, target: Xd10State) -> Result<Xd10State, String> {
+        let allowed = match (self.current, target) {
+            (Xd10State::Idle, Xd10State::Running) => true,
+            (Xd10State::Running, Xd10State::Paused) => true,
+            (Xd10State::Running, Xd10State::Done) => true,
+            (Xd10State::Paused, Xd10State::Running) => true,
+            (Xd10State::Paused, Xd10State::Done) => true,
+            (Xd10State::Done, Xd10State::Idle) => true,
+            _ => false,
+        };
+        if !allowed {
+            return Err(format!(
+                "xd_10: invalid transition {} -> {}",
+                self.current, target
+            ));
+        }
+        let t = Xd10Transition {
+            from: self.current,
+            to: target,
+            step: self.step_counter,
+        };
+        self.step_counter += 1;
+        self.current = target;
+        self.history.push(t);
+        Ok(self.current)
+    }
+
+    /// Serialize state machine to a simple string representation.
+    pub fn serialize(&self) -> String {
+        let hist: Vec<String> = self
+            .history
+            .iter()
+            .map(|t| format!("{}->{}@{}", t.from, t.to, t.step))
+            .collect();
+        format!(
+            "Xd10SM[current={},steps={},history=[{}]]",
+            self.current,
+            self.step_counter,
+            hist.join(";")
+        )
+    }
+
+    /// Deserialize from the serialized string, recovering current state.
+    pub fn deserialize_current(s: &str) -> Option<Xd10State> {
+        let prefix = "Xd10SM[current=";
+        if !s.starts_with(prefix) {
+            return None;
+        }
+        let rest = &s[prefix.len()..];
+        let end = rest.find(',')?;
+        match &rest[..end] {
+            "Idle" => Some(Xd10State::Idle),
+            "Running" => Some(Xd10State::Running),
+            "Paused" => Some(Xd10State::Paused),
+            "Done" => Some(Xd10State::Done),
+            _ => None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current = Xd10State::Idle;
+        self.history.clear();
+        self.step_counter = 0;
+    }
+}
+
+/// Typed events for the Xd10 event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Xd10Event {
+    Started(String),
+    Stopped(String),
+    Error(String),
+    Custom(String, String),
+}
+
+impl Xd10Event {
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Started(_) => "started",
+            Self::Stopped(_) => "stopped",
+            Self::Error(_) => "error",
+            Self::Custom(k, _) => k.as_str(),
+        }
+    }
+
+    pub fn payload(&self) -> &str {
+        match self {
+            Self::Started(p) | Self::Stopped(p) | Self::Error(p) => p.as_str(),
+            Self::Custom(_, p) => p.as_str(),
+        }
+    }
+}
+
+type Xd10HandlerFn = Box<dyn Fn(&Xd10Event) + Send + Sync>;
+
+/// Event bus with subscribe/publish/unsubscribe and filtering.
+pub struct Xd10EventBus {
+    handlers: Vec<(usize, Option<String>, Xd10HandlerFn)>,
+    next_id: usize,
+    published: Vec<Xd10Event>,
+}
+
+impl Xd10EventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            next_id: 0,
+            published: Vec::new(),
+        }
+    }
+
+    /// Subscribe to all events. Returns a subscription id.
+    pub fn subscribe<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&Xd10Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers.push((id, None, Box::new(handler)));
+        id
+    }
+
+    /// Subscribe only to events matching a specific kind filter.
+    pub fn subscribe_filtered<F>(&mut self, kind_filter: &str, handler: F) -> usize
+    where
+        F: Fn(&Xd10Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers
+            .push((id, Some(kind_filter.to_string()), Box::new(handler)));
+        id
+    }
+
+    /// Unsubscribe by subscription id.
+    pub fn unsubscribe(&mut self, sub_id: usize) -> bool {
+        let before = self.handlers.len();
+        self.handlers.retain(|(id, _, _)| *id != sub_id);
+        self.handlers.len() < before
+    }
+
+    /// Publish an event to all matching subscribers.
+    pub fn publish(&mut self, event: Xd10Event) {
+        for (_, filter, handler) in &self.handlers {
+            let matched = match filter {
+                None => true,
+                Some(f) => event.kind() == f.as_str(),
+            };
+            if matched {
+                handler(&event);
+            }
+        }
+        self.published.push(event);
+    }
+
+    pub fn published_events(&self) -> &[Xd10Event] {
+        &self.published
+    }
+
+    pub fn subscriber_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.published.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4008,6 +4236,169 @@ mod tests {
     fn xc_76_reverse_str() {
         assert_eq!(super::xc_76_reverse("abc"), "cba");
         assert_eq!(super::xc_76_reverse(""), "");
+    }
+
+
+    // --- xd_10 deepening tests ---
+
+    #[test]
+    fn xd_10_sm_initial_state() {
+        let sm = Xd10StateMachine::new();
+        assert_eq!(sm.current_state(), Xd10State::Idle);
+        assert!(sm.history().is_empty());
+        assert_eq!(sm.step_count(), 0);
+    }
+
+    #[test]
+    fn xd_10_sm_valid_idle_to_running() {
+        let mut sm = Xd10StateMachine::new();
+        assert!(sm.transition(Xd10State::Running).is_ok());
+        assert_eq!(sm.current_state(), Xd10State::Running);
+    }
+
+    #[test]
+    fn xd_10_sm_valid_running_to_paused() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        assert!(sm.transition(Xd10State::Paused).is_ok());
+        assert_eq!(sm.current_state(), Xd10State::Paused);
+    }
+
+    #[test]
+    fn xd_10_sm_valid_running_to_done() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        assert!(sm.transition(Xd10State::Done).is_ok());
+        assert_eq!(sm.current_state(), Xd10State::Done);
+    }
+
+    #[test]
+    fn xd_10_sm_valid_paused_to_running() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        sm.transition(Xd10State::Paused).unwrap();
+        assert!(sm.transition(Xd10State::Running).is_ok());
+    }
+
+    #[test]
+    fn xd_10_sm_valid_done_to_idle() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        sm.transition(Xd10State::Done).unwrap();
+        assert!(sm.transition(Xd10State::Idle).is_ok());
+        assert_eq!(sm.current_state(), Xd10State::Idle);
+    }
+
+    #[test]
+    fn xd_10_sm_invalid_idle_to_done() {
+        let mut sm = Xd10StateMachine::new();
+        assert!(sm.transition(Xd10State::Done).is_err());
+    }
+
+    #[test]
+    fn xd_10_sm_invalid_idle_to_paused() {
+        let mut sm = Xd10StateMachine::new();
+        assert!(sm.transition(Xd10State::Paused).is_err());
+    }
+
+    #[test]
+    fn xd_10_sm_history_tracking() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        sm.transition(Xd10State::Paused).unwrap();
+        sm.transition(Xd10State::Done).unwrap();
+        assert_eq!(sm.history().len(), 3);
+        assert_eq!(sm.history()[0].from, Xd10State::Idle);
+        assert_eq!(sm.history()[0].to, Xd10State::Running);
+        assert_eq!(sm.history()[1].from, Xd10State::Running);
+        assert_eq!(sm.history()[2].to, Xd10State::Done);
+    }
+
+    #[test]
+    fn xd_10_sm_serialize_deserialize() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        let s = sm.serialize();
+        assert!(s.contains("current=Running"));
+        let recovered = Xd10StateMachine::deserialize_current(&s);
+        assert_eq!(recovered, Some(Xd10State::Running));
+    }
+
+    #[test]
+    fn xd_10_sm_deserialize_invalid() {
+        assert_eq!(Xd10StateMachine::deserialize_current("garbage"), None);
+    }
+
+    #[test]
+    fn xd_10_sm_reset() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        sm.reset();
+        assert_eq!(sm.current_state(), Xd10State::Idle);
+        assert!(sm.history().is_empty());
+    }
+
+    #[test]
+    fn xd_10_bus_publish_and_receive() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd10EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe(move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd10Event::Started("go".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(bus.published_events().len(), 1);
+    }
+
+    #[test]
+    fn xd_10_bus_filtered_subscribe() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd10EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe_filtered("error", move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd10Event::Started("a".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        bus.publish(Xd10Event::Error("fail".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn xd_10_bus_unsubscribe() {
+        let mut bus = Xd10EventBus::new();
+        let id = bus.subscribe(|_| {});
+        assert_eq!(bus.subscriber_count(), 1);
+        assert!(bus.unsubscribe(id));
+        assert_eq!(bus.subscriber_count(), 0);
+        assert!(!bus.unsubscribe(id));
+    }
+
+    #[test]
+    fn xd_10_event_kind_and_payload() {
+        let e = Xd10Event::Custom("mytype".into(), "mydata".into());
+        assert_eq!(e.kind(), "mytype");
+        assert_eq!(e.payload(), "mydata");
+        let e2 = Xd10Event::Started("hello".into());
+        assert_eq!(e2.kind(), "started");
+        assert_eq!(e2.payload(), "hello");
+    }
+
+    #[test]
+    fn xd_10_bus_clear_history() {
+        let mut bus = Xd10EventBus::new();
+        bus.publish(Xd10Event::Stopped("x".into()));
+        assert_eq!(bus.published_events().len(), 1);
+        bus.clear_history();
+        assert!(bus.published_events().is_empty());
+    }
+
+    #[test]
+    fn xd_10_sm_step_counter_increments() {
+        let mut sm = Xd10StateMachine::new();
+        sm.transition(Xd10State::Running).unwrap();
+        assert_eq!(sm.step_count(), 1);
+        sm.transition(Xd10State::Paused).unwrap();
+        assert_eq!(sm.step_count(), 2);
     }
 
 }

@@ -2401,6 +2401,234 @@ pub fn xc_180_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// --- xd_108 deepening: state machine + event bus ---
+
+/// States for the Xd108 state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Xd108State {
+    Idle,
+    Running,
+    Paused,
+    Done,
+}
+
+impl std::fmt::Display for Xd108State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Done => write!(f, "Done"),
+        }
+    }
+}
+
+/// Transition record for history tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xd108Transition {
+    pub from: Xd108State,
+    pub to: Xd108State,
+    pub step: usize,
+}
+
+/// State machine with history tracking and serialization.
+pub struct Xd108StateMachine {
+    current: Xd108State,
+    history: Vec<Xd108Transition>,
+    step_counter: usize,
+}
+
+impl Xd108StateMachine {
+    pub fn new() -> Self {
+        Self {
+            current: Xd108State::Idle,
+            history: Vec::new(),
+            step_counter: 0,
+        }
+    }
+
+    pub fn current_state(&self) -> Xd108State {
+        self.current
+    }
+
+    pub fn history(&self) -> &[Xd108Transition] {
+        &self.history
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.step_counter
+    }
+
+    /// Attempt a state transition. Returns Ok(new_state) or Err with reason.
+    pub fn transition(&mut self, target: Xd108State) -> Result<Xd108State, String> {
+        let allowed = match (self.current, target) {
+            (Xd108State::Idle, Xd108State::Running) => true,
+            (Xd108State::Running, Xd108State::Paused) => true,
+            (Xd108State::Running, Xd108State::Done) => true,
+            (Xd108State::Paused, Xd108State::Running) => true,
+            (Xd108State::Paused, Xd108State::Done) => true,
+            (Xd108State::Done, Xd108State::Idle) => true,
+            _ => false,
+        };
+        if !allowed {
+            return Err(format!(
+                "xd_108: invalid transition {} -> {}",
+                self.current, target
+            ));
+        }
+        let t = Xd108Transition {
+            from: self.current,
+            to: target,
+            step: self.step_counter,
+        };
+        self.step_counter += 1;
+        self.current = target;
+        self.history.push(t);
+        Ok(self.current)
+    }
+
+    /// Serialize state machine to a simple string representation.
+    pub fn serialize(&self) -> String {
+        let hist: Vec<String> = self
+            .history
+            .iter()
+            .map(|t| format!("{}->{}@{}", t.from, t.to, t.step))
+            .collect();
+        format!(
+            "Xd108SM[current={},steps={},history=[{}]]",
+            self.current,
+            self.step_counter,
+            hist.join(";")
+        )
+    }
+
+    /// Deserialize from the serialized string, recovering current state.
+    pub fn deserialize_current(s: &str) -> Option<Xd108State> {
+        let prefix = "Xd108SM[current=";
+        if !s.starts_with(prefix) {
+            return None;
+        }
+        let rest = &s[prefix.len()..];
+        let end = rest.find(',')?;
+        match &rest[..end] {
+            "Idle" => Some(Xd108State::Idle),
+            "Running" => Some(Xd108State::Running),
+            "Paused" => Some(Xd108State::Paused),
+            "Done" => Some(Xd108State::Done),
+            _ => None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current = Xd108State::Idle;
+        self.history.clear();
+        self.step_counter = 0;
+    }
+}
+
+/// Typed events for the Xd108 event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Xd108Event {
+    Started(String),
+    Stopped(String),
+    Error(String),
+    Custom(String, String),
+}
+
+impl Xd108Event {
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Started(_) => "started",
+            Self::Stopped(_) => "stopped",
+            Self::Error(_) => "error",
+            Self::Custom(k, _) => k.as_str(),
+        }
+    }
+
+    pub fn payload(&self) -> &str {
+        match self {
+            Self::Started(p) | Self::Stopped(p) | Self::Error(p) => p.as_str(),
+            Self::Custom(_, p) => p.as_str(),
+        }
+    }
+}
+
+type Xd108HandlerFn = Box<dyn Fn(&Xd108Event) + Send + Sync>;
+
+/// Event bus with subscribe/publish/unsubscribe and filtering.
+pub struct Xd108EventBus {
+    handlers: Vec<(usize, Option<String>, Xd108HandlerFn)>,
+    next_id: usize,
+    published: Vec<Xd108Event>,
+}
+
+impl Xd108EventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            next_id: 0,
+            published: Vec::new(),
+        }
+    }
+
+    /// Subscribe to all events. Returns a subscription id.
+    pub fn subscribe<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&Xd108Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers.push((id, None, Box::new(handler)));
+        id
+    }
+
+    /// Subscribe only to events matching a specific kind filter.
+    pub fn subscribe_filtered<F>(&mut self, kind_filter: &str, handler: F) -> usize
+    where
+        F: Fn(&Xd108Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers
+            .push((id, Some(kind_filter.to_string()), Box::new(handler)));
+        id
+    }
+
+    /// Unsubscribe by subscription id.
+    pub fn unsubscribe(&mut self, sub_id: usize) -> bool {
+        let before = self.handlers.len();
+        self.handlers.retain(|(id, _, _)| *id != sub_id);
+        self.handlers.len() < before
+    }
+
+    /// Publish an event to all matching subscribers.
+    pub fn publish(&mut self, event: Xd108Event) {
+        for (_, filter, handler) in &self.handlers {
+            let matched = match filter {
+                None => true,
+                Some(f) => event.kind() == f.as_str(),
+            };
+            if matched {
+                handler(&event);
+            }
+        }
+        self.published.push(event);
+    }
+
+    pub fn published_events(&self) -> &[Xd108Event] {
+        &self.published
+    }
+
+    pub fn subscriber_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.published.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4147,6 +4375,169 @@ mod tests {
     fn xc_180_reverse_str() {
         assert_eq!(super::xc_180_reverse("abc"), "cba");
         assert_eq!(super::xc_180_reverse(""), "");
+    }
+
+
+    // --- xd_108 deepening tests ---
+
+    #[test]
+    fn xd_108_sm_initial_state() {
+        let sm = Xd108StateMachine::new();
+        assert_eq!(sm.current_state(), Xd108State::Idle);
+        assert!(sm.history().is_empty());
+        assert_eq!(sm.step_count(), 0);
+    }
+
+    #[test]
+    fn xd_108_sm_valid_idle_to_running() {
+        let mut sm = Xd108StateMachine::new();
+        assert!(sm.transition(Xd108State::Running).is_ok());
+        assert_eq!(sm.current_state(), Xd108State::Running);
+    }
+
+    #[test]
+    fn xd_108_sm_valid_running_to_paused() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        assert!(sm.transition(Xd108State::Paused).is_ok());
+        assert_eq!(sm.current_state(), Xd108State::Paused);
+    }
+
+    #[test]
+    fn xd_108_sm_valid_running_to_done() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        assert!(sm.transition(Xd108State::Done).is_ok());
+        assert_eq!(sm.current_state(), Xd108State::Done);
+    }
+
+    #[test]
+    fn xd_108_sm_valid_paused_to_running() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        sm.transition(Xd108State::Paused).unwrap();
+        assert!(sm.transition(Xd108State::Running).is_ok());
+    }
+
+    #[test]
+    fn xd_108_sm_valid_done_to_idle() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        sm.transition(Xd108State::Done).unwrap();
+        assert!(sm.transition(Xd108State::Idle).is_ok());
+        assert_eq!(sm.current_state(), Xd108State::Idle);
+    }
+
+    #[test]
+    fn xd_108_sm_invalid_idle_to_done() {
+        let mut sm = Xd108StateMachine::new();
+        assert!(sm.transition(Xd108State::Done).is_err());
+    }
+
+    #[test]
+    fn xd_108_sm_invalid_idle_to_paused() {
+        let mut sm = Xd108StateMachine::new();
+        assert!(sm.transition(Xd108State::Paused).is_err());
+    }
+
+    #[test]
+    fn xd_108_sm_history_tracking() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        sm.transition(Xd108State::Paused).unwrap();
+        sm.transition(Xd108State::Done).unwrap();
+        assert_eq!(sm.history().len(), 3);
+        assert_eq!(sm.history()[0].from, Xd108State::Idle);
+        assert_eq!(sm.history()[0].to, Xd108State::Running);
+        assert_eq!(sm.history()[1].from, Xd108State::Running);
+        assert_eq!(sm.history()[2].to, Xd108State::Done);
+    }
+
+    #[test]
+    fn xd_108_sm_serialize_deserialize() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        let s = sm.serialize();
+        assert!(s.contains("current=Running"));
+        let recovered = Xd108StateMachine::deserialize_current(&s);
+        assert_eq!(recovered, Some(Xd108State::Running));
+    }
+
+    #[test]
+    fn xd_108_sm_deserialize_invalid() {
+        assert_eq!(Xd108StateMachine::deserialize_current("garbage"), None);
+    }
+
+    #[test]
+    fn xd_108_sm_reset() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        sm.reset();
+        assert_eq!(sm.current_state(), Xd108State::Idle);
+        assert!(sm.history().is_empty());
+    }
+
+    #[test]
+    fn xd_108_bus_publish_and_receive() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd108EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe(move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd108Event::Started("go".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(bus.published_events().len(), 1);
+    }
+
+    #[test]
+    fn xd_108_bus_filtered_subscribe() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd108EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe_filtered("error", move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd108Event::Started("a".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        bus.publish(Xd108Event::Error("fail".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn xd_108_bus_unsubscribe() {
+        let mut bus = Xd108EventBus::new();
+        let id = bus.subscribe(|_| {});
+        assert_eq!(bus.subscriber_count(), 1);
+        assert!(bus.unsubscribe(id));
+        assert_eq!(bus.subscriber_count(), 0);
+        assert!(!bus.unsubscribe(id));
+    }
+
+    #[test]
+    fn xd_108_event_kind_and_payload() {
+        let e = Xd108Event::Custom("mytype".into(), "mydata".into());
+        assert_eq!(e.kind(), "mytype");
+        assert_eq!(e.payload(), "mydata");
+        let e2 = Xd108Event::Started("hello".into());
+        assert_eq!(e2.kind(), "started");
+        assert_eq!(e2.payload(), "hello");
+    }
+
+    #[test]
+    fn xd_108_bus_clear_history() {
+        let mut bus = Xd108EventBus::new();
+        bus.publish(Xd108Event::Stopped("x".into()));
+        assert_eq!(bus.published_events().len(), 1);
+        bus.clear_history();
+        assert!(bus.published_events().is_empty());
+    }
+
+    #[test]
+    fn xd_108_sm_step_counter_increments() {
+        let mut sm = Xd108StateMachine::new();
+        sm.transition(Xd108State::Running).unwrap();
+        assert_eq!(sm.step_count(), 1);
+        sm.transition(Xd108State::Paused).unwrap();
+        assert_eq!(sm.step_count(), 2);
     }
 
 }

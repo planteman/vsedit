@@ -2430,6 +2430,449 @@ pub fn xc_118_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// --- xd_1 deepening: state machine + event bus ---
+
+/// States for the Xd1 state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Xd1State {
+    Idle,
+    Running,
+    Paused,
+    Done,
+}
+
+impl std::fmt::Display for Xd1State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Done => write!(f, "Done"),
+        }
+    }
+}
+
+/// Transition record for history tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xd1Transition {
+    pub from: Xd1State,
+    pub to: Xd1State,
+    pub step: usize,
+}
+
+/// State machine with history tracking and serialization.
+pub struct Xd1StateMachine {
+    current: Xd1State,
+    history: Vec<Xd1Transition>,
+    step_counter: usize,
+}
+
+impl Xd1StateMachine {
+    pub fn new() -> Self {
+        Self {
+            current: Xd1State::Idle,
+            history: Vec::new(),
+            step_counter: 0,
+        }
+    }
+
+    pub fn current_state(&self) -> Xd1State {
+        self.current
+    }
+
+    pub fn history(&self) -> &[Xd1Transition] {
+        &self.history
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.step_counter
+    }
+
+    /// Attempt a state transition. Returns Ok(new_state) or Err with reason.
+    pub fn transition(&mut self, target: Xd1State) -> Result<Xd1State, String> {
+        let allowed = match (self.current, target) {
+            (Xd1State::Idle, Xd1State::Running) => true,
+            (Xd1State::Running, Xd1State::Paused) => true,
+            (Xd1State::Running, Xd1State::Done) => true,
+            (Xd1State::Paused, Xd1State::Running) => true,
+            (Xd1State::Paused, Xd1State::Done) => true,
+            (Xd1State::Done, Xd1State::Idle) => true,
+            _ => false,
+        };
+        if !allowed {
+            return Err(format!(
+                "xd_1: invalid transition {} -> {}",
+                self.current, target
+            ));
+        }
+        let t = Xd1Transition {
+            from: self.current,
+            to: target,
+            step: self.step_counter,
+        };
+        self.step_counter += 1;
+        self.current = target;
+        self.history.push(t);
+        Ok(self.current)
+    }
+
+    /// Serialize state machine to a simple string representation.
+    pub fn serialize(&self) -> String {
+        let hist: Vec<String> = self
+            .history
+            .iter()
+            .map(|t| format!("{}->{}@{}", t.from, t.to, t.step))
+            .collect();
+        format!(
+            "Xd1SM[current={},steps={},history=[{}]]",
+            self.current,
+            self.step_counter,
+            hist.join(";")
+        )
+    }
+
+    /// Deserialize from the serialized string, recovering current state.
+    pub fn deserialize_current(s: &str) -> Option<Xd1State> {
+        let prefix = "Xd1SM[current=";
+        if !s.starts_with(prefix) {
+            return None;
+        }
+        let rest = &s[prefix.len()..];
+        let end = rest.find(',')?;
+        match &rest[..end] {
+            "Idle" => Some(Xd1State::Idle),
+            "Running" => Some(Xd1State::Running),
+            "Paused" => Some(Xd1State::Paused),
+            "Done" => Some(Xd1State::Done),
+            _ => None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current = Xd1State::Idle;
+        self.history.clear();
+        self.step_counter = 0;
+    }
+}
+
+/// Typed events for the Xd1 event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Xd1Event {
+    Started(String),
+    Stopped(String),
+    Error(String),
+    Custom(String, String),
+}
+
+impl Xd1Event {
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Started(_) => "started",
+            Self::Stopped(_) => "stopped",
+            Self::Error(_) => "error",
+            Self::Custom(k, _) => k.as_str(),
+        }
+    }
+
+    pub fn payload(&self) -> &str {
+        match self {
+            Self::Started(p) | Self::Stopped(p) | Self::Error(p) => p.as_str(),
+            Self::Custom(_, p) => p.as_str(),
+        }
+    }
+}
+
+type Xd1HandlerFn = Box<dyn Fn(&Xd1Event) + Send + Sync>;
+
+/// Event bus with subscribe/publish/unsubscribe and filtering.
+pub struct Xd1EventBus {
+    handlers: Vec<(usize, Option<String>, Xd1HandlerFn)>,
+    next_id: usize,
+    published: Vec<Xd1Event>,
+}
+
+impl Xd1EventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            next_id: 0,
+            published: Vec::new(),
+        }
+    }
+
+    /// Subscribe to all events. Returns a subscription id.
+    pub fn subscribe<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&Xd1Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers.push((id, None, Box::new(handler)));
+        id
+    }
+
+    /// Subscribe only to events matching a specific kind filter.
+    pub fn subscribe_filtered<F>(&mut self, kind_filter: &str, handler: F) -> usize
+    where
+        F: Fn(&Xd1Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers
+            .push((id, Some(kind_filter.to_string()), Box::new(handler)));
+        id
+    }
+
+    /// Unsubscribe by subscription id.
+    pub fn unsubscribe(&mut self, sub_id: usize) -> bool {
+        let before = self.handlers.len();
+        self.handlers.retain(|(id, _, _)| *id != sub_id);
+        self.handlers.len() < before
+    }
+
+    /// Publish an event to all matching subscribers.
+    pub fn publish(&mut self, event: Xd1Event) {
+        for (_, filter, handler) in &self.handlers {
+            let matched = match filter {
+                None => true,
+                Some(f) => event.kind() == f.as_str(),
+            };
+            if matched {
+                handler(&event);
+            }
+        }
+        self.published.push(event);
+    }
+
+    pub fn published_events(&self) -> &[Xd1Event] {
+        &self.published
+    }
+
+    pub fn subscriber_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.published.clear();
+    }
+}
+
+
+// === Xe120 Pipeline & Cache ===
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Xe120Stage {
+    Parse,
+    Transform,
+    Validate,
+    Emit,
+}
+
+#[derive(Debug, Clone)]
+pub struct Xe120PipelineError {
+    pub stage: Xe120Stage,
+    pub message: String,
+}
+
+impl std::fmt::Display for Xe120PipelineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Xe120Pipeline error at {:?}: {}", self.stage, self.message)
+    }
+}
+
+pub struct Xe120Pipeline {
+    stages: Vec<Box<dyn Fn(Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError>>>,
+    stage_names: Vec<Xe120Stage>,
+}
+
+impl Xe120Pipeline {
+    pub fn new() -> Self {
+        Self { stages: Vec::new(), stage_names: Vec::new() }
+    }
+
+    pub fn add_parse<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe120Stage::Parse);
+        self
+    }
+
+    pub fn add_transform<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe120Stage::Transform);
+        self
+    }
+
+    pub fn add_validate<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe120Stage::Validate);
+        self
+    }
+
+    pub fn add_emit<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe120Stage::Emit);
+        self
+    }
+
+    pub fn execute(&self, input: Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> {
+        let mut data = input;
+        for (i, stage_fn) in self.stages.iter().enumerate() {
+            data = stage_fn(data).map_err(|mut e| {
+                e.stage = self.stage_names[i].clone();
+                e
+            })?;
+        }
+        Ok(data)
+    }
+
+    pub fn stage_count(&self) -> usize {
+        self.stages.len()
+    }
+
+    pub fn compose(mut self, other: Xe120Pipeline) -> Self {
+        for (stage_fn, name) in other.stages.into_iter().zip(other.stage_names) {
+            self.stages.push(stage_fn);
+            self.stage_names.push(name);
+        }
+        self
+    }
+}
+
+pub struct Xe120CacheEntry<V> {
+    value: V,
+    inserted_at: u64,
+    ttl: u64,
+}
+
+pub struct Xe120CacheStats {
+    pub hits: u64,
+    pub misses: u64,
+    pub evictions: u64,
+}
+
+pub struct Xe120Cache<K: std::hash::Hash + Eq, V: Clone> {
+    entries: std::collections::HashMap<K, Xe120CacheEntry<V>>,
+    capacity: usize,
+    current_time: u64,
+    stats: Xe120CacheStats,
+}
+
+impl<K: std::hash::Hash + Eq + Clone, V: Clone> Xe120Cache<K, V> {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            capacity,
+            current_time: 0,
+            stats: Xe120CacheStats { hits: 0, misses: 0, evictions: 0 },
+        }
+    }
+
+    pub fn advance_time(&mut self, amount: u64) {
+        self.current_time += amount;
+    }
+
+    pub fn put(&mut self, key: K, value: V, ttl: u64) {
+        if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
+            self.xe_120_evict_expired();
+            if self.entries.len() >= self.capacity {
+                if let Some(oldest_key) = self.entries.keys().next().cloned() {
+                    self.entries.remove(&oldest_key);
+                    self.stats.evictions += 1;
+                }
+            }
+        }
+        self.entries.insert(key, Xe120CacheEntry {
+            value,
+            inserted_at: self.current_time,
+            ttl,
+        });
+    }
+
+    pub fn get(&mut self, key: &K) -> Option<V> {
+        let now = self.current_time;
+        if let Some(entry) = self.entries.get(key) {
+            if now - entry.inserted_at < entry.ttl {
+                self.stats.hits += 1;
+                return Some(entry.value.clone());
+            } else {
+                self.stats.misses += 1;
+                let key_clone = key.clone();
+                self.entries.remove(&key_clone);
+                return None;
+            }
+        }
+        self.stats.misses += 1;
+        None
+    }
+
+    pub fn evict(&mut self, key: &K) -> bool {
+        if self.entries.remove(key).is_some() {
+            self.stats.evictions += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn xe_120_evict_expired(&mut self) {
+        let now = self.current_time;
+        let expired: Vec<K> = self.entries.iter()
+            .filter(|(_, e)| now - e.inserted_at >= e.ttl)
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in &expired {
+            self.entries.remove(k);
+            self.stats.evictions += 1;
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn stats(&self) -> &Xe120CacheStats {
+        &self.stats
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+pub fn xe_120_pipeline_identity(data: Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> {
+    Ok(data)
+}
+
+pub fn xe_120_pipeline_double(data: Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> {
+    let mut out = data.clone();
+    out.extend_from_slice(&data);
+    Ok(out)
+}
+
+pub fn xe_120_pipeline_reverse(data: Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> {
+    Ok(data.into_iter().rev().collect())
+}
+
+pub fn xe_120_pipeline_filter_zeros(data: Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> {
+    Ok(data.into_iter().filter(|b| *b != 0).collect())
+}
+
+pub fn xe_120_pipeline_fail(_data: Vec<u8>) -> Result<Vec<u8>, Xe120PipelineError> {
+    Err(Xe120PipelineError {
+        stage: Xe120Stage::Parse,
+        message: "intentional failure".to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3995,6 +4438,312 @@ mod tests {
     fn xc_118_reverse_str() {
         assert_eq!(super::xc_118_reverse("abc"), "cba");
         assert_eq!(super::xc_118_reverse(""), "");
+    }
+
+
+    // --- xd_1 deepening tests ---
+
+    #[test]
+    fn xd_1_sm_initial_state() {
+        let sm = Xd1StateMachine::new();
+        assert_eq!(sm.current_state(), Xd1State::Idle);
+        assert!(sm.history().is_empty());
+        assert_eq!(sm.step_count(), 0);
+    }
+
+    #[test]
+    fn xd_1_sm_valid_idle_to_running() {
+        let mut sm = Xd1StateMachine::new();
+        assert!(sm.transition(Xd1State::Running).is_ok());
+        assert_eq!(sm.current_state(), Xd1State::Running);
+    }
+
+    #[test]
+    fn xd_1_sm_valid_running_to_paused() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        assert!(sm.transition(Xd1State::Paused).is_ok());
+        assert_eq!(sm.current_state(), Xd1State::Paused);
+    }
+
+    #[test]
+    fn xd_1_sm_valid_running_to_done() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        assert!(sm.transition(Xd1State::Done).is_ok());
+        assert_eq!(sm.current_state(), Xd1State::Done);
+    }
+
+    #[test]
+    fn xd_1_sm_valid_paused_to_running() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        sm.transition(Xd1State::Paused).unwrap();
+        assert!(sm.transition(Xd1State::Running).is_ok());
+    }
+
+    #[test]
+    fn xd_1_sm_valid_done_to_idle() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        sm.transition(Xd1State::Done).unwrap();
+        assert!(sm.transition(Xd1State::Idle).is_ok());
+        assert_eq!(sm.current_state(), Xd1State::Idle);
+    }
+
+    #[test]
+    fn xd_1_sm_invalid_idle_to_done() {
+        let mut sm = Xd1StateMachine::new();
+        assert!(sm.transition(Xd1State::Done).is_err());
+    }
+
+    #[test]
+    fn xd_1_sm_invalid_idle_to_paused() {
+        let mut sm = Xd1StateMachine::new();
+        assert!(sm.transition(Xd1State::Paused).is_err());
+    }
+
+    #[test]
+    fn xd_1_sm_history_tracking() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        sm.transition(Xd1State::Paused).unwrap();
+        sm.transition(Xd1State::Done).unwrap();
+        assert_eq!(sm.history().len(), 3);
+        assert_eq!(sm.history()[0].from, Xd1State::Idle);
+        assert_eq!(sm.history()[0].to, Xd1State::Running);
+        assert_eq!(sm.history()[1].from, Xd1State::Running);
+        assert_eq!(sm.history()[2].to, Xd1State::Done);
+    }
+
+    #[test]
+    fn xd_1_sm_serialize_deserialize() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        let s = sm.serialize();
+        assert!(s.contains("current=Running"));
+        let recovered = Xd1StateMachine::deserialize_current(&s);
+        assert_eq!(recovered, Some(Xd1State::Running));
+    }
+
+    #[test]
+    fn xd_1_sm_deserialize_invalid() {
+        assert_eq!(Xd1StateMachine::deserialize_current("garbage"), None);
+    }
+
+    #[test]
+    fn xd_1_sm_reset() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        sm.reset();
+        assert_eq!(sm.current_state(), Xd1State::Idle);
+        assert!(sm.history().is_empty());
+    }
+
+    #[test]
+    fn xd_1_bus_publish_and_receive() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd1EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe(move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd1Event::Started("go".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(bus.published_events().len(), 1);
+    }
+
+    #[test]
+    fn xd_1_bus_filtered_subscribe() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd1EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe_filtered("error", move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd1Event::Started("a".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        bus.publish(Xd1Event::Error("fail".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn xd_1_bus_unsubscribe() {
+        let mut bus = Xd1EventBus::new();
+        let id = bus.subscribe(|_| {});
+        assert_eq!(bus.subscriber_count(), 1);
+        assert!(bus.unsubscribe(id));
+        assert_eq!(bus.subscriber_count(), 0);
+        assert!(!bus.unsubscribe(id));
+    }
+
+    #[test]
+    fn xd_1_event_kind_and_payload() {
+        let e = Xd1Event::Custom("mytype".into(), "mydata".into());
+        assert_eq!(e.kind(), "mytype");
+        assert_eq!(e.payload(), "mydata");
+        let e2 = Xd1Event::Started("hello".into());
+        assert_eq!(e2.kind(), "started");
+        assert_eq!(e2.payload(), "hello");
+    }
+
+    #[test]
+    fn xd_1_bus_clear_history() {
+        let mut bus = Xd1EventBus::new();
+        bus.publish(Xd1Event::Stopped("x".into()));
+        assert_eq!(bus.published_events().len(), 1);
+        bus.clear_history();
+        assert!(bus.published_events().is_empty());
+    }
+
+    #[test]
+    fn xd_1_sm_step_counter_increments() {
+        let mut sm = Xd1StateMachine::new();
+        sm.transition(Xd1State::Running).unwrap();
+        assert_eq!(sm.step_count(), 1);
+        sm.transition(Xd1State::Paused).unwrap();
+        assert_eq!(sm.step_count(), 2);
+    }
+
+
+    #[test]
+    fn xe_120_pipeline_empty() {
+        let p = super::Xe120Pipeline::new();
+        assert_eq!(p.stage_count(), 0);
+        let r = p.execute(vec![1, 2, 3]).unwrap();
+        assert_eq!(r, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_parse_stage() {
+        let p = super::Xe120Pipeline::new()
+            .add_parse(super::xe_120_pipeline_identity);
+        assert_eq!(p.stage_count(), 1);
+        assert_eq!(p.execute(vec![10]).unwrap(), vec![10]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_transform_double() {
+        let p = super::Xe120Pipeline::new()
+            .add_transform(super::xe_120_pipeline_double);
+        assert_eq!(p.execute(vec![1, 2]).unwrap(), vec![1, 2, 1, 2]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_validate_reverse() {
+        let p = super::Xe120Pipeline::new()
+            .add_validate(super::xe_120_pipeline_reverse);
+        assert_eq!(p.execute(vec![1, 2, 3]).unwrap(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_emit_filter() {
+        let p = super::Xe120Pipeline::new()
+            .add_emit(super::xe_120_pipeline_filter_zeros);
+        assert_eq!(p.execute(vec![0, 1, 0, 2]).unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_multi_stage() {
+        let p = super::Xe120Pipeline::new()
+            .add_parse(super::xe_120_pipeline_identity)
+            .add_transform(super::xe_120_pipeline_double)
+            .add_validate(super::xe_120_pipeline_reverse)
+            .add_emit(super::xe_120_pipeline_filter_zeros);
+        assert_eq!(p.stage_count(), 4);
+        let r = p.execute(vec![1, 0]).unwrap();
+        assert_eq!(r, vec![1, 1]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_error_propagation() {
+        let p = super::Xe120Pipeline::new()
+            .add_parse(super::xe_120_pipeline_fail);
+        let e = p.execute(vec![1]).unwrap_err();
+        assert_eq!(e.stage, super::Xe120Stage::Parse);
+        assert!(e.message.contains("intentional"));
+    }
+
+    #[test]
+    fn xe_120_pipeline_compose() {
+        let p1 = super::Xe120Pipeline::new()
+            .add_parse(super::xe_120_pipeline_identity);
+        let p2 = super::Xe120Pipeline::new()
+            .add_transform(super::xe_120_pipeline_double);
+        let combined = p1.compose(p2);
+        assert_eq!(combined.stage_count(), 2);
+        assert_eq!(combined.execute(vec![5]).unwrap(), vec![5, 5]);
+    }
+
+    #[test]
+    fn xe_120_pipeline_error_display() {
+        let e = super::Xe120PipelineError {
+            stage: super::Xe120Stage::Validate,
+            message: "bad data".to_string(),
+        };
+        let s = format!("{}", e);
+        assert!(s.contains("Validate"));
+        assert!(s.contains("bad data"));
+    }
+
+    #[test]
+    fn xe_120_cache_put_get() {
+        let mut c = super::Xe120Cache::new(10);
+        c.put("a", 1, 100);
+        assert_eq!(c.get(&"a"), Some(1));
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn xe_120_cache_miss() {
+        let mut c: super::Xe120Cache<&str, i32> = super::Xe120Cache::new(10);
+        assert_eq!(c.get(&"x"), None);
+        assert_eq!(c.stats().misses, 1);
+    }
+
+    #[test]
+    fn xe_120_cache_ttl_expiry() {
+        let mut c = super::Xe120Cache::new(10);
+        c.put("k", 42, 5);
+        assert_eq!(c.get(&"k"), Some(42));
+        c.advance_time(5);
+        assert_eq!(c.get(&"k"), None);
+    }
+
+    #[test]
+    fn xe_120_cache_evict() {
+        let mut c = super::Xe120Cache::new(10);
+        c.put("k", 1, 100);
+        assert!(c.evict(&"k"));
+        assert!(!c.evict(&"k"));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn xe_120_cache_capacity() {
+        let mut c = super::Xe120Cache::new(2);
+        c.put("a", 1, 100);
+        c.put("b", 2, 100);
+        c.put("c", 3, 100);
+        assert!(c.len() <= 2);
+    }
+
+    #[test]
+    fn xe_120_cache_stats() {
+        let mut c = super::Xe120Cache::new(10);
+        c.put("a", 1, 100);
+        c.get(&"a");
+        c.get(&"z");
+        assert_eq!(c.stats().hits, 1);
+        assert_eq!(c.stats().misses, 1);
+    }
+
+    #[test]
+    fn xe_120_cache_clear() {
+        let mut c = super::Xe120Cache::new(10);
+        c.put("a", 1, 100);
+        c.put("b", 2, 100);
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.len(), 0);
     }
 
 }

@@ -2438,6 +2438,449 @@ pub fn xc_144_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// --- xd_2 deepening: state machine + event bus ---
+
+/// States for the Xd2 state machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Xd2State {
+    Idle,
+    Running,
+    Paused,
+    Done,
+}
+
+impl std::fmt::Display for Xd2State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Done => write!(f, "Done"),
+        }
+    }
+}
+
+/// Transition record for history tracking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Xd2Transition {
+    pub from: Xd2State,
+    pub to: Xd2State,
+    pub step: usize,
+}
+
+/// State machine with history tracking and serialization.
+pub struct Xd2StateMachine {
+    current: Xd2State,
+    history: Vec<Xd2Transition>,
+    step_counter: usize,
+}
+
+impl Xd2StateMachine {
+    pub fn new() -> Self {
+        Self {
+            current: Xd2State::Idle,
+            history: Vec::new(),
+            step_counter: 0,
+        }
+    }
+
+    pub fn current_state(&self) -> Xd2State {
+        self.current
+    }
+
+    pub fn history(&self) -> &[Xd2Transition] {
+        &self.history
+    }
+
+    pub fn step_count(&self) -> usize {
+        self.step_counter
+    }
+
+    /// Attempt a state transition. Returns Ok(new_state) or Err with reason.
+    pub fn transition(&mut self, target: Xd2State) -> Result<Xd2State, String> {
+        let allowed = match (self.current, target) {
+            (Xd2State::Idle, Xd2State::Running) => true,
+            (Xd2State::Running, Xd2State::Paused) => true,
+            (Xd2State::Running, Xd2State::Done) => true,
+            (Xd2State::Paused, Xd2State::Running) => true,
+            (Xd2State::Paused, Xd2State::Done) => true,
+            (Xd2State::Done, Xd2State::Idle) => true,
+            _ => false,
+        };
+        if !allowed {
+            return Err(format!(
+                "xd_2: invalid transition {} -> {}",
+                self.current, target
+            ));
+        }
+        let t = Xd2Transition {
+            from: self.current,
+            to: target,
+            step: self.step_counter,
+        };
+        self.step_counter += 1;
+        self.current = target;
+        self.history.push(t);
+        Ok(self.current)
+    }
+
+    /// Serialize state machine to a simple string representation.
+    pub fn serialize(&self) -> String {
+        let hist: Vec<String> = self
+            .history
+            .iter()
+            .map(|t| format!("{}->{}@{}", t.from, t.to, t.step))
+            .collect();
+        format!(
+            "Xd2SM[current={},steps={},history=[{}]]",
+            self.current,
+            self.step_counter,
+            hist.join(";")
+        )
+    }
+
+    /// Deserialize from the serialized string, recovering current state.
+    pub fn deserialize_current(s: &str) -> Option<Xd2State> {
+        let prefix = "Xd2SM[current=";
+        if !s.starts_with(prefix) {
+            return None;
+        }
+        let rest = &s[prefix.len()..];
+        let end = rest.find(',')?;
+        match &rest[..end] {
+            "Idle" => Some(Xd2State::Idle),
+            "Running" => Some(Xd2State::Running),
+            "Paused" => Some(Xd2State::Paused),
+            "Done" => Some(Xd2State::Done),
+            _ => None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current = Xd2State::Idle;
+        self.history.clear();
+        self.step_counter = 0;
+    }
+}
+
+/// Typed events for the Xd2 event bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Xd2Event {
+    Started(String),
+    Stopped(String),
+    Error(String),
+    Custom(String, String),
+}
+
+impl Xd2Event {
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Started(_) => "started",
+            Self::Stopped(_) => "stopped",
+            Self::Error(_) => "error",
+            Self::Custom(k, _) => k.as_str(),
+        }
+    }
+
+    pub fn payload(&self) -> &str {
+        match self {
+            Self::Started(p) | Self::Stopped(p) | Self::Error(p) => p.as_str(),
+            Self::Custom(_, p) => p.as_str(),
+        }
+    }
+}
+
+type Xd2HandlerFn = Box<dyn Fn(&Xd2Event) + Send + Sync>;
+
+/// Event bus with subscribe/publish/unsubscribe and filtering.
+pub struct Xd2EventBus {
+    handlers: Vec<(usize, Option<String>, Xd2HandlerFn)>,
+    next_id: usize,
+    published: Vec<Xd2Event>,
+}
+
+impl Xd2EventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+            next_id: 0,
+            published: Vec::new(),
+        }
+    }
+
+    /// Subscribe to all events. Returns a subscription id.
+    pub fn subscribe<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&Xd2Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers.push((id, None, Box::new(handler)));
+        id
+    }
+
+    /// Subscribe only to events matching a specific kind filter.
+    pub fn subscribe_filtered<F>(&mut self, kind_filter: &str, handler: F) -> usize
+    where
+        F: Fn(&Xd2Event) + Send + Sync + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.handlers
+            .push((id, Some(kind_filter.to_string()), Box::new(handler)));
+        id
+    }
+
+    /// Unsubscribe by subscription id.
+    pub fn unsubscribe(&mut self, sub_id: usize) -> bool {
+        let before = self.handlers.len();
+        self.handlers.retain(|(id, _, _)| *id != sub_id);
+        self.handlers.len() < before
+    }
+
+    /// Publish an event to all matching subscribers.
+    pub fn publish(&mut self, event: Xd2Event) {
+        for (_, filter, handler) in &self.handlers {
+            let matched = match filter {
+                None => true,
+                Some(f) => event.kind() == f.as_str(),
+            };
+            if matched {
+                handler(&event);
+            }
+        }
+        self.published.push(event);
+    }
+
+    pub fn published_events(&self) -> &[Xd2Event] {
+        &self.published
+    }
+
+    pub fn subscriber_count(&self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn clear_history(&mut self) {
+        self.published.clear();
+    }
+}
+
+
+// === Xe121 Pipeline & Cache ===
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Xe121Stage {
+    Parse,
+    Transform,
+    Validate,
+    Emit,
+}
+
+#[derive(Debug, Clone)]
+pub struct Xe121PipelineError {
+    pub stage: Xe121Stage,
+    pub message: String,
+}
+
+impl std::fmt::Display for Xe121PipelineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Xe121Pipeline error at {:?}: {}", self.stage, self.message)
+    }
+}
+
+pub struct Xe121Pipeline {
+    stages: Vec<Box<dyn Fn(Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError>>>,
+    stage_names: Vec<Xe121Stage>,
+}
+
+impl Xe121Pipeline {
+    pub fn new() -> Self {
+        Self { stages: Vec::new(), stage_names: Vec::new() }
+    }
+
+    pub fn add_parse<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe121Stage::Parse);
+        self
+    }
+
+    pub fn add_transform<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe121Stage::Transform);
+        self
+    }
+
+    pub fn add_validate<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe121Stage::Validate);
+        self
+    }
+
+    pub fn add_emit<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe121Stage::Emit);
+        self
+    }
+
+    pub fn execute(&self, input: Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> {
+        let mut data = input;
+        for (i, stage_fn) in self.stages.iter().enumerate() {
+            data = stage_fn(data).map_err(|mut e| {
+                e.stage = self.stage_names[i].clone();
+                e
+            })?;
+        }
+        Ok(data)
+    }
+
+    pub fn stage_count(&self) -> usize {
+        self.stages.len()
+    }
+
+    pub fn compose(mut self, other: Xe121Pipeline) -> Self {
+        for (stage_fn, name) in other.stages.into_iter().zip(other.stage_names) {
+            self.stages.push(stage_fn);
+            self.stage_names.push(name);
+        }
+        self
+    }
+}
+
+pub struct Xe121CacheEntry<V> {
+    value: V,
+    inserted_at: u64,
+    ttl: u64,
+}
+
+pub struct Xe121CacheStats {
+    pub hits: u64,
+    pub misses: u64,
+    pub evictions: u64,
+}
+
+pub struct Xe121Cache<K: std::hash::Hash + Eq, V: Clone> {
+    entries: std::collections::HashMap<K, Xe121CacheEntry<V>>,
+    capacity: usize,
+    current_time: u64,
+    stats: Xe121CacheStats,
+}
+
+impl<K: std::hash::Hash + Eq + Clone, V: Clone> Xe121Cache<K, V> {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            capacity,
+            current_time: 0,
+            stats: Xe121CacheStats { hits: 0, misses: 0, evictions: 0 },
+        }
+    }
+
+    pub fn advance_time(&mut self, amount: u64) {
+        self.current_time += amount;
+    }
+
+    pub fn put(&mut self, key: K, value: V, ttl: u64) {
+        if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
+            self.xe_121_evict_expired();
+            if self.entries.len() >= self.capacity {
+                if let Some(oldest_key) = self.entries.keys().next().cloned() {
+                    self.entries.remove(&oldest_key);
+                    self.stats.evictions += 1;
+                }
+            }
+        }
+        self.entries.insert(key, Xe121CacheEntry {
+            value,
+            inserted_at: self.current_time,
+            ttl,
+        });
+    }
+
+    pub fn get(&mut self, key: &K) -> Option<V> {
+        let now = self.current_time;
+        if let Some(entry) = self.entries.get(key) {
+            if now - entry.inserted_at < entry.ttl {
+                self.stats.hits += 1;
+                return Some(entry.value.clone());
+            } else {
+                self.stats.misses += 1;
+                let key_clone = key.clone();
+                self.entries.remove(&key_clone);
+                return None;
+            }
+        }
+        self.stats.misses += 1;
+        None
+    }
+
+    pub fn evict(&mut self, key: &K) -> bool {
+        if self.entries.remove(key).is_some() {
+            self.stats.evictions += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn xe_121_evict_expired(&mut self) {
+        let now = self.current_time;
+        let expired: Vec<K> = self.entries.iter()
+            .filter(|(_, e)| now - e.inserted_at >= e.ttl)
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in &expired {
+            self.entries.remove(k);
+            self.stats.evictions += 1;
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn stats(&self) -> &Xe121CacheStats {
+        &self.stats
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+pub fn xe_121_pipeline_identity(data: Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> {
+    Ok(data)
+}
+
+pub fn xe_121_pipeline_double(data: Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> {
+    let mut out = data.clone();
+    out.extend_from_slice(&data);
+    Ok(out)
+}
+
+pub fn xe_121_pipeline_reverse(data: Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> {
+    Ok(data.into_iter().rev().collect())
+}
+
+pub fn xe_121_pipeline_filter_zeros(data: Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> {
+    Ok(data.into_iter().filter(|b| *b != 0).collect())
+}
+
+pub fn xe_121_pipeline_fail(_data: Vec<u8>) -> Result<Vec<u8>, Xe121PipelineError> {
+    Err(Xe121PipelineError {
+        stage: Xe121Stage::Parse,
+        message: "intentional failure".to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3995,6 +4438,312 @@ mod tests {
     fn xc_144_reverse_str() {
         assert_eq!(super::xc_144_reverse("abc"), "cba");
         assert_eq!(super::xc_144_reverse(""), "");
+    }
+
+
+    // --- xd_2 deepening tests ---
+
+    #[test]
+    fn xd_2_sm_initial_state() {
+        let sm = Xd2StateMachine::new();
+        assert_eq!(sm.current_state(), Xd2State::Idle);
+        assert!(sm.history().is_empty());
+        assert_eq!(sm.step_count(), 0);
+    }
+
+    #[test]
+    fn xd_2_sm_valid_idle_to_running() {
+        let mut sm = Xd2StateMachine::new();
+        assert!(sm.transition(Xd2State::Running).is_ok());
+        assert_eq!(sm.current_state(), Xd2State::Running);
+    }
+
+    #[test]
+    fn xd_2_sm_valid_running_to_paused() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        assert!(sm.transition(Xd2State::Paused).is_ok());
+        assert_eq!(sm.current_state(), Xd2State::Paused);
+    }
+
+    #[test]
+    fn xd_2_sm_valid_running_to_done() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        assert!(sm.transition(Xd2State::Done).is_ok());
+        assert_eq!(sm.current_state(), Xd2State::Done);
+    }
+
+    #[test]
+    fn xd_2_sm_valid_paused_to_running() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        sm.transition(Xd2State::Paused).unwrap();
+        assert!(sm.transition(Xd2State::Running).is_ok());
+    }
+
+    #[test]
+    fn xd_2_sm_valid_done_to_idle() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        sm.transition(Xd2State::Done).unwrap();
+        assert!(sm.transition(Xd2State::Idle).is_ok());
+        assert_eq!(sm.current_state(), Xd2State::Idle);
+    }
+
+    #[test]
+    fn xd_2_sm_invalid_idle_to_done() {
+        let mut sm = Xd2StateMachine::new();
+        assert!(sm.transition(Xd2State::Done).is_err());
+    }
+
+    #[test]
+    fn xd_2_sm_invalid_idle_to_paused() {
+        let mut sm = Xd2StateMachine::new();
+        assert!(sm.transition(Xd2State::Paused).is_err());
+    }
+
+    #[test]
+    fn xd_2_sm_history_tracking() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        sm.transition(Xd2State::Paused).unwrap();
+        sm.transition(Xd2State::Done).unwrap();
+        assert_eq!(sm.history().len(), 3);
+        assert_eq!(sm.history()[0].from, Xd2State::Idle);
+        assert_eq!(sm.history()[0].to, Xd2State::Running);
+        assert_eq!(sm.history()[1].from, Xd2State::Running);
+        assert_eq!(sm.history()[2].to, Xd2State::Done);
+    }
+
+    #[test]
+    fn xd_2_sm_serialize_deserialize() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        let s = sm.serialize();
+        assert!(s.contains("current=Running"));
+        let recovered = Xd2StateMachine::deserialize_current(&s);
+        assert_eq!(recovered, Some(Xd2State::Running));
+    }
+
+    #[test]
+    fn xd_2_sm_deserialize_invalid() {
+        assert_eq!(Xd2StateMachine::deserialize_current("garbage"), None);
+    }
+
+    #[test]
+    fn xd_2_sm_reset() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        sm.reset();
+        assert_eq!(sm.current_state(), Xd2State::Idle);
+        assert!(sm.history().is_empty());
+    }
+
+    #[test]
+    fn xd_2_bus_publish_and_receive() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd2EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe(move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd2Event::Started("go".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(bus.published_events().len(), 1);
+    }
+
+    #[test]
+    fn xd_2_bus_filtered_subscribe() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        let mut bus = Xd2EventBus::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        bus.subscribe_filtered("error", move |_| { c.fetch_add(1, Ordering::SeqCst); });
+        bus.publish(Xd2Event::Started("a".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        bus.publish(Xd2Event::Error("fail".into()));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn xd_2_bus_unsubscribe() {
+        let mut bus = Xd2EventBus::new();
+        let id = bus.subscribe(|_| {});
+        assert_eq!(bus.subscriber_count(), 1);
+        assert!(bus.unsubscribe(id));
+        assert_eq!(bus.subscriber_count(), 0);
+        assert!(!bus.unsubscribe(id));
+    }
+
+    #[test]
+    fn xd_2_event_kind_and_payload() {
+        let e = Xd2Event::Custom("mytype".into(), "mydata".into());
+        assert_eq!(e.kind(), "mytype");
+        assert_eq!(e.payload(), "mydata");
+        let e2 = Xd2Event::Started("hello".into());
+        assert_eq!(e2.kind(), "started");
+        assert_eq!(e2.payload(), "hello");
+    }
+
+    #[test]
+    fn xd_2_bus_clear_history() {
+        let mut bus = Xd2EventBus::new();
+        bus.publish(Xd2Event::Stopped("x".into()));
+        assert_eq!(bus.published_events().len(), 1);
+        bus.clear_history();
+        assert!(bus.published_events().is_empty());
+    }
+
+    #[test]
+    fn xd_2_sm_step_counter_increments() {
+        let mut sm = Xd2StateMachine::new();
+        sm.transition(Xd2State::Running).unwrap();
+        assert_eq!(sm.step_count(), 1);
+        sm.transition(Xd2State::Paused).unwrap();
+        assert_eq!(sm.step_count(), 2);
+    }
+
+
+    #[test]
+    fn xe_121_pipeline_empty() {
+        let p = super::Xe121Pipeline::new();
+        assert_eq!(p.stage_count(), 0);
+        let r = p.execute(vec![1, 2, 3]).unwrap();
+        assert_eq!(r, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_parse_stage() {
+        let p = super::Xe121Pipeline::new()
+            .add_parse(super::xe_121_pipeline_identity);
+        assert_eq!(p.stage_count(), 1);
+        assert_eq!(p.execute(vec![10]).unwrap(), vec![10]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_transform_double() {
+        let p = super::Xe121Pipeline::new()
+            .add_transform(super::xe_121_pipeline_double);
+        assert_eq!(p.execute(vec![1, 2]).unwrap(), vec![1, 2, 1, 2]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_validate_reverse() {
+        let p = super::Xe121Pipeline::new()
+            .add_validate(super::xe_121_pipeline_reverse);
+        assert_eq!(p.execute(vec![1, 2, 3]).unwrap(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_emit_filter() {
+        let p = super::Xe121Pipeline::new()
+            .add_emit(super::xe_121_pipeline_filter_zeros);
+        assert_eq!(p.execute(vec![0, 1, 0, 2]).unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_multi_stage() {
+        let p = super::Xe121Pipeline::new()
+            .add_parse(super::xe_121_pipeline_identity)
+            .add_transform(super::xe_121_pipeline_double)
+            .add_validate(super::xe_121_pipeline_reverse)
+            .add_emit(super::xe_121_pipeline_filter_zeros);
+        assert_eq!(p.stage_count(), 4);
+        let r = p.execute(vec![1, 0]).unwrap();
+        assert_eq!(r, vec![1, 1]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_error_propagation() {
+        let p = super::Xe121Pipeline::new()
+            .add_parse(super::xe_121_pipeline_fail);
+        let e = p.execute(vec![1]).unwrap_err();
+        assert_eq!(e.stage, super::Xe121Stage::Parse);
+        assert!(e.message.contains("intentional"));
+    }
+
+    #[test]
+    fn xe_121_pipeline_compose() {
+        let p1 = super::Xe121Pipeline::new()
+            .add_parse(super::xe_121_pipeline_identity);
+        let p2 = super::Xe121Pipeline::new()
+            .add_transform(super::xe_121_pipeline_double);
+        let combined = p1.compose(p2);
+        assert_eq!(combined.stage_count(), 2);
+        assert_eq!(combined.execute(vec![5]).unwrap(), vec![5, 5]);
+    }
+
+    #[test]
+    fn xe_121_pipeline_error_display() {
+        let e = super::Xe121PipelineError {
+            stage: super::Xe121Stage::Validate,
+            message: "bad data".to_string(),
+        };
+        let s = format!("{}", e);
+        assert!(s.contains("Validate"));
+        assert!(s.contains("bad data"));
+    }
+
+    #[test]
+    fn xe_121_cache_put_get() {
+        let mut c = super::Xe121Cache::new(10);
+        c.put("a", 1, 100);
+        assert_eq!(c.get(&"a"), Some(1));
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn xe_121_cache_miss() {
+        let mut c: super::Xe121Cache<&str, i32> = super::Xe121Cache::new(10);
+        assert_eq!(c.get(&"x"), None);
+        assert_eq!(c.stats().misses, 1);
+    }
+
+    #[test]
+    fn xe_121_cache_ttl_expiry() {
+        let mut c = super::Xe121Cache::new(10);
+        c.put("k", 42, 5);
+        assert_eq!(c.get(&"k"), Some(42));
+        c.advance_time(5);
+        assert_eq!(c.get(&"k"), None);
+    }
+
+    #[test]
+    fn xe_121_cache_evict() {
+        let mut c = super::Xe121Cache::new(10);
+        c.put("k", 1, 100);
+        assert!(c.evict(&"k"));
+        assert!(!c.evict(&"k"));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn xe_121_cache_capacity() {
+        let mut c = super::Xe121Cache::new(2);
+        c.put("a", 1, 100);
+        c.put("b", 2, 100);
+        c.put("c", 3, 100);
+        assert!(c.len() <= 2);
+    }
+
+    #[test]
+    fn xe_121_cache_stats() {
+        let mut c = super::Xe121Cache::new(10);
+        c.put("a", 1, 100);
+        c.get(&"a");
+        c.get(&"z");
+        assert_eq!(c.stats().hits, 1);
+        assert_eq!(c.stats().misses, 1);
+    }
+
+    #[test]
+    fn xe_121_cache_clear() {
+        let mut c = super::Xe121Cache::new(10);
+        c.put("a", 1, 100);
+        c.put("b", 2, 100);
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.len(), 0);
     }
 
 }

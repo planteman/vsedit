@@ -2531,6 +2531,221 @@ pub fn xc_135_reverse(s: &str) -> String {
     s.chars().rev().collect()
 }
 
+
+// === Xe84 Pipeline & Cache ===
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Xe84Stage {
+    Parse,
+    Transform,
+    Validate,
+    Emit,
+}
+
+#[derive(Debug, Clone)]
+pub struct Xe84PipelineError {
+    pub stage: Xe84Stage,
+    pub message: String,
+}
+
+impl std::fmt::Display for Xe84PipelineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Xe84Pipeline error at {:?}: {}", self.stage, self.message)
+    }
+}
+
+pub struct Xe84Pipeline {
+    stages: Vec<Box<dyn Fn(Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError>>>,
+    stage_names: Vec<Xe84Stage>,
+}
+
+impl Xe84Pipeline {
+    pub fn new() -> Self {
+        Self { stages: Vec::new(), stage_names: Vec::new() }
+    }
+
+    pub fn add_parse<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe84Stage::Parse);
+        self
+    }
+
+    pub fn add_transform<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe84Stage::Transform);
+        self
+    }
+
+    pub fn add_validate<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe84Stage::Validate);
+        self
+    }
+
+    pub fn add_emit<F>(mut self, f: F) -> Self
+    where F: Fn(Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> + 'static {
+        self.stages.push(Box::new(f));
+        self.stage_names.push(Xe84Stage::Emit);
+        self
+    }
+
+    pub fn execute(&self, input: Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> {
+        let mut data = input;
+        for (i, stage_fn) in self.stages.iter().enumerate() {
+            data = stage_fn(data).map_err(|mut e| {
+                e.stage = self.stage_names[i].clone();
+                e
+            })?;
+        }
+        Ok(data)
+    }
+
+    pub fn stage_count(&self) -> usize {
+        self.stages.len()
+    }
+
+    pub fn compose(mut self, other: Xe84Pipeline) -> Self {
+        for (stage_fn, name) in other.stages.into_iter().zip(other.stage_names) {
+            self.stages.push(stage_fn);
+            self.stage_names.push(name);
+        }
+        self
+    }
+}
+
+pub struct Xe84CacheEntry<V> {
+    value: V,
+    inserted_at: u64,
+    ttl: u64,
+}
+
+pub struct Xe84CacheStats {
+    pub hits: u64,
+    pub misses: u64,
+    pub evictions: u64,
+}
+
+pub struct Xe84Cache<K: std::hash::Hash + Eq, V: Clone> {
+    entries: std::collections::HashMap<K, Xe84CacheEntry<V>>,
+    capacity: usize,
+    current_time: u64,
+    stats: Xe84CacheStats,
+}
+
+impl<K: std::hash::Hash + Eq + Clone, V: Clone> Xe84Cache<K, V> {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+            capacity,
+            current_time: 0,
+            stats: Xe84CacheStats { hits: 0, misses: 0, evictions: 0 },
+        }
+    }
+
+    pub fn advance_time(&mut self, amount: u64) {
+        self.current_time += amount;
+    }
+
+    pub fn put(&mut self, key: K, value: V, ttl: u64) {
+        if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
+            self.xe_84_evict_expired();
+            if self.entries.len() >= self.capacity {
+                if let Some(oldest_key) = self.entries.keys().next().cloned() {
+                    self.entries.remove(&oldest_key);
+                    self.stats.evictions += 1;
+                }
+            }
+        }
+        self.entries.insert(key, Xe84CacheEntry {
+            value,
+            inserted_at: self.current_time,
+            ttl,
+        });
+    }
+
+    pub fn get(&mut self, key: &K) -> Option<V> {
+        let now = self.current_time;
+        if let Some(entry) = self.entries.get(key) {
+            if now - entry.inserted_at < entry.ttl {
+                self.stats.hits += 1;
+                return Some(entry.value.clone());
+            } else {
+                self.stats.misses += 1;
+                let key_clone = key.clone();
+                self.entries.remove(&key_clone);
+                return None;
+            }
+        }
+        self.stats.misses += 1;
+        None
+    }
+
+    pub fn evict(&mut self, key: &K) -> bool {
+        if self.entries.remove(key).is_some() {
+            self.stats.evictions += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn xe_84_evict_expired(&mut self) {
+        let now = self.current_time;
+        let expired: Vec<K> = self.entries.iter()
+            .filter(|(_, e)| now - e.inserted_at >= e.ttl)
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in &expired {
+            self.entries.remove(k);
+            self.stats.evictions += 1;
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn stats(&self) -> &Xe84CacheStats {
+        &self.stats
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+pub fn xe_84_pipeline_identity(data: Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> {
+    Ok(data)
+}
+
+pub fn xe_84_pipeline_double(data: Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> {
+    let mut out = data.clone();
+    out.extend_from_slice(&data);
+    Ok(out)
+}
+
+pub fn xe_84_pipeline_reverse(data: Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> {
+    Ok(data.into_iter().rev().collect())
+}
+
+pub fn xe_84_pipeline_filter_zeros(data: Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> {
+    Ok(data.into_iter().filter(|b| *b != 0).collect())
+}
+
+pub fn xe_84_pipeline_fail(_data: Vec<u8>) -> Result<Vec<u8>, Xe84PipelineError> {
+    Err(Xe84PipelineError {
+        stage: Xe84Stage::Parse,
+        message: "intentional failure".to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4224,6 +4439,149 @@ mod tests {
     fn xc_135_reverse_str() {
         assert_eq!(super::xc_135_reverse("abc"), "cba");
         assert_eq!(super::xc_135_reverse(""), "");
+    }
+
+
+    #[test]
+    fn xe_84_pipeline_empty() {
+        let p = super::Xe84Pipeline::new();
+        assert_eq!(p.stage_count(), 0);
+        let r = p.execute(vec![1, 2, 3]).unwrap();
+        assert_eq!(r, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_parse_stage() {
+        let p = super::Xe84Pipeline::new()
+            .add_parse(super::xe_84_pipeline_identity);
+        assert_eq!(p.stage_count(), 1);
+        assert_eq!(p.execute(vec![10]).unwrap(), vec![10]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_transform_double() {
+        let p = super::Xe84Pipeline::new()
+            .add_transform(super::xe_84_pipeline_double);
+        assert_eq!(p.execute(vec![1, 2]).unwrap(), vec![1, 2, 1, 2]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_validate_reverse() {
+        let p = super::Xe84Pipeline::new()
+            .add_validate(super::xe_84_pipeline_reverse);
+        assert_eq!(p.execute(vec![1, 2, 3]).unwrap(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_emit_filter() {
+        let p = super::Xe84Pipeline::new()
+            .add_emit(super::xe_84_pipeline_filter_zeros);
+        assert_eq!(p.execute(vec![0, 1, 0, 2]).unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_multi_stage() {
+        let p = super::Xe84Pipeline::new()
+            .add_parse(super::xe_84_pipeline_identity)
+            .add_transform(super::xe_84_pipeline_double)
+            .add_validate(super::xe_84_pipeline_reverse)
+            .add_emit(super::xe_84_pipeline_filter_zeros);
+        assert_eq!(p.stage_count(), 4);
+        let r = p.execute(vec![1, 0]).unwrap();
+        assert_eq!(r, vec![1, 1]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_error_propagation() {
+        let p = super::Xe84Pipeline::new()
+            .add_parse(super::xe_84_pipeline_fail);
+        let e = p.execute(vec![1]).unwrap_err();
+        assert_eq!(e.stage, super::Xe84Stage::Parse);
+        assert!(e.message.contains("intentional"));
+    }
+
+    #[test]
+    fn xe_84_pipeline_compose() {
+        let p1 = super::Xe84Pipeline::new()
+            .add_parse(super::xe_84_pipeline_identity);
+        let p2 = super::Xe84Pipeline::new()
+            .add_transform(super::xe_84_pipeline_double);
+        let combined = p1.compose(p2);
+        assert_eq!(combined.stage_count(), 2);
+        assert_eq!(combined.execute(vec![5]).unwrap(), vec![5, 5]);
+    }
+
+    #[test]
+    fn xe_84_pipeline_error_display() {
+        let e = super::Xe84PipelineError {
+            stage: super::Xe84Stage::Validate,
+            message: "bad data".to_string(),
+        };
+        let s = format!("{}", e);
+        assert!(s.contains("Validate"));
+        assert!(s.contains("bad data"));
+    }
+
+    #[test]
+    fn xe_84_cache_put_get() {
+        let mut c = super::Xe84Cache::new(10);
+        c.put("a", 1, 100);
+        assert_eq!(c.get(&"a"), Some(1));
+        assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn xe_84_cache_miss() {
+        let mut c: super::Xe84Cache<&str, i32> = super::Xe84Cache::new(10);
+        assert_eq!(c.get(&"x"), None);
+        assert_eq!(c.stats().misses, 1);
+    }
+
+    #[test]
+    fn xe_84_cache_ttl_expiry() {
+        let mut c = super::Xe84Cache::new(10);
+        c.put("k", 42, 5);
+        assert_eq!(c.get(&"k"), Some(42));
+        c.advance_time(5);
+        assert_eq!(c.get(&"k"), None);
+    }
+
+    #[test]
+    fn xe_84_cache_evict() {
+        let mut c = super::Xe84Cache::new(10);
+        c.put("k", 1, 100);
+        assert!(c.evict(&"k"));
+        assert!(!c.evict(&"k"));
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn xe_84_cache_capacity() {
+        let mut c = super::Xe84Cache::new(2);
+        c.put("a", 1, 100);
+        c.put("b", 2, 100);
+        c.put("c", 3, 100);
+        assert!(c.len() <= 2);
+    }
+
+    #[test]
+    fn xe_84_cache_stats() {
+        let mut c = super::Xe84Cache::new(10);
+        c.put("a", 1, 100);
+        c.get(&"a");
+        c.get(&"z");
+        assert_eq!(c.stats().hits, 1);
+        assert_eq!(c.stats().misses, 1);
+    }
+
+    #[test]
+    fn xe_84_cache_clear() {
+        let mut c = super::Xe84Cache::new(10);
+        c.put("a", 1, 100);
+        c.put("b", 2, 100);
+        c.clear();
+        assert!(c.is_empty());
+        assert_eq!(c.len(), 0);
     }
 
 }
