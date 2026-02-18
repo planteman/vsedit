@@ -5011,6 +5011,236 @@ impl Xo88ConsistentHash {
     }
 }
 
+
+/// Splay tree data structure keyed by `K` with values `V` (variant 89).
+#[derive(Debug)]
+pub struct Xp89SplayTree<K: Ord, V> {
+    xp_root: Option<Box<Xp89Node<K, V>>>,
+    xp_len: usize,
+    xp_splay_count: u64,
+}
+
+#[derive(Debug)]
+struct Xp89Node<K: Ord, V> {
+    xp_key: K,
+    xp_val: V,
+    xp_left: Option<Box<Xp89Node<K, V>>>,
+    xp_right: Option<Box<Xp89Node<K, V>>>,
+}
+
+impl<K: Ord, V> Xp89Node<K, V> {
+    fn xp_new(key: K, val: V) -> Self {
+        Self { xp_key: key, xp_val: val, xp_left: None, xp_right: None }
+    }
+
+    fn xp_depth(&self) -> usize {
+        let ld = self.xp_left.as_ref().map_or(0, |n| n.xp_depth());
+        let rd = self.xp_right.as_ref().map_or(0, |n| n.xp_depth());
+        1 + ld.max(rd)
+    }
+
+    fn xp_min_key(&self) -> &K {
+        match &self.xp_left {
+            Some(left) => left.xp_min_key(),
+            None => &self.xp_key,
+        }
+    }
+
+    fn xp_max_key(&self) -> &K {
+        match &self.xp_right {
+            Some(right) => right.xp_max_key(),
+            None => &self.xp_key,
+        }
+    }
+}
+
+impl<K: Ord, V> Default for Xp89SplayTree<K, V> {
+    fn default() -> Self {
+        Self { xp_root: None, xp_len: 0, xp_splay_count: 0 }
+    }
+}
+
+impl<K: Ord, V> Xp89SplayTree<K, V> {
+    /// Creates a new empty splay tree.
+    pub fn xp_new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the number of entries in the tree.
+    pub fn xp_len(&self) -> usize {
+        self.xp_len
+    }
+
+    /// Returns true when empty.
+    pub fn xp_is_empty(&self) -> bool {
+        self.xp_len == 0
+    }
+
+    /// Returns how many splay operations have been performed.
+    pub fn xp_splay_count(&self) -> u64 {
+        self.xp_splay_count
+    }
+
+    /// Returns the depth of the tree.
+    pub fn xp_depth(&self) -> usize {
+        self.xp_root.as_ref().map_or(0, |n| n.xp_depth())
+    }
+
+    /// Returns a reference to the minimum key, if any.
+    pub fn xp_min(&self) -> Option<&K> {
+        self.xp_root.as_ref().map(|n| n.xp_min_key())
+    }
+
+    /// Returns a reference to the maximum key, if any.
+    pub fn xp_max(&self) -> Option<&K> {
+        self.xp_root.as_ref().map(|n| n.xp_max_key())
+    }
+
+    fn xp_splay(&mut self, key: &K) {
+        self.xp_splay_count += 1;
+        let root = self.xp_root.take();
+        self.xp_root = Self::xp_splay_node(root, key);
+    }
+
+    fn xp_splay_node(node: Option<Box<Xp89Node<K, V>>>, key: &K) -> Option<Box<Xp89Node<K, V>>> {
+        let mut node = node?;
+        use std::cmp::Ordering;
+        match key.cmp(&node.xp_key) {
+            Ordering::Equal => Some(node),
+            Ordering::Less => {
+                let mut left = match node.xp_left.take() {
+                    Some(l) => l,
+                    None => { return Some(node); }
+                };
+                if *key < left.xp_key {
+                    left.xp_left = Self::xp_splay_node(left.xp_left.take(), key);
+                    node.xp_left = Some(left);
+                    node = Self::xp_rotate_right(node);
+                } else if *key > left.xp_key {
+                    left.xp_right = Self::xp_splay_node(left.xp_right.take(), key);
+                    if left.xp_right.is_some() {
+                        left = Self::xp_rotate_left(left);
+                    }
+                    node.xp_left = Some(left);
+                } else {
+                    node.xp_left = Some(left);
+                }
+                Some(Self::xp_rotate_right(node))
+            }
+            Ordering::Greater => {
+                let mut right = match node.xp_right.take() {
+                    Some(r) => r,
+                    None => { return Some(node); }
+                };
+                if *key > right.xp_key {
+                    right.xp_right = Self::xp_splay_node(right.xp_right.take(), key);
+                    node.xp_right = Some(right);
+                    node = Self::xp_rotate_left(node);
+                } else if *key < right.xp_key {
+                    right.xp_left = Self::xp_splay_node(right.xp_left.take(), key);
+                    if right.xp_left.is_some() {
+                        right = Self::xp_rotate_right(right);
+                    }
+                    node.xp_right = Some(right);
+                } else {
+                    node.xp_right = Some(right);
+                }
+                Some(Self::xp_rotate_left(node))
+            }
+        }
+    }
+
+    fn xp_rotate_right(mut node: Box<Xp89Node<K, V>>) -> Box<Xp89Node<K, V>> {
+        match node.xp_left.take() {
+            Some(mut left) => {
+                node.xp_left = left.xp_right.take();
+                left.xp_right = Some(node);
+                left
+            }
+            None => node,
+        }
+    }
+
+    fn xp_rotate_left(mut node: Box<Xp89Node<K, V>>) -> Box<Xp89Node<K, V>> {
+        match node.xp_right.take() {
+            Some(mut right) => {
+                node.xp_right = right.xp_left.take();
+                right.xp_left = Some(node);
+                right
+            }
+            None => node,
+        }
+    }
+
+    /// Inserts a key-value pair. Returns the old value if the key already existed.
+    pub fn xp_insert(&mut self, key: K, val: V) -> Option<V> {
+        if self.xp_root.is_none() {
+            self.xp_root = Some(Box::new(Xp89Node::xp_new(key, val)));
+            self.xp_len += 1;
+            return None;
+        }
+        self.xp_splay(&key);
+        let root = self.xp_root.as_mut().unwrap();
+        use std::cmp::Ordering;
+        match key.cmp(&root.xp_key) {
+            Ordering::Equal => {
+                let old = std::mem::replace(&mut root.xp_val, val);
+                Some(old)
+            }
+            Ordering::Less => {
+                let mut new_node = Box::new(Xp89Node::xp_new(key, val));
+                new_node.xp_left = root.xp_left.take();
+                new_node.xp_right = self.xp_root.take();
+                self.xp_root = Some(new_node);
+                self.xp_len += 1;
+                None
+            }
+            Ordering::Greater => {
+                let mut new_node = Box::new(Xp89Node::xp_new(key, val));
+                new_node.xp_right = root.xp_right.take();
+                new_node.xp_left = self.xp_root.take();
+                self.xp_root = Some(new_node);
+                self.xp_len += 1;
+                None
+            }
+        }
+    }
+
+    /// Retrieves a reference to the value for the given key, splaying it to root.
+    pub fn xp_get(&mut self, key: &K) -> Option<&V> {
+        if self.xp_root.is_none() {
+            return None;
+        }
+        self.xp_splay(key);
+        let root = self.xp_root.as_ref().unwrap();
+        if root.xp_key == *key { Some(&root.xp_val) } else { None }
+    }
+
+    /// Removes the entry for `key` and returns its value if present.
+    pub fn xp_remove(&mut self, key: &K) -> Option<V> {
+        if self.xp_root.is_none() {
+            return None;
+        }
+        self.xp_splay(key);
+        let root = self.xp_root.as_ref().unwrap();
+        if root.xp_key != *key {
+            return None;
+        }
+        let mut root = self.xp_root.take().unwrap();
+        let val = root.xp_val;
+        match root.xp_left.take() {
+            None => { self.xp_root = root.xp_right.take(); }
+            Some(left) => {
+                self.xp_root = Some(left);
+                self.xp_splay(key);
+                self.xp_root.as_mut().unwrap().xp_right = root.xp_right.take();
+            }
+        }
+        self.xp_len -= 1;
+        Some(val)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8126,6 +8356,87 @@ mod tests {
         let first = ring.xo_get_node("stable-key").unwrap().to_string();
         let second = ring.xo_get_node("stable-key").unwrap().to_string();
         assert_eq!(first, second, "same key must map to same node");
+    }
+
+
+    #[test]
+    fn xp_89_splay_insert_get() {
+        let mut t = super::Xp89SplayTree::xp_new();
+        t.xp_insert(10, "ten");
+        t.xp_insert(20, "twenty");
+        t.xp_insert(5, "five");
+        assert_eq!(t.xp_get(&10), Some(&"ten"));
+        assert_eq!(t.xp_get(&20), Some(&"twenty"));
+        assert_eq!(t.xp_get(&5), Some(&"five"));
+    }
+
+    #[test]
+    fn xp_89_splay_remove() {
+        let mut t = super::Xp89SplayTree::xp_new();
+        t.xp_insert(1, "a");
+        t.xp_insert(2, "b");
+        t.xp_insert(3, "c");
+        assert_eq!(t.xp_remove(&2), Some("b"));
+        assert_eq!(t.xp_len(), 2);
+        assert_eq!(t.xp_get(&2), None);
+    }
+
+    #[test]
+    fn xp_89_splay_count_increases() {
+        let mut t = super::Xp89SplayTree::xp_new();
+        t.xp_insert(1, 100);
+        t.xp_insert(2, 200);
+        let before = t.xp_splay_count();
+        t.xp_get(&1);
+        assert!(t.xp_splay_count() > before);
+    }
+
+    #[test]
+    fn xp_89_splay_depth() {
+        let mut t = super::Xp89SplayTree::<i32, i32>::xp_new();
+        assert_eq!(t.xp_depth(), 0);
+        t.xp_insert(1, 1);
+        assert!(t.xp_depth() >= 1);
+        t.xp_insert(2, 2);
+        t.xp_insert(3, 3);
+        assert!(t.xp_depth() >= 1);
+    }
+
+    #[test]
+    fn xp_89_splay_len_empty() {
+        let t = super::Xp89SplayTree::<String, u8>::xp_new();
+        assert!(t.xp_is_empty());
+        assert_eq!(t.xp_len(), 0);
+    }
+
+    #[test]
+    fn xp_89_splay_min_max() {
+        let mut t = super::Xp89SplayTree::xp_new();
+        assert!(t.xp_min().is_none());
+        assert!(t.xp_max().is_none());
+        t.xp_insert(30, "x");
+        t.xp_insert(10, "y");
+        t.xp_insert(50, "z");
+        assert_eq!(t.xp_min(), Some(&10));
+        assert_eq!(t.xp_max(), Some(&50));
+    }
+
+    #[test]
+    fn xp_89_splay_overwrite() {
+        let mut t = super::Xp89SplayTree::xp_new();
+        assert!(t.xp_insert(5, "old").is_none());
+        assert_eq!(t.xp_insert(5, "new"), Some("old"));
+        assert_eq!(t.xp_get(&5), Some(&"new"));
+        assert_eq!(t.xp_len(), 1);
+    }
+
+    #[test]
+    fn xp_89_splay_remove_missing() {
+        let mut t = super::Xp89SplayTree::<i32, i32>::xp_new();
+        assert_eq!(t.xp_remove(&99), None);
+        t.xp_insert(1, 1);
+        assert_eq!(t.xp_remove(&99), None);
+        assert_eq!(t.xp_len(), 1);
     }
 
 }
