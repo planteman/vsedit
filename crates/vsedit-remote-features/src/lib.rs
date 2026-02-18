@@ -10846,6 +10846,263 @@ impl YkEventBus {
     }
 }
 
+
+// --- yl_ Min-Max Heap ---
+
+/// Min-max heap: O(1) access to both min and max, O(log n) insert/remove.
+#[derive(Debug, Clone)]
+pub struct YlMinMaxHeap {
+    yl_data: Vec<i64>,
+}
+
+impl std::fmt::Display for YlMinMaxHeap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MinMaxHeap(size={})", self.yl_data.len())
+    }
+}
+
+impl Default for YlMinMaxHeap {
+    fn default() -> Self { Self::yl_new() }
+}
+
+impl YlMinMaxHeap {
+    /// Create an empty min-max heap.
+    pub fn yl_new() -> Self { Self { yl_data: Vec::new() } }
+
+    /// Number of elements.
+    pub fn yl_len(&self) -> usize { self.yl_data.len() }
+
+    /// Is empty.
+    pub fn yl_is_empty(&self) -> bool { self.yl_data.is_empty() }
+
+    fn yl_is_min_level(idx: usize) -> bool {
+        let level = ((idx + 1) as f64).log2().floor() as u32;
+        level % 2 == 0
+    }
+
+    /// Insert a value.
+    pub fn yl_insert(&mut self, val: i64) {
+        self.yl_data.push(val);
+        let idx = self.yl_data.len() - 1;
+        self.yl_bubble_up(idx);
+    }
+
+    fn yl_bubble_up(&mut self, idx: usize) {
+        if idx == 0 { return; }
+        let parent = (idx - 1) / 2;
+        if Self::yl_is_min_level(idx) {
+            if self.yl_data[idx] > self.yl_data[parent] {
+                self.yl_data.swap(idx, parent);
+                self.yl_bubble_up_max(parent);
+            } else {
+                self.yl_bubble_up_min(idx);
+            }
+        } else {
+            if self.yl_data[idx] < self.yl_data[parent] {
+                self.yl_data.swap(idx, parent);
+                self.yl_bubble_up_min(parent);
+            } else {
+                self.yl_bubble_up_max(idx);
+            }
+        }
+    }
+
+    fn yl_bubble_up_min(&mut self, mut idx: usize) {
+        while idx > 2 {
+            let grandparent = ((idx - 1) / 2 - 1) / 2;
+            if self.yl_data[idx] < self.yl_data[grandparent] {
+                self.yl_data.swap(idx, grandparent);
+                idx = grandparent;
+            } else { break; }
+        }
+    }
+
+    fn yl_bubble_up_max(&mut self, mut idx: usize) {
+        while idx > 2 {
+            let grandparent = ((idx - 1) / 2 - 1) / 2;
+            if self.yl_data[idx] > self.yl_data[grandparent] {
+                self.yl_data.swap(idx, grandparent);
+                idx = grandparent;
+            } else { break; }
+        }
+    }
+
+    /// Peek at minimum.
+    pub fn yl_peek_min(&self) -> Option<i64> { self.yl_data.first().copied() }
+
+    /// Peek at maximum.
+    pub fn yl_peek_max(&self) -> Option<i64> {
+        match self.yl_data.len() {
+            0 => None,
+            1 => Some(self.yl_data[0]),
+            2 => Some(self.yl_data[1]),
+            _ => Some(self.yl_data[1].max(self.yl_data[2])),
+        }
+    }
+
+    /// Pop minimum.
+    pub fn yl_pop_min(&mut self) -> Option<i64> {
+        if self.yl_data.is_empty() { return None; }
+        let min = self.yl_data[0];
+        let last = self.yl_data.len() - 1;
+        self.yl_data.swap(0, last);
+        self.yl_data.pop();
+        if !self.yl_data.is_empty() { self.yl_trickle_down(0); }
+        Some(min)
+    }
+
+    fn yl_trickle_down(&mut self, idx: usize) {
+        if Self::yl_is_min_level(idx) {
+            self.yl_trickle_down_min(idx);
+        } else {
+            self.yl_trickle_down_max(idx);
+        }
+    }
+
+    fn yl_trickle_down_min(&mut self, idx: usize) {
+        let n = self.yl_data.len();
+        let mut smallest = idx;
+        for child in [2 * idx + 1, 2 * idx + 2] {
+            if child < n && self.yl_data[child] < self.yl_data[smallest] { smallest = child; }
+            for gc in [2 * child + 1, 2 * child + 2] {
+                if gc < n && self.yl_data[gc] < self.yl_data[smallest] { smallest = gc; }
+            }
+        }
+        if smallest != idx {
+            self.yl_data.swap(idx, smallest);
+            if smallest > 2 * idx + 2 { // grandchild
+                let parent = (smallest - 1) / 2;
+                if self.yl_data[smallest] > self.yl_data[parent] {
+                    self.yl_data.swap(smallest, parent);
+                }
+                self.yl_trickle_down_min(smallest);
+            }
+        }
+    }
+
+    fn yl_trickle_down_max(&mut self, idx: usize) {
+        let n = self.yl_data.len();
+        let mut largest = idx;
+        for child in [2 * idx + 1, 2 * idx + 2] {
+            if child < n && self.yl_data[child] > self.yl_data[largest] { largest = child; }
+            for gc in [2 * child + 1, 2 * child + 2] {
+                if gc < n && self.yl_data[gc] > self.yl_data[largest] { largest = gc; }
+            }
+        }
+        if largest != idx {
+            self.yl_data.swap(idx, largest);
+            if largest > 2 * idx + 2 {
+                let parent = (largest - 1) / 2;
+                if self.yl_data[largest] < self.yl_data[parent] {
+                    self.yl_data.swap(largest, parent);
+                }
+                self.yl_trickle_down_max(largest);
+            }
+        }
+    }
+
+    /// Convert to sorted vec.
+    pub fn yl_to_sorted_vec(&mut self) -> Vec<i64> {
+        let mut result = Vec::with_capacity(self.yl_data.len());
+        while let Some(v) = self.yl_pop_min() { result.push(v); }
+        result
+    }
+
+    /// Clear.
+    pub fn yl_clear(&mut self) { self.yl_data.clear(); }
+}
+
+// --- yl_ State Machine ---
+
+/// Simple deterministic finite state machine.
+#[derive(Debug, Clone)]
+pub struct YlStateMachine {
+    yl_states: Vec<String>,
+    yl_current: usize,
+    yl_transitions: Vec<(usize, String, usize)>,
+    yl_accept: std::collections::HashSet<usize>,
+}
+
+impl std::fmt::Display for YlStateMachine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FSM(states={}, current={})", self.yl_states.len(),
+            self.yl_states.get(self.yl_current).map(|s| s.as_str()).unwrap_or("?"))
+    }
+}
+
+impl Default for YlStateMachine {
+    fn default() -> Self { Self::yl_new() }
+}
+
+impl YlStateMachine {
+    /// Create an empty state machine.
+    pub fn yl_new() -> Self {
+        Self { yl_states: Vec::new(), yl_current: 0, yl_transitions: Vec::new(), yl_accept: std::collections::HashSet::new() }
+    }
+
+    /// Add a state. Returns state index.
+    pub fn yl_add_state(&mut self, name: &str) -> usize {
+        let idx = self.yl_states.len();
+        self.yl_states.push(name.to_string());
+        idx
+    }
+
+    /// Add a transition.
+    pub fn yl_add_transition(&mut self, from: usize, input: &str, to: usize) {
+        self.yl_transitions.push((from, input.to_string(), to));
+    }
+
+    /// Mark a state as accepting.
+    pub fn yl_set_accept(&mut self, state: usize) { self.yl_accept.insert(state); }
+
+    /// Set starting state.
+    pub fn yl_set_start(&mut self, state: usize) { self.yl_current = state; }
+
+    /// Process an input. Returns true if transition found.
+    pub fn yl_step(&mut self, input: &str) -> bool {
+        for (from, inp, to) in &self.yl_transitions {
+            if *from == self.yl_current && inp == input {
+                self.yl_current = *to;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Process a sequence of inputs. Returns true if all transitions found.
+    pub fn yl_run(&mut self, inputs: &[&str]) -> bool {
+        for input in inputs {
+            if !self.yl_step(input) { return false; }
+        }
+        true
+    }
+
+    /// Current state name.
+    pub fn yl_current_state(&self) -> &str {
+        self.yl_states.get(self.yl_current).map(|s| s.as_str()).unwrap_or("")
+    }
+
+    /// Is current state accepting.
+    pub fn yl_is_accepting(&self) -> bool { self.yl_accept.contains(&self.yl_current) }
+
+    /// Number of states.
+    pub fn yl_state_count(&self) -> usize { self.yl_states.len() }
+
+    /// Number of transitions.
+    pub fn yl_transition_count(&self) -> usize { self.yl_transitions.len() }
+
+    /// Available transitions from current state.
+    pub fn yl_available_inputs(&self) -> Vec<String> {
+        self.yl_transitions.iter()
+            .filter(|(from, _, _)| *from == self.yl_current)
+            .map(|(_, input, _)| input.clone())
+            .collect()
+    }
+
+    /// Reset to start state.
+    pub fn yl_reset(&mut self) { self.yl_current = 0; }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -17610,6 +17867,157 @@ mod tests {
     fn yk_bus_default() {
         let b = super::YkEventBus::default();
         assert_eq!(b.yk_topic_count(), 0);
+    }
+
+
+    // --- yl_ MinMaxHeap tests ---
+
+    #[test]
+    fn yl_mmh_new() {
+        let h = super::YlMinMaxHeap::yl_new();
+        assert!(h.yl_is_empty());
+    }
+
+    #[test]
+    fn yl_mmh_insert_min_max() {
+        let mut h = super::YlMinMaxHeap::yl_new();
+        h.yl_insert(5);
+        h.yl_insert(3);
+        h.yl_insert(8);
+        h.yl_insert(1);
+        assert_eq!(h.yl_peek_min(), Some(1));
+        assert_eq!(h.yl_peek_max(), Some(8));
+    }
+
+    #[test]
+    fn yl_mmh_pop_min() {
+        let mut h = super::YlMinMaxHeap::yl_new();
+        h.yl_insert(5);
+        h.yl_insert(1);
+        h.yl_insert(9);
+        assert_eq!(h.yl_pop_min(), Some(1));
+        assert_eq!(h.yl_peek_min(), Some(5));
+    }
+
+    #[test]
+    fn yl_mmh_sorted() {
+        let mut h = super::YlMinMaxHeap::yl_new();
+        for v in [7, 3, 9, 1, 5] { h.yl_insert(v); }
+        let sorted = h.yl_to_sorted_vec();
+        assert_eq!(sorted, vec![1, 3, 5, 7, 9]);
+    }
+
+    #[test]
+    fn yl_mmh_single() {
+        let mut h = super::YlMinMaxHeap::yl_new();
+        h.yl_insert(42);
+        assert_eq!(h.yl_peek_min(), Some(42));
+        assert_eq!(h.yl_peek_max(), Some(42));
+    }
+
+    #[test]
+    fn yl_mmh_two() {
+        let mut h = super::YlMinMaxHeap::yl_new();
+        h.yl_insert(5);
+        h.yl_insert(3);
+        assert_eq!(h.yl_peek_min(), Some(3));
+        assert_eq!(h.yl_peek_max(), Some(5));
+    }
+
+    #[test]
+    fn yl_mmh_clear() {
+        let mut h = super::YlMinMaxHeap::yl_new();
+        h.yl_insert(1);
+        h.yl_clear();
+        assert!(h.yl_is_empty());
+    }
+
+    #[test]
+    fn yl_mmh_display() {
+        let h = super::YlMinMaxHeap::yl_new();
+        assert!(format!("{}", h).contains("MinMaxHeap"));
+    }
+
+    #[test]
+    fn yl_mmh_default() {
+        let h = super::YlMinMaxHeap::default();
+        assert!(h.yl_is_empty());
+    }
+
+    // --- yl_ StateMachine tests ---
+
+    #[test]
+    fn yl_fsm_new() {
+        let m = super::YlStateMachine::yl_new();
+        assert_eq!(m.yl_state_count(), 0);
+    }
+
+    #[test]
+    fn yl_fsm_basic() {
+        let mut m = super::YlStateMachine::yl_new();
+        let s0 = m.yl_add_state("start");
+        let s1 = m.yl_add_state("end");
+        m.yl_add_transition(s0, "go", s1);
+        m.yl_set_accept(s1);
+        m.yl_set_start(s0);
+        assert!(m.yl_step("go"));
+        assert!(m.yl_is_accepting());
+    }
+
+    #[test]
+    fn yl_fsm_run() {
+        let mut m = super::YlStateMachine::yl_new();
+        let s0 = m.yl_add_state("a");
+        let s1 = m.yl_add_state("b");
+        let s2 = m.yl_add_state("c");
+        m.yl_add_transition(s0, "x", s1);
+        m.yl_add_transition(s1, "y", s2);
+        m.yl_set_start(s0);
+        assert!(m.yl_run(&["x", "y"]));
+        assert_eq!(m.yl_current_state(), "c");
+    }
+
+    #[test]
+    fn yl_fsm_invalid() {
+        let mut m = super::YlStateMachine::yl_new();
+        let s0 = m.yl_add_state("start");
+        m.yl_set_start(s0);
+        assert!(!m.yl_step("invalid"));
+    }
+
+    #[test]
+    fn yl_fsm_available() {
+        let mut m = super::YlStateMachine::yl_new();
+        let s0 = m.yl_add_state("s0");
+        let s1 = m.yl_add_state("s1");
+        m.yl_add_transition(s0, "a", s1);
+        m.yl_add_transition(s0, "b", s1);
+        m.yl_set_start(s0);
+        assert_eq!(m.yl_available_inputs().len(), 2);
+    }
+
+    #[test]
+    fn yl_fsm_reset() {
+        let mut m = super::YlStateMachine::yl_new();
+        let s0 = m.yl_add_state("start");
+        let s1 = m.yl_add_state("end");
+        m.yl_add_transition(s0, "go", s1);
+        m.yl_set_start(s0);
+        m.yl_step("go");
+        m.yl_reset();
+        assert_eq!(m.yl_current_state(), "start");
+    }
+
+    #[test]
+    fn yl_fsm_display() {
+        let m = super::YlStateMachine::yl_new();
+        assert!(format!("{}", m).contains("FSM"));
+    }
+
+    #[test]
+    fn yl_fsm_default() {
+        let m = super::YlStateMachine::default();
+        assert_eq!(m.yl_state_count(), 0);
     }
 
 }
