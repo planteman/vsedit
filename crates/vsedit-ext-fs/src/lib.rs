@@ -10469,6 +10469,212 @@ impl YhReservoirSampler {
     pub fn yh_len(&self) -> usize { self.yh_reservoir.len() }
 }
 
+
+// --- yi_ Ring Buffer ---
+
+/// Fixed-capacity ring buffer (circular buffer) with O(1) push/pop at both ends.
+#[derive(Debug, Clone)]
+pub struct YiRingBuffer<T: Clone + Default> {
+    yi_data: Vec<T>,
+    yi_head: usize,
+    yi_len: usize,
+    yi_cap: usize,
+}
+
+impl<T: Clone + Default + std::fmt::Display> std::fmt::Display for YiRingBuffer<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RingBuffer(len={}, cap={})", self.yi_len, self.yi_cap)
+    }
+}
+
+impl<T: Clone + Default> Default for YiRingBuffer<T> {
+    fn default() -> Self { Self::yi_new(16) }
+}
+
+impl<T: Clone + Default> YiRingBuffer<T> {
+    /// Create a ring buffer with given capacity.
+    pub fn yi_new(capacity: usize) -> Self {
+        let cap = capacity.max(1);
+        Self { yi_data: vec![T::default(); cap], yi_head: 0, yi_len: 0, yi_cap: cap }
+    }
+
+    /// Current number of elements.
+    pub fn yi_len(&self) -> usize { self.yi_len }
+
+    /// Maximum capacity.
+    pub fn yi_capacity(&self) -> usize { self.yi_cap }
+
+    /// Is the buffer empty.
+    pub fn yi_is_empty(&self) -> bool { self.yi_len == 0 }
+
+    /// Is the buffer full.
+    pub fn yi_is_full(&self) -> bool { self.yi_len == self.yi_cap }
+
+    /// Push to the back. Returns false if full.
+    pub fn yi_push_back(&mut self, value: T) -> bool {
+        if self.yi_is_full() { return false; }
+        let idx = (self.yi_head + self.yi_len) % self.yi_cap;
+        self.yi_data[idx] = value;
+        self.yi_len += 1;
+        true
+    }
+
+    /// Push to the front. Returns false if full.
+    pub fn yi_push_front(&mut self, value: T) -> bool {
+        if self.yi_is_full() { return false; }
+        self.yi_head = if self.yi_head == 0 { self.yi_cap - 1 } else { self.yi_head - 1 };
+        self.yi_data[self.yi_head] = value;
+        self.yi_len += 1;
+        true
+    }
+
+    /// Pop from the front.
+    pub fn yi_pop_front(&mut self) -> Option<T> {
+        if self.yi_is_empty() { return None; }
+        let val = self.yi_data[self.yi_head].clone();
+        self.yi_head = (self.yi_head + 1) % self.yi_cap;
+        self.yi_len -= 1;
+        Some(val)
+    }
+
+    /// Pop from the back.
+    pub fn yi_pop_back(&mut self) -> Option<T> {
+        if self.yi_is_empty() { return None; }
+        self.yi_len -= 1;
+        let idx = (self.yi_head + self.yi_len) % self.yi_cap;
+        Some(self.yi_data[idx].clone())
+    }
+
+    /// Peek at the front.
+    pub fn yi_front(&self) -> Option<&T> {
+        if self.yi_is_empty() { None } else { Some(&self.yi_data[self.yi_head]) }
+    }
+
+    /// Peek at the back.
+    pub fn yi_back(&self) -> Option<&T> {
+        if self.yi_is_empty() { None }
+        else { Some(&self.yi_data[(self.yi_head + self.yi_len - 1) % self.yi_cap]) }
+    }
+
+    /// Get element at logical index.
+    pub fn yi_get(&self, index: usize) -> Option<&T> {
+        if index >= self.yi_len { None }
+        else { Some(&self.yi_data[(self.yi_head + index) % self.yi_cap]) }
+    }
+
+    /// Convert to vec preserving order.
+    pub fn yi_to_vec(&self) -> Vec<T> {
+        (0..self.yi_len).map(|i| self.yi_data[(self.yi_head + i) % self.yi_cap].clone()).collect()
+    }
+
+    /// Clear the buffer.
+    pub fn yi_clear(&mut self) { self.yi_len = 0; self.yi_head = 0; }
+
+    /// Force push to back, overwriting oldest if full.
+    pub fn yi_force_push_back(&mut self, value: T) {
+        if self.yi_is_full() { self.yi_pop_front(); }
+        self.yi_push_back(value);
+    }
+}
+
+// --- yi_ Weighted Graph ---
+
+/// Weighted directed graph with Dijkstra shortest paths.
+#[derive(Debug, Clone)]
+pub struct YiWeightedGraph {
+    yi_adj: std::collections::HashMap<usize, Vec<(usize, f64)>>,
+    yi_nodes: std::collections::HashSet<usize>,
+}
+
+impl std::fmt::Display for YiWeightedGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let edges: usize = self.yi_adj.values().map(|v| v.len()).sum();
+        write!(f, "WGraph(nodes={}, edges={})", self.yi_nodes.len(), edges)
+    }
+}
+
+impl Default for YiWeightedGraph {
+    fn default() -> Self { Self::yi_new() }
+}
+
+impl YiWeightedGraph {
+    /// Create an empty weighted graph.
+    pub fn yi_new() -> Self {
+        Self { yi_adj: std::collections::HashMap::new(), yi_nodes: std::collections::HashSet::new() }
+    }
+
+    /// Add a node.
+    pub fn yi_add_node(&mut self, node: usize) {
+        self.yi_nodes.insert(node);
+        self.yi_adj.entry(node).or_default();
+    }
+
+    /// Add a weighted directed edge.
+    pub fn yi_add_edge(&mut self, from: usize, to: usize, weight: f64) {
+        self.yi_add_node(from);
+        self.yi_add_node(to);
+        self.yi_adj.entry(from).or_default().push((to, weight));
+    }
+
+    /// Number of nodes.
+    pub fn yi_node_count(&self) -> usize { self.yi_nodes.len() }
+
+    /// Dijkstra shortest path distances from source.
+    pub fn yi_dijkstra(&self, source: usize) -> std::collections::HashMap<usize, f64> {
+        let mut dist: std::collections::HashMap<usize, f64> = std::collections::HashMap::new();
+        let mut visited: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        dist.insert(source, 0.0);
+        loop {
+            let mut min_node = None;
+            let mut min_dist = f64::INFINITY;
+            for (node, d) in &dist {
+                if !visited.contains(node) && *d < min_dist {
+                    min_dist = *d;
+                    min_node = Some(*node);
+                }
+            }
+            let Some(u) = min_node else { break };
+            visited.insert(u);
+            if let Some(neighbors) = self.yi_adj.get(&u) {
+                for (v, w) in neighbors {
+                    let new_dist = min_dist + w;
+                    let entry = dist.entry(*v).or_insert(f64::INFINITY);
+                    if new_dist < *entry { *entry = new_dist; }
+                }
+            }
+        }
+        dist
+    }
+
+    /// Shortest path distance between two nodes.
+    pub fn yi_shortest_distance(&self, from: usize, to: usize) -> Option<f64> {
+        let dists = self.yi_dijkstra(from);
+        dists.get(&to).copied().filter(|d| d.is_finite())
+    }
+
+    /// Get neighbors of a node.
+    pub fn yi_neighbors(&self, node: usize) -> &[(usize, f64)] {
+        self.yi_adj.get(&node).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Check if node exists.
+    pub fn yi_has_node(&self, node: usize) -> bool { self.yi_nodes.contains(&node) }
+
+    /// Clear the graph.
+    pub fn yi_clear(&mut self) { self.yi_adj.clear(); self.yi_nodes.clear(); }
+
+    /// Total edge weight.
+    pub fn yi_total_weight(&self) -> f64 {
+        self.yi_adj.values().flat_map(|v| v.iter()).map(|(_, w)| w).sum()
+    }
+
+    /// Add bidirectional edge.
+    pub fn yi_add_undirected_edge(&mut self, a: usize, b: usize, weight: f64) {
+        self.yi_add_edge(a, b, weight);
+        self.yi_add_edge(b, a, weight);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -16735,6 +16941,179 @@ mod tests {
         let mut r = super::YhReservoirSampler::yh_new(5, 42);
         for i in 0..100 { r.yh_add(i); }
         assert_eq!(r.yh_sample().len(), 5);
+    }
+
+
+    // --- yi_ RingBuffer tests ---
+
+    #[test]
+    fn yi_ring_new() {
+        let r = super::YiRingBuffer::<i32>::yi_new(10);
+        assert!(r.yi_is_empty());
+        assert_eq!(r.yi_capacity(), 10);
+    }
+
+    #[test]
+    fn yi_ring_push_pop() {
+        let mut r = super::YiRingBuffer::yi_new(5);
+        r.yi_push_back(1);
+        r.yi_push_back(2);
+        r.yi_push_back(3);
+        assert_eq!(r.yi_pop_front(), Some(1));
+        assert_eq!(r.yi_pop_front(), Some(2));
+    }
+
+    #[test]
+    fn yi_ring_push_front() {
+        let mut r = super::YiRingBuffer::yi_new(5);
+        r.yi_push_front(1);
+        r.yi_push_front(2);
+        assert_eq!(r.yi_front(), Some(&2));
+    }
+
+    #[test]
+    fn yi_ring_full() {
+        let mut r = super::YiRingBuffer::yi_new(2);
+        assert!(r.yi_push_back(1));
+        assert!(r.yi_push_back(2));
+        assert!(!r.yi_push_back(3));
+        assert!(r.yi_is_full());
+    }
+
+    #[test]
+    fn yi_ring_wrap() {
+        let mut r = super::YiRingBuffer::yi_new(3);
+        r.yi_push_back(1);
+        r.yi_push_back(2);
+        r.yi_push_back(3);
+        r.yi_pop_front();
+        r.yi_push_back(4);
+        assert_eq!(r.yi_to_vec(), vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn yi_ring_force_push() {
+        let mut r = super::YiRingBuffer::yi_new(2);
+        r.yi_force_push_back(1);
+        r.yi_force_push_back(2);
+        r.yi_force_push_back(3);
+        assert_eq!(r.yi_to_vec(), vec![2, 3]);
+    }
+
+    #[test]
+    fn yi_ring_get() {
+        let mut r = super::YiRingBuffer::yi_new(5);
+        r.yi_push_back(10);
+        r.yi_push_back(20);
+        assert_eq!(r.yi_get(0), Some(&10));
+        assert_eq!(r.yi_get(1), Some(&20));
+    }
+
+    #[test]
+    fn yi_ring_clear() {
+        let mut r = super::YiRingBuffer::yi_new(5);
+        r.yi_push_back(1);
+        r.yi_clear();
+        assert!(r.yi_is_empty());
+    }
+
+    #[test]
+    fn yi_ring_back() {
+        let mut r = super::YiRingBuffer::yi_new(5);
+        r.yi_push_back(1);
+        r.yi_push_back(2);
+        assert_eq!(r.yi_back(), Some(&2));
+    }
+
+    #[test]
+    fn yi_ring_pop_back() {
+        let mut r = super::YiRingBuffer::yi_new(5);
+        r.yi_push_back(1);
+        r.yi_push_back(2);
+        assert_eq!(r.yi_pop_back(), Some(2));
+        assert_eq!(r.yi_len(), 1);
+    }
+
+    #[test]
+    fn yi_ring_display() {
+        let r = super::YiRingBuffer::<i32>::yi_new(10);
+        assert!(format!("{}", r).contains("RingBuffer"));
+    }
+
+    // --- yi_ WeightedGraph tests ---
+
+    #[test]
+    fn yi_wgraph_new() {
+        let g = super::YiWeightedGraph::yi_new();
+        assert_eq!(g.yi_node_count(), 0);
+    }
+
+    #[test]
+    fn yi_wgraph_add_edge() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_edge(0, 1, 5.0);
+        assert_eq!(g.yi_node_count(), 2);
+    }
+
+    #[test]
+    fn yi_wgraph_dijkstra() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_edge(0, 1, 4.0);
+        g.yi_add_edge(0, 2, 1.0);
+        g.yi_add_edge(2, 1, 2.0);
+        let dists = g.yi_dijkstra(0);
+        assert_eq!(dists[&1], 3.0);
+    }
+
+    #[test]
+    fn yi_wgraph_shortest() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_edge(0, 1, 1.0);
+        g.yi_add_edge(1, 2, 2.0);
+        assert_eq!(g.yi_shortest_distance(0, 2), Some(3.0));
+    }
+
+    #[test]
+    fn yi_wgraph_no_path() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_node(0);
+        g.yi_add_node(1);
+        assert_eq!(g.yi_shortest_distance(0, 1), None);
+    }
+
+    #[test]
+    fn yi_wgraph_undirected() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_undirected_edge(0, 1, 3.0);
+        assert_eq!(g.yi_shortest_distance(1, 0), Some(3.0));
+    }
+
+    #[test]
+    fn yi_wgraph_total_weight() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_edge(0, 1, 2.0);
+        g.yi_add_edge(1, 2, 3.0);
+        assert_eq!(g.yi_total_weight(), 5.0);
+    }
+
+    #[test]
+    fn yi_wgraph_clear() {
+        let mut g = super::YiWeightedGraph::yi_new();
+        g.yi_add_edge(0, 1, 1.0);
+        g.yi_clear();
+        assert_eq!(g.yi_node_count(), 0);
+    }
+
+    #[test]
+    fn yi_wgraph_display() {
+        let g = super::YiWeightedGraph::yi_new();
+        assert!(format!("{}", g).contains("WGraph"));
+    }
+
+    #[test]
+    fn yi_wgraph_default() {
+        let g = super::YiWeightedGraph::default();
+        assert_eq!(g.yi_node_count(), 0);
     }
 
 }
