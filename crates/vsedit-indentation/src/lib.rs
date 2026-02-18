@@ -4075,6 +4075,274 @@ impl Xk91DisjointIntervals {
     }
 }
 
+
+/// Rope data structure for efficient large text manipulation (xl_91).
+#[derive(Debug, Clone)]
+pub struct Xl91Rope {
+    xl_chunks: Vec<String>,
+    xl_total_len: usize,
+}
+
+impl Xl91Rope {
+    /// Create a new empty rope.
+    pub fn xl_new() -> Self {
+        Self {
+            xl_chunks: Vec::new(),
+            xl_total_len: 0,
+        }
+    }
+
+    /// Create a rope from a string.
+    pub fn xl_from_str(s: &str) -> Self {
+        let mut rope = Self::xl_new();
+        if !s.is_empty() {
+            let chunk_size = 64;
+            let mut start = 0;
+            while start < s.len() {
+                let end = (start + chunk_size).min(s.len());
+                let boundary = if end < s.len() {
+                    let mut b = end;
+                    while b > start && !s.is_char_boundary(b) {
+                        b -= 1;
+                    }
+                    if b == start { end } else { b }
+                } else {
+                    end
+                };
+                rope.xl_chunks.push(s[start..boundary].to_string());
+                rope.xl_total_len += boundary - start;
+                start = boundary;
+            }
+        }
+        rope
+    }
+
+    /// Insert text at a character offset.
+    pub fn xl_insert_at(&mut self, pos: usize, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        let flat = self.xl_to_string();
+        let byte_pos = flat.char_indices()
+            .nth(pos)
+            .map(|(i, _)| i)
+            .unwrap_or(flat.len());
+        let mut new_str = String::with_capacity(flat.len() + text.len());
+        new_str.push_str(&flat[..byte_pos]);
+        new_str.push_str(text);
+        new_str.push_str(&flat[byte_pos..]);
+        *self = Self::xl_from_str(&new_str);
+    }
+
+    /// Delete a range of characters [start, end).
+    pub fn xl_delete_range(&mut self, start: usize, end: usize) {
+        if start >= end {
+            return;
+        }
+        let flat = self.xl_to_string();
+        let indices: Vec<usize> = flat.char_indices().map(|(i, _)| i).collect();
+        let byte_start = if start < indices.len() { indices[start] } else { flat.len() };
+        let byte_end = if end < indices.len() { indices[end] } else { flat.len() };
+        let mut new_str = String::with_capacity(flat.len() - (byte_end - byte_start));
+        new_str.push_str(&flat[..byte_start]);
+        new_str.push_str(&flat[byte_end..]);
+        *self = Self::xl_from_str(&new_str);
+    }
+
+    /// Get the character at a given index.
+    pub fn xl_char_at(&self, index: usize) -> Option<char> {
+        self.xl_to_string().chars().nth(index)
+    }
+
+    /// Total length in bytes.
+    pub fn xl_len(&self) -> usize {
+        self.xl_total_len
+    }
+
+    /// Check if empty.
+    pub fn xl_is_empty(&self) -> bool {
+        self.xl_total_len == 0
+    }
+
+    /// Extract a substring by byte range.
+    pub fn xl_slice(&self, start: usize, end: usize) -> String {
+        let flat = self.xl_to_string();
+        let clamped_end = end.min(flat.len());
+        let clamped_start = start.min(clamped_end);
+        flat[clamped_start..clamped_end].to_string()
+    }
+
+    /// Split the rope at a byte position into two ropes.
+    pub fn xl_split(self, at: usize) -> (Self, Self) {
+        let flat = self.xl_to_string();
+        let split_at = at.min(flat.len());
+        (Self::xl_from_str(&flat[..split_at]), Self::xl_from_str(&flat[split_at..]))
+    }
+
+    /// Concatenate another rope onto this one.
+    pub fn xl_concat(&mut self, other: &Self) {
+        for chunk in &other.xl_chunks {
+            self.xl_total_len += chunk.len();
+            self.xl_chunks.push(chunk.clone());
+        }
+    }
+
+    /// Count lines (number of '\n' characters + 1).
+    pub fn xl_line_count(&self) -> usize {
+        let flat = self.xl_to_string();
+        if flat.is_empty() {
+            return 0;
+        }
+        flat.chars().filter(|&c| c == '\n').count() + 1
+    }
+
+    /// Get a specific line by zero-based index.
+    pub fn xl_line_at(&self, index: usize) -> Option<String> {
+        let flat = self.xl_to_string();
+        flat.split('\n').nth(index).map(|s| s.to_string())
+    }
+
+    /// Flatten to a single String.
+    pub fn xl_to_string(&self) -> String {
+        let mut out = String::with_capacity(self.xl_total_len);
+        for chunk in &self.xl_chunks {
+            out.push_str(chunk);
+        }
+        out
+    }
+
+    /// Number of chunks in internal storage.
+    pub fn xl_chunk_count(&self) -> usize {
+        self.xl_chunks.len()
+    }
+}
+
+/// Suffix array for efficient string searching (xl_91).
+#[derive(Debug, Clone)]
+pub struct Xl91SuffixArray {
+    xl_text: String,
+    xl_sa: Vec<usize>,
+}
+
+impl Xl91SuffixArray {
+    /// Build a suffix array from the given text.
+    pub fn xl_build(text: &str) -> Self {
+        let n = text.len();
+        let mut sa: Vec<usize> = (0..n).collect();
+        let bytes = text.as_bytes();
+        sa.sort_by(|&a, &b| bytes[a..].cmp(&bytes[b..]));
+        Self {
+            xl_text: text.to_string(),
+            xl_sa: sa,
+        }
+    }
+
+    /// Search for a pattern; returns the first matching position or None.
+    pub fn xl_search(&self, pattern: &str) -> Option<usize> {
+        let pat = pattern.as_bytes();
+        let text = self.xl_text.as_bytes();
+        let mut lo: usize = 0;
+        let mut hi: usize = self.xl_sa.len();
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            let suffix_start = self.xl_sa[mid];
+            let suffix_end = (suffix_start + pat.len()).min(text.len());
+            if &text[suffix_start..suffix_end] < pat {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        if lo < self.xl_sa.len() {
+            let suffix_start = self.xl_sa[lo];
+            let suffix_end = (suffix_start + pat.len()).min(text.len());
+            if &text[suffix_start..suffix_end] == pat {
+                return Some(self.xl_sa[lo]);
+            }
+        }
+        None
+    }
+
+    /// Count occurrences of a pattern.
+    pub fn xl_count_occurrences(&self, pattern: &str) -> usize {
+        self.xl_all_positions(pattern).len()
+    }
+
+    /// Find the longest repeated substring.
+    pub fn xl_longest_repeated(&self) -> String {
+        if self.xl_sa.len() < 2 {
+            return String::new();
+        }
+        let text = self.xl_text.as_bytes();
+        let mut best_len = 0;
+        let mut best_start = 0;
+        for i in 1..self.xl_sa.len() {
+            let a = self.xl_sa[i - 1];
+            let b = self.xl_sa[i];
+            let mut common = 0;
+            while a + common < text.len() && b + common < text.len() && text[a + common] == text[b + common] {
+                common += 1;
+            }
+            if common > best_len {
+                best_len = common;
+                best_start = a;
+            }
+        }
+        self.xl_text[best_start..best_start + best_len].to_string()
+    }
+
+    /// Return all positions where the pattern occurs.
+    pub fn xl_all_positions(&self, pattern: &str) -> Vec<usize> {
+        let pat = pattern.as_bytes();
+        let text = self.xl_text.as_bytes();
+        let mut results = Vec::new();
+        if pat.is_empty() || text.is_empty() {
+            return results;
+        }
+        // Find lower bound
+        let mut lo: usize = 0;
+        let mut hi: usize = self.xl_sa.len();
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            let s = self.xl_sa[mid];
+            let e = (s + pat.len()).min(text.len());
+            if &text[s..e] < pat {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        let start = lo;
+        // Find upper bound
+        hi = self.xl_sa.len();
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            let s = self.xl_sa[mid];
+            let e = (s + pat.len()).min(text.len());
+            if &text[s..e] <= pat {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        for idx in start..lo {
+            results.push(self.xl_sa[idx]);
+        }
+        results.sort();
+        results
+    }
+
+    /// Length of the underlying text.
+    pub fn xl_len(&self) -> usize {
+        self.xl_text.len()
+    }
+
+    /// Whether the text is empty.
+    pub fn xl_is_empty(&self) -> bool {
+        self.xl_text.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6553,4 +6821,119 @@ mod tests {
         assert!(!di.xk_contains_point(0));
     }
 
+
+    #[test]
+    fn xl_91_rope_new_empty() {
+        let rope = super::Xl91Rope::xl_new();
+        assert_eq!(rope.xl_len(), 0);
+        assert!(rope.xl_is_empty());
+    }
+
+    #[test]
+    fn xl_91_rope_from_str() {
+        let rope = super::Xl91Rope::xl_from_str("hello world");
+        assert_eq!(rope.xl_len(), 11);
+        assert_eq!(rope.xl_to_string(), "hello world");
+    }
+
+    #[test]
+    fn xl_91_rope_insert_at() {
+        let mut rope = super::Xl91Rope::xl_from_str("helo");
+        rope.xl_insert_at(2, "l");
+        assert_eq!(rope.xl_to_string(), "hello");
+    }
+
+    #[test]
+    fn xl_91_rope_delete_range() {
+        let mut rope = super::Xl91Rope::xl_from_str("hello world");
+        rope.xl_delete_range(5, 11);
+        assert_eq!(rope.xl_to_string(), "hello");
+    }
+
+    #[test]
+    fn xl_91_rope_char_at() {
+        let rope = super::Xl91Rope::xl_from_str("abcdef");
+        assert_eq!(rope.xl_char_at(0), Some('a'));
+        assert_eq!(rope.xl_char_at(5), Some('f'));
+        assert_eq!(rope.xl_char_at(6), None);
+    }
+
+    #[test]
+    fn xl_91_rope_split_concat() {
+        let rope = super::Xl91Rope::xl_from_str("hello world");
+        let (left, right) = rope.xl_split(5);
+        assert_eq!(left.xl_to_string(), "hello");
+        assert_eq!(right.xl_to_string(), " world");
+    }
+
+    #[test]
+    fn xl_91_rope_line_count() {
+        let rope = super::Xl91Rope::xl_from_str("line1\nline2\nline3");
+        assert_eq!(rope.xl_line_count(), 3);
+    }
+
+    #[test]
+    fn xl_91_rope_line_at() {
+        let rope = super::Xl91Rope::xl_from_str("aaa\nbbb\nccc");
+        assert_eq!(rope.xl_line_at(0), Some("aaa".to_string()));
+        assert_eq!(rope.xl_line_at(2), Some("ccc".to_string()));
+        assert_eq!(rope.xl_line_at(3), None);
+    }
+
+    #[test]
+    fn xl_91_sa_build_and_search() {
+        let sa = super::Xl91SuffixArray::xl_build("banana");
+        assert!(sa.xl_search("ana").is_some());
+        assert!(sa.xl_search("xyz").is_none());
+    }
+
+    #[test]
+    fn xl_91_sa_count() {
+        let sa = super::Xl91SuffixArray::xl_build("banana");
+        assert_eq!(sa.xl_count_occurrences("ana"), 2);
+        assert_eq!(sa.xl_count_occurrences("ban"), 1);
+        assert_eq!(sa.xl_count_occurrences("xyz"), 0);
+    }
+
+    #[test]
+    fn xl_91_sa_longest_repeated() {
+        let sa = super::Xl91SuffixArray::xl_build("banana");
+        let lr = sa.xl_longest_repeated();
+        assert_eq!(lr, "ana");
+    }
+
+    #[test]
+    fn xl_91_sa_all_positions() {
+        let sa = super::Xl91SuffixArray::xl_build("abcabc");
+        let pos = sa.xl_all_positions("abc");
+        assert_eq!(pos, vec![0, 3]);
+    }
+
+    #[test]
+    fn xl_91_sa_len() {
+        let sa = super::Xl91SuffixArray::xl_build("test");
+        assert_eq!(sa.xl_len(), 4);
+        assert!(!sa.xl_is_empty());
+    }
+
+    #[test]
+    fn xl_91_sa_empty() {
+        let sa = super::Xl91SuffixArray::xl_build("");
+        assert_eq!(sa.xl_len(), 0);
+        assert!(sa.xl_is_empty());
+        assert_eq!(sa.xl_count_occurrences("x"), 0);
+    }
+
+    #[test]
+    fn xl_91_rope_slice() {
+        let rope = super::Xl91Rope::xl_from_str("hello world");
+        assert_eq!(rope.xl_slice(0, 5), "hello");
+    }
+
+    #[test]
+    fn xl_91_sa_search_start() {
+        let sa = super::Xl91SuffixArray::xl_build("hello world");
+        let pos = sa.xl_search("hello");
+        assert_eq!(pos, Some(0));
+    }
 }
