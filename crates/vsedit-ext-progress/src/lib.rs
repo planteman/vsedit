@@ -23577,6 +23577,126 @@ impl AyeUndoStack {
     pub fn clear(&mut self) { self.undo_stack.clear(); self.redo_stack.clear(); self.save_point = None; }
 }
 
+
+// --- ayf_ editor word wrap and line measurement ---
+
+/// Word wrap mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AyfWrapMode { Off, On, WordBoundary, Bounded(u32) }
+
+impl AyfWrapMode {
+    pub fn is_enabled(&self) -> bool { !matches!(self, Self::Off) }
+    pub fn max_col(&self) -> Option<u32> { if let Self::Bounded(n) = self { Some(*n) } else { None } }
+}
+
+/// Measured line info after wrapping.
+#[derive(Debug, Clone)]
+pub struct AyfWrappedLine {
+    pub logical_line: u32,
+    pub visual_lines: Vec<String>,
+    pub wrap_offsets: Vec<u32>,
+}
+
+impl AyfWrappedLine {
+    pub fn unwrapped(line: u32, text: &str) -> Self {
+        Self { logical_line: line, visual_lines: vec![text.to_string()], wrap_offsets: vec![0] }
+    }
+    pub fn visual_line_count(&self) -> u32 { self.visual_lines.len() as u32 }
+    pub fn is_wrapped(&self) -> bool { self.visual_lines.len() > 1 }
+}
+
+/// Word wrap engine.
+pub struct AyfWrapEngine;
+
+impl AyfWrapEngine {
+    pub fn wrap_line(text: &str, mode: AyfWrapMode, viewport_width: u32) -> AyfWrappedLine {
+        let max_col = match mode {
+            AyfWrapMode::Off => return AyfWrappedLine { logical_line: 0, visual_lines: vec![text.to_string()], wrap_offsets: vec![0] },
+            AyfWrapMode::On => viewport_width,
+            AyfWrapMode::WordBoundary => viewport_width,
+            AyfWrapMode::Bounded(n) => n.min(viewport_width),
+        };
+        if max_col == 0 || text.len() <= max_col as usize {
+            return AyfWrappedLine { logical_line: 0, visual_lines: vec![text.to_string()], wrap_offsets: vec![0] };
+        }
+        let mut lines = Vec::new();
+        let mut offsets = vec![0u32];
+        let mut remaining = text;
+        let mc = max_col as usize;
+        while remaining.len() > mc {
+            let break_at = if matches!(mode, AyfWrapMode::WordBoundary) {
+                remaining[..mc].rfind(' ').map(|p| p + 1).unwrap_or(mc)
+            } else { mc };
+            lines.push(remaining[..break_at].to_string());
+            remaining = &remaining[break_at..];
+            offsets.push((text.len() - remaining.len()) as u32);
+        }
+        if !remaining.is_empty() { lines.push(remaining.to_string()); }
+        AyfWrappedLine { logical_line: 0, visual_lines: lines, wrap_offsets: offsets }
+    }
+}
+
+/// Character width measurement for terminal.
+pub struct AyfCharWidth;
+
+impl AyfCharWidth {
+    pub fn char_width(c: char) -> u32 {
+        if c.is_control() { return 0; }
+        let cp = c as u32;
+        if (0x1100..=0x115F).contains(&cp) || (0x2E80..=0xA4CF).contains(&cp)
+            || (0xAC00..=0xD7A3).contains(&cp) || (0xF900..=0xFAFF).contains(&cp)
+            || (0xFE10..=0xFE6F).contains(&cp) || (0xFF01..=0xFF60).contains(&cp)
+            || (0xFFE0..=0xFFE6).contains(&cp) || (0x20000..=0x2FFFD).contains(&cp)
+            || (0x30000..=0x3FFFD).contains(&cp) || c == '\t' {
+            2
+        } else { 1 }
+    }
+    pub fn str_width(s: &str) -> u32 { s.chars().map(Self::char_width).sum() }
+    pub fn truncate_to_width(s: &str, max_width: u32) -> String {
+        let mut width = 0u32;
+        let mut result = String::new();
+        for c in s.chars() {
+            let cw = Self::char_width(c);
+            if width + cw > max_width { break; }
+            result.push(c);
+            width += cw;
+        }
+        result
+    }
+}
+
+/// Line height model for the editor viewport.
+#[derive(Debug)]
+pub struct AyfLineHeightMap {
+    heights: Vec<u32>,
+    total: u32,
+}
+
+impl AyfLineHeightMap {
+    pub fn new(line_count: usize) -> Self {
+        Self { heights: vec![1; line_count], total: line_count as u32 }
+    }
+    pub fn set_height(&mut self, line: usize, height: u32) {
+        if line < self.heights.len() {
+            self.total = self.total - self.heights[line] + height;
+            self.heights[line] = height;
+        }
+    }
+    pub fn height_of(&self, line: usize) -> u32 { self.heights.get(line).copied().unwrap_or(1) }
+    pub fn total_height(&self) -> u32 { self.total }
+    pub fn visual_line_to_logical(&self, visual: u32) -> (usize, u32) {
+        let mut accum = 0u32;
+        for (i, h) in self.heights.iter().enumerate() {
+            if accum + h > visual { return (i, visual - accum); }
+            accum += h;
+        }
+        (self.heights.len().saturating_sub(1), 0)
+    }
+    pub fn logical_to_visual(&self, logical: usize) -> u32 {
+        self.heights.iter().take(logical).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37953,6 +38073,67 @@ mod tests {
         stack.push(AyeEditOp::insert(0, "x", 100));
         stack.clear();
         assert!(!stack.can_undo());
+    }
+
+
+    #[test]
+    fn test_ayf_wrap_mode() {
+        assert!(!AyfWrapMode::Off.is_enabled());
+        assert!(AyfWrapMode::On.is_enabled());
+        assert_eq!(AyfWrapMode::Bounded(80).max_col(), Some(80));
+    }
+
+    #[test]
+    fn test_ayf_wrap_off() {
+        let w = AyfWrapEngine::wrap_line("hello world long text", AyfWrapMode::Off, 10);
+        assert_eq!(w.visual_line_count(), 1);
+    }
+
+    #[test]
+    fn test_ayf_wrap_on() {
+        let w = AyfWrapEngine::wrap_line("hello world long text", AyfWrapMode::On, 10);
+        assert!(w.is_wrapped());
+        assert!(w.visual_line_count() >= 2);
+    }
+
+    #[test]
+    fn test_ayf_wrap_word_boundary() {
+        let w = AyfWrapEngine::wrap_line("hello world this is a test", AyfWrapMode::WordBoundary, 12);
+        assert!(w.visual_line_count() >= 2);
+        assert!(w.visual_lines[0].len() <= 12);
+    }
+
+    #[test]
+    fn test_ayf_char_width() {
+        assert_eq!(AyfCharWidth::char_width('a'), 1);
+        assert_eq!(AyfCharWidth::str_width("hello"), 5);
+    }
+
+    #[test]
+    fn test_ayf_truncate() {
+        let t = AyfCharWidth::truncate_to_width("hello world", 5);
+        assert_eq!(t, "hello");
+    }
+
+    #[test]
+    fn test_ayf_line_height_map() {
+        let mut map = AyfLineHeightMap::new(5);
+        assert_eq!(map.total_height(), 5);
+        map.set_height(2, 3);
+        assert_eq!(map.total_height(), 7);
+        assert_eq!(map.height_of(2), 3);
+    }
+
+    #[test]
+    fn test_ayf_visual_logical_mapping() {
+        let mut map = AyfLineHeightMap::new(3);
+        map.set_height(0, 1);
+        map.set_height(1, 3);
+        map.set_height(2, 1);
+        let (line, offset) = map.visual_line_to_logical(2);
+        assert_eq!(line, 1);
+        assert_eq!(offset, 1);
+        assert_eq!(map.logical_to_visual(2), 4);
     }
 
 }
