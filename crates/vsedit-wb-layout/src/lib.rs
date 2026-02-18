@@ -4307,6 +4307,319 @@ impl Xm212Tokenizer {
     }
 }
 
+
+/// Fenwick (Binary Indexed) tree for prefix‑sum queries — crate 212.
+pub struct Xn212Fenwick {
+    xn_tree: Vec<i64>,
+    xn_n: usize,
+}
+
+impl Xn212Fenwick {
+    /// Create a new Fenwick tree of size `n` initialised to zero.
+    pub fn xn_new(n: usize) -> Self {
+        Self { xn_tree: vec![0i64; n + 1], xn_n: n }
+    }
+
+    /// Point‑update: add `delta` to index `i` (0‑based).
+    pub fn xn_update(&mut self, mut i: usize, delta: i64) {
+        i += 1;
+        while i <= self.xn_n {
+            self.xn_tree[i] += delta;
+            i += i & i.wrapping_neg();
+        }
+    }
+
+    /// Prefix sum of elements `[0, i]` (0‑based, inclusive).
+    pub fn xn_prefix_sum(&self, mut i: usize) -> i64 {
+        i += 1;
+        let mut s = 0i64;
+        while i > 0 {
+            s += self.xn_tree[i];
+            i -= i & i.wrapping_neg();
+        }
+        s
+    }
+
+    /// Range sum of elements `[l, r]` (inclusive, 0‑based).
+    pub fn xn_range_sum(&self, l: usize, r: usize) -> i64 {
+        if l == 0 {
+            self.xn_prefix_sum(r)
+        } else {
+            self.xn_prefix_sum(r) - self.xn_prefix_sum(l - 1)
+        }
+    }
+
+    /// Point query — value at index `i`.
+    pub fn xn_point_query(&self, i: usize) -> i64 {
+        self.xn_range_sum(i, i)
+    }
+
+    /// Number of elements the tree can hold.
+    pub fn xn_len(&self) -> usize {
+        self.xn_n
+    }
+
+    /// Find the smallest index whose prefix sum is at least `target`.
+    /// Returns `None` when no such index exists.
+    pub fn xn_find_kth(&self, mut target: i64) -> Option<usize> {
+        let mut pos: usize = 0;
+        let mut bit_mask = 1usize;
+        while bit_mask <= self.xn_n {
+            bit_mask <<= 1;
+        }
+        bit_mask >>= 1;
+        while bit_mask > 0 {
+            let next = pos + bit_mask;
+            if next <= self.xn_n && self.xn_tree[next] < target {
+                target -= self.xn_tree[next];
+                pos = next;
+            }
+            bit_mask >>= 1;
+        }
+        let result = pos; // 0‑based
+        if result < self.xn_n {
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
+// ----- AVL tree map — crate 212 -----
+
+#[derive(Debug, Clone)]
+struct Xn212AvlNode<K, V> {
+    key: K,
+    value: V,
+    left: Option<Box<Xn212AvlNode<K, V>>>,
+    right: Option<Box<Xn212AvlNode<K, V>>>,
+    height: i32,
+}
+
+/// Self‑balancing AVL tree map — crate 212.
+#[derive(Debug, Clone)]
+pub struct Xn212AVL<K, V> {
+    root: Option<Box<Xn212AvlNode<K, V>>>,
+    xn_len: usize,
+}
+
+impl<K: Ord + Clone, V: Clone> Default for Xn212AVL<K, V> {
+    fn default() -> Self {
+        Self::xn_new()
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> Xn212AVL<K, V> {
+    pub fn xn_new() -> Self {
+        Self { root: None, xn_len: 0 }
+    }
+
+    fn xn_node_height(node: &Option<Box<Xn212AvlNode<K, V>>>) -> i32 {
+        node.as_ref().map_or(0, |n| n.height)
+    }
+
+    fn xn_balance(node: &Option<Box<Xn212AvlNode<K, V>>>) -> i32 {
+        node.as_ref().map_or(0, |n| Self::xn_node_height(&n.left) - Self::xn_node_height(&n.right))
+    }
+
+    fn xn_update_height(node: &mut Box<Xn212AvlNode<K, V>>) {
+        node.height = 1 + std::cmp::max(Self::xn_node_height(&node.left), Self::xn_node_height(&node.right));
+    }
+
+    fn xn_rotate_right(mut y: Box<Xn212AvlNode<K, V>>) -> Box<Xn212AvlNode<K, V>> {
+        let mut x = y.left.take().expect("xn rotate right");
+        y.left = x.right.take();
+        Self::xn_update_height(&mut y);
+        x.right = Some(y);
+        Self::xn_update_height(&mut x);
+        x
+    }
+
+    fn xn_rotate_left(mut x: Box<Xn212AvlNode<K, V>>) -> Box<Xn212AvlNode<K, V>> {
+        let mut y = x.right.take().expect("xn rotate left");
+        x.right = y.left.take();
+        Self::xn_update_height(&mut x);
+        y.left = Some(x);
+        Self::xn_update_height(&mut y);
+        y
+    }
+
+    fn xn_rebalance(mut node: Box<Xn212AvlNode<K, V>>) -> Box<Xn212AvlNode<K, V>> {
+        Self::xn_update_height(&mut node);
+        let bal = Self::xn_balance(&Some(node.clone()));
+        if bal > 1 {
+            if Self::xn_balance(&node.left) < 0 {
+                node.left = Some(Self::xn_rotate_left(node.left.take().unwrap()));
+            }
+            return Self::xn_rotate_right(node);
+        }
+        if bal < -1 {
+            if Self::xn_balance(&node.right) > 0 {
+                node.right = Some(Self::xn_rotate_right(node.right.take().unwrap()));
+            }
+            return Self::xn_rotate_left(node);
+        }
+        node
+    }
+
+    fn xn_insert_node(node: Option<Box<Xn212AvlNode<K, V>>>, key: K, value: V, inserted: &mut bool) -> Box<Xn212AvlNode<K, V>> {
+        let Some(mut n) = node else {
+            *inserted = true;
+            return Box::new(Xn212AvlNode { key, value, left: None, right: None, height: 1 });
+        };
+        match key.cmp(&n.key) {
+            std::cmp::Ordering::Less => n.left = Some(Self::xn_insert_node(n.left.take(), key, value, inserted)),
+            std::cmp::Ordering::Greater => n.right = Some(Self::xn_insert_node(n.right.take(), key, value, inserted)),
+            std::cmp::Ordering::Equal => { n.value = value; }
+        }
+        Self::xn_rebalance(n)
+    }
+
+    /// Insert or update a key‑value pair.
+    pub fn xn_insert(&mut self, key: K, value: V) {
+        let mut inserted = false;
+        let root = Self::xn_insert_node(self.root.take(), key, value, &mut inserted);
+        self.root = Some(root);
+        if inserted { self.xn_len += 1; }
+    }
+
+    fn xn_get_node<'a>(node: &'a Option<Box<Xn212AvlNode<K, V>>>, key: &K) -> Option<&'a V> {
+        let n = node.as_ref()?;
+        match key.cmp(&n.key) {
+            std::cmp::Ordering::Less => Self::xn_get_node(&n.left, key),
+            std::cmp::Ordering::Greater => Self::xn_get_node(&n.right, key),
+            std::cmp::Ordering::Equal => Some(&n.value),
+        }
+    }
+
+    /// Look up a value by key.
+    pub fn xn_get(&self, key: &K) -> Option<&V> {
+        Self::xn_get_node(&self.root, key)
+    }
+
+    /// Check whether the map contains `key`.
+    pub fn xn_contains(&self, key: &K) -> bool {
+        self.xn_get(key).is_some()
+    }
+
+    fn xn_min_node(node: &Box<Xn212AvlNode<K, V>>) -> &Xn212AvlNode<K, V> {
+        node.left.as_ref().map_or(node.as_ref(), |l| Self::xn_min_node(l))
+    }
+
+    fn xn_remove_min(mut node: Box<Xn212AvlNode<K, V>>) -> (Box<Xn212AvlNode<K, V>>, Option<Box<Xn212AvlNode<K, V>>>) {
+        if node.left.is_none() {
+            let right = node.right.take();
+            return (node, right);
+        }
+        let (min, new_left) = Self::xn_remove_min(node.left.take().unwrap());
+        node.left = new_left;
+        (min, Some(Self::xn_rebalance(node)))
+    }
+
+    fn xn_remove_node(node: Option<Box<Xn212AvlNode<K, V>>>, key: &K, removed: &mut bool) -> Option<Box<Xn212AvlNode<K, V>>> {
+        let Some(mut n) = node else { return None };
+        match key.cmp(&n.key) {
+            std::cmp::Ordering::Less => { n.left = Self::xn_remove_node(n.left.take(), key, removed); Some(Self::xn_rebalance(n)) }
+            std::cmp::Ordering::Greater => { n.right = Self::xn_remove_node(n.right.take(), key, removed); Some(Self::xn_rebalance(n)) }
+            std::cmp::Ordering::Equal => {
+                *removed = true;
+                match (n.left.take(), n.right.take()) {
+                    (None, None) => None,
+                    (Some(l), None) => Some(Self::xn_rebalance(l)),
+                    (None, Some(r)) => Some(Self::xn_rebalance(r)),
+                    (Some(l), Some(r)) => {
+                        let (mut successor, new_right) = Self::xn_remove_min(r);
+                        successor.left = Some(l);
+                        successor.right = new_right;
+                        Some(Self::xn_rebalance(successor))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Remove a key from the map. Returns `true` when the key was present.
+    pub fn xn_remove(&mut self, key: &K) -> bool {
+        let mut removed = false;
+        self.root = Self::xn_remove_node(self.root.take(), key, &mut removed);
+        if removed { self.xn_len -= 1; }
+        removed
+    }
+
+    /// Number of entries.
+    pub fn xn_len(&self) -> usize {
+        self.xn_len
+    }
+
+    fn xn_collect_in_order(node: &Option<Box<Xn212AvlNode<K, V>>>, out: &mut Vec<(K, V)>) {
+        if let Some(n) = node {
+            Self::xn_collect_in_order(&n.left, out);
+            out.push((n.key.clone(), n.value.clone()));
+            Self::xn_collect_in_order(&n.right, out);
+        }
+    }
+
+    /// Return all key‑value pairs in sorted order.
+    pub fn xn_in_order(&self) -> Vec<(K, V)> {
+        let mut v = Vec::new();
+        Self::xn_collect_in_order(&self.root, &mut v);
+        v
+    }
+
+    /// Height of the tree (0 for empty).
+    pub fn xn_height(&self) -> i32 {
+        Self::xn_node_height(&self.root)
+    }
+
+    fn xn_min_key(node: &Option<Box<Xn212AvlNode<K, V>>>) -> Option<&K> {
+        let n = node.as_ref()?;
+        if n.left.is_some() { Self::xn_min_key(&n.left) } else { Some(&n.key) }
+    }
+
+    /// Smallest key in the map.
+    pub fn xn_min(&self) -> Option<&K> {
+        Self::xn_min_key(&self.root)
+    }
+
+    fn xn_max_key(node: &Option<Box<Xn212AvlNode<K, V>>>) -> Option<&K> {
+        let n = node.as_ref()?;
+        if n.right.is_some() { Self::xn_max_key(&n.right) } else { Some(&n.key) }
+    }
+
+    /// Largest key in the map.
+    pub fn xn_max(&self) -> Option<&K> {
+        Self::xn_max_key(&self.root)
+    }
+
+    fn xn_floor_key<'a>(node: &'a Option<Box<Xn212AvlNode<K, V>>>, key: &K) -> Option<&'a K> {
+        let n = node.as_ref()?;
+        match key.cmp(&n.key) {
+            std::cmp::Ordering::Equal => Some(&n.key),
+            std::cmp::Ordering::Less => Self::xn_floor_key(&n.left, key),
+            std::cmp::Ordering::Greater => Self::xn_floor_key(&n.right, key).or(Some(&n.key)),
+        }
+    }
+
+    /// Greatest key less than or equal to `key`.
+    pub fn xn_floor(&self, key: &K) -> Option<&K> {
+        Self::xn_floor_key(&self.root, key)
+    }
+
+    fn xn_ceiling_key<'a>(node: &'a Option<Box<Xn212AvlNode<K, V>>>, key: &K) -> Option<&'a K> {
+        let n = node.as_ref()?;
+        match key.cmp(&n.key) {
+            std::cmp::Ordering::Equal => Some(&n.key),
+            std::cmp::Ordering::Greater => Self::xn_ceiling_key(&n.right, key),
+            std::cmp::Ordering::Less => Self::xn_ceiling_key(&n.left, key).or(Some(&n.key)),
+        }
+    }
+
+    /// Smallest key greater than or equal to `key`.
+    pub fn xn_ceiling(&self, key: &K) -> Option<&K> {
+        Self::xn_ceiling_key(&self.root, key)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -7184,4 +7497,137 @@ mod tests {
         assert_eq!(t.xm_token_count(), 0);
     }
 
+
+    // ---- Fenwick tree tests — crate 212 ----
+
+    #[test]
+    fn xn_212_fenwick_prefix_sum() {
+        let mut ft = super::Xn212Fenwick::xn_new(5);
+        for i in 0..5 { ft.xn_update(i, (i + 1) as i64); }
+        assert_eq!(ft.xn_prefix_sum(0), 1);
+        assert_eq!(ft.xn_prefix_sum(4), 15);
+    }
+
+    #[test]
+    fn xn_212_fenwick_range_sum() {
+        let mut ft = super::Xn212Fenwick::xn_new(6);
+        for i in 0..6 { ft.xn_update(i, (i * 2) as i64); }
+        assert_eq!(ft.xn_range_sum(1, 3), 2 + 4 + 6);
+    }
+
+    #[test]
+    fn xn_212_fenwick_point_query() {
+        let mut ft = super::Xn212Fenwick::xn_new(4);
+        ft.xn_update(2, 7);
+        assert_eq!(ft.xn_point_query(2), 7);
+        assert_eq!(ft.xn_point_query(0), 0);
+    }
+
+    #[test]
+    fn xn_212_fenwick_len() {
+        let ft = super::Xn212Fenwick::xn_new(10);
+        assert_eq!(ft.xn_len(), 10);
+    }
+
+    #[test]
+    fn xn_212_fenwick_multiple_updates() {
+        let mut ft = super::Xn212Fenwick::xn_new(3);
+        ft.xn_update(0, 5);
+        ft.xn_update(0, 3);
+        assert_eq!(ft.xn_point_query(0), 8);
+    }
+
+    #[test]
+    fn xn_212_fenwick_single_element() {
+        let mut ft = super::Xn212Fenwick::xn_new(1);
+        ft.xn_update(0, 42);
+        assert_eq!(ft.xn_prefix_sum(0), 42);
+        assert_eq!(ft.xn_range_sum(0, 0), 42);
+    }
+
+    #[test]
+    fn xn_212_fenwick_find_kth() {
+        let mut ft = super::Xn212Fenwick::xn_new(5);
+        for i in 0..5 { ft.xn_update(i, 1); }
+        assert_eq!(ft.xn_find_kth(3), Some(2));
+    }
+
+    #[test]
+    fn xn_212_fenwick_negative_delta() {
+        let mut ft = super::Xn212Fenwick::xn_new(3);
+        ft.xn_update(1, 10);
+        ft.xn_update(1, -4);
+        assert_eq!(ft.xn_point_query(1), 6);
+    }
+
+    // ---- AVL tree tests — crate 212 ----
+
+    #[test]
+    fn xn_212_avl_insert_get() {
+        let mut m = super::Xn212AVL::xn_new();
+        m.xn_insert(3, "c");
+        m.xn_insert(1, "a");
+        m.xn_insert(2, "b");
+        assert_eq!(m.xn_get(&2), Some(&"b"));
+        assert_eq!(m.xn_len(), 3);
+    }
+
+    #[test]
+    fn xn_212_avl_remove() {
+        let mut m = super::Xn212AVL::xn_new();
+        m.xn_insert(1, 10);
+        m.xn_insert(2, 20);
+        assert!(m.xn_remove(&1));
+        assert!(!m.xn_contains(&1));
+        assert_eq!(m.xn_len(), 1);
+    }
+
+    #[test]
+    fn xn_212_avl_in_order() {
+        let mut m = super::Xn212AVL::xn_new();
+        for k in [5, 3, 7, 1, 4] { m.xn_insert(k, k * 10); }
+        let keys: Vec<_> = m.xn_in_order().iter().map(|(k, _)| *k).collect();
+        assert_eq!(keys, vec![1, 3, 4, 5, 7]);
+    }
+
+    #[test]
+    fn xn_212_avl_min_max() {
+        let mut m = super::Xn212AVL::xn_new();
+        for k in [10, 5, 20, 3, 15] { m.xn_insert(k, k); }
+        assert_eq!(m.xn_min(), Some(&3));
+        assert_eq!(m.xn_max(), Some(&20));
+    }
+
+    #[test]
+    fn xn_212_avl_floor_ceiling() {
+        let mut m = super::Xn212AVL::xn_new();
+        for k in [10, 20, 30] { m.xn_insert(k, k); }
+        assert_eq!(m.xn_floor(&15), Some(&10));
+        assert_eq!(m.xn_ceiling(&15), Some(&20));
+    }
+
+    #[test]
+    fn xn_212_avl_height_balanced() {
+        let mut m = super::Xn212AVL::xn_new();
+        for k in 0..31 { m.xn_insert(k, k); }
+        assert!(m.xn_height() <= 7);
+    }
+
+    #[test]
+    fn xn_212_avl_overwrite() {
+        let mut m = super::Xn212AVL::xn_new();
+        m.xn_insert(1, "old");
+        m.xn_insert(1, "new");
+        assert_eq!(m.xn_get(&1), Some(&"new"));
+        assert_eq!(m.xn_len(), 1);
+    }
+
+    #[test]
+    fn xn_212_avl_empty() {
+        let m: super::Xn212AVL<i32, i32> = super::Xn212AVL::xn_new();
+        assert_eq!(m.xn_len(), 0);
+        assert_eq!(m.xn_min(), None);
+        assert_eq!(m.xn_max(), None);
+        assert_eq!(m.xn_height(), 0);
+    }
 }
