@@ -15629,6 +15629,158 @@ impl std::fmt::Display for ZkTypeHierarchyItem {
     }
 }
 
+
+// --- zl_ notebook cells and terminal types ---
+
+/// A notebook cell kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZlCellKind {
+    Markup,
+    Code,
+}
+
+impl std::fmt::Display for ZlCellKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self { ZlCellKind::Markup => write!(f, "markup"), ZlCellKind::Code => write!(f, "code") }
+    }
+}
+
+/// A notebook cell containing either code or markup.
+#[derive(Debug, Clone)]
+pub struct ZlNotebookCell {
+    pub kind: ZlCellKind,
+    pub source: String,
+    pub language: String,
+    pub outputs: Vec<ZlCellOutput>,
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+/// Output from a notebook cell execution.
+#[derive(Debug, Clone)]
+pub struct ZlCellOutput {
+    pub output_kind: String,
+    pub data: std::collections::HashMap<String, String>,
+}
+
+impl ZlNotebookCell {
+    pub fn code(source: &str, language: &str) -> Self {
+        Self { kind: ZlCellKind::Code, source: source.to_string(), language: language.to_string(), outputs: Vec::new(), metadata: std::collections::HashMap::new() }
+    }
+
+    pub fn markup(source: &str) -> Self {
+        Self { kind: ZlCellKind::Markup, source: source.to_string(), language: "markdown".to_string(), outputs: Vec::new(), metadata: std::collections::HashMap::new() }
+    }
+
+    pub fn add_output(&mut self, kind: &str) {
+        self.outputs.push(ZlCellOutput { output_kind: kind.to_string(), data: std::collections::HashMap::new() });
+    }
+
+    pub fn set_meta(&mut self, key: &str, value: &str) {
+        self.metadata.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn is_code(&self) -> bool { self.kind == ZlCellKind::Code }
+    pub fn is_markup(&self) -> bool { self.kind == ZlCellKind::Markup }
+    pub fn line_count(&self) -> usize { self.source.lines().count() }
+    pub fn has_outputs(&self) -> bool { !self.outputs.is_empty() }
+}
+
+impl std::fmt::Display for ZlNotebookCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZlNotebookCell({}, {}, {} lines)", self.kind, self.language, self.line_count())
+    }
+}
+
+/// A notebook document containing cells.
+#[derive(Debug, Clone)]
+pub struct ZlNotebook {
+    pub uri: String,
+    pub cells: Vec<ZlNotebookCell>,
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+impl ZlNotebook {
+    pub fn new(uri: &str) -> Self {
+        Self { uri: uri.to_string(), cells: Vec::new(), metadata: std::collections::HashMap::new() }
+    }
+
+    pub fn add_cell(&mut self, cell: ZlNotebookCell) { self.cells.push(cell); }
+    pub fn cell_count(&self) -> usize { self.cells.len() }
+    pub fn code_cells(&self) -> Vec<&ZlNotebookCell> { self.cells.iter().filter(|c| c.is_code()).collect() }
+    pub fn markup_cells(&self) -> Vec<&ZlNotebookCell> { self.cells.iter().filter(|c| c.is_markup()).collect() }
+    pub fn is_empty(&self) -> bool { self.cells.is_empty() }
+}
+
+impl std::fmt::Display for ZlNotebook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZlNotebook({}, {} cells)", self.uri, self.cell_count())
+    }
+}
+
+/// A terminal profile for creating terminal instances.
+#[derive(Debug, Clone)]
+pub struct ZlTerminalProfile {
+    pub name: String,
+    pub shell_path: String,
+    pub shell_args: Vec<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub cwd: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+}
+
+impl ZlTerminalProfile {
+    pub fn new(name: &str, shell_path: &str) -> Self {
+        Self { name: name.to_string(), shell_path: shell_path.to_string(), shell_args: Vec::new(),
+               env: std::collections::HashMap::new(), cwd: None, icon: None, color: None }
+    }
+
+    pub fn with_args(mut self, args: &[&str]) -> Self {
+        self.shell_args = args.iter().map(|a| a.to_string()).collect(); self
+    }
+
+    pub fn with_cwd(mut self, cwd: &str) -> Self { self.cwd = Some(cwd.to_string()); self }
+    pub fn with_icon(mut self, icon: &str) -> Self { self.icon = Some(icon.to_string()); self }
+    pub fn with_color(mut self, color: &str) -> Self { self.color = Some(color.to_string()); self }
+
+    pub fn set_env(&mut self, key: &str, value: &str) {
+        self.env.insert(key.to_string(), value.to_string());
+    }
+}
+
+impl std::fmt::Display for ZlTerminalProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZlTerminalProfile({}: {})", self.name, self.shell_path)
+    }
+}
+
+/// A terminal link detected in terminal output.
+#[derive(Debug, Clone)]
+pub struct ZlTerminalLink {
+    pub start_index: usize,
+    pub length: usize,
+    pub tooltip: Option<String>,
+    pub uri: Option<String>,
+}
+
+impl ZlTerminalLink {
+    pub fn new(start: usize, length: usize) -> Self {
+        Self { start_index: start, length, tooltip: None, uri: None }
+    }
+
+    pub fn with_uri(mut self, uri: &str) -> Self { self.uri = Some(uri.to_string()); self }
+    pub fn with_tooltip(mut self, tip: &str) -> Self { self.tooltip = Some(tip.to_string()); self }
+
+    pub fn end_index(&self) -> usize { self.start_index + self.length }
+    pub fn is_resolved(&self) -> bool { self.uri.is_some() }
+}
+
+impl std::fmt::Display for ZlTerminalLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZlTerminalLink({}..{})", self.start_index, self.end_index())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -25973,6 +26125,113 @@ mod tests {
     fn test_zk_type_hierarchy_display() {
         let item = ZkTypeHierarchyItem::new("Trait", 0, "t.rs", 0, 10);
         assert!(format!("{}", item).contains("Trait"));
+    }
+
+
+    // --- zl_ tests ---
+
+    #[test]
+    fn test_zl_cell_code() {
+        let c = ZlNotebookCell::code("print(1)", "python");
+        assert!(c.is_code());
+        assert!(!c.is_markup());
+        assert_eq!(c.language, "python");
+    }
+
+    #[test]
+    fn test_zl_cell_markup() {
+        let c = ZlNotebookCell::markup("# Title");
+        assert!(c.is_markup());
+        assert_eq!(c.language, "markdown");
+    }
+
+    #[test]
+    fn test_zl_cell_outputs() {
+        let mut c = ZlNotebookCell::code("1+1", "python");
+        c.add_output("text/plain");
+        assert!(c.has_outputs());
+        assert_eq!(c.outputs.len(), 1);
+    }
+
+    #[test]
+    fn test_zl_cell_metadata() {
+        let mut c = ZlNotebookCell::code("x", "rust");
+        c.set_meta("editable", "true");
+        assert_eq!(c.metadata.get("editable"), Some(&"true".to_string()));
+    }
+
+    #[test]
+    fn test_zl_cell_display() {
+        let c = ZlNotebookCell::code("x=1", "python");
+        assert!(format!("{}", c).contains("code"));
+    }
+
+    #[test]
+    fn test_zl_notebook_new() {
+        let nb = ZlNotebook::new("notebook.ipynb");
+        assert!(nb.is_empty());
+        assert_eq!(nb.cell_count(), 0);
+    }
+
+    #[test]
+    fn test_zl_notebook_add_cells() {
+        let mut nb = ZlNotebook::new("test.ipynb");
+        nb.add_cell(ZlNotebookCell::markup("# Intro"));
+        nb.add_cell(ZlNotebookCell::code("x = 1", "python"));
+        nb.add_cell(ZlNotebookCell::code("y = 2", "python"));
+        assert_eq!(nb.cell_count(), 3);
+        assert_eq!(nb.code_cells().len(), 2);
+        assert_eq!(nb.markup_cells().len(), 1);
+    }
+
+    #[test]
+    fn test_zl_notebook_display() {
+        let nb = ZlNotebook::new("test.ipynb");
+        assert!(format!("{}", nb).contains("ZlNotebook"));
+    }
+
+    #[test]
+    fn test_zl_terminal_profile() {
+        let p = ZlTerminalProfile::new("bash", "/bin/bash")
+            .with_args(&["-l"])
+            .with_cwd("/home/user")
+            .with_icon("terminal")
+            .with_color("#ff0000");
+        assert_eq!(p.name, "bash");
+        assert_eq!(p.shell_args, vec!["-l"]);
+        assert_eq!(p.cwd, Some("/home/user".to_string()));
+    }
+
+    #[test]
+    fn test_zl_terminal_profile_env() {
+        let mut p = ZlTerminalProfile::new("zsh", "/bin/zsh");
+        p.set_env("TERM", "xterm-256color");
+        assert_eq!(p.env.get("TERM"), Some(&"xterm-256color".to_string()));
+    }
+
+    #[test]
+    fn test_zl_terminal_profile_display() {
+        let p = ZlTerminalProfile::new("sh", "/bin/sh");
+        assert!(format!("{}", p).contains("ZlTerminalProfile"));
+    }
+
+    #[test]
+    fn test_zl_terminal_link() {
+        let l = ZlTerminalLink::new(10, 20).with_uri("file:///test").with_tooltip("click");
+        assert_eq!(l.end_index(), 30);
+        assert!(l.is_resolved());
+    }
+
+    #[test]
+    fn test_zl_terminal_link_unresolved() {
+        let l = ZlTerminalLink::new(0, 5);
+        assert!(!l.is_resolved());
+    }
+
+    #[test]
+    fn test_zl_terminal_link_display() {
+        let l = ZlTerminalLink::new(5, 10);
+        assert!(format!("{}", l).contains("ZlTerminalLink"));
     }
 
 }
