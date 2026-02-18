@@ -8474,6 +8474,267 @@ impl<K: Eq + Clone + std::hash::Hash, V: Clone> XzLruCache<K, V> {
     }
 }
 
+
+// --- ya_ Trie (Prefix Tree) ---
+
+/// A node in a trie (prefix tree) for string key lookups.
+#[derive(Debug, Clone)]
+pub struct YaTrieNode<V: Clone> {
+    ya_children: std::collections::HashMap<char, Box<YaTrieNode<V>>>,
+    ya_value: Option<V>,
+    ya_is_end: bool,
+}
+
+impl<V: Clone> Default for YaTrieNode<V> {
+    fn default() -> Self {
+        Self { ya_children: std::collections::HashMap::new(), ya_value: None, ya_is_end: false }
+    }
+}
+
+impl<V: Clone + std::fmt::Display> std::fmt::Display for YaTrieNode<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TrieNode(children={}, end={})", self.ya_children.len(), self.ya_is_end)
+    }
+}
+
+/// Trie (prefix tree) for O(m) string key operations where m is key length.
+#[derive(Debug, Clone)]
+pub struct YaTrie<V: Clone> {
+    ya_root: YaTrieNode<V>,
+    ya_size: usize,
+}
+
+impl<V: Clone> Default for YaTrie<V> {
+    fn default() -> Self { Self::ya_new() }
+}
+
+impl<V: Clone + std::fmt::Display> std::fmt::Display for YaTrie<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Trie(size={})", self.ya_size)
+    }
+}
+
+impl<V: Clone> YaTrie<V> {
+    /// Create an empty trie.
+    pub fn ya_new() -> Self { Self { ya_root: YaTrieNode::default(), ya_size: 0 } }
+
+    /// Number of stored keys.
+    pub fn ya_len(&self) -> usize { self.ya_size }
+
+    /// Is the trie empty.
+    pub fn ya_is_empty(&self) -> bool { self.ya_size == 0 }
+
+    /// Insert a key-value pair.
+    pub fn ya_insert(&mut self, key: &str, value: V) {
+        let mut node = &mut self.ya_root;
+        for ch in key.chars() {
+            node = node.ya_children.entry(ch).or_insert_with(|| Box::new(YaTrieNode::default()));
+        }
+        if !node.ya_is_end { self.ya_size += 1; }
+        node.ya_value = Some(value);
+        node.ya_is_end = true;
+    }
+
+    /// Look up a key.
+    pub fn ya_get(&self, key: &str) -> Option<&V> {
+        let mut node = &self.ya_root;
+        for ch in key.chars() {
+            match node.ya_children.get(&ch) {
+                Some(child) => node = child,
+                None => return None,
+            }
+        }
+        if node.ya_is_end { node.ya_value.as_ref() } else { None }
+    }
+
+    /// Check if a key exists.
+    pub fn ya_contains(&self, key: &str) -> bool { self.ya_get(key).is_some() }
+
+    /// Check if any key starts with the given prefix.
+    pub fn ya_has_prefix(&self, prefix: &str) -> bool {
+        let mut node = &self.ya_root;
+        for ch in prefix.chars() {
+            match node.ya_children.get(&ch) {
+                Some(child) => node = child,
+                None => return false,
+            }
+        }
+        true
+    }
+
+    /// Collect all keys with the given prefix.
+    pub fn ya_keys_with_prefix(&self, prefix: &str) -> Vec<String> {
+        let mut node = &self.ya_root;
+        for ch in prefix.chars() {
+            match node.ya_children.get(&ch) {
+                Some(child) => node = child,
+                None => return Vec::new(),
+            }
+        }
+        let mut results = Vec::new();
+        Self::ya_collect_keys(node, &mut prefix.to_string(), &mut results);
+        results
+    }
+
+    fn ya_collect_keys(node: &YaTrieNode<V>, current: &mut String, results: &mut Vec<String>) {
+        if node.ya_is_end { results.push(current.clone()); }
+        let mut chars: Vec<char> = node.ya_children.keys().copied().collect();
+        chars.sort();
+        for ch in chars {
+            current.push(ch);
+            Self::ya_collect_keys(node.ya_children.get(&ch).unwrap(), current, results);
+            current.pop();
+        }
+    }
+
+    /// Collect all keys.
+    pub fn ya_all_keys(&self) -> Vec<String> {
+        self.ya_keys_with_prefix("")
+    }
+
+    /// Remove a key. Returns the value if it existed.
+    pub fn ya_remove(&mut self, key: &str) -> Option<V> {
+        let result = Self::ya_remove_recursive(&mut self.ya_root, key, 0);
+        if result.is_some() { self.ya_size -= 1; }
+        result
+    }
+
+    fn ya_remove_recursive(node: &mut YaTrieNode<V>, key: &str, depth: usize) -> Option<V> {
+        let chars: Vec<char> = key.chars().collect();
+        if depth == chars.len() {
+            if node.ya_is_end {
+                node.ya_is_end = false;
+                return node.ya_value.take();
+            }
+            return None;
+        }
+        let ch = chars[depth];
+        if let Some(child) = node.ya_children.get_mut(&ch) {
+            let result = Self::ya_remove_recursive(child, key, depth + 1);
+            if !child.ya_is_end && child.ya_children.is_empty() {
+                node.ya_children.remove(&ch);
+            }
+            result
+        } else {
+            None
+        }
+    }
+
+    /// Clear the trie.
+    pub fn ya_clear(&mut self) {
+        self.ya_root = YaTrieNode::default();
+        self.ya_size = 0;
+    }
+
+    /// Count keys with a given prefix.
+    pub fn ya_count_prefix(&self, prefix: &str) -> usize {
+        self.ya_keys_with_prefix(prefix).len()
+    }
+
+    /// Longest common prefix among all keys.
+    pub fn ya_longest_common_prefix(&self) -> String {
+        let mut result = String::new();
+        let mut node = &self.ya_root;
+        while node.ya_children.len() == 1 && !node.ya_is_end {
+            let (&ch, child) = node.ya_children.iter().next().unwrap();
+            result.push(ch);
+            node = child;
+        }
+        result
+    }
+}
+
+// --- ya_ Bloom Filter ---
+
+/// Bloom filter for probabilistic set membership testing with no false negatives.
+#[derive(Debug, Clone)]
+pub struct YaBloomFilter {
+    ya_bits: Vec<bool>,
+    ya_size: usize,
+    ya_num_hashes: usize,
+    ya_count: usize,
+}
+
+impl std::fmt::Display for YaBloomFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bloom(bits={}, hashes={}, count={})", self.ya_size, self.ya_num_hashes, self.ya_count)
+    }
+}
+
+impl Default for YaBloomFilter {
+    fn default() -> Self { Self::ya_new(1000, 5) }
+}
+
+impl YaBloomFilter {
+    /// Create a new bloom filter with given bit size and number of hash functions.
+    pub fn ya_new(bits: usize, num_hashes: usize) -> Self {
+        Self { ya_bits: vec![false; bits], ya_size: bits, ya_num_hashes: num_hashes.max(1), ya_count: 0 }
+    }
+
+    /// Create from expected number of items and desired false positive rate.
+    pub fn ya_with_fp_rate(expected_items: usize, fp_rate: f64) -> Self {
+        let bits = (-(expected_items as f64) * fp_rate.ln() / (2.0f64.ln().powi(2))).ceil() as usize;
+        let bits = bits.max(64);
+        let hashes = ((bits as f64 / expected_items as f64) * 2.0f64.ln()).ceil() as usize;
+        let hashes = hashes.max(1);
+        Self::ya_new(bits, hashes)
+    }
+
+    fn ya_hash(&self, item: u64, seed: usize) -> usize {
+        let h = item.wrapping_mul(0xff51afd7ed558ccd_u64.wrapping_add(seed as u64));
+        let h = h ^ (h >> 33);
+        let h = h.wrapping_mul(0xc4ceb9fe1a85ec53_u64.wrapping_add(seed as u64 * 7));
+        (h ^ (h >> 33)) as usize % self.ya_size
+    }
+
+    /// Add an item.
+    pub fn ya_add(&mut self, item: u64) {
+        for i in 0..self.ya_num_hashes {
+            let idx = self.ya_hash(item, i);
+            self.ya_bits[idx] = true;
+        }
+        self.ya_count += 1;
+    }
+
+    /// Check if an item might be in the set (false positives possible, no false negatives).
+    pub fn ya_might_contain(&self, item: u64) -> bool {
+        for i in 0..self.ya_num_hashes {
+            let idx = self.ya_hash(item, i);
+            if !self.ya_bits[idx] { return false; }
+        }
+        true
+    }
+
+    /// Number of items added.
+    pub fn ya_count(&self) -> usize { self.ya_count }
+
+    /// Bit array size.
+    pub fn ya_bit_size(&self) -> usize { self.ya_size }
+
+    /// Number of hash functions.
+    pub fn ya_num_hashes(&self) -> usize { self.ya_num_hashes }
+
+    /// Estimated false positive rate.
+    pub fn ya_estimated_fp_rate(&self) -> f64 {
+        let ones = self.ya_bits.iter().filter(|&&b| b).count() as f64;
+        (ones / self.ya_size as f64).powi(self.ya_num_hashes as i32)
+    }
+
+    /// Clear the filter.
+    pub fn ya_clear(&mut self) {
+        for b in &mut self.ya_bits { *b = false; }
+        self.ya_count = 0;
+    }
+
+    /// Merge another bloom filter (union).
+    pub fn ya_merge(&mut self, other: &YaBloomFilter) {
+        if self.ya_size != other.ya_size { return; }
+        for i in 0..self.ya_size {
+            self.ya_bits[i] = self.ya_bits[i] || other.ya_bits[i];
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -13588,6 +13849,183 @@ mod tests {
     fn xz_lru_missing_key() {
         let mut lru = super::XzLruCache::<i32, i32>::xz_new(10);
         assert_eq!(lru.xz_get(&999), None);
+    }
+
+
+    // --- ya_ Trie tests ---
+
+    #[test]
+    fn ya_trie_new() {
+        let t = super::YaTrie::<i32>::ya_new();
+        assert!(t.ya_is_empty());
+        assert_eq!(t.ya_len(), 0);
+    }
+
+    #[test]
+    fn ya_trie_insert_get() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("hello", 1);
+        t.ya_insert("world", 2);
+        assert_eq!(t.ya_get("hello"), Some(&1));
+        assert_eq!(t.ya_get("world"), Some(&2));
+        assert_eq!(t.ya_get("missing"), None);
+    }
+
+    #[test]
+    fn ya_trie_contains() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("abc", 1);
+        assert!(t.ya_contains("abc"));
+        assert!(!t.ya_contains("ab"));
+        assert!(!t.ya_contains("abcd"));
+    }
+
+    #[test]
+    fn ya_trie_prefix() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("abc", 1);
+        t.ya_insert("abd", 2);
+        assert!(t.ya_has_prefix("ab"));
+        assert!(!t.ya_has_prefix("ac"));
+    }
+
+    #[test]
+    fn ya_trie_keys_with_prefix() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("cat", 1);
+        t.ya_insert("car", 2);
+        t.ya_insert("dog", 3);
+        let keys = t.ya_keys_with_prefix("ca");
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"cat".to_string()));
+        assert!(keys.contains(&"car".to_string()));
+    }
+
+    #[test]
+    fn ya_trie_all_keys() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("b", 1);
+        t.ya_insert("a", 2);
+        t.ya_insert("c", 3);
+        let keys = t.ya_all_keys();
+        assert_eq!(keys, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn ya_trie_remove() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("hello", 1);
+        assert_eq!(t.ya_remove("hello"), Some(1));
+        assert!(!t.ya_contains("hello"));
+        assert_eq!(t.ya_len(), 0);
+    }
+
+    #[test]
+    fn ya_trie_lcp() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("abc", 1);
+        t.ya_insert("abd", 2);
+        assert_eq!(t.ya_longest_common_prefix(), "ab");
+    }
+
+    #[test]
+    fn ya_trie_clear() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("a", 1);
+        t.ya_clear();
+        assert!(t.ya_is_empty());
+    }
+
+    #[test]
+    fn ya_trie_display() {
+        let t = super::YaTrie::<i32>::ya_new();
+        assert!(format!("{}", t).contains("Trie"));
+    }
+
+    #[test]
+    fn ya_trie_default() {
+        let t = super::YaTrie::<i32>::default();
+        assert!(t.ya_is_empty());
+    }
+
+    #[test]
+    fn ya_trie_count_prefix() {
+        let mut t = super::YaTrie::ya_new();
+        t.ya_insert("test1", 1);
+        t.ya_insert("test2", 2);
+        t.ya_insert("other", 3);
+        assert_eq!(t.ya_count_prefix("test"), 2);
+    }
+
+    // --- ya_ Bloom Filter tests ---
+
+    #[test]
+    fn ya_bloom_new() {
+        let bf = super::YaBloomFilter::ya_new(1000, 5);
+        assert_eq!(bf.ya_bit_size(), 1000);
+        assert_eq!(bf.ya_num_hashes(), 5);
+        assert_eq!(bf.ya_count(), 0);
+    }
+
+    #[test]
+    fn ya_bloom_add_contains() {
+        let mut bf = super::YaBloomFilter::ya_new(10000, 7);
+        bf.ya_add(42);
+        bf.ya_add(100);
+        assert!(bf.ya_might_contain(42));
+        assert!(bf.ya_might_contain(100));
+    }
+
+    #[test]
+    fn ya_bloom_no_false_negatives() {
+        let mut bf = super::YaBloomFilter::ya_new(10000, 7);
+        for i in 0..100 { bf.ya_add(i); }
+        for i in 0..100 { assert!(bf.ya_might_contain(i)); }
+    }
+
+    #[test]
+    fn ya_bloom_with_fp_rate() {
+        let bf = super::YaBloomFilter::ya_with_fp_rate(1000, 0.01);
+        assert!(bf.ya_bit_size() > 0);
+        assert!(bf.ya_num_hashes() > 0);
+    }
+
+    #[test]
+    fn ya_bloom_clear() {
+        let mut bf = super::YaBloomFilter::ya_new(1000, 5);
+        bf.ya_add(1);
+        bf.ya_clear();
+        assert_eq!(bf.ya_count(), 0);
+        assert!(!bf.ya_might_contain(1));
+    }
+
+    #[test]
+    fn ya_bloom_merge() {
+        let mut a = super::YaBloomFilter::ya_new(1000, 5);
+        let mut b = super::YaBloomFilter::ya_new(1000, 5);
+        a.ya_add(1);
+        b.ya_add(2);
+        a.ya_merge(&b);
+        assert!(a.ya_might_contain(1));
+        assert!(a.ya_might_contain(2));
+    }
+
+    #[test]
+    fn ya_bloom_fp_rate() {
+        let bf = super::YaBloomFilter::ya_new(1000, 5);
+        assert_eq!(bf.ya_estimated_fp_rate(), 0.0);
+    }
+
+    #[test]
+    fn ya_bloom_display() {
+        let bf = super::YaBloomFilter::ya_new(100, 3);
+        assert!(format!("{}", bf).contains("Bloom"));
+    }
+
+    #[test]
+    fn ya_bloom_default() {
+        let bf = super::YaBloomFilter::default();
+        assert_eq!(bf.ya_num_hashes(), 5);
     }
 
 }
