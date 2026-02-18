@@ -27314,6 +27314,80 @@ impl AztScopeSelector {
     pub fn specificity(&self) -> usize { self.parts.len() }
 }
 
+
+// --- azu_ editor drag-drop and data transfer ---
+
+/// Drag-drop data kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzuDropKind { Text, Files, Uri, Custom }
+
+/// Data transfer item.
+#[derive(Debug, Clone)]
+pub struct AzuTransferItem {
+    pub kind: AzuDropKind,
+    pub mime_type: String,
+    pub data: Vec<u8>,
+}
+
+impl AzuTransferItem {
+    pub fn text(s: &str) -> Self { Self { kind: AzuDropKind::Text, mime_type: "text/plain".to_string(), data: s.as_bytes().to_vec() } }
+    pub fn uri(u: &str) -> Self { Self { kind: AzuDropKind::Uri, mime_type: "text/uri-list".to_string(), data: u.as_bytes().to_vec() } }
+    pub fn files(paths: &[&str]) -> Self {
+        let joined = paths.join("
+");
+        Self { kind: AzuDropKind::Files, mime_type: "text/uri-list".to_string(), data: joined.into_bytes() }
+    }
+    pub fn as_text(&self) -> Option<String> { String::from_utf8(self.data.clone()).ok() }
+    pub fn is_text(&self) -> bool { self.kind == AzuDropKind::Text }
+    pub fn is_files(&self) -> bool { self.kind == AzuDropKind::Files }
+    pub fn byte_size(&self) -> usize { self.data.len() }
+}
+
+/// Drop target position.
+#[derive(Debug, Clone)]
+pub struct AzuDropTarget {
+    pub line: u32,
+    pub col: u32,
+    pub area: AzuDropArea,
+}
+
+/// Drop area classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AzuDropArea { Editor, Explorer, TabBar, Terminal, Panel }
+
+impl AzuDropTarget {
+    pub fn editor(line: u32, col: u32) -> Self { Self { line, col, area: AzuDropArea::Editor } }
+    pub fn explorer() -> Self { Self { line: 0, col: 0, area: AzuDropArea::Explorer } }
+    pub fn tab_bar() -> Self { Self { line: 0, col: 0, area: AzuDropArea::TabBar } }
+    pub fn is_editor(&self) -> bool { self.area == AzuDropArea::Editor }
+}
+
+/// Drag-drop operation state.
+#[derive(Debug)]
+pub struct AzuDragDropState {
+    pub active: bool,
+    pub items: Vec<AzuTransferItem>,
+    pub target: Option<AzuDropTarget>,
+    pub copy_mode: bool,
+}
+
+impl AzuDragDropState {
+    pub fn new() -> Self { Self { active: false, items: Vec::new(), target: None, copy_mode: false } }
+    pub fn start_drag(&mut self, items: Vec<AzuTransferItem>) { self.active = true; self.items = items; }
+    pub fn update_target(&mut self, t: AzuDropTarget) { self.target = Some(t); }
+    pub fn set_copy(&mut self, c: bool) { self.copy_mode = c; }
+    pub fn cancel(&mut self) { self.active = false; self.items.clear(); self.target = None; }
+    pub fn complete(&mut self) -> Option<(Vec<AzuTransferItem>, AzuDropTarget)> {
+        if !self.active { return None; }
+        self.active = false;
+        let items = std::mem::take(&mut self.items);
+        self.target.take().map(|t| (items, t))
+    }
+    pub fn item_count(&self) -> usize { self.items.len() }
+    pub fn has_text(&self) -> bool { self.items.iter().any(|i| i.is_text()) }
+    pub fn has_files(&self) -> bool { self.items.iter().any(|i| i.is_files()) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -44442,6 +44516,77 @@ goodbye";
         line.add_token(AztClassifiedToken::new(5, 7, AztTokenClass::StringLiteral));
         line.add_token(AztClassifiedToken::new(15, 4, AztTokenClass::StringLiteral));
         assert_eq!(line.strings().len(), 2);
+    }
+
+
+    #[test]
+    fn test_azu_transfer_text() {
+        let t = AzuTransferItem::text("hello");
+        assert!(t.is_text());
+        assert_eq!(t.as_text().unwrap(), "hello");
+        assert_eq!(t.byte_size(), 5);
+    }
+
+    #[test]
+    fn test_azu_transfer_uri() {
+        let t = AzuTransferItem::uri("file:///path");
+        assert_eq!(t.kind, AzuDropKind::Uri);
+        assert!(t.as_text().unwrap().contains("file:"));
+    }
+
+    #[test]
+    fn test_azu_transfer_files() {
+        let t = AzuTransferItem::files(&["/a.rs", "/b.rs"]);
+        assert!(t.is_files());
+        let text = t.as_text().unwrap();
+        assert!(text.contains("/a.rs"));
+    }
+
+    #[test]
+    fn test_azu_drop_target() {
+        let t = AzuDropTarget::editor(10, 5);
+        assert!(t.is_editor());
+        let e = AzuDropTarget::explorer();
+        assert!(!e.is_editor());
+    }
+
+    #[test]
+    fn test_azu_drag_drop_lifecycle() {
+        let mut state = AzuDragDropState::new();
+        assert!(!state.active);
+        state.start_drag(vec![AzuTransferItem::text("data")]);
+        assert!(state.active);
+        assert!(state.has_text());
+        state.update_target(AzuDropTarget::editor(5, 0));
+        let result = state.complete();
+        assert!(result.is_some());
+        let (items, target) = result.unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(target.is_editor());
+    }
+
+    #[test]
+    fn test_azu_cancel() {
+        let mut state = AzuDragDropState::new();
+        state.start_drag(vec![AzuTransferItem::text("x")]);
+        state.cancel();
+        assert!(!state.active);
+        assert_eq!(state.item_count(), 0);
+    }
+
+    #[test]
+    fn test_azu_copy_mode() {
+        let mut state = AzuDragDropState::new();
+        state.start_drag(vec![AzuTransferItem::files(&["/a"])]);
+        state.set_copy(true);
+        assert!(state.copy_mode);
+        assert!(state.has_files());
+    }
+
+    #[test]
+    fn test_azu_complete_inactive() {
+        let mut state = AzuDragDropState::new();
+        assert!(state.complete().is_none());
     }
 
 }
