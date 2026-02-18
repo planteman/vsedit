@@ -7907,6 +7907,262 @@ impl XwRope {
     pub fn xw_clear(&mut self) { self.xw_root = None; }
 }
 
+
+// --- xx_ Skip List ---
+
+/// A node in a skip list with multiple forward pointers for O(log n) search.
+#[derive(Debug, Clone)]
+pub struct XxSkipNode<K: Ord + Clone, V: Clone> {
+    pub xx_key: Option<K>,
+    pub xx_value: Option<V>,
+    xx_forward: Vec<Option<usize>>,
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for XxSkipNode<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.xx_key {
+            Some(k) => write!(f, "SkipNode(k={}, lvl={})", k, self.xx_forward.len()),
+            None => write!(f, "SkipNode(HEAD, lvl={})", self.xx_forward.len()),
+        }
+    }
+}
+
+/// Skip list — a probabilistic data structure with O(log n) average search, insert, delete.
+#[derive(Debug, Clone)]
+pub struct XxSkipList<K: Ord + Clone, V: Clone> {
+    xx_nodes: Vec<XxSkipNode<K, V>>,
+    xx_head: usize,
+    xx_max_level: usize,
+    xx_level: usize,
+    xx_size: usize,
+    xx_rng_state: u64,
+}
+
+impl<K: Ord + Clone, V: Clone> Default for XxSkipList<K, V> {
+    fn default() -> Self { Self::xx_new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for XxSkipList<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SkipList(size={}, level={})", self.xx_size, self.xx_level)
+    }
+}
+
+impl<K: Ord + Clone, V: Clone> XxSkipList<K, V> {
+    const XX_MAX_LEVEL: usize = 16;
+
+    /// Create an empty skip list.
+    pub fn xx_new() -> Self {
+        let head = XxSkipNode {
+            xx_key: None,
+            xx_value: None,
+            xx_forward: vec![None; Self::XX_MAX_LEVEL],
+        };
+        Self {
+            xx_nodes: vec![head],
+            xx_head: 0,
+            xx_max_level: Self::XX_MAX_LEVEL,
+            xx_level: 1,
+            xx_size: 0,
+            xx_rng_state: 42,
+        }
+    }
+
+    fn xx_random_level(&mut self) -> usize {
+        let mut lvl = 1;
+        while lvl < self.xx_max_level {
+            self.xx_rng_state ^= self.xx_rng_state << 13;
+            self.xx_rng_state ^= self.xx_rng_state >> 7;
+            self.xx_rng_state ^= self.xx_rng_state << 17;
+            if self.xx_rng_state % 4 < 1 { break; }
+            lvl += 1;
+        }
+        lvl
+    }
+
+    /// Number of elements.
+    pub fn xx_len(&self) -> usize { self.xx_size }
+
+    /// Is empty.
+    pub fn xx_is_empty(&self) -> bool { self.xx_size == 0 }
+
+    /// Insert a key-value pair.
+    pub fn xx_insert(&mut self, key: K, value: V) {
+        let mut update = vec![self.xx_head; self.xx_max_level];
+        let mut current = self.xx_head;
+        for i in (0..self.xx_level).rev() {
+            while let Some(next) = self.xx_nodes[current].xx_forward[i] {
+                if let Some(ref nk) = self.xx_nodes[next].xx_key {
+                    if *nk < key { current = next; continue; }
+                    if *nk == key {
+                        self.xx_nodes[next].xx_value = Some(value);
+                        return;
+                    }
+                }
+                break;
+            }
+            update[i] = current;
+        }
+        let lvl = self.xx_random_level();
+        if lvl > self.xx_level {
+            for i in self.xx_level..lvl {
+                update[i] = self.xx_head;
+            }
+            self.xx_level = lvl;
+        }
+        let new_idx = self.xx_nodes.len();
+        self.xx_nodes.push(XxSkipNode {
+            xx_key: Some(key),
+            xx_value: Some(value),
+            xx_forward: vec![None; lvl],
+        });
+        for i in 0..lvl {
+            self.xx_nodes[new_idx].xx_forward[i] = self.xx_nodes[update[i]].xx_forward[i];
+            self.xx_nodes[update[i]].xx_forward[i] = Some(new_idx);
+        }
+        self.xx_size += 1;
+    }
+
+    /// Search for a key.
+    pub fn xx_get(&self, key: &K) -> Option<&V> {
+        let mut current = self.xx_head;
+        for i in (0..self.xx_level).rev() {
+            while let Some(next) = self.xx_nodes[current].xx_forward[i] {
+                if let Some(ref nk) = self.xx_nodes[next].xx_key {
+                    if *nk < *key { current = next; continue; }
+                    if *nk == *key { return self.xx_nodes[next].xx_value.as_ref(); }
+                }
+                break;
+            }
+        }
+        None
+    }
+
+    /// Check if key exists.
+    pub fn xx_contains(&self, key: &K) -> bool { self.xx_get(key).is_some() }
+
+    /// Collect all keys in sorted order.
+    pub fn xx_keys(&self) -> Vec<K> {
+        let mut result = Vec::new();
+        let mut current = self.xx_nodes[self.xx_head].xx_forward[0];
+        while let Some(idx) = current {
+            if let Some(ref k) = self.xx_nodes[idx].xx_key {
+                result.push(k.clone());
+            }
+            current = self.xx_nodes[idx].xx_forward[0];
+        }
+        result
+    }
+
+    /// Clear the skip list.
+    pub fn xx_clear(&mut self) {
+        self.xx_nodes.truncate(1);
+        for i in 0..self.xx_max_level {
+            self.xx_nodes[0].xx_forward[i] = None;
+        }
+        self.xx_level = 1;
+        self.xx_size = 0;
+    }
+}
+
+// --- xx_ Suffix Array ---
+
+/// Suffix array for O(n log n) construction and O(m log n) pattern matching.
+#[derive(Debug, Clone)]
+pub struct XxSuffixArray {
+    xx_text: String,
+    xx_sa: Vec<usize>,
+}
+
+impl std::fmt::Display for XxSuffixArray {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SuffixArray(len={})", self.xx_text.len())
+    }
+}
+
+impl Default for XxSuffixArray {
+    fn default() -> Self { Self::xx_new("") }
+}
+
+impl XxSuffixArray {
+    /// Build a suffix array from a string.
+    pub fn xx_new(text: &str) -> Self {
+        let n = text.len();
+        let bytes = text.as_bytes();
+        let mut sa: Vec<usize> = (0..n).collect();
+        sa.sort_by(|&a, &b| bytes[a..].cmp(&bytes[b..]));
+        Self { xx_text: text.to_string(), xx_sa: sa }
+    }
+
+    /// Length of the text.
+    pub fn xx_len(&self) -> usize { self.xx_text.len() }
+
+    /// Is empty.
+    pub fn xx_is_empty(&self) -> bool { self.xx_text.is_empty() }
+
+    /// Get the suffix array.
+    pub fn xx_array(&self) -> &[usize] { &self.xx_sa }
+
+    /// Get the original text.
+    pub fn xx_text(&self) -> &str { &self.xx_text }
+
+    /// Search for a pattern, returning all starting positions.
+    pub fn xx_search(&self, pattern: &str) -> Vec<usize> {
+        if pattern.is_empty() || self.xx_text.is_empty() { return Vec::new(); }
+        let pb = pattern.as_bytes();
+        let tb = self.xx_text.as_bytes();
+        let n = tb.len();
+        let m = pb.len();
+        // Binary search for lower bound
+        let mut lo = 0usize;
+        let mut hi = n;
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            let start = self.xx_sa[mid];
+            let end = std::cmp::min(start + m, n);
+            if tb[start..end] < *pb { lo = mid + 1; } else { hi = mid; }
+        }
+        let lower = lo;
+        hi = n;
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            let start = self.xx_sa[mid];
+            let end = std::cmp::min(start + m, n);
+            if tb[start..end] <= *pb { lo = mid + 1; } else { hi = mid; }
+        }
+        let upper = lo;
+        self.xx_sa[lower..upper].to_vec()
+    }
+
+    /// Count occurrences of a pattern.
+    pub fn xx_count(&self, pattern: &str) -> usize {
+        self.xx_search(pattern).len()
+    }
+
+    /// Get the suffix at position i in sorted order.
+    pub fn xx_suffix_at(&self, i: usize) -> &str {
+        if i < self.xx_sa.len() { &self.xx_text[self.xx_sa[i]..] } else { "" }
+    }
+
+    /// Find the longest repeated substring.
+    pub fn xx_longest_repeated(&self) -> String {
+        if self.xx_sa.len() < 2 { return String::new(); }
+        let tb = self.xx_text.as_bytes();
+        let mut best_len = 0;
+        let mut best_start = 0;
+        for i in 1..self.xx_sa.len() {
+            let a = self.xx_sa[i - 1];
+            let b = self.xx_sa[i];
+            let mut lcp = 0;
+            while a + lcp < tb.len() && b + lcp < tb.len() && tb[a + lcp] == tb[b + lcp] {
+                lcp += 1;
+            }
+            if lcp > best_len { best_len = lcp; best_start = a; }
+        }
+        self.xx_text[best_start..best_start + best_len].to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -12503,6 +12759,158 @@ mod tests {
         let r = super::XwRope::xw_new();
         assert_eq!(r.xw_to_string(), "");
         assert_eq!(r.xw_substring(0, 5), "");
+    }
+
+
+    // --- xx_ Skip List tests ---
+
+    #[test]
+    fn xx_skip_list_new() {
+        let sl = super::XxSkipList::<i32, &str>::xx_new();
+        assert!(sl.xx_is_empty());
+        assert_eq!(sl.xx_len(), 0);
+    }
+
+    #[test]
+    fn xx_skip_list_insert_get() {
+        let mut sl = super::XxSkipList::xx_new();
+        sl.xx_insert(5, "five");
+        sl.xx_insert(3, "three");
+        sl.xx_insert(7, "seven");
+        assert_eq!(sl.xx_get(&5), Some(&"five"));
+        assert_eq!(sl.xx_get(&3), Some(&"three"));
+        assert_eq!(sl.xx_get(&7), Some(&"seven"));
+        assert_eq!(sl.xx_get(&4), None);
+    }
+
+    #[test]
+    fn xx_skip_list_contains() {
+        let mut sl = super::XxSkipList::xx_new();
+        sl.xx_insert(10, "a");
+        assert!(sl.xx_contains(&10));
+        assert!(!sl.xx_contains(&20));
+    }
+
+    #[test]
+    fn xx_skip_list_keys_sorted() {
+        let mut sl = super::XxSkipList::xx_new();
+        for k in [5, 3, 8, 1, 9, 2, 7, 4, 6] {
+            sl.xx_insert(k, k * 10);
+        }
+        assert_eq!(sl.xx_keys(), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn xx_skip_list_replace() {
+        let mut sl = super::XxSkipList::xx_new();
+        sl.xx_insert(5, "old");
+        sl.xx_insert(5, "new");
+        assert_eq!(sl.xx_get(&5), Some(&"new"));
+    }
+
+    #[test]
+    fn xx_skip_list_many() {
+        let mut sl = super::XxSkipList::xx_new();
+        for k in 1..=50 {
+            sl.xx_insert(k, k);
+        }
+        assert_eq!(sl.xx_len(), 50);
+        for k in 1..=50 {
+            assert!(sl.xx_contains(&k));
+        }
+    }
+
+    #[test]
+    fn xx_skip_list_clear() {
+        let mut sl = super::XxSkipList::xx_new();
+        sl.xx_insert(1, "a");
+        sl.xx_clear();
+        assert!(sl.xx_is_empty());
+    }
+
+    #[test]
+    fn xx_skip_list_display() {
+        let sl = super::XxSkipList::<i32, i32>::xx_new();
+        assert!(format!("{}", sl).contains("SkipList"));
+    }
+
+    #[test]
+    fn xx_skip_list_default() {
+        let sl = super::XxSkipList::<i32, i32>::default();
+        assert!(sl.xx_is_empty());
+    }
+
+    #[test]
+    fn xx_skip_node_display() {
+        let n = super::XxSkipNode::<i32, i32> { xx_key: Some(5), xx_value: Some(50), xx_forward: vec![None] };
+        assert!(format!("{}", n).contains("SkipNode"));
+    }
+
+    // --- xx_ Suffix Array tests ---
+
+    #[test]
+    fn xx_suffix_array_new() {
+        let sa = super::XxSuffixArray::xx_new("banana");
+        assert_eq!(sa.xx_len(), 6);
+        assert!(!sa.xx_is_empty());
+    }
+
+    #[test]
+    fn xx_suffix_array_search() {
+        let sa = super::XxSuffixArray::xx_new("banana");
+        let pos = sa.xx_search("ana");
+        assert_eq!(pos.len(), 2);
+    }
+
+    #[test]
+    fn xx_suffix_array_count() {
+        let sa = super::XxSuffixArray::xx_new("abcabcabc");
+        assert_eq!(sa.xx_count("abc"), 3);
+    }
+
+    #[test]
+    fn xx_suffix_array_no_match() {
+        let sa = super::XxSuffixArray::xx_new("hello");
+        assert_eq!(sa.xx_count("xyz"), 0);
+    }
+
+    #[test]
+    fn xx_suffix_array_suffix_at() {
+        let sa = super::XxSuffixArray::xx_new("abc");
+        let s = sa.xx_suffix_at(0);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn xx_suffix_array_longest_repeated() {
+        let sa = super::XxSuffixArray::xx_new("banana");
+        let lr = sa.xx_longest_repeated();
+        assert_eq!(lr, "ana");
+    }
+
+    #[test]
+    fn xx_suffix_array_empty() {
+        let sa = super::XxSuffixArray::xx_new("");
+        assert!(sa.xx_is_empty());
+        assert_eq!(sa.xx_search("a").len(), 0);
+    }
+
+    #[test]
+    fn xx_suffix_array_display() {
+        let sa = super::XxSuffixArray::xx_new("test");
+        assert!(format!("{}", sa).contains("SuffixArray"));
+    }
+
+    #[test]
+    fn xx_suffix_array_default() {
+        let sa = super::XxSuffixArray::default();
+        assert!(sa.xx_is_empty());
+    }
+
+    #[test]
+    fn xx_suffix_array_text() {
+        let sa = super::XxSuffixArray::xx_new("hello");
+        assert_eq!(sa.xx_text(), "hello");
     }
 
 }
