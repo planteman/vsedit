@@ -1571,6 +1571,115 @@ impl ScmDiffStatisticsView {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// scm_view – Workbench state helpers
+// ---------------------------------------------------------------------------
+
+/// Layout region within the workbench.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XScmViewLayoutRegion {
+    Sidebar,
+    Panel,
+    Editor,
+    Statusbar,
+    Titlebar,
+    Auxiliary,
+}
+
+/// Visibility state for a workbench panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XScmViewPanelState {
+    pub region: XScmViewLayoutRegion,
+    pub visible: bool,
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl XScmViewPanelState {
+    pub fn new(region: XScmViewLayoutRegion, label: impl Into<String>) -> Self {
+        Self { region, visible: true, width: 300, height: 200, label: label.into() }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn is_narrow(&self) -> bool {
+        self.width < 200
+    }
+}
+
+/// Compute the total visible area across a set of panels.
+pub fn x_scm_view_total_visible_area(panels: &[XScmViewPanelState]) -> u64 {
+    panels.iter().filter(|p| p.visible).map(|p| p.area()).sum()
+}
+
+/// Count panels visible in a specific region.
+pub fn x_scm_view_count_in_region(
+    panels: &[XScmViewPanelState],
+    region: XScmViewLayoutRegion,
+) -> usize {
+    panels.iter().filter(|p| p.region == region && p.visible).count()
+}
+
+/// Find the widest visible panel.
+pub fn x_scm_view_widest_panel(panels: &[XScmViewPanelState]) -> Option<&XScmViewPanelState> {
+    panels.iter().filter(|p| p.visible).max_by_key(|p| p.width)
+}
+
+/// Collapse all panels in a given region (set visible = false).
+pub fn x_scm_view_collapse_region(
+    panels: &mut [XScmViewPanelState],
+    region: XScmViewLayoutRegion,
+) {
+    for p in panels.iter_mut() {
+        if p.region == region {
+            p.visible = false;
+        }
+    }
+}
+
+/// Layout constraint: minimum and maximum dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XScmViewLayoutConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl XScmViewLayoutConstraint {
+    pub fn new(min_w: u32, max_w: u32, min_h: u32, max_h: u32) -> Self {
+        Self { min_width: min_w, max_width: max_w, min_height: min_h, max_height: max_h }
+    }
+
+    /// Clamp a width value to this constraint's range.
+    pub fn clamp_width(&self, w: u32) -> u32 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to this constraint's range.
+    pub fn clamp_height(&self, h: u32) -> u32 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Returns true if both dimensions are within the constraint.
+    pub fn is_satisfied(&self, w: u32, h: u32) -> bool {
+        w >= self.min_width && w <= self.max_width && h >= self.min_height && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2547,7 +2656,7 @@ index abc..def 100644
     // -- staging/unstaging view helpers -----------------------------------
 
     #[test]
-    fn toggle_staged_selected() {
+    fn toggle_staged_selected_works() {
         let mut view = ScmView::new();
         populate_from_git(&mut view, &[
             (PathBuf::from("a.rs"), FileStatus::Modified),
@@ -2773,5 +2882,133 @@ index abc..def 100644
         assert_eq!(sorted[2].path, "small.rs");
     }
 
+
+
+    // -- scm_view additional tests -------------------------------------------
+
+    #[test]
+    fn x_scm_view_panel_state_new() {
+        let p = XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "Explorer");
+        assert!(p.visible);
+        assert_eq!(p.label, "Explorer");
+        assert_eq!(p.region, XScmViewLayoutRegion::Sidebar);
+    }
+
+    #[test]
+    fn x_scm_view_panel_area() {
+        let p = XScmViewPanelState::new(XScmViewLayoutRegion::Editor, "ed");
+        assert_eq!(p.area(), 300 * 200);
+    }
+
+    #[test]
+    fn x_scm_view_panel_toggle() {
+        let mut p = XScmViewPanelState::new(XScmViewLayoutRegion::Panel, "terminal");
+        assert!(p.visible);
+        p.toggle();
+        assert!(!p.visible);
+        p.toggle();
+        assert!(p.visible);
+    }
+
+    #[test]
+    fn x_scm_view_panel_resize() {
+        let mut p = XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "files");
+        p.resize(400, 600);
+        assert_eq!(p.width, 400);
+        assert_eq!(p.height, 600);
+        assert_eq!(p.area(), 240_000);
+    }
+
+    #[test]
+    fn x_scm_view_panel_is_narrow() {
+        let mut p = XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "x");
+        assert!(!p.is_narrow());
+        p.resize(100, 200);
+        assert!(p.is_narrow());
+    }
+
+    #[test]
+    fn x_scm_view_total_visible_area_basic() {
+        let panels = vec![
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "a"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Editor, "b"),
+        ];
+        assert_eq!(x_scm_view_total_visible_area(&panels), 2 * 300 * 200);
+    }
+
+    #[test]
+    fn x_scm_view_total_visible_area_hidden() {
+        let mut panels = vec![
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "a"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Panel, "b"),
+        ];
+        panels[1].visible = false;
+        assert_eq!(x_scm_view_total_visible_area(&panels), 300 * 200);
+    }
+
+    #[test]
+    fn x_scm_view_count_in_region_basic() {
+        let panels = vec![
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "a"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "b"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Editor, "c"),
+        ];
+        assert_eq!(x_scm_view_count_in_region(&panels, XScmViewLayoutRegion::Sidebar), 2);
+        assert_eq!(x_scm_view_count_in_region(&panels, XScmViewLayoutRegion::Editor), 1);
+        assert_eq!(x_scm_view_count_in_region(&panels, XScmViewLayoutRegion::Panel), 0);
+    }
+
+    #[test]
+    fn x_scm_view_widest_panel_basic() {
+        let mut panels = vec![
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "narrow"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Editor, "wide"),
+        ];
+        panels[1].resize(800, 600);
+        let widest = x_scm_view_widest_panel(&panels).unwrap();
+        assert_eq!(widest.label, "wide");
+    }
+
+    #[test]
+    fn x_scm_view_collapse_region_basic() {
+        let mut panels = vec![
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "a"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Sidebar, "b"),
+            XScmViewPanelState::new(XScmViewLayoutRegion::Editor, "c"),
+        ];
+        x_scm_view_collapse_region(&mut panels, XScmViewLayoutRegion::Sidebar);
+        assert!(!panels[0].visible);
+        assert!(!panels[1].visible);
+        assert!(panels[2].visible);
+    }
+
+    #[test]
+    fn x_scm_view_layout_constraint_clamp() {
+        let lc = XScmViewLayoutConstraint::new(100, 800, 50, 600);
+        assert_eq!(lc.clamp_width(50), 100);
+        assert_eq!(lc.clamp_width(500), 500);
+        assert_eq!(lc.clamp_width(1000), 800);
+        assert_eq!(lc.clamp_height(10), 50);
+    }
+
+    #[test]
+    fn x_scm_view_layout_constraint_satisfied() {
+        let lc = XScmViewLayoutConstraint::new(100, 800, 50, 600);
+        assert!(lc.is_satisfied(400, 300));
+        assert!(!lc.is_satisfied(50, 300));
+        assert!(!lc.is_satisfied(400, 700));
+    }
+
+    #[test]
+    fn x_scm_view_widest_panel_empty() {
+        let panels: Vec<XScmViewPanelState> = vec![];
+        assert!(x_scm_view_widest_panel(&panels).is_none());
+    }
+
+    #[test]
+    fn x_scm_view_layout_region_eq() {
+        assert_eq!(XScmViewLayoutRegion::Sidebar, XScmViewLayoutRegion::Sidebar);
+        assert_ne!(XScmViewLayoutRegion::Sidebar, XScmViewLayoutRegion::Panel);
+    }
 
 }

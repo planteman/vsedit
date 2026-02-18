@@ -1694,6 +1694,115 @@ impl fmt::Display for SearchResultPreview {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// search_view – Workbench state helpers
+// ---------------------------------------------------------------------------
+
+/// Layout region within the workbench.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XSearchViewLayoutRegion {
+    Sidebar,
+    Panel,
+    Editor,
+    Statusbar,
+    Titlebar,
+    Auxiliary,
+}
+
+/// Visibility state for a workbench panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XSearchViewPanelState {
+    pub region: XSearchViewLayoutRegion,
+    pub visible: bool,
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl XSearchViewPanelState {
+    pub fn new(region: XSearchViewLayoutRegion, label: impl Into<String>) -> Self {
+        Self { region, visible: true, width: 300, height: 200, label: label.into() }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn is_narrow(&self) -> bool {
+        self.width < 200
+    }
+}
+
+/// Compute the total visible area across a set of panels.
+pub fn x_search_view_total_visible_area(panels: &[XSearchViewPanelState]) -> u64 {
+    panels.iter().filter(|p| p.visible).map(|p| p.area()).sum()
+}
+
+/// Count panels visible in a specific region.
+pub fn x_search_view_count_in_region(
+    panels: &[XSearchViewPanelState],
+    region: XSearchViewLayoutRegion,
+) -> usize {
+    panels.iter().filter(|p| p.region == region && p.visible).count()
+}
+
+/// Find the widest visible panel.
+pub fn x_search_view_widest_panel(panels: &[XSearchViewPanelState]) -> Option<&XSearchViewPanelState> {
+    panels.iter().filter(|p| p.visible).max_by_key(|p| p.width)
+}
+
+/// Collapse all panels in a given region (set visible = false).
+pub fn x_search_view_collapse_region(
+    panels: &mut [XSearchViewPanelState],
+    region: XSearchViewLayoutRegion,
+) {
+    for p in panels.iter_mut() {
+        if p.region == region {
+            p.visible = false;
+        }
+    }
+}
+
+/// Layout constraint: minimum and maximum dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XSearchViewLayoutConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl XSearchViewLayoutConstraint {
+    pub fn new(min_w: u32, max_w: u32, min_h: u32, max_h: u32) -> Self {
+        Self { min_width: min_w, max_width: max_w, min_height: min_h, max_height: max_h }
+    }
+
+    /// Clamp a width value to this constraint's range.
+    pub fn clamp_width(&self, w: u32) -> u32 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to this constraint's range.
+    pub fn clamp_height(&self, h: u32) -> u32 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Returns true if both dimensions are within the constraint.
+    pub fn is_satisfied(&self, w: u32, h: u32) -> bool {
+        w >= self.min_width && w <= self.max_width && h >= self.min_height && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1943,7 +2052,7 @@ mod tests {
     }
 
     #[test]
-    fn replace_all_in_file() {
+    fn replace_all_in_file_works() {
         let dir = temp_dir();
         let path = write_file(&dir, "replace.txt", "hello world\ngoodbye world\n");
         let fm = FileMatches::new(
@@ -2729,4 +2838,132 @@ mod tests {
         assert_eq!(stats.total_matches, 2);
         assert_eq!(stats.lines_with_matches, 2);
     }
+
+    // -- search_view additional tests -------------------------------------------
+
+    #[test]
+    fn x_search_view_panel_state_new() {
+        let p = XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "Explorer");
+        assert!(p.visible);
+        assert_eq!(p.label, "Explorer");
+        assert_eq!(p.region, XSearchViewLayoutRegion::Sidebar);
+    }
+
+    #[test]
+    fn x_search_view_panel_area() {
+        let p = XSearchViewPanelState::new(XSearchViewLayoutRegion::Editor, "ed");
+        assert_eq!(p.area(), 300 * 200);
+    }
+
+    #[test]
+    fn x_search_view_panel_toggle() {
+        let mut p = XSearchViewPanelState::new(XSearchViewLayoutRegion::Panel, "terminal");
+        assert!(p.visible);
+        p.toggle();
+        assert!(!p.visible);
+        p.toggle();
+        assert!(p.visible);
+    }
+
+    #[test]
+    fn x_search_view_panel_resize() {
+        let mut p = XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "files");
+        p.resize(400, 600);
+        assert_eq!(p.width, 400);
+        assert_eq!(p.height, 600);
+        assert_eq!(p.area(), 240_000);
+    }
+
+    #[test]
+    fn x_search_view_panel_is_narrow() {
+        let mut p = XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "x");
+        assert!(!p.is_narrow());
+        p.resize(100, 200);
+        assert!(p.is_narrow());
+    }
+
+    #[test]
+    fn x_search_view_total_visible_area_basic() {
+        let panels = vec![
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "a"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Editor, "b"),
+        ];
+        assert_eq!(x_search_view_total_visible_area(&panels), 2 * 300 * 200);
+    }
+
+    #[test]
+    fn x_search_view_total_visible_area_hidden() {
+        let mut panels = vec![
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "a"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Panel, "b"),
+        ];
+        panels[1].visible = false;
+        assert_eq!(x_search_view_total_visible_area(&panels), 300 * 200);
+    }
+
+    #[test]
+    fn x_search_view_count_in_region_basic() {
+        let panels = vec![
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "a"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "b"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Editor, "c"),
+        ];
+        assert_eq!(x_search_view_count_in_region(&panels, XSearchViewLayoutRegion::Sidebar), 2);
+        assert_eq!(x_search_view_count_in_region(&panels, XSearchViewLayoutRegion::Editor), 1);
+        assert_eq!(x_search_view_count_in_region(&panels, XSearchViewLayoutRegion::Panel), 0);
+    }
+
+    #[test]
+    fn x_search_view_widest_panel_basic() {
+        let mut panels = vec![
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "narrow"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Editor, "wide"),
+        ];
+        panels[1].resize(800, 600);
+        let widest = x_search_view_widest_panel(&panels).unwrap();
+        assert_eq!(widest.label, "wide");
+    }
+
+    #[test]
+    fn x_search_view_collapse_region_basic() {
+        let mut panels = vec![
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "a"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Sidebar, "b"),
+            XSearchViewPanelState::new(XSearchViewLayoutRegion::Editor, "c"),
+        ];
+        x_search_view_collapse_region(&mut panels, XSearchViewLayoutRegion::Sidebar);
+        assert!(!panels[0].visible);
+        assert!(!panels[1].visible);
+        assert!(panels[2].visible);
+    }
+
+    #[test]
+    fn x_search_view_layout_constraint_clamp() {
+        let lc = XSearchViewLayoutConstraint::new(100, 800, 50, 600);
+        assert_eq!(lc.clamp_width(50), 100);
+        assert_eq!(lc.clamp_width(500), 500);
+        assert_eq!(lc.clamp_width(1000), 800);
+        assert_eq!(lc.clamp_height(10), 50);
+    }
+
+    #[test]
+    fn x_search_view_layout_constraint_satisfied() {
+        let lc = XSearchViewLayoutConstraint::new(100, 800, 50, 600);
+        assert!(lc.is_satisfied(400, 300));
+        assert!(!lc.is_satisfied(50, 300));
+        assert!(!lc.is_satisfied(400, 700));
+    }
+
+    #[test]
+    fn x_search_view_widest_panel_empty() {
+        let panels: Vec<XSearchViewPanelState> = vec![];
+        assert!(x_search_view_widest_panel(&panels).is_none());
+    }
+
+    #[test]
+    fn x_search_view_layout_region_eq() {
+        assert_eq!(XSearchViewLayoutRegion::Sidebar, XSearchViewLayoutRegion::Sidebar);
+        assert_ne!(XSearchViewLayoutRegion::Sidebar, XSearchViewLayoutRegion::Panel);
+    }
+
 }

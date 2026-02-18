@@ -1748,6 +1748,125 @@ impl NotificationHistory {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// notification_svc – Platform service helpers
+// ---------------------------------------------------------------------------
+
+/// Capability flags for platform feature detection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XNotificationSvcCapabilities {
+    flags: std::collections::HashSet<String>,
+}
+
+impl XNotificationSvcCapabilities {
+    pub fn new() -> Self {
+        Self { flags: std::collections::HashSet::new() }
+    }
+
+    pub fn register(&mut self, cap: impl Into<String>) {
+        self.flags.insert(cap.into());
+    }
+
+    pub fn has(&self, cap: &str) -> bool {
+        self.flags.contains(cap)
+    }
+
+    pub fn len(&self) -> usize {
+        self.flags.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.flags.is_empty()
+    }
+
+    /// Return the intersection with another capability set.
+    pub fn intersect(&self, other: &Self) -> Self {
+        Self {
+            flags: self.flags.intersection(&other.flags).cloned().collect(),
+        }
+    }
+
+    /// Return capabilities present here but not in `other`.
+    pub fn diff(&self, other: &Self) -> Self {
+        Self {
+            flags: self.flags.difference(&other.flags).cloned().collect(),
+        }
+    }
+
+    pub fn all(&self) -> Vec<&str> {
+        self.flags.iter().map(|s| s.as_str()).collect()
+    }
+}
+
+impl Default for XNotificationSvcCapabilities {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A simple service registry keyed by name.
+#[derive(Debug, Default)]
+pub struct XNotificationSvcServiceRegistry {
+    services: std::collections::HashMap<String, String>,
+}
+
+impl XNotificationSvcServiceRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a service. Returns the previous value if the key was already present.
+    pub fn register(&mut self, name: impl Into<String>, descriptor: impl Into<String>) -> Option<String> {
+        self.services.insert(name.into(), descriptor.into())
+    }
+
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.services.get(name).map(|s| s.as_str())
+    }
+
+    pub fn contains(&self, name: &str) -> bool {
+        self.services.contains_key(name)
+    }
+
+    pub fn remove(&mut self, name: &str) -> Option<String> {
+        self.services.remove(name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.services.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.services.is_empty()
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        self.services.keys().map(|s| s.as_str()).collect()
+    }
+}
+
+/// Sanitize a path-like string by collapsing repeated separators and removing trailing ones.
+pub fn x_notification_svc_sanitize_path(p: &str) -> String {
+    let mut result = String::with_capacity(p.len());
+    let mut last_was_sep = false;
+    for ch in p.chars() {
+        if ch == '/' || ch == '\\' {
+            if !last_was_sep {
+                result.push('/');
+            }
+            last_was_sep = true;
+        } else {
+            result.push(ch);
+            last_was_sep = false;
+        }
+    }
+    if result.len() > 1 && result.ends_with('/') {
+        result.pop();
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1830,7 +1949,7 @@ mod tests {
     }
 
     #[test]
-    fn set_sticky() {
+    fn set_sticky_works() {
         let mut svc = NotificationService::new();
         let id = svc.warn("important");
         svc.set_sticky(id, true);
@@ -1840,7 +1959,7 @@ mod tests {
     }
 
     #[test]
-    fn get_by_severity() {
+    fn get_by_severity_works() {
         let mut svc = NotificationService::new();
         svc.info("a");
         svc.warn("b");
@@ -1851,7 +1970,7 @@ mod tests {
     }
 
     #[test]
-    fn get_by_source() {
+    fn get_by_source_works() {
         let mut svc = NotificationService::new();
         let id = svc.info("from linter");
         // Manually set source for testing.
@@ -1862,7 +1981,7 @@ mod tests {
     }
 
     #[test]
-    fn remove_dismissed() {
+    fn remove_dismissed_works() {
         let mut svc = NotificationService::new();
         let id = svc.info("gone");
         svc.info("stay");
@@ -1873,7 +1992,7 @@ mod tests {
     }
 
     #[test]
-    fn get_stats() {
+    fn get_stats_works() {
         let mut svc = NotificationService::new();
         svc.info("a");
         svc.warn("b");
@@ -1949,7 +2068,7 @@ mod tests {
     }
 
     #[test]
-    fn dedup_by_message() {
+    fn dedup_by_message_works() {
         let mut svc = NotificationService::new();
         svc.info("hello");
         svc.info("hello");
@@ -1964,7 +2083,7 @@ mod tests {
     }
 
     #[test]
-    fn has_duplicate() {
+    fn has_duplicate_works() {
         let mut svc = NotificationService::new();
         svc.info("test msg");
         assert!(svc.has_duplicate("test msg"));
@@ -1987,7 +2106,7 @@ mod tests {
     }
 
     #[test]
-    fn add_with_priority() {
+    fn add_with_priority_works() {
         let mut svc = NotificationService::new();
         svc.add_with_priority("urgent!", NotificationSeverity::Error, NotificationPriority::Urgent);
         svc.add_with_priority("low priority", NotificationSeverity::Info, NotificationPriority::Low);
@@ -2008,7 +2127,7 @@ mod tests {
     }
 
     #[test]
-    fn highest_priority_active() {
+    fn highest_priority_active_works() {
         let mut svc = NotificationService::new();
         assert!(svc.highest_priority_active().is_none());
 
@@ -2793,4 +2912,115 @@ mod tests {
         assert_eq!(recent.len(), 2);
         assert_eq!(recent[0].message, "c");
     }
+
+    // -- notification_svc additional tests -------------------------------------------
+
+    #[test]
+    fn x_notification_svc_capabilities_register_and_has() {
+        let mut caps = XNotificationSvcCapabilities::new();
+        caps.register("clipboard");
+        assert!(caps.has("clipboard"));
+        assert!(!caps.has("fs"));
+    }
+
+    #[test]
+    fn x_notification_svc_capabilities_len() {
+        let mut caps = XNotificationSvcCapabilities::new();
+        assert!(caps.is_empty());
+        caps.register("a");
+        caps.register("b");
+        assert_eq!(caps.len(), 2);
+    }
+
+    #[test]
+    fn x_notification_svc_capabilities_intersect() {
+        let mut a = XNotificationSvcCapabilities::new();
+        a.register("x");
+        a.register("y");
+        let mut b = XNotificationSvcCapabilities::new();
+        b.register("y");
+        b.register("z");
+        let inter = a.intersect(&b);
+        assert_eq!(inter.len(), 1);
+        assert!(inter.has("y"));
+    }
+
+    #[test]
+    fn x_notification_svc_capabilities_diff() {
+        let mut a = XNotificationSvcCapabilities::new();
+        a.register("x");
+        a.register("y");
+        let mut b = XNotificationSvcCapabilities::new();
+        b.register("y");
+        let d = a.diff(&b);
+        assert_eq!(d.len(), 1);
+        assert!(d.has("x"));
+    }
+
+    #[test]
+    fn x_notification_svc_service_registry_basic() {
+        let mut reg = XNotificationSvcServiceRegistry::new();
+        assert!(reg.is_empty());
+        reg.register("clipboard", "v1");
+        assert_eq!(reg.get("clipboard"), Some("v1"));
+        assert!(reg.contains("clipboard"));
+    }
+
+    #[test]
+    fn x_notification_svc_service_registry_replace() {
+        let mut reg = XNotificationSvcServiceRegistry::new();
+        assert!(reg.register("svc", "old").is_none());
+        assert_eq!(reg.register("svc", "new"), Some("old".into()));
+        assert_eq!(reg.get("svc"), Some("new"));
+    }
+
+    #[test]
+    fn x_notification_svc_service_registry_remove() {
+        let mut reg = XNotificationSvcServiceRegistry::new();
+        reg.register("svc", "v1");
+        assert_eq!(reg.remove("svc"), Some("v1".into()));
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn x_notification_svc_service_registry_names() {
+        let mut reg = XNotificationSvcServiceRegistry::new();
+        reg.register("a", "1");
+        reg.register("b", "2");
+        let mut names = reg.names();
+        names.sort();
+        assert_eq!(names, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn x_notification_svc_sanitize_path_basic() {
+        assert_eq!(x_notification_svc_sanitize_path("/a//b///c/"), "/a/b/c");
+    }
+
+    #[test]
+    fn x_notification_svc_sanitize_path_backslash() {
+        assert_eq!(x_notification_svc_sanitize_path("a\\b\\c"), "a/b/c");
+    }
+
+    #[test]
+    fn x_notification_svc_sanitize_path_single() {
+        assert_eq!(x_notification_svc_sanitize_path("/"), "/");
+    }
+
+    #[test]
+    fn x_notification_svc_capabilities_default() {
+        let caps = XNotificationSvcCapabilities::default();
+        assert!(caps.is_empty());
+    }
+
+    #[test]
+    fn x_notification_svc_capabilities_all() {
+        let mut caps = XNotificationSvcCapabilities::new();
+        caps.register("a");
+        caps.register("b");
+        let mut all = caps.all();
+        all.sort();
+        assert_eq!(all, vec!["a", "b"]);
+    }
+
 }

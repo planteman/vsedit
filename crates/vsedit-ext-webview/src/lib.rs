@@ -1653,6 +1653,128 @@ impl Default for WebviewCspDirectiveBuilder {
     fn default() -> Self { Self::new() }
 }
 
+
+// ---------------------------------------------------------------------------
+// ext_webview – Extension protocol helpers
+// ---------------------------------------------------------------------------
+
+/// Activation event kinds for extension lifecycle management.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum XExtWebviewActivationKind {
+    /// Activate on a specific language.
+    Language(String),
+    /// Activate on a command.
+    Command(String),
+    /// Activate on a workspace-contains glob.
+    WorkspaceContains(String),
+    /// Activate on a custom URI scheme.
+    UriScheme(String),
+    /// Activate on startup.
+    Star,
+}
+
+impl XExtWebviewActivationKind {
+    /// Parse an activation event string like `"onLanguage:rust"`.
+    pub fn parse(raw: &str) -> Option<Self> {
+        if raw == "*" {
+            return Some(Self::Star);
+        }
+        let (kind, value) = raw.split_once(':')?;
+        match kind {
+            "onLanguage" => Some(Self::Language(value.to_string())),
+            "onCommand" => Some(Self::Command(value.to_string())),
+            "workspaceContains" => Some(Self::WorkspaceContains(value.to_string())),
+            "onUri" => Some(Self::UriScheme(value.to_string())),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this activation kind targets a specific language.
+    pub fn is_language(&self) -> bool {
+        matches!(self, Self::Language(_))
+    }
+}
+
+/// Message envelope for extension host RPC.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XExtWebviewRpcEnvelope {
+    pub seq: u64,
+    pub method: String,
+    pub payload: String,
+}
+
+impl XExtWebviewRpcEnvelope {
+    /// Create a new RPC envelope.
+    pub fn new(seq: u64, method: impl Into<String>, payload: impl Into<String>) -> Self {
+        Self { seq, method: method.into(), payload: payload.into() }
+    }
+
+    /// Returns true when the envelope carries a response (method starts with `$/`).
+    pub fn is_response(&self) -> bool {
+        self.method.starts_with("$/")
+    }
+
+    /// Compute a simple checksum of the payload (sum of bytes mod 2^32).
+    pub fn payload_checksum(&self) -> u32 {
+        self.payload.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32))
+    }
+}
+
+/// Batch multiple RPC envelopes and return their sequence numbers.
+pub fn x_ext_webview_collect_sequences(envelopes: &[XExtWebviewRpcEnvelope]) -> Vec<u64> {
+    envelopes.iter().map(|e| e.seq).collect()
+}
+
+/// Filter envelopes by method prefix.
+pub fn x_ext_webview_filter_by_method<'a>(
+    envelopes: &'a [XExtWebviewRpcEnvelope],
+    method_prefix: &str,
+) -> Vec<&'a XExtWebviewRpcEnvelope> {
+    envelopes.iter().filter(|e| e.method.starts_with(method_prefix)).collect()
+}
+
+/// Deduplicate envelopes by sequence number, keeping the first occurrence.
+pub fn x_ext_webview_dedup_by_seq(envelopes: Vec<XExtWebviewRpcEnvelope>) -> Vec<XExtWebviewRpcEnvelope> {
+    let mut seen = std::collections::HashSet::new();
+    envelopes.into_iter().filter(|e| seen.insert(e.seq)).collect()
+}
+
+/// Simple capability negotiation: given requested and available feature sets,
+/// return the intersection.
+pub fn x_ext_webview_negotiate_capabilities(
+    requested: &[&str],
+    available: &[&str],
+) -> Vec<String> {
+    requested.iter()
+        .filter(|r| available.contains(r))
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Version tuple for extension API compatibility checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct XExtWebviewApiVersion {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl XExtWebviewApiVersion {
+    pub fn new(major: u32, minor: u32, patch: u32) -> Self {
+        Self { major, minor, patch }
+    }
+    /// Check if this version satisfies a minimum requirement.
+    pub fn satisfies(&self, min: &Self) -> bool {
+        (self.major, self.minor, self.patch) >= (min.major, min.minor, min.patch)
+    }
+}
+
+impl std::fmt::Display for XExtWebviewApiVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2738,6 +2860,120 @@ mod tests {
         let mut b = WebviewCspDirectiveBuilder::new();
         b.default_src(&["'self'"]).style_src(&["'unsafe-inline'"]);
         assert_eq!(b.directive_count(), 2);
+    }
+
+
+    // -- ext_webview additional tests -------------------------------------------
+
+    #[test]
+    fn x_ext_webview_activation_parse_language() {
+        let ak = XExtWebviewActivationKind::parse("onLanguage:rust").unwrap();
+        assert_eq!(ak, XExtWebviewActivationKind::Language("rust".into()));
+        assert!(ak.is_language());
+    }
+
+    #[test]
+    fn x_ext_webview_activation_parse_command() {
+        let ak = XExtWebviewActivationKind::parse("onCommand:editor.action.format").unwrap();
+        assert_eq!(ak, XExtWebviewActivationKind::Command("editor.action.format".into()));
+        assert!(!ak.is_language());
+    }
+
+    #[test]
+    fn x_ext_webview_activation_parse_star() {
+        assert_eq!(XExtWebviewActivationKind::parse("*"), Some(XExtWebviewActivationKind::Star));
+    }
+
+    #[test]
+    fn x_ext_webview_activation_parse_unknown() {
+        assert!(XExtWebviewActivationKind::parse("badKind:thing").is_none());
+    }
+
+    #[test]
+    fn x_ext_webview_activation_parse_workspace() {
+        let ak = XExtWebviewActivationKind::parse("workspaceContains:**/Cargo.toml").unwrap();
+        assert_eq!(ak, XExtWebviewActivationKind::WorkspaceContains("**/" .to_owned() + "Cargo.toml"));
+    }
+
+    #[test]
+    fn x_ext_webview_rpc_envelope_basic() {
+        let env = XExtWebviewRpcEnvelope::new(1, "textDocument/didOpen", "{}" );
+        assert_eq!(env.seq, 1);
+        assert!(!env.is_response());
+    }
+
+    #[test]
+    fn x_ext_webview_rpc_envelope_response() {
+        let env = XExtWebviewRpcEnvelope::new(2, "$/cancelRequest", "");
+        assert!(env.is_response());
+    }
+
+    #[test]
+    fn x_ext_webview_rpc_payload_checksum() {
+        let env = XExtWebviewRpcEnvelope::new(1, "m", "AB");
+        assert_eq!(env.payload_checksum(), 65 + 66);
+    }
+
+    #[test]
+    fn x_ext_webview_collect_sequences_works() {
+        let envs = vec![
+            XExtWebviewRpcEnvelope::new(10, "a", ""),
+            XExtWebviewRpcEnvelope::new(20, "b", ""),
+        ];
+        assert_eq!(x_ext_webview_collect_sequences(&envs), vec![10, 20]);
+    }
+
+    #[test]
+    fn x_ext_webview_filter_by_method_works() {
+        let envs = vec![
+            XExtWebviewRpcEnvelope::new(1, "textDocument/open", ""),
+            XExtWebviewRpcEnvelope::new(2, "workspace/config", ""),
+            XExtWebviewRpcEnvelope::new(3, "textDocument/close", ""),
+        ];
+        let filtered = x_ext_webview_filter_by_method(&envs, "textDocument/");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn x_ext_webview_dedup_by_seq_works() {
+        let envs = vec![
+            XExtWebviewRpcEnvelope::new(1, "a", "first"),
+            XExtWebviewRpcEnvelope::new(1, "a", "second"),
+            XExtWebviewRpcEnvelope::new(2, "b", "third"),
+        ];
+        let deduped = x_ext_webview_dedup_by_seq(envs);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].payload, "first");
+    }
+
+    #[test]
+    fn x_ext_webview_negotiate_capabilities_basic() {
+        let result = x_ext_webview_negotiate_capabilities(
+            &["hover", "completion", "rename"],
+            &["hover", "rename", "format"],
+        );
+        assert_eq!(result, vec!["hover", "rename"]);
+    }
+
+    #[test]
+    fn x_ext_webview_api_version_satisfies() {
+        let v1 = XExtWebviewApiVersion::new(1, 80, 0);
+        let min = XExtWebviewApiVersion::new(1, 70, 0);
+        assert!(v1.satisfies(&min));
+        assert!(!min.satisfies(&v1));
+    }
+
+    #[test]
+    fn x_ext_webview_api_version_display() {
+        let v = XExtWebviewApiVersion::new(2, 3, 4);
+        assert_eq!(v.to_string(), "2.3.4");
+    }
+
+    #[test]
+    fn x_ext_webview_api_version_ord() {
+        let v1 = XExtWebviewApiVersion::new(1, 0, 0);
+        let v2 = XExtWebviewApiVersion::new(1, 1, 0);
+        assert!(v1 < v2);
     }
 
 }

@@ -1761,6 +1761,115 @@ impl ClipboardMetadataV2 {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// wb_clipboard – Workbench state helpers
+// ---------------------------------------------------------------------------
+
+/// Layout region within the workbench.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XWbClipboardLayoutRegion {
+    Sidebar,
+    Panel,
+    Editor,
+    Statusbar,
+    Titlebar,
+    Auxiliary,
+}
+
+/// Visibility state for a workbench panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XWbClipboardPanelState {
+    pub region: XWbClipboardLayoutRegion,
+    pub visible: bool,
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl XWbClipboardPanelState {
+    pub fn new(region: XWbClipboardLayoutRegion, label: impl Into<String>) -> Self {
+        Self { region, visible: true, width: 300, height: 200, label: label.into() }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn is_narrow(&self) -> bool {
+        self.width < 200
+    }
+}
+
+/// Compute the total visible area across a set of panels.
+pub fn x_wb_clipboard_total_visible_area(panels: &[XWbClipboardPanelState]) -> u64 {
+    panels.iter().filter(|p| p.visible).map(|p| p.area()).sum()
+}
+
+/// Count panels visible in a specific region.
+pub fn x_wb_clipboard_count_in_region(
+    panels: &[XWbClipboardPanelState],
+    region: XWbClipboardLayoutRegion,
+) -> usize {
+    panels.iter().filter(|p| p.region == region && p.visible).count()
+}
+
+/// Find the widest visible panel.
+pub fn x_wb_clipboard_widest_panel(panels: &[XWbClipboardPanelState]) -> Option<&XWbClipboardPanelState> {
+    panels.iter().filter(|p| p.visible).max_by_key(|p| p.width)
+}
+
+/// Collapse all panels in a given region (set visible = false).
+pub fn x_wb_clipboard_collapse_region(
+    panels: &mut [XWbClipboardPanelState],
+    region: XWbClipboardLayoutRegion,
+) {
+    for p in panels.iter_mut() {
+        if p.region == region {
+            p.visible = false;
+        }
+    }
+}
+
+/// Layout constraint: minimum and maximum dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XWbClipboardLayoutConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl XWbClipboardLayoutConstraint {
+    pub fn new(min_w: u32, max_w: u32, min_h: u32, max_h: u32) -> Self {
+        Self { min_width: min_w, max_width: max_w, min_height: min_h, max_height: max_h }
+    }
+
+    /// Clamp a width value to this constraint's range.
+    pub fn clamp_width(&self, w: u32) -> u32 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to this constraint's range.
+    pub fn clamp_height(&self, h: u32) -> u32 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Returns true if both dimensions are within the constraint.
+    pub fn is_satisfied(&self, w: u32, h: u32) -> bool {
+        w >= self.min_width && w <= self.max_width && h >= self.min_height && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1787,7 +1896,7 @@ mod tests {
     }
 
     #[test]
-    fn clear_history() {
+    fn clear_history_works() {
         let mut svc = ClipboardService::new(10);
         svc.write_text("data".to_string(), 1);
         svc.clear_history();
@@ -1862,7 +1971,7 @@ mod tests {
     }
 
     #[test]
-    fn get_history_by_mode() {
+    fn get_history_by_mode_works() {
         let mut svc = ClipboardService::new(10);
         svc.write_entry("a".into(), 1, SourceMode::Visual);
         svc.write_entry("b".into(), 2, SourceMode::Normal);
@@ -1885,7 +1994,7 @@ mod tests {
     }
 
     #[test]
-    fn total_text_size() {
+    fn total_text_size_works() {
         let mut svc = ClipboardService::new(10);
         svc.write_text("abc".into(), 1);
         svc.write_text("de".into(), 2);
@@ -1913,7 +2022,7 @@ mod tests {
     }
 
     #[test]
-    fn undo_last_write() {
+    fn undo_last_write_works() {
         let mut svc = ClipboardService::new(10);
         svc.write_text("first".into(), 1);
         svc.write_text("second".into(), 2);
@@ -2511,7 +2620,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_newlines() {
+    fn normalize_newlines_works() {
         assert_eq!(
             ClipboardTransform::normalize_newlines("a\r\nb\rc\nd"),
             "a\nb\nc\nd"
@@ -2519,7 +2628,7 @@ mod tests {
     }
 
     #[test]
-    fn collapse_blank_lines() {
+    fn collapse_blank_lines_works() {
         let input = "a\n\n\n\nb\n\nc";
         assert_eq!(
             ClipboardTransform::collapse_blank_lines(input),
@@ -2795,6 +2904,134 @@ mod tests {
     fn metadata_no_filter() {
         let meta = ClipboardMetadataV2::new(0);
         assert!(meta.matches_filter(None, None));
+    }
+
+
+    // -- wb_clipboard additional tests -------------------------------------------
+
+    #[test]
+    fn x_wb_clipboard_panel_state_new() {
+        let p = XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "Explorer");
+        assert!(p.visible);
+        assert_eq!(p.label, "Explorer");
+        assert_eq!(p.region, XWbClipboardLayoutRegion::Sidebar);
+    }
+
+    #[test]
+    fn x_wb_clipboard_panel_area() {
+        let p = XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Editor, "ed");
+        assert_eq!(p.area(), 300 * 200);
+    }
+
+    #[test]
+    fn x_wb_clipboard_panel_toggle() {
+        let mut p = XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Panel, "terminal");
+        assert!(p.visible);
+        p.toggle();
+        assert!(!p.visible);
+        p.toggle();
+        assert!(p.visible);
+    }
+
+    #[test]
+    fn x_wb_clipboard_panel_resize() {
+        let mut p = XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "files");
+        p.resize(400, 600);
+        assert_eq!(p.width, 400);
+        assert_eq!(p.height, 600);
+        assert_eq!(p.area(), 240_000);
+    }
+
+    #[test]
+    fn x_wb_clipboard_panel_is_narrow() {
+        let mut p = XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "x");
+        assert!(!p.is_narrow());
+        p.resize(100, 200);
+        assert!(p.is_narrow());
+    }
+
+    #[test]
+    fn x_wb_clipboard_total_visible_area_basic() {
+        let panels = vec![
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "a"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Editor, "b"),
+        ];
+        assert_eq!(x_wb_clipboard_total_visible_area(&panels), 2 * 300 * 200);
+    }
+
+    #[test]
+    fn x_wb_clipboard_total_visible_area_hidden() {
+        let mut panels = vec![
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "a"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Panel, "b"),
+        ];
+        panels[1].visible = false;
+        assert_eq!(x_wb_clipboard_total_visible_area(&panels), 300 * 200);
+    }
+
+    #[test]
+    fn x_wb_clipboard_count_in_region_basic() {
+        let panels = vec![
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "a"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "b"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Editor, "c"),
+        ];
+        assert_eq!(x_wb_clipboard_count_in_region(&panels, XWbClipboardLayoutRegion::Sidebar), 2);
+        assert_eq!(x_wb_clipboard_count_in_region(&panels, XWbClipboardLayoutRegion::Editor), 1);
+        assert_eq!(x_wb_clipboard_count_in_region(&panels, XWbClipboardLayoutRegion::Panel), 0);
+    }
+
+    #[test]
+    fn x_wb_clipboard_widest_panel_basic() {
+        let mut panels = vec![
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "narrow"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Editor, "wide"),
+        ];
+        panels[1].resize(800, 600);
+        let widest = x_wb_clipboard_widest_panel(&panels).unwrap();
+        assert_eq!(widest.label, "wide");
+    }
+
+    #[test]
+    fn x_wb_clipboard_collapse_region_basic() {
+        let mut panels = vec![
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "a"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Sidebar, "b"),
+            XWbClipboardPanelState::new(XWbClipboardLayoutRegion::Editor, "c"),
+        ];
+        x_wb_clipboard_collapse_region(&mut panels, XWbClipboardLayoutRegion::Sidebar);
+        assert!(!panels[0].visible);
+        assert!(!panels[1].visible);
+        assert!(panels[2].visible);
+    }
+
+    #[test]
+    fn x_wb_clipboard_layout_constraint_clamp() {
+        let lc = XWbClipboardLayoutConstraint::new(100, 800, 50, 600);
+        assert_eq!(lc.clamp_width(50), 100);
+        assert_eq!(lc.clamp_width(500), 500);
+        assert_eq!(lc.clamp_width(1000), 800);
+        assert_eq!(lc.clamp_height(10), 50);
+    }
+
+    #[test]
+    fn x_wb_clipboard_layout_constraint_satisfied() {
+        let lc = XWbClipboardLayoutConstraint::new(100, 800, 50, 600);
+        assert!(lc.is_satisfied(400, 300));
+        assert!(!lc.is_satisfied(50, 300));
+        assert!(!lc.is_satisfied(400, 700));
+    }
+
+    #[test]
+    fn x_wb_clipboard_widest_panel_empty() {
+        let panels: Vec<XWbClipboardPanelState> = vec![];
+        assert!(x_wb_clipboard_widest_panel(&panels).is_none());
+    }
+
+    #[test]
+    fn x_wb_clipboard_layout_region_eq() {
+        assert_eq!(XWbClipboardLayoutRegion::Sidebar, XWbClipboardLayoutRegion::Sidebar);
+        assert_ne!(XWbClipboardLayoutRegion::Sidebar, XWbClipboardLayoutRegion::Panel);
     }
 
 }

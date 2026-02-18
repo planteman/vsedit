@@ -1789,6 +1789,115 @@ impl Default for ChatMessageSearch {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// wb_chat – Workbench state helpers
+// ---------------------------------------------------------------------------
+
+/// Layout region within the workbench.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XWbChatLayoutRegion {
+    Sidebar,
+    Panel,
+    Editor,
+    Statusbar,
+    Titlebar,
+    Auxiliary,
+}
+
+/// Visibility state for a workbench panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XWbChatPanelState {
+    pub region: XWbChatLayoutRegion,
+    pub visible: bool,
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl XWbChatPanelState {
+    pub fn new(region: XWbChatLayoutRegion, label: impl Into<String>) -> Self {
+        Self { region, visible: true, width: 300, height: 200, label: label.into() }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn is_narrow(&self) -> bool {
+        self.width < 200
+    }
+}
+
+/// Compute the total visible area across a set of panels.
+pub fn x_wb_chat_total_visible_area(panels: &[XWbChatPanelState]) -> u64 {
+    panels.iter().filter(|p| p.visible).map(|p| p.area()).sum()
+}
+
+/// Count panels visible in a specific region.
+pub fn x_wb_chat_count_in_region(
+    panels: &[XWbChatPanelState],
+    region: XWbChatLayoutRegion,
+) -> usize {
+    panels.iter().filter(|p| p.region == region && p.visible).count()
+}
+
+/// Find the widest visible panel.
+pub fn x_wb_chat_widest_panel(panels: &[XWbChatPanelState]) -> Option<&XWbChatPanelState> {
+    panels.iter().filter(|p| p.visible).max_by_key(|p| p.width)
+}
+
+/// Collapse all panels in a given region (set visible = false).
+pub fn x_wb_chat_collapse_region(
+    panels: &mut [XWbChatPanelState],
+    region: XWbChatLayoutRegion,
+) {
+    for p in panels.iter_mut() {
+        if p.region == region {
+            p.visible = false;
+        }
+    }
+}
+
+/// Layout constraint: minimum and maximum dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XWbChatLayoutConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl XWbChatLayoutConstraint {
+    pub fn new(min_w: u32, max_w: u32, min_h: u32, max_h: u32) -> Self {
+        Self { min_width: min_w, max_width: max_w, min_height: min_h, max_height: max_h }
+    }
+
+    /// Clamp a width value to this constraint's range.
+    pub fn clamp_width(&self, w: u32) -> u32 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to this constraint's range.
+    pub fn clamp_height(&self, h: u32) -> u32 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Returns true if both dimensions are within the constraint.
+    pub fn is_satisfied(&self, w: u32, h: u32) -> bool {
+        w >= self.min_width && w <= self.max_width && h >= self.min_height && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1821,7 +1930,7 @@ mod tests {
     }
 
     #[test]
-    fn get_default_participant() {
+    fn get_default_participant_works() {
         let mut svc = ChatWorkbenchService::new();
         svc.register_participant(make_participant("copilot", true));
         svc.register_participant(make_participant("workspace", false));
@@ -2010,7 +2119,7 @@ mod tests {
     }
 
     #[test]
-    fn unregister_variable() {
+    fn unregister_variable_works() {
         let mut svc = ChatWorkbenchService::new();
         svc.register_variable(make_variable("file", "a.rs"));
         assert!(svc.unregister_variable("file"));
@@ -2794,6 +2903,134 @@ mod tests {
     fn chatMessageSearch_priority_display() {
         assert_eq!(format!("{}", ChatMessageSearchPriority::High), "high");
         assert_eq!(format!("{}", ChatMessageSearchPriority::Low), "low");
+    }
+
+
+    // -- wb_chat additional tests -------------------------------------------
+
+    #[test]
+    fn x_wb_chat_panel_state_new() {
+        let p = XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "Explorer");
+        assert!(p.visible);
+        assert_eq!(p.label, "Explorer");
+        assert_eq!(p.region, XWbChatLayoutRegion::Sidebar);
+    }
+
+    #[test]
+    fn x_wb_chat_panel_area() {
+        let p = XWbChatPanelState::new(XWbChatLayoutRegion::Editor, "ed");
+        assert_eq!(p.area(), 300 * 200);
+    }
+
+    #[test]
+    fn x_wb_chat_panel_toggle() {
+        let mut p = XWbChatPanelState::new(XWbChatLayoutRegion::Panel, "terminal");
+        assert!(p.visible);
+        p.toggle();
+        assert!(!p.visible);
+        p.toggle();
+        assert!(p.visible);
+    }
+
+    #[test]
+    fn x_wb_chat_panel_resize() {
+        let mut p = XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "files");
+        p.resize(400, 600);
+        assert_eq!(p.width, 400);
+        assert_eq!(p.height, 600);
+        assert_eq!(p.area(), 240_000);
+    }
+
+    #[test]
+    fn x_wb_chat_panel_is_narrow() {
+        let mut p = XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "x");
+        assert!(!p.is_narrow());
+        p.resize(100, 200);
+        assert!(p.is_narrow());
+    }
+
+    #[test]
+    fn x_wb_chat_total_visible_area_basic() {
+        let panels = vec![
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "a"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Editor, "b"),
+        ];
+        assert_eq!(x_wb_chat_total_visible_area(&panels), 2 * 300 * 200);
+    }
+
+    #[test]
+    fn x_wb_chat_total_visible_area_hidden() {
+        let mut panels = vec![
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "a"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Panel, "b"),
+        ];
+        panels[1].visible = false;
+        assert_eq!(x_wb_chat_total_visible_area(&panels), 300 * 200);
+    }
+
+    #[test]
+    fn x_wb_chat_count_in_region_basic() {
+        let panels = vec![
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "a"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "b"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Editor, "c"),
+        ];
+        assert_eq!(x_wb_chat_count_in_region(&panels, XWbChatLayoutRegion::Sidebar), 2);
+        assert_eq!(x_wb_chat_count_in_region(&panels, XWbChatLayoutRegion::Editor), 1);
+        assert_eq!(x_wb_chat_count_in_region(&panels, XWbChatLayoutRegion::Panel), 0);
+    }
+
+    #[test]
+    fn x_wb_chat_widest_panel_basic() {
+        let mut panels = vec![
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "narrow"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Editor, "wide"),
+        ];
+        panels[1].resize(800, 600);
+        let widest = x_wb_chat_widest_panel(&panels).unwrap();
+        assert_eq!(widest.label, "wide");
+    }
+
+    #[test]
+    fn x_wb_chat_collapse_region_basic() {
+        let mut panels = vec![
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "a"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Sidebar, "b"),
+            XWbChatPanelState::new(XWbChatLayoutRegion::Editor, "c"),
+        ];
+        x_wb_chat_collapse_region(&mut panels, XWbChatLayoutRegion::Sidebar);
+        assert!(!panels[0].visible);
+        assert!(!panels[1].visible);
+        assert!(panels[2].visible);
+    }
+
+    #[test]
+    fn x_wb_chat_layout_constraint_clamp() {
+        let lc = XWbChatLayoutConstraint::new(100, 800, 50, 600);
+        assert_eq!(lc.clamp_width(50), 100);
+        assert_eq!(lc.clamp_width(500), 500);
+        assert_eq!(lc.clamp_width(1000), 800);
+        assert_eq!(lc.clamp_height(10), 50);
+    }
+
+    #[test]
+    fn x_wb_chat_layout_constraint_satisfied() {
+        let lc = XWbChatLayoutConstraint::new(100, 800, 50, 600);
+        assert!(lc.is_satisfied(400, 300));
+        assert!(!lc.is_satisfied(50, 300));
+        assert!(!lc.is_satisfied(400, 700));
+    }
+
+    #[test]
+    fn x_wb_chat_widest_panel_empty() {
+        let panels: Vec<XWbChatPanelState> = vec![];
+        assert!(x_wb_chat_widest_panel(&panels).is_none());
+    }
+
+    #[test]
+    fn x_wb_chat_layout_region_eq() {
+        assert_eq!(XWbChatLayoutRegion::Sidebar, XWbChatLayoutRegion::Sidebar);
+        assert_ne!(XWbChatLayoutRegion::Sidebar, XWbChatLayoutRegion::Panel);
     }
 
 }

@@ -1465,6 +1465,115 @@ impl MarkersCopyDiagnosticText {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// markers_view – Workbench state helpers
+// ---------------------------------------------------------------------------
+
+/// Layout region within the workbench.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XMarkersViewLayoutRegion {
+    Sidebar,
+    Panel,
+    Editor,
+    Statusbar,
+    Titlebar,
+    Auxiliary,
+}
+
+/// Visibility state for a workbench panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XMarkersViewPanelState {
+    pub region: XMarkersViewLayoutRegion,
+    pub visible: bool,
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl XMarkersViewPanelState {
+    pub fn new(region: XMarkersViewLayoutRegion, label: impl Into<String>) -> Self {
+        Self { region, visible: true, width: 300, height: 200, label: label.into() }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn is_narrow(&self) -> bool {
+        self.width < 200
+    }
+}
+
+/// Compute the total visible area across a set of panels.
+pub fn x_markers_view_total_visible_area(panels: &[XMarkersViewPanelState]) -> u64 {
+    panels.iter().filter(|p| p.visible).map(|p| p.area()).sum()
+}
+
+/// Count panels visible in a specific region.
+pub fn x_markers_view_count_in_region(
+    panels: &[XMarkersViewPanelState],
+    region: XMarkersViewLayoutRegion,
+) -> usize {
+    panels.iter().filter(|p| p.region == region && p.visible).count()
+}
+
+/// Find the widest visible panel.
+pub fn x_markers_view_widest_panel(panels: &[XMarkersViewPanelState]) -> Option<&XMarkersViewPanelState> {
+    panels.iter().filter(|p| p.visible).max_by_key(|p| p.width)
+}
+
+/// Collapse all panels in a given region (set visible = false).
+pub fn x_markers_view_collapse_region(
+    panels: &mut [XMarkersViewPanelState],
+    region: XMarkersViewLayoutRegion,
+) {
+    for p in panels.iter_mut() {
+        if p.region == region {
+            p.visible = false;
+        }
+    }
+}
+
+/// Layout constraint: minimum and maximum dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XMarkersViewLayoutConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl XMarkersViewLayoutConstraint {
+    pub fn new(min_w: u32, max_w: u32, min_h: u32, max_h: u32) -> Self {
+        Self { min_width: min_w, max_width: max_w, min_height: min_h, max_height: max_h }
+    }
+
+    /// Clamp a width value to this constraint's range.
+    pub fn clamp_width(&self, w: u32) -> u32 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to this constraint's range.
+    pub fn clamp_height(&self, h: u32) -> u32 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Returns true if both dimensions are within the constraint.
+    pub fn is_satisfied(&self, w: u32, h: u32) -> bool {
+        w >= self.min_width && w <= self.max_width && h >= self.min_height && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1749,7 +1858,7 @@ mod tests {
     // -- Integration with vsedit-markers --
 
     #[test]
-    fn import_from_marker_service() {
+    fn import_from_marker_service_works() {
         use vsedit_markers::{MarkerService, MarkerData, MarkerSeverity as CoreSeverity};
         use vsedit_uri::VsUri;
 
@@ -2764,6 +2873,134 @@ mod tests {
         let table = MarkersCopyDiagnosticText::format_as_table(&svc);
         assert!(table.contains("| Severity |"));
         assert!(table.contains("| error |"));
+    }
+
+
+    // -- markers_view additional tests -------------------------------------------
+
+    #[test]
+    fn x_markers_view_panel_state_new() {
+        let p = XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "Explorer");
+        assert!(p.visible);
+        assert_eq!(p.label, "Explorer");
+        assert_eq!(p.region, XMarkersViewLayoutRegion::Sidebar);
+    }
+
+    #[test]
+    fn x_markers_view_panel_area() {
+        let p = XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Editor, "ed");
+        assert_eq!(p.area(), 300 * 200);
+    }
+
+    #[test]
+    fn x_markers_view_panel_toggle() {
+        let mut p = XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Panel, "terminal");
+        assert!(p.visible);
+        p.toggle();
+        assert!(!p.visible);
+        p.toggle();
+        assert!(p.visible);
+    }
+
+    #[test]
+    fn x_markers_view_panel_resize() {
+        let mut p = XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "files");
+        p.resize(400, 600);
+        assert_eq!(p.width, 400);
+        assert_eq!(p.height, 600);
+        assert_eq!(p.area(), 240_000);
+    }
+
+    #[test]
+    fn x_markers_view_panel_is_narrow() {
+        let mut p = XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "x");
+        assert!(!p.is_narrow());
+        p.resize(100, 200);
+        assert!(p.is_narrow());
+    }
+
+    #[test]
+    fn x_markers_view_total_visible_area_basic() {
+        let panels = vec![
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "a"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Editor, "b"),
+        ];
+        assert_eq!(x_markers_view_total_visible_area(&panels), 2 * 300 * 200);
+    }
+
+    #[test]
+    fn x_markers_view_total_visible_area_hidden() {
+        let mut panels = vec![
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "a"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Panel, "b"),
+        ];
+        panels[1].visible = false;
+        assert_eq!(x_markers_view_total_visible_area(&panels), 300 * 200);
+    }
+
+    #[test]
+    fn x_markers_view_count_in_region_basic() {
+        let panels = vec![
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "a"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "b"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Editor, "c"),
+        ];
+        assert_eq!(x_markers_view_count_in_region(&panels, XMarkersViewLayoutRegion::Sidebar), 2);
+        assert_eq!(x_markers_view_count_in_region(&panels, XMarkersViewLayoutRegion::Editor), 1);
+        assert_eq!(x_markers_view_count_in_region(&panels, XMarkersViewLayoutRegion::Panel), 0);
+    }
+
+    #[test]
+    fn x_markers_view_widest_panel_basic() {
+        let mut panels = vec![
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "narrow"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Editor, "wide"),
+        ];
+        panels[1].resize(800, 600);
+        let widest = x_markers_view_widest_panel(&panels).unwrap();
+        assert_eq!(widest.label, "wide");
+    }
+
+    #[test]
+    fn x_markers_view_collapse_region_basic() {
+        let mut panels = vec![
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "a"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Sidebar, "b"),
+            XMarkersViewPanelState::new(XMarkersViewLayoutRegion::Editor, "c"),
+        ];
+        x_markers_view_collapse_region(&mut panels, XMarkersViewLayoutRegion::Sidebar);
+        assert!(!panels[0].visible);
+        assert!(!panels[1].visible);
+        assert!(panels[2].visible);
+    }
+
+    #[test]
+    fn x_markers_view_layout_constraint_clamp() {
+        let lc = XMarkersViewLayoutConstraint::new(100, 800, 50, 600);
+        assert_eq!(lc.clamp_width(50), 100);
+        assert_eq!(lc.clamp_width(500), 500);
+        assert_eq!(lc.clamp_width(1000), 800);
+        assert_eq!(lc.clamp_height(10), 50);
+    }
+
+    #[test]
+    fn x_markers_view_layout_constraint_satisfied() {
+        let lc = XMarkersViewLayoutConstraint::new(100, 800, 50, 600);
+        assert!(lc.is_satisfied(400, 300));
+        assert!(!lc.is_satisfied(50, 300));
+        assert!(!lc.is_satisfied(400, 700));
+    }
+
+    #[test]
+    fn x_markers_view_widest_panel_empty() {
+        let panels: Vec<XMarkersViewPanelState> = vec![];
+        assert!(x_markers_view_widest_panel(&panels).is_none());
+    }
+
+    #[test]
+    fn x_markers_view_layout_region_eq() {
+        assert_eq!(XMarkersViewLayoutRegion::Sidebar, XMarkersViewLayoutRegion::Sidebar);
+        assert_ne!(XMarkersViewLayoutRegion::Sidebar, XMarkersViewLayoutRegion::Panel);
     }
 
 }

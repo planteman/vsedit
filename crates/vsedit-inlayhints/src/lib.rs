@@ -1652,6 +1652,106 @@ impl InlayHintVersionedCache {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// inlayhints – Editor text helpers
+// ---------------------------------------------------------------------------
+
+/// A half-open range within a document `[start, end)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XInlayhintsTextSpan {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl XInlayhintsTextSpan {
+    pub fn new(start: usize, end: usize) -> Self {
+        let (s, e) = if start <= end { (start, end) } else { (end, start) };
+        Self { start: s, end: e }
+    }
+
+    pub fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start == self.end
+    }
+
+    /// Extract the spanned slice from `text`.
+    pub fn extract<'a>(&self, text: &'a str) -> &'a str {
+        &text[self.start..self.end]
+    }
+
+    /// Returns true if `pos` is contained within this span.
+    pub fn contains(&self, pos: usize) -> bool {
+        pos >= self.start && pos < self.end
+    }
+
+    /// Returns the overlap with `other`, if any.
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
+        let s = self.start.max(other.start);
+        let e = self.end.min(other.end);
+        if s < e { Some(Self { start: s, end: e }) } else { None }
+    }
+
+    /// Merge two spans into the smallest enclosing span.
+    pub fn union(&self, other: &Self) -> Self {
+        Self {
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+        }
+    }
+
+    /// Shift the span by `delta` positions to the right.
+    pub fn shift(&self, delta: usize) -> Self {
+        Self { start: self.start + delta, end: self.end + delta }
+    }
+}
+
+/// Count the number of lines in `text`.
+pub fn x_inlayhints_count_lines(text: &str) -> usize {
+    if text.is_empty() { return 0; }
+    text.lines().count()
+}
+
+/// Return the byte offset of the start of line `n` (0-based).
+pub fn x_inlayhints_line_start_offset(text: &str, line: usize) -> Option<usize> {
+    let mut current = 0usize;
+    for (i, l) in text.split('\n').enumerate() {
+        if i == line { return Some(current); }
+        current += l.len() + 1;
+    }
+    None
+}
+
+/// Compute the indentation level (number of leading spaces) of a line.
+pub fn x_inlayhints_indent_level(line: &str) -> usize {
+    line.chars().take_while(|c| *c == ' ').count()
+}
+
+/// Trim trailing whitespace from every line in `text`.
+pub fn x_inlayhints_trim_trailing(text: &str) -> String {
+    text.lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Detect the dominant line ending in `text` (`"\n"` or `"\r\n"`).
+pub fn x_inlayhints_detect_eol(text: &str) -> &'static str {
+    let crlf = text.matches("\r\n").count();
+    let lf = text.matches('\n').count().saturating_sub(crlf);
+    if crlf > lf { "\r\n" } else { "\n" }
+}
+
+/// Simple word-boundary based tokenizer: split on whitespace and punctuation.
+pub fn x_inlayhints_tokenize(text: &str) -> Vec<&str> {
+    text.split(|c: char| c.is_whitespace() || ".,;:!?()[]{}".contains(c))
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2791,6 +2891,120 @@ mod tests {
         c.set("b.rs", 2, vec![]);
         c.invalidate_all();
         assert_eq!(c.cache_size(), 0);
+    }
+
+
+    // -- inlayhints additional tests -------------------------------------------
+
+    #[test]
+    fn x_inlayhints_text_span_new_ordered() {
+        let s = XInlayhintsTextSpan::new(5, 10);
+        assert_eq!(s.start, 5);
+        assert_eq!(s.end, 10);
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_new_reversed() {
+        let s = XInlayhintsTextSpan::new(10, 5);
+        assert_eq!(s.start, 5);
+        assert_eq!(s.end, 10);
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_len() {
+        assert_eq!(XInlayhintsTextSpan::new(3, 7).len(), 4);
+        assert_eq!(XInlayhintsTextSpan::new(0, 0).len(), 0);
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_extract() {
+        let s = XInlayhintsTextSpan::new(0, 5);
+        assert_eq!(s.extract("hello world"), "hello");
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_contains() {
+        let s = XInlayhintsTextSpan::new(2, 8);
+        assert!(s.contains(2));
+        assert!(s.contains(7));
+        assert!(!s.contains(8));
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_intersect() {
+        let a = XInlayhintsTextSpan::new(0, 10);
+        let b = XInlayhintsTextSpan::new(5, 15);
+        let inter = a.intersect(&b).unwrap();
+        assert_eq!(inter.start, 5);
+        assert_eq!(inter.end, 10);
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_intersect_none() {
+        let a = XInlayhintsTextSpan::new(0, 5);
+        let b = XInlayhintsTextSpan::new(5, 10);
+        assert!(a.intersect(&b).is_none());
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_union() {
+        let a = XInlayhintsTextSpan::new(3, 7);
+        let b = XInlayhintsTextSpan::new(5, 12);
+        let u = a.union(&b);
+        assert_eq!(u.start, 3);
+        assert_eq!(u.end, 12);
+    }
+
+    #[test]
+    fn x_inlayhints_count_lines_basic() {
+        assert_eq!(x_inlayhints_count_lines("a\nb\nc"), 3);
+        assert_eq!(x_inlayhints_count_lines(""), 0);
+        assert_eq!(x_inlayhints_count_lines("single"), 1);
+    }
+
+    #[test]
+    fn x_inlayhints_line_start_offset_basic() {
+        assert_eq!(x_inlayhints_line_start_offset("abc\ndef\nghi", 0), Some(0));
+        assert_eq!(x_inlayhints_line_start_offset("abc\ndef\nghi", 1), Some(4));
+        assert_eq!(x_inlayhints_line_start_offset("abc\ndef\nghi", 2), Some(8));
+        assert_eq!(x_inlayhints_line_start_offset("abc\ndef\nghi", 3), None);
+    }
+
+    #[test]
+    fn x_inlayhints_indent_level_basic() {
+        assert_eq!(x_inlayhints_indent_level("    hello"), 4);
+        assert_eq!(x_inlayhints_indent_level("hello"), 0);
+        assert_eq!(x_inlayhints_indent_level("  "), 2);
+    }
+
+    #[test]
+    fn x_inlayhints_trim_trailing_basic() {
+        let input = "hello   \nworld  \n  foo  ";
+        let result = x_inlayhints_trim_trailing(input);
+        assert_eq!(result, "hello\nworld\n  foo");
+    }
+
+    #[test]
+    fn x_inlayhints_detect_eol_lf() {
+        assert_eq!(x_inlayhints_detect_eol("a\nb\nc"), "\n");
+    }
+
+    #[test]
+    fn x_inlayhints_detect_eol_crlf() {
+        assert_eq!(x_inlayhints_detect_eol("a\r\nb\r\nc"), "\r\n");
+    }
+
+    #[test]
+    fn x_inlayhints_tokenize_basic() {
+        let tokens = x_inlayhints_tokenize("hello, world! foo");
+        assert_eq!(tokens, vec!["hello", "world", "foo"]);
+    }
+
+    #[test]
+    fn x_inlayhints_text_span_shift() {
+        let s = XInlayhintsTextSpan::new(2, 5).shift(10);
+        assert_eq!(s.start, 12);
+        assert_eq!(s.end, 15);
     }
 
 }

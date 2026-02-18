@@ -1567,6 +1567,128 @@ impl TokenBudgetOptimizer {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// ext_lm – Extension protocol helpers
+// ---------------------------------------------------------------------------
+
+/// Activation event kinds for extension lifecycle management.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum XExtLmActivationKind {
+    /// Activate on a specific language.
+    Language(String),
+    /// Activate on a command.
+    Command(String),
+    /// Activate on a workspace-contains glob.
+    WorkspaceContains(String),
+    /// Activate on a custom URI scheme.
+    UriScheme(String),
+    /// Activate on startup.
+    Star,
+}
+
+impl XExtLmActivationKind {
+    /// Parse an activation event string like `"onLanguage:rust"`.
+    pub fn parse(raw: &str) -> Option<Self> {
+        if raw == "*" {
+            return Some(Self::Star);
+        }
+        let (kind, value) = raw.split_once(':')?;
+        match kind {
+            "onLanguage" => Some(Self::Language(value.to_string())),
+            "onCommand" => Some(Self::Command(value.to_string())),
+            "workspaceContains" => Some(Self::WorkspaceContains(value.to_string())),
+            "onUri" => Some(Self::UriScheme(value.to_string())),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this activation kind targets a specific language.
+    pub fn is_language(&self) -> bool {
+        matches!(self, Self::Language(_))
+    }
+}
+
+/// Message envelope for extension host RPC.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XExtLmRpcEnvelope {
+    pub seq: u64,
+    pub method: String,
+    pub payload: String,
+}
+
+impl XExtLmRpcEnvelope {
+    /// Create a new RPC envelope.
+    pub fn new(seq: u64, method: impl Into<String>, payload: impl Into<String>) -> Self {
+        Self { seq, method: method.into(), payload: payload.into() }
+    }
+
+    /// Returns true when the envelope carries a response (method starts with `$/`).
+    pub fn is_response(&self) -> bool {
+        self.method.starts_with("$/")
+    }
+
+    /// Compute a simple checksum of the payload (sum of bytes mod 2^32).
+    pub fn payload_checksum(&self) -> u32 {
+        self.payload.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32))
+    }
+}
+
+/// Batch multiple RPC envelopes and return their sequence numbers.
+pub fn x_ext_lm_collect_sequences(envelopes: &[XExtLmRpcEnvelope]) -> Vec<u64> {
+    envelopes.iter().map(|e| e.seq).collect()
+}
+
+/// Filter envelopes by method prefix.
+pub fn x_ext_lm_filter_by_method<'a>(
+    envelopes: &'a [XExtLmRpcEnvelope],
+    method_prefix: &str,
+) -> Vec<&'a XExtLmRpcEnvelope> {
+    envelopes.iter().filter(|e| e.method.starts_with(method_prefix)).collect()
+}
+
+/// Deduplicate envelopes by sequence number, keeping the first occurrence.
+pub fn x_ext_lm_dedup_by_seq(envelopes: Vec<XExtLmRpcEnvelope>) -> Vec<XExtLmRpcEnvelope> {
+    let mut seen = std::collections::HashSet::new();
+    envelopes.into_iter().filter(|e| seen.insert(e.seq)).collect()
+}
+
+/// Simple capability negotiation: given requested and available feature sets,
+/// return the intersection.
+pub fn x_ext_lm_negotiate_capabilities(
+    requested: &[&str],
+    available: &[&str],
+) -> Vec<String> {
+    requested.iter()
+        .filter(|r| available.contains(r))
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Version tuple for extension API compatibility checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct XExtLmApiVersion {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl XExtLmApiVersion {
+    pub fn new(major: u32, minor: u32, patch: u32) -> Self {
+        Self { major, minor, patch }
+    }
+    /// Check if this version satisfies a minimum requirement.
+    pub fn satisfies(&self, min: &Self) -> bool {
+        (self.major, self.minor, self.patch) >= (min.major, min.minor, min.patch)
+    }
+}
+
+impl std::fmt::Display for XExtLmApiVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1657,7 +1779,7 @@ mod tests {
     }
 
     #[test]
-    fn get_models_by_vendor() {
+    fn get_models_by_vendor_works() {
         let mut bridge = LmBridge::new();
         bridge.register_model(test_model());
         bridge.register_model(LanguageModelChat {
@@ -1674,7 +1796,7 @@ mod tests {
     }
 
     #[test]
-    fn get_models_by_family() {
+    fn get_models_by_family_works() {
         let mut bridge = LmBridge::new();
         bridge.register_model(test_model());
         assert_eq!(bridge.get_models_by_family("gpt").len(), 1);
@@ -2806,4 +2928,118 @@ mod tests {
         assert!(r.contains("my-label"));
         assert!(r.contains("false"));
     }
+
+    // -- ext_lm additional tests -------------------------------------------
+
+    #[test]
+    fn x_ext_lm_activation_parse_language() {
+        let ak = XExtLmActivationKind::parse("onLanguage:rust").unwrap();
+        assert_eq!(ak, XExtLmActivationKind::Language("rust".into()));
+        assert!(ak.is_language());
+    }
+
+    #[test]
+    fn x_ext_lm_activation_parse_command() {
+        let ak = XExtLmActivationKind::parse("onCommand:editor.action.format").unwrap();
+        assert_eq!(ak, XExtLmActivationKind::Command("editor.action.format".into()));
+        assert!(!ak.is_language());
+    }
+
+    #[test]
+    fn x_ext_lm_activation_parse_star() {
+        assert_eq!(XExtLmActivationKind::parse("*"), Some(XExtLmActivationKind::Star));
+    }
+
+    #[test]
+    fn x_ext_lm_activation_parse_unknown() {
+        assert!(XExtLmActivationKind::parse("badKind:thing").is_none());
+    }
+
+    #[test]
+    fn x_ext_lm_activation_parse_workspace() {
+        let ak = XExtLmActivationKind::parse("workspaceContains:**/Cargo.toml").unwrap();
+        assert_eq!(ak, XExtLmActivationKind::WorkspaceContains("**/" .to_owned() + "Cargo.toml"));
+    }
+
+    #[test]
+    fn x_ext_lm_rpc_envelope_basic() {
+        let env = XExtLmRpcEnvelope::new(1, "textDocument/didOpen", "{}" );
+        assert_eq!(env.seq, 1);
+        assert!(!env.is_response());
+    }
+
+    #[test]
+    fn x_ext_lm_rpc_envelope_response() {
+        let env = XExtLmRpcEnvelope::new(2, "$/cancelRequest", "");
+        assert!(env.is_response());
+    }
+
+    #[test]
+    fn x_ext_lm_rpc_payload_checksum() {
+        let env = XExtLmRpcEnvelope::new(1, "m", "AB");
+        assert_eq!(env.payload_checksum(), 65 + 66);
+    }
+
+    #[test]
+    fn x_ext_lm_collect_sequences_works() {
+        let envs = vec![
+            XExtLmRpcEnvelope::new(10, "a", ""),
+            XExtLmRpcEnvelope::new(20, "b", ""),
+        ];
+        assert_eq!(x_ext_lm_collect_sequences(&envs), vec![10, 20]);
+    }
+
+    #[test]
+    fn x_ext_lm_filter_by_method_works() {
+        let envs = vec![
+            XExtLmRpcEnvelope::new(1, "textDocument/open", ""),
+            XExtLmRpcEnvelope::new(2, "workspace/config", ""),
+            XExtLmRpcEnvelope::new(3, "textDocument/close", ""),
+        ];
+        let filtered = x_ext_lm_filter_by_method(&envs, "textDocument/");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn x_ext_lm_dedup_by_seq_works() {
+        let envs = vec![
+            XExtLmRpcEnvelope::new(1, "a", "first"),
+            XExtLmRpcEnvelope::new(1, "a", "second"),
+            XExtLmRpcEnvelope::new(2, "b", "third"),
+        ];
+        let deduped = x_ext_lm_dedup_by_seq(envs);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].payload, "first");
+    }
+
+    #[test]
+    fn x_ext_lm_negotiate_capabilities_basic() {
+        let result = x_ext_lm_negotiate_capabilities(
+            &["hover", "completion", "rename"],
+            &["hover", "rename", "format"],
+        );
+        assert_eq!(result, vec!["hover", "rename"]);
+    }
+
+    #[test]
+    fn x_ext_lm_api_version_satisfies() {
+        let v1 = XExtLmApiVersion::new(1, 80, 0);
+        let min = XExtLmApiVersion::new(1, 70, 0);
+        assert!(v1.satisfies(&min));
+        assert!(!min.satisfies(&v1));
+    }
+
+    #[test]
+    fn x_ext_lm_api_version_display() {
+        let v = XExtLmApiVersion::new(2, 3, 4);
+        assert_eq!(v.to_string(), "2.3.4");
+    }
+
+    #[test]
+    fn x_ext_lm_api_version_ord() {
+        let v1 = XExtLmApiVersion::new(1, 0, 0);
+        let v2 = XExtLmApiVersion::new(1, 1, 0);
+        assert!(v1 < v2);
+    }
+
 }

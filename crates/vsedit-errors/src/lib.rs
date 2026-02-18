@@ -1762,6 +1762,114 @@ impl ErrorDialogFormatter {
 }
 
 
+
+// ---------------------------------------------------------------------------
+// errors – Data validation and analysis helpers
+// ---------------------------------------------------------------------------
+
+/// Result of validating a value against a schema-like rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum XErrorsValidationResult {
+    Ok,
+    Error(String),
+    Warning(String),
+}
+
+impl XErrorsValidationResult {
+    pub fn is_ok(&self) -> bool {
+        matches!(self, Self::Ok)
+    }
+
+    pub fn message(&self) -> Option<&str> {
+        match self {
+            Self::Ok => None,
+            Self::Error(m) | Self::Warning(m) => Some(m),
+        }
+    }
+}
+
+/// A key-value pair with optional metadata tag.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XErrorsTaggedEntry {
+    pub key: String,
+    pub value: String,
+    pub tag: Option<String>,
+}
+
+impl XErrorsTaggedEntry {
+    pub fn new(key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self { key: key.into(), value: value.into(), tag: None }
+    }
+
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tag = Some(tag.into());
+        self
+    }
+
+    pub fn matches_tag(&self, tag: &str) -> bool {
+        self.tag.as_deref() == Some(tag)
+    }
+}
+
+/// Validate that a string is non-empty and within a max length.
+pub fn x_errors_validate_string(value: &str, max_len: usize) -> XErrorsValidationResult {
+    if value.is_empty() {
+        return XErrorsValidationResult::Error("value must not be empty".into());
+    }
+    if value.len() > max_len {
+        return XErrorsValidationResult::Error(
+            format!("value exceeds max length of {max_len}"),
+        );
+    }
+    XErrorsValidationResult::Ok
+}
+
+/// Validate that a number falls within an inclusive range.
+pub fn x_errors_validate_range(value: i64, min: i64, max: i64) -> XErrorsValidationResult {
+    if value < min || value > max {
+        XErrorsValidationResult::Error(
+            format!("{value} is outside range [{min}, {max}]"),
+        )
+    } else {
+        XErrorsValidationResult::Ok
+    }
+}
+
+/// Filter entries by tag, returning only matching ones.
+pub fn x_errors_filter_by_tag<'a>(
+    entries: &'a [XErrorsTaggedEntry],
+    tag: &str,
+) -> Vec<&'a XErrorsTaggedEntry> {
+    entries.iter().filter(|e| e.matches_tag(tag)).collect()
+}
+
+/// Group entries by their tag (entries without a tag go under `"_untagged"`).
+pub fn x_errors_group_by_tag(
+    entries: &[XErrorsTaggedEntry],
+) -> std::collections::HashMap<String, Vec<&XErrorsTaggedEntry>> {
+    let mut map: std::collections::HashMap<String, Vec<_>> = std::collections::HashMap::new();
+    for e in entries {
+        let key = e.tag.clone().unwrap_or_else(|| "_untagged".into());
+        map.entry(key).or_default().push(e);
+    }
+    map
+}
+
+/// Compute a simple digest of a string (DJB2 hash).
+pub fn x_errors_djb2_hash(s: &str) -> u64 {
+    let mut hash: u64 = 5381;
+    for b in s.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    hash
+}
+
+/// Deduplicate entries by key, keeping the first occurrence.
+pub fn x_errors_dedup_entries(entries: Vec<XErrorsTaggedEntry>) -> Vec<XErrorsTaggedEntry> {
+    let mut seen = std::collections::HashSet::new();
+    entries.into_iter().filter(|e| seen.insert(e.key.clone())).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2792,4 +2900,118 @@ mod tests {
         assert!(r.contains("my-label"));
         assert!(r.contains("false"));
     }
+
+    // -- errors additional tests -------------------------------------------
+
+    #[test]
+    fn x_errors_validation_ok() {
+        let r = x_errors_validate_string("hello", 100);
+        assert!(r.is_ok());
+        assert!(r.message().is_none());
+    }
+
+    #[test]
+    fn x_errors_validation_empty() {
+        let r = x_errors_validate_string("", 100);
+        assert!(!r.is_ok());
+        assert!(r.message().unwrap().contains("empty"));
+    }
+
+    #[test]
+    fn x_errors_validation_too_long() {
+        let r = x_errors_validate_string("abcdef", 3);
+        assert!(!r.is_ok());
+        assert!(r.message().unwrap().contains("max length"));
+    }
+
+    #[test]
+    fn x_errors_validate_range_ok() {
+        assert!(x_errors_validate_range(5, 1, 10).is_ok());
+        assert!(x_errors_validate_range(1, 1, 10).is_ok());
+        assert!(x_errors_validate_range(10, 1, 10).is_ok());
+    }
+
+    #[test]
+    fn x_errors_validate_range_out() {
+        assert!(!x_errors_validate_range(0, 1, 10).is_ok());
+        assert!(!x_errors_validate_range(11, 1, 10).is_ok());
+    }
+
+    #[test]
+    fn x_errors_tagged_entry_basic() {
+        let e = XErrorsTaggedEntry::new("k", "v");
+        assert_eq!(e.key, "k");
+        assert_eq!(e.value, "v");
+        assert!(e.tag.is_none());
+    }
+
+    #[test]
+    fn x_errors_tagged_entry_with_tag() {
+        let e = XErrorsTaggedEntry::new("k", "v").with_tag("important");
+        assert!(e.matches_tag("important"));
+        assert!(!e.matches_tag("other"));
+    }
+
+    #[test]
+    fn x_errors_filter_by_tag_basic() {
+        let entries = vec![
+            XErrorsTaggedEntry::new("a", "1").with_tag("x"),
+            XErrorsTaggedEntry::new("b", "2").with_tag("y"),
+            XErrorsTaggedEntry::new("c", "3").with_tag("x"),
+        ];
+        let filtered = x_errors_filter_by_tag(&entries, "x");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn x_errors_group_by_tag_basic() {
+        let entries = vec![
+            XErrorsTaggedEntry::new("a", "1").with_tag("x"),
+            XErrorsTaggedEntry::new("b", "2"),
+            XErrorsTaggedEntry::new("c", "3").with_tag("x"),
+        ];
+        let groups = x_errors_group_by_tag(&entries);
+        assert_eq!(groups["x"].len(), 2);
+        assert_eq!(groups["_untagged"].len(), 1);
+    }
+
+    #[test]
+    fn x_errors_djb2_hash_deterministic() {
+        let h1 = x_errors_djb2_hash("hello");
+        let h2 = x_errors_djb2_hash("hello");
+        assert_eq!(h1, h2);
+        assert_ne!(x_errors_djb2_hash("hello"), x_errors_djb2_hash("world"));
+    }
+
+    #[test]
+    fn x_errors_dedup_entries_basic() {
+        let entries = vec![
+            XErrorsTaggedEntry::new("a", "1"),
+            XErrorsTaggedEntry::new("a", "2"),
+            XErrorsTaggedEntry::new("b", "3"),
+        ];
+        let deduped = x_errors_dedup_entries(entries);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].value, "1");
+    }
+
+    #[test]
+    fn x_errors_validation_result_warning() {
+        let w = XErrorsValidationResult::Warning("low disk".into());
+        assert!(!w.is_ok());
+        assert_eq!(w.message(), Some("low disk"));
+    }
+
+    #[test]
+    fn x_errors_filter_by_tag_empty() {
+        let entries: Vec<XErrorsTaggedEntry> = vec![];
+        assert!(x_errors_filter_by_tag(&entries, "x").is_empty());
+    }
+
+    #[test]
+    fn x_errors_tagged_entry_no_tag_match() {
+        let e = XErrorsTaggedEntry::new("k", "v");
+        assert!(!e.matches_tag("any"));
+    }
+
 }

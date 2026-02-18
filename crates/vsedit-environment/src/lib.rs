@@ -1687,6 +1687,125 @@ impl EnvDiffDisplay {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// environment – Platform service helpers
+// ---------------------------------------------------------------------------
+
+/// Capability flags for platform feature detection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XEnvironmentCapabilities {
+    flags: std::collections::HashSet<String>,
+}
+
+impl XEnvironmentCapabilities {
+    pub fn new() -> Self {
+        Self { flags: std::collections::HashSet::new() }
+    }
+
+    pub fn register(&mut self, cap: impl Into<String>) {
+        self.flags.insert(cap.into());
+    }
+
+    pub fn has(&self, cap: &str) -> bool {
+        self.flags.contains(cap)
+    }
+
+    pub fn len(&self) -> usize {
+        self.flags.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.flags.is_empty()
+    }
+
+    /// Return the intersection with another capability set.
+    pub fn intersect(&self, other: &Self) -> Self {
+        Self {
+            flags: self.flags.intersection(&other.flags).cloned().collect(),
+        }
+    }
+
+    /// Return capabilities present here but not in `other`.
+    pub fn diff(&self, other: &Self) -> Self {
+        Self {
+            flags: self.flags.difference(&other.flags).cloned().collect(),
+        }
+    }
+
+    pub fn all(&self) -> Vec<&str> {
+        self.flags.iter().map(|s| s.as_str()).collect()
+    }
+}
+
+impl Default for XEnvironmentCapabilities {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A simple service registry keyed by name.
+#[derive(Debug, Default)]
+pub struct XEnvironmentServiceRegistry {
+    services: std::collections::HashMap<String, String>,
+}
+
+impl XEnvironmentServiceRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a service. Returns the previous value if the key was already present.
+    pub fn register(&mut self, name: impl Into<String>, descriptor: impl Into<String>) -> Option<String> {
+        self.services.insert(name.into(), descriptor.into())
+    }
+
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.services.get(name).map(|s| s.as_str())
+    }
+
+    pub fn contains(&self, name: &str) -> bool {
+        self.services.contains_key(name)
+    }
+
+    pub fn remove(&mut self, name: &str) -> Option<String> {
+        self.services.remove(name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.services.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.services.is_empty()
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        self.services.keys().map(|s| s.as_str()).collect()
+    }
+}
+
+/// Sanitize a path-like string by collapsing repeated separators and removing trailing ones.
+pub fn x_environment_sanitize_path(p: &str) -> String {
+    let mut result = String::with_capacity(p.len());
+    let mut last_was_sep = false;
+    for ch in p.chars() {
+        if ch == '/' || ch == '\\' {
+            if !last_was_sep {
+                result.push('/');
+            }
+            last_was_sep = true;
+        } else {
+            result.push(ch);
+            last_was_sep = false;
+        }
+    }
+    if result.len() > 1 && result.ends_with('/') {
+        result.pop();
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2704,6 +2823,117 @@ mod tests {
         assert_eq!(entry.to_string(), "+ FOO=bar");
         let entry2 = EnvDiffEntry::Removed { key: "BAZ".into(), value: "qux".into() };
         assert_eq!(entry2.to_string(), "- BAZ=qux");
+    }
+
+
+    // -- environment additional tests -------------------------------------------
+
+    #[test]
+    fn x_environment_capabilities_register_and_has() {
+        let mut caps = XEnvironmentCapabilities::new();
+        caps.register("clipboard");
+        assert!(caps.has("clipboard"));
+        assert!(!caps.has("fs"));
+    }
+
+    #[test]
+    fn x_environment_capabilities_len() {
+        let mut caps = XEnvironmentCapabilities::new();
+        assert!(caps.is_empty());
+        caps.register("a");
+        caps.register("b");
+        assert_eq!(caps.len(), 2);
+    }
+
+    #[test]
+    fn x_environment_capabilities_intersect() {
+        let mut a = XEnvironmentCapabilities::new();
+        a.register("x");
+        a.register("y");
+        let mut b = XEnvironmentCapabilities::new();
+        b.register("y");
+        b.register("z");
+        let inter = a.intersect(&b);
+        assert_eq!(inter.len(), 1);
+        assert!(inter.has("y"));
+    }
+
+    #[test]
+    fn x_environment_capabilities_diff() {
+        let mut a = XEnvironmentCapabilities::new();
+        a.register("x");
+        a.register("y");
+        let mut b = XEnvironmentCapabilities::new();
+        b.register("y");
+        let d = a.diff(&b);
+        assert_eq!(d.len(), 1);
+        assert!(d.has("x"));
+    }
+
+    #[test]
+    fn x_environment_service_registry_basic() {
+        let mut reg = XEnvironmentServiceRegistry::new();
+        assert!(reg.is_empty());
+        reg.register("clipboard", "v1");
+        assert_eq!(reg.get("clipboard"), Some("v1"));
+        assert!(reg.contains("clipboard"));
+    }
+
+    #[test]
+    fn x_environment_service_registry_replace() {
+        let mut reg = XEnvironmentServiceRegistry::new();
+        assert!(reg.register("svc", "old").is_none());
+        assert_eq!(reg.register("svc", "new"), Some("old".into()));
+        assert_eq!(reg.get("svc"), Some("new"));
+    }
+
+    #[test]
+    fn x_environment_service_registry_remove() {
+        let mut reg = XEnvironmentServiceRegistry::new();
+        reg.register("svc", "v1");
+        assert_eq!(reg.remove("svc"), Some("v1".into()));
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn x_environment_service_registry_names() {
+        let mut reg = XEnvironmentServiceRegistry::new();
+        reg.register("a", "1");
+        reg.register("b", "2");
+        let mut names = reg.names();
+        names.sort();
+        assert_eq!(names, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn x_environment_sanitize_path_basic() {
+        assert_eq!(x_environment_sanitize_path("/a//b///c/"), "/a/b/c");
+    }
+
+    #[test]
+    fn x_environment_sanitize_path_backslash() {
+        assert_eq!(x_environment_sanitize_path("a\\b\\c"), "a/b/c");
+    }
+
+    #[test]
+    fn x_environment_sanitize_path_single() {
+        assert_eq!(x_environment_sanitize_path("/"), "/");
+    }
+
+    #[test]
+    fn x_environment_capabilities_default() {
+        let caps = XEnvironmentCapabilities::default();
+        assert!(caps.is_empty());
+    }
+
+    #[test]
+    fn x_environment_capabilities_all() {
+        let mut caps = XEnvironmentCapabilities::new();
+        caps.register("a");
+        caps.register("b");
+        let mut all = caps.all();
+        all.sort();
+        assert_eq!(all, vec!["a", "b"]);
     }
 
 }

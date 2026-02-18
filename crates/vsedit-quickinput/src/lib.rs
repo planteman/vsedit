@@ -1780,6 +1780,115 @@ impl Default for InputValidator {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// quickinput – Workbench state helpers
+// ---------------------------------------------------------------------------
+
+/// Layout region within the workbench.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XQuickinputLayoutRegion {
+    Sidebar,
+    Panel,
+    Editor,
+    Statusbar,
+    Titlebar,
+    Auxiliary,
+}
+
+/// Visibility state for a workbench panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XQuickinputPanelState {
+    pub region: XQuickinputLayoutRegion,
+    pub visible: bool,
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl XQuickinputPanelState {
+    pub fn new(region: XQuickinputLayoutRegion, label: impl Into<String>) -> Self {
+        Self { region, visible: true, width: 300, height: 200, label: label.into() }
+    }
+
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    pub fn toggle(&mut self) {
+        self.visible = !self.visible;
+    }
+
+    pub fn resize(&mut self, w: u32, h: u32) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn is_narrow(&self) -> bool {
+        self.width < 200
+    }
+}
+
+/// Compute the total visible area across a set of panels.
+pub fn x_quickinput_total_visible_area(panels: &[XQuickinputPanelState]) -> u64 {
+    panels.iter().filter(|p| p.visible).map(|p| p.area()).sum()
+}
+
+/// Count panels visible in a specific region.
+pub fn x_quickinput_count_in_region(
+    panels: &[XQuickinputPanelState],
+    region: XQuickinputLayoutRegion,
+) -> usize {
+    panels.iter().filter(|p| p.region == region && p.visible).count()
+}
+
+/// Find the widest visible panel.
+pub fn x_quickinput_widest_panel(panels: &[XQuickinputPanelState]) -> Option<&XQuickinputPanelState> {
+    panels.iter().filter(|p| p.visible).max_by_key(|p| p.width)
+}
+
+/// Collapse all panels in a given region (set visible = false).
+pub fn x_quickinput_collapse_region(
+    panels: &mut [XQuickinputPanelState],
+    region: XQuickinputLayoutRegion,
+) {
+    for p in panels.iter_mut() {
+        if p.region == region {
+            p.visible = false;
+        }
+    }
+}
+
+/// Layout constraint: minimum and maximum dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XQuickinputLayoutConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl XQuickinputLayoutConstraint {
+    pub fn new(min_w: u32, max_w: u32, min_h: u32, max_h: u32) -> Self {
+        Self { min_width: min_w, max_width: max_w, min_height: min_h, max_height: max_h }
+    }
+
+    /// Clamp a width value to this constraint's range.
+    pub fn clamp_width(&self, w: u32) -> u32 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp a height value to this constraint's range.
+    pub fn clamp_height(&self, h: u32) -> u32 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Returns true if both dimensions are within the constraint.
+    pub fn is_satisfied(&self, w: u32, h: u32) -> bool {
+        w >= self.min_width && w <= self.max_width && h >= self.min_height && h <= self.max_height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2753,4 +2862,132 @@ mod tests {
         assert!(h.contains("B"));
         assert!(h.contains("C"));
     }
+
+    // -- quickinput additional tests -------------------------------------------
+
+    #[test]
+    fn x_quickinput_panel_state_new() {
+        let p = XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "Explorer");
+        assert!(p.visible);
+        assert_eq!(p.label, "Explorer");
+        assert_eq!(p.region, XQuickinputLayoutRegion::Sidebar);
+    }
+
+    #[test]
+    fn x_quickinput_panel_area() {
+        let p = XQuickinputPanelState::new(XQuickinputLayoutRegion::Editor, "ed");
+        assert_eq!(p.area(), 300 * 200);
+    }
+
+    #[test]
+    fn x_quickinput_panel_toggle() {
+        let mut p = XQuickinputPanelState::new(XQuickinputLayoutRegion::Panel, "terminal");
+        assert!(p.visible);
+        p.toggle();
+        assert!(!p.visible);
+        p.toggle();
+        assert!(p.visible);
+    }
+
+    #[test]
+    fn x_quickinput_panel_resize() {
+        let mut p = XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "files");
+        p.resize(400, 600);
+        assert_eq!(p.width, 400);
+        assert_eq!(p.height, 600);
+        assert_eq!(p.area(), 240_000);
+    }
+
+    #[test]
+    fn x_quickinput_panel_is_narrow() {
+        let mut p = XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "x");
+        assert!(!p.is_narrow());
+        p.resize(100, 200);
+        assert!(p.is_narrow());
+    }
+
+    #[test]
+    fn x_quickinput_total_visible_area_basic() {
+        let panels = vec![
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "a"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Editor, "b"),
+        ];
+        assert_eq!(x_quickinput_total_visible_area(&panels), 2 * 300 * 200);
+    }
+
+    #[test]
+    fn x_quickinput_total_visible_area_hidden() {
+        let mut panels = vec![
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "a"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Panel, "b"),
+        ];
+        panels[1].visible = false;
+        assert_eq!(x_quickinput_total_visible_area(&panels), 300 * 200);
+    }
+
+    #[test]
+    fn x_quickinput_count_in_region_basic() {
+        let panels = vec![
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "a"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "b"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Editor, "c"),
+        ];
+        assert_eq!(x_quickinput_count_in_region(&panels, XQuickinputLayoutRegion::Sidebar), 2);
+        assert_eq!(x_quickinput_count_in_region(&panels, XQuickinputLayoutRegion::Editor), 1);
+        assert_eq!(x_quickinput_count_in_region(&panels, XQuickinputLayoutRegion::Panel), 0);
+    }
+
+    #[test]
+    fn x_quickinput_widest_panel_basic() {
+        let mut panels = vec![
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "narrow"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Editor, "wide"),
+        ];
+        panels[1].resize(800, 600);
+        let widest = x_quickinput_widest_panel(&panels).unwrap();
+        assert_eq!(widest.label, "wide");
+    }
+
+    #[test]
+    fn x_quickinput_collapse_region_basic() {
+        let mut panels = vec![
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "a"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Sidebar, "b"),
+            XQuickinputPanelState::new(XQuickinputLayoutRegion::Editor, "c"),
+        ];
+        x_quickinput_collapse_region(&mut panels, XQuickinputLayoutRegion::Sidebar);
+        assert!(!panels[0].visible);
+        assert!(!panels[1].visible);
+        assert!(panels[2].visible);
+    }
+
+    #[test]
+    fn x_quickinput_layout_constraint_clamp() {
+        let lc = XQuickinputLayoutConstraint::new(100, 800, 50, 600);
+        assert_eq!(lc.clamp_width(50), 100);
+        assert_eq!(lc.clamp_width(500), 500);
+        assert_eq!(lc.clamp_width(1000), 800);
+        assert_eq!(lc.clamp_height(10), 50);
+    }
+
+    #[test]
+    fn x_quickinput_layout_constraint_satisfied() {
+        let lc = XQuickinputLayoutConstraint::new(100, 800, 50, 600);
+        assert!(lc.is_satisfied(400, 300));
+        assert!(!lc.is_satisfied(50, 300));
+        assert!(!lc.is_satisfied(400, 700));
+    }
+
+    #[test]
+    fn x_quickinput_widest_panel_empty() {
+        let panels: Vec<XQuickinputPanelState> = vec![];
+        assert!(x_quickinput_widest_panel(&panels).is_none());
+    }
+
+    #[test]
+    fn x_quickinput_layout_region_eq() {
+        assert_eq!(XQuickinputLayoutRegion::Sidebar, XQuickinputLayoutRegion::Sidebar);
+        assert_ne!(XQuickinputLayoutRegion::Sidebar, XQuickinputLayoutRegion::Panel);
+    }
+
 }
