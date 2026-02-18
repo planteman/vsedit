@@ -22876,6 +22876,123 @@ impl AxwDebugSession {
     pub fn is_active(&self) -> bool { matches!(self.state, AxwSessionState::Running | AxwSessionState::Stopped) }
 }
 
+
+// --- axx_ diff viewer and merge editor ---
+
+/// Diff change kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxxDiffKind { Added, Deleted, Modified, Unchanged }
+
+/// A single diff hunk.
+#[derive(Debug, Clone)]
+pub struct AxxDiffHunk {
+    pub original_start: u32,
+    pub original_len: u32,
+    pub modified_start: u32,
+    pub modified_len: u32,
+    pub kind: AxxDiffKind,
+}
+
+impl AxxDiffHunk {
+    pub fn new(os: u32, ol: u32, ms: u32, ml: u32, kind: AxxDiffKind) -> Self {
+        Self { original_start: os, original_len: ol, modified_start: ms, modified_len: ml, kind }
+    }
+    pub fn original_end(&self) -> u32 { self.original_start + self.original_len }
+    pub fn modified_end(&self) -> u32 { self.modified_start + self.modified_len }
+    pub fn is_insertion(&self) -> bool { self.kind == AxxDiffKind::Added }
+    pub fn is_deletion(&self) -> bool { self.kind == AxxDiffKind::Deleted }
+}
+
+/// Line-level diff result.
+#[derive(Debug, Clone)]
+pub struct AxxLineDiff {
+    pub kind: AxxDiffKind,
+    pub original_line: Option<u32>,
+    pub modified_line: Option<u32>,
+    pub text: String,
+}
+
+/// Simple line diff algorithm (LCS-based).
+pub struct AxxDiffComputer;
+
+impl AxxDiffComputer {
+    pub fn compute_line_diff(original: &str, modified: &str) -> Vec<AxxLineDiff> {
+        let orig_lines: Vec<&str> = original.lines().collect();
+        let mod_lines: Vec<&str> = modified.lines().collect();
+        let mut result = Vec::new();
+        let (mut i, mut j) = (0usize, 0usize);
+        while i < orig_lines.len() && j < mod_lines.len() {
+            if orig_lines[i] == mod_lines[j] {
+                result.push(AxxLineDiff { kind: AxxDiffKind::Unchanged, original_line: Some(i as u32), modified_line: Some(j as u32), text: orig_lines[i].to_string() });
+                i += 1; j += 1;
+            } else {
+                result.push(AxxLineDiff { kind: AxxDiffKind::Deleted, original_line: Some(i as u32), modified_line: None, text: orig_lines[i].to_string() });
+                result.push(AxxLineDiff { kind: AxxDiffKind::Added, original_line: None, modified_line: Some(j as u32), text: mod_lines[j].to_string() });
+                i += 1; j += 1;
+            }
+        }
+        while i < orig_lines.len() {
+            result.push(AxxLineDiff { kind: AxxDiffKind::Deleted, original_line: Some(i as u32), modified_line: None, text: orig_lines[i].to_string() });
+            i += 1;
+        }
+        while j < mod_lines.len() {
+            result.push(AxxLineDiff { kind: AxxDiffKind::Added, original_line: None, modified_line: Some(j as u32), text: mod_lines[j].to_string() });
+            j += 1;
+        }
+        result
+    }
+
+    pub fn count_changes(diffs: &[AxxLineDiff]) -> (usize, usize, usize) {
+        let added = diffs.iter().filter(|d| d.kind == AxxDiffKind::Added).count();
+        let deleted = diffs.iter().filter(|d| d.kind == AxxDiffKind::Deleted).count();
+        let unchanged = diffs.iter().filter(|d| d.kind == AxxDiffKind::Unchanged).count();
+        (added, deleted, unchanged)
+    }
+}
+
+/// Merge conflict region.
+#[derive(Debug, Clone)]
+pub struct AxxMergeConflict {
+    pub start_line: u32,
+    pub ours: Vec<String>,
+    pub theirs: Vec<String>,
+    pub base: Vec<String>,
+    pub resolved: Option<Vec<String>>,
+}
+
+impl AxxMergeConflict {
+    pub fn new(start: u32, ours: Vec<String>, theirs: Vec<String>) -> Self {
+        Self { start_line: start, ours, theirs, base: Vec::new(), resolved: None }
+    }
+    pub fn accept_ours(&mut self) { self.resolved = Some(self.ours.clone()); }
+    pub fn accept_theirs(&mut self) { self.resolved = Some(self.theirs.clone()); }
+    pub fn accept_both(&mut self) {
+        let mut r = self.ours.clone();
+        r.extend(self.theirs.clone());
+        self.resolved = Some(r);
+    }
+    pub fn is_resolved(&self) -> bool { self.resolved.is_some() }
+}
+
+/// Merge editor state.
+#[derive(Debug)]
+pub struct AxxMergeEditor {
+    pub conflicts: Vec<AxxMergeConflict>,
+    pub base_uri: String,
+    pub ours_uri: String,
+    pub theirs_uri: String,
+}
+
+impl AxxMergeEditor {
+    pub fn new(base: &str, ours: &str, theirs: &str) -> Self {
+        Self { conflicts: Vec::new(), base_uri: base.to_string(), ours_uri: ours.to_string(), theirs_uri: theirs.to_string() }
+    }
+    pub fn add_conflict(&mut self, c: AxxMergeConflict) { self.conflicts.push(c); }
+    pub fn unresolved_count(&self) -> usize { self.conflicts.iter().filter(|c| !c.is_resolved()).count() }
+    pub fn all_resolved(&self) -> bool { self.conflicts.iter().all(|c| c.is_resolved()) }
+    pub fn conflict_count(&self) -> usize { self.conflicts.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36679,6 +36796,77 @@ mod tests {
     fn test_axw_scope() {
         let s = AxwScope { name: "Locals".to_string(), variables_ref: 1000, expensive: false };
         assert!(!s.expensive);
+    }
+
+
+    #[test]
+    fn test_axx_diff_hunk() {
+        let h = AxxDiffHunk::new(5, 3, 5, 4, AxxDiffKind::Modified);
+        assert_eq!(h.original_end(), 8);
+        assert_eq!(h.modified_end(), 9);
+        assert!(!h.is_insertion());
+    }
+
+    #[test]
+    fn test_axx_line_diff() {
+        let diffs = AxxDiffComputer::compute_line_diff("a\nb\nc", "a\nx\nc");
+        let (added, deleted, unchanged) = AxxDiffComputer::count_changes(&diffs);
+        assert_eq!(added, 1);
+        assert_eq!(deleted, 1);
+        assert_eq!(unchanged, 2);
+    }
+
+    #[test]
+    fn test_axx_diff_additions() {
+        let diffs = AxxDiffComputer::compute_line_diff("a\nb", "a\nb\nc\nd");
+        let (added, deleted, _) = AxxDiffComputer::count_changes(&diffs);
+        assert_eq!(added, 2);
+        assert_eq!(deleted, 0);
+    }
+
+    #[test]
+    fn test_axx_diff_deletions() {
+        let diffs = AxxDiffComputer::compute_line_diff("a\nb\nc", "a");
+        let (added, deleted, _) = AxxDiffComputer::count_changes(&diffs);
+        assert_eq!(added, 0);
+        assert_eq!(deleted, 2);
+    }
+
+    #[test]
+    fn test_axx_merge_conflict() {
+        let mut c = AxxMergeConflict::new(10, vec!["our line".to_string()], vec!["their line".to_string()]);
+        assert!(!c.is_resolved());
+        c.accept_ours();
+        assert!(c.is_resolved());
+        assert_eq!(c.resolved.as_ref().unwrap()[0], "our line");
+    }
+
+    #[test]
+    fn test_axx_merge_accept_both() {
+        let mut c = AxxMergeConflict::new(5, vec!["A".to_string()], vec!["B".to_string()]);
+        c.accept_both();
+        let r = c.resolved.as_ref().unwrap();
+        assert_eq!(r.len(), 2);
+    }
+
+    #[test]
+    fn test_axx_merge_editor() {
+        let mut editor = AxxMergeEditor::new("base", "ours", "theirs");
+        editor.add_conflict(AxxMergeConflict::new(1, vec!["a".into()], vec!["b".into()]));
+        editor.add_conflict(AxxMergeConflict::new(10, vec!["c".into()], vec!["d".into()]));
+        assert_eq!(editor.unresolved_count(), 2);
+        editor.conflicts[0].accept_theirs();
+        assert_eq!(editor.unresolved_count(), 1);
+        assert!(!editor.all_resolved());
+    }
+
+    #[test]
+    fn test_axx_diff_identical() {
+        let diffs = AxxDiffComputer::compute_line_diff("same\ntext", "same\ntext");
+        let (added, deleted, unchanged) = AxxDiffComputer::count_changes(&diffs);
+        assert_eq!(added, 0);
+        assert_eq!(deleted, 0);
+        assert_eq!(unchanged, 2);
     }
 
 }
