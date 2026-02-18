@@ -13627,6 +13627,171 @@ impl<T: Clone + PartialEq + std::fmt::Debug> std::fmt::Display for YyObservable<
     }
 }
 
+
+// --- yz_ disposable and cancellation token ---
+
+/// A resource lifecycle manager that tracks disposables.
+/// Mirrors VS Code's IDisposable pattern.
+#[derive(Debug, Clone)]
+pub struct YzDisposableStore {
+    items: Vec<(usize, String, bool)>, // id, label, disposed
+    next_id: usize,
+}
+
+impl YzDisposableStore {
+    pub fn new() -> Self {
+        Self { items: Vec::new(), next_id: 0 }
+    }
+
+    pub fn register(&mut self, label: &str) -> usize {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.items.push((id, label.to_string(), false));
+        id
+    }
+
+    pub fn dispose(&mut self, id: usize) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|(i, _, _)| *i == id) {
+            if !item.2 {
+                item.2 = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn dispose_all(&mut self) -> usize {
+        let mut count = 0;
+        for item in &mut self.items {
+            if !item.2 {
+                item.2 = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    pub fn is_disposed(&self, id: usize) -> bool {
+        self.items.iter().find(|(i, _, _)| *i == id).map(|(_, _, d)| *d).unwrap_or(true)
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.items.iter().filter(|(_, _, d)| !d).count()
+    }
+
+    pub fn disposed_count(&self) -> usize {
+        self.items.iter().filter(|(_, _, d)| *d).count()
+    }
+
+    pub fn total_count(&self) -> usize { self.items.len() }
+
+    pub fn active_labels(&self) -> Vec<&str> {
+        self.items.iter().filter(|(_, _, d)| !d).map(|(_, l, _)| l.as_str()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.dispose_all();
+        self.items.clear();
+    }
+
+    pub fn has_active(&self) -> bool {
+        self.items.iter().any(|(_, _, d)| !d)
+    }
+}
+
+impl Default for YzDisposableStore {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for YzDisposableStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YzDisposableStore(active={}, disposed={})", self.active_count(), self.disposed_count())
+    }
+}
+
+/// A cancellation token for cooperative task cancellation.
+/// Mirrors VS Code's CancellationToken pattern.
+#[derive(Debug, Clone)]
+pub struct YzCancellationToken {
+    is_cancelled: bool,
+    reason: Option<String>,
+    listeners: usize,
+}
+
+impl YzCancellationToken {
+    pub fn new() -> Self {
+        Self { is_cancelled: false, reason: None, listeners: 0 }
+    }
+
+    pub fn cancel(&mut self) {
+        self.is_cancelled = true;
+    }
+
+    pub fn cancel_with_reason(&mut self, reason: &str) {
+        self.is_cancelled = true;
+        self.reason = Some(reason.to_string());
+    }
+
+    pub fn is_cancelled(&self) -> bool { self.is_cancelled }
+
+    pub fn reason(&self) -> Option<&str> { self.reason.as_deref() }
+
+    pub fn throw_if_cancelled(&self) -> std::result::Result<(), String> {
+        if self.is_cancelled {
+            Err(self.reason.clone().unwrap_or_else(|| "Cancelled".to_string()))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn add_listener(&mut self) { self.listeners += 1; }
+
+    pub fn remove_listener(&mut self) { if self.listeners > 0 { self.listeners -= 1; } }
+
+    pub fn listener_count(&self) -> usize { self.listeners }
+
+    pub fn reset(&mut self) {
+        self.is_cancelled = false;
+        self.reason = None;
+    }
+
+    /// Create a linked token that cancels when either parent is cancelled.
+    pub fn link(a: &YzCancellationToken, b: &YzCancellationToken) -> YzCancellationToken {
+        let mut token = YzCancellationToken::new();
+        if a.is_cancelled || b.is_cancelled {
+            token.cancel();
+            if let Some(r) = a.reason.as_ref().or(b.reason.as_ref()) {
+                token.reason = Some(r.clone());
+            }
+        }
+        token
+    }
+
+    /// Create a token that is already cancelled.
+    pub fn cancelled() -> Self {
+        Self { is_cancelled: true, reason: Some("Pre-cancelled".to_string()), listeners: 0 }
+    }
+
+    /// Create a token that is never cancelled.
+    pub fn none() -> Self {
+        Self::new()
+    }
+}
+
+impl Default for YzCancellationToken {
+    fn default() -> Self { Self::new() }
+}
+
+impl std::fmt::Display for YzCancellationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_cancelled {
+            write!(f, "YzCancellationToken(cancelled)")
+        } else {
+            write!(f, "YzCancellationToken(active)")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -22511,6 +22676,181 @@ src/b.rs:5:3: warning: msg2
     fn test_yy_observable_default() {
         let o: YyObservable<i32> = YyObservable::default();
         assert_eq!(*o.get(), 0);
+    }
+
+
+    // --- yz_ tests ---
+
+    #[test]
+    fn test_yz_disposable_new() {
+        let d = YzDisposableStore::new();
+        assert_eq!(d.total_count(), 0);
+        assert!(!d.has_active());
+    }
+
+    #[test]
+    fn test_yz_disposable_register() {
+        let mut d = YzDisposableStore::new();
+        let id = d.register("listener");
+        assert_eq!(d.active_count(), 1);
+        assert!(!d.is_disposed(id));
+    }
+
+    #[test]
+    fn test_yz_disposable_dispose() {
+        let mut d = YzDisposableStore::new();
+        let id = d.register("item");
+        assert!(d.dispose(id));
+        assert!(d.is_disposed(id));
+        assert_eq!(d.active_count(), 0);
+    }
+
+    #[test]
+    fn test_yz_disposable_dispose_twice() {
+        let mut d = YzDisposableStore::new();
+        let id = d.register("item");
+        assert!(d.dispose(id));
+        assert!(!d.dispose(id));
+    }
+
+    #[test]
+    fn test_yz_disposable_dispose_all() {
+        let mut d = YzDisposableStore::new();
+        d.register("a");
+        d.register("b");
+        d.register("c");
+        assert_eq!(d.dispose_all(), 3);
+        assert_eq!(d.active_count(), 0);
+    }
+
+    #[test]
+    fn test_yz_disposable_active_labels() {
+        let mut d = YzDisposableStore::new();
+        d.register("a");
+        let b = d.register("b");
+        d.register("c");
+        d.dispose(b);
+        let labels = d.active_labels();
+        assert_eq!(labels.len(), 2);
+        assert!(labels.contains(&"a"));
+        assert!(labels.contains(&"c"));
+    }
+
+    #[test]
+    fn test_yz_disposable_clear() {
+        let mut d = YzDisposableStore::new();
+        d.register("x");
+        d.clear();
+        assert_eq!(d.total_count(), 0);
+    }
+
+    #[test]
+    fn test_yz_disposable_display() {
+        let d = YzDisposableStore::new();
+        let s = format!("{}", d);
+        assert!(s.contains("YzDisposableStore"));
+    }
+
+    #[test]
+    fn test_yz_disposable_default() {
+        let d = YzDisposableStore::default();
+        assert_eq!(d.total_count(), 0);
+    }
+
+    #[test]
+    fn test_yz_cancel_new() {
+        let t = YzCancellationToken::new();
+        assert!(!t.is_cancelled());
+        assert_eq!(t.reason(), None);
+    }
+
+    #[test]
+    fn test_yz_cancel_cancel() {
+        let mut t = YzCancellationToken::new();
+        t.cancel();
+        assert!(t.is_cancelled());
+    }
+
+    #[test]
+    fn test_yz_cancel_with_reason() {
+        let mut t = YzCancellationToken::new();
+        t.cancel_with_reason("timeout");
+        assert!(t.is_cancelled());
+        assert_eq!(t.reason(), Some("timeout"));
+    }
+
+    #[test]
+    fn test_yz_cancel_throw() {
+        let t = YzCancellationToken::new();
+        assert!(t.throw_if_cancelled().is_ok());
+        let mut t2 = YzCancellationToken::new();
+        t2.cancel();
+        assert!(t2.throw_if_cancelled().is_err());
+    }
+
+    #[test]
+    fn test_yz_cancel_listeners() {
+        let mut t = YzCancellationToken::new();
+        t.add_listener();
+        t.add_listener();
+        assert_eq!(t.listener_count(), 2);
+        t.remove_listener();
+        assert_eq!(t.listener_count(), 1);
+    }
+
+    #[test]
+    fn test_yz_cancel_reset() {
+        let mut t = YzCancellationToken::new();
+        t.cancel_with_reason("err");
+        t.reset();
+        assert!(!t.is_cancelled());
+        assert_eq!(t.reason(), None);
+    }
+
+    #[test]
+    fn test_yz_cancel_link() {
+        let a = YzCancellationToken::new();
+        let mut b = YzCancellationToken::new();
+        b.cancel();
+        let linked = YzCancellationToken::link(&a, &b);
+        assert!(linked.is_cancelled());
+    }
+
+    #[test]
+    fn test_yz_cancel_link_both_active() {
+        let a = YzCancellationToken::new();
+        let b = YzCancellationToken::new();
+        let linked = YzCancellationToken::link(&a, &b);
+        assert!(!linked.is_cancelled());
+    }
+
+    #[test]
+    fn test_yz_cancel_precancelled() {
+        let t = YzCancellationToken::cancelled();
+        assert!(t.is_cancelled());
+    }
+
+    #[test]
+    fn test_yz_cancel_none() {
+        let t = YzCancellationToken::none();
+        assert!(!t.is_cancelled());
+    }
+
+    #[test]
+    fn test_yz_cancel_display() {
+        let t = YzCancellationToken::new();
+        let s = format!("{}", t);
+        assert!(s.contains("active"));
+        let mut t2 = YzCancellationToken::new();
+        t2.cancel();
+        let s2 = format!("{}", t2);
+        assert!(s2.contains("cancelled"));
+    }
+
+    #[test]
+    fn test_yz_cancel_default() {
+        let t = YzCancellationToken::default();
+        assert!(!t.is_cancelled());
     }
 
 }
