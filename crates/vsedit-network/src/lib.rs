@@ -14395,6 +14395,163 @@ impl std::fmt::Display for ZcWorkspaceEdit {
     }
 }
 
+
+// --- zd_ diagnostic and marker types ---
+
+/// Severity level for diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ZdSeverity {
+    Error = 0,
+    Warning = 1,
+    Information = 2,
+    Hint = 3,
+}
+
+impl ZdSeverity {
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            0 => ZdSeverity::Error,
+            1 => ZdSeverity::Warning,
+            2 => ZdSeverity::Information,
+            _ => ZdSeverity::Hint,
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            ZdSeverity::Error => "error",
+            ZdSeverity::Warning => "warning",
+            ZdSeverity::Information => "information",
+            ZdSeverity::Hint => "hint",
+        }
+    }
+
+    pub fn is_error(&self) -> bool { *self == ZdSeverity::Error }
+    pub fn is_warning(&self) -> bool { *self == ZdSeverity::Warning }
+}
+
+impl std::fmt::Display for ZdSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl Default for ZdSeverity {
+    fn default() -> Self { ZdSeverity::Error }
+}
+
+/// A diagnostic message associated with a source location.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZdDiagnostic {
+    pub severity: ZdSeverity,
+    pub message: String,
+    pub source: String,
+    pub code: Option<String>,
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub related: Vec<ZdRelatedInfo>,
+    pub tags: Vec<ZdDiagnosticTag>,
+}
+
+/// A tag for diagnostics (unnecessary, deprecated).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZdDiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+/// Related diagnostic information.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZdRelatedInfo {
+    pub uri: String,
+    pub line: u32,
+    pub character: u32,
+    pub message: String,
+}
+
+impl ZdDiagnostic {
+    pub fn error(message: &str, line: u32, start: u32, end: u32) -> Self {
+        Self { severity: ZdSeverity::Error, message: message.to_string(), source: String::new(), code: None,
+            start_line: line, start_char: start, end_line: line, end_char: end, related: Vec::new(), tags: Vec::new() }
+    }
+
+    pub fn warning(message: &str, line: u32, start: u32, end: u32) -> Self {
+        Self { severity: ZdSeverity::Warning, message: message.to_string(), source: String::new(), code: None,
+            start_line: line, start_char: start, end_line: line, end_char: end, related: Vec::new(), tags: Vec::new() }
+    }
+
+    pub fn info(message: &str, line: u32, start: u32, end: u32) -> Self {
+        Self { severity: ZdSeverity::Information, message: message.to_string(), source: String::new(), code: None,
+            start_line: line, start_char: start, end_line: line, end_char: end, related: Vec::new(), tags: Vec::new() }
+    }
+
+    pub fn hint(message: &str, line: u32, start: u32, end: u32) -> Self {
+        Self { severity: ZdSeverity::Hint, message: message.to_string(), source: String::new(), code: None,
+            start_line: line, start_char: start, end_line: line, end_char: end, related: Vec::new(), tags: Vec::new() }
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self { self.source = source.to_string(); self }
+
+    pub fn with_code(mut self, code: &str) -> Self { self.code = Some(code.to_string()); self }
+
+    pub fn with_tag(mut self, tag: ZdDiagnosticTag) -> Self { self.tags.push(tag); self }
+
+    pub fn add_related(&mut self, uri: &str, line: u32, character: u32, message: &str) {
+        self.related.push(ZdRelatedInfo { uri: uri.to_string(), line, character, message: message.to_string() });
+    }
+
+    pub fn is_error(&self) -> bool { self.severity.is_error() }
+    pub fn is_warning(&self) -> bool { self.severity.is_warning() }
+    pub fn is_deprecated(&self) -> bool { self.tags.contains(&ZdDiagnosticTag::Deprecated) }
+    pub fn is_unnecessary(&self) -> bool { self.tags.contains(&ZdDiagnosticTag::Unnecessary) }
+    pub fn affects_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+}
+
+impl std::fmt::Display for ZdDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}:{}: {}", self.severity, self.start_line + 1, self.start_char + 1, self.message)
+    }
+}
+
+/// A collection of diagnostics for a URI.
+#[derive(Debug, Clone)]
+pub struct ZdDiagnosticCollection {
+    pub uri: String,
+    pub diagnostics: Vec<ZdDiagnostic>,
+}
+
+impl ZdDiagnosticCollection {
+    pub fn new(uri: &str) -> Self { Self { uri: uri.to_string(), diagnostics: Vec::new() } }
+
+    pub fn add(&mut self, diag: ZdDiagnostic) { self.diagnostics.push(diag); }
+
+    pub fn error_count(&self) -> usize { self.diagnostics.iter().filter(|d| d.is_error()).count() }
+    pub fn warning_count(&self) -> usize { self.diagnostics.iter().filter(|d| d.is_warning()).count() }
+    pub fn total(&self) -> usize { self.diagnostics.len() }
+    pub fn is_empty(&self) -> bool { self.diagnostics.is_empty() }
+
+    pub fn errors(&self) -> Vec<&ZdDiagnostic> { self.diagnostics.iter().filter(|d| d.is_error()).collect() }
+    pub fn warnings(&self) -> Vec<&ZdDiagnostic> { self.diagnostics.iter().filter(|d| d.is_warning()).collect() }
+
+    pub fn for_line(&self, line: u32) -> Vec<&ZdDiagnostic> {
+        self.diagnostics.iter().filter(|d| d.affects_line(line)).collect()
+    }
+
+    pub fn clear(&mut self) { self.diagnostics.clear(); }
+
+    pub fn sort_by_severity(&mut self) {
+        self.diagnostics.sort_by_key(|d| d.severity);
+    }
+}
+
+impl std::fmt::Display for ZdDiagnosticCollection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZdDiagnosticCollection({}, {} errors, {} warnings)", self.uri, self.error_count(), self.warning_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -23662,6 +23819,131 @@ mod tests {
     fn test_zc_workspace_edit_default() {
         let we = ZcWorkspaceEdit::default();
         assert!(we.is_empty());
+    }
+
+
+    // --- zd_ tests ---
+
+    #[test]
+    fn test_zd_severity() {
+        assert!(ZdSeverity::Error.is_error());
+        assert!(ZdSeverity::Warning.is_warning());
+        assert_eq!(ZdSeverity::Error.as_str(), "error");
+    }
+
+    #[test]
+    fn test_zd_severity_from_u8() {
+        assert_eq!(ZdSeverity::from_u8(0), ZdSeverity::Error);
+        assert_eq!(ZdSeverity::from_u8(1), ZdSeverity::Warning);
+        assert_eq!(ZdSeverity::from_u8(99), ZdSeverity::Hint);
+    }
+
+    #[test]
+    fn test_zd_severity_ord() {
+        assert!(ZdSeverity::Error < ZdSeverity::Warning);
+        assert!(ZdSeverity::Warning < ZdSeverity::Hint);
+    }
+
+    #[test]
+    fn test_zd_severity_display() {
+        assert_eq!(format!("{}", ZdSeverity::Error), "error");
+    }
+
+    #[test]
+    fn test_zd_diagnostic_error() {
+        let d = ZdDiagnostic::error("missing semicolon", 10, 5, 6);
+        assert!(d.is_error());
+        assert_eq!(d.message, "missing semicolon");
+        assert_eq!(d.start_line, 10);
+    }
+
+    #[test]
+    fn test_zd_diagnostic_warning() {
+        let d = ZdDiagnostic::warning("unused var", 3, 0, 5);
+        assert!(d.is_warning());
+    }
+
+    #[test]
+    fn test_zd_diagnostic_with_source() {
+        let d = ZdDiagnostic::error("err", 0, 0, 1).with_source("rustc");
+        assert_eq!(d.source, "rustc");
+    }
+
+    #[test]
+    fn test_zd_diagnostic_with_code() {
+        let d = ZdDiagnostic::error("err", 0, 0, 1).with_code("E0001");
+        assert_eq!(d.code, Some("E0001".to_string()));
+    }
+
+    #[test]
+    fn test_zd_diagnostic_tags() {
+        let d = ZdDiagnostic::hint("unused", 0, 0, 1).with_tag(ZdDiagnosticTag::Unnecessary);
+        assert!(d.is_unnecessary());
+        assert!(!d.is_deprecated());
+    }
+
+    #[test]
+    fn test_zd_diagnostic_related() {
+        let mut d = ZdDiagnostic::error("err", 0, 0, 1);
+        d.add_related("file.rs", 5, 0, "defined here");
+        assert_eq!(d.related.len(), 1);
+    }
+
+    #[test]
+    fn test_zd_diagnostic_affects_line() {
+        let d = ZdDiagnostic::error("err", 5, 0, 10);
+        assert!(d.affects_line(5));
+        assert!(!d.affects_line(4));
+    }
+
+    #[test]
+    fn test_zd_diagnostic_display() {
+        let d = ZdDiagnostic::error("test", 0, 0, 1);
+        let s = format!("{}", d);
+        assert!(s.contains("error"));
+        assert!(s.contains("test"));
+    }
+
+    #[test]
+    fn test_zd_collection_new() {
+        let c = ZdDiagnosticCollection::new("file.rs");
+        assert!(c.is_empty());
+        assert_eq!(c.total(), 0);
+    }
+
+    #[test]
+    fn test_zd_collection_add() {
+        let mut c = ZdDiagnosticCollection::new("file.rs");
+        c.add(ZdDiagnostic::error("e1", 0, 0, 1));
+        c.add(ZdDiagnostic::warning("w1", 1, 0, 1));
+        assert_eq!(c.error_count(), 1);
+        assert_eq!(c.warning_count(), 1);
+        assert_eq!(c.total(), 2);
+    }
+
+    #[test]
+    fn test_zd_collection_for_line() {
+        let mut c = ZdDiagnosticCollection::new("f");
+        c.add(ZdDiagnostic::error("e1", 5, 0, 1));
+        c.add(ZdDiagnostic::warning("w1", 10, 0, 1));
+        assert_eq!(c.for_line(5).len(), 1);
+        assert_eq!(c.for_line(7).len(), 0);
+    }
+
+    #[test]
+    fn test_zd_collection_sort() {
+        let mut c = ZdDiagnosticCollection::new("f");
+        c.add(ZdDiagnostic::warning("w", 0, 0, 1));
+        c.add(ZdDiagnostic::error("e", 0, 0, 1));
+        c.sort_by_severity();
+        assert!(c.diagnostics[0].is_error());
+    }
+
+    #[test]
+    fn test_zd_collection_display() {
+        let c = ZdDiagnosticCollection::new("test.rs");
+        let s = format!("{}", c);
+        assert!(s.contains("ZdDiagnosticCollection"));
     }
 
 }
