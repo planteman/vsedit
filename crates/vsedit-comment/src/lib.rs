@@ -15371,6 +15371,173 @@ impl std::fmt::Display for ZiSelectionRange {
     }
 }
 
+
+// --- zj_ inlay hints and rename info ---
+
+/// The kind of inlay hint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZjInlayHintKind {
+    Type,
+    Parameter,
+    Other,
+}
+
+impl std::fmt::Display for ZjInlayHintKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZjInlayHintKind::Type => write!(f, "type"),
+            ZjInlayHintKind::Parameter => write!(f, "parameter"),
+            ZjInlayHintKind::Other => write!(f, "other"),
+        }
+    }
+}
+
+/// An inlay hint displayed inline in the editor.
+#[derive(Debug, Clone)]
+pub struct ZjInlayHint {
+    pub line: u32,
+    pub character: u32,
+    pub label: String,
+    pub kind: ZjInlayHintKind,
+    pub tooltip: Option<String>,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+impl ZjInlayHint {
+    pub fn new(line: u32, character: u32, label: &str, kind: ZjInlayHintKind) -> Self {
+        Self { line, character, label: label.to_string(), kind, tooltip: None, padding_left: false, padding_right: false }
+    }
+
+    pub fn type_hint(line: u32, character: u32, label: &str) -> Self {
+        Self::new(line, character, label, ZjInlayHintKind::Type)
+    }
+
+    pub fn param_hint(line: u32, character: u32, label: &str) -> Self {
+        Self::new(line, character, label, ZjInlayHintKind::Parameter).padded_left()
+    }
+
+    pub fn with_tooltip(mut self, tip: &str) -> Self { self.tooltip = Some(tip.to_string()); self }
+    pub fn padded_left(mut self) -> Self { self.padding_left = true; self }
+    pub fn padded_right(mut self) -> Self { self.padding_right = true; self }
+
+    pub fn is_type(&self) -> bool { self.kind == ZjInlayHintKind::Type }
+    pub fn is_parameter(&self) -> bool { self.kind == ZjInlayHintKind::Parameter }
+}
+
+impl std::fmt::Display for ZjInlayHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZjInlayHint(L{}:{}, {}: {})", self.line + 1, self.character, self.kind, self.label)
+    }
+}
+
+/// A collection of inlay hints for a range.
+#[derive(Debug, Clone, Default)]
+pub struct ZjInlayHints {
+    pub hints: Vec<ZjInlayHint>,
+}
+
+impl ZjInlayHints {
+    pub fn new() -> Self { Self { hints: Vec::new() } }
+    pub fn add(&mut self, hint: ZjInlayHint) { self.hints.push(hint); }
+    pub fn len(&self) -> usize { self.hints.len() }
+    pub fn is_empty(&self) -> bool { self.hints.is_empty() }
+
+    pub fn for_line(&self, line: u32) -> Vec<&ZjInlayHint> {
+        self.hints.iter().filter(|h| h.line == line).collect()
+    }
+
+    pub fn type_hints(&self) -> Vec<&ZjInlayHint> {
+        self.hints.iter().filter(|h| h.is_type()).collect()
+    }
+
+    pub fn param_hints(&self) -> Vec<&ZjInlayHint> {
+        self.hints.iter().filter(|h| h.is_parameter()).collect()
+    }
+
+    pub fn sort(&mut self) {
+        self.hints.sort_by_key(|h| (h.line, h.character));
+    }
+
+    pub fn clear(&mut self) { self.hints.clear(); }
+}
+
+impl std::fmt::Display for ZjInlayHints {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZjInlayHints({} hints)", self.len())
+    }
+}
+
+/// Information for preparing a rename operation.
+#[derive(Debug, Clone)]
+pub struct ZjPrepareRename {
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+    pub placeholder: String,
+}
+
+impl ZjPrepareRename {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, placeholder: &str) -> Self {
+        Self { start_line: sl, start_char: sc, end_line: el, end_char: ec, placeholder: placeholder.to_string() }
+    }
+
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+}
+
+impl std::fmt::Display for ZjPrepareRename {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZjPrepareRename(L{}:{}-L{}:{}, {})", self.start_line + 1, self.start_char, self.end_line + 1, self.end_char, self.placeholder)
+    }
+}
+
+/// A workspace rename edit containing changes across multiple files.
+#[derive(Debug, Clone)]
+pub struct ZjRenameEdit {
+    pub old_name: String,
+    pub new_name: String,
+    pub changes: Vec<ZjRenameFileChange>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ZjRenameFileChange {
+    pub uri: String,
+    pub edits: Vec<ZjRenameTextEdit>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ZjRenameTextEdit {
+    pub start_line: u32,
+    pub start_char: u32,
+    pub end_line: u32,
+    pub end_char: u32,
+}
+
+impl ZjRenameEdit {
+    pub fn new(old_name: &str, new_name: &str) -> Self {
+        Self { old_name: old_name.to_string(), new_name: new_name.to_string(), changes: Vec::new() }
+    }
+
+    pub fn add_file_change(&mut self, uri: &str, edits: Vec<ZjRenameTextEdit>) {
+        self.changes.push(ZjRenameFileChange { uri: uri.to_string(), edits });
+    }
+
+    pub fn file_count(&self) -> usize { self.changes.len() }
+    pub fn total_edits(&self) -> usize { self.changes.iter().map(|c| c.edits.len()).sum() }
+    pub fn is_empty(&self) -> bool { self.changes.is_empty() }
+
+    pub fn affected_uris(&self) -> Vec<&str> {
+        self.changes.iter().map(|c| c.uri.as_str()).collect()
+    }
+}
+
+impl std::fmt::Display for ZjRenameEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZjRenameEdit({} -> {}, {} files, {} edits)", self.old_name, self.new_name, self.file_count(), self.total_edits())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -25341,6 +25508,109 @@ mod tests {
     fn test_zi_selection_range_display() {
         let sr = ZiSelectionRange::new(5, 0, 5, 10);
         assert!(format!("{}", sr).contains("ZiSelectionRange"));
+    }
+
+
+    // --- zj_ tests ---
+
+    #[test]
+    fn test_zj_inlay_hint_type() {
+        let h = ZjInlayHint::type_hint(5, 10, ": i32");
+        assert!(h.is_type());
+        assert!(!h.is_parameter());
+        assert_eq!(h.label, ": i32");
+    }
+
+    #[test]
+    fn test_zj_inlay_hint_param() {
+        let h = ZjInlayHint::param_hint(3, 5, "name:");
+        assert!(h.is_parameter());
+        assert!(h.padding_left);
+    }
+
+    #[test]
+    fn test_zj_inlay_hint_builder() {
+        let h = ZjInlayHint::type_hint(0, 0, ": u32").with_tooltip("inferred type").padded_right();
+        assert!(h.tooltip.is_some());
+        assert!(h.padding_right);
+    }
+
+    #[test]
+    fn test_zj_inlay_hint_display() {
+        let h = ZjInlayHint::type_hint(0, 5, ": bool");
+        assert!(format!("{}", h).contains("type"));
+    }
+
+    #[test]
+    fn test_zj_inlay_hints_collection() {
+        let mut hints = ZjInlayHints::new();
+        hints.add(ZjInlayHint::type_hint(0, 5, ": i32"));
+        hints.add(ZjInlayHint::param_hint(0, 10, "x:"));
+        hints.add(ZjInlayHint::type_hint(3, 0, ": String"));
+        assert_eq!(hints.len(), 3);
+        assert_eq!(hints.for_line(0).len(), 2);
+        assert_eq!(hints.type_hints().len(), 2);
+        assert_eq!(hints.param_hints().len(), 1);
+    }
+
+    #[test]
+    fn test_zj_inlay_hints_sort() {
+        let mut hints = ZjInlayHints::new();
+        hints.add(ZjInlayHint::type_hint(5, 0, "a"));
+        hints.add(ZjInlayHint::type_hint(1, 0, "b"));
+        hints.sort();
+        assert_eq!(hints.hints[0].line, 1);
+    }
+
+    #[test]
+    fn test_zj_inlay_hints_display() {
+        let hints = ZjInlayHints::new();
+        assert!(format!("{}", hints).contains("ZjInlayHints"));
+    }
+
+    #[test]
+    fn test_zj_prepare_rename() {
+        let pr = ZjPrepareRename::new(5, 10, 5, 15, "oldName");
+        assert!(pr.is_single_line());
+        assert_eq!(pr.placeholder, "oldName");
+    }
+
+    #[test]
+    fn test_zj_prepare_rename_display() {
+        let pr = ZjPrepareRename::new(0, 0, 0, 5, "x");
+        assert!(format!("{}", pr).contains("ZjPrepareRename"));
+    }
+
+    #[test]
+    fn test_zj_rename_edit_new() {
+        let re = ZjRenameEdit::new("old", "new");
+        assert!(re.is_empty());
+        assert_eq!(re.old_name, "old");
+        assert_eq!(re.new_name, "new");
+    }
+
+    #[test]
+    fn test_zj_rename_edit_add_changes() {
+        let mut re = ZjRenameEdit::new("foo", "bar");
+        re.add_file_change("a.rs", vec![
+            ZjRenameTextEdit { start_line: 0, start_char: 5, end_line: 0, end_char: 8 },
+            ZjRenameTextEdit { start_line: 10, start_char: 0, end_line: 10, end_char: 3 },
+        ]);
+        re.add_file_change("b.rs", vec![
+            ZjRenameTextEdit { start_line: 5, start_char: 0, end_line: 5, end_char: 3 },
+        ]);
+        assert_eq!(re.file_count(), 2);
+        assert_eq!(re.total_edits(), 3);
+        assert_eq!(re.affected_uris(), vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn test_zj_rename_edit_display() {
+        let re = ZjRenameEdit::new("x", "y");
+        let s = format!("{}", re);
+        assert!(s.contains("ZjRenameEdit"));
+        assert!(s.contains("x"));
+        assert!(s.contains("y"));
     }
 
 }
