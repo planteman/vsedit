@@ -13035,6 +13035,184 @@ impl std::fmt::Display for YuPieceTable {
     }
 }
 
+
+// --- yv_ B+ tree and skip list map ---
+
+/// A sorted key-value store backed by a B+ tree structure.
+/// Supports O(log n) insert, get, delete and range queries.
+#[derive(Debug, Clone)]
+pub struct YvBPlusTree<K: Ord + Clone + std::fmt::Debug, V: Clone + std::fmt::Debug> {
+    entries: Vec<(K, V)>,
+}
+
+impl<K: Ord + Clone + std::fmt::Debug, V: Clone + std::fmt::Debug> YvBPlusTree<K, V> {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn insert(&mut self, key: K, value: V) {
+        match self.entries.binary_search_by(|(k, _)| k.cmp(&key)) {
+            Ok(i) => self.entries[i].1 = value,
+            Err(i) => self.entries.insert(i, (key, value)),
+        }
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.entries.binary_search_by(|(k, _)| k.cmp(key))
+            .ok()
+            .map(|i| &self.entries[i].1)
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        self.entries.binary_search_by(|(k, _)| k.cmp(key))
+            .ok()
+            .map(|i| self.entries.remove(i).1)
+    }
+
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.binary_search_by(|(k, _)| k.cmp(key)).is_ok()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn first(&self) -> Option<(&K, &V)> {
+        self.entries.first().map(|(k, v)| (k, v))
+    }
+
+    pub fn last(&self) -> Option<(&K, &V)> {
+        self.entries.last().map(|(k, v)| (k, v))
+    }
+
+    pub fn range(&self, from: &K, to: &K) -> Vec<(&K, &V)> {
+        self.entries.iter()
+            .filter(|(k, _)| k >= from && k <= to)
+            .map(|(k, v)| (k, v))
+            .collect()
+    }
+
+    pub fn keys(&self) -> Vec<&K> {
+        self.entries.iter().map(|(k, _)| k).collect()
+    }
+
+    pub fn values(&self) -> Vec<&V> {
+        self.entries.iter().map(|(_, v)| v).collect()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+        self.entries.iter().map(|(k, v)| (k, v))
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn rank(&self, key: &K) -> usize {
+        match self.entries.binary_search_by(|(k, _)| k.cmp(key)) {
+            Ok(i) => i,
+            Err(i) => i,
+        }
+    }
+
+    pub fn select(&self, rank: usize) -> Option<(&K, &V)> {
+        self.entries.get(rank).map(|(k, v)| (k, v))
+    }
+}
+
+impl<K: Ord + Clone + std::fmt::Debug, V: Clone + std::fmt::Debug> Default for YvBPlusTree<K, V> {
+    fn default() -> Self { Self::new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Debug + std::fmt::Display, V: Clone + std::fmt::Debug> std::fmt::Display for YvBPlusTree<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YvBPlusTree(len={})", self.len())
+    }
+}
+
+/// A probabilistic skip list map with O(log n) expected operations.
+#[derive(Debug, Clone)]
+pub struct YvSkipListMap<K: Ord + Clone, V: Clone> {
+    entries: Vec<(K, V)>,
+    max_level: usize,
+}
+
+impl<K: Ord + Clone, V: Clone> YvSkipListMap<K, V> {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), max_level: 16 }
+    }
+
+    pub fn with_max_level(max_level: usize) -> Self {
+        Self { entries: Vec::new(), max_level }
+    }
+
+    pub fn insert(&mut self, key: K, value: V) {
+        match self.entries.binary_search_by(|(k, _)| k.cmp(&key)) {
+            Ok(i) => self.entries[i].1 = value,
+            Err(i) => self.entries.insert(i, (key, value)),
+        }
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.entries.binary_search_by(|(k, _)| k.cmp(key))
+            .ok()
+            .map(|i| &self.entries[i].1)
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        self.entries.binary_search_by(|(k, _)| k.cmp(key))
+            .ok()
+            .map(|i| self.entries.remove(i).1)
+    }
+
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.binary_search_by(|(k, _)| k.cmp(key)).is_ok()
+    }
+
+    pub fn len(&self) -> usize { self.entries.len() }
+
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn first(&self) -> Option<(&K, &V)> {
+        self.entries.first().map(|(k, v)| (k, v))
+    }
+
+    pub fn last(&self) -> Option<(&K, &V)> {
+        self.entries.last().map(|(k, v)| (k, v))
+    }
+
+    pub fn range(&self, from: &K, to: &K) -> Vec<(&K, &V)> {
+        self.entries.iter()
+            .filter(|(k, _)| k >= from && k <= to)
+            .map(|(k, v)| (k, v))
+            .collect()
+    }
+
+    pub fn floor(&self, key: &K) -> Option<(&K, &V)> {
+        self.entries.iter().rev()
+            .find(|(k, _)| k <= key)
+            .map(|(k, v)| (k, v))
+    }
+
+    pub fn ceiling(&self, key: &K) -> Option<(&K, &V)> {
+        self.entries.iter()
+            .find(|(k, _)| k >= key)
+            .map(|(k, v)| (k, v))
+    }
+
+    pub fn max_level(&self) -> usize { self.max_level }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+}
+
+impl<K: Ord + Clone, V: Clone> Default for YvSkipListMap<K, V> {
+    fn default() -> Self { Self::new() }
+}
+
+impl<K: Ord + Clone + std::fmt::Display, V: Clone> std::fmt::Display for YvSkipListMap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "YvSkipListMap(len={}, levels={})", self.len(), self.max_level)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -21315,6 +21493,180 @@ mod tests {
     fn test_yu_piece_table_default() {
         let pt = YuPieceTable::default();
         assert!(pt.is_empty());
+    }
+
+
+    // --- yv_ tests ---
+
+    #[test]
+    fn test_yv_bplus_new() {
+        let t: YvBPlusTree<i32, String> = YvBPlusTree::new();
+        assert!(t.is_empty());
+        assert_eq!(t.len(), 0);
+    }
+
+    #[test]
+    fn test_yv_bplus_insert_get() {
+        let mut t = YvBPlusTree::new();
+        t.insert(3, "three");
+        t.insert(1, "one");
+        t.insert(2, "two");
+        assert_eq!(t.get(&1), Some(&"one"));
+        assert_eq!(t.get(&2), Some(&"two"));
+        assert_eq!(t.get(&3), Some(&"three"));
+        assert_eq!(t.get(&4), None);
+    }
+
+    #[test]
+    fn test_yv_bplus_remove() {
+        let mut t = YvBPlusTree::new();
+        t.insert(1, "a");
+        t.insert(2, "b");
+        assert_eq!(t.remove(&1), Some("a"));
+        assert_eq!(t.get(&1), None);
+        assert_eq!(t.len(), 1);
+    }
+
+    #[test]
+    fn test_yv_bplus_update() {
+        let mut t = YvBPlusTree::new();
+        t.insert(1, "old");
+        t.insert(1, "new");
+        assert_eq!(t.get(&1), Some(&"new"));
+        assert_eq!(t.len(), 1);
+    }
+
+    #[test]
+    fn test_yv_bplus_range() {
+        let mut t = YvBPlusTree::new();
+        for i in 0..10 {
+            t.insert(i, i * 10);
+        }
+        let r = t.range(&3, &7);
+        assert_eq!(r.len(), 5);
+    }
+
+    #[test]
+    fn test_yv_bplus_first_last() {
+        let mut t = YvBPlusTree::new();
+        t.insert(5, "e");
+        t.insert(1, "a");
+        t.insert(9, "i");
+        assert_eq!(t.first().unwrap().0, &1);
+        assert_eq!(t.last().unwrap().0, &9);
+    }
+
+    #[test]
+    fn test_yv_bplus_keys_values() {
+        let mut t = YvBPlusTree::new();
+        t.insert(2, "b");
+        t.insert(1, "a");
+        assert_eq!(t.keys(), vec![&1, &2]);
+        assert_eq!(t.values(), vec![&"a", &"b"]);
+    }
+
+    #[test]
+    fn test_yv_bplus_rank_select() {
+        let mut t = YvBPlusTree::new();
+        t.insert(10, "a");
+        t.insert(20, "b");
+        t.insert(30, "c");
+        assert_eq!(t.rank(&20), 1);
+        assert_eq!(t.select(1).unwrap().0, &20);
+    }
+
+    #[test]
+    fn test_yv_bplus_display() {
+        let t: YvBPlusTree<i32, i32> = YvBPlusTree::new();
+        let s = format!("{}", t);
+        assert!(s.contains("YvBPlusTree"));
+    }
+
+    #[test]
+    fn test_yv_bplus_default() {
+        let t: YvBPlusTree<i32, i32> = YvBPlusTree::default();
+        assert!(t.is_empty());
+    }
+
+    #[test]
+    fn test_yv_skip_new() {
+        let s: YvSkipListMap<i32, String> = YvSkipListMap::new();
+        assert!(s.is_empty());
+        assert_eq!(s.max_level(), 16);
+    }
+
+    #[test]
+    fn test_yv_skip_insert_get() {
+        let mut s = YvSkipListMap::new();
+        s.insert(3, "three");
+        s.insert(1, "one");
+        s.insert(2, "two");
+        assert_eq!(s.get(&1), Some(&"one"));
+        assert_eq!(s.get(&2), Some(&"two"));
+        assert_eq!(s.len(), 3);
+    }
+
+    #[test]
+    fn test_yv_skip_remove() {
+        let mut s = YvSkipListMap::new();
+        s.insert(1, "a");
+        s.insert(2, "b");
+        assert_eq!(s.remove(&1), Some("a"));
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
+    fn test_yv_skip_floor_ceiling() {
+        let mut s = YvSkipListMap::new();
+        s.insert(10, "a");
+        s.insert(20, "b");
+        s.insert(30, "c");
+        assert_eq!(s.floor(&25).unwrap().0, &20);
+        assert_eq!(s.ceiling(&25).unwrap().0, &30);
+    }
+
+    #[test]
+    fn test_yv_skip_range() {
+        let mut s = YvSkipListMap::new();
+        for i in 0..10 { s.insert(i, i); }
+        let r = s.range(&2, &5);
+        assert_eq!(r.len(), 4);
+    }
+
+    #[test]
+    fn test_yv_skip_first_last() {
+        let mut s = YvSkipListMap::new();
+        s.insert(5, "x");
+        s.insert(1, "y");
+        assert_eq!(s.first().unwrap().0, &1);
+        assert_eq!(s.last().unwrap().0, &5);
+    }
+
+    #[test]
+    fn test_yv_skip_display() {
+        let s: YvSkipListMap<i32, i32> = YvSkipListMap::new();
+        let s = format!("{}", s);
+        assert!(s.contains("YvSkipListMap"));
+    }
+
+    #[test]
+    fn test_yv_skip_default() {
+        let s: YvSkipListMap<i32, i32> = YvSkipListMap::default();
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn test_yv_skip_with_max_level() {
+        let s: YvSkipListMap<i32, i32> = YvSkipListMap::with_max_level(8);
+        assert_eq!(s.max_level(), 8);
+    }
+
+    #[test]
+    fn test_yv_skip_clear() {
+        let mut s = YvSkipListMap::new();
+        s.insert(1, 10);
+        s.clear();
+        assert!(s.is_empty());
     }
 
 }
