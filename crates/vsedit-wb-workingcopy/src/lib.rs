@@ -18498,6 +18498,243 @@ impl ZyKeybindingResolver {
     }
 }
 
+
+// --- zz_ editor layout and window management types ---
+
+/// Editor group layout direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZzLayoutDirection {
+    Horizontal,
+    Vertical,
+}
+
+/// An editor group (a tab container).
+#[derive(Debug, Clone)]
+pub struct ZzEditorGroup {
+    pub id: u32,
+    pub tabs: Vec<ZzEditorTab>,
+    pub active_tab: Option<usize>,
+    pub is_active: bool,
+    pub size: f32,
+}
+
+impl ZzEditorGroup {
+    pub fn new(id: u32) -> Self {
+        Self { id, tabs: Vec::new(), active_tab: None, is_active: false, size: 1.0 }
+    }
+
+    pub fn open_tab(&mut self, tab: ZzEditorTab) -> usize {
+        // Check if already open
+        if let Some(idx) = self.tabs.iter().position(|t| t.uri == tab.uri) {
+            self.active_tab = Some(idx);
+            return idx;
+        }
+        let idx = self.tabs.len();
+        self.tabs.push(tab);
+        self.active_tab = Some(idx);
+        idx
+    }
+
+    pub fn close_tab(&mut self, idx: usize) -> Option<ZzEditorTab> {
+        if idx >= self.tabs.len() {
+            return None;
+        }
+        let tab = self.tabs.remove(idx);
+        if self.tabs.is_empty() {
+            self.active_tab = None;
+        } else if let Some(active) = self.active_tab {
+            if active >= self.tabs.len() {
+                self.active_tab = Some(self.tabs.len() - 1);
+            } else if active > idx {
+                self.active_tab = Some(active - 1);
+            }
+        }
+        Some(tab)
+    }
+
+    pub fn active_tab(&self) -> Option<&ZzEditorTab> {
+        self.active_tab.and_then(|i| self.tabs.get(i))
+    }
+
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tabs.is_empty()
+    }
+
+    pub fn has_dirty_tabs(&self) -> bool {
+        self.tabs.iter().any(|t| t.is_dirty)
+    }
+
+    pub fn dirty_tab_count(&self) -> usize {
+        self.tabs.iter().filter(|t| t.is_dirty).count()
+    }
+}
+
+/// A tab in an editor group.
+#[derive(Debug, Clone)]
+pub struct ZzEditorTab {
+    pub uri: String,
+    pub label: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub icon_id: Option<String>,
+}
+
+impl ZzEditorTab {
+    pub fn new(uri: &str, label: &str) -> Self {
+        Self {
+            uri: uri.to_string(),
+            label: label.to_string(),
+            is_dirty: false,
+            is_pinned: false,
+            is_preview: false,
+            icon_id: None,
+        }
+    }
+
+    pub fn preview(uri: &str, label: &str) -> Self {
+        Self { is_preview: true, ..Self::new(uri, label) }
+    }
+
+    pub fn pin(&mut self) {
+        self.is_pinned = true;
+        self.is_preview = false;
+    }
+
+    pub fn unpin(&mut self) {
+        self.is_pinned = false;
+    }
+
+    pub fn mark_dirty(&mut self) {
+        self.is_dirty = true;
+    }
+
+    pub fn mark_clean(&mut self) {
+        self.is_dirty = false;
+    }
+
+    pub fn promote(&mut self) {
+        self.is_preview = false;
+    }
+}
+
+/// A split layout of editor groups.
+#[derive(Debug, Clone)]
+pub struct ZzEditorLayout {
+    groups: Vec<ZzEditorGroup>,
+    active_group: Option<usize>,
+    direction: ZzLayoutDirection,
+    next_group_id: u32,
+}
+
+impl ZzEditorLayout {
+    pub fn new() -> Self {
+        let mut layout = Self {
+            groups: Vec::new(),
+            active_group: None,
+            direction: ZzLayoutDirection::Horizontal,
+            next_group_id: 1,
+        };
+        layout.add_group();
+        layout
+    }
+
+    pub fn add_group(&mut self) -> usize {
+        let id = self.next_group_id;
+        self.next_group_id += 1;
+        let idx = self.groups.len();
+        let mut group = ZzEditorGroup::new(id);
+        if self.active_group.is_none() {
+            group.is_active = true;
+            self.active_group = Some(idx);
+        }
+        self.groups.push(group);
+        self.rebalance();
+        idx
+    }
+
+    pub fn remove_group(&mut self, idx: usize) -> bool {
+        if self.groups.len() <= 1 || idx >= self.groups.len() {
+            return false;
+        }
+        self.groups.remove(idx);
+        if let Some(active) = self.active_group {
+            if active == idx {
+                self.active_group = Some(0);
+                if let Some(g) = self.groups.get_mut(0) {
+                    g.is_active = true;
+                }
+            } else if active > idx {
+                self.active_group = Some(active - 1);
+            }
+        }
+        self.rebalance();
+        true
+    }
+
+    pub fn active_group(&self) -> Option<&ZzEditorGroup> {
+        self.active_group.and_then(|i| self.groups.get(i))
+    }
+
+    pub fn active_group_mut(&mut self) -> Option<&mut ZzEditorGroup> {
+        self.active_group.and_then(|i| self.groups.get_mut(i))
+    }
+
+    pub fn group(&self, idx: usize) -> Option<&ZzEditorGroup> {
+        self.groups.get(idx)
+    }
+
+    pub fn group_mut(&mut self, idx: usize) -> Option<&mut ZzEditorGroup> {
+        self.groups.get_mut(idx)
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn set_active(&mut self, idx: usize) {
+        for (i, g) in self.groups.iter_mut().enumerate() {
+            g.is_active = i == idx;
+        }
+        self.active_group = Some(idx);
+    }
+
+    pub fn set_direction(&mut self, dir: ZzLayoutDirection) {
+        self.direction = dir;
+    }
+
+    pub fn direction(&self) -> ZzLayoutDirection {
+        self.direction
+    }
+
+    fn rebalance(&mut self) {
+        let count = self.groups.len() as f32;
+        if count > 0.0 {
+            let size = 1.0 / count;
+            for g in &mut self.groups {
+                g.size = size;
+            }
+        }
+    }
+
+    pub fn total_tabs(&self) -> usize {
+        self.groups.iter().map(|g| g.tab_count()).sum()
+    }
+
+    pub fn find_tab(&self, uri: &str) -> Option<(usize, usize)> {
+        for (gi, group) in self.groups.iter().enumerate() {
+            if let Some(ti) = group.tabs.iter().position(|t| t.uri == uri) {
+                return Some((gi, ti));
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -30415,6 +30652,118 @@ mod tests {
         r.add(ZyKeybinding::new(ZyKeyCombination::ctrl(ZyKeyCode::Char('a')), "selectAll"));
         r.remove_command("selectAll");
         assert_eq!(r.binding_count(), 0);
+    }
+
+
+    // --- zz_ editor layout and window management tests ---
+
+    #[test]
+    fn test_zz_editor_tab() {
+        let mut tab = ZzEditorTab::new("file:///a.rs", "a.rs");
+        assert!(!tab.is_dirty);
+        assert!(!tab.is_pinned);
+        tab.mark_dirty();
+        assert!(tab.is_dirty);
+        tab.pin();
+        assert!(tab.is_pinned);
+        tab.mark_clean();
+        assert!(!tab.is_dirty);
+    }
+
+    #[test]
+    fn test_zz_editor_tab_preview() {
+        let mut tab = ZzEditorTab::preview("f", "f.rs");
+        assert!(tab.is_preview);
+        tab.promote();
+        assert!(!tab.is_preview);
+    }
+
+    #[test]
+    fn test_zz_editor_group() {
+        let mut group = ZzEditorGroup::new(1);
+        assert!(group.is_empty());
+        let idx = group.open_tab(ZzEditorTab::new("f1", "f1.rs"));
+        assert_eq!(idx, 0);
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.active_tab().unwrap().uri, "f1");
+        // Opening same URI again doesn't duplicate
+        let idx2 = group.open_tab(ZzEditorTab::new("f1", "f1.rs"));
+        assert_eq!(idx2, 0);
+        assert_eq!(group.tab_count(), 1);
+    }
+
+    #[test]
+    fn test_zz_editor_group_close() {
+        let mut group = ZzEditorGroup::new(1);
+        group.open_tab(ZzEditorTab::new("a", "a"));
+        group.open_tab(ZzEditorTab::new("b", "b"));
+        let closed = group.close_tab(0).unwrap();
+        assert_eq!(closed.uri, "a");
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.active_tab().unwrap().uri, "b");
+    }
+
+    #[test]
+    fn test_zz_editor_group_dirty() {
+        let mut group = ZzEditorGroup::new(1);
+        group.open_tab(ZzEditorTab::new("a", "a"));
+        assert!(!group.has_dirty_tabs());
+        group.tabs[0].mark_dirty();
+        assert!(group.has_dirty_tabs());
+        assert_eq!(group.dirty_tab_count(), 1);
+    }
+
+    #[test]
+    fn test_zz_editor_layout_default() {
+        let layout = ZzEditorLayout::new();
+        assert_eq!(layout.group_count(), 1);
+        assert!(layout.active_group().is_some());
+        assert_eq!(layout.direction(), ZzLayoutDirection::Horizontal);
+    }
+
+    #[test]
+    fn test_zz_editor_layout_split() {
+        let mut layout = ZzEditorLayout::new();
+        layout.add_group();
+        assert_eq!(layout.group_count(), 2);
+        // Sizes should be balanced
+        assert!((layout.group(0).unwrap().size - 0.5).abs() < 0.01);
+        assert!((layout.group(1).unwrap().size - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_zz_editor_layout_remove_group() {
+        let mut layout = ZzEditorLayout::new();
+        layout.add_group();
+        assert!(layout.remove_group(1));
+        assert_eq!(layout.group_count(), 1);
+        // Cannot remove last group
+        assert!(!layout.remove_group(0));
+    }
+
+    #[test]
+    fn test_zz_editor_layout_active() {
+        let mut layout = ZzEditorLayout::new();
+        layout.add_group();
+        layout.set_active(1);
+        assert!(layout.group(1).unwrap().is_active);
+        assert!(!layout.group(0).unwrap().is_active);
+    }
+
+    #[test]
+    fn test_zz_editor_layout_find_tab() {
+        let mut layout = ZzEditorLayout::new();
+        layout.active_group_mut().unwrap().open_tab(ZzEditorTab::new("x", "x"));
+        assert_eq!(layout.find_tab("x"), Some((0, 0)));
+        assert_eq!(layout.find_tab("y"), None);
+        assert_eq!(layout.total_tabs(), 1);
+    }
+
+    #[test]
+    fn test_zz_editor_layout_direction() {
+        let mut layout = ZzEditorLayout::new();
+        layout.set_direction(ZzLayoutDirection::Vertical);
+        assert_eq!(layout.direction(), ZzLayoutDirection::Vertical);
     }
 
 }
