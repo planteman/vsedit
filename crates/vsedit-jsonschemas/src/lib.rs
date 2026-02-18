@@ -23777,6 +23777,103 @@ impl AyjCodeActionList {
     pub fn count(&self) -> usize { self.actions.len() }
 }
 
+
+// --- ayk_ rename provider ---
+
+/// Rename preparation result (validates rename is possible).
+#[derive(Debug, Clone)]
+pub struct AykPrepareRename {
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub placeholder: String,
+}
+
+impl AykPrepareRename {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, placeholder: &str) -> Self {
+        Self { range_start_line: sl, range_start_col: sc, range_end_line: el, range_end_col: ec, placeholder: placeholder.to_string() }
+    }
+    pub fn is_single_line(&self) -> bool { self.range_start_line == self.range_end_line }
+}
+
+/// Rename edit for a single file.
+#[derive(Debug, Clone)]
+pub struct AykRenameEdit {
+    pub uri: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl AykRenameEdit {
+    pub fn new(uri: &str, sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { uri: uri.to_string(), start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+}
+
+/// Workspace-wide rename result.
+#[derive(Debug)]
+pub struct AykRenameResult {
+    pub edits: Vec<AykRenameEdit>,
+    pub old_name: String,
+    pub new_name: String,
+}
+
+impl AykRenameResult {
+    pub fn new(old: &str, new_name: &str) -> Self {
+        Self { edits: Vec::new(), old_name: old.to_string(), new_name: new_name.to_string() }
+    }
+    pub fn add(&mut self, edit: AykRenameEdit) { self.edits.push(edit); }
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+    pub fn file_count(&self) -> usize {
+        let mut files: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for e in &self.edits { files.insert(&e.uri); }
+        files.len()
+    }
+    pub fn edits_for_file(&self, uri: &str) -> Vec<&AykRenameEdit> {
+        self.edits.iter().filter(|e| e.uri == uri).collect()
+    }
+    pub fn affected_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.edits.iter().map(|e| e.uri.as_str()).collect();
+        files.sort(); files.dedup(); files
+    }
+    pub fn preview_summary(&self) -> String {
+        format!("Rename '{}' -> '{}': {} edits in {} files",
+            self.old_name, self.new_name, self.edit_count(), self.file_count())
+    }
+}
+
+/// Rename validation.
+pub struct AykRenameValidator;
+
+impl AykRenameValidator {
+    pub fn is_valid_identifier(name: &str) -> bool {
+        if name.is_empty() { return false; }
+        let first = name.chars().next().unwrap();
+        if !first.is_alphabetic() && first != '_' { return false; }
+        name.chars().all(|c| c.is_alphanumeric() || c == '_')
+    }
+    pub fn would_conflict(existing_names: &[&str], new_name: &str) -> bool {
+        existing_names.contains(&new_name)
+    }
+}
+
+/// Rename history for potential undo.
+#[derive(Debug)]
+pub struct AykRenameHistory {
+    pub entries: Vec<AykRenameResult>,
+}
+
+impl AykRenameHistory {
+    pub fn new() -> Self { Self { entries: Vec::new() } }
+    pub fn record(&mut self, result: AykRenameResult) { self.entries.push(result); }
+    pub fn last(&self) -> Option<&AykRenameResult> { self.entries.last() }
+    pub fn count(&self) -> usize { self.entries.len() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38815,6 +38912,71 @@ mod tests {
         let mut action = AyjCodeAction::new("Fix", AyjCodeActionKind::QuickFix);
         action.diagnostics.push("unused variable".to_string());
         assert_eq!(action.diagnostics.len(), 1);
+    }
+
+
+    #[test]
+    fn test_ayk_prepare_rename() {
+        let pr = AykPrepareRename::new(5, 10, 5, 20, "oldName");
+        assert!(pr.is_single_line());
+        assert_eq!(pr.placeholder, "oldName");
+    }
+
+    #[test]
+    fn test_ayk_rename_result() {
+        let mut result = AykRenameResult::new("foo", "bar");
+        result.add(AykRenameEdit::new("a.rs", 1, 0, 1, 3, "bar"));
+        result.add(AykRenameEdit::new("a.rs", 5, 0, 5, 3, "bar"));
+        result.add(AykRenameEdit::new("b.rs", 10, 0, 10, 3, "bar"));
+        assert_eq!(result.edit_count(), 3);
+        assert_eq!(result.file_count(), 2);
+        assert_eq!(result.edits_for_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_ayk_rename_preview() {
+        let mut result = AykRenameResult::new("x", "y");
+        result.add(AykRenameEdit::new("f.rs", 0, 0, 0, 1, "y"));
+        assert!(result.preview_summary().contains("1 edits"));
+    }
+
+    #[test]
+    fn test_ayk_validator() {
+        assert!(AykRenameValidator::is_valid_identifier("my_var"));
+        assert!(AykRenameValidator::is_valid_identifier("_private"));
+        assert!(!AykRenameValidator::is_valid_identifier("123abc"));
+        assert!(!AykRenameValidator::is_valid_identifier(""));
+    }
+
+    #[test]
+    fn test_ayk_conflict_check() {
+        let names = vec!["foo", "bar", "baz"];
+        assert!(AykRenameValidator::would_conflict(&names, "bar"));
+        assert!(!AykRenameValidator::would_conflict(&names, "qux"));
+    }
+
+    #[test]
+    fn test_ayk_rename_history() {
+        let mut history = AykRenameHistory::new();
+        history.record(AykRenameResult::new("a", "b"));
+        assert_eq!(history.count(), 1);
+        assert_eq!(history.last().unwrap().old_name, "a");
+    }
+
+    #[test]
+    fn test_ayk_affected_files() {
+        let mut result = AykRenameResult::new("x", "y");
+        result.add(AykRenameEdit::new("b.rs", 0, 0, 0, 1, "y"));
+        result.add(AykRenameEdit::new("a.rs", 0, 0, 0, 1, "y"));
+        let files = result.affected_files();
+        assert_eq!(files[0], "a.rs");
+        assert_eq!(files[1], "b.rs");
+    }
+
+    #[test]
+    fn test_ayk_valid_unicode_identifier() {
+        assert!(AykRenameValidator::is_valid_identifier("_test_123"));
+        assert!(!AykRenameValidator::is_valid_identifier("has space"));
     }
 
 }
