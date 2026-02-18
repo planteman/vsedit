@@ -24982,6 +24982,97 @@ impl AyrTerminalManager {
     pub fn remove_exited(&mut self) { self.sessions.retain(|s| !s.is_exited()); }
 }
 
+
+// --- ays_ extension contribution points ---
+
+/// Contribution point kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AysContributionKind {
+    Command, Menu, Keybinding, Language, Grammar, Theme, Snippet,
+    View, ViewContainer, Configuration, TaskDefinition, Debugger,
+    Terminal, ProblemMatcher, CustomEditor, Walkthrough,
+}
+
+impl AysContributionKind {
+    pub fn section_name(&self) -> &str {
+        match self {
+            Self::Command => "commands", Self::Menu => "menus", Self::Keybinding => "keybindings",
+            Self::Language => "languages", Self::Grammar => "grammars", Self::Theme => "themes",
+            Self::Snippet => "snippets", Self::View => "views", Self::ViewContainer => "viewsContainers",
+            Self::Configuration => "configuration", Self::TaskDefinition => "taskDefinitions",
+            Self::Debugger => "debuggers", Self::Terminal => "terminal", Self::ProblemMatcher => "problemMatchers",
+            Self::CustomEditor => "customEditors", Self::Walkthrough => "walkthroughs",
+        }
+    }
+}
+
+/// A contributed command.
+#[derive(Debug, Clone)]
+pub struct AysCommandContribution {
+    pub id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub icon: Option<String>,
+    pub when: Option<String>,
+}
+
+impl AysCommandContribution {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self { id: id.to_string(), title: title.to_string(), category: None, icon: None, when: None }
+    }
+    pub fn with_category(mut self, cat: &str) -> Self { self.category = Some(cat.to_string()); self }
+    pub fn display_title(&self) -> String {
+        match &self.category { Some(cat) => format!("{}: {}", cat, self.title), None => self.title.clone() }
+    }
+}
+
+/// A contributed menu item.
+#[derive(Debug, Clone)]
+pub struct AysMenuContribution {
+    pub menu_id: String,
+    pub command_id: String,
+    pub group: Option<String>,
+    pub when: Option<String>,
+    pub order: Option<i32>,
+}
+
+impl AysMenuContribution {
+    pub fn new(menu: &str, command: &str) -> Self {
+        Self { menu_id: menu.to_string(), command_id: command.to_string(), group: None, when: None, order: None }
+    }
+    pub fn with_group(mut self, group: &str) -> Self { self.group = Some(group.to_string()); self }
+}
+
+/// Extension manifest contribution section.
+#[derive(Debug)]
+pub struct AysContributions {
+    pub commands: Vec<AysCommandContribution>,
+    pub menus: Vec<AysMenuContribution>,
+    pub languages: Vec<String>,
+    pub themes: Vec<String>,
+    pub snippets: Vec<String>,
+    pub keybindings: Vec<String>,
+}
+
+impl AysContributions {
+    pub fn new() -> Self {
+        Self { commands: Vec::new(), menus: Vec::new(), languages: Vec::new(),
+            themes: Vec::new(), snippets: Vec::new(), keybindings: Vec::new() }
+    }
+    pub fn add_command(&mut self, cmd: AysCommandContribution) { self.commands.push(cmd); }
+    pub fn add_menu(&mut self, menu: AysMenuContribution) { self.menus.push(menu); }
+    pub fn command_count(&self) -> usize { self.commands.len() }
+    pub fn find_command(&self, id: &str) -> Option<&AysCommandContribution> {
+        self.commands.iter().find(|c| c.id == id)
+    }
+    pub fn menus_for(&self, menu_id: &str) -> Vec<&AysMenuContribution> {
+        self.menus.iter().filter(|m| m.menu_id == menu_id).collect()
+    }
+    pub fn total_contributions(&self) -> usize {
+        self.commands.len() + self.menus.len() + self.languages.len() + self.themes.len() + self.snippets.len() + self.keybindings.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40237,6 +40328,66 @@ mod tests {
         let mut mgr = AyrTerminalManager::new(AyrTerminalProfile::new("bash", "/bin/bash"));
         mgr.create_session(Some(p));
         assert_eq!(mgr.active_session().unwrap().profile.shell_path, "/bin/zsh");
+    }
+
+
+    #[test]
+    fn test_ays_contribution_kind() {
+        assert_eq!(AysContributionKind::Command.section_name(), "commands");
+        assert_eq!(AysContributionKind::Theme.section_name(), "themes");
+    }
+
+    #[test]
+    fn test_ays_command_contribution() {
+        let cmd = AysCommandContribution::new("git.commit", "Commit").with_category("Git");
+        assert_eq!(cmd.display_title(), "Git: Commit");
+    }
+
+    #[test]
+    fn test_ays_command_no_category() {
+        let cmd = AysCommandContribution::new("workbench.action.files.save", "Save");
+        assert_eq!(cmd.display_title(), "Save");
+    }
+
+    #[test]
+    fn test_ays_menu_contribution() {
+        let menu = AysMenuContribution::new("editor/context", "git.commit").with_group("navigation");
+        assert_eq!(menu.group.as_deref(), Some("navigation"));
+    }
+
+    #[test]
+    fn test_ays_contributions() {
+        let mut contribs = AysContributions::new();
+        contribs.add_command(AysCommandContribution::new("cmd1", "Cmd 1"));
+        contribs.add_command(AysCommandContribution::new("cmd2", "Cmd 2"));
+        contribs.add_menu(AysMenuContribution::new("editor/context", "cmd1"));
+        assert_eq!(contribs.command_count(), 2);
+        assert!(contribs.find_command("cmd1").is_some());
+        assert!(contribs.find_command("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_ays_menus_for() {
+        let mut contribs = AysContributions::new();
+        contribs.add_menu(AysMenuContribution::new("editor/context", "cmd1"));
+        contribs.add_menu(AysMenuContribution::new("editor/context", "cmd2"));
+        contribs.add_menu(AysMenuContribution::new("editor/title", "cmd3"));
+        assert_eq!(contribs.menus_for("editor/context").len(), 2);
+    }
+
+    #[test]
+    fn test_ays_total_contributions() {
+        let mut contribs = AysContributions::new();
+        contribs.add_command(AysCommandContribution::new("a", "A"));
+        contribs.languages.push("rust".into());
+        contribs.themes.push("dark".into());
+        assert_eq!(contribs.total_contributions(), 3);
+    }
+
+    #[test]
+    fn test_ays_all_section_names() {
+        let kinds = [AysContributionKind::Command, AysContributionKind::Debugger, AysContributionKind::Walkthrough];
+        for k in &kinds { assert!(!k.section_name().is_empty()); }
     }
 
 }
