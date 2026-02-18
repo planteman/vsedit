@@ -20791,6 +20791,218 @@ impl AxiSnippetCollection {
     pub fn count(&self) -> usize { self.snippets.len() }
 }
 
+
+// --- axj_ progress reporting and notification types ---
+
+/// Location where progress should be shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxjProgressLocation {
+    SourceControl,
+    Window,
+    Notification,
+}
+
+/// A progress report update.
+#[derive(Debug, Clone)]
+pub struct AxjProgressReport {
+    pub message: Option<String>,
+    pub increment: Option<u32>,
+}
+
+impl AxjProgressReport {
+    pub fn message(msg: &str) -> Self {
+        Self { message: Some(msg.to_string()), increment: None }
+    }
+
+    pub fn increment(n: u32) -> Self {
+        Self { message: None, increment: Some(n) }
+    }
+
+    pub fn both(msg: &str, n: u32) -> Self {
+        Self { message: Some(msg.to_string()), increment: Some(n) }
+    }
+}
+
+/// A progress task.
+#[derive(Debug, Clone)]
+pub struct AxjProgress {
+    pub title: String,
+    pub location: AxjProgressLocation,
+    pub cancellable: bool,
+    pub current: u32,
+    pub total: u32,
+    pub message: String,
+    cancelled: bool,
+    done: bool,
+}
+
+impl AxjProgress {
+    pub fn new(title: &str, location: AxjProgressLocation, cancellable: bool) -> Self {
+        Self {
+            title: title.to_string(),
+            location,
+            cancellable,
+            current: 0,
+            total: 100,
+            message: String::new(),
+            cancelled: false,
+            done: false,
+        }
+    }
+
+    pub fn report(&mut self, report: AxjProgressReport) {
+        if let Some(msg) = report.message {
+            self.message = msg;
+        }
+        if let Some(inc) = report.increment {
+            self.current = (self.current + inc).min(self.total);
+        }
+    }
+
+    pub fn cancel(&mut self) {
+        if self.cancellable {
+            self.cancelled = true;
+        }
+    }
+
+    pub fn finish(&mut self) {
+        self.done = true;
+        self.current = self.total;
+    }
+
+    pub fn is_cancelled(&self) -> bool { self.cancelled }
+    pub fn is_done(&self) -> bool { self.done }
+    pub fn percentage(&self) -> f32 { (self.current as f32 / self.total as f32) * 100.0 }
+}
+
+/// Notification severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxjNotificationSeverity {
+    Information,
+    Warning,
+    Error,
+}
+
+/// An action button on a notification.
+#[derive(Debug, Clone)]
+pub struct AxjNotificationAction {
+    pub title: String,
+    pub is_close_affordance: bool,
+}
+
+impl AxjNotificationAction {
+    pub fn new(title: &str) -> Self {
+        Self { title: title.to_string(), is_close_affordance: false }
+    }
+
+    pub fn close_affordance(title: &str) -> Self {
+        Self { title: title.to_string(), is_close_affordance: true }
+    }
+}
+
+/// A notification message.
+#[derive(Debug, Clone)]
+pub struct AxjNotification {
+    pub severity: AxjNotificationSeverity,
+    pub message: String,
+    pub detail: Option<String>,
+    pub actions: Vec<AxjNotificationAction>,
+    pub modal: bool,
+    dismissed: bool,
+    pub source: Option<String>,
+}
+
+impl AxjNotification {
+    pub fn info(message: &str) -> Self {
+        Self::new(AxjNotificationSeverity::Information, message)
+    }
+
+    pub fn warning(message: &str) -> Self {
+        Self::new(AxjNotificationSeverity::Warning, message)
+    }
+
+    pub fn error(message: &str) -> Self {
+        Self::new(AxjNotificationSeverity::Error, message)
+    }
+
+    fn new(severity: AxjNotificationSeverity, message: &str) -> Self {
+        Self {
+            severity,
+            message: message.to_string(),
+            detail: None,
+            actions: Vec::new(),
+            modal: false,
+            dismissed: false,
+            source: None,
+        }
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_actions(mut self, actions: Vec<AxjNotificationAction>) -> Self {
+        self.actions = actions;
+        self
+    }
+
+    pub fn as_modal(mut self) -> Self {
+        self.modal = true;
+        self
+    }
+
+    pub fn from_source(mut self, source: &str) -> Self {
+        self.source = Some(source.to_string());
+        self
+    }
+
+    pub fn dismiss(&mut self) { self.dismissed = true; }
+    pub fn is_dismissed(&self) -> bool { self.dismissed }
+    pub fn has_actions(&self) -> bool { !self.actions.is_empty() }
+}
+
+/// Notification center collecting active notifications.
+#[derive(Debug, Clone)]
+pub struct AxjNotificationCenter {
+    notifications: Vec<AxjNotification>,
+    max_visible: usize,
+}
+
+impl AxjNotificationCenter {
+    pub fn new(max_visible: usize) -> Self {
+        Self { notifications: Vec::new(), max_visible }
+    }
+
+    pub fn show(&mut self, notification: AxjNotification) -> usize {
+        let idx = self.notifications.len();
+        self.notifications.push(notification);
+        idx
+    }
+
+    pub fn dismiss(&mut self, idx: usize) {
+        if let Some(n) = self.notifications.get_mut(idx) {
+            n.dismiss();
+        }
+    }
+
+    pub fn dismiss_all(&mut self) {
+        for n in &mut self.notifications {
+            n.dismiss();
+        }
+    }
+
+    pub fn visible(&self) -> Vec<&AxjNotification> {
+        self.notifications.iter()
+            .filter(|n| !n.is_dismissed())
+            .take(self.max_visible)
+            .collect()
+    }
+
+    pub fn total_count(&self) -> usize { self.notifications.len() }
+    pub fn active_count(&self) -> usize { self.notifications.iter().filter(|n| !n.is_dismissed()).count() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -33603,6 +33815,92 @@ mod tests {
         assert_eq!(coll.count(), 2);
         assert_eq!(coll.find_by_prefix("f").len(), 2);
         assert_eq!(coll.find_by_prefix("fo").len(), 1);
+    }
+
+
+    // --- axj_ progress and notification tests ---
+
+    #[test]
+    fn test_axj_progress_report() {
+        let r = AxjProgressReport::both("Loading...", 25);
+        assert_eq!(r.message.as_deref(), Some("Loading..."));
+        assert_eq!(r.increment, Some(25));
+    }
+
+    #[test]
+    fn test_axj_progress() {
+        let mut p = AxjProgress::new("Indexing", AxjProgressLocation::Notification, true);
+        assert_eq!(p.percentage(), 0.0);
+        p.report(AxjProgressReport::increment(50));
+        assert!((p.percentage() - 50.0).abs() < 0.01);
+        p.report(AxjProgressReport::message("Half done"));
+        assert_eq!(p.message, "Half done");
+        assert!(!p.is_cancelled());
+        p.cancel();
+        assert!(p.is_cancelled());
+    }
+
+    #[test]
+    fn test_axj_progress_finish() {
+        let mut p = AxjProgress::new("Task", AxjProgressLocation::Window, false);
+        p.finish();
+        assert!(p.is_done());
+        assert!((p.percentage() - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_axj_progress_not_cancellable() {
+        let mut p = AxjProgress::new("T", AxjProgressLocation::Window, false);
+        p.cancel();
+        assert!(!p.is_cancelled()); // not cancellable
+    }
+
+    #[test]
+    fn test_axj_notification() {
+        let n = AxjNotification::info("Hello")
+            .with_detail("Details here")
+            .with_actions(vec![AxjNotificationAction::new("OK")])
+            .from_source("ext.test");
+        assert_eq!(n.severity, AxjNotificationSeverity::Information);
+        assert!(n.has_actions());
+        assert_eq!(n.source.as_deref(), Some("ext.test"));
+        assert!(!n.is_dismissed());
+    }
+
+    #[test]
+    fn test_axj_notification_modal() {
+        let n = AxjNotification::warning("Confirm?").as_modal();
+        assert!(n.modal);
+    }
+
+    #[test]
+    fn test_axj_notification_action() {
+        let a = AxjNotificationAction::close_affordance("Close");
+        assert!(a.is_close_affordance);
+    }
+
+    #[test]
+    fn test_axj_notification_center() {
+        let mut nc = AxjNotificationCenter::new(3);
+        nc.show(AxjNotification::info("A"));
+        nc.show(AxjNotification::warning("B"));
+        nc.show(AxjNotification::error("C"));
+        assert_eq!(nc.visible().len(), 3);
+        assert_eq!(nc.active_count(), 3);
+        nc.dismiss(0);
+        assert_eq!(nc.active_count(), 2);
+        nc.dismiss_all();
+        assert_eq!(nc.active_count(), 0);
+    }
+
+    #[test]
+    fn test_axj_notification_center_max_visible() {
+        let mut nc = AxjNotificationCenter::new(2);
+        nc.show(AxjNotification::info("1"));
+        nc.show(AxjNotification::info("2"));
+        nc.show(AxjNotification::info("3"));
+        assert_eq!(nc.visible().len(), 2); // capped at max_visible
+        assert_eq!(nc.total_count(), 3);
     }
 
 }
