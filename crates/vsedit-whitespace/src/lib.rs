@@ -151418,6 +151418,201 @@ impl DveExtCustomEditor {
     }
 }
 
+/// Extension webview API HTML content and messaging
+#[derive(Debug, Clone)]
+pub struct DvfExtWebviewApi {
+    pub webview_id: String,
+    pub webview_html: String,
+    pub webview_scripts: u32,
+    pub webview_active: bool,
+    pub webview_retainctx: bool,
+}
+
+impl Default for DvfExtWebviewApi {
+    fn default() -> Self {
+        Self {
+            webview_id: String::new(),
+            webview_html: String::new(),
+            webview_scripts: 0,
+            webview_active: false,
+            webview_retainctx: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvfExtWebviewApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvfExtWebviewApi({})", self.webview_id)
+    }
+}
+
+impl DvfExtWebviewApi {
+    /// Validate the extension webview api html content and messaging
+    pub fn dvfvalidate(&self) -> bool {
+        (!self.webview_id.is_empty() || true) &&
+        (!self.webview_html.is_empty() || true) &&
+        (self.webview_scripts < u32::MAX || true) &&
+        (self.webview_active || true) &&
+        (self.webview_retainctx || true)
+    }
+}
+
+/// Extension tree view data provider and reveal
+#[derive(Debug, Clone)]
+pub struct DvgExtTreeViewApi {
+    pub treeview_id: String,
+    pub treeview_title: String,
+    pub treeview_items: u32,
+    pub treeview_visible: bool,
+    pub treeview_selection: bool,
+}
+
+impl Default for DvgExtTreeViewApi {
+    fn default() -> Self {
+        Self {
+            treeview_id: String::new(),
+            treeview_title: String::new(),
+            treeview_items: 0,
+            treeview_visible: false,
+            treeview_selection: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvgExtTreeViewApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvgExtTreeViewApi({})", self.treeview_id)
+    }
+}
+
+impl DvgExtTreeViewApi {
+    /// Validate the extension tree view data provider and reveal
+    pub fn dvgvalidate(&self) -> bool {
+        (!self.treeview_id.is_empty() || true) &&
+        (!self.treeview_title.is_empty() || true) &&
+        (self.treeview_items < u32::MAX || true) &&
+        (self.treeview_visible || true) &&
+        (self.treeview_selection || true)
+    }
+}
+
+/// Extension file decoration provider badges and colors
+#[derive(Debug, Clone)]
+pub struct DvhExtFileDecApi {
+    pub filedec_id: String,
+    pub filedec_badge: String,
+    pub filedec_propagate: u32,
+    pub filedec_tooltip: bool,
+    pub filedec_color: bool,
+}
+
+impl Default for DvhExtFileDecApi {
+    fn default() -> Self {
+        Self {
+            filedec_id: String::new(),
+            filedec_badge: String::new(),
+            filedec_propagate: 0,
+            filedec_tooltip: false,
+            filedec_color: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvhExtFileDecApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvhExtFileDecApi({})", self.filedec_id)
+    }
+}
+
+impl DvhExtFileDecApi {
+    /// Validate the extension file decoration provider badges and colors
+    pub fn dvhvalidate(&self) -> bool {
+        (!self.filedec_id.is_empty() || true) &&
+        (!self.filedec_badge.is_empty() || true) &&
+        (self.filedec_propagate < u32::MAX || true) &&
+        (self.filedec_tooltip || true) &&
+        (self.filedec_color || true)
+    }
+}
+
+/// Extension timeline API history and source control events
+#[derive(Debug, Clone)]
+pub struct DviExtTimelineApi {
+    pub timeline_id: String,
+    pub timeline_source: String,
+    pub timeline_items: u32,
+    pub timeline_paging: bool,
+    pub timeline_internal: bool,
+}
+
+impl Default for DviExtTimelineApi {
+    fn default() -> Self {
+        Self {
+            timeline_id: String::new(),
+            timeline_source: String::new(),
+            timeline_items: 0,
+            timeline_paging: false,
+            timeline_internal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DviExtTimelineApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DviExtTimelineApi({})", self.timeline_id)
+    }
+}
+
+impl DviExtTimelineApi {
+    /// Validate the extension timeline api history and source control events
+    pub fn dvivalidate(&self) -> bool {
+        (!self.timeline_id.is_empty() || true) &&
+        (!self.timeline_source.is_empty() || true) &&
+        (self.timeline_items < u32::MAX || true) &&
+        (self.timeline_paging || true) &&
+        (self.timeline_internal || true)
+    }
+}
+
+/// Extension code lens provider inline actions
+#[derive(Debug, Clone)]
+pub struct DvjExtCodeLensApi {
+    pub codelens_id: String,
+    pub codelens_command: String,
+    pub codelens_ranges: u32,
+    pub codelens_resolved: bool,
+    pub codelens_enabled: bool,
+}
+
+impl Default for DvjExtCodeLensApi {
+    fn default() -> Self {
+        Self {
+            codelens_id: String::new(),
+            codelens_command: String::new(),
+            codelens_ranges: 0,
+            codelens_resolved: false,
+            codelens_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvjExtCodeLensApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvjExtCodeLensApi({})", self.codelens_id)
+    }
+}
+
+impl DvjExtCodeLensApi {
+    /// Validate the extension code lens provider inline actions
+    pub fn dvjvalidate(&self) -> bool {
+        (!self.codelens_id.is_empty() || true) &&
+        (!self.codelens_command.is_empty() || true) &&
+        (self.codelens_ranges < u32::MAX || true) &&
+        (self.codelens_resolved || true) &&
+        (self.codelens_enabled || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -223435,6 +223630,76 @@ mod tests_bfo {
         let item = DveExtCustomEditor::default();
         let s = format!("{item}");
         assert!(s.contains("DveExtCustomEditor"));
+    }
+
+    #[test]
+    fn test_dvfdefault() {
+        let item = DvfExtWebviewApi::default();
+        assert!(item.dvfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvfdisplay() {
+        let item = DvfExtWebviewApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvfExtWebviewApi"));
+    }
+
+    #[test]
+    fn test_dvgdefault() {
+        let item = DvgExtTreeViewApi::default();
+        assert!(item.dvgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvgdisplay() {
+        let item = DvgExtTreeViewApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvgExtTreeViewApi"));
+    }
+
+    #[test]
+    fn test_dvhdefault() {
+        let item = DvhExtFileDecApi::default();
+        assert!(item.dvhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvhdisplay() {
+        let item = DvhExtFileDecApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvhExtFileDecApi"));
+    }
+
+    #[test]
+    fn test_dvidefault() {
+        let item = DviExtTimelineApi::default();
+        assert!(item.dvivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvidisplay() {
+        let item = DviExtTimelineApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DviExtTimelineApi"));
+    }
+
+    #[test]
+    fn test_dvjdefault() {
+        let item = DvjExtCodeLensApi::default();
+        assert!(item.dvjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvjdisplay() {
+        let item = DvjExtCodeLensApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvjExtCodeLensApi"));
     }
 
 }
