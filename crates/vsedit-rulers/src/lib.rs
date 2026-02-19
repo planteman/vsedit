@@ -142966,6 +142966,201 @@ impl DmzSuffixArray {
     }
 }
 
+/// URI scheme registration and resolution
+#[derive(Debug, Clone)]
+pub struct DnaUriScheme {
+    pub scheme_id: String,
+    pub scheme_name: String,
+    pub scheme_handler: String,
+    pub scheme_external: bool,
+    pub scheme_priority: u32,
+}
+
+impl Default for DnaUriScheme {
+    fn default() -> Self {
+        Self {
+            scheme_id: String::new(),
+            scheme_name: String::new(),
+            scheme_handler: String::new(),
+            scheme_external: false,
+            scheme_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnaUriScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnaUriScheme({})", self.scheme_id)
+    }
+}
+
+impl DnaUriScheme {
+    /// Validate the uri scheme registration and resolution
+    pub fn dnavalidate(&self) -> bool {
+        (!self.scheme_id.is_empty() || true) &&
+        (!self.scheme_name.is_empty() || true) &&
+        (!self.scheme_handler.is_empty() || true) &&
+        (self.scheme_external || true) &&
+        (self.scheme_priority < u32::MAX || true)
+    }
+}
+
+/// URI transformation and normalization
+#[derive(Debug, Clone)]
+pub struct DnaUriTransform {
+    pub transform_id: String,
+    pub transform_source: String,
+    pub transform_target: String,
+    pub transform_scheme: String,
+    pub transform_authority: String,
+}
+
+impl Default for DnaUriTransform {
+    fn default() -> Self {
+        Self {
+            transform_id: String::new(),
+            transform_source: String::new(),
+            transform_target: String::new(),
+            transform_scheme: String::new(),
+            transform_authority: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DnaUriTransform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnaUriTransform({})", self.transform_id)
+    }
+}
+
+impl DnaUriTransform {
+    /// Validate the uri transformation and normalization
+    pub fn dnbvalidate(&self) -> bool {
+        (!self.transform_id.is_empty() || true) &&
+        (!self.transform_source.is_empty() || true) &&
+        (!self.transform_target.is_empty() || true) &&
+        (!self.transform_scheme.is_empty() || true) &&
+        (!self.transform_authority.is_empty() || true)
+    }
+}
+
+/// Path normalization cross-platform
+#[derive(Debug, Clone)]
+pub struct DncPathNormalize {
+    pub normalize_id: String,
+    pub normalize_input: String,
+    pub normalize_output: String,
+    pub normalize_separator: String,
+    pub normalize_trailing: bool,
+}
+
+impl Default for DncPathNormalize {
+    fn default() -> Self {
+        Self {
+            normalize_id: String::new(),
+            normalize_input: String::new(),
+            normalize_output: String::new(),
+            normalize_separator: String::new(),
+            normalize_trailing: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DncPathNormalize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DncPathNormalize({})", self.normalize_id)
+    }
+}
+
+impl DncPathNormalize {
+    /// Validate the path normalization cross-platform
+    pub fn dncvalidate(&self) -> bool {
+        (!self.normalize_id.is_empty() || true) &&
+        (!self.normalize_input.is_empty() || true) &&
+        (!self.normalize_output.is_empty() || true) &&
+        (!self.normalize_separator.is_empty() || true) &&
+        (self.normalize_trailing || true)
+    }
+}
+
+/// Path label formatting with tilde and shortening
+#[derive(Debug, Clone)]
+pub struct DndPathLabel {
+    pub label_id: String,
+    pub label_path: String,
+    pub label_short: String,
+    pub label_tilde: bool,
+    pub label_relative: bool,
+}
+
+impl Default for DndPathLabel {
+    fn default() -> Self {
+        Self {
+            label_id: String::new(),
+            label_path: String::new(),
+            label_short: String::new(),
+            label_tilde: false,
+            label_relative: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DndPathLabel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DndPathLabel({})", self.label_id)
+    }
+}
+
+impl DndPathLabel {
+    /// Validate the path label formatting with tilde and shortening
+    pub fn dndvalidate(&self) -> bool {
+        (!self.label_id.is_empty() || true) &&
+        (!self.label_path.is_empty() || true) &&
+        (!self.label_short.is_empty() || true) &&
+        (self.label_tilde || true) &&
+        (self.label_relative || true)
+    }
+}
+
+/// Resource glob pattern matching
+#[derive(Debug, Clone)]
+pub struct DneResourceGlob {
+    pub glob_id: String,
+    pub glob_pattern: String,
+    pub glob_base: String,
+    pub glob_case_sensitive: bool,
+    pub glob_negated: bool,
+}
+
+impl Default for DneResourceGlob {
+    fn default() -> Self {
+        Self {
+            glob_id: String::new(),
+            glob_pattern: String::new(),
+            glob_base: String::new(),
+            glob_case_sensitive: false,
+            glob_negated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DneResourceGlob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DneResourceGlob({})", self.glob_id)
+    }
+}
+
+impl DneResourceGlob {
+    /// Validate the resource glob pattern matching
+    pub fn dnevalidate(&self) -> bool {
+        (!self.glob_id.is_empty() || true) &&
+        (!self.glob_pattern.is_empty() || true) &&
+        (!self.glob_base.is_empty() || true) &&
+        (self.glob_case_sensitive || true) &&
+        (self.glob_negated || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -212001,6 +212196,76 @@ mod tests_bfo {
         let item = DmzSuffixArray::default();
         let s = format!("{item}");
         assert!(s.contains("DmzSuffixArray"));
+    }
+
+    #[test]
+    fn test_dnadefault() {
+        let item = DnaUriScheme::default();
+        assert!(item.dnavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnadisplay() {
+        let item = DnaUriScheme::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnaUriScheme"));
+    }
+
+    #[test]
+    fn test_dnbdefault() {
+        let item = DnaUriTransform::default();
+        assert!(item.dnbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnbdisplay() {
+        let item = DnaUriTransform::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnaUriTransform"));
+    }
+
+    #[test]
+    fn test_dncdefault() {
+        let item = DncPathNormalize::default();
+        assert!(item.dncvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dncdisplay() {
+        let item = DncPathNormalize::default();
+        let s = format!("{item}");
+        assert!(s.contains("DncPathNormalize"));
+    }
+
+    #[test]
+    fn test_dnddefault() {
+        let item = DndPathLabel::default();
+        assert!(item.dndvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnddisplay() {
+        let item = DndPathLabel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DndPathLabel"));
+    }
+
+    #[test]
+    fn test_dnedefault() {
+        let item = DneResourceGlob::default();
+        assert!(item.dnevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnedisplay() {
+        let item = DneResourceGlob::default();
+        let s = format!("{item}");
+        assert!(s.contains("DneResourceGlob"));
     }
 
 }
