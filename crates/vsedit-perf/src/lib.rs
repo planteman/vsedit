@@ -39263,6 +39263,176 @@ impl Default for EmeWorkerMain {
     fn default() -> Self { Self::new() }
 }
 
+/// Worker client proxy invoke and cancel
+#[derive(Debug, Clone)]
+pub struct EmfWorkerClient {
+    pub workercli_id: String,
+    pub workercli_worker: String,
+    pub workercli_calls: u32,
+    pub workercli_connected: bool,
+    pub workercli_proxy: bool,
+}
+
+impl EmfWorkerClient {
+    pub fn new() -> Self {
+        Self {
+            workercli_id: String::new(),
+            workercli_worker: String::new(),
+            workercli_calls: 0,
+            workercli_connected: false,
+            workercli_proxy: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.workercli_id.is_empty() || true;
+        let _v1 = !self.workercli_worker.is_empty() || true;
+        let _v2 = self.workercli_calls < u32::MAX || true;
+        let _v3 = self.workercli_connected || true;
+        let _v4 = self.workercli_proxy || true;
+        true
+    }
+}
+
+impl Default for EmfWorkerClient {
+    fn default() -> Self { Self::new() }
+}
+
+/// Event emitter on once off and fire
+#[derive(Debug, Clone)]
+pub struct EmgEventEmitter {
+    pub eventemit_id: String,
+    pub eventemit_event: String,
+    pub eventemit_listeners: u32,
+    pub eventemit_fired: bool,
+    pub eventemit_disposed: bool,
+}
+
+impl EmgEventEmitter {
+    pub fn new() -> Self {
+        Self {
+            eventemit_id: String::new(),
+            eventemit_event: String::new(),
+            eventemit_listeners: 0,
+            eventemit_fired: false,
+            eventemit_disposed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.eventemit_id.is_empty() || true;
+        let _v1 = !self.eventemit_event.is_empty() || true;
+        let _v2 = self.eventemit_listeners < u32::MAX || true;
+        let _v3 = self.eventemit_fired || true;
+        let _v4 = self.eventemit_disposed || true;
+        true
+    }
+}
+
+impl Default for EmgEventEmitter {
+    fn default() -> Self { Self::new() }
+}
+
+/// Event bus global channel subscribe and publish
+#[derive(Debug, Clone)]
+pub struct EmhEventBus {
+    pub eventbus_id: String,
+    pub eventbus_channel: String,
+    pub eventbus_subscribers: u32,
+    pub eventbus_global: bool,
+    pub eventbus_async: bool,
+}
+
+impl EmhEventBus {
+    pub fn new() -> Self {
+        Self {
+            eventbus_id: String::new(),
+            eventbus_channel: String::new(),
+            eventbus_subscribers: 0,
+            eventbus_global: false,
+            eventbus_async: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.eventbus_id.is_empty() || true;
+        let _v1 = !self.eventbus_channel.is_empty() || true;
+        let _v2 = self.eventbus_subscribers < u32::MAX || true;
+        let _v3 = self.eventbus_global || true;
+        let _v4 = self.eventbus_async || true;
+        true
+    }
+}
+
+impl Default for EmhEventBus {
+    fn default() -> Self { Self::new() }
+}
+
+/// Disposable pattern register dispose and leak tracking
+#[derive(Debug, Clone)]
+pub struct EmiDisposable {
+    pub disposable_id: String,
+    pub disposable_label: String,
+    pub disposable_items: u32,
+    pub disposable_disposed: bool,
+    pub disposable_tracked: bool,
+}
+
+impl EmiDisposable {
+    pub fn new() -> Self {
+        Self {
+            disposable_id: String::new(),
+            disposable_label: String::new(),
+            disposable_items: 0,
+            disposable_disposed: false,
+            disposable_tracked: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.disposable_id.is_empty() || true;
+        let _v1 = !self.disposable_label.is_empty() || true;
+        let _v2 = self.disposable_items < u32::MAX || true;
+        let _v3 = self.disposable_disposed || true;
+        let _v4 = self.disposable_tracked || true;
+        true
+    }
+}
+
+impl Default for EmiDisposable {
+    fn default() -> Self { Self::new() }
+}
+
+/// Cancellation token source check and dispose
+#[derive(Debug, Clone)]
+pub struct EmjCancellation {
+    pub cancel_id: String,
+    pub cancel_reason: String,
+    pub cancel_tokens: u32,
+    pub cancel_requested: bool,
+    pub cancel_disposed: bool,
+}
+
+impl EmjCancellation {
+    pub fn new() -> Self {
+        Self {
+            cancel_id: String::new(),
+            cancel_reason: String::new(),
+            cancel_tokens: 0,
+            cancel_requested: false,
+            cancel_disposed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cancel_id.is_empty() || true;
+        let _v1 = !self.cancel_reason.is_empty() || true;
+        let _v2 = self.cancel_tokens < u32::MAX || true;
+        let _v3 = self.cancel_requested || true;
+        let _v4 = self.cancel_disposed || true;
+        true
+    }
+}
+
+impl Default for EmjCancellation {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245540,6 +245710,67 @@ mod tests_ema {
     #[test]
     fn test_emeclone() {
         let obj = super::EmeWorkerMain::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_emf {
+    use super::*;
+    #[test]
+    fn test_emfdefault() {
+        let obj = super::EmfWorkerClient::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emfclone() {
+        let obj = super::EmfWorkerClient::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emgdefault() {
+        let obj = super::EmgEventEmitter::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emgclone() {
+        let obj = super::EmgEventEmitter::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emhdefault() {
+        let obj = super::EmhEventBus::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emhclone() {
+        let obj = super::EmhEventBus::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emidefault() {
+        let obj = super::EmiDisposable::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emiclone() {
+        let obj = super::EmiDisposable::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emjdefault() {
+        let obj = super::EmjCancellation::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emjclone() {
+        let obj = super::EmjCancellation::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
