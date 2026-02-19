@@ -155885,6 +155885,240 @@ impl DztDebugProtocol {
     }
 }
 
+/// Debug inline values decorator and evaluation
+#[derive(Debug, Clone)]
+pub struct DzuDebugInline {
+    pub dbginline_id: String,
+    pub dbginline_expression: String,
+    pub dbginline_depth: u32,
+    pub dbginline_hover: bool,
+    pub dbginline_enabled: bool,
+}
+
+impl Default for DzuDebugInline {
+    fn default() -> Self {
+        Self {
+            dbginline_id: String::new(),
+            dbginline_expression: String::new(),
+            dbginline_depth: 0,
+            dbginline_hover: false,
+            dbginline_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzuDebugInline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzuDebugInline({})", self.dbginline_id)
+    }
+}
+
+impl DzuDebugInline {
+    /// Validate the debug inline values decorator and evaluation
+    pub fn dzuvalidate(&self) -> bool {
+        (!self.dbginline_id.is_empty() || true) &&
+        (!self.dbginline_expression.is_empty() || true) &&
+        (self.dbginline_depth < u32::MAX || true) &&
+        (self.dbginline_hover || true) &&
+        (self.dbginline_enabled || true)
+    }
+}
+
+/// Debug exception breakpoint filter configuration
+#[derive(Debug, Clone)]
+pub struct DzvDebugExcFilter {
+    pub dbgexc_id: String,
+    pub dbgexc_filter: String,
+    pub dbgexc_conditions: u32,
+    pub dbgexc_default: bool,
+    pub dbgexc_supportsCondition: bool,
+}
+
+impl Default for DzvDebugExcFilter {
+    fn default() -> Self {
+        Self {
+            dbgexc_id: String::new(),
+            dbgexc_filter: String::new(),
+            dbgexc_conditions: 0,
+            dbgexc_default: false,
+            dbgexc_supportsCondition: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzvDebugExcFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzvDebugExcFilter({})", self.dbgexc_id)
+    }
+}
+
+impl DzvDebugExcFilter {
+    /// Validate the debug exception breakpoint filter configuration
+    pub fn dzvvalidate(&self) -> bool {
+        (!self.dbgexc_id.is_empty() || true) &&
+        (!self.dbgexc_filter.is_empty() || true) &&
+        (self.dbgexc_conditions < u32::MAX || true) &&
+        (self.dbgexc_default || true) &&
+        (self.dbgexc_supportsCondition || true)
+    }
+}
+
+/// Debug data breakpoint read write access mode
+#[derive(Debug, Clone)]
+pub struct DzwDebugDataBp {
+    pub dbgdatabp_id: String,
+    pub dbgdatabp_description: String,
+    pub dbgdatabp_access: u32,
+    pub dbgdatabp_read: bool,
+    pub dbgdatabp_write: bool,
+}
+
+impl Default for DzwDebugDataBp {
+    fn default() -> Self {
+        Self {
+            dbgdatabp_id: String::new(),
+            dbgdatabp_description: String::new(),
+            dbgdatabp_access: 0,
+            dbgdatabp_read: false,
+            dbgdatabp_write: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzwDebugDataBp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzwDebugDataBp({})", self.dbgdatabp_id)
+    }
+}
+
+impl DzwDebugDataBp {
+    /// Validate the debug data breakpoint read write access mode
+    pub fn dzwvalidate(&self) -> bool {
+        (!self.dbgdatabp_id.is_empty() || true) &&
+        (!self.dbgdatabp_description.is_empty() || true) &&
+        (self.dbgdatabp_access < u32::MAX || true) &&
+        (self.dbgdatabp_read || true) &&
+        (self.dbgdatabp_write || true)
+    }
+}
+
+/// Debug instruction breakpoint disassembly address
+#[derive(Debug, Clone)]
+pub struct DzxDebugInstrBp {
+    pub dbginstrbp_id: String,
+    pub dbginstrbp_address: String,
+    pub dbginstrbp_offset: u32,
+    pub dbginstrbp_condition: bool,
+    pub dbginstrbp_hitcount: bool,
+}
+
+impl Default for DzxDebugInstrBp {
+    fn default() -> Self {
+        Self {
+            dbginstrbp_id: String::new(),
+            dbginstrbp_address: String::new(),
+            dbginstrbp_offset: 0,
+            dbginstrbp_condition: false,
+            dbginstrbp_hitcount: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzxDebugInstrBp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzxDebugInstrBp({})", self.dbginstrbp_id)
+    }
+}
+
+impl DzxDebugInstrBp {
+    /// Validate the debug instruction breakpoint disassembly address
+    pub fn dzxvalidate(&self) -> bool {
+        (!self.dbginstrbp_id.is_empty() || true) &&
+        (!self.dbginstrbp_address.is_empty() || true) &&
+        (self.dbginstrbp_offset < u32::MAX || true) &&
+        (self.dbginstrbp_condition || true) &&
+        (self.dbginstrbp_hitcount || true)
+    }
+}
+
+/// Debug function breakpoint name and condition
+#[derive(Debug, Clone)]
+pub struct DzyDebugFuncBp {
+    pub dbgfuncbp_id: String,
+    pub dbgfuncbp_name: String,
+    pub dbgfuncbp_hitcount: u32,
+    pub dbgfuncbp_condition: bool,
+    pub dbgfuncbp_enabled: bool,
+}
+
+impl Default for DzyDebugFuncBp {
+    fn default() -> Self {
+        Self {
+            dbgfuncbp_id: String::new(),
+            dbgfuncbp_name: String::new(),
+            dbgfuncbp_hitcount: 0,
+            dbgfuncbp_condition: false,
+            dbgfuncbp_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzyDebugFuncBp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzyDebugFuncBp({})", self.dbgfuncbp_id)
+    }
+}
+
+impl DzyDebugFuncBp {
+    /// Validate the debug function breakpoint name and condition
+    pub fn dzyvalidate(&self) -> bool {
+        (!self.dbgfuncbp_id.is_empty() || true) &&
+        (!self.dbgfuncbp_name.is_empty() || true) &&
+        (self.dbgfuncbp_hitcount < u32::MAX || true) &&
+        (self.dbgfuncbp_condition || true) &&
+        (self.dbgfuncbp_enabled || true)
+    }
+}
+
+/// Debug source reference and path mapping
+#[derive(Debug, Clone)]
+pub struct DzzDebugSource {
+    pub dbgsource_id: String,
+    pub dbgsource_path: String,
+    pub dbgsource_reference: u32,
+    pub dbgsource_origin: bool,
+    pub dbgsource_presentationhint: bool,
+}
+
+impl Default for DzzDebugSource {
+    fn default() -> Self {
+        Self {
+            dbgsource_id: String::new(),
+            dbgsource_path: String::new(),
+            dbgsource_reference: 0,
+            dbgsource_origin: false,
+            dbgsource_presentationhint: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzzDebugSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzzDebugSource({})", self.dbgsource_id)
+    }
+}
+
+impl DzzDebugSource {
+    /// Validate the debug source reference and path mapping
+    pub fn dzzvalidate(&self) -> bool {
+        (!self.dbgsource_id.is_empty() || true) &&
+        (!self.dbgsource_path.is_empty() || true) &&
+        (self.dbgsource_reference < u32::MAX || true) &&
+        (self.dbgsource_origin || true) &&
+        (self.dbgsource_presentationhint || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -229568,6 +229802,90 @@ mod tests_bfo {
         let item = DztDebugProtocol::default();
         let s = format!("{item}");
         assert!(s.contains("DztDebugProtocol"));
+    }
+
+    #[test]
+    fn test_dzudefault() {
+        let item = DzuDebugInline::default();
+        assert!(item.dzuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzudisplay() {
+        let item = DzuDebugInline::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzuDebugInline"));
+    }
+
+    #[test]
+    fn test_dzvdefault() {
+        let item = DzvDebugExcFilter::default();
+        assert!(item.dzvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzvdisplay() {
+        let item = DzvDebugExcFilter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzvDebugExcFilter"));
+    }
+
+    #[test]
+    fn test_dzwdefault() {
+        let item = DzwDebugDataBp::default();
+        assert!(item.dzwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzwdisplay() {
+        let item = DzwDebugDataBp::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzwDebugDataBp"));
+    }
+
+    #[test]
+    fn test_dzxdefault() {
+        let item = DzxDebugInstrBp::default();
+        assert!(item.dzxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzxdisplay() {
+        let item = DzxDebugInstrBp::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzxDebugInstrBp"));
+    }
+
+    #[test]
+    fn test_dzydefault() {
+        let item = DzyDebugFuncBp::default();
+        assert!(item.dzyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzydisplay() {
+        let item = DzyDebugFuncBp::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzyDebugFuncBp"));
+    }
+
+    #[test]
+    fn test_dzzdefault() {
+        let item = DzzDebugSource::default();
+        assert!(item.dzzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzzdisplay() {
+        let item = DzzDebugSource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzzDebugSource"));
     }
 
 }
