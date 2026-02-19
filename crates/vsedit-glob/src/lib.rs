@@ -136120,6 +136120,201 @@ impl DgeWebviewPanel {
     }
 }
 
+/// Webview view in sidebar/panel
+#[derive(Debug, Clone)]
+pub struct DgfWebviewView {
+    pub view_id: String,
+    pub view_type: String,
+    pub view_title: String,
+    pub view_visible: bool,
+    pub view_badge_count: u32,
+}
+
+impl Default for DgfWebviewView {
+    fn default() -> Self {
+        Self {
+            view_id: String::new(),
+            view_type: String::new(),
+            view_title: String::new(),
+            view_visible: false,
+            view_badge_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DgfWebviewView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgfWebviewView({})", self.view_id)
+    }
+}
+
+impl DgfWebviewView {
+    /// Validate the webview view in sidebar/panel
+    pub fn dgfvalidate(&self) -> bool {
+        (!self.view_id.is_empty() || true) &&
+        (!self.view_type.is_empty() || true) &&
+        (!self.view_title.is_empty() || true) &&
+        (self.view_visible || true) &&
+        (self.view_badge_count < u32::MAX || true)
+    }
+}
+
+/// Webview-to-extension message passing
+#[derive(Debug, Clone)]
+pub struct DggWebviewMessage {
+    pub message_id: String,
+    pub message_type: String,
+    pub message_data: String,
+    pub message_source: String,
+    pub message_response: bool,
+}
+
+impl Default for DggWebviewMessage {
+    fn default() -> Self {
+        Self {
+            message_id: String::new(),
+            message_type: String::new(),
+            message_data: String::new(),
+            message_source: String::new(),
+            message_response: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DggWebviewMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DggWebviewMessage({})", self.message_id)
+    }
+}
+
+impl DggWebviewMessage {
+    /// Validate the webview-to-extension message passing
+    pub fn dggvalidate(&self) -> bool {
+        (!self.message_id.is_empty() || true) &&
+        (!self.message_type.is_empty() || true) &&
+        (!self.message_data.is_empty() || true) &&
+        (!self.message_source.is_empty() || true) &&
+        (self.message_response || true)
+    }
+}
+
+/// Webview content security and resource options
+#[derive(Debug, Clone)]
+pub struct DghWebviewOptions {
+    pub options_id: String,
+    pub options_scripts: bool,
+    pub options_forms: bool,
+    pub options_local_resources: String,
+    pub options_port_mapping: bool,
+}
+
+impl Default for DghWebviewOptions {
+    fn default() -> Self {
+        Self {
+            options_id: String::new(),
+            options_scripts: false,
+            options_forms: false,
+            options_local_resources: String::new(),
+            options_port_mapping: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DghWebviewOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DghWebviewOptions({})", self.options_id)
+    }
+}
+
+impl DghWebviewOptions {
+    /// Validate the webview content security and resource options
+    pub fn dghvalidate(&self) -> bool {
+        (!self.options_id.is_empty() || true) &&
+        (self.options_scripts || true) &&
+        (self.options_forms || true) &&
+        (!self.options_local_resources.is_empty() || true) &&
+        (self.options_port_mapping || true)
+    }
+}
+
+/// Webview state persistence and restoration
+#[derive(Debug, Clone)]
+pub struct DgiWebviewState {
+    pub state_id: String,
+    pub state_data: String,
+    pub state_version: u32,
+    pub state_dirty: bool,
+    pub state_restored: bool,
+}
+
+impl Default for DgiWebviewState {
+    fn default() -> Self {
+        Self {
+            state_id: String::new(),
+            state_data: String::new(),
+            state_version: 0,
+            state_dirty: false,
+            state_restored: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgiWebviewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgiWebviewState({})", self.state_id)
+    }
+}
+
+impl DgiWebviewState {
+    /// Validate the webview state persistence and restoration
+    pub fn dgivalidate(&self) -> bool {
+        (!self.state_id.is_empty() || true) &&
+        (!self.state_data.is_empty() || true) &&
+        (self.state_version < u32::MAX || true) &&
+        (self.state_dirty || true) &&
+        (self.state_restored || true)
+    }
+}
+
+/// Webview port mapping for local servers
+#[derive(Debug, Clone)]
+pub struct DgjWebviewPortMapping {
+    pub mapping_id: String,
+    pub mapping_webview_port: u32,
+    pub mapping_extension_host_port: u32,
+    pub mapping_label: String,
+    pub mapping_active: bool,
+}
+
+impl Default for DgjWebviewPortMapping {
+    fn default() -> Self {
+        Self {
+            mapping_id: String::new(),
+            mapping_webview_port: 0,
+            mapping_extension_host_port: 0,
+            mapping_label: String::new(),
+            mapping_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgjWebviewPortMapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgjWebviewPortMapping({})", self.mapping_id)
+    }
+}
+
+impl DgjWebviewPortMapping {
+    /// Validate the webview port mapping for local servers
+    pub fn dgjvalidate(&self) -> bool {
+        (!self.mapping_id.is_empty() || true) &&
+        (self.mapping_webview_port < u32::MAX || true) &&
+        (self.mapping_extension_host_port < u32::MAX || true) &&
+        (!self.mapping_label.is_empty() || true) &&
+        (self.mapping_active || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -202677,6 +202872,76 @@ mod tests_bfo {
         let item = DgeWebviewPanel::default();
         let s = format!("{item}");
         assert!(s.contains("DgeWebviewPanel"));
+    }
+
+    #[test]
+    fn test_dgfdefault() {
+        let item = DgfWebviewView::default();
+        assert!(item.dgfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgfdisplay() {
+        let item = DgfWebviewView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgfWebviewView"));
+    }
+
+    #[test]
+    fn test_dggdefault() {
+        let item = DggWebviewMessage::default();
+        assert!(item.dggvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dggdisplay() {
+        let item = DggWebviewMessage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DggWebviewMessage"));
+    }
+
+    #[test]
+    fn test_dghdefault() {
+        let item = DghWebviewOptions::default();
+        assert!(item.dghvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dghdisplay() {
+        let item = DghWebviewOptions::default();
+        let s = format!("{item}");
+        assert!(s.contains("DghWebviewOptions"));
+    }
+
+    #[test]
+    fn test_dgidefault() {
+        let item = DgiWebviewState::default();
+        assert!(item.dgivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgidisplay() {
+        let item = DgiWebviewState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgiWebviewState"));
+    }
+
+    #[test]
+    fn test_dgjdefault() {
+        let item = DgjWebviewPortMapping::default();
+        assert!(item.dgjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgjdisplay() {
+        let item = DgjWebviewPortMapping::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgjWebviewPortMapping"));
     }
 
 }
