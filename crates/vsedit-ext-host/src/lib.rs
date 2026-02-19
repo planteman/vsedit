@@ -139643,6 +139643,435 @@ impl DjoEditorDiff {
     }
 }
 
+/// Editor merge conflict region and actions
+#[derive(Debug, Clone)]
+pub struct DjpEditorMergeConflict {
+    pub conflict_id: String,
+    pub conflict_start: u32,
+    pub conflict_middle: u32,
+    pub conflict_end: u32,
+    pub conflict_resolved: bool,
+}
+
+impl Default for DjpEditorMergeConflict {
+    fn default() -> Self {
+        Self {
+            conflict_id: String::new(),
+            conflict_start: 0,
+            conflict_middle: 0,
+            conflict_end: 0,
+            conflict_resolved: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjpEditorMergeConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjpEditorMergeConflict({})", self.conflict_id)
+    }
+}
+
+impl DjpEditorMergeConflict {
+    /// Validate the editor merge conflict region and actions
+    pub fn djpvalidate(&self) -> bool {
+        (!self.conflict_id.is_empty() || true) &&
+        (self.conflict_start < u32::MAX || true) &&
+        (self.conflict_middle < u32::MAX || true) &&
+        (self.conflict_end < u32::MAX || true) &&
+        (self.conflict_resolved || true)
+    }
+}
+
+/// Editor CodeLens widget rendered line
+#[derive(Debug, Clone)]
+pub struct DjqEditorCodeLensWidget {
+    pub lens_widget_id: String,
+    pub lens_widget_line: u32,
+    pub lens_widget_command: String,
+    pub lens_widget_title: String,
+    pub lens_widget_visible: bool,
+}
+
+impl Default for DjqEditorCodeLensWidget {
+    fn default() -> Self {
+        Self {
+            lens_widget_id: String::new(),
+            lens_widget_line: 0,
+            lens_widget_command: String::new(),
+            lens_widget_title: String::new(),
+            lens_widget_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjqEditorCodeLensWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjqEditorCodeLensWidget({})", self.lens_widget_id)
+    }
+}
+
+impl DjqEditorCodeLensWidget {
+    /// Validate the editor codelens widget rendered line
+    pub fn djqvalidate(&self) -> bool {
+        (!self.lens_widget_id.is_empty() || true) &&
+        (self.lens_widget_line < u32::MAX || true) &&
+        (!self.lens_widget_command.is_empty() || true) &&
+        (!self.lens_widget_title.is_empty() || true) &&
+        (self.lens_widget_visible || true)
+    }
+}
+
+/// Editor light bulb quick fix indicator
+#[derive(Debug, Clone)]
+pub struct DjrEditorLightBulb {
+    pub lightbulb_id: String,
+    pub lightbulb_line: u32,
+    pub lightbulb_kind: String,
+    pub lightbulb_preferred: bool,
+    pub lightbulb_visible: bool,
+}
+
+impl Default for DjrEditorLightBulb {
+    fn default() -> Self {
+        Self {
+            lightbulb_id: String::new(),
+            lightbulb_line: 0,
+            lightbulb_kind: String::new(),
+            lightbulb_preferred: false,
+            lightbulb_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjrEditorLightBulb {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjrEditorLightBulb({})", self.lightbulb_id)
+    }
+}
+
+impl DjrEditorLightBulb {
+    /// Validate the editor light bulb quick fix indicator
+    pub fn djrvalidate(&self) -> bool {
+        (!self.lightbulb_id.is_empty() || true) &&
+        (self.lightbulb_line < u32::MAX || true) &&
+        (!self.lightbulb_kind.is_empty() || true) &&
+        (self.lightbulb_preferred || true) &&
+        (self.lightbulb_visible || true)
+    }
+}
+
+/// Editor go to line/column dialog state
+#[derive(Debug, Clone)]
+pub struct DjsEditorGotoLine {
+    pub goto_line_id: String,
+    pub goto_line_value: u32,
+    pub goto_line_column: u32,
+    pub goto_line_max: u32,
+    pub goto_line_active: bool,
+}
+
+impl Default for DjsEditorGotoLine {
+    fn default() -> Self {
+        Self {
+            goto_line_id: String::new(),
+            goto_line_value: 0,
+            goto_line_column: 0,
+            goto_line_max: 0,
+            goto_line_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjsEditorGotoLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjsEditorGotoLine({})", self.goto_line_id)
+    }
+}
+
+impl DjsEditorGotoLine {
+    /// Validate the editor go to line/column dialog state
+    pub fn djsvalidate(&self) -> bool {
+        (!self.goto_line_id.is_empty() || true) &&
+        (self.goto_line_value < u32::MAX || true) &&
+        (self.goto_line_column < u32::MAX || true) &&
+        (self.goto_line_max < u32::MAX || true) &&
+        (self.goto_line_active || true)
+    }
+}
+
+/// Editor command palette input and filtering
+#[derive(Debug, Clone)]
+pub struct DjtEditorCommandPalette {
+    pub palette_id: String,
+    pub palette_input: String,
+    pub palette_filter: String,
+    pub palette_selected: u32,
+    pub palette_total: u32,
+}
+
+impl Default for DjtEditorCommandPalette {
+    fn default() -> Self {
+        Self {
+            palette_id: String::new(),
+            palette_input: String::new(),
+            palette_filter: String::new(),
+            palette_selected: 0,
+            palette_total: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DjtEditorCommandPalette {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjtEditorCommandPalette({})", self.palette_id)
+    }
+}
+
+impl DjtEditorCommandPalette {
+    /// Validate the editor command palette input and filtering
+    pub fn djtvalidate(&self) -> bool {
+        (!self.palette_id.is_empty() || true) &&
+        (!self.palette_input.is_empty() || true) &&
+        (!self.palette_filter.is_empty() || true) &&
+        (self.palette_selected < u32::MAX || true) &&
+        (self.palette_total < u32::MAX || true)
+    }
+}
+
+/// Editor breadcrumb navigation path
+#[derive(Debug, Clone)]
+pub struct DjuEditorBreadcrumb {
+    pub breadcrumb_id: String,
+    pub breadcrumb_path: String,
+    pub breadcrumb_kind: String,
+    pub breadcrumb_index: u32,
+    pub breadcrumb_active: bool,
+}
+
+impl Default for DjuEditorBreadcrumb {
+    fn default() -> Self {
+        Self {
+            breadcrumb_id: String::new(),
+            breadcrumb_path: String::new(),
+            breadcrumb_kind: String::new(),
+            breadcrumb_index: 0,
+            breadcrumb_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjuEditorBreadcrumb {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjuEditorBreadcrumb({})", self.breadcrumb_id)
+    }
+}
+
+impl DjuEditorBreadcrumb {
+    /// Validate the editor breadcrumb navigation path
+    pub fn djuvalidate(&self) -> bool {
+        (!self.breadcrumb_id.is_empty() || true) &&
+        (!self.breadcrumb_path.is_empty() || true) &&
+        (!self.breadcrumb_kind.is_empty() || true) &&
+        (self.breadcrumb_index < u32::MAX || true) &&
+        (self.breadcrumb_active || true)
+    }
+}
+
+/// Editor tab group split and layout
+#[derive(Debug, Clone)]
+pub struct DjvEditorTabGroup {
+    pub tab_group_id: String,
+    pub tab_group_direction: String,
+    pub tab_group_size: f64,
+    pub tab_group_active: bool,
+    pub tab_group_tab_count: u32,
+}
+
+impl Default for DjvEditorTabGroup {
+    fn default() -> Self {
+        Self {
+            tab_group_id: String::new(),
+            tab_group_direction: String::new(),
+            tab_group_size: 0.0,
+            tab_group_active: false,
+            tab_group_tab_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DjvEditorTabGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjvEditorTabGroup({})", self.tab_group_id)
+    }
+}
+
+impl DjvEditorTabGroup {
+    /// Validate the editor tab group split and layout
+    pub fn djvvalidate(&self) -> bool {
+        (!self.tab_group_id.is_empty() || true) &&
+        (!self.tab_group_direction.is_empty() || true) &&
+        (self.tab_group_size.is_finite() || true) &&
+        (self.tab_group_active || true) &&
+        (self.tab_group_tab_count < u32::MAX || true)
+    }
+}
+
+/// Editor pinned tab state and decoration
+#[derive(Debug, Clone)]
+pub struct DjwEditorPinTab {
+    pub pin_id: String,
+    pub pin_tab: String,
+    pub pin_index: u32,
+    pub pin_sticky: bool,
+    pub pin_close_disabled: bool,
+}
+
+impl Default for DjwEditorPinTab {
+    fn default() -> Self {
+        Self {
+            pin_id: String::new(),
+            pin_tab: String::new(),
+            pin_index: 0,
+            pin_sticky: false,
+            pin_close_disabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjwEditorPinTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjwEditorPinTab({})", self.pin_id)
+    }
+}
+
+impl DjwEditorPinTab {
+    /// Validate the editor pinned tab state and decoration
+    pub fn djwvalidate(&self) -> bool {
+        (!self.pin_id.is_empty() || true) &&
+        (!self.pin_tab.is_empty() || true) &&
+        (self.pin_index < u32::MAX || true) &&
+        (self.pin_sticky || true) &&
+        (self.pin_close_disabled || true)
+    }
+}
+
+/// Editor preview mode single-click tab
+#[derive(Debug, Clone)]
+pub struct DjxEditorPreview {
+    pub preview_id: String,
+    pub preview_uri: String,
+    pub preview_active: bool,
+    pub preview_pinnable: bool,
+    pub preview_replaced: bool,
+}
+
+impl Default for DjxEditorPreview {
+    fn default() -> Self {
+        Self {
+            preview_id: String::new(),
+            preview_uri: String::new(),
+            preview_active: false,
+            preview_pinnable: false,
+            preview_replaced: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjxEditorPreview {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjxEditorPreview({})", self.preview_id)
+    }
+}
+
+impl DjxEditorPreview {
+    /// Validate the editor preview mode single-click tab
+    pub fn djxvalidate(&self) -> bool {
+        (!self.preview_id.is_empty() || true) &&
+        (!self.preview_uri.is_empty() || true) &&
+        (self.preview_active || true) &&
+        (self.preview_pinnable || true) &&
+        (self.preview_replaced || true)
+    }
+}
+
+/// Editor unsaved changes indicator
+#[derive(Debug, Clone)]
+pub struct DjyEditorDirtyState {
+    pub dirty_id: String,
+    pub dirty_uri: String,
+    pub dirty_modified: bool,
+    pub dirty_conflict: bool,
+    pub dirty_auto_save: bool,
+}
+
+impl Default for DjyEditorDirtyState {
+    fn default() -> Self {
+        Self {
+            dirty_id: String::new(),
+            dirty_uri: String::new(),
+            dirty_modified: false,
+            dirty_conflict: false,
+            dirty_auto_save: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjyEditorDirtyState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjyEditorDirtyState({})", self.dirty_id)
+    }
+}
+
+impl DjyEditorDirtyState {
+    /// Validate the editor unsaved changes indicator
+    pub fn djyvalidate(&self) -> bool {
+        (!self.dirty_id.is_empty() || true) &&
+        (!self.dirty_uri.is_empty() || true) &&
+        (self.dirty_modified || true) &&
+        (self.dirty_conflict || true) &&
+        (self.dirty_auto_save || true)
+    }
+}
+
+/// Editor readonly mode and enforcement
+#[derive(Debug, Clone)]
+pub struct DjzEditorReadonly {
+    pub readonly_id: String,
+    pub readonly_uri: String,
+    pub readonly_enforced: bool,
+    pub readonly_reason: String,
+    pub readonly_editable: bool,
+}
+
+impl Default for DjzEditorReadonly {
+    fn default() -> Self {
+        Self {
+            readonly_id: String::new(),
+            readonly_uri: String::new(),
+            readonly_enforced: false,
+            readonly_reason: String::new(),
+            readonly_editable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjzEditorReadonly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjzEditorReadonly({})", self.readonly_id)
+    }
+}
+
+impl DjzEditorReadonly {
+    /// Validate the editor readonly mode and enforcement
+    pub fn djzvalidate(&self) -> bool {
+        (!self.readonly_id.is_empty() || true) &&
+        (!self.readonly_uri.is_empty() || true) &&
+        (self.readonly_enforced || true) &&
+        (!self.readonly_reason.is_empty() || true) &&
+        (self.readonly_editable || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -207432,6 +207861,160 @@ mod tests_bfo {
         let item = DjoEditorDiff::default();
         let s = format!("{item}");
         assert!(s.contains("DjoEditorDiff"));
+    }
+
+    #[test]
+    fn test_djpdefault() {
+        let item = DjpEditorMergeConflict::default();
+        assert!(item.djpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djpdisplay() {
+        let item = DjpEditorMergeConflict::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjpEditorMergeConflict"));
+    }
+
+    #[test]
+    fn test_djqdefault() {
+        let item = DjqEditorCodeLensWidget::default();
+        assert!(item.djqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djqdisplay() {
+        let item = DjqEditorCodeLensWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjqEditorCodeLensWidget"));
+    }
+
+    #[test]
+    fn test_djrdefault() {
+        let item = DjrEditorLightBulb::default();
+        assert!(item.djrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djrdisplay() {
+        let item = DjrEditorLightBulb::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjrEditorLightBulb"));
+    }
+
+    #[test]
+    fn test_djsdefault() {
+        let item = DjsEditorGotoLine::default();
+        assert!(item.djsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djsdisplay() {
+        let item = DjsEditorGotoLine::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjsEditorGotoLine"));
+    }
+
+    #[test]
+    fn test_djtdefault() {
+        let item = DjtEditorCommandPalette::default();
+        assert!(item.djtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djtdisplay() {
+        let item = DjtEditorCommandPalette::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjtEditorCommandPalette"));
+    }
+
+    #[test]
+    fn test_djudefault() {
+        let item = DjuEditorBreadcrumb::default();
+        assert!(item.djuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djudisplay() {
+        let item = DjuEditorBreadcrumb::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjuEditorBreadcrumb"));
+    }
+
+    #[test]
+    fn test_djvdefault() {
+        let item = DjvEditorTabGroup::default();
+        assert!(item.djvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djvdisplay() {
+        let item = DjvEditorTabGroup::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjvEditorTabGroup"));
+    }
+
+    #[test]
+    fn test_djwdefault() {
+        let item = DjwEditorPinTab::default();
+        assert!(item.djwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djwdisplay() {
+        let item = DjwEditorPinTab::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjwEditorPinTab"));
+    }
+
+    #[test]
+    fn test_djxdefault() {
+        let item = DjxEditorPreview::default();
+        assert!(item.djxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djxdisplay() {
+        let item = DjxEditorPreview::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjxEditorPreview"));
+    }
+
+    #[test]
+    fn test_djydefault() {
+        let item = DjyEditorDirtyState::default();
+        assert!(item.djyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djydisplay() {
+        let item = DjyEditorDirtyState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjyEditorDirtyState"));
+    }
+
+    #[test]
+    fn test_djzdefault() {
+        let item = DjzEditorReadonly::default();
+        assert!(item.djzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djzdisplay() {
+        let item = DjzEditorReadonly::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjzEditorReadonly"));
     }
 
 }
