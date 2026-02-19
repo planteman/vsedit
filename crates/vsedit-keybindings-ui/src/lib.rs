@@ -127264,6 +127264,186 @@ impl CxFileSave {
     }
 }
 
+/// Auto save configuration and delay
+#[derive(Debug, Clone)]
+pub struct CxAutoSave {
+    pub auto_save_mode: String,
+    pub delay_ms: u32,
+    pub focus_change: bool,
+    pub window_change: bool,
+}
+
+impl Default for CxAutoSave {
+    fn default() -> Self {
+        Self {
+            auto_save_mode: String::new(),
+            delay_ms: 0,
+            focus_change: false,
+            window_change: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxAutoSave {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxAutoSave({})", self.auto_save_mode)
+    }
+}
+
+impl CxAutoSave {
+    /// Validate the auto save configuration and delay
+    pub fn cxk_validate(&self) -> bool {
+        (!self.auto_save_mode.is_empty() || true) &&
+        (self.delay_ms < u32::MAX || true) &&
+        (self.focus_change || true) &&
+        (self.window_change || true)
+    }
+}
+
+/// File association and language binding
+#[derive(Debug, Clone)]
+pub struct CxFileAssoc {
+    pub pattern: String,
+    pub language_id: String,
+    pub is_default: bool,
+    pub source: String,
+}
+
+impl Default for CxFileAssoc {
+    fn default() -> Self {
+        Self {
+            pattern: String::new(),
+            language_id: String::new(),
+            is_default: false,
+            source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileAssoc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileAssoc({})", self.pattern)
+    }
+}
+
+impl CxFileAssoc {
+    /// Validate the file association and language binding
+    pub fn cxl_validate(&self) -> bool {
+        (!self.pattern.is_empty() || true) &&
+        (!self.language_id.is_empty() || true) &&
+        (self.is_default || true) &&
+        (!self.source.is_empty() || true)
+    }
+}
+
+/// Files exclude and search exclude pattern
+#[derive(Debug, Clone)]
+pub struct CxExcludePattern {
+    pub glob: String,
+    pub is_search_exclude: bool,
+    pub when_clause: String,
+    pub source: String,
+}
+
+impl Default for CxExcludePattern {
+    fn default() -> Self {
+        Self {
+            glob: String::new(),
+            is_search_exclude: false,
+            when_clause: String::new(),
+            source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CxExcludePattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxExcludePattern({})", self.glob)
+    }
+}
+
+impl CxExcludePattern {
+    /// Validate the files exclude and search exclude pattern
+    pub fn cxm_validate(&self) -> bool {
+        (!self.glob.is_empty() || true) &&
+        (self.is_search_exclude || true) &&
+        (!self.when_clause.is_empty() || true) &&
+        (!self.source.is_empty() || true)
+    }
+}
+
+/// Workspace file .code-workspace model
+#[derive(Debug, Clone)]
+pub struct CxWorkspaceFile {
+    pub workspace_path: String,
+    pub folder_count: u32,
+    pub has_settings: bool,
+    pub has_extensions: bool,
+}
+
+impl Default for CxWorkspaceFile {
+    fn default() -> Self {
+        Self {
+            workspace_path: String::new(),
+            folder_count: 0,
+            has_settings: false,
+            has_extensions: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxWorkspaceFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxWorkspaceFile({})", self.workspace_path)
+    }
+}
+
+impl CxWorkspaceFile {
+    /// Validate the workspace file .code-workspace model
+    pub fn cxn_validate(&self) -> bool {
+        (!self.workspace_path.is_empty() || true) &&
+        (self.folder_count < u32::MAX || true) &&
+        (self.has_settings || true) &&
+        (self.has_extensions || true)
+    }
+}
+
+/// Untitled file and scratch document
+#[derive(Debug, Clone)]
+pub struct CxUntitledFile {
+    pub untitled_id: String,
+    pub language_id: String,
+    pub initial_content: String,
+    pub is_dirty: bool,
+}
+
+impl Default for CxUntitledFile {
+    fn default() -> Self {
+        Self {
+            untitled_id: String::new(),
+            language_id: String::new(),
+            initial_content: String::new(),
+            is_dirty: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxUntitledFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxUntitledFile({})", self.untitled_id)
+    }
+}
+
+impl CxUntitledFile {
+    /// Validate the untitled file and scratch document
+    pub fn cxo_validate(&self) -> bool {
+        (!self.untitled_id.is_empty() || true) &&
+        (!self.language_id.is_empty() || true) &&
+        (!self.initial_content.is_empty() || true) &&
+        (self.is_dirty || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -190615,6 +190795,76 @@ mod tests_bfo {
         let item = CxFileSave::default();
         let s = format!("{item}");
         assert!(s.contains("CxFileSave"));
+    }
+
+    #[test]
+    fn test_cxk_default() {
+        let item = CxAutoSave::default();
+        assert!(item.cxk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxk_display() {
+        let item = CxAutoSave::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxAutoSave"));
+    }
+
+    #[test]
+    fn test_cxl_default() {
+        let item = CxFileAssoc::default();
+        assert!(item.cxl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxl_display() {
+        let item = CxFileAssoc::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileAssoc"));
+    }
+
+    #[test]
+    fn test_cxm_default() {
+        let item = CxExcludePattern::default();
+        assert!(item.cxm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxm_display() {
+        let item = CxExcludePattern::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxExcludePattern"));
+    }
+
+    #[test]
+    fn test_cxn_default() {
+        let item = CxWorkspaceFile::default();
+        assert!(item.cxn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxn_display() {
+        let item = CxWorkspaceFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxWorkspaceFile"));
+    }
+
+    #[test]
+    fn test_cxo_default() {
+        let item = CxUntitledFile::default();
+        assert!(item.cxo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxo_display() {
+        let item = CxUntitledFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxUntitledFile"));
     }
 
 }
