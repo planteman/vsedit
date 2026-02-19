@@ -55414,3 +55414,286 @@ mod bax_tests {
         assert_eq!(m.find_provider("ts").unwrap().id, "high");
     }
 }
+
+
+// --- bay_: Workspace symbol search ---
+
+/// Kind of workspace symbol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaySymbolKind {
+    File, Module, Namespace, Package, Class, Method, Property, Field,
+    Constructor, Enum, Interface, Function, Variable, Constant, String,
+    Number, Boolean, Array, Object, Key, Null, EnumMember, Struct, Event,
+    Operator, TypeParameter,
+}
+
+impl BaySymbolKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::File => "File", Self::Module => "Module", Self::Namespace => "Namespace",
+            Self::Package => "Package", Self::Class => "Class", Self::Method => "Method",
+            Self::Property => "Property", Self::Field => "Field", Self::Constructor => "Constructor",
+            Self::Enum => "Enum", Self::Interface => "Interface", Self::Function => "Function",
+            Self::Variable => "Variable", Self::Constant => "Constant", Self::String => "String",
+            Self::Number => "Number", Self::Boolean => "Boolean", Self::Array => "Array",
+            Self::Object => "Object", Self::Key => "Key", Self::Null => "Null",
+            Self::EnumMember => "Enum Member", Self::Struct => "Struct", Self::Event => "Event",
+            Self::Operator => "Operator", Self::TypeParameter => "Type Parameter",
+        }
+    }
+
+    pub fn icon(&self) -> char {
+        match self {
+            Self::File => '📄', Self::Module | Self::Namespace | Self::Package => '📦',
+            Self::Class | Self::Interface | Self::Struct => '🔷',
+            Self::Method | Self::Function | Self::Constructor => 'ƒ',
+            Self::Property | Self::Field | Self::Key => '🔑',
+            Self::Enum | Self::EnumMember => '📋',
+            Self::Variable | Self::Constant => '𝑥',
+            Self::Event => '⚡', Self::Operator => '±',
+            Self::TypeParameter => 'T',
+            _ => '○',
+        }
+    }
+}
+
+/// A workspace symbol result.
+#[derive(Debug, Clone)]
+pub struct BayWorkspaceSymbol {
+    pub name: String,
+    pub kind: BaySymbolKind,
+    pub container_name: Option<String>,
+    pub file_path: String,
+    pub line: u32,
+    pub col: u32,
+    pub score: f64,
+}
+
+impl BayWorkspaceSymbol {
+    pub fn new(name: &str, kind: BaySymbolKind, path: &str, line: u32, col: u32) -> Self {
+        Self {
+            name: name.to_string(), kind, container_name: None,
+            file_path: path.to_string(), line, col, score: 0.0,
+        }
+    }
+
+    pub fn with_container(mut self, c: &str) -> Self {
+        self.container_name = Some(c.to_string()); self
+    }
+
+    pub fn qualified_name(&self) -> String {
+        match &self.container_name {
+            Some(c) => format!("{}.{}", c, self.name),
+            None => self.name.clone(),
+        }
+    }
+
+    pub fn location_text(&self) -> String {
+        format!("{}:{}:{}", self.file_path, self.line, self.col)
+    }
+
+    pub fn display_text(&self) -> String {
+        format!("{} {} — {}", self.kind.icon(), self.name, self.file_path)
+    }
+
+    pub fn matches_query(&self, query: &str) -> bool {
+        let ql = query.to_lowercase();
+        self.name.to_lowercase().contains(&ql)
+    }
+}
+
+/// Workspace symbol search model.
+#[derive(Debug)]
+pub struct BaySymbolSearch {
+    query: String,
+    results: Vec<BayWorkspaceSymbol>,
+    selected_index: Option<usize>,
+    max_results: usize,
+    kind_filter: Option<BaySymbolKind>,
+    searching: bool,
+}
+
+impl BaySymbolSearch {
+    pub fn new() -> Self {
+        Self {
+            query: String::new(), results: Vec::new(),
+            selected_index: None, max_results: 100,
+            kind_filter: None, searching: false,
+        }
+    }
+
+    pub fn set_query(&mut self, q: &str) {
+        self.query = q.to_string();
+        self.selected_index = None;
+    }
+
+    pub fn query(&self) -> &str { &self.query }
+
+    pub fn set_results(&mut self, mut results: Vec<BayWorkspaceSymbol>) {
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        if results.len() > self.max_results { results.truncate(self.max_results); }
+        self.results = results;
+        self.searching = false;
+        if !self.results.is_empty() { self.selected_index = Some(0); }
+    }
+
+    pub fn results(&self) -> &[BayWorkspaceSymbol] { &self.results }
+    pub fn result_count(&self) -> usize { self.results.len() }
+
+    pub fn selected(&self) -> Option<&BayWorkspaceSymbol> {
+        self.selected_index.map(|i| &self.results[i])
+    }
+
+    pub fn select_next(&mut self) {
+        if self.results.is_empty() { return; }
+        self.selected_index = Some(match self.selected_index {
+            Some(i) => (i + 1).min(self.results.len() - 1),
+            None => 0,
+        });
+    }
+
+    pub fn select_prev(&mut self) {
+        if self.results.is_empty() { return; }
+        self.selected_index = Some(match self.selected_index {
+            Some(i) => i.saturating_sub(1),
+            None => 0,
+        });
+    }
+
+    pub fn set_kind_filter(&mut self, kind: Option<BaySymbolKind>) {
+        self.kind_filter = kind;
+    }
+
+    pub fn filtered_results(&self) -> Vec<&BayWorkspaceSymbol> {
+        match self.kind_filter {
+            Some(k) => self.results.iter().filter(|s| s.kind == k).collect(),
+            None => self.results.iter().collect(),
+        }
+    }
+
+    pub fn set_searching(&mut self, v: bool) { self.searching = v; }
+    pub fn is_searching(&self) -> bool { self.searching }
+
+    pub fn clear(&mut self) {
+        self.query.clear();
+        self.results.clear();
+        self.selected_index = None;
+    }
+
+    pub fn status_text(&self) -> String {
+        if self.searching { return "Searching...".to_string(); }
+        if self.results.is_empty() { return "No symbols found".to_string(); }
+        format!("{} symbols", self.results.len())
+    }
+
+    pub fn set_max_results(&mut self, max: usize) { self.max_results = max; }
+}
+
+#[cfg(test)]
+mod bay_tests {
+    use super::*;
+
+    #[test]
+    fn test_bay_symbol_kind() {
+        assert_eq!(BaySymbolKind::Function.label(), "Function");
+        assert_eq!(BaySymbolKind::Class.icon(), '🔷');
+    }
+
+    #[test]
+    fn test_bay_symbol_qualified() {
+        let s = BayWorkspaceSymbol::new("foo", BaySymbolKind::Method, "src/lib.rs", 10, 4)
+            .with_container("MyClass");
+        assert_eq!(s.qualified_name(), "MyClass.foo");
+    }
+
+    #[test]
+    fn test_bay_symbol_location() {
+        let s = BayWorkspaceSymbol::new("bar", BaySymbolKind::Function, "src/main.rs", 5, 0);
+        assert_eq!(s.location_text(), "src/main.rs:5:0");
+    }
+
+    #[test]
+    fn test_bay_symbol_matches() {
+        let s = BayWorkspaceSymbol::new("handleClick", BaySymbolKind::Function, "x.ts", 1, 0);
+        assert!(s.matches_query("click"));
+        assert!(s.matches_query("HANDLE"));
+        assert!(!s.matches_query("submit"));
+    }
+
+    #[test]
+    fn test_bay_search_lifecycle() {
+        let mut search = BaySymbolSearch::new();
+        search.set_query("test");
+        assert_eq!(search.query(), "test");
+        search.set_searching(true);
+        assert!(search.is_searching());
+    }
+
+    #[test]
+    fn test_bay_search_results() {
+        let mut search = BaySymbolSearch::new();
+        let mut s1 = BayWorkspaceSymbol::new("a", BaySymbolKind::Function, "x", 1, 0);
+        s1.score = 10.0;
+        let mut s2 = BayWorkspaceSymbol::new("b", BaySymbolKind::Function, "x", 2, 0);
+        s2.score = 20.0;
+        search.set_results(vec![s1, s2]);
+        assert_eq!(search.result_count(), 2);
+        assert_eq!(search.selected().unwrap().name, "b"); // Higher score first
+    }
+
+    #[test]
+    fn test_bay_search_navigation() {
+        let mut search = BaySymbolSearch::new();
+        search.set_results(vec![
+            BayWorkspaceSymbol::new("a", BaySymbolKind::Function, "x", 1, 0),
+            BayWorkspaceSymbol::new("b", BaySymbolKind::Function, "x", 2, 0),
+            BayWorkspaceSymbol::new("c", BaySymbolKind::Function, "x", 3, 0),
+        ]);
+        assert_eq!(search.selected().unwrap().name, "a");
+        search.select_next();
+        assert_eq!(search.selected().unwrap().name, "b");
+        search.select_prev();
+        assert_eq!(search.selected().unwrap().name, "a");
+    }
+
+    #[test]
+    fn test_bay_search_kind_filter() {
+        let mut search = BaySymbolSearch::new();
+        search.set_results(vec![
+            BayWorkspaceSymbol::new("a", BaySymbolKind::Function, "x", 1, 0),
+            BayWorkspaceSymbol::new("b", BaySymbolKind::Class, "x", 2, 0),
+        ]);
+        search.set_kind_filter(Some(BaySymbolKind::Function));
+        assert_eq!(search.filtered_results().len(), 1);
+    }
+
+    #[test]
+    fn test_bay_search_clear() {
+        let mut search = BaySymbolSearch::new();
+        search.set_query("test");
+        search.set_results(vec![BayWorkspaceSymbol::new("a", BaySymbolKind::Function, "x", 1, 0)]);
+        search.clear();
+        assert!(search.query().is_empty());
+        assert_eq!(search.result_count(), 0);
+    }
+
+    #[test]
+    fn test_bay_search_status() {
+        let mut search = BaySymbolSearch::new();
+        assert_eq!(search.status_text(), "No symbols found");
+        search.set_searching(true);
+        assert_eq!(search.status_text(), "Searching...");
+    }
+
+    #[test]
+    fn test_bay_search_max_results() {
+        let mut search = BaySymbolSearch::new();
+        search.set_max_results(2);
+        search.set_results(vec![
+            BayWorkspaceSymbol::new("a", BaySymbolKind::Function, "x", 1, 0),
+            BayWorkspaceSymbol::new("b", BaySymbolKind::Function, "x", 2, 0),
+            BayWorkspaceSymbol::new("c", BaySymbolKind::Function, "x", 3, 0),
+        ]);
+        assert_eq!(search.result_count(), 2);
+    }
+}
