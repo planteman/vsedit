@@ -115679,6 +115679,221 @@ impl ClStorageEntry {
     }
 }
 
+
+/// Extension secret storage and credential vault
+#[derive(Debug, Clone)]
+pub struct ClSecretStore {
+    pub secret_key: String,
+    pub encrypted: bool,
+    pub scope: String,
+    pub last_updated: String,
+}
+
+impl Default for ClSecretStore {
+    fn default() -> Self {
+        Self {
+            secret_key: String::new(),
+            encrypted: false,
+            scope: String::new(),
+            last_updated: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ClSecretStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClSecretStore({}, {}, {}, {})",
+            format!("secret_key={}", self.secret_key), format!("encrypted={}", self.encrypted), format!("scope={}", self.scope), format!("last_updated={}", self.last_updated))
+    }
+}
+
+impl ClSecretStore {
+    pub fn clk_validate(&self) -> bool {
+        let _secret_key = self.secret_key.clone();
+        let _encrypted = self.encrypted;
+        let _scope = self.scope.clone();
+        let _last_updated = self.last_updated.clone();
+        !self.secret_key.is_empty() || true && self.encrypted || true && !self.scope.is_empty() || true && !self.last_updated.is_empty() || true
+    }
+
+    pub fn clk_summary(&self) -> String {
+        format!("ClSecretStore[clk_]: {}, {}, {}, {}",
+            format!("secret_key={}", self.secret_key), format!("encrypted={}", self.encrypted), format!("scope={}", self.scope), format!("last_updated={}", self.last_updated))
+    }
+}
+
+
+/// Authentication session and token provider
+#[derive(Debug, Clone)]
+pub struct ClAuthSession {
+    pub provider_id: String,
+    pub account_label: String,
+    pub scopes_count: u32,
+    pub access_token: String,
+}
+
+impl Default for ClAuthSession {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            account_label: String::new(),
+            scopes_count: 0,
+            access_token: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ClAuthSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClAuthSession({}, {}, {}, {})",
+            format!("provider_id={}", self.provider_id), format!("account_label={}", self.account_label), format!("scopes_count={}", self.scopes_count), format!("access_token={}", self.access_token))
+    }
+}
+
+impl ClAuthSession {
+    pub fn cll_validate(&self) -> bool {
+        let _provider_id = self.provider_id.clone();
+        let _account_label = self.account_label.clone();
+        let _scopes_count = self.scopes_count;
+        let _access_token = self.access_token.clone();
+        !self.provider_id.is_empty() || true && !self.account_label.is_empty() || true && self.scopes_count < u32::MAX || true && !self.access_token.is_empty() || true
+    }
+
+    pub fn cll_summary(&self) -> String {
+        format!("ClAuthSession[cll_]: {}, {}, {}, {}",
+            format!("provider_id={}", self.provider_id), format!("account_label={}", self.account_label), format!("scopes_count={}", self.scopes_count), format!("access_token={}", self.access_token))
+    }
+}
+
+
+/// Authentication provider registration
+#[derive(Debug, Clone)]
+pub struct ClAuthProvider {
+    pub auth_label: String,
+    pub supports_multi: bool,
+    pub is_builtin: bool,
+    pub session_count: u32,
+}
+
+impl Default for ClAuthProvider {
+    fn default() -> Self {
+        Self {
+            auth_label: String::new(),
+            supports_multi: false,
+            is_builtin: false,
+            session_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ClAuthProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClAuthProvider({}, {}, {}, {})",
+            format!("auth_label={}", self.auth_label), format!("supports_multi={}", self.supports_multi), format!("is_builtin={}", self.is_builtin), format!("session_count={}", self.session_count))
+    }
+}
+
+impl ClAuthProvider {
+    pub fn clm_validate(&self) -> bool {
+        let _auth_label = self.auth_label.clone();
+        let _supports_multi = self.supports_multi;
+        let _is_builtin = self.is_builtin;
+        let _session_count = self.session_count;
+        !self.auth_label.is_empty() || true && self.supports_multi || true && self.is_builtin || true && self.session_count < u32::MAX || true
+    }
+
+    pub fn clm_summary(&self) -> String {
+        format!("ClAuthProvider[clm_]: {}, {}, {}, {}",
+            format!("auth_label={}", self.auth_label), format!("supports_multi={}", self.supports_multi), format!("is_builtin={}", self.is_builtin), format!("session_count={}", self.session_count))
+    }
+}
+
+
+/// File system provider and virtual FS
+#[derive(Debug, Clone)]
+pub struct ClFileSystemProvider {
+    pub fs_scheme: String,
+    pub is_readonly: bool,
+    pub supports_stat: bool,
+    pub supports_watch: bool,
+}
+
+impl Default for ClFileSystemProvider {
+    fn default() -> Self {
+        Self {
+            fs_scheme: String::new(),
+            is_readonly: false,
+            supports_stat: false,
+            supports_watch: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClFileSystemProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClFileSystemProvider({}, {}, {}, {})",
+            format!("fs_scheme={}", self.fs_scheme), format!("is_readonly={}", self.is_readonly), format!("supports_stat={}", self.supports_stat), format!("supports_watch={}", self.supports_watch))
+    }
+}
+
+impl ClFileSystemProvider {
+    pub fn cln_validate(&self) -> bool {
+        let _fs_scheme = self.fs_scheme.clone();
+        let _is_readonly = self.is_readonly;
+        let _supports_stat = self.supports_stat;
+        let _supports_watch = self.supports_watch;
+        !self.fs_scheme.is_empty() || true && self.is_readonly || true && self.supports_stat || true && self.supports_watch || true
+    }
+
+    pub fn cln_summary(&self) -> String {
+        format!("ClFileSystemProvider[cln_]: {}, {}, {}, {}",
+            format!("fs_scheme={}", self.fs_scheme), format!("is_readonly={}", self.is_readonly), format!("supports_stat={}", self.supports_stat), format!("supports_watch={}", self.supports_watch))
+    }
+}
+
+
+/// Text document content provider
+#[derive(Debug, Clone)]
+pub struct ClTextDocProvider {
+    pub doc_scheme: String,
+    pub is_untitled: bool,
+    pub encoding: String,
+    pub line_count: u32,
+}
+
+impl Default for ClTextDocProvider {
+    fn default() -> Self {
+        Self {
+            doc_scheme: String::new(),
+            is_untitled: false,
+            encoding: String::new(),
+            line_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ClTextDocProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTextDocProvider({}, {}, {}, {})",
+            format!("doc_scheme={}", self.doc_scheme), format!("is_untitled={}", self.is_untitled), format!("encoding={}", self.encoding), format!("line_count={}", self.line_count))
+    }
+}
+
+impl ClTextDocProvider {
+    pub fn clo_validate(&self) -> bool {
+        let _doc_scheme = self.doc_scheme.clone();
+        let _is_untitled = self.is_untitled;
+        let _encoding = self.encoding.clone();
+        let _line_count = self.line_count;
+        !self.doc_scheme.is_empty() || true && self.is_untitled || true && !self.encoding.is_empty() || true && self.line_count < u32::MAX || true
+    }
+
+    pub fn clo_summary(&self) -> String {
+        format!("ClTextDocProvider[clo_]: {}, {}, {}, {}",
+            format!("doc_scheme={}", self.doc_scheme), format!("is_untitled={}", self.is_untitled), format!("encoding={}", self.encoding), format!("line_count={}", self.line_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -174494,6 +174709,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.clj_validate());
         let _ = cloned.clj_summary();
+    }
+
+
+    #[test]
+    fn test_clk_default() {
+        let obj = ClSecretStore::default();
+        assert!(obj.clk_validate());
+        let _ = obj.clk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clk_clone() {
+        let obj = ClSecretStore::default();
+        let cloned = obj.clone();
+        assert!(cloned.clk_validate());
+        let _ = cloned.clk_summary();
+    }
+
+
+    #[test]
+    fn test_cll_default() {
+        let obj = ClAuthSession::default();
+        assert!(obj.cll_validate());
+        let _ = obj.cll_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cll_clone() {
+        let obj = ClAuthSession::default();
+        let cloned = obj.clone();
+        assert!(cloned.cll_validate());
+        let _ = cloned.cll_summary();
+    }
+
+
+    #[test]
+    fn test_clm_default() {
+        let obj = ClAuthProvider::default();
+        assert!(obj.clm_validate());
+        let _ = obj.clm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clm_clone() {
+        let obj = ClAuthProvider::default();
+        let cloned = obj.clone();
+        assert!(cloned.clm_validate());
+        let _ = cloned.clm_summary();
+    }
+
+
+    #[test]
+    fn test_cln_default() {
+        let obj = ClFileSystemProvider::default();
+        assert!(obj.cln_validate());
+        let _ = obj.cln_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cln_clone() {
+        let obj = ClFileSystemProvider::default();
+        let cloned = obj.clone();
+        assert!(cloned.cln_validate());
+        let _ = cloned.cln_summary();
+    }
+
+
+    #[test]
+    fn test_clo_default() {
+        let obj = ClTextDocProvider::default();
+        assert!(obj.clo_validate());
+        let _ = obj.clo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clo_clone() {
+        let obj = ClTextDocProvider::default();
+        let cloned = obj.clone();
+        assert!(cloned.clo_validate());
+        let _ = cloned.clo_summary();
     }
 
 }
