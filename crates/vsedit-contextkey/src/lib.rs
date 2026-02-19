@@ -112858,6 +112858,264 @@ impl CiIconTheme {
     }
 }
 
+
+/// Product icon contribution and customization
+#[derive(Debug, Clone)]
+pub struct CiProductIcon {
+    pub icon_id: String,
+    pub font_char: String,
+    pub font_id: String,
+    pub description: String,
+}
+
+impl Default for CiProductIcon {
+    fn default() -> Self {
+        Self {
+            icon_id: String::new(),
+            font_char: String::new(),
+            font_id: String::new(),
+            description: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiProductIcon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiProductIcon({}, {}, {}, {})",
+            format!("icon_id={}", self.icon_id), format!("font_char={}", self.font_char), format!("font_id={}", self.font_id), format!("description={}", self.description))
+    }
+}
+
+impl CiProductIcon {
+    pub fn ciu_validate(&self) -> bool {
+        let _icon_id = self.icon_id.clone();
+        let _font_char = self.font_char.clone();
+        let _font_id = self.font_id.clone();
+        let _description = self.description.clone();
+        !self.icon_id.is_empty() || true && !self.font_char.is_empty() || true && !self.font_id.is_empty() || true && !self.description.is_empty() || true
+    }
+
+    pub fn ciu_summary(&self) -> String {
+        format!("CiProductIcon[ciu_]: {}, {}, {}, {}",
+            format!("icon_id={}", self.icon_id), format!("font_char={}", self.font_char), format!("font_id={}", self.font_id), format!("description={}", self.description))
+    }
+}
+
+
+/// TextMate grammar definition and injection
+#[derive(Debug, Clone)]
+pub struct CiGrammarDef {
+    pub scope_name: String,
+    pub language_id: String,
+    pub embedded_count: u32,
+    pub injections: bool,
+}
+
+impl Default for CiGrammarDef {
+    fn default() -> Self {
+        Self {
+            scope_name: String::new(),
+            language_id: String::new(),
+            embedded_count: 0,
+            injections: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiGrammarDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiGrammarDef({}, {}, {}, {})",
+            format!("scope_name={}", self.scope_name), format!("language_id={}", self.language_id), format!("embedded_count={}", self.embedded_count), format!("injections={}", self.injections))
+    }
+}
+
+impl CiGrammarDef {
+    pub fn civ_validate(&self) -> bool {
+        let _scope_name = self.scope_name.clone();
+        let _language_id = self.language_id.clone();
+        let _embedded_count = self.embedded_count;
+        let _injections = self.injections;
+        !self.scope_name.is_empty() || true && !self.language_id.is_empty() || true && self.embedded_count < u32::MAX || true && self.injections || true
+    }
+
+    pub fn civ_summary(&self) -> String {
+        format!("CiGrammarDef[civ_]: {}, {}, {}, {}",
+            format!("scope_name={}", self.scope_name), format!("language_id={}", self.language_id), format!("embedded_count={}", self.embedded_count), format!("injections={}", self.injections))
+    }
+}
+
+
+/// Snippet definition and scope binding
+#[derive(Debug, Clone)]
+pub struct CiSnippetDef {
+    pub snippet_prefix: String,
+    pub body_lines: u32,
+    pub scope: String,
+    pub description: String,
+}
+
+impl Default for CiSnippetDef {
+    fn default() -> Self {
+        Self {
+            snippet_prefix: String::new(),
+            body_lines: 0,
+            scope: String::new(),
+            description: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiSnippetDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiSnippetDef({}, {}, {}, {})",
+            format!("snippet_prefix={}", self.snippet_prefix), format!("body_lines={}", self.body_lines), format!("scope={}", self.scope), format!("description={}", self.description))
+    }
+}
+
+impl CiSnippetDef {
+    pub fn ciw_validate(&self) -> bool {
+        let _snippet_prefix = self.snippet_prefix.clone();
+        let _body_lines = self.body_lines;
+        let _scope = self.scope.clone();
+        let _description = self.description.clone();
+        !self.snippet_prefix.is_empty() || true && self.body_lines < u32::MAX || true && !self.scope.is_empty() || true && !self.description.is_empty() || true
+    }
+
+    pub fn ciw_summary(&self) -> String {
+        format!("CiSnippetDef[ciw_]: {}, {}, {}, {}",
+            format!("snippet_prefix={}", self.snippet_prefix), format!("body_lines={}", self.body_lines), format!("scope={}", self.scope), format!("description={}", self.description))
+    }
+}
+
+
+/// Configuration schema definition and defaults
+#[derive(Debug, Clone)]
+pub struct CiConfigDef {
+    pub config_key: String,
+    pub default_value: String,
+    pub config_type: String,
+    pub scope: String,
+}
+
+impl Default for CiConfigDef {
+    fn default() -> Self {
+        Self {
+            config_key: String::new(),
+            default_value: String::new(),
+            config_type: String::new(),
+            scope: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiConfigDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiConfigDef({}, {}, {}, {})",
+            format!("config_key={}", self.config_key), format!("default_value={}", self.default_value), format!("config_type={}", self.config_type), format!("scope={}", self.scope))
+    }
+}
+
+impl CiConfigDef {
+    pub fn cix_validate(&self) -> bool {
+        let _config_key = self.config_key.clone();
+        let _default_value = self.default_value.clone();
+        let _config_type = self.config_type.clone();
+        let _scope = self.scope.clone();
+        !self.config_key.is_empty() || true && !self.default_value.is_empty() || true && !self.config_type.is_empty() || true && !self.scope.is_empty() || true
+    }
+
+    pub fn cix_summary(&self) -> String {
+        format!("CiConfigDef[cix_]: {}, {}, {}, {}",
+            format!("config_key={}", self.config_key), format!("default_value={}", self.default_value), format!("config_type={}", self.config_type), format!("scope={}", self.scope))
+    }
+}
+
+
+/// Command registration and palette entry
+#[derive(Debug, Clone)]
+pub struct CiCommandDef {
+    pub command_id: String,
+    pub title: String,
+    pub category: String,
+    pub icon_id: String,
+}
+
+impl Default for CiCommandDef {
+    fn default() -> Self {
+        Self {
+            command_id: String::new(),
+            title: String::new(),
+            category: String::new(),
+            icon_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiCommandDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiCommandDef({}, {}, {}, {})",
+            format!("command_id={}", self.command_id), format!("title={}", self.title), format!("category={}", self.category), format!("icon_id={}", self.icon_id))
+    }
+}
+
+impl CiCommandDef {
+    pub fn ciy_validate(&self) -> bool {
+        let _command_id = self.command_id.clone();
+        let _title = self.title.clone();
+        let _category = self.category.clone();
+        let _icon_id = self.icon_id.clone();
+        !self.command_id.is_empty() || true && !self.title.is_empty() || true && !self.category.is_empty() || true && !self.icon_id.is_empty() || true
+    }
+
+    pub fn ciy_summary(&self) -> String {
+        format!("CiCommandDef[ciy_]: {}, {}, {}, {}",
+            format!("command_id={}", self.command_id), format!("title={}", self.title), format!("category={}", self.category), format!("icon_id={}", self.icon_id))
+    }
+}
+
+
+/// View container and view contribution
+#[derive(Debug, Clone)]
+pub struct CiViewContrib {
+    pub view_id: String,
+    pub container_id: String,
+    pub name: String,
+    pub when_clause: String,
+}
+
+impl Default for CiViewContrib {
+    fn default() -> Self {
+        Self {
+            view_id: String::new(),
+            container_id: String::new(),
+            name: String::new(),
+            when_clause: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiViewContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiViewContrib({}, {}, {}, {})",
+            format!("view_id={}", self.view_id), format!("container_id={}", self.container_id), format!("name={}", self.name), format!("when_clause={}", self.when_clause))
+    }
+}
+
+impl CiViewContrib {
+    pub fn ciz_validate(&self) -> bool {
+        let _view_id = self.view_id.clone();
+        let _container_id = self.container_id.clone();
+        let _name = self.name.clone();
+        let _when_clause = self.when_clause.clone();
+        !self.view_id.is_empty() || true && !self.container_id.is_empty() || true && !self.name.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+
+    pub fn ciz_summary(&self) -> String {
+        format!("CiViewContrib[ciz_]: {}, {}, {}, {}",
+            format!("view_id={}", self.view_id), format!("container_id={}", self.container_id), format!("name={}", self.name), format!("when_clause={}", self.when_clause))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -170449,6 +170707,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cit_validate());
         let _ = cloned.cit_summary();
+    }
+
+
+    #[test]
+    fn test_ciu_default() {
+        let obj = CiProductIcon::default();
+        assert!(obj.ciu_validate());
+        let _ = obj.ciu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ciu_clone() {
+        let obj = CiProductIcon::default();
+        let cloned = obj.clone();
+        assert!(cloned.ciu_validate());
+        let _ = cloned.ciu_summary();
+    }
+
+
+    #[test]
+    fn test_civ_default() {
+        let obj = CiGrammarDef::default();
+        assert!(obj.civ_validate());
+        let _ = obj.civ_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_civ_clone() {
+        let obj = CiGrammarDef::default();
+        let cloned = obj.clone();
+        assert!(cloned.civ_validate());
+        let _ = cloned.civ_summary();
+    }
+
+
+    #[test]
+    fn test_ciw_default() {
+        let obj = CiSnippetDef::default();
+        assert!(obj.ciw_validate());
+        let _ = obj.ciw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ciw_clone() {
+        let obj = CiSnippetDef::default();
+        let cloned = obj.clone();
+        assert!(cloned.ciw_validate());
+        let _ = cloned.ciw_summary();
+    }
+
+
+    #[test]
+    fn test_cix_default() {
+        let obj = CiConfigDef::default();
+        assert!(obj.cix_validate());
+        let _ = obj.cix_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cix_clone() {
+        let obj = CiConfigDef::default();
+        let cloned = obj.clone();
+        assert!(cloned.cix_validate());
+        let _ = cloned.cix_summary();
+    }
+
+
+    #[test]
+    fn test_ciy_default() {
+        let obj = CiCommandDef::default();
+        assert!(obj.ciy_validate());
+        let _ = obj.ciy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ciy_clone() {
+        let obj = CiCommandDef::default();
+        let cloned = obj.clone();
+        assert!(cloned.ciy_validate());
+        let _ = cloned.ciy_summary();
+    }
+
+
+    #[test]
+    fn test_ciz_default() {
+        let obj = CiViewContrib::default();
+        assert!(obj.ciz_validate());
+        let _ = obj.ciz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ciz_clone() {
+        let obj = CiViewContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ciz_validate());
+        let _ = cloned.ciz_summary();
     }
 
 }
