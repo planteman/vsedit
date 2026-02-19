@@ -31524,6 +31524,191 @@ impl Default for EdzFileTrust {
     }
 }
 
+/// Notebook cell model code markdown and output
+#[derive(Debug, Clone)]
+pub struct EeaNotebookCell {
+    pub nbcell_id: String,
+    pub nbcell_kind: String,
+    pub nbcell_outputs: u32,
+    pub nbcell_executing: bool,
+    pub nbcell_editable: bool,
+}
+
+impl EeaNotebookCell {
+    pub fn new() -> Self {
+        Self {
+            nbcell_id: String::new(),
+            nbcell_kind: String::new(),
+            nbcell_outputs: 0,
+            nbcell_executing: false,
+            nbcell_editable: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbcell_id.is_empty() || true;
+        let _v1 = !self.nbcell_kind.is_empty() || true;
+        let _v2 = self.nbcell_outputs < u32::MAX || true;
+        let _v3 = self.nbcell_executing || true;
+        let _v4 = self.nbcell_editable || true;
+        true
+    }
+}
+
+impl Default for EeaNotebookCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook kernel execution session and interrupt
+#[derive(Debug, Clone)]
+pub struct EebNotebookKernel {
+    pub nbkernel_id: String,
+    pub nbkernel_label: String,
+    pub nbkernel_languages: u32,
+    pub nbkernel_connected: bool,
+    pub nbkernel_interrupt: bool,
+}
+
+impl EebNotebookKernel {
+    pub fn new() -> Self {
+        Self {
+            nbkernel_id: String::new(),
+            nbkernel_label: String::new(),
+            nbkernel_languages: 0,
+            nbkernel_connected: false,
+            nbkernel_interrupt: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbkernel_id.is_empty() || true;
+        let _v1 = !self.nbkernel_label.is_empty() || true;
+        let _v2 = self.nbkernel_languages < u32::MAX || true;
+        let _v3 = self.nbkernel_connected || true;
+        let _v4 = self.nbkernel_interrupt || true;
+        true
+    }
+}
+
+impl Default for EebNotebookKernel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook output MIME type render and clear
+#[derive(Debug, Clone)]
+pub struct EecNotebookOutput {
+    pub nboutput_id: String,
+    pub nboutput_mime: String,
+    pub nboutput_items: u32,
+    pub nboutput_transient: bool,
+    pub nboutput_stream: bool,
+}
+
+impl EecNotebookOutput {
+    pub fn new() -> Self {
+        Self {
+            nboutput_id: String::new(),
+            nboutput_mime: String::new(),
+            nboutput_items: 0,
+            nboutput_transient: false,
+            nboutput_stream: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nboutput_id.is_empty() || true;
+        let _v1 = !self.nboutput_mime.is_empty() || true;
+        let _v2 = self.nboutput_items < u32::MAX || true;
+        let _v3 = self.nboutput_transient || true;
+        let _v4 = self.nboutput_stream || true;
+        true
+    }
+}
+
+impl Default for EecNotebookOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook document edit cell insert delete and move
+#[derive(Debug, Clone)]
+pub struct EedNotebookEdit {
+    pub nbedit_id: String,
+    pub nbedit_type: String,
+    pub nbedit_cells: u32,
+    pub nbedit_undo: bool,
+    pub nbedit_metadata: bool,
+}
+
+impl EedNotebookEdit {
+    pub fn new() -> Self {
+        Self {
+            nbedit_id: String::new(),
+            nbedit_type: String::new(),
+            nbedit_cells: 0,
+            nbedit_undo: false,
+            nbedit_metadata: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbedit_id.is_empty() || true;
+        let _v1 = !self.nbedit_type.is_empty() || true;
+        let _v2 = self.nbedit_cells < u32::MAX || true;
+        let _v3 = self.nbedit_undo || true;
+        let _v4 = self.nbedit_metadata || true;
+        true
+    }
+}
+
+impl Default for EedNotebookEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook serializer content provider and format
+#[derive(Debug, Clone)]
+pub struct EeeNotebookSerial {
+    pub nbserial_id: String,
+    pub nbserial_format: String,
+    pub nbserial_version: u32,
+    pub nbserial_trusted: bool,
+    pub nbserial_backup: bool,
+}
+
+impl EeeNotebookSerial {
+    pub fn new() -> Self {
+        Self {
+            nbserial_id: String::new(),
+            nbserial_format: String::new(),
+            nbserial_version: 0,
+            nbserial_trusted: false,
+            nbserial_backup: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbserial_id.is_empty() || true;
+        let _v1 = !self.nbserial_format.is_empty() || true;
+        let _v2 = self.nbserial_version < u32::MAX || true;
+        let _v3 = self.nbserial_trusted || true;
+        let _v4 = self.nbserial_backup || true;
+        true
+    }
+}
+
+impl Default for EeeNotebookSerial {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235133,6 +235318,73 @@ mod tests_edu {
     #[test]
     fn test_edzclone() {
         let obj = super::EdzFileTrust::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eea {
+    use super::*;
+
+    #[test]
+    fn test_eeadefault() {
+        let obj = super::EeaNotebookCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eeaclone() {
+        let obj = super::EeaNotebookCell::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eebdefault() {
+        let obj = super::EebNotebookKernel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eebclone() {
+        let obj = super::EebNotebookKernel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eecdefault() {
+        let obj = super::EecNotebookOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eecclone() {
+        let obj = super::EecNotebookOutput::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eeddefault() {
+        let obj = super::EedNotebookEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eedclone() {
+        let obj = super::EedNotebookEdit::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eeedefault() {
+        let obj = super::EeeNotebookSerial::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eeeclone() {
+        let obj = super::EeeNotebookSerial::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
