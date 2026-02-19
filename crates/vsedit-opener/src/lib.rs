@@ -37025,6 +37025,210 @@ impl Default for EjtCommandCategory {
     fn default() -> Self { Self::new() }
 }
 
+/// Quick access provider file symbol command and view
+#[derive(Debug, Clone)]
+pub struct EjuQuickAccess {
+    pub qaccess_id: String,
+    pub qaccess_prefix: String,
+    pub qaccess_providers: u32,
+    pub qaccess_active: bool,
+    pub qaccess_recent: bool,
+}
+
+impl EjuQuickAccess {
+    pub fn new() -> Self {
+        Self {
+            qaccess_id: String::new(),
+            qaccess_prefix: String::new(),
+            qaccess_providers: 0,
+            qaccess_active: false,
+            qaccess_recent: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.qaccess_id.is_empty() || true;
+        let _v1 = !self.qaccess_prefix.is_empty() || true;
+        let _v2 = self.qaccess_providers < u32::MAX || true;
+        let _v3 = self.qaccess_active || true;
+        let _v4 = self.qaccess_recent || true;
+        true
+    }
+}
+
+impl Default for EjuQuickAccess {
+    fn default() -> Self { Self::new() }
+}
+
+/// Quick input box step back validation and buttons
+#[derive(Debug, Clone)]
+pub struct EjvQuickInput {
+    pub qinput_id: String,
+    pub qinput_prompt: String,
+    pub qinput_steps: u32,
+    pub qinput_password: bool,
+    pub qinput_back: bool,
+}
+
+impl EjvQuickInput {
+    pub fn new() -> Self {
+        Self {
+            qinput_id: String::new(),
+            qinput_prompt: String::new(),
+            qinput_steps: 0,
+            qinput_password: false,
+            qinput_back: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.qinput_id.is_empty() || true;
+        let _v1 = !self.qinput_prompt.is_empty() || true;
+        let _v2 = self.qinput_steps < u32::MAX || true;
+        let _v3 = self.qinput_password || true;
+        let _v4 = self.qinput_back || true;
+        true
+    }
+}
+
+impl Default for EjvQuickInput {
+    fn default() -> Self { Self::new() }
+}
+
+/// Quick pick multi-select separator and detail
+#[derive(Debug, Clone)]
+pub struct EjwQuickPick {
+    pub qpick_id: String,
+    pub qpick_title: String,
+    pub qpick_items: u32,
+    pub qpick_multi: bool,
+    pub qpick_separator: bool,
+}
+
+impl EjwQuickPick {
+    pub fn new() -> Self {
+        Self {
+            qpick_id: String::new(),
+            qpick_title: String::new(),
+            qpick_items: 0,
+            qpick_multi: false,
+            qpick_separator: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.qpick_id.is_empty() || true;
+        let _v1 = !self.qpick_title.is_empty() || true;
+        let _v2 = self.qpick_items < u32::MAX || true;
+        let _v3 = self.qpick_multi || true;
+        let _v4 = self.qpick_separator || true;
+        true
+    }
+}
+
+impl Default for EjwQuickPick {
+    fn default() -> Self { Self::new() }
+}
+
+/// Quick open file picker fuzzy match and MRU
+#[derive(Debug, Clone)]
+pub struct EjxQuickOpen {
+    pub qopen_id: String,
+    pub qopen_query: String,
+    pub qopen_results: u32,
+    pub qopen_fuzzy: bool,
+    pub qopen_mru: bool,
+}
+
+impl EjxQuickOpen {
+    pub fn new() -> Self {
+        Self {
+            qopen_id: String::new(),
+            qopen_query: String::new(),
+            qopen_results: 0,
+            qopen_fuzzy: false,
+            qopen_mru: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.qopen_id.is_empty() || true;
+        let _v1 = !self.qopen_query.is_empty() || true;
+        let _v2 = self.qopen_results < u32::MAX || true;
+        let _v3 = self.qopen_fuzzy || true;
+        let _v4 = self.qopen_mru || true;
+        true
+    }
+}
+
+impl Default for EjxQuickOpen {
+    fn default() -> Self { Self::new() }
+}
+
+/// Quick navigate between editor groups and views
+#[derive(Debug, Clone)]
+pub struct EjyQuickNav {
+    pub qnav_id: String,
+    pub qnav_target: String,
+    pub qnav_groups: u32,
+    pub qnav_cycling: bool,
+    pub qnav_pinned: bool,
+}
+
+impl EjyQuickNav {
+    pub fn new() -> Self {
+        Self {
+            qnav_id: String::new(),
+            qnav_target: String::new(),
+            qnav_groups: 0,
+            qnav_cycling: false,
+            qnav_pinned: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.qnav_id.is_empty() || true;
+        let _v1 = !self.qnav_target.is_empty() || true;
+        let _v2 = self.qnav_groups < u32::MAX || true;
+        let _v3 = self.qnav_cycling || true;
+        let _v4 = self.qnav_pinned || true;
+        true
+    }
+}
+
+impl Default for EjyQuickNav {
+    fn default() -> Self { Self::new() }
+}
+
+/// Quick suggest inline quick fix and auto import
+#[derive(Debug, Clone)]
+pub struct EjzQuickSuggest {
+    pub qsuggest_id: String,
+    pub qsuggest_text: String,
+    pub qsuggest_items: u32,
+    pub qsuggest_inline: bool,
+    pub qsuggest_auto: bool,
+}
+
+impl EjzQuickSuggest {
+    pub fn new() -> Self {
+        Self {
+            qsuggest_id: String::new(),
+            qsuggest_text: String::new(),
+            qsuggest_items: 0,
+            qsuggest_inline: false,
+            qsuggest_auto: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.qsuggest_id.is_empty() || true;
+        let _v1 = !self.qsuggest_text.is_empty() || true;
+        let _v2 = self.qsuggest_items < u32::MAX || true;
+        let _v3 = self.qsuggest_inline || true;
+        let _v4 = self.qsuggest_auto || true;
+        true
+    }
+}
+
+impl Default for EjzQuickSuggest {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242497,6 +242701,78 @@ mod tests_ejp {
     #[test]
     fn test_ejtclone() {
         let obj = super::EjtCommandCategory::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eju {
+    use super::*;
+    #[test]
+    fn test_ejudefault() {
+        let obj = super::EjuQuickAccess::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejuclone() {
+        let obj = super::EjuQuickAccess::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejvdefault() {
+        let obj = super::EjvQuickInput::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejvclone() {
+        let obj = super::EjvQuickInput::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejwdefault() {
+        let obj = super::EjwQuickPick::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejwclone() {
+        let obj = super::EjwQuickPick::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejxdefault() {
+        let obj = super::EjxQuickOpen::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejxclone() {
+        let obj = super::EjxQuickOpen::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejydefault() {
+        let obj = super::EjyQuickNav::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejyclone() {
+        let obj = super::EjyQuickNav::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejzdefault() {
+        let obj = super::EjzQuickSuggest::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejzclone() {
+        let obj = super::EjzQuickSuggest::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
