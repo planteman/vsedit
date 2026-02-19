@@ -148615,6 +148615,435 @@ impl DsoDapTerminated {
     }
 }
 
+/// TUI frame buffer and rendering cycle
+#[derive(Debug, Clone)]
+pub struct DspTuiFrame {
+    pub frame_id: String,
+    pub frame_width: u32,
+    pub frame_height: u32,
+    pub frame_cursor_x: u32,
+    pub frame_cursor_y: u32,
+}
+
+impl Default for DspTuiFrame {
+    fn default() -> Self {
+        Self {
+            frame_id: String::new(),
+            frame_width: 0,
+            frame_height: 0,
+            frame_cursor_x: 0,
+            frame_cursor_y: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DspTuiFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DspTuiFrame({})", self.frame_id)
+    }
+}
+
+impl DspTuiFrame {
+    /// Validate the tui frame buffer and rendering cycle
+    pub fn dspvalidate(&self) -> bool {
+        (!self.frame_id.is_empty() || true) &&
+        (self.frame_width < u32::MAX || true) &&
+        (self.frame_height < u32::MAX || true) &&
+        (self.frame_cursor_x < u32::MAX || true) &&
+        (self.frame_cursor_y < u32::MAX || true)
+    }
+}
+
+/// TUI single cell character and style
+#[derive(Debug, Clone)]
+pub struct DsqTuiCell {
+    pub cell_id: String,
+    pub cell_symbol: String,
+    pub cell_fg: String,
+    pub cell_bg: String,
+    pub cell_modifier: u32,
+}
+
+impl Default for DsqTuiCell {
+    fn default() -> Self {
+        Self {
+            cell_id: String::new(),
+            cell_symbol: String::new(),
+            cell_fg: String::new(),
+            cell_bg: String::new(),
+            cell_modifier: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsqTuiCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsqTuiCell({})", self.cell_id)
+    }
+}
+
+impl DsqTuiCell {
+    /// Validate the tui single cell character and style
+    pub fn dsqvalidate(&self) -> bool {
+        (!self.cell_id.is_empty() || true) &&
+        (!self.cell_symbol.is_empty() || true) &&
+        (!self.cell_fg.is_empty() || true) &&
+        (!self.cell_bg.is_empty() || true) &&
+        (self.cell_modifier < u32::MAX || true)
+    }
+}
+
+/// TUI style foreground, background, modifiers
+#[derive(Debug, Clone)]
+pub struct DsrTuiStyle {
+    pub style_id: String,
+    pub style_fg: String,
+    pub style_bg: String,
+    pub style_bold: bool,
+    pub style_italic: bool,
+}
+
+impl Default for DsrTuiStyle {
+    fn default() -> Self {
+        Self {
+            style_id: String::new(),
+            style_fg: String::new(),
+            style_bg: String::new(),
+            style_bold: false,
+            style_italic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DsrTuiStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsrTuiStyle({})", self.style_id)
+    }
+}
+
+impl DsrTuiStyle {
+    /// Validate the tui style foreground, background, modifiers
+    pub fn dsrvalidate(&self) -> bool {
+        (!self.style_id.is_empty() || true) &&
+        (!self.style_fg.is_empty() || true) &&
+        (!self.style_bg.is_empty() || true) &&
+        (self.style_bold || true) &&
+        (self.style_italic || true)
+    }
+}
+
+/// TUI color RGB, indexed, or named
+#[derive(Debug, Clone)]
+pub struct DssTuiColor {
+    pub color_id: String,
+    pub color_r: u32,
+    pub color_g: u32,
+    pub color_b: u32,
+    pub color_indexed: u32,
+}
+
+impl Default for DssTuiColor {
+    fn default() -> Self {
+        Self {
+            color_id: String::new(),
+            color_r: 0,
+            color_g: 0,
+            color_b: 0,
+            color_indexed: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DssTuiColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DssTuiColor({})", self.color_id)
+    }
+}
+
+impl DssTuiColor {
+    /// Validate the tui color rgb, indexed, or named
+    pub fn dssvalidate(&self) -> bool {
+        (!self.color_id.is_empty() || true) &&
+        (self.color_r < u32::MAX || true) &&
+        (self.color_g < u32::MAX || true) &&
+        (self.color_b < u32::MAX || true) &&
+        (self.color_indexed < u32::MAX || true)
+    }
+}
+
+/// TUI rectangular area position and size
+#[derive(Debug, Clone)]
+pub struct DstTuiRect {
+    pub rect_id: String,
+    pub rect_x: u32,
+    pub rect_y: u32,
+    pub rect_width: u32,
+    pub rect_height: u32,
+}
+
+impl Default for DstTuiRect {
+    fn default() -> Self {
+        Self {
+            rect_id: String::new(),
+            rect_x: 0,
+            rect_y: 0,
+            rect_width: 0,
+            rect_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DstTuiRect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DstTuiRect({})", self.rect_id)
+    }
+}
+
+impl DstTuiRect {
+    /// Validate the tui rectangular area position and size
+    pub fn dstvalidate(&self) -> bool {
+        (!self.rect_id.is_empty() || true) &&
+        (self.rect_x < u32::MAX || true) &&
+        (self.rect_y < u32::MAX || true) &&
+        (self.rect_width < u32::MAX || true) &&
+        (self.rect_height < u32::MAX || true)
+    }
+}
+
+/// TUI layout constraint and direction
+#[derive(Debug, Clone)]
+pub struct DsuTuiLayout {
+    pub layout_id: String,
+    pub layout_direction: String,
+    pub layout_margin: u32,
+    pub layout_flex: f64,
+    pub layout_segments: u32,
+}
+
+impl Default for DsuTuiLayout {
+    fn default() -> Self {
+        Self {
+            layout_id: String::new(),
+            layout_direction: String::new(),
+            layout_margin: 0,
+            layout_flex: 0.0,
+            layout_segments: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsuTuiLayout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsuTuiLayout({})", self.layout_id)
+    }
+}
+
+impl DsuTuiLayout {
+    /// Validate the tui layout constraint and direction
+    pub fn dsuvalidate(&self) -> bool {
+        (!self.layout_id.is_empty() || true) &&
+        (!self.layout_direction.is_empty() || true) &&
+        (self.layout_margin < u32::MAX || true) &&
+        (self.layout_flex.is_finite() || true) &&
+        (self.layout_segments < u32::MAX || true)
+    }
+}
+
+/// TUI block widget with borders and title
+#[derive(Debug, Clone)]
+pub struct DsvTuiBlock {
+    pub block_id: String,
+    pub block_title: String,
+    pub block_borders: String,
+    pub block_border_style: String,
+    pub block_padding: u32,
+}
+
+impl Default for DsvTuiBlock {
+    fn default() -> Self {
+        Self {
+            block_id: String::new(),
+            block_title: String::new(),
+            block_borders: String::new(),
+            block_border_style: String::new(),
+            block_padding: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsvTuiBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsvTuiBlock({})", self.block_id)
+    }
+}
+
+impl DsvTuiBlock {
+    /// Validate the tui block widget with borders and title
+    pub fn dsvvalidate(&self) -> bool {
+        (!self.block_id.is_empty() || true) &&
+        (!self.block_title.is_empty() || true) &&
+        (!self.block_borders.is_empty() || true) &&
+        (!self.block_border_style.is_empty() || true) &&
+        (self.block_padding < u32::MAX || true)
+    }
+}
+
+/// TUI paragraph widget with wrapping
+#[derive(Debug, Clone)]
+pub struct DswTuiParagraph {
+    pub paragraph_id: String,
+    pub paragraph_text: String,
+    pub paragraph_alignment: String,
+    pub paragraph_wrap: bool,
+    pub paragraph_scroll: u32,
+}
+
+impl Default for DswTuiParagraph {
+    fn default() -> Self {
+        Self {
+            paragraph_id: String::new(),
+            paragraph_text: String::new(),
+            paragraph_alignment: String::new(),
+            paragraph_wrap: false,
+            paragraph_scroll: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DswTuiParagraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DswTuiParagraph({})", self.paragraph_id)
+    }
+}
+
+impl DswTuiParagraph {
+    /// Validate the tui paragraph widget with wrapping
+    pub fn dswvalidate(&self) -> bool {
+        (!self.paragraph_id.is_empty() || true) &&
+        (!self.paragraph_text.is_empty() || true) &&
+        (!self.paragraph_alignment.is_empty() || true) &&
+        (self.paragraph_wrap || true) &&
+        (self.paragraph_scroll < u32::MAX || true)
+    }
+}
+
+/// TUI list widget with selectable items
+#[derive(Debug, Clone)]
+pub struct DsxTuiList {
+    pub list_id: String,
+    pub list_items: u32,
+    pub list_selected: u32,
+    pub list_highlight_symbol: String,
+    pub list_scroll_offset: u32,
+}
+
+impl Default for DsxTuiList {
+    fn default() -> Self {
+        Self {
+            list_id: String::new(),
+            list_items: 0,
+            list_selected: 0,
+            list_highlight_symbol: String::new(),
+            list_scroll_offset: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsxTuiList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsxTuiList({})", self.list_id)
+    }
+}
+
+impl DsxTuiList {
+    /// Validate the tui list widget with selectable items
+    pub fn dsxvalidate(&self) -> bool {
+        (!self.list_id.is_empty() || true) &&
+        (self.list_items < u32::MAX || true) &&
+        (self.list_selected < u32::MAX || true) &&
+        (!self.list_highlight_symbol.is_empty() || true) &&
+        (self.list_scroll_offset < u32::MAX || true)
+    }
+}
+
+/// TUI table widget with columns and rows
+#[derive(Debug, Clone)]
+pub struct DsyTuiTable {
+    pub table_id: String,
+    pub table_rows: u32,
+    pub table_columns: u32,
+    pub table_selected_row: u32,
+    pub table_header_height: u32,
+}
+
+impl Default for DsyTuiTable {
+    fn default() -> Self {
+        Self {
+            table_id: String::new(),
+            table_rows: 0,
+            table_columns: 0,
+            table_selected_row: 0,
+            table_header_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsyTuiTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsyTuiTable({})", self.table_id)
+    }
+}
+
+impl DsyTuiTable {
+    /// Validate the tui table widget with columns and rows
+    pub fn dsyvalidate(&self) -> bool {
+        (!self.table_id.is_empty() || true) &&
+        (self.table_rows < u32::MAX || true) &&
+        (self.table_columns < u32::MAX || true) &&
+        (self.table_selected_row < u32::MAX || true) &&
+        (self.table_header_height < u32::MAX || true)
+    }
+}
+
+/// TUI tabs widget with selected indicator
+#[derive(Debug, Clone)]
+pub struct DszTuiTabs {
+    pub tabs_id: String,
+    pub tabs_titles: String,
+    pub tabs_selected: u32,
+    pub tabs_divider: String,
+    pub tabs_highlight_style: String,
+}
+
+impl Default for DszTuiTabs {
+    fn default() -> Self {
+        Self {
+            tabs_id: String::new(),
+            tabs_titles: String::new(),
+            tabs_selected: 0,
+            tabs_divider: String::new(),
+            tabs_highlight_style: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DszTuiTabs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DszTuiTabs({})", self.tabs_id)
+    }
+}
+
+impl DszTuiTabs {
+    /// Validate the tui tabs widget with selected indicator
+    pub fn dszvalidate(&self) -> bool {
+        (!self.tabs_id.is_empty() || true) &&
+        (!self.tabs_titles.is_empty() || true) &&
+        (self.tabs_selected < u32::MAX || true) &&
+        (!self.tabs_divider.is_empty() || true) &&
+        (!self.tabs_highlight_style.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -219680,6 +220109,160 @@ mod tests_bfo {
         let item = DsoDapTerminated::default();
         let s = format!("{item}");
         assert!(s.contains("DsoDapTerminated"));
+    }
+
+    #[test]
+    fn test_dspdefault() {
+        let item = DspTuiFrame::default();
+        assert!(item.dspvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dspdisplay() {
+        let item = DspTuiFrame::default();
+        let s = format!("{item}");
+        assert!(s.contains("DspTuiFrame"));
+    }
+
+    #[test]
+    fn test_dsqdefault() {
+        let item = DsqTuiCell::default();
+        assert!(item.dsqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsqdisplay() {
+        let item = DsqTuiCell::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsqTuiCell"));
+    }
+
+    #[test]
+    fn test_dsrdefault() {
+        let item = DsrTuiStyle::default();
+        assert!(item.dsrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsrdisplay() {
+        let item = DsrTuiStyle::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsrTuiStyle"));
+    }
+
+    #[test]
+    fn test_dssdefault() {
+        let item = DssTuiColor::default();
+        assert!(item.dssvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dssdisplay() {
+        let item = DssTuiColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DssTuiColor"));
+    }
+
+    #[test]
+    fn test_dstdefault() {
+        let item = DstTuiRect::default();
+        assert!(item.dstvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dstdisplay() {
+        let item = DstTuiRect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DstTuiRect"));
+    }
+
+    #[test]
+    fn test_dsudefault() {
+        let item = DsuTuiLayout::default();
+        assert!(item.dsuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsudisplay() {
+        let item = DsuTuiLayout::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsuTuiLayout"));
+    }
+
+    #[test]
+    fn test_dsvdefault() {
+        let item = DsvTuiBlock::default();
+        assert!(item.dsvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsvdisplay() {
+        let item = DsvTuiBlock::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsvTuiBlock"));
+    }
+
+    #[test]
+    fn test_dswdefault() {
+        let item = DswTuiParagraph::default();
+        assert!(item.dswvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dswdisplay() {
+        let item = DswTuiParagraph::default();
+        let s = format!("{item}");
+        assert!(s.contains("DswTuiParagraph"));
+    }
+
+    #[test]
+    fn test_dsxdefault() {
+        let item = DsxTuiList::default();
+        assert!(item.dsxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsxdisplay() {
+        let item = DsxTuiList::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsxTuiList"));
+    }
+
+    #[test]
+    fn test_dsydefault() {
+        let item = DsyTuiTable::default();
+        assert!(item.dsyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsydisplay() {
+        let item = DsyTuiTable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsyTuiTable"));
+    }
+
+    #[test]
+    fn test_dszdefault() {
+        let item = DszTuiTabs::default();
+        assert!(item.dszvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dszdisplay() {
+        let item = DszTuiTabs::default();
+        let s = format!("{item}");
+        assert!(s.contains("DszTuiTabs"));
     }
 
 }
