@@ -68058,3 +68058,168 @@ mod bdh_tests {
         assert_eq!(ss.visible_count(), 1);
     }
 }
+
+
+// --- bdi_: Editor inline diff / change indicators ---
+
+/// Line change type for gutter indicators.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdiChangeType { Added, Modified, Deleted }
+
+/// A change indicator on a line range.
+#[derive(Debug, Clone)]
+pub struct BdiChangeIndicator {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub change_type: BdiChangeType,
+}
+
+impl BdiChangeIndicator {
+    pub fn new(start: u32, end: u32, ct: BdiChangeType) -> Self { Self { start_line: start, end_line: end, change_type: ct } }
+    pub fn added(start: u32, end: u32) -> Self { Self::new(start, end, BdiChangeType::Added) }
+    pub fn modified(start: u32, end: u32) -> Self { Self::new(start, end, BdiChangeType::Modified) }
+    pub fn deleted(line: u32) -> Self { Self::new(line, line, BdiChangeType::Deleted) }
+
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+
+    pub fn gutter_char(&self) -> char {
+        match self.change_type { BdiChangeType::Added => '┃', BdiChangeType::Modified => '┃', BdiChangeType::Deleted => '▸' }
+    }
+
+    pub fn gutter_color(&self) -> &str {
+        match self.change_type { BdiChangeType::Added => "green", BdiChangeType::Modified => "blue", BdiChangeType::Deleted => "red" }
+    }
+}
+
+/// Inline diff between two text versions.
+#[derive(Debug, Clone)]
+pub struct BdiInlineDiff {
+    pub old_line: Option<String>,
+    pub new_line: Option<String>,
+    pub change_type: BdiChangeType,
+}
+
+impl BdiInlineDiff {
+    pub fn added(new: &str) -> Self { Self { old_line: None, new_line: Some(new.to_string()), change_type: BdiChangeType::Added } }
+    pub fn deleted(old: &str) -> Self { Self { old_line: Some(old.to_string()), new_line: None, change_type: BdiChangeType::Deleted } }
+    pub fn modified(old: &str, new: &str) -> Self { Self { old_line: Some(old.to_string()), new_line: Some(new.to_string()), change_type: BdiChangeType::Modified } }
+
+    pub fn render(&self) -> String {
+        match self.change_type {
+            BdiChangeType::Added => format!("+ {}", self.new_line.as_deref().unwrap_or("")),
+            BdiChangeType::Deleted => format!("- {}", self.old_line.as_deref().unwrap_or("")),
+            BdiChangeType::Modified => format!("~ {} → {}", self.old_line.as_deref().unwrap_or(""), self.new_line.as_deref().unwrap_or("")),
+        }
+    }
+}
+
+/// Manages change indicators for a file.
+#[derive(Debug)]
+pub struct BdiChangeTracker {
+    indicators: Vec<BdiChangeIndicator>,
+    enabled: bool,
+}
+
+impl BdiChangeTracker {
+    pub fn new() -> Self { Self { indicators: Vec::new(), enabled: true } }
+
+    pub fn set_indicators(&mut self, indicators: Vec<BdiChangeIndicator>) { self.indicators = indicators; }
+    pub fn clear(&mut self) { self.indicators.clear(); }
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+
+    pub fn change_at_line(&self, line: u32) -> Option<&BdiChangeIndicator> {
+        if !self.enabled { return None; }
+        self.indicators.iter().find(|i| i.contains_line(line))
+    }
+
+    pub fn all_indicators(&self) -> &[BdiChangeIndicator] { &self.indicators }
+    pub fn added_count(&self) -> u32 { self.indicators.iter().filter(|i| i.change_type == BdiChangeType::Added).map(|i| i.line_count()).sum() }
+    pub fn modified_count(&self) -> u32 { self.indicators.iter().filter(|i| i.change_type == BdiChangeType::Modified).map(|i| i.line_count()).sum() }
+    pub fn deleted_count(&self) -> usize { self.indicators.iter().filter(|i| i.change_type == BdiChangeType::Deleted).count() }
+
+    pub fn summary(&self) -> String { format!("+{} ~{} -{}", self.added_count(), self.modified_count(), self.deleted_count()) }
+
+    pub fn next_change(&self, from_line: u32) -> Option<u32> {
+        self.indicators.iter().map(|i| i.start_line).filter(|&l| l > from_line).min()
+    }
+
+    pub fn prev_change(&self, from_line: u32) -> Option<u32> {
+        self.indicators.iter().map(|i| i.start_line).filter(|&l| l < from_line).max()
+    }
+}
+
+#[cfg(test)]
+mod bdi_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdi_indicator_added() {
+        let i = BdiChangeIndicator::added(5, 10);
+        assert_eq!(i.line_count(), 6);
+        assert!(i.contains_line(7));
+    }
+
+    #[test]
+    fn test_bdi_indicator_deleted() {
+        let i = BdiChangeIndicator::deleted(15);
+        assert_eq!(i.gutter_char(), '▸');
+    }
+
+    #[test]
+    fn test_bdi_gutter_color() {
+        assert_eq!(BdiChangeIndicator::added(0, 0).gutter_color(), "green");
+        assert_eq!(BdiChangeIndicator::modified(0, 0).gutter_color(), "blue");
+    }
+
+    #[test]
+    fn test_bdi_inline_diff() {
+        let d = BdiInlineDiff::added("new line");
+        assert!(d.render().starts_with('+'));
+    }
+
+    #[test]
+    fn test_bdi_inline_modified() {
+        let d = BdiInlineDiff::modified("old", "new");
+        assert!(d.render().contains('→'));
+    }
+
+    #[test]
+    fn test_bdi_tracker() {
+        let mut t = BdiChangeTracker::new();
+        t.set_indicators(vec![BdiChangeIndicator::added(1, 3), BdiChangeIndicator::deleted(10)]);
+        assert!(t.change_at_line(2).is_some());
+        assert!(t.change_at_line(5).is_none());
+    }
+
+    #[test]
+    fn test_bdi_summary() {
+        let mut t = BdiChangeTracker::new();
+        t.set_indicators(vec![BdiChangeIndicator::added(1, 3), BdiChangeIndicator::modified(5, 5), BdiChangeIndicator::deleted(10)]);
+        assert_eq!(t.summary(), "+3 ~1 -1");
+    }
+
+    #[test]
+    fn test_bdi_next_prev() {
+        let mut t = BdiChangeTracker::new();
+        t.set_indicators(vec![BdiChangeIndicator::added(5, 5), BdiChangeIndicator::added(15, 15)]);
+        assert_eq!(t.next_change(3), Some(5));
+        assert_eq!(t.prev_change(20), Some(15));
+    }
+
+    #[test]
+    fn test_bdi_disabled() {
+        let mut t = BdiChangeTracker::new();
+        t.set_indicators(vec![BdiChangeIndicator::added(1, 1)]);
+        t.set_enabled(false);
+        assert!(t.change_at_line(1).is_none());
+    }
+
+    #[test]
+    fn test_bdi_clear() {
+        let mut t = BdiChangeTracker::new();
+        t.set_indicators(vec![BdiChangeIndicator::added(1, 1)]);
+        t.clear();
+        assert!(t.all_indicators().is_empty());
+    }
+}
