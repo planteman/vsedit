@@ -86111,6 +86111,67 @@ pub struct BkjGutterClickEvent { pub line: usize, pub gutter_type: u8, pub butto
 #[derive(Debug, Clone)]
 pub struct BkjGutterState { pub decorations: Vec<BkjGutterDecoration>, pub fold_indicators: Vec<BkjFoldIndicator>, pub line_number_width: usize }
 
+
+// Code folding engine — fold ranges, collapse/expand, import folding, region folding
+#[derive(Debug, Clone)]
+pub struct BkkFoldRange { pub start_line: usize, pub end_line: usize, pub kind: u8, pub is_collapsed: bool }
+#[derive(Debug, Clone)]
+pub struct BkkFoldAction { pub line: usize, pub collapse: bool, pub recursive: bool }
+#[derive(Debug, Clone)]
+pub struct BkkFoldState { pub ranges: Vec<BkkFoldRange>, pub hidden_lines: usize, pub total_foldable: usize }
+#[derive(Debug, Clone)]
+pub struct BkkFoldLevelConfig { pub fold_imports: bool, pub fold_comments: bool, pub fold_regions: bool, pub default_level: Option<usize> }
+#[derive(Debug, Clone)]
+pub struct BkkFoldRegionMarker { pub start_line: usize, pub end_line: usize, pub label: Option<String> }
+
+// Editor overlay widgets — find/replace widget, go-to-line, peek view overlay
+#[derive(Debug, Clone)]
+pub struct BklOverlayPosition { pub line: usize, pub col: usize, pub above: bool, pub width: usize, pub height: usize }
+#[derive(Debug, Clone)]
+pub struct BklFindWidget { pub search_text: String, pub replace_text: String, pub is_regex: bool, pub case_sensitive: bool, pub whole_word: bool, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BklGoToLineWidget { pub target_line: Option<usize>, pub max_line: usize, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BklPeekViewWidget { pub file: String, pub line: usize, pub title: String, pub visible: bool, pub height: usize }
+#[derive(Debug, Clone)]
+pub struct BklOverlayState { pub active_overlay: Option<String>, pub position: Option<BklOverlayPosition> }
+
+// Snippet variable resolution — built-in variables, clipboard, selection, date/time, random
+#[derive(Debug, Clone)]
+pub struct BkmSnippetVariable { pub name: String, pub default_value: Option<String>, pub transform: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkmSnippetResolver { pub clipboard: String, pub selection: String, pub file_name: String, pub file_path: String, pub workspace_name: String }
+#[derive(Debug, Clone)]
+pub struct BkmResolvedValue { pub variable: String, pub value: String, pub was_default: bool }
+#[derive(Debug, Clone)]
+pub struct BkmDateTimeVars { pub year: String, pub month: String, pub day: String, pub hour: String, pub minute: String, pub second: String }
+#[derive(Debug, Clone)]
+pub struct BkmRandomVars { pub uuid: String, pub random_hex: String }
+
+// Multi-cursor editing — add/remove cursors, cursor above/below, column selection
+#[derive(Debug, Clone)]
+pub struct BknCursorPosition { pub line: usize, pub col: usize, pub affinity: u8 }
+#[derive(Debug, Clone)]
+pub struct BknMultiCursorState { pub cursors: Vec<BknCursorPosition>, pub primary_index: usize }
+#[derive(Debug, Clone)]
+pub struct BknAddCursorAction { pub line: usize, pub col: usize, pub direction: u8 }
+#[derive(Debug, Clone)]
+pub struct BknColumnSelection { pub start_line: usize, pub end_line: usize, pub start_col: usize, pub end_col: usize }
+#[derive(Debug, Clone)]
+pub struct BknCursorMergeResult { pub original_count: usize, pub merged_count: usize, pub removed_indices: Vec<usize> }
+
+// Editor zones and regions — editor zone tracking, zone decorations, contrib point registration
+#[derive(Debug, Clone)]
+pub struct BkoEditorZone { pub id: String, pub start_line: usize, pub end_line: usize, pub after_line_number: usize, pub height_in_lines: usize }
+#[derive(Debug, Clone)]
+pub struct BkoZoneDecoration { pub zone_id: String, pub background_color: Option<u32>, pub border_color: Option<u32> }
+#[derive(Debug, Clone)]
+pub struct BkoContribPoint { pub id: String, pub zone_type: u8, pub priority: i32 }
+#[derive(Debug, Clone)]
+pub struct BkoZoneAction { pub zone_id: String, pub action: u8, pub data: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkoZoneRegistry { pub zones: Vec<BkoEditorZone>, pub decorations: Vec<BkoZoneDecoration> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -94811,4 +94872,104 @@ mod tests_bfo {
     fn test_bkj_empty_gutter_state() { let s = BkjGutterState { decorations: vec![], fold_indicators: vec![], line_number_width: 4 }; assert_eq!(s.line_number_width, 4); }
     #[test]
     fn test_bkj_gutter_with_folds() { let f = BkjFoldIndicator { line: 0, is_collapsed: false, fold_end_line: 5 }; let s = BkjGutterState { decorations: vec![], fold_indicators: vec![f], line_number_width: 5 }; assert_eq!(s.fold_indicators.len(), 1); }
+    #[test]
+    fn test_bkk_range_expanded() { let r = BkkFoldRange { start_line: 5, end_line: 15, kind: 1, is_collapsed: false }; assert!(!r.is_collapsed); }
+    #[test]
+    fn test_bkk_range_collapsed() { let r = BkkFoldRange { start_line: 5, end_line: 15, kind: 1, is_collapsed: true }; assert!(r.is_collapsed); }
+    #[test]
+    fn test_bkk_action_collapse() { let a = BkkFoldAction { line: 10, collapse: true, recursive: false }; assert!(a.collapse); }
+    #[test]
+    fn test_bkk_action_expand_recursive() { let a = BkkFoldAction { line: 10, collapse: false, recursive: true }; assert!(a.recursive); }
+    #[test]
+    fn test_bkk_empty_state() { let s = BkkFoldState { ranges: vec![], hidden_lines: 0, total_foldable: 0 }; assert_eq!(s.hidden_lines, 0); }
+    #[test]
+    fn test_bkk_state_with_folds() { let r = BkkFoldRange { start_line: 1, end_line: 10, kind: 0, is_collapsed: true }; let s = BkkFoldState { ranges: vec![r], hidden_lines: 9, total_foldable: 1 }; assert_eq!(s.hidden_lines, 9); }
+    #[test]
+    fn test_bkk_config_fold_imports() { let c = BkkFoldLevelConfig { fold_imports: true, fold_comments: false, fold_regions: true, default_level: Some(2) }; assert!(c.fold_imports); }
+    #[test]
+    fn test_bkk_config_no_defaults() { let c = BkkFoldLevelConfig { fold_imports: false, fold_comments: false, fold_regions: false, default_level: None }; assert!(c.default_level.is_none()); }
+    #[test]
+    fn test_bkk_region_with_label() { let r = BkkFoldRegionMarker { start_line: 0, end_line: 50, label: Some("Imports".into()) }; assert_eq!(r.label.as_deref(), Some("Imports")); }
+    #[test]
+    fn test_bkk_region_no_label() { let r = BkkFoldRegionMarker { start_line: 60, end_line: 100, label: None }; assert!(r.label.is_none()); }
+    #[test]
+    fn test_bkl_overlay_above() { let p = BklOverlayPosition { line: 10, col: 5, above: true, width: 40, height: 10 }; assert!(p.above); }
+    #[test]
+    fn test_bkl_overlay_below() { let p = BklOverlayPosition { line: 10, col: 5, above: false, width: 40, height: 10 }; assert!(!p.above); }
+    #[test]
+    fn test_bkl_find_basic() { let f = BklFindWidget { search_text: "hello".into(), replace_text: String::new(), is_regex: false, case_sensitive: false, whole_word: false, visible: true }; assert!(f.visible); }
+    #[test]
+    fn test_bkl_find_regex() { let f = BklFindWidget { search_text: "fn\\s+\\w+".into(), replace_text: String::new(), is_regex: true, case_sensitive: true, whole_word: false, visible: true }; assert!(f.is_regex); }
+    #[test]
+    fn test_bkl_goto_line() { let g = BklGoToLineWidget { target_line: Some(42), max_line: 1000, visible: true }; assert_eq!(g.target_line, Some(42)); }
+    #[test]
+    fn test_bkl_goto_no_target() { let g = BklGoToLineWidget { target_line: None, max_line: 500, visible: true }; assert!(g.target_line.is_none()); }
+    #[test]
+    fn test_bkl_peek_view() { let p = BklPeekViewWidget { file: "def.rs".into(), line: 25, title: "Definition".into(), visible: true, height: 15 }; assert_eq!(p.height, 15); }
+    #[test]
+    fn test_bkl_peek_hidden() { let p = BklPeekViewWidget { file: String::new(), line: 0, title: String::new(), visible: false, height: 0 }; assert!(!p.visible); }
+    #[test]
+    fn test_bkl_no_overlay() { let s = BklOverlayState { active_overlay: None, position: None }; assert!(s.active_overlay.is_none()); }
+    #[test]
+    fn test_bkl_active_find_overlay() { let p = BklOverlayPosition { line: 0, col: 0, above: true, width: 60, height: 3 }; let s = BklOverlayState { active_overlay: Some("find".into()), position: Some(p) }; assert_eq!(s.active_overlay.as_deref(), Some("find")); }
+    #[test]
+    fn test_bkm_variable_basic() { let v = BkmSnippetVariable { name: "TM_FILENAME".into(), default_value: None, transform: None }; assert_eq!(v.name, "TM_FILENAME"); }
+    #[test]
+    fn test_bkm_variable_with_default() { let v = BkmSnippetVariable { name: "TM_SELECTED_TEXT".into(), default_value: Some("text".into()), transform: None }; assert!(v.default_value.is_some()); }
+    #[test]
+    fn test_bkm_variable_with_transform() { let v = BkmSnippetVariable { name: "TM_FILENAME_BASE".into(), default_value: None, transform: Some("/(.*)/${1:/upcase}/".into()) }; assert!(v.transform.is_some()); }
+    #[test]
+    fn test_bkm_resolver() { let r = BkmSnippetResolver { clipboard: "copied".into(), selection: String::new(), file_name: "lib.rs".into(), file_path: "/src/lib.rs".into(), workspace_name: "project".into() }; assert_eq!(r.file_name, "lib.rs"); }
+    #[test]
+    fn test_bkm_resolved_value() { let v = BkmResolvedValue { variable: "CLIPBOARD".into(), value: "pasted".into(), was_default: false }; assert!(!v.was_default); }
+    #[test]
+    fn test_bkm_resolved_default() { let v = BkmResolvedValue { variable: "TM_SELECTED_TEXT".into(), value: "fallback".into(), was_default: true }; assert!(v.was_default); }
+    #[test]
+    fn test_bkm_datetime_vars() { let d = BkmDateTimeVars { year: "2025".into(), month: "01".into(), day: "15".into(), hour: "14".into(), minute: "30".into(), second: "00".into() }; assert_eq!(d.year, "2025"); }
+    #[test]
+    fn test_bkm_random_uuid() { let r = BkmRandomVars { uuid: "550e8400-e29b-41d4-a716-446655440000".into(), random_hex: "a1b2c3".into() }; assert!(r.uuid.contains('-')); }
+    #[test]
+    fn test_bkm_empty_selection() { let r = BkmSnippetResolver { clipboard: String::new(), selection: String::new(), file_name: String::new(), file_path: String::new(), workspace_name: String::new() }; assert!(r.selection.is_empty()); }
+    #[test]
+    fn test_bkm_workspace_var() { let r = BkmSnippetResolver { clipboard: String::new(), selection: String::new(), file_name: "main.rs".into(), file_path: "/workspace/main.rs".into(), workspace_name: "myproject".into() }; assert_eq!(r.workspace_name, "myproject"); }
+    #[test]
+    fn test_bkn_single_cursor() { let c = BknCursorPosition { line: 0, col: 0, affinity: 0 }; assert_eq!(c.line, 0); }
+    #[test]
+    fn test_bkn_cursor_with_affinity() { let c = BknCursorPosition { line: 5, col: 10, affinity: 1 }; assert_eq!(c.affinity, 1); }
+    #[test]
+    fn test_bkn_multi_state() { let c1 = BknCursorPosition { line: 1, col: 0, affinity: 0 }; let c2 = BknCursorPosition { line: 2, col: 0, affinity: 0 }; let s = BknMultiCursorState { cursors: vec![c1, c2], primary_index: 0 }; assert_eq!(s.cursors.len(), 2); }
+    #[test]
+    fn test_bkn_primary_cursor() { let c = BknCursorPosition { line: 5, col: 5, affinity: 0 }; let s = BknMultiCursorState { cursors: vec![c], primary_index: 0 }; assert_eq!(s.primary_index, 0); }
+    #[test]
+    fn test_bkn_add_above() { let a = BknAddCursorAction { line: 10, col: 5, direction: 0 }; assert_eq!(a.direction, 0); }
+    #[test]
+    fn test_bkn_add_below() { let a = BknAddCursorAction { line: 10, col: 5, direction: 1 }; assert_eq!(a.direction, 1); }
+    #[test]
+    fn test_bkn_column_selection() { let c = BknColumnSelection { start_line: 5, end_line: 10, start_col: 3, end_col: 8 }; assert_eq!(c.end_line - c.start_line, 5); }
+    #[test]
+    fn test_bkn_single_line_column() { let c = BknColumnSelection { start_line: 3, end_line: 3, start_col: 0, end_col: 20 }; assert_eq!(c.start_line, c.end_line); }
+    #[test]
+    fn test_bkn_merge_no_overlap() { let r = BknCursorMergeResult { original_count: 3, merged_count: 3, removed_indices: vec![] }; assert!(r.removed_indices.is_empty()); }
+    #[test]
+    fn test_bkn_merge_with_overlap() { let r = BknCursorMergeResult { original_count: 5, merged_count: 3, removed_indices: vec![2, 4] }; assert_eq!(r.removed_indices.len(), 2); }
+    #[test]
+    fn test_bko_basic_zone() { let z = BkoEditorZone { id: "z1".into(), start_line: 10, end_line: 20, after_line_number: 10, height_in_lines: 3 }; assert_eq!(z.height_in_lines, 3); }
+    #[test]
+    fn test_bko_zone_decoration() { let d = BkoZoneDecoration { zone_id: "z1".into(), background_color: Some(0x333333), border_color: None }; assert!(d.background_color.is_some()); }
+    #[test]
+    fn test_bko_contrib_point() { let c = BkoContribPoint { id: "contrib1".into(), zone_type: 1, priority: 100 }; assert_eq!(c.priority, 100); }
+    #[test]
+    fn test_bko_zone_action_show() { let a = BkoZoneAction { zone_id: "z1".into(), action: 1, data: None }; assert_eq!(a.action, 1); }
+    #[test]
+    fn test_bko_zone_action_with_data() { let a = BkoZoneAction { zone_id: "z2".into(), action: 2, data: Some("content".into()) }; assert!(a.data.is_some()); }
+    #[test]
+    fn test_bko_empty_registry() { let r = BkoZoneRegistry { zones: vec![], decorations: vec![] }; assert!(r.zones.is_empty()); }
+    #[test]
+    fn test_bko_registry_with_zone() { let z = BkoEditorZone { id: "z1".into(), start_line: 0, end_line: 5, after_line_number: 0, height_in_lines: 2 }; let r = BkoZoneRegistry { zones: vec![z], decorations: vec![] }; assert_eq!(r.zones.len(), 1); }
+    #[test]
+    fn test_bko_zone_with_both_colors() { let d = BkoZoneDecoration { zone_id: "z3".into(), background_color: Some(0xAA), border_color: Some(0xBB) }; assert!(d.border_color.is_some()); }
+    #[test]
+    fn test_bko_high_priority_contrib() { let c = BkoContribPoint { id: "cp1".into(), zone_type: 0, priority: 999 }; assert_eq!(c.priority, 999); }
+    #[test]
+    fn test_bko_negative_priority() { let c = BkoContribPoint { id: "cp2".into(), zone_type: 2, priority: -10 }; assert!(c.priority < 0); }
 }
