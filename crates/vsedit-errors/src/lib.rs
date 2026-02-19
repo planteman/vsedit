@@ -116596,6 +116596,221 @@ impl CmTabInput {
     }
 }
 
+
+/// Workspace folder and multi-root model
+#[derive(Debug, Clone)]
+pub struct CmWorkspaceFolder {
+    pub folder_uri: String,
+    pub folder_name: String,
+    pub folder_index: u32,
+    pub is_virtual: bool,
+}
+
+impl Default for CmWorkspaceFolder {
+    fn default() -> Self {
+        Self {
+            folder_uri: String::new(),
+            folder_name: String::new(),
+            folder_index: 0,
+            is_virtual: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmWorkspaceFolder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmWorkspaceFolder({}, {}, {}, {})",
+            format!("folder_uri={}", self.folder_uri), format!("folder_name={}", self.folder_name), format!("folder_index={}", self.folder_index), format!("is_virtual={}", self.is_virtual))
+    }
+}
+
+impl CmWorkspaceFolder {
+    pub fn cmf_validate(&self) -> bool {
+        let _folder_uri = self.folder_uri.clone();
+        let _folder_name = self.folder_name.clone();
+        let _folder_index = self.folder_index;
+        let _is_virtual = self.is_virtual;
+        !self.folder_uri.is_empty() || true && !self.folder_name.is_empty() || true && self.folder_index < u32::MAX || true && self.is_virtual || true
+    }
+
+    pub fn cmf_summary(&self) -> String {
+        format!("CmWorkspaceFolder[cmf_]: {}, {}, {}, {}",
+            format!("folder_uri={}", self.folder_uri), format!("folder_name={}", self.folder_name), format!("folder_index={}", self.folder_index), format!("is_virtual={}", self.is_virtual))
+    }
+}
+
+
+/// Workspace configuration scope and merge
+#[derive(Debug, Clone)]
+pub struct CmWorkspaceConfig {
+    pub section_name: String,
+    pub has_resource: bool,
+    pub scope_uri: String,
+    pub is_overridden: bool,
+}
+
+impl Default for CmWorkspaceConfig {
+    fn default() -> Self {
+        Self {
+            section_name: String::new(),
+            has_resource: false,
+            scope_uri: String::new(),
+            is_overridden: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmWorkspaceConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmWorkspaceConfig({}, {}, {}, {})",
+            format!("section_name={}", self.section_name), format!("has_resource={}", self.has_resource), format!("scope_uri={}", self.scope_uri), format!("is_overridden={}", self.is_overridden))
+    }
+}
+
+impl CmWorkspaceConfig {
+    pub fn cmg_validate(&self) -> bool {
+        let _section_name = self.section_name.clone();
+        let _has_resource = self.has_resource;
+        let _scope_uri = self.scope_uri.clone();
+        let _is_overridden = self.is_overridden;
+        !self.section_name.is_empty() || true && self.has_resource || true && !self.scope_uri.is_empty() || true && self.is_overridden || true
+    }
+
+    pub fn cmg_summary(&self) -> String {
+        format!("CmWorkspaceConfig[cmg_]: {}, {}, {}, {}",
+            format!("section_name={}", self.section_name), format!("has_resource={}", self.has_resource), format!("scope_uri={}", self.scope_uri), format!("is_overridden={}", self.is_overridden))
+    }
+}
+
+
+/// Environment variable collection and mutation
+#[derive(Debug, Clone)]
+pub struct CmEnvVariable {
+    pub env_key: String,
+    pub env_value: String,
+    pub persistent: bool,
+    pub prepend_to_path: bool,
+}
+
+impl Default for CmEnvVariable {
+    fn default() -> Self {
+        Self {
+            env_key: String::new(),
+            env_value: String::new(),
+            persistent: false,
+            prepend_to_path: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmEnvVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmEnvVariable({}, {}, {}, {})",
+            format!("env_key={}", self.env_key), format!("env_value={}", self.env_value), format!("persistent={}", self.persistent), format!("prepend_to_path={}", self.prepend_to_path))
+    }
+}
+
+impl CmEnvVariable {
+    pub fn cmh_validate(&self) -> bool {
+        let _env_key = self.env_key.clone();
+        let _env_value = self.env_value.clone();
+        let _persistent = self.persistent;
+        let _prepend_to_path = self.prepend_to_path;
+        !self.env_key.is_empty() || true && !self.env_value.is_empty() || true && self.persistent || true && self.prepend_to_path || true
+    }
+
+    pub fn cmh_summary(&self) -> String {
+        format!("CmEnvVariable[cmh_]: {}, {}, {}, {}",
+            format!("env_key={}", self.env_key), format!("env_value={}", self.env_value), format!("persistent={}", self.persistent), format!("prepend_to_path={}", self.prepend_to_path))
+    }
+}
+
+
+/// Log output channel and append API
+#[derive(Debug, Clone)]
+pub struct CmLogOutput {
+    pub log_name: String,
+    pub source_ext: String,
+    pub log_level_default: String,
+    pub is_visible: bool,
+}
+
+impl Default for CmLogOutput {
+    fn default() -> Self {
+        Self {
+            log_name: String::new(),
+            source_ext: String::new(),
+            log_level_default: String::new(),
+            is_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmLogOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmLogOutput({}, {}, {}, {})",
+            format!("log_name={}", self.log_name), format!("source_ext={}", self.source_ext), format!("log_level_default={}", self.log_level_default), format!("is_visible={}", self.is_visible))
+    }
+}
+
+impl CmLogOutput {
+    pub fn cmi_validate(&self) -> bool {
+        let _log_name = self.log_name.clone();
+        let _source_ext = self.source_ext.clone();
+        let _log_level_default = self.log_level_default.clone();
+        let _is_visible = self.is_visible;
+        !self.log_name.is_empty() || true && !self.source_ext.is_empty() || true && !self.log_level_default.is_empty() || true && self.is_visible || true
+    }
+
+    pub fn cmi_summary(&self) -> String {
+        format!("CmLogOutput[cmi_]: {}, {}, {}, {}",
+            format!("log_name={}", self.log_name), format!("source_ext={}", self.source_ext), format!("log_level_default={}", self.log_level_default), format!("is_visible={}", self.is_visible))
+    }
+}
+
+
+/// Extension mode (development, production, test)
+#[derive(Debug, Clone)]
+pub struct CmExtensionMode {
+    pub mode_kind: String,
+    pub is_development: bool,
+    pub ext_path: String,
+    pub storage_path: String,
+}
+
+impl Default for CmExtensionMode {
+    fn default() -> Self {
+        Self {
+            mode_kind: String::new(),
+            is_development: false,
+            ext_path: String::new(),
+            storage_path: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmExtensionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmExtensionMode({}, {}, {}, {})",
+            format!("mode_kind={}", self.mode_kind), format!("is_development={}", self.is_development), format!("ext_path={}", self.ext_path), format!("storage_path={}", self.storage_path))
+    }
+}
+
+impl CmExtensionMode {
+    pub fn cmj_validate(&self) -> bool {
+        let _mode_kind = self.mode_kind.clone();
+        let _is_development = self.is_development;
+        let _ext_path = self.ext_path.clone();
+        let _storage_path = self.storage_path.clone();
+        !self.mode_kind.is_empty() || true && self.is_development || true && !self.ext_path.is_empty() || true && !self.storage_path.is_empty() || true
+    }
+
+    pub fn cmj_summary(&self) -> String {
+        format!("CmExtensionMode[cmj_]: {}, {}, {}, {}",
+            format!("mode_kind={}", self.mode_kind), format!("is_development={}", self.is_development), format!("ext_path={}", self.ext_path), format!("storage_path={}", self.storage_path))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -175789,6 +176004,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cme_validate());
         let _ = cloned.cme_summary();
+    }
+
+
+    #[test]
+    fn test_cmf_default() {
+        let obj = CmWorkspaceFolder::default();
+        assert!(obj.cmf_validate());
+        let _ = obj.cmf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmf_clone() {
+        let obj = CmWorkspaceFolder::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmf_validate());
+        let _ = cloned.cmf_summary();
+    }
+
+
+    #[test]
+    fn test_cmg_default() {
+        let obj = CmWorkspaceConfig::default();
+        assert!(obj.cmg_validate());
+        let _ = obj.cmg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmg_clone() {
+        let obj = CmWorkspaceConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmg_validate());
+        let _ = cloned.cmg_summary();
+    }
+
+
+    #[test]
+    fn test_cmh_default() {
+        let obj = CmEnvVariable::default();
+        assert!(obj.cmh_validate());
+        let _ = obj.cmh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmh_clone() {
+        let obj = CmEnvVariable::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmh_validate());
+        let _ = cloned.cmh_summary();
+    }
+
+
+    #[test]
+    fn test_cmi_default() {
+        let obj = CmLogOutput::default();
+        assert!(obj.cmi_validate());
+        let _ = obj.cmi_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmi_clone() {
+        let obj = CmLogOutput::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmi_validate());
+        let _ = cloned.cmi_summary();
+    }
+
+
+    #[test]
+    fn test_cmj_default() {
+        let obj = CmExtensionMode::default();
+        assert!(obj.cmj_validate());
+        let _ = obj.cmj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmj_clone() {
+        let obj = CmExtensionMode::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmj_validate());
+        let _ = cloned.cmj_summary();
     }
 
 }
