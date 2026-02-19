@@ -48670,3 +48670,429 @@ mod baf_tests {
         assert_eq!(notif.age_ms(3000), 0); // Can't be negative
     }
 }
+
+
+// --- bag_: Workspace search model ---
+
+/// Search match location within a file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BagSearchMatch {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub preview_text: String,
+}
+
+impl BagSearchMatch {
+    pub fn new(line: u32, start_col: u32, end_col: u32, preview: &str) -> Self {
+        Self {
+            line,
+            start_col,
+            end_col,
+            preview_text: preview.to_string(),
+        }
+    }
+
+    pub fn match_length(&self) -> u32 {
+        self.end_col.saturating_sub(self.start_col)
+    }
+}
+
+/// A file result containing all matches within that file.
+#[derive(Debug, Clone)]
+pub struct BagFileResult {
+    pub file_path: String,
+    pub matches: Vec<BagSearchMatch>,
+    pub is_expanded: bool,
+}
+
+impl BagFileResult {
+    pub fn new(path: &str) -> Self {
+        Self {
+            file_path: path.to_string(),
+            matches: Vec::new(),
+            is_expanded: true,
+        }
+    }
+
+    pub fn add_match(&mut self, m: BagSearchMatch) {
+        self.matches.push(m);
+    }
+
+    pub fn match_count(&self) -> usize {
+        self.matches.len()
+    }
+
+    pub fn filename(&self) -> &str {
+        self.file_path.rsplit('/').next().unwrap_or(&self.file_path)
+    }
+
+    pub fn directory(&self) -> &str {
+        match self.file_path.rsplit_once('/') {
+            Some((dir, _)) => dir,
+            None => "",
+        }
+    }
+
+    pub fn toggle_expand(&mut self) {
+        self.is_expanded = !self.is_expanded;
+    }
+}
+
+/// Search options for workspace search.
+#[derive(Debug, Clone)]
+pub struct BagSearchOptions {
+    pub query: String,
+    pub is_regex: bool,
+    pub is_case_sensitive: bool,
+    pub is_whole_word: bool,
+    pub include_pattern: Option<String>,
+    pub exclude_pattern: Option<String>,
+    pub max_results: usize,
+    pub use_ignore_files: bool,
+    pub search_in_open_editors_only: bool,
+}
+
+impl BagSearchOptions {
+    pub fn new(query: &str) -> Self {
+        Self {
+            query: query.to_string(),
+            is_regex: false,
+            is_case_sensitive: false,
+            is_whole_word: false,
+            include_pattern: None,
+            exclude_pattern: None,
+            max_results: 20_000,
+            use_ignore_files: true,
+            search_in_open_editors_only: false,
+        }
+    }
+
+    pub fn regex(mut self) -> Self {
+        self.is_regex = true;
+        self
+    }
+
+    pub fn case_sensitive(mut self) -> Self {
+        self.is_case_sensitive = true;
+        self
+    }
+
+    pub fn whole_word(mut self) -> Self {
+        self.is_whole_word = true;
+        self
+    }
+
+    pub fn with_include(mut self, pattern: &str) -> Self {
+        self.include_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn with_exclude(mut self, pattern: &str) -> Self {
+        self.exclude_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+}
+
+/// Replace options extend search with replacement text.
+#[derive(Debug, Clone)]
+pub struct BagReplaceOptions {
+    pub search: BagSearchOptions,
+    pub replace_text: String,
+    pub preserve_case: bool,
+}
+
+impl BagReplaceOptions {
+    pub fn new(query: &str, replace: &str) -> Self {
+        Self {
+            search: BagSearchOptions::new(query),
+            replace_text: replace.to_string(),
+            preserve_case: false,
+        }
+    }
+
+    pub fn with_preserve_case(mut self) -> Self {
+        self.preserve_case = true;
+        self
+    }
+}
+
+/// Search progress state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BagSearchState {
+    Idle,
+    Searching,
+    Complete,
+    Cancelled,
+}
+
+/// The workspace search model.
+#[derive(Debug, Clone)]
+pub struct BagSearchModel {
+    pub options: BagSearchOptions,
+    pub results: Vec<BagFileResult>,
+    pub state: BagSearchState,
+    pub total_match_count: usize,
+    pub files_searched: usize,
+    pub search_duration_ms: Option<u64>,
+    pub replace_text: Option<String>,
+    pub history: Vec<String>,
+    max_history: usize,
+}
+
+impl BagSearchModel {
+    pub fn new() -> Self {
+        Self {
+            options: BagSearchOptions::new(""),
+            results: Vec::new(),
+            state: BagSearchState::Idle,
+            total_match_count: 0,
+            files_searched: 0,
+            search_duration_ms: None,
+            replace_text: None,
+            history: Vec::new(),
+            max_history: 50,
+        }
+    }
+
+    pub fn start_search(&mut self, options: BagSearchOptions) {
+        self.options = options;
+        self.results.clear();
+        self.total_match_count = 0;
+        self.files_searched = 0;
+        self.state = BagSearchState::Searching;
+        self.search_duration_ms = None;
+
+        // Add to history
+        if !self.options.query.is_empty() {
+            if self.history.last().map(|s| s.as_str()) != Some(&self.options.query) {
+                self.history.push(self.options.query.clone());
+                if self.history.len() > self.max_history {
+                    self.history.remove(0);
+                }
+            }
+        }
+    }
+
+    pub fn add_file_result(&mut self, result: BagFileResult) {
+        self.total_match_count += result.match_count();
+        self.files_searched += 1;
+        self.results.push(result);
+    }
+
+    pub fn complete(&mut self, duration_ms: u64) {
+        self.state = BagSearchState::Complete;
+        self.search_duration_ms = Some(duration_ms);
+    }
+
+    pub fn cancel(&mut self) {
+        self.state = BagSearchState::Cancelled;
+    }
+
+    pub fn clear(&mut self) {
+        self.results.clear();
+        self.total_match_count = 0;
+        self.files_searched = 0;
+        self.state = BagSearchState::Idle;
+        self.search_duration_ms = None;
+    }
+
+    pub fn is_searching(&self) -> bool {
+        self.state == BagSearchState::Searching
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.results.len()
+    }
+
+    pub fn status_text(&self) -> String {
+        match self.state {
+            BagSearchState::Idle => "Ready".to_string(),
+            BagSearchState::Searching => format!("Searching... {} results in {} files",
+                self.total_match_count, self.file_count()),
+            BagSearchState::Complete => {
+                let dur = self.search_duration_ms.map(|d| format!(" in {}ms", d)).unwrap_or_default();
+                format!("{} results in {} files{}", self.total_match_count, self.file_count(), dur)
+            }
+            BagSearchState::Cancelled => format!("{} results (cancelled)", self.total_match_count),
+        }
+    }
+
+    pub fn collapse_all(&mut self) {
+        for r in &mut self.results {
+            r.is_expanded = false;
+        }
+    }
+
+    pub fn expand_all(&mut self) {
+        for r in &mut self.results {
+            r.is_expanded = true;
+        }
+    }
+
+    pub fn result_at_path(&self, path: &str) -> Option<&BagFileResult> {
+        self.results.iter().find(|r| r.file_path == path)
+    }
+
+    pub fn set_replace_text(&mut self, text: &str) {
+        self.replace_text = Some(text.to_string());
+    }
+
+    pub fn search_history(&self) -> &[String] {
+        &self.history
+    }
+}
+
+#[cfg(test)]
+mod bag_tests {
+    use super::*;
+
+    #[test]
+    fn test_bag_search_match() {
+        let m = BagSearchMatch::new(10, 5, 12, "let foo = bar;");
+        assert_eq!(m.match_length(), 7);
+        assert_eq!(m.line, 10);
+    }
+
+    #[test]
+    fn test_bag_file_result() {
+        let mut fr = BagFileResult::new("src/main.rs");
+        assert_eq!(fr.filename(), "main.rs");
+        assert_eq!(fr.directory(), "src");
+
+        fr.add_match(BagSearchMatch::new(1, 0, 3, "foo"));
+        fr.add_match(BagSearchMatch::new(5, 2, 5, "foo"));
+        assert_eq!(fr.match_count(), 2);
+
+        fr.toggle_expand();
+        assert!(!fr.is_expanded);
+    }
+
+    #[test]
+    fn test_bag_search_options() {
+        let opts = BagSearchOptions::new("hello")
+            .case_sensitive()
+            .whole_word()
+            .with_include("*.rs")
+            .with_exclude("target/**");
+        assert!(opts.is_case_sensitive);
+        assert!(opts.is_whole_word);
+        assert_eq!(opts.include_pattern.as_deref(), Some("*.rs"));
+        assert!(!opts.is_empty());
+    }
+
+    #[test]
+    fn test_bag_search_options_regex() {
+        let opts = BagSearchOptions::new("fn\\s+\\w+").regex();
+        assert!(opts.is_regex);
+    }
+
+    #[test]
+    fn test_bag_replace_options() {
+        let opts = BagReplaceOptions::new("old", "new").with_preserve_case();
+        assert!(opts.preserve_case);
+        assert_eq!(opts.replace_text, "new");
+    }
+
+    #[test]
+    fn test_bag_search_model_lifecycle() {
+        let mut model = BagSearchModel::new();
+        assert_eq!(model.state, BagSearchState::Idle);
+
+        model.start_search(BagSearchOptions::new("test"));
+        assert!(model.is_searching());
+
+        let mut fr = BagFileResult::new("a.rs");
+        fr.add_match(BagSearchMatch::new(1, 0, 4, "test"));
+        fr.add_match(BagSearchMatch::new(3, 0, 4, "test"));
+        model.add_file_result(fr);
+
+        let mut fr2 = BagFileResult::new("b.rs");
+        fr2.add_match(BagSearchMatch::new(5, 0, 4, "test"));
+        model.add_file_result(fr2);
+
+        model.complete(150);
+        assert_eq!(model.state, BagSearchState::Complete);
+        assert_eq!(model.total_match_count, 3);
+        assert_eq!(model.file_count(), 2);
+        assert!(model.status_text().contains("3 results"));
+    }
+
+    #[test]
+    fn test_bag_search_cancel() {
+        let mut model = BagSearchModel::new();
+        model.start_search(BagSearchOptions::new("query"));
+        model.cancel();
+        assert_eq!(model.state, BagSearchState::Cancelled);
+    }
+
+    #[test]
+    fn test_bag_search_clear() {
+        let mut model = BagSearchModel::new();
+        model.start_search(BagSearchOptions::new("x"));
+        model.add_file_result(BagFileResult::new("a.rs"));
+        model.clear();
+        assert_eq!(model.file_count(), 0);
+        assert_eq!(model.state, BagSearchState::Idle);
+    }
+
+    #[test]
+    fn test_bag_collapse_expand() {
+        let mut model = BagSearchModel::new();
+        model.start_search(BagSearchOptions::new("x"));
+        model.add_file_result(BagFileResult::new("a.rs"));
+        model.add_file_result(BagFileResult::new("b.rs"));
+        model.collapse_all();
+        assert!(model.results.iter().all(|r| !r.is_expanded));
+        model.expand_all();
+        assert!(model.results.iter().all(|r| r.is_expanded));
+    }
+
+    #[test]
+    fn test_bag_search_history() {
+        let mut model = BagSearchModel::new();
+        model.start_search(BagSearchOptions::new("first"));
+        model.start_search(BagSearchOptions::new("second"));
+        model.start_search(BagSearchOptions::new("second")); // Duplicate not added
+        assert_eq!(model.search_history().len(), 2);
+    }
+
+    #[test]
+    fn test_bag_result_at_path() {
+        let mut model = BagSearchModel::new();
+        model.start_search(BagSearchOptions::new("x"));
+        model.add_file_result(BagFileResult::new("src/lib.rs"));
+        assert!(model.result_at_path("src/lib.rs").is_some());
+        assert!(model.result_at_path("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_bag_replace_text() {
+        let mut model = BagSearchModel::new();
+        model.set_replace_text("replacement");
+        assert_eq!(model.replace_text.as_deref(), Some("replacement"));
+    }
+
+    #[test]
+    fn test_bag_file_result_root() {
+        let fr = BagFileResult::new("file.txt");
+        assert_eq!(fr.filename(), "file.txt");
+        assert_eq!(fr.directory(), "");
+    }
+
+    #[test]
+    fn test_bag_status_text_idle() {
+        let model = BagSearchModel::new();
+        assert_eq!(model.status_text(), "Ready");
+    }
+
+    #[test]
+    fn test_bag_empty_query() {
+        let opts = BagSearchOptions::new("");
+        assert!(opts.is_empty());
+    }
+}
