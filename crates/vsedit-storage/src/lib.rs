@@ -62469,3 +62469,172 @@ mod bcc_tests {
         assert_eq!(bar.entries()[0].id, "a");
     }
 }
+
+
+// --- bcd_: Editor layout / grid model ---
+
+/// Split direction for editor groups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcdSplitDirection { Horizontal, Vertical }
+
+/// A cell in the editor grid.
+#[derive(Debug, Clone)]
+pub enum BcdGridCell {
+    Leaf { group_id: u32, weight: f64 },
+    Split { direction: BcdSplitDirection, children: Vec<BcdGridCell>, weights: Vec<f64> },
+}
+
+impl BcdGridCell {
+    pub fn leaf(gid: u32) -> Self { BcdGridCell::Leaf { group_id: gid, weight: 1.0 } }
+
+    pub fn split(dir: BcdSplitDirection, children: Vec<BcdGridCell>) -> Self {
+        let n = children.len();
+        let w = 1.0 / n as f64;
+        BcdGridCell::Split { direction: dir, children, weights: vec![w; n] }
+    }
+
+    pub fn group_ids(&self) -> Vec<u32> {
+        match self {
+            BcdGridCell::Leaf { group_id, .. } => vec![*group_id],
+            BcdGridCell::Split { children, .. } => children.iter().flat_map(|c| c.group_ids()).collect(),
+        }
+    }
+
+    pub fn depth(&self) -> usize {
+        match self {
+            BcdGridCell::Leaf { .. } => 0,
+            BcdGridCell::Split { children, .. } => 1 + children.iter().map(|c| c.depth()).max().unwrap_or(0),
+        }
+    }
+
+    pub fn cell_count(&self) -> usize {
+        match self {
+            BcdGridCell::Leaf { .. } => 1,
+            BcdGridCell::Split { children, .. } => children.iter().map(|c| c.cell_count()).sum(),
+        }
+    }
+}
+
+/// The overall editor layout.
+#[derive(Debug)]
+pub struct BcdEditorLayout {
+    root: BcdGridCell,
+    next_group: u32,
+}
+
+impl BcdEditorLayout {
+    pub fn new() -> Self {
+        Self { root: BcdGridCell::leaf(0), next_group: 1 }
+    }
+
+    pub fn root(&self) -> &BcdGridCell { &self.root }
+
+    pub fn all_groups(&self) -> Vec<u32> { self.root.group_ids() }
+
+    pub fn group_count(&self) -> usize { self.root.cell_count() }
+
+    pub fn depth(&self) -> usize { self.root.depth() }
+
+    pub fn split_group(&mut self, _target: u32, dir: BcdSplitDirection) -> u32 {
+        let new_id = self.next_group;
+        self.next_group += 1;
+        let old_root = std::mem::replace(&mut self.root, BcdGridCell::leaf(0));
+        self.root = BcdGridCell::split(dir, vec![old_root, BcdGridCell::leaf(new_id)]);
+        new_id
+    }
+
+    pub fn set_weights(&mut self, weights: Vec<f64>) {
+        if let BcdGridCell::Split { weights: w, .. } = &mut self.root {
+            if weights.len() == w.len() { *w = weights; }
+        }
+    }
+
+    pub fn flatten(&self) -> Vec<(u32, f64)> {
+        fn collect(cell: &BcdGridCell, scale: f64, out: &mut Vec<(u32, f64)>) {
+            match cell {
+                BcdGridCell::Leaf { group_id, weight } => out.push((*group_id, weight * scale)),
+                BcdGridCell::Split { children, weights, .. } => {
+                    for (c, w) in children.iter().zip(weights.iter()) {
+                        collect(c, scale * w, out);
+                    }
+                }
+            }
+        }
+        let mut out = Vec::new();
+        collect(&self.root, 1.0, &mut out);
+        out
+    }
+}
+
+#[cfg(test)]
+mod bcd_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcd_new_layout() {
+        let l = BcdEditorLayout::new();
+        assert_eq!(l.group_count(), 1);
+        assert_eq!(l.all_groups(), vec![0]);
+    }
+
+    #[test]
+    fn test_bcd_split() {
+        let mut l = BcdEditorLayout::new();
+        let new_id = l.split_group(0, BcdSplitDirection::Vertical);
+        assert_eq!(new_id, 1);
+        assert_eq!(l.group_count(), 2);
+    }
+
+    #[test]
+    fn test_bcd_depth() {
+        let mut l = BcdEditorLayout::new();
+        assert_eq!(l.depth(), 0);
+        l.split_group(0, BcdSplitDirection::Horizontal);
+        assert_eq!(l.depth(), 1);
+    }
+
+    #[test]
+    fn test_bcd_flatten() {
+        let mut l = BcdEditorLayout::new();
+        l.split_group(0, BcdSplitDirection::Vertical);
+        let f = l.flatten();
+        assert_eq!(f.len(), 2);
+        assert!((f[0].1 - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bcd_set_weights() {
+        let mut l = BcdEditorLayout::new();
+        l.split_group(0, BcdSplitDirection::Vertical);
+        l.set_weights(vec![0.7, 0.3]);
+        let f = l.flatten();
+        assert!((f[0].1 - 0.7).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bcd_cell_count() {
+        let c = BcdGridCell::split(BcdSplitDirection::Horizontal, vec![BcdGridCell::leaf(0), BcdGridCell::leaf(1), BcdGridCell::leaf(2)]);
+        assert_eq!(c.cell_count(), 3);
+    }
+
+    #[test]
+    fn test_bcd_group_ids() {
+        let c = BcdGridCell::split(BcdSplitDirection::Vertical, vec![BcdGridCell::leaf(10), BcdGridCell::leaf(20)]);
+        assert_eq!(c.group_ids(), vec![10, 20]);
+    }
+
+    #[test]
+    fn test_bcd_leaf() {
+        let l = BcdGridCell::leaf(5);
+        assert_eq!(l.depth(), 0);
+        assert_eq!(l.cell_count(), 1);
+    }
+
+    #[test]
+    fn test_bcd_multiple_splits() {
+        let mut l = BcdEditorLayout::new();
+        l.split_group(0, BcdSplitDirection::Vertical);
+        l.split_group(1, BcdSplitDirection::Horizontal);
+        assert!(l.group_count() >= 2);
+    }
+}
