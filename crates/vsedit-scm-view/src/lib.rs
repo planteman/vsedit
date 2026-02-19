@@ -63182,3 +63182,160 @@ mod bcf_tests {
         assert_eq!(t.position, BcfDropPosition::Bottom);
     }
 }
+
+
+// --- bcg_: Editor title bar model ---
+
+/// Title bar display style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcgTitleStyle { Native, Custom, Hidden }
+
+/// A title bar action button.
+#[derive(Debug, Clone)]
+pub struct BcgTitleAction {
+    pub id: String,
+    pub icon: char,
+    pub tooltip: String,
+    pub enabled: bool,
+}
+
+impl BcgTitleAction {
+    pub fn new(id: &str, icon: char, tooltip: &str) -> Self {
+        Self { id: id.to_string(), icon, tooltip: tooltip.to_string(), enabled: true }
+    }
+}
+
+/// The editor title bar model.
+#[derive(Debug)]
+pub struct BcgTitleBar {
+    title: String,
+    subtitle: Option<String>,
+    style: BcgTitleStyle,
+    actions: Vec<BcgTitleAction>,
+    menu_visible: bool,
+    dirty: bool,
+}
+
+impl BcgTitleBar {
+    pub fn new() -> Self {
+        Self { title: String::from("vsedit"), subtitle: None, style: BcgTitleStyle::Custom, actions: Vec::new(), menu_visible: true, dirty: false }
+    }
+
+    pub fn title(&self) -> &str { &self.title }
+    pub fn subtitle(&self) -> Option<&str> { self.subtitle.as_deref() }
+    pub fn style(&self) -> BcgTitleStyle { self.style }
+    pub fn is_dirty(&self) -> bool { self.dirty }
+
+    pub fn set_title(&mut self, t: &str) { self.title = t.to_string(); }
+    pub fn set_subtitle(&mut self, s: Option<&str>) { self.subtitle = s.map(|x| x.to_string()); }
+    pub fn set_style(&mut self, s: BcgTitleStyle) { self.style = s; }
+    pub fn set_dirty(&mut self, d: bool) { self.dirty = d; }
+    pub fn set_menu_visible(&mut self, v: bool) { self.menu_visible = v; }
+
+    pub fn add_action(&mut self, action: BcgTitleAction) { self.actions.push(action); }
+
+    pub fn actions(&self) -> &[BcgTitleAction] { &self.actions }
+
+    pub fn display_title(&self) -> String {
+        let dirty_mark = if self.dirty { "● " } else { "" };
+        match &self.subtitle {
+            Some(sub) => format!("{}{} — {}", dirty_mark, self.title, sub),
+            None => format!("{}{}", dirty_mark, self.title),
+        }
+    }
+
+    pub fn render_bar(&self, width: usize) -> String {
+        let title = self.display_title();
+        let actions_str: String = self.actions.iter().filter(|a| a.enabled).map(|a| format!(" {}", a.icon)).collect();
+        let avail = width.saturating_sub(actions_str.len());
+        let title_trunc = if title.len() > avail { &title[..avail] } else { &title };
+        let pad = avail.saturating_sub(title_trunc.len());
+        format!("{}{}{}", title_trunc, " ".repeat(pad), actions_str)
+    }
+
+    pub fn from_file(&mut self, path: &str, workspace: Option<&str>) {
+        let filename = path.rsplit('/').next().unwrap_or(path);
+        self.set_title(filename);
+        self.set_subtitle(workspace);
+    }
+}
+
+#[cfg(test)]
+mod bcg_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcg_new() {
+        let tb = BcgTitleBar::new();
+        assert_eq!(tb.title(), "vsedit");
+        assert!(!tb.is_dirty());
+    }
+
+    #[test]
+    fn test_bcg_display_title() {
+        let mut tb = BcgTitleBar::new();
+        tb.set_title("main.rs");
+        tb.set_subtitle(Some("my-project"));
+        assert_eq!(tb.display_title(), "main.rs — my-project");
+    }
+
+    #[test]
+    fn test_bcg_dirty_mark() {
+        let mut tb = BcgTitleBar::new();
+        tb.set_dirty(true);
+        assert!(tb.display_title().starts_with("● "));
+    }
+
+    #[test]
+    fn test_bcg_from_file() {
+        let mut tb = BcgTitleBar::new();
+        tb.from_file("/home/user/project/src/lib.rs", Some("project"));
+        assert_eq!(tb.title(), "lib.rs");
+        assert_eq!(tb.subtitle(), Some("project"));
+    }
+
+    #[test]
+    fn test_bcg_render_bar() {
+        let mut tb = BcgTitleBar::new();
+        tb.set_title("test.rs");
+        let line = tb.render_bar(40);
+        assert_eq!(line.len(), 40);
+    }
+
+    #[test]
+    fn test_bcg_actions() {
+        let mut tb = BcgTitleBar::new();
+        tb.add_action(BcgTitleAction::new("close", '✕', "Close"));
+        tb.add_action(BcgTitleAction::new("max", '□', "Maximize"));
+        assert_eq!(tb.actions().len(), 2);
+    }
+
+    #[test]
+    fn test_bcg_style() {
+        let mut tb = BcgTitleBar::new();
+        assert_eq!(tb.style(), BcgTitleStyle::Custom);
+        tb.set_style(BcgTitleStyle::Hidden);
+        assert_eq!(tb.style(), BcgTitleStyle::Hidden);
+    }
+
+    #[test]
+    fn test_bcg_no_subtitle() {
+        let mut tb = BcgTitleBar::new();
+        tb.set_title("foo");
+        assert_eq!(tb.display_title(), "foo");
+    }
+
+    #[test]
+    fn test_bcg_menu_toggle() {
+        let mut tb = BcgTitleBar::new();
+        assert!(tb.menu_visible);
+        tb.set_menu_visible(false);
+        assert!(!tb.menu_visible);
+    }
+
+    #[test]
+    fn test_bcg_action_tooltip() {
+        let a = BcgTitleAction::new("min", '—', "Minimize");
+        assert_eq!(a.tooltip, "Minimize");
+    }
+}
