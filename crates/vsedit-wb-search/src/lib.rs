@@ -80877,6 +80877,421 @@ impl BgeColumnSelectionModel {
 }
 
 
+
+// bgf_ Editor Linked Editing Model
+
+/// A linked editing range — when one is edited, all linked ranges update.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgfLinkedRange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+/// Linked editing session tracking synchronized ranges.
+#[derive(Debug, Clone)]
+pub struct BgfLinkedEditingSession {
+    pub ranges: Vec<BgfLinkedRange>,
+    pub word_pattern: Option<String>,
+    pub is_active: bool,
+}
+
+impl BgfLinkedEditingSession {
+    pub fn new() -> Self {
+        Self { ranges: Vec::new(), word_pattern: None, is_active: false }
+    }
+
+    pub fn activate(&mut self, ranges: Vec<BgfLinkedRange>) {
+        self.ranges = ranges;
+        self.is_active = true;
+    }
+
+    pub fn deactivate(&mut self) {
+        self.ranges.clear();
+        self.is_active = false;
+    }
+
+    pub fn set_word_pattern(&mut self, pattern: &str) {
+        self.word_pattern = Some(pattern.to_string());
+    }
+
+    pub fn range_count(&self) -> usize {
+        self.ranges.len()
+    }
+
+    pub fn contains_position(&self, line: usize, col: usize) -> bool {
+        self.ranges.iter().any(|r| {
+            if line < r.start_line || line > r.end_line { return false; }
+            if line == r.start_line && col < r.start_col { return false; }
+            if line == r.end_line && col > r.end_col { return false; }
+            true
+        })
+    }
+
+    pub fn range_at(&self, line: usize, col: usize) -> Option<&BgfLinkedRange> {
+        self.ranges.iter().find(|r| {
+            if line < r.start_line || line > r.end_line { return false; }
+            if line == r.start_line && col < r.start_col { return false; }
+            if line == r.end_line && col > r.end_col { return false; }
+            true
+        })
+    }
+
+    pub fn all_on_same_line(&self) -> bool {
+        if self.ranges.is_empty() { return true; }
+        let first_line = self.ranges[0].start_line;
+        self.ranges.iter().all(|r| r.start_line == first_line && r.end_line == first_line)
+    }
+}
+
+
+// bgg_ Editor Color Picker Model
+
+/// Color format for the color picker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BggColorFormat {
+    Hex,
+    Rgb,
+    Hsl,
+    Hwb,
+    Named,
+}
+
+/// Color value in RGBA.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BggColor {
+    pub r: f64,
+    pub g: f64,
+    pub b: f64,
+    pub a: f64,
+}
+
+/// Color picker widget model.
+#[derive(Debug, Clone)]
+pub struct BggColorPicker {
+    pub color: BggColor,
+    pub format: BggColorFormat,
+    pub is_visible: bool,
+    pub line: usize,
+    pub column: usize,
+    pub original_text: String,
+}
+
+impl BggColor {
+    pub fn new(r: f64, g: f64, b: f64, a: f64) -> Self {
+        Self {
+            r: r.max(0.0).min(1.0),
+            g: g.max(0.0).min(1.0),
+            b: b.max(0.0).min(1.0),
+            a: a.max(0.0).min(1.0),
+        }
+    }
+
+    pub fn to_hex(&self) -> String {
+        let r = (self.r * 255.0) as u8;
+        let g = (self.g * 255.0) as u8;
+        let b = (self.b * 255.0) as u8;
+        if (self.a - 1.0).abs() < 0.001 {
+            format!("#{:02x}{:02x}{:02x}", r, g, b)
+        } else {
+            let a = (self.a * 255.0) as u8;
+            format!("#{:02x}{:02x}{:02x}{:02x}", r, g, b, a)
+        }
+    }
+
+    pub fn to_rgb_string(&self) -> String {
+        let r = (self.r * 255.0) as u8;
+        let g = (self.g * 255.0) as u8;
+        let b = (self.b * 255.0) as u8;
+        if (self.a - 1.0).abs() < 0.001 {
+            format!("rgb({}, {}, {})", r, g, b)
+        } else {
+            format!("rgba({}, {}, {}, {:.2})", r, g, b, self.a)
+        }
+    }
+
+    pub fn luminance(&self) -> f64 {
+        0.2126 * self.r + 0.7152 * self.g + 0.0722 * self.b
+    }
+
+    pub fn is_dark(&self) -> bool {
+        self.luminance() < 0.5
+    }
+}
+
+impl BggColorPicker {
+    pub fn new(line: usize, col: usize, color: BggColor, format: BggColorFormat, text: &str) -> Self {
+        Self { color, format, is_visible: true, line, column: col, original_text: text.to_string() }
+    }
+
+    pub fn set_color(&mut self, color: BggColor) {
+        self.color = color;
+    }
+
+    pub fn set_format(&mut self, format: BggColorFormat) {
+        self.format = format;
+    }
+
+    pub fn formatted_value(&self) -> String {
+        match self.format {
+            BggColorFormat::Hex => self.color.to_hex(),
+            BggColorFormat::Rgb => self.color.to_rgb_string(),
+            _ => self.color.to_hex(),
+        }
+    }
+
+    pub fn dismiss(&mut self) {
+        self.is_visible = false;
+    }
+}
+
+
+// bgh_ Editor Diff Decoration Model
+
+/// Kind of diff change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BghDiffChangeKind {
+    Added,
+    Modified,
+    Deleted,
+}
+
+/// A diff gutter decoration showing line-level changes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BghDiffDecoration {
+    pub start_line: usize,
+    pub line_count: usize,
+    pub kind: BghDiffChangeKind,
+}
+
+/// Diff decoration model for showing SCM changes in the gutter.
+#[derive(Debug, Clone)]
+pub struct BghDiffDecorationModel {
+    decorations: Vec<BghDiffDecoration>,
+    is_enabled: bool,
+}
+
+impl BghDiffDecorationModel {
+    pub fn new() -> Self {
+        Self { decorations: Vec::new(), is_enabled: true }
+    }
+
+    pub fn set_decorations(&mut self, decorations: Vec<BghDiffDecoration>) {
+        self.decorations = decorations;
+    }
+
+    pub fn toggle(&mut self) {
+        self.is_enabled = !self.is_enabled;
+    }
+
+    pub fn decoration_at_line(&self, line: usize) -> Option<&BghDiffDecoration> {
+        if !self.is_enabled { return None; }
+        self.decorations.iter().find(|d| line >= d.start_line && line < d.start_line + d.line_count)
+    }
+
+    pub fn added_count(&self) -> usize {
+        self.decorations.iter().filter(|d| d.kind == BghDiffChangeKind::Added).map(|d| d.line_count).sum()
+    }
+
+    pub fn modified_count(&self) -> usize {
+        self.decorations.iter().filter(|d| d.kind == BghDiffChangeKind::Modified).map(|d| d.line_count).sum()
+    }
+
+    pub fn deleted_count(&self) -> usize {
+        self.decorations.iter().filter(|d| d.kind == BghDiffChangeKind::Deleted).count()
+    }
+
+    pub fn total_changes(&self) -> usize {
+        self.decorations.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.decorations.clear();
+    }
+
+    pub fn next_change(&self, from_line: usize) -> Option<&BghDiffDecoration> {
+        self.decorations.iter().find(|d| d.start_line > from_line)
+    }
+
+    pub fn prev_change(&self, from_line: usize) -> Option<&BghDiffDecoration> {
+        self.decorations.iter().rev().find(|d| d.start_line < from_line)
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+}
+
+
+// bgi_ Editor Parameter Hints Model
+
+/// A single parameter in a signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgiParameter {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+/// A function/method signature for parameter hints.
+#[derive(Debug, Clone)]
+pub struct BgiSignature {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<BgiParameter>,
+    pub active_parameter: usize,
+}
+
+/// Parameter hints widget model.
+#[derive(Debug, Clone)]
+pub struct BgiParameterHints {
+    pub signatures: Vec<BgiSignature>,
+    pub active_signature: usize,
+    pub is_visible: bool,
+    pub trigger_char: Option<char>,
+}
+
+impl BgiParameterHints {
+    pub fn new() -> Self {
+        Self { signatures: Vec::new(), active_signature: 0, is_visible: false, trigger_char: None }
+    }
+
+    pub fn show(&mut self, signatures: Vec<BgiSignature>, trigger: Option<char>) {
+        self.signatures = signatures;
+        self.active_signature = 0;
+        self.is_visible = !self.signatures.is_empty();
+        self.trigger_char = trigger;
+    }
+
+    pub fn hide(&mut self) {
+        self.is_visible = false;
+        self.signatures.clear();
+    }
+
+    pub fn next_signature(&mut self) {
+        if !self.signatures.is_empty() {
+            self.active_signature = (self.active_signature + 1) % self.signatures.len();
+        }
+    }
+
+    pub fn prev_signature(&mut self) {
+        if !self.signatures.is_empty() {
+            self.active_signature = if self.active_signature == 0 {
+                self.signatures.len() - 1
+            } else {
+                self.active_signature - 1
+            };
+        }
+    }
+
+    pub fn active_sig(&self) -> Option<&BgiSignature> {
+        self.signatures.get(self.active_signature)
+    }
+
+    pub fn active_param(&self) -> Option<&BgiParameter> {
+        self.active_sig().and_then(|s| s.parameters.get(s.active_parameter))
+    }
+
+    pub fn set_active_parameter(&mut self, index: usize) {
+        if let Some(sig) = self.signatures.get_mut(self.active_signature) {
+            if index < sig.parameters.len() {
+                sig.active_parameter = index;
+            }
+        }
+    }
+
+    pub fn signature_count(&self) -> usize {
+        self.signatures.len()
+    }
+}
+
+
+// bgj_ Editor Peek View Model
+
+/// Kind of peek view content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgjPeekKind {
+    Definition,
+    References,
+    Implementation,
+    TypeDefinition,
+    Declaration,
+}
+
+/// A result entry in the peek view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgjPeekResult {
+    pub uri: String,
+    pub line: usize,
+    pub column: usize,
+    pub preview_text: String,
+}
+
+/// Peek view widget model.
+#[derive(Debug, Clone)]
+pub struct BgjPeekView {
+    pub kind: BgjPeekKind,
+    pub results: Vec<BgjPeekResult>,
+    pub selected_index: usize,
+    pub is_visible: bool,
+    pub anchor_line: usize,
+    pub anchor_column: usize,
+}
+
+impl BgjPeekView {
+    pub fn new(kind: BgjPeekKind, anchor_line: usize, anchor_col: usize) -> Self {
+        Self {
+            kind, results: Vec::new(), selected_index: 0,
+            is_visible: true, anchor_line, anchor_column: anchor_col,
+        }
+    }
+
+    pub fn set_results(&mut self, results: Vec<BgjPeekResult>) {
+        self.results = results;
+        self.selected_index = 0;
+    }
+
+    pub fn select_next(&mut self) {
+        if !self.results.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.results.len();
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if !self.results.is_empty() {
+            self.selected_index = if self.selected_index == 0 {
+                self.results.len() - 1
+            } else {
+                self.selected_index - 1
+            };
+        }
+    }
+
+    pub fn selected(&self) -> Option<&BgjPeekResult> {
+        self.results.get(self.selected_index)
+    }
+
+    pub fn close(&mut self) {
+        self.is_visible = false;
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.results.len()
+    }
+
+    pub fn has_multiple_results(&self) -> bool {
+        self.results.len() > 1
+    }
+
+    pub fn unique_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.results.iter().map(|r| r.uri.as_str()).collect();
+        files.sort();
+        files.dedup();
+        files
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -82527,6 +82942,505 @@ mod tests_bfo {
         let mut m = BgeColumnSelectionModel::new();
         m.extend_to(5, 10);
         assert!(m.selection.is_none());
+    }
+
+
+
+    // bgf_ tests
+
+    #[test]
+    fn test_bgf_linked_creation() {
+        let s = BgfLinkedEditingSession::new();
+        assert!(!s.is_active);
+        assert_eq!(s.range_count(), 0);
+    }
+
+    #[test]
+    fn test_bgf_activate_deactivate() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 1, start_col: 0, end_line: 1, end_col: 5 },
+            BgfLinkedRange { start_line: 3, start_col: 10, end_line: 3, end_col: 15 },
+        ]);
+        assert!(s.is_active);
+        assert_eq!(s.range_count(), 2);
+        s.deactivate();
+        assert!(!s.is_active);
+        assert_eq!(s.range_count(), 0);
+    }
+
+    #[test]
+    fn test_bgf_contains_position() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 5, start_col: 10, end_line: 5, end_col: 20 },
+        ]);
+        assert!(s.contains_position(5, 15));
+        assert!(!s.contains_position(5, 25));
+        assert!(!s.contains_position(6, 15));
+    }
+
+    #[test]
+    fn test_bgf_range_at() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 1, start_col: 0, end_line: 1, end_col: 5 },
+        ]);
+        assert!(s.range_at(1, 3).is_some());
+        assert!(s.range_at(2, 0).is_none());
+    }
+
+    #[test]
+    fn test_bgf_all_on_same_line() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 1, start_col: 0, end_line: 1, end_col: 3 },
+            BgfLinkedRange { start_line: 1, start_col: 10, end_line: 1, end_col: 13 },
+        ]);
+        assert!(s.all_on_same_line());
+    }
+
+    #[test]
+    fn test_bgf_not_same_line() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 1, start_col: 0, end_line: 1, end_col: 3 },
+            BgfLinkedRange { start_line: 5, start_col: 0, end_line: 5, end_col: 3 },
+        ]);
+        assert!(!s.all_on_same_line());
+    }
+
+    #[test]
+    fn test_bgf_word_pattern() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.set_word_pattern(r"\w+");
+        assert_eq!(s.word_pattern.as_deref(), Some(r"\w+"));
+    }
+
+    #[test]
+    fn test_bgf_empty_same_line() {
+        let s = BgfLinkedEditingSession::new();
+        assert!(s.all_on_same_line());
+    }
+
+    #[test]
+    fn test_bgf_multiline_range() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 1, start_col: 5, end_line: 3, end_col: 10 },
+        ]);
+        assert!(s.contains_position(2, 0));
+        assert!(s.contains_position(1, 5));
+        assert!(s.contains_position(3, 10));
+        assert!(!s.contains_position(1, 4));
+    }
+
+    #[test]
+    fn test_bgf_boundary_check() {
+        let mut s = BgfLinkedEditingSession::new();
+        s.activate(vec![
+            BgfLinkedRange { start_line: 5, start_col: 0, end_line: 5, end_col: 0 },
+        ]);
+        assert!(s.contains_position(5, 0));
+        assert!(!s.contains_position(5, 1));
+    }
+
+
+    // bgg_ tests
+
+    #[test]
+    fn test_bgg_color_creation() {
+        let c = BggColor::new(1.0, 0.0, 0.0, 1.0);
+        assert!((c.r - 1.0).abs() < 0.001);
+        assert!((c.g).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_bgg_color_clamp() {
+        let c = BggColor::new(2.0, -1.0, 0.5, 1.5);
+        assert!((c.r - 1.0).abs() < 0.001);
+        assert!((c.g).abs() < 0.001);
+        assert!((c.a - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_bgg_to_hex() {
+        let c = BggColor::new(1.0, 0.0, 0.0, 1.0);
+        assert_eq!(c.to_hex(), "#ff0000");
+    }
+
+    #[test]
+    fn test_bgg_to_hex_with_alpha() {
+        let c = BggColor::new(1.0, 1.0, 1.0, 0.5);
+        let hex = c.to_hex();
+        assert!(hex.starts_with("#ffffff"));
+        assert_eq!(hex.len(), 9);
+    }
+
+    #[test]
+    fn test_bgg_to_rgb() {
+        let c = BggColor::new(0.0, 0.0, 1.0, 1.0);
+        assert_eq!(c.to_rgb_string(), "rgb(0, 0, 255)");
+    }
+
+    #[test]
+    fn test_bgg_luminance() {
+        let white = BggColor::new(1.0, 1.0, 1.0, 1.0);
+        assert!((white.luminance() - 1.0).abs() < 0.01);
+        let black = BggColor::new(0.0, 0.0, 0.0, 1.0);
+        assert!(black.luminance().abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bgg_is_dark() {
+        let dark = BggColor::new(0.1, 0.1, 0.1, 1.0);
+        assert!(dark.is_dark());
+        let light = BggColor::new(0.9, 0.9, 0.9, 1.0);
+        assert!(!light.is_dark());
+    }
+
+    #[test]
+    fn test_bgg_picker_creation() {
+        let c = BggColor::new(0.5, 0.5, 0.5, 1.0);
+        let p = BggColorPicker::new(10, 5, c, BggColorFormat::Hex, "#808080");
+        assert!(p.is_visible);
+        assert_eq!(p.line, 10);
+    }
+
+    #[test]
+    fn test_bgg_picker_format() {
+        let c = BggColor::new(1.0, 0.0, 0.0, 1.0);
+        let mut p = BggColorPicker::new(1, 0, c, BggColorFormat::Hex, "#ff0000");
+        assert_eq!(p.formatted_value(), "#ff0000");
+        p.set_format(BggColorFormat::Rgb);
+        assert_eq!(p.formatted_value(), "rgb(255, 0, 0)");
+    }
+
+    #[test]
+    fn test_bgg_picker_dismiss() {
+        let c = BggColor::new(0.0, 0.0, 0.0, 1.0);
+        let mut p = BggColorPicker::new(1, 0, c, BggColorFormat::Hex, "#000");
+        p.dismiss();
+        assert!(!p.is_visible);
+    }
+
+
+    // bgh_ tests
+
+    #[test]
+    fn test_bgh_diff_creation() {
+        let m = BghDiffDecorationModel::new();
+        assert!(m.is_enabled());
+        assert_eq!(m.total_changes(), 0);
+    }
+
+    #[test]
+    fn test_bgh_set_decorations() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 5, line_count: 3, kind: BghDiffChangeKind::Added },
+            BghDiffDecoration { start_line: 15, line_count: 1, kind: BghDiffChangeKind::Modified },
+            BghDiffDecoration { start_line: 20, line_count: 0, kind: BghDiffChangeKind::Deleted },
+        ]);
+        assert_eq!(m.total_changes(), 3);
+    }
+
+    #[test]
+    fn test_bgh_decoration_at_line() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 10, line_count: 3, kind: BghDiffChangeKind::Added },
+        ]);
+        assert!(m.decoration_at_line(10).is_some());
+        assert!(m.decoration_at_line(12).is_some());
+        assert!(m.decoration_at_line(13).is_none());
+        assert!(m.decoration_at_line(9).is_none());
+    }
+
+    #[test]
+    fn test_bgh_counts() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 1, line_count: 5, kind: BghDiffChangeKind::Added },
+            BghDiffDecoration { start_line: 10, line_count: 2, kind: BghDiffChangeKind::Modified },
+            BghDiffDecoration { start_line: 20, line_count: 0, kind: BghDiffChangeKind::Deleted },
+        ]);
+        assert_eq!(m.added_count(), 5);
+        assert_eq!(m.modified_count(), 2);
+        assert_eq!(m.deleted_count(), 1);
+    }
+
+    #[test]
+    fn test_bgh_toggle_disabled() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 1, line_count: 1, kind: BghDiffChangeKind::Added },
+        ]);
+        m.toggle();
+        assert!(m.decoration_at_line(1).is_none());
+    }
+
+    #[test]
+    fn test_bgh_next_change() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 5, line_count: 1, kind: BghDiffChangeKind::Added },
+            BghDiffDecoration { start_line: 15, line_count: 1, kind: BghDiffChangeKind::Modified },
+        ]);
+        assert_eq!(m.next_change(5).unwrap().start_line, 15);
+        assert!(m.next_change(15).is_none());
+    }
+
+    #[test]
+    fn test_bgh_prev_change() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 5, line_count: 1, kind: BghDiffChangeKind::Added },
+            BghDiffDecoration { start_line: 15, line_count: 1, kind: BghDiffChangeKind::Modified },
+        ]);
+        assert_eq!(m.prev_change(15).unwrap().start_line, 5);
+        assert!(m.prev_change(5).is_none());
+    }
+
+    #[test]
+    fn test_bgh_clear() {
+        let mut m = BghDiffDecorationModel::new();
+        m.set_decorations(vec![
+            BghDiffDecoration { start_line: 1, line_count: 1, kind: BghDiffChangeKind::Added },
+        ]);
+        m.clear();
+        assert_eq!(m.total_changes(), 0);
+    }
+
+    #[test]
+    fn test_bgh_change_kind_variants() {
+        let kinds = [BghDiffChangeKind::Added, BghDiffChangeKind::Modified, BghDiffChangeKind::Deleted];
+        assert_eq!(kinds.len(), 3);
+    }
+
+    #[test]
+    fn test_bgh_empty_next_prev() {
+        let m = BghDiffDecorationModel::new();
+        assert!(m.next_change(0).is_none());
+        assert!(m.prev_change(100).is_none());
+    }
+
+
+    // bgi_ tests
+
+    #[test]
+    fn test_bgi_hints_creation() {
+        let h = BgiParameterHints::new();
+        assert!(!h.is_visible);
+        assert_eq!(h.signature_count(), 0);
+    }
+
+    #[test]
+    fn test_bgi_show_signatures() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![BgiSignature {
+            label: "fn foo(x: i32, y: String)".into(),
+            documentation: None,
+            parameters: vec![
+                BgiParameter { label: "x: i32".into(), documentation: None },
+                BgiParameter { label: "y: String".into(), documentation: Some("the name".into()) },
+            ],
+            active_parameter: 0,
+        }], Some('('));
+        assert!(h.is_visible);
+        assert_eq!(h.signature_count(), 1);
+        assert_eq!(h.trigger_char, Some('('));
+    }
+
+    #[test]
+    fn test_bgi_active_param() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![BgiSignature {
+            label: "fn bar(a: u8, b: u8)".into(), documentation: None,
+            parameters: vec![
+                BgiParameter { label: "a: u8".into(), documentation: None },
+                BgiParameter { label: "b: u8".into(), documentation: None },
+            ],
+            active_parameter: 0,
+        }], None);
+        assert_eq!(h.active_param().unwrap().label, "a: u8");
+        h.set_active_parameter(1);
+        assert_eq!(h.active_param().unwrap().label, "b: u8");
+    }
+
+    #[test]
+    fn test_bgi_next_prev_signature() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![
+            BgiSignature { label: "sig1".into(), documentation: None, parameters: vec![], active_parameter: 0 },
+            BgiSignature { label: "sig2".into(), documentation: None, parameters: vec![], active_parameter: 0 },
+            BgiSignature { label: "sig3".into(), documentation: None, parameters: vec![], active_parameter: 0 },
+        ], None);
+        assert_eq!(h.active_sig().unwrap().label, "sig1");
+        h.next_signature();
+        assert_eq!(h.active_sig().unwrap().label, "sig2");
+        h.next_signature();
+        assert_eq!(h.active_sig().unwrap().label, "sig3");
+        h.next_signature();
+        assert_eq!(h.active_sig().unwrap().label, "sig1"); // wraps
+    }
+
+    #[test]
+    fn test_bgi_prev_wraps() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![
+            BgiSignature { label: "a".into(), documentation: None, parameters: vec![], active_parameter: 0 },
+            BgiSignature { label: "b".into(), documentation: None, parameters: vec![], active_parameter: 0 },
+        ], None);
+        h.prev_signature();
+        assert_eq!(h.active_sig().unwrap().label, "b");
+    }
+
+    #[test]
+    fn test_bgi_hide() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![BgiSignature {
+            label: "fn x()".into(), documentation: None, parameters: vec![], active_parameter: 0,
+        }], None);
+        h.hide();
+        assert!(!h.is_visible);
+        assert_eq!(h.signature_count(), 0);
+    }
+
+    #[test]
+    fn test_bgi_empty_show() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![], None);
+        assert!(!h.is_visible);
+    }
+
+    #[test]
+    fn test_bgi_active_none() {
+        let h = BgiParameterHints::new();
+        assert!(h.active_sig().is_none());
+        assert!(h.active_param().is_none());
+    }
+
+    #[test]
+    fn test_bgi_param_documentation() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![BgiSignature {
+            label: "fn f(x: i32)".into(), documentation: Some("doc".into()),
+            parameters: vec![BgiParameter { label: "x".into(), documentation: Some("param doc".into()) }],
+            active_parameter: 0,
+        }], None);
+        assert_eq!(h.active_param().unwrap().documentation.as_deref(), Some("param doc"));
+    }
+
+    #[test]
+    fn test_bgi_set_active_param_bounds() {
+        let mut h = BgiParameterHints::new();
+        h.show(vec![BgiSignature {
+            label: "fn f(a: i32)".into(), documentation: None,
+            parameters: vec![BgiParameter { label: "a".into(), documentation: None }],
+            active_parameter: 0,
+        }], None);
+        h.set_active_parameter(99); // out of bounds, should not change
+        assert_eq!(h.active_sig().unwrap().active_parameter, 0);
+    }
+
+
+    // bgj_ tests
+
+    #[test]
+    fn test_bgj_peek_creation() {
+        let p = BgjPeekView::new(BgjPeekKind::Definition, 10, 5);
+        assert!(p.is_visible);
+        assert_eq!(p.kind, BgjPeekKind::Definition);
+        assert_eq!(p.result_count(), 0);
+    }
+
+    #[test]
+    fn test_bgj_set_results() {
+        let mut p = BgjPeekView::new(BgjPeekKind::References, 1, 0);
+        p.set_results(vec![
+            BgjPeekResult { uri: "a.rs".into(), line: 5, column: 0, preview_text: "fn foo()".into() },
+            BgjPeekResult { uri: "b.rs".into(), line: 10, column: 0, preview_text: "foo()".into() },
+        ]);
+        assert_eq!(p.result_count(), 2);
+        assert!(p.has_multiple_results());
+    }
+
+    #[test]
+    fn test_bgj_select_navigation() {
+        let mut p = BgjPeekView::new(BgjPeekKind::Definition, 1, 0);
+        p.set_results(vec![
+            BgjPeekResult { uri: "a.rs".into(), line: 1, column: 0, preview_text: "a".into() },
+            BgjPeekResult { uri: "b.rs".into(), line: 2, column: 0, preview_text: "b".into() },
+        ]);
+        assert_eq!(p.selected().unwrap().uri, "a.rs");
+        p.select_next();
+        assert_eq!(p.selected().unwrap().uri, "b.rs");
+        p.select_next();
+        assert_eq!(p.selected().unwrap().uri, "a.rs"); // wraps
+    }
+
+    #[test]
+    fn test_bgj_select_prev_wraps() {
+        let mut p = BgjPeekView::new(BgjPeekKind::Definition, 1, 0);
+        p.set_results(vec![
+            BgjPeekResult { uri: "a.rs".into(), line: 1, column: 0, preview_text: "x".into() },
+            BgjPeekResult { uri: "b.rs".into(), line: 2, column: 0, preview_text: "y".into() },
+        ]);
+        p.select_prev();
+        assert_eq!(p.selected().unwrap().uri, "b.rs");
+    }
+
+    #[test]
+    fn test_bgj_close() {
+        let mut p = BgjPeekView::new(BgjPeekKind::Definition, 1, 0);
+        p.close();
+        assert!(!p.is_visible);
+    }
+
+    #[test]
+    fn test_bgj_unique_files() {
+        let mut p = BgjPeekView::new(BgjPeekKind::References, 1, 0);
+        p.set_results(vec![
+            BgjPeekResult { uri: "a.rs".into(), line: 1, column: 0, preview_text: "".into() },
+            BgjPeekResult { uri: "a.rs".into(), line: 5, column: 0, preview_text: "".into() },
+            BgjPeekResult { uri: "b.rs".into(), line: 1, column: 0, preview_text: "".into() },
+        ]);
+        assert_eq!(p.unique_files().len(), 2);
+    }
+
+    #[test]
+    fn test_bgj_peek_kind_variants() {
+        let kinds = [
+            BgjPeekKind::Definition, BgjPeekKind::References,
+            BgjPeekKind::Implementation, BgjPeekKind::TypeDefinition,
+            BgjPeekKind::Declaration,
+        ];
+        assert_eq!(kinds.len(), 5);
+    }
+
+    #[test]
+    fn test_bgj_empty_selected() {
+        let p = BgjPeekView::new(BgjPeekKind::Definition, 1, 0);
+        assert!(p.selected().is_none());
+        assert!(!p.has_multiple_results());
+    }
+
+    #[test]
+    fn test_bgj_single_result() {
+        let mut p = BgjPeekView::new(BgjPeekKind::Definition, 1, 0);
+        p.set_results(vec![
+            BgjPeekResult { uri: "x.rs".into(), line: 1, column: 0, preview_text: "def".into() },
+        ]);
+        assert!(!p.has_multiple_results());
+        assert_eq!(p.selected().unwrap().preview_text, "def");
+    }
+
+    #[test]
+    fn test_bgj_anchor_position() {
+        let p = BgjPeekView::new(BgjPeekKind::TypeDefinition, 42, 15);
+        assert_eq!(p.anchor_line, 42);
+        assert_eq!(p.anchor_column, 15);
     }
 
 
