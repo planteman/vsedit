@@ -89173,6 +89173,111 @@ impl MenuContribution {
     }
 }
 
+/// Runtime wiring: bra_ KeybindingRule
+#[derive(Debug, Clone)]
+pub struct KeybindingRule {
+    pub bra_command_id: String,
+    pub bra_key_primary: String,
+    pub bra_key_secondary: String,
+    pub bra_when_clause: String,
+    pub bra_weight: u32,
+    pub bra_is_default: bool,
+    pub bra_source: String,
+    pub bra_extension_id: String,
+    pub bra_args_json: String,
+    pub bra_is_chord: bool,
+}
+
+impl KeybindingRule {
+    pub fn bra_summary(&self) -> String {
+        format!("KeybindingRule({})", self.bra_command_id)
+    }
+}
+
+/// Runtime wiring: brb_ KeybindingResolver
+#[derive(Debug, Clone)]
+pub struct KeybindingResolver {
+    pub brb_default_count: u32,
+    pub brb_user_count: u32,
+    pub brb_extension_count: u32,
+    pub brb_conflict_count: u32,
+    pub brb_resolved_command: String,
+    pub brb_resolved_args: String,
+    pub brb_lookup_key: String,
+    pub brb_has_chord_part: bool,
+    pub brb_context_keys: Vec<String>,
+    pub brb_is_dispatching: bool,
+}
+
+impl KeybindingResolver {
+    pub fn brb_summary(&self) -> String {
+        format!("KeybindingResolver({})", self.brb_default_count)
+    }
+}
+
+/// Runtime wiring: brc_ KeyChord
+#[derive(Debug, Clone)]
+pub struct KeyChord {
+    pub brc_first_part: String,
+    pub brc_second_part: String,
+    pub brc_ctrl_key: bool,
+    pub brc_shift_key: bool,
+    pub brc_alt_key: bool,
+    pub brc_meta_key: bool,
+    pub brc_key_code: u32,
+    pub brc_scan_code: u32,
+    pub brc_display_label: String,
+    pub brc_is_modifier_only: bool,
+}
+
+impl KeyChord {
+    pub fn brc_summary(&self) -> String {
+        format!("KeyChord({})", self.brc_first_part)
+    }
+}
+
+/// Runtime wiring: brd_ KeyboardLayout
+#[derive(Debug, Clone)]
+pub struct KeyboardLayout {
+    pub brd_layout_id: String,
+    pub brd_layout_name: String,
+    pub brd_language: String,
+    pub brd_is_iso: bool,
+    pub brd_is_ansi: bool,
+    pub brd_mapping_count: u32,
+    pub brd_dead_key_count: u32,
+    pub brd_raw_mapping: Vec<String>,
+    pub brd_is_detected: bool,
+    pub brd_fallback_layout: String,
+}
+
+impl KeyboardLayout {
+    pub fn brd_summary(&self) -> String {
+        format!("KeyboardLayout({})", self.brd_layout_id)
+    }
+}
+
+/// Runtime wiring: bre_ InputDispatch
+#[derive(Debug, Clone)]
+pub struct InputDispatch {
+    pub bre_event_type: String,
+    pub bre_key_code: u32,
+    pub bre_character: String,
+    pub bre_is_composition: bool,
+    pub bre_is_repeat: bool,
+    pub bre_timestamp: u64,
+    pub bre_target_id: String,
+    pub bre_prevented: bool,
+    pub bre_stopped: bool,
+    pub bre_dispatch_order: u32,
+}
+
+impl InputDispatch {
+    pub fn bre_summary(&self) -> String {
+        format!("InputDispatch({})", self.bre_event_type)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -117231,6 +117336,910 @@ mod tests_bfo {
         };
         let _ = obj.bqz_summary();
         assert_eq!(obj.bqz_submenu_id, "test");
+    }
+
+    #[test]
+    fn test_bra_command_id() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_command_id, "test");
+    }
+
+    #[test]
+    fn test_bra_key_primary() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_key_primary, "test");
+    }
+
+    #[test]
+    fn test_bra_key_secondary() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_key_secondary, "test");
+    }
+
+    #[test]
+    fn test_bra_when_clause() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_when_clause, "test");
+    }
+
+    #[test]
+    fn test_bra_weight() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_weight, 0);
+    }
+
+    #[test]
+    fn test_bra_is_default() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert!(!obj.bra_is_default);
+    }
+
+    #[test]
+    fn test_bra_source() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_source, "test");
+    }
+
+    #[test]
+    fn test_bra_extension_id() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bra_args_json() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert_eq!(obj.bra_args_json, "test");
+    }
+
+    #[test]
+    fn test_bra_is_chord() {
+        let obj = KeybindingRule {
+            bra_command_id: String::from("test"),
+            bra_key_primary: String::from("test"),
+            bra_key_secondary: String::from("test"),
+            bra_when_clause: String::from("test"),
+            bra_weight: 0,
+            bra_is_default: false,
+            bra_source: String::from("test"),
+            bra_extension_id: String::from("test"),
+            bra_args_json: String::from("test"),
+            bra_is_chord: false,
+        };
+        let _ = obj.bra_summary();
+        assert!(!obj.bra_is_chord);
+    }
+
+
+    #[test]
+    fn test_brb_default_count() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_default_count, 0);
+    }
+
+    #[test]
+    fn test_brb_user_count() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_user_count, 0);
+    }
+
+    #[test]
+    fn test_brb_extension_count() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_extension_count, 0);
+    }
+
+    #[test]
+    fn test_brb_conflict_count() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_conflict_count, 0);
+    }
+
+    #[test]
+    fn test_brb_resolved_command() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_resolved_command, "test");
+    }
+
+    #[test]
+    fn test_brb_resolved_args() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_resolved_args, "test");
+    }
+
+    #[test]
+    fn test_brb_lookup_key() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert_eq!(obj.brb_lookup_key, "test");
+    }
+
+    #[test]
+    fn test_brb_has_chord_part() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert!(!obj.brb_has_chord_part);
+    }
+
+    #[test]
+    fn test_brb_context_keys() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert!(obj.brb_context_keys.is_empty());
+    }
+
+    #[test]
+    fn test_brb_is_dispatching() {
+        let obj = KeybindingResolver {
+            brb_default_count: 0,
+            brb_user_count: 0,
+            brb_extension_count: 0,
+            brb_conflict_count: 0,
+            brb_resolved_command: String::from("test"),
+            brb_resolved_args: String::from("test"),
+            brb_lookup_key: String::from("test"),
+            brb_has_chord_part: false,
+            brb_context_keys: Vec::new(),
+            brb_is_dispatching: false,
+        };
+        let _ = obj.brb_summary();
+        assert!(!obj.brb_is_dispatching);
+    }
+
+
+    #[test]
+    fn test_brc_first_part() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert_eq!(obj.brc_first_part, "test");
+    }
+
+    #[test]
+    fn test_brc_second_part() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert_eq!(obj.brc_second_part, "test");
+    }
+
+    #[test]
+    fn test_brc_ctrl_key() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert!(!obj.brc_ctrl_key);
+    }
+
+    #[test]
+    fn test_brc_shift_key() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert!(!obj.brc_shift_key);
+    }
+
+    #[test]
+    fn test_brc_alt_key() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert!(!obj.brc_alt_key);
+    }
+
+    #[test]
+    fn test_brc_meta_key() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert!(!obj.brc_meta_key);
+    }
+
+    #[test]
+    fn test_brc_key_code() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert_eq!(obj.brc_key_code, 0);
+    }
+
+    #[test]
+    fn test_brc_scan_code() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert_eq!(obj.brc_scan_code, 0);
+    }
+
+    #[test]
+    fn test_brc_display_label() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert_eq!(obj.brc_display_label, "test");
+    }
+
+    #[test]
+    fn test_brc_is_modifier_only() {
+        let obj = KeyChord {
+            brc_first_part: String::from("test"),
+            brc_second_part: String::from("test"),
+            brc_ctrl_key: false,
+            brc_shift_key: false,
+            brc_alt_key: false,
+            brc_meta_key: false,
+            brc_key_code: 0,
+            brc_scan_code: 0,
+            brc_display_label: String::from("test"),
+            brc_is_modifier_only: false,
+        };
+        let _ = obj.brc_summary();
+        assert!(!obj.brc_is_modifier_only);
+    }
+
+
+    #[test]
+    fn test_brd_layout_id() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert_eq!(obj.brd_layout_id, "test");
+    }
+
+    #[test]
+    fn test_brd_layout_name() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert_eq!(obj.brd_layout_name, "test");
+    }
+
+    #[test]
+    fn test_brd_language() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert_eq!(obj.brd_language, "test");
+    }
+
+    #[test]
+    fn test_brd_is_iso() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert!(!obj.brd_is_iso);
+    }
+
+    #[test]
+    fn test_brd_is_ansi() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert!(!obj.brd_is_ansi);
+    }
+
+    #[test]
+    fn test_brd_mapping_count() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert_eq!(obj.brd_mapping_count, 0);
+    }
+
+    #[test]
+    fn test_brd_dead_key_count() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert_eq!(obj.brd_dead_key_count, 0);
+    }
+
+    #[test]
+    fn test_brd_raw_mapping() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert!(obj.brd_raw_mapping.is_empty());
+    }
+
+    #[test]
+    fn test_brd_is_detected() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert!(!obj.brd_is_detected);
+    }
+
+    #[test]
+    fn test_brd_fallback_layout() {
+        let obj = KeyboardLayout {
+            brd_layout_id: String::from("test"),
+            brd_layout_name: String::from("test"),
+            brd_language: String::from("test"),
+            brd_is_iso: false,
+            brd_is_ansi: false,
+            brd_mapping_count: 0,
+            brd_dead_key_count: 0,
+            brd_raw_mapping: Vec::new(),
+            brd_is_detected: false,
+            brd_fallback_layout: String::from("test"),
+        };
+        let _ = obj.brd_summary();
+        assert_eq!(obj.brd_fallback_layout, "test");
+    }
+
+
+    #[test]
+    fn test_bre_event_type() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert_eq!(obj.bre_event_type, "test");
+    }
+
+    #[test]
+    fn test_bre_key_code() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert_eq!(obj.bre_key_code, 0);
+    }
+
+    #[test]
+    fn test_bre_character() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert_eq!(obj.bre_character, "test");
+    }
+
+    #[test]
+    fn test_bre_is_composition() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert!(!obj.bre_is_composition);
+    }
+
+    #[test]
+    fn test_bre_is_repeat() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert!(!obj.bre_is_repeat);
+    }
+
+    #[test]
+    fn test_bre_timestamp() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert_eq!(obj.bre_timestamp, 0);
+    }
+
+    #[test]
+    fn test_bre_target_id() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert_eq!(obj.bre_target_id, "test");
+    }
+
+    #[test]
+    fn test_bre_prevented() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert!(!obj.bre_prevented);
+    }
+
+    #[test]
+    fn test_bre_stopped() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert!(!obj.bre_stopped);
+    }
+
+    #[test]
+    fn test_bre_dispatch_order() {
+        let obj = InputDispatch {
+            bre_event_type: String::from("test"),
+            bre_key_code: 0,
+            bre_character: String::from("test"),
+            bre_is_composition: false,
+            bre_is_repeat: false,
+            bre_timestamp: 0,
+            bre_target_id: String::from("test"),
+            bre_prevented: false,
+            bre_stopped: false,
+            bre_dispatch_order: 0,
+        };
+        let _ = obj.bre_summary();
+        assert_eq!(obj.bre_dispatch_order, 0);
     }
 
 }
