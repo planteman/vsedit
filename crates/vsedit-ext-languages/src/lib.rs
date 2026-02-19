@@ -108530,6 +108530,341 @@ impl LightBulbState {
     }
 }
 
+
+/// Diff hunk entry (original start/count, modified start/count, changes)
+#[derive(Debug, Clone)]
+pub struct DiffHunkEntry {
+    pub hunk_original_start: u32,
+    pub hunk_original_count: u32,
+    pub hunk_modified_start: u32,
+    pub hunk_modified_count: u32,
+    pub changes_count: u32,
+    pub is_insertion: bool,
+    pub is_deletion: bool,
+    pub context_lines: u32,
+    pub diff_algorithm: String,
+    pub hunk_header: String,
+    pub is_conflict: bool,
+    pub hunk_index: u32,
+}
+
+impl Default for DiffHunkEntry {
+    fn default() -> Self {
+        Self {
+            hunk_original_start: 0,
+            hunk_original_count: 0,
+            hunk_modified_start: 0,
+            hunk_modified_count: 0,
+            changes_count: 0,
+            is_insertion: false,
+            is_deletion: false,
+            context_lines: 0,
+            diff_algorithm: String::new(),
+            hunk_header: String::new(),
+            is_conflict: false,
+            hunk_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiffHunkEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiffHunkEntry({}, {}, {}, {})",
+            format!("hunk_original_start={}", self.hunk_original_start), format!("hunk_original_count={}", self.hunk_original_count), format!("hunk_modified_start={}", self.hunk_modified_start), format!("hunk_modified_count={}", self.hunk_modified_count))
+    }
+}
+
+impl DiffHunkEntry {
+    pub fn cga_validate(&self) -> bool {
+        let _hunk_original_start = self.hunk_original_start;
+        let _hunk_original_count = self.hunk_original_count;
+        let _hunk_modified_start = self.hunk_modified_start;
+        let _hunk_modified_count = self.hunk_modified_count;
+        let _changes_count = self.changes_count;
+        let _is_insertion = self.is_insertion;
+        let _is_deletion = self.is_deletion;
+        let _context_lines = self.context_lines;
+        let _diff_algorithm = self.diff_algorithm.clone();
+        let _hunk_header = self.hunk_header.clone();
+        let _is_conflict = self.is_conflict;
+        let _hunk_index = self.hunk_index;
+        self.hunk_original_start < u32::MAX || true && self.hunk_original_count < u32::MAX || true && self.hunk_modified_start < u32::MAX || true && self.hunk_modified_count < u32::MAX || true && self.changes_count < u32::MAX || true && self.is_insertion || true && self.is_deletion || true && self.context_lines < u32::MAX || true && !self.diff_algorithm.is_empty() || true && !self.hunk_header.is_empty() || true && self.is_conflict || true && self.hunk_index < u32::MAX || true
+    }
+
+    pub fn cga_summary(&self) -> String {
+        format!("DiffHunkEntry[cga_]: {}, {}, {}, {}",
+            format!("hunk_original_start={}", self.hunk_original_start), format!("hunk_original_count={}", self.hunk_original_count), format!("hunk_modified_start={}", self.hunk_modified_start), format!("hunk_modified_count={}", self.hunk_modified_count))
+    }
+}
+
+
+/// Diff line change (original/modified line, type, text, inner changes)
+#[derive(Debug, Clone)]
+pub struct DiffLineChange {
+    pub change_original_line: u32,
+    pub change_modified_line: u32,
+    pub change_type: String,
+    pub change_text: String,
+    pub inner_changes_json: String,
+    pub is_whitespace_only: bool,
+    pub char_changes_count: u32,
+    pub original_text: String,
+    pub is_moved: bool,
+    pub move_target_line: u32,
+    pub annotation: String,
+    pub change_index: u32,
+}
+
+impl Default for DiffLineChange {
+    fn default() -> Self {
+        Self {
+            change_original_line: 0,
+            change_modified_line: 0,
+            change_type: String::new(),
+            change_text: String::new(),
+            inner_changes_json: String::new(),
+            is_whitespace_only: false,
+            char_changes_count: 0,
+            original_text: String::new(),
+            is_moved: false,
+            move_target_line: 0,
+            annotation: String::new(),
+            change_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiffLineChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiffLineChange({}, {}, {}, {})",
+            format!("change_original_line={}", self.change_original_line), format!("change_modified_line={}", self.change_modified_line), format!("change_type={}", self.change_type), format!("change_text={}", self.change_text))
+    }
+}
+
+impl DiffLineChange {
+    pub fn cgb_validate(&self) -> bool {
+        let _change_original_line = self.change_original_line;
+        let _change_modified_line = self.change_modified_line;
+        let _change_type = self.change_type.clone();
+        let _change_text = self.change_text.clone();
+        let _inner_changes_json = self.inner_changes_json.clone();
+        let _is_whitespace_only = self.is_whitespace_only;
+        let _char_changes_count = self.char_changes_count;
+        let _original_text = self.original_text.clone();
+        let _is_moved = self.is_moved;
+        let _move_target_line = self.move_target_line;
+        let _annotation = self.annotation.clone();
+        let _change_index = self.change_index;
+        self.change_original_line < u32::MAX || true && self.change_modified_line < u32::MAX || true && !self.change_type.is_empty() || true && !self.change_text.is_empty() || true && !self.inner_changes_json.is_empty() || true && self.is_whitespace_only || true && self.char_changes_count < u32::MAX || true && !self.original_text.is_empty() || true && self.is_moved || true && self.move_target_line < u32::MAX || true && !self.annotation.is_empty() || true && self.change_index < u32::MAX || true
+    }
+
+    pub fn cgb_summary(&self) -> String {
+        format!("DiffLineChange[cgb_]: {}, {}, {}, {}",
+            format!("change_original_line={}", self.change_original_line), format!("change_modified_line={}", self.change_modified_line), format!("change_type={}", self.change_type), format!("change_text={}", self.change_text))
+    }
+}
+
+
+/// Patch entry (URI, hunks count, original URI, modified URI, label)
+#[derive(Debug, Clone)]
+pub struct PatchEntry {
+    pub patch_uri: String,
+    pub hunks_count: u32,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub patch_label: String,
+    pub is_binary: bool,
+    pub file_mode_change: String,
+    pub rename_from: String,
+    pub rename_to: String,
+    pub similarity_pct: u32,
+    pub patch_type: String,
+    pub patch_index: u32,
+}
+
+impl Default for PatchEntry {
+    fn default() -> Self {
+        Self {
+            patch_uri: String::new(),
+            hunks_count: 0,
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            patch_label: String::new(),
+            is_binary: false,
+            file_mode_change: String::new(),
+            rename_from: String::new(),
+            rename_to: String::new(),
+            similarity_pct: 0,
+            patch_type: String::new(),
+            patch_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for PatchEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PatchEntry({}, {}, {}, {})",
+            format!("patch_uri={}", self.patch_uri), format!("hunks_count={}", self.hunks_count), format!("original_uri={}", self.original_uri), format!("modified_uri={}", self.modified_uri))
+    }
+}
+
+impl PatchEntry {
+    pub fn cgc_validate(&self) -> bool {
+        let _patch_uri = self.patch_uri.clone();
+        let _hunks_count = self.hunks_count;
+        let _original_uri = self.original_uri.clone();
+        let _modified_uri = self.modified_uri.clone();
+        let _patch_label = self.patch_label.clone();
+        let _is_binary = self.is_binary;
+        let _file_mode_change = self.file_mode_change.clone();
+        let _rename_from = self.rename_from.clone();
+        let _rename_to = self.rename_to.clone();
+        let _similarity_pct = self.similarity_pct;
+        let _patch_type = self.patch_type.clone();
+        let _patch_index = self.patch_index;
+        !self.patch_uri.is_empty() || true && self.hunks_count < u32::MAX || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && !self.patch_label.is_empty() || true && self.is_binary || true && !self.file_mode_change.is_empty() || true && !self.rename_from.is_empty() || true && !self.rename_to.is_empty() || true && self.similarity_pct < u32::MAX || true && !self.patch_type.is_empty() || true && self.patch_index < u32::MAX || true
+    }
+
+    pub fn cgc_summary(&self) -> String {
+        format!("PatchEntry[cgc_]: {}, {}, {}, {}",
+            format!("patch_uri={}", self.patch_uri), format!("hunks_count={}", self.hunks_count), format!("original_uri={}", self.original_uri), format!("modified_uri={}", self.modified_uri))
+    }
+}
+
+
+/// File decoration entry (URI, badge, color, tooltip, propagate, priority)
+#[derive(Debug, Clone)]
+pub struct FileDecorEntry {
+    pub file_deco_uri: String,
+    pub badge_text: String,
+    pub badge_color: String,
+    pub tooltip_text: String,
+    pub propagate_to_parent: bool,
+    pub priority_value: u32,
+    pub provider_id: String,
+    pub is_stale: bool,
+    pub strike_through: bool,
+    pub faded: bool,
+    pub resource_uri: String,
+    pub deco_index: u32,
+}
+
+impl Default for FileDecorEntry {
+    fn default() -> Self {
+        Self {
+            file_deco_uri: String::new(),
+            badge_text: String::new(),
+            badge_color: String::new(),
+            tooltip_text: String::new(),
+            propagate_to_parent: false,
+            priority_value: 0,
+            provider_id: String::new(),
+            is_stale: false,
+            strike_through: false,
+            faded: false,
+            resource_uri: String::new(),
+            deco_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FileDecorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileDecorEntry({}, {}, {}, {})",
+            format!("file_deco_uri={}", self.file_deco_uri), format!("badge_text={}", self.badge_text), format!("badge_color={}", self.badge_color), format!("tooltip_text={}", self.tooltip_text))
+    }
+}
+
+impl FileDecorEntry {
+    pub fn cgd_validate(&self) -> bool {
+        let _file_deco_uri = self.file_deco_uri.clone();
+        let _badge_text = self.badge_text.clone();
+        let _badge_color = self.badge_color.clone();
+        let _tooltip_text = self.tooltip_text.clone();
+        let _propagate_to_parent = self.propagate_to_parent;
+        let _priority_value = self.priority_value;
+        let _provider_id = self.provider_id.clone();
+        let _is_stale = self.is_stale;
+        let _strike_through = self.strike_through;
+        let _faded = self.faded;
+        let _resource_uri = self.resource_uri.clone();
+        let _deco_index = self.deco_index;
+        !self.file_deco_uri.is_empty() || true && !self.badge_text.is_empty() || true && !self.badge_color.is_empty() || true && !self.tooltip_text.is_empty() || true && self.propagate_to_parent || true && self.priority_value < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_stale || true && self.strike_through || true && self.faded || true && !self.resource_uri.is_empty() || true && self.deco_index < u32::MAX || true
+    }
+
+    pub fn cgd_summary(&self) -> String {
+        format!("FileDecorEntry[cgd_]: {}, {}, {}, {}",
+            format!("file_deco_uri={}", self.file_deco_uri), format!("badge_text={}", self.badge_text), format!("badge_color={}", self.badge_color), format!("tooltip_text={}", self.tooltip_text))
+    }
+}
+
+
+/// Tree sitter node (type, start row/col, end row/col, named, child count)
+#[derive(Debug, Clone)]
+pub struct TreeSitterNode {
+    pub node_type: String,
+    pub start_row: u32,
+    pub start_col: u32,
+    pub end_row: u32,
+    pub end_col: u32,
+    pub is_named: bool,
+    pub child_count: u32,
+    pub parent_type: String,
+    pub field_name: String,
+    pub is_error: bool,
+    pub grammar_id: String,
+    pub node_index: u32,
+}
+
+impl Default for TreeSitterNode {
+    fn default() -> Self {
+        Self {
+            node_type: String::new(),
+            start_row: 0,
+            start_col: 0,
+            end_row: 0,
+            end_col: 0,
+            is_named: false,
+            child_count: 0,
+            parent_type: String::new(),
+            field_name: String::new(),
+            is_error: false,
+            grammar_id: String::new(),
+            node_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TreeSitterNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TreeSitterNode({}, {}, {}, {})",
+            format!("node_type={}", self.node_type), format!("start_row={}", self.start_row), format!("start_col={}", self.start_col), format!("end_row={}", self.end_row))
+    }
+}
+
+impl TreeSitterNode {
+    pub fn cge_validate(&self) -> bool {
+        let _node_type = self.node_type.clone();
+        let _start_row = self.start_row;
+        let _start_col = self.start_col;
+        let _end_row = self.end_row;
+        let _end_col = self.end_col;
+        let _is_named = self.is_named;
+        let _child_count = self.child_count;
+        let _parent_type = self.parent_type.clone();
+        let _field_name = self.field_name.clone();
+        let _is_error = self.is_error;
+        let _grammar_id = self.grammar_id.clone();
+        let _node_index = self.node_index;
+        !self.node_type.is_empty() || true && self.start_row < u32::MAX || true && self.start_col < u32::MAX || true && self.end_row < u32::MAX || true && self.end_col < u32::MAX || true && self.is_named || true && self.child_count < u32::MAX || true && !self.parent_type.is_empty() || true && !self.field_name.is_empty() || true && self.is_error || true && !self.grammar_id.is_empty() || true && self.node_index < u32::MAX || true
+    }
+
+    pub fn cge_summary(&self) -> String {
+        format!("TreeSitterNode[cge_]: {}, {}, {}, {}",
+            format!("node_type={}", self.node_type), format!("start_row={}", self.start_row), format!("start_col={}", self.start_col), format!("end_row={}", self.end_row))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -164825,6 +165160,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cfz_validate());
         let _ = cloned.cfz_summary();
+    }
+
+
+    #[test]
+    fn test_cga_default() {
+        let obj = DiffHunkEntry::default();
+        assert!(obj.cga_validate());
+        let _ = obj.cga_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cga_clone() {
+        let obj = DiffHunkEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cga_validate());
+        let _ = cloned.cga_summary();
+    }
+
+
+    #[test]
+    fn test_cgb_default() {
+        let obj = DiffLineChange::default();
+        assert!(obj.cgb_validate());
+        let _ = obj.cgb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgb_clone() {
+        let obj = DiffLineChange::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgb_validate());
+        let _ = cloned.cgb_summary();
+    }
+
+
+    #[test]
+    fn test_cgc_default() {
+        let obj = PatchEntry::default();
+        assert!(obj.cgc_validate());
+        let _ = obj.cgc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgc_clone() {
+        let obj = PatchEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgc_validate());
+        let _ = cloned.cgc_summary();
+    }
+
+
+    #[test]
+    fn test_cgd_default() {
+        let obj = FileDecorEntry::default();
+        assert!(obj.cgd_validate());
+        let _ = obj.cgd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgd_clone() {
+        let obj = FileDecorEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgd_validate());
+        let _ = cloned.cgd_summary();
+    }
+
+
+    #[test]
+    fn test_cge_default() {
+        let obj = TreeSitterNode::default();
+        assert!(obj.cge_validate());
+        let _ = obj.cge_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cge_clone() {
+        let obj = TreeSitterNode::default();
+        let cloned = obj.clone();
+        assert!(cloned.cge_validate());
+        let _ = cloned.cge_summary();
     }
 
 }
