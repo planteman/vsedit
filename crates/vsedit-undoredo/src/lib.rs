@@ -84716,6 +84716,234 @@ impl BioIconRegistry {
     pub fn icon_count(&self) -> usize { self.icons.len() }
 }
 
+
+/// Telemetry opt-in level (bip_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BipTelemetryLevel {
+    Off,
+    Crash,
+    Error,
+    All,
+}
+
+/// Telemetry event (bip_)
+#[derive(Debug, Clone)]
+pub struct BipTelemetryEvent {
+    pub name: String,
+    pub properties: std::collections::HashMap<String, String>,
+    pub measurements: std::collections::HashMap<String, f64>,
+}
+
+/// Telemetry service (bip_)
+#[derive(Debug, Clone)]
+pub struct BipTelemetryService {
+    pub level: BipTelemetryLevel,
+    pub events: Vec<BipTelemetryEvent>,
+}
+
+impl BipTelemetryService {
+    pub fn new(level: BipTelemetryLevel) -> Self { Self { level, events: Vec::new() } }
+    pub fn log_event(&mut self, event: BipTelemetryEvent) {
+        if self.level != BipTelemetryLevel::Off { self.events.push(event); }
+    }
+    pub fn log_error(&mut self, name: String, props: std::collections::HashMap<String, String>) {
+        if self.level == BipTelemetryLevel::Error || self.level == BipTelemetryLevel::All || self.level == BipTelemetryLevel::Crash {
+            self.events.push(BipTelemetryEvent { name, properties: props, measurements: std::collections::HashMap::new() });
+        }
+    }
+    pub fn set_level(&mut self, level: BipTelemetryLevel) { self.level = level; }
+    pub fn flush(&mut self) -> Vec<BipTelemetryEvent> { std::mem::take(&mut self.events) }
+    pub fn event_count(&self) -> usize { self.events.len() }
+    pub fn is_enabled(&self) -> bool { self.level != BipTelemetryLevel::Off }
+}
+
+
+/// Log level (biq_)
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum BiqLogLevel {
+    Trace = 0,
+    Debug = 1,
+    Info = 2,
+    Warning = 3,
+    Error = 4,
+}
+
+/// Log entry (biq_)
+#[derive(Debug, Clone)]
+pub struct BiqLogEntry {
+    pub level: BiqLogLevel,
+    pub message: String,
+    pub source: String,
+    pub timestamp: u64,
+}
+
+/// Log output service (biq_)
+#[derive(Debug, Clone)]
+pub struct BiqLogService {
+    pub entries: Vec<BiqLogEntry>,
+    pub min_level: BiqLogLevel,
+    pub max_entries: usize,
+}
+
+impl BiqLogService {
+    pub fn new(min_level: BiqLogLevel, max_entries: usize) -> Self {
+        Self { entries: Vec::new(), min_level, max_entries }
+    }
+    pub fn log(&mut self, entry: BiqLogEntry) {
+        if entry.level >= self.min_level {
+            self.entries.push(entry);
+            if self.entries.len() > self.max_entries {
+                self.entries.remove(0);
+            }
+        }
+    }
+    pub fn set_level(&mut self, level: BiqLogLevel) { self.min_level = level; }
+    pub fn by_level(&self, level: &BiqLogLevel) -> Vec<&BiqLogEntry> {
+        self.entries.iter().filter(|e| &e.level == level).collect()
+    }
+    pub fn by_source(&self, src: &str) -> Vec<&BiqLogEntry> {
+        self.entries.iter().filter(|e| e.source == src).collect()
+    }
+    pub fn clear(&mut self) { self.entries.clear(); }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+}
+
+
+/// OS type (bir_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BirOsType {
+    Windows,
+    Linux,
+    MacOS,
+    Unknown,
+}
+
+/// Environment info (bir_)
+#[derive(Debug, Clone)]
+pub struct BirEnvironmentInfo {
+    pub os: BirOsType,
+    pub arch: String,
+    pub shell: String,
+    pub locale: String,
+    pub home_dir: String,
+    pub app_root: String,
+    pub user_data_dir: String,
+    pub extensions_dir: String,
+    pub env_vars: std::collections::HashMap<String, String>,
+}
+
+impl BirEnvironmentInfo {
+    pub fn new(os: BirOsType, arch: String) -> Self {
+        Self { os, arch, shell: String::new(), locale: "en-US".into(), home_dir: String::new(), app_root: String::new(), user_data_dir: String::new(), extensions_dir: String::new(), env_vars: std::collections::HashMap::new() }
+    }
+    pub fn set_shell(&mut self, s: String) { self.shell = s; }
+    pub fn set_locale(&mut self, l: String) { self.locale = l; }
+    pub fn set_home(&mut self, h: String) { self.home_dir = h; }
+    pub fn set_app_root(&mut self, r: String) { self.app_root = r; }
+    pub fn set_env(&mut self, key: String, val: String) { self.env_vars.insert(key, val); }
+    pub fn get_env(&self, key: &str) -> Option<&str> { self.env_vars.get(key).map(|s| s.as_str()) }
+    pub fn is_linux(&self) -> bool { self.os == BirOsType::Linux }
+    pub fn is_windows(&self) -> bool { self.os == BirOsType::Windows }
+    pub fn is_macos(&self) -> bool { self.os == BirOsType::MacOS }
+}
+
+
+/// Lifecycle phase (bis_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BisLifecyclePhase {
+    Starting,
+    Ready,
+    Restored,
+    Eventually,
+    ShuttingDown,
+}
+
+/// Shutdown reason (bis_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BisShutdownReason {
+    Quit,
+    Reload,
+    Close,
+    LoadWorkspace,
+}
+
+/// Lifecycle service (bis_)
+#[derive(Debug, Clone)]
+pub struct BisLifecycleService {
+    pub phase: BisLifecyclePhase,
+    pub dirty_count: usize,
+    pub shutdown_reason: Option<BisShutdownReason>,
+    pub restart_requested: bool,
+}
+
+impl BisLifecycleService {
+    pub fn new() -> Self {
+        Self { phase: BisLifecyclePhase::Starting, dirty_count: 0, shutdown_reason: None, restart_requested: false }
+    }
+    pub fn set_phase(&mut self, phase: BisLifecyclePhase) { self.phase = phase; }
+    pub fn set_dirty_count(&mut self, count: usize) { self.dirty_count = count; }
+    pub fn request_shutdown(&mut self, reason: BisShutdownReason) {
+        self.phase = BisLifecyclePhase::ShuttingDown;
+        self.shutdown_reason = Some(reason);
+    }
+    pub fn request_restart(&mut self) { self.restart_requested = true; }
+    pub fn can_shutdown(&self) -> bool { self.dirty_count == 0 }
+    pub fn is_starting(&self) -> bool { self.phase == BisLifecyclePhase::Starting }
+    pub fn is_ready(&self) -> bool { self.phase == BisLifecyclePhase::Ready || self.phase == BisLifecyclePhase::Restored || self.phase == BisLifecyclePhase::Eventually }
+    pub fn is_shutting_down(&self) -> bool { self.phase == BisLifecyclePhase::ShuttingDown }
+}
+
+
+/// Configuration scope (bit_)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BitConfigScope {
+    Default,
+    User,
+    Workspace,
+    WorkspaceFolder(String),
+}
+
+/// Configuration value with source (bit_)
+#[derive(Debug, Clone)]
+pub struct BitConfigValue {
+    pub value: String,
+    pub scope: BitConfigScope,
+}
+
+/// Configuration resolver (bit_)
+#[derive(Debug, Clone)]
+pub struct BitConfigResolver {
+    pub values: std::collections::HashMap<String, Vec<BitConfigValue>>,
+}
+
+impl BitConfigResolver {
+    pub fn new() -> Self { Self { values: std::collections::HashMap::new() } }
+    pub fn set(&mut self, key: String, value: String, scope: BitConfigScope) {
+        let entry = self.values.entry(key).or_default();
+        entry.retain(|v| v.scope != scope);
+        entry.push(BitConfigValue { value, scope });
+    }
+    pub fn get_effective(&self, key: &str) -> Option<&str> {
+        let vals = self.values.get(key)?;
+        // WorkspaceFolder > Workspace > User > Default
+        for scope in &[BitConfigScope::Workspace, BitConfigScope::User, BitConfigScope::Default] {
+            if let Some(v) = vals.iter().find(|v| &v.scope == scope) {
+                return Some(&v.value);
+            }
+        }
+        // Check any workspace folder
+        vals.iter().find(|v| matches!(v.scope, BitConfigScope::WorkspaceFolder(_))).map(|v| v.value.as_str())
+    }
+    pub fn get_at_scope(&self, key: &str, scope: &BitConfigScope) -> Option<&str> {
+        self.values.get(key).and_then(|vs| vs.iter().find(|v| &v.scope == scope).map(|v| v.value.as_str()))
+    }
+    pub fn reset(&mut self, key: &str, scope: &BitConfigScope) {
+        if let Some(vs) = self.values.get_mut(key) { vs.retain(|v| &v.scope != scope); }
+    }
+    pub fn keys(&self) -> Vec<&str> { self.values.keys().map(|k| k.as_str()).collect() }
+    pub fn key_count(&self) -> usize { self.values.len() }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -91322,6 +91550,329 @@ mod tests_bfo {
     fn test_bio_get_nonexistent() {
         let r = BioIconRegistry::new();
         assert!(r.get("missing").is_none());
+    }
+
+
+    #[test]
+    fn test_bip_telemetry_new() {
+        let t = BipTelemetryService::new(BipTelemetryLevel::All);
+        assert!(t.is_enabled());
+        assert_eq!(t.event_count(), 0);
+    }
+    #[test]
+    fn test_bip_log_event() {
+        let mut t = BipTelemetryService::new(BipTelemetryLevel::All);
+        t.log_event(BipTelemetryEvent { name: "startup".into(), properties: std::collections::HashMap::new(), measurements: std::collections::HashMap::new() });
+        assert_eq!(t.event_count(), 1);
+    }
+    #[test]
+    fn test_bip_off_no_log() {
+        let mut t = BipTelemetryService::new(BipTelemetryLevel::Off);
+        t.log_event(BipTelemetryEvent { name: "x".into(), properties: std::collections::HashMap::new(), measurements: std::collections::HashMap::new() });
+        assert_eq!(t.event_count(), 0);
+    }
+    #[test]
+    fn test_bip_log_error() {
+        let mut t = BipTelemetryService::new(BipTelemetryLevel::Error);
+        t.log_error("crash".into(), std::collections::HashMap::new());
+        assert_eq!(t.event_count(), 1);
+    }
+    #[test]
+    fn test_bip_flush() {
+        let mut t = BipTelemetryService::new(BipTelemetryLevel::All);
+        t.log_event(BipTelemetryEvent { name: "a".into(), properties: std::collections::HashMap::new(), measurements: std::collections::HashMap::new() });
+        let flushed = t.flush();
+        assert_eq!(flushed.len(), 1);
+        assert_eq!(t.event_count(), 0);
+    }
+    #[test]
+    fn test_bip_set_level() {
+        let mut t = BipTelemetryService::new(BipTelemetryLevel::All);
+        t.set_level(BipTelemetryLevel::Off);
+        assert!(!t.is_enabled());
+    }
+    #[test]
+    fn test_bip_crash_level() {
+        let t = BipTelemetryService::new(BipTelemetryLevel::Crash);
+        assert!(t.is_enabled());
+    }
+    #[test]
+    fn test_bip_event_properties() {
+        let mut props = std::collections::HashMap::new();
+        props.insert("action".into(), "save".into());
+        let e = BipTelemetryEvent { name: "action".into(), properties: props, measurements: std::collections::HashMap::new() };
+        assert_eq!(e.properties.get("action").unwrap(), "save");
+    }
+    #[test]
+    fn test_bip_event_measurements() {
+        let mut ms = std::collections::HashMap::new();
+        ms.insert("duration_ms".into(), 42.5);
+        let e = BipTelemetryEvent { name: "perf".into(), properties: std::collections::HashMap::new(), measurements: ms };
+        assert_eq!(*e.measurements.get("duration_ms").unwrap(), 42.5);
+    }
+    #[test]
+    fn test_bip_multiple_events() {
+        let mut t = BipTelemetryService::new(BipTelemetryLevel::All);
+        for i in 0..5 {
+            t.log_event(BipTelemetryEvent { name: format!("e{i}"), properties: std::collections::HashMap::new(), measurements: std::collections::HashMap::new() });
+        }
+        assert_eq!(t.event_count(), 5);
+    }
+
+
+    #[test]
+    fn test_biq_log_service_new() {
+        let s = BiqLogService::new(BiqLogLevel::Info, 1000);
+        assert_eq!(s.entry_count(), 0);
+    }
+    #[test]
+    fn test_biq_log_entry() {
+        let mut s = BiqLogService::new(BiqLogLevel::Info, 100);
+        s.log(BiqLogEntry { level: BiqLogLevel::Info, message: "started".into(), source: "main".into(), timestamp: 1000 });
+        assert_eq!(s.entry_count(), 1);
+    }
+    #[test]
+    fn test_biq_below_level_filtered() {
+        let mut s = BiqLogService::new(BiqLogLevel::Warning, 100);
+        s.log(BiqLogEntry { level: BiqLogLevel::Debug, message: "debug".into(), source: "main".into(), timestamp: 1000 });
+        assert_eq!(s.entry_count(), 0);
+    }
+    #[test]
+    fn test_biq_max_entries() {
+        let mut s = BiqLogService::new(BiqLogLevel::Trace, 3);
+        for i in 0..5 {
+            s.log(BiqLogEntry { level: BiqLogLevel::Info, message: format!("m{i}"), source: "s".into(), timestamp: i });
+        }
+        assert_eq!(s.entry_count(), 3);
+    }
+    #[test]
+    fn test_biq_by_level() {
+        let mut s = BiqLogService::new(BiqLogLevel::Trace, 100);
+        s.log(BiqLogEntry { level: BiqLogLevel::Error, message: "err".into(), source: "s".into(), timestamp: 1 });
+        s.log(BiqLogEntry { level: BiqLogLevel::Info, message: "info".into(), source: "s".into(), timestamp: 2 });
+        assert_eq!(s.by_level(&BiqLogLevel::Error).len(), 1);
+    }
+    #[test]
+    fn test_biq_by_source() {
+        let mut s = BiqLogService::new(BiqLogLevel::Trace, 100);
+        s.log(BiqLogEntry { level: BiqLogLevel::Info, message: "a".into(), source: "lsp".into(), timestamp: 1 });
+        s.log(BiqLogEntry { level: BiqLogLevel::Info, message: "b".into(), source: "ext".into(), timestamp: 2 });
+        assert_eq!(s.by_source("lsp").len(), 1);
+    }
+    #[test]
+    fn test_biq_clear() {
+        let mut s = BiqLogService::new(BiqLogLevel::Trace, 100);
+        s.log(BiqLogEntry { level: BiqLogLevel::Info, message: "x".into(), source: "s".into(), timestamp: 1 });
+        s.clear();
+        assert_eq!(s.entry_count(), 0);
+    }
+    #[test]
+    fn test_biq_set_level() {
+        let mut s = BiqLogService::new(BiqLogLevel::Trace, 100);
+        s.set_level(BiqLogLevel::Error);
+        s.log(BiqLogEntry { level: BiqLogLevel::Info, message: "x".into(), source: "s".into(), timestamp: 1 });
+        assert_eq!(s.entry_count(), 0);
+    }
+    #[test]
+    fn test_biq_trace_level() {
+        let mut s = BiqLogService::new(BiqLogLevel::Trace, 100);
+        s.log(BiqLogEntry { level: BiqLogLevel::Trace, message: "t".into(), source: "s".into(), timestamp: 1 });
+        assert_eq!(s.entry_count(), 1);
+    }
+    #[test]
+    fn test_biq_log_level_order() {
+        assert!(BiqLogLevel::Error > BiqLogLevel::Warning);
+        assert!(BiqLogLevel::Warning > BiqLogLevel::Info);
+    }
+
+
+    #[test]
+    fn test_bir_env_new() {
+        let e = BirEnvironmentInfo::new(BirOsType::Linux, "x86_64".into());
+        assert!(e.is_linux());
+        assert_eq!(e.arch, "x86_64");
+    }
+    #[test]
+    fn test_bir_shell() {
+        let mut e = BirEnvironmentInfo::new(BirOsType::Linux, "x86_64".into());
+        e.set_shell("/bin/bash".into());
+        assert_eq!(e.shell, "/bin/bash");
+    }
+    #[test]
+    fn test_bir_locale() {
+        let mut e = BirEnvironmentInfo::new(BirOsType::MacOS, "arm64".into());
+        e.set_locale("fr-FR".into());
+        assert_eq!(e.locale, "fr-FR");
+    }
+    #[test]
+    fn test_bir_home() {
+        let mut e = BirEnvironmentInfo::new(BirOsType::Linux, "x86_64".into());
+        e.set_home("/home/user".into());
+        assert_eq!(e.home_dir, "/home/user");
+    }
+    #[test]
+    fn test_bir_env_vars() {
+        let mut e = BirEnvironmentInfo::new(BirOsType::Linux, "x86_64".into());
+        e.set_env("PATH".into(), "/usr/bin".into());
+        assert_eq!(e.get_env("PATH"), Some("/usr/bin"));
+    }
+    #[test]
+    fn test_bir_missing_env() {
+        let e = BirEnvironmentInfo::new(BirOsType::Linux, "x86_64".into());
+        assert!(e.get_env("NONEXISTENT").is_none());
+    }
+    #[test]
+    fn test_bir_windows() {
+        let e = BirEnvironmentInfo::new(BirOsType::Windows, "x86_64".into());
+        assert!(e.is_windows());
+        assert!(!e.is_linux());
+    }
+    #[test]
+    fn test_bir_macos() {
+        let e = BirEnvironmentInfo::new(BirOsType::MacOS, "arm64".into());
+        assert!(e.is_macos());
+    }
+    #[test]
+    fn test_bir_app_root() {
+        let mut e = BirEnvironmentInfo::new(BirOsType::Linux, "x86_64".into());
+        e.set_app_root("/opt/vsedit".into());
+        assert_eq!(e.app_root, "/opt/vsedit");
+    }
+    #[test]
+    fn test_bir_unknown_os() {
+        let e = BirEnvironmentInfo::new(BirOsType::Unknown, "wasm32".into());
+        assert!(!e.is_linux());
+        assert!(!e.is_windows());
+    }
+
+
+    #[test]
+    fn test_bis_lifecycle_new() {
+        let l = BisLifecycleService::new();
+        assert!(l.is_starting());
+        assert!(!l.is_shutting_down());
+    }
+    #[test]
+    fn test_bis_set_phase() {
+        let mut l = BisLifecycleService::new();
+        l.set_phase(BisLifecyclePhase::Ready);
+        assert!(l.is_ready());
+    }
+    #[test]
+    fn test_bis_shutdown() {
+        let mut l = BisLifecycleService::new();
+        l.request_shutdown(BisShutdownReason::Quit);
+        assert!(l.is_shutting_down());
+        assert_eq!(l.shutdown_reason, Some(BisShutdownReason::Quit));
+    }
+    #[test]
+    fn test_bis_can_shutdown() {
+        let mut l = BisLifecycleService::new();
+        assert!(l.can_shutdown());
+        l.set_dirty_count(3);
+        assert!(!l.can_shutdown());
+    }
+    #[test]
+    fn test_bis_restart() {
+        let mut l = BisLifecycleService::new();
+        l.request_restart();
+        assert!(l.restart_requested);
+    }
+    #[test]
+    fn test_bis_reload_reason() {
+        let mut l = BisLifecycleService::new();
+        l.request_shutdown(BisShutdownReason::Reload);
+        assert_eq!(l.shutdown_reason, Some(BisShutdownReason::Reload));
+    }
+    #[test]
+    fn test_bis_restored_phase() {
+        let mut l = BisLifecycleService::new();
+        l.set_phase(BisLifecyclePhase::Restored);
+        assert!(l.is_ready());
+    }
+    #[test]
+    fn test_bis_eventually_phase() {
+        let mut l = BisLifecycleService::new();
+        l.set_phase(BisLifecyclePhase::Eventually);
+        assert!(l.is_ready());
+    }
+    #[test]
+    fn test_bis_close_reason() {
+        let r = BisShutdownReason::Close;
+        assert_eq!(r, BisShutdownReason::Close);
+    }
+    #[test]
+    fn test_bis_dirty_count() {
+        let mut l = BisLifecycleService::new();
+        l.set_dirty_count(5);
+        assert_eq!(l.dirty_count, 5);
+    }
+
+
+    #[test]
+    fn test_bit_resolver_new() {
+        let r = BitConfigResolver::new();
+        assert_eq!(r.key_count(), 0);
+    }
+    #[test]
+    fn test_bit_set_get() {
+        let mut r = BitConfigResolver::new();
+        r.set("editor.fontSize".into(), "14".into(), BitConfigScope::Default);
+        assert_eq!(r.get_effective("editor.fontSize"), Some("14"));
+    }
+    #[test]
+    fn test_bit_scope_precedence() {
+        let mut r = BitConfigResolver::new();
+        r.set("editor.tabSize".into(), "4".into(), BitConfigScope::Default);
+        r.set("editor.tabSize".into(), "2".into(), BitConfigScope::User);
+        assert_eq!(r.get_effective("editor.tabSize"), Some("2"));
+    }
+    #[test]
+    fn test_bit_workspace_overrides_user() {
+        let mut r = BitConfigResolver::new();
+        r.set("k".into(), "default".into(), BitConfigScope::Default);
+        r.set("k".into(), "user".into(), BitConfigScope::User);
+        r.set("k".into(), "workspace".into(), BitConfigScope::Workspace);
+        assert_eq!(r.get_effective("k"), Some("workspace"));
+    }
+    #[test]
+    fn test_bit_get_at_scope() {
+        let mut r = BitConfigResolver::new();
+        r.set("k".into(), "d".into(), BitConfigScope::Default);
+        r.set("k".into(), "u".into(), BitConfigScope::User);
+        assert_eq!(r.get_at_scope("k", &BitConfigScope::Default), Some("d"));
+    }
+    #[test]
+    fn test_bit_reset() {
+        let mut r = BitConfigResolver::new();
+        r.set("k".into(), "v".into(), BitConfigScope::User);
+        r.reset("k", &BitConfigScope::User);
+        assert!(r.get_at_scope("k", &BitConfigScope::User).is_none());
+    }
+    #[test]
+    fn test_bit_folder_scope() {
+        let mut r = BitConfigResolver::new();
+        r.set("k".into(), "folder".into(), BitConfigScope::WorkspaceFolder("/project".into()));
+        assert!(r.get_effective("k").is_some());
+    }
+    #[test]
+    fn test_bit_missing_key() {
+        let r = BitConfigResolver::new();
+        assert!(r.get_effective("nonexistent").is_none());
+    }
+    #[test]
+    fn test_bit_keys() {
+        let mut r = BitConfigResolver::new();
+        r.set("a".into(), "1".into(), BitConfigScope::Default);
+        r.set("b".into(), "2".into(), BitConfigScope::Default);
+        assert_eq!(r.key_count(), 2);
+    }
+    #[test]
+    fn test_bit_overwrite_same_scope() {
+        let mut r = BitConfigResolver::new();
+        r.set("k".into(), "old".into(), BitConfigScope::User);
+        r.set("k".into(), "new".into(), BitConfigScope::User);
+        assert_eq!(r.get_at_scope("k", &BitConfigScope::User), Some("new"));
     }
 
 }
