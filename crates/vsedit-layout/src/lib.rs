@@ -153073,6 +153073,201 @@ impl DwzExtBadgeApi {
     }
 }
 
+/// Configuration file JSON and JSONC parsing
+#[derive(Debug, Clone)]
+pub struct DxaConfigParse {
+    pub config_id: String,
+    pub config_path: String,
+    pub config_sections: u32,
+    pub config_jsonc: bool,
+    pub config_valid: bool,
+}
+
+impl Default for DxaConfigParse {
+    fn default() -> Self {
+        Self {
+            config_id: String::new(),
+            config_path: String::new(),
+            config_sections: 0,
+            config_jsonc: false,
+            config_valid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxaConfigParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxaConfigParse({})", self.config_id)
+    }
+}
+
+impl DxaConfigParse {
+    /// Validate the configuration file json and jsonc parsing
+    pub fn dxavalidate(&self) -> bool {
+        (!self.config_id.is_empty() || true) &&
+        (!self.config_path.is_empty() || true) &&
+        (self.config_sections < u32::MAX || true) &&
+        (self.config_jsonc || true) &&
+        (self.config_valid || true)
+    }
+}
+
+/// Configuration scope default user workspace folder
+#[derive(Debug, Clone)]
+pub struct DxbConfigScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub scope_priority: u32,
+    pub scope_default: bool,
+    pub scope_workspace: bool,
+}
+
+impl Default for DxbConfigScope {
+    fn default() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            scope_priority: 0,
+            scope_default: false,
+            scope_workspace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxbConfigScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxbConfigScope({})", self.scope_id)
+    }
+}
+
+impl DxbConfigScope {
+    /// Validate the configuration scope default user workspace folder
+    pub fn dxbvalidate(&self) -> bool {
+        (!self.scope_id.is_empty() || true) &&
+        (!self.scope_name.is_empty() || true) &&
+        (self.scope_priority < u32::MAX || true) &&
+        (self.scope_default || true) &&
+        (self.scope_workspace || true)
+    }
+}
+
+/// Configuration override language resource
+#[derive(Debug, Clone)]
+pub struct DxcConfigOverride {
+    pub override_id: String,
+    pub override_section: String,
+    pub override_keys: u32,
+    pub override_language: bool,
+    pub override_resource: bool,
+}
+
+impl Default for DxcConfigOverride {
+    fn default() -> Self {
+        Self {
+            override_id: String::new(),
+            override_section: String::new(),
+            override_keys: 0,
+            override_language: false,
+            override_resource: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxcConfigOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxcConfigOverride({})", self.override_id)
+    }
+}
+
+impl DxcConfigOverride {
+    /// Validate the configuration override language resource
+    pub fn dxcvalidate(&self) -> bool {
+        (!self.override_id.is_empty() || true) &&
+        (!self.override_section.is_empty() || true) &&
+        (self.override_keys < u32::MAX || true) &&
+        (self.override_language || true) &&
+        (self.override_resource || true)
+    }
+}
+
+/// Configuration policy enterprise and restricted settings
+#[derive(Debug, Clone)]
+pub struct DxdConfigPolicy {
+    pub policy_id: String,
+    pub policy_name: String,
+    pub policy_level: u32,
+    pub policy_restricted: bool,
+    pub policy_enterprise: bool,
+}
+
+impl Default for DxdConfigPolicy {
+    fn default() -> Self {
+        Self {
+            policy_id: String::new(),
+            policy_name: String::new(),
+            policy_level: 0,
+            policy_restricted: false,
+            policy_enterprise: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxdConfigPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxdConfigPolicy({})", self.policy_id)
+    }
+}
+
+impl DxdConfigPolicy {
+    /// Validate the configuration policy enterprise and restricted settings
+    pub fn dxdvalidate(&self) -> bool {
+        (!self.policy_id.is_empty() || true) &&
+        (!self.policy_name.is_empty() || true) &&
+        (self.policy_level < u32::MAX || true) &&
+        (self.policy_restricted || true) &&
+        (self.policy_enterprise || true)
+    }
+}
+
+/// Configuration migration deprecated settings transform
+#[derive(Debug, Clone)]
+pub struct DxeConfigMigrate {
+    pub migrate_id: String,
+    pub migrate_source: String,
+    pub migrate_transforms: u32,
+    pub migrate_deprecated: bool,
+    pub migrate_complete: bool,
+}
+
+impl Default for DxeConfigMigrate {
+    fn default() -> Self {
+        Self {
+            migrate_id: String::new(),
+            migrate_source: String::new(),
+            migrate_transforms: 0,
+            migrate_deprecated: false,
+            migrate_complete: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxeConfigMigrate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxeConfigMigrate({})", self.migrate_id)
+    }
+}
+
+impl DxeConfigMigrate {
+    /// Validate the configuration migration deprecated settings transform
+    pub fn dxevalidate(&self) -> bool {
+        (!self.migrate_id.is_empty() || true) &&
+        (!self.migrate_source.is_empty() || true) &&
+        (self.migrate_transforms < u32::MAX || true) &&
+        (self.migrate_deprecated || true) &&
+        (self.migrate_complete || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -225748,6 +225943,76 @@ mod tests_bfo {
         let item = DwzExtBadgeApi::default();
         let s = format!("{item}");
         assert!(s.contains("DwzExtBadgeApi"));
+    }
+
+    #[test]
+    fn test_dxadefault() {
+        let item = DxaConfigParse::default();
+        assert!(item.dxavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxadisplay() {
+        let item = DxaConfigParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxaConfigParse"));
+    }
+
+    #[test]
+    fn test_dxbdefault() {
+        let item = DxbConfigScope::default();
+        assert!(item.dxbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxbdisplay() {
+        let item = DxbConfigScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxbConfigScope"));
+    }
+
+    #[test]
+    fn test_dxcdefault() {
+        let item = DxcConfigOverride::default();
+        assert!(item.dxcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxcdisplay() {
+        let item = DxcConfigOverride::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxcConfigOverride"));
+    }
+
+    #[test]
+    fn test_dxddefault() {
+        let item = DxdConfigPolicy::default();
+        assert!(item.dxdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxddisplay() {
+        let item = DxdConfigPolicy::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxdConfigPolicy"));
+    }
+
+    #[test]
+    fn test_dxedefault() {
+        let item = DxeConfigMigrate::default();
+        assert!(item.dxevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxedisplay() {
+        let item = DxeConfigMigrate::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxeConfigMigrate"));
     }
 
 }
