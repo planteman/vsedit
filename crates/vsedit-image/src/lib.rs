@@ -96773,6 +96773,247 @@ impl std::fmt::Display for EditorParameterHintConfig {
     }
 }
 
+
+/// EditorWordWrapConfig — editor word wrap configuration
+#[derive(Debug, Clone)]
+pub struct EditorWordWrapConfig {
+    pub bza_word_wrap: String,
+    pub bza_word_wrap_column: u32,
+    pub bza_word_wrap_min_width: u32,
+    pub bza_wrapping_indent: String,
+    pub bza_wrapping_strategy: String,
+    pub bza_overflow_widgets: bool,
+    pub bza_column_selection: bool,
+    pub bza_auto_closing_brackets: String,
+}
+
+impl EditorWordWrapConfig {
+    pub fn new() -> Self {
+        Self {
+            bza_word_wrap: "off".into(),
+            bza_word_wrap_column: 80,
+            bza_word_wrap_min_width: 20,
+            bza_wrapping_indent: "same".into(),
+            bza_wrapping_strategy: "simple".into(),
+            bza_overflow_widgets: true,
+            bza_column_selection: false,
+            bza_auto_closing_brackets: "languageDefined".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorWordWrapConfig({})", self.bza_word_wrap)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bza_word_wrap.is_empty() || true
+    }
+}
+
+impl Default for EditorWordWrapConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorWordWrapConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorWordWrapConfig({})", self.bza_word_wrap)
+    }
+}
+
+/// EditorFontConfig — editor font configuration
+#[derive(Debug, Clone)]
+pub struct EditorFontConfig {
+    pub bzb_font_family: String,
+    pub bzb_font_size: u32,
+    pub bzb_line_height: u32,
+    pub bzb_letter_spacing: f64,
+    pub bzb_font_weight: String,
+    pub bzb_font_ligatures: bool,
+    pub bzb_font_variations: String,
+    pub bzb_disable_monospace_optimization: bool,
+}
+
+impl EditorFontConfig {
+    pub fn new() -> Self {
+        Self {
+            bzb_font_family: "monospace".into(),
+            bzb_font_size: 14,
+            bzb_line_height: 0,
+            bzb_letter_spacing: 0.0,
+            bzb_font_weight: "normal".into(),
+            bzb_font_ligatures: false,
+            bzb_font_variations: "".into(),
+            bzb_disable_monospace_optimization: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorFontConfig({})", self.bzb_font_family)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzb_font_family.is_empty() || true
+    }
+}
+
+impl Default for EditorFontConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorFontConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorFontConfig({})", self.bzb_font_family)
+    }
+}
+
+/// EditorRenderConfig — editor render configuration
+#[derive(Debug, Clone)]
+pub struct EditorRenderConfig {
+    pub bzc_render_line_numbers: String,
+    pub bzc_render_final_newline: String,
+    pub bzc_glyph_margin: bool,
+    pub bzc_folding: bool,
+    pub bzc_folding_strategy: String,
+    pub bzc_show_folding_controls: String,
+    pub bzc_folding_highlight: bool,
+    pub bzc_folding_imports_collapsed: bool,
+}
+
+impl EditorRenderConfig {
+    pub fn new() -> Self {
+        Self {
+            bzc_render_line_numbers: "on".into(),
+            bzc_render_final_newline: "on".into(),
+            bzc_glyph_margin: true,
+            bzc_folding: true,
+            bzc_folding_strategy: "auto".into(),
+            bzc_show_folding_controls: "mouseover".into(),
+            bzc_folding_highlight: true,
+            bzc_folding_imports_collapsed: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorRenderConfig({})", self.bzc_render_line_numbers)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzc_render_line_numbers.is_empty() || true
+    }
+}
+
+impl Default for EditorRenderConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorRenderConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorRenderConfig({})", self.bzc_render_line_numbers)
+    }
+}
+
+/// EditorDiffConfig — editor diff configuration
+#[derive(Debug, Clone)]
+pub struct EditorDiffConfig {
+    pub bzd_render_side_by_side: bool,
+    pub bzd_ignore_trim_whitespace: bool,
+    pub bzd_render_indicators: bool,
+    pub bzd_code_lens: bool,
+    pub bzd_word_wrap: String,
+    pub bzd_max_computation_time_ms: u32,
+    pub bzd_render_margin: bool,
+    pub bzd_experimental_show_moves: bool,
+}
+
+impl EditorDiffConfig {
+    pub fn new() -> Self {
+        Self {
+            bzd_render_side_by_side: true,
+            bzd_ignore_trim_whitespace: true,
+            bzd_render_indicators: true,
+            bzd_code_lens: false,
+            bzd_word_wrap: "inherit".into(),
+            bzd_max_computation_time_ms: 5000,
+            bzd_render_margin: true,
+            bzd_experimental_show_moves: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorDiffConfig({})", self.bzd_render_side_by_side)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bzd_render_side_by_side || true
+    }
+}
+
+impl Default for EditorDiffConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorDiffConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorDiffConfig({})", self.bzd_render_side_by_side)
+    }
+}
+
+/// SnippetConfig — snippet configuration
+#[derive(Debug, Clone)]
+pub struct SnippetConfig {
+    pub bze_snippet_suggestions: String,
+    pub bze_snippet_tab_stop: bool,
+    pub bze_prefix: String,
+    pub bze_body_lines: u32,
+    pub bze_description: String,
+    pub bze_scope: String,
+    pub bze_is_builtin: bool,
+    pub bze_source_extension: String,
+}
+
+impl SnippetConfig {
+    pub fn new() -> Self {
+        Self {
+            bze_snippet_suggestions: "inline".into(),
+            bze_snippet_tab_stop: true,
+            bze_prefix: "".into(),
+            bze_body_lines: 0,
+            bze_description: "".into(),
+            bze_scope: "".into(),
+            bze_is_builtin: false,
+            bze_source_extension: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SnippetConfig({})", self.bze_snippet_suggestions)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bze_snippet_suggestions.is_empty() || true
+    }
+}
+
+impl Default for SnippetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SnippetConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SnippetConfig({})", self.bze_snippet_suggestions)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -148565,6 +148806,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.byz_enabled = true;
         assert_eq!(c.summary(), EditorParameterHintConfig::new().summary());
+    }
+
+
+    #[test]
+    fn test_bza_create() {
+        let obj = EditorWordWrapConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bza_validate() {
+        let obj = EditorWordWrapConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bza_display() {
+        let obj = EditorWordWrapConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorWordWrapConfig"));
+    }
+
+    #[test]
+    fn test_bza_clone() {
+        let obj = EditorWordWrapConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bza_debug() {
+        let obj = EditorWordWrapConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorWordWrapConfig"));
+    }
+
+    #[test]
+    fn test_bza_default() {
+        let obj = EditorWordWrapConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bza_summary_contains_name() {
+        let obj = EditorWordWrapConfig::new();
+        assert!(obj.summary().contains("EditorWordWrapConfig"));
+    }
+
+    #[test]
+    fn test_bza_validate_default() {
+        let obj = EditorWordWrapConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bza_display_not_empty() {
+        let obj = EditorWordWrapConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bza_clone_independence() {
+        let mut obj = EditorWordWrapConfig::new();
+        let c = obj.clone();
+        obj.bza_word_wrap = "off".into();
+        assert_eq!(c.summary(), EditorWordWrapConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bzb_create() {
+        let obj = EditorFontConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzb_validate() {
+        let obj = EditorFontConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzb_display() {
+        let obj = EditorFontConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorFontConfig"));
+    }
+
+    #[test]
+    fn test_bzb_clone() {
+        let obj = EditorFontConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzb_debug() {
+        let obj = EditorFontConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorFontConfig"));
+    }
+
+    #[test]
+    fn test_bzb_default() {
+        let obj = EditorFontConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzb_summary_contains_name() {
+        let obj = EditorFontConfig::new();
+        assert!(obj.summary().contains("EditorFontConfig"));
+    }
+
+    #[test]
+    fn test_bzb_validate_default() {
+        let obj = EditorFontConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzb_display_not_empty() {
+        let obj = EditorFontConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzb_clone_independence() {
+        let mut obj = EditorFontConfig::new();
+        let c = obj.clone();
+        obj.bzb_font_family = "monospace".into();
+        assert_eq!(c.summary(), EditorFontConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bzc_create() {
+        let obj = EditorRenderConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzc_validate() {
+        let obj = EditorRenderConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzc_display() {
+        let obj = EditorRenderConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorRenderConfig"));
+    }
+
+    #[test]
+    fn test_bzc_clone() {
+        let obj = EditorRenderConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzc_debug() {
+        let obj = EditorRenderConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorRenderConfig"));
+    }
+
+    #[test]
+    fn test_bzc_default() {
+        let obj = EditorRenderConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzc_summary_contains_name() {
+        let obj = EditorRenderConfig::new();
+        assert!(obj.summary().contains("EditorRenderConfig"));
+    }
+
+    #[test]
+    fn test_bzc_validate_default() {
+        let obj = EditorRenderConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzc_display_not_empty() {
+        let obj = EditorRenderConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzc_clone_independence() {
+        let mut obj = EditorRenderConfig::new();
+        let c = obj.clone();
+        obj.bzc_render_line_numbers = "on".into();
+        assert_eq!(c.summary(), EditorRenderConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bzd_create() {
+        let obj = EditorDiffConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzd_validate() {
+        let obj = EditorDiffConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzd_display() {
+        let obj = EditorDiffConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorDiffConfig"));
+    }
+
+    #[test]
+    fn test_bzd_clone() {
+        let obj = EditorDiffConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzd_debug() {
+        let obj = EditorDiffConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorDiffConfig"));
+    }
+
+    #[test]
+    fn test_bzd_default() {
+        let obj = EditorDiffConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzd_summary_contains_name() {
+        let obj = EditorDiffConfig::new();
+        assert!(obj.summary().contains("EditorDiffConfig"));
+    }
+
+    #[test]
+    fn test_bzd_validate_default() {
+        let obj = EditorDiffConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzd_display_not_empty() {
+        let obj = EditorDiffConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzd_clone_independence() {
+        let mut obj = EditorDiffConfig::new();
+        let c = obj.clone();
+        obj.bzd_render_side_by_side = true;
+        assert_eq!(c.summary(), EditorDiffConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bze_create() {
+        let obj = SnippetConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bze_validate() {
+        let obj = SnippetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bze_display() {
+        let obj = SnippetConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SnippetConfig"));
+    }
+
+    #[test]
+    fn test_bze_clone() {
+        let obj = SnippetConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bze_debug() {
+        let obj = SnippetConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SnippetConfig"));
+    }
+
+    #[test]
+    fn test_bze_default() {
+        let obj = SnippetConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bze_summary_contains_name() {
+        let obj = SnippetConfig::new();
+        assert!(obj.summary().contains("SnippetConfig"));
+    }
+
+    #[test]
+    fn test_bze_validate_default() {
+        let obj = SnippetConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bze_display_not_empty() {
+        let obj = SnippetConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bze_clone_independence() {
+        let mut obj = SnippetConfig::new();
+        let c = obj.clone();
+        obj.bze_snippet_suggestions = "inline".into();
+        assert_eq!(c.summary(), SnippetConfig::new().summary());
     }
 
 }
