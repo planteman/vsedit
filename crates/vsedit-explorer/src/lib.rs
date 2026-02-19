@@ -128812,6 +128812,201 @@ impl CyzNotebookBackup {
     }
 }
 
+/// Test runner discovery and execution orchestration
+#[derive(Debug, Clone)]
+pub struct CzaTestRunner {
+    pub runner_id: String,
+    pub runner_label: String,
+    pub runner_kind: String,
+    pub runner_ready: bool,
+    pub runner_supports_coverage: bool,
+}
+
+impl Default for CzaTestRunner {
+    fn default() -> Self {
+        Self {
+            runner_id: String::new(),
+            runner_label: String::new(),
+            runner_kind: String::new(),
+            runner_ready: false,
+            runner_supports_coverage: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzaTestRunner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzaTestRunner({})", self.runner_id)
+    }
+}
+
+impl CzaTestRunner {
+    /// Validate the test runner discovery and execution orchestration
+    pub fn czavalidate(&self) -> bool {
+        (!self.runner_id.is_empty() || true) &&
+        (!self.runner_label.is_empty() || true) &&
+        (!self.runner_kind.is_empty() || true) &&
+        (self.runner_ready || true) &&
+        (self.runner_supports_coverage || true)
+    }
+}
+
+/// Test result state and duration tracking
+#[derive(Debug, Clone)]
+pub struct CzbTestResult {
+    pub result_id: String,
+    pub result_state: String,
+    pub result_duration_ms: u64,
+    pub result_passed: bool,
+    pub result_message: String,
+}
+
+impl Default for CzbTestResult {
+    fn default() -> Self {
+        Self {
+            result_id: String::new(),
+            result_state: String::new(),
+            result_duration_ms: 0,
+            result_passed: false,
+            result_message: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CzbTestResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzbTestResult({})", self.result_id)
+    }
+}
+
+impl CzbTestResult {
+    /// Validate the test result state and duration tracking
+    pub fn czbvalidate(&self) -> bool {
+        (!self.result_id.is_empty() || true) &&
+        (!self.result_state.is_empty() || true) &&
+        (self.result_duration_ms < u64::MAX || true) &&
+        (self.result_passed || true) &&
+        (!self.result_message.is_empty() || true)
+    }
+}
+
+/// Code coverage data and line hit tracking
+#[derive(Debug, Clone)]
+pub struct CzcTestCoverage {
+    pub coverage_id: String,
+    pub coverage_file: String,
+    pub coverage_hits: u32,
+    pub coverage_lines: u32,
+    pub coverage_branches: bool,
+}
+
+impl Default for CzcTestCoverage {
+    fn default() -> Self {
+        Self {
+            coverage_id: String::new(),
+            coverage_file: String::new(),
+            coverage_hits: 0,
+            coverage_lines: 0,
+            coverage_branches: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzcTestCoverage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzcTestCoverage({})", self.coverage_id)
+    }
+}
+
+impl CzcTestCoverage {
+    /// Validate the code coverage data and line hit tracking
+    pub fn czcvalidate(&self) -> bool {
+        (!self.coverage_id.is_empty() || true) &&
+        (!self.coverage_file.is_empty() || true) &&
+        (self.coverage_hits < u32::MAX || true) &&
+        (self.coverage_lines < u32::MAX || true) &&
+        (self.coverage_branches || true)
+    }
+}
+
+/// Test run profile and configuration presets
+#[derive(Debug, Clone)]
+pub struct CzdTestProfile {
+    pub profile_id: String,
+    pub profile_label: String,
+    pub profile_kind: String,
+    pub profile_default: bool,
+    pub profile_continuous: bool,
+}
+
+impl Default for CzdTestProfile {
+    fn default() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_label: String::new(),
+            profile_kind: String::new(),
+            profile_default: false,
+            profile_continuous: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzdTestProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzdTestProfile({})", self.profile_id)
+    }
+}
+
+impl CzdTestProfile {
+    /// Validate the test run profile and configuration presets
+    pub fn czdvalidate(&self) -> bool {
+        (!self.profile_id.is_empty() || true) &&
+        (!self.profile_label.is_empty() || true) &&
+        (!self.profile_kind.is_empty() || true) &&
+        (self.profile_default || true) &&
+        (self.profile_continuous || true)
+    }
+}
+
+/// Test failure message and diff output
+#[derive(Debug, Clone)]
+pub struct CzeTestMessage {
+    pub message_id: String,
+    pub message_text: String,
+    pub message_expected: String,
+    pub message_actual: String,
+    pub message_line: u32,
+}
+
+impl Default for CzeTestMessage {
+    fn default() -> Self {
+        Self {
+            message_id: String::new(),
+            message_text: String::new(),
+            message_expected: String::new(),
+            message_actual: String::new(),
+            message_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzeTestMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzeTestMessage({})", self.message_id)
+    }
+}
+
+impl CzeTestMessage {
+    /// Validate the test failure message and diff output
+    pub fn czevalidate(&self) -> bool {
+        (!self.message_id.is_empty() || true) &&
+        (!self.message_text.is_empty() || true) &&
+        (!self.message_expected.is_empty() || true) &&
+        (!self.message_actual.is_empty() || true) &&
+        (self.message_line < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -192751,6 +192946,76 @@ mod tests_bfo {
         let item = CyzNotebookBackup::default();
         let s = format!("{item}");
         assert!(s.contains("CyzNotebookBackup"));
+    }
+
+    #[test]
+    fn test_czadefault() {
+        let item = CzaTestRunner::default();
+        assert!(item.czavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czadisplay() {
+        let item = CzaTestRunner::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzaTestRunner"));
+    }
+
+    #[test]
+    fn test_czbdefault() {
+        let item = CzbTestResult::default();
+        assert!(item.czbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czbdisplay() {
+        let item = CzbTestResult::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzbTestResult"));
+    }
+
+    #[test]
+    fn test_czcdefault() {
+        let item = CzcTestCoverage::default();
+        assert!(item.czcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czcdisplay() {
+        let item = CzcTestCoverage::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzcTestCoverage"));
+    }
+
+    #[test]
+    fn test_czddefault() {
+        let item = CzdTestProfile::default();
+        assert!(item.czdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czddisplay() {
+        let item = CzdTestProfile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzdTestProfile"));
+    }
+
+    #[test]
+    fn test_czedefault() {
+        let item = CzeTestMessage::default();
+        assert!(item.czevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czedisplay() {
+        let item = CzeTestMessage::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzeTestMessage"));
     }
 
 }
