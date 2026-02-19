@@ -56290,3 +56290,281 @@ mod bba_tests {
         assert_eq!(m.status_text(), "'foo' 1 of 2");
     }
 }
+
+
+// --- bbb_: Editor folding range model ---
+
+/// Kind of folding range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbbFoldKind {
+    Comment,
+    Imports,
+    Region,
+    Code,
+}
+
+impl BbbFoldKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Comment => "Comment", Self::Imports => "Imports",
+            Self::Region => "Region", Self::Code => "Code",
+        }
+    }
+
+    pub fn is_user_defined(&self) -> bool { matches!(self, Self::Region) }
+}
+
+/// A folding range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbbFoldRange {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: BbbFoldKind,
+    pub collapsed: bool,
+    pub label: Option<String>,
+}
+
+impl BbbFoldRange {
+    pub fn new(start: u32, end: u32, kind: BbbFoldKind) -> Self {
+        Self { start_line: start, end_line: end, kind, collapsed: false, label: None }
+    }
+
+    pub fn with_label(mut self, label: &str) -> Self {
+        self.label = Some(label.to_string()); self
+    }
+
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+    pub fn hidden_lines(&self) -> u32 { if self.collapsed { self.end_line - self.start_line } else { 0 } }
+    pub fn contains_line(&self, line: u32) -> bool { line >= self.start_line && line <= self.end_line }
+
+    pub fn is_hidden(&self, line: u32) -> bool {
+        self.collapsed && line > self.start_line && line <= self.end_line
+    }
+
+    pub fn toggle(&mut self) { self.collapsed = !self.collapsed; }
+
+    pub fn collapse_text(&self) -> String {
+        match &self.label {
+            Some(l) => format!("⋯ {}", l),
+            None => format!("⋯ ({} lines)", self.line_count() - 1),
+        }
+    }
+}
+
+/// The folding model.
+#[derive(Debug)]
+pub struct BbbFoldModel {
+    ranges: Vec<BbbFoldRange>,
+    fold_comments: bool,
+    fold_imports: bool,
+    max_fold_regions: usize,
+}
+
+impl BbbFoldModel {
+    pub fn new() -> Self {
+        Self { ranges: Vec::new(), fold_comments: true, fold_imports: true, max_fold_regions: 5000 }
+    }
+
+    pub fn set_ranges(&mut self, ranges: Vec<BbbFoldRange>) {
+        self.ranges = ranges;
+        if self.ranges.len() > self.max_fold_regions {
+            self.ranges.truncate(self.max_fold_regions);
+        }
+    }
+
+    pub fn ranges(&self) -> &[BbbFoldRange] { &self.ranges }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+
+    pub fn toggle_at_line(&mut self, line: u32) -> bool {
+        for r in &mut self.ranges {
+            if r.start_line == line {
+                r.toggle();
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn fold_all(&mut self) {
+        for r in &mut self.ranges { r.collapsed = true; }
+    }
+
+    pub fn unfold_all(&mut self) {
+        for r in &mut self.ranges { r.collapsed = false; }
+    }
+
+    pub fn fold_by_kind(&mut self, kind: BbbFoldKind) {
+        for r in &mut self.ranges {
+            if r.kind == kind { r.collapsed = true; }
+        }
+    }
+
+    pub fn fold_at_level(&mut self, level: u32) {
+        let to_fold: Vec<usize> = (0..self.ranges.len()).filter(|&i| {
+            let r = &self.ranges[i];
+            let depth = self.ranges.iter().enumerate().filter(|(j, o)| {
+                *j != i && o.start_line < r.start_line && o.end_line > r.end_line
+            }).count() as u32;
+            depth >= level
+        }).collect();
+        for i in to_fold { self.ranges[i].collapsed = true; }
+    }
+
+    pub fn is_line_visible(&self, line: u32) -> bool {
+        !self.ranges.iter().any(|r| r.is_hidden(line))
+    }
+
+    pub fn visible_line_count(&self, total_lines: u32) -> u32 {
+        (0..total_lines).filter(|l| self.is_line_visible(*l)).count() as u32
+    }
+
+    pub fn ranges_at_line(&self, line: u32) -> Vec<&BbbFoldRange> {
+        self.ranges.iter().filter(|r| r.contains_line(line)).collect()
+    }
+
+    pub fn fold_range_at(&self, line: u32) -> Option<&BbbFoldRange> {
+        self.ranges.iter().find(|r| r.start_line == line)
+    }
+
+    pub fn collapsed_count(&self) -> usize {
+        self.ranges.iter().filter(|r| r.collapsed).count()
+    }
+
+    pub fn hidden_line_count(&self) -> u32 {
+        self.ranges.iter().map(|r| r.hidden_lines()).sum()
+    }
+
+    pub fn set_fold_comments(&mut self, v: bool) { self.fold_comments = v; }
+    pub fn set_fold_imports(&mut self, v: bool) { self.fold_imports = v; }
+}
+
+#[cfg(test)]
+mod bbb_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbb_fold_kind() {
+        assert_eq!(BbbFoldKind::Comment.label(), "Comment");
+        assert!(BbbFoldKind::Region.is_user_defined());
+        assert!(!BbbFoldKind::Code.is_user_defined());
+    }
+
+    #[test]
+    fn test_bbb_fold_range() {
+        let mut r = BbbFoldRange::new(5, 15, BbbFoldKind::Code);
+        assert_eq!(r.line_count(), 11);
+        assert!(!r.collapsed);
+        r.toggle();
+        assert!(r.collapsed);
+        assert_eq!(r.hidden_lines(), 10);
+    }
+
+    #[test]
+    fn test_bbb_fold_is_hidden() {
+        let mut r = BbbFoldRange::new(5, 10, BbbFoldKind::Code);
+        assert!(!r.is_hidden(6)); // not collapsed yet
+        r.toggle();
+        assert!(!r.is_hidden(5)); // start line always visible
+        assert!(r.is_hidden(6));
+        assert!(r.is_hidden(10));
+        assert!(!r.is_hidden(11));
+    }
+
+    #[test]
+    fn test_bbb_fold_label() {
+        let r = BbbFoldRange::new(1, 5, BbbFoldKind::Region).with_label("My Region");
+        assert_eq!(r.collapse_text(), "⋯ My Region");
+        let r2 = BbbFoldRange::new(1, 10, BbbFoldKind::Code);
+        assert_eq!(r2.collapse_text(), "⋯ (9 lines)");
+    }
+
+    #[test]
+    fn test_bbb_model_toggle() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![
+            BbbFoldRange::new(5, 10, BbbFoldKind::Code),
+            BbbFoldRange::new(15, 20, BbbFoldKind::Code),
+        ]);
+        assert!(m.toggle_at_line(5));
+        assert!(m.ranges[0].collapsed);
+        assert!(!m.toggle_at_line(7)); // no range starts here
+    }
+
+    #[test]
+    fn test_bbb_model_fold_unfold_all() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![
+            BbbFoldRange::new(1, 5, BbbFoldKind::Code),
+            BbbFoldRange::new(10, 15, BbbFoldKind::Comment),
+        ]);
+        m.fold_all();
+        assert_eq!(m.collapsed_count(), 2);
+        m.unfold_all();
+        assert_eq!(m.collapsed_count(), 0);
+    }
+
+    #[test]
+    fn test_bbb_model_fold_by_kind() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![
+            BbbFoldRange::new(1, 5, BbbFoldKind::Comment),
+            BbbFoldRange::new(10, 15, BbbFoldKind::Code),
+        ]);
+        m.fold_by_kind(BbbFoldKind::Comment);
+        assert!(m.ranges[0].collapsed);
+        assert!(!m.ranges[1].collapsed);
+    }
+
+    #[test]
+    fn test_bbb_model_visibility() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![BbbFoldRange::new(5, 10, BbbFoldKind::Code)]);
+        assert!(m.is_line_visible(6));
+        m.toggle_at_line(5);
+        assert!(!m.is_line_visible(6));
+        assert!(m.is_line_visible(5)); // start visible
+    }
+
+    #[test]
+    fn test_bbb_model_hidden_count() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![
+            BbbFoldRange::new(1, 5, BbbFoldKind::Code),
+            BbbFoldRange::new(10, 20, BbbFoldKind::Code),
+        ]);
+        m.fold_all();
+        assert_eq!(m.hidden_line_count(), 4 + 10);
+    }
+
+    #[test]
+    fn test_bbb_model_ranges_at() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![
+            BbbFoldRange::new(1, 10, BbbFoldKind::Code),
+            BbbFoldRange::new(3, 7, BbbFoldKind::Code),
+        ]);
+        assert_eq!(m.ranges_at_line(5).len(), 2); // nested
+        assert_eq!(m.ranges_at_line(9).len(), 1);
+    }
+
+    #[test]
+    fn test_bbb_model_max_regions() {
+        let mut m = BbbFoldModel::new();
+        m.max_fold_regions = 2;
+        m.set_ranges(vec![
+            BbbFoldRange::new(1, 5, BbbFoldKind::Code),
+            BbbFoldRange::new(10, 15, BbbFoldKind::Code),
+            BbbFoldRange::new(20, 25, BbbFoldKind::Code),
+        ]);
+        assert_eq!(m.range_count(), 2);
+    }
+
+    #[test]
+    fn test_bbb_visible_line_count() {
+        let mut m = BbbFoldModel::new();
+        m.set_ranges(vec![BbbFoldRange::new(2, 4, BbbFoldKind::Code)]);
+        m.fold_all();
+        // Lines 0,1,2,5,6,7,8,9 visible out of 10 (3,4 hidden)
+        assert_eq!(m.visible_line_count(10), 8);
+    }
+}
