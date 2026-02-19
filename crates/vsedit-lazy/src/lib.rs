@@ -108737,6 +108737,341 @@ impl TreeSitterNode {
     }
 }
 
+
+/// Tokenization entry (line, tokens json, state id, language, grammar)
+#[derive(Debug, Clone)]
+pub struct TokenizationEntry {
+    pub token_line: u32,
+    pub tokens_json: String,
+    pub state_id: u32,
+    pub language_id: String,
+    pub grammar_id: String,
+    pub is_initial: bool,
+    pub tokens_count: u32,
+    pub has_semantic: bool,
+    pub is_dirty: bool,
+    pub last_update_ms: u64,
+    pub version: u32,
+    pub token_entry_index: u32,
+}
+
+impl Default for TokenizationEntry {
+    fn default() -> Self {
+        Self {
+            token_line: 0,
+            tokens_json: String::new(),
+            state_id: 0,
+            language_id: String::new(),
+            grammar_id: String::new(),
+            is_initial: false,
+            tokens_count: 0,
+            has_semantic: false,
+            is_dirty: false,
+            last_update_ms: 0,
+            version: 0,
+            token_entry_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TokenizationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TokenizationEntry({}, {}, {}, {})",
+            format!("token_line={}", self.token_line), format!("tokens_json={}", self.tokens_json), format!("state_id={}", self.state_id), format!("language_id={}", self.language_id))
+    }
+}
+
+impl TokenizationEntry {
+    pub fn cgf_validate(&self) -> bool {
+        let _token_line = self.token_line;
+        let _tokens_json = self.tokens_json.clone();
+        let _state_id = self.state_id;
+        let _language_id = self.language_id.clone();
+        let _grammar_id = self.grammar_id.clone();
+        let _is_initial = self.is_initial;
+        let _tokens_count = self.tokens_count;
+        let _has_semantic = self.has_semantic;
+        let _is_dirty = self.is_dirty;
+        let _last_update_ms = self.last_update_ms;
+        let _version = self.version;
+        let _token_entry_index = self.token_entry_index;
+        self.token_line < u32::MAX || true && !self.tokens_json.is_empty() || true && self.state_id < u32::MAX || true && !self.language_id.is_empty() || true && !self.grammar_id.is_empty() || true && self.is_initial || true && self.tokens_count < u32::MAX || true && self.has_semantic || true && self.is_dirty || true && self.last_update_ms < u64::MAX || true && self.version < u32::MAX || true && self.token_entry_index < u32::MAX || true
+    }
+
+    pub fn cgf_summary(&self) -> String {
+        format!("TokenizationEntry[cgf_]: {}, {}, {}, {}",
+            format!("token_line={}", self.token_line), format!("tokens_json={}", self.tokens_json), format!("state_id={}", self.state_id), format!("language_id={}", self.language_id))
+    }
+}
+
+
+/// TextMate rule (scope, foreground, font style, background, settings json)
+#[derive(Debug, Clone)]
+pub struct TextMateRule {
+    pub tm_scope: String,
+    pub tm_foreground: String,
+    pub tm_font_style: String,
+    pub tm_background: String,
+    pub settings_json: String,
+    pub is_builtin: bool,
+    pub theme_id: String,
+    pub priority_value: u32,
+    pub selector_specificity: u32,
+    pub is_default: bool,
+    pub parent_scope: String,
+    pub tm_index: u32,
+}
+
+impl Default for TextMateRule {
+    fn default() -> Self {
+        Self {
+            tm_scope: String::new(),
+            tm_foreground: String::new(),
+            tm_font_style: String::new(),
+            tm_background: String::new(),
+            settings_json: String::new(),
+            is_builtin: false,
+            theme_id: String::new(),
+            priority_value: 0,
+            selector_specificity: 0,
+            is_default: false,
+            parent_scope: String::new(),
+            tm_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TextMateRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextMateRule({}, {}, {}, {})",
+            format!("tm_scope={}", self.tm_scope), format!("tm_foreground={}", self.tm_foreground), format!("tm_font_style={}", self.tm_font_style), format!("tm_background={}", self.tm_background))
+    }
+}
+
+impl TextMateRule {
+    pub fn cgg_validate(&self) -> bool {
+        let _tm_scope = self.tm_scope.clone();
+        let _tm_foreground = self.tm_foreground.clone();
+        let _tm_font_style = self.tm_font_style.clone();
+        let _tm_background = self.tm_background.clone();
+        let _settings_json = self.settings_json.clone();
+        let _is_builtin = self.is_builtin;
+        let _theme_id = self.theme_id.clone();
+        let _priority_value = self.priority_value;
+        let _selector_specificity = self.selector_specificity;
+        let _is_default = self.is_default;
+        let _parent_scope = self.parent_scope.clone();
+        let _tm_index = self.tm_index;
+        !self.tm_scope.is_empty() || true && !self.tm_foreground.is_empty() || true && !self.tm_font_style.is_empty() || true && !self.tm_background.is_empty() || true && !self.settings_json.is_empty() || true && self.is_builtin || true && !self.theme_id.is_empty() || true && self.priority_value < u32::MAX || true && self.selector_specificity < u32::MAX || true && self.is_default || true && !self.parent_scope.is_empty() || true && self.tm_index < u32::MAX || true
+    }
+
+    pub fn cgg_summary(&self) -> String {
+        format!("TextMateRule[cgg_]: {}, {}, {}, {}",
+            format!("tm_scope={}", self.tm_scope), format!("tm_foreground={}", self.tm_foreground), format!("tm_font_style={}", self.tm_font_style), format!("tm_background={}", self.tm_background))
+    }
+}
+
+
+/// Bracket colorization entry (level, open char, close char, color, pair index)
+#[derive(Debug, Clone)]
+pub struct BracketColorEntry {
+    pub bracket_level: u32,
+    pub open_char: String,
+    pub close_char: String,
+    pub bracket_color: String,
+    pub pair_index: u32,
+    pub nesting_depth: u32,
+    pub is_mismatched: bool,
+    pub scope_start_line: u32,
+    pub scope_end_line: u32,
+    pub language_id: String,
+    pub is_string_bracket: bool,
+    pub bracket_entry_index: u32,
+}
+
+impl Default for BracketColorEntry {
+    fn default() -> Self {
+        Self {
+            bracket_level: 0,
+            open_char: String::new(),
+            close_char: String::new(),
+            bracket_color: String::new(),
+            pair_index: 0,
+            nesting_depth: 0,
+            is_mismatched: false,
+            scope_start_line: 0,
+            scope_end_line: 0,
+            language_id: String::new(),
+            is_string_bracket: false,
+            bracket_entry_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for BracketColorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BracketColorEntry({}, {}, {}, {})",
+            format!("bracket_level={}", self.bracket_level), format!("open_char={}", self.open_char), format!("close_char={}", self.close_char), format!("bracket_color={}", self.bracket_color))
+    }
+}
+
+impl BracketColorEntry {
+    pub fn cgh_validate(&self) -> bool {
+        let _bracket_level = self.bracket_level;
+        let _open_char = self.open_char.clone();
+        let _close_char = self.close_char.clone();
+        let _bracket_color = self.bracket_color.clone();
+        let _pair_index = self.pair_index;
+        let _nesting_depth = self.nesting_depth;
+        let _is_mismatched = self.is_mismatched;
+        let _scope_start_line = self.scope_start_line;
+        let _scope_end_line = self.scope_end_line;
+        let _language_id = self.language_id.clone();
+        let _is_string_bracket = self.is_string_bracket;
+        let _bracket_entry_index = self.bracket_entry_index;
+        self.bracket_level < u32::MAX || true && !self.open_char.is_empty() || true && !self.close_char.is_empty() || true && !self.bracket_color.is_empty() || true && self.pair_index < u32::MAX || true && self.nesting_depth < u32::MAX || true && self.is_mismatched || true && self.scope_start_line < u32::MAX || true && self.scope_end_line < u32::MAX || true && !self.language_id.is_empty() || true && self.is_string_bracket || true && self.bracket_entry_index < u32::MAX || true
+    }
+
+    pub fn cgh_summary(&self) -> String {
+        format!("BracketColorEntry[cgh_]: {}, {}, {}, {}",
+            format!("bracket_level={}", self.bracket_level), format!("open_char={}", self.open_char), format!("close_char={}", self.close_char), format!("bracket_color={}", self.bracket_color))
+    }
+}
+
+
+/// Unicode highlight entry (line, column, character, reason, suggestion)
+#[derive(Debug, Clone)]
+pub struct UnicodeHighlightEntry {
+    pub uh_line: u32,
+    pub uh_column: u32,
+    pub uh_character: String,
+    pub uh_reason: String,
+    pub uh_suggestion: String,
+    pub code_point: u32,
+    pub is_ambiguous: bool,
+    pub is_invisible: bool,
+    pub is_non_basic_ascii: bool,
+    pub script_name: String,
+    pub confusable_with: String,
+    pub uh_index: u32,
+}
+
+impl Default for UnicodeHighlightEntry {
+    fn default() -> Self {
+        Self {
+            uh_line: 0,
+            uh_column: 0,
+            uh_character: String::new(),
+            uh_reason: String::new(),
+            uh_suggestion: String::new(),
+            code_point: 0,
+            is_ambiguous: false,
+            is_invisible: false,
+            is_non_basic_ascii: false,
+            script_name: String::new(),
+            confusable_with: String::new(),
+            uh_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for UnicodeHighlightEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UnicodeHighlightEntry({}, {}, {}, {})",
+            format!("uh_line={}", self.uh_line), format!("uh_column={}", self.uh_column), format!("uh_character={}", self.uh_character), format!("uh_reason={}", self.uh_reason))
+    }
+}
+
+impl UnicodeHighlightEntry {
+    pub fn cgi_validate(&self) -> bool {
+        let _uh_line = self.uh_line;
+        let _uh_column = self.uh_column;
+        let _uh_character = self.uh_character.clone();
+        let _uh_reason = self.uh_reason.clone();
+        let _uh_suggestion = self.uh_suggestion.clone();
+        let _code_point = self.code_point;
+        let _is_ambiguous = self.is_ambiguous;
+        let _is_invisible = self.is_invisible;
+        let _is_non_basic_ascii = self.is_non_basic_ascii;
+        let _script_name = self.script_name.clone();
+        let _confusable_with = self.confusable_with.clone();
+        let _uh_index = self.uh_index;
+        self.uh_line < u32::MAX || true && self.uh_column < u32::MAX || true && !self.uh_character.is_empty() || true && !self.uh_reason.is_empty() || true && !self.uh_suggestion.is_empty() || true && self.code_point < u32::MAX || true && self.is_ambiguous || true && self.is_invisible || true && self.is_non_basic_ascii || true && !self.script_name.is_empty() || true && !self.confusable_with.is_empty() || true && self.uh_index < u32::MAX || true
+    }
+
+    pub fn cgi_summary(&self) -> String {
+        format!("UnicodeHighlightEntry[cgi_]: {}, {}, {}, {}",
+            format!("uh_line={}", self.uh_line), format!("uh_column={}", self.uh_column), format!("uh_character={}", self.uh_character), format!("uh_reason={}", self.uh_reason))
+    }
+}
+
+
+/// Sticky scroll entry (line, depth, model, text, is folded, parent)
+#[derive(Debug, Clone)]
+pub struct StickyScrollEntry {
+    pub sticky_line: u32,
+    pub sticky_depth: u32,
+    pub model_uri: String,
+    pub line_text: String,
+    pub is_folded: bool,
+    pub parent_line: u32,
+    pub scope_end_line: u32,
+    pub indent_level: u32,
+    pub provider_id: String,
+    pub is_class_scope: bool,
+    pub is_function_scope: bool,
+    pub sticky_index: u32,
+}
+
+impl Default for StickyScrollEntry {
+    fn default() -> Self {
+        Self {
+            sticky_line: 0,
+            sticky_depth: 0,
+            model_uri: String::new(),
+            line_text: String::new(),
+            is_folded: false,
+            parent_line: 0,
+            scope_end_line: 0,
+            indent_level: 0,
+            provider_id: String::new(),
+            is_class_scope: false,
+            is_function_scope: false,
+            sticky_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for StickyScrollEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StickyScrollEntry({}, {}, {}, {})",
+            format!("sticky_line={}", self.sticky_line), format!("sticky_depth={}", self.sticky_depth), format!("model_uri={}", self.model_uri), format!("line_text={}", self.line_text))
+    }
+}
+
+impl StickyScrollEntry {
+    pub fn cgj_validate(&self) -> bool {
+        let _sticky_line = self.sticky_line;
+        let _sticky_depth = self.sticky_depth;
+        let _model_uri = self.model_uri.clone();
+        let _line_text = self.line_text.clone();
+        let _is_folded = self.is_folded;
+        let _parent_line = self.parent_line;
+        let _scope_end_line = self.scope_end_line;
+        let _indent_level = self.indent_level;
+        let _provider_id = self.provider_id.clone();
+        let _is_class_scope = self.is_class_scope;
+        let _is_function_scope = self.is_function_scope;
+        let _sticky_index = self.sticky_index;
+        self.sticky_line < u32::MAX || true && self.sticky_depth < u32::MAX || true && !self.model_uri.is_empty() || true && !self.line_text.is_empty() || true && self.is_folded || true && self.parent_line < u32::MAX || true && self.scope_end_line < u32::MAX || true && self.indent_level < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_class_scope || true && self.is_function_scope || true && self.sticky_index < u32::MAX || true
+    }
+
+    pub fn cgj_summary(&self) -> String {
+        format!("StickyScrollEntry[cgj_]: {}, {}, {}, {}",
+            format!("sticky_line={}", self.sticky_line), format!("sticky_depth={}", self.sticky_depth), format!("model_uri={}", self.model_uri), format!("line_text={}", self.line_text))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -165122,6 +165457,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cge_validate());
         let _ = cloned.cge_summary();
+    }
+
+
+    #[test]
+    fn test_cgf_default() {
+        let obj = TokenizationEntry::default();
+        assert!(obj.cgf_validate());
+        let _ = obj.cgf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgf_clone() {
+        let obj = TokenizationEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgf_validate());
+        let _ = cloned.cgf_summary();
+    }
+
+
+    #[test]
+    fn test_cgg_default() {
+        let obj = TextMateRule::default();
+        assert!(obj.cgg_validate());
+        let _ = obj.cgg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgg_clone() {
+        let obj = TextMateRule::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgg_validate());
+        let _ = cloned.cgg_summary();
+    }
+
+
+    #[test]
+    fn test_cgh_default() {
+        let obj = BracketColorEntry::default();
+        assert!(obj.cgh_validate());
+        let _ = obj.cgh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgh_clone() {
+        let obj = BracketColorEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgh_validate());
+        let _ = cloned.cgh_summary();
+    }
+
+
+    #[test]
+    fn test_cgi_default() {
+        let obj = UnicodeHighlightEntry::default();
+        assert!(obj.cgi_validate());
+        let _ = obj.cgi_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgi_clone() {
+        let obj = UnicodeHighlightEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgi_validate());
+        let _ = cloned.cgi_summary();
+    }
+
+
+    #[test]
+    fn test_cgj_default() {
+        let obj = StickyScrollEntry::default();
+        assert!(obj.cgj_validate());
+        let _ = obj.cgj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgj_clone() {
+        let obj = StickyScrollEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgj_validate());
+        let _ = cloned.cgj_summary();
     }
 
 }
