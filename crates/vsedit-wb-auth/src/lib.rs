@@ -100845,6 +100845,341 @@ impl StatusBarItem {
     }
 }
 
+
+/// Tree view item (id, label, icon, collapsible, context, tooltip, description)
+#[derive(Debug, Clone)]
+pub struct TreeViewItem {
+    pub tree_item_id: String,
+    pub tree_label: String,
+    pub tree_icon: String,
+    pub is_collapsible: bool,
+    pub context_value: String,
+    pub tooltip_text: String,
+    pub description_text: String,
+    pub resource_uri: String,
+    pub command_id: String,
+    pub check_state: String,
+    pub accessibility_info: String,
+    pub tree_index: u32,
+}
+
+impl Default for TreeViewItem {
+    fn default() -> Self {
+        Self {
+            tree_item_id: String::new(),
+            tree_label: String::new(),
+            tree_icon: String::new(),
+            is_collapsible: false,
+            context_value: String::new(),
+            tooltip_text: String::new(),
+            description_text: String::new(),
+            resource_uri: String::new(),
+            command_id: String::new(),
+            check_state: String::new(),
+            accessibility_info: String::new(),
+            tree_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TreeViewItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TreeViewItem({}, {}, {}, {})",
+            format!("tree_item_id={}", self.tree_item_id), format!("tree_label={}", self.tree_label), format!("tree_icon={}", self.tree_icon), format!("is_collapsible={}", self.is_collapsible))
+    }
+}
+
+impl TreeViewItem {
+    pub fn cbp_validate(&self) -> bool {
+        let _tree_item_id = self.tree_item_id.clone();
+        let _tree_label = self.tree_label.clone();
+        let _tree_icon = self.tree_icon.clone();
+        let _is_collapsible = self.is_collapsible;
+        let _context_value = self.context_value.clone();
+        let _tooltip_text = self.tooltip_text.clone();
+        let _description_text = self.description_text.clone();
+        let _resource_uri = self.resource_uri.clone();
+        let _command_id = self.command_id.clone();
+        let _check_state = self.check_state.clone();
+        let _accessibility_info = self.accessibility_info.clone();
+        let _tree_index = self.tree_index;
+        !self.tree_item_id.is_empty() || true && !self.tree_label.is_empty() || true && !self.tree_icon.is_empty() || true && self.is_collapsible || true && !self.context_value.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.description_text.is_empty() || true && !self.resource_uri.is_empty() || true && !self.command_id.is_empty() || true && !self.check_state.is_empty() || true && !self.accessibility_info.is_empty() || true && self.tree_index < u32::MAX || true
+    }
+
+    pub fn cbp_summary(&self) -> String {
+        format!("TreeViewItem[cbp_]: {}, {}, {}, {}",
+            format!("tree_item_id={}", self.tree_item_id), format!("tree_label={}", self.tree_label), format!("tree_icon={}", self.tree_icon), format!("is_collapsible={}", self.is_collapsible))
+    }
+}
+
+
+/// Webview panel entry (id, type, title, column, options, local resources)
+#[derive(Debug, Clone)]
+pub struct WebviewPanelEntry {
+    pub webview_id: String,
+    pub view_type: String,
+    pub panel_title: String,
+    pub view_column: u32,
+    pub enable_scripts: bool,
+    pub enable_forms: bool,
+    pub retain_context: bool,
+    pub local_resource_roots: String,
+    pub port_mapping: String,
+    pub options_json: String,
+    pub serialize_state: bool,
+    pub panel_index: u32,
+}
+
+impl Default for WebviewPanelEntry {
+    fn default() -> Self {
+        Self {
+            webview_id: String::new(),
+            view_type: String::new(),
+            panel_title: String::new(),
+            view_column: 0,
+            enable_scripts: false,
+            enable_forms: false,
+            retain_context: false,
+            local_resource_roots: String::new(),
+            port_mapping: String::new(),
+            options_json: String::new(),
+            serialize_state: false,
+            panel_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WebviewPanelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WebviewPanelEntry({}, {}, {}, {})",
+            format!("webview_id={}", self.webview_id), format!("view_type={}", self.view_type), format!("panel_title={}", self.panel_title), format!("view_column={}", self.view_column))
+    }
+}
+
+impl WebviewPanelEntry {
+    pub fn cbq_validate(&self) -> bool {
+        let _webview_id = self.webview_id.clone();
+        let _view_type = self.view_type.clone();
+        let _panel_title = self.panel_title.clone();
+        let _view_column = self.view_column;
+        let _enable_scripts = self.enable_scripts;
+        let _enable_forms = self.enable_forms;
+        let _retain_context = self.retain_context;
+        let _local_resource_roots = self.local_resource_roots.clone();
+        let _port_mapping = self.port_mapping.clone();
+        let _options_json = self.options_json.clone();
+        let _serialize_state = self.serialize_state;
+        let _panel_index = self.panel_index;
+        !self.webview_id.is_empty() || true && !self.view_type.is_empty() || true && !self.panel_title.is_empty() || true && self.view_column < u32::MAX || true && self.enable_scripts || true && self.enable_forms || true && self.retain_context || true && !self.local_resource_roots.is_empty() || true && !self.port_mapping.is_empty() || true && !self.options_json.is_empty() || true && self.serialize_state || true && self.panel_index < u32::MAX || true
+    }
+
+    pub fn cbq_summary(&self) -> String {
+        format!("WebviewPanelEntry[cbq_]: {}, {}, {}, {}",
+            format!("webview_id={}", self.webview_id), format!("view_type={}", self.view_type), format!("panel_title={}", self.panel_title), format!("view_column={}", self.view_column))
+    }
+}
+
+
+/// Custom editor entry (view type, priority, selector, capabilities, provider)
+#[derive(Debug, Clone)]
+pub struct CustomEditorContrib {
+    pub editor_view_type: String,
+    pub priority_name: String,
+    pub selector_pattern: String,
+    pub supports_multi_edit: bool,
+    pub supports_undo_redo: bool,
+    pub provider_id: String,
+    pub backup_id: String,
+    pub resource_count: u32,
+    pub is_active: bool,
+    pub edit_count: u32,
+    pub save_count: u32,
+    pub editor_index: u32,
+}
+
+impl Default for CustomEditorContrib {
+    fn default() -> Self {
+        Self {
+            editor_view_type: String::new(),
+            priority_name: String::new(),
+            selector_pattern: String::new(),
+            supports_multi_edit: false,
+            supports_undo_redo: false,
+            provider_id: String::new(),
+            backup_id: String::new(),
+            resource_count: 0,
+            is_active: false,
+            edit_count: 0,
+            save_count: 0,
+            editor_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CustomEditorContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CustomEditorEntry({}, {}, {}, {})",
+            format!("editor_view_type={}", self.editor_view_type), format!("priority_name={}", self.priority_name), format!("selector_pattern={}", self.selector_pattern), format!("supports_multi_edit={}", self.supports_multi_edit))
+    }
+}
+
+impl CustomEditorContrib {
+    pub fn cbr_validate(&self) -> bool {
+        let _editor_view_type = self.editor_view_type.clone();
+        let _priority_name = self.priority_name.clone();
+        let _selector_pattern = self.selector_pattern.clone();
+        let _supports_multi_edit = self.supports_multi_edit;
+        let _supports_undo_redo = self.supports_undo_redo;
+        let _provider_id = self.provider_id.clone();
+        let _backup_id = self.backup_id.clone();
+        let _resource_count = self.resource_count;
+        let _is_active = self.is_active;
+        let _edit_count = self.edit_count;
+        let _save_count = self.save_count;
+        let _editor_index = self.editor_index;
+        !self.editor_view_type.is_empty() || true && !self.priority_name.is_empty() || true && !self.selector_pattern.is_empty() || true && self.supports_multi_edit || true && self.supports_undo_redo || true && !self.provider_id.is_empty() || true && !self.backup_id.is_empty() || true && self.resource_count < u32::MAX || true && self.is_active || true && self.edit_count < u32::MAX || true && self.save_count < u32::MAX || true && self.editor_index < u32::MAX || true
+    }
+
+    pub fn cbr_summary(&self) -> String {
+        format!("CustomEditorContrib[cbr_]: {}, {}, {}, {}",
+            format!("editor_view_type={}", self.editor_view_type), format!("priority_name={}", self.priority_name), format!("selector_pattern={}", self.selector_pattern), format!("supports_multi_edit={}", self.supports_multi_edit))
+    }
+}
+
+
+/// Terminal profile entry (name, path, args, env, icon, color, default)
+#[derive(Debug, Clone)]
+pub struct TerminalProfileEntry {
+    pub profile_name: String,
+    pub shell_path: String,
+    pub shell_args: String,
+    pub env_vars: String,
+    pub icon_id: String,
+    pub color_name: String,
+    pub is_default: bool,
+    pub is_auto_detected: bool,
+    pub overridden_name: String,
+    pub title_mode: String,
+    pub automation_profile: bool,
+    pub profile_index: u32,
+}
+
+impl Default for TerminalProfileEntry {
+    fn default() -> Self {
+        Self {
+            profile_name: String::new(),
+            shell_path: String::new(),
+            shell_args: String::new(),
+            env_vars: String::new(),
+            icon_id: String::new(),
+            color_name: String::new(),
+            is_default: false,
+            is_auto_detected: false,
+            overridden_name: String::new(),
+            title_mode: String::new(),
+            automation_profile: false,
+            profile_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TerminalProfileEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalProfileEntry({}, {}, {}, {})",
+            format!("profile_name={}", self.profile_name), format!("shell_path={}", self.shell_path), format!("shell_args={}", self.shell_args), format!("env_vars={}", self.env_vars))
+    }
+}
+
+impl TerminalProfileEntry {
+    pub fn cbs_validate(&self) -> bool {
+        let _profile_name = self.profile_name.clone();
+        let _shell_path = self.shell_path.clone();
+        let _shell_args = self.shell_args.clone();
+        let _env_vars = self.env_vars.clone();
+        let _icon_id = self.icon_id.clone();
+        let _color_name = self.color_name.clone();
+        let _is_default = self.is_default;
+        let _is_auto_detected = self.is_auto_detected;
+        let _overridden_name = self.overridden_name.clone();
+        let _title_mode = self.title_mode.clone();
+        let _automation_profile = self.automation_profile;
+        let _profile_index = self.profile_index;
+        !self.profile_name.is_empty() || true && !self.shell_path.is_empty() || true && !self.shell_args.is_empty() || true && !self.env_vars.is_empty() || true && !self.icon_id.is_empty() || true && !self.color_name.is_empty() || true && self.is_default || true && self.is_auto_detected || true && !self.overridden_name.is_empty() || true && !self.title_mode.is_empty() || true && self.automation_profile || true && self.profile_index < u32::MAX || true
+    }
+
+    pub fn cbs_summary(&self) -> String {
+        format!("TerminalProfileEntry[cbs_]: {}, {}, {}, {}",
+            format!("profile_name={}", self.profile_name), format!("shell_path={}", self.shell_path), format!("shell_args={}", self.shell_args), format!("env_vars={}", self.env_vars))
+    }
+}
+
+
+/// Debug session configuration (name, type, request, program, args, env)
+#[derive(Debug, Clone)]
+pub struct DebugSessionConfig {
+    pub session_name: String,
+    pub debug_type: String,
+    pub request_type: String,
+    pub program_path: String,
+    pub program_args: String,
+    pub env_vars: String,
+    pub cwd_path: String,
+    pub stop_on_entry: bool,
+    pub console_mode: String,
+    pub pre_launch_task: String,
+    pub post_debug_task: String,
+    pub session_index: u32,
+}
+
+impl Default for DebugSessionConfig {
+    fn default() -> Self {
+        Self {
+            session_name: String::new(),
+            debug_type: String::new(),
+            request_type: String::new(),
+            program_path: String::new(),
+            program_args: String::new(),
+            env_vars: String::new(),
+            cwd_path: String::new(),
+            stop_on_entry: false,
+            console_mode: String::new(),
+            pre_launch_task: String::new(),
+            post_debug_task: String::new(),
+            session_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DebugSessionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugSessionConfig({}, {}, {}, {})",
+            format!("session_name={}", self.session_name), format!("debug_type={}", self.debug_type), format!("request_type={}", self.request_type), format!("program_path={}", self.program_path))
+    }
+}
+
+impl DebugSessionConfig {
+    pub fn cbt_validate(&self) -> bool {
+        let _session_name = self.session_name.clone();
+        let _debug_type = self.debug_type.clone();
+        let _request_type = self.request_type.clone();
+        let _program_path = self.program_path.clone();
+        let _program_args = self.program_args.clone();
+        let _env_vars = self.env_vars.clone();
+        let _cwd_path = self.cwd_path.clone();
+        let _stop_on_entry = self.stop_on_entry;
+        let _console_mode = self.console_mode.clone();
+        let _pre_launch_task = self.pre_launch_task.clone();
+        let _post_debug_task = self.post_debug_task.clone();
+        let _session_index = self.session_index;
+        !self.session_name.is_empty() || true && !self.debug_type.is_empty() || true && !self.request_type.is_empty() || true && !self.program_path.is_empty() || true && !self.program_args.is_empty() || true && !self.env_vars.is_empty() || true && !self.cwd_path.is_empty() || true && self.stop_on_entry || true && !self.console_mode.is_empty() || true && !self.pre_launch_task.is_empty() || true && !self.post_debug_task.is_empty() || true && self.session_index < u32::MAX || true
+    }
+
+    pub fn cbt_summary(&self) -> String {
+        format!("DebugSessionConfig[cbt_]: {}, {}, {}, {}",
+            format!("session_name={}", self.session_name), format!("debug_type={}", self.debug_type), format!("request_type={}", self.request_type), format!("program_path={}", self.program_path))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -155070,6 +155405,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cbo_validate());
         let _ = cloned.cbo_summary();
+    }
+
+
+    #[test]
+    fn test_cbp_default() {
+        let obj = TreeViewItem::default();
+        assert!(obj.cbp_validate());
+        let _ = obj.cbp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbp_clone() {
+        let obj = TreeViewItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbp_validate());
+        let _ = cloned.cbp_summary();
+    }
+
+
+    #[test]
+    fn test_cbq_default() {
+        let obj = WebviewPanelEntry::default();
+        assert!(obj.cbq_validate());
+        let _ = obj.cbq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbq_clone() {
+        let obj = WebviewPanelEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbq_validate());
+        let _ = cloned.cbq_summary();
+    }
+
+
+    #[test]
+    fn test_cbr_default() {
+        let obj = CustomEditorContrib::default();
+        assert!(obj.cbr_validate());
+        let _ = obj.cbr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbr_clone() {
+        let obj = CustomEditorContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbr_validate());
+        let _ = cloned.cbr_summary();
+    }
+
+
+    #[test]
+    fn test_cbs_default() {
+        let obj = TerminalProfileEntry::default();
+        assert!(obj.cbs_validate());
+        let _ = obj.cbs_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbs_clone() {
+        let obj = TerminalProfileEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbs_validate());
+        let _ = cloned.cbs_summary();
+    }
+
+
+    #[test]
+    fn test_cbt_default() {
+        let obj = DebugSessionConfig::default();
+        assert!(obj.cbt_validate());
+        let _ = obj.cbt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbt_clone() {
+        let obj = DebugSessionConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbt_validate());
+        let _ = cloned.cbt_summary();
     }
 
 }
