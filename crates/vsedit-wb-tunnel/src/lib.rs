@@ -65740,3 +65740,171 @@ mod bcu_tests {
         assert!(e.stars().contains("☆☆☆☆☆"));
     }
 }
+
+
+// --- bcv_: Editor color picker model ---
+
+/// Color representation format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcvColorFormat { Hex, Rgb, Hsl, Hsv }
+
+/// A color with RGBA components (0.0-1.0).
+#[derive(Debug, Clone, Copy)]
+pub struct BcvColor {
+    pub r: f64, pub g: f64, pub b: f64, pub a: f64,
+}
+
+impl BcvColor {
+    pub fn new(r: f64, g: f64, b: f64, a: f64) -> Self {
+        Self { r: r.clamp(0.0, 1.0), g: g.clamp(0.0, 1.0), b: b.clamp(0.0, 1.0), a: a.clamp(0.0, 1.0) }
+    }
+
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        let hex = hex.trim_start_matches('#');
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f64 / 255.0;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f64 / 255.0;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f64 / 255.0;
+            Some(Self::new(r, g, b, 1.0))
+        } else { None }
+    }
+
+    pub fn to_hex(&self) -> String {
+        format!("#{:02X}{:02X}{:02X}", (self.r * 255.0) as u8, (self.g * 255.0) as u8, (self.b * 255.0) as u8)
+    }
+
+    pub fn to_rgb_string(&self) -> String {
+        format!("rgb({}, {}, {})", (self.r * 255.0) as u8, (self.g * 255.0) as u8, (self.b * 255.0) as u8)
+    }
+
+    pub fn to_hsl(&self) -> (f64, f64, f64) {
+        let max = self.r.max(self.g).max(self.b);
+        let min = self.r.min(self.g).min(self.b);
+        let l = (max + min) / 2.0;
+        if (max - min).abs() < 1e-10 { return (0.0, 0.0, l); }
+        let d = max - min;
+        let s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
+        let h = if (max - self.r).abs() < 1e-10 { (self.g - self.b) / d + if self.g < self.b { 6.0 } else { 0.0 } }
+                else if (max - self.g).abs() < 1e-10 { (self.b - self.r) / d + 2.0 }
+                else { (self.r - self.g) / d + 4.0 };
+        (h * 60.0, s, l)
+    }
+
+    pub fn luminance(&self) -> f64 { 0.2126 * self.r + 0.7152 * self.g + 0.0722 * self.b }
+    pub fn is_light(&self) -> bool { self.luminance() > 0.5 }
+
+    pub fn format(&self, fmt: BcvColorFormat) -> String {
+        match fmt {
+            BcvColorFormat::Hex => self.to_hex(),
+            BcvColorFormat::Rgb => self.to_rgb_string(),
+            BcvColorFormat::Hsl => { let (h, s, l) = self.to_hsl(); format!("hsl({:.0}, {:.0}%, {:.0}%)", h, s * 100.0, l * 100.0) }
+            BcvColorFormat::Hsv => format!("hsv({:.2}, {:.2}, {:.2})", self.r, self.g, self.b),
+        }
+    }
+}
+
+/// The color picker state.
+#[derive(Debug)]
+pub struct BcvColorPicker {
+    pub color: BcvColor,
+    pub format: BcvColorFormat,
+    pub original: BcvColor,
+    pub recent: Vec<BcvColor>,
+}
+
+impl BcvColorPicker {
+    pub fn new(color: BcvColor) -> Self {
+        Self { color, format: BcvColorFormat::Hex, original: color, recent: Vec::new() }
+    }
+
+    pub fn set_color(&mut self, c: BcvColor) { self.color = c; }
+    pub fn set_format(&mut self, f: BcvColorFormat) { self.format = f; }
+    pub fn reset(&mut self) { self.color = self.original; }
+
+    pub fn confirm(&mut self) {
+        self.recent.push(self.color);
+        if self.recent.len() > 10 { self.recent.remove(0); }
+    }
+
+    pub fn display(&self) -> String { self.color.format(self.format) }
+    pub fn changed(&self) -> bool { (self.color.r - self.original.r).abs() > 1e-10 || (self.color.g - self.original.g).abs() > 1e-10 || (self.color.b - self.original.b).abs() > 1e-10 }
+}
+
+#[cfg(test)]
+mod bcv_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcv_from_hex() {
+        let c = BcvColor::from_hex("#FF0000").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!(c.g < 0.01);
+    }
+
+    #[test]
+    fn test_bcv_to_hex() {
+        let c = BcvColor::new(1.0, 0.0, 0.0, 1.0);
+        assert_eq!(c.to_hex(), "#FF0000");
+    }
+
+    #[test]
+    fn test_bcv_to_rgb() {
+        let c = BcvColor::new(0.0, 1.0, 0.0, 1.0);
+        assert!(c.to_rgb_string().contains("0, 255, 0"));
+    }
+
+    #[test]
+    fn test_bcv_hsl() {
+        let c = BcvColor::new(1.0, 0.0, 0.0, 1.0);
+        let (h, s, l) = c.to_hsl();
+        assert!((h - 0.0).abs() < 1.0);
+        assert!((s - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bcv_luminance() {
+        let white = BcvColor::new(1.0, 1.0, 1.0, 1.0);
+        assert!(white.is_light());
+        let black = BcvColor::new(0.0, 0.0, 0.0, 1.0);
+        assert!(!black.is_light());
+    }
+
+    #[test]
+    fn test_bcv_picker() {
+        let c = BcvColor::new(0.5, 0.5, 0.5, 1.0);
+        let picker = BcvColorPicker::new(c);
+        assert!(!picker.changed());
+    }
+
+    #[test]
+    fn test_bcv_picker_change() {
+        let c = BcvColor::new(0.5, 0.5, 0.5, 1.0);
+        let mut picker = BcvColorPicker::new(c);
+        picker.set_color(BcvColor::new(1.0, 0.0, 0.0, 1.0));
+        assert!(picker.changed());
+    }
+
+    #[test]
+    fn test_bcv_reset() {
+        let c = BcvColor::new(0.5, 0.5, 0.5, 1.0);
+        let mut picker = BcvColorPicker::new(c);
+        picker.set_color(BcvColor::new(1.0, 0.0, 0.0, 1.0));
+        picker.reset();
+        assert!(!picker.changed());
+    }
+
+    #[test]
+    fn test_bcv_confirm() {
+        let c = BcvColor::new(0.5, 0.5, 0.5, 1.0);
+        let mut picker = BcvColorPicker::new(c);
+        picker.confirm();
+        assert_eq!(picker.recent.len(), 1);
+    }
+
+    #[test]
+    fn test_bcv_format() {
+        let c = BcvColor::new(1.0, 0.0, 0.0, 1.0);
+        assert!(c.format(BcvColorFormat::Hex).starts_with('#'));
+        assert!(c.format(BcvColorFormat::Rgb).starts_with("rgb("));
+    }
+}
