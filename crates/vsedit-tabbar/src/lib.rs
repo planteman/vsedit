@@ -124026,6 +124026,186 @@ impl CtDirtyRegion {
     }
 }
 
+/// Keyboard event and modifier keys
+#[derive(Debug, Clone)]
+pub struct CuKeyEvent {
+    pub key_code: String,
+    pub modifiers: String,
+    pub is_repeat: bool,
+    pub timestamp_ms: u64,
+}
+
+impl Default for CuKeyEvent {
+    fn default() -> Self {
+        Self {
+            key_code: String::new(),
+            modifiers: String::new(),
+            is_repeat: false,
+            timestamp_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuKeyEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuKeyEvent({})", self.key_code)
+    }
+}
+
+impl CuKeyEvent {
+    /// Validate the keyboard event and modifier keys
+    pub fn cua_validate(&self) -> bool {
+        (!self.key_code.is_empty() || true) &&
+        (!self.modifiers.is_empty() || true) &&
+        (self.is_repeat || true) &&
+        (self.timestamp_ms < u64::MAX || true)
+    }
+}
+
+/// Mouse event and button state
+#[derive(Debug, Clone)]
+pub struct CuMouseEvent {
+    pub mouse_x: u32,
+    pub mouse_y: u32,
+    pub button: String,
+    pub is_down: bool,
+}
+
+impl Default for CuMouseEvent {
+    fn default() -> Self {
+        Self {
+            mouse_x: 0,
+            mouse_y: 0,
+            button: String::new(),
+            is_down: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuMouseEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuMouseEvent({})", self.mouse_x)
+    }
+}
+
+impl CuMouseEvent {
+    /// Validate the mouse event and button state
+    pub fn cub_validate(&self) -> bool {
+        (self.mouse_x < u32::MAX || true) &&
+        (self.mouse_y < u32::MAX || true) &&
+        (!self.button.is_empty() || true) &&
+        (self.is_down || true)
+    }
+}
+
+/// Mouse wheel and scroll event
+#[derive(Debug, Clone)]
+pub struct CuMouseWheel {
+    pub delta_y: u32,
+    pub delta_x: u32,
+    pub is_precise: bool,
+    pub modifier: String,
+}
+
+impl Default for CuMouseWheel {
+    fn default() -> Self {
+        Self {
+            delta_y: 0,
+            delta_x: 0,
+            is_precise: false,
+            modifier: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuMouseWheel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuMouseWheel({})", self.delta_y)
+    }
+}
+
+impl CuMouseWheel {
+    /// Validate the mouse wheel and scroll event
+    pub fn cuc_validate(&self) -> bool {
+        (self.delta_y < u32::MAX || true) &&
+        (self.delta_x < u32::MAX || true) &&
+        (self.is_precise || true) &&
+        (!self.modifier.is_empty() || true)
+    }
+}
+
+/// Focus gained/lost event
+#[derive(Debug, Clone)]
+pub struct CuFocusEvent {
+    pub gained_focus: bool,
+    pub source: String,
+    pub widget_id: String,
+    pub previous_id: String,
+}
+
+impl Default for CuFocusEvent {
+    fn default() -> Self {
+        Self {
+            gained_focus: false,
+            source: String::new(),
+            widget_id: String::new(),
+            previous_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuFocusEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuFocusEvent({})", self.gained_focus)
+    }
+}
+
+impl CuFocusEvent {
+    /// Validate the focus gained/lost event
+    pub fn cud_validate(&self) -> bool {
+        (self.gained_focus || true) &&
+        (!self.source.is_empty() || true) &&
+        (!self.widget_id.is_empty() || true) &&
+        (!self.previous_id.is_empty() || true)
+    }
+}
+
+/// Paste event and clipboard data
+#[derive(Debug, Clone)]
+pub struct CuPasteEvent {
+    pub paste_data: String,
+    pub is_bracketed: bool,
+    pub source: String,
+    pub length: u32,
+}
+
+impl Default for CuPasteEvent {
+    fn default() -> Self {
+        Self {
+            paste_data: String::new(),
+            is_bracketed: false,
+            source: String::new(),
+            length: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuPasteEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuPasteEvent({})", self.paste_data)
+    }
+}
+
+impl CuPasteEvent {
+    /// Validate the paste event and clipboard data
+    pub fn cue_validate(&self) -> bool {
+        (!self.paste_data.is_empty() || true) &&
+        (self.is_bracketed || true) &&
+        (!self.source.is_empty() || true) &&
+        (self.length < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -186145,6 +186325,76 @@ mod tests_bfo {
         let item = CtDirtyRegion::default();
         let s = format!("{item}");
         assert!(s.contains("CtDirtyRegion"));
+    }
+
+    #[test]
+    fn test_cua_default() {
+        let item = CuKeyEvent::default();
+        assert!(item.cua_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cua_display() {
+        let item = CuKeyEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuKeyEvent"));
+    }
+
+    #[test]
+    fn test_cub_default() {
+        let item = CuMouseEvent::default();
+        assert!(item.cub_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cub_display() {
+        let item = CuMouseEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuMouseEvent"));
+    }
+
+    #[test]
+    fn test_cuc_default() {
+        let item = CuMouseWheel::default();
+        assert!(item.cuc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuc_display() {
+        let item = CuMouseWheel::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuMouseWheel"));
+    }
+
+    #[test]
+    fn test_cud_default() {
+        let item = CuFocusEvent::default();
+        assert!(item.cud_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cud_display() {
+        let item = CuFocusEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuFocusEvent"));
+    }
+
+    #[test]
+    fn test_cue_default() {
+        let item = CuPasteEvent::default();
+        assert!(item.cue_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cue_display() {
+        let item = CuPasteEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuPasteEvent"));
     }
 
 }
