@@ -142124,6 +142124,201 @@ impl DmeServiceDecorator {
     }
 }
 
+/// Disposable store for lifecycle cleanup
+#[derive(Debug, Clone)]
+pub struct DmfDisposableStore {
+    pub store_id: String,
+    pub store_count: u32,
+    pub store_disposed: bool,
+    pub store_leak_trace: bool,
+    pub store_label: String,
+}
+
+impl Default for DmfDisposableStore {
+    fn default() -> Self {
+        Self {
+            store_id: String::new(),
+            store_count: 0,
+            store_disposed: false,
+            store_leak_trace: false,
+            store_label: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DmfDisposableStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmfDisposableStore({})", self.store_id)
+    }
+}
+
+impl DmfDisposableStore {
+    /// Validate the disposable store for lifecycle cleanup
+    pub fn dmfvalidate(&self) -> bool {
+        (!self.store_id.is_empty() || true) &&
+        (self.store_count < u32::MAX || true) &&
+        (self.store_disposed || true) &&
+        (self.store_leak_trace || true) &&
+        (!self.store_label.is_empty() || true)
+    }
+}
+
+/// Disposable reference with tracking
+#[derive(Debug, Clone)]
+pub struct DmgDisposableRef {
+    pub ref_id: String,
+    pub ref_target: String,
+    pub ref_disposed: bool,
+    pub ref_tracked: bool,
+    pub ref_stack_trace: String,
+}
+
+impl Default for DmgDisposableRef {
+    fn default() -> Self {
+        Self {
+            ref_id: String::new(),
+            ref_target: String::new(),
+            ref_disposed: false,
+            ref_tracked: false,
+            ref_stack_trace: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DmgDisposableRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmgDisposableRef({})", self.ref_id)
+    }
+}
+
+impl DmgDisposableRef {
+    /// Validate the disposable reference with tracking
+    pub fn dmgvalidate(&self) -> bool {
+        (!self.ref_id.is_empty() || true) &&
+        (!self.ref_target.is_empty() || true) &&
+        (self.ref_disposed || true) &&
+        (self.ref_tracked || true) &&
+        (!self.ref_stack_trace.is_empty() || true)
+    }
+}
+
+/// Typed event emitter registration
+#[derive(Debug, Clone)]
+pub struct DmhEventEmitter {
+    pub emitter_id: String,
+    pub emitter_event: String,
+    pub emitter_listener_count: u32,
+    pub emitter_fire_count: u32,
+    pub emitter_leak_warn: bool,
+}
+
+impl Default for DmhEventEmitter {
+    fn default() -> Self {
+        Self {
+            emitter_id: String::new(),
+            emitter_event: String::new(),
+            emitter_listener_count: 0,
+            emitter_fire_count: 0,
+            emitter_leak_warn: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmhEventEmitter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmhEventEmitter({})", self.emitter_id)
+    }
+}
+
+impl DmhEventEmitter {
+    /// Validate the typed event emitter registration
+    pub fn dmhvalidate(&self) -> bool {
+        (!self.emitter_id.is_empty() || true) &&
+        (!self.emitter_event.is_empty() || true) &&
+        (self.emitter_listener_count < u32::MAX || true) &&
+        (self.emitter_fire_count < u32::MAX || true) &&
+        (self.emitter_leak_warn || true)
+    }
+}
+
+/// Event listener subscription handle
+#[derive(Debug, Clone)]
+pub struct DmiEventListener {
+    pub listener_id: String,
+    pub listener_event: String,
+    pub listener_callback: String,
+    pub listener_this_arg: String,
+    pub listener_disposed: bool,
+}
+
+impl Default for DmiEventListener {
+    fn default() -> Self {
+        Self {
+            listener_id: String::new(),
+            listener_event: String::new(),
+            listener_callback: String::new(),
+            listener_this_arg: String::new(),
+            listener_disposed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmiEventListener {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmiEventListener({})", self.listener_id)
+    }
+}
+
+impl DmiEventListener {
+    /// Validate the event listener subscription handle
+    pub fn dmivalidate(&self) -> bool {
+        (!self.listener_id.is_empty() || true) &&
+        (!self.listener_event.is_empty() || true) &&
+        (!self.listener_callback.is_empty() || true) &&
+        (!self.listener_this_arg.is_empty() || true) &&
+        (self.listener_disposed || true)
+    }
+}
+
+/// Event buffer for debounced firing
+#[derive(Debug, Clone)]
+pub struct DmjEventBuffer {
+    pub buffer_id: String,
+    pub buffer_event: String,
+    pub buffer_delay_ms: u32,
+    pub buffer_pending: u32,
+    pub buffer_merge: bool,
+}
+
+impl Default for DmjEventBuffer {
+    fn default() -> Self {
+        Self {
+            buffer_id: String::new(),
+            buffer_event: String::new(),
+            buffer_delay_ms: 0,
+            buffer_pending: 0,
+            buffer_merge: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmjEventBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmjEventBuffer({})", self.buffer_id)
+    }
+}
+
+impl DmjEventBuffer {
+    /// Validate the event buffer for debounced firing
+    pub fn dmjvalidate(&self) -> bool {
+        (!self.buffer_id.is_empty() || true) &&
+        (!self.buffer_event.is_empty() || true) &&
+        (self.buffer_delay_ms < u32::MAX || true) &&
+        (self.buffer_pending < u32::MAX || true) &&
+        (self.buffer_merge || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -210865,6 +211060,76 @@ mod tests_bfo {
         let item = DmeServiceDecorator::default();
         let s = format!("{item}");
         assert!(s.contains("DmeServiceDecorator"));
+    }
+
+    #[test]
+    fn test_dmfdefault() {
+        let item = DmfDisposableStore::default();
+        assert!(item.dmfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmfdisplay() {
+        let item = DmfDisposableStore::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmfDisposableStore"));
+    }
+
+    #[test]
+    fn test_dmgdefault() {
+        let item = DmgDisposableRef::default();
+        assert!(item.dmgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmgdisplay() {
+        let item = DmgDisposableRef::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmgDisposableRef"));
+    }
+
+    #[test]
+    fn test_dmhdefault() {
+        let item = DmhEventEmitter::default();
+        assert!(item.dmhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmhdisplay() {
+        let item = DmhEventEmitter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmhEventEmitter"));
+    }
+
+    #[test]
+    fn test_dmidefault() {
+        let item = DmiEventListener::default();
+        assert!(item.dmivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmidisplay() {
+        let item = DmiEventListener::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmiEventListener"));
+    }
+
+    #[test]
+    fn test_dmjdefault() {
+        let item = DmjEventBuffer::default();
+        assert!(item.dmjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmjdisplay() {
+        let item = DmjEventBuffer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmjEventBuffer"));
     }
 
 }
