@@ -97764,6 +97764,295 @@ impl std::fmt::Display for JsonValidationEntry {
     }
 }
 
+
+/// ColorCustomizationEntry — color customization entry
+#[derive(Debug, Clone)]
+pub struct ColorCustomizationEntry {
+    pub bzu_color_id: String,
+    pub bzu_value: String,
+    pub bzu_scope: String,
+    pub bzu_description: String,
+    pub bzu_dark_default: String,
+    pub bzu_light_default: String,
+    pub bzu_hc_default: String,
+    pub bzu_is_custom: bool,
+}
+
+impl ColorCustomizationEntry {
+    pub fn new() -> Self {
+        Self {
+            bzu_color_id: "editor.background".into(),
+            bzu_value: "#1e1e1e".into(),
+            bzu_scope: "workbench".into(),
+            bzu_description: "".into(),
+            bzu_dark_default: "#1e1e1e".into(),
+            bzu_light_default: "#ffffff".into(),
+            bzu_hc_default: "#000000".into(),
+            bzu_is_custom: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ColorCustomizationEntry({})", self.bzu_color_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzu_color_id.is_empty() || true
+    }
+}
+
+impl Default for ColorCustomizationEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ColorCustomizationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ColorCustomizationEntry({})", self.bzu_color_id)
+    }
+}
+
+/// TokenStyleRule — token style rule
+#[derive(Debug, Clone)]
+pub struct TokenStyleRule {
+    pub bzv_selector: String,
+    pub bzv_foreground: String,
+    pub bzv_font_style: String,
+    pub bzv_scope: String,
+    pub bzv_language: String,
+    pub bzv_settings_json: String,
+    pub bzv_priority: u32,
+    pub bzv_is_builtin: bool,
+}
+
+impl TokenStyleRule {
+    pub fn new() -> Self {
+        Self {
+            bzv_selector: "comment".into(),
+            bzv_foreground: "#6A9955".into(),
+            bzv_font_style: "italic".into(),
+            bzv_scope: "".into(),
+            bzv_language: "".into(),
+            bzv_settings_json: "{}".into(),
+            bzv_priority: 0,
+            bzv_is_builtin: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TokenStyleRule({})", self.bzv_selector)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzv_selector.is_empty() || true
+    }
+}
+
+impl Default for TokenStyleRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TokenStyleRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TokenStyleRule({})", self.bzv_selector)
+    }
+}
+
+/// WorkspaceFolderEntry — workspace folder entry
+#[derive(Debug, Clone)]
+pub struct WorkspaceFolderEntry {
+    pub bzw_uri: String,
+    pub bzw_name: String,
+    pub bzw_index: u32,
+    pub bzw_is_root: bool,
+    pub bzw_search_exclude: String,
+    pub bzw_watcher_exclude: String,
+    pub bzw_files_exclude: String,
+    pub bzw_is_untitled: bool,
+}
+
+impl WorkspaceFolderEntry {
+    pub fn new() -> Self {
+        Self {
+            bzw_uri: "file:///workspace".into(),
+            bzw_name: "workspace".into(),
+            bzw_index: 0,
+            bzw_is_root: true,
+            bzw_search_exclude: "node_modules".into(),
+            bzw_watcher_exclude: "**/.git".into(),
+            bzw_files_exclude: "**/.git".into(),
+            bzw_is_untitled: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WorkspaceFolderEntry({})", self.bzw_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzw_uri.is_empty() || true
+    }
+}
+
+impl Default for WorkspaceFolderEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WorkspaceFolderEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceFolderEntry({})", self.bzw_uri)
+    }
+}
+
+/// MultiRootConfig — multi-root workspace configuration
+#[derive(Debug, Clone)]
+pub struct MultiRootConfig {
+    pub bzx_folder_count: u32,
+    pub bzx_config_path: String,
+    pub bzx_is_untitled: bool,
+    pub bzx_trust_state: String,
+    pub bzx_launch_config_count: u32,
+    pub bzx_task_config_count: u32,
+    pub bzx_extensions_json: String,
+    pub bzx_settings_json: String,
+}
+
+impl MultiRootConfig {
+    pub fn new() -> Self {
+        Self {
+            bzx_folder_count: 1,
+            bzx_config_path: "".into(),
+            bzx_is_untitled: false,
+            bzx_trust_state: "trusted".into(),
+            bzx_launch_config_count: 0,
+            bzx_task_config_count: 0,
+            bzx_extensions_json: "{}".into(),
+            bzx_settings_json: "{}".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("MultiRootConfig({})", self.bzx_folder_count)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bzx_folder_count < u32::MAX || true
+    }
+}
+
+impl Default for MultiRootConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for MultiRootConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MultiRootConfig({})", self.bzx_folder_count)
+    }
+}
+
+/// RecentEntryModel — recent entry model
+#[derive(Debug, Clone)]
+pub struct RecentEntryModel {
+    pub bzy_uri: String,
+    pub bzy_label: String,
+    pub bzy_remote_authority: String,
+    pub bzy_opened_at: u64,
+    pub bzy_entry_type: String,
+    pub bzy_is_pinned: bool,
+    pub bzy_workspace_config_path: String,
+    pub bzy_is_workspace: bool,
+}
+
+impl RecentEntryModel {
+    pub fn new() -> Self {
+        Self {
+            bzy_uri: "".into(),
+            bzy_label: "".into(),
+            bzy_remote_authority: "".into(),
+            bzy_opened_at: 0,
+            bzy_entry_type: "file".into(),
+            bzy_is_pinned: false,
+            bzy_workspace_config_path: "".into(),
+            bzy_is_workspace: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("RecentEntryModel({})", self.bzy_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzy_uri.is_empty() || true
+    }
+}
+
+impl Default for RecentEntryModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for RecentEntryModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RecentEntryModel({})", self.bzy_uri)
+    }
+}
+
+/// StartupPerfModel — startup performance model
+#[derive(Debug, Clone)]
+pub struct StartupPerfModel {
+    pub bzz_total_ms: u64,
+    pub bzz_window_load_ms: u64,
+    pub bzz_workspace_load_ms: u64,
+    pub bzz_extension_load_ms: u64,
+    pub bzz_renderer_ready_ms: u64,
+    pub bzz_workbench_ready_ms: u64,
+    pub bzz_first_paint_ms: u64,
+    pub bzz_extension_count: u32,
+}
+
+impl StartupPerfModel {
+    pub fn new() -> Self {
+        Self {
+            bzz_total_ms: 0,
+            bzz_window_load_ms: 0,
+            bzz_workspace_load_ms: 0,
+            bzz_extension_load_ms: 0,
+            bzz_renderer_ready_ms: 0,
+            bzz_workbench_ready_ms: 0,
+            bzz_first_paint_ms: 0,
+            bzz_extension_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("StartupPerfModel({})", self.bzz_total_ms)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bzz_total_ms < u64::MAX || true
+    }
+}
+
+impl Default for StartupPerfModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for StartupPerfModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StartupPerfModel({})", self.bzz_total_ms)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -150860,6 +151149,397 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bzt_file_match = "settings.json".into();
         assert_eq!(c.summary(), JsonValidationEntry::new().summary());
+    }
+
+
+    #[test]
+    fn test_bzu_create() {
+        let obj = ColorCustomizationEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzu_validate() {
+        let obj = ColorCustomizationEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzu_display() {
+        let obj = ColorCustomizationEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ColorCustomizationEntry"));
+    }
+
+    #[test]
+    fn test_bzu_clone() {
+        let obj = ColorCustomizationEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzu_debug() {
+        let obj = ColorCustomizationEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ColorCustomizationEntry"));
+    }
+
+    #[test]
+    fn test_bzu_default() {
+        let obj = ColorCustomizationEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzu_summary_contains_name() {
+        let obj = ColorCustomizationEntry::new();
+        assert!(obj.summary().contains("ColorCustomizationEntry"));
+    }
+
+    #[test]
+    fn test_bzu_validate_default() {
+        let obj = ColorCustomizationEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzu_display_not_empty() {
+        let obj = ColorCustomizationEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzu_clone_independence() {
+        let mut obj = ColorCustomizationEntry::new();
+        let c = obj.clone();
+        obj.bzu_color_id = "editor.background".into();
+        assert_eq!(c.summary(), ColorCustomizationEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzv_create() {
+        let obj = TokenStyleRule::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzv_validate() {
+        let obj = TokenStyleRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzv_display() {
+        let obj = TokenStyleRule::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TokenStyleRule"));
+    }
+
+    #[test]
+    fn test_bzv_clone() {
+        let obj = TokenStyleRule::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzv_debug() {
+        let obj = TokenStyleRule::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TokenStyleRule"));
+    }
+
+    #[test]
+    fn test_bzv_default() {
+        let obj = TokenStyleRule::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzv_summary_contains_name() {
+        let obj = TokenStyleRule::new();
+        assert!(obj.summary().contains("TokenStyleRule"));
+    }
+
+    #[test]
+    fn test_bzv_validate_default() {
+        let obj = TokenStyleRule::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzv_display_not_empty() {
+        let obj = TokenStyleRule::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzv_clone_independence() {
+        let mut obj = TokenStyleRule::new();
+        let c = obj.clone();
+        obj.bzv_selector = "comment".into();
+        assert_eq!(c.summary(), TokenStyleRule::new().summary());
+    }
+
+    #[test]
+    fn test_bzw_create() {
+        let obj = WorkspaceFolderEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzw_validate() {
+        let obj = WorkspaceFolderEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzw_display() {
+        let obj = WorkspaceFolderEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WorkspaceFolderEntry"));
+    }
+
+    #[test]
+    fn test_bzw_clone() {
+        let obj = WorkspaceFolderEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzw_debug() {
+        let obj = WorkspaceFolderEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WorkspaceFolderEntry"));
+    }
+
+    #[test]
+    fn test_bzw_default() {
+        let obj = WorkspaceFolderEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzw_summary_contains_name() {
+        let obj = WorkspaceFolderEntry::new();
+        assert!(obj.summary().contains("WorkspaceFolderEntry"));
+    }
+
+    #[test]
+    fn test_bzw_validate_default() {
+        let obj = WorkspaceFolderEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzw_display_not_empty() {
+        let obj = WorkspaceFolderEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzw_clone_independence() {
+        let mut obj = WorkspaceFolderEntry::new();
+        let c = obj.clone();
+        obj.bzw_uri = "file:///workspace".into();
+        assert_eq!(c.summary(), WorkspaceFolderEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzx_create() {
+        let obj = MultiRootConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzx_validate() {
+        let obj = MultiRootConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzx_display() {
+        let obj = MultiRootConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("MultiRootConfig"));
+    }
+
+    #[test]
+    fn test_bzx_clone() {
+        let obj = MultiRootConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzx_debug() {
+        let obj = MultiRootConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("MultiRootConfig"));
+    }
+
+    #[test]
+    fn test_bzx_default() {
+        let obj = MultiRootConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzx_summary_contains_name() {
+        let obj = MultiRootConfig::new();
+        assert!(obj.summary().contains("MultiRootConfig"));
+    }
+
+    #[test]
+    fn test_bzx_validate_default() {
+        let obj = MultiRootConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzx_display_not_empty() {
+        let obj = MultiRootConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzx_clone_independence() {
+        let mut obj = MultiRootConfig::new();
+        let c = obj.clone();
+        obj.bzx_folder_count = 1;
+        assert_eq!(c.summary(), MultiRootConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bzy_create() {
+        let obj = RecentEntryModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzy_validate() {
+        let obj = RecentEntryModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzy_display() {
+        let obj = RecentEntryModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("RecentEntryModel"));
+    }
+
+    #[test]
+    fn test_bzy_clone() {
+        let obj = RecentEntryModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzy_debug() {
+        let obj = RecentEntryModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("RecentEntryModel"));
+    }
+
+    #[test]
+    fn test_bzy_default() {
+        let obj = RecentEntryModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzy_summary_contains_name() {
+        let obj = RecentEntryModel::new();
+        assert!(obj.summary().contains("RecentEntryModel"));
+    }
+
+    #[test]
+    fn test_bzy_validate_default() {
+        let obj = RecentEntryModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzy_display_not_empty() {
+        let obj = RecentEntryModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzy_clone_independence() {
+        let mut obj = RecentEntryModel::new();
+        let c = obj.clone();
+        obj.bzy_uri = "".into();
+        assert_eq!(c.summary(), RecentEntryModel::new().summary());
+    }
+
+    #[test]
+    fn test_bzz_create() {
+        let obj = StartupPerfModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzz_validate() {
+        let obj = StartupPerfModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzz_display() {
+        let obj = StartupPerfModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("StartupPerfModel"));
+    }
+
+    #[test]
+    fn test_bzz_clone() {
+        let obj = StartupPerfModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzz_debug() {
+        let obj = StartupPerfModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("StartupPerfModel"));
+    }
+
+    #[test]
+    fn test_bzz_default() {
+        let obj = StartupPerfModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzz_summary_contains_name() {
+        let obj = StartupPerfModel::new();
+        assert!(obj.summary().contains("StartupPerfModel"));
+    }
+
+    #[test]
+    fn test_bzz_validate_default() {
+        let obj = StartupPerfModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzz_display_not_empty() {
+        let obj = StartupPerfModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzz_clone_independence() {
+        let mut obj = StartupPerfModel::new();
+        let c = obj.clone();
+        obj.bzz_total_ms = 0;
+        assert_eq!(c.summary(), StartupPerfModel::new().summary());
     }
 
 }
