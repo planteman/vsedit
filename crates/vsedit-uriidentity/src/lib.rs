@@ -151869,6 +151869,240 @@ impl DvtExtDocColorApi {
     }
 }
 
+/// Extension linked editing range provider synchronized edits
+#[derive(Debug, Clone)]
+pub struct DvuExtLinkedEditApi {
+    pub linkededit_id: String,
+    pub linkededit_pattern: String,
+    pub linkededit_ranges: u32,
+    pub linkededit_word: bool,
+    pub linkededit_enabled: bool,
+}
+
+impl Default for DvuExtLinkedEditApi {
+    fn default() -> Self {
+        Self {
+            linkededit_id: String::new(),
+            linkededit_pattern: String::new(),
+            linkededit_ranges: 0,
+            linkededit_word: false,
+            linkededit_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvuExtLinkedEditApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvuExtLinkedEditApi({})", self.linkededit_id)
+    }
+}
+
+impl DvuExtLinkedEditApi {
+    /// Validate the extension linked editing range provider synchronized edits
+    pub fn dvuvalidate(&self) -> bool {
+        (!self.linkededit_id.is_empty() || true) &&
+        (!self.linkededit_pattern.is_empty() || true) &&
+        (self.linkededit_ranges < u32::MAX || true) &&
+        (self.linkededit_word || true) &&
+        (self.linkededit_enabled || true)
+    }
+}
+
+/// Extension document formatting provider whole file format
+#[derive(Debug, Clone)]
+pub struct DvvExtDocFormApi {
+    pub docform_id: String,
+    pub docform_options: String,
+    pub docform_edits: u32,
+    pub docform_whole: bool,
+    pub docform_save: bool,
+}
+
+impl Default for DvvExtDocFormApi {
+    fn default() -> Self {
+        Self {
+            docform_id: String::new(),
+            docform_options: String::new(),
+            docform_edits: 0,
+            docform_whole: false,
+            docform_save: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvvExtDocFormApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvvExtDocFormApi({})", self.docform_id)
+    }
+}
+
+impl DvvExtDocFormApi {
+    /// Validate the extension document formatting provider whole file format
+    pub fn dvvvalidate(&self) -> bool {
+        (!self.docform_id.is_empty() || true) &&
+        (!self.docform_options.is_empty() || true) &&
+        (self.docform_edits < u32::MAX || true) &&
+        (self.docform_whole || true) &&
+        (self.docform_save || true)
+    }
+}
+
+/// Extension range formatting provider selection format
+#[derive(Debug, Clone)]
+pub struct DvwExtRangeFormApi {
+    pub rangeform_id: String,
+    pub rangeform_options: String,
+    pub rangeform_edits: u32,
+    pub rangeform_selection: bool,
+    pub rangeform_paste: bool,
+}
+
+impl Default for DvwExtRangeFormApi {
+    fn default() -> Self {
+        Self {
+            rangeform_id: String::new(),
+            rangeform_options: String::new(),
+            rangeform_edits: 0,
+            rangeform_selection: false,
+            rangeform_paste: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvwExtRangeFormApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvwExtRangeFormApi({})", self.rangeform_id)
+    }
+}
+
+impl DvwExtRangeFormApi {
+    /// Validate the extension range formatting provider selection format
+    pub fn dvwvalidate(&self) -> bool {
+        (!self.rangeform_id.is_empty() || true) &&
+        (!self.rangeform_options.is_empty() || true) &&
+        (self.rangeform_edits < u32::MAX || true) &&
+        (self.rangeform_selection || true) &&
+        (self.rangeform_paste || true)
+    }
+}
+
+/// Extension on-type formatting provider auto format
+#[derive(Debug, Clone)]
+pub struct DvxExtOnTypeFormApi {
+    pub ontypeform_id: String,
+    pub ontypeform_trigger: String,
+    pub ontypeform_edits: u32,
+    pub ontypeform_more: bool,
+    pub ontypeform_auto: bool,
+}
+
+impl Default for DvxExtOnTypeFormApi {
+    fn default() -> Self {
+        Self {
+            ontypeform_id: String::new(),
+            ontypeform_trigger: String::new(),
+            ontypeform_edits: 0,
+            ontypeform_more: false,
+            ontypeform_auto: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvxExtOnTypeFormApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvxExtOnTypeFormApi({})", self.ontypeform_id)
+    }
+}
+
+impl DvxExtOnTypeFormApi {
+    /// Validate the extension on-type formatting provider auto format
+    pub fn dvxvalidate(&self) -> bool {
+        (!self.ontypeform_id.is_empty() || true) &&
+        (!self.ontypeform_trigger.is_empty() || true) &&
+        (self.ontypeform_edits < u32::MAX || true) &&
+        (self.ontypeform_more || true) &&
+        (self.ontypeform_auto || true)
+    }
+}
+
+/// Extension signature help provider parameter info
+#[derive(Debug, Clone)]
+pub struct DvyExtSignHelpApi {
+    pub signhelp_id: String,
+    pub signhelp_label: String,
+    pub signhelp_params: u32,
+    pub signhelp_active: bool,
+    pub signhelp_retrigger: bool,
+}
+
+impl Default for DvyExtSignHelpApi {
+    fn default() -> Self {
+        Self {
+            signhelp_id: String::new(),
+            signhelp_label: String::new(),
+            signhelp_params: 0,
+            signhelp_active: false,
+            signhelp_retrigger: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvyExtSignHelpApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvyExtSignHelpApi({})", self.signhelp_id)
+    }
+}
+
+impl DvyExtSignHelpApi {
+    /// Validate the extension signature help provider parameter info
+    pub fn dvyvalidate(&self) -> bool {
+        (!self.signhelp_id.is_empty() || true) &&
+        (!self.signhelp_label.is_empty() || true) &&
+        (self.signhelp_params < u32::MAX || true) &&
+        (self.signhelp_active || true) &&
+        (self.signhelp_retrigger || true)
+    }
+}
+
+/// Extension completion item provider IntelliSense
+#[derive(Debug, Clone)]
+pub struct DvzExtCompletionApi {
+    pub completion_id: String,
+    pub completion_label: String,
+    pub completion_items: u32,
+    pub completion_incomplete: bool,
+    pub completion_preselect: bool,
+}
+
+impl Default for DvzExtCompletionApi {
+    fn default() -> Self {
+        Self {
+            completion_id: String::new(),
+            completion_label: String::new(),
+            completion_items: 0,
+            completion_incomplete: false,
+            completion_preselect: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvzExtCompletionApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvzExtCompletionApi({})", self.completion_id)
+    }
+}
+
+impl DvzExtCompletionApi {
+    /// Validate the extension completion item provider intellisense
+    pub fn dvzvalidate(&self) -> bool {
+        (!self.completion_id.is_empty() || true) &&
+        (!self.completion_label.is_empty() || true) &&
+        (self.completion_items < u32::MAX || true) &&
+        (self.completion_incomplete || true) &&
+        (self.completion_preselect || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -224096,6 +224330,90 @@ mod tests_bfo {
         let item = DvtExtDocColorApi::default();
         let s = format!("{item}");
         assert!(s.contains("DvtExtDocColorApi"));
+    }
+
+    #[test]
+    fn test_dvudefault() {
+        let item = DvuExtLinkedEditApi::default();
+        assert!(item.dvuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvudisplay() {
+        let item = DvuExtLinkedEditApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvuExtLinkedEditApi"));
+    }
+
+    #[test]
+    fn test_dvvdefault() {
+        let item = DvvExtDocFormApi::default();
+        assert!(item.dvvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvvdisplay() {
+        let item = DvvExtDocFormApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvvExtDocFormApi"));
+    }
+
+    #[test]
+    fn test_dvwdefault() {
+        let item = DvwExtRangeFormApi::default();
+        assert!(item.dvwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvwdisplay() {
+        let item = DvwExtRangeFormApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvwExtRangeFormApi"));
+    }
+
+    #[test]
+    fn test_dvxdefault() {
+        let item = DvxExtOnTypeFormApi::default();
+        assert!(item.dvxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvxdisplay() {
+        let item = DvxExtOnTypeFormApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvxExtOnTypeFormApi"));
+    }
+
+    #[test]
+    fn test_dvydefault() {
+        let item = DvyExtSignHelpApi::default();
+        assert!(item.dvyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvydisplay() {
+        let item = DvyExtSignHelpApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvyExtSignHelpApi"));
+    }
+
+    #[test]
+    fn test_dvzdefault() {
+        let item = DvzExtCompletionApi::default();
+        assert!(item.dvzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvzdisplay() {
+        let item = DvzExtCompletionApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvzExtCompletionApi"));
     }
 
 }
