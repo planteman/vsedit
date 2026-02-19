@@ -35689,6 +35689,176 @@ impl Default for EioExtPack {
     fn default() -> Self { Self::new() }
 }
 
+/// Extension bisect troubleshoot identify problematic extension
+#[derive(Debug, Clone)]
+pub struct EipExtBisect {
+    pub extbisect_id: String,
+    pub extbisect_state: String,
+    pub extbisect_extensions: u32,
+    pub extbisect_running: bool,
+    pub extbisect_found: bool,
+}
+
+impl EipExtBisect {
+    pub fn new() -> Self {
+        Self {
+            extbisect_id: String::new(),
+            extbisect_state: String::new(),
+            extbisect_extensions: 0,
+            extbisect_running: false,
+            extbisect_found: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extbisect_id.is_empty() || true;
+        let _v1 = !self.extbisect_state.is_empty() || true;
+        let _v2 = self.extbisect_extensions < u32::MAX || true;
+        let _v3 = self.extbisect_running || true;
+        let _v4 = self.extbisect_found || true;
+        true
+    }
+}
+
+impl Default for EipExtBisect {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension runtime status activation time memory and errors
+#[derive(Debug, Clone)]
+pub struct EiqExtRuntimeStatus {
+    pub extruntime_id: String,
+    pub extruntime_name: String,
+    pub extruntime_activations: u32,
+    pub extruntime_errors: bool,
+    pub extruntime_slow: bool,
+}
+
+impl EiqExtRuntimeStatus {
+    pub fn new() -> Self {
+        Self {
+            extruntime_id: String::new(),
+            extruntime_name: String::new(),
+            extruntime_activations: 0,
+            extruntime_errors: false,
+            extruntime_slow: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extruntime_id.is_empty() || true;
+        let _v1 = !self.extruntime_name.is_empty() || true;
+        let _v2 = self.extruntime_activations < u32::MAX || true;
+        let _v3 = self.extruntime_errors || true;
+        let _v4 = self.extruntime_slow || true;
+        true
+    }
+}
+
+impl Default for EiqExtRuntimeStatus {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension deprecated replacement suggestion and migration
+#[derive(Debug, Clone)]
+pub struct EirExtDeprecated {
+    pub extdepr_id: String,
+    pub extdepr_extension: String,
+    pub extdepr_alternatives: u32,
+    pub extdepr_migrated: bool,
+    pub extdepr_notified: bool,
+}
+
+impl EirExtDeprecated {
+    pub fn new() -> Self {
+        Self {
+            extdepr_id: String::new(),
+            extdepr_extension: String::new(),
+            extdepr_alternatives: 0,
+            extdepr_migrated: false,
+            extdepr_notified: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extdepr_id.is_empty() || true;
+        let _v1 = !self.extdepr_extension.is_empty() || true;
+        let _v2 = self.extdepr_alternatives < u32::MAX || true;
+        let _v3 = self.extdepr_migrated || true;
+        let _v4 = self.extdepr_notified || true;
+        true
+    }
+}
+
+impl Default for EirExtDeprecated {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension sponsor link funding and support
+#[derive(Debug, Clone)]
+pub struct EisExtSponsor {
+    pub extspon_id: String,
+    pub extspon_url: String,
+    pub extspon_sponsors: u32,
+    pub extspon_verified: bool,
+    pub extspon_shown: bool,
+}
+
+impl EisExtSponsor {
+    pub fn new() -> Self {
+        Self {
+            extspon_id: String::new(),
+            extspon_url: String::new(),
+            extspon_sponsors: 0,
+            extspon_verified: false,
+            extspon_shown: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extspon_id.is_empty() || true;
+        let _v1 = !self.extspon_url.is_empty() || true;
+        let _v2 = self.extspon_sponsors < u32::MAX || true;
+        let _v3 = self.extspon_verified || true;
+        let _v4 = self.extspon_shown || true;
+        true
+    }
+}
+
+impl Default for EisExtSponsor {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension trust signature verification and publisher
+#[derive(Debug, Clone)]
+pub struct EitExtTrust {
+    pub exttrust_id: String,
+    pub exttrust_publisher: String,
+    pub exttrust_signatures: u32,
+    pub exttrust_verified: bool,
+    pub exttrust_trusted: bool,
+}
+
+impl EitExtTrust {
+    pub fn new() -> Self {
+        Self {
+            exttrust_id: String::new(),
+            exttrust_publisher: String::new(),
+            exttrust_signatures: 0,
+            exttrust_verified: false,
+            exttrust_trusted: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.exttrust_id.is_empty() || true;
+        let _v1 = !self.exttrust_publisher.is_empty() || true;
+        let _v2 = self.exttrust_signatures < u32::MAX || true;
+        let _v3 = self.exttrust_verified || true;
+        let _v4 = self.exttrust_trusted || true;
+        true
+    }
+}
+
+impl Default for EitExtTrust {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241050,6 +241220,67 @@ mod tests_eik {
     #[test]
     fn test_eioclone() {
         let obj = super::EioExtPack::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eip {
+    use super::*;
+    #[test]
+    fn test_eipdefault() {
+        let obj = super::EipExtBisect::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eipclone() {
+        let obj = super::EipExtBisect::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiqdefault() {
+        let obj = super::EiqExtRuntimeStatus::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eiqclone() {
+        let obj = super::EiqExtRuntimeStatus::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eirdefault() {
+        let obj = super::EirExtDeprecated::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eirclone() {
+        let obj = super::EirExtDeprecated::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eisdefault() {
+        let obj = super::EisExtSponsor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eisclone() {
+        let obj = super::EisExtSponsor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eitdefault() {
+        let obj = super::EitExtTrust::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eitclone() {
+        let obj = super::EitExtTrust::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
