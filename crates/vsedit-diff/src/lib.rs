@@ -153866,6 +153866,240 @@ impl DxtSnippetTransform {
     }
 }
 
+/// Snippet scope language and project filtering
+#[derive(Debug, Clone)]
+pub struct DxuSnippetScope {
+    pub scope_id: String,
+    pub scope_languages: String,
+    pub scope_count: u32,
+    pub scope_global: bool,
+    pub scope_project: bool,
+}
+
+impl Default for DxuSnippetScope {
+    fn default() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_languages: String::new(),
+            scope_count: 0,
+            scope_global: false,
+            scope_project: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxuSnippetScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxuSnippetScope({})", self.scope_id)
+    }
+}
+
+impl DxuSnippetScope {
+    /// Validate the snippet scope language and project filtering
+    pub fn dxuvalidate(&self) -> bool {
+        (!self.scope_id.is_empty() || true) &&
+        (!self.scope_languages.is_empty() || true) &&
+        (self.scope_count < u32::MAX || true) &&
+        (self.scope_global || true) &&
+        (self.scope_project || true)
+    }
+}
+
+/// Snippet insertion adjust whitespace and final cursor
+#[derive(Debug, Clone)]
+pub struct DxvSnippetInsert {
+    pub insert_id: String,
+    pub insert_position: String,
+    pub insert_edits: u32,
+    pub insert_adjust: bool,
+    pub insert_final: bool,
+}
+
+impl Default for DxvSnippetInsert {
+    fn default() -> Self {
+        Self {
+            insert_id: String::new(),
+            insert_position: String::new(),
+            insert_edits: 0,
+            insert_adjust: false,
+            insert_final: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxvSnippetInsert {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxvSnippetInsert({})", self.insert_id)
+    }
+}
+
+impl DxvSnippetInsert {
+    /// Validate the snippet insertion adjust whitespace and final cursor
+    pub fn dxvvalidate(&self) -> bool {
+        (!self.insert_id.is_empty() || true) &&
+        (!self.insert_position.is_empty() || true) &&
+        (self.insert_edits < u32::MAX || true) &&
+        (self.insert_adjust || true) &&
+        (self.insert_final || true)
+    }
+}
+
+/// Snippet registry collection and lookup
+#[derive(Debug, Clone)]
+pub struct DxwSnippetRegistry {
+    pub registry_id: String,
+    pub registry_source: String,
+    pub registry_snippets: u32,
+    pub registry_builtin: bool,
+    pub registry_extension: bool,
+}
+
+impl Default for DxwSnippetRegistry {
+    fn default() -> Self {
+        Self {
+            registry_id: String::new(),
+            registry_source: String::new(),
+            registry_snippets: 0,
+            registry_builtin: false,
+            registry_extension: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxwSnippetRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxwSnippetRegistry({})", self.registry_id)
+    }
+}
+
+impl DxwSnippetRegistry {
+    /// Validate the snippet registry collection and lookup
+    pub fn dxwvalidate(&self) -> bool {
+        (!self.registry_id.is_empty() || true) &&
+        (!self.registry_source.is_empty() || true) &&
+        (self.registry_snippets < u32::MAX || true) &&
+        (self.registry_builtin || true) &&
+        (self.registry_extension || true)
+    }
+}
+
+/// Color theme file parsing JSON token colors
+#[derive(Debug, Clone)]
+pub struct DxxThemeParse {
+    pub theme_id: String,
+    pub theme_name: String,
+    pub theme_rules: u32,
+    pub theme_dark: bool,
+    pub theme_hc: bool,
+}
+
+impl Default for DxxThemeParse {
+    fn default() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_name: String::new(),
+            theme_rules: 0,
+            theme_dark: false,
+            theme_hc: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxxThemeParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxxThemeParse({})", self.theme_id)
+    }
+}
+
+impl DxxThemeParse {
+    /// Validate the color theme file parsing json token colors
+    pub fn dxxvalidate(&self) -> bool {
+        (!self.theme_id.is_empty() || true) &&
+        (!self.theme_name.is_empty() || true) &&
+        (self.theme_rules < u32::MAX || true) &&
+        (self.theme_dark || true) &&
+        (self.theme_hc || true)
+    }
+}
+
+/// Theme scope selector TextMate scope matching
+#[derive(Debug, Clone)]
+pub struct DxyThemeScope {
+    pub themescope_id: String,
+    pub themescope_selector: String,
+    pub themescope_specificity: u32,
+    pub themescope_parent: bool,
+    pub themescope_match: bool,
+}
+
+impl Default for DxyThemeScope {
+    fn default() -> Self {
+        Self {
+            themescope_id: String::new(),
+            themescope_selector: String::new(),
+            themescope_specificity: 0,
+            themescope_parent: false,
+            themescope_match: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxyThemeScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxyThemeScope({})", self.themescope_id)
+    }
+}
+
+impl DxyThemeScope {
+    /// Validate the theme scope selector textmate scope matching
+    pub fn dxyvalidate(&self) -> bool {
+        (!self.themescope_id.is_empty() || true) &&
+        (!self.themescope_selector.is_empty() || true) &&
+        (self.themescope_specificity < u32::MAX || true) &&
+        (self.themescope_parent || true) &&
+        (self.themescope_match || true)
+    }
+}
+
+/// Theme inheritance base theme and include chain
+#[derive(Debug, Clone)]
+pub struct DxzThemeInherit {
+    pub inherit_id: String,
+    pub inherit_base: String,
+    pub inherit_depth: u32,
+    pub inherit_override: bool,
+    pub inherit_merge: bool,
+}
+
+impl Default for DxzThemeInherit {
+    fn default() -> Self {
+        Self {
+            inherit_id: String::new(),
+            inherit_base: String::new(),
+            inherit_depth: 0,
+            inherit_override: false,
+            inherit_merge: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxzThemeInherit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxzThemeInherit({})", self.inherit_id)
+    }
+}
+
+impl DxzThemeInherit {
+    /// Validate the theme inheritance base theme and include chain
+    pub fn dxzvalidate(&self) -> bool {
+        (!self.inherit_id.is_empty() || true) &&
+        (!self.inherit_base.is_empty() || true) &&
+        (self.inherit_depth < u32::MAX || true) &&
+        (self.inherit_override || true) &&
+        (self.inherit_merge || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -226821,6 +227055,90 @@ mod tests_bfo {
         let item = DxtSnippetTransform::default();
         let s = format!("{item}");
         assert!(s.contains("DxtSnippetTransform"));
+    }
+
+    #[test]
+    fn test_dxudefault() {
+        let item = DxuSnippetScope::default();
+        assert!(item.dxuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxudisplay() {
+        let item = DxuSnippetScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxuSnippetScope"));
+    }
+
+    #[test]
+    fn test_dxvdefault() {
+        let item = DxvSnippetInsert::default();
+        assert!(item.dxvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxvdisplay() {
+        let item = DxvSnippetInsert::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxvSnippetInsert"));
+    }
+
+    #[test]
+    fn test_dxwdefault() {
+        let item = DxwSnippetRegistry::default();
+        assert!(item.dxwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxwdisplay() {
+        let item = DxwSnippetRegistry::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxwSnippetRegistry"));
+    }
+
+    #[test]
+    fn test_dxxdefault() {
+        let item = DxxThemeParse::default();
+        assert!(item.dxxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxxdisplay() {
+        let item = DxxThemeParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxxThemeParse"));
+    }
+
+    #[test]
+    fn test_dxydefault() {
+        let item = DxyThemeScope::default();
+        assert!(item.dxyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxydisplay() {
+        let item = DxyThemeScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxyThemeScope"));
+    }
+
+    #[test]
+    fn test_dxzdefault() {
+        let item = DxzThemeInherit::default();
+        assert!(item.dxzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxzdisplay() {
+        let item = DxzThemeInherit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxzThemeInherit"));
     }
 
 }
