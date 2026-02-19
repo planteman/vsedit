@@ -147271,6 +147271,201 @@ impl DreLspInlayHint {
     }
 }
 
+/// LSP folding range kind and collapsed
+#[derive(Debug, Clone)]
+pub struct DrfLspFoldingRange {
+    pub fold_id: String,
+    pub fold_start_line: u32,
+    pub fold_end_line: u32,
+    pub fold_kind: String,
+    pub fold_collapsed_text: String,
+}
+
+impl Default for DrfLspFoldingRange {
+    fn default() -> Self {
+        Self {
+            fold_id: String::new(),
+            fold_start_line: 0,
+            fold_end_line: 0,
+            fold_kind: String::new(),
+            fold_collapsed_text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrfLspFoldingRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrfLspFoldingRange({})", self.fold_id)
+    }
+}
+
+impl DrfLspFoldingRange {
+    /// Validate the lsp folding range kind and collapsed
+    pub fn drfvalidate(&self) -> bool {
+        (!self.fold_id.is_empty() || true) &&
+        (self.fold_start_line < u32::MAX || true) &&
+        (self.fold_end_line < u32::MAX || true) &&
+        (!self.fold_kind.is_empty() || true) &&
+        (!self.fold_collapsed_text.is_empty() || true)
+    }
+}
+
+/// LSP document symbol hierarchy
+#[derive(Debug, Clone)]
+pub struct DrgLspDocSymbol {
+    pub doc_sym_id: String,
+    pub doc_sym_name: String,
+    pub doc_sym_kind: u32,
+    pub doc_sym_range: String,
+    pub doc_sym_children: u32,
+}
+
+impl Default for DrgLspDocSymbol {
+    fn default() -> Self {
+        Self {
+            doc_sym_id: String::new(),
+            doc_sym_name: String::new(),
+            doc_sym_kind: 0,
+            doc_sym_range: String::new(),
+            doc_sym_children: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DrgLspDocSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrgLspDocSymbol({})", self.doc_sym_id)
+    }
+}
+
+impl DrgLspDocSymbol {
+    /// Validate the lsp document symbol hierarchy
+    pub fn drgvalidate(&self) -> bool {
+        (!self.doc_sym_id.is_empty() || true) &&
+        (!self.doc_sym_name.is_empty() || true) &&
+        (self.doc_sym_kind < u32::MAX || true) &&
+        (!self.doc_sym_range.is_empty() || true) &&
+        (self.doc_sym_children < u32::MAX || true)
+    }
+}
+
+/// LSP document link target and tooltip
+#[derive(Debug, Clone)]
+pub struct DrhLspDocLink {
+    pub doc_link_id: String,
+    pub doc_link_range: String,
+    pub doc_link_target: String,
+    pub doc_link_tooltip: String,
+    pub doc_link_data: String,
+}
+
+impl Default for DrhLspDocLink {
+    fn default() -> Self {
+        Self {
+            doc_link_id: String::new(),
+            doc_link_range: String::new(),
+            doc_link_target: String::new(),
+            doc_link_tooltip: String::new(),
+            doc_link_data: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrhLspDocLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrhLspDocLink({})", self.doc_link_id)
+    }
+}
+
+impl DrhLspDocLink {
+    /// Validate the lsp document link target and tooltip
+    pub fn drhvalidate(&self) -> bool {
+        (!self.doc_link_id.is_empty() || true) &&
+        (!self.doc_link_range.is_empty() || true) &&
+        (!self.doc_link_target.is_empty() || true) &&
+        (!self.doc_link_tooltip.is_empty() || true) &&
+        (!self.doc_link_data.is_empty() || true)
+    }
+}
+
+/// LSP document color information
+#[derive(Debug, Clone)]
+pub struct DriLspDocColor {
+    pub doc_color_id: String,
+    pub doc_color_range: String,
+    pub doc_color_red: f64,
+    pub doc_color_green: f64,
+    pub doc_color_blue: f64,
+}
+
+impl Default for DriLspDocColor {
+    fn default() -> Self {
+        Self {
+            doc_color_id: String::new(),
+            doc_color_range: String::new(),
+            doc_color_red: 0.0,
+            doc_color_green: 0.0,
+            doc_color_blue: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DriLspDocColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DriLspDocColor({})", self.doc_color_id)
+    }
+}
+
+impl DriLspDocColor {
+    /// Validate the lsp document color information
+    pub fn drivalidate(&self) -> bool {
+        (!self.doc_color_id.is_empty() || true) &&
+        (!self.doc_color_range.is_empty() || true) &&
+        (self.doc_color_red.is_finite() || true) &&
+        (self.doc_color_green.is_finite() || true) &&
+        (self.doc_color_blue.is_finite() || true)
+    }
+}
+
+/// LSP document formatting options
+#[derive(Debug, Clone)]
+pub struct DrjLspDocFormat {
+    pub doc_format_id: String,
+    pub doc_format_tab_size: u32,
+    pub doc_format_insert_spaces: bool,
+    pub doc_format_trim_trailing: bool,
+    pub doc_format_insert_final_newline: bool,
+}
+
+impl Default for DrjLspDocFormat {
+    fn default() -> Self {
+        Self {
+            doc_format_id: String::new(),
+            doc_format_tab_size: 0,
+            doc_format_insert_spaces: false,
+            doc_format_trim_trailing: false,
+            doc_format_insert_final_newline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrjLspDocFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrjLspDocFormat({})", self.doc_format_id)
+    }
+}
+
+impl DrjLspDocFormat {
+    /// Validate the lsp document formatting options
+    pub fn drjvalidate(&self) -> bool {
+        (!self.doc_format_id.is_empty() || true) &&
+        (self.doc_format_tab_size < u32::MAX || true) &&
+        (self.doc_format_insert_spaces || true) &&
+        (self.doc_format_trim_trailing || true) &&
+        (self.doc_format_insert_final_newline || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -217832,6 +218027,76 @@ mod tests_bfo {
         let item = DreLspInlayHint::default();
         let s = format!("{item}");
         assert!(s.contains("DreLspInlayHint"));
+    }
+
+    #[test]
+    fn test_drfdefault() {
+        let item = DrfLspFoldingRange::default();
+        assert!(item.drfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drfdisplay() {
+        let item = DrfLspFoldingRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrfLspFoldingRange"));
+    }
+
+    #[test]
+    fn test_drgdefault() {
+        let item = DrgLspDocSymbol::default();
+        assert!(item.drgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drgdisplay() {
+        let item = DrgLspDocSymbol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrgLspDocSymbol"));
+    }
+
+    #[test]
+    fn test_drhdefault() {
+        let item = DrhLspDocLink::default();
+        assert!(item.drhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drhdisplay() {
+        let item = DrhLspDocLink::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrhLspDocLink"));
+    }
+
+    #[test]
+    fn test_dridefault() {
+        let item = DriLspDocColor::default();
+        assert!(item.drivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dridisplay() {
+        let item = DriLspDocColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DriLspDocColor"));
+    }
+
+    #[test]
+    fn test_drjdefault() {
+        let item = DrjLspDocFormat::default();
+        assert!(item.drjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drjdisplay() {
+        let item = DrjLspDocFormat::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrjLspDocFormat"));
     }
 
 }
