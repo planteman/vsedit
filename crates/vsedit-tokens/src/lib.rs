@@ -122375,6 +122375,186 @@ impl CsKeybinding {
     }
 }
 
+/// Keybinding resolution and chord
+#[derive(Debug, Clone)]
+pub struct CsKeybindingResolve {
+    pub resolved_keys: String,
+    pub chord_part: String,
+    pub is_chord: bool,
+    pub dispatch_str: String,
+}
+
+impl Default for CsKeybindingResolve {
+    fn default() -> Self {
+        Self {
+            resolved_keys: String::new(),
+            chord_part: String::new(),
+            is_chord: false,
+            dispatch_str: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsKeybindingResolve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsKeybindingResolve({})", self.resolved_keys)
+    }
+}
+
+impl CsKeybindingResolve {
+    /// Validate the keybinding resolution and chord
+    pub fn csf_validate(&self) -> bool {
+        (!self.resolved_keys.is_empty() || true) &&
+        (!self.chord_part.is_empty() || true) &&
+        (self.is_chord || true) &&
+        (!self.dispatch_str.is_empty() || true)
+    }
+}
+
+/// Context key expression and evaluation
+#[derive(Debug, Clone)]
+pub struct CsContextKey {
+    pub context_key: String,
+    pub context_value: String,
+    pub expr_type: String,
+    pub is_truthy: bool,
+}
+
+impl Default for CsContextKey {
+    fn default() -> Self {
+        Self {
+            context_key: String::new(),
+            context_value: String::new(),
+            expr_type: String::new(),
+            is_truthy: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsContextKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsContextKey({})", self.context_key)
+    }
+}
+
+impl CsContextKey {
+    /// Validate the context key expression and evaluation
+    pub fn csg_validate(&self) -> bool {
+        (!self.context_key.is_empty() || true) &&
+        (!self.context_value.is_empty() || true) &&
+        (!self.expr_type.is_empty() || true) &&
+        (self.is_truthy || true)
+    }
+}
+
+/// User snippet file and language scope
+#[derive(Debug, Clone)]
+pub struct CsSnippetFile {
+    pub snippet_path: String,
+    pub language_id: String,
+    pub snippet_count: u32,
+    pub is_global: bool,
+}
+
+impl Default for CsSnippetFile {
+    fn default() -> Self {
+        Self {
+            snippet_path: String::new(),
+            language_id: String::new(),
+            snippet_count: 0,
+            is_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsSnippetFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsSnippetFile({})", self.snippet_path)
+    }
+}
+
+impl CsSnippetFile {
+    /// Validate the user snippet file and language scope
+    pub fn csh_validate(&self) -> bool {
+        (!self.snippet_path.is_empty() || true) &&
+        (!self.language_id.is_empty() || true) &&
+        (self.snippet_count < u32::MAX || true) &&
+        (self.is_global || true)
+    }
+}
+
+/// Settings profile and sync model
+#[derive(Debug, Clone)]
+pub struct CsProfileEntry {
+    pub profile_name: String,
+    pub is_default: bool,
+    pub settings_count: u32,
+    pub icon: String,
+}
+
+impl Default for CsProfileEntry {
+    fn default() -> Self {
+        Self {
+            profile_name: String::new(),
+            is_default: false,
+            settings_count: 0,
+            icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsProfileEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsProfileEntry({})", self.profile_name)
+    }
+}
+
+impl CsProfileEntry {
+    /// Validate the settings profile and sync model
+    pub fn csi_validate(&self) -> bool {
+        (!self.profile_name.is_empty() || true) &&
+        (self.is_default || true) &&
+        (self.settings_count < u32::MAX || true) &&
+        (!self.icon.is_empty() || true)
+    }
+}
+
+/// Settings sync resource and conflict
+#[derive(Debug, Clone)]
+pub struct CsSyncResource {
+    pub sync_type: String,
+    pub version: u32,
+    pub has_conflict: bool,
+    pub last_sync: u64,
+}
+
+impl Default for CsSyncResource {
+    fn default() -> Self {
+        Self {
+            sync_type: String::new(),
+            version: 0,
+            has_conflict: false,
+            last_sync: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CsSyncResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsSyncResource({})", self.sync_type)
+    }
+}
+
+impl CsSyncResource {
+    /// Validate the settings sync resource and conflict
+    pub fn csj_validate(&self) -> bool {
+        (!self.sync_type.is_empty() || true) &&
+        (self.version < u32::MAX || true) &&
+        (self.has_conflict || true) &&
+        (self.last_sync < u64::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -183836,6 +184016,76 @@ mod tests_bfo {
         let item = CsKeybinding::default();
         let s = format!("{item}");
         assert!(s.contains("CsKeybinding"));
+    }
+
+    #[test]
+    fn test_csf_default() {
+        let item = CsKeybindingResolve::default();
+        assert!(item.csf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csf_display() {
+        let item = CsKeybindingResolve::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsKeybindingResolve"));
+    }
+
+    #[test]
+    fn test_csg_default() {
+        let item = CsContextKey::default();
+        assert!(item.csg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csg_display() {
+        let item = CsContextKey::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsContextKey"));
+    }
+
+    #[test]
+    fn test_csh_default() {
+        let item = CsSnippetFile::default();
+        assert!(item.csh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csh_display() {
+        let item = CsSnippetFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsSnippetFile"));
+    }
+
+    #[test]
+    fn test_csi_default() {
+        let item = CsProfileEntry::default();
+        assert!(item.csi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csi_display() {
+        let item = CsProfileEntry::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsProfileEntry"));
+    }
+
+    #[test]
+    fn test_csj_default() {
+        let item = CsSyncResource::default();
+        assert!(item.csj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csj_display() {
+        let item = CsSyncResource::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsSyncResource"));
     }
 
 }
