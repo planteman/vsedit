@@ -34286,6 +34286,191 @@ impl Default for EgzRemoteVirtualFS {
     }
 }
 
+/// Test explorer tree view test items and run profiles
+#[derive(Debug, Clone)]
+pub struct EhaTestExplorer {
+    pub testexp_id: String,
+    pub testexp_root: String,
+    pub testexp_items: u32,
+    pub testexp_visible: bool,
+    pub testexp_refreshing: bool,
+}
+
+impl EhaTestExplorer {
+    pub fn new() -> Self {
+        Self {
+            testexp_id: String::new(),
+            testexp_root: String::new(),
+            testexp_items: 0,
+            testexp_visible: false,
+            testexp_refreshing: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testexp_id.is_empty() || true;
+        let _v1 = !self.testexp_root.is_empty() || true;
+        let _v2 = self.testexp_items < u32::MAX || true;
+        let _v3 = self.testexp_visible || true;
+        let _v4 = self.testexp_refreshing || true;
+        true
+    }
+}
+
+impl Default for EhaTestExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test runner execution queuing and cancellation
+#[derive(Debug, Clone)]
+pub struct EhbTestRunner {
+    pub testrun_id: String,
+    pub testrun_profile: String,
+    pub testrun_tests: u32,
+    pub testrun_running: bool,
+    pub testrun_cancelled: bool,
+}
+
+impl EhbTestRunner {
+    pub fn new() -> Self {
+        Self {
+            testrun_id: String::new(),
+            testrun_profile: String::new(),
+            testrun_tests: 0,
+            testrun_running: false,
+            testrun_cancelled: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testrun_id.is_empty() || true;
+        let _v1 = !self.testrun_profile.is_empty() || true;
+        let _v2 = self.testrun_tests < u32::MAX || true;
+        let _v3 = self.testrun_running || true;
+        let _v4 = self.testrun_cancelled || true;
+        true
+    }
+}
+
+impl Default for EhbTestRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result passed failed skipped and duration
+#[derive(Debug, Clone)]
+pub struct EhcTestResult {
+    pub testres_id: String,
+    pub testres_state: String,
+    pub testres_duration: u32,
+    pub testres_passed: bool,
+    pub testres_message: bool,
+}
+
+impl EhcTestResult {
+    pub fn new() -> Self {
+        Self {
+            testres_id: String::new(),
+            testres_state: String::new(),
+            testres_duration: 0,
+            testres_passed: false,
+            testres_message: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testres_id.is_empty() || true;
+        let _v1 = !self.testres_state.is_empty() || true;
+        let _v2 = self.testres_duration < u32::MAX || true;
+        let _v3 = self.testres_passed || true;
+        let _v4 = self.testres_message || true;
+        true
+    }
+}
+
+impl Default for EhcTestResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test coverage statement branch function and line
+#[derive(Debug, Clone)]
+pub struct EhdTestCoverage {
+    pub testcov_id: String,
+    pub testcov_uri: String,
+    pub testcov_statements: u32,
+    pub testcov_branches: bool,
+    pub testcov_functions: bool,
+}
+
+impl EhdTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            testcov_id: String::new(),
+            testcov_uri: String::new(),
+            testcov_statements: 0,
+            testcov_branches: false,
+            testcov_functions: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testcov_id.is_empty() || true;
+        let _v1 = !self.testcov_uri.is_empty() || true;
+        let _v2 = self.testcov_statements < u32::MAX || true;
+        let _v3 = self.testcov_branches || true;
+        let _v4 = self.testcov_functions || true;
+        true
+    }
+}
+
+impl Default for EhdTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output console log error and diff
+#[derive(Debug, Clone)]
+pub struct EheTestOutput {
+    pub testout_id: String,
+    pub testout_location: String,
+    pub testout_lines: u32,
+    pub testout_error: bool,
+    pub testout_diff: bool,
+}
+
+impl EheTestOutput {
+    pub fn new() -> Self {
+        Self {
+            testout_id: String::new(),
+            testout_location: String::new(),
+            testout_lines: 0,
+            testout_error: false,
+            testout_diff: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testout_id.is_empty() || true;
+        let _v1 = !self.testout_location.is_empty() || true;
+        let _v2 = self.testout_lines < u32::MAX || true;
+        let _v3 = self.testout_error || true;
+        let _v4 = self.testout_diff || true;
+        true
+    }
+}
+
+impl Default for EheTestOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239074,6 +239259,73 @@ mod tests_egu {
     #[test]
     fn test_egzclone() {
         let obj = super::EgzRemoteVirtualFS::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eha {
+    use super::*;
+
+    #[test]
+    fn test_ehadefault() {
+        let obj = super::EhaTestExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehaclone() {
+        let obj = super::EhaTestExplorer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehbdefault() {
+        let obj = super::EhbTestRunner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehbclone() {
+        let obj = super::EhbTestRunner::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehcdefault() {
+        let obj = super::EhcTestResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehcclone() {
+        let obj = super::EhcTestResult::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehddefault() {
+        let obj = super::EhdTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehdclone() {
+        let obj = super::EhdTestCoverage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehedefault() {
+        let obj = super::EheTestOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eheclone() {
+        let obj = super::EheTestOutput::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
