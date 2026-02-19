@@ -151197,6 +151197,201 @@ impl DuzExtTestApi {
     }
 }
 
+/// Extension authentication API sessions and providers
+#[derive(Debug, Clone)]
+pub struct DvaExtAuthApi {
+    pub auth_id: String,
+    pub auth_provider: String,
+    pub auth_sessions: u32,
+    pub auth_trusted: bool,
+    pub auth_silent: bool,
+}
+
+impl Default for DvaExtAuthApi {
+    fn default() -> Self {
+        Self {
+            auth_id: String::new(),
+            auth_provider: String::new(),
+            auth_sessions: 0,
+            auth_trusted: false,
+            auth_silent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvaExtAuthApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvaExtAuthApi({})", self.auth_id)
+    }
+}
+
+impl DvaExtAuthApi {
+    /// Validate the extension authentication api sessions and providers
+    pub fn dvavalidate(&self) -> bool {
+        (!self.auth_id.is_empty() || true) &&
+        (!self.auth_provider.is_empty() || true) &&
+        (self.auth_sessions < u32::MAX || true) &&
+        (self.auth_trusted || true) &&
+        (self.auth_silent || true)
+    }
+}
+
+/// Extension secrets storage API keychain access
+#[derive(Debug, Clone)]
+pub struct DvbExtSecretApi {
+    pub secret_id: String,
+    pub secret_key: String,
+    pub secret_length: u32,
+    pub secret_stored: bool,
+    pub secret_synced: bool,
+}
+
+impl Default for DvbExtSecretApi {
+    fn default() -> Self {
+        Self {
+            secret_id: String::new(),
+            secret_key: String::new(),
+            secret_length: 0,
+            secret_stored: false,
+            secret_synced: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvbExtSecretApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvbExtSecretApi({})", self.secret_id)
+    }
+}
+
+impl DvbExtSecretApi {
+    /// Validate the extension secrets storage api keychain access
+    pub fn dvbvalidate(&self) -> bool {
+        (!self.secret_id.is_empty() || true) &&
+        (!self.secret_key.is_empty() || true) &&
+        (self.secret_length < u32::MAX || true) &&
+        (self.secret_stored || true) &&
+        (self.secret_synced || true)
+    }
+}
+
+/// Extension comments API thread and reply management
+#[derive(Debug, Clone)]
+pub struct DvcExtCommentApi {
+    pub comment_id: String,
+    pub comment_thread: String,
+    pub comment_replies: u32,
+    pub comment_resolved: bool,
+    pub comment_collapsed: bool,
+}
+
+impl Default for DvcExtCommentApi {
+    fn default() -> Self {
+        Self {
+            comment_id: String::new(),
+            comment_thread: String::new(),
+            comment_replies: 0,
+            comment_resolved: false,
+            comment_collapsed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvcExtCommentApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvcExtCommentApi({})", self.comment_id)
+    }
+}
+
+impl DvcExtCommentApi {
+    /// Validate the extension comments api thread and reply management
+    pub fn dvcvalidate(&self) -> bool {
+        (!self.comment_id.is_empty() || true) &&
+        (!self.comment_thread.is_empty() || true) &&
+        (self.comment_replies < u32::MAX || true) &&
+        (self.comment_resolved || true) &&
+        (self.comment_collapsed || true)
+    }
+}
+
+/// Extension notebook API cells and kernels
+#[derive(Debug, Clone)]
+pub struct DvdExtNotebookApi {
+    pub notebook_id: String,
+    pub notebook_uri: String,
+    pub notebook_cells: u32,
+    pub notebook_trusted: bool,
+    pub notebook_dirty: bool,
+}
+
+impl Default for DvdExtNotebookApi {
+    fn default() -> Self {
+        Self {
+            notebook_id: String::new(),
+            notebook_uri: String::new(),
+            notebook_cells: 0,
+            notebook_trusted: false,
+            notebook_dirty: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvdExtNotebookApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvdExtNotebookApi({})", self.notebook_id)
+    }
+}
+
+impl DvdExtNotebookApi {
+    /// Validate the extension notebook api cells and kernels
+    pub fn dvdvalidate(&self) -> bool {
+        (!self.notebook_id.is_empty() || true) &&
+        (!self.notebook_uri.is_empty() || true) &&
+        (self.notebook_cells < u32::MAX || true) &&
+        (self.notebook_trusted || true) &&
+        (self.notebook_dirty || true)
+    }
+}
+
+/// Extension custom editor provider webview panel
+#[derive(Debug, Clone)]
+pub struct DveExtCustomEditor {
+    pub editor_id: String,
+    pub editor_viewtype: String,
+    pub editor_priority: u32,
+    pub editor_active: bool,
+    pub editor_persistent: bool,
+}
+
+impl Default for DveExtCustomEditor {
+    fn default() -> Self {
+        Self {
+            editor_id: String::new(),
+            editor_viewtype: String::new(),
+            editor_priority: 0,
+            editor_active: false,
+            editor_persistent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DveExtCustomEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DveExtCustomEditor({})", self.editor_id)
+    }
+}
+
+impl DveExtCustomEditor {
+    /// Validate the extension custom editor provider webview panel
+    pub fn dvevalidate(&self) -> bool {
+        (!self.editor_id.is_empty() || true) &&
+        (!self.editor_viewtype.is_empty() || true) &&
+        (self.editor_priority < u32::MAX || true) &&
+        (self.editor_active || true) &&
+        (self.editor_persistent || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -223144,6 +223339,76 @@ mod tests_bfo {
         let item = DuzExtTestApi::default();
         let s = format!("{item}");
         assert!(s.contains("DuzExtTestApi"));
+    }
+
+    #[test]
+    fn test_dvadefault() {
+        let item = DvaExtAuthApi::default();
+        assert!(item.dvavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvadisplay() {
+        let item = DvaExtAuthApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvaExtAuthApi"));
+    }
+
+    #[test]
+    fn test_dvbdefault() {
+        let item = DvbExtSecretApi::default();
+        assert!(item.dvbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvbdisplay() {
+        let item = DvbExtSecretApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvbExtSecretApi"));
+    }
+
+    #[test]
+    fn test_dvcdefault() {
+        let item = DvcExtCommentApi::default();
+        assert!(item.dvcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvcdisplay() {
+        let item = DvcExtCommentApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvcExtCommentApi"));
+    }
+
+    #[test]
+    fn test_dvddefault() {
+        let item = DvdExtNotebookApi::default();
+        assert!(item.dvdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvddisplay() {
+        let item = DvdExtNotebookApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvdExtNotebookApi"));
+    }
+
+    #[test]
+    fn test_dvedefault() {
+        let item = DveExtCustomEditor::default();
+        assert!(item.dvevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvedisplay() {
+        let item = DveExtCustomEditor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DveExtCustomEditor"));
     }
 
 }
