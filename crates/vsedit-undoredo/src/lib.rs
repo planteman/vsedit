@@ -76937,3 +76937,845 @@ mod tests_bez {
         assert!(!e.is_git_commit());
     }
 }
+
+// bfa_: Editor word wrap model — word wrap mode, wrapping column,
+// wrapped line mapping, soft wrap indicators, wrap indent
+
+/// Word wrap mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfaWrapMode {
+    Off,
+    On,
+    WordWrapColumn,
+    Bounded,
+}
+
+/// Wrap indent mode (how continuation lines are indented)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfaWrapIndent {
+    None,
+    Same,
+    Indent,
+    DeepIndent,
+}
+
+/// Word wrap configuration
+#[derive(Debug, Clone)]
+pub struct BfaWrapConfig {
+    pub mode: BfaWrapMode,
+    pub column: usize,
+    pub indent: BfaWrapIndent,
+    pub show_indicator: bool,
+    pub indicator_char: char,
+}
+
+impl Default for BfaWrapConfig {
+    fn default() -> Self {
+        Self { mode: BfaWrapMode::Off, column: 80, indent: BfaWrapIndent::Same,
+               show_indicator: true, indicator_char: '↪' }
+    }
+}
+
+impl BfaWrapConfig {
+    pub fn is_enabled(&self) -> bool { self.mode != BfaWrapMode::Off }
+
+    pub fn effective_column(&self, viewport_cols: usize) -> usize {
+        match self.mode {
+            BfaWrapMode::Off => usize::MAX,
+            BfaWrapMode::On => viewport_cols,
+            BfaWrapMode::WordWrapColumn => self.column,
+            BfaWrapMode::Bounded => self.column.min(viewport_cols),
+        }
+    }
+}
+
+/// A wrapped line segment
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BfaWrappedSegment {
+    pub logical_line: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+    pub is_continuation: bool,
+}
+
+impl BfaWrappedSegment {
+    pub fn new(logical_line: usize, start_col: usize, end_col: usize, is_continuation: bool) -> Self {
+        Self { logical_line, start_col, end_col, is_continuation }
+    }
+
+    pub fn char_count(&self) -> usize { self.end_col - self.start_col }
+}
+
+/// Word wrap state for a document
+#[derive(Debug, Clone, Default)]
+pub struct BfaWrapState {
+    pub segments: Vec<BfaWrappedSegment>,
+    pub config: BfaWrapConfig,
+}
+
+impl BfaWrapState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn wrap_line(&mut self, logical_line: usize, line_len: usize, wrap_col: usize) {
+        if wrap_col == 0 || line_len <= wrap_col {
+            self.segments.push(BfaWrappedSegment::new(logical_line, 0, line_len, false));
+            return;
+        }
+        let mut start = 0;
+        let mut first = true;
+        while start < line_len {
+            let end = (start + wrap_col).min(line_len);
+            self.segments.push(BfaWrappedSegment::new(logical_line, start, end, !first));
+            start = end;
+            first = false;
+        }
+    }
+
+    pub fn visual_line_count(&self) -> usize { self.segments.len() }
+
+    pub fn segments_for_line(&self, logical_line: usize) -> Vec<&BfaWrappedSegment> {
+        self.segments.iter().filter(|s| s.logical_line == logical_line).collect()
+    }
+
+    pub fn visual_to_logical(&self, visual_line: usize) -> Option<(usize, usize)> {
+        self.segments.get(visual_line).map(|s| (s.logical_line, s.start_col))
+    }
+
+    pub fn logical_to_visual(&self, logical_line: usize) -> Option<usize> {
+        self.segments.iter().position(|s| s.logical_line == logical_line)
+    }
+
+    pub fn clear(&mut self) { self.segments.clear(); }
+
+    pub fn continuation_count(&self) -> usize {
+        self.segments.iter().filter(|s| s.is_continuation).count()
+    }
+}
+
+#[cfg(test)]
+mod tests_bfa {
+    use super::*;
+
+    #[test]
+    fn test_bfa_wrap_config_defaults() {
+        let cfg = BfaWrapConfig::default();
+        assert!(!cfg.is_enabled());
+        assert_eq!(cfg.column, 80);
+    }
+
+    #[test]
+    fn test_bfa_effective_column() {
+        let mut cfg = BfaWrapConfig::default();
+        cfg.mode = BfaWrapMode::On;
+        assert_eq!(cfg.effective_column(120), 120);
+        cfg.mode = BfaWrapMode::WordWrapColumn;
+        assert_eq!(cfg.effective_column(120), 80);
+        cfg.mode = BfaWrapMode::Bounded;
+        assert_eq!(cfg.effective_column(60), 60);
+        assert_eq!(cfg.effective_column(120), 80);
+    }
+
+    #[test]
+    fn test_bfa_wrap_short_line() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 20, 80);
+        assert_eq!(state.visual_line_count(), 1);
+        assert!(!state.segments[0].is_continuation);
+    }
+
+    #[test]
+    fn test_bfa_wrap_long_line() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 200, 80);
+        assert_eq!(state.visual_line_count(), 3);
+        assert!(!state.segments[0].is_continuation);
+        assert!(state.segments[1].is_continuation);
+        assert!(state.segments[2].is_continuation);
+    }
+
+    #[test]
+    fn test_bfa_segments_for_line() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 150, 80);
+        state.wrap_line(1, 50, 80);
+        assert_eq!(state.segments_for_line(0).len(), 2);
+        assert_eq!(state.segments_for_line(1).len(), 1);
+    }
+
+    #[test]
+    fn test_bfa_visual_to_logical() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 200, 80);
+        let (line, col) = state.visual_to_logical(1).unwrap();
+        assert_eq!(line, 0);
+        assert_eq!(col, 80);
+    }
+
+    #[test]
+    fn test_bfa_logical_to_visual() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 50, 80);
+        state.wrap_line(1, 50, 80);
+        assert_eq!(state.logical_to_visual(1), Some(1));
+    }
+
+    #[test]
+    fn test_bfa_continuation_count() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 200, 80);
+        assert_eq!(state.continuation_count(), 2);
+    }
+
+    #[test]
+    fn test_bfa_clear() {
+        let mut state = BfaWrapState::new();
+        state.wrap_line(0, 100, 80);
+        state.clear();
+        assert_eq!(state.visual_line_count(), 0);
+    }
+
+    #[test]
+    fn test_bfa_segment_char_count() {
+        let seg = BfaWrappedSegment::new(0, 10, 30, true);
+        assert_eq!(seg.char_count(), 20);
+    }
+}
+
+// bfb_: Editor zoom model — zoom level, font size scaling, reset zoom,
+// zoom in/out, zoom to fit, pinch zoom emulation
+
+/// Zoom level configuration
+#[derive(Debug, Clone)]
+pub struct BfbZoomConfig {
+    pub level: i32,
+    pub min_level: i32,
+    pub max_level: i32,
+    pub step: i32,
+    pub base_font_size: f64,
+}
+
+impl Default for BfbZoomConfig {
+    fn default() -> Self {
+        Self { level: 0, min_level: -5, max_level: 20, step: 1, base_font_size: 14.0 }
+    }
+}
+
+impl BfbZoomConfig {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn zoom_in(&mut self) -> bool {
+        if self.level < self.max_level { self.level += self.step; true } else { false }
+    }
+
+    pub fn zoom_out(&mut self) -> bool {
+        if self.level > self.min_level { self.level -= self.step; true } else { false }
+    }
+
+    pub fn reset(&mut self) { self.level = 0; }
+
+    pub fn set_level(&mut self, level: i32) {
+        self.level = level.clamp(self.min_level, self.max_level);
+    }
+
+    pub fn effective_font_size(&self) -> f64 {
+        self.base_font_size * (1.0 + self.level as f64 * 0.1)
+    }
+
+    pub fn scale_factor(&self) -> f64 {
+        1.0 + self.level as f64 * 0.1
+    }
+
+    pub fn is_zoomed(&self) -> bool { self.level != 0 }
+
+    pub fn display_percentage(&self) -> String {
+        format!("{}%", (self.scale_factor() * 100.0).round() as i32)
+    }
+}
+
+#[cfg(test)]
+mod tests_bfb {
+    use super::*;
+
+    #[test]
+    fn test_bfb_zoom_defaults() {
+        let z = BfbZoomConfig::new();
+        assert_eq!(z.level, 0);
+        assert!(!z.is_zoomed());
+        assert_eq!(z.display_percentage(), "100%");
+    }
+
+    #[test]
+    fn test_bfb_zoom_in_out() {
+        let mut z = BfbZoomConfig::new();
+        assert!(z.zoom_in());
+        assert_eq!(z.level, 1);
+        assert!(z.is_zoomed());
+        assert!(z.zoom_out());
+        assert_eq!(z.level, 0);
+    }
+
+    #[test]
+    fn test_bfb_zoom_limits() {
+        let mut z = BfbZoomConfig::new();
+        z.set_level(100);
+        assert_eq!(z.level, z.max_level);
+        z.set_level(-100);
+        assert_eq!(z.level, z.min_level);
+    }
+
+    #[test]
+    fn test_bfb_zoom_font_size() {
+        let mut z = BfbZoomConfig::new();
+        z.zoom_in();
+        z.zoom_in();
+        assert!((z.effective_font_size() - 16.8).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bfb_zoom_scale() {
+        let mut z = BfbZoomConfig::new();
+        z.set_level(5);
+        assert!((z.scale_factor() - 1.5).abs() < 0.01);
+        assert_eq!(z.display_percentage(), "150%");
+    }
+
+    #[test]
+    fn test_bfb_zoom_reset() {
+        let mut z = BfbZoomConfig::new();
+        z.zoom_in();
+        z.zoom_in();
+        z.reset();
+        assert_eq!(z.level, 0);
+    }
+
+    #[test]
+    fn test_bfb_zoom_max() {
+        let mut z = BfbZoomConfig::new();
+        z.set_level(20);
+        assert!(!z.zoom_in());
+    }
+
+    #[test]
+    fn test_bfb_zoom_min() {
+        let mut z = BfbZoomConfig::new();
+        z.set_level(-5);
+        assert!(!z.zoom_out());
+    }
+
+    #[test]
+    fn test_bfb_zoom_negative() {
+        let mut z = BfbZoomConfig::new();
+        z.zoom_out();
+        assert_eq!(z.level, -1);
+        assert!((z.scale_factor() - 0.9).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bfb_zoom_display() {
+        let z = BfbZoomConfig::new();
+        assert!(z.display_percentage().contains("100"));
+    }
+}
+
+// bfc_: Editor encoding model — character encoding detection, BOM handling,
+// encoding conversion, encoding display, supported encodings
+
+/// Character encoding
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BfcEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Ascii,
+    Latin1,
+    ShiftJis,
+    Gbk,
+    Big5,
+    Euc,
+}
+
+impl BfcEncoding {
+    pub fn label(&self) -> &str {
+        match self {
+            BfcEncoding::Utf8 => "UTF-8",
+            BfcEncoding::Utf8Bom => "UTF-8 with BOM",
+            BfcEncoding::Utf16Le => "UTF-16 LE",
+            BfcEncoding::Utf16Be => "UTF-16 BE",
+            BfcEncoding::Ascii => "ASCII",
+            BfcEncoding::Latin1 => "ISO 8859-1",
+            BfcEncoding::ShiftJis => "Shift JIS",
+            BfcEncoding::Gbk => "GBK",
+            BfcEncoding::Big5 => "Big5",
+            BfcEncoding::Euc => "EUC",
+        }
+    }
+
+    pub fn has_bom(&self) -> bool {
+        matches!(self, BfcEncoding::Utf8Bom | BfcEncoding::Utf16Le | BfcEncoding::Utf16Be)
+    }
+
+    pub fn bom_bytes(&self) -> &[u8] {
+        match self {
+            BfcEncoding::Utf8Bom => &[0xEF, 0xBB, 0xBF],
+            BfcEncoding::Utf16Le => &[0xFF, 0xFE],
+            BfcEncoding::Utf16Be => &[0xFE, 0xFF],
+            _ => &[],
+        }
+    }
+
+    pub fn is_unicode(&self) -> bool {
+        matches!(self, BfcEncoding::Utf8 | BfcEncoding::Utf8Bom | BfcEncoding::Utf16Le | BfcEncoding::Utf16Be)
+    }
+}
+
+/// Detect encoding from BOM
+pub fn bfc_detect_bom(bytes: &[u8]) -> Option<BfcEncoding> {
+    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+        return Some(BfcEncoding::Utf8Bom);
+    }
+    if bytes.len() >= 2 {
+        if bytes[0] == 0xFF && bytes[1] == 0xFE { return Some(BfcEncoding::Utf16Le); }
+        if bytes[0] == 0xFE && bytes[1] == 0xFF { return Some(BfcEncoding::Utf16Be); }
+    }
+    None
+}
+
+/// Encoding configuration
+#[derive(Debug, Clone)]
+pub struct BfcEncodingConfig {
+    pub default_encoding: BfcEncoding,
+    pub auto_detect: bool,
+    pub auto_detect_candidates: Vec<BfcEncoding>,
+}
+
+impl Default for BfcEncodingConfig {
+    fn default() -> Self {
+        Self {
+            default_encoding: BfcEncoding::Utf8,
+            auto_detect: true,
+            auto_detect_candidates: vec![BfcEncoding::Utf8, BfcEncoding::Utf8Bom, BfcEncoding::Utf16Le, BfcEncoding::Latin1],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_bfc {
+    use super::*;
+
+    #[test]
+    fn test_bfc_encoding_label() {
+        assert_eq!(BfcEncoding::Utf8.label(), "UTF-8");
+        assert_eq!(BfcEncoding::Utf16Le.label(), "UTF-16 LE");
+        assert_eq!(BfcEncoding::ShiftJis.label(), "Shift JIS");
+    }
+
+    #[test]
+    fn test_bfc_encoding_bom() {
+        assert!(!BfcEncoding::Utf8.has_bom());
+        assert!(BfcEncoding::Utf8Bom.has_bom());
+        assert!(BfcEncoding::Utf16Le.has_bom());
+    }
+
+    #[test]
+    fn test_bfc_encoding_bom_bytes() {
+        assert_eq!(BfcEncoding::Utf8Bom.bom_bytes(), &[0xEF, 0xBB, 0xBF]);
+        assert_eq!(BfcEncoding::Utf16Le.bom_bytes(), &[0xFF, 0xFE]);
+        assert!(BfcEncoding::Utf8.bom_bytes().is_empty());
+    }
+
+    #[test]
+    fn test_bfc_encoding_unicode() {
+        assert!(BfcEncoding::Utf8.is_unicode());
+        assert!(BfcEncoding::Utf16Be.is_unicode());
+        assert!(!BfcEncoding::Latin1.is_unicode());
+        assert!(!BfcEncoding::ShiftJis.is_unicode());
+    }
+
+    #[test]
+    fn test_bfc_detect_bom_utf8() {
+        assert_eq!(bfc_detect_bom(&[0xEF, 0xBB, 0xBF, 0x41]), Some(BfcEncoding::Utf8Bom));
+    }
+
+    #[test]
+    fn test_bfc_detect_bom_utf16le() {
+        assert_eq!(bfc_detect_bom(&[0xFF, 0xFE, 0x00, 0x00]), Some(BfcEncoding::Utf16Le));
+    }
+
+    #[test]
+    fn test_bfc_detect_bom_utf16be() {
+        assert_eq!(bfc_detect_bom(&[0xFE, 0xFF, 0x00, 0x41]), Some(BfcEncoding::Utf16Be));
+    }
+
+    #[test]
+    fn test_bfc_detect_bom_none() {
+        assert_eq!(bfc_detect_bom(&[0x41, 0x42, 0x43]), None);
+    }
+
+    #[test]
+    fn test_bfc_config_defaults() {
+        let cfg = BfcEncodingConfig::default();
+        assert_eq!(cfg.default_encoding, BfcEncoding::Utf8);
+        assert!(cfg.auto_detect);
+    }
+
+    #[test]
+    fn test_bfc_detect_bom_empty() {
+        assert_eq!(bfc_detect_bom(&[]), None);
+    }
+}
+
+// bfd_: Editor language model — language ID, language configuration,
+// comment rules, bracket rules, auto-closing pairs per language
+
+/// Language configuration
+#[derive(Debug, Clone)]
+pub struct BfdLanguageConfig {
+    pub id: String,
+    pub name: String,
+    pub extensions: Vec<String>,
+    pub filenames: Vec<String>,
+    pub aliases: Vec<String>,
+    pub line_comment: Option<String>,
+    pub block_comment: Option<(String, String)>,
+    pub brackets: Vec<(String, String)>,
+    pub auto_closing_pairs: Vec<(String, String)>,
+    pub word_pattern: Option<String>,
+    pub indent_rules: Option<BfdIndentRules>,
+}
+
+/// Indent rules for a language
+#[derive(Debug, Clone)]
+pub struct BfdIndentRules {
+    pub increase_pattern: String,
+    pub decrease_pattern: String,
+}
+
+impl BfdLanguageConfig {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self { id: id.to_string(), name: name.to_string(), extensions: Vec::new(),
+               filenames: Vec::new(), aliases: Vec::new(), line_comment: None,
+               block_comment: None, brackets: Vec::new(), auto_closing_pairs: Vec::new(),
+               word_pattern: None, indent_rules: None }
+    }
+
+    pub fn with_extension(mut self, ext: &str) -> Self { self.extensions.push(ext.to_string()); self }
+    pub fn with_line_comment(mut self, comment: &str) -> Self { self.line_comment = Some(comment.to_string()); self }
+    pub fn with_block_comment(mut self, open: &str, close: &str) -> Self {
+        self.block_comment = Some((open.to_string(), close.to_string())); self
+    }
+
+    pub fn matches_extension(&self, ext: &str) -> bool {
+        self.extensions.iter().any(|e| e == ext)
+    }
+
+    pub fn matches_filename(&self, name: &str) -> bool {
+        self.filenames.iter().any(|f| f == name)
+    }
+
+    pub fn has_line_comment(&self) -> bool { self.line_comment.is_some() }
+    pub fn has_block_comment(&self) -> bool { self.block_comment.is_some() }
+}
+
+/// Language registry
+#[derive(Debug, Clone, Default)]
+pub struct BfdLanguageRegistry {
+    pub languages: Vec<BfdLanguageConfig>,
+}
+
+impl BfdLanguageRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn register(&mut self, lang: BfdLanguageConfig) { self.languages.push(lang); }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&BfdLanguageConfig> {
+        self.languages.iter().find(|l| l.id == id)
+    }
+
+    pub fn find_by_extension(&self, ext: &str) -> Option<&BfdLanguageConfig> {
+        self.languages.iter().find(|l| l.matches_extension(ext))
+    }
+
+    pub fn find_by_filename(&self, name: &str) -> Option<&BfdLanguageConfig> {
+        self.languages.iter().find(|l| l.matches_filename(name))
+    }
+
+    pub fn language_ids(&self) -> Vec<&str> { self.languages.iter().map(|l| l.id.as_str()).collect() }
+    pub fn count(&self) -> usize { self.languages.len() }
+}
+
+#[cfg(test)]
+mod tests_bfd {
+    use super::*;
+
+    #[test]
+    fn test_bfd_language_basic() {
+        let lang = BfdLanguageConfig::new("rust", "Rust")
+            .with_extension(".rs")
+            .with_line_comment("//")
+            .with_block_comment("/*", "*/");
+        assert!(lang.matches_extension(".rs"));
+        assert!(!lang.matches_extension(".py"));
+        assert!(lang.has_line_comment());
+        assert!(lang.has_block_comment());
+    }
+
+    #[test]
+    fn test_bfd_language_filename() {
+        let mut lang = BfdLanguageConfig::new("makefile", "Makefile");
+        lang.filenames.push("Makefile".to_string());
+        assert!(lang.matches_filename("Makefile"));
+    }
+
+    #[test]
+    fn test_bfd_registry_register() {
+        let mut reg = BfdLanguageRegistry::new();
+        reg.register(BfdLanguageConfig::new("rust", "Rust").with_extension(".rs"));
+        reg.register(BfdLanguageConfig::new("python", "Python").with_extension(".py"));
+        assert_eq!(reg.count(), 2);
+    }
+
+    #[test]
+    fn test_bfd_registry_find_id() {
+        let mut reg = BfdLanguageRegistry::new();
+        reg.register(BfdLanguageConfig::new("rust", "Rust"));
+        assert!(reg.find_by_id("rust").is_some());
+        assert!(reg.find_by_id("go").is_none());
+    }
+
+    #[test]
+    fn test_bfd_registry_find_ext() {
+        let mut reg = BfdLanguageRegistry::new();
+        reg.register(BfdLanguageConfig::new("rust", "Rust").with_extension(".rs"));
+        let lang = reg.find_by_extension(".rs").unwrap();
+        assert_eq!(lang.id, "rust");
+    }
+
+    #[test]
+    fn test_bfd_registry_ids() {
+        let mut reg = BfdLanguageRegistry::new();
+        reg.register(BfdLanguageConfig::new("a", "A"));
+        reg.register(BfdLanguageConfig::new("b", "B"));
+        assert_eq!(reg.language_ids(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_bfd_language_no_comments() {
+        let lang = BfdLanguageConfig::new("plain", "Plain Text");
+        assert!(!lang.has_line_comment());
+        assert!(!lang.has_block_comment());
+    }
+
+    #[test]
+    fn test_bfd_indent_rules() {
+        let rules = BfdIndentRules { increase_pattern: r"\{".to_string(), decrease_pattern: r"\}".to_string() };
+        assert!(!rules.increase_pattern.is_empty());
+    }
+
+    #[test]
+    fn test_bfd_language_aliases() {
+        let mut lang = BfdLanguageConfig::new("javascript", "JavaScript");
+        lang.aliases.push("js".to_string());
+        assert_eq!(lang.aliases.len(), 1);
+    }
+
+    #[test]
+    fn test_bfd_language_brackets() {
+        let mut lang = BfdLanguageConfig::new("json", "JSON");
+        lang.brackets.push(("{".to_string(), "}".to_string()));
+        assert_eq!(lang.brackets.len(), 1);
+    }
+}
+
+// bfe_: Editor editor group model — editor groups, split view, grid layout,
+// group focus, move editors between groups, group close policies
+
+/// Editor group layout direction
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfeGroupDirection {
+    Horizontal,
+    Vertical,
+}
+
+/// Editor group close policy when empty
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfeClosePolicy {
+    CloseGroup,
+    KeepOpen,
+}
+
+/// An editor tab within a group
+#[derive(Debug, Clone)]
+pub struct BfeEditorTab {
+    pub id: String,
+    pub label: String,
+    pub uri: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+}
+
+impl BfeEditorTab {
+    pub fn new(id: &str, label: &str, uri: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), uri: uri.to_string(),
+               is_dirty: false, is_pinned: false, is_preview: false }
+    }
+
+    pub fn display_label(&self) -> String {
+        let prefix = if self.is_dirty { "● " } else { "" };
+        let suffix = if self.is_pinned { " 📌" } else { "" };
+        format!("{}{}{}", prefix, self.label, suffix)
+    }
+}
+
+/// An editor group (split pane)
+#[derive(Debug, Clone)]
+pub struct BfeEditorGroup {
+    pub id: usize,
+    pub tabs: Vec<BfeEditorTab>,
+    pub active_tab: Option<usize>,
+    pub close_policy: BfeClosePolicy,
+}
+
+impl BfeEditorGroup {
+    pub fn new(id: usize) -> Self {
+        Self { id, tabs: Vec::new(), active_tab: None, close_policy: BfeClosePolicy::CloseGroup }
+    }
+
+    pub fn add_tab(&mut self, tab: BfeEditorTab) {
+        self.tabs.push(tab);
+        if self.active_tab.is_none() { self.active_tab = Some(0); }
+    }
+
+    pub fn close_tab(&mut self, index: usize) -> bool {
+        if index < self.tabs.len() {
+            self.tabs.remove(index);
+            if self.tabs.is_empty() { self.active_tab = None; }
+            else if let Some(a) = self.active_tab { self.active_tab = Some(a.min(self.tabs.len() - 1)); }
+            true
+        } else { false }
+    }
+
+    pub fn active(&self) -> Option<&BfeEditorTab> {
+        self.active_tab.and_then(|i| self.tabs.get(i))
+    }
+
+    pub fn tab_count(&self) -> usize { self.tabs.len() }
+    pub fn is_empty(&self) -> bool { self.tabs.is_empty() }
+}
+
+/// Editor grid layout
+#[derive(Debug, Clone, Default)]
+pub struct BfeEditorGrid {
+    pub groups: Vec<BfeEditorGroup>,
+    pub active_group: Option<usize>,
+    pub direction: BfeGroupDirection,
+}
+
+impl Default for BfeGroupDirection { fn default() -> Self { BfeGroupDirection::Horizontal } }
+
+impl BfeEditorGrid {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add_group(&mut self) -> usize {
+        let id = self.groups.len();
+        self.groups.push(BfeEditorGroup::new(id));
+        if self.active_group.is_none() { self.active_group = Some(0); }
+        id
+    }
+
+    pub fn active_group(&self) -> Option<&BfeEditorGroup> {
+        self.active_group.and_then(|i| self.groups.get(i))
+    }
+
+    pub fn active_group_mut(&mut self) -> Option<&mut BfeEditorGroup> {
+        self.active_group.and_then(|i| self.groups.get_mut(i))
+    }
+
+    pub fn group_count(&self) -> usize { self.groups.len() }
+
+    pub fn total_tabs(&self) -> usize { self.groups.iter().map(|g| g.tab_count()).sum() }
+}
+
+#[cfg(test)]
+mod tests_bfe {
+    use super::*;
+
+    #[test]
+    fn test_bfe_tab_display() {
+        let mut tab = BfeEditorTab::new("t1", "main.rs", "file:///main.rs");
+        assert_eq!(tab.display_label(), "main.rs");
+        tab.is_dirty = true;
+        assert!(tab.display_label().starts_with("● "));
+        tab.is_pinned = true;
+        assert!(tab.display_label().contains("📌"));
+    }
+
+    #[test]
+    fn test_bfe_group_add_close() {
+        let mut group = BfeEditorGroup::new(0);
+        group.add_tab(BfeEditorTab::new("t1", "a.rs", "file:///a.rs"));
+        group.add_tab(BfeEditorTab::new("t2", "b.rs", "file:///b.rs"));
+        assert_eq!(group.tab_count(), 2);
+        assert!(group.close_tab(0));
+        assert_eq!(group.tab_count(), 1);
+    }
+
+    #[test]
+    fn test_bfe_group_active() {
+        let mut group = BfeEditorGroup::new(0);
+        group.add_tab(BfeEditorTab::new("t1", "main.rs", "file:///main.rs"));
+        assert_eq!(group.active().unwrap().label, "main.rs");
+    }
+
+    #[test]
+    fn test_bfe_group_empty() {
+        let group = BfeEditorGroup::new(0);
+        assert!(group.is_empty());
+        assert!(group.active().is_none());
+    }
+
+    #[test]
+    fn test_bfe_grid_add_group() {
+        let mut grid = BfeEditorGrid::new();
+        grid.add_group();
+        grid.add_group();
+        assert_eq!(grid.group_count(), 2);
+    }
+
+    #[test]
+    fn test_bfe_grid_active() {
+        let mut grid = BfeEditorGrid::new();
+        grid.add_group();
+        grid.active_group_mut().unwrap().add_tab(BfeEditorTab::new("t1", "x.rs", "file:///x.rs"));
+        assert_eq!(grid.total_tabs(), 1);
+    }
+
+    #[test]
+    fn test_bfe_grid_empty() {
+        let grid = BfeEditorGrid::new();
+        assert!(grid.active_group().is_none());
+        assert_eq!(grid.total_tabs(), 0);
+    }
+
+    #[test]
+    fn test_bfe_tab_preview() {
+        let mut tab = BfeEditorTab::new("t", "f.rs", "file:///f.rs");
+        tab.is_preview = true;
+        assert!(tab.is_preview);
+    }
+
+    #[test]
+    fn test_bfe_close_last_tab() {
+        let mut group = BfeEditorGroup::new(0);
+        group.add_tab(BfeEditorTab::new("t1", "a", "a"));
+        group.close_tab(0);
+        assert!(group.is_empty());
+        assert!(group.active().is_none());
+    }
+
+    #[test]
+    fn test_bfe_directions() {
+        assert_ne!(BfeGroupDirection::Horizontal, BfeGroupDirection::Vertical);
+    }
+}
