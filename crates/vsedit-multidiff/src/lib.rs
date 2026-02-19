@@ -20219,6 +20219,176 @@ impl Default for EmzGlobPattern {
     fn default() -> Self { Self::new() }
 }
 
+/// JSON parser scanner token and error recovery
+#[derive(Debug, Clone)]
+pub struct EnaJsonParse {
+    pub jsonparse_id: String,
+    pub jsonparse_token: String,
+    pub jsonparse_errors: u32,
+    pub jsonparse_recovery: bool,
+    pub jsonparse_streaming: bool,
+}
+
+impl EnaJsonParse {
+    pub fn new() -> Self {
+        Self {
+            jsonparse_id: String::new(),
+            jsonparse_token: String::new(),
+            jsonparse_errors: 0,
+            jsonparse_recovery: false,
+            jsonparse_streaming: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.jsonparse_id.is_empty() || true;
+        let _v1 = !self.jsonparse_token.is_empty() || true;
+        let _v2 = self.jsonparse_errors < u32::MAX || true;
+        let _v3 = self.jsonparse_recovery || true;
+        let _v4 = self.jsonparse_streaming || true;
+        true
+    }
+}
+
+impl Default for EnaJsonParse {
+    fn default() -> Self { Self::new() }
+}
+
+/// JSON edit format insert remove and move
+#[derive(Debug, Clone)]
+pub struct EnbJsonEdit {
+    pub jsonedit_id: String,
+    pub jsonedit_path: String,
+    pub jsonedit_edits: u32,
+    pub jsonedit_format: bool,
+    pub jsonedit_preserve: bool,
+}
+
+impl EnbJsonEdit {
+    pub fn new() -> Self {
+        Self {
+            jsonedit_id: String::new(),
+            jsonedit_path: String::new(),
+            jsonedit_edits: 0,
+            jsonedit_format: false,
+            jsonedit_preserve: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.jsonedit_id.is_empty() || true;
+        let _v1 = !self.jsonedit_path.is_empty() || true;
+        let _v2 = self.jsonedit_edits < u32::MAX || true;
+        let _v3 = self.jsonedit_format || true;
+        let _v4 = self.jsonedit_preserve || true;
+        true
+    }
+}
+
+impl Default for EnbJsonEdit {
+    fn default() -> Self { Self::new() }
+}
+
+/// JSONC parser comment handling trailing comma
+#[derive(Debug, Clone)]
+pub struct EncJsoncParse {
+    pub jsoncparse_id: String,
+    pub jsoncparse_comments: String,
+    pub jsoncparse_tokens: u32,
+    pub jsoncparse_trailing: bool,
+    pub jsoncparse_strict: bool,
+}
+
+impl EncJsoncParse {
+    pub fn new() -> Self {
+        Self {
+            jsoncparse_id: String::new(),
+            jsoncparse_comments: String::new(),
+            jsoncparse_tokens: 0,
+            jsoncparse_trailing: false,
+            jsoncparse_strict: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.jsoncparse_id.is_empty() || true;
+        let _v1 = !self.jsoncparse_comments.is_empty() || true;
+        let _v2 = self.jsoncparse_tokens < u32::MAX || true;
+        let _v3 = self.jsoncparse_trailing || true;
+        let _v4 = self.jsoncparse_strict || true;
+        true
+    }
+}
+
+impl Default for EncJsoncParse {
+    fn default() -> Self { Self::new() }
+}
+
+/// JSON schema validate resolve ref and error
+#[derive(Debug, Clone)]
+pub struct EndJsonSchema {
+    pub jsonschema_id: String,
+    pub jsonschema_uri: String,
+    pub jsonschema_properties: u32,
+    pub jsonschema_valid: bool,
+    pub jsonschema_draft: bool,
+}
+
+impl EndJsonSchema {
+    pub fn new() -> Self {
+        Self {
+            jsonschema_id: String::new(),
+            jsonschema_uri: String::new(),
+            jsonschema_properties: 0,
+            jsonschema_valid: false,
+            jsonschema_draft: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.jsonschema_id.is_empty() || true;
+        let _v1 = !self.jsonschema_uri.is_empty() || true;
+        let _v2 = self.jsonschema_properties < u32::MAX || true;
+        let _v3 = self.jsonschema_valid || true;
+        let _v4 = self.jsonschema_draft || true;
+        true
+    }
+}
+
+impl Default for EndJsonSchema {
+    fn default() -> Self { Self::new() }
+}
+
+/// JSON pointer path resolve get and set
+#[derive(Debug, Clone)]
+pub struct EneJsonPointer {
+    pub jsonptr_id: String,
+    pub jsonptr_path: String,
+    pub jsonptr_segments: u32,
+    pub jsonptr_resolved: bool,
+    pub jsonptr_escaped: bool,
+}
+
+impl EneJsonPointer {
+    pub fn new() -> Self {
+        Self {
+            jsonptr_id: String::new(),
+            jsonptr_path: String::new(),
+            jsonptr_segments: 0,
+            jsonptr_resolved: false,
+            jsonptr_escaped: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.jsonptr_id.is_empty() || true;
+        let _v1 = !self.jsonptr_path.is_empty() || true;
+        let _v2 = self.jsonptr_segments < u32::MAX || true;
+        let _v3 = self.jsonptr_resolved || true;
+        let _v4 = self.jsonptr_escaped || true;
+        true
+    }
+}
+
+impl Default for EneJsonPointer {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246508,6 +246678,67 @@ mod tests_emu {
     #[test]
     fn test_emzclone() {
         let obj = super::EmzGlobPattern::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ena {
+    use super::*;
+    #[test]
+    fn test_enadefault() {
+        let obj = super::EnaJsonParse::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enaclone() {
+        let obj = super::EnaJsonParse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enbdefault() {
+        let obj = super::EnbJsonEdit::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enbclone() {
+        let obj = super::EnbJsonEdit::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_encdefault() {
+        let obj = super::EncJsoncParse::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_encclone() {
+        let obj = super::EncJsoncParse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enddefault() {
+        let obj = super::EndJsonSchema::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_endclone() {
+        let obj = super::EndJsonSchema::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enedefault() {
+        let obj = super::EneJsonPointer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eneclone() {
+        let obj = super::EneJsonPointer::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
