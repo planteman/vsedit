@@ -86751,6 +86751,67 @@ pub struct BmjScopeDisplay { pub scope: u8, pub label: String, pub description: 
 #[derive(Debug, Clone)]
 pub struct BmjSettingInspect { pub key: String, pub default_value: Option<String>, pub user_value: Option<String>, pub workspace_value: Option<String>, pub folder_value: Option<String> }
 
+
+// Language configuration — comment rules, bracket pairs, auto-closing, on-enter rules, word patterns
+#[derive(Debug, Clone)]
+pub struct BmkCommentRule { pub line_comment: Option<String>, pub block_open: Option<String>, pub block_close: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmkBracketPairDef { pub open: String, pub close: String }
+#[derive(Debug, Clone)]
+pub struct BmkAutoClosingPair { pub open: String, pub close: String, pub not_in: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BmkOnEnterRule { pub before_text: String, pub after_text: Option<String>, pub action: u8, pub indent_action: u8 }
+#[derive(Debug, Clone)]
+pub struct BmkLanguageConfig { pub comments: BmkCommentRule, pub brackets: Vec<BmkBracketPairDef>, pub auto_closing: Vec<BmkAutoClosingPair>, pub word_pattern: Option<String> }
+
+// TextMate grammar registry — grammar scopes, scope name resolution, tokenization grammar, injection
+#[derive(Debug, Clone)]
+pub struct BmlGrammar { pub scope_name: String, pub language_id: Option<String>, pub path: String, pub embedded_languages: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BmlInjectionGrammar { pub scope_name: String, pub injected_into: String, pub selector: String }
+#[derive(Debug, Clone)]
+pub struct BmlScopeName { pub parts: Vec<String>, pub full: String }
+#[derive(Debug, Clone)]
+pub struct BmlGrammarContribution { pub language_id: String, pub scope_name: String, pub extension_id: String }
+#[derive(Debug, Clone)]
+pub struct BmlGrammarRegistry { pub grammars: Vec<BmlGrammar>, pub injections: Vec<BmlInjectionGrammar> }
+
+// Color theme parsing — theme rules, token colors, semantic token colors, workbench colors
+#[derive(Debug, Clone)]
+pub struct BmmTokenColorRule { pub scope: String, pub foreground: Option<u32>, pub background: Option<u32>, pub font_style: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmmWorkbenchColor { pub id: String, pub value: u32 }
+#[derive(Debug, Clone)]
+pub struct BmmSemanticTokenColor { pub token_type: String, pub modifiers: Vec<String>, pub foreground: Option<u32>, pub font_style: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmmThemeData { pub name: String, pub theme_type: u8, pub token_colors: Vec<BmmTokenColorRule>, pub workbench_colors: Vec<BmmWorkbenchColor> }
+#[derive(Debug, Clone)]
+pub struct BmmThemeInheritance { pub base_theme: String, pub overrides: Vec<BmmTokenColorRule> }
+
+// Color customization — color registry, computed colors, high contrast themes, color contributions
+#[derive(Debug, Clone)]
+pub struct BmnColorId { pub id: String, pub description: String, pub default_dark: u32, pub default_light: u32, pub default_hc: u32 }
+#[derive(Debug, Clone)]
+pub struct BmnComputedColor { pub id: String, pub value: u32, pub theme_type: u8 }
+#[derive(Debug, Clone)]
+pub struct BmnColorContribution { pub extension_id: String, pub colors: Vec<BmnColorId> }
+#[derive(Debug, Clone)]
+pub struct BmnColorPatch { pub id: String, pub value: Option<u32> }
+#[derive(Debug, Clone)]
+pub struct BmnColorRegistry { pub colors: Vec<BmnColorId>, pub computed: Vec<BmnComputedColor> }
+
+// File icon theme — icon definitions, folder icons, language icons, icon associations
+#[derive(Debug, Clone)]
+pub struct BmoIconDefinition { pub id: String, pub font_id: Option<String>, pub font_character: Option<String>, pub icon_path: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmoFileIconAssoc { pub file_name: Option<String>, pub file_extension: Option<String>, pub language_id: Option<String>, pub icon_id: String }
+#[derive(Debug, Clone)]
+pub struct BmoFolderIconAssoc { pub folder_name: String, pub icon_id: String, pub expanded_icon_id: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmoIconThemeData { pub name: String, pub file_associations: Vec<BmoFileIconAssoc>, pub folder_associations: Vec<BmoFolderIconAssoc>, pub default_icon: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmoIconThemeContribution { pub id: String, pub label: String, pub path: String, pub extension_id: String }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -96491,4 +96552,104 @@ mod tests_bfo {
     fn test_bmj_inspect_user_override() { let i = BmjSettingInspect { key: "k".into(), default_value: Some("d".into()), user_value: Some("u".into()), workspace_value: None, folder_value: None }; assert!(i.user_value.is_some()); }
     #[test]
     fn test_bmj_inspect_all_set() { let i = BmjSettingInspect { key: "k".into(), default_value: Some("d".into()), user_value: Some("u".into()), workspace_value: Some("w".into()), folder_value: Some("f".into()) }; assert!(i.folder_value.is_some()); }
+    #[test]
+    fn test_bmk_line_comment() { let c = BmkCommentRule { line_comment: Some("//".into()), block_open: None, block_close: None }; assert!(c.line_comment.is_some()); }
+    #[test]
+    fn test_bmk_block_comment() { let c = BmkCommentRule { line_comment: None, block_open: Some("/*".into()), block_close: Some("*/".into()) }; assert!(c.block_open.is_some()); }
+    #[test]
+    fn test_bmk_bracket_pair() { let b = BmkBracketPairDef { open: "{".into(), close: "}".into() }; assert_eq!(b.open, "{"); }
+    #[test]
+    fn test_bmk_auto_close_quote() { let a = BmkAutoClosingPair { open: "\"".into(), close: "\"".into(), not_in: vec!["string".into()] }; assert_eq!(a.not_in.len(), 1); }
+    #[test]
+    fn test_bmk_auto_close_no_filter() { let a = BmkAutoClosingPair { open: "(".into(), close: ")".into(), not_in: vec![] }; assert!(a.not_in.is_empty()); }
+    #[test]
+    fn test_bmk_on_enter_indent() { let r = BmkOnEnterRule { before_text: ".*\\{$".into(), after_text: None, action: 1, indent_action: 1 }; assert_eq!(r.indent_action, 1); }
+    #[test]
+    fn test_bmk_on_enter_outdent() { let r = BmkOnEnterRule { before_text: "^\\s*\\}".into(), after_text: None, action: 0, indent_action: 2 }; assert_eq!(r.indent_action, 2); }
+    #[test]
+    fn test_bmk_full_config() { let c = BmkCommentRule { line_comment: Some("//".into()), block_open: Some("/*".into()), block_close: Some("*/".into()) }; let b = BmkBracketPairDef { open: "{".into(), close: "}".into() }; let cfg = BmkLanguageConfig { comments: c, brackets: vec![b], auto_closing: vec![], word_pattern: None }; assert_eq!(cfg.brackets.len(), 1); }
+    #[test]
+    fn test_bmk_with_word_pattern() { let c = BmkCommentRule { line_comment: None, block_open: None, block_close: None }; let cfg = BmkLanguageConfig { comments: c, brackets: vec![], auto_closing: vec![], word_pattern: Some("[a-zA-Z_]+".into()) }; assert!(cfg.word_pattern.is_some()); }
+    #[test]
+    fn test_bmk_no_comments() { let c = BmkCommentRule { line_comment: None, block_open: None, block_close: None }; assert!(c.line_comment.is_none()); }
+    #[test]
+    fn test_bml_grammar_rust() { let g = BmlGrammar { scope_name: "source.rust".into(), language_id: Some("rust".into()), path: "./syntaxes/rust.tmLanguage.json".into(), embedded_languages: vec![] }; assert_eq!(g.scope_name, "source.rust"); }
+    #[test]
+    fn test_bml_grammar_no_lang() { let g = BmlGrammar { scope_name: "text.html.markdown".into(), language_id: None, path: "md.json".into(), embedded_languages: vec!["source.js".into()] }; assert_eq!(g.embedded_languages.len(), 1); }
+    #[test]
+    fn test_bml_injection() { let i = BmlInjectionGrammar { scope_name: "highlight.todo".into(), injected_into: "source".into(), selector: "L:comment".into() }; assert_eq!(i.selector, "L:comment"); }
+    #[test]
+    fn test_bml_scope_name() { let s = BmlScopeName { parts: vec!["source".into(), "rust".into()], full: "source.rust".into() }; assert_eq!(s.parts.len(), 2); }
+    #[test]
+    fn test_bml_scope_deep() { let s = BmlScopeName { parts: vec!["entity".into(), "name".into(), "function".into()], full: "entity.name.function".into() }; assert_eq!(s.parts.len(), 3); }
+    #[test]
+    fn test_bml_contribution() { let c = BmlGrammarContribution { language_id: "rust".into(), scope_name: "source.rust".into(), extension_id: "rust-lang.rust-analyzer".into() }; assert_eq!(c.extension_id, "rust-lang.rust-analyzer"); }
+    #[test]
+    fn test_bml_empty_registry() { let r = BmlGrammarRegistry { grammars: vec![], injections: vec![] }; assert!(r.grammars.is_empty()); }
+    #[test]
+    fn test_bml_registry_with_grammars() { let g = BmlGrammar { scope_name: "s".into(), language_id: None, path: "p".into(), embedded_languages: vec![] }; let r = BmlGrammarRegistry { grammars: vec![g], injections: vec![] }; assert_eq!(r.grammars.len(), 1); }
+    #[test]
+    fn test_bml_multi_embed() { let g = BmlGrammar { scope_name: "text.html".into(), language_id: Some("html".into()), path: "h".into(), embedded_languages: vec!["source.js".into(), "source.css".into()] }; assert_eq!(g.embedded_languages.len(), 2); }
+    #[test]
+    fn test_bml_single_part_scope() { let s = BmlScopeName { parts: vec!["comment".into()], full: "comment".into() }; assert_eq!(s.parts.len(), 1); }
+    #[test]
+    fn test_bmm_keyword_color() { let r = BmmTokenColorRule { scope: "keyword".into(), foreground: Some(0xCC7832), background: None, font_style: Some("bold".into()) }; assert!(r.foreground.is_some()); }
+    #[test]
+    fn test_bmm_comment_color() { let r = BmmTokenColorRule { scope: "comment".into(), foreground: Some(0x6A9955), background: None, font_style: Some("italic".into()) }; assert_eq!(r.font_style.as_deref(), Some("italic")); }
+    #[test]
+    fn test_bmm_workbench_bg() { let c = BmmWorkbenchColor { id: "editor.background".into(), value: 0x1E1E1E }; assert_eq!(c.value, 0x1E1E1E); }
+    #[test]
+    fn test_bmm_workbench_fg() { let c = BmmWorkbenchColor { id: "editor.foreground".into(), value: 0xD4D4D4 }; assert_eq!(c.id, "editor.foreground"); }
+    #[test]
+    fn test_bmm_semantic_function() { let s = BmmSemanticTokenColor { token_type: "function".into(), modifiers: vec!["declaration".into()], foreground: Some(0xDCDCAA), font_style: None }; assert_eq!(s.modifiers.len(), 1); }
+    #[test]
+    fn test_bmm_semantic_no_mods() { let s = BmmSemanticTokenColor { token_type: "variable".into(), modifiers: vec![], foreground: Some(0x9CDCFE), font_style: None }; assert!(s.modifiers.is_empty()); }
+    #[test]
+    fn test_bmm_dark_theme() { let t = BmmThemeData { name: "Dark+".into(), theme_type: 2, token_colors: vec![], workbench_colors: vec![] }; assert_eq!(t.theme_type, 2); }
+    #[test]
+    fn test_bmm_light_theme() { let t = BmmThemeData { name: "Light+".into(), theme_type: 1, token_colors: vec![], workbench_colors: vec![] }; assert_eq!(t.theme_type, 1); }
+    #[test]
+    fn test_bmm_inheritance() { let o = BmmTokenColorRule { scope: "string".into(), foreground: Some(0xCE9178), background: None, font_style: None }; let i = BmmThemeInheritance { base_theme: "vs-dark".into(), overrides: vec![o] }; assert_eq!(i.overrides.len(), 1); }
+    #[test]
+    fn test_bmm_no_overrides() { let i = BmmThemeInheritance { base_theme: "vs".into(), overrides: vec![] }; assert!(i.overrides.is_empty()); }
+    #[test]
+    fn test_bmn_color_id() { let c = BmnColorId { id: "editor.background".into(), description: "Editor background".into(), default_dark: 0x1E1E1E, default_light: 0xFFFFFF, default_hc: 0x000000 }; assert_eq!(c.default_dark, 0x1E1E1E); }
+    #[test]
+    fn test_bmn_computed_dark() { let c = BmnComputedColor { id: "editor.background".into(), value: 0x1E1E1E, theme_type: 2 }; assert_eq!(c.theme_type, 2); }
+    #[test]
+    fn test_bmn_computed_light() { let c = BmnComputedColor { id: "editor.background".into(), value: 0xFFFFFF, theme_type: 1 }; assert_eq!(c.theme_type, 1); }
+    #[test]
+    fn test_bmn_contribution() { let c = BmnColorId { id: "myExt.accent".into(), description: "Accent".into(), default_dark: 0xFF0000, default_light: 0x0000FF, default_hc: 0xFFFF00 }; let co = BmnColorContribution { extension_id: "myext".into(), colors: vec![c] }; assert_eq!(co.colors.len(), 1); }
+    #[test]
+    fn test_bmn_patch_set() { let p = BmnColorPatch { id: "editor.background".into(), value: Some(0x282C34) }; assert!(p.value.is_some()); }
+    #[test]
+    fn test_bmn_patch_unset() { let p = BmnColorPatch { id: "x".into(), value: None }; assert!(p.value.is_none()); }
+    #[test]
+    fn test_bmn_empty_registry() { let r = BmnColorRegistry { colors: vec![], computed: vec![] }; assert!(r.colors.is_empty()); }
+    #[test]
+    fn test_bmn_registry_with_colors() { let c = BmnColorId { id: "x".into(), description: "x".into(), default_dark: 0, default_light: 0, default_hc: 0 }; let r = BmnColorRegistry { colors: vec![c], computed: vec![] }; assert_eq!(r.colors.len(), 1); }
+    #[test]
+    fn test_bmn_hc_color() { let c = BmnColorId { id: "border".into(), description: "Border".into(), default_dark: 0, default_light: 0, default_hc: 0xFFFFFF }; assert_eq!(c.default_hc, 0xFFFFFF); }
+    #[test]
+    fn test_bmn_computed_hc() { let c = BmnComputedColor { id: "border".into(), value: 0xFFFFFF, theme_type: 3 }; assert_eq!(c.theme_type, 3); }
+    #[test]
+    fn test_bmo_font_icon() { let i = BmoIconDefinition { id: "file".into(), font_id: Some("seti".into()), font_character: Some("\\E001".into()), icon_path: None }; assert!(i.font_id.is_some()); }
+    #[test]
+    fn test_bmo_image_icon() { let i = BmoIconDefinition { id: "rust".into(), font_id: None, font_character: None, icon_path: Some("icons/rust.svg".into()) }; assert!(i.icon_path.is_some()); }
+    #[test]
+    fn test_bmo_by_extension() { let a = BmoFileIconAssoc { file_name: None, file_extension: Some("rs".into()), language_id: None, icon_id: "rust".into() }; assert!(a.file_extension.is_some()); }
+    #[test]
+    fn test_bmo_by_filename() { let a = BmoFileIconAssoc { file_name: Some("Cargo.toml".into()), file_extension: None, language_id: None, icon_id: "cargo".into() }; assert!(a.file_name.is_some()); }
+    #[test]
+    fn test_bmo_by_language() { let a = BmoFileIconAssoc { file_name: None, file_extension: None, language_id: Some("python".into()), icon_id: "python".into() }; assert!(a.language_id.is_some()); }
+    #[test]
+    fn test_bmo_folder_icon() { let f = BmoFolderIconAssoc { folder_name: "src".into(), icon_id: "folder-src".into(), expanded_icon_id: Some("folder-src-open".into()) }; assert!(f.expanded_icon_id.is_some()); }
+    #[test]
+    fn test_bmo_folder_no_expanded() { let f = BmoFolderIconAssoc { folder_name: "node_modules".into(), icon_id: "folder".into(), expanded_icon_id: None }; assert!(f.expanded_icon_id.is_none()); }
+    #[test]
+    fn test_bmo_theme_data() { let t = BmoIconThemeData { name: "Seti".into(), file_associations: vec![], folder_associations: vec![], default_icon: Some("file".into()) }; assert!(t.default_icon.is_some()); }
+    #[test]
+    fn test_bmo_contribution() { let c = BmoIconThemeContribution { id: "seti".into(), label: "Seti".into(), path: "./icons".into(), extension_id: "ext.seti".into() }; assert_eq!(c.id, "seti"); }
+    #[test]
+    fn test_bmo_no_default_icon() { let t = BmoIconThemeData { name: "None".into(), file_associations: vec![], folder_associations: vec![], default_icon: None }; assert!(t.default_icon.is_none()); }
 }
