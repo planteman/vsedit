@@ -57021,3 +57021,297 @@ mod bbd_tests {
         assert_eq!(c.a, 0.0);
     }
 }
+
+
+// --- bbe_: Editor indentation model ---
+
+/// Indentation style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbeIndentStyle {
+    Spaces,
+    Tabs,
+}
+
+impl BbeIndentStyle {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Spaces => "Spaces", Self::Tabs => "Tabs" }
+    }
+}
+
+/// Indentation configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BbeIndentConfig {
+    pub style: BbeIndentStyle,
+    pub size: u32,
+    pub detect_indentation: bool,
+}
+
+impl BbeIndentConfig {
+    pub fn spaces(size: u32) -> Self {
+        Self { style: BbeIndentStyle::Spaces, size, detect_indentation: true }
+    }
+
+    pub fn tabs(size: u32) -> Self {
+        Self { style: BbeIndentStyle::Tabs, size, detect_indentation: true }
+    }
+
+    pub fn indent_str(&self) -> String {
+        match self.style {
+            BbeIndentStyle::Spaces => " ".repeat(self.size as usize),
+            BbeIndentStyle::Tabs => "\t".to_string(),
+        }
+    }
+
+    pub fn status_text(&self) -> String {
+        match self.style {
+            BbeIndentStyle::Spaces => format!("Spaces: {}", self.size),
+            BbeIndentStyle::Tabs => format!("Tab Size: {}", self.size),
+        }
+    }
+}
+
+/// Result of indentation detection.
+#[derive(Debug, Clone)]
+pub struct BbeDetectResult {
+    pub style: BbeIndentStyle,
+    pub size: u32,
+    pub confidence: f64,
+    pub lines_analyzed: u32,
+    pub tabs_count: u32,
+    pub spaces_count: u32,
+}
+
+impl BbeDetectResult {
+    pub fn new(style: BbeIndentStyle, size: u32, confidence: f64) -> Self {
+        Self { style, size, confidence, lines_analyzed: 0, tabs_count: 0, spaces_count: 0 }
+    }
+
+    pub fn is_confident(&self) -> bool { self.confidence > 0.7 }
+    pub fn is_mixed(&self) -> bool { self.tabs_count > 0 && self.spaces_count > 0 }
+}
+
+/// Indentation guides model.
+#[derive(Debug, Clone)]
+pub struct BbeIndentGuide {
+    pub line: u32,
+    pub level: u32,
+    pub is_active: bool,
+}
+
+impl BbeIndentGuide {
+    pub fn new(line: u32, level: u32) -> Self {
+        Self { line, level, is_active: false }
+    }
+
+    pub fn col(&self, tab_size: u32) -> u32 { self.level * tab_size }
+}
+
+/// The indentation model.
+#[derive(Debug)]
+pub struct BbeIndentModel {
+    config: BbeIndentConfig,
+    detected: Option<BbeDetectResult>,
+    guides_enabled: bool,
+    guides: Vec<BbeIndentGuide>,
+}
+
+impl BbeIndentModel {
+    pub fn new(config: BbeIndentConfig) -> Self {
+        Self { config, detected: None, guides_enabled: true, guides: Vec::new() }
+    }
+
+    pub fn config(&self) -> &BbeIndentConfig { &self.config }
+    pub fn set_config(&mut self, config: BbeIndentConfig) { self.config = config; }
+
+    pub fn effective_config(&self) -> BbeIndentConfig {
+        if self.config.detect_indentation {
+            if let Some(d) = &self.detected {
+                if d.is_confident() {
+                    return BbeIndentConfig {
+                        style: d.style, size: d.size, detect_indentation: true
+                    };
+                }
+            }
+        }
+        self.config
+    }
+
+    pub fn detect_from_lines(&mut self, lines: &[&str]) {
+        let mut tabs = 0u32;
+        let mut spaces = 0u32;
+        let mut space_sizes: [u32; 9] = [0; 9]; // sizes 1-8
+
+        for line in lines {
+            if line.is_empty() { continue; }
+            if line.starts_with('\t') { tabs += 1; }
+            else {
+                let indent = line.len() - line.trim_start_matches(' ').len();
+                if indent > 0 && indent <= 8 {
+                    space_sizes[indent] += 1;
+                    spaces += 1;
+                }
+            }
+        }
+
+        let total = tabs + spaces;
+        if total == 0 { return; }
+
+        let style = if tabs > spaces { BbeIndentStyle::Tabs } else { BbeIndentStyle::Spaces };
+        let size = if style == BbeIndentStyle::Tabs { self.config.size }
+        else {
+            (2..=8).max_by_key(|&s| space_sizes[s as usize]).unwrap_or(4)
+        };
+
+        let confidence = if total < 5 { 0.3 } else {
+            let dominant = tabs.max(spaces) as f64;
+            dominant / total as f64
+        };
+
+        self.detected = Some(BbeDetectResult {
+            style, size, confidence, lines_analyzed: lines.len() as u32, tabs_count: tabs, spaces_count: spaces,
+        });
+    }
+
+    pub fn detected(&self) -> Option<&BbeDetectResult> { self.detected.as_ref() }
+
+    pub fn indent_line(&self, current_indent: u32) -> String {
+        let cfg = self.effective_config();
+        let new_level = current_indent + 1;
+        match cfg.style {
+            BbeIndentStyle::Spaces => " ".repeat((new_level * cfg.size) as usize),
+            BbeIndentStyle::Tabs => "\t".repeat(new_level as usize),
+        }
+    }
+
+    pub fn outdent_line(&self, current_indent: u32) -> String {
+        if current_indent == 0 { return String::new(); }
+        let cfg = self.effective_config();
+        let new_level = current_indent - 1;
+        match cfg.style {
+            BbeIndentStyle::Spaces => " ".repeat((new_level * cfg.size) as usize),
+            BbeIndentStyle::Tabs => "\t".repeat(new_level as usize),
+        }
+    }
+
+    pub fn set_guides_enabled(&mut self, v: bool) { self.guides_enabled = v; }
+    pub fn guides_enabled(&self) -> bool { self.guides_enabled }
+
+    pub fn set_guides(&mut self, guides: Vec<BbeIndentGuide>) { self.guides = guides; }
+    pub fn guides(&self) -> &[BbeIndentGuide] { &self.guides }
+
+    pub fn guides_for_line(&self, line: u32) -> Vec<&BbeIndentGuide> {
+        self.guides.iter().filter(|g| g.line == line).collect()
+    }
+
+    pub fn status_text(&self) -> String { self.effective_config().status_text() }
+}
+
+#[cfg(test)]
+mod bbe_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbe_indent_style() {
+        assert_eq!(BbeIndentStyle::Spaces.label(), "Spaces");
+    }
+
+    #[test]
+    fn test_bbe_config_str() {
+        let c = BbeIndentConfig::spaces(4);
+        assert_eq!(c.indent_str(), "    ");
+        let c2 = BbeIndentConfig::tabs(4);
+        assert_eq!(c2.indent_str(), "\t");
+    }
+
+    #[test]
+    fn test_bbe_config_status() {
+        assert_eq!(BbeIndentConfig::spaces(2).status_text(), "Spaces: 2");
+        assert_eq!(BbeIndentConfig::tabs(4).status_text(), "Tab Size: 4");
+    }
+
+    #[test]
+    fn test_bbe_detect_spaces() {
+        let mut m = BbeIndentModel::new(BbeIndentConfig::tabs(4));
+        m.detect_from_lines(&[
+            "fn main() {",
+            "    let x = 1;",
+            "    let y = 2;",
+            "    if x > 0 {",
+            "        println!(\"hello\");",
+            "    }",
+            "}",
+            "",
+            "fn other() {",
+            "    let z = 3;",
+        ]);
+        let d = m.detected().unwrap();
+        assert_eq!(d.style, BbeIndentStyle::Spaces);
+    }
+
+    #[test]
+    fn test_bbe_detect_tabs() {
+        let mut m = BbeIndentModel::new(BbeIndentConfig::spaces(4));
+        m.detect_from_lines(&[
+            "fn main() {",
+            "\tlet x = 1;",
+            "\tlet y = 2;",
+            "\tif x > 0 {",
+            "\t\tprintln!(\"hello\");",
+            "\t}",
+            "}",
+            "",
+            "fn other() {",
+            "\tlet z = 3;",
+        ]);
+        let d = m.detected().unwrap();
+        assert_eq!(d.style, BbeIndentStyle::Tabs);
+    }
+
+    #[test]
+    fn test_bbe_effective_config() {
+        let mut m = BbeIndentModel::new(BbeIndentConfig::tabs(4));
+        m.detected = Some(BbeDetectResult {
+            style: BbeIndentStyle::Spaces, size: 2, confidence: 0.9,
+            lines_analyzed: 100, tabs_count: 5, spaces_count: 95,
+        });
+        let eff = m.effective_config();
+        assert_eq!(eff.style, BbeIndentStyle::Spaces);
+        assert_eq!(eff.size, 2);
+    }
+
+    #[test]
+    fn test_bbe_indent_outdent() {
+        let m = BbeIndentModel::new(BbeIndentConfig::spaces(4));
+        assert_eq!(m.indent_line(0), "    ");
+        assert_eq!(m.indent_line(1), "        ");
+        assert_eq!(m.outdent_line(2), "    ");
+        assert_eq!(m.outdent_line(0), "");
+    }
+
+    #[test]
+    fn test_bbe_guides() {
+        let mut m = BbeIndentModel::new(BbeIndentConfig::spaces(4));
+        m.set_guides(vec![
+            BbeIndentGuide::new(1, 1),
+            BbeIndentGuide::new(1, 2),
+            BbeIndentGuide::new(2, 1),
+        ]);
+        assert_eq!(m.guides_for_line(1).len(), 2);
+    }
+
+    #[test]
+    fn test_bbe_guide_col() {
+        let g = BbeIndentGuide::new(5, 3);
+        assert_eq!(g.col(4), 12);
+    }
+
+    #[test]
+    fn test_bbe_detect_mixed() {
+        let r = BbeDetectResult {
+            style: BbeIndentStyle::Spaces, size: 4, confidence: 0.6,
+            lines_analyzed: 10, tabs_count: 3, spaces_count: 7,
+        };
+        assert!(r.is_mixed());
+        assert!(!r.is_confident());
+    }
+}
