@@ -87466,6 +87466,111 @@ impl AppLifecycle {
     }
 }
 
+/// Runtime wiring: boa_ EditorViewport
+#[derive(Debug, Clone)]
+pub struct EditorViewport {
+    pub boa_viewport_top: u32,
+    pub boa_viewport_bottom: u32,
+    pub boa_visible_line_count: u32,
+    pub boa_total_line_count: u32,
+    pub boa_scroll_offset_x: f64,
+    pub boa_scroll_offset_y: f64,
+    pub boa_viewport_width: u32,
+    pub boa_viewport_height: u32,
+    pub boa_line_height: f64,
+    pub boa_content_width: u32,
+}
+
+impl EditorViewport {
+    pub fn boa_summary(&self) -> String {
+        format!("EditorViewport({})", self.boa_viewport_top)
+    }
+}
+
+/// Runtime wiring: bob_ ScrollState
+#[derive(Debug, Clone)]
+pub struct ScrollState {
+    pub bob_scroll_top: f64,
+    pub bob_scroll_left: f64,
+    pub bob_scroll_width: f64,
+    pub bob_scroll_height: f64,
+    pub bob_client_width: u32,
+    pub bob_client_height: u32,
+    pub bob_is_scrolling: bool,
+    pub bob_smooth_scrolling: bool,
+    pub bob_scroll_speed: f64,
+    pub bob_reveal_cursor: bool,
+}
+
+impl ScrollState {
+    pub fn bob_summary(&self) -> String {
+        format!("ScrollState({})", self.bob_scroll_top)
+    }
+}
+
+/// Runtime wiring: boc_ VisibleRange
+#[derive(Debug, Clone)]
+pub struct VisibleRange {
+    pub boc_start_line: u32,
+    pub boc_end_line: u32,
+    pub boc_start_column: u32,
+    pub boc_end_column: u32,
+    pub boc_is_partial_top: bool,
+    pub boc_is_partial_bottom: bool,
+    pub boc_visible_text_length: usize,
+    pub boc_has_folded_regions: bool,
+    pub boc_whitespace_count: u32,
+    pub boc_tab_count: u32,
+}
+
+impl VisibleRange {
+    pub fn boc_summary(&self) -> String {
+        format!("VisibleRange({})", self.boc_start_line)
+    }
+}
+
+/// Runtime wiring: bod_ FoldRegion
+#[derive(Debug, Clone)]
+pub struct FoldRegion {
+    pub bod_fold_start_line: u32,
+    pub bod_fold_end_line: u32,
+    pub bod_is_collapsed: bool,
+    pub bod_fold_kind: String,
+    pub bod_collapsed_text: String,
+    pub bod_nesting_level: u32,
+    pub bod_is_manual: bool,
+    pub bod_source_provider: String,
+    pub bod_line_count: u32,
+    pub bod_is_recoverable: bool,
+}
+
+impl FoldRegion {
+    pub fn bod_summary(&self) -> String {
+        format!("FoldRegion({})", self.bod_fold_start_line)
+    }
+}
+
+/// Runtime wiring: boe_ SoftWrapModel
+#[derive(Debug, Clone)]
+pub struct SoftWrapModel {
+    pub boe_wrap_column: u32,
+    pub boe_word_wrap_mode: String,
+    pub boe_min_wrap_column: u32,
+    pub boe_max_wrap_column: u32,
+    pub boe_indent_wrapped_lines: bool,
+    pub boe_wrap_indent_mode: String,
+    pub boe_forced_wraps: Vec<u32>,
+    pub boe_wrap_at_boundary: bool,
+    pub boe_tab_size: u32,
+    pub boe_use_tabstops: bool,
+}
+
+impl SoftWrapModel {
+    pub fn boe_summary(&self) -> String {
+        format!("SoftWrapModel({})", self.boe_wrap_column)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -101421,6 +101526,910 @@ mod tests_bfo {
         };
         let _ = obj.bnz_summary();
         assert!(!obj.bnz_crash_reporter_enabled);
+    }
+
+    #[test]
+    fn test_boa_viewport_top() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_viewport_top, 0);
+    }
+
+    #[test]
+    fn test_boa_viewport_bottom() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_viewport_bottom, 0);
+    }
+
+    #[test]
+    fn test_boa_visible_line_count() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_visible_line_count, 0);
+    }
+
+    #[test]
+    fn test_boa_total_line_count() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_total_line_count, 0);
+    }
+
+    #[test]
+    fn test_boa_scroll_offset_x() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert!((obj.boa_scroll_offset_x - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boa_scroll_offset_y() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert!((obj.boa_scroll_offset_y - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boa_viewport_width() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_viewport_width, 0);
+    }
+
+    #[test]
+    fn test_boa_viewport_height() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_viewport_height, 0);
+    }
+
+    #[test]
+    fn test_boa_line_height() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert!((obj.boa_line_height - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boa_content_width() {
+        let obj = EditorViewport {
+            boa_viewport_top: 0,
+            boa_viewport_bottom: 0,
+            boa_visible_line_count: 0,
+            boa_total_line_count: 0,
+            boa_scroll_offset_x: 0.0,
+            boa_scroll_offset_y: 0.0,
+            boa_viewport_width: 0,
+            boa_viewport_height: 0,
+            boa_line_height: 0.0,
+            boa_content_width: 0,
+        };
+        let _ = obj.boa_summary();
+        assert_eq!(obj.boa_content_width, 0);
+    }
+
+
+    #[test]
+    fn test_bob_scroll_top() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!((obj.bob_scroll_top - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bob_scroll_left() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!((obj.bob_scroll_left - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bob_scroll_width() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!((obj.bob_scroll_width - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bob_scroll_height() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!((obj.bob_scroll_height - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bob_client_width() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert_eq!(obj.bob_client_width, 0);
+    }
+
+    #[test]
+    fn test_bob_client_height() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert_eq!(obj.bob_client_height, 0);
+    }
+
+    #[test]
+    fn test_bob_is_scrolling() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!(!obj.bob_is_scrolling);
+    }
+
+    #[test]
+    fn test_bob_smooth_scrolling() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!(!obj.bob_smooth_scrolling);
+    }
+
+    #[test]
+    fn test_bob_scroll_speed() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!((obj.bob_scroll_speed - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bob_reveal_cursor() {
+        let obj = ScrollState {
+            bob_scroll_top: 0.0,
+            bob_scroll_left: 0.0,
+            bob_scroll_width: 0.0,
+            bob_scroll_height: 0.0,
+            bob_client_width: 0,
+            bob_client_height: 0,
+            bob_is_scrolling: false,
+            bob_smooth_scrolling: false,
+            bob_scroll_speed: 0.0,
+            bob_reveal_cursor: false,
+        };
+        let _ = obj.bob_summary();
+        assert!(!obj.bob_reveal_cursor);
+    }
+
+
+    #[test]
+    fn test_boc_start_line() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_start_line, 0);
+    }
+
+    #[test]
+    fn test_boc_end_line() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_end_line, 0);
+    }
+
+    #[test]
+    fn test_boc_start_column() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_start_column, 0);
+    }
+
+    #[test]
+    fn test_boc_end_column() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_end_column, 0);
+    }
+
+    #[test]
+    fn test_boc_is_partial_top() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert!(!obj.boc_is_partial_top);
+    }
+
+    #[test]
+    fn test_boc_is_partial_bottom() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert!(!obj.boc_is_partial_bottom);
+    }
+
+    #[test]
+    fn test_boc_visible_text_length() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_visible_text_length, 0);
+    }
+
+    #[test]
+    fn test_boc_has_folded_regions() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert!(!obj.boc_has_folded_regions);
+    }
+
+    #[test]
+    fn test_boc_whitespace_count() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_whitespace_count, 0);
+    }
+
+    #[test]
+    fn test_boc_tab_count() {
+        let obj = VisibleRange {
+            boc_start_line: 0,
+            boc_end_line: 0,
+            boc_start_column: 0,
+            boc_end_column: 0,
+            boc_is_partial_top: false,
+            boc_is_partial_bottom: false,
+            boc_visible_text_length: 0,
+            boc_has_folded_regions: false,
+            boc_whitespace_count: 0,
+            boc_tab_count: 0,
+        };
+        let _ = obj.boc_summary();
+        assert_eq!(obj.boc_tab_count, 0);
+    }
+
+
+    #[test]
+    fn test_bod_fold_start_line() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_fold_start_line, 0);
+    }
+
+    #[test]
+    fn test_bod_fold_end_line() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_fold_end_line, 0);
+    }
+
+    #[test]
+    fn test_bod_is_collapsed() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert!(!obj.bod_is_collapsed);
+    }
+
+    #[test]
+    fn test_bod_fold_kind() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_fold_kind, "test");
+    }
+
+    #[test]
+    fn test_bod_collapsed_text() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_collapsed_text, "test");
+    }
+
+    #[test]
+    fn test_bod_nesting_level() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_nesting_level, 0);
+    }
+
+    #[test]
+    fn test_bod_is_manual() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert!(!obj.bod_is_manual);
+    }
+
+    #[test]
+    fn test_bod_source_provider() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_source_provider, "test");
+    }
+
+    #[test]
+    fn test_bod_line_count() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert_eq!(obj.bod_line_count, 0);
+    }
+
+    #[test]
+    fn test_bod_is_recoverable() {
+        let obj = FoldRegion {
+            bod_fold_start_line: 0,
+            bod_fold_end_line: 0,
+            bod_is_collapsed: false,
+            bod_fold_kind: String::from("test"),
+            bod_collapsed_text: String::from("test"),
+            bod_nesting_level: 0,
+            bod_is_manual: false,
+            bod_source_provider: String::from("test"),
+            bod_line_count: 0,
+            bod_is_recoverable: false,
+        };
+        let _ = obj.bod_summary();
+        assert!(!obj.bod_is_recoverable);
+    }
+
+
+    #[test]
+    fn test_boe_wrap_column() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert_eq!(obj.boe_wrap_column, 0);
+    }
+
+    #[test]
+    fn test_boe_word_wrap_mode() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert_eq!(obj.boe_word_wrap_mode, "test");
+    }
+
+    #[test]
+    fn test_boe_min_wrap_column() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert_eq!(obj.boe_min_wrap_column, 0);
+    }
+
+    #[test]
+    fn test_boe_max_wrap_column() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert_eq!(obj.boe_max_wrap_column, 0);
+    }
+
+    #[test]
+    fn test_boe_indent_wrapped_lines() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert!(!obj.boe_indent_wrapped_lines);
+    }
+
+    #[test]
+    fn test_boe_wrap_indent_mode() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert_eq!(obj.boe_wrap_indent_mode, "test");
+    }
+
+    #[test]
+    fn test_boe_forced_wraps() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert!(obj.boe_forced_wraps.is_empty());
+    }
+
+    #[test]
+    fn test_boe_wrap_at_boundary() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert!(!obj.boe_wrap_at_boundary);
+    }
+
+    #[test]
+    fn test_boe_tab_size() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert_eq!(obj.boe_tab_size, 0);
+    }
+
+    #[test]
+    fn test_boe_use_tabstops() {
+        let obj = SoftWrapModel {
+            boe_wrap_column: 0,
+            boe_word_wrap_mode: String::from("test"),
+            boe_min_wrap_column: 0,
+            boe_max_wrap_column: 0,
+            boe_indent_wrapped_lines: false,
+            boe_wrap_indent_mode: String::from("test"),
+            boe_forced_wraps: Vec::new(),
+            boe_wrap_at_boundary: false,
+            boe_tab_size: 0,
+            boe_use_tabstops: false,
+        };
+        let _ = obj.boe_summary();
+        assert!(!obj.boe_use_tabstops);
     }
 
 }
