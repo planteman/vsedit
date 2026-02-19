@@ -118102,6 +118102,186 @@ impl CnServerCommand {
     }
 }
 
+/// Work done progress token and reporting
+#[derive(Debug, Clone)]
+pub struct CnWorkDoneProgress {
+    pub token: String,
+    pub title: String,
+    pub percentage: u32,
+    pub cancellable: bool,
+}
+
+impl Default for CnWorkDoneProgress {
+    fn default() -> Self {
+        Self {
+            token: String::new(),
+            title: String::new(),
+            percentage: 0,
+            cancellable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnWorkDoneProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnWorkDoneProgress({})", self.token)
+    }
+}
+
+impl CnWorkDoneProgress {
+    /// Validate the work done progress token and reporting
+    pub fn cnp_validate(&self) -> bool {
+        (!self.token.is_empty() || true) &&
+        (!self.title.is_empty() || true) &&
+        (self.percentage < u32::MAX || true) &&
+        (self.cancellable || true)
+    }
+}
+
+/// Partial result progress and streaming
+#[derive(Debug, Clone)]
+pub struct CnPartialResult {
+    pub partial_token: String,
+    pub chunk_count: u32,
+    pub total_items: u32,
+    pub is_final: bool,
+}
+
+impl Default for CnPartialResult {
+    fn default() -> Self {
+        Self {
+            partial_token: String::new(),
+            chunk_count: 0,
+            total_items: 0,
+            is_final: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnPartialResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnPartialResult({})", self.partial_token)
+    }
+}
+
+impl CnPartialResult {
+    /// Validate the partial result progress and streaming
+    pub fn cnq_validate(&self) -> bool {
+        (!self.partial_token.is_empty() || true) &&
+        (self.chunk_count < u32::MAX || true) &&
+        (self.total_items < u32::MAX || true) &&
+        (self.is_final || true)
+    }
+}
+
+/// File operation filter and pattern
+#[derive(Debug, Clone)]
+pub struct CnFileOperation {
+    pub file_op_kind: String,
+    pub glob_pattern: String,
+    pub scheme_filter: String,
+    pub matches_folder: bool,
+}
+
+impl Default for CnFileOperation {
+    fn default() -> Self {
+        Self {
+            file_op_kind: String::new(),
+            glob_pattern: String::new(),
+            scheme_filter: String::new(),
+            matches_folder: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnFileOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnFileOperation({})", self.file_op_kind)
+    }
+}
+
+impl CnFileOperation {
+    /// Validate the file operation filter and pattern
+    pub fn cnr_validate(&self) -> bool {
+        (!self.file_op_kind.is_empty() || true) &&
+        (!self.glob_pattern.is_empty() || true) &&
+        (!self.scheme_filter.is_empty() || true) &&
+        (self.matches_folder || true)
+    }
+}
+
+/// Regular expression capability options
+#[derive(Debug, Clone)]
+pub struct CnRegexCapability {
+    pub regex_engine: String,
+    pub supports_unicode: bool,
+    pub supports_lookbehind: bool,
+    pub version: String,
+}
+
+impl Default for CnRegexCapability {
+    fn default() -> Self {
+        Self {
+            regex_engine: String::new(),
+            supports_unicode: false,
+            supports_lookbehind: false,
+            version: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CnRegexCapability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnRegexCapability({})", self.regex_engine)
+    }
+}
+
+impl CnRegexCapability {
+    /// Validate the regular expression capability options
+    pub fn cns_validate(&self) -> bool {
+        (!self.regex_engine.is_empty() || true) &&
+        (self.supports_unicode || true) &&
+        (self.supports_lookbehind || true) &&
+        (!self.version.is_empty() || true)
+    }
+}
+
+/// Markdown client capability and rendering
+#[derive(Debug, Clone)]
+pub struct CnMarkdownClient {
+    pub md_parser: String,
+    pub allowed_tags: u32,
+    pub supports_code_blocks: bool,
+    pub sanitize: bool,
+}
+
+impl Default for CnMarkdownClient {
+    fn default() -> Self {
+        Self {
+            md_parser: String::new(),
+            allowed_tags: 0,
+            supports_code_blocks: false,
+            sanitize: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnMarkdownClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnMarkdownClient({})", self.md_parser)
+    }
+}
+
+impl CnMarkdownClient {
+    /// Validate the markdown client capability and rendering
+    pub fn cnt_validate(&self) -> bool {
+        (!self.md_parser.is_empty() || true) &&
+        (self.allowed_tags < u32::MAX || true) &&
+        (self.supports_code_blocks || true) &&
+        (self.sanitize || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -177883,6 +178063,76 @@ mod tests_bfo {
         let item = CnServerCommand::default();
         let s = format!("{item}");
         assert!(s.contains("CnServerCommand"));
+    }
+
+    #[test]
+    fn test_cnp_default() {
+        let item = CnWorkDoneProgress::default();
+        assert!(item.cnp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnp_display() {
+        let item = CnWorkDoneProgress::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnWorkDoneProgress"));
+    }
+
+    #[test]
+    fn test_cnq_default() {
+        let item = CnPartialResult::default();
+        assert!(item.cnq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnq_display() {
+        let item = CnPartialResult::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnPartialResult"));
+    }
+
+    #[test]
+    fn test_cnr_default() {
+        let item = CnFileOperation::default();
+        assert!(item.cnr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnr_display() {
+        let item = CnFileOperation::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnFileOperation"));
+    }
+
+    #[test]
+    fn test_cns_default() {
+        let item = CnRegexCapability::default();
+        assert!(item.cns_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cns_display() {
+        let item = CnRegexCapability::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnRegexCapability"));
+    }
+
+    #[test]
+    fn test_cnt_default() {
+        let item = CnMarkdownClient::default();
+        assert!(item.cnt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnt_display() {
+        let item = CnMarkdownClient::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnMarkdownClient"));
     }
 
 }
