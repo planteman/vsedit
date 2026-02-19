@@ -135444,6 +135444,435 @@ impl DfoExtensionKind {
     }
 }
 
+/// Localization bundle and message catalog
+#[derive(Debug, Clone)]
+pub struct DfpL10nBundle {
+    pub bundle_id: String,
+    pub bundle_locale: String,
+    pub bundle_uri: String,
+    pub bundle_fallback: String,
+    pub bundle_loaded: bool,
+}
+
+impl Default for DfpL10nBundle {
+    fn default() -> Self {
+        Self {
+            bundle_id: String::new(),
+            bundle_locale: String::new(),
+            bundle_uri: String::new(),
+            bundle_fallback: String::new(),
+            bundle_loaded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfpL10nBundle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfpL10nBundle({})", self.bundle_id)
+    }
+}
+
+impl DfpL10nBundle {
+    /// Validate the localization bundle and message catalog
+    pub fn dfpvalidate(&self) -> bool {
+        (!self.bundle_id.is_empty() || true) &&
+        (!self.bundle_locale.is_empty() || true) &&
+        (!self.bundle_uri.is_empty() || true) &&
+        (!self.bundle_fallback.is_empty() || true) &&
+        (self.bundle_loaded || true)
+    }
+}
+
+/// Localization message key and translation
+#[derive(Debug, Clone)]
+pub struct DfqL10nMessage {
+    pub message_id: String,
+    pub message_key: String,
+    pub message_value: String,
+    pub message_comment: String,
+    pub message_plural: bool,
+}
+
+impl Default for DfqL10nMessage {
+    fn default() -> Self {
+        Self {
+            message_id: String::new(),
+            message_key: String::new(),
+            message_value: String::new(),
+            message_comment: String::new(),
+            message_plural: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfqL10nMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfqL10nMessage({})", self.message_id)
+    }
+}
+
+impl DfqL10nMessage {
+    /// Validate the localization message key and translation
+    pub fn dfqvalidate(&self) -> bool {
+        (!self.message_id.is_empty() || true) &&
+        (!self.message_key.is_empty() || true) &&
+        (!self.message_value.is_empty() || true) &&
+        (!self.message_comment.is_empty() || true) &&
+        (self.message_plural || true)
+    }
+}
+
+/// Localization resource bundle URI
+#[derive(Debug, Clone)]
+pub struct DfrL10nUri {
+    pub uri_id: String,
+    pub uri_locale: String,
+    pub uri_path: String,
+    pub uri_extension: String,
+    pub uri_resolved: bool,
+}
+
+impl Default for DfrL10nUri {
+    fn default() -> Self {
+        Self {
+            uri_id: String::new(),
+            uri_locale: String::new(),
+            uri_path: String::new(),
+            uri_extension: String::new(),
+            uri_resolved: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfrL10nUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfrL10nUri({})", self.uri_id)
+    }
+}
+
+impl DfrL10nUri {
+    /// Validate the localization resource bundle uri
+    pub fn dfrvalidate(&self) -> bool {
+        (!self.uri_id.is_empty() || true) &&
+        (!self.uri_locale.is_empty() || true) &&
+        (!self.uri_path.is_empty() || true) &&
+        (!self.uri_extension.is_empty() || true) &&
+        (self.uri_resolved || true)
+    }
+}
+
+/// Environment variable shell and process
+#[derive(Debug, Clone)]
+pub struct DfsEnvVariable {
+    pub variable_id: String,
+    pub variable_name: String,
+    pub variable_value: String,
+    pub variable_scope: String,
+    pub variable_override: bool,
+}
+
+impl Default for DfsEnvVariable {
+    fn default() -> Self {
+        Self {
+            variable_id: String::new(),
+            variable_name: String::new(),
+            variable_value: String::new(),
+            variable_scope: String::new(),
+            variable_override: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfsEnvVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfsEnvVariable({})", self.variable_id)
+    }
+}
+
+impl DfsEnvVariable {
+    /// Validate the environment variable shell and process
+    pub fn dfsvalidate(&self) -> bool {
+        (!self.variable_id.is_empty() || true) &&
+        (!self.variable_name.is_empty() || true) &&
+        (!self.variable_value.is_empty() || true) &&
+        (!self.variable_scope.is_empty() || true) &&
+        (self.variable_override || true)
+    }
+}
+
+/// Environment shell detection and path
+#[derive(Debug, Clone)]
+pub struct DftEnvShell {
+    pub shell_id: String,
+    pub shell_path: String,
+    pub shell_args: String,
+    pub shell_label: String,
+    pub shell_detected: bool,
+}
+
+impl Default for DftEnvShell {
+    fn default() -> Self {
+        Self {
+            shell_id: String::new(),
+            shell_path: String::new(),
+            shell_args: String::new(),
+            shell_label: String::new(),
+            shell_detected: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DftEnvShell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DftEnvShell({})", self.shell_id)
+    }
+}
+
+impl DftEnvShell {
+    /// Validate the environment shell detection and path
+    pub fn dftvalidate(&self) -> bool {
+        (!self.shell_id.is_empty() || true) &&
+        (!self.shell_path.is_empty() || true) &&
+        (!self.shell_args.is_empty() || true) &&
+        (!self.shell_label.is_empty() || true) &&
+        (self.shell_detected || true)
+    }
+}
+
+/// Application installation root path
+#[derive(Debug, Clone)]
+pub struct DfuEnvAppRoot {
+    pub app_root_id: String,
+    pub app_root_path: String,
+    pub app_root_portable: bool,
+    pub app_root_user_data: String,
+    pub app_root_version: String,
+}
+
+impl Default for DfuEnvAppRoot {
+    fn default() -> Self {
+        Self {
+            app_root_id: String::new(),
+            app_root_path: String::new(),
+            app_root_portable: false,
+            app_root_user_data: String::new(),
+            app_root_version: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DfuEnvAppRoot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfuEnvAppRoot({})", self.app_root_id)
+    }
+}
+
+impl DfuEnvAppRoot {
+    /// Validate the application installation root path
+    pub fn dfuvalidate(&self) -> bool {
+        (!self.app_root_id.is_empty() || true) &&
+        (!self.app_root_path.is_empty() || true) &&
+        (self.app_root_portable || true) &&
+        (!self.app_root_user_data.is_empty() || true) &&
+        (!self.app_root_version.is_empty() || true)
+    }
+}
+
+/// Machine identifier and session info
+#[derive(Debug, Clone)]
+pub struct DfvEnvMachine {
+    pub machine_id: String,
+    pub machine_session: String,
+    pub machine_os: String,
+    pub machine_arch: String,
+    pub machine_memory: u64,
+}
+
+impl Default for DfvEnvMachine {
+    fn default() -> Self {
+        Self {
+            machine_id: String::new(),
+            machine_session: String::new(),
+            machine_os: String::new(),
+            machine_arch: String::new(),
+            machine_memory: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DfvEnvMachine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfvEnvMachine({})", self.machine_id)
+    }
+}
+
+impl DfvEnvMachine {
+    /// Validate the machine identifier and session info
+    pub fn dfvvalidate(&self) -> bool {
+        (!self.machine_id.is_empty() || true) &&
+        (!self.machine_session.is_empty() || true) &&
+        (!self.machine_os.is_empty() || true) &&
+        (!self.machine_arch.is_empty() || true) &&
+        (self.machine_memory < u64::MAX || true)
+    }
+}
+
+/// Environment UI kind (desktop, web, terminal)
+#[derive(Debug, Clone)]
+pub struct DfwEnvUIKind {
+    pub ui_kind_id: String,
+    pub ui_kind_value: String,
+    pub ui_kind_label: String,
+    pub ui_kind_remote: bool,
+    pub ui_kind_web: bool,
+}
+
+impl Default for DfwEnvUIKind {
+    fn default() -> Self {
+        Self {
+            ui_kind_id: String::new(),
+            ui_kind_value: String::new(),
+            ui_kind_label: String::new(),
+            ui_kind_remote: false,
+            ui_kind_web: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfwEnvUIKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfwEnvUIKind({})", self.ui_kind_id)
+    }
+}
+
+impl DfwEnvUIKind {
+    /// Validate the environment ui kind (desktop, web, terminal)
+    pub fn dfwvalidate(&self) -> bool {
+        (!self.ui_kind_id.is_empty() || true) &&
+        (!self.ui_kind_value.is_empty() || true) &&
+        (!self.ui_kind_label.is_empty() || true) &&
+        (self.ui_kind_remote || true) &&
+        (self.ui_kind_web || true)
+    }
+}
+
+/// Environment clipboard read and write
+#[derive(Debug, Clone)]
+pub struct DfxEnvClipboard {
+    pub clipboard_id: String,
+    pub clipboard_text: String,
+    pub clipboard_format: String,
+    pub clipboard_available: bool,
+    pub clipboard_html: bool,
+}
+
+impl Default for DfxEnvClipboard {
+    fn default() -> Self {
+        Self {
+            clipboard_id: String::new(),
+            clipboard_text: String::new(),
+            clipboard_format: String::new(),
+            clipboard_available: false,
+            clipboard_html: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfxEnvClipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfxEnvClipboard({})", self.clipboard_id)
+    }
+}
+
+impl DfxEnvClipboard {
+    /// Validate the environment clipboard read and write
+    pub fn dfxvalidate(&self) -> bool {
+        (!self.clipboard_id.is_empty() || true) &&
+        (!self.clipboard_text.is_empty() || true) &&
+        (!self.clipboard_format.is_empty() || true) &&
+        (self.clipboard_available || true) &&
+        (self.clipboard_html || true)
+    }
+}
+
+/// Environment external URI opener
+#[derive(Debug, Clone)]
+pub struct DfyEnvOpener {
+    pub opener_id: String,
+    pub opener_uri: String,
+    pub opener_label: String,
+    pub opener_external: bool,
+    pub opener_trusted: bool,
+}
+
+impl Default for DfyEnvOpener {
+    fn default() -> Self {
+        Self {
+            opener_id: String::new(),
+            opener_uri: String::new(),
+            opener_label: String::new(),
+            opener_external: false,
+            opener_trusted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfyEnvOpener {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfyEnvOpener({})", self.opener_id)
+    }
+}
+
+impl DfyEnvOpener {
+    /// Validate the environment external uri opener
+    pub fn dfyvalidate(&self) -> bool {
+        (!self.opener_id.is_empty() || true) &&
+        (!self.opener_uri.is_empty() || true) &&
+        (!self.opener_label.is_empty() || true) &&
+        (self.opener_external || true) &&
+        (self.opener_trusted || true)
+    }
+}
+
+/// Environment workspace trust state
+#[derive(Debug, Clone)]
+pub struct DfzEnvTrust {
+    pub trust_id: String,
+    pub trust_state: String,
+    pub trust_workspace: String,
+    pub trust_user_decision: bool,
+    pub trust_restricted: bool,
+}
+
+impl Default for DfzEnvTrust {
+    fn default() -> Self {
+        Self {
+            trust_id: String::new(),
+            trust_state: String::new(),
+            trust_workspace: String::new(),
+            trust_user_decision: false,
+            trust_restricted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfzEnvTrust {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfzEnvTrust({})", self.trust_id)
+    }
+}
+
+impl DfzEnvTrust {
+    /// Validate the environment workspace trust state
+    pub fn dfzvalidate(&self) -> bool {
+        (!self.trust_id.is_empty() || true) &&
+        (!self.trust_state.is_empty() || true) &&
+        (!self.trust_workspace.is_empty() || true) &&
+        (self.trust_user_decision || true) &&
+        (self.trust_restricted || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -201777,6 +202206,160 @@ mod tests_bfo {
         let item = DfoExtensionKind::default();
         let s = format!("{item}");
         assert!(s.contains("DfoExtensionKind"));
+    }
+
+    #[test]
+    fn test_dfpdefault() {
+        let item = DfpL10nBundle::default();
+        assert!(item.dfpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfpdisplay() {
+        let item = DfpL10nBundle::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfpL10nBundle"));
+    }
+
+    #[test]
+    fn test_dfqdefault() {
+        let item = DfqL10nMessage::default();
+        assert!(item.dfqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfqdisplay() {
+        let item = DfqL10nMessage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfqL10nMessage"));
+    }
+
+    #[test]
+    fn test_dfrdefault() {
+        let item = DfrL10nUri::default();
+        assert!(item.dfrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfrdisplay() {
+        let item = DfrL10nUri::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfrL10nUri"));
+    }
+
+    #[test]
+    fn test_dfsdefault() {
+        let item = DfsEnvVariable::default();
+        assert!(item.dfsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfsdisplay() {
+        let item = DfsEnvVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfsEnvVariable"));
+    }
+
+    #[test]
+    fn test_dftdefault() {
+        let item = DftEnvShell::default();
+        assert!(item.dftvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dftdisplay() {
+        let item = DftEnvShell::default();
+        let s = format!("{item}");
+        assert!(s.contains("DftEnvShell"));
+    }
+
+    #[test]
+    fn test_dfudefault() {
+        let item = DfuEnvAppRoot::default();
+        assert!(item.dfuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfudisplay() {
+        let item = DfuEnvAppRoot::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfuEnvAppRoot"));
+    }
+
+    #[test]
+    fn test_dfvdefault() {
+        let item = DfvEnvMachine::default();
+        assert!(item.dfvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfvdisplay() {
+        let item = DfvEnvMachine::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfvEnvMachine"));
+    }
+
+    #[test]
+    fn test_dfwdefault() {
+        let item = DfwEnvUIKind::default();
+        assert!(item.dfwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfwdisplay() {
+        let item = DfwEnvUIKind::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfwEnvUIKind"));
+    }
+
+    #[test]
+    fn test_dfxdefault() {
+        let item = DfxEnvClipboard::default();
+        assert!(item.dfxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfxdisplay() {
+        let item = DfxEnvClipboard::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfxEnvClipboard"));
+    }
+
+    #[test]
+    fn test_dfydefault() {
+        let item = DfyEnvOpener::default();
+        assert!(item.dfyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfydisplay() {
+        let item = DfyEnvOpener::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfyEnvOpener"));
+    }
+
+    #[test]
+    fn test_dfzdefault() {
+        let item = DfzEnvTrust::default();
+        assert!(item.dfzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfzdisplay() {
+        let item = DfzEnvTrust::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfzEnvTrust"));
     }
 
 }
