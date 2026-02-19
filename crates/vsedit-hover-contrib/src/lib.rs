@@ -67491,3 +67491,178 @@ mod bde_tests {
         assert_eq!(mc.count(), 1);
     }
 }
+
+
+// --- bdf_: Editor snippet insertion model ---
+
+/// Snippet placeholder kind.
+#[derive(Debug, Clone)]
+pub enum BdfSnippetPart {
+    Text(String),
+    Tabstop(u32),
+    Placeholder { index: u32, default: String },
+    Choice { index: u32, options: Vec<String> },
+    Variable { name: String, default: Option<String> },
+    FinalTabstop,
+}
+
+/// A parsed snippet template.
+#[derive(Debug)]
+pub struct BdfSnippetTemplate {
+    pub name: String,
+    pub prefix: String,
+    pub description: Option<String>,
+    pub parts: Vec<BdfSnippetPart>,
+    pub scope: Option<String>,
+}
+
+impl BdfSnippetTemplate {
+    pub fn new(name: &str, prefix: &str, body: &str) -> Self {
+        let parts = Self::parse_body(body);
+        Self { name: name.to_string(), prefix: prefix.to_string(), description: None, parts, scope: None }
+    }
+
+    pub fn with_description(mut self, d: &str) -> Self { self.description = Some(d.to_string()); self }
+    pub fn with_scope(mut self, s: &str) -> Self { self.scope = Some(s.to_string()); self }
+
+    fn parse_body(body: &str) -> Vec<BdfSnippetPart> {
+        // Simplified parser: just treat the whole body as text
+        vec![BdfSnippetPart::Text(body.to_string())]
+    }
+
+    pub fn tabstop_count(&self) -> usize {
+        self.parts.iter().filter(|p| matches!(p, BdfSnippetPart::Tabstop(_) | BdfSnippetPart::Placeholder { .. } | BdfSnippetPart::Choice { .. })).count()
+    }
+
+    pub fn expand(&self) -> String {
+        self.parts.iter().map(|p| match p {
+            BdfSnippetPart::Text(t) => t.clone(),
+            BdfSnippetPart::Tabstop(_) | BdfSnippetPart::FinalTabstop => String::new(),
+            BdfSnippetPart::Placeholder { default, .. } => default.clone(),
+            BdfSnippetPart::Choice { options, .. } => options.first().cloned().unwrap_or_default(),
+            BdfSnippetPart::Variable { default, .. } => default.clone().unwrap_or_default(),
+        }).collect()
+    }
+}
+
+/// Active snippet session during insertion.
+#[derive(Debug)]
+pub struct BdfSnippetSession {
+    template: BdfSnippetTemplate,
+    current_tabstop: u32,
+    active: bool,
+    values: Vec<(u32, String)>,
+}
+
+impl BdfSnippetSession {
+    pub fn new(template: BdfSnippetTemplate) -> Self {
+        Self { template, current_tabstop: 1, active: true, values: Vec::new() }
+    }
+
+    pub fn is_active(&self) -> bool { self.active }
+    pub fn current_tabstop(&self) -> u32 { self.current_tabstop }
+
+    pub fn next_tabstop(&mut self) -> bool {
+        let max = self.template.tabstop_count() as u32;
+        if self.current_tabstop < max { self.current_tabstop += 1; true }
+        else { self.active = false; false }
+    }
+
+    pub fn prev_tabstop(&mut self) -> bool {
+        if self.current_tabstop > 1 { self.current_tabstop -= 1; true }
+        else { false }
+    }
+
+    pub fn set_value(&mut self, tabstop: u32, value: &str) {
+        if let Some(v) = self.values.iter_mut().find(|(t, _)| *t == tabstop) { v.1 = value.to_string(); }
+        else { self.values.push((tabstop, value.to_string())); }
+    }
+
+    pub fn finish(&mut self) { self.active = false; }
+    pub fn cancel(&mut self) { self.active = false; self.values.clear(); }
+
+    pub fn expanded_text(&self) -> String { self.template.expand() }
+    pub fn template_name(&self) -> &str { &self.template.name }
+}
+
+#[cfg(test)]
+mod bdf_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdf_template() {
+        let t = BdfSnippetTemplate::new("for loop", "for", "for (let i = 0; i < n; i++) {}");
+        assert_eq!(t.name, "for loop");
+        assert_eq!(t.prefix, "for");
+    }
+
+    #[test]
+    fn test_bdf_expand() {
+        let t = BdfSnippetTemplate::new("test", "t", "hello world");
+        assert_eq!(t.expand(), "hello world");
+    }
+
+    #[test]
+    fn test_bdf_description() {
+        let t = BdfSnippetTemplate::new("t", "t", "").with_description("A test snippet");
+        assert_eq!(t.description.as_deref(), Some("A test snippet"));
+    }
+
+    #[test]
+    fn test_bdf_scope() {
+        let t = BdfSnippetTemplate::new("t", "t", "").with_scope("rust");
+        assert_eq!(t.scope.as_deref(), Some("rust"));
+    }
+
+    #[test]
+    fn test_bdf_session() {
+        let t = BdfSnippetTemplate::new("t", "t", "body");
+        let session = BdfSnippetSession::new(t);
+        assert!(session.is_active());
+        assert_eq!(session.current_tabstop(), 1);
+    }
+
+    #[test]
+    fn test_bdf_session_nav() {
+        let mut t = BdfSnippetTemplate::new("t", "t", "body");
+        t.parts = vec![BdfSnippetPart::Tabstop(1), BdfSnippetPart::Tabstop(2), BdfSnippetPart::Text("end".to_string())];
+        let mut s = BdfSnippetSession::new(t);
+        assert!(s.next_tabstop());
+        assert_eq!(s.current_tabstop(), 2);
+        assert!(s.prev_tabstop());
+        assert_eq!(s.current_tabstop(), 1);
+    }
+
+    #[test]
+    fn test_bdf_session_finish() {
+        let t = BdfSnippetTemplate::new("t", "t", "body");
+        let mut s = BdfSnippetSession::new(t);
+        s.finish();
+        assert!(!s.is_active());
+    }
+
+    #[test]
+    fn test_bdf_session_cancel() {
+        let t = BdfSnippetTemplate::new("t", "t", "body");
+        let mut s = BdfSnippetSession::new(t);
+        s.set_value(1, "val");
+        s.cancel();
+        assert!(s.values.is_empty());
+    }
+
+    #[test]
+    fn test_bdf_set_value() {
+        let t = BdfSnippetTemplate::new("t", "t", "body");
+        let mut s = BdfSnippetSession::new(t);
+        s.set_value(1, "hello");
+        s.set_value(1, "world"); // override
+        assert_eq!(s.values.len(), 1);
+    }
+
+    #[test]
+    fn test_bdf_template_name() {
+        let t = BdfSnippetTemplate::new("my-snippet", "ms", "body");
+        let s = BdfSnippetSession::new(t);
+        assert_eq!(s.template_name(), "my-snippet");
+    }
+}
