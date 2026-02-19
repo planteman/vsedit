@@ -84594,6 +84594,214 @@ impl BijMenuRegistry {
     }
 }
 
+
+/// Registered command (bik_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BikCommand {
+    pub id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub precondition: Option<String>,
+}
+
+/// Command registry (bik_)
+#[derive(Debug, Clone)]
+pub struct BikCommandRegistry {
+    pub commands: Vec<BikCommand>,
+}
+
+impl BikCommandRegistry {
+    pub fn new() -> Self { Self { commands: Vec::new() } }
+    pub fn register(&mut self, cmd: BikCommand) {
+        if !self.commands.iter().any(|c| c.id == cmd.id) { self.commands.push(cmd); }
+    }
+    pub fn unregister(&mut self, id: &str) { self.commands.retain(|c| c.id != id); }
+    pub fn get(&self, id: &str) -> Option<&BikCommand> { self.commands.iter().find(|c| c.id == id) }
+    pub fn has(&self, id: &str) -> bool { self.commands.iter().any(|c| c.id == id) }
+    pub fn by_category(&self, cat: &str) -> Vec<&BikCommand> {
+        self.commands.iter().filter(|c| c.category.as_deref() == Some(cat)).collect()
+    }
+    pub fn search(&self, query: &str) -> Vec<&BikCommand> {
+        let q = query.to_lowercase();
+        self.commands.iter().filter(|c| c.title.to_lowercase().contains(&q) || c.id.to_lowercase().contains(&q)).collect()
+    }
+    pub fn command_count(&self) -> usize { self.commands.len() }
+}
+
+
+/// Action item (bil_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BilActionItem {
+    pub id: String,
+    pub label: String,
+    pub icon: Option<String>,
+    pub is_enabled: bool,
+    pub is_checked: bool,
+    pub tooltip: Option<String>,
+}
+
+/// Action bar (bil_)
+#[derive(Debug, Clone)]
+pub struct BilActionBar {
+    pub items: Vec<BilActionItem>,
+    pub orientation: BilOrientation,
+}
+
+/// Action bar orientation (bil_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BilOrientation {
+    Horizontal,
+    Vertical,
+}
+
+impl BilActionBar {
+    pub fn new(orientation: BilOrientation) -> Self {
+        Self { items: Vec::new(), orientation }
+    }
+    pub fn add_action(&mut self, item: BilActionItem) { self.items.push(item); }
+    pub fn remove_action(&mut self, id: &str) { self.items.retain(|i| i.id != id); }
+    pub fn enable(&mut self, id: &str) {
+        if let Some(i) = self.items.iter_mut().find(|i| i.id == id) { i.is_enabled = true; }
+    }
+    pub fn disable(&mut self, id: &str) {
+        if let Some(i) = self.items.iter_mut().find(|i| i.id == id) { i.is_enabled = false; }
+    }
+    pub fn toggle_check(&mut self, id: &str) {
+        if let Some(i) = self.items.iter_mut().find(|i| i.id == id) { i.is_checked = !i.is_checked; }
+    }
+    pub fn enabled_actions(&self) -> Vec<&BilActionItem> { self.items.iter().filter(|i| i.is_enabled).collect() }
+    pub fn action_count(&self) -> usize { self.items.len() }
+}
+
+
+/// Tooltip content element (bim_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BimTooltipElement {
+    Text(String),
+    Markdown(String),
+    CodeBlock { language: String, code: String },
+    CommandLink { command_id: String, label: String },
+}
+
+/// Tooltip model (bim_)
+#[derive(Debug, Clone)]
+pub struct BimTooltip {
+    pub elements: Vec<BimTooltipElement>,
+    pub is_sticky: bool,
+    pub hover_delay_ms: u32,
+    pub max_width: Option<u32>,
+}
+
+impl BimTooltip {
+    pub fn text(s: String) -> Self {
+        Self { elements: vec![BimTooltipElement::Text(s)], is_sticky: false, hover_delay_ms: 300, max_width: None }
+    }
+    pub fn markdown(s: String) -> Self {
+        Self { elements: vec![BimTooltipElement::Markdown(s)], is_sticky: false, hover_delay_ms: 300, max_width: None }
+    }
+    pub fn add_element(&mut self, e: BimTooltipElement) { self.elements.push(e); }
+    pub fn set_sticky(&mut self, sticky: bool) { self.is_sticky = sticky; }
+    pub fn set_delay(&mut self, ms: u32) { self.hover_delay_ms = ms; }
+    pub fn set_max_width(&mut self, w: u32) { self.max_width = Some(w); }
+    pub fn is_empty(&self) -> bool { self.elements.is_empty() }
+    pub fn element_count(&self) -> usize { self.elements.len() }
+    pub fn plain_text(&self) -> String {
+        self.elements.iter().map(|e| match e {
+            BimTooltipElement::Text(t) => t.clone(),
+            BimTooltipElement::Markdown(m) => m.clone(),
+            BimTooltipElement::CodeBlock { code, .. } => code.clone(),
+            BimTooltipElement::CommandLink { label, .. } => label.clone(),
+        }).collect::<Vec<_>>().join("\n")
+    }
+}
+
+
+/// Theme type (bin_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinThemeType {
+    Light,
+    Dark,
+    HighContrastLight,
+    HighContrastDark,
+}
+
+/// Color theme definition (bin_)
+#[derive(Debug, Clone)]
+pub struct BinColorTheme {
+    pub id: String,
+    pub name: String,
+    pub theme_type: BinThemeType,
+    pub colors: std::collections::HashMap<String, String>,
+}
+
+impl BinColorTheme {
+    pub fn new(id: String, name: String, theme_type: BinThemeType) -> Self {
+        Self { id, name, theme_type, colors: std::collections::HashMap::new() }
+    }
+    pub fn set_color(&mut self, key: String, value: String) { self.colors.insert(key, value); }
+    pub fn get_color(&self, key: &str) -> Option<&str> { self.colors.get(key).map(|s| s.as_str()) }
+    pub fn color_count(&self) -> usize { self.colors.len() }
+}
+
+/// Theme registry (bin_)
+#[derive(Debug, Clone)]
+pub struct BinThemeRegistry {
+    pub themes: Vec<BinColorTheme>,
+    pub active_theme_id: Option<String>,
+}
+
+impl BinThemeRegistry {
+    pub fn new() -> Self { Self { themes: Vec::new(), active_theme_id: None } }
+    pub fn register(&mut self, theme: BinColorTheme) { self.themes.push(theme); }
+    pub fn set_active(&mut self, id: String) { self.active_theme_id = Some(id); }
+    pub fn active_theme(&self) -> Option<&BinColorTheme> {
+        self.active_theme_id.as_ref().and_then(|id| self.themes.iter().find(|t| t.id == *id))
+    }
+    pub fn by_type(&self, tt: &BinThemeType) -> Vec<&BinColorTheme> {
+        self.themes.iter().filter(|t| &t.theme_type == tt).collect()
+    }
+    pub fn theme_count(&self) -> usize { self.themes.len() }
+}
+
+
+/// Icon source (bio_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BioIconSource {
+    Path(String),
+    Font { font_id: String, character: char },
+}
+
+/// Icon definition (bio_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BioIconDef {
+    pub id: String,
+    pub source: BioIconSource,
+    pub description: Option<String>,
+}
+
+/// Icon registry (bio_)
+#[derive(Debug, Clone)]
+pub struct BioIconRegistry {
+    pub icons: Vec<BioIconDef>,
+    pub active_theme: Option<String>,
+}
+
+impl BioIconRegistry {
+    pub fn new() -> Self { Self { icons: Vec::new(), active_theme: None } }
+    pub fn register(&mut self, icon: BioIconDef) {
+        if !self.icons.iter().any(|i| i.id == icon.id) { self.icons.push(icon); }
+    }
+    pub fn get(&self, id: &str) -> Option<&BioIconDef> { self.icons.iter().find(|i| i.id == id) }
+    pub fn set_theme(&mut self, theme: String) { self.active_theme = Some(theme); }
+    pub fn font_icons(&self) -> Vec<&BioIconDef> {
+        self.icons.iter().filter(|i| matches!(i.source, BioIconSource::Font { .. })).collect()
+    }
+    pub fn path_icons(&self) -> Vec<&BioIconDef> {
+        self.icons.iter().filter(|i| matches!(i.source, BioIconSource::Path(_))).collect()
+    }
+    pub fn icon_count(&self) -> usize { self.icons.len() }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -90891,6 +91099,315 @@ mod tests_bfo {
     fn test_bij_group() {
         let item = BijMenuItem { kind: BijMenuItemKind::Command { command_id: "paste".into(), title: "Paste".into() }, when: None, group: Some("9_cutcopypaste".into()), order: 3 };
         assert_eq!(item.group.as_deref(), Some("9_cutcopypaste"));
+    }
+
+
+    #[test]
+    fn test_bik_registry_new() {
+        let r = BikCommandRegistry::new();
+        assert_eq!(r.command_count(), 0);
+    }
+    #[test]
+    fn test_bik_register() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "editor.action.copy".into(), title: "Copy".into(), category: Some("Editor".into()), precondition: None });
+        assert_eq!(r.command_count(), 1);
+    }
+    #[test]
+    fn test_bik_no_duplicate() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "cmd".into(), title: "T".into(), category: None, precondition: None });
+        r.register(BikCommand { id: "cmd".into(), title: "T2".into(), category: None, precondition: None });
+        assert_eq!(r.command_count(), 1);
+    }
+    #[test]
+    fn test_bik_unregister() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "cmd".into(), title: "T".into(), category: None, precondition: None });
+        r.unregister("cmd");
+        assert!(!r.has("cmd"));
+    }
+    #[test]
+    fn test_bik_get() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "cmd".into(), title: "Title".into(), category: None, precondition: None });
+        assert_eq!(r.get("cmd").unwrap().title, "Title");
+    }
+    #[test]
+    fn test_bik_by_category() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "a".into(), title: "A".into(), category: Some("Edit".into()), precondition: None });
+        r.register(BikCommand { id: "b".into(), title: "B".into(), category: Some("View".into()), precondition: None });
+        assert_eq!(r.by_category("Edit").len(), 1);
+    }
+    #[test]
+    fn test_bik_search() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "editor.action.formatDocument".into(), title: "Format Document".into(), category: None, precondition: None });
+        r.register(BikCommand { id: "editor.action.copy".into(), title: "Copy".into(), category: None, precondition: None });
+        assert_eq!(r.search("format").len(), 1);
+    }
+    #[test]
+    fn test_bik_precondition() {
+        let cmd = BikCommand { id: "c".into(), title: "T".into(), category: None, precondition: Some("editorFocus".into()) };
+        assert_eq!(cmd.precondition.as_deref(), Some("editorFocus"));
+    }
+    #[test]
+    fn test_bik_has() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "x".into(), title: "X".into(), category: None, precondition: None });
+        assert!(r.has("x"));
+        assert!(!r.has("y"));
+    }
+    #[test]
+    fn test_bik_search_by_id() {
+        let mut r = BikCommandRegistry::new();
+        r.register(BikCommand { id: "workbench.action.quickOpen".into(), title: "Quick Open".into(), category: None, precondition: None });
+        assert_eq!(r.search("quickOpen").len(), 1);
+    }
+
+
+    #[test]
+    fn test_bil_action_bar_new() {
+        let b = BilActionBar::new(BilOrientation::Horizontal);
+        assert_eq!(b.action_count(), 0);
+    }
+    #[test]
+    fn test_bil_add_action() {
+        let mut b = BilActionBar::new(BilOrientation::Horizontal);
+        b.add_action(BilActionItem { id: "save".into(), label: "Save".into(), icon: Some("💾".into()), is_enabled: true, is_checked: false, tooltip: Some("Save file".into()) });
+        assert_eq!(b.action_count(), 1);
+    }
+    #[test]
+    fn test_bil_remove_action() {
+        let mut b = BilActionBar::new(BilOrientation::Horizontal);
+        b.add_action(BilActionItem { id: "a".into(), label: "A".into(), icon: None, is_enabled: true, is_checked: false, tooltip: None });
+        b.remove_action("a");
+        assert_eq!(b.action_count(), 0);
+    }
+    #[test]
+    fn test_bil_enable_disable() {
+        let mut b = BilActionBar::new(BilOrientation::Horizontal);
+        b.add_action(BilActionItem { id: "a".into(), label: "A".into(), icon: None, is_enabled: true, is_checked: false, tooltip: None });
+        b.disable("a");
+        assert!(!b.items[0].is_enabled);
+        b.enable("a");
+        assert!(b.items[0].is_enabled);
+    }
+    #[test]
+    fn test_bil_toggle_check() {
+        let mut b = BilActionBar::new(BilOrientation::Horizontal);
+        b.add_action(BilActionItem { id: "a".into(), label: "A".into(), icon: None, is_enabled: true, is_checked: false, tooltip: None });
+        b.toggle_check("a");
+        assert!(b.items[0].is_checked);
+    }
+    #[test]
+    fn test_bil_enabled_actions() {
+        let mut b = BilActionBar::new(BilOrientation::Horizontal);
+        b.add_action(BilActionItem { id: "a".into(), label: "A".into(), icon: None, is_enabled: true, is_checked: false, tooltip: None });
+        b.add_action(BilActionItem { id: "b".into(), label: "B".into(), icon: None, is_enabled: false, is_checked: false, tooltip: None });
+        assert_eq!(b.enabled_actions().len(), 1);
+    }
+    #[test]
+    fn test_bil_vertical() {
+        let b = BilActionBar::new(BilOrientation::Vertical);
+        assert_eq!(b.orientation, BilOrientation::Vertical);
+    }
+    #[test]
+    fn test_bil_tooltip() {
+        let i = BilActionItem { id: "a".into(), label: "A".into(), icon: None, is_enabled: true, is_checked: false, tooltip: Some("Do A".into()) };
+        assert_eq!(i.tooltip.as_deref(), Some("Do A"));
+    }
+    #[test]
+    fn test_bil_icon() {
+        let i = BilActionItem { id: "a".into(), label: "A".into(), icon: Some("codicon-save".into()), is_enabled: true, is_checked: false, tooltip: None };
+        assert!(i.icon.is_some());
+    }
+    #[test]
+    fn test_bil_checked_item() {
+        let i = BilActionItem { id: "wrap".into(), label: "Word Wrap".into(), icon: None, is_enabled: true, is_checked: true, tooltip: None };
+        assert!(i.is_checked);
+    }
+
+
+    #[test]
+    fn test_bim_text_tooltip() {
+        let t = BimTooltip::text("Hello".into());
+        assert_eq!(t.element_count(), 1);
+        assert!(!t.is_sticky);
+    }
+    #[test]
+    fn test_bim_markdown() {
+        let t = BimTooltip::markdown("**bold**".into());
+        assert_eq!(t.plain_text(), "**bold**");
+    }
+    #[test]
+    fn test_bim_add_element() {
+        let mut t = BimTooltip::text("Info".into());
+        t.add_element(BimTooltipElement::CodeBlock { language: "rust".into(), code: "fn main() {}".into() });
+        assert_eq!(t.element_count(), 2);
+    }
+    #[test]
+    fn test_bim_sticky() {
+        let mut t = BimTooltip::text("T".into());
+        t.set_sticky(true);
+        assert!(t.is_sticky);
+    }
+    #[test]
+    fn test_bim_delay() {
+        let mut t = BimTooltip::text("T".into());
+        t.set_delay(500);
+        assert_eq!(t.hover_delay_ms, 500);
+    }
+    #[test]
+    fn test_bim_max_width() {
+        let mut t = BimTooltip::text("T".into());
+        t.set_max_width(400);
+        assert_eq!(t.max_width, Some(400));
+    }
+    #[test]
+    fn test_bim_empty() {
+        let t = BimTooltip { elements: vec![], is_sticky: false, hover_delay_ms: 300, max_width: None };
+        assert!(t.is_empty());
+    }
+    #[test]
+    fn test_bim_command_link() {
+        let mut t = BimTooltip::text("Hover".into());
+        t.add_element(BimTooltipElement::CommandLink { command_id: "editor.action.goToDeclaration".into(), label: "Go to Definition".into() });
+        assert_eq!(t.element_count(), 2);
+    }
+    #[test]
+    fn test_bim_plain_text() {
+        let mut t = BimTooltip::text("Line 1".into());
+        t.add_element(BimTooltipElement::Text("Line 2".into()));
+        assert!(t.plain_text().contains("Line 1"));
+    }
+    #[test]
+    fn test_bim_default_delay() {
+        let t = BimTooltip::text("T".into());
+        assert_eq!(t.hover_delay_ms, 300);
+    }
+
+
+    #[test]
+    fn test_bin_registry_new() {
+        let r = BinThemeRegistry::new();
+        assert_eq!(r.theme_count(), 0);
+    }
+    #[test]
+    fn test_bin_register_theme() {
+        let mut r = BinThemeRegistry::new();
+        r.register(BinColorTheme::new("dark+".into(), "Dark+".into(), BinThemeType::Dark));
+        assert_eq!(r.theme_count(), 1);
+    }
+    #[test]
+    fn test_bin_set_active() {
+        let mut r = BinThemeRegistry::new();
+        r.register(BinColorTheme::new("dark+".into(), "Dark+".into(), BinThemeType::Dark));
+        r.set_active("dark+".into());
+        assert_eq!(r.active_theme().unwrap().name, "Dark+");
+    }
+    #[test]
+    fn test_bin_theme_colors() {
+        let mut t = BinColorTheme::new("t".into(), "T".into(), BinThemeType::Light);
+        t.set_color("editor.background".into(), "#ffffff".into());
+        assert_eq!(t.get_color("editor.background"), Some("#ffffff"));
+        assert_eq!(t.color_count(), 1);
+    }
+    #[test]
+    fn test_bin_by_type() {
+        let mut r = BinThemeRegistry::new();
+        r.register(BinColorTheme::new("dark".into(), "Dark".into(), BinThemeType::Dark));
+        r.register(BinColorTheme::new("light".into(), "Light".into(), BinThemeType::Light));
+        assert_eq!(r.by_type(&BinThemeType::Dark).len(), 1);
+    }
+    #[test]
+    fn test_bin_high_contrast() {
+        let t = BinColorTheme::new("hc".into(), "HC".into(), BinThemeType::HighContrastDark);
+        assert_eq!(t.theme_type, BinThemeType::HighContrastDark);
+    }
+    #[test]
+    fn test_bin_no_active() {
+        let r = BinThemeRegistry::new();
+        assert!(r.active_theme().is_none());
+    }
+    #[test]
+    fn test_bin_missing_color() {
+        let t = BinColorTheme::new("t".into(), "T".into(), BinThemeType::Dark);
+        assert!(t.get_color("nonexistent").is_none());
+    }
+    #[test]
+    fn test_bin_multiple_colors() {
+        let mut t = BinColorTheme::new("t".into(), "T".into(), BinThemeType::Dark);
+        t.set_color("editor.background".into(), "#1e1e1e".into());
+        t.set_color("editor.foreground".into(), "#d4d4d4".into());
+        assert_eq!(t.color_count(), 2);
+    }
+    #[test]
+    fn test_bin_hc_light() {
+        let t = BinColorTheme::new("hcl".into(), "HC Light".into(), BinThemeType::HighContrastLight);
+        assert_eq!(t.theme_type, BinThemeType::HighContrastLight);
+    }
+
+
+    #[test]
+    fn test_bio_registry_new() {
+        let r = BioIconRegistry::new();
+        assert_eq!(r.icon_count(), 0);
+    }
+    #[test]
+    fn test_bio_register_path_icon() {
+        let mut r = BioIconRegistry::new();
+        r.register(BioIconDef { id: "file-rust".into(), source: BioIconSource::Path("/icons/rust.svg".into()), description: Some("Rust file".into()) });
+        assert_eq!(r.icon_count(), 1);
+    }
+    #[test]
+    fn test_bio_register_font_icon() {
+        let mut r = BioIconRegistry::new();
+        r.register(BioIconDef { id: "close".into(), source: BioIconSource::Font { font_id: "codicon".into(), character: '\u{EB99}' }, description: None });
+        assert_eq!(r.icon_count(), 1);
+    }
+    #[test]
+    fn test_bio_no_duplicate() {
+        let mut r = BioIconRegistry::new();
+        r.register(BioIconDef { id: "x".into(), source: BioIconSource::Path("a".into()), description: None });
+        r.register(BioIconDef { id: "x".into(), source: BioIconSource::Path("b".into()), description: None });
+        assert_eq!(r.icon_count(), 1);
+    }
+    #[test]
+    fn test_bio_get() {
+        let mut r = BioIconRegistry::new();
+        r.register(BioIconDef { id: "save".into(), source: BioIconSource::Font { font_id: "codicon".into(), character: '\u{EB4B}' }, description: None });
+        assert!(r.get("save").is_some());
+    }
+    #[test]
+    fn test_bio_set_theme() {
+        let mut r = BioIconRegistry::new();
+        r.set_theme("seti".into());
+        assert_eq!(r.active_theme.as_deref(), Some("seti"));
+    }
+    #[test]
+    fn test_bio_font_icons() {
+        let mut r = BioIconRegistry::new();
+        r.register(BioIconDef { id: "a".into(), source: BioIconSource::Font { font_id: "f".into(), character: 'a' }, description: None });
+        r.register(BioIconDef { id: "b".into(), source: BioIconSource::Path("p".into()), description: None });
+        assert_eq!(r.font_icons().len(), 1);
+    }
+    #[test]
+    fn test_bio_path_icons() {
+        let mut r = BioIconRegistry::new();
+        r.register(BioIconDef { id: "a".into(), source: BioIconSource::Path("p".into()), description: None });
+        assert_eq!(r.path_icons().len(), 1);
+    }
+    #[test]
+    fn test_bio_description() {
+        let i = BioIconDef { id: "file".into(), source: BioIconSource::Path("/icons/file.svg".into()), description: Some("Default file icon".into()) };
+        assert!(i.description.is_some());
+    }
+    #[test]
+    fn test_bio_get_nonexistent() {
+        let r = BioIconRegistry::new();
+        assert!(r.get("missing").is_none());
     }
 
 }
