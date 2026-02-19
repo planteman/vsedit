@@ -90483,6 +90483,111 @@ impl DataBreakpoint {
     }
 }
 
+/// Runtime wiring: btk_ ExceptionBreakpoint
+#[derive(Debug, Clone)]
+pub struct ExceptionBreakpoint {
+    pub btk_filter_id: String,
+    pub btk_label: String,
+    pub btk_description: String,
+    pub btk_is_enabled: bool,
+    pub btk_condition: String,
+    pub btk_supports_condition: bool,
+    pub btk_condition_description: String,
+    pub btk_is_default: bool,
+    pub btk_adapter_id: String,
+    pub btk_mode: String,
+}
+
+impl ExceptionBreakpoint {
+    pub fn btk_summary(&self) -> String {
+        format!("ExceptionBreakpoint({})", self.btk_filter_id)
+    }
+}
+
+/// Runtime wiring: btl_ InstructionBreakpoint
+#[derive(Debug, Clone)]
+pub struct InstructionBreakpoint {
+    pub btl_instruction_reference: String,
+    pub btl_offset: i32,
+    pub btl_condition: String,
+    pub btl_hit_condition: String,
+    pub btl_is_enabled: bool,
+    pub btl_is_verified: bool,
+    pub btl_address: String,
+    pub btl_instruction_text: String,
+    pub btl_mode: String,
+    pub btl_adapter_id: String,
+}
+
+impl InstructionBreakpoint {
+    pub fn btl_summary(&self) -> String {
+        format!("InstructionBreakpoint({})", self.btl_instruction_reference)
+    }
+}
+
+/// Runtime wiring: btm_ DisassemblyView
+#[derive(Debug, Clone)]
+pub struct DisassemblyView {
+    pub btm_memory_reference: String,
+    pub btm_instruction_offset: i32,
+    pub btm_instruction_count: u32,
+    pub btm_instructions: Vec<String>,
+    pub btm_addresses: Vec<String>,
+    pub btm_is_stepping: bool,
+    pub btm_current_address: String,
+    pub btm_can_step_granularity: bool,
+    pub btm_show_source: bool,
+    pub btm_byte_offset: i32,
+}
+
+impl DisassemblyView {
+    pub fn btm_summary(&self) -> String {
+        format!("DisassemblyView({})", self.btm_memory_reference)
+    }
+}
+
+/// Runtime wiring: btn_ MemoryView
+#[derive(Debug, Clone)]
+pub struct MemoryView {
+    pub btn_memory_reference: String,
+    pub btn_offset: i32,
+    pub btn_count: u32,
+    pub btn_data_base64: String,
+    pub btn_unreadable_bytes: u32,
+    pub btn_can_write: bool,
+    pub btn_address_format: String,
+    pub btn_bytes_per_row: u32,
+    pub btn_show_ascii: bool,
+    pub btn_total_bytes: u64,
+}
+
+impl MemoryView {
+    pub fn btn_summary(&self) -> String {
+        format!("MemoryView({})", self.btn_memory_reference)
+    }
+}
+
+/// Runtime wiring: bto_ RegisterView
+#[derive(Debug, Clone)]
+pub struct RegisterView {
+    pub bto_register_name: String,
+    pub bto_register_value: String,
+    pub bto_register_type: String,
+    pub bto_register_group: String,
+    pub bto_is_modified: bool,
+    pub bto_is_readonly: bool,
+    pub bto_bit_size: u32,
+    pub bto_format: String,
+    pub bto_presentation_hint: String,
+    pub bto_frame_id: u64,
+}
+
+impl RegisterView {
+    pub fn bto_summary(&self) -> String {
+        format!("RegisterView({})", self.bto_register_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -129751,6 +129856,910 @@ mod tests_bfo {
         };
         let _ = obj.btj_summary();
         assert_eq!(obj.btj_byte_size, 0);
+    }
+
+    #[test]
+    fn test_btk_filter_id() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_filter_id, "test");
+    }
+
+    #[test]
+    fn test_btk_label() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_label, "test");
+    }
+
+    #[test]
+    fn test_btk_description() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_description, "test");
+    }
+
+    #[test]
+    fn test_btk_is_enabled() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert!(!obj.btk_is_enabled);
+    }
+
+    #[test]
+    fn test_btk_condition() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_condition, "test");
+    }
+
+    #[test]
+    fn test_btk_supports_condition() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert!(!obj.btk_supports_condition);
+    }
+
+    #[test]
+    fn test_btk_condition_description() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_condition_description, "test");
+    }
+
+    #[test]
+    fn test_btk_is_default() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert!(!obj.btk_is_default);
+    }
+
+    #[test]
+    fn test_btk_adapter_id() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_adapter_id, "test");
+    }
+
+    #[test]
+    fn test_btk_mode() {
+        let obj = ExceptionBreakpoint {
+            btk_filter_id: String::from("test"),
+            btk_label: String::from("test"),
+            btk_description: String::from("test"),
+            btk_is_enabled: false,
+            btk_condition: String::from("test"),
+            btk_supports_condition: false,
+            btk_condition_description: String::from("test"),
+            btk_is_default: false,
+            btk_adapter_id: String::from("test"),
+            btk_mode: String::from("test"),
+        };
+        let _ = obj.btk_summary();
+        assert_eq!(obj.btk_mode, "test");
+    }
+
+
+    #[test]
+    fn test_btl_instruction_reference() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_instruction_reference, "test");
+    }
+
+    #[test]
+    fn test_btl_offset() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_offset, 0);
+    }
+
+    #[test]
+    fn test_btl_condition() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_condition, "test");
+    }
+
+    #[test]
+    fn test_btl_hit_condition() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_hit_condition, "test");
+    }
+
+    #[test]
+    fn test_btl_is_enabled() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert!(!obj.btl_is_enabled);
+    }
+
+    #[test]
+    fn test_btl_is_verified() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert!(!obj.btl_is_verified);
+    }
+
+    #[test]
+    fn test_btl_address() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_address, "test");
+    }
+
+    #[test]
+    fn test_btl_instruction_text() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_instruction_text, "test");
+    }
+
+    #[test]
+    fn test_btl_mode() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_mode, "test");
+    }
+
+    #[test]
+    fn test_btl_adapter_id() {
+        let obj = InstructionBreakpoint {
+            btl_instruction_reference: String::from("test"),
+            btl_offset: 0,
+            btl_condition: String::from("test"),
+            btl_hit_condition: String::from("test"),
+            btl_is_enabled: false,
+            btl_is_verified: false,
+            btl_address: String::from("test"),
+            btl_instruction_text: String::from("test"),
+            btl_mode: String::from("test"),
+            btl_adapter_id: String::from("test"),
+        };
+        let _ = obj.btl_summary();
+        assert_eq!(obj.btl_adapter_id, "test");
+    }
+
+
+    #[test]
+    fn test_btm_memory_reference() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert_eq!(obj.btm_memory_reference, "test");
+    }
+
+    #[test]
+    fn test_btm_instruction_offset() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert_eq!(obj.btm_instruction_offset, 0);
+    }
+
+    #[test]
+    fn test_btm_instruction_count() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert_eq!(obj.btm_instruction_count, 0);
+    }
+
+    #[test]
+    fn test_btm_instructions() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert!(obj.btm_instructions.is_empty());
+    }
+
+    #[test]
+    fn test_btm_addresses() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert!(obj.btm_addresses.is_empty());
+    }
+
+    #[test]
+    fn test_btm_is_stepping() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert!(!obj.btm_is_stepping);
+    }
+
+    #[test]
+    fn test_btm_current_address() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert_eq!(obj.btm_current_address, "test");
+    }
+
+    #[test]
+    fn test_btm_can_step_granularity() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert!(!obj.btm_can_step_granularity);
+    }
+
+    #[test]
+    fn test_btm_show_source() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert!(!obj.btm_show_source);
+    }
+
+    #[test]
+    fn test_btm_byte_offset() {
+        let obj = DisassemblyView {
+            btm_memory_reference: String::from("test"),
+            btm_instruction_offset: 0,
+            btm_instruction_count: 0,
+            btm_instructions: Vec::new(),
+            btm_addresses: Vec::new(),
+            btm_is_stepping: false,
+            btm_current_address: String::from("test"),
+            btm_can_step_granularity: false,
+            btm_show_source: false,
+            btm_byte_offset: 0,
+        };
+        let _ = obj.btm_summary();
+        assert_eq!(obj.btm_byte_offset, 0);
+    }
+
+
+    #[test]
+    fn test_btn_memory_reference() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_memory_reference, "test");
+    }
+
+    #[test]
+    fn test_btn_offset() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_offset, 0);
+    }
+
+    #[test]
+    fn test_btn_count() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_count, 0);
+    }
+
+    #[test]
+    fn test_btn_data_base64() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_data_base64, "test");
+    }
+
+    #[test]
+    fn test_btn_unreadable_bytes() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_unreadable_bytes, 0);
+    }
+
+    #[test]
+    fn test_btn_can_write() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert!(!obj.btn_can_write);
+    }
+
+    #[test]
+    fn test_btn_address_format() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_address_format, "test");
+    }
+
+    #[test]
+    fn test_btn_bytes_per_row() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_bytes_per_row, 0);
+    }
+
+    #[test]
+    fn test_btn_show_ascii() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert!(!obj.btn_show_ascii);
+    }
+
+    #[test]
+    fn test_btn_total_bytes() {
+        let obj = MemoryView {
+            btn_memory_reference: String::from("test"),
+            btn_offset: 0,
+            btn_count: 0,
+            btn_data_base64: String::from("test"),
+            btn_unreadable_bytes: 0,
+            btn_can_write: false,
+            btn_address_format: String::from("test"),
+            btn_bytes_per_row: 0,
+            btn_show_ascii: false,
+            btn_total_bytes: 0,
+        };
+        let _ = obj.btn_summary();
+        assert_eq!(obj.btn_total_bytes, 0);
+    }
+
+
+    #[test]
+    fn test_bto_register_name() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_register_name, "test");
+    }
+
+    #[test]
+    fn test_bto_register_value() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_register_value, "test");
+    }
+
+    #[test]
+    fn test_bto_register_type() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_register_type, "test");
+    }
+
+    #[test]
+    fn test_bto_register_group() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_register_group, "test");
+    }
+
+    #[test]
+    fn test_bto_is_modified() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert!(!obj.bto_is_modified);
+    }
+
+    #[test]
+    fn test_bto_is_readonly() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert!(!obj.bto_is_readonly);
+    }
+
+    #[test]
+    fn test_bto_bit_size() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_bit_size, 0);
+    }
+
+    #[test]
+    fn test_bto_format() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_format, "test");
+    }
+
+    #[test]
+    fn test_bto_presentation_hint() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_presentation_hint, "test");
+    }
+
+    #[test]
+    fn test_bto_frame_id() {
+        let obj = RegisterView {
+            bto_register_name: String::from("test"),
+            bto_register_value: String::from("test"),
+            bto_register_type: String::from("test"),
+            bto_register_group: String::from("test"),
+            bto_is_modified: false,
+            bto_is_readonly: false,
+            bto_bit_size: 0,
+            bto_format: String::from("test"),
+            bto_presentation_hint: String::from("test"),
+            bto_frame_id: 0,
+        };
+        let _ = obj.bto_summary();
+        assert_eq!(obj.bto_frame_id, 0);
     }
 
 }
