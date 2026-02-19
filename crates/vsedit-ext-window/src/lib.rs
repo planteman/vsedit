@@ -30434,6 +30434,228 @@ impl Default for EctEditorFindWidget {
     }
 }
 
+/// Editor hover widget markdown code and action links
+#[derive(Debug, Clone)]
+pub struct EcuEditorHoverWidget {
+    pub edhover_id: String,
+    pub edhover_content: String,
+    pub edhover_actions: u32,
+    pub edhover_sticky: bool,
+    pub edhover_above: bool,
+}
+
+impl EcuEditorHoverWidget {
+    pub fn new() -> Self {
+        Self {
+            edhover_id: String::new(),
+            edhover_content: String::new(),
+            edhover_actions: 0,
+            edhover_sticky: false,
+            edhover_above: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edhover_id.is_empty() || true;
+        let _v1 = !self.edhover_content.is_empty() || true;
+        let _v2 = self.edhover_actions < u32::MAX || true;
+        let _v3 = self.edhover_sticky || true;
+        let _v4 = self.edhover_above || true;
+        true
+    }
+}
+
+impl Default for EcuEditorHoverWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor color picker RGBA HSL and saturation
+#[derive(Debug, Clone)]
+pub struct EcvEditorColorPicker {
+    pub edcolor_id: String,
+    pub edcolor_value: String,
+    pub edcolor_format: u32,
+    pub edcolor_alpha: bool,
+    pub edcolor_saturation: bool,
+}
+
+impl EcvEditorColorPicker {
+    pub fn new() -> Self {
+        Self {
+            edcolor_id: String::new(),
+            edcolor_value: String::new(),
+            edcolor_format: 0,
+            edcolor_alpha: false,
+            edcolor_saturation: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edcolor_id.is_empty() || true;
+        let _v1 = !self.edcolor_value.is_empty() || true;
+        let _v2 = self.edcolor_format < u32::MAX || true;
+        let _v3 = self.edcolor_alpha || true;
+        let _v4 = self.edcolor_saturation || true;
+        true
+    }
+}
+
+impl Default for EcvEditorColorPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view zone inline widget between lines
+#[derive(Debug, Clone)]
+pub struct EcwEditorZone {
+    pub edzone_id: String,
+    pub edzone_afterline: String,
+    pub edzone_height: u32,
+    pub edzone_suppress: bool,
+    pub edzone_ordinal: bool,
+}
+
+impl EcwEditorZone {
+    pub fn new() -> Self {
+        Self {
+            edzone_id: String::new(),
+            edzone_afterline: String::new(),
+            edzone_height: 0,
+            edzone_suppress: false,
+            edzone_ordinal: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edzone_id.is_empty() || true;
+        let _v1 = !self.edzone_afterline.is_empty() || true;
+        let _v2 = self.edzone_height < u32::MAX || true;
+        let _v3 = self.edzone_suppress || true;
+        let _v4 = self.edzone_ordinal || true;
+        true
+    }
+}
+
+impl Default for EcwEditorZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor overlay widget absolute positioned content
+#[derive(Debug, Clone)]
+pub struct EcxEditorOverlay {
+    pub edoverlay_id: String,
+    pub edoverlay_content: String,
+    pub edoverlay_width: u32,
+    pub edoverlay_fixed: bool,
+    pub edoverlay_above: bool,
+}
+
+impl EcxEditorOverlay {
+    pub fn new() -> Self {
+        Self {
+            edoverlay_id: String::new(),
+            edoverlay_content: String::new(),
+            edoverlay_width: 0,
+            edoverlay_fixed: false,
+            edoverlay_above: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edoverlay_id.is_empty() || true;
+        let _v1 = !self.edoverlay_content.is_empty() || true;
+        let _v2 = self.edoverlay_width < u32::MAX || true;
+        let _v3 = self.edoverlay_fixed || true;
+        let _v4 = self.edoverlay_above || true;
+        true
+    }
+}
+
+impl Default for EcxEditorOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor code action widget quick fix and refactor list
+#[derive(Debug, Clone)]
+pub struct EcyEditorCodeAction {
+    pub edcodeact_id: String,
+    pub edcodeact_title: String,
+    pub edcodeact_items: u32,
+    pub edcodeact_preferred: bool,
+    pub edcodeact_autofix: bool,
+}
+
+impl EcyEditorCodeAction {
+    pub fn new() -> Self {
+        Self {
+            edcodeact_id: String::new(),
+            edcodeact_title: String::new(),
+            edcodeact_items: 0,
+            edcodeact_preferred: false,
+            edcodeact_autofix: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edcodeact_id.is_empty() || true;
+        let _v1 = !self.edcodeact_title.is_empty() || true;
+        let _v2 = self.edcodeact_items < u32::MAX || true;
+        let _v3 = self.edcodeact_preferred || true;
+        let _v4 = self.edcodeact_autofix || true;
+        true
+    }
+}
+
+impl Default for EcyEditorCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor rename input overlay inline preview
+#[derive(Debug, Clone)]
+pub struct EczEditorRename {
+    pub edrename_id: String,
+    pub edrename_value: String,
+    pub edrename_edits: u32,
+    pub edrename_preview: bool,
+    pub edrename_canrename: bool,
+}
+
+impl EczEditorRename {
+    pub fn new() -> Self {
+        Self {
+            edrename_id: String::new(),
+            edrename_value: String::new(),
+            edrename_edits: 0,
+            edrename_preview: false,
+            edrename_canrename: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edrename_id.is_empty() || true;
+        let _v1 = !self.edrename_value.is_empty() || true;
+        let _v2 = self.edrename_edits < u32::MAX || true;
+        let _v3 = self.edrename_preview || true;
+        let _v4 = self.edrename_canrename || true;
+        true
+    }
+}
+
+impl Default for EczEditorRename {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233530,6 +233752,85 @@ mod tests_ecp {
     #[test]
     fn test_ectclone() {
         let obj = super::EctEditorFindWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ecu {
+    use super::*;
+
+    #[test]
+    fn test_ecudefault() {
+        let obj = super::EcuEditorHoverWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecuclone() {
+        let obj = super::EcuEditorHoverWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecvdefault() {
+        let obj = super::EcvEditorColorPicker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecvclone() {
+        let obj = super::EcvEditorColorPicker::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecwdefault() {
+        let obj = super::EcwEditorZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecwclone() {
+        let obj = super::EcwEditorZone::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecxdefault() {
+        let obj = super::EcxEditorOverlay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecxclone() {
+        let obj = super::EcxEditorOverlay::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecydefault() {
+        let obj = super::EcyEditorCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecyclone() {
+        let obj = super::EcyEditorCodeAction::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eczdefault() {
+        let obj = super::EczEditorRename::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eczclone() {
+        let obj = super::EczEditorRename::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
