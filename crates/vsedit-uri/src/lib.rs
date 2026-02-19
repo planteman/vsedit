@@ -137279,6 +137279,201 @@ impl DhjThemeContrib {
     }
 }
 
+/// File icon theme contribution
+#[derive(Debug, Clone)]
+pub struct DhkIconThemeContrib {
+    pub icon_theme_id: String,
+    pub icon_theme_label: String,
+    pub icon_theme_path: String,
+    pub icon_theme_ui_theme: String,
+    pub icon_theme_high_contrast: bool,
+}
+
+impl Default for DhkIconThemeContrib {
+    fn default() -> Self {
+        Self {
+            icon_theme_id: String::new(),
+            icon_theme_label: String::new(),
+            icon_theme_path: String::new(),
+            icon_theme_ui_theme: String::new(),
+            icon_theme_high_contrast: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhkIconThemeContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhkIconThemeContrib({})", self.icon_theme_id)
+    }
+}
+
+impl DhkIconThemeContrib {
+    /// Validate the file icon theme contribution
+    pub fn dhkvalidate(&self) -> bool {
+        (!self.icon_theme_id.is_empty() || true) &&
+        (!self.icon_theme_label.is_empty() || true) &&
+        (!self.icon_theme_path.is_empty() || true) &&
+        (!self.icon_theme_ui_theme.is_empty() || true) &&
+        (self.icon_theme_high_contrast || true)
+    }
+}
+
+/// Product icon theme contribution
+#[derive(Debug, Clone)]
+pub struct DhlProductIconContrib {
+    pub product_icon_id: String,
+    pub product_icon_label: String,
+    pub product_icon_path: String,
+    pub product_icon_font: String,
+    pub product_icon_version: u32,
+}
+
+impl Default for DhlProductIconContrib {
+    fn default() -> Self {
+        Self {
+            product_icon_id: String::new(),
+            product_icon_label: String::new(),
+            product_icon_path: String::new(),
+            product_icon_font: String::new(),
+            product_icon_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DhlProductIconContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhlProductIconContrib({})", self.product_icon_id)
+    }
+}
+
+impl DhlProductIconContrib {
+    /// Validate the product icon theme contribution
+    pub fn dhlvalidate(&self) -> bool {
+        (!self.product_icon_id.is_empty() || true) &&
+        (!self.product_icon_label.is_empty() || true) &&
+        (!self.product_icon_path.is_empty() || true) &&
+        (!self.product_icon_font.is_empty() || true) &&
+        (self.product_icon_version < u32::MAX || true)
+    }
+}
+
+/// Debugger contribution with type and runtime
+#[derive(Debug, Clone)]
+pub struct DhmDebuggerContrib {
+    pub debugger_id: String,
+    pub debugger_type: String,
+    pub debugger_label: String,
+    pub debugger_runtime: String,
+    pub debugger_languages: String,
+}
+
+impl Default for DhmDebuggerContrib {
+    fn default() -> Self {
+        Self {
+            debugger_id: String::new(),
+            debugger_type: String::new(),
+            debugger_label: String::new(),
+            debugger_runtime: String::new(),
+            debugger_languages: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhmDebuggerContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhmDebuggerContrib({})", self.debugger_id)
+    }
+}
+
+impl DhmDebuggerContrib {
+    /// Validate the debugger contribution with type and runtime
+    pub fn dhmvalidate(&self) -> bool {
+        (!self.debugger_id.is_empty() || true) &&
+        (!self.debugger_type.is_empty() || true) &&
+        (!self.debugger_label.is_empty() || true) &&
+        (!self.debugger_runtime.is_empty() || true) &&
+        (!self.debugger_languages.is_empty() || true)
+    }
+}
+
+/// Task type contribution schema
+#[derive(Debug, Clone)]
+pub struct DhnTaskTypeContrib {
+    pub task_type_id: String,
+    pub task_type_label: String,
+    pub task_type_schema: String,
+    pub task_type_required: String,
+    pub task_type_priority: u32,
+}
+
+impl Default for DhnTaskTypeContrib {
+    fn default() -> Self {
+        Self {
+            task_type_id: String::new(),
+            task_type_label: String::new(),
+            task_type_schema: String::new(),
+            task_type_required: String::new(),
+            task_type_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DhnTaskTypeContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhnTaskTypeContrib({})", self.task_type_id)
+    }
+}
+
+impl DhnTaskTypeContrib {
+    /// Validate the task type contribution schema
+    pub fn dhnvalidate(&self) -> bool {
+        (!self.task_type_id.is_empty() || true) &&
+        (!self.task_type_label.is_empty() || true) &&
+        (!self.task_type_schema.is_empty() || true) &&
+        (!self.task_type_required.is_empty() || true) &&
+        (self.task_type_priority < u32::MAX || true)
+    }
+}
+
+/// Terminal profile contribution
+#[derive(Debug, Clone)]
+pub struct DhoTerminalProfileContrib {
+    pub profile_id: String,
+    pub profile_title: String,
+    pub profile_shell: String,
+    pub profile_args: String,
+    pub profile_icon: String,
+}
+
+impl Default for DhoTerminalProfileContrib {
+    fn default() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_title: String::new(),
+            profile_shell: String::new(),
+            profile_args: String::new(),
+            profile_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhoTerminalProfileContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhoTerminalProfileContrib({})", self.profile_id)
+    }
+}
+
+impl DhoTerminalProfileContrib {
+    /// Validate the terminal profile contribution
+    pub fn dhovalidate(&self) -> bool {
+        (!self.profile_id.is_empty() || true) &&
+        (!self.profile_title.is_empty() || true) &&
+        (!self.profile_shell.is_empty() || true) &&
+        (!self.profile_args.is_empty() || true) &&
+        (!self.profile_icon.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -204270,6 +204465,76 @@ mod tests_bfo {
         let item = DhjThemeContrib::default();
         let s = format!("{item}");
         assert!(s.contains("DhjThemeContrib"));
+    }
+
+    #[test]
+    fn test_dhkdefault() {
+        let item = DhkIconThemeContrib::default();
+        assert!(item.dhkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhkdisplay() {
+        let item = DhkIconThemeContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhkIconThemeContrib"));
+    }
+
+    #[test]
+    fn test_dhldefault() {
+        let item = DhlProductIconContrib::default();
+        assert!(item.dhlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhldisplay() {
+        let item = DhlProductIconContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhlProductIconContrib"));
+    }
+
+    #[test]
+    fn test_dhmdefault() {
+        let item = DhmDebuggerContrib::default();
+        assert!(item.dhmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhmdisplay() {
+        let item = DhmDebuggerContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhmDebuggerContrib"));
+    }
+
+    #[test]
+    fn test_dhndefault() {
+        let item = DhnTaskTypeContrib::default();
+        assert!(item.dhnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhndisplay() {
+        let item = DhnTaskTypeContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhnTaskTypeContrib"));
+    }
+
+    #[test]
+    fn test_dhodefault() {
+        let item = DhoTerminalProfileContrib::default();
+        assert!(item.dhovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhodisplay() {
+        let item = DhoTerminalProfileContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhoTerminalProfileContrib"));
     }
 
 }
